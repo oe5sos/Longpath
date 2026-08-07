@@ -256,6 +256,7 @@ warren@wpratt.com
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "widgets/VfoWidget.h"
+#include "widgets/RotorDialWidget.h"
 #include "widgets/RxDashboard.h"
 #include "widgets/AntennaSwitchToast.h"
 #include "widgets/StatusToast.h"
@@ -6213,6 +6214,19 @@ void MainWindow::buildMenuBar()
         connect(spotHubAction, &QAction::triggered, this, &MainWindow::openSpotHub);
     }
 
+    // Rotor dial — step 1 of the logbook/rotator work. A modeless
+    // window rather than a dock or a splitter pane: the surrounding
+    // layout stays untouched while the instrument itself is reviewed.
+    {
+        QAction* rotorAction = toolsMenu->addAction(QStringLiteral("&Rotor..."));
+        rotorAction->setObjectName(QStringLiteral("actRotorDial"));
+        // User-visible tooltip — plain English, no source cites.
+        rotorAction->setToolTip(QStringLiteral(
+            "Open the antenna rotator dial."));
+        connect(rotorAction, &QAction::triggered,
+                this, &MainWindow::openRotorDial);
+    }
+
     // Phase 3J-2 H1: FreeDV Reporter live station map.
     // Modeless singleton dialog; lazy-constructed in openFreeDVReporter()
     // with FreeDVStationModel + FreeDVReporterClient from RadioModel.
@@ -8945,6 +8959,84 @@ void MainWindow::openPureSignalDialog()
 //
 // Mirrors the modeless-singleton pattern at AetherSDR
 // src/gui/MainWindow.cpp openDxClusterDialog() [@0cd4559].
+// ── Antenna rotator dial ────────────────────────────────────────────
+//
+// Step 1: the instrument only. No rotator protocol behind it yet — the
+// target is set by clicking in the rose, and "Rotate" walks a simulated
+// heading towards it so the four states can be seen and judged before
+// any hardware is wired up. The operator's own locator (JN67VV) and a
+// network/serial connection follow in the next steps.
+void MainWindow::openRotorDial()
+{
+    if (!m_rotorWindow) {
+        m_rotorWindow = new QWidget(this, Qt::Window);
+        m_rotorWindow->setWindowTitle(QStringLiteral("Rotor"));
+        m_rotorWindow->setAttribute(Qt::WA_StyledBackground, true);
+        m_rotorWindow->setStyleSheet(
+            QStringLiteral("background: %1;").arg(Style::kAppBg));
+        m_rotorWindow->resize(260, 330);
+
+        auto* col = new QVBoxLayout(m_rotorWindow);
+        col->setContentsMargins(10, 10, 10, 10);
+        col->setSpacing(8);
+
+        m_rotorDial = new RotorDialWidget(m_rotorWindow);
+        col->addWidget(m_rotorDial, 1);
+
+        auto* row = new QHBoxLayout;
+        row->setSpacing(6);
+
+        auto* rotateBtn = new QPushButton(QStringLiteral("Rotate"), m_rotorWindow);
+        rotateBtn->setStyleSheet(Style::buttonBaseStyle());
+        row->addWidget(rotateBtn);
+
+        auto* stopBtn = new QPushButton(QStringLiteral("Stop"), m_rotorWindow);
+        stopBtn->setStyleSheet(Style::buttonBaseStyle());
+        row->addWidget(stopBtn);
+
+        auto* longPathBtn = new QPushButton(QStringLiteral("Long path"),
+                                            m_rotorWindow);
+        longPathBtn->setStyleSheet(Style::buttonBaseStyle());
+        row->addWidget(longPathBtn);
+        col->addLayout(row);
+
+        // Simulated movement, one degree per tick, so the Turning and
+        // OnTarget states are reachable without hardware.
+        auto* timer = new QTimer(m_rotorWindow);
+        timer->setInterval(40);
+
+        connect(rotateBtn, &QPushButton::clicked, this, [this, timer]() {
+            if (!m_rotorDial || !m_rotorDial->hasTarget()) { return; }
+            m_rotorDial->setState(RotorDialWidget::State::Turning);
+            timer->start();
+        });
+        connect(stopBtn, &QPushButton::clicked, this, [this, timer]() {
+            timer->stop();
+            if (m_rotorDial) {
+                m_rotorDial->setState(RotorDialWidget::State::Targeted);
+            }
+        });
+        connect(longPathBtn, &QPushButton::clicked, this, [this]() {
+            if (!m_rotorDial || !m_rotorDial->hasTarget()) { return; }
+            m_rotorDial->setTargetBearing(m_rotorDial->targetBearing() + 180.0);
+        });
+        connect(timer, &QTimer::timeout, this, [this, timer]() {
+            if (!m_rotorDial) { timer->stop(); return; }
+            const double togo = m_rotorDial->travelDegrees();
+            if (qAbs(togo) < 1.0) {
+                timer->stop();
+                m_rotorDial->setState(RotorDialWidget::State::OnTarget);
+                return;
+            }
+            m_rotorDial->setActualBearing(
+                m_rotorDial->actualBearing() + (togo > 0 ? 1.0 : -1.0));
+        });
+    }
+    m_rotorWindow->show();
+    m_rotorWindow->raise();
+    m_rotorWindow->activateWindow();
+}
+
 void MainWindow::openSpotHub()
 {
     if (!m_radioModel) { return; }

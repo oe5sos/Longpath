@@ -127,6 +127,7 @@ class OverflowChip;
 class PsaIndicatorWidget;
 class AppletVisibilityController;
 class AppletWidget;
+class RotorDialWidget;
 
 // Phase 23: TCI server + applets forward declarations (all inside NereusSDR
 // namespace — TciServer only exists when HAVE_WEBSOCKETS is defined but we
@@ -543,6 +544,9 @@ private slots:
 private:
     void buildUI();
     void buildMenuBar();
+    // Antenna rotator dial (Tools > Rotor...). Modeless singleton,
+    // lazy-constructed so it costs nothing until opened.
+    void openRotorDial();
     void buildStatusBar();
     void applyDarkTheme();
     void tryAutoReconnect();
@@ -1109,6 +1113,10 @@ private:
     // Applet visibility controller (NereusSDR-original) — backs the
     // Containers > Applets top menu and the panel banner ☰ menu.
     // Constructed in the layout-build path after the panel is wired.
+    // Rotator dial window (Tools > Rotor...). Lazy; owned by `this`.
+    QWidget*         m_rotorWindow{nullptr};
+    RotorDialWidget* m_rotorDial{nullptr};
+
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;
     QHash<QString, QAction*> m_topMenuAppletActions;

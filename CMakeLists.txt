@@ -905,6 +905,7 @@ set(GUI_SOURCES
     src/gui/applets/NyiOverlay.cpp
     src/gui/applets/AppletPanelWidget.cpp
     src/gui/applets/AppletVisibilityController.cpp
+    src/gui/widgets/RotorDialWidget.cpp
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp
