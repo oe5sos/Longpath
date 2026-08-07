@@ -915,6 +915,7 @@ set(GUI_SOURCES
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
     src/core/AdifLog.cpp
+    src/core/WorkedBefore.cpp
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp

@@ -20,6 +20,7 @@
 // =================================================================
 
 #include "core/CallsignInfo.h"
+#include "core/WorkedBefore.h"
 #include "models/LogEntry.h"
 
 #include <QVector>
@@ -100,6 +101,12 @@ private:
     void updateFlagFor(const QString& call);
     // Station line, with the current flag in front of it.
     void setStationLine(const QString& text);
+    // "New DXCC" / "worked 3x, last 2024-05-02" for the callsign being
+    // typed, on the current band and mode.
+    void updateWorkedLine(const QString& call);
+    // Current band and mode as the log would record them, so what the
+    // worked-before line answers is the same question logging asks.
+    void currentBandMode(QString& band, QString& mode) const;
     // Point the globe at home and, if known, at the worked station.
     void updateGlobeFromLocators();
     // Sunrise, sunset and grey line at the far end. Refreshed on a
@@ -138,6 +145,11 @@ private:
     QLabel*    m_status{nullptr};
     QLabel*    m_stationLine{nullptr};
     QLabel*    m_solarLine{nullptr};
+    QLabel*    m_workedLine{nullptr};
+
+    // Rebuilt whenever the log file changes, so the answer beside a
+    // callsign is never older than the last contact written.
+    WorkedBefore m_worked;
     QTableWidget* m_recent{nullptr};
     QPushButton*  m_lookupBtn{nullptr};
 

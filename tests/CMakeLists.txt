@@ -4615,6 +4615,14 @@ nereus_add_test(tst_waterfall_color)
 nereus_add_test(tst_rotctld_client)
 target_link_libraries(tst_rotctld_client PRIVATE Qt6::Network)
 
+# -- Worked-before award logic: DXCC mode groups, new band vs new mode,
+#    and an unresolved prefix that must not be reported as a new one --
+nereus_add_test(tst_worked_before)
+
+# -- Worked-before award logic: DXCC mode groups, new band vs new mode,
+#    and an unresolved prefix that must not be reported as a new one --
+nereus_add_test(tst_worked_before)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

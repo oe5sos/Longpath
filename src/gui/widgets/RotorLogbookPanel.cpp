@@ -43,6 +43,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -257,6 +258,13 @@ void RotorLogbookPanel::buildUi()
     m_solarLine = new QLabel(QString{}, this);
     m_solarLine->setWordWrap(true);
     cardCol->addWidget(m_solarLine);
+
+    // Have I had this one before, and does it count. The question gets
+    // asked in the two seconds before deciding to call, so it belongs
+    // beside the callsign and not in a window.
+    m_workedLine = new QLabel(QString{}, this);
+    m_workedLine->setWordWrap(true);
+    cardCol->addWidget(m_workedLine);
     cardCol->addStretch(1);
 
     cardRow->addLayout(cardCol, 1);
@@ -898,10 +906,13 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
         QSignalBlocker block(m_callEdit);
         m_callEdit->setText(call);
     }
+    updateWorkedLine(call);
+
     if (call.isEmpty()) {
         m_flagEmoji.clear();
         m_stationLine->clear();
         m_solarLine->clear();
+        m_workedLine->clear();
         m_photo->clear();
         m_photo->setVisible(false);
         m_hasDxPos = false;
@@ -950,6 +961,81 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
 }
 
 // ── Station card ────────────────────────────────────────────────────
+
+void RotorLogbookPanel::currentBandMode(QString& band, QString& mode) const
+{
+    band.clear();
+    mode.clear();
+    SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr;
+    if (!s) { return; }
+
+    band = bandLabel(bandFromFrequency(s->frequency()));
+
+    // Same collapsing as buildEntry: ADIF has no LSB/USB mode, and the
+    // worked-before answer has to be about the mode the contact will be
+    // logged as, not the one the radio calls it.
+    const QString m = SliceModel::modeName(s->dspMode());
+    if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
+        mode = QStringLiteral("SSB");
+    } else if (m == QLatin1String("CWL") || m == QLatin1String("CWU")) {
+        mode = QStringLiteral("CW");
+    } else {
+        mode = m;
+    }
+}
+
+void RotorLogbookPanel::updateWorkedLine(const QString& call)
+{
+    if (call.trimmed().isEmpty()) {
+        m_workedLine->clear();
+        return;
+    }
+
+    WorkedBefore::PrefixResolver resolver;
+    if (m_radio) {
+        if (DxccColorProvider* dxcc = m_radio->dxccColorProvider()) {
+            resolver = [dxcc](const QString& c) {
+                return dxcc->ctyDat().resolvePrimaryPrefix(c);
+            };
+        }
+    }
+
+    QString band, mode;
+    currentBandMode(band, mode);
+    const WorkedSummary s = m_worked.lookup(call, band, mode, resolver);
+
+    QStringList bits;
+    QString colour = QString::fromLatin1(Style::kTextSecondary);
+
+    if (s.knownEntity && s.newEntity) {
+        bits << QStringLiteral("NEW DXCC");
+        colour = QString::fromLatin1(Style::kGreenText);
+    } else if (s.knownEntity && (s.newBand || s.newMode)) {
+        QStringList what;
+        if (s.newBand) { what << QStringLiteral("band"); }
+        if (s.newMode) { what << QStringLiteral("mode"); }
+        bits << QStringLiteral("new %1 for %2")
+                    .arg(what.join(QStringLiteral(" and ")), s.entity);
+        colour = QString::fromLatin1(Style::kAmberText);
+    }
+
+    if (s.timesWorked > 0) {
+        QString had = s.timesWorked == 1
+            ? QStringLiteral("worked once")
+            : QStringLiteral("worked %1×").arg(s.timesWorked);
+        if (s.lastWorked.isValid()) {
+            had += QStringLiteral(", last %1")
+                       .arg(s.lastWorked.toString(QStringLiteral("yyyy-MM-dd")));
+        }
+        bits << had;
+    } else if (bits.isEmpty()) {
+        bits << QStringLiteral("not in your log");
+    }
+
+    m_workedLine->setText(bits.join(QStringLiteral(" · ")));
+    m_workedLine->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 10px; }").arg(colour));
+}
 
 void RotorLogbookPanel::updateFlagFor(const QString& call)
 {
@@ -1128,6 +1214,26 @@ void RotorLogbookPanel::onLogQso()
         return;
     }
 
+    // Ask, do not refuse. Working the same station twice on one band
+    // and mode inside a couple of minutes is unusual but legitimate —
+    // a botched exchange repeated, a contest dupe logged deliberately.
+    // The same rule the importer uses, so one idea of "the same QSO"
+    // rather than two that disagree.
+    if (m_worked.wouldDuplicate(e)) {
+        if (QMessageBox::question(this, QStringLiteral("Duplicate"),
+                QStringLiteral("You already have %1 on %2 at about this "
+                               "time.\n\nLog it again?")
+                    .arg(e.call,
+                         e.band.isEmpty() ? QStringLiteral("this band")
+                                          : e.band),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+            != QMessageBox::Yes) {
+            setStatus(QStringLiteral("Not logged — %1 is already in the log")
+                          .arg(e.call), true);
+            return;
+        }
+    }
+
     QString err;
     if (!appendToLogFile(e, &err)) {
         setStatus(QStringLiteral("Couldn't write the log: %1").arg(err), true);
@@ -1169,6 +1275,22 @@ void RotorLogbookPanel::refreshRecentList()
     // Shares AdifLog with the logbook window, so the dock and the window
     // can never disagree about what a record says.
     QVector<LogEntry> all = AdifLog::read(logbookPath());
+
+    // Rebuild the worked-before index from the same read. Doing it here
+    // rather than on a timer means the answer beside a callsign is
+    // never older than the last contact written — including one
+    // written by the logbook window or pulled in by an import.
+    {
+        WorkedBefore::PrefixResolver resolver;
+        if (m_radio) {
+            if (DxccColorProvider* dxcc = m_radio->dxccColorProvider()) {
+                resolver = [dxcc](const QString& c) {
+                    return dxcc->ctyDat().resolvePrimaryPrefix(c);
+                };
+            }
+        }
+        m_worked.rebuild(all, resolver);
+    }
 
     // Sort rather than trusting file order. The file is written oldest
     // first, but an imported log need not be, and relying on position
