@@ -210,6 +210,22 @@ void QrzClient::testLogin(const QString& username, const QString& password)
     auto* reply = getUrl(q.toString(QUrl::FullyEncoded));
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         reply->deleteLater();
+
+        // Diagnosis logging. Without this a failing login is a dead end
+        // for anyone who cannot reproduce it: the dialog can only show
+        // a sentence, and the sentence is derived from a body we never
+        // see. Warning level so it appears without setting a rule.
+        // The request carried the password; the RESPONSE does not, so
+        // logging the body is safe.
+        const QByteArray body = reply->readAll();
+        const QVariant status =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        qCWarning(lcQrz).noquote()
+            << "QRZ login test — transport:" << reply->errorString()
+            << "| HTTP:" << (status.isValid() ? status.toString()
+                                              : QStringLiteral("none"))
+            << "| body:" << QString::fromUtf8(body.left(400));
+
         if (reply->error() != QNetworkReply::NoError) {
             emit loginTestFinished(false, reply->errorString());
             return;
