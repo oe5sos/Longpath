@@ -160,6 +160,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <utility>
 
@@ -212,17 +213,32 @@ static const WfGradientStop kDefaultStops[] = {
 };
 
 // Enhanced scheme — from Thetis display.cs:6864-6954 (9-band progression)
+// 2026-08-07: reworked alongside ClarityBlue, and for the same two
+// reasons — but worse here. The top 22% of this ramp was red-magenta
+// into purple, so a strong signal did not merely get a pink cap, it got
+// a pink and purple band a fifth of the range deep. Ten stops on exact
+// ninths also banded badly: 28 of 255 steps were more than twice the
+// mean perceptual step.
+//
+// Now spaced by equal CIELAB distance and ending at red: worst step
+// 1.3x the mean, no step above twice it.
 static const WfGradientStop kEnhancedStops[] = {
-    {0.000f,   0,   0,   0},   // black
-    {0.111f,   0,   0, 255},   // blue
-    {0.222f,   0, 255, 255},   // cyan
-    {0.333f,   0, 255,   0},   // green
-    {0.444f, 128, 255,   0},   // yellow-green
-    {0.556f, 255, 255,   0},   // yellow
-    {0.667f, 255, 128,   0},   // orange
-    {0.778f, 255,   0,   0},   // red
-    {0.889f, 255,   0, 128},   // red-magenta
-    {1.000f, 192,   0, 255},   // purple
+    {0.000f,  0x00, 0x00, 0x00},  // black
+    {0.107f,  0x05, 0x06, 0x4c},  // deep navy
+    {0.199f,  0x08, 0x12, 0xa4},  // blue
+    {0.236f,  0x0d, 0x38, 0xdc},  // bright blue
+    {0.306f,  0x10, 0x6e, 0xef},  // azure
+    {0.398f,  0x14, 0xa2, 0xed},  // cyan
+    {0.487f,  0x18, 0xc6, 0xd2},  // cyan-teal
+    {0.565f,  0x22, 0xd6, 0xa2},  // teal
+    {0.635f,  0x3c, 0xde, 0x6a},  // green
+    {0.684f,  0x74, 0xe3, 0x3e},  // yellow-green
+    {0.731f,  0xb2, 0xe6, 0x26},  // lime
+    {0.783f,  0xe2, 0xdc, 0x1a},  // yellow
+    {0.846f,  0xf7, 0xb6, 0x14},  // amber
+    {0.905f,  0xfc, 0x8a, 0x18},  // orange
+    {0.960f,  0xff, 0x5c, 0x22},  // red-orange
+    {1.000f,  0xff, 0x2a, 0x2a},  // red — peak
 };
 
 // Spectran scheme — from Thetis display.cs:6956-7036
@@ -289,47 +305,73 @@ static const WfGradientStop kCustomFallbackStops[] = {
 // distinguishable. Compare to Default/Enhanced which start at dark blue
 // and spread the bright colours across the full range (producing a noisy
 // noise floor). Visual target: 2026-04-14/2026-04-15 AetherSDR reference.
+// 2026-08-07: reworked. Two problems, both visible on the bench.
+//
+// The last stop was magenta, one step past red. That is a hue reversal
+// — the ramp runs blue → cyan → green → yellow → orange → red, all of
+// it forwards through the spectrum, and then turns back on itself. It
+// reads as a pink cap sitting on top of every strong signal rather than
+// as "even hotter", and it was the colour the whole waterfall showed
+// while the threshold arithmetic was broken. The ramp now ends at red.
+//
+// The stops were also placed on round numbers rather than on equal
+// perceptual steps, so the ramp banded: measured in CIELAB, the worst
+// single step was 4.6x the mean and eleven steps were more than twice
+// it — visible as hard edges between colour zones. The visible part of
+// the ramp is now spaced by equal CIELAB distance, which brings the
+// worst step to 1.4x the mean and no step above twice it.
+//
+// The deep floor is deliberate and kept: black to very dark blue over
+// the bottom 18% of the range, so the noise floor stays dark instead of
+// being spread across the palette. Equalising that region too would
+// have compressed the dark share from 36% to 13% and thrown away what
+// makes this scheme worth having.
 static const WfGradientStop kClarityBlueStops[] = {
-    {0.00f,  0x00, 0x00, 0x00},  // pure black — noise floor bottom
-    {0.18f,  0x02, 0x08, 0x20},  // very dark blue — noise floor top
-    {0.32f,  0x08, 0x20, 0x58},  // dark blue — weak signal edge
-    {0.46f,  0x10, 0x50, 0xb0},  // medium blue — weak signals
-    {0.58f,  0x10, 0xa0, 0xe0},  // cyan — medium signals
-    {0.70f,  0x10, 0xd0, 0x60},  // green — strong signals
-    {0.80f,  0xf0, 0xe0, 0x10},  // yellow — very strong
-    {0.90f,  0xff, 0x80, 0x00},  // orange — extreme
-    {0.96f,  0xff, 0x20, 0x20},  // red — peak
-    {1.00f,  0xff, 0x40, 0xc0},  // magenta — absolute peak
+    {0.000f,  0x00, 0x00, 0x00},  // pure black — noise floor bottom
+    {0.180f,  0x02, 0x07, 0x1c},  // very dark blue — noise floor top
+    {0.226f,  0x05, 0x15, 0x40},  // dark blue — weak signal edge
+    {0.264f,  0x08, 0x28, 0x6c},  // deep blue
+    {0.298f,  0x0c, 0x3f, 0x99},  // blue
+    {0.325f,  0x11, 0x59, 0xbe},  // bright blue
+    {0.355f,  0x14, 0x76, 0xd6},  // blue-cyan
+    {0.397f,  0x16, 0x93, 0xdf},  // cyan — medium signals
+    {0.453f,  0x18, 0xac, 0xd4},  // cyan-teal
+    {0.523f,  0x1d, 0xbe, 0xb2},  // teal
+    {0.588f,  0x2c, 0xca, 0x8a},  // teal-green
+    {0.644f,  0x50, 0xd2, 0x60},  // green — strong signals
+    {0.694f,  0x8a, 0xda, 0x3c},  // yellow-green
+    {0.746f,  0xc4, 0xdd, 0x24},  // yellow — very strong
+    {0.795f,  0xee, 0xd4, 0x18},  // amber
+    {0.855f,  0xf8, 0xac, 0x14},  // orange — extreme
+    {0.911f,  0xfb, 0x82, 0x18},  // deep orange
+    {0.962f,  0xfd, 0x58, 0x22},  // red-orange
+    {1.000f,  0xff, 0x2a, 0x2a},  // red — peak
 };
+
+// Counts come from the arrays, not from a number typed beside them.
+// They used to be hand-maintained, which is a stop-count one edit away
+// from disagreeing with its palette — and a count that is too small
+// silently truncates the top of the ramp while a count that is too
+// large reads past the end of the array.
+template <std::size_t N>
+const WfGradientStop* pick(const WfGradientStop (&arr)[N], int& count)
+{
+    count = static_cast<int>(N);
+    return arr;
+}
 
 const WfGradientStop* wfSchemeStops(WfColorScheme scheme, int& count)
 {
     switch (scheme) {
-    case WfColorScheme::Enhanced:
-        count = 10;
-        return kEnhancedStops;
-    case WfColorScheme::Spectran:
-        count = 8;
-        return kSpectranStops;
-    case WfColorScheme::BlackWhite:
-        count = 2;
-        return kBlackWhiteStops;
-    case WfColorScheme::LinLog:
-        count = 7;
-        return kLinLogStops;
-    case WfColorScheme::LinRad:
-        count = 7;
-        return kLinRadStops;
-    case WfColorScheme::Custom:
-        count = 7;
-        return kCustomFallbackStops;
-    case WfColorScheme::ClarityBlue:
-        count = 10;
-        return kClarityBlueStops;
+    case WfColorScheme::Enhanced:    return pick(kEnhancedStops, count);
+    case WfColorScheme::Spectran:    return pick(kSpectranStops, count);
+    case WfColorScheme::BlackWhite:  return pick(kBlackWhiteStops, count);
+    case WfColorScheme::LinLog:      return pick(kLinLogStops, count);
+    case WfColorScheme::LinRad:      return pick(kLinRadStops, count);
+    case WfColorScheme::Custom:      return pick(kCustomFallbackStops, count);
+    case WfColorScheme::ClarityBlue: return pick(kClarityBlueStops, count);
     case WfColorScheme::Default:
-    default:
-        count = 7;
-        return kDefaultStops;
+    default:                         return pick(kDefaultStops, count);
     }
 }
 

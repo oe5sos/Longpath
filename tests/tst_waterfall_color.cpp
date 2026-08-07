@@ -85,6 +85,8 @@ private slots:
     void a_collapsed_window_does_not_saturate();
     void not_a_number_is_dark_not_bright();
     void slider_offsets_match_the_shipped_defaults();
+    void no_palette_ends_in_pink_or_purple();
+    void the_ramp_has_no_hard_edges();
 };
 
 void TstWaterfallColor::a_flat_spectrum_is_not_one_solid_colour()
@@ -193,6 +195,110 @@ void TstWaterfallColor::slider_offsets_match_the_shipped_defaults()
     // The inequality that caused it: the slider took more off the top
     // than the AGC's 12 dB margin put there.
     QVERIFY(SpectrumWidget::wfColorGainOffsetDb(45) > 12.0f);
+}
+
+namespace {
+
+// The palette as 256 samples, read through the real mapping with a
+// plain 0..1 window so position maps straight to palette position.
+QVector<QRgb> rampOf(WfColorScheme scheme)
+{
+    QVector<QRgb> out;
+    out.reserve(256);
+    for (int i = 0; i < 256; ++i) {
+        const float t = static_cast<float>(i) / 255.0f;
+        // low=0, high=1 with both sliders neutralised: black level 125
+        // adds nothing, colour gain 0 takes nothing.
+        out.append(SpectrumWidget::waterfallColor(t, 0.0f, 1.0f, 125, 0,
+                                                  scheme));
+    }
+    return out;
+}
+
+// CIELAB, so "how different do these look" is measured rather than
+// guessed. Two colours can differ hugely in RGB and barely at all to
+// the eye, and vice versa.
+struct Lab { double l, a, b; };
+
+Lab toLab(QRgb c)
+{
+    auto lin = [](int v) {
+        const double u = v / 255.0;
+        return u <= 0.04045 ? u / 12.92 : std::pow((u + 0.055) / 1.055, 2.4);
+    };
+    const double r = lin(qRed(c)), g = lin(qGreen(c)), b = lin(qBlue(c));
+    const double x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+    const double y = (r * 0.2126 + g * 0.7152 + b * 0.0722);
+    const double z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    auto f = [](double t) {
+        return t > 0.008856 ? std::cbrt(t) : 7.787 * t + 16.0 / 116.0;
+    };
+    const double fx = f(x), fy = f(y), fz = f(z);
+    return {116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)};
+}
+
+double deltaE(QRgb a, QRgb b)
+{
+    const Lab p = toLab(a), q = toLab(b);
+    return std::sqrt((p.l - q.l) * (p.l - q.l) + (p.a - q.a) * (p.a - q.a)
+                     + (p.b - q.b) * (p.b - q.b));
+}
+
+const WfColorScheme kSchemes[] = {
+    WfColorScheme::Default, WfColorScheme::Enhanced,
+    WfColorScheme::ClarityBlue, WfColorScheme::LinLog,
+    WfColorScheme::LinRad, WfColorScheme::Custom,
+};
+
+} // namespace
+
+void TstWaterfallColor::no_palette_ends_in_pink_or_purple()
+{
+    // ClarityBlue ended magenta and Enhanced ended purple, both one step
+    // past red — a hue reversal after a ramp that runs forwards through
+    // the spectrum the whole way. It reads as a pink cap on every strong
+    // signal rather than as 'hotter still'.
+    for (WfColorScheme s : kSchemes) {
+        for (QRgb c : rampOf(s)) {
+            const bool pink = qRed(c) > 150 && qBlue(c) > 120
+                              && qGreen(c) < qBlue(c) * 0.7;
+            QVERIFY2(!pink,
+                     qPrintable(QStringLiteral("scheme %1 contains #%2%3%4")
+                                    .arg(static_cast<int>(s))
+                                    .arg(qRed(c), 2, 16, QLatin1Char('0'))
+                                    .arg(qGreen(c), 2, 16, QLatin1Char('0'))
+                                    .arg(qBlue(c), 2, 16, QLatin1Char('0'))));
+        }
+    }
+}
+
+void TstWaterfallColor::the_ramp_has_no_hard_edges()
+{
+    // Stops placed on round numbers rather than on equal perceptual
+    // steps make the ramp band: one step several times larger than its
+    // neighbours shows as an edge between colour zones. Measured in
+    // CIELAB, no single step should be more than four times the mean.
+    //
+    // The bound is generous on purpose. It is a guard against a stop
+    // being dropped, mistyped or moved a long way, not a demand that
+    // every palette be perceptually uniform — Spectran and BlackWhite
+    // are deliberately coarse and are not in the list.
+    for (WfColorScheme s : {WfColorScheme::ClarityBlue,
+                            WfColorScheme::Enhanced}) {
+        const QVector<QRgb> r = rampOf(s);
+        double total = 0.0, worst = 0.0;
+        for (int i = 1; i < r.size(); ++i) {
+            const double d = deltaE(r.at(i), r.at(i - 1));
+            total += d;
+            worst = std::max(worst, d);
+        }
+        const double mean = total / (r.size() - 1);
+        QVERIFY2(worst <= 4.0 * mean,
+                 qPrintable(QStringLiteral("scheme %1: worst step %2, "
+                                           "mean %3")
+                                .arg(static_cast<int>(s))
+                                .arg(worst).arg(mean)));
+    }
 }
 
 QTEST_MAIN(TstWaterfallColor)

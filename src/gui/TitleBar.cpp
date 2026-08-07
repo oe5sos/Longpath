@@ -56,6 +56,8 @@
 
 #include "TitleBar.h"
 
+#include "core/BuildIdentity.h"
+
 #include "StyleConstants.h"
 #include "widgets/MasterOutputWidget.h"
 
@@ -418,6 +420,25 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
                            .arg(QLatin1String(Style::kAccent)));
     appName->setAlignment(Qt::AlignCenter);
     m_hbox->addWidget(appName);
+
+    // Build identity, beside the name.
+    //
+    // It is already in the window title, but the window title is not
+    // visible full screen — and this session lost time twice to the
+    // question "is that the build we just made or the installed copy".
+    // A branch@sha you can read at a glance settles it, and on a
+    // release build the tag is empty so nothing shows.
+    const QString tag = BuildIdentity::buildTag();
+    if (!tag.isEmpty()) {
+        auto* build = new QLabel(tag, this);
+        build->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 10px; }")
+            .arg(QLatin1String(Style::kTextScale)));
+        build->setToolTip(QStringLiteral(
+            "Branch and commit this binary was built from"));
+        m_hbox->addSpacing(6);
+        m_hbox->addWidget(build);
+    }
 
     // ── Right stretch ──────────────────────────────────────────────────────
     m_hbox->addStretch(1);
