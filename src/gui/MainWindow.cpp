@@ -256,12 +256,11 @@ warren@wpratt.com
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "widgets/VfoWidget.h"
-#include "widgets/RotorDialWidget.h"
+#include "widgets/RotorLogbookPanel.h"
 #include "core/Maidenhead.h"
 #include "core/CredentialStore.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
-#include "models/LogEntry.h"
 #include "widgets/RxDashboard.h"
 #include "widgets/AntennaSwitchToast.h"
 #include "widgets/StatusToast.h"
@@ -397,6 +396,7 @@ warren@wpratt.com
 #include <QMessageBox>
 #include <QDialog>
 #include <QDir>
+#include <QDockWidget>
 #include <QFormLayout>
 #include <QLineEdit>
 #include <QStandardPaths>
@@ -8970,54 +8970,6 @@ void MainWindow::openPureSignalDialog()
 //
 // Mirrors the modeless-singleton pattern at AetherSDR
 // src/gui/MainWindow.cpp openDxClusterDialog() [@0cd4559].
-// ── Logbook ─────────────────────────────────────────────────────────
-//
-// One ADIF file, appended to. Not a database: ADIF is what every logger
-// imports, so the operator is never locked in, and an append-only text
-// file cannot lose earlier contacts to a bad write.
-QString MainWindow::logbookPath()
-{
-    const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/logbook.adi");
-}
-
-bool MainWindow::appendQsoToLog(const LogEntry& entry, QString* error)
-{
-    const QString path = logbookPath();
-    const bool isNew = !QFile::exists(path);
-
-    QFile f(path);
-    if (!f.open(QIODevice::Append | QIODevice::Text)) {
-        if (error) { *error = f.errorString(); }
-        return false;
-    }
-    QTextStream out(&f);
-    if (isNew) {
-        // ADIF requires a header terminated by <EOH> before any record;
-        // a file that starts straight in on <CALL:...> is rejected by
-        // strict importers.
-        out << "NereusSDR logbook\n"
-            << "<ADIF_VER:5>3.1.4 <PROGRAMID:9>NereusSDR <EOH>\n";
-    }
-    out << entry.toAdifRecord() << "\n";
-    out.flush();
-    f.close();
-    return true;
-}
-
-void MainWindow::ensureQrzUploader()
-{
-    if (m_qrzUploader) { return; }
-    m_qrzUploader = new QrzLogbookUploader(this);
-    // The logbook API key is a different credential from the XML
-    // login, so it gets its own keychain entry.
-    m_qrzUploader->setApiKey(
-        CredentialStore::retrieve(QStringLiteral("qrz.logbookkey"),
-                                  QStringLiteral("logbook")));
-}
-
 // ── QRZ account ─────────────────────────────────────────────────────
 
 void MainWindow::ensureQrzClient()
@@ -9037,9 +8989,21 @@ void MainWindow::ensureQrzClient()
     }
 }
 
+void MainWindow::ensureQrzUploader()
+{
+    if (m_qrzUploader) { return; }
+    m_qrzUploader = new QrzLogbookUploader(this);
+    // The logbook API key is a different credential from the XML
+    // login, so it gets its own keychain entry.
+    m_qrzUploader->setApiKey(
+        CredentialStore::retrieve(QStringLiteral("qrz.logbookkey"),
+                                  QStringLiteral("logbook")));
+}
+
 void MainWindow::openQrzCredentialsDialog()
 {
     ensureQrzClient();
+    ensureQrzUploader();
 
     QDialog dlg(this);
     dlg.setWindowTitle(QStringLiteral("QRZ account"));
@@ -9053,10 +9017,9 @@ void MainWindow::openQrzCredentialsDialog()
     auto* userEdit = new QLineEdit(
         AppSettings::instance().value(QStringLiteral("QrzUsername"),
                                       QString{}).toString(), &dlg);
-    // NOT a realistic callsign. A grey "OE5SOS" in an empty required
-    // field reads as already filled in — that exact placeholder cost
-    // an afternoon of chasing a QRZ login that was never being sent
-    // because the username was blank.
+    // NOT a realistic callsign: a grey example in an empty required
+    // field reads as already filled in, which cost an afternoon of
+    // chasing a login that was never being sent.
     userEdit->setPlaceholderText(QStringLiteral("your QRZ callsign"));
     form->addRow(QStringLiteral("Callsign"), userEdit);
 
@@ -9068,11 +9031,9 @@ void MainWindow::openQrzCredentialsDialog()
     form->addRow(QStringLiteral("Password"), passEdit);
 
     // Separate credential, separate service: uploads go to
-    // logbook.qrz.com with an API key from the logbook's settings page,
-    // not with the username and password above. Labelled so the two are
-    // not confused — mixing them up is the usual cause of an
-    // unexplained "invalid".
-    ensureQrzUploader();
+    // logbook.qrz.com with an API key from the logbook settings page,
+    // not the password above. Confusing the two is the usual cause of
+    // an unexplained rejection.
     auto* keyEdit = new QLineEdit(&dlg);
     keyEdit->setEchoMode(QLineEdit::Password);
     keyEdit->setPlaceholderText(QStringLiteral("for uploading QSOs"));
@@ -9088,9 +9049,20 @@ void MainWindow::openQrzCredentialsDialog()
                                .arg(Style::kTextSecondary));
     col->addWidget(keyNote);
 
-    // Empty required fields get an amber border, not only a sentence
-    // under the form. Same reason as the locator field: a status line
-    // is easy to read past when the placeholder looks like a value.
+    auto* note = new QLabel(CredentialStore::backendDescription(), &dlg);
+    note->setWordWrap(true);
+    note->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                            .arg(Style::kTextSecondary));
+    col->addWidget(note);
+
+    auto* status = new QLabel(QString{}, &dlg);
+    status->setWordWrap(true);
+    status->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                              .arg(Style::kTextSecondary));
+    col->addWidget(status);
+
+    // Empty required fields get an amber border, not only a sentence:
+    // a status line is easy to read past when the field looks filled.
     const QString kNeedsInput = QString::fromLatin1(Style::kLineEditStyle)
         + QStringLiteral("QLineEdit { border: 1px solid %1; }")
               .arg(Style::kAmberBorder);
@@ -9105,21 +9077,6 @@ void MainWindow::openQrzCredentialsDialog()
         });
     }
 
-    // Say where the password goes. On a platform without a keychain it
-    // is session-only, and the operator needs to know that rather than
-    // wondering why it is gone tomorrow.
-    auto* note = new QLabel(CredentialStore::backendDescription(), &dlg);
-    note->setWordWrap(true);
-    note->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
-                            .arg(Style::kTextSecondary));
-    col->addWidget(note);
-
-    auto* status = new QLabel(QString{}, &dlg);
-    status->setWordWrap(true);
-    status->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
-                              .arg(Style::kTextSecondary));
-    col->addWidget(status);
-
     auto* row = new QHBoxLayout;
     auto* testBtn = new QPushButton(QStringLiteral("Test"), &dlg);
     row->addWidget(testBtn);
@@ -9132,8 +9089,7 @@ void MainWindow::openQrzCredentialsDialog()
     col->addLayout(row);
 
     // A dialog that says nothing back is indistinguishable from a
-    // broken one. Every path below ends in a sentence: refusal to send,
-    // a reply, or a timeout.
+    // broken one. Every path ends in a sentence.
     auto* timeout = new QTimer(&dlg);
     timeout->setSingleShot(true);
     timeout->setInterval(20000);
@@ -9157,8 +9113,6 @@ void MainWindow::openQrzCredentialsDialog()
             [status, timeout](bool ok, const QString& message) {
         timeout->stop();
         if (ok) {
-            // A key without a subscription still logs in but returns
-            // little; say so rather than letting lookups look broken.
             status->setText(message.isEmpty()
                 ? QStringLiteral("Login accepted")
                 : QStringLiteral("Login accepted — %1").arg(message));
@@ -9167,8 +9121,6 @@ void MainWindow::openQrzCredentialsDialog()
         QString hint;
         if (message.contains(QLatin1String("incorrect"), Qt::CaseInsensitive)
             || message.contains(QLatin1String("password"), Qt::CaseInsensitive)) {
-            // The commonest cause by far: QRZ wants the callsign, and
-            // people type the address they log in to the website with.
             hint = QStringLiteral(
                 " — QRZ wants your callsign as the username, not your email");
         }
@@ -9191,430 +9143,28 @@ void MainWindow::openQrzCredentialsDialog()
     dlg.exec();
 }
 
-// ── Antenna rotator dial ────────────────────────────────────────────
+// ── Rotor + logbook dock ────────────────────────────────────────────
 //
-// Step 2: the instrument plus real bearings. The operator's own square
-// and the target square are entered here and persisted; distance and
-// bearing come from the shared Maidenhead helpers rather than a click
-// in the rose (which still works as a manual override). No rotator
-// protocol yet — "Rotate" walks a simulated heading so the four states
-// remain reachable without hardware.
+// A dock rather than a free window: QDockWidget already gives the area
+// show / hide / float / re-dock and a checkable menu action that tracks
+// its real visibility, so the panel behaves like the rest of the app
+// instead of being a stray window the operator has to keep track of.
 void MainWindow::openRotorDial()
 {
-    if (!m_rotorWindow) {
-        m_rotorWindow = new QWidget(this, Qt::Window);
-        m_rotorWindow->setWindowTitle(QStringLiteral("Rotor"));
-        m_rotorWindow->setAttribute(Qt::WA_StyledBackground, true);
-        m_rotorWindow->setStyleSheet(
-            QStringLiteral("background: %1;").arg(Style::kAppBg));
-        m_rotorWindow->resize(280, 420);
-
-        auto* col = new QVBoxLayout(m_rotorWindow);
-        col->setContentsMargins(10, 10, 10, 10);
-        col->setSpacing(8);
-
-        // ── Callsign ─────────────────────────────────────────────────
-        // Typing shows the direction immediately, from the cty.dat DXCC
-        // entity centre — no network, no Enter. Country-level accuracy,
-        // which is all that is needed to know which way to turn. Enter
-        // is reserved for actually driving the rotator, so a half-typed
-        // callsign can never start the antenna moving.
-        auto* callEdit = new QLineEdit(m_rotorWindow);
-        // User-visible placeholder — a real example, not an "e.g." prefix.
-        callEdit->setPlaceholderText(QStringLiteral("G0ABC"));
-        QFont callFont = callEdit->font();
-        callFont.setPixelSize(16);
-        callFont.setBold(true);
-        callEdit->setFont(callFont);
-        callEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
-        m_rotorWindow->setFocusProxy(callEdit);
-        col->addWidget(callEdit);
-
-        auto* callStatus = new QLabel(QString{}, m_rotorWindow);
-        callStatus->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
-        col->addWidget(callStatus);
-
-        // ── Locators ─────────────────────────────────────────────────
-        auto& settings = AppSettings::instance();
-        const QString myGridKey = QStringLiteral("StationGridSquare");
-
-        auto* gridRow = new QHBoxLayout;
-        gridRow->setSpacing(6);
-
-        auto* myLabel = new QLabel(QStringLiteral("MY"), m_rotorWindow);
-        myLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 9px; }").arg(Style::kTextScale));
-        gridRow->addWidget(myLabel);
-
-        auto* myGridEdit = new QLineEdit(
-            settings.value(myGridKey, QString{}).toString(), m_rotorWindow);
-        // Deliberately NOT a realistic locator: a grey "JN67VV" in an
-        // empty field reads as already filled in, and the operator then
-        // wonders why every bearing is zero. Say what goes here instead.
-        myGridEdit->setPlaceholderText(QStringLiteral("your locator"));
-        myGridEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
-        gridRow->addWidget(myGridEdit, 1);
-
-        auto* dxLabel = new QLabel(QStringLiteral("DX"), m_rotorWindow);
-        dxLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 9px; }").arg(Style::kTextScale));
-        gridRow->addWidget(dxLabel);
-
-        auto* dxGridEdit = new QLineEdit(m_rotorWindow);
-        dxGridEdit->setPlaceholderText(QStringLiteral("their locator"));
-        dxGridEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
-        gridRow->addWidget(dxGridEdit, 1);
-        col->addLayout(gridRow);
-
-        auto* gridStatus = new QLabel(QString{}, m_rotorWindow);
-        gridStatus->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
-        col->addWidget(gridStatus);
-
-        m_rotorDial = new RotorDialWidget(m_rotorWindow);
-        col->addWidget(m_rotorDial, 1);
-
-        // Recompute on every edit of either field. Cheap, and it means
-        // the dial answers while the operator is still typing the
-        // fourth character rather than waiting for a button.
-        // A field the operator MUST fill gets an accent border until it
-        // is valid. A status line alone is easy to read past — the
-        // empty own-locator was mistaken for a filled one exactly once,
-        // and once is enough.
-        const QString kNeedsInput = QString::fromLatin1(Style::kLineEditStyle)
-            + QStringLiteral("QLineEdit { border: 1px solid %1; }")
-                  .arg(Style::kAmberBorder);
-
-        auto applyGrids = [this, myGridEdit, dxGridEdit, gridStatus,
-                           myGridKey, kNeedsInput]() {
-            const QString mine = myGridEdit->text().trimmed().toUpper();
-            const QString dx   = dxGridEdit->text().trimmed().toUpper();
-
-            AppSettings::instance().setValue(myGridKey, mine);
-
-            const bool myOk = isValidGridSquare(mine);
-            myGridEdit->setStyleSheet(
-                myOk ? QString::fromLatin1(Style::kLineEditStyle) : kNeedsInput);
-
-            if (!myOk) {
-                gridStatus->setText(mine.isEmpty()
-                    ? QStringLiteral("Enter your own locator to get bearings")
-                    : QStringLiteral("%1 is not a valid locator").arg(mine));
-                return;
-            }
-            if (!isValidGridSquare(dx)) {
-                gridStatus->setText(dx.isEmpty()
-                    ? QStringLiteral("Enter the station's locator")
-                    : QStringLiteral("%1 is not a valid locator").arg(dx));
-                return;
-            }
-
-            const double km  = calculateDistanceKm(mine, dx);
-            const double deg = calculateBearingInDegrees(mine, dx);
-            m_rotorDial->setTargetBearing(deg);
-            gridStatus->setText(QStringLiteral("%1 → %2 · %3 km")
-                                    .arg(mine, dx)
-                                    .arg(km, 0, 'f', 0));
-        };
-        connect(myGridEdit, &QLineEdit::textChanged, this, applyGrids);
-        connect(dxGridEdit, &QLineEdit::textChanged, this, applyGrids);
-        applyGrids();
-
-        // Callsign → DXCC entity centre → bearing, on every keystroke.
-        connect(callEdit, &QLineEdit::textChanged, this,
-                [this, callEdit, myGridEdit, dxGridEdit, callStatus](
-                    const QString& raw) {
-            const QString call = raw.trimmed().toUpper();
-            if (call != raw) {
-                QSignalBlocker block(callEdit);
-                callEdit->setText(call);
-            }
-            if (call.isEmpty()) { callStatus->clear(); return; }
-
-            const QString mine = myGridEdit->text().trimmed().toUpper();
-            if (!isValidGridSquare(mine)) {
-                callStatus->setText(
-                    QStringLiteral("Enter your own locator to get bearings"));
-                return;
-            }
-            DxccColorProvider* dxcc =
-                m_radioModel ? m_radioModel->dxccColorProvider() : nullptr;
-            if (!dxcc) { return; }
-
-            const CtyDatParser& cty = dxcc->ctyDat();
-            const QString prefix = cty.resolvePrimaryPrefix(call);
-            const DxccEntity* ent = prefix.isEmpty()
-                ? nullptr : cty.entityByPrefix(prefix);
-            if (!ent || !ent->hasLatLon) {
-                callStatus->setText(
-                    QStringLiteral("%1 — no country match yet").arg(call));
-                return;
-            }
-
-            // Entity centre → locator → the same maths the DX field uses.
-            const QString entGrid =
-                gridSquareFromLatLon(ent->latitude, ent->longitude);
-            const double km  = calculateDistanceKm(mine, entGrid);
-            const double deg = calculateBearingInDegrees(mine, entGrid);
-            m_rotorDial->setTargetBearing(deg);
-
-            // The DX field mirrors the derived square so the operator
-            // can see — and correct — what the prefix guessed.
-            {
-                QSignalBlocker block(dxGridEdit);
-                dxGridEdit->setText(entGrid);
-            }
-            callStatus->setText(QStringLiteral("%1 · %2 km · approx from prefix")
-                                    .arg(ent->name).arg(km, 0, 'f', 0));
-        });
-
-        // ── QRZ ──────────────────────────────────────────────────────
-        // The prefix estimate above is country-level. A QRZ lookup
-        // replaces it with the station's own locator when credentials
-        // are configured — Enter triggers it, alongside the rotate.
-        auto* qrzRow = new QHBoxLayout;
-        qrzRow->setSpacing(6);
-
-        auto* qrzBtn = new QPushButton(QStringLiteral("QRZ lookup"),
-                                       m_rotorWindow);
-        qrzBtn->setStyleSheet(Style::buttonBaseStyle());
-        qrzRow->addWidget(qrzBtn);
-
-        auto* qrzSetupBtn = new QPushButton(QStringLiteral("QRZ account…"),
-                                            m_rotorWindow);
-        qrzSetupBtn->setStyleSheet(Style::buttonBaseStyle());
-        qrzRow->addWidget(qrzSetupBtn);
-        col->addLayout(qrzRow);
-
+    if (!m_rotorDock) {
         ensureQrzClient();
-
-        auto doQrzLookup = [this, callEdit, callStatus]() {
-            const QString call = Callsigns::normalized(callEdit->text());
-            if (call.isEmpty()) { return; }
-            if (!Callsigns::isLikelyCallsign(call)) {
-                callStatus->setText(
-                    QStringLiteral("%1 doesn't look like a callsign").arg(call));
-                return;
-            }
-            if (!m_qrzClient || !m_qrzClient->hasCredentials()) {
-                callStatus->setText(QStringLiteral(
-                    "Add your QRZ account to look up the exact locator"));
-                return;
-            }
-            callStatus->setText(QStringLiteral("Looking up %1…").arg(call));
-            m_qrzClient->lookup(call);
-        };
-        connect(qrzBtn, &QPushButton::clicked, this, doQrzLookup);
-
-        // QRZ replies land here. Guarded against a queued reply for a
-        // callsign the operator has already typed past.
-        connect(m_qrzClient, &QrzClient::lookupSucceeded, m_rotorWindow,
-                [this, callEdit, myGridEdit, dxGridEdit, callStatus](
-                    const QString& call, const CallsignInfo& info) {
-            if (Callsigns::normalized(callEdit->text()) != call) { return; }
-            if (!isValidGridSquare(info.grid)) {
-                callStatus->setText(QStringLiteral(
-                    "%1: %2 — QRZ has no locator, keeping the country estimate")
-                        .arg(call, info.displayName()));
-                return;
-            }
-            const QString mine = myGridEdit->text().trimmed().toUpper();
-            if (!isValidGridSquare(mine)) { return; }
-
-            const double km  = calculateDistanceKm(mine, info.grid);
-            const double deg = calculateBearingInDegrees(mine, info.grid);
-            m_rotorDial->setTargetBearing(deg);
-            {
-                QSignalBlocker block(dxGridEdit);
-                dxGridEdit->setText(info.grid);
-            }
-            callStatus->setText(QStringLiteral("%1 · %2 · %3 km")
-                                    .arg(info.displayName(),
-                                         info.country.isEmpty()
-                                             ? info.grid : info.country)
-                                    .arg(km, 0, 'f', 0));
-        });
-        connect(m_qrzClient, &QrzClient::lookupFailed, m_rotorWindow,
-                [callEdit, callStatus](const QString& call,
-                                       QrzClient::Error err,
-                                       const QString& msg) {
-            if (Callsigns::normalized(callEdit->text()) != call) { return; }
-            // Say what happened and what it means — the prefix estimate
-            // is still on the dial, so nothing is lost.
-            switch (err) {
-            case QrzClient::Error::NotFound:
-                callStatus->setText(QStringLiteral(
-                    "%1 isn't in QRZ — keeping the country estimate").arg(call));
-                break;
-            case QrzClient::Error::AuthFailed:
-                callStatus->setText(QStringLiteral(
-                    "QRZ rejected the login — check the account settings"));
-                break;
-            case QrzClient::Error::Network:
-                callStatus->setText(QStringLiteral(
-                    "Couldn't reach QRZ — keeping the country estimate"));
-                break;
-            case QrzClient::Error::Provider:
-                callStatus->setText(msg.isEmpty()
-                    ? QStringLiteral("QRZ returned no data") : msg);
-                break;
-            }
-        });
-
-        connect(qrzSetupBtn, &QPushButton::clicked,
-                this, &MainWindow::openQrzCredentialsDialog);
-
-        // ── Log QSO ──────────────────────────────────────────────────
-        // Everything the radio already knows is taken from the radio:
-        // frequency, mode and band come from the active slice, the time
-        // is stamped now, and the station detail is whatever the
-        // callsign field last resolved. The operator types nothing they
-        // have already told the radio.
-        auto* logBtn = new QPushButton(QStringLiteral("Log QSO"),
-                                       m_rotorWindow);
-        logBtn->setStyleSheet(Style::buttonBaseStyle()
-                              + Style::greenCheckedStyle());
-        col->addWidget(logBtn);
-
-        connect(logBtn, &QPushButton::clicked, this,
-                [this, callEdit, myGridEdit, dxGridEdit, callStatus]() {
-            const QString call = Callsigns::normalized(callEdit->text());
-            if (call.isEmpty()) {
-                callStatus->setText(QStringLiteral("Enter a callsign to log"));
-                return;
-            }
-
-            LogEntry e;
-            e.call   = call;
-            e.timeOn = QDateTime::currentDateTimeUtc();
-            e.myGridSquare = myGridEdit->text().trimmed().toUpper();
-            e.gridSquare   = dxGridEdit->text().trimmed().toUpper();
-
-            if (SliceModel* s = m_radioModel ? m_radioModel->activeSlice()
-                                             : nullptr) {
-                e.freqMHz = s->frequency() / 1e6;
-                e.band    = bandLabel(bandFromFrequency(s->frequency()));
-
-                // ADIF wants the umbrella mode with the sideband as a
-                // submode: a QSO logged as MODE=LSB is rejected or
-                // silently rewritten by most services, because LSB is
-                // not an ADIF mode — SSB is.
-                const QString m = SliceModel::modeName(s->dspMode());
-                if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
-                    e.mode = QStringLiteral("SSB");
-                    e.submode = m;
-                } else if (m == QLatin1String("CWL")
-                           || m == QLatin1String("CWU")) {
-                    e.mode = QStringLiteral("CW");
-                } else {
-                    e.mode = m;
-                }
-            }
-
-            if (isValidGridSquare(e.myGridSquare)
-                && isValidGridSquare(e.gridSquare)) {
-                e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
-                e.bearingDeg = calculateBearingInDegrees(e.myGridSquare,
-                                                         e.gridSquare);
-            }
-
-            QString err;
-            if (!appendQsoToLog(e, &err)) {
-                callStatus->setText(
-                    QStringLiteral("Couldn't write the log: %1").arg(err));
-                return;
-            }
-
-            // Local write succeeded — say so before the upload, so a
-            // failing upload never reads as a lost contact.
-            QString msg = QStringLiteral("Logged %1 on %2")
-                              .arg(call, e.band.isEmpty()
-                                             ? QStringLiteral("—") : e.band);
-            if (m_qrzUploader && m_qrzUploader->isConfigured()) {
-                msg += QStringLiteral(" · uploading…");
-                m_qrzUploader->upload(e);
-            }
-            callStatus->setText(msg);
-        });
-
         ensureQrzUploader();
-        connect(m_qrzUploader, &QsoUploader::uploadFinished, m_rotorWindow,
-                [callStatus](const QString& call, bool ok, bool duplicate,
-                             const QString& message) {
-            callStatus->setText(ok
-                ? QStringLiteral("%1 — %2").arg(call,
-                      duplicate ? QStringLiteral("already in your QRZ logbook")
-                                : message)
-                // The contact is safe in the local file either way; say
-                // that rather than leaving the operator wondering.
-                : QStringLiteral("%1 logged locally, QRZ upload failed: %2")
-                      .arg(call, message));
-        });
 
-        // Enter: look up the exact locator AND start the rotator.
-        // Never a keystroke — a half-typed callsign must not move the
-        // antenna or spend a lookup.
-        connect(callEdit, &QLineEdit::returnPressed, this,
-                [this, doQrzLookup]() {
-            doQrzLookup();
-            if (m_rotorDial && m_rotorDial->hasTarget()) {
-                emit m_rotorDial->rotateRequested(m_rotorDial->targetBearing());
-            }
-        });
-
-        auto* row = new QHBoxLayout;
-        row->setSpacing(6);
-
-        auto* rotateBtn = new QPushButton(QStringLiteral("Rotate"), m_rotorWindow);
-        rotateBtn->setStyleSheet(Style::buttonBaseStyle());
-        row->addWidget(rotateBtn);
-
-        auto* stopBtn = new QPushButton(QStringLiteral("Stop"), m_rotorWindow);
-        stopBtn->setStyleSheet(Style::buttonBaseStyle());
-        row->addWidget(stopBtn);
-
-        auto* longPathBtn = new QPushButton(QStringLiteral("Long path"),
-                                            m_rotorWindow);
-        longPathBtn->setStyleSheet(Style::buttonBaseStyle());
-        row->addWidget(longPathBtn);
-        col->addLayout(row);
-
-        // Simulated movement, one degree per tick, so the Turning and
-        // OnTarget states are reachable without hardware.
-        auto* timer = new QTimer(m_rotorWindow);
-        timer->setInterval(40);
-
-        connect(rotateBtn, &QPushButton::clicked, this, [this, timer]() {
-            if (!m_rotorDial || !m_rotorDial->hasTarget()) { return; }
-            m_rotorDial->setState(RotorDialWidget::State::Turning);
-            timer->start();
-        });
-        connect(stopBtn, &QPushButton::clicked, this, [this, timer]() {
-            timer->stop();
-            if (m_rotorDial) {
-                m_rotorDial->setState(RotorDialWidget::State::Targeted);
-            }
-        });
-        connect(longPathBtn, &QPushButton::clicked, this, [this]() {
-            if (!m_rotorDial || !m_rotorDial->hasTarget()) { return; }
-            m_rotorDial->setTargetBearing(m_rotorDial->targetBearing() + 180.0);
-        });
-        connect(timer, &QTimer::timeout, this, [this, timer]() {
-            if (!m_rotorDial) { timer->stop(); return; }
-            const double togo = m_rotorDial->travelDegrees();
-            if (qAbs(togo) < 1.0) {
-                timer->stop();
-                m_rotorDial->setState(RotorDialWidget::State::OnTarget);
-                return;
-            }
-            m_rotorDial->setActualBearing(
-                m_rotorDial->actualBearing() + (togo > 0 ? 1.0 : -1.0));
-        });
+        m_rotorDock = new QDockWidget(QStringLiteral("Rotor / Log"), this);
+        m_rotorDock->setObjectName(QStringLiteral("rotorLogDock"));
+        m_rotorDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+        m_rotorDock->setWidget(
+            new RotorLogbookPanel(m_radioModel, m_qrzClient, m_qrzUploader,
+                                  m_rotorDock));
+        addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);
     }
-    m_rotorWindow->show();
-    m_rotorWindow->raise();
-    m_rotorWindow->activateWindow();
+    m_rotorDock->show();
+    m_rotorDock->raise();
 }
 
 void MainWindow::openSpotHub()

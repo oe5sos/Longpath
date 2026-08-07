@@ -127,10 +127,8 @@ class OverflowChip;
 class PsaIndicatorWidget;
 class AppletVisibilityController;
 class AppletWidget;
-class RotorDialWidget;
 class QrzClient;
 class QrzLogbookUploader;
-struct LogEntry;
 
 // Phase 23: TCI server + applets forward declarations (all inside NereusSDR
 // namespace — TciServer only exists when HAVE_WEBSOCKETS is defined but we
@@ -556,8 +554,6 @@ private:
     void openQrzCredentialsDialog();
     // Logbook: one appended ADIF file, plus the QRZ logbook uploader
     // (a different service and credential from the XML lookup).
-    static QString logbookPath();
-    bool appendQsoToLog(const LogEntry& entry, QString* error);
     void ensureQrzUploader();
     void buildStatusBar();
     void applyDarkTheme();
@@ -1125,9 +1121,8 @@ private:
     // Applet visibility controller (NereusSDR-original) — backs the
     // Containers > Applets top menu and the panel banner ☰ menu.
     // Constructed in the layout-build path after the panel is wired.
-    // Rotator dial window (Tools > Rotor...). Lazy; owned by `this`.
-    QWidget*         m_rotorWindow{nullptr};
-    RotorDialWidget* m_rotorDial{nullptr};
+    // Rotor + logbook dock (Tools > Rotor...). Lazy; owned by `this`.
+    QDockWidget*     m_rotorDock{nullptr};
     QrzClient*           m_qrzClient{nullptr};
     QrzLogbookUploader*  m_qrzUploader{nullptr};
 

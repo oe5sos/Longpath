@@ -906,9 +906,14 @@ set(GUI_SOURCES
     src/gui/applets/AppletPanelWidget.cpp
     src/gui/applets/AppletVisibilityController.cpp
     src/gui/widgets/RotorDialWidget.cpp
+    src/gui/widgets/RotorLogbookPanel.cpp
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp
+    # Header-only Q_OBJECT: AUTOMOC only picks up a header when a source
+    # file of the same base name exists, so an interface class with no
+    # .cpp has to be listed explicitly or its vtable never gets built.
+    src/core/QsoUploader.h
     src/models/LogEntry.cpp
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
