@@ -925,6 +925,7 @@ set(GUI_SOURCES
     src/core/RotctldClient.cpp
     src/core/RotctldProcess.cpp
     src/core/TxAudioRecorder.cpp
+    src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
     # QsoUploader above.
     src/core/RotorController.h

@@ -4639,6 +4639,10 @@ nereus_add_test(tst_tx_offair_monitor)
 #    hot samples, a WAV header that agrees with the file --
 nereus_add_test(tst_tx_audio_recorder)
 
+# -- Voice analysis: target curve, an EQ suggestion that never boosts,
+#    hum at the right mains frequency, clipping reported first --
+nereus_add_test(tst_voice_analyzer)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and
