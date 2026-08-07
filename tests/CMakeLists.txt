@@ -4606,6 +4606,10 @@ target_link_libraries(tst_cloudlog_uploader PRIVATE Qt6::Network)
 #    that stops a Pacific path streaking back across the whole map --
 nereus_add_test(tst_flat_map)
 
+# -- Waterfall colour mapping: pins the solid-magenta bug (colour-gain
+#    slider took more off the top than the AGC margin put there) --
+nereus_add_test(tst_waterfall_color)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

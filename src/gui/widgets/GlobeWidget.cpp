@@ -642,7 +642,11 @@ void GlobeWidget::paintEvent(QPaintEvent*)
             const bool wantMarked = pass == 1;
             const QColor col = wantMarked ? marked : faint;
 
-            if (m_showPointPaths) {
+            // Marked contacts keep their arc even with paths switched
+            // off: turning paths off is how you clear the clutter to
+            // look at a few marked ones, so removing theirs as well
+            // would defeat the switch.
+            if (m_showPointPaths || wantMarked) {
                 for (const MapPoint& pt : m_points) {
                     if (pt.highlight != wantMarked) { continue; }
                     drawArc(p, pt.lat, pt.lon, col,

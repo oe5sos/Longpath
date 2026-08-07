@@ -269,9 +269,14 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     // Paths first, so the markers sit on top of them. Marked contacts
     // are drawn in a second pass so their lines are not buried under
     // hundreds of ordinary ones.
-    if (m_showPaths && m_hasHome) {
+    //
+    // Marked contacts keep their line even with paths switched off:
+    // turning paths off is how you clear the clutter to look at a few
+    // marked ones, so removing theirs too would defeat the switch.
+    if (m_hasHome) {
         for (int pass = 0; pass < 2; ++pass) {
             const bool wantMarked = pass == 1;
+            if (!wantMarked && !m_showPaths) { continue; }
             for (const MapPoint& pt : m_points) {
                 if (pt.highlight != wantMarked) { continue; }
                 const QVector<QPointF> samples =

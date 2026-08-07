@@ -1626,6 +1626,48 @@ private:
     void   pushWaterfallRow(const QVector<float>& wfPixelsDbm);
     QRgb   dbmToRgb(float dbm) const;
 
+public:
+    // ---- Waterfall colour mapping, as pure functions ----
+    //
+    // Extracted from dbmToRgb so the arithmetic can be checked without
+    // a running radio. It had to be: the two sliders and the AGC margin
+    // were computed in two different places, and nothing noticed that
+    // the colour-gain slider removed more headroom from the top of the
+    // window (13.5 dB at the shipped default) than the AGC margin put
+    // there (12 dB). The effective high threshold therefore sat below
+    // the loudest display pixel, so the peak always clamped to the
+    // palette's last stop — magenta — and on a flat spectrum, where
+    // every pixel is the loudest, the whole waterfall did.
+
+    // Decibels the black-level slider adds to the low threshold.
+    static float wfBlackLevelOffsetDb(int blackLevel)
+    { return static_cast<float>(125 - blackLevel) * 0.4f; }
+
+    // Decibels the colour-gain slider takes off the high threshold.
+    static float wfColorGainOffsetDb(int colorGain)
+    { return static_cast<float>(colorGain) * 0.3f; }
+
+    // Narrowest window that is still a display. A one-decibel span maps
+    // everything above the floor to the top of the palette, which is a
+    // solid block of one colour rather than a waterfall.
+    static constexpr float kWfMinSpanDb = 6.0f;
+
+    // Span the AGC must leave after the sliders have taken their cut.
+    static constexpr float kWfAgcPaletteSpanDb = 20.0f;
+
+    // How far into the loud end of the real dynamic range the
+    // colour-gain slider may pull the high threshold. Peaks reaching
+    // the top colour is correct; the top colour swallowing the picture
+    // is not.
+    static constexpr float kWfMaxClipDb = 6.0f;
+
+    // dBm to colour, given already-composed thresholds. No widget state.
+    static QRgb waterfallColor(float dbm, float lowDbm, float highDbm,
+                               int blackLevel, int colorGain,
+                               WfColorScheme scheme);
+
+private:
+
     // ---- FFT pipeline state ----
     // Single Thetis-faithful pipeline: linear-power FFT bins -> visible
     // slice -> detector -> avenger -> dBm display pixels.  Spectrum and

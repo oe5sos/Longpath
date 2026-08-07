@@ -4684,8 +4684,46 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
         }
         // Phase 3G-9b: 12 dB margin for palette breathing room.
         const float margin = 12.0f;
-        m_wfActiveLowThreshold  = m_wfAgcRunMin - margin;
-        m_wfActiveHighThreshold = m_wfAgcRunMax + margin;
+        float low  = m_wfAgcRunMin - margin;
+        float high = m_wfAgcRunMax + margin;
+
+        // …except the sliders take their cut afterwards, in dbmToRgb,
+        // and at the shipped defaults the colour-gain slider removes
+        // 13.5 dB from the top while this margin only added 12. The
+        // effective high threshold therefore landed 1.5 dB BELOW the
+        // running maximum: the loudest pixels always saturated to the
+        // palette's last stop, which in ClarityBlue is magenta. On a
+        // flat spectrum — a quiet band, or a radio not yet delivering
+        // varied data — every pixel is the running maximum, and the
+        // whole waterfall came up magenta. Reported on ANAN-7000DLE and
+        // present in released 0.5.2.
+        //
+        // The sliders may eat into this margin — that is what they are
+        // for, and peaks reaching the top colour is correct. What is
+        // not correct is the palette top swallowing everything. So the
+        // colour-gain slider may pull the high threshold down into the
+        // loud end of the real dynamic range, but no further than a
+        // quarter of it (and never more than 6 dB).
+        const float blackCut = wfBlackLevelOffsetDb(m_wfBlackLevel);
+        const float gainCut  = wfColorGainOffsetDb(m_wfColorGain);
+
+        const float dataSpan = std::max(0.0f, m_wfAgcRunMax - m_wfAgcRunMin);
+        const float clipAllowance = std::min(kWfMaxClipDb, 0.25f * dataSpan);
+        low  = std::min(low,  m_wfAgcRunMin - 1.0f - blackCut);
+        high = std::max(high, m_wfAgcRunMax - clipAllowance + gainCut);
+
+        // On a flat spectrum the allowance is zero, which would put
+        // every pixel exactly at the top of the palette — the solid
+        // magenta again, by a different route. Keep a usable span so a
+        // quiet band looks quiet instead of looking like one colour.
+        const float needed = kWfAgcPaletteSpanDb + blackCut + gainCut;
+        if (high - low < needed) {
+            const float mid = 0.5f * (low + high);
+            low  = mid - 0.5f * needed;
+            high = mid + 0.5f * needed;
+        }
+        m_wfActiveLowThreshold  = low;
+        m_wfActiveHighThreshold = high;
     }
 
     // Note: "Use spectrum min/max" no longer mutates here.  Thetis
@@ -4789,28 +4827,47 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 // Color gain adjusts high_threshold, black level adjusts low_threshold.
 QRgb SpectrumWidget::dbmToRgb(float dbm) const
 {
-    // Effective thresholds adjusted by gain/black level sliders.
-    // Black level slider (0-125): lower = more black, higher = less black.
-    // Color gain slider (0-100): shifts high threshold DOWN (more color).
-    // From Thetis display.cs:2522-2536 defaults: high=-80, low=-130.
     // Issue #230 fix: read the render-active mirror, not the
     // persistent user fields — AGC / NF-AGC / Clarity drive the
     // active mirror via composeWaterfallActiveThresholds() and
     // setClarityWaterfallThresholds().  Persistent values stay clean.
-    float effectiveLow = m_wfActiveLowThreshold + static_cast<float>(125 - m_wfBlackLevel) * 0.4f;
-    float effectiveHigh = m_wfActiveHighThreshold - static_cast<float>(m_wfColorGain) * 0.3f;
-    if (effectiveHigh <= effectiveLow) {
-        effectiveHigh = effectiveLow + 1.0f;
+    return waterfallColor(dbm, m_wfActiveLowThreshold,
+                          m_wfActiveHighThreshold,
+                          m_wfBlackLevel, m_wfColorGain, m_wfColorScheme);
+}
+
+QRgb SpectrumWidget::waterfallColor(float dbm, float lowDbm, float highDbm,
+                                    int blackLevel, int colorGain,
+                                    WfColorScheme scheme)
+{
+    // Effective thresholds adjusted by gain/black level sliders.
+    // Black level slider (0-125): lower = more black, higher = less black.
+    // Color gain slider (0-100): shifts high threshold DOWN (more color).
+    // From Thetis display.cs:2522-2536 defaults: high=-80, low=-130.
+    float effectiveLow  = lowDbm  + wfBlackLevelOffsetDb(blackLevel);
+    float effectiveHigh = highDbm - wfColorGainOffsetDb(colorGain);
+
+    // Was `effectiveLow + 1.0f`, which is not a display: a one-decibel
+    // window puts every pixel above the floor at the top of the palette,
+    // and the top of ClarityBlue is magenta. A collapsed window is
+    // always a mistake somewhere upstream, but the mapping should
+    // degrade to a low-contrast picture rather than a solid colour.
+    if (effectiveHigh - effectiveLow < kWfMinSpanDb) {
+        effectiveHigh = effectiveLow + kWfMinSpanDb;
     }
 
     // From Thetis display.cs:6889-6891
-    float range = effectiveHigh - effectiveLow;
+    const float range = effectiveHigh - effectiveLow;
     float adjusted = (dbm - effectiveLow) / range;
+    // A NaN pixel is unknown, not loud. Left to qBound it would fall
+    // through the stop search and take the last stop, painting the
+    // brightest colour in the palette for missing data.
+    if (!std::isfinite(adjusted)) { adjusted = 0.0f; }
     adjusted = qBound(0.0f, adjusted, 1.0f);
 
     // Look up in gradient stops for current color scheme
     int stopCount = 0;
-    const WfGradientStop* stops = wfSchemeStops(m_wfColorScheme, stopCount);
+    const WfGradientStop* stops = wfSchemeStops(scheme, stopCount);
 
     // Find the two surrounding stops and interpolate
     for (int i = 0; i < stopCount - 1; ++i) {
