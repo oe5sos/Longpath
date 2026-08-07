@@ -63,8 +63,14 @@ private:
     void deleteSelected();
     void exportAdif();
     void exportCsv();
+    void importAdif();
     void uploadSelected(QsoUploader* target);
     void openMap();
+
+    // Timestamped copy of the log file beside itself. Taken before an
+    // import, which is the one operation here that touches many records
+    // at once and cannot be undone from the table.
+    QString makeBackup(QString* error) const;
 
     // Index into m_all for the given visible row, or -1.
     int sourceRow(int viewRow) const;

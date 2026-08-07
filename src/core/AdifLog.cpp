@@ -16,9 +16,12 @@
 
 #include <QDate>
 #include <QFile>
+#include <QHash>
 #include <QSaveFile>
 #include <QTextStream>
 #include <QTimeZone>
+
+#include <cmath>
 
 namespace NereusSDR {
 namespace AdifLog {
@@ -178,6 +181,69 @@ bool write(const QString& path, const QVector<LogEntry>& entries,
         return false;
     }
     return true;
+}
+
+bool isSameQso(const LogEntry& a, const LogEntry& b)
+{
+    const QString ca = a.call.trimmed().toUpper();
+    const QString cb = b.call.trimmed().toUpper();
+    if (ca.isEmpty() || ca != cb) { return false; }
+
+    // Band and mode only distinguish when both records state them. An
+    // export that omitted BAND is not thereby a different contact, and
+    // treating it as one would import the whole file twice.
+    auto agrees = [](const QString& x, const QString& y) {
+        const QString a1 = x.trimmed();
+        const QString b1 = y.trimmed();
+        if (a1.isEmpty() || b1.isEmpty()) { return true; }
+        return a1.compare(b1, Qt::CaseInsensitive) == 0;
+    };
+    if (!agrees(a.band, b.band)) { return false; }
+    // MODE only, not SUBMODE: one side writing SSB and the other
+    // SSB/LSB is the same contact spelled with more detail.
+    if (!agrees(a.mode, b.mode)) { return false; }
+
+    const bool va = a.timeOn.isValid();
+    const bool vb = b.timeOn.isValid();
+    if (va != vb) { return false; }
+    if (!va) {
+        // Neither has a time. Call, band and mode already matched, and
+        // there is nothing further to go on.
+        return true;
+    }
+    const qint64 secs = std::abs(a.timeOn.secsTo(b.timeOn));
+    return secs <= kDuplicateToleranceMinutes * 60;
+}
+
+MergeResult merge(const QVector<LogEntry>& existing,
+                  const QVector<LogEntry>& incoming)
+{
+    MergeResult r;
+    r.merged = existing;
+
+    // Bucket by callsign so a large import does not compare every
+    // incoming record against every existing one. A 20,000-contact log
+    // imported into another would otherwise be 400 million comparisons.
+    QHash<QString, QVector<int>> byCall;
+    for (int i = 0; i < r.merged.size(); ++i) {
+        byCall[r.merged.at(i).call.trimmed().toUpper()].append(i);
+    }
+
+    for (const LogEntry& in : incoming) {
+        if (!in.isValid()) { continue; }
+        const QString key = in.call.trimmed().toUpper();
+
+        bool dup = false;
+        for (int idx : byCall.value(key)) {
+            if (isSameQso(r.merged.at(idx), in)) { dup = true; break; }
+        }
+        if (dup) { ++r.skipped; continue; }
+
+        byCall[key].append(r.merged.size());
+        r.merged.append(in);
+        ++r.added;
+    }
+    return r;
 }
 
 QString toCsv(const QVector<LogEntry>& entries)

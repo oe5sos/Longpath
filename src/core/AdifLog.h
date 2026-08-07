@@ -56,6 +56,37 @@ bool write(const QString& path, const QVector<LogEntry>& entries,
 // is entirely normal.
 QString toCsv(const QVector<LogEntry>& entries);
 
+// How far two records' timestamps may differ and still be the same
+// contact. Clocks disagree, and the two ends of a QSO log it seconds
+// or a minute apart; the same contact re-imported from a friend's log
+// or from LoTW should not double up.
+//
+// Two minutes rather than ten: on a contest weekend the same station
+// on the same band and mode ten minutes later is very often a genuine
+// second contact, and merging those would destroy data that cannot be
+// recovered.
+constexpr int kDuplicateToleranceMinutes = 2;
+
+// Are these the same contact?
+//
+// Callsign must match. Band and mode must match when both records say
+// — an import that omits BAND should not be treated as a different
+// contact for that reason alone. Times must be within tolerance, or
+// both absent.
+bool isSameQso(const LogEntry& a, const LogEntry& b);
+
+struct MergeResult {
+    QVector<LogEntry> merged;   // existing plus whatever was new
+    int added{0};
+    int skipped{0};             // already present
+};
+
+// Fold `incoming` into `existing`. Never replaces an existing record:
+// the local log is the one the operator has been correcting, and an
+// import overwriting those corrections would be silent damage.
+MergeResult merge(const QVector<LogEntry>& existing,
+                  const QVector<LogEntry>& incoming);
+
 } // namespace AdifLog
 
 } // namespace NereusSDR

@@ -114,15 +114,20 @@ void LogbookWindow::buildUi()
     mapBtn->setToolTip(
         QStringLiteral("See the contacts in a period on a globe or a "
                        "world map"));
+    auto* importBtn = new QPushButton(QStringLiteral("Import…"), this);
+    importBtn->setToolTip(QStringLiteral(
+        "Merge an ADIF file into this log, skipping contacts it already has"));
     auto* adifBtn = new QPushButton(QStringLiteral("Export ADIF…"), this);
     auto* csvBtn  = new QPushButton(QStringLiteral("Export CSV…"), this);
     for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
-                           adifBtn, csvBtn}) {
+                           importBtn, adifBtn, csvBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
     col->addLayout(top);
     connect(mapBtn, &QPushButton::clicked, this, &LogbookWindow::openMap);
+    connect(importBtn, &QPushButton::clicked,
+            this, &LogbookWindow::importAdif);
 
     connect(m_uploadBtn, &QPushButton::clicked, this, [this]() {
         if (m_uploaders.isEmpty()) {
@@ -566,6 +571,104 @@ void LogbookWindow::openMap()
     m_map->show();
     m_map->raise();
     m_map->activateWindow();
+}
+
+// ── Import ──────────────────────────────────────────────────────────
+
+QString LogbookWindow::makeBackup(QString* error) const
+{
+    if (!QFile::exists(m_path)) { return {}; }   // nothing to lose yet
+
+    const QString stamp = QDateTime::currentDateTimeUtc()
+                              .toString(QStringLiteral("yyyyMMdd-hhmmss"));
+    const QString dest = m_path + QStringLiteral(".") + stamp
+                       + QStringLiteral(".bak");
+    if (!QFile::copy(m_path, dest)) {
+        if (error) {
+            *error = QStringLiteral("couldn't write %1").arg(dest);
+        }
+        return {};
+    }
+    return dest;
+}
+
+void LogbookWindow::importAdif()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Import ADIF"), QString{},
+        QStringLiteral("ADIF (*.adi *.adif);;All files (*)"));
+    if (path.isEmpty()) { return; }
+
+    QString err;
+    const QVector<LogEntry> incoming = AdifLog::read(path, &err);
+    if (!err.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("Import"),
+            QStringLiteral("Couldn't read that file:\n%1").arg(err));
+        return;
+    }
+    if (incoming.isEmpty()) {
+        // Distinguish "empty" from "not ADIF": a file the parser found
+        // no records in is usually the wrong file, not an empty log.
+        QMessageBox::warning(this, QStringLiteral("Import"),
+            QStringLiteral("No contacts found in that file.\n\n"
+                           "ADIF records are marked with <EOR>; if this "
+                           "is a Cabrillo or CSV export it needs "
+                           "converting first."));
+        return;
+    }
+
+    const AdifLog::MergeResult r = AdifLog::merge(m_all, incoming);
+
+    if (r.added == 0) {
+        QMessageBox::information(this, QStringLiteral("Import"),
+            QStringLiteral("All %1 contacts in that file are already in "
+                           "your log. Nothing to do.").arg(incoming.size()));
+        return;
+    }
+
+    const QString question =
+        QStringLiteral("%1 contacts in the file.\n\n"
+                       "%2 are new and will be added.\n"
+                       "%3 are already in your log and will be skipped.\n\n"
+                       "Your current log is copied to a dated backup "
+                       "first. Go ahead?")
+            .arg(incoming.size()).arg(r.added).arg(r.skipped);
+
+    if (QMessageBox::question(this, QStringLiteral("Import"), question,
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
+        != QMessageBox::Yes) {
+        return;
+    }
+
+    // Back up before touching anything. This is the one operation here
+    // that rewrites many records at once, and unlike an edit or a delete
+    // it cannot be put right from the table afterwards.
+    QString backupErr;
+    const QString backup = makeBackup(&backupErr);
+    if (!backupErr.isEmpty()) {
+        if (QMessageBox::warning(this, QStringLiteral("Import"),
+                QStringLiteral("Couldn't make a backup first: %1\n\n"
+                               "Import anyway?").arg(backupErr),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+            != QMessageBox::Yes) {
+            return;
+        }
+    }
+
+    m_all = r.merged;
+    if (!saveAll()) {
+        // saveAll already explained itself and left the old file intact.
+        reload();
+        return;
+    }
+    reload();
+
+    QString done = QStringLiteral("Added %1 contacts, skipped %2 already "
+                                  "present.").arg(r.added).arg(r.skipped);
+    if (!backup.isEmpty()) {
+        done += QStringLiteral("\n\nBackup: %1").arg(backup);
+    }
+    QMessageBox::information(this, QStringLiteral("Import"), done);
 }
 
 // ── Export ──────────────────────────────────────────────────────────

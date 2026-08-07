@@ -26,6 +26,15 @@ private slots:
     void write_is_atomic_enough_to_replace();
     void csv_quotes_embedded_commas_and_quotes();
     void distance_is_recomputed_from_the_locators();
+
+    void duplicate_within_tolerance_is_the_same_qso();
+    void a_later_contact_with_the_same_station_is_not_a_duplicate();
+    void a_different_band_or_mode_is_not_a_duplicate();
+    void a_missing_band_does_not_make_it_a_different_contact();
+    void submode_detail_does_not_split_a_contact();
+    void merge_adds_only_what_is_new();
+    void merge_never_replaces_an_existing_record();
+    void merge_dedupes_within_the_incoming_file_too();
 };
 
 void TstAdifLog::reads_a_record_we_wrote()
@@ -200,6 +209,152 @@ void TstAdifLog::distance_is_recomputed_from_the_locators()
              qPrintable(QStringLiteral("%1 km").arg(v.at(0).distanceKm)));
     QVERIFY2(v.at(0).bearingDeg > 280 && v.at(0).bearingDeg < 315,
              qPrintable(QStringLiteral("%1 deg").arg(v.at(0).bearingDeg)));
+}
+
+namespace {
+
+LogEntry qso(const QString& call, const QString& band, const QString& mode,
+             const QDateTime& when)
+{
+    LogEntry e;
+    e.call = call;
+    e.band = band;
+    e.mode = mode;
+    e.timeOn = when;
+    return e;
+}
+
+QDateTime at(int h, int m, int s = 0)
+{
+    return QDateTime(QDate(2026, 8, 7), QTime(h, m, s), QTimeZone::UTC);
+}
+
+} // namespace
+
+void TstAdifLog::duplicate_within_tolerance_is_the_same_qso()
+{
+    // The two ends of a contact log it seconds or a minute apart, and
+    // clocks disagree. Re-importing from a friend's log or from LoTW
+    // must not double the contact up.
+    const LogEntry a = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                           QStringLiteral("SSB"), at(14, 0, 0));
+    QVERIFY(AdifLog::isSameQso(a, a));
+    QVERIFY(AdifLog::isSameQso(a, qso(QStringLiteral("oe1w"),
+                                      QStringLiteral("40M"),
+                                      QStringLiteral("ssb"), at(14, 0, 45))));
+    QVERIFY(AdifLog::isSameQso(a, qso(QStringLiteral("OE1W"),
+                                      QStringLiteral("40m"),
+                                      QStringLiteral("SSB"), at(13, 58, 30))));
+}
+
+void TstAdifLog::a_later_contact_with_the_same_station_is_not_a_duplicate()
+{
+    // On a contest weekend the same station on the same band ten minutes
+    // later is very often a genuine second contact. Merging those would
+    // destroy data that cannot be recovered, which is why the window is
+    // two minutes and not ten.
+    const LogEntry a = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                           QStringLiteral("SSB"), at(14, 0));
+    QVERIFY(!AdifLog::isSameQso(a, qso(QStringLiteral("OE1W"),
+                                       QStringLiteral("40m"),
+                                       QStringLiteral("SSB"), at(14, 10))));
+    QVERIFY(!AdifLog::isSameQso(a, qso(QStringLiteral("OE1W"),
+                                       QStringLiteral("40m"),
+                                       QStringLiteral("SSB"), at(14, 2, 30))));
+}
+
+void TstAdifLog::a_different_band_or_mode_is_not_a_duplicate()
+{
+    const LogEntry a = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                           QStringLiteral("SSB"), at(14, 0));
+    QVERIFY(!AdifLog::isSameQso(a, qso(QStringLiteral("OE1W"),
+                                       QStringLiteral("20m"),
+                                       QStringLiteral("SSB"), at(14, 0))));
+    QVERIFY(!AdifLog::isSameQso(a, qso(QStringLiteral("OE1W"),
+                                       QStringLiteral("40m"),
+                                       QStringLiteral("CW"), at(14, 0))));
+    QVERIFY(!AdifLog::isSameQso(a, qso(QStringLiteral("DL1AB"),
+                                       QStringLiteral("40m"),
+                                       QStringLiteral("SSB"), at(14, 0))));
+}
+
+void TstAdifLog::a_missing_band_does_not_make_it_a_different_contact()
+{
+    // An export that omitted BAND is not thereby a different QSO.
+    // Treating it as one would import the whole file a second time.
+    const LogEntry a = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                           QStringLiteral("SSB"), at(14, 0));
+    const LogEntry b = qso(QStringLiteral("OE1W"), QString{},
+                           QStringLiteral("SSB"), at(14, 0));
+    QVERIFY(AdifLog::isSameQso(a, b));
+    QVERIFY(AdifLog::isSameQso(b, a));
+}
+
+void TstAdifLog::submode_detail_does_not_split_a_contact()
+{
+    LogEntry a = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                     QStringLiteral("SSB"), at(14, 0));
+    LogEntry b = a;
+    b.submode = QStringLiteral("LSB");
+    // One side spelling the same contact with more detail is still one
+    // contact.
+    QVERIFY(AdifLog::isSameQso(a, b));
+}
+
+void TstAdifLog::merge_adds_only_what_is_new()
+{
+    const QVector<LogEntry> mine = {
+        qso(QStringLiteral("OE1W"),  QStringLiteral("40m"),
+            QStringLiteral("SSB"), at(14, 0)),
+        qso(QStringLiteral("DL1AB"), QStringLiteral("20m"),
+            QStringLiteral("CW"),  at(15, 0)),
+    };
+    const QVector<LogEntry> theirs = {
+        qso(QStringLiteral("OE1W"),  QStringLiteral("40m"),
+            QStringLiteral("SSB"), at(14, 0, 30)),   // same
+        qso(QStringLiteral("G3XYZ"), QStringLiteral("20m"),
+            QStringLiteral("CW"),  at(16, 0)),       // new
+    };
+
+    const auto r = AdifLog::merge(mine, theirs);
+    QCOMPARE(r.added, 1);
+    QCOMPARE(r.skipped, 1);
+    QCOMPARE(r.merged.size(), 3);
+    QCOMPARE(r.merged.at(2).call, QStringLiteral("G3XYZ"));
+}
+
+void TstAdifLog::merge_never_replaces_an_existing_record()
+{
+    // The local log is the one that has been corrected by hand. An
+    // import overwriting those corrections would be silent damage.
+    LogEntry mineOne = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                           QStringLiteral("SSB"), at(14, 0));
+    mineOne.comment = QStringLiteral("corrected by hand");
+    mineOne.name    = QStringLiteral("Hans");
+
+    LogEntry theirOne = qso(QStringLiteral("OE1W"), QStringLiteral("40m"),
+                            QStringLiteral("SSB"), at(14, 0, 20));
+    theirOne.comment = QStringLiteral("from the other end");
+    theirOne.name    = QStringLiteral("WRONG");
+
+    const auto r = AdifLog::merge({mineOne}, {theirOne});
+    QCOMPARE(r.added, 0);
+    QCOMPARE(r.merged.size(), 1);
+    QCOMPARE(r.merged.at(0).comment, QStringLiteral("corrected by hand"));
+    QCOMPARE(r.merged.at(0).name, QStringLiteral("Hans"));
+}
+
+void TstAdifLog::merge_dedupes_within_the_incoming_file_too()
+{
+    // A file that repeats a contact must not add it twice, which means
+    // each accepted record has to join the pool the rest are checked
+    // against.
+    const LogEntry one = qso(QStringLiteral("G3XYZ"), QStringLiteral("20m"),
+                             QStringLiteral("CW"), at(16, 0));
+    const auto r = AdifLog::merge({}, {one, one, one});
+    QCOMPARE(r.added, 1);
+    QCOMPARE(r.skipped, 2);
+    QCOMPARE(r.merged.size(), 1);
 }
 
 QTEST_APPLESS_MAIN(TstAdifLog)
