@@ -4631,6 +4631,14 @@ nereus_add_test(tst_anf_tuning)
 #    only, no stray -r, and ARCO/ERC reachable from the picker --
 nereus_add_test(tst_rotctld_process)
 
+# -- The one rule of the off-air monitor: it may be heard, it may not be
+#    transmitted. Truth table over both listening gates --
+nereus_add_test(tst_tx_offair_monitor)
+
+# -- TX audio recorder: no wrap over the start, clamp instead of wrap on
+#    hot samples, a WAV header that agrees with the file --
+nereus_add_test(tst_tx_audio_recorder)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

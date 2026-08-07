@@ -682,6 +682,53 @@ public:
     ///   "DEXP code runs continuously so it can be used to trigger VOX also."
     void setVoxListening(bool on);
 
+    // ── Off-air monitor ─────────────────────────────────────────────────────
+
+    /// Run the transmit chain and feed the monitor, without going on air.
+    ///
+    /// An operator setting up their audio needs to hear what the chain is
+    /// doing to their voice, and needs to hear it while turning the knob
+    /// rather than after. Until now that meant transmitting: the pump
+    /// already ran off air for VOX, but the monitor siphon was skipped
+    /// unless MOX was engaged, so the only way to hear yourself was to
+    /// put a signal on the band while fiddling.
+    ///
+    /// This flag lifts the siphon gate and NOTHING ELSE. The radio write
+    /// stays gated on m_running alone — the same single condition it has
+    /// always had. That separation is the whole design: this is the
+    /// transmit path, a mistake here radiates, and the guarantee has to
+    /// be one that can be read in one place rather than reasoned about.
+    /// tst_tx_offair_monitor pins it.
+    ///
+    /// Like VOX listening, this turns the WDSP TXA channel on so
+    /// fexchange0 actually processes audio.
+    void setOffAirMonitor(bool on);
+
+    bool offAirMonitorForTest() const noexcept {
+        return m_offAirMonitor.load(std::memory_order_acquire);
+    }
+
+    /// Would this combination of gates write I/Q to the radio, and would
+    /// it feed the monitor?
+    ///
+    /// Static and pure so the gate logic can be checked without a radio,
+    /// a WDSP build or an audio device. The pump uses exactly these two
+    /// functions, so a test of them is a test of the real decision and
+    /// not of a paraphrase of it.
+    static constexpr bool writesToRadio(bool running, bool /*voxListening*/,
+                                        bool /*offAirMonitor*/) noexcept
+    {
+        // Deliberately ignores both listening modes. If a future gate is
+        // added, it goes in the siphon function below — never here.
+        return running;
+    }
+
+    static constexpr bool feedsMonitor(bool running, bool /*voxListening*/,
+                                       bool offAirMonitor) noexcept
+    {
+        return running || offAirMonitor;
+    }
+
     // ── Per-mode TXA configuration (3M-1b D.2) ──────────────────────────────
 
     /// Set the TXA channel's DSP mode (LSB / USB / DIGL / DIGU / etc.).
@@ -2672,6 +2719,10 @@ private:
     // gates on m_running for power-saving when neither MOX nor VOX
     // is in play; this flag re-enables pumping for VOX detection.
     std::atomic<bool> m_voxListening{false};
+
+    /// Off-air monitor. Gates the monitor siphon only; see
+    /// setOffAirMonitor and writesToRadio().
+    std::atomic<bool> m_offAirMonitor{false};
 
     // ── Phase 3J-1 bench fix (2026-05-10): TCI audio source gate ───────────
     // When a TCI client holds the TX audio mutex (trx:N,true,tci;) the

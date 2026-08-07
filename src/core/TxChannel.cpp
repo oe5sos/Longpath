@@ -1090,6 +1090,31 @@ void TxChannel::setRunning(bool on)
 // leaving vox-listening AND MOX is also off, drop the channel state.
 // When MOX is on, leave WDSP state alone — setRunning manages it.
 // ---------------------------------------------------------------------------
+void TxChannel::setOffAirMonitor(bool on)
+{
+    const bool prev = m_offAirMonitor.exchange(on, std::memory_order_acq_rel);
+    if (prev == on) { return; }
+
+#ifdef HAVE_WDSP
+    // Same channel-state handling as vox listening: without this the
+    // pump runs but fexchange0 processes nothing, and the operator
+    // hears silence and concludes the monitor is broken.
+    const bool actualRunning = m_running.load(std::memory_order_acquire);
+    if (on) {
+        if (!actualRunning) {
+            const int proto = (m_connection ? m_connection->protocolVersion() : 1);
+            const int cfirRun = (proto == 2) ? 1 : 0;
+            SetTXACFIRRun(m_channelId, cfirRun);
+            SetChannelState(m_channelId, 1, 0);
+        }
+    } else if (!actualRunning
+               && !m_voxListening.load(std::memory_order_acquire)) {
+        // Only drop the channel when nothing else still wants it.
+        SetChannelState(m_channelId, 0, 1);
+    }
+#endif
+}
+
 void TxChannel::setVoxListening(bool on)
 {
     const bool wasOn = m_voxListening.exchange(on, std::memory_order_acq_rel);
@@ -2849,7 +2874,8 @@ void TxChannel::driveOneTxBlock(const float* samples, int frames)
     // in driveOneTxBlockFromInterleaved on m_running ONLY.
     const bool actualRunning = m_running.load(std::memory_order_acquire);
     const bool voxListening  = m_voxListening.load(std::memory_order_acquire);
-    if ((!actualRunning && !voxListening) || !m_connection) {
+    const bool offAirMonitor = m_offAirMonitor.load(std::memory_order_acquire);
+    if ((!actualRunning && !voxListening && !offAirMonitor) || !m_connection) {
         return;
     }
     const int inN = m_inputBufferSize;
@@ -2909,7 +2935,9 @@ void TxChannel::driveOneTxBlockFromInterleaved(const double* interleavedIn)
     // via the two-gate split here.
     const bool actualRunning = m_running.load(std::memory_order_acquire);
     const bool voxListening  = m_voxListening.load(std::memory_order_acquire);
-    const bool shouldPumpDsp = actualRunning || voxListening;
+    const bool offAirMonitor = m_offAirMonitor.load(std::memory_order_acquire);
+    // Three reasons to run the chain, one reason to put it on the air.
+    const bool shouldPumpDsp = actualRunning || voxListening || offAirMonitor;
     if (!shouldPumpDsp || !m_connection) {
         return;
     }
@@ -2954,14 +2982,32 @@ void TxChannel::driveOneTxBlockFromInterleaved(const double* interleavedIn)
     // m_running flips true via MoxController::txReady → setRunning(true)
     // and the radio-write resumes normally on the next pump cycle.
     //
-    // The MON-path siphon (sip1OutputReady) below is also skipped — MON
-    // audio is post-SSB-modulator output that we don't want to monitor
-    // until the operator is actually transmitting.
-    const bool shouldWriteRx = actualRunning;
-    if (!shouldWriteRx) {
+    // The MON-path siphon used to be skipped here too, on the reasoning
+    // that post-modulator audio is not worth monitoring until the
+    // operator is actually transmitting. That is right for VOX
+    // listening and wrong for setting up a microphone: it meant the
+    // only way to hear your own processing was to put a signal on the
+    // band while adjusting it. setOffAirMonitor lifts the siphon gate
+    // and only the siphon gate.
+    // Two gates, decided by two pure functions in the header so the
+    // rule can be read in one place. The radio write is m_running and
+    // nothing else — that has always been true and must stay true. The
+    // monitor may also run off air, which is what lets an operator hear
+    // their own processing while adjusting it instead of having to
+    // transmit to find out.
+    const bool shouldWriteRx = writesToRadio(actualRunning, voxListening,
+                                             offAirMonitor);
+    const bool shouldSiphon  = feedsMonitor(actualRunning, voxListening,
+                                            offAirMonitor);
+    if (!shouldWriteRx && !shouldSiphon) {
         return;
     }
 
+    // Everything from here to the siphon is the radio write, and it is
+    // wrapped in shouldWriteRx as one block. Guarding each statement
+    // separately would leave the door open for a later edit to add one
+    // outside the guard.
+    if (shouldWriteRx) {
     // Convert m_out (interleaved double) → m_outInterleavedFloat for
     // sendTxIq, which still uses the float* SPSC ring layout.
     // Without HAVE_WDSP, m_out stays all-zeros (silence stream) — keeps
@@ -2986,6 +3032,9 @@ void TxChannel::driveOneTxBlockFromInterleaved(const double* interleavedIn)
     // Push to connection's SPSC ring (producer side).
     // sendTxIq(iq, n): n = number of complex samples; buffer has 2*n floats.
     m_connection->sendTxIq(m_outInterleavedFloat.data(), outN);
+    }   // shouldWriteRx
+
+    if (!shouldSiphon) { return; }
 
     // Siphon signal — MON path (3M-1b D.5).
     //
