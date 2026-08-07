@@ -44,6 +44,15 @@ class QsoMapWindow : public QDialog {
 public:
     explicit QsoMapWindow(QWidget* parent = nullptr);
 
+    // Marked contacts each get their own line, up to this many.
+    //
+    // A cap rather than a promise to draw everything: the arcs are
+    // slerped per repaint, and past a few hundred the globe stops
+    // turning smoothly — which is precisely when a large selection is
+    // being looked at. Contacts beyond the limit are counted in the
+    // summary rather than silently dropped.
+    static constexpr int kMaxMarkedPaths = 500;
+
     // The contacts to draw, and where the operator is. Both may be
     // replaced whenever the log changes.
     void setEntries(const QVector<LogEntry>& entries);

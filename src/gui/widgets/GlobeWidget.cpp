@@ -500,7 +500,7 @@ void GlobeWidget::renderSphere()
 
 void GlobeWidget::drawArc(QPainter& p, double endLat, double endLon,
                           const QColor& col, double width,
-                          double opacity) const
+                          double opacity, int steps) const
 {
     const double dist = angularDistance(m_homeLat, m_homeLon, endLat, endLon);
     if (dist < 0.05) { return; }
@@ -515,10 +515,7 @@ void GlobeWidget::drawArc(QPainter& p, double endLat, double endLon,
     // as a transatlantic path would misrepresent both.
     const double peak = 0.04 + 0.26 * std::min(1.0, dist / 180.0);
 
-    // Fewer samples for the thin bulk arcs. A logbook map draws hundreds
-    // of them, and at 0.7 px wide nobody can see the difference between
-    // 64 segments and 160 — but the widget can feel it.
-    const int kSteps = width < 1.0 ? 64 : 160;
+    const int kSteps = qBound(16, steps, 240);
     QPointF prev;
     bool havePrev = false;
 
@@ -624,10 +621,11 @@ void GlobeWidget::paintEvent(QPaintEvent*)
                 double lat = 0, lon = 0;
                 destinationPoint(m_homeLat, m_homeLon, bear + off, dist,
                                  lat, lon);
-                drawArc(p, lat, lon, accent, 1.0, 0.34);
+                drawArc(p, lat, lon, accent, 1.0, 0.34, 160);
             }
         }
-        drawArc(p, m_targetLat, m_targetLon, accent, 1.6, 1.0);
+        // The live path is one arc and gets the full sample count.
+        drawArc(p, m_targetLat, m_targetLon, accent, 1.6, 1.0, 200);
     }
 
     // Logged contacts. Thinner and dimmer than the live path on purpose:
@@ -637,6 +635,14 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     if (m_hasHome && !m_points.isEmpty()) {
         const QColor faint(Style::kAccent);
         const QColor marked(Style::kAmberText);
+
+        // Sample count against the number of arcs, not the width of
+        // one. Five hundred arcs at the single-path count would be
+        // eighty thousand slerp evaluations per repaint, and the globe
+        // would stop turning smoothly the moment a large selection was
+        // shown — which is exactly when the operator is looking at it.
+        const int n = m_points.size();
+        const int arcSteps = n > 200 ? 40 : (n > 60 ? 72 : 128);
 
         for (int pass = 0; pass < 2; ++pass) {
             const bool wantMarked = pass == 1;
@@ -651,7 +657,8 @@ void GlobeWidget::paintEvent(QPaintEvent*)
                     if (pt.highlight != wantMarked) { continue; }
                     drawArc(p, pt.lat, pt.lon, col,
                             wantMarked ? 1.3 : 0.7,
-                            wantMarked ? 0.9 : 0.22);
+                            wantMarked ? 0.9 : 0.22,
+                            arcSteps);
                 }
             }
             p.setPen(Qt::NoPen);

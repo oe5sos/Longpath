@@ -274,6 +274,10 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     // turning paths off is how you clear the clutter to look at a few
     // marked ones, so removing theirs too would defeat the switch.
     if (m_hasHome) {
+        // Sample count against how many paths are coming, not per path.
+        const int n = m_points.size();
+        const int pathSteps = n > 200 ? 24 : (n > 60 ? 40 : 64);
+
         for (int pass = 0; pass < 2; ++pass) {
             const bool wantMarked = pass == 1;
             if (!wantMarked && !m_showPaths) { continue; }
@@ -281,7 +285,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
                 if (pt.highlight != wantMarked) { continue; }
                 const QVector<QPointF> samples =
                     greatCircleSamples(m_homeLat, m_homeLon,
-                                       pt.lat, pt.lon, 64);
+                                       pt.lat, pt.lon, pathSteps);
                 for (const QVector<QPointF>& run : splitAtAntimeridian(samples)) {
                     if (run.size() < 2) { continue; }
                     QPolygonF poly;

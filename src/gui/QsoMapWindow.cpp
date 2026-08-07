@@ -207,31 +207,47 @@ void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)
     rebuild();
 }
 
+namespace {
+
+// Identity of one logged contact, for telling a marked row from an
+// identical-looking neighbour. Callsign plus timestamp: the same
+// station worked twice is two rows, and marking one must not light the
+// other.
+QString entryKey(const LogEntry& e)
+{
+    return e.call.trimmed().toUpper() + QLatin1Char('|')
+           + e.timeOn.toUTC().toString(Qt::ISODate);
+}
+
+} // namespace
+
 void QsoMapWindow::rebuild()
 {
     const bool onlyMarked = m_onlySelected->isChecked()
                             && !m_selected.isEmpty();
 
-    // Which places are marked. Keyed by grid square rather than by
-    // callsign: the map is a map of places, and two different stations
-    // in one square share a dot.
-    QSet<QString> markedKeys;
-    for (const LogEntry& e : m_selected) {
-        if (isValidGridSquare(e.gridSquare)) {
-            markedKeys.insert(e.gridSquare.left(6).toUpper());
-        }
-    }
+    // Marked rows, identified per contact rather than per grid square.
+    // Keying on the square meant marking one QSO lit every other QSO
+    // from the same square — which for a station worked forty times is
+    // forty lines the operator did not ask for.
+    QSet<QString> markedRows;
+    for (const LogEntry& e : m_selected) { markedRows.insert(entryKey(e)); }
 
     const QVector<LogEntry>& source = onlyMarked ? m_selected : m_all;
     const QDate from = m_from->date();
     const QDate to   = m_to->date();
 
     QVector<MapPoint> points;
-    QSet<QString> seen;
-    int considered = 0;
-    int noGrid     = 0;
+    QSet<QString> seenPlaces;
+    int considered   = 0;
+    int noGrid       = 0;
+    int markedShown  = 0;
+    int markedCut    = 0;
+    int markedNoGrid = 0;
 
     for (const LogEntry& e : source) {
+        const bool marked = markedRows.contains(entryKey(e));
+
         if (!onlyMarked) {
             // A contact with no timestamp is kept rather than dropped:
             // an imported log full of dateless records would otherwise
@@ -241,18 +257,32 @@ void QsoMapWindow::rebuild()
         }
         ++considered;
 
-        if (!isValidGridSquare(e.gridSquare)) { ++noGrid; continue; }
-
-        // One dot per place, not per contact. Working the same station
-        // forty times should not stack forty arcs on one pixel and make
-        // that direction look busier than it is.
-        const QString key = e.gridSquare.left(6).toUpper();
-        if (seen.contains(key)) { continue; }
-        seen.insert(key);
+        if (!isValidGridSquare(e.gridSquare)) {
+            ++noGrid;
+            if (marked) { ++markedNoGrid; }
+            continue;
+        }
 
         double lat = 0, lon = 0;
         calculateLatLonFromGridSquare(e.gridSquare, lat, lon);
-        points.append(MapPoint{lat, lon, e.call, markedKeys.contains(key)});
+        const QString place = e.gridSquare.left(6).toUpper();
+
+        if (marked) {
+            // Every marked contact gets its own line, not one per
+            // place. Two marked QSOs in the same square draw the same
+            // path twice, which is what "show them all" means.
+            if (markedShown >= kMaxMarkedPaths) { ++markedCut; continue; }
+            ++markedShown;
+            points.append(MapPoint{lat, lon, e.call, true});
+            continue;
+        }
+
+        // Unmarked contacts stay one dot per place. Working the same
+        // station forty times should not stack forty arcs on one pixel
+        // and make that direction look busier than it is.
+        if (seenPlaces.contains(place)) { continue; }
+        seenPlaces.insert(place);
+        points.append(MapPoint{lat, lon, e.call, false});
     }
 
     m_globe->setPoints(points);
@@ -265,26 +295,33 @@ void QsoMapWindow::rebuild()
     bits << (onlyMarked
         ? QStringLiteral("%1 marked contacts").arg(considered)
         : QStringLiteral("%1 contacts in range").arg(considered));
-    bits << QStringLiteral("%1 places shown").arg(points.size());
 
-    if (!onlyMarked && !markedKeys.isEmpty()) {
-        int shownMarked = 0;
-        for (const MapPoint& p : points) {
-            if (p.highlight) { ++shownMarked; }
-        }
-        bits << QStringLiteral("%1 marked, in amber").arg(shownMarked);
+    if (markedShown > 0) {
+        bits << QStringLiteral("%1 marked lines").arg(markedShown);
+    }
+    if (markedCut > 0) {
+        bits << QStringLiteral("%1 more marked not drawn (limit %2)")
+                    .arg(markedCut).arg(kMaxMarkedPaths);
+    }
+    if (markedNoGrid > 0) {
+        bits << QStringLiteral("%1 marked without a locator")
+                    .arg(markedNoGrid);
+    }
+    if (!onlyMarked) {
+        bits << QStringLiteral("%1 other places").arg(seenPlaces.size());
         // A row marked outside the date range simply is not there. Say
-        // so, or the operator counts the amber dots and concludes the
-        // marking did not work.
-        const int outside = markedKeys.size() - shownMarked;
+        // so, or the operator counts the amber lines, gets fewer than
+        // they marked, and concludes the marking did not work.
+        const int outside = m_selected.size() - markedShown - markedCut
+                            - markedNoGrid;
         if (outside > 0) {
             bits << QStringLiteral("%1 marked outside the dates")
                         .arg(outside);
         }
     }
-    if (noGrid > 0) {
+    if (noGrid - markedNoGrid > 0) {
         bits << QStringLiteral("%1 without a locator, so not on the map")
-                    .arg(noGrid);
+                    .arg(noGrid - markedNoGrid);
     }
     if (!isValidGridSquare(m_homeGrid)) {
         bits << QStringLiteral("no home locator — paths need one");

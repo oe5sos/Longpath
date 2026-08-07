@@ -134,8 +134,13 @@ private:
     // Radius of the disc in pixels, magnification included.
     double radiusPx() const;
     // One raised great-circle arc from home to the given end point.
+    //
+    // `steps` is the caller's, not the arc's: drawing five hundred of
+    // these is a different budget from drawing one, and the caller is
+    // the only one who knows how many are coming.
     void drawArc(QPainter& p, double endLat, double endLon,
-                 const QColor& col, double width, double opacity) const;
+                 const QColor& col, double width, double opacity,
+                 int steps) const;
 
     QImage m_frame;        // rendered sphere, cached until something moves
 
