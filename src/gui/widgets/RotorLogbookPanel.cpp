@@ -781,8 +781,10 @@ void RotorLogbookPanel::loadStationPhoto(const QString& url)
                      QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply* reply = m_net->get(req);
 
+    // No `this` in the capture list: `show` already holds it, and the
+    // context object above is what governs the lifetime.
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, url, cached, show]() {
+            [reply, cached, show]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) { return; }
 
