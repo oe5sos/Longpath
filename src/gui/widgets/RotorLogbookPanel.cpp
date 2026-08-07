@@ -21,11 +21,13 @@
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
+#include "core/SolarTimes.h"
 #include "gui/StyleConstants.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
+#include <QAction>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -60,6 +62,18 @@ namespace {
 const QString kMyGridKey    = QStringLiteral("StationGridSquare");
 const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
+
+// NASA Blue Marble. Works of the US government are public domain, so
+// this can be fetched and kept without anyone agreeing to anything —
+// which is why it is offered as a download instead of being bundled:
+// the file is larger than the rest of the application's assets put
+// together, and the globe is one optional view.
+constexpr const char* kNasaSmallUrl =
+    "https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/"
+    "land_shallow_topo_2048.jpg";
+constexpr const char* kNasaLargeUrl =
+    "https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/"
+    "world.topo.bathy.200412x5400x2700.jpg";
 
 // Portraits live beside the log, not in the system cache: they are small,
 // they belong to contacts the operator made, and a cache the OS may clear
@@ -114,6 +128,14 @@ RotorLogbookPanel::RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
     wireQrz();
     applyLocators();
     refreshRecentList();
+
+    // The sun keeps moving while you are in QSO. A minute is finer than
+    // the model's own accuracy needs, but coarse enough to be free.
+    auto* solarTick = new QTimer(this);
+    solarTick->setInterval(60 * 1000);
+    connect(solarTick, &QTimer::timeout,
+            this, &RotorLogbookPanel::updateSolarLine);
+    solarTick->start();
 }
 
 QString RotorLogbookPanel::logbookPath()
@@ -199,6 +221,13 @@ void RotorLogbookPanel::buildUi()
     m_stationLine->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
     cardCol->addWidget(m_stationLine);
+
+    // Grey line at the far end. On the low bands this decides whether
+    // the path is open at all, so it belongs next to the callsign, not
+    // buried in a propagation window.
+    m_solarLine = new QLabel(QString{}, this);
+    m_solarLine->setWordWrap(true);
+    cardCol->addWidget(m_solarLine);
     cardCol->addStretch(1);
 
     cardRow->addLayout(cardCol, 1);
@@ -232,8 +261,8 @@ void RotorLogbookPanel::buildUi()
     auto* worldBtn = new QPushButton(QStringLiteral("World image…"), globePage);
     worldBtn->setStyleSheet(Style::buttonBaseStyle());
     worldBtn->setToolTip(QStringLiteral(
-        "Load an equirectangular world map (2:1, e.g. NASA Blue Marble). "
-        "Without one the globe still shows the path, just unpainted."));
+        "Paint the globe with an equirectangular world map (2:1). "
+        "Without one it still shows the path, just unpainted."));
     globeCol->addWidget(worldBtn);
 
     m_viewStack = new QStackedWidget(this);
@@ -244,8 +273,28 @@ void RotorLogbookPanel::buildUi()
     const QString saved =
         AppSettings::instance().value(kWorldImgKey, QString{}).toString();
     if (!saved.isEmpty()) { m_globe->loadTexture(saved); }
-    connect(worldBtn, &QPushButton::clicked,
-            this, &RotorLogbookPanel::chooseWorldImage);
+
+    connect(worldBtn, &QPushButton::clicked, this, [this, worldBtn]() {
+        QMenu menu(this);
+        QAction* small = menu.addAction(
+            QStringLiteral("Download from NASA — 2048 × 1024 (about 1 MB)"));
+        QAction* large = menu.addAction(
+            QStringLiteral("Download from NASA — 5400 × 2700 (about 7 MB)"));
+        menu.addSeparator();
+        QAction* pick = menu.addAction(QStringLiteral("Choose a file…"));
+
+        QAction* chosen = menu.exec(worldBtn->mapToGlobal(
+            QPoint(0, worldBtn->height())));
+        if (chosen == small) {
+            downloadWorldImage(QString::fromLatin1(kNasaSmallUrl),
+                               QStringLiteral("2048 × 1024"));
+        } else if (chosen == large) {
+            downloadWorldImage(QString::fromLatin1(kNasaLargeUrl),
+                               QStringLiteral("5400 × 2700"));
+        } else if (chosen == pick) {
+            chooseWorldImage();
+        }
+    });
 
     // Rotor buttons
     auto* btnRow = new QHBoxLayout;
@@ -479,6 +528,7 @@ void RotorLogbookPanel::applyLocators()
     const double deg = calculateBearingInDegrees(mine, dx);
     m_dial->setTargetBearing(deg);
     updateGlobeFromLocators();
+    updateSolarLine();
     setStatus(QStringLiteral("%1 km · %2° %3")
                   .arg(km, 0, 'f', 0).arg(deg, 0, 'f', 0)
                   .arg(compassPoint(deg)));
@@ -499,12 +549,48 @@ void RotorLogbookPanel::updateGlobeFromLocators()
         double lat = 0.0, lon = 0.0;
         calculateLatLonFromGridSquare(dx, lat, lon);
         m_globe->setTarget(lat, lon);
+        m_dxLat = lat; m_dxLon = lon; m_hasDxPos = true;
     } else {
         m_globe->clearTarget();
     }
     // The sun moves; a terminator computed once at startup would be
     // visibly wrong by evening.
     m_globe->useCurrentSubsolarPoint();
+}
+
+void RotorLogbookPanel::updateSolarLine()
+{
+    if (!m_hasDxPos) {
+        m_solarLine->clear();
+        return;
+    }
+
+    const SolarInfo s =
+        solarInfo(QDateTime::currentDateTimeUtc(), m_dxLat, m_dxLon);
+
+    QString text;
+    if (s.alwaysUp) {
+        text = QStringLiteral("DX: midnight sun");
+    } else if (s.alwaysDown) {
+        text = QStringLiteral("DX: polar night");
+    } else {
+        text = QStringLiteral("DX: SR %1z · SS %2z")
+                   .arg(s.riseUtc.toString(QStringLiteral("HH:mm")),
+                        s.setUtc.toString(QStringLiteral("HH:mm")));
+    }
+    // Elevation with an explicit sign: "-9" reads as night at a glance
+    // in a way that "9 degrees below the horizon" does not.
+    text += QStringLiteral(" · sun %1%2°")
+                .arg(s.elevationDeg >= 0 ? QStringLiteral("+")
+                                         : QStringLiteral("-"))
+                .arg(std::abs(s.elevationDeg), 0, 'f', 0);
+    if (s.greyline) { text += QStringLiteral(" · GREY LINE"); }
+
+    m_solarLine->setText(text);
+    m_solarLine->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 10px; }")
+        .arg(QString::fromLatin1(s.greyline ? Style::kAmberText
+                                            : Style::kTextSecondary)));
 }
 
 void RotorLogbookPanel::chooseWorldImage()
@@ -523,6 +609,65 @@ void RotorLogbookPanel::chooseWorldImage()
     setStatus(QStringLiteral("World image loaded"));
 }
 
+void RotorLogbookPanel::downloadWorldImage(const QString& url,
+                                           const QString& label)
+{
+    if (!m_net) { m_net = new QNetworkAccessManager(this); }
+
+    const QString dest =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        + QStringLiteral("/world.jpg");
+
+    setStatus(QStringLiteral("Downloading world image (%1)…").arg(label));
+
+    QNetworkRequest req{QUrl(url)};
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply* reply = m_net->get(req);
+
+    connect(reply, &QNetworkReply::downloadProgress, this,
+            [this, label](qint64 got, qint64 total) {
+        if (total <= 0) { return; }
+        setStatus(QStringLiteral("Downloading world image (%1) — %2%")
+                      .arg(label).arg(got * 100 / total));
+    });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, dest, url]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            // Name the address. If NASA has moved the file, the operator
+            // can find its replacement and use "Choose a file…" — an
+            // unexplained failure would just look like a broken feature.
+            setStatus(QStringLiteral("Download failed: %1 — you can still "
+                                     "load an image manually (%2)")
+                          .arg(reply->errorString(), url), true);
+            return;
+        }
+
+        const QByteArray bytes = reply->readAll();
+        QFile out(dest);
+        if (!out.open(QIODevice::WriteOnly)) {
+            setStatus(QStringLiteral("Couldn't save the image: %1")
+                          .arg(out.errorString()), true);
+            return;
+        }
+        out.write(bytes);
+        out.close();
+
+        // Load before remembering the path: a truncated or redirected
+        // download must not become the remembered setting.
+        if (!m_globe->loadTexture(dest)) {
+            setStatus(QStringLiteral("That download wasn't a readable image"),
+                      true);
+            return;
+        }
+        AppSettings::instance().setValue(kWorldImgKey, dest);
+        setStatus(QStringLiteral("World image loaded (%1 KB)")
+                      .arg(bytes.size() / 1024));
+    });
+}
+
 void RotorLogbookPanel::onCallsignEdited(const QString& raw)
 {
     const QString call = raw.trimmed().toUpper();
@@ -532,10 +677,12 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
     }
     if (call.isEmpty()) {
         m_stationLine->clear();
+        m_solarLine->clear();
         m_flag->clear();
         m_flag->setVisible(false);
         m_photo->clear();
         m_photo->setVisible(false);
+        m_hasDxPos = false;
         m_lastInfo = CallsignInfo{};
         return;
     }
@@ -555,16 +702,22 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
     m_flag->setText(flag);
     m_flag->setVisible(!flag.isEmpty());
 
-    const QString mine = m_myGrid->text().trimmed().toUpper();
-    if (!isValidGridSquare(mine)) { return; }
-
     const DxccEntity* ent = prefix.isEmpty() ? nullptr
                                              : cty.entityByPrefix(prefix);
     if (!ent || !ent->hasLatLon) { return; }
 
+    // The entity centre is enough for the grey line even with no
+    // locator of our own — sunrise over Japan does not depend on where
+    // the listener is standing.
+    m_dxLat = ent->latitude; m_dxLon = ent->longitude; m_hasDxPos = true;
+    m_globe->setTarget(ent->latitude, ent->longitude);
+    updateSolarLine();
+
+    const QString mine = m_myGrid->text().trimmed().toUpper();
+    if (!isValidGridSquare(mine)) { return; }
+
     const QString entGrid = gridSquareFromLatLon(ent->latitude, ent->longitude);
     m_dial->setTargetBearing(calculateBearingInDegrees(mine, entGrid));
-    m_globe->setTarget(ent->latitude, ent->longitude);
     m_stationLine->setText(QStringLiteral("%1 · %2 km (from prefix)")
         .arg(ent->name)
         .arg(calculateDistanceKm(mine, entGrid), 0, 'f', 0));

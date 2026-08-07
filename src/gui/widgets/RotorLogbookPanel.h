@@ -78,8 +78,14 @@ private:
     void showStationVisuals(const CallsignInfo& info);
     // Point the globe at home and, if known, at the worked station.
     void updateGlobeFromLocators();
+    // Sunrise, sunset and grey line at the far end. Refreshed on a
+    // timer as well as on edit, because the sun moves while you talk.
+    void updateSolarLine();
     // Ask for an equirectangular world image and remember the choice.
     void chooseWorldImage();
+    // Fetch one from NASA. Public-domain imagery, so nothing has to be
+    // bundled and nothing has to be agreed to.
+    void downloadWorldImage(const QString& url, const QString& label);
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
 
@@ -104,8 +110,17 @@ private:
     QLineEdit* m_comment{nullptr};
     QLabel*    m_status{nullptr};
     QLabel*    m_stationLine{nullptr};
+    QLabel*    m_solarLine{nullptr};
     QTableWidget* m_recent{nullptr};
     QPushButton*  m_lookupBtn{nullptr};
+
+    // Best known position of the far end, from whichever source spoke
+    // last: a typed locator, a QRZ grid, or the DXCC entity centre
+    // resolved from the prefix. Kept separately from the locator field
+    // so the grey line still works while only a prefix is known.
+    double m_dxLat{0.0};
+    double m_dxLon{0.0};
+    bool   m_hasDxPos{false};
 
     // Detail from the last successful QRZ lookup. Only folded into a
     // logged contact when it belongs to the callsign being logged —

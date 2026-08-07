@@ -909,6 +909,7 @@ set(GUI_SOURCES
     src/gui/widgets/RotorLogbookPanel.cpp
     src/gui/widgets/GlobeWidget.cpp
     src/core/DxccFlag.cpp
+    src/core/SolarTimes.cpp
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp

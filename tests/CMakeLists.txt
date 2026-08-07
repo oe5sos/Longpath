@@ -4589,6 +4589,10 @@ nereus_add_test(tst_globe_geometry)
 # -- DXCC prefix to flag: known entities, and no guess for the rest --
 nereus_add_test(tst_dxcc_flag)
 
+# -- Sunrise/sunset/elevation against NOAA figures, incl. polar day and
+#    night and the self-consistency of rise time vs elevation --
+nereus_add_test(tst_solar_times)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and
