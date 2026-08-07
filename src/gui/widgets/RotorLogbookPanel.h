@@ -23,8 +23,11 @@
 #include "core/WorkedBefore.h"
 #include "models/LogEntry.h"
 
+#include <QHash>
 #include <QVector>
 #include <QWidget>
+
+class QTimer;
 
 class QLabel;
 class QLineEdit;
@@ -79,6 +82,13 @@ private:
 
     void onCallsignEdited(const QString& raw);   // country estimate
     void onLookupRequested();                    // QRZ, on demand
+    // Start the clock on an automatic QRZ lookup. Debounced, because
+    // firing on every keystroke would send four requests for one
+    // callsign and get the answers back out of order.
+    void scheduleAutoLookup(const QString& call);
+    // Take a locator from a QRZ result into the DX field, unless the
+    // operator has typed one themselves.
+    void adoptGridFromQrz(const CallsignInfo& info);
     void onLogQso();
     // Rotator: set up the link, and start or stop a turn. With nothing
     // connected these fall back to the simulated needle, so the dial
@@ -175,6 +185,21 @@ private:
     // logged contact when it belongs to the callsign being logged —
     // never a leftover card from the previous station.
     CallsignInfo m_lastInfo;
+
+    // Automatic lookup while typing. The timer debounces; the cache
+    // means working a station twice in a contest, or backspacing over
+    // a callsign and retyping it, costs one request rather than
+    // several — which matters when a subscription is metered and a
+    // contest is three hundred callsigns.
+    QTimer* m_lookupTimer{nullptr};
+    QHash<QString, CallsignInfo> m_qrzCache;
+
+    // True while a QRZ grid is being written into the DX field, so the
+    // field's own textChanged does not treat it as the operator typing.
+    bool m_adoptingGrid{false};
+    // Set when the operator edits the locator by hand. A later QRZ
+    // answer must not overwrite what a person deliberately entered.
+    bool m_dxGridIsManual{false};
 };
 
 } // namespace NereusSDR

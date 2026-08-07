@@ -264,6 +264,7 @@ warren@wpratt.com
 #include "core/CloudlogUploader.h"
 #include "core/AdifNetworkUploader.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include "widgets/RxDashboard.h"
@@ -9212,6 +9213,21 @@ void MainWindow::openQrzCredentialsDialog()
     form->addRow(QStringLiteral("Logbook API key"), keyEdit);
     col->addLayout(form);
 
+    // Automatic lookup while typing. On by default because the locator
+    // is what the log wants and nobody remembers to press a button for
+    // it — but switchable, because a contest is several hundred
+    // callsigns and an XML subscription is metered.
+    auto* autoLookup = new QCheckBox(
+        QStringLiteral("Look up automatically while typing a callsign"), &dlg);
+    autoLookup->setChecked(
+        AppSettings::instance()
+            .value(QStringLiteral("QrzAutoLookupWhileTyping"), true).toBool());
+    autoLookup->setToolTip(QStringLiteral(
+        "Fills in the station's locator so the contact is logged with "
+        "one. Answers are remembered for the session, so a callsign "
+        "worked twice costs one lookup."));
+    col->addWidget(autoLookup);
+
     auto* keyNote = new QLabel(QStringLiteral(
         "The logbook key is separate from the password above — "
         "find it on your QRZ logbook settings page."), &dlg);
@@ -9308,6 +9324,9 @@ void MainWindow::openQrzCredentialsDialog()
         CredentialStore::store(QStringLiteral("qrz.logbookkey"),
                                QStringLiteral("logbook"), keyEdit->text());
         m_qrzUploader->setApiKey(keyEdit->text());
+
+        AppSettings::instance().setValue(
+            QStringLiteral("QrzAutoLookupWhileTyping"), autoLookup->isChecked());
         dlg.accept();
     });
 

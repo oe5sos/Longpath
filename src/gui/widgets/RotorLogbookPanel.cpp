@@ -70,6 +70,15 @@ const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
 const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
 const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
+const QString kAutoLookupKey = QStringLiteral("QrzAutoLookupWhileTyping");
+
+// Long enough that typing a callsign is one request, short enough that
+// the answer is there before the operator reaches for the log button.
+constexpr int kAutoLookupDelayMs = 700;
+
+// Below this, a partial callsign matches the pattern often enough to
+// waste a lookup: "OE1" is a legal prefix and not a station.
+constexpr int kMinAutoLookupChars = 4;
 
 // NASA Blue Marble. Works of the US government are public domain, so
 // this can be fetched and kept without anyone agreeing to anything —
@@ -446,8 +455,22 @@ void RotorLogbookPanel::buildUi()
             this, &RotorLogbookPanel::onLookupRequested);
     connect(m_myGrid, &QLineEdit::textChanged,
             this, &RotorLogbookPanel::applyLocators);
-    connect(m_dxGrid, &QLineEdit::textChanged,
-            this, &RotorLogbookPanel::applyLocators);
+    connect(m_dxGrid, &QLineEdit::textChanged, this, [this]() {
+        // Only a human typing here counts as manual. Writing a QRZ
+        // answer into the field must not make the field look defended
+        // against the next QRZ answer.
+        if (!m_adoptingGrid) { m_dxGridIsManual = true; }
+        applyLocators();
+    });
+
+    // Automatic QRZ lookup while typing. Debounced rather than
+    // per-keystroke: OE, OE1, OE1W, OE1WY would otherwise be four
+    // requests for one station, and the replies can land out of order.
+    m_lookupTimer = new QTimer(this);
+    m_lookupTimer->setSingleShot(true);
+    m_lookupTimer->setInterval(kAutoLookupDelayMs);
+    connect(m_lookupTimer, &QTimer::timeout,
+            this, &RotorLogbookPanel::onLookupRequested);
     connect(logBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::onLogQso);
 
@@ -662,14 +685,14 @@ void RotorLogbookPanel::wireQrz()
             [this](const QString& call, const CallsignInfo& info) {
         // A queued reply for a callsign the operator has already typed
         // past must not overwrite the card.
+        // Remember it whatever the operator has typed since — the next
+        // time this callsign comes round, the answer is already here.
+        m_qrzCache.insert(call, info);
+
         if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
         m_lastInfo = info;
 
-        if (isValidGridSquare(info.grid)) {
-            QSignalBlocker block(m_dxGrid);
-            m_dxGrid->setText(info.grid);
-            applyLocators();
-        }
+        adoptGridFromQrz(info);
         QStringList bits;
         if (!info.displayName().isEmpty()) { bits << info.displayName(); }
         if (!info.city.isEmpty())          { bits << info.city; }
@@ -907,6 +930,7 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
         m_callEdit->setText(call);
     }
     updateWorkedLine(call);
+    scheduleAutoLookup(call);
 
     if (call.isEmpty()) {
         m_flagEmoji.clear();
@@ -1129,12 +1153,62 @@ void RotorLogbookPanel::onLookupRequested()
                   true);
         return;
     }
+
+    // Already answered once this session. A contest is three hundred
+    // callsigns and some of them repeat; a metered subscription should
+    // not pay twice for the same answer.
+    if (m_qrzCache.contains(call)) {
+        const CallsignInfo cached = m_qrzCache.value(call);
+        m_lastInfo = cached;
+        adoptGridFromQrz(cached);
+        updateFlagFor(cached.call);
+        QStringList bits;
+        if (!cached.displayName().isEmpty()) { bits << cached.displayName(); }
+        if (!cached.city.isEmpty())          { bits << cached.city; }
+        if (!cached.country.isEmpty())       { bits << cached.country; }
+        setStationLine(bits.join(QStringLiteral(" · ")));
+        showStationVisuals(cached);
+        return;
+    }
+
     if (!m_qrz || !m_qrz->hasCredentials()) {
         setStatus(QStringLiteral("Add your QRZ account in Tools first"), true);
         return;
     }
     setStatus(QStringLiteral("Looking up %1…").arg(call));
     m_qrz->lookup(call);
+}
+
+void RotorLogbookPanel::scheduleAutoLookup(const QString& call)
+{
+    if (!m_lookupTimer) { return; }
+    m_lookupTimer->stop();
+
+    if (!AppSettings::instance().value(kAutoLookupKey, true).toBool()) {
+        return;
+    }
+    if (call.size() < kMinAutoLookupChars) { return; }
+    if (!Callsigns::isLikelyCallsign(call)) { return; }
+    if (!m_qrz || !m_qrz->hasCredentials()) { return; }
+
+    // A cached answer needs no waiting.
+    if (m_qrzCache.contains(call)) { onLookupRequested(); return; }
+
+    m_lookupTimer->start();
+}
+
+void RotorLogbookPanel::adoptGridFromQrz(const CallsignInfo& info)
+{
+    if (!isValidGridSquare(info.grid)) { return; }
+    // Never over a locator a person typed. QRZ is often right and
+    // sometimes years out of date; the operator in front of the radio
+    // has just been told the real one.
+    if (m_dxGridIsManual && !m_dxGrid->text().trimmed().isEmpty()) { return; }
+
+    m_adoptingGrid = true;
+    m_dxGrid->setText(info.grid.trimmed().toUpper());
+    m_adoptingGrid = false;
+    applyLocators();
 }
 
 // ── Logging ─────────────────────────────────────────────────────────
@@ -1256,6 +1330,14 @@ void RotorLogbookPanel::onLogQso()
     // Clear only what belongs to the contact just made. The locators
     // and the reports stay — the next station is usually worked with
     // the same defaults, and retyping "59" every time is friction.
+    // Clear the DX locator too, and forget that it was hand-entered.
+    // Carrying the last station's grid into the next contact is how a
+    // whole run of contest QSOs ends up logged from one square.
+    m_adoptingGrid = true;
+    m_dxGrid->clear();
+    m_adoptingGrid = false;
+    m_dxGridIsManual = false;
+
     m_callEdit->clear();
     m_comment->clear();
     m_stationLine->clear();
