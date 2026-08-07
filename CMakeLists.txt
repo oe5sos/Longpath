@@ -908,8 +908,10 @@ set(GUI_SOURCES
     src/gui/widgets/RotorDialWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp
     src/gui/widgets/GlobeWidget.cpp
+    src/gui/LogbookWindow.cpp
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
+    src/core/AdifLog.cpp
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp

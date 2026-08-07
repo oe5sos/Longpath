@@ -4593,6 +4593,10 @@ nereus_add_test(tst_dxcc_flag)
 #    night and the self-consistency of rise time vs elevation --
 nereus_add_test(tst_solar_times)
 
+# -- Logbook file round-trip: other loggers' extension tags, hhmm times,
+#    values containing '<', a last record with no <EOR>, atomic rewrite --
+nereus_add_test(tst_adif_log)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

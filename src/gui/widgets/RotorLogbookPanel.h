@@ -37,6 +37,7 @@ class QrzClient;
 class QrzLogbookUploader;
 class RadioModel;
 class GlobeWidget;
+class LogbookWindow;
 class RotorDialWidget;
 
 // Aim the antenna and log the contact, in one surface.
@@ -71,11 +72,18 @@ private:
     void onLogQso();
     void applyLocators();
     void refreshRecentList();
+    void openLogbookWindow();
     void setStatus(const QString& text, bool warn = false);
     // Fetch and show the QRZ portrait. Cached on disk so working the
     // same station twice costs one request, not two.
     void loadStationPhoto(const QString& url);
     void showStationVisuals(const CallsignInfo& info);
+    // Flag emoji for the callsign's DXCC prefix, or empty. Kept as a
+    // separate step from displaying it so the lookup can be tested and
+    // so the flag survives a station line being rewritten.
+    void updateFlagFor(const QString& call);
+    // Station line, with the current flag in front of it.
+    void setStationLine(const QString& text);
     // Point the globe at home and, if known, at the worked station.
     void updateGlobeFromLocators();
     // Sunrise, sunset and grey line at the far end. Refreshed on a
@@ -84,8 +92,11 @@ private:
     // Ask for an equirectangular world image and remember the choice.
     void chooseWorldImage();
     // Fetch one from NASA. Public-domain imagery, so nothing has to be
-    // bundled and nothing has to be agreed to.
-    void downloadWorldImage(const QString& url, const QString& label);
+    // bundled and nothing has to be agreed to. Tries the candidates in
+    // order — deep image paths move, and one dead link should cost a
+    // second, not the whole feature.
+    void downloadWorldImage(const QStringList& candidates, int index,
+                            const QString& label);
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
 
@@ -98,7 +109,7 @@ private:
     QStackedWidget*  m_viewStack{nullptr};
     QPushButton*     m_globeBtn{nullptr};
     QLabel*          m_photo{nullptr};
-    QLabel*          m_flag{nullptr};
+    QString          m_flagEmoji;
     // Created on first portrait fetch — a panel that never looks anyone
     // up should not open a network stack.
     QNetworkAccessManager* m_net{nullptr};
@@ -113,6 +124,10 @@ private:
     QLabel*    m_solarLine{nullptr};
     QTableWidget* m_recent{nullptr};
     QPushButton*  m_lookupBtn{nullptr};
+
+    // Created on first use and kept. Two windows over one file is how
+    // one of them ends up writing over the other's correction.
+    LogbookWindow* m_logWindow{nullptr};
 
     // Best known position of the far end, from whichever source spoke
     // last: a typed locator, a QRZ grid, or the DXCC entity centre

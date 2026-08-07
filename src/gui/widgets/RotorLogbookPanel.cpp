@@ -14,6 +14,7 @@
 #include "GlobeWidget.h"
 #include "RotorDialWidget.h"
 
+#include "core/AdifLog.h"
 #include "core/AppSettings.h"
 #include "core/CtyDatParser.h"
 #include "core/DxccColorProvider.h"
@@ -22,6 +23,7 @@
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
 #include "core/SolarTimes.h"
+#include "gui/LogbookWindow.h"
 #include "gui/StyleConstants.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
@@ -68,12 +70,37 @@ const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
 // which is why it is offered as a download instead of being bundled:
 // the file is larger than the rest of the application's assets put
 // together, and the globe is one optional view.
-constexpr const char* kNasaSmallUrl =
-    "https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/"
-    "land_shallow_topo_2048.jpg";
-constexpr const char* kNasaLargeUrl =
-    "https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/"
-    "world.topo.bathy.200412x5400x2700.jpg";
+//
+// Each entry is a list of candidates tried in order. NASA reorganised
+// its image sites and the deep paths do move; one dead link should be
+// a pause of a second, not a feature that does not work. My first
+// attempt at the large one 404'd because the Blue Marble Next
+// Generation naming carries a band count — "200412.3x5400x2700", not
+// "200412x5400x2700" — which is exactly the kind of detail a fallback
+// list exists to absorb.
+const QStringList& smallCandidates()
+{
+    static const QStringList l = {
+        QStringLiteral("https://eoimages.gsfc.nasa.gov/images/imagerecords/"
+                       "57000/57752/land_shallow_topo_2048.jpg"),
+        QStringLiteral("https://eoimages.gsfc.nasa.gov/images/imagerecords/"
+                       "57000/57752/land_ocean_ice_2048.jpg"),
+    };
+    return l;
+}
+
+const QStringList& largeCandidates()
+{
+    static const QStringList l = {
+        QStringLiteral("https://eoimages.gsfc.nasa.gov/images/imagerecords/"
+                       "73000/73909/world.topo.bathy.200412.3x5400x2700.jpg"),
+        QStringLiteral("https://eoimages.gsfc.nasa.gov/images/imagerecords/"
+                       "73000/73776/world.topo.bathy.200408.3x5400x2700.jpg"),
+        QStringLiteral("https://eoimages.gsfc.nasa.gov/images/imagerecords/"
+                       "74000/74117/world.200412.3x5400x2700.jpg"),
+    };
+    return l;
+}
 
 // Portraits live beside the log, not in the system cache: they are small,
 // they belong to contacts the operator made, and a cache the OS may clear
@@ -209,13 +236,10 @@ void RotorLogbookPanel::buildUi()
     auto* cardCol = new QVBoxLayout;
     cardCol->setSpacing(2);
 
-    m_flag = new QLabel(QString{}, this);
-    QFont ff = m_flag->font();
-    ff.setPixelSize(20);
-    m_flag->setFont(ff);
-    m_flag->setVisible(false);
-    cardCol->addWidget(m_flag);
-
+    // The flag lives on the same line as the station text rather than in
+    // a label of its own. A separate row is one more thing that can end
+    // up zero-height or laid out off-screen, and then a missing flag
+    // looks like a missing lookup.
     m_stationLine = new QLabel(QString{}, this);
     m_stationLine->setWordWrap(true);
     m_stationLine->setStyleSheet(QStringLiteral(
@@ -286,10 +310,10 @@ void RotorLogbookPanel::buildUi()
         QAction* chosen = menu.exec(worldBtn->mapToGlobal(
             QPoint(0, worldBtn->height())));
         if (chosen == small) {
-            downloadWorldImage(QString::fromLatin1(kNasaSmallUrl),
+            downloadWorldImage(smallCandidates(), 0,
                                QStringLiteral("2048 × 1024"));
         } else if (chosen == large) {
-            downloadWorldImage(QString::fromLatin1(kNasaLargeUrl),
+            downloadWorldImage(largeCandidates(), 0,
                                QStringLiteral("5400 × 2700"));
         } else if (chosen == pick) {
             chooseWorldImage();
@@ -343,10 +367,20 @@ void RotorLogbookPanel::buildUi()
         e->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
     }
 
+    auto* logRow = new QHBoxLayout;
+    logRow->setSpacing(6);
     auto* logBtn = new QPushButton(QStringLiteral("Log QSO"), this);
     logBtn->setStyleSheet(Style::buttonBaseStyle()
                           + Style::greenCheckedStyle());
-    col->addWidget(logBtn);
+    logRow->addWidget(logBtn, 1);
+    auto* bookBtn = new QPushButton(QStringLiteral("Logbook…"), this);
+    bookBtn->setStyleSheet(Style::buttonBaseStyle());
+    bookBtn->setToolTip(QStringLiteral(
+        "Search, correct and export the whole log"));
+    logRow->addWidget(bookBtn);
+    col->addLayout(logRow);
+    connect(bookBtn, &QPushButton::clicked,
+            this, &RotorLogbookPanel::openLogbookWindow);
 
     m_status = new QLabel(QString{}, this);
     m_status->setWordWrap(true);
@@ -457,7 +491,8 @@ void RotorLogbookPanel::wireQrz()
         if (!info.displayName().isEmpty()) { bits << info.displayName(); }
         if (!info.city.isEmpty())          { bits << info.city; }
         if (!info.country.isEmpty())       { bits << info.country; }
-        m_stationLine->setText(bits.join(QStringLiteral(" · ")));
+        updateFlagFor(info.call);
+        setStationLine(bits.join(QStringLiteral(" · ")));
         showStationVisuals(info);
         setStatus(QString{});
     });
@@ -609,9 +644,12 @@ void RotorLogbookPanel::chooseWorldImage()
     setStatus(QStringLiteral("World image loaded"));
 }
 
-void RotorLogbookPanel::downloadWorldImage(const QString& url,
-                                           const QString& label)
+void RotorLogbookPanel::downloadWorldImage(const QStringList& candidates,
+                                           int index, const QString& label)
 {
+    if (index < 0 || index >= candidates.size()) { return; }
+    const QString url = candidates.at(index);
+
     if (!m_net) { m_net = new QNetworkAccessManager(this); }
 
     const QString dest =
@@ -633,15 +671,25 @@ void RotorLogbookPanel::downloadWorldImage(const QString& url,
     });
 
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, dest, url]() {
+            [this, reply, dest, candidates, index, label]() {
         reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            // Name the address. If NASA has moved the file, the operator
-            // can find its replacement and use "Choose a file…" — an
-            // unexplained failure would just look like a broken feature.
+
+        auto tryNext = [this, candidates, index, label](const QString& why) {
+            if (index + 1 < candidates.size()) {
+                downloadWorldImage(candidates, index + 1, label);
+                return;
+            }
+            // Out of candidates. Name the last address: if NASA has moved
+            // the file for good, the operator can find its replacement and
+            // use "Choose a file…". An unexplained failure would just look
+            // like a feature that does not work.
             setStatus(QStringLiteral("Download failed: %1 — you can still "
                                      "load an image manually (%2)")
-                          .arg(reply->errorString(), url), true);
+                          .arg(why, candidates.last()), true);
+        };
+
+        if (reply->error() != QNetworkReply::NoError) {
+            tryNext(reply->errorString());
             return;
         }
 
@@ -655,11 +703,11 @@ void RotorLogbookPanel::downloadWorldImage(const QString& url,
         out.write(bytes);
         out.close();
 
-        // Load before remembering the path: a truncated or redirected
-        // download must not become the remembered setting.
+        // Load before remembering the path: a truncated download, or an
+        // error page served with status 200, must not become the
+        // remembered setting.
         if (!m_globe->loadTexture(dest)) {
-            setStatus(QStringLiteral("That download wasn't a readable image"),
-                      true);
+            tryNext(QStringLiteral("not a readable image"));
             return;
         }
         AppSettings::instance().setValue(kWorldImgKey, dest);
@@ -676,10 +724,9 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
         m_callEdit->setText(call);
     }
     if (call.isEmpty()) {
+        m_flagEmoji.clear();
         m_stationLine->clear();
         m_solarLine->clear();
-        m_flag->clear();
-        m_flag->setVisible(false);
         m_photo->clear();
         m_photo->setVisible(false);
         m_hasDxPos = false;
@@ -698,13 +745,17 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
 
     // The flag comes from the prefix alone, so it appears as the callsign
     // is typed — no locator and no lookup needed.
-    const QString flag = dxccFlagEmoji(prefix);
-    m_flag->setText(flag);
-    m_flag->setVisible(!flag.isEmpty());
+    updateFlagFor(call);
 
     const DxccEntity* ent = prefix.isEmpty() ? nullptr
                                              : cty.entityByPrefix(prefix);
-    if (!ent || !ent->hasLatLon) { return; }
+    if (!ent || !ent->hasLatLon) {
+        // Even with no coordinates the entity name is worth showing, and
+        // it proves the prefix resolved — which is what a missing flag
+        // would otherwise leave ambiguous.
+        setStationLine(ent ? ent->name : QString{});
+        return;
+    }
 
     // The entity centre is enough for the grey line even with no
     // locator of our own — sunrise over Japan does not depend on where
@@ -718,29 +769,38 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
 
     const QString entGrid = gridSquareFromLatLon(ent->latitude, ent->longitude);
     m_dial->setTargetBearing(calculateBearingInDegrees(mine, entGrid));
-    m_stationLine->setText(QStringLiteral("%1 · %2 km (from prefix)")
+    setStationLine(QStringLiteral("%1 · %2 km (from prefix)")
         .arg(ent->name)
         .arg(calculateDistanceKm(mine, entGrid), 0, 'f', 0));
 }
 
 // ── Station card ────────────────────────────────────────────────────
 
-void RotorLogbookPanel::showStationVisuals(const CallsignInfo& info)
+void RotorLogbookPanel::updateFlagFor(const QString& call)
 {
     // Flag from the DXCC prefix rather than from QRZ's free-text country
     // field: the prefix is what cty.dat resolves deterministically, while
     // "country" arrives spelled a dozen different ways.
-    QString flag;
-    if (m_radio) {
-        if (DxccColorProvider* dxcc = m_radio->dxccColorProvider()) {
-            const QString prefix =
-                dxcc->ctyDat().resolvePrimaryPrefix(info.call);
-            flag = dxccFlagEmoji(prefix);
-        }
-    }
-    m_flag->setText(flag);
-    m_flag->setVisible(!flag.isEmpty());
+    m_flagEmoji.clear();
+    if (!m_radio) { return; }
+    DxccColorProvider* dxcc = m_radio->dxccColorProvider();
+    if (!dxcc) { return; }
+    m_flagEmoji = dxccFlagEmoji(dxcc->ctyDat().resolvePrimaryPrefix(call));
+}
 
+void RotorLogbookPanel::setStationLine(const QString& text)
+{
+    if (m_flagEmoji.isEmpty()) {
+        m_stationLine->setText(text);
+    } else if (text.isEmpty()) {
+        m_stationLine->setText(m_flagEmoji);
+    } else {
+        m_stationLine->setText(m_flagEmoji + QLatin1Char(' ') + text);
+    }
+}
+
+void RotorLogbookPanel::showStationVisuals(const CallsignInfo& info)
+{
     if (AppSettings::instance().value(kShowPhotoKey, true).toBool()
         && !info.imageUrl.isEmpty()) {
         loadStationPhoto(info.imageUrl);
@@ -918,6 +978,7 @@ void RotorLogbookPanel::onLogQso()
     m_callEdit->clear();
     m_comment->clear();
     m_stationLine->clear();
+    m_flagEmoji.clear();
     m_lastInfo = CallsignInfo{};
     m_callEdit->setFocus();
 }
@@ -926,65 +987,53 @@ void RotorLogbookPanel::refreshRecentList()
 {
     m_recent->setRowCount(0);
 
-    QFile f(logbookPath());
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { return; }
-    const QString text = QString::fromUtf8(f.readAll());
-    f.close();
-
-    // Read back what was written rather than remembering it: the list
-    // then shows the file's truth, including contacts from earlier
+    // Read the file back rather than remembering what was written: the
+    // list then shows the file's truth, including contacts from earlier
     // sessions, and a write that silently failed would be visible.
-    static const QRegularExpression fieldRe(
-        QStringLiteral("<([A-Za-z_]+):(\\d+)(?::[A-Za-z])?>"));
+    //
+    // Shares AdifLog with the logbook window, so the dock and the window
+    // can never disagree about what a record says.
+    QVector<LogEntry> all = AdifLog::read(logbookPath());
 
-    struct Row { QString time, call, band, mode; };
-    QList<Row> rows;
-    Row cur;
-
-    int pos = 0;
-    while (pos < text.size()) {
-        const int lt = text.indexOf(QLatin1Char('<'), pos);
-        if (lt < 0) { break; }
-        const int gt = text.indexOf(QLatin1Char('>'), lt);
-        if (gt < 0) { break; }
-        const QString spec = text.mid(lt + 1, gt - lt - 1);
-        pos = gt + 1;
-
-        if (spec.compare(QStringLiteral("EOR"), Qt::CaseInsensitive) == 0) {
-            if (!cur.call.isEmpty()) { rows.append(cur); }
-            cur = Row{};
-            continue;
+    // Sort rather than trusting file order. The file is written oldest
+    // first, but an imported log need not be, and relying on position
+    // would put the twelve oldest contacts here without any error.
+    std::stable_sort(all.begin(), all.end(),
+                     [](const LogEntry& a, const LogEntry& b) {
+        if (a.timeOn.isValid() != b.timeOn.isValid()) {
+            return a.timeOn.isValid();
         }
-        const QStringList parts = spec.split(QLatin1Char(':'));
-        if (parts.size() < 2) { continue; }
-        bool ok = false;
-        const int len = parts.at(1).toInt(&ok);
-        // ADIF is length-prefixed; a value may legally contain '<', so
-        // walking lengths is the only correct way to read it.
-        if (!ok || len < 0 || pos + len > text.size()) { continue; }
-        const QString value = text.mid(pos, len);
-        pos += len;
+        return a.timeOn > b.timeOn;
+    });
 
-        const QString name = parts.at(0).toUpper();
-        if      (name == QLatin1String("CALL"))    { cur.call = value; }
-        else if (name == QLatin1String("BAND"))    { cur.band = value; }
-        else if (name == QLatin1String("MODE"))    { cur.mode = value; }
-        else if (name == QLatin1String("TIME_ON")) {
-            cur.time = value.left(4);
-            cur.time.insert(2, QLatin1Char(':'));
-        }
-    }
-
-    const int shown = std::min<int>(rows.size(), 12);
+    const int shown = std::min<int>(all.size(), 12);
     m_recent->setRowCount(shown);
     for (int i = 0; i < shown; ++i) {
-        const Row& r = rows.at(rows.size() - 1 - i);   // newest first
-        m_recent->setItem(i, 0, new QTableWidgetItem(r.time));
-        m_recent->setItem(i, 1, new QTableWidgetItem(r.call));
-        m_recent->setItem(i, 2, new QTableWidgetItem(r.band));
-        m_recent->setItem(i, 3, new QTableWidgetItem(r.mode));
+        const LogEntry& e = all.at(i);   // already newest first
+        const QDateTime u = e.timeOn.toUTC();
+        m_recent->setItem(i, 0, new QTableWidgetItem(
+            u.isValid() ? u.toString(QStringLiteral("hh:mm")) : QString{}));
+        m_recent->setItem(i, 1, new QTableWidgetItem(e.call));
+        m_recent->setItem(i, 2, new QTableWidgetItem(e.band));
+        m_recent->setItem(i, 3, new QTableWidgetItem(
+            e.submode.isEmpty() ? e.mode : e.submode));
     }
     m_recent->resizeColumnsToContents();
+}
+
+void RotorLogbookPanel::openLogbookWindow()
+{
+    // One window, reused. Opening a second copy of the same file in two
+    // windows is how one of them ends up writing over the other's edit.
+    if (!m_logWindow) {
+        m_logWindow = new LogbookWindow(logbookPath(), this);
+        connect(m_logWindow, &LogbookWindow::logChanged,
+                this, &RotorLogbookPanel::refreshRecentList);
+    }
+    m_logWindow->reload();
+    m_logWindow->show();
+    m_logWindow->raise();
+    m_logWindow->activateWindow();
 }
 
 void RotorLogbookPanel::setStatus(const QString& text, bool warn)
