@@ -9000,16 +9000,37 @@ void MainWindow::openQrzCredentialsDialog()
     auto* userEdit = new QLineEdit(
         AppSettings::instance().value(QStringLiteral("QrzUsername"),
                                       QString{}).toString(), &dlg);
-    // User-visible placeholder — a real example, not an "e.g." prefix.
-    userEdit->setPlaceholderText(QStringLiteral("OE5SOS"));
+    // NOT a realistic callsign. A grey "OE5SOS" in an empty required
+    // field reads as already filled in — that exact placeholder cost
+    // an afternoon of chasing a QRZ login that was never being sent
+    // because the username was blank.
+    userEdit->setPlaceholderText(QStringLiteral("your QRZ callsign"));
     form->addRow(QStringLiteral("Callsign"), userEdit);
 
     auto* passEdit = new QLineEdit(&dlg);
     passEdit->setEchoMode(QLineEdit::Password);
+    passEdit->setPlaceholderText(QStringLiteral("your QRZ password"));
     passEdit->setText(CredentialStore::retrieve(
         QStringLiteral("qrz.password"), userEdit->text()));
     form->addRow(QStringLiteral("Password"), passEdit);
     col->addLayout(form);
+
+    // Empty required fields get an amber border, not only a sentence
+    // under the form. Same reason as the locator field: a status line
+    // is easy to read past when the placeholder looks like a value.
+    const QString kNeedsInput = QString::fromLatin1(Style::kLineEditStyle)
+        + QStringLiteral("QLineEdit { border: 1px solid %1; }")
+              .arg(Style::kAmberBorder);
+    auto markEmpty = [kNeedsInput](QLineEdit* e) {
+        e->setStyleSheet(e->text().trimmed().isEmpty()
+            ? kNeedsInput : QString::fromLatin1(Style::kLineEditStyle));
+    };
+    for (QLineEdit* e : {userEdit, passEdit}) {
+        markEmpty(e);
+        connect(e, &QLineEdit::textChanged, &dlg, [markEmpty, e]() {
+            markEmpty(e);
+        });
+    }
 
     // Say where the password goes. On a platform without a keychain it
     // is session-only, and the operator needs to know that rather than
