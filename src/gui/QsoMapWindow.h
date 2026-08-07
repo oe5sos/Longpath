@@ -49,12 +49,19 @@ public:
     void setEntries(const QVector<LogEntry>& entries);
     void setHomeGrid(const QString& grid);
 
+    // Rows picked out in the log's table. Passing a non-empty selection
+    // switches the window to showing only those; the operator can flip
+    // back to the date range, where they stay picked out in colour
+    // rather than being the only thing drawn.
+    void setSelection(const QVector<LogEntry>& selected);
+
 private:
     void buildUi();
-    void applyRange();
+    void rebuild();
     void setQuickRange(int days);   // 0 means everything
 
     QVector<LogEntry> m_all;
+    QVector<LogEntry> m_selected;
     QString m_homeGrid;
 
     QStackedWidget* m_stack{nullptr};
@@ -64,8 +71,13 @@ private:
     QDateEdit*   m_from{nullptr};
     QDateEdit*   m_to{nullptr};
     QCheckBox*   m_paths{nullptr};
+    QCheckBox*   m_onlySelected{nullptr};
     QLabel*      m_summary{nullptr};
     QPushButton* m_viewBtn{nullptr};
+    // The date controls and the quick-range buttons, greyed together
+    // while only the selection is shown — a live date field that
+    // changes nothing is worse than a disabled one.
+    QVector<QWidget*> m_rangeControls;
 };
 
 } // namespace NereusSDR

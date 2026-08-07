@@ -631,26 +631,55 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     }
 
     // Logged contacts. Thinner and dimmer than the live path on purpose:
-    // 500 arcs drawn like the one live path would bury it.
+    // 500 arcs drawn like the one live path would bury it. Contacts
+    // marked in the log's table are drawn in a second pass, so they are
+    // not buried under the ordinary ones either.
     if (m_hasHome && !m_points.isEmpty()) {
         const QColor faint(Style::kAccent);
-        if (m_showPointPaths) {
+        const QColor marked(Style::kAmberText);
+
+        for (int pass = 0; pass < 2; ++pass) {
+            const bool wantMarked = pass == 1;
+            const QColor col = wantMarked ? marked : faint;
+
+            if (m_showPointPaths) {
+                for (const MapPoint& pt : m_points) {
+                    if (pt.highlight != wantMarked) { continue; }
+                    drawArc(p, pt.lat, pt.lon, col,
+                            wantMarked ? 1.3 : 0.7,
+                            wantMarked ? 0.9 : 0.22);
+                }
+            }
+            p.setPen(Qt::NoPen);
             for (const MapPoint& pt : m_points) {
-                drawArc(p, pt.lat, pt.lon, faint, 0.7, 0.22);
+                if (pt.highlight != wantMarked) { continue; }
+                QPointF s;
+                if (!project(pt.lat, pt.lon, s)) { continue; }
+                QColor glow = col;
+                glow.setAlpha(wantMarked ? 120 : 80);
+                p.setBrush(glow);
+                p.drawEllipse(s, wantMarked ? 6.5 : 4.5,
+                                 wantMarked ? 6.5 : 4.5);
+                p.setBrush(col);
+                p.drawEllipse(s, wantMarked ? 2.8 : 2.0,
+                                 wantMarked ? 2.8 : 2.0);
+            }
+            p.setBrush(Qt::NoBrush);
+
+            if (wantMarked) {
+                QFont lf = p.font();
+                lf.setPixelSize(9);
+                lf.setBold(true);
+                p.setFont(lf);
+                p.setPen(marked);
+                for (const MapPoint& pt : m_points) {
+                    if (!pt.highlight || pt.label.isEmpty()) { continue; }
+                    QPointF s;
+                    if (!project(pt.lat, pt.lon, s)) { continue; }
+                    p.drawText(s + QPointF(8, 3), pt.label);
+                }
             }
         }
-        p.setPen(Qt::NoPen);
-        for (const MapPoint& pt : m_points) {
-            QPointF s;
-            if (!project(pt.lat, pt.lon, s)) { continue; }
-            QColor glow = faint;
-            glow.setAlpha(80);
-            p.setBrush(glow);
-            p.drawEllipse(s, 4.5, 4.5);
-            p.setBrush(faint);
-            p.drawEllipse(s, 2.0, 2.0);
-        }
-        p.setBrush(Qt::NoBrush);
     }
 
     auto marker = [&](double lat, double lon, const QColor& col,

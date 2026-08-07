@@ -568,6 +568,14 @@ void LogbookWindow::openMap()
     }
     m_map->setHomeGrid(home);
     m_map->setEntries(m_all);
+
+    // Rows picked out in the table go to the map as a selection. With
+    // none picked, the map falls back to its date range — opening it
+    // with nothing selected should still show something.
+    QVector<LogEntry> marked;
+    for (int idx : selectedSourceRows()) { marked.append(m_all.at(idx)); }
+    m_map->setSelection(marked);
+
     m_map->show();
     m_map->raise();
     m_map->activateWindow();

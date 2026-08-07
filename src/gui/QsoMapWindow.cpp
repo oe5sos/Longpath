@@ -56,17 +56,20 @@ void QsoMapWindow::buildUi()
         return l;
     };
 
-    bar->addWidget(caption(QStringLiteral("FROM")));
+    QLabel* fromCap = caption(QStringLiteral("FROM"));
+    bar->addWidget(fromCap);
     m_from = new QDateEdit(QDate::currentDate().addDays(-30), this);
     m_from->setCalendarPopup(true);
     m_from->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
     bar->addWidget(m_from);
 
-    bar->addWidget(caption(QStringLiteral("TO")));
+    QLabel* toCap = caption(QStringLiteral("TO"));
+    bar->addWidget(toCap);
     m_to = new QDateEdit(QDate::currentDate(), this);
     m_to->setCalendarPopup(true);
     m_to->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
     bar->addWidget(m_to);
+    m_rangeControls << fromCap << m_from << toCap << m_to;
 
     // Quick ranges, because typing two dates to answer "what did I work
     // this week" is three interactions too many.
@@ -77,12 +80,22 @@ void QsoMapWindow::buildUi()
         auto* b = new QPushButton(QString::fromLatin1(q.label), this);
         b->setStyleSheet(Style::buttonBaseStyle());
         bar->addWidget(b);
+        m_rangeControls << b;
         const int days = q.days;
         connect(b, &QPushButton::clicked, this,
                 [this, days]() { setQuickRange(days); });
     }
 
     bar->addStretch(1);
+
+    m_onlySelected = new QCheckBox(QStringLiteral("Only marked"), this);
+    m_onlySelected->setEnabled(false);
+    m_onlySelected->setToolTip(QStringLiteral(
+        "Show only the rows picked out in the logbook. Unticked, they "
+        "stay marked in colour among the rest."));
+    m_onlySelected->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                                      .arg(QString::fromLatin1(Style::kAmberText)));
+    bar->addWidget(m_onlySelected);
 
     m_paths = new QCheckBox(QStringLiteral("Paths"), this);
     m_paths->setChecked(true);
@@ -126,8 +139,32 @@ void QsoMapWindow::buildUi()
         m_globe->setShowPointPaths(on);
         m_flat->setShowPaths(on);
     });
-    connect(m_from, &QDateEdit::dateChanged, this, &QsoMapWindow::applyRange);
-    connect(m_to,   &QDateEdit::dateChanged, this, &QsoMapWindow::applyRange);
+    connect(m_from, &QDateEdit::dateChanged, this, &QsoMapWindow::rebuild);
+    connect(m_to,   &QDateEdit::dateChanged, this, &QsoMapWindow::rebuild);
+    connect(m_onlySelected, &QCheckBox::toggled, this, [this](bool on) {
+        // A live date field that changes nothing on screen is worse
+        // than a disabled one.
+        for (QWidget* w : m_rangeControls) { w->setEnabled(!on); }
+        rebuild();
+    });
+}
+
+void QsoMapWindow::setSelection(const QVector<LogEntry>& selected)
+{
+    m_selected = selected;
+    const bool any = !m_selected.isEmpty();
+
+    QSignalBlocker block(m_onlySelected);
+    m_onlySelected->setEnabled(any);
+    m_onlySelected->setText(any
+        ? QStringLiteral("Only marked (%1)").arg(m_selected.size())
+        : QStringLiteral("Only marked"));
+    // Opened from a selection, start by showing just that — it is what
+    // the operator asked for. The tick is there to widen it back out.
+    m_onlySelected->setChecked(any);
+    for (QWidget* w : m_rangeControls) { w->setEnabled(!any); }
+
+    rebuild();
 }
 
 void QsoMapWindow::setQuickRange(int days)
@@ -147,7 +184,7 @@ void QsoMapWindow::setQuickRange(int days)
     } else {
         m_from->setDate(QDate::currentDate().addDays(-days + 1));
     }
-    applyRange();
+    rebuild();
 }
 
 void QsoMapWindow::setHomeGrid(const QString& grid)
@@ -167,26 +204,42 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
 void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)
 {
     m_all = entries;
-    applyRange();
+    rebuild();
 }
 
-void QsoMapWindow::applyRange()
+void QsoMapWindow::rebuild()
 {
+    const bool onlyMarked = m_onlySelected->isChecked()
+                            && !m_selected.isEmpty();
+
+    // Which places are marked. Keyed by grid square rather than by
+    // callsign: the map is a map of places, and two different stations
+    // in one square share a dot.
+    QSet<QString> markedKeys;
+    for (const LogEntry& e : m_selected) {
+        if (isValidGridSquare(e.gridSquare)) {
+            markedKeys.insert(e.gridSquare.left(6).toUpper());
+        }
+    }
+
+    const QVector<LogEntry>& source = onlyMarked ? m_selected : m_all;
     const QDate from = m_from->date();
     const QDate to   = m_to->date();
 
     QVector<MapPoint> points;
     QSet<QString> seen;
-    int inRange = 0;
-    int noGrid  = 0;
+    int considered = 0;
+    int noGrid     = 0;
 
-    for (const LogEntry& e : m_all) {
-        // A contact with no timestamp is kept rather than dropped: an
-        // imported log full of dateless records would otherwise produce
-        // an empty map for every range the operator tries.
-        const QDate d = e.timeOn.toUTC().date();
-        if (d.isValid() && (d < from || d > to)) { continue; }
-        ++inRange;
+    for (const LogEntry& e : source) {
+        if (!onlyMarked) {
+            // A contact with no timestamp is kept rather than dropped:
+            // an imported log full of dateless records would otherwise
+            // produce an empty map for every range the operator tries.
+            const QDate d = e.timeOn.toUTC().date();
+            if (d.isValid() && (d < from || d > to)) { continue; }
+        }
+        ++considered;
 
         if (!isValidGridSquare(e.gridSquare)) { ++noGrid; continue; }
 
@@ -199,7 +252,7 @@ void QsoMapWindow::applyRange()
 
         double lat = 0, lon = 0;
         calculateLatLonFromGridSquare(e.gridSquare, lat, lon);
-        points.append(MapPoint{lat, lon, e.call});
+        points.append(MapPoint{lat, lon, e.call, markedKeys.contains(key)});
     }
 
     m_globe->setPoints(points);
@@ -209,8 +262,26 @@ void QsoMapWindow::applyRange()
     // log looks exactly like a map of the whole log, and the operator
     // has no way to tell the difference.
     QStringList bits;
-    bits << QStringLiteral("%1 contacts in range").arg(inRange);
+    bits << (onlyMarked
+        ? QStringLiteral("%1 marked contacts").arg(considered)
+        : QStringLiteral("%1 contacts in range").arg(considered));
     bits << QStringLiteral("%1 places shown").arg(points.size());
+
+    if (!onlyMarked && !markedKeys.isEmpty()) {
+        int shownMarked = 0;
+        for (const MapPoint& p : points) {
+            if (p.highlight) { ++shownMarked; }
+        }
+        bits << QStringLiteral("%1 marked, in amber").arg(shownMarked);
+        // A row marked outside the date range simply is not there. Say
+        // so, or the operator counts the amber dots and concludes the
+        // marking did not work.
+        const int outside = markedKeys.size() - shownMarked;
+        if (outside > 0) {
+            bits << QStringLiteral("%1 marked outside the dates")
+                        .arg(outside);
+        }
+    }
     if (noGrid > 0) {
         bits << QStringLiteral("%1 without a locator, so not on the map")
                     .arg(noGrid);

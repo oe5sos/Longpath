@@ -263,48 +263,66 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     p.setBrush(Qt::NoBrush);
     p.drawRect(r);
 
-    // Paths first, so the markers sit on top of them.
+    const QColor accent(Style::kAccent);
+    const QColor marked(Style::kAmberText);
+
+    // Paths first, so the markers sit on top of them. Marked contacts
+    // are drawn in a second pass so their lines are not buried under
+    // hundreds of ordinary ones.
     if (m_showPaths && m_hasHome) {
-        const QColor accent(Style::kAccent);
-        for (const MapPoint& pt : m_points) {
-            const QVector<QPointF> samples =
-                greatCircleSamples(m_homeLat, m_homeLon, pt.lat, pt.lon, 64);
-            for (const QVector<QPointF>& run : splitAtAntimeridian(samples)) {
-                if (run.size() < 2) { continue; }
-                QPolygonF poly;
-                poly.reserve(run.size());
-                for (const QPointF& s : run) {
-                    poly << project(s.y(), s.x());
+        for (int pass = 0; pass < 2; ++pass) {
+            const bool wantMarked = pass == 1;
+            for (const MapPoint& pt : m_points) {
+                if (pt.highlight != wantMarked) { continue; }
+                const QVector<QPointF> samples =
+                    greatCircleSamples(m_homeLat, m_homeLon,
+                                       pt.lat, pt.lon, 64);
+                for (const QVector<QPointF>& run : splitAtAntimeridian(samples)) {
+                    if (run.size() < 2) { continue; }
+                    QPolygonF poly;
+                    poly.reserve(run.size());
+                    for (const QPointF& s : run) {
+                        poly << project(s.y(), s.x());
+                    }
+                    p.setOpacity(wantMarked ? 0.95 : 0.35);
+                    p.setPen(QPen(wantMarked ? marked : accent,
+                                  wantMarked ? 1.6 : 1.0));
+                    p.drawPolyline(poly);
                 }
-                p.setOpacity(0.35);
-                p.setPen(QPen(accent, 1.0));
-                p.drawPolyline(poly);
             }
         }
         p.setOpacity(1.0);
     }
 
-    // Contacts.
-    const QColor dot(Style::kAccent);
+    // Contacts. Marked ones last, so they sit on top.
     const bool labels = m_points.size() <= 40 && m_zoom >= 1.0;
     QFont f = p.font();
     f.setPixelSize(9);
     p.setFont(f);
 
-    for (const MapPoint& pt : m_points) {
-        const QPointF s = project(pt.lat, pt.lon);
-        if (!r.contains(s)) { continue; }
-        p.setPen(Qt::NoPen);
-        QColor glow = dot;
-        glow.setAlpha(90);
-        p.setBrush(glow);
-        p.drawEllipse(s, 5.5, 5.5);
-        p.setBrush(dot);
-        p.drawEllipse(s, 2.4, 2.4);
-        if (labels && !pt.label.isEmpty()) {
-            p.setBrush(Qt::NoBrush);
-            p.setPen(QColor(Style::kTextPrimary));
-            p.drawText(s + QPointF(7, 3), pt.label);
+    for (int pass = 0; pass < 2; ++pass) {
+        const bool wantMarked = pass == 1;
+        for (const MapPoint& pt : m_points) {
+            if (pt.highlight != wantMarked) { continue; }
+            const QPointF s = project(pt.lat, pt.lon);
+            if (!r.contains(s)) { continue; }
+
+            const QColor dot = wantMarked ? marked : accent;
+            p.setPen(Qt::NoPen);
+            QColor glow = dot;
+            glow.setAlpha(wantMarked ? 120 : 90);
+            p.setBrush(glow);
+            p.drawEllipse(s, wantMarked ? 7.5 : 5.5, wantMarked ? 7.5 : 5.5);
+            p.setBrush(dot);
+            p.drawEllipse(s, wantMarked ? 3.2 : 2.4, wantMarked ? 3.2 : 2.4);
+
+            // A marked contact is always named. Finding it among the
+            // rest is the entire reason it was marked.
+            if (!pt.label.isEmpty() && (wantMarked || labels)) {
+                p.setBrush(Qt::NoBrush);
+                p.setPen(wantMarked ? marked : QColor(Style::kTextPrimary));
+                p.drawText(s + QPointF(8, 3), pt.label);
+            }
         }
     }
 

@@ -26,6 +26,12 @@ struct MapPoint {
     double  lat{0.0};
     double  lon{0.0};   // positive east, matching the Maidenhead helpers
     QString label;
+
+    // Picked out in the log's table. Drawn last, in a different colour,
+    // and always labelled — the point of marking rows is to find them
+    // among the rest, so hiding the rest would answer a different
+    // question than the one being asked.
+    bool highlight{false};
 };
 
 } // namespace NereusSDR
