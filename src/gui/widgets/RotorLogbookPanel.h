@@ -26,7 +26,9 @@
 
 class QLabel;
 class QLineEdit;
+class QNetworkAccessManager;
 class QPushButton;
+class QStackedWidget;
 class QTableWidget;
 
 namespace NereusSDR {
@@ -34,6 +36,7 @@ namespace NereusSDR {
 class QrzClient;
 class QrzLogbookUploader;
 class RadioModel;
+class GlobeWidget;
 class RotorDialWidget;
 
 // Aim the antenna and log the contact, in one surface.
@@ -69,6 +72,14 @@ private:
     void applyLocators();
     void refreshRecentList();
     void setStatus(const QString& text, bool warn = false);
+    // Fetch and show the QRZ portrait. Cached on disk so working the
+    // same station twice costs one request, not two.
+    void loadStationPhoto(const QString& url);
+    void showStationVisuals(const CallsignInfo& info);
+    // Point the globe at home and, if known, at the worked station.
+    void updateGlobeFromLocators();
+    // Ask for an equirectangular world image and remember the choice.
+    void chooseWorldImage();
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
 
@@ -77,6 +88,14 @@ private:
     QrzLogbookUploader* m_uploader{nullptr};
 
     RotorDialWidget* m_dial{nullptr};
+    GlobeWidget*     m_globe{nullptr};
+    QStackedWidget*  m_viewStack{nullptr};
+    QPushButton*     m_globeBtn{nullptr};
+    QLabel*          m_photo{nullptr};
+    QLabel*          m_flag{nullptr};
+    // Created on first portrait fetch — a panel that never looks anyone
+    // up should not open a network stack.
+    QNetworkAccessManager* m_net{nullptr};
     QLineEdit* m_callEdit{nullptr};
     QLineEdit* m_myGrid{nullptr};
     QLineEdit* m_dxGrid{nullptr};

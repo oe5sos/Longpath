@@ -11,11 +11,13 @@
 // =================================================================
 
 #include "RotorLogbookPanel.h"
+#include "GlobeWidget.h"
 #include "RotorDialWidget.h"
 
 #include "core/AppSettings.h"
 #include "core/CtyDatParser.h"
 #include "core/DxccColorProvider.h"
+#include "core/DxccFlag.h"
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
@@ -24,21 +26,30 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QFileDialog>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QStackedWidget>
 #include <QStandardPaths>
 #include <QTableWidget>
 #include <QTextStream>
 #include <QVBoxLayout>
 #include <QTimer>
 #include <QRegularExpression>
+#include <QUrl>
 
 #include <algorithm>
 
@@ -46,7 +57,29 @@ namespace NereusSDR {
 
 namespace {
 
-const QString kMyGridKey = QStringLiteral("StationGridSquare");
+const QString kMyGridKey    = QStringLiteral("StationGridSquare");
+const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
+const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
+
+// Portraits live beside the log, not in the system cache: they are small,
+// they belong to contacts the operator made, and a cache the OS may clear
+// would silently start costing a request per lookup again.
+QString photoCacheDir()
+{
+    const QString dir =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        + QStringLiteral("/qrz-photos");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString photoCachePath(const QString& url)
+{
+    const QByteArray h =
+        QCryptographicHash::hash(url.toUtf8(), QCryptographicHash::Sha1);
+    return photoCacheDir() + QLatin1Char('/') + QString::fromLatin1(h.toHex())
+           + QStringLiteral(".img");
+}
 
 QLabel* caption(const QString& text, QWidget* parent)
 {
@@ -119,11 +152,57 @@ void RotorLogbookPanel::buildUi()
     callRow->addWidget(m_lookupBtn);
     col->addLayout(callRow);
 
+    // Station card: portrait, flag, name line. The portrait is on the
+    // left and fixed-width so the text below never reflows as images of
+    // different shapes arrive.
+    auto* cardRow = new QHBoxLayout;
+    cardRow->setSpacing(8);
+
+    m_photo = new QLabel(this);
+    m_photo->setFixedSize(78, 78);
+    m_photo->setAlignment(Qt::AlignCenter);
+    m_photo->setScaledContents(false);
+    m_photo->setStyleSheet(QStringLiteral(
+        "QLabel { background: %1; border: 1px solid %2; border-radius: 3px; }")
+        .arg(QString::fromLatin1(Style::kInsetBg),
+             QString::fromLatin1(Style::kBorderSubtle)));
+    m_photo->setVisible(false);
+    // A portrait is one network request per station, so it has to be
+    // switchable — and a setting nobody can find is not a switch.
+    m_photo->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_photo, &QLabel::customContextMenuRequested, this,
+            [this](const QPoint& pos) {
+        QMenu menu(this);
+        QAction* off = menu.addAction(QStringLiteral("Don't show QRZ photos"));
+        if (menu.exec(m_photo->mapToGlobal(pos)) == off) {
+            AppSettings::instance().setValue(kShowPhotoKey, false);
+            m_photo->clear();
+            m_photo->setVisible(false);
+            setStatus(QStringLiteral("QRZ photos off — re-enable in settings "
+                                     "(%1)").arg(kShowPhotoKey));
+        }
+    });
+    cardRow->addWidget(m_photo, 0, Qt::AlignTop);
+
+    auto* cardCol = new QVBoxLayout;
+    cardCol->setSpacing(2);
+
+    m_flag = new QLabel(QString{}, this);
+    QFont ff = m_flag->font();
+    ff.setPixelSize(20);
+    m_flag->setFont(ff);
+    m_flag->setVisible(false);
+    cardCol->addWidget(m_flag);
+
     m_stationLine = new QLabel(QString{}, this);
     m_stationLine->setWordWrap(true);
     m_stationLine->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
-    col->addWidget(m_stationLine);
+    cardCol->addWidget(m_stationLine);
+    cardCol->addStretch(1);
+
+    cardRow->addLayout(cardCol, 1);
+    col->addLayout(cardRow);
 
     // Locators
     auto* gridRow = new QHBoxLayout;
@@ -139,8 +218,34 @@ void RotorLogbookPanel::buildUi()
     gridRow->addWidget(m_dxGrid, 1);
     col->addLayout(gridRow);
 
-    m_dial = new RotorDialWidget(this);
-    col->addWidget(m_dial, 1);
+    // Dial and globe share one slot rather than stacking vertically: in a
+    // dock this narrow, two 260 px squares would push the log off screen,
+    // and they answer the same question in two ways.
+    m_dial  = new RotorDialWidget(this);
+    m_globe = new GlobeWidget(this);
+
+    auto* globePage = new QWidget(this);
+    auto* globeCol  = new QVBoxLayout(globePage);
+    globeCol->setContentsMargins(0, 0, 0, 0);
+    globeCol->setSpacing(4);
+    globeCol->addWidget(m_globe, 1);
+    auto* worldBtn = new QPushButton(QStringLiteral("World image…"), globePage);
+    worldBtn->setStyleSheet(Style::buttonBaseStyle());
+    worldBtn->setToolTip(QStringLiteral(
+        "Load an equirectangular world map (2:1, e.g. NASA Blue Marble). "
+        "Without one the globe still shows the path, just unpainted."));
+    globeCol->addWidget(worldBtn);
+
+    m_viewStack = new QStackedWidget(this);
+    m_viewStack->addWidget(m_dial);
+    m_viewStack->addWidget(globePage);
+    col->addWidget(m_viewStack, 1);
+
+    const QString saved =
+        AppSettings::instance().value(kWorldImgKey, QString{}).toString();
+    if (!saved.isEmpty()) { m_globe->loadTexture(saved); }
+    connect(worldBtn, &QPushButton::clicked,
+            this, &RotorLogbookPanel::chooseWorldImage);
 
     // Rotor buttons
     auto* btnRow = new QHBoxLayout;
@@ -152,6 +257,19 @@ void RotorLogbookPanel::buildUi()
         b->setStyleSheet(Style::buttonBaseStyle());
         btnRow->addWidget(b);
     }
+    m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
+    m_globeBtn->setCheckable(true);
+    m_globeBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_globeBtn->setToolTip(QStringLiteral("Swap the dial for the globe view"));
+    btnRow->addWidget(m_globeBtn);
+    connect(m_globeBtn, &QPushButton::toggled, this, [this](bool on) {
+        m_viewStack->setCurrentIndex(on ? 1 : 0);
+        // Idle spin only while the globe is the thing being looked at —
+        // motion in a hidden page is wasted, and in a visible corner it
+        // is a distraction while operating.
+        m_globe->setAutoRotate(false);
+        if (on) { updateGlobeFromLocators(); }
+    });
     col->addLayout(btnRow);
 
     // Report + log
@@ -233,19 +351,17 @@ void RotorLogbookPanel::buildUi()
     // Turning and OnTarget states stay reachable.
     auto* timer = new QTimer(this);
     timer->setInterval(40);
-    connect(rotateBtn, &QPushButton::clicked, this, [this, timer]() {
-        if (m_dial->hasTarget()) {
-            m_dial->setState(RotorDialWidget::State::Turning);
-            timer->start();
-        }
-    });
+    auto beginTurn = [this, timer]() {
+        if (!m_dial->hasTarget()) { return; }
+        m_dial->setState(RotorDialWidget::State::Turning);
+        timer->start();
+        // Swing the globe round to the heading as the mast turns: the
+        // point of the view is watching which way the path goes.
+        m_globe->lookAlongBearing(m_dial->targetBearing());
+    };
+    connect(rotateBtn, &QPushButton::clicked, this, beginTurn);
     connect(m_dial, &RotorDialWidget::rotateRequested, this,
-            [this, timer](double) {
-        if (m_dial->hasTarget()) {
-            m_dial->setState(RotorDialWidget::State::Turning);
-            timer->start();
-        }
-    });
+            [beginTurn](double) { beginTurn(); });
     connect(stopBtn, &QPushButton::clicked, this, [this, timer]() {
         timer->stop();
         m_dial->setState(RotorDialWidget::State::Targeted);
@@ -293,6 +409,7 @@ void RotorLogbookPanel::wireQrz()
         if (!info.city.isEmpty())          { bits << info.city; }
         if (!info.country.isEmpty())       { bits << info.country; }
         m_stationLine->setText(bits.join(QStringLiteral(" · ")));
+        showStationVisuals(info);
         setStatus(QString{});
     });
 
@@ -361,9 +478,49 @@ void RotorLogbookPanel::applyLocators()
     const double km  = calculateDistanceKm(mine, dx);
     const double deg = calculateBearingInDegrees(mine, dx);
     m_dial->setTargetBearing(deg);
+    updateGlobeFromLocators();
     setStatus(QStringLiteral("%1 km · %2° %3")
                   .arg(km, 0, 'f', 0).arg(deg, 0, 'f', 0)
                   .arg(compassPoint(deg)));
+}
+
+void RotorLogbookPanel::updateGlobeFromLocators()
+{
+    if (!m_globe) { return; }
+    const QString mine = m_myGrid->text().trimmed().toUpper();
+    const QString dx   = m_dxGrid->text().trimmed().toUpper();
+
+    if (isValidGridSquare(mine)) {
+        double lat = 0.0, lon = 0.0;
+        calculateLatLonFromGridSquare(mine, lat, lon);
+        m_globe->setHome(lat, lon);
+    }
+    if (isValidGridSquare(dx)) {
+        double lat = 0.0, lon = 0.0;
+        calculateLatLonFromGridSquare(dx, lat, lon);
+        m_globe->setTarget(lat, lon);
+    } else {
+        m_globe->clearTarget();
+    }
+    // The sun moves; a terminator computed once at startup would be
+    // visibly wrong by evening.
+    m_globe->useCurrentSubsolarPoint();
+}
+
+void RotorLogbookPanel::chooseWorldImage()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Choose an equirectangular world image"),
+        AppSettings::instance().value(kWorldImgKey, QString{}).toString(),
+        QStringLiteral("Images (*.jpg *.jpeg *.png *.tif *.tiff *.webp)"));
+    if (path.isEmpty()) { return; }
+
+    if (!m_globe->loadTexture(path)) {
+        setStatus(QStringLiteral("Couldn't read that image"), true);
+        return;
+    }
+    AppSettings::instance().setValue(kWorldImgKey, path);
+    setStatus(QStringLiteral("World image loaded"));
 }
 
 void RotorLogbookPanel::onCallsignEdited(const QString& raw)
@@ -375,28 +532,116 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
     }
     if (call.isEmpty()) {
         m_stationLine->clear();
+        m_flag->clear();
+        m_flag->setVisible(false);
+        m_photo->clear();
+        m_photo->setVisible(false);
         m_lastInfo = CallsignInfo{};
         return;
     }
 
     // Country estimate from cty.dat — no network, so it keeps up with
     // typing. QRZ replaces it on demand.
-    const QString mine = m_myGrid->text().trimmed().toUpper();
-    if (!isValidGridSquare(mine) || !m_radio) { return; }
+    if (!m_radio) { return; }
     DxccColorProvider* dxcc = m_radio->dxccColorProvider();
     if (!dxcc) { return; }
 
     const CtyDatParser& cty = dxcc->ctyDat();
     const QString prefix = cty.resolvePrimaryPrefix(call);
+
+    // The flag comes from the prefix alone, so it appears as the callsign
+    // is typed — no locator and no lookup needed.
+    const QString flag = dxccFlagEmoji(prefix);
+    m_flag->setText(flag);
+    m_flag->setVisible(!flag.isEmpty());
+
+    const QString mine = m_myGrid->text().trimmed().toUpper();
+    if (!isValidGridSquare(mine)) { return; }
+
     const DxccEntity* ent = prefix.isEmpty() ? nullptr
                                              : cty.entityByPrefix(prefix);
     if (!ent || !ent->hasLatLon) { return; }
 
     const QString entGrid = gridSquareFromLatLon(ent->latitude, ent->longitude);
     m_dial->setTargetBearing(calculateBearingInDegrees(mine, entGrid));
+    m_globe->setTarget(ent->latitude, ent->longitude);
     m_stationLine->setText(QStringLiteral("%1 · %2 km (from prefix)")
         .arg(ent->name)
         .arg(calculateDistanceKm(mine, entGrid), 0, 'f', 0));
+}
+
+// ── Station card ────────────────────────────────────────────────────
+
+void RotorLogbookPanel::showStationVisuals(const CallsignInfo& info)
+{
+    // Flag from the DXCC prefix rather than from QRZ's free-text country
+    // field: the prefix is what cty.dat resolves deterministically, while
+    // "country" arrives spelled a dozen different ways.
+    QString flag;
+    if (m_radio) {
+        if (DxccColorProvider* dxcc = m_radio->dxccColorProvider()) {
+            const QString prefix =
+                dxcc->ctyDat().resolvePrimaryPrefix(info.call);
+            flag = dxccFlagEmoji(prefix);
+        }
+    }
+    m_flag->setText(flag);
+    m_flag->setVisible(!flag.isEmpty());
+
+    if (AppSettings::instance().value(kShowPhotoKey, true).toBool()
+        && !info.imageUrl.isEmpty()) {
+        loadStationPhoto(info.imageUrl);
+    } else {
+        m_photo->clear();
+        m_photo->setVisible(false);
+    }
+}
+
+void RotorLogbookPanel::loadStationPhoto(const QString& url)
+{
+    const QUrl u(url);
+    // QRZ portraits are ordinary https URLs; anything else is not a
+    // portrait and should not be fetched just because a field said so.
+    if (!u.isValid() || u.scheme() != QLatin1String("https")) { return; }
+
+    auto show = [this](const QByteArray& bytes) {
+        QPixmap pm;
+        if (!pm.loadFromData(bytes)) { return false; }
+        m_photo->setPixmap(pm.scaled(m_photo->size() - QSize(2, 2),
+                                     Qt::KeepAspectRatio,
+                                     Qt::SmoothTransformation));
+        m_photo->setVisible(true);
+        return true;
+    };
+
+    const QString cached = photoCachePath(url);
+    QFile cf(cached);
+    if (cf.open(QIODevice::ReadOnly)) {
+        const QByteArray bytes = cf.readAll();
+        cf.close();
+        if (show(bytes)) { return; }
+    }
+
+    if (!m_net) { m_net = new QNetworkAccessManager(this); }
+    QNetworkRequest req(u);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply* reply = m_net->get(req);
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, url, cached, show]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) { return; }
+
+        const QByteArray bytes = reply->readAll();
+        // Cap what gets written: a redirect to something huge should not
+        // fill the config directory with a file nobody asked for.
+        if (bytes.isEmpty() || bytes.size() > 4 * 1024 * 1024) { return; }
+        if (!show(bytes)) { return; }
+
+        QFile out(cached);
+        if (out.open(QIODevice::WriteOnly)) { out.write(bytes); }
+    });
 }
 
 void RotorLogbookPanel::onLookupRequested()

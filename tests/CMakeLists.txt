@@ -4582,6 +4582,13 @@ target_link_libraries(tst_qrz_client PRIVATE Qt6::Network)
 nereus_add_test(tst_log_entry)
 target_link_libraries(tst_log_entry PRIVATE Qt6::Network)
 
+# -- GlobeWidget geometry: subsolar point (terminator) and great-circle
+#    slerp (the path), both static so no window is needed --
+nereus_add_test(tst_globe_geometry)
+
+# -- DXCC prefix to flag: known entities, and no guess for the rest --
+nereus_add_test(tst_dxcc_flag)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and
