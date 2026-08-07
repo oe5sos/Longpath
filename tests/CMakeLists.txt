@@ -4627,6 +4627,10 @@ nereus_add_test(tst_log_filter)
 #    wrong factor is a useless notch rather than a crash --
 nereus_add_test(tst_anf_tuning)
 
+# -- rotctld command line and the curated controller list: loopback
+#    only, no stray -r, and ARCO/ERC reachable from the picker --
+nereus_add_test(tst_rotctld_process)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

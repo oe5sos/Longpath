@@ -20,6 +20,7 @@
 // =================================================================
 
 #include "core/CallsignInfo.h"
+#include "core/RotctldProcess.h"
 #include "core/WorkedBefore.h"
 #include "models/LogEntry.h"
 
@@ -179,6 +180,10 @@ private:
     // The rotator link, and the timer that stands in for one. Exactly
     // one of the two drives the needle at any moment.
     RotctldClient* m_rotor{nullptr};
+    // rotctld started by us, when the controller is on this computer.
+    // Owned so it is stopped on the way out rather than left holding
+    // the serial port.
+    RotctldProcess m_rotorProc;
     QTimer*        m_simTimer{nullptr};
 
     // Best known position of the far end, from whichever source spoke

@@ -23,6 +23,8 @@
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
 #include "core/RotctldClient.h"
+#include "core/RotctldProcess.h"
+#include "core/RotorModels.h"
 #include "core/SolarTimes.h"
 #include "gui/LogbookWindow.h"
 #include "gui/StyleConstants.h"
@@ -31,6 +33,7 @@
 #include "models/SliceModel.h"
 
 #include <QAction>
+#include <QComboBox>
 #include <QCryptographicHash>
 #include <QDialog>
 #include <QDir>
@@ -58,6 +61,9 @@
 #include <QTimer>
 #include <QRegularExpression>
 #include <QUrl>
+#ifdef HAVE_SERIALPORT
+#include <QSerialPortInfo>
+#endif
 
 #include <algorithm>
 
@@ -70,6 +76,10 @@ const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
 const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
 const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
+const QString kRotorUseSerialKey = QStringLiteral("RotorUseLocalSerial");
+const QString kRotorModelKey     = QStringLiteral("RotorHamlibModel");
+const QString kRotorDeviceKey    = QStringLiteral("RotorSerialDevice");
+const QString kRotorBaudKey      = QStringLiteral("RotorSerialBaud");
 const QString kAutoLookupKey = QStringLiteral("QrzAutoLookupWhileTyping");
 
 // Long enough that typing a callsign is one request, short enough that
@@ -609,42 +619,110 @@ void RotorLogbookPanel::openRotorSetupDialog()
     col->setContentsMargins(14, 14, 14, 14);
     col->setSpacing(10);
 
-    auto* form = new QFormLayout;
-    auto* hostEdit = new QLineEdit(m_rotor->host(), &dlg);
+    AppSettings& s = AppSettings::instance();
+
+    // Two ways in. Most operators want the first and should not have to
+    // know the second exists; anyone already running rotctld their own
+    // way, or with the controller on another machine, needs the second
+    // and would be blocked without it.
+    auto* modeBox = new QComboBox(&dlg);
+    modeBox->addItem(QStringLiteral("Controller on this computer"));
+    modeBox->addItem(QStringLiteral("rotctld already running (network)"));
+    modeBox->setCurrentIndex(
+        s.value(kRotorUseSerialKey, true).toBool() ? 0 : 1);
+    col->addWidget(modeBox);
+
+    // ── Local: model + port + baud ───────────────────────────────────
+    auto* localBox = new QWidget(&dlg);
+    auto* localForm = new QFormLayout(localBox);
+    localForm->setContentsMargins(0, 0, 0, 0);
+
+    auto* modelCombo = new QComboBox(localBox);
+    const QVector<RotorModel> models = commonRotorModels();
+    for (const RotorModel& m : models) {
+        modelCombo->addItem(QStringLiteral("%1  (%2)").arg(m.name)
+                                .arg(m.hamlibId), m.hamlibId);
+    }
+    // Anything Hamlib knows that is not in the short list.
+    modelCombo->addItem(QStringLiteral("Other — enter a Hamlib number"), -1);
+    const int savedModel = s.value(kRotorModelKey, 601).toInt();
+    const int at = modelCombo->findData(savedModel);
+    modelCombo->setCurrentIndex(at >= 0 ? at : 0);
+    localForm->addRow(QStringLiteral("Controller"), modelCombo);
+
+    auto* otherEdit = new QLineEdit(QString::number(savedModel), localBox);
+    otherEdit->setPlaceholderText(QStringLiteral("rotctl --list shows them all"));
+    otherEdit->setVisible(at < 0);
+    localForm->addRow(QStringLiteral("Model number"), otherEdit);
+
+    auto* noteLabel = new QLabel(localBox);
+    noteLabel->setWordWrap(true);
+    noteLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                 .arg(QString::fromLatin1(Style::kTextSecondary)));
+    localForm->addRow(QString{}, noteLabel);
+
+    auto* portCombo = new QComboBox(localBox);
+    portCombo->setEditable(true);   // a port that is not plugged in yet
+    localForm->addRow(QStringLiteral("Serial port"), portCombo);
+
+    auto* baudCombo = new QComboBox(localBox);
+    for (int b : commonRotorBauds()) { baudCombo->addItem(QString::number(b), b); }
+    const int savedBaud = s.value(kRotorBaudKey, 9600).toInt();
+    const int bat = baudCombo->findData(savedBaud);
+    baudCombo->setCurrentIndex(bat >= 0 ? bat : baudCombo->findData(9600));
+    localForm->addRow(QStringLiteral("Speed"), baudCombo);
+    col->addWidget(localBox);
+
+    auto refreshPorts = [portCombo, &s]() {
+        const QString keep = portCombo->currentText();
+        portCombo->clear();
+#ifdef HAVE_SERIALPORT
+        for (const QSerialPortInfo& info : QSerialPortInfo::availablePorts()) {
+            // Name the device beside the path. "/dev/tty.usbserial-1410"
+            // tells nobody which box it is; "FT232R USB UART" does.
+            const QString desc = info.description().isEmpty()
+                ? info.manufacturer() : info.description();
+            portCombo->addItem(desc.isEmpty()
+                ? info.systemLocation()
+                : QStringLiteral("%1  —  %2").arg(info.systemLocation(), desc),
+                info.systemLocation());
+        }
+#endif
+        if (portCombo->count() == 0) {
+            portCombo->addItem(QStringLiteral("no serial ports found"),
+                               QString{});
+        }
+        const QString saved = keep.isEmpty()
+            ? s.value(kRotorDeviceKey, QString{}).toString() : keep;
+        if (!saved.isEmpty()) {
+            const int i = portCombo->findData(saved);
+            if (i >= 0) { portCombo->setCurrentIndex(i); }
+            else { portCombo->setEditText(saved); }
+        }
+    };
+    refreshPorts();
+
+    // ── Network: host + port ─────────────────────────────────────────
+    auto* netBox = new QWidget(&dlg);
+    auto* netForm = new QFormLayout(netBox);
+    netForm->setContentsMargins(0, 0, 0, 0);
+    auto* hostEdit = new QLineEdit(m_rotor->host(), netBox);
     hostEdit->setPlaceholderText(
         QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
-    form->addRow(QStringLiteral("Host"), hostEdit);
-
-    auto* portEdit = new QLineEdit(QString::number(m_rotor->port()), &dlg);
+    netForm->addRow(QStringLiteral("Host"), hostEdit);
+    auto* portEdit = new QLineEdit(QString::number(m_rotor->port()), netBox);
     portEdit->setPlaceholderText(QStringLiteral("4533"));
-    form->addRow(QStringLiteral("Port"), portEdit);
-    col->addLayout(form);
+    netForm->addRow(QStringLiteral("Port"), portEdit);
+    col->addWidget(netBox);
 
-    auto* note = new QLabel(QStringLiteral(
-        "NereusSDR speaks Hamlib's rotctld. For a rotator on a serial "
-        "port, run rotctld on the machine it is plugged into — for "
-        "example\n\n"
-        "    rotctld -m 603 -r /dev/tty.usbserial-1410 -T 0.0.0.0\n\n"
-        "and put that machine's address above. -m 603 is Yaesu GS-232B; "
-        "rotctl --list shows the rest."), &dlg);
-    note->setWordWrap(true);
-    note->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
-                            .arg(QString::fromLatin1(Style::kTextSecondary)));
-    col->addWidget(note);
-
-    auto* status = new QLabel(
-        m_rotor->isConnected()
-            ? QStringLiteral("Connected — %1").arg(m_rotor->description())
-            : QStringLiteral("Not connected"), &dlg);
+    auto* status = new QLabel(&dlg);
     status->setWordWrap(true);
     status->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                               .arg(QString::fromLatin1(Style::kTextSecondary)));
     col->addWidget(status);
 
     auto* row = new QHBoxLayout;
-    auto* connectBtn = new QPushButton(
-        m_rotor->isConnected() ? QStringLiteral("Disconnect")
-                               : QStringLiteral("Connect"), &dlg);
+    auto* connectBtn = new QPushButton(&dlg);
     connectBtn->setStyleSheet(Style::buttonBaseStyle());
     row->addWidget(connectBtn);
     row->addStretch(1);
@@ -653,33 +731,89 @@ void RotorLogbookPanel::openRotorSetupDialog()
     row->addWidget(closeBtn);
     col->addLayout(row);
 
-    // Report inside the dialog while it is open, so a wrong address
-    // fails where the operator is looking rather than behind it.
+    auto currentModel = [modelCombo, otherEdit]() {
+        const int id = modelCombo->currentData().toInt();
+        return id > 0 ? id : otherEdit->text().trimmed().toInt();
+    };
+
+    auto refreshUi = [&]() {
+        const bool local = modeBox->currentIndex() == 0;
+        localBox->setVisible(local);
+        netBox->setVisible(!local);
+        otherEdit->setVisible(local
+                              && modelCombo->currentData().toInt() < 0);
+
+        const int id = currentModel();
+        QString note;
+        for (const RotorModel& m : models) {
+            if (m.hamlibId == id) { note = m.note; break; }
+        }
+        if (note.isEmpty() && RotctldProcess::findBinary().isEmpty()) {
+            note = QStringLiteral("Hamlib is not installed — "
+                                  "brew install hamlib");
+        }
+        noteLabel->setText(note);
+        noteLabel->setVisible(!note.isEmpty());
+
+        connectBtn->setText(m_rotor->isConnected()
+            ? QStringLiteral("Disconnect") : QStringLiteral("Connect"));
+        status->setText(m_rotor->isConnected()
+            ? QStringLiteral("Connected — %1").arg(m_rotor->description())
+            : QStringLiteral("Not connected"));
+    };
+    refreshUi();
+
+    connect(modeBox, &QComboBox::currentIndexChanged, &dlg,
+            [&](int) { refreshUi(); });
+    connect(modelCombo, &QComboBox::currentIndexChanged, &dlg,
+            [&](int) { refreshUi(); });
+
     auto reportConn = connect(m_rotor, &RotorController::errorOccurred,
                               &dlg, [status](const QString& m) {
         status->setText(m);
     });
     auto reportState = connect(m_rotor, &RotorController::stateChanged,
-                               &dlg, [this, status, connectBtn](auto) {
-        status->setText(m_rotor->isConnected()
-            ? QStringLiteral("Connected — %1").arg(m_rotor->description())
-            : QStringLiteral("Not connected"));
-        connectBtn->setText(m_rotor->isConnected()
-            ? QStringLiteral("Disconnect") : QStringLiteral("Connect"));
-    });
+                               &dlg, [&](auto) { refreshUi(); });
 
-    connect(connectBtn, &QPushButton::clicked, &dlg,
-            [this, hostEdit, portEdit]() {
+    connect(connectBtn, &QPushButton::clicked, &dlg, [&]() {
         if (m_rotor->isConnected()) {
             m_rotor->disconnectFromRotor();
+            m_rotorProc.stop();
+            refreshUi();
             return;
         }
-        const QString host = hostEdit->text().trimmed();
-        const quint16 port =
-            static_cast<quint16>(portEdit->text().trimmed().toUInt());
-        m_rotor->setTarget(host, port ? port : 4533);
-        AppSettings::instance().setValue(kRotorHostKey, host);
-        AppSettings::instance().setValue(kRotorPortKey, port ? port : 4533);
+
+        const bool local = modeBox->currentIndex() == 0;
+        s.setValue(kRotorUseSerialKey, local);
+
+        if (local) {
+            const int model = currentModel();
+            const QString device = portCombo->currentData().isValid()
+                && !portCombo->currentData().toString().isEmpty()
+                    ? portCombo->currentData().toString()
+                    : portCombo->currentText().trimmed();
+            const int baud = baudCombo->currentData().toInt();
+
+            s.setValue(kRotorModelKey, model);
+            s.setValue(kRotorDeviceKey, device);
+            s.setValue(kRotorBaudKey, baud);
+
+            QString err;
+            if (!m_rotorProc.start(model, device, baud, 4533, &err)) {
+                status->setText(err);
+                return;
+            }
+            m_rotor->setTarget(QStringLiteral("127.0.0.1"), 4533);
+            s.setValue(kRotorHostKey, QStringLiteral("127.0.0.1"));
+            s.setValue(kRotorPortKey, 4533);
+        } else {
+            const QString host = hostEdit->text().trimmed();
+            const quint16 port =
+                static_cast<quint16>(portEdit->text().trimmed().toUInt());
+            m_rotor->setTarget(host, port ? port : 4533);
+            s.setValue(kRotorHostKey, host);
+            s.setValue(kRotorPortKey, port ? port : 4533);
+        }
         m_rotor->connectToRotor();
     });
     connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
@@ -687,139 +821,6 @@ void RotorLogbookPanel::openRotorSetupDialog()
     dlg.exec();
     disconnect(reportConn);
     disconnect(reportState);
-}
-
-void RotorLogbookPanel::wireQrz()
-{
-    if (!m_qrz) {
-        m_lookupBtn->setEnabled(false);
-        m_lookupBtn->setToolTip(
-            QStringLiteral("Add your QRZ account in Tools to enable lookups"));
-        return;
-    }
-
-    connect(m_qrz, &QrzClient::lookupSucceeded, this,
-            [this](const QString& call, const CallsignInfo& info) {
-        // A queued reply for a callsign the operator has already typed
-        // past must not overwrite the card.
-        // Remember it whatever the operator has typed since — the next
-        // time this callsign comes round, the answer is already here.
-        m_qrzCache.insert(call, info);
-
-        if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
-        m_lastInfo = info;
-
-        adoptGridFromQrz(info);
-        QStringList bits;
-        if (!info.displayName().isEmpty()) { bits << info.displayName(); }
-        if (!info.city.isEmpty())          { bits << info.city; }
-        if (!info.country.isEmpty())       { bits << info.country; }
-        updateFlagFor(info.call);
-        setStationLine(bits.join(QStringLiteral(" · ")));
-        showStationVisuals(info);
-        setStatus(QString{});
-    });
-
-    connect(m_qrz, &QrzClient::lookupFailed, this,
-            [this](const QString& call, QrzClient::Error err,
-                   const QString& msg) {
-        if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
-        m_lastInfo = CallsignInfo{};
-        switch (err) {
-        case QrzClient::Error::NotFound:
-            setStatus(QStringLiteral("%1 isn't in QRZ — country estimate kept")
-                          .arg(call), true);
-            break;
-        case QrzClient::Error::AuthFailed:
-            setStatus(QStringLiteral("QRZ rejected the login"), true);
-            break;
-        case QrzClient::Error::Network:
-            setStatus(QStringLiteral("Couldn't reach QRZ — estimate kept"), true);
-            break;
-        case QrzClient::Error::Provider:
-            setStatus(msg.isEmpty() ? QStringLiteral("QRZ returned no data")
-                                    : msg, true);
-            break;
-        }
-    });
-
-    if (m_uploader) {
-        connect(m_uploader, &QsoUploader::uploadFinished, this,
-                [this](const QString& call, bool ok, bool duplicate,
-                       const QString& message) {
-            if (ok) {
-                // Record that it got through. Without this the answer
-                // is forgotten at the next restart, and the only safe
-                // thing left is to send everything again.
-                markUploaded(call);
-            }
-            setStatus(ok
-                ? QStringLiteral("%1 — %2").arg(call,
-                      duplicate ? QStringLiteral("already in your QRZ logbook")
-                                : message)
-                // The contact is in the local file regardless; say so,
-                // or a failed upload reads as a lost QSO.
-                : QStringLiteral("%1 logged locally, QRZ upload failed: %2")
-                      .arg(call, message),
-                !ok);
-        });
-    }
-}
-
-// ── Bearings ────────────────────────────────────────────────────────
-
-void RotorLogbookPanel::applyLocators()
-{
-    const QString mine = m_myGrid->text().trimmed().toUpper();
-    const QString dx   = m_dxGrid->text().trimmed().toUpper();
-    AppSettings::instance().setValue(kMyGridKey, mine);
-
-    const QString needsInput = QString::fromLatin1(Style::kLineEditStyle)
-        + QStringLiteral("QLineEdit { border: 1px solid %1; }")
-              .arg(Style::kAmberBorder);
-    const bool myOk = isValidGridSquare(mine);
-    m_myGrid->setStyleSheet(myOk ? QString::fromLatin1(Style::kLineEditStyle)
-                                 : needsInput);
-    if (!myOk) {
-        setStatus(mine.isEmpty()
-            ? QStringLiteral("Enter your own locator to get bearings")
-            : QStringLiteral("%1 is not a valid locator").arg(mine), true);
-        return;
-    }
-    if (!isValidGridSquare(dx)) { return; }
-
-    const double km  = calculateDistanceKm(mine, dx);
-    const double deg = calculateBearingInDegrees(mine, dx);
-    m_dial->setTargetBearing(deg);
-    updateGlobeFromLocators();
-    updateSolarLine();
-    setStatus(QStringLiteral("%1 km · %2° %3")
-                  .arg(km, 0, 'f', 0).arg(deg, 0, 'f', 0)
-                  .arg(compassPoint(deg)));
-}
-
-void RotorLogbookPanel::updateGlobeFromLocators()
-{
-    if (!m_globe) { return; }
-    const QString mine = m_myGrid->text().trimmed().toUpper();
-    const QString dx   = m_dxGrid->text().trimmed().toUpper();
-
-    if (isValidGridSquare(mine)) {
-        double lat = 0.0, lon = 0.0;
-        calculateLatLonFromGridSquare(mine, lat, lon);
-        m_globe->setHome(lat, lon);
-    }
-    if (isValidGridSquare(dx)) {
-        double lat = 0.0, lon = 0.0;
-        calculateLatLonFromGridSquare(dx, lat, lon);
-        m_globe->setTarget(lat, lon);
-        m_dxLat = lat; m_dxLon = lon; m_hasDxPos = true;
-    } else {
-        m_globe->clearTarget();
-    }
-    // The sun moves; a terminator computed once at startup would be
-    // visibly wrong by evening.
-    m_globe->useCurrentSubsolarPoint();
 }
 
 void RotorLogbookPanel::updateSolarLine()
