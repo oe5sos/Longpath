@@ -8982,6 +8982,28 @@ void MainWindow::openRotorDial()
         col->setContentsMargins(10, 10, 10, 10);
         col->setSpacing(8);
 
+        // ── Callsign ─────────────────────────────────────────────────
+        // Typing shows the direction immediately, from the cty.dat DXCC
+        // entity centre — no network, no Enter. Country-level accuracy,
+        // which is all that is needed to know which way to turn. Enter
+        // is reserved for actually driving the rotator, so a half-typed
+        // callsign can never start the antenna moving.
+        auto* callEdit = new QLineEdit(m_rotorWindow);
+        // User-visible placeholder — a real example, not an "e.g." prefix.
+        callEdit->setPlaceholderText(QStringLiteral("G0ABC"));
+        QFont callFont = callEdit->font();
+        callFont.setPixelSize(16);
+        callFont.setBold(true);
+        callEdit->setFont(callFont);
+        callEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+        m_rotorWindow->setFocusProxy(callEdit);
+        col->addWidget(callEdit);
+
+        auto* callStatus = new QLabel(QString{}, m_rotorWindow);
+        callStatus->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
+        col->addWidget(callStatus);
+
         // ── Locators ─────────────────────────────────────────────────
         auto& settings = AppSettings::instance();
         const QString myGridKey = QStringLiteral("StationGridSquare");
@@ -9053,6 +9075,61 @@ void MainWindow::openRotorDial()
         connect(myGridEdit, &QLineEdit::textChanged, this, applyGrids);
         connect(dxGridEdit, &QLineEdit::textChanged, this, applyGrids);
         applyGrids();
+
+        // Callsign → DXCC entity centre → bearing, on every keystroke.
+        connect(callEdit, &QLineEdit::textChanged, this,
+                [this, callEdit, myGridEdit, dxGridEdit, callStatus](
+                    const QString& raw) {
+            const QString call = raw.trimmed().toUpper();
+            if (call != raw) {
+                QSignalBlocker block(callEdit);
+                callEdit->setText(call);
+            }
+            if (call.isEmpty()) { callStatus->clear(); return; }
+
+            const QString mine = myGridEdit->text().trimmed().toUpper();
+            if (!isValidGridSquare(mine)) {
+                callStatus->setText(
+                    QStringLiteral("Enter your own locator to get bearings"));
+                return;
+            }
+            DxccColorProvider* dxcc =
+                m_radioModel ? m_radioModel->dxccColorProvider() : nullptr;
+            if (!dxcc) { return; }
+
+            const CtyDatParser& cty = dxcc->ctyDat();
+            const QString prefix = cty.resolvePrimaryPrefix(call);
+            const DxccEntity* ent = prefix.isEmpty()
+                ? nullptr : cty.entityByPrefix(prefix);
+            if (!ent || !ent->hasLatLon) {
+                callStatus->setText(
+                    QStringLiteral("%1 — no country match yet").arg(call));
+                return;
+            }
+
+            // Entity centre → locator → the same maths the DX field uses.
+            const QString entGrid =
+                gridSquareFromLatLon(ent->latitude, ent->longitude);
+            const double km  = calculateDistanceKm(mine, entGrid);
+            const double deg = calculateBearingInDegrees(mine, entGrid);
+            m_rotorDial->setTargetBearing(deg);
+
+            // The DX field mirrors the derived square so the operator
+            // can see — and correct — what the prefix guessed.
+            {
+                QSignalBlocker block(dxGridEdit);
+                dxGridEdit->setText(entGrid);
+            }
+            callStatus->setText(QStringLiteral("%1 · %2 km · approx from prefix")
+                                    .arg(ent->name).arg(km, 0, 'f', 0));
+        });
+
+        // Enter drives the rotator — never a keystroke.
+        connect(callEdit, &QLineEdit::returnPressed, this, [this]() {
+            if (m_rotorDial && m_rotorDial->hasTarget()) {
+                emit m_rotorDial->rotateRequested(m_rotorDial->targetBearing());
+            }
+        });
 
         auto* row = new QHBoxLayout;
         row->setSpacing(6);

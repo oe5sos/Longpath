@@ -35,6 +35,21 @@ struct DxccEntity {
     QString continent;       // e.g. "EU"
     int     cqZone{0};
     int     ituZone{0};
+
+    // Entity centre, from cty.dat fields 5 and 6. Captured but
+    // previously discarded by the header regex; the rotator dial needs
+    // them to show a bearing the moment a callsign is typed, before any
+    // network lookup could return a real locator. Country-level
+    // accuracy only — good enough to know which way to turn, not good
+    // enough to log.
+    //
+    // NOTE ON SIGN: cty.dat writes longitude POSITIVE WEST (so England
+    // is +0.00, New York is +73.00). Everything else in this codebase —
+    // and the Maidenhead helpers — uses positive east. The parser flips
+    // it on read, so this field is positive east like everywhere else.
+    double  latitude{0.0};
+    double  longitude{0.0};
+    bool    hasLatLon{false};
 };
 
 // From AetherSDR src/core/CtyDatParser.h:17-49 [@0cd4559]

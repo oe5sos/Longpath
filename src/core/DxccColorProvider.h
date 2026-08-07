@@ -94,6 +94,15 @@ public:
     int  qsoCount()    const { return m_workedStatus.totalQsos(); }
     int  entityCount() const { return m_workedStatus.entityCount(); }
 
+    // Read-only access to the loaded prefix database.
+    //
+    // Added 2026-08-07 for the rotator dial, which resolves a callsign
+    // to its DXCC entity centre to show a bearing while the operator is
+    // still typing. Const reference rather than a copy of the lookup:
+    // this class already owns and loads the parser, and a second
+    // instance would mean parsing cty.dat twice for the same answers.
+    const CtyDatParser& ctyDat() const { return m_ctyParser; }
+
     // Configurable colors (loaded/saved via AppSettings externally)
     QColor colorNewDxcc{0xFF, 0x30, 0x30};   // bright red
     QColor colorNewBand{0xFF, 0x8C, 0x00};   // orange

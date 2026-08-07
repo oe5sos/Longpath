@@ -58,4 +58,14 @@ double calculateBearingInDegrees(const QString& gridSquare1,
 // two letters, two digits, optionally two more letters.
 bool isValidGridSquare(const QString& gridSquare);
 
+// Inverse of calculateLatLonFromGridSquare: the 6-character square
+// containing the given position. Longitude is positive east.
+//
+// Exists so callers holding raw coordinates (a DXCC entity centre from
+// cty.dat, a QRZ lat/lon) can feed the distance/bearing helpers above
+// without a second haversine implementation. A 6-character square is
+// about 5 x 2.5 km, which is far below the accuracy of anything that
+// currently produces coordinates here.
+QString gridSquareFromLatLon(double lat, double lon);
+
 } // namespace NereusSDR

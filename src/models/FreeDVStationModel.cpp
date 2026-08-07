@@ -47,6 +47,7 @@
 
 #include <QtMath>
 
+#include <algorithm>
 #include <cmath>
 
 namespace NereusSDR {
@@ -194,6 +195,45 @@ double calculateBearingInDegrees(const QString& gridSquare1, const QString& grid
     double radians = atan2(x, y);
 
     return RadiansToDegrees(radians);
+}
+
+// NereusSDR addition (2026-08-07): the inverse of
+// calculateLatLonFromGridSquare, so callers holding raw coordinates can
+// reuse the grid-based distance/bearing helpers instead of growing a
+// second haversine.
+QString gridSquareFromLatLon(double lat, double lon)
+{
+    // Shift into the all-positive space the encoding assumes.
+    double la = std::clamp(lat, -90.0, 90.0) + 90.0;    // 0..180
+    double lo = std::fmod(lon + 180.0, 360.0);          // 0..360
+    if (lo < 0.0) { lo += 360.0; }
+
+    QString out;
+    // Field: 20 deg lat, 20 deg lon, letters A..R
+    const int fieldLon = static_cast<int>(lo / 20.0);
+    const int fieldLat = static_cast<int>(la / 10.0);
+    out += QChar(QLatin1Char('A').unicode() + std::min(fieldLon, 17));
+    out += QChar(QLatin1Char('A').unicode() + std::min(fieldLat, 17));
+
+    lo -= fieldLon * 20.0;
+    la -= fieldLat * 10.0;
+
+    // Square: 2 deg lon, 1 deg lat, digits 0..9
+    const int sqLon = static_cast<int>(lo / 2.0);
+    const int sqLat = static_cast<int>(la / 1.0);
+    out += QChar(QLatin1Char('0').unicode() + std::min(sqLon, 9));
+    out += QChar(QLatin1Char('0').unicode() + std::min(sqLat, 9));
+
+    lo -= sqLon * 2.0;
+    la -= sqLat * 1.0;
+
+    // Sub-square: 5 min lon, 2.5 min lat, letters A..X
+    const int subLon = static_cast<int>(lo / (2.0 / 24.0));
+    const int subLat = static_cast<int>(la / (1.0 / 24.0));
+    out += QChar(QLatin1Char('A').unicode() + std::min(subLon, 23));
+    out += QChar(QLatin1Char('A').unicode() + std::min(subLat, 23));
+
+    return out;
 }
 
 // NereusSDR addition (2026-08-07): the callers of the helpers above

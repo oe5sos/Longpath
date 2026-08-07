@@ -4570,6 +4570,9 @@ nereus_add_test(tst_rotor_dial)
 # -- Maidenhead helpers, now shared: validation, distance, bearing --
 nereus_add_test(tst_maidenhead)
 
+# -- cty.dat entity coordinates + the positive-west longitude flip --
+nereus_add_test(tst_cty_latlon)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

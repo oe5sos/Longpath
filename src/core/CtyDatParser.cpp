@@ -145,8 +145,11 @@ void CtyDatParser::parse(const QStringList& lines)
 
     // Regex for header line: "Entity Name:  CQ:  ITU:  Cont:  lat:  lon:  tz:  Prefix:"
     // Fields are colon-separated on the first line.
+    // Latitude and longitude were previously skipped over. They are
+    // captured now (groups 5 and 6) so a callsign can produce a bearing
+    // without a network lookup.
     static const QRegularExpression headerRe(
-        R"(^([^:]+):\s*(\d+):\s*(\d+):\s*(\w+):\s*[\d\.\-]+:\s*[\d\.\-]+:\s*[\d\.\-]+:\s*([^:]+):)");
+        R"(^([^:]+):\s*(\d+):\s*(\d+):\s*(\w+):\s*([\d\.\-]+):\s*([\d\.\-]+):\s*[\d\.\-]+:\s*([^:]+):)");
 
     for (const QString& line : lines) {
         // Header line — doesn't start with whitespace
@@ -165,7 +168,22 @@ void CtyDatParser::parse(const QStringList& lines)
             current.cqZone       = m.captured(2).toInt();
             current.ituZone      = m.captured(3).toInt();
             current.continent    = m.captured(4).trimmed();
-            current.primaryPrefix = m.captured(5).trimmed().toUpper();
+
+            // cty.dat longitude is POSITIVE WEST; the rest of this
+            // codebase is positive east, so flip on read. Getting this
+            // wrong mirrors every bearing about the prime meridian —
+            // London and Moscow would swap sides.
+            bool latOk = false;
+            bool lonOk = false;
+            const double lat = m.captured(5).toDouble(&latOk);
+            const double lonWest = m.captured(6).toDouble(&lonOk);
+            if (latOk && lonOk) {
+                current.latitude  = lat;
+                current.longitude = -lonWest;
+                current.hasLatLon = true;
+            }
+
+            current.primaryPrefix = m.captured(7).trimmed().toUpper();
             // Remove trailing slash variants like "3D2/c" -> use as-is (sub-entities get own primary prefix)
             inEntity = true;
             aliasBuffer.clear();

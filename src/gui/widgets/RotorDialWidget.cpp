@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "RotorDialWidget.h"
+#include "gui/StyleConstants.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -24,14 +25,19 @@ namespace NereusSDR {
 
 namespace {
 
-const QColor kActual   (0xe8, 0xea, 0xee);   // white — where it is
-const QColor kTarget   (0x7f, 0xd0, 0xff);   // accent — where it should go
-const QColor kTurning  (0xff, 0xd8, 0x9b);   // amber — in motion
-const QColor kArrived  (0x5c, 0xd4, 0x9a);   // green — on target
-const QColor kRing     (0x2c, 0x2c, 0x32);
-const QColor kRingInner(0x1f, 0x1f, 0x23);
-const QColor kCardinal (0x6a, 0x6a, 0x72);
-const QColor kMuted    (0x8a, 0x8a, 0x92);
+// Palette taken from Style:: so the dial matches the rest of the app
+// rather than carrying its own look. The four needle states reuse the
+// existing semantic colours: accent for the target, amber for motion,
+// green for arrival.
+const QColor kBackground(Style::kPanelBg);      // #0a0a18
+const QColor kActual    (Style::kTextPrimary);  // where it is
+const QColor kTarget    (Style::kAccent);       // where it should go
+const QColor kTurning   (Style::kAmberText);    // in motion
+const QColor kArrived   (Style::kGreenText);    // on target
+const QColor kRing      (Style::kBorder);
+const QColor kRingInner (Style::kBorderSubtle);
+const QColor kCardinal  (Style::kTextScale);
+const QColor kMuted     (Style::kTextSecondary);
 
 double norm360(double deg)
 {
@@ -192,13 +198,17 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
 
     const double w = width();
     const double h = height();
-    p.fillRect(rect(), QColor(0x06, 0x06, 0x08));
+    p.fillRect(rect(), kBackground);
 
-    // Lamp wash from below, matching the other instruments.
-    QRadialGradient lamp(QPointF(w * 0.5, h * 1.12), w * 0.85);
-    lamp.setColorAt(0.0, QColor(255, 172, 64, 38));
-    lamp.setColorAt(1.0, QColor(0, 0, 0, 0));
-    p.fillRect(rect(), lamp);
+    // Faint accent wash from below so the face is not dead flat. Kept
+    // subtle and in the app's accent hue rather than a warm lamp — the
+    // surrounding panels are cool-toned.
+    QRadialGradient glow(QPointF(w * 0.5, h * 1.10), w * 0.85);
+    QColor glowInner = QColor(Style::kAccent);
+    glowInner.setAlpha(26);
+    glow.setColorAt(0.0, glowInner);
+    glow.setColorAt(1.0, QColor(0, 0, 0, 0));
+    p.fillRect(rect(), glow);
 
     const QPointF c(w * 0.5, h * 0.42);
     const double r = std::min(w * 0.42, h * 0.36);
