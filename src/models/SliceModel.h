@@ -286,6 +286,15 @@ class SliceModel : public QObject {
     Q_PROPERTY(double nr1Leakage  READ nr1Leakage  WRITE setNr1Leakage  NOTIFY nr1LeakageChanged)
     Q_PROPERTY(NereusSDR::NrPosition nr1Position READ nr1Position WRITE setNr1Position NOTIFY nr1PositionChanged)
 
+    // ANF — the same four values as NR1, for the auto-notch. It was an
+    // on/off switch while NR1 had the full set; same LMS filter, same
+    // tuning, only the WDSP entry points differ.
+    Q_PROPERTY(int    anfTaps     READ anfTaps     WRITE setAnfTaps     NOTIFY anfTapsChanged)
+    Q_PROPERTY(int    anfDelay    READ anfDelay    WRITE setAnfDelay    NOTIFY anfDelayChanged)
+    Q_PROPERTY(double anfGain     READ anfGain     WRITE setAnfGain     NOTIFY anfGainChanged)
+    Q_PROPERTY(double anfLeakage  READ anfLeakage  WRITE setAnfLeakage  NOTIFY anfLeakageChanged)
+    Q_PROPERTY(NereusSDR::NrPosition anfPosition READ anfPosition WRITE setAnfPosition NOTIFY anfPositionChanged)
+
     // NR2 (EMNR) tuning — gain-method + npe-method + AE + Position +
     // trainT1/T2 + post2 cascade.
     Q_PROPERTY(NereusSDR::EmnrGainMethod nr2GainMethod READ nr2GainMethod WRITE setNr2GainMethod NOTIFY nr2GainMethodChanged)
@@ -305,6 +314,9 @@ class SliceModel : public QObject {
     Q_PROPERTY(bool nr3UseDefaultGain READ nr3UseDefaultGain WRITE setNr3UseDefaultGain NOTIFY nr3UseDefaultGainChanged)
 
     // NR4 (SBNR) — 5 spinboxes + algo radio.
+    // NR4 was the only denoiser without a position control while NR1,
+    // NR2 and NR3 all had one — the same omission as ANF.
+    Q_PROPERTY(NereusSDR::NrPosition nr4Position READ nr4Position WRITE setNr4Position NOTIFY nr4PositionChanged)
     Q_PROPERTY(double nr4Reduction  READ nr4Reduction  WRITE setNr4Reduction  NOTIFY nr4ReductionChanged)
     Q_PROPERTY(double nr4Smoothing  READ nr4Smoothing  WRITE setNr4Smoothing  NOTIFY nr4SmoothingChanged)
     Q_PROPERTY(double nr4Whitening  READ nr4Whitening  WRITE setNr4Whitening  NOTIFY nr4WhiteningChanged)
@@ -653,6 +665,21 @@ public:
     NereusSDR::NrPosition nr1Position() const { return m_nr1Position; }
     void                  setNr1Position(NereusSDR::NrPosition p);
 
+    NereusSDR::NrPosition nr4Position() const { return m_nr4Position; }
+    void                  setNr4Position(NereusSDR::NrPosition p);
+
+    // ANF
+    int    anfTaps()    const { return m_anfTaps; }
+    void   setAnfTaps(int v);
+    int    anfDelay()   const { return m_anfDelay; }
+    void   setAnfDelay(int v);
+    double anfGain()    const { return m_anfGain; }
+    void   setAnfGain(double v);
+    double anfLeakage() const { return m_anfLeakage; }
+    void   setAnfLeakage(double v);
+    NereusSDR::NrPosition anfPosition() const { return m_anfPosition; }
+    void                  setAnfPosition(NereusSDR::NrPosition p);
+
     // NR2
     NereusSDR::EmnrGainMethod nr2GainMethod() const { return m_nr2GainMethod; }
     void                      setNr2GainMethod(NereusSDR::EmnrGainMethod v);
@@ -970,6 +997,12 @@ signals:
     void nbModeChanged(NereusSDR::NbMode v);
     // NR signals (Sub-epic C-1)
     void activeNrChanged(NereusSDR::NrSlot slot);
+    void nr4PositionChanged(NereusSDR::NrPosition p);
+    void anfTapsChanged(int v);
+    void anfDelayChanged(int v);
+    void anfGainChanged(double v);
+    void anfLeakageChanged(double v);
+    void anfPositionChanged(NereusSDR::NrPosition p);
     void nr1TapsChanged(int v);
     void nr1DelayChanged(int v);
     void nr1GainChanged(double v);
@@ -1113,6 +1146,17 @@ private:
 
     // NR1 — from RxChannel::Nr1Tuning defaults (Task 8 commit 8747ae4),
     // which in turn match Thetis radio.cs:673-699 [v2.10.3.13].
+    NereusSDR::NrPosition m_nr4Position = NereusSDR::NrPosition::PostAgc;
+
+    // ANF defaults from Thetis radio.cs:722-729 [@852bf0e]. Gain and
+    // leakage differ from NR1's on purpose: a notch has to settle on a
+    // steady carrier without chewing at speech, so it adapts slower.
+    int    m_anfTaps    = 64;
+    int    m_anfDelay   = 16;
+    double m_anfGain    = 10e-4;
+    double m_anfLeakage = 1e-7;
+    NereusSDR::NrPosition m_anfPosition = NereusSDR::NrPosition::PostAgc;
+
     int    m_nr1Taps    = 64;           // radio.cs:674   nr_taps = 64
     int    m_nr1Delay   = 16;           // radio.cs:675   nr_delay = 16
     double m_nr1Gain    = 16e-4;        // radio.cs:677   nr_gain = 16e-4 (WDSP-domain)

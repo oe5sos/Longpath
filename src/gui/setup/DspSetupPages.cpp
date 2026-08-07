@@ -721,6 +721,90 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         }
     }
 
+    // ── ANF tab ───────────────────────────────────────────────────────────────
+    // The auto-notch, with the same four values NR1 has. It is the same
+    // LMS filter run as a notch, so this page is deliberately the NR1
+    // page with different targets — different numbers here and there
+    // would suggest a difference that does not exist.
+    // From Thetis radio.cs:730-748 [@852bf0e].
+    {
+        auto [tabPage, tabLay] = makeTab(tabs, "ANF");
+        Q_UNUSED(tabPage)
+        QVBoxLayout* grpLay = makeGroup(tabLay, "ANF (auto notch, LMS)");
+
+        auto [taps, tapsVal] = addSliderRow(grpLay, "Taps", 16, 1024,
+            slice ? slice->anfTaps() : 64,
+            tr("LMS filter length. Longer notches deeper and narrower, "
+               "and takes longer to find the carrier. Range 16-1024."));
+
+        auto [delay, delayVal] = addSliderRow(grpLay, "Delay", 1, 256,
+            slice ? slice->anfDelay() : 16,
+            tr("Adaptive delay in samples. This is what separates a steady "
+               "carrier from speech: too short and the notch starts eating "
+               "voice."));
+
+        // Same UI scaling as NR1 so the two pages read alike:
+        // gain is UI x 1e-6, leakage UI x 1e-3, both in WDSP domain.
+        const int gainDefault = slice
+            ? std::min(999, static_cast<int>(slice->anfGain() * 1e6))
+            : 1000 - 1;
+        auto [gain, gainVal] = addSliderRow(grpLay, "Gain", 0, 999,
+            gainDefault,
+            tr("Adaptation rate. UI units x 1e-6 = WDSP value. Higher "
+               "catches a drifting carrier sooner and is rougher on speech."));
+
+        auto [leak, leakVal] = addSliderRow(grpLay, "Leak", 0, 999,
+            slice ? static_cast<int>(slice->anfLeakage() * 1e3) : 0,
+            tr("Leakage. UI units x 1e-3 = WDSP value. Lets the notch "
+               "forget a carrier that has gone away."));
+
+        auto [preRdo, postRdo] = addPositionRow(grpLay);
+        const bool isPost = !slice || (slice->anfPosition() == NrPosition::PostAgc);
+        preRdo->setChecked(!isPost);
+        postRdo->setChecked(isPost);
+
+        tabLay->addStretch(1);
+
+        if (slice) {
+            connect(taps, &QSlider::valueChanged,
+                    slice, &SliceModel::setAnfTaps);
+            connect(delay, &QSlider::valueChanged,
+                    slice, &SliceModel::setAnfDelay);
+            connect(gain, &QSlider::valueChanged, slice, [slice](int v) {
+                slice->setAnfGain(static_cast<double>(v) * 1e-6);
+            });
+            connect(leak, &QSlider::valueChanged, slice, [slice](int v) {
+                slice->setAnfLeakage(static_cast<double>(v) * 1e-3);
+            });
+            connect(preRdo, &QRadioButton::toggled, slice, [slice](bool on) {
+                if (on) { slice->setAnfPosition(NrPosition::PreAgc); }
+            });
+            connect(postRdo, &QRadioButton::toggled, slice, [slice](bool on) {
+                if (on) { slice->setAnfPosition(NrPosition::PostAgc); }
+            });
+
+            connect(slice, &SliceModel::anfTapsChanged, taps, [taps](int v) {
+                QSignalBlocker b(taps); taps->setValue(v);
+            });
+            connect(slice, &SliceModel::anfDelayChanged, delay, [delay](int v) {
+                QSignalBlocker b(delay); delay->setValue(v);
+            });
+            connect(slice, &SliceModel::anfGainChanged, gain, [gain](double v) {
+                QSignalBlocker b(gain);
+                gain->setValue(std::min(999, static_cast<int>(v * 1e6)));
+            });
+            connect(slice, &SliceModel::anfLeakageChanged, leak, [leak](double v) {
+                QSignalBlocker b(leak); leak->setValue(static_cast<int>(v * 1e3));
+            });
+            connect(slice, &SliceModel::anfPositionChanged, preRdo,
+                    [preRdo, postRdo](NrPosition p) {
+                QSignalBlocker b1(preRdo), b2(postRdo);
+                preRdo->setChecked(p == NrPosition::PreAgc);
+                postRdo->setChecked(p == NrPosition::PostAgc);
+            });
+        }
+    }
+
     // ── NR2 tab ───────────────────────────────────────────────────────────────
     // From Thetis setup.designer.cs NR2 (EMNR) group [v2.10.3.13].
     {
@@ -1060,6 +1144,31 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             0.5, 1,
             tr("Post-processing SNR threshold. Range -10 to +10 dB, step 0.5."),
             " dB");
+
+        // Position — the control NR1, NR2 and NR3 all had and NR4 did
+        // not. Placed before the algorithm radio so the four NR pages
+        // read the same way down the page.
+        {
+            auto [preRdo, postRdo] = addPositionRow(grpLay);
+            const bool isPost = !slice
+                || (slice->nr4Position() == NrPosition::PostAgc);
+            preRdo->setChecked(!isPost);
+            postRdo->setChecked(isPost);
+            if (slice) {
+                connect(preRdo, &QRadioButton::toggled, slice, [slice](bool on) {
+                    if (on) { slice->setNr4Position(NrPosition::PreAgc); }
+                });
+                connect(postRdo, &QRadioButton::toggled, slice, [slice](bool on) {
+                    if (on) { slice->setNr4Position(NrPosition::PostAgc); }
+                });
+                connect(slice, &SliceModel::nr4PositionChanged, preRdo,
+                        [preRdo, postRdo](NrPosition p) {
+                    QSignalBlocker b1(preRdo), b2(postRdo);
+                    preRdo->setChecked(p == NrPosition::PreAgc);
+                    postRdo->setChecked(p == NrPosition::PostAgc);
+                });
+            }
+        }
 
         // Algorithm radio — rdoSBNR1/2/3 [v2.10.3.13]
         const QString rdoStyle =

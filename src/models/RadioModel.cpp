@@ -9774,6 +9774,44 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     // Thetis pattern: console.cs:43297 SelectNR [v2.10.3.13] — push
     // parameters before the active-slot run-flag.
 
+    connect(slice, &SliceModel::nr4PositionChanged, this,
+            [this, slice](NereusSDR::NrPosition p) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setSbnrPosition(p); }
+        scheduleSettingsSave();
+    });
+
+    // ANF — the auto-notch's own four values plus position. Same LMS
+    // filter as NR1 below, run as a notch; it had a run flag and
+    // nothing else until now.
+    // From Thetis radio.cs:730-748 [@852bf0e]
+    connect(slice, &SliceModel::anfTapsChanged, this, [this, slice](int v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setAnfTaps(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::anfDelayChanged, this, [this, slice](int v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setAnfDelay(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::anfGainChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setAnfGain(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::anfLeakageChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setAnfLeakage(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::anfPositionChanged, this,
+            [this, slice](NereusSDR::NrPosition p) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setAnfPosition(p); }
+        scheduleSettingsSave();
+    });
+
     // NR1 (ANR) — 5 knobs
     // From Thetis setup.cs:8539-8566 [v2.10.3.13]
     connect(slice, &SliceModel::nr1TapsChanged, this, [this, slice](int v) {

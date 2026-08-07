@@ -974,6 +974,73 @@ void RxChannel::setEmnrPost2Taper(int taper)
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// ANF — automatic notch tuning
+//
+// The same four values NR1 has carried since it was ported, against the
+// ANF entry points. From Thetis radio.cs:730-748 [@852bf0e], where
+// SetANFVals pushes taps, delay, gain and leak in one call.
+// ---------------------------------------------------------------------------
+
+void RxChannel::setAnfTuning(const AnfTuning& t)
+{
+    m_anfTuning = t;
+#ifdef HAVE_WDSP
+    SetRXAANFVals(m_channelId, t.taps, t.delay, t.gain, t.leakage);
+    SetRXAANFPosition(m_channelId, static_cast<int>(t.position));
+#endif
+}
+
+void RxChannel::setAnfTaps(int taps)
+{
+    m_anfTuning.taps = taps;
+#ifdef HAVE_WDSP
+    SetRXAANFTaps(m_channelId, taps);
+#endif
+}
+
+void RxChannel::setAnfDelay(int delay)
+{
+    m_anfTuning.delay = delay;
+#ifdef HAVE_WDSP
+    SetRXAANFDelay(m_channelId, delay);
+#endif
+}
+
+void RxChannel::setAnfGain(double gain)
+{
+    m_anfTuning.gain = gain;
+#ifdef HAVE_WDSP
+    SetRXAANFGain(m_channelId, gain);
+#endif
+}
+
+void RxChannel::setAnfLeakage(double leakage)
+{
+    m_anfTuning.leakage = leakage;
+#ifdef HAVE_WDSP
+    SetRXAANFLeakage(m_channelId, leakage);
+#endif
+}
+
+void RxChannel::setAnfPosition(NrPosition p)
+{
+    m_anfTuning.position = p;
+#ifdef HAVE_WDSP
+    SetRXAANFPosition(m_channelId, static_cast<int>(p));
+#endif
+}
+
+// NR4 position — the one denoiser that had no position control while
+// NR1, NR2 and NR3 all did.
+void RxChannel::setSbnrPosition(NrPosition p)
+{
+    m_nr4Tuning.position = p;
+#ifdef HAVE_WDSP
+    SetRXASBNRPosition(m_channelId, static_cast<int>(p));
+#endif
+}
+
 // NR3 — RNNR tuning (Sub-epic C-1)
 // Porting from Thetis radio.cs:2257-2311, setup.cs:35460-35462 [v2.10.3.13]
 // ---------------------------------------------------------------------------
@@ -1024,6 +1091,7 @@ void RxChannel::setSbnrTuning(const Nr4Tuning& t)
     SetRXASBNRnoiseRescale       (m_channelId, static_cast<float>(t.noiseRescale));
     SetRXASBNRpostFilterThreshold(m_channelId, static_cast<float>(t.postFilterThreshold));
     SetRXASBNRnoiseScalingType   (m_channelId, static_cast<int>(t.algo));
+    SetRXASBNRPosition           (m_channelId, static_cast<int>(t.position));
 #endif
 }
 

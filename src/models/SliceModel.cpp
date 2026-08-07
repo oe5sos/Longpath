@@ -918,6 +918,51 @@ void SliceModel::setActiveNr(NereusSDR::NrSlot slot)
 }
 
 // NR1
+void SliceModel::setNr4Position(NereusSDR::NrPosition p)
+{
+    if (m_nr4Position == p) { return; }
+    m_nr4Position = p;
+    emit nr4PositionChanged(p);
+}
+
+// ANF — same shape as the NR1 setters below. Kept adjacent to them on
+// purpose: they are one algorithm in two roles, and a change to one is
+// almost always a change to both.
+void SliceModel::setAnfTaps(int v)
+{
+    if (m_anfTaps == v) { return; }
+    m_anfTaps = v;
+    emit anfTapsChanged(v);
+}
+
+void SliceModel::setAnfDelay(int v)
+{
+    if (m_anfDelay == v) { return; }
+    m_anfDelay = v;
+    emit anfDelayChanged(v);
+}
+
+void SliceModel::setAnfGain(double v)
+{
+    if (qFuzzyCompare(m_anfGain, v)) { return; }
+    m_anfGain = v;
+    emit anfGainChanged(v);
+}
+
+void SliceModel::setAnfLeakage(double v)
+{
+    if (qFuzzyCompare(m_anfLeakage, v)) { return; }
+    m_anfLeakage = v;
+    emit anfLeakageChanged(v);
+}
+
+void SliceModel::setAnfPosition(NereusSDR::NrPosition p)
+{
+    if (m_anfPosition == p) { return; }
+    m_anfPosition = p;
+    emit anfPositionChanged(p);
+}
+
 void SliceModel::setNr1Taps(int v)
 {
     if (m_nr1Taps == v) { return; }

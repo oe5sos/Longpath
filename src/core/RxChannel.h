@@ -419,6 +419,24 @@ public:
         NrPosition position = NrPosition::PostAgc;  // setup.cs:8723
     };
 
+    // ANF — the same LMS filter as NR1, run as a notch instead of a
+    // denoiser. It had a run flag and nothing else here, while NR1 has
+    // carried all four values since it was ported: an oversight rather
+    // than a decision, since the algorithm and the tuning are the same
+    // and only the WDSP entry points differ.
+    //
+    // Defaults from Thetis radio.cs:722-729 [@852bf0e] — anf_taps = 64,
+    // anf_delay = 16, anf_gain = 10e-4, anf_leak = 1e-7. Note the gain
+    // and leakage differ from NR1's: an auto-notch has to converge on a
+    // steady carrier without chewing at speech, so it adapts slower.
+    struct AnfTuning {
+        int        taps     = 64;
+        int        delay    = 16;
+        double     gain     = 10e-4;
+        double     leakage  = 1e-7;
+        NrPosition position = NrPosition::PostAgc;
+    };
+
     // NR2 — EMNR (Enhanced Multiband NR, Warren Pratt NR0V)
     // All post2 values are raw passthrough to WDSP (no scaling at setter boundary).
     // From Thetis radio.cs:2062-2213, setup.cs:34711-34748 [v2.10.3.13]
@@ -453,6 +471,7 @@ public:
         double   noiseRescale        = 2.0;    // setup.cs default
         double   postFilterThreshold = -10.0;  // setup.cs default
         SbnrAlgo algo                = SbnrAlgo::Algo2;  // setup.cs:34511-34527
+        NrPosition position          = NrPosition::PostAgc;
     };
 
     // ----- NR API (Sub-epic C-1) -----
@@ -473,6 +492,20 @@ public:
     void setAnrGain    (double gain);        // raw WDSP domain; SetRXAANRGain
     void setAnrLeakage (double leakage);     // raw WDSP domain; SetRXAANRLeakage
     void setAnrPosition(NrPosition p);
+
+    // ANF — same shape as the ANR setters above, different WDSP entry
+    // points. From Thetis radio.cs:730-748 [@852bf0e].
+    void setAnfTuning  (const AnfTuning& t);
+    void setAnfTaps    (int taps);
+    void setAnfDelay   (int delay);
+    void setAnfGain    (double gain);        // raw WDSP domain
+    void setAnfLeakage (double leakage);     // raw WDSP domain
+    void setAnfPosition(NrPosition p);
+    AnfTuning anfTuning() const { return m_anfTuning; }
+
+    // NR4 was the one denoiser without a position control, while NR1,
+    // NR2 and NR3 all had one. Same omission as ANF, same fix.
+    void setSbnrPosition(NrPosition p);
 
     // EMNR per-knob setters not in the legacy API.
     // From Thetis setup.cs NR2 group [v2.10.3.13]
@@ -935,6 +968,7 @@ private:
     std::atomic<bool> m_nbBypassed{false};
     std::atomic<bool> m_nrEnabled{false};
     std::atomic<bool> m_anfEnabled{false};
+    AnfTuning         m_anfTuning{};
     // emnr: From Thetis radio.cs:2216 — rx_nr2_run default = 0
     std::atomic<bool> m_emnrEnabled{false};
     // apf: Audio Peak Filter — off by default

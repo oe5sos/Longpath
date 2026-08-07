@@ -4623,6 +4623,10 @@ nereus_add_test(tst_worked_before)
 #    inclusive and off until asked for, empty filter showing everything --
 nereus_add_test(tst_log_filter)
 
+# -- ANF tuning: Thetis defaults, and the slider-to-WDSP scaling where a
+#    wrong factor is a useless notch rather than a crash --
+nereus_add_test(tst_anf_tuning)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

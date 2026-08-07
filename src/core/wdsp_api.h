@@ -532,6 +532,19 @@ void SetRXAANRPosition(int channel, int position);  // 0=pre-AGC, 1=post-AGC
 
 void SetRXAANFRun(int channel, int setit);
 
+// The same four values ANR has. ANF is the same LMS filter run as a
+// notch, so the tuning is identical and only the entry points differ —
+// which is why only the run flag was declared here for so long, and why
+// the auto-notch had no controls while NR1 had four.
+// Signatures from the bundled WDSP source, anf.h:95-105.
+void SetRXAANFVals(int channel, int taps, int delay, double gain,
+                   double leakage);
+void SetRXAANFTaps(int channel, int taps);
+void SetRXAANFDelay(int channel, int delay);
+void SetRXAANFGain(int channel, double gain);
+void SetRXAANFLeakage(int channel, double leakage);
+void SetRXAANFPosition(int channel, int position);  // 0=pre-AGC, 1=post-AGC
+
 // =====================================================================
 // NR2 — EMNR (WDSP emnr.c, Warren Pratt NR0V).
 // From Thetis wdsp/emnr.h + setup.cs [v2.10.3.13].
@@ -601,6 +614,10 @@ void SetRXASBNRnoiseRescale(int channel, float factor);
 void SetRXASBNRpostFilterThreshold(int channel, float threshold);
 
 void SetRXASBNRnoiseScalingType(int channel, int noise_scaling_type);
+
+// NR4 was the only denoiser here without a position control, while NR1,
+// NR2 and NR3 all had one. Thetis calls this; we did not.
+void SetRXASBNRPosition(int channel, int position);  // 0=pre-AGC, 1=post-AGC
 
 // ---------------------------------------------------------------------------
 // Spectral noise blanker (snb.h) — From Thetis dsp.cs P/Invoke declarations
