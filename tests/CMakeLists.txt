@@ -4610,6 +4610,11 @@ nereus_add_test(tst_flat_map)
 #    slider took more off the top than the AGC margin put there) --
 nereus_add_test(tst_waterfall_color)
 
+# -- rotctld link, exercised against a stand-in rotctld: parsing, a
+#    refused move, replies split across packets, a dropped connection --
+nereus_add_test(tst_rotctld_client)
+target_link_libraries(tst_rotctld_client PRIVATE Qt6::Network)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

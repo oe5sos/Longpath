@@ -22,6 +22,7 @@
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
+#include "core/RotctldClient.h"
 #include "core/SolarTimes.h"
 #include "gui/LogbookWindow.h"
 #include "gui/StyleConstants.h"
@@ -31,9 +32,11 @@
 
 #include <QAction>
 #include <QCryptographicHash>
+#include <QDialog>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -64,6 +67,8 @@ namespace {
 const QString kMyGridKey    = QStringLiteral("StationGridSquare");
 const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
+const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
+const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
 
 // NASA Blue Marble. Works of the US government are public domain, so
 // this can be fetched and kept without anyone agreeing to anything —
@@ -330,6 +335,14 @@ void RotorLogbookPanel::buildUi()
         b->setStyleSheet(Style::buttonBaseStyle());
         btnRow->addWidget(b);
     }
+    auto* setupBtn = new QPushButton(QStringLiteral("Rotor…"), this);
+    setupBtn->setStyleSheet(Style::buttonBaseStyle());
+    setupBtn->setToolTip(QStringLiteral(
+        "Connect to a rotator through Hamlib's rotctld"));
+    btnRow->addWidget(setupBtn);
+    connect(setupBtn, &QPushButton::clicked,
+            this, &RotorLogbookPanel::openRotorSetupDialog);
+
     m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
     m_globeBtn->setCheckable(true);
     m_globeBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -430,40 +443,202 @@ void RotorLogbookPanel::buildUi()
     connect(logBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::onLogQso);
 
-    // Simulated movement until a rotator protocol exists, so the
-    // Turning and OnTarget states stay reachable.
-    auto* timer = new QTimer(this);
-    timer->setInterval(40);
-    auto beginTurn = [this, timer]() {
-        if (!m_dial->hasTarget()) { return; }
-        m_dial->setState(RotorDialWidget::State::Turning);
-        timer->start();
-        // Swing the globe round to the heading as the mast turns: the
-        // point of the view is watching which way the path goes.
-        m_globe->lookAlongBearing(m_dial->targetBearing());
-    };
-    connect(rotateBtn, &QPushButton::clicked, this, beginTurn);
-    connect(m_dial, &RotorDialWidget::rotateRequested, this,
-            [beginTurn](double) { beginTurn(); });
-    connect(stopBtn, &QPushButton::clicked, this, [this, timer]() {
-        timer->stop();
-        m_dial->setState(RotorDialWidget::State::Targeted);
-    });
-    connect(longBtn, &QPushButton::clicked, this, [this]() {
-        if (m_dial->hasTarget()) {
-            m_dial->setTargetBearing(m_dial->targetBearing() + 180.0);
-        }
-    });
-    connect(timer, &QTimer::timeout, this, [this, timer]() {
+    // Stand-in movement for when no rotator is connected, so the dial
+    // is demonstrable and the Turning / OnTarget states stay reachable.
+    // A real rotator takes this timer's place entirely.
+    m_simTimer = new QTimer(this);
+    m_simTimer->setInterval(40);
+    connect(m_simTimer, &QTimer::timeout, this, [this]() {
         const double togo = m_dial->travelDegrees();
         if (qAbs(togo) < 1.0) {
-            timer->stop();
+            m_simTimer->stop();
             m_dial->setState(RotorDialWidget::State::OnTarget);
             return;
         }
         m_dial->setActualBearing(m_dial->actualBearing()
                                  + (togo > 0 ? 1.0 : -1.0));
     });
+
+    connect(rotateBtn, &QPushButton::clicked,
+            this, &RotorLogbookPanel::beginTurn);
+    connect(m_dial, &RotorDialWidget::rotateRequested, this,
+            [this](double) { beginTurn(); });
+    connect(stopBtn, &QPushButton::clicked,
+            this, &RotorLogbookPanel::haltTurn);
+    connect(longBtn, &QPushButton::clicked, this, [this]() {
+        if (m_dial->hasTarget()) {
+            m_dial->setTargetBearing(m_dial->targetBearing() + 180.0);
+        }
+    });
+}
+
+// ── Rotator ─────────────────────────────────────────────────────────
+
+void RotorLogbookPanel::beginTurn()
+{
+    if (!m_dial->hasTarget()) { return; }
+    const double bearing = m_dial->targetBearing();
+
+    // Swing the globe round to the heading as the mast turns: the point
+    // of that view is watching which way the path goes.
+    m_globe->lookAlongBearing(bearing);
+    m_dial->setState(RotorDialWidget::State::Turning);
+
+    if (m_rotor && m_rotor->isConnected()) {
+        m_rotor->moveTo(bearing);
+        return;
+    }
+    // No rotator. Say so every time rather than once at startup — the
+    // needle moving is otherwise indistinguishable from the mast
+    // moving, and that is a mistake an operator makes exactly once
+    // before they stop trusting the display.
+    setStatus(QStringLiteral("No rotator connected — needle simulated"), true);
+    m_simTimer->start();
+}
+
+void RotorLogbookPanel::haltTurn()
+{
+    m_simTimer->stop();
+    if (m_rotor && m_rotor->isConnected()) { m_rotor->stop(); }
+    m_dial->setState(RotorDialWidget::State::Targeted);
+}
+
+void RotorLogbookPanel::ensureRotor()
+{
+    if (m_rotor) { return; }
+    m_rotor = new RotctldClient(this);
+
+    AppSettings& s = AppSettings::instance();
+    m_rotor->setTarget(
+        s.value(kRotorHostKey, QString{}).toString(),
+        static_cast<quint16>(s.value(kRotorPortKey, 4533).toInt()));
+
+    // The rotator's own reading drives the second needle. Nothing else
+    // may write it while a rotator is connected, or the dial would show
+    // where the software thinks the mast is rather than where it is.
+    connect(m_rotor, &RotorController::positionChanged, this,
+            [this](double az) { m_dial->setActualBearing(az); });
+
+    connect(m_rotor, &RotorController::stateChanged, this,
+            [this](RotorController::State st) {
+        switch (st) {
+        case RotorController::State::Idle:
+            m_dial->setState(m_dial->hasTarget()
+                                 ? RotorDialWidget::State::OnTarget
+                                 : RotorDialWidget::State::Idle);
+            setStatus(QStringLiteral("Rotator connected — %1")
+                          .arg(m_rotor->description()));
+            break;
+        case RotorController::State::Moving:
+            m_dial->setState(RotorDialWidget::State::Turning);
+            break;
+        case RotorController::State::Connecting:
+            setStatus(QStringLiteral("Connecting to %1…")
+                          .arg(m_rotor->description()));
+            break;
+        case RotorController::State::Disconnected:
+            setStatus(QStringLiteral("Rotator disconnected"), true);
+            break;
+        case RotorController::State::Error:
+            break;   // errorOccurred carries the detail
+        }
+    });
+
+    connect(m_rotor, &RotorController::errorOccurred, this,
+            [this](const QString& msg) {
+        setStatus(QStringLiteral("Rotator: %1").arg(msg), true);
+    });
+}
+
+void RotorLogbookPanel::openRotorSetupDialog()
+{
+    ensureRotor();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("Rotator"));
+
+    auto* col = new QVBoxLayout(&dlg);
+    col->setContentsMargins(14, 14, 14, 14);
+    col->setSpacing(10);
+
+    auto* form = new QFormLayout;
+    auto* hostEdit = new QLineEdit(m_rotor->host(), &dlg);
+    hostEdit->setPlaceholderText(
+        QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
+    form->addRow(QStringLiteral("Host"), hostEdit);
+
+    auto* portEdit = new QLineEdit(QString::number(m_rotor->port()), &dlg);
+    portEdit->setPlaceholderText(QStringLiteral("4533"));
+    form->addRow(QStringLiteral("Port"), portEdit);
+    col->addLayout(form);
+
+    auto* note = new QLabel(QStringLiteral(
+        "NereusSDR speaks Hamlib's rotctld. For a rotator on a serial "
+        "port, run rotctld on the machine it is plugged into — for "
+        "example\n\n"
+        "    rotctld -m 603 -r /dev/tty.usbserial-1410 -T 0.0.0.0\n\n"
+        "and put that machine's address above. -m 603 is Yaesu GS-232B; "
+        "rotctl --list shows the rest."), &dlg);
+    note->setWordWrap(true);
+    note->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                            .arg(QString::fromLatin1(Style::kTextSecondary)));
+    col->addWidget(note);
+
+    auto* status = new QLabel(
+        m_rotor->isConnected()
+            ? QStringLiteral("Connected — %1").arg(m_rotor->description())
+            : QStringLiteral("Not connected"), &dlg);
+    status->setWordWrap(true);
+    status->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                              .arg(QString::fromLatin1(Style::kTextSecondary)));
+    col->addWidget(status);
+
+    auto* row = new QHBoxLayout;
+    auto* connectBtn = new QPushButton(
+        m_rotor->isConnected() ? QStringLiteral("Disconnect")
+                               : QStringLiteral("Connect"), &dlg);
+    connectBtn->setStyleSheet(Style::buttonBaseStyle());
+    row->addWidget(connectBtn);
+    row->addStretch(1);
+    auto* closeBtn = new QPushButton(QStringLiteral("Close"), &dlg);
+    closeBtn->setStyleSheet(Style::buttonBaseStyle());
+    row->addWidget(closeBtn);
+    col->addLayout(row);
+
+    // Report inside the dialog while it is open, so a wrong address
+    // fails where the operator is looking rather than behind it.
+    auto reportConn = connect(m_rotor, &RotorController::errorOccurred,
+                              &dlg, [status](const QString& m) {
+        status->setText(m);
+    });
+    auto reportState = connect(m_rotor, &RotorController::stateChanged,
+                               &dlg, [this, status, connectBtn](auto) {
+        status->setText(m_rotor->isConnected()
+            ? QStringLiteral("Connected — %1").arg(m_rotor->description())
+            : QStringLiteral("Not connected"));
+        connectBtn->setText(m_rotor->isConnected()
+            ? QStringLiteral("Disconnect") : QStringLiteral("Connect"));
+    });
+
+    connect(connectBtn, &QPushButton::clicked, &dlg,
+            [this, hostEdit, portEdit]() {
+        if (m_rotor->isConnected()) {
+            m_rotor->disconnectFromRotor();
+            return;
+        }
+        const QString host = hostEdit->text().trimmed();
+        const quint16 port =
+            static_cast<quint16>(portEdit->text().trimmed().toUInt());
+        m_rotor->setTarget(host, port ? port : 4533);
+        AppSettings::instance().setValue(kRotorHostKey, host);
+        AppSettings::instance().setValue(kRotorPortKey, port ? port : 4533);
+        m_rotor->connectToRotor();
+    });
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    dlg.exec();
+    disconnect(reportConn);
+    disconnect(reportState);
 }
 
 void RotorLogbookPanel::wireQrz()

@@ -37,6 +37,7 @@ namespace NereusSDR {
 class QrzClient;
 class QrzLogbookUploader;
 class QsoUploader;
+class RotctldClient;
 class RadioModel;
 class GlobeWidget;
 class LogbookWindow;
@@ -78,6 +79,13 @@ private:
     void onCallsignEdited(const QString& raw);   // country estimate
     void onLookupRequested();                    // QRZ, on demand
     void onLogQso();
+    // Rotator: set up the link, and start or stop a turn. With nothing
+    // connected these fall back to the simulated needle, so the dial
+    // stays demonstrable — but the status line says which it is.
+    void openRotorSetupDialog();
+    void ensureRotor();
+    void beginTurn();
+    void haltTurn();
     void applyLocators();
     void refreshRecentList();
     void openLogbookWindow();
@@ -137,6 +145,11 @@ private:
     // one of them ends up writing over the other's correction.
     LogbookWindow* m_logWindow{nullptr};
     QVector<QsoUploader*> m_uploadTargets;
+
+    // The rotator link, and the timer that stands in for one. Exactly
+    // one of the two drives the needle at any moment.
+    RotctldClient* m_rotor{nullptr};
+    QTimer*        m_simTimer{nullptr};
 
     // Best known position of the far end, from whichever source spoke
     // last: a typed locator, a QRZ grid, or the DXCC entity centre

@@ -920,6 +920,10 @@ set(GUI_SOURCES
     src/core/QrzLogbookUploader.cpp
     src/core/CloudlogUploader.cpp
     src/core/AdifNetworkUploader.cpp
+    src/core/RotctldClient.cpp
+    # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
+    # QsoUploader above.
+    src/core/RotorController.h
     # Header-only Q_OBJECT: AUTOMOC only picks up a header when a source
     # file of the same base name exists, so an interface class with no
     # .cpp has to be listed explicitly or its vtable never gets built.
