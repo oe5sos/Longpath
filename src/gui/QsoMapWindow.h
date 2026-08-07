@@ -77,10 +77,17 @@ public:
         std::function<bool(const QString& call, double& lat, double& lon)>;
     void setPositionFallback(PositionFallback fn);
 
+protected:
+    void closeEvent(QCloseEvent*) override;
+    void keyPressEvent(QKeyEvent*) override;
+
 private:
     void buildUi();
     void rebuild();
     void setQuickRange(int days);   // 0 means everything
+    // Zoom whichever of the two views is on screen.
+    void zoomActiveView(double factor);
+    void resetActiveView();
 
     QVector<LogEntry> m_all;
     QVector<LogEntry> m_selected;

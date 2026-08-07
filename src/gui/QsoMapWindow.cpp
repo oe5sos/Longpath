@@ -19,7 +19,9 @@
 #include "gui/widgets/GlobeWidget.h"
 
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QDateEdit>
+#include <QKeyEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -34,8 +36,63 @@ QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
 {
     setWindowTitle(QStringLiteral("QSO map"));
     setModal(false);
-    resize(1100, 660);
+
+    // A plain QDialog on macOS gets a close button and nothing else —
+    // no zoom, no full screen — so a map window could not be made
+    // bigger, which is the first thing anyone wants from a map. Asking
+    // for the window flags explicitly gets the whole title bar.
+    setWindowFlags(Qt::Window
+                   | Qt::WindowTitleHint
+                   | Qt::WindowSystemMenuHint
+                   | Qt::WindowMinimizeButtonHint
+                   | Qt::WindowMaximizeButtonHint
+                   | Qt::WindowCloseButtonHint);
+    setSizeGripEnabled(true);
+
+    // Remember how big it was. A window that opens small every time is
+    // a window you resize every time.
+    const QByteArray geom = AppSettings::instance()
+        .value(QStringLiteral("QsoMapGeometry")).toByteArray();
+    if (!geom.isEmpty()) {
+        restoreGeometry(geom);
+    } else {
+        resize(1100, 660);
+    }
+
     buildUi();
+}
+
+void QsoMapWindow::closeEvent(QCloseEvent* e)
+{
+    AppSettings::instance().setValue(QStringLiteral("QsoMapGeometry"),
+                                     saveGeometry());
+    QDialog::closeEvent(e);
+}
+
+void QsoMapWindow::keyPressEvent(QKeyEvent* e)
+{
+    // The usual keys. Someone who has zoomed anything else on this
+    // machine will try them before finding the buttons.
+    switch (e->key()) {
+    case Qt::Key_Plus:
+    case Qt::Key_Equal:  zoomActiveView(1.25);  return;
+    case Qt::Key_Minus:  zoomActiveView(1 / 1.25); return;
+    case Qt::Key_0:      resetActiveView();     return;
+    default: break;
+    }
+    QDialog::keyPressEvent(e);
+}
+
+void QsoMapWindow::zoomActiveView(double factor)
+{
+    if (m_stack->currentIndex() == 0) { m_globe->zoomBy(factor); }
+    else                              { m_flat->zoomBy(factor); }
+}
+
+void QsoMapWindow::resetActiveView()
+{
+    if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
+    else                              { m_flat->resetView(); }
 }
 
 void QsoMapWindow::buildUi()
@@ -103,6 +160,26 @@ void QsoMapWindow::buildUi()
     m_paths->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                .arg(QString::fromLatin1(Style::kTextPrimary)));
     bar->addWidget(m_paths);
+
+    // Zoom controls. The wheel already did this; nothing said so.
+    auto* zoomOut = new QPushButton(QStringLiteral("−"), this);
+    auto* zoomIn  = new QPushButton(QStringLiteral("+"), this);
+    auto* fit     = new QPushButton(QStringLiteral("Fit"), this);
+    zoomOut->setToolTip(QStringLiteral("Zoom out  (− key, or the wheel)"));
+    zoomIn->setToolTip(QStringLiteral("Zoom in  (+ key, or the wheel)"));
+    fit->setToolTip(QStringLiteral("Back to the whole view  (0 key, or "
+                                   "double-click)"));
+    for (QPushButton* b : {zoomOut, zoomIn, fit}) {
+        b->setStyleSheet(Style::buttonBaseStyle());
+        b->setFocusPolicy(Qt::NoFocus);   // keep the +/- keys working
+        bar->addWidget(b);
+    }
+    connect(zoomOut, &QPushButton::clicked,
+            this, [this]() { zoomActiveView(1 / 1.25); });
+    connect(zoomIn, &QPushButton::clicked,
+            this, [this]() { zoomActiveView(1.25); });
+    connect(fit, &QPushButton::clicked,
+            this, [this]() { resetActiveView(); });
 
     m_viewBtn = new QPushButton(QStringLiteral("Flat map"), this);
     m_viewBtn->setStyleSheet(Style::buttonBaseStyle());

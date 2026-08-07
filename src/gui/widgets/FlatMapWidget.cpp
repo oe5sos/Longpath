@@ -88,6 +88,26 @@ void FlatMapWidget::refreshTexture()
     update();
 }
 
+void FlatMapWidget::zoomBy(double factor)
+{
+    const double before = m_zoom;
+    m_zoom = std::clamp(m_zoom * factor, 1.0, 12.0);
+    if (qFuzzyCompare(before, m_zoom)) { return; }
+
+    // Keep the centre of the view where it is. Zooming from a button
+    // has no pointer to anchor on, and letting the map drift sideways
+    // on every press makes the buttons feel broken.
+    m_pan *= m_zoom / before;
+    update();
+}
+
+void FlatMapWidget::resetView()
+{
+    m_zoom = 1.0;
+    m_pan = QPointF(0.0, 0.0);
+    update();
+}
+
 // ── Geometry ────────────────────────────────────────────────────────
 
 QVector<QPointF> FlatMapWidget::greatCircleSamples(double lat1, double lon1,
@@ -407,9 +427,7 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
 void FlatMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (e->button() == Qt::LeftButton) {
-        m_zoom = 1.0;
-        m_pan = QPointF(0.0, 0.0);
-        update();
+        resetView();
         return;
     }
     QWidget::mouseDoubleClickEvent(e);

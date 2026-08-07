@@ -168,6 +168,15 @@ void GlobeWidget::setBeamSpread(double deg)
     update();
 }
 
+void GlobeWidget::zoomBy(double factor)
+{
+    const double before = m_zoom;
+    m_zoom = std::clamp(m_zoom * factor, 0.6, 6.0);
+    if (qFuzzyCompare(before, m_zoom)) { return; }
+    m_frameDirty = true;
+    update();
+}
+
 void GlobeWidget::resetView()
 {
     m_zoom = 1.0;

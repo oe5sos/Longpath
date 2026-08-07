@@ -1406,6 +1406,11 @@ void RotorLogbookPanel::setUploadTargets(const QVector<QsoUploader*>& targets)
     if (m_logWindow) { m_logWindow->setUploaders(m_uploadTargets); }
 }
 
+void RotorLogbookPanel::showLogbook()
+{
+    openLogbookWindow();
+}
+
 void RotorLogbookPanel::openLogbookWindow()
 {
     // One window, reused. Opening a second copy of the same file in two

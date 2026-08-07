@@ -551,6 +551,11 @@ private:
     // Antenna rotator dial (Tools > Rotor...). Modeless singleton,
     // lazy-constructed so it costs nothing until opened.
     void openRotorDial();
+    // The logbook window, reachable from the menu without the dock
+    // having to be visible. Both go through the one panel, so there is
+    // never a second window over the same file.
+    void openLogbookWindow();
+    class RotorLogbookPanel* ensureRotorPanel();
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
     void ensureQrzClient();

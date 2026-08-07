@@ -6244,6 +6244,22 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openRotorDial);
     }
 
+    // The logbook, reachable without going through the dock. It is the
+    // same window the dock's button opens — one window over one file.
+    {
+        QAction* logAction =
+            toolsMenu->addAction(QStringLiteral("&Logbook..."));
+        logAction->setObjectName(QStringLiteral("actLogbook"));
+        // Not Ctrl+L: the pan-layout dialog already has it, and two
+        // actions on one shortcut means one of them silently never
+        // fires.
+        logAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+L")));
+        logAction->setToolTip(QStringLiteral(
+            "Open the logbook: search, correct, import, export and map."));
+        connect(logAction, &QAction::triggered,
+                this, &MainWindow::openLogbookWindow);
+    }
+
     // Where logged contacts can be sent on to. Separate from the QRZ
     // account entry, because these are separate services with separate
     // credentials and one combined dialog would invite mixing them up.
@@ -9339,7 +9355,12 @@ void MainWindow::openQrzCredentialsDialog()
 // show / hide / float / re-dock and a checkable menu action that tracks
 // its real visibility, so the panel behaves like the rest of the app
 // instead of being a stray window the operator has to keep track of.
-void MainWindow::openRotorDial()
+// Build the dock if it does not exist yet and hand back the panel.
+// Split out of openRotorDial so the Logbook menu entry can reach the
+// panel's logbook window without also forcing the dock into view — a
+// menu item called Logbook should open a logbook, not rearrange the
+// operator's screen.
+RotorLogbookPanel* MainWindow::ensureRotorPanel()
 {
     if (!m_rotorDock) {
         ensureQrzClient();
@@ -9357,8 +9378,21 @@ void MainWindow::openRotorDial()
         m_rotorDock->setWidget(panel);
         addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);
     }
+    return qobject_cast<RotorLogbookPanel*>(m_rotorDock->widget());
+}
+
+void MainWindow::openRotorDial()
+{
+    ensureRotorPanel();
     m_rotorDock->show();
     m_rotorDock->raise();
+}
+
+void MainWindow::openLogbookWindow()
+{
+    if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+        panel->showLogbook();
+    }
 }
 
 void MainWindow::openSpotHub()

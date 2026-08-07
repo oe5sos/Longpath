@@ -73,6 +73,12 @@ public:
     // to the constructor.
     void setUploadTargets(const QVector<QsoUploader*>& targets);
 
+    // Open the logbook window. Public so the Tools menu can reach it
+    // without the operator having to find the dock first — but still
+    // the panel's window, so there is only ever one of them over one
+    // file.
+    void showLogbook();
+
 signals:
     void qsoLogged(const LogEntry& entry);
 

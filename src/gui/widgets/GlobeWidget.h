@@ -78,6 +78,11 @@ public:
     // Back to the default camera and magnification.
     void resetView();
 
+    // Magnify. The wheel does this too, but a wheel is not an
+    // affordance — nothing on screen says the globe zooms.
+    void zoomBy(double factor);
+    double zoom() const { return m_zoom; }
+
     // Spin slowly when idle. Off by default: motion in the corner of
     // the eye is a distraction while operating.
     void setAutoRotate(bool on);

@@ -53,6 +53,13 @@ public:
     // Re-read the shared world image, e.g. after a download.
     void refreshTexture();
 
+    // Magnify about the centre. The wheel does this too, but a wheel is
+    // not an affordance — nothing on screen says the map zooms.
+    void zoomBy(double factor);
+    double zoom() const { return m_zoom; }
+    // Back to the whole world, centred.
+    void resetView();
+
     QSize sizeHint() const override { return {900, 460}; }
 
     // ── Pure geometry, exposed for tests ─────────────────────────────
