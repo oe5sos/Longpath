@@ -39,6 +39,8 @@ private slots:
     void bands_sort_by_frequency_not_by_name();
     void centimetre_bands_sort_above_metre_bands();
     void unrecognised_bands_sort_together();
+    void the_upload_mark_survives_a_round_trip();
+    void an_unmarked_contact_writes_no_upload_field();
 };
 
 void TstAdifLog::reads_a_record_we_wrote()
@@ -408,6 +410,43 @@ void TstAdifLog::unrecognised_bands_sort_together()
     QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("banana")), 0.0);
     QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("40")), 0.0);   // no unit
     QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("0m")), 0.0);   // no divide
+}
+
+void TstAdifLog::the_upload_mark_survives_a_round_trip()
+{
+    // The whole point of the flag is that it outlives a restart. If it
+    // did not survive write-then-read, every session would start by
+    // offering the entire log for upload again.
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    e.band = QStringLiteral("40m");
+    e.mode = QStringLiteral("SSB");
+    e.timeOn = QDateTime(QDate(2026, 8, 7), QTime(14, 0), QTimeZone::UTC);
+    e.uploadedToQrz = true;
+
+    const QVector<LogEntry> back = AdifLog::parse(e.toAdifRecord());
+    QCOMPARE(back.size(), 1);
+    QVERIFY(back.at(0).uploadedToQrz);
+
+    // And a foreign log, which has never heard of the field, reads as
+    // not uploaded rather than as anything stranger.
+    const QVector<LogEntry> foreign = AdifLog::parse(
+        QStringLiteral("<EOH>\n<CALL:4>OE1W <BAND:3>40m <EOR>\n"));
+    QCOMPARE(foreign.size(), 1);
+    QVERIFY(!foreign.at(0).uploadedToQrz);
+}
+
+void TstAdifLog::an_unmarked_contact_writes_no_upload_field()
+{
+    // Absent, not "N". Half the point of an APP_ field is that other
+    // programs pass it through untouched; writing a negative on every
+    // record would add a column of noise to every log this exports.
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    QVERIFY(!e.toAdifRecord().contains(QStringLiteral("APP_NEREUS_QRZUP")));
+
+    e.uploadedToQrz = true;
+    QVERIFY(e.toAdifRecord().contains(QStringLiteral("APP_NEREUS_QRZUP")));
 }
 
 QTEST_APPLESS_MAIN(TstAdifLog)

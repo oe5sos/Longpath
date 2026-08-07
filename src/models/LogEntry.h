@@ -45,6 +45,18 @@ struct LogEntry {
     QString   comment;       // COMMENT
     double    txPowerW{0.0}; // TX_PWR
 
+    // Has this been accepted by the QRZ logbook?
+    //
+    // Written as APP_NEREUS_QRZUP. An APP_ prefix is the ADIF-sanctioned
+    // way to record something the standard has no field for, and other
+    // programs are required to leave it alone rather than choke on it.
+    //
+    // It exists because "upload" without "uploaded" is not a feature:
+    // without somewhere to record the answer, every restart forgets
+    // which contacts got through, and the only safe thing left to do is
+    // send everything again.
+    bool uploadedToQrz{false};
+
     // Derived from the two locators; not written to ADIF, which has no
     // field for either — every logger recomputes them.
     double distanceKm{0.0};

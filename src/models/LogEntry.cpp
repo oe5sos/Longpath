@@ -56,6 +56,13 @@ QString LogEntry::toAdifRecord() const
     field(r, QStringLiteral("QTH"), qth);
     field(r, QStringLiteral("COUNTRY"), country);
     field(r, QStringLiteral("COMMENT"), comment);
+    if (uploadedToQrz) {
+        // APP_ is the ADIF-sanctioned prefix for a field the standard
+        // does not define. Other programs must pass it through
+        // untouched, so a log that goes out to Log4OM and comes back
+        // still knows what has been uploaded.
+        field(r, QStringLiteral("APP_NEREUS_QRZUP"), QStringLiteral("Y"));
+    }
     if (txPowerW > 0.0) {
         field(r, QStringLiteral("TX_PWR"), QString::number(txPowerW, 'f', 0));
     }

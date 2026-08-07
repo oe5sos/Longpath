@@ -92,7 +92,11 @@ private:
     void exportAdif();
     void exportCsv();
     void importAdif();
-    void uploadSelected(QsoUploader* target);
+    // Send these records. With rows marked in the table it is those;
+    // with none marked it is everything not yet uploaded, which is the
+    // question an operator actually has after a session.
+    void uploadEntries(const QList<int>& sourceRows, QsoUploader* target);
+    QList<int> outstandingRows() const;
     void openMap();
 
     // Timestamped copy of the log file beside itself. Taken before an
@@ -148,6 +152,10 @@ private:
     int m_okCount{0};
     int m_dupCount{0};
     QStringList m_failures;
+    // Source indices in the batch being uploaded, so a success can be
+    // written back against the right record instead of against every
+    // past contact with the same station.
+    QList<int> m_uploadBatch;
 };
 
 } // namespace NereusSDR

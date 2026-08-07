@@ -214,6 +214,23 @@ void RotorLogbookPanel::buildUi()
     m_lookupBtn = new QPushButton(QStringLiteral("QRZ"), this);
     m_lookupBtn->setStyleSheet(Style::buttonBaseStyle());
     callRow->addWidget(m_lookupBtn);
+
+    // A second Log button, here in the callsign row. The one further
+    // down is where it belongs when you are filling in reports and a
+    // comment; this one is for the other case, which is most of them:
+    // type a callsign, watch the name and locator arrive, click. Two
+    // buttons for one action is usually a smell, but the distance
+    // between the callsign field and the bottom of the panel is the
+    // whole cost of logging a contact when you are working a run.
+    auto* quickLogBtn = new QPushButton(QStringLiteral("LOG"), this);
+    quickLogBtn->setStyleSheet(Style::buttonBaseStyle()
+                               + Style::greenCheckedStyle());
+    quickLogBtn->setToolTip(QStringLiteral(
+        "Log this contact now, with whatever is filled in"));
+    callRow->addWidget(quickLogBtn);
+    connect(quickLogBtn, &QPushButton::clicked,
+            this, &RotorLogbookPanel::onLogQso);
+
     col->addLayout(callRow);
 
     // Station card: portrait, flag, name line. The portrait is on the
@@ -730,6 +747,12 @@ void RotorLogbookPanel::wireQrz()
         connect(m_uploader, &QsoUploader::uploadFinished, this,
                 [this](const QString& call, bool ok, bool duplicate,
                        const QString& message) {
+            if (ok) {
+                // Record that it got through. Without this the answer
+                // is forgotten at the next restart, and the only safe
+                // thing left is to send everything again.
+                markUploaded(call);
+            }
             setStatus(ok
                 ? QStringLiteral("%1 — %2").arg(call,
                       duplicate ? QStringLiteral("already in your QRZ logbook")
@@ -1320,6 +1343,7 @@ void RotorLogbookPanel::onLogQso()
     if (!e.band.isEmpty()) { msg += QStringLiteral(" on %1").arg(e.band); }
     if (m_uploader && m_uploader->isConfigured()) {
         msg += QStringLiteral(" · uploading…");
+        m_lastLogged = e;
         m_uploader->upload(e);
     }
     setStatus(msg);
@@ -1344,6 +1368,37 @@ void RotorLogbookPanel::onLogQso()
     m_flagEmoji.clear();
     m_lastInfo = CallsignInfo{};
     m_callEdit->setFocus();
+}
+
+void RotorLogbookPanel::markUploaded(const QString& call)
+{
+    // Only the contact just logged, not every past QSO with the same
+    // station. Marking by callsign alone would claim a station's whole
+    // history had been uploaded because one of its contacts was.
+    if (!m_lastLogged.isValid()) { return; }
+    if (Callsigns::normalized(m_lastLogged.call)
+        != Callsigns::normalized(call)) { return; }
+
+    QVector<LogEntry> all = AdifLog::read(logbookPath());
+    bool changed = false;
+    for (LogEntry& e : all) {
+        if (!e.uploadedToQrz && AdifLog::isSameQso(e, m_lastLogged)) {
+            e.uploadedToQrz = true;
+            changed = true;
+            break;
+        }
+    }
+    if (!changed) { return; }
+
+    QString err;
+    if (!AdifLog::write(logbookPath(), all, &err)) {
+        // Not worth interrupting for: the contact is logged and it is
+        // uploaded. Only the note saying so failed, and the worst
+        // consequence is that it gets offered for upload again, where
+        // QRZ will call it a duplicate.
+        qWarning("Couldn't record the QRZ upload: %s", qPrintable(err));
+    }
+    m_lastLogged = LogEntry{};
 }
 
 void RotorLogbookPanel::refreshRecentList()

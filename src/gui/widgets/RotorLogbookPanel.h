@@ -105,6 +105,8 @@ private:
     void haltTurn();
     void applyLocators();
     void refreshRecentList();
+    // Note in the log file that this contact reached QRZ.
+    void markUploaded(const QString& call);
     void openLogbookWindow();
     void setStatus(const QString& text, bool warn = false);
     // Fetch and show the QRZ portrait. Cached on disk so working the
@@ -191,6 +193,11 @@ private:
     // logged contact when it belongs to the callsign being logged —
     // never a leftover card from the previous station.
     CallsignInfo m_lastInfo;
+
+    // The contact just written, so a later upload result can be
+    // matched to the right record rather than to every past QSO
+    // with the same station.
+    LogEntry m_lastLogged;
 
     // Automatic lookup while typing. The timer debounces; the cache
     // means working a station twice in a contest, or backspacing over

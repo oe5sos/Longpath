@@ -128,6 +128,10 @@ QVector<LogEntry> parse(const QString& text)
         else if (key == QLatin1String("COMMENT"))       { cur.comment = value; }
         else if (key == QLatin1String("FREQ"))          { cur.freqMHz = value.toDouble(); }
         else if (key == QLatin1String("TX_PWR"))        { cur.txPowerW = value.toDouble(); }
+        else if (key == QLatin1String("APP_NEREUS_QRZUP")) {
+            cur.uploadedToQrz = value.trimmed().compare(QLatin1String("Y"),
+                                    Qt::CaseInsensitive) == 0;
+        }
         // Anything else is somebody's private extension. Ignored, not
         // rejected — a log that refuses to open because it met an
         // APP_LOG4OM_ tag would be useless.
