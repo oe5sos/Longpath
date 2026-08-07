@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "GlobeWidget.h"
+#include "WorldTexture.h"
 #include "gui/StyleConstants.h"
 
 #include <QDateTime>
@@ -86,14 +87,18 @@ GlobeWidget::GlobeWidget(QWidget* parent)
 
 bool GlobeWidget::loadTexture(const QString& path)
 {
-    QImage img(path);
-    if (img.isNull()) { return false; }
-    // Convert once, on load: sampling a non-native format per pixel
-    // would cost more than the whole render.
-    m_texture = img.convertToFormat(QImage::Format_RGB32);
+    // Shared with the flat map through WorldTexture: the large Blue
+    // Marble is 58 MB decoded, and two widgets each holding their own
+    // copy is 58 MB nobody asked for.
+    if (!WorldTexture::setPath(path)) { return false; }
     m_frameDirty = true;
     update();
     return true;
+}
+
+bool GlobeWidget::hasTexture() const
+{
+    return !WorldTexture::image().isNull();
 }
 
 void GlobeWidget::setHome(double lat, double lon)
@@ -115,6 +120,18 @@ void GlobeWidget::setTarget(double lat, double lon)
 void GlobeWidget::clearTarget()
 {
     m_hasTarget = false;
+    update();
+}
+
+void GlobeWidget::setPoints(const QVector<MapPoint>& points)
+{
+    m_points = points;
+    update();
+}
+
+void GlobeWidget::setShowPointPaths(bool on)
+{
+    m_showPointPaths = on;
     update();
 }
 
@@ -421,9 +438,12 @@ void GlobeWidget::renderSphere()
     const double sunZ = std::sin(vla) * std::sin(sla)
                       + std::cos(vla) * std::cos(sla) * std::cos(slo);
 
-    const bool tex = !m_texture.isNull();
-    const int tw = tex ? m_texture.width()  : 0;
-    const int th = tex ? m_texture.height() : 0;
+    // One local handle to the shared image. QImage is implicitly
+    // shared, so this copies a pointer, not 58 MB.
+    const QImage texture = WorldTexture::image();
+    const bool tex = !texture.isNull();
+    const int tw = tex ? texture.width()  : 0;
+    const int th = tex ? texture.height() : 0;
 
     const int x0 = std::max(0, static_cast<int>(cx - r) - 1);
     const int x1 = std::min(w - 1, static_cast<int>(cx + r) + 1);
@@ -453,7 +473,7 @@ void GlobeWidget::renderSphere()
                 if (tx < 0) { tx += tw; }
                 int ty = static_cast<int>((90.0 - lat / kDeg) / 180.0 * th);
                 ty = std::clamp(ty, 0, th - 1);
-                base = m_texture.pixel(tx, ty);
+                base = texture.pixel(tx, ty);
             } else {
                 // No texture: a plain blue marble so the shape and the
                 // terminator still read.
@@ -495,7 +515,10 @@ void GlobeWidget::drawArc(QPainter& p, double endLat, double endLon,
     // as a transatlantic path would misrepresent both.
     const double peak = 0.04 + 0.26 * std::min(1.0, dist / 180.0);
 
-    constexpr int kSteps = 160;
+    // Fewer samples for the thin bulk arcs. A logbook map draws hundreds
+    // of them, and at 0.7 px wide nobody can see the difference between
+    // 64 segments and 160 — but the widget can feel it.
+    const int kSteps = width < 1.0 ? 64 : 160;
     QPointF prev;
     bool havePrev = false;
 
@@ -552,7 +575,8 @@ void GlobeWidget::paintEvent(QPaintEvent*)
 
     // Graticule every 30°, clipped to the visible hemisphere by the
     // projection itself.
-    p.setPen(QPen(QColor(255, 255, 255, m_texture.isNull() ? 44 : 28), 0.8));
+    const bool untextured = !hasTexture();
+    p.setPen(QPen(QColor(255, 255, 255, untextured ? 44 : 28), 0.8));
     for (int lonLine = -180; lonLine < 180; lonLine += 30) {
         QPointF prev;
         bool havePrev = false;
@@ -606,6 +630,29 @@ void GlobeWidget::paintEvent(QPaintEvent*)
         drawArc(p, m_targetLat, m_targetLon, accent, 1.6, 1.0);
     }
 
+    // Logged contacts. Thinner and dimmer than the live path on purpose:
+    // 500 arcs drawn like the one live path would bury it.
+    if (m_hasHome && !m_points.isEmpty()) {
+        const QColor faint(Style::kAccent);
+        if (m_showPointPaths) {
+            for (const MapPoint& pt : m_points) {
+                drawArc(p, pt.lat, pt.lon, faint, 0.7, 0.22);
+            }
+        }
+        p.setPen(Qt::NoPen);
+        for (const MapPoint& pt : m_points) {
+            QPointF s;
+            if (!project(pt.lat, pt.lon, s)) { continue; }
+            QColor glow = faint;
+            glow.setAlpha(80);
+            p.setBrush(glow);
+            p.drawEllipse(s, 4.5, 4.5);
+            p.setBrush(faint);
+            p.drawEllipse(s, 2.0, 2.0);
+        }
+        p.setBrush(Qt::NoBrush);
+    }
+
     auto marker = [&](double lat, double lon, const QColor& col,
                       const QString& label) {
         QPointF pt;
@@ -636,7 +683,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
         marker(m_targetLat, m_targetLon, QColor(Style::kAccent), QString{});
     }
 
-    if (m_texture.isNull()) {
+    if (untextured) {
         // Say why it looks plain, and what fixes it.
         QFont f = p.font();
         f.setPixelSize(10);

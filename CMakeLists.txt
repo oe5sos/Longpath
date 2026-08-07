@@ -908,7 +908,10 @@ set(GUI_SOURCES
     src/gui/widgets/RotorDialWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp
     src/gui/widgets/GlobeWidget.cpp
+    src/gui/widgets/FlatMapWidget.cpp
+    src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp
+    src/gui/QsoMapWindow.cpp
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
     src/core/AdifLog.cpp

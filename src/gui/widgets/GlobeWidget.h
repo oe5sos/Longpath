@@ -19,8 +19,11 @@
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================
 
+#include "MapPoint.h"
+
 #include <QImage>
 #include <QPoint>
+#include <QVector>
 #include <QWidget>
 
 class QDateTime;
@@ -47,12 +50,19 @@ public:
     // Equirectangular world image. Returns false if it can't be read;
     // the globe then keeps whatever it had.
     bool loadTexture(const QString& path);
-    bool hasTexture() const { return !m_texture.isNull(); }
+    bool hasTexture() const;
 
     // Home station and the station being worked, in degrees.
     void setHome(double lat, double lon);
     void setTarget(double lat, double lon);
     void clearTarget();
+
+    // Many places at once, for the QSO map. Drawn as dots with thin
+    // paths, separately from the single live target — a log of 500
+    // contacts and "the station I am working now" are different things
+    // and should not look alike.
+    void setPoints(const QVector<MapPoint>& points);
+    void setShowPointPaths(bool on);
 
     // Turn the globe so the given bearing from home faces the viewer.
     // Animated — the point is to see which way the path swings.
@@ -127,7 +137,6 @@ private:
     void drawArc(QPainter& p, double endLat, double endLon,
                  const QColor& col, double width, double opacity) const;
 
-    QImage m_texture;      // equirectangular, may be null
     QImage m_frame;        // rendered sphere, cached until something moves
 
     double m_viewLat{20.0};   // camera centre
@@ -147,6 +156,9 @@ private:
 
     // Main lobe half-width for the flanking arcs, in degrees.
     double m_beamSpread{5.0};
+
+    QVector<MapPoint> m_points;
+    bool m_showPointPaths{true};
 
     // Magnification. 1.0 fits the disc in the widget.
     double m_zoom{1.0};

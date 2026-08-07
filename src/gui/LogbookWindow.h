@@ -64,6 +64,7 @@ private:
     void exportAdif();
     void exportCsv();
     void uploadSelected(QsoUploader* target);
+    void openMap();
 
     // Index into m_all for the given visible row, or -1.
     int sourceRow(int viewRow) const;
@@ -84,6 +85,10 @@ private:
     QPushButton*  m_uploadBtn{nullptr};
 
     QVector<QsoUploader*> m_uploaders;
+
+    // One map window, reused, so a second click raises the existing one
+    // instead of stacking copies of the same picture.
+    class QsoMapWindow* m_map{nullptr};
 
     // Outstanding uploads for the current batch, so the summary can be
     // reported once instead of one message box per contact.

@@ -14,6 +14,7 @@
 
 #include "core/AdifLog.h"
 #include "core/QsoUploader.h"
+#include "gui/QsoMapWindow.h"
 #include "gui/StyleConstants.h"
 
 #include <QAction>
@@ -109,14 +110,19 @@ void LogbookWindow::buildUi()
     m_uploadBtn = new QPushButton(QStringLiteral("Upload…"), this);
     m_uploadBtn->setToolTip(
         QStringLiteral("Send the selected contacts to a logging service"));
+    auto* mapBtn  = new QPushButton(QStringLiteral("Map…"), this);
+    mapBtn->setToolTip(
+        QStringLiteral("See the contacts in a period on a globe or a "
+                       "world map"));
     auto* adifBtn = new QPushButton(QStringLiteral("Export ADIF…"), this);
     auto* csvBtn  = new QPushButton(QStringLiteral("Export CSV…"), this);
-    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn,
+    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
                            adifBtn, csvBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
     col->addLayout(top);
+    connect(mapBtn, &QPushButton::clicked, this, &LogbookWindow::openMap);
 
     connect(m_uploadBtn, &QPushButton::clicked, this, [this]() {
         if (m_uploaders.isEmpty()) {
@@ -536,6 +542,30 @@ void LogbookWindow::deleteSelected()
     std::sort(victims.begin(), victims.end(), std::greater<int>());
     for (int idx : victims) { m_all.removeAt(idx); }
     if (saveAll()) { reload(); }
+}
+
+// ── Map ─────────────────────────────────────────────────────────────
+
+void LogbookWindow::openMap()
+{
+    if (!m_map) { m_map = new QsoMapWindow(this); }
+
+    // Home comes from whichever contact recorded it most recently. The
+    // panel knows the operator's locator, but the map is opened from
+    // here — and the log carries the same answer, with the advantage of
+    // being right for an imported log made from a different station.
+    QString home;
+    for (const LogEntry& e : m_all) {
+        if (!e.myGridSquare.trimmed().isEmpty()) {
+            home = e.myGridSquare;
+            break;   // m_all is newest first
+        }
+    }
+    m_map->setHomeGrid(home);
+    m_map->setEntries(m_all);
+    m_map->show();
+    m_map->raise();
+    m_map->activateWindow();
 }
 
 // ── Export ──────────────────────────────────────────────────────────
