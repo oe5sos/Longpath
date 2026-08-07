@@ -4619,6 +4619,10 @@ target_link_libraries(tst_rotctld_client PRIVATE Qt6::Network)
 #    and an unresolved prefix that must not be reported as a new one --
 nereus_add_test(tst_worked_before)
 
+# -- Logbook filtering: grid as a prefix, mode matching submode, dates
+#    inclusive and off until asked for, empty filter showing everything --
+nereus_add_test(tst_log_filter)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

@@ -21,6 +21,7 @@
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================
 
+#include "core/LogFilter.h"
 #include "models/LogEntry.h"
 
 #include <QDialog>
@@ -29,10 +30,14 @@
 
 #include <functional>
 
+class QCheckBox;
+class QComboBox;
+class QDateEdit;
 class QLabel;
 class QLineEdit;
 class QPushButton;
 class QTableWidget;
+class QVBoxLayout;
 
 namespace NereusSDR {
 
@@ -65,6 +70,13 @@ signals:
 
 private:
     void buildUi();
+    void buildFilterBar(QVBoxLayout* col);
+    // Refill the band and mode lists from what is actually in the log,
+    // keeping the current choice if it is still there. Offering every
+    // band in existence would make most of the list a way to get no
+    // results.
+    void refreshFilterChoices();
+    LogFilter currentFilter() const;
     void applyFilter();
     void refreshTable();
     void updateStats();
@@ -93,6 +105,15 @@ private:
     QVector<int>      m_visible;  // indices into m_all, after filtering
 
     QLineEdit*    m_search{nullptr};
+    QComboBox*    m_bandBox{nullptr};
+    QComboBox*    m_modeBox{nullptr};
+    QLineEdit*    m_gridEdit{nullptr};
+    QLineEdit*    m_countryEdit{nullptr};
+    QCheckBox*    m_useDates{nullptr};
+    QDateEdit*    m_fromDate{nullptr};
+    QDateEdit*    m_toDate{nullptr};
+    QPushButton*  m_clearBtn{nullptr};
+
     QTableWidget* m_table{nullptr};
     QLabel*       m_stats{nullptr};
     QPushButton*  m_editBtn{nullptr};

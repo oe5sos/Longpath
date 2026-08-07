@@ -18,6 +18,9 @@
 #include "gui/StyleConstants.h"
 
 #include <QAction>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDateEdit>
 #include <QDateTimeEdit>
 #include <QHash>
 #include <QMenu>
@@ -32,6 +35,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSet>
+#include <QSignalBlocker>
 #include <QTableWidget>
 #include <QTextStream>
 #include <QTimeZone>
@@ -157,6 +161,8 @@ void LogbookWindow::buildUi()
         }
     });
 
+    buildFilterBar(col);
+
     // Table
     m_table = new QTableWidget(0, ColumnCount, this);
     m_table->setHorizontalHeaderLabels(headerLabels());
@@ -202,6 +208,156 @@ void LogbookWindow::buildUi()
             this, [this](QTableWidgetItem*) { editSelected(); });
 }
 
+void LogbookWindow::buildFilterBar(QVBoxLayout* col)
+{
+    auto* row = new QHBoxLayout;
+    row->setSpacing(6);
+
+    auto caption = [this](const QString& t) {
+        auto* l = new QLabel(t, this);
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+                             .arg(QString::fromLatin1(Style::kTextScale)));
+        return l;
+    };
+
+    row->addWidget(caption(QStringLiteral("BAND")));
+    m_bandBox = new QComboBox(this);
+    m_bandBox->setMinimumWidth(80);
+    row->addWidget(m_bandBox);
+
+    row->addWidget(caption(QStringLiteral("MODE")));
+    m_modeBox = new QComboBox(this);
+    m_modeBox->setMinimumWidth(80);
+    row->addWidget(m_modeBox);
+
+    row->addWidget(caption(QStringLiteral("GRID")));
+    m_gridEdit = new QLineEdit(this);
+    m_gridEdit->setPlaceholderText(QStringLiteral("JN, JN67, JN67VV"));
+    m_gridEdit->setToolTip(QStringLiteral(
+        "Matches from the start, so two characters find a whole field"));
+    m_gridEdit->setMaximumWidth(120);
+    row->addWidget(m_gridEdit);
+
+    row->addWidget(caption(QStringLiteral("COUNTRY")));
+    m_countryEdit = new QLineEdit(this);
+    m_countryEdit->setPlaceholderText(QStringLiteral("part of the name"));
+    m_countryEdit->setMaximumWidth(140);
+    row->addWidget(m_countryEdit);
+
+    // Off by default. A live date range would hide contacts the moment
+    // the window opened, and an empty log reads as an empty log.
+    m_useDates = new QCheckBox(QStringLiteral("Dates"), this);
+    m_useDates->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                                  .arg(QString::fromLatin1(Style::kTextPrimary)));
+    row->addWidget(m_useDates);
+
+    m_fromDate = new QDateEdit(QDate::currentDate().addYears(-1), this);
+    m_fromDate->setCalendarPopup(true);
+    m_fromDate->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+    m_fromDate->setEnabled(false);
+    row->addWidget(m_fromDate);
+
+    m_toDate = new QDateEdit(QDate::currentDate(), this);
+    m_toDate->setCalendarPopup(true);
+    m_toDate->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+    m_toDate->setEnabled(false);
+    row->addWidget(m_toDate);
+
+    row->addStretch(1);
+
+    m_clearBtn = new QPushButton(QStringLiteral("Clear"), this);
+    m_clearBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_clearBtn->setToolTip(QStringLiteral("Empty every filter box"));
+    row->addWidget(m_clearBtn);
+
+    for (QLineEdit* e : {m_gridEdit, m_countryEdit}) {
+        e->setClearButtonEnabled(true);
+        e->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+    }
+    col->addLayout(row);
+
+    auto reapply = [this]() {
+        applyFilter();
+        refreshTable();
+        updateStats();
+    };
+    connect(m_bandBox, &QComboBox::currentTextChanged, this, reapply);
+    connect(m_modeBox, &QComboBox::currentTextChanged, this, reapply);
+    connect(m_gridEdit, &QLineEdit::textChanged, this, reapply);
+    connect(m_countryEdit, &QLineEdit::textChanged, this, reapply);
+    connect(m_fromDate, &QDateEdit::dateChanged, this, reapply);
+    connect(m_toDate, &QDateEdit::dateChanged, this, reapply);
+    connect(m_useDates, &QCheckBox::toggled, this, [this, reapply](bool on) {
+        m_fromDate->setEnabled(on);
+        m_toDate->setEnabled(on);
+        reapply();
+    });
+
+    connect(m_clearBtn, &QPushButton::clicked, this, [this, reapply]() {
+        // Block each control rather than reapplying six times on the
+        // way to an empty filter.
+        QSignalBlocker b1(m_search), b2(m_bandBox), b3(m_modeBox);
+        QSignalBlocker b4(m_gridEdit), b5(m_countryEdit), b6(m_useDates);
+        m_search->clear();
+        m_bandBox->setCurrentIndex(0);
+        m_modeBox->setCurrentIndex(0);
+        m_gridEdit->clear();
+        m_countryEdit->clear();
+        m_useDates->setChecked(false);
+        m_fromDate->setEnabled(false);
+        m_toDate->setEnabled(false);
+        reapply();
+    });
+}
+
+void LogbookWindow::refreshFilterChoices()
+{
+    // Only what the log actually contains. A list of every band in
+    // existence is mostly a set of ways to get no results.
+    auto fill = [](QComboBox* box, QStringList values) {
+        const QString keep = box->currentText();
+        values.removeDuplicates();
+        std::sort(values.begin(), values.end());
+
+        QSignalBlocker block(box);
+        box->clear();
+        box->addItem(QStringLiteral("any"));
+        box->addItems(values);
+
+        const int at = box->findText(keep);
+        box->setCurrentIndex(at >= 0 ? at : 0);
+    };
+
+    QStringList bands;
+    QStringList modes;
+    for (const LogEntry& e : m_all) {
+        if (!e.band.trimmed().isEmpty())    { bands << e.band.trimmed(); }
+        if (!e.mode.trimmed().isEmpty())    { modes << e.mode.trimmed(); }
+        if (!e.submode.trimmed().isEmpty()) { modes << e.submode.trimmed(); }
+    }
+    fill(m_bandBox, bands);
+    fill(m_modeBox, modes);
+}
+
+LogFilter LogbookWindow::currentFilter() const
+{
+    LogFilter f;
+    f.text    = m_search->text();
+    f.grid    = m_gridEdit->text();
+    f.country = m_countryEdit->text();
+
+    // Index 0 is "any" and is not a value to match against.
+    if (m_bandBox->currentIndex() > 0) { f.band = m_bandBox->currentText(); }
+    if (m_modeBox->currentIndex() > 0) { f.mode = m_modeBox->currentText(); }
+
+    f.useDates = m_useDates->isChecked();
+    if (f.useDates) {
+        f.from = m_fromDate->date();
+        f.to   = m_toDate->date();
+    }
+    return f;
+}
+
 // ── Data ────────────────────────────────────────────────────────────
 
 void LogbookWindow::reload()
@@ -213,6 +369,7 @@ void LogbookWindow::reload()
             QStringLiteral("Couldn't read the log:\n%1").arg(err));
     }
     std::stable_sort(m_all.begin(), m_all.end(), newerFirst);
+    refreshFilterChoices();
     applyFilter();
     refreshTable();
     updateStats();
@@ -220,26 +377,12 @@ void LogbookWindow::reload()
 
 void LogbookWindow::applyFilter()
 {
-    const QString needle = m_search->text().trimmed();
+    const LogFilter f = currentFilter();
     m_visible.clear();
     m_visible.reserve(m_all.size());
 
     for (int i = 0; i < m_all.size(); ++i) {
-        if (needle.isEmpty()) { m_visible.append(i); continue; }
-        const LogEntry& e = m_all.at(i);
-        // One box across every text field. An operator looking for
-        // "Fort Salonga" should not first have to decide that it is a
-        // QTH and not a comment.
-        const bool hit =
-               e.call.contains(needle, Qt::CaseInsensitive)
-            || e.name.contains(needle, Qt::CaseInsensitive)
-            || e.qth.contains(needle, Qt::CaseInsensitive)
-            || e.country.contains(needle, Qt::CaseInsensitive)
-            || e.gridSquare.contains(needle, Qt::CaseInsensitive)
-            || e.band.contains(needle, Qt::CaseInsensitive)
-            || e.mode.contains(needle, Qt::CaseInsensitive)
-            || e.comment.contains(needle, Qt::CaseInsensitive);
-        if (hit) { m_visible.append(i); }
+        if (f.matches(m_all.at(i))) { m_visible.append(i); }
     }
 }
 
