@@ -167,9 +167,15 @@ void TstRotctldClient::report_codes_read_as_english()
 
 void TstRotctldClient::move_command_uses_plain_decimals()
 {
-    // A German locale writes 145,00. rotctld rejects that, and the
-    // antenna simply does not move — with no error the operator could
-    // trace to a decimal comma.
+    // rotctld rejects "145,00" and the antenna then does not move, with
+    // nothing in the error pointing at a decimal comma.
+    //
+    // This passes today without the guard: QString::arg(double) formats
+    // through the C locale whatever the user's is — only %L1 asks for
+    // theirs. The test is here for the edit that has not happened yet.
+    // Someone tidying this to %L1, or to QLocale::toString(), would
+    // break every rotator outside the English-speaking world and see
+    // nothing wrong on their own machine.
     const QLocale saved = QLocale();
     QLocale::setDefault(QLocale(QLocale::German, QLocale::Germany));
     const QByteArray cmd = RotctldClient::moveCommand(145.0);

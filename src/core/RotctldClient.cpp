@@ -148,9 +148,18 @@ void RotctldClient::disconnectFromRotor()
 
 QByteArray RotctldClient::moveCommand(double azimuthDeg, double elevationDeg)
 {
-    // Plain decimals, C locale. A German locale writing "145,0" would
-    // be rejected by rotctld, and the antenna would simply not move —
-    // with no error the operator could connect to the cause.
+    // Plain decimals. rotctld wants "145.00"; a decimal comma is
+    // rejected and the antenna then simply does not move, with nothing
+    // in the error to connect it to a number format.
+    //
+    // As written this is already safe, and it is worth being exact
+    // about why: QString::arg(double) formats through QLocaleData::c(),
+    // the C locale, regardless of the user's. Only the %L1 form asks
+    // for the user's locale. So the danger is not today's code — it is
+    // an innocent-looking future edit to %L1, or a switch to
+    // QLocale::toString(), either of which would break this silently
+    // on every machine outside the English-speaking world. The test
+    // sets a German locale and pins the output for exactly that.
     return QStringLiteral("P %1 %2\n")
         .arg(norm360(azimuthDeg), 0, 'f', 2)
         .arg(elevationDeg, 0, 'f', 2)
