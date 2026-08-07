@@ -908,6 +908,8 @@ set(GUI_SOURCES
     src/gui/widgets/RotorDialWidget.cpp
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
+    src/core/QrzLogbookUploader.cpp
+    src/models/LogEntry.cpp
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp

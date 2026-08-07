@@ -177,18 +177,41 @@ double RotorDialWidget::travelDegrees() const
     return shortWay >= 0.0 ? shortWay - 360.0 : shortWay + 360.0;
 }
 
+// Bearing under the cursor, or a negative value inside the hub's dead
+// zone (where the angle is meaningless and a stray pixel would swing
+// the target wildly).
+double RotorDialWidget::bearingAt(const QPointF& pos) const
+{
+    const QPointF c(width() * 0.5, height() * 0.42);
+    const QPointF p = pos - c;
+    if (std::hypot(p.x(), p.y()) < 8.0) { return -1.0; }
+    return norm360(qRadiansToDegrees(std::atan2(p.x(), -p.y())));
+}
+
 void RotorDialWidget::mousePressEvent(QMouseEvent* ev)
 {
     if (ev->button() != Qt::LeftButton) { QWidget::mousePressEvent(ev); return; }
-
-    const QPointF c(width() * 0.5, height() * 0.42);
-    const QPointF p = ev->position() - c;
-    if (std::hypot(p.x(), p.y()) < 8.0) { return; }   // dead zone at the hub
-
-    // Screen vector back to a compass bearing.
-    const double deg = norm360(qRadiansToDegrees(std::atan2(p.x(), -p.y())));
+    const double deg = bearingAt(ev->position());
+    if (deg < 0.0) { return; }
     setTargetBearing(deg);
     emit targetPicked(deg);
+}
+
+void RotorDialWidget::mouseDoubleClickEvent(QMouseEvent* ev)
+{
+    if (ev->button() != Qt::LeftButton) {
+        QWidget::mouseDoubleClickEvent(ev);
+        return;
+    }
+    const double deg = bearingAt(ev->position());
+    if (deg < 0.0) { return; }
+
+    // Aim at where the second click landed, not at the target the first
+    // click set: the two can differ by a pixel or two, and the antenna
+    // should go where the operator last pointed.
+    setTargetBearing(deg);
+    emit targetPicked(deg);
+    emit rotateRequested(deg);
 }
 
 void RotorDialWidget::paintEvent(QPaintEvent*)

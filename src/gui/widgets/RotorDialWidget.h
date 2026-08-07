@@ -18,6 +18,7 @@
 //                 rotator protocol behind it yet.
 // =================================================================
 
+#include <QPointF>
 #include <QWidget>
 
 namespace NereusSDR {
@@ -94,11 +95,18 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent*) override;
+    // Single click aims, double click aims and starts turning. Keeping
+    // "commit" behind a second, deliberate action means a stray click
+    // on the rose can never send the antenna somewhere.
     void mousePressEvent(QMouseEvent* ev) override;
+    void mouseDoubleClickEvent(QMouseEvent* ev) override;
 
 private:
     // Screen angle for a compass bearing: 0° is up, clockwise.
     static double bearingToRadians(double deg);
+    // Compass bearing under a widget-local point; negative inside the
+    // hub's dead zone, where the angle is meaningless.
+    double bearingAt(const QPointF& pos) const;
     void recomputeState();
 
     double m_actual{0.0};

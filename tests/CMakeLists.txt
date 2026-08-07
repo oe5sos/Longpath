@@ -4578,6 +4578,10 @@ nereus_add_test(tst_cty_latlon)
 nereus_add_test(tst_qrz_client)
 target_link_libraries(tst_qrz_client PRIVATE Qt6::Network)
 
+# -- LogEntry ADIF output + QRZ logbook upload response parsing --
+nereus_add_test(tst_log_entry)
+target_link_libraries(tst_log_entry PRIVATE Qt6::Network)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

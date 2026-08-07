@@ -260,6 +260,8 @@ warren@wpratt.com
 #include "core/Maidenhead.h"
 #include "core/CredentialStore.h"
 #include "core/QrzClient.h"
+#include "core/QrzLogbookUploader.h"
+#include "models/LogEntry.h"
 #include "widgets/RxDashboard.h"
 #include "widgets/AntennaSwitchToast.h"
 #include "widgets/StatusToast.h"
@@ -394,8 +396,11 @@ warren@wpratt.com
 #include <QProgressDialog>
 #include <QMessageBox>
 #include <QDialog>
+#include <QDir>
 #include <QFormLayout>
 #include <QLineEdit>
+#include <QStandardPaths>
+#include <QTextStream>
 #include <QTimer>
 #include <QThread>
 #include <QFile>          // /proc/stat reader for Linux system-CPU path
@@ -8965,6 +8970,54 @@ void MainWindow::openPureSignalDialog()
 //
 // Mirrors the modeless-singleton pattern at AetherSDR
 // src/gui/MainWindow.cpp openDxClusterDialog() [@0cd4559].
+// ── Logbook ─────────────────────────────────────────────────────────
+//
+// One ADIF file, appended to. Not a database: ADIF is what every logger
+// imports, so the operator is never locked in, and an append-only text
+// file cannot lose earlier contacts to a bad write.
+QString MainWindow::logbookPath()
+{
+    const QString dir =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QDir().mkpath(dir);
+    return dir + QStringLiteral("/logbook.adi");
+}
+
+bool MainWindow::appendQsoToLog(const LogEntry& entry, QString* error)
+{
+    const QString path = logbookPath();
+    const bool isNew = !QFile::exists(path);
+
+    QFile f(path);
+    if (!f.open(QIODevice::Append | QIODevice::Text)) {
+        if (error) { *error = f.errorString(); }
+        return false;
+    }
+    QTextStream out(&f);
+    if (isNew) {
+        // ADIF requires a header terminated by <EOH> before any record;
+        // a file that starts straight in on <CALL:...> is rejected by
+        // strict importers.
+        out << "NereusSDR logbook\n"
+            << "<ADIF_VER:5>3.1.4 <PROGRAMID:9>NereusSDR <EOH>\n";
+    }
+    out << entry.toAdifRecord() << "\n";
+    out.flush();
+    f.close();
+    return true;
+}
+
+void MainWindow::ensureQrzUploader()
+{
+    if (m_qrzUploader) { return; }
+    m_qrzUploader = new QrzLogbookUploader(this);
+    // The logbook API key is a different credential from the XML
+    // login, so it gets its own keychain entry.
+    m_qrzUploader->setApiKey(
+        CredentialStore::retrieve(QStringLiteral("qrz.logbookkey"),
+                                  QStringLiteral("logbook")));
+}
+
 // ── QRZ account ─────────────────────────────────────────────────────
 
 void MainWindow::ensureQrzClient()
@@ -9013,7 +9066,27 @@ void MainWindow::openQrzCredentialsDialog()
     passEdit->setText(CredentialStore::retrieve(
         QStringLiteral("qrz.password"), userEdit->text()));
     form->addRow(QStringLiteral("Password"), passEdit);
+
+    // Separate credential, separate service: uploads go to
+    // logbook.qrz.com with an API key from the logbook's settings page,
+    // not with the username and password above. Labelled so the two are
+    // not confused — mixing them up is the usual cause of an
+    // unexplained "invalid".
+    ensureQrzUploader();
+    auto* keyEdit = new QLineEdit(&dlg);
+    keyEdit->setEchoMode(QLineEdit::Password);
+    keyEdit->setPlaceholderText(QStringLiteral("for uploading QSOs"));
+    keyEdit->setText(m_qrzUploader->apiKey());
+    form->addRow(QStringLiteral("Logbook API key"), keyEdit);
     col->addLayout(form);
+
+    auto* keyNote = new QLabel(QStringLiteral(
+        "The logbook key is separate from the password above — "
+        "find it on your QRZ logbook settings page."), &dlg);
+    keyNote->setWordWrap(true);
+    keyNote->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                               .arg(Style::kTextSecondary));
+    col->addWidget(keyNote);
 
     // Empty required fields get an amber border, not only a sentence
     // under the form. Same reason as the locator field: a status line
@@ -9108,6 +9181,10 @@ void MainWindow::openQrzCredentialsDialog()
         CredentialStore::store(QStringLiteral("qrz.password"), user,
                                passEdit->text());
         m_qrzClient->setCredentials(user, passEdit->text());
+
+        CredentialStore::store(QStringLiteral("qrz.logbookkey"),
+                               QStringLiteral("logbook"), keyEdit->text());
+        m_qrzUploader->setApiKey(keyEdit->text());
         dlg.accept();
     });
 
@@ -9387,6 +9464,93 @@ void MainWindow::openRotorDial()
 
         connect(qrzSetupBtn, &QPushButton::clicked,
                 this, &MainWindow::openQrzCredentialsDialog);
+
+        // ── Log QSO ──────────────────────────────────────────────────
+        // Everything the radio already knows is taken from the radio:
+        // frequency, mode and band come from the active slice, the time
+        // is stamped now, and the station detail is whatever the
+        // callsign field last resolved. The operator types nothing they
+        // have already told the radio.
+        auto* logBtn = new QPushButton(QStringLiteral("Log QSO"),
+                                       m_rotorWindow);
+        logBtn->setStyleSheet(Style::buttonBaseStyle()
+                              + Style::greenCheckedStyle());
+        col->addWidget(logBtn);
+
+        connect(logBtn, &QPushButton::clicked, this,
+                [this, callEdit, myGridEdit, dxGridEdit, callStatus]() {
+            const QString call = Callsigns::normalized(callEdit->text());
+            if (call.isEmpty()) {
+                callStatus->setText(QStringLiteral("Enter a callsign to log"));
+                return;
+            }
+
+            LogEntry e;
+            e.call   = call;
+            e.timeOn = QDateTime::currentDateTimeUtc();
+            e.myGridSquare = myGridEdit->text().trimmed().toUpper();
+            e.gridSquare   = dxGridEdit->text().trimmed().toUpper();
+
+            if (SliceModel* s = m_radioModel ? m_radioModel->activeSlice()
+                                             : nullptr) {
+                e.freqMHz = s->frequency() / 1e6;
+                e.band    = bandLabel(bandFromFrequency(s->frequency()));
+
+                // ADIF wants the umbrella mode with the sideband as a
+                // submode: a QSO logged as MODE=LSB is rejected or
+                // silently rewritten by most services, because LSB is
+                // not an ADIF mode — SSB is.
+                const QString m = SliceModel::modeName(s->dspMode());
+                if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
+                    e.mode = QStringLiteral("SSB");
+                    e.submode = m;
+                } else if (m == QLatin1String("CWL")
+                           || m == QLatin1String("CWU")) {
+                    e.mode = QStringLiteral("CW");
+                } else {
+                    e.mode = m;
+                }
+            }
+
+            if (isValidGridSquare(e.myGridSquare)
+                && isValidGridSquare(e.gridSquare)) {
+                e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
+                e.bearingDeg = calculateBearingInDegrees(e.myGridSquare,
+                                                         e.gridSquare);
+            }
+
+            QString err;
+            if (!appendQsoToLog(e, &err)) {
+                callStatus->setText(
+                    QStringLiteral("Couldn't write the log: %1").arg(err));
+                return;
+            }
+
+            // Local write succeeded — say so before the upload, so a
+            // failing upload never reads as a lost contact.
+            QString msg = QStringLiteral("Logged %1 on %2")
+                              .arg(call, e.band.isEmpty()
+                                             ? QStringLiteral("—") : e.band);
+            if (m_qrzUploader && m_qrzUploader->isConfigured()) {
+                msg += QStringLiteral(" · uploading…");
+                m_qrzUploader->upload(e);
+            }
+            callStatus->setText(msg);
+        });
+
+        ensureQrzUploader();
+        connect(m_qrzUploader, &QsoUploader::uploadFinished, m_rotorWindow,
+                [callStatus](const QString& call, bool ok, bool duplicate,
+                             const QString& message) {
+            callStatus->setText(ok
+                ? QStringLiteral("%1 — %2").arg(call,
+                      duplicate ? QStringLiteral("already in your QRZ logbook")
+                                : message)
+                // The contact is safe in the local file either way; say
+                // that rather than leaving the operator wondering.
+                : QStringLiteral("%1 logged locally, QRZ upload failed: %2")
+                      .arg(call, message));
+        });
 
         // Enter: look up the exact locator AND start the rotator.
         // Never a keystroke — a half-typed callsign must not move the

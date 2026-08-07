@@ -129,6 +129,8 @@ class AppletVisibilityController;
 class AppletWidget;
 class RotorDialWidget;
 class QrzClient;
+class QrzLogbookUploader;
+struct LogEntry;
 
 // Phase 23: TCI server + applets forward declarations (all inside NereusSDR
 // namespace — TciServer only exists when HAVE_WEBSOCKETS is defined but we
@@ -552,6 +554,11 @@ private:
     // password from the platform credential store.
     void ensureQrzClient();
     void openQrzCredentialsDialog();
+    // Logbook: one appended ADIF file, plus the QRZ logbook uploader
+    // (a different service and credential from the XML lookup).
+    static QString logbookPath();
+    bool appendQsoToLog(const LogEntry& entry, QString* error);
+    void ensureQrzUploader();
     void buildStatusBar();
     void applyDarkTheme();
     void tryAutoReconnect();
@@ -1121,7 +1128,8 @@ private:
     // Rotator dial window (Tools > Rotor...). Lazy; owned by `this`.
     QWidget*         m_rotorWindow{nullptr};
     RotorDialWidget* m_rotorDial{nullptr};
-    QrzClient*       m_qrzClient{nullptr};
+    QrzClient*           m_qrzClient{nullptr};
+    QrzLogbookUploader*  m_qrzUploader{nullptr};
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;
