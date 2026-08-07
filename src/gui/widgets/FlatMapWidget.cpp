@@ -317,13 +317,24 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
             if (!r.contains(s)) { continue; }
 
             const QColor dot = wantMarked ? marked : accent;
-            p.setPen(Qt::NoPen);
-            QColor glow = dot;
-            glow.setAlpha(wantMarked ? 120 : 90);
-            p.setBrush(glow);
-            p.drawEllipse(s, wantMarked ? 7.5 : 5.5, wantMarked ? 7.5 : 5.5);
-            p.setBrush(dot);
-            p.drawEllipse(s, wantMarked ? 3.2 : 2.4, wantMarked ? 3.2 : 2.4);
+            const double r1 = wantMarked ? 7.5 : 5.5;
+            const double r2 = wantMarked ? 3.2 : 2.4;
+
+            if (pt.approximate) {
+                // A ring, not a dot: this is the middle of a country,
+                // not a place anyone was.
+                p.setBrush(Qt::NoBrush);
+                p.setPen(QPen(dot, 1.4));
+                p.drawEllipse(s, r2 + 1.6, r2 + 1.6);
+            } else {
+                p.setPen(Qt::NoPen);
+                QColor glow = dot;
+                glow.setAlpha(wantMarked ? 120 : 90);
+                p.setBrush(glow);
+                p.drawEllipse(s, r1, r1);
+                p.setBrush(dot);
+                p.drawEllipse(s, r2, r2);
+            }
 
             // A marked contact is always named. Finding it among the
             // rest is the entire reason it was marked.

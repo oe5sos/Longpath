@@ -1333,6 +1333,27 @@ void RotorLogbookPanel::openLogbookWindow()
         m_logWindow->setUploaders(m_uploadTargets);
         connect(m_logWindow, &LogbookWindow::logChanged,
                 this, &RotorLogbookPanel::refreshRecentList);
+
+        // Hand cty.dat down to the map. Contacts logged before a QRZ
+        // lookup filled in a locator — and most contacts in a log
+        // imported from another program — have no GRIDSQUARE at all,
+        // and without this the map draws nothing for them.
+        if (m_radio) {
+            if (DxccColorProvider* dxcc = m_radio->dxccColorProvider()) {
+                m_logWindow->setPositionFallback(
+                    [dxcc](const QString& call, double& lat, double& lon) {
+                        const QString prefix =
+                            dxcc->ctyDat().resolvePrimaryPrefix(call);
+                        if (prefix.isEmpty()) { return false; }
+                        const DxccEntity* ent = dxcc->ctyDat()
+                                                    .entityByPrefix(prefix);
+                        if (!ent || !ent->hasLatLon) { return false; }
+                        lat = ent->latitude;
+                        lon = ent->longitude;
+                        return true;
+                    });
+            }
+        }
     }
     m_logWindow->reload();
     m_logWindow->show();

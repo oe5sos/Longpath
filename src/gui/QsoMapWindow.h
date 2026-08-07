@@ -28,6 +28,8 @@
 #include <QDialog>
 #include <QVector>
 
+#include <functional>
+
 class QCheckBox;
 class QDateEdit;
 class QLabel;
@@ -64,6 +66,17 @@ public:
     // rather than being the only thing drawn.
     void setSelection(const QVector<LogEntry>& selected);
 
+    // Last resort for a contact with no locator: the centre of its DXCC
+    // entity. Injected because cty.dat lives with the radio model and
+    // this window is opened from the logbook, which has no radio.
+    //
+    // Without it a log whose contacts carry no GRIDSQUARE — which is
+    // most logs imported from elsewhere, and every QSO logged before a
+    // QRZ lookup filled the field — draws an empty map.
+    using PositionFallback =
+        std::function<bool(const QString& call, double& lat, double& lon)>;
+    void setPositionFallback(PositionFallback fn);
+
 private:
     void buildUi();
     void rebuild();
@@ -72,6 +85,7 @@ private:
     QVector<LogEntry> m_all;
     QVector<LogEntry> m_selected;
     QString m_homeGrid;
+    PositionFallback m_fallback;
 
     QStackedWidget* m_stack{nullptr};
     GlobeWidget*    m_globe{nullptr};

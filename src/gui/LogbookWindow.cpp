@@ -551,9 +551,16 @@ void LogbookWindow::deleteSelected()
 
 // ── Map ─────────────────────────────────────────────────────────────
 
+void LogbookWindow::setPositionFallback(PositionFallback fn)
+{
+    m_fallback = std::move(fn);
+    if (m_map) { m_map->setPositionFallback(m_fallback); }
+}
+
 void LogbookWindow::openMap()
 {
     if (!m_map) { m_map = new QsoMapWindow(this); }
+    m_map->setPositionFallback(m_fallback);
 
     // Home comes from whichever contact recorded it most recently. The
     // panel knows the operator's locator, but the map is opened from

@@ -661,19 +661,27 @@ void GlobeWidget::paintEvent(QPaintEvent*)
                             arcSteps);
                 }
             }
-            p.setPen(Qt::NoPen);
             for (const MapPoint& pt : m_points) {
                 if (pt.highlight != wantMarked) { continue; }
                 QPointF s;
                 if (!project(pt.lat, pt.lon, s)) { continue; }
+                const double r2 = wantMarked ? 2.8 : 2.0;
+
+                if (pt.approximate) {
+                    // A ring: the middle of a country, not a place.
+                    p.setBrush(Qt::NoBrush);
+                    p.setPen(QPen(col, 1.2));
+                    p.drawEllipse(s, r2 + 1.4, r2 + 1.4);
+                    continue;
+                }
+                p.setPen(Qt::NoPen);
                 QColor glow = col;
                 glow.setAlpha(wantMarked ? 120 : 80);
                 p.setBrush(glow);
                 p.drawEllipse(s, wantMarked ? 6.5 : 4.5,
                                  wantMarked ? 6.5 : 4.5);
                 p.setBrush(col);
-                p.drawEllipse(s, wantMarked ? 2.8 : 2.0,
-                                 wantMarked ? 2.8 : 2.0);
+                p.drawEllipse(s, r2, r2);
             }
             p.setBrush(Qt::NoBrush);
 

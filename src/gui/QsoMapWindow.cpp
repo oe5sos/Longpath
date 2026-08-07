@@ -12,6 +12,7 @@
 
 #include "QsoMapWindow.h"
 
+#include "core/AppSettings.h"
 #include "core/Maidenhead.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
@@ -187,9 +188,27 @@ void QsoMapWindow::setQuickRange(int days)
     rebuild();
 }
 
+void QsoMapWindow::setPositionFallback(PositionFallback fn)
+{
+    m_fallback = std::move(fn);
+    rebuild();
+}
+
 void QsoMapWindow::setHomeGrid(const QString& grid)
 {
     m_homeGrid = grid.trimmed().toUpper();
+
+    // Fall back to the operator's own locator. A log written before
+    // MY_GRIDSQUARE was recorded, or imported from a logger that omits
+    // it, has no home in it at all — and with no home there is nothing
+    // to draw a line from, so the map came up with dots and no paths
+    // and no obvious reason why.
+    if (!isValidGridSquare(m_homeGrid)) {
+        m_homeGrid = AppSettings::instance()
+                         .value(QStringLiteral("StationGridSquare"), QString{})
+                         .toString().trimmed().toUpper();
+    }
+
     if (isValidGridSquare(m_homeGrid)) {
         double lat = 0, lon = 0;
         calculateLatLonFromGridSquare(m_homeGrid, lat, lon);
@@ -244,6 +263,7 @@ void QsoMapWindow::rebuild()
     int markedShown  = 0;
     int markedCut    = 0;
     int markedNoGrid = 0;
+    int approxCount  = 0;
 
     for (const LogEntry& e : source) {
         const bool marked = markedRows.contains(entryKey(e));
@@ -257,15 +277,25 @@ void QsoMapWindow::rebuild()
         }
         ++considered;
 
-        if (!isValidGridSquare(e.gridSquare)) {
+        double lat = 0, lon = 0;
+        QString place;
+        bool approximate = false;
+
+        if (isValidGridSquare(e.gridSquare)) {
+            calculateLatLonFromGridSquare(e.gridSquare, lat, lon);
+            place = e.gridSquare.left(6).toUpper();
+        } else if (m_fallback && m_fallback(e.call, lat, lon)) {
+            // The middle of the country, which is a guess — but a
+            // contact drawn approximately in Japan tells the operator
+            // more than a contact not drawn at all.
+            approximate = true;
+            ++approxCount;
+            place = QStringLiteral("~") + e.call.trimmed().toUpper();
+        } else {
             ++noGrid;
             if (marked) { ++markedNoGrid; }
             continue;
         }
-
-        double lat = 0, lon = 0;
-        calculateLatLonFromGridSquare(e.gridSquare, lat, lon);
-        const QString place = e.gridSquare.left(6).toUpper();
 
         if (marked) {
             // Every marked contact gets its own line, not one per
@@ -273,7 +303,7 @@ void QsoMapWindow::rebuild()
             // path twice, which is what "show them all" means.
             if (markedShown >= kMaxMarkedPaths) { ++markedCut; continue; }
             ++markedShown;
-            points.append(MapPoint{lat, lon, e.call, true});
+            points.append(MapPoint{lat, lon, e.call, true, approximate});
             continue;
         }
 
@@ -282,7 +312,7 @@ void QsoMapWindow::rebuild()
         // and make that direction look busier than it is.
         if (seenPlaces.contains(place)) { continue; }
         seenPlaces.insert(place);
-        points.append(MapPoint{lat, lon, e.call, false});
+        points.append(MapPoint{lat, lon, e.call, false, approximate});
     }
 
     m_globe->setPoints(points);
@@ -319,14 +349,33 @@ void QsoMapWindow::rebuild()
                         .arg(outside);
         }
     }
+    if (approxCount > 0) {
+        bits << QStringLiteral("%1 placed from the country only (rings)")
+                    .arg(approxCount);
+    }
     if (noGrid - markedNoGrid > 0) {
-        bits << QStringLiteral("%1 without a locator, so not on the map")
+        bits << QStringLiteral("%1 could not be placed at all")
                     .arg(noGrid - markedNoGrid);
     }
-    if (!isValidGridSquare(m_homeGrid)) {
-        bits << QStringLiteral("no home locator — paths need one");
-    }
     m_summary->setText(bits.join(QStringLiteral("  ·  ")));
+
+    // The one condition under which nothing can be drawn, said on its
+    // own line and in amber rather than buried at the end of a summary.
+    // Without a home there is no line to draw, and the map otherwise
+    // shows dots with no explanation of the missing paths.
+    if (!isValidGridSquare(m_homeGrid)) {
+        m_summary->setText(
+            QStringLiteral("No home locator, so no paths can be drawn. "
+                           "Set MY in the Rotor / Log panel.  ·  ")
+            + m_summary->text());
+        m_summary->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kAmberText)));
+    } else {
+        m_summary->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary)));
+    }
 }
 
 } // namespace NereusSDR

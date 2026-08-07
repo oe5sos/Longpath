@@ -27,6 +27,8 @@
 #include <QList>
 #include <QVector>
 
+#include <functional>
+
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -49,6 +51,13 @@ public:
     // one of several users of the same uploaders, and whoever holds the
     // credentials holds the objects.
     void setUploaders(const QVector<QsoUploader*>& uploaders);
+
+    // Passed straight to the map: the centre of a contact's DXCC entity,
+    // for contacts that carry no locator. cty.dat lives with the radio
+    // model, which this window has no handle on.
+    using PositionFallback =
+        std::function<bool(const QString& call, double& lat, double& lon)>;
+    void setPositionFallback(PositionFallback fn);
 
 signals:
     // The file changed underneath other views (edit or delete).
@@ -95,6 +104,7 @@ private:
     // One map window, reused, so a second click raises the existing one
     // instead of stacking copies of the same picture.
     class QsoMapWindow* m_map{nullptr};
+    PositionFallback m_fallback;
 
     // Outstanding uploads for the current batch, so the summary can be
     // reported once instead of one message box per contact.

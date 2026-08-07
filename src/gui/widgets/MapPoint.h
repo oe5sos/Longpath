@@ -32,6 +32,12 @@ struct MapPoint {
     // among the rest, so hiding the rest would answer a different
     // question than the one being asked.
     bool highlight{false};
+
+    // Placed from the DXCC entity rather than from a locator the
+    // station gave. Drawn as a ring instead of a filled dot: it is the
+    // middle of a country, not a place anyone was, and a map that
+    // renders a guess exactly like a measurement is lying quietly.
+    bool approximate{false};
 };
 
 } // namespace NereusSDR
