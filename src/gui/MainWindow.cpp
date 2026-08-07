@@ -258,6 +258,8 @@ warren@wpratt.com
 #include "widgets/VfoWidget.h"
 #include "widgets/RotorDialWidget.h"
 #include "core/Maidenhead.h"
+#include "core/CredentialStore.h"
+#include "core/QrzClient.h"
 #include "widgets/RxDashboard.h"
 #include "widgets/AntennaSwitchToast.h"
 #include "widgets/StatusToast.h"
@@ -391,6 +393,9 @@ warren@wpratt.com
 #include <QPixmap>
 #include <QProgressDialog>
 #include <QMessageBox>
+#include <QDialog>
+#include <QFormLayout>
+#include <QLineEdit>
 #include <QTimer>
 #include <QThread>
 #include <QFile>          // /proc/stat reader for Linux system-CPU path
@@ -8960,6 +8965,102 @@ void MainWindow::openPureSignalDialog()
 //
 // Mirrors the modeless-singleton pattern at AetherSDR
 // src/gui/MainWindow.cpp openDxClusterDialog() [@0cd4559].
+// ── QRZ account ─────────────────────────────────────────────────────
+
+void MainWindow::ensureQrzClient()
+{
+    if (m_qrzClient) { return; }
+    m_qrzClient = new QrzClient(this);
+
+    // Username lives in settings; the password goes to the platform
+    // credential store, never into the settings file.
+    const QString user =
+        AppSettings::instance().value(QStringLiteral("QrzUsername"),
+                                      QString{}).toString();
+    if (!user.isEmpty()) {
+        m_qrzClient->setCredentials(
+            user, CredentialStore::retrieve(QStringLiteral("qrz.password"),
+                                            user));
+    }
+}
+
+void MainWindow::openQrzCredentialsDialog()
+{
+    ensureQrzClient();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("QRZ account"));
+    Style::applyDarkPageStyle(&dlg);
+
+    auto* col = new QVBoxLayout(&dlg);
+    col->setContentsMargins(14, 14, 14, 14);
+    col->setSpacing(8);
+
+    auto* form = new QFormLayout;
+    auto* userEdit = new QLineEdit(
+        AppSettings::instance().value(QStringLiteral("QrzUsername"),
+                                      QString{}).toString(), &dlg);
+    // User-visible placeholder — a real example, not an "e.g." prefix.
+    userEdit->setPlaceholderText(QStringLiteral("OE5SOS"));
+    form->addRow(QStringLiteral("Callsign"), userEdit);
+
+    auto* passEdit = new QLineEdit(&dlg);
+    passEdit->setEchoMode(QLineEdit::Password);
+    passEdit->setText(CredentialStore::retrieve(
+        QStringLiteral("qrz.password"), userEdit->text()));
+    form->addRow(QStringLiteral("Password"), passEdit);
+    col->addLayout(form);
+
+    // Say where the password goes. On a platform without a keychain it
+    // is session-only, and the operator needs to know that rather than
+    // wondering why it is gone tomorrow.
+    auto* note = new QLabel(CredentialStore::backendDescription(), &dlg);
+    note->setWordWrap(true);
+    note->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                            .arg(Style::kTextSecondary));
+    col->addWidget(note);
+
+    auto* status = new QLabel(QString{}, &dlg);
+    status->setWordWrap(true);
+    status->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                              .arg(Style::kTextSecondary));
+    col->addWidget(status);
+
+    auto* row = new QHBoxLayout;
+    auto* testBtn = new QPushButton(QStringLiteral("Test"), &dlg);
+    row->addWidget(testBtn);
+    row->addStretch();
+    auto* cancelBtn = new QPushButton(QStringLiteral("Cancel"), &dlg);
+    row->addWidget(cancelBtn);
+    auto* saveBtn = new QPushButton(QStringLiteral("Save"), &dlg);
+    saveBtn->setDefault(true);
+    row->addWidget(saveBtn);
+    col->addLayout(row);
+
+    connect(testBtn, &QPushButton::clicked, &dlg, [&]() {
+        status->setText(QStringLiteral("Testing…"));
+        m_qrzClient->testLogin(userEdit->text().trimmed(), passEdit->text());
+    });
+    connect(m_qrzClient, &QrzClient::loginTestFinished, &dlg,
+            [status](bool ok, const QString& message) {
+        status->setText(ok
+            ? (message.isEmpty() ? QStringLiteral("Login accepted")
+                                 : QStringLiteral("Login accepted — %1").arg(message))
+            : QStringLiteral("Login failed — %1").arg(message));
+    });
+    connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+    connect(saveBtn, &QPushButton::clicked, &dlg, [&]() {
+        const QString user = userEdit->text().trimmed();
+        AppSettings::instance().setValue(QStringLiteral("QrzUsername"), user);
+        CredentialStore::store(QStringLiteral("qrz.password"), user,
+                               passEdit->text());
+        m_qrzClient->setCredentials(user, passEdit->text());
+        dlg.accept();
+    });
+
+    dlg.exec();
+}
+
 // ── Antenna rotator dial ────────────────────────────────────────────
 //
 // Step 2: the instrument plus real bearings. The operator's own square
@@ -9124,8 +9225,108 @@ void MainWindow::openRotorDial()
                                     .arg(ent->name).arg(km, 0, 'f', 0));
         });
 
-        // Enter drives the rotator — never a keystroke.
-        connect(callEdit, &QLineEdit::returnPressed, this, [this]() {
+        // ── QRZ ──────────────────────────────────────────────────────
+        // The prefix estimate above is country-level. A QRZ lookup
+        // replaces it with the station's own locator when credentials
+        // are configured — Enter triggers it, alongside the rotate.
+        auto* qrzRow = new QHBoxLayout;
+        qrzRow->setSpacing(6);
+
+        auto* qrzBtn = new QPushButton(QStringLiteral("QRZ lookup"),
+                                       m_rotorWindow);
+        qrzBtn->setStyleSheet(Style::buttonBaseStyle());
+        qrzRow->addWidget(qrzBtn);
+
+        auto* qrzSetupBtn = new QPushButton(QStringLiteral("QRZ account…"),
+                                            m_rotorWindow);
+        qrzSetupBtn->setStyleSheet(Style::buttonBaseStyle());
+        qrzRow->addWidget(qrzSetupBtn);
+        col->addLayout(qrzRow);
+
+        ensureQrzClient();
+
+        auto doQrzLookup = [this, callEdit, callStatus]() {
+            const QString call = Callsigns::normalized(callEdit->text());
+            if (call.isEmpty()) { return; }
+            if (!Callsigns::isLikelyCallsign(call)) {
+                callStatus->setText(
+                    QStringLiteral("%1 doesn't look like a callsign").arg(call));
+                return;
+            }
+            if (!m_qrzClient || !m_qrzClient->hasCredentials()) {
+                callStatus->setText(QStringLiteral(
+                    "Add your QRZ account to look up the exact locator"));
+                return;
+            }
+            callStatus->setText(QStringLiteral("Looking up %1…").arg(call));
+            m_qrzClient->lookup(call);
+        };
+        connect(qrzBtn, &QPushButton::clicked, this, doQrzLookup);
+
+        // QRZ replies land here. Guarded against a queued reply for a
+        // callsign the operator has already typed past.
+        connect(m_qrzClient, &QrzClient::lookupSucceeded, m_rotorWindow,
+                [this, callEdit, myGridEdit, dxGridEdit, callStatus](
+                    const QString& call, const CallsignInfo& info) {
+            if (Callsigns::normalized(callEdit->text()) != call) { return; }
+            if (!isValidGridSquare(info.grid)) {
+                callStatus->setText(QStringLiteral(
+                    "%1: %2 — QRZ has no locator, keeping the country estimate")
+                        .arg(call, info.displayName()));
+                return;
+            }
+            const QString mine = myGridEdit->text().trimmed().toUpper();
+            if (!isValidGridSquare(mine)) { return; }
+
+            const double km  = calculateDistanceKm(mine, info.grid);
+            const double deg = calculateBearingInDegrees(mine, info.grid);
+            m_rotorDial->setTargetBearing(deg);
+            {
+                QSignalBlocker block(dxGridEdit);
+                dxGridEdit->setText(info.grid);
+            }
+            callStatus->setText(QStringLiteral("%1 · %2 · %3 km")
+                                    .arg(info.displayName(),
+                                         info.country.isEmpty()
+                                             ? info.grid : info.country)
+                                    .arg(km, 0, 'f', 0));
+        });
+        connect(m_qrzClient, &QrzClient::lookupFailed, m_rotorWindow,
+                [callEdit, callStatus](const QString& call,
+                                       QrzClient::Error err,
+                                       const QString& msg) {
+            if (Callsigns::normalized(callEdit->text()) != call) { return; }
+            // Say what happened and what it means — the prefix estimate
+            // is still on the dial, so nothing is lost.
+            switch (err) {
+            case QrzClient::Error::NotFound:
+                callStatus->setText(QStringLiteral(
+                    "%1 isn't in QRZ — keeping the country estimate").arg(call));
+                break;
+            case QrzClient::Error::AuthFailed:
+                callStatus->setText(QStringLiteral(
+                    "QRZ rejected the login — check the account settings"));
+                break;
+            case QrzClient::Error::Network:
+                callStatus->setText(QStringLiteral(
+                    "Couldn't reach QRZ — keeping the country estimate"));
+                break;
+            case QrzClient::Error::Provider:
+                callStatus->setText(msg.isEmpty()
+                    ? QStringLiteral("QRZ returned no data") : msg);
+                break;
+            }
+        });
+
+        connect(qrzSetupBtn, &QPushButton::clicked,
+                this, &MainWindow::openQrzCredentialsDialog);
+
+        // Enter: look up the exact locator AND start the rotator.
+        // Never a keystroke — a half-typed callsign must not move the
+        // antenna or spend a lookup.
+        connect(callEdit, &QLineEdit::returnPressed, this,
+                [this, doQrzLookup]() {
+            doQrzLookup();
             if (m_rotorDial && m_rotorDial->hasTarget()) {
                 emit m_rotorDial->rotateRequested(m_rotorDial->targetBearing());
             }

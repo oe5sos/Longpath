@@ -906,6 +906,8 @@ set(GUI_SOURCES
     src/gui/applets/AppletPanelWidget.cpp
     src/gui/applets/AppletVisibilityController.cpp
     src/gui/widgets/RotorDialWidget.cpp
+    src/core/CredentialStore.cpp
+    src/core/QrzClient.cpp
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp

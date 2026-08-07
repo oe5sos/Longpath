@@ -128,6 +128,7 @@ class PsaIndicatorWidget;
 class AppletVisibilityController;
 class AppletWidget;
 class RotorDialWidget;
+class QrzClient;
 
 // Phase 23: TCI server + applets forward declarations (all inside NereusSDR
 // namespace — TciServer only exists when HAVE_WEBSOCKETS is defined but we
@@ -547,6 +548,10 @@ private:
     // Antenna rotator dial (Tools > Rotor...). Modeless singleton,
     // lazy-constructed so it costs nothing until opened.
     void openRotorDial();
+    // QRZ XML client, created on first use. Username from AppSettings,
+    // password from the platform credential store.
+    void ensureQrzClient();
+    void openQrzCredentialsDialog();
     void buildStatusBar();
     void applyDarkTheme();
     void tryAutoReconnect();
@@ -1116,6 +1121,7 @@ private:
     // Rotator dial window (Tools > Rotor...). Lazy; owned by `this`.
     QWidget*         m_rotorWindow{nullptr};
     RotorDialWidget* m_rotorDial{nullptr};
+    QrzClient*       m_qrzClient{nullptr};
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;
