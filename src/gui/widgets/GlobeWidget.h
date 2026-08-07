@@ -20,9 +20,11 @@
 // =================================================================
 
 #include <QImage>
+#include <QPoint>
 #include <QWidget>
 
 class QDateTime;
+class QPainter;
 class QTimer;
 
 namespace NereusSDR {
@@ -56,6 +58,16 @@ public:
     // Animated — the point is to see which way the path swings.
     void lookAlongBearing(double deg);
 
+    // Antenna main lobe, drawn as two more arcs this many degrees either
+    // side of the path. Zero draws only the centre line. This is the
+    // one thing on the globe that answers "will I hear them if the
+    // rotator is a few degrees off".
+    void setBeamSpread(double deg);
+    double beamSpread() const { return m_beamSpread; }
+
+    // Back to the default camera and magnification.
+    void resetView();
+
     // Spin slowly when idle. Off by default: motion in the corner of
     // the eye is a distraction while operating.
     void setAutoRotate(bool on);
@@ -76,16 +88,44 @@ public:
     static void interpolateGreatCircle(double latA, double lonA,
                                        double latB, double lonB,
                                        double f, double& lat, double& lon);
+    // Where you arrive setting off from (lat,lon) on `bearingDeg` and
+    // travelling `angularDistDeg` of arc. Used to spread the beam.
+    static void destinationPoint(double lat, double lon, double bearingDeg,
+                                 double angularDistDeg,
+                                 double& outLat, double& outLon);
+    // Initial bearing a→b, degrees true.
+    static double initialBearing(double latA, double lonA,
+                                 double latB, double lonB);
+    // Angular separation a→b, in degrees of arc.
+    static double angularDistance(double latA, double lonA,
+                                  double latB, double lonB);
 
 protected:
     void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent*) override;
+    void mousePressEvent(QMouseEvent*) override;
+    void mouseMoveEvent(QMouseEvent*) override;
+    void mouseReleaseEvent(QMouseEvent*) override;
+    void mouseDoubleClickEvent(QMouseEvent*) override;
+    void wheelEvent(QWheelEvent*) override;
 
 private:
     // Render the lit sphere into m_frame at the current view angles.
     void renderSphere();
     // Screen position of a lat/lon, and whether it faces the viewer.
     bool project(double lat, double lon, QPointF& out) const;
+    // As project(), but for a point lifted `alt` sphere-radii above the
+    // surface. Arcs are drawn raised: a great circle lying flat on the
+    // sphere projects to a straight line whenever the camera is in its
+    // plane — which is exactly where lookAlongBearing puts it. Lifting
+    // the path off the surface makes it read as the curve it is, and is
+    // also what makes an orbital view legible.
+    bool projectAlt(double lat, double lon, double alt, QPointF& out) const;
+    // Radius of the disc in pixels, magnification included.
+    double radiusPx() const;
+    // One raised great-circle arc from home to the given end point.
+    void drawArc(QPainter& p, double endLat, double endLon,
+                 const QColor& col, double width, double opacity) const;
 
     QImage m_texture;      // equirectangular, may be null
     QImage m_frame;        // rendered sphere, cached until something moves
@@ -104,6 +144,19 @@ private:
     bool     m_autoRotate{false};
     QTimer*  m_anim{nullptr};
     bool     m_frameDirty{true};
+
+    // Main lobe half-width for the flanking arcs, in degrees.
+    double m_beamSpread{5.0};
+
+    // Magnification. 1.0 fits the disc in the widget.
+    double m_zoom{1.0};
+
+    // Drag state. The globe is a thing you turn with your hand, and an
+    // operator will try that before finding any button.
+    bool   m_dragging{false};
+    QPoint m_dragFrom;
+    double m_dragStartLat{0.0};
+    double m_dragStartLon{0.0};
 };
 
 } // namespace NereusSDR

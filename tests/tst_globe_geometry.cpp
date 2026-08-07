@@ -42,6 +42,9 @@ private slots:
     void interpolated_points_lie_on_the_great_circle();
     void path_over_the_pole_is_not_a_straight_lat_lon_line();
     void degenerate_path_does_not_divide_by_zero();
+    void destination_and_bearing_are_inverses();
+    void beam_offsets_separate_with_distance();
+    void bearing_matches_the_maidenhead_helper();
 };
 
 void TstGlobeGeometry::subsolar_latitude_tracks_the_seasons()
@@ -155,6 +158,86 @@ void TstGlobeGeometry::degenerate_path_does_not_divide_by_zero()
     QVERIFY(!std::isnan(lon));
     QCOMPARE(lat, 48.3);
     QCOMPARE(lon, 14.3);
+}
+
+void TstGlobeGeometry::destination_and_bearing_are_inverses()
+{
+    // Set off from Linz on a heading for a given arc, and the bearing
+    // back to where you arrived must be the heading you set off on.
+    // The flanking beam arcs are built entirely on this, so if it drifts
+    // the main lobe would be drawn pointing somewhere it is not.
+    const double home[2] = {48.3, 14.3};
+    for (double bearing : {0.0, 45.0, 118.0, 180.0, 298.0, 355.0}) {
+        for (double dist : {5.0, 40.0, 120.0}) {
+            double lat = 0, lon = 0;
+            GlobeWidget::destinationPoint(home[0], home[1], bearing, dist,
+                                          lat, lon);
+            const double back =
+                GlobeWidget::initialBearing(home[0], home[1], lat, lon);
+            double diff = std::fmod(std::abs(back - bearing) + 360.0, 360.0);
+            if (diff > 180.0) { diff = 360.0 - diff; }
+            QVERIFY2(diff < 0.01,
+                     qPrintable(QStringLiteral("b=%1 d=%2 got %3")
+                                    .arg(bearing).arg(dist).arg(back)));
+
+            const double arc =
+                GlobeWidget::angularDistance(home[0], home[1], lat, lon);
+            QVERIFY2(std::abs(arc - dist) < 0.01,
+                     qPrintable(QStringLiteral("arc %1 vs %2").arg(arc).arg(dist)));
+        }
+    }
+}
+
+void TstGlobeGeometry::beam_offsets_separate_with_distance()
+{
+    // Five degrees of beam width is a few hundred kilometres at short
+    // range and thousands across an ocean. If the flanking arcs did not
+    // widen with distance they would be decoration rather than an
+    // answer to "is the rotator close enough".
+    const double home[2] = {48.3, 14.3};
+    const double bearing = 298.0;
+
+    auto spreadAt = [&](double dist) {
+        double aLat = 0, aLon = 0, bLat = 0, bLon = 0;
+        GlobeWidget::destinationPoint(home[0], home[1], bearing - 5.0, dist,
+                                      aLat, aLon);
+        GlobeWidget::destinationPoint(home[0], home[1], bearing + 5.0, dist,
+                                      bLat, bLon);
+        return GlobeWidget::angularDistance(aLat, aLon, bLat, bLon);
+    };
+
+    const double near = spreadAt(5.0);
+    const double far  = spreadAt(60.0);
+    QVERIFY2(far > near * 5.0,
+             qPrintable(QStringLiteral("near %1 far %2").arg(near).arg(far)));
+
+    // At the target the two flanks straddle the centre symmetrically.
+    double cLat = 0, cLon = 0;
+    GlobeWidget::destinationPoint(home[0], home[1], bearing, 60.0, cLat, cLon);
+    double aLat = 0, aLon = 0, bLat = 0, bLon = 0;
+    GlobeWidget::destinationPoint(home[0], home[1], bearing - 5.0, 60.0,
+                                  aLat, aLon);
+    GlobeWidget::destinationPoint(home[0], home[1], bearing + 5.0, 60.0,
+                                  bLat, bLon);
+    const double toA = GlobeWidget::angularDistance(cLat, cLon, aLat, aLon);
+    const double toB = GlobeWidget::angularDistance(cLat, cLon, bLat, bLon);
+    QVERIFY2(std::abs(toA - toB) < 0.05,
+             qPrintable(QStringLiteral("%1 vs %2").arg(toA).arg(toB)));
+}
+
+void TstGlobeGeometry::bearing_matches_the_maidenhead_helper()
+{
+    // Two implementations of the same thing now exist: this one, and the
+    // ported Maidenhead helper the dial uses. They must agree, or the
+    // needle and the globe would point different ways and neither would
+    // look wrong on its own.
+    //
+    // JN67VV to FN30IV — Linz to Long Island, the pair from the screen
+    // where this was first checked by hand: 298.5 degrees.
+    const double b = GlobeWidget::initialBearing(47.8958, 13.7917,
+                                                 40.8958, -73.2917);
+    QVERIFY2(std::abs(b - 298.5) < 0.5,
+             qPrintable(QStringLiteral("got %1").arg(b)));
 }
 
 QTEST_MAIN(TstGlobeGeometry)

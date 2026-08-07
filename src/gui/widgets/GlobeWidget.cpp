@@ -14,10 +14,12 @@
 #include "gui/StyleConstants.h"
 
 #include <QDateTime>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QRadialGradient>
 #include <QTimer>
+#include <QWheelEvent>
 #include <QtMath>
 
 #include <algorithm>
@@ -45,6 +47,11 @@ GlobeWidget::GlobeWidget(QWidget* parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
+    // The open hand is the only affordance saying "this turns". Without
+    // it the globe reads as a picture.
+    setCursor(Qt::OpenHandCursor);
+    setToolTip(QStringLiteral(
+        "Drag to turn · wheel to zoom · double-click to reset"));
     useCurrentSubsolarPoint();
 
     // One timer drives both the look-at animation and the idle spin;
@@ -138,6 +145,101 @@ void GlobeWidget::setAutoRotate(bool on)
     if (on && !m_anim->isActive()) { m_anim->start(); }
 }
 
+void GlobeWidget::setBeamSpread(double deg)
+{
+    m_beamSpread = std::clamp(deg, 0.0, 60.0);
+    update();
+}
+
+void GlobeWidget::resetView()
+{
+    m_zoom = 1.0;
+    m_viewLat = 20.0;
+    if (m_hasHome) {
+        // Home is the useful default centre — it is the one point that
+        // is on every path.
+        m_viewLat = std::clamp(m_homeLat, -75.0, 75.0);
+        m_viewLon = m_homeLon;
+    }
+    m_targetViewLon = m_viewLon;
+    m_frameDirty = true;
+    update();
+}
+
+// ── Mouse ───────────────────────────────────────────────────────────
+
+void GlobeWidget::mousePressEvent(QMouseEvent* e)
+{
+    if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
+
+    m_dragging = true;
+    m_dragFrom = e->position().toPoint();
+    m_dragStartLat = m_viewLat;
+    m_dragStartLon = m_viewLon;
+
+    // Stop any running animation, and stop it from snapping back: the
+    // hand on the globe outranks whatever the software wanted to show.
+    m_anim->stop();
+    m_targetViewLon = m_viewLon;
+    setCursor(Qt::ClosedHandCursor);
+}
+
+void GlobeWidget::mouseMoveEvent(QMouseEvent* e)
+{
+    if (!m_dragging) { QWidget::mouseMoveEvent(e); return; }
+
+    const QPoint d = e->position().toPoint() - m_dragFrom;
+
+    // Degrees per pixel scaled to the disc, so dragging across the globe
+    // turns it by roughly the angle your finger travelled — and so the
+    // feel does not change when the widget is resized or zoomed.
+    const double perPx = 90.0 / std::max(1.0, radiusPx());
+
+    m_viewLon = norm180(m_dragStartLon - d.x() * perPx);
+    // Clamped short of the poles: at exactly 90 the projection loses its
+    // sense of which way is east and the globe appears to jump.
+    m_viewLat = std::clamp(m_dragStartLat + d.y() * perPx, -85.0, 85.0);
+    m_targetViewLon = m_viewLon;
+
+    m_frameDirty = true;
+    update();
+}
+
+void GlobeWidget::mouseReleaseEvent(QMouseEvent* e)
+{
+    if (e->button() == Qt::LeftButton && m_dragging) {
+        m_dragging = false;
+        setCursor(Qt::OpenHandCursor);
+        return;
+    }
+    QWidget::mouseReleaseEvent(e);
+}
+
+void GlobeWidget::mouseDoubleClickEvent(QMouseEvent* e)
+{
+    if (e->button() == Qt::LeftButton) {
+        // A way back. Having turned the globe to somewhere unhelpful,
+        // hunting for a reset button is worse than a double click.
+        resetView();
+        return;
+    }
+    QWidget::mouseDoubleClickEvent(e);
+}
+
+void GlobeWidget::wheelEvent(QWheelEvent* e)
+{
+    const double steps = e->angleDelta().y() / 120.0;
+    if (qFuzzyIsNull(steps)) { QWidget::wheelEvent(e); return; }
+
+    const double before = m_zoom;
+    m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 0.6, 6.0);
+    if (!qFuzzyCompare(before, m_zoom)) {
+        m_frameDirty = true;
+        update();
+    }
+    e->accept();
+}
+
 void GlobeWidget::setSubsolarPoint(double lat, double lon)
 {
     m_sunLat = lat;
@@ -205,26 +307,88 @@ void GlobeWidget::interpolateGreatCircle(double latA, double lonA,
     lon = std::atan2(y, x) / kDeg;
 }
 
+double GlobeWidget::radiusPx() const
+{
+    return std::min(width(), height()) * 0.44 * m_zoom;
+}
+
 bool GlobeWidget::project(double lat, double lon, QPointF& out) const
 {
-    const double la = lat * kDeg;
-    const double lo = (lon - m_viewLon) * kDeg;
+    return projectAlt(lat, lon, 0.0, out);
+}
+
+bool GlobeWidget::projectAlt(double lat, double lon, double alt,
+                             QPointF& out) const
+{
+    const double la  = lat * kDeg;
+    const double lo  = (lon - m_viewLon) * kDeg;
     const double vla = m_viewLat * kDeg;
 
-    // Orthographic: only the hemisphere facing the camera is visible.
-    const double cosC = std::sin(vla) * std::sin(la)
-                      + std::cos(vla) * std::cos(la) * std::cos(lo);
-    if (cosC < 0.0) { return false; }
-
-    const double r = std::min(width(), height()) * 0.44;
-    const double cx = width() * 0.5;
-    const double cy = height() * 0.5;
-
+    // Unit vector in camera space; z points at the viewer.
     const double x = std::cos(la) * std::sin(lo);
     const double y = std::cos(vla) * std::sin(la)
                    - std::sin(vla) * std::cos(la) * std::cos(lo);
-    out = QPointF(cx + r * x, cy - r * y);
+    const double z = std::sin(vla) * std::sin(la)
+                   + std::cos(vla) * std::cos(la) * std::cos(lo);
+
+    const double s = 1.0 + alt;
+    const double X = x * s;
+    const double Y = y * s;
+    const double Z = z * s;
+
+    // Hidden only if it is behind the sphere AND inside its silhouette.
+    // A raised point past the limb is still in view — that is the whole
+    // reason arcs are lifted, so the path does not vanish at the edge.
+    if (Z < 0.0 && (X * X + Y * Y) < 1.0) { return false; }
+
+    const double r = radiusPx();
+    out = QPointF(width() * 0.5 + r * X, height() * 0.5 - r * Y);
     return true;
+}
+
+// ── Geodesics ───────────────────────────────────────────────────────
+
+double GlobeWidget::angularDistance(double latA, double lonA,
+                                    double latB, double lonB)
+{
+    const double la1 = latA * kDeg, la2 = latB * kDeg;
+    const double dLat = la2 - la1;
+    const double dLon = (lonB - lonA) * kDeg;
+    const double h = std::sin(dLat / 2) * std::sin(dLat / 2)
+                   + std::cos(la1) * std::cos(la2)
+                         * std::sin(dLon / 2) * std::sin(dLon / 2);
+    return 2.0 * std::asin(std::min(1.0, std::sqrt(h))) / kDeg;
+}
+
+double GlobeWidget::initialBearing(double latA, double lonA,
+                                   double latB, double lonB)
+{
+    const double la1 = latA * kDeg, la2 = latB * kDeg;
+    const double dLon = (lonB - lonA) * kDeg;
+    const double y = std::sin(dLon) * std::cos(la2);
+    const double x = std::cos(la1) * std::sin(la2)
+                   - std::sin(la1) * std::cos(la2) * std::cos(dLon);
+    double b = std::atan2(y, x) / kDeg;
+    if (b < 0.0) { b += 360.0; }
+    return b;
+}
+
+void GlobeWidget::destinationPoint(double lat, double lon, double bearingDeg,
+                                   double angularDistDeg,
+                                   double& outLat, double& outLon)
+{
+    const double la = lat * kDeg;
+    const double b  = bearingDeg * kDeg;
+    const double d  = angularDistDeg * kDeg;
+
+    const double la2 = std::asin(std::sin(la) * std::cos(d)
+                                 + std::cos(la) * std::sin(d) * std::cos(b));
+    const double lo2 = lon * kDeg
+        + std::atan2(std::sin(b) * std::sin(d) * std::cos(la),
+                     std::cos(d) - std::sin(la) * std::sin(la2));
+
+    outLat = la2 / kDeg;
+    outLon = norm180(lo2 / kDeg);
 }
 
 // ── Rendering ───────────────────────────────────────────────────────
@@ -243,7 +407,7 @@ void GlobeWidget::renderSphere()
     m_frame = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
     m_frame.fill(Qt::transparent);
 
-    const double r  = std::min(w, h) * 0.44;
+    const double r  = radiusPx();
     const double cx = w * 0.5;
     const double cy = h * 0.5;
     const double vla = m_viewLat * kDeg;
@@ -314,6 +478,55 @@ void GlobeWidget::renderSphere()
     m_frameDirty = false;
 }
 
+void GlobeWidget::drawArc(QPainter& p, double endLat, double endLon,
+                          const QColor& col, double width,
+                          double opacity) const
+{
+    const double dist = angularDistance(m_homeLat, m_homeLon, endLat, endLon);
+    if (dist < 0.05) { return; }
+
+    // Lift the arc off the surface, highest in the middle. A great
+    // circle lying flat projects to a straight line whenever the camera
+    // sits in its plane — which is precisely where lookAlongBearing puts
+    // it, so the one view built to show the path was the view that made
+    // it look like a ruled line. Raised, it reads as the curve it is.
+    //
+    // Height scales with distance: a 300 km hop that ballooned as high
+    // as a transatlantic path would misrepresent both.
+    const double peak = 0.04 + 0.26 * std::min(1.0, dist / 180.0);
+
+    constexpr int kSteps = 160;
+    QPointF prev;
+    bool havePrev = false;
+
+    for (int i = 0; i <= kSteps; ++i) {
+        const double f = static_cast<double>(i) / kSteps;
+        double lat = 0, lon = 0;
+        interpolateGreatCircle(m_homeLat, m_homeLon, endLat, endLon,
+                               f, lat, lon);
+        const double alt = peak * std::sin(M_PI * f);
+
+        QPointF pt;
+        if (!projectAlt(lat, lon, alt, pt)) {
+            // Behind the globe. Pick the arc up again when it comes
+            // round rather than drawing a chord across the disc.
+            havePrev = false;
+            continue;
+        }
+        if (havePrev) {
+            p.setOpacity(opacity * 0.30);
+            p.setPen(QPen(col, width * 2.2, Qt::SolidLine, Qt::RoundCap));
+            p.drawLine(prev, pt);
+            p.setOpacity(opacity);
+            p.setPen(QPen(col, width, Qt::SolidLine, Qt::RoundCap));
+            p.drawLine(prev, pt);
+        }
+        prev = pt;
+        havePrev = true;
+    }
+    p.setOpacity(1.0);
+}
+
 void GlobeWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
@@ -322,7 +535,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
 
     if (m_frameDirty || m_frame.size() != size()) { renderSphere(); }
 
-    const double r  = std::min(width(), height()) * 0.44;
+    const double r  = radiusPx();
     const QPointF c(width() * 0.5, height() * 0.5);
 
     // Atmosphere: a soft rim just outside the disc.
@@ -369,35 +582,28 @@ void GlobeWidget::paintEvent(QPaintEvent*)
         }
     }
 
-    // Great-circle path. Drawn as many short segments through
-    // interpolateGreatCircle — a straight line between the two screen
-    // points would show a path the signal does not take.
+    // The path, and the antenna's main lobe either side of it.
+    //
+    // Three arcs rather than one: the centre is where the beam is
+    // pointed, the flanking pair are the half-power edges. Seeing them
+    // spread apart over 8000 km is what makes it obvious that a rotator
+    // five degrees off still covers the station — or does not.
     if (m_hasHome && m_hasTarget) {
-        QPointF prev;
-        bool havePrev = false;
-        for (int i = 0; i <= 120; ++i) {
-            double lat = 0, lon = 0;
-            interpolateGreatCircle(m_homeLat, m_homeLon,
-                                   m_targetLat, m_targetLon,
-                                   i / 120.0, lat, lon);
-            QPointF pt;
-            if (project(lat, lon, pt)) {
-                if (havePrev) {
-                    p.setPen(QPen(QColor(Style::kAccent), 3.0));
-                    p.setOpacity(0.30);
-                    p.drawLine(prev, pt);
-                    p.setOpacity(1.0);
-                    p.setPen(QPen(QColor(Style::kAccent), 1.4));
-                    p.drawLine(prev, pt);
-                }
-                prev = pt;
-                havePrev = true;
-            } else {
-                // The path went round the back — pick it up again when
-                // it returns rather than drawing a chord across the disc.
-                havePrev = false;
+        const double dist = angularDistance(m_homeLat, m_homeLon,
+                                            m_targetLat, m_targetLon);
+        const double bear = initialBearing(m_homeLat, m_homeLon,
+                                           m_targetLat, m_targetLon);
+        const QColor accent(Style::kAccent);
+
+        if (m_beamSpread > 0.0 && dist > 1.0) {
+            for (double off : {-m_beamSpread, m_beamSpread}) {
+                double lat = 0, lon = 0;
+                destinationPoint(m_homeLat, m_homeLon, bear + off, dist,
+                                 lat, lon);
+                drawArc(p, lat, lon, accent, 1.0, 0.34);
             }
         }
+        drawArc(p, m_targetLat, m_targetLon, accent, 1.6, 1.0);
     }
 
     auto marker = [&](double lat, double lon, const QColor& col,
