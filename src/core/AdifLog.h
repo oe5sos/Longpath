@@ -51,6 +51,19 @@ QVector<LogEntry> read(const QString& path, QString* error = nullptr);
 bool write(const QString& path, const QVector<LogEntry>& entries,
            QString* error = nullptr);
 
+// Sort key for an ADIF band string, as an approximate frequency in MHz.
+//
+// Sorting band names as text is wrong in a way that looks right:
+// "160m" sorts before "40m" because '1' precedes '4', and a logbook
+// sorted by band then lists 10m, 160m, 17m, 20m — plausible enough at a
+// glance that nobody checks it. Bands have an order, and it is the one
+// the dial has.
+//
+// Handles metres and centimetres ("70cm"), returns 0 for anything
+// unrecognised so blanks and junk sort together at one end rather than
+// scattering through the list.
+double bandSortKeyMHz(const QString& band);
+
 // Comma-separated export for spreadsheets. Values are quoted and inner
 // quotes doubled, per RFC 4180, because a comment containing a comma
 // is entirely normal.

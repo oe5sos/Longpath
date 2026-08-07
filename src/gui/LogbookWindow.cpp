@@ -13,6 +13,7 @@
 #include "LogbookWindow.h"
 
 #include "core/AdifLog.h"
+#include "core/AppSettings.h"
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/StyleConstants.h"
@@ -48,7 +49,7 @@ namespace NereusSDR {
 namespace {
 
 enum Column {
-    ColDate = 0, ColTime, ColCall, ColBand, ColMode,
+    ColDate = 0, ColTime, ColCall, ColFreq, ColBand, ColMode,
     ColSent, ColRcvd, ColName, ColQth, ColCountry,
     ColGrid, ColDistance, ColComment, ColumnCount
 };
@@ -56,7 +57,8 @@ enum Column {
 QStringList headerLabels()
 {
     return {QStringLiteral("Date"),  QStringLiteral("UTC"),
-            QStringLiteral("Call"),  QStringLiteral("Band"),
+            QStringLiteral("Call"),  QStringLiteral("MHz"),
+            QStringLiteral("Band"),
             QStringLiteral("Mode"),  QStringLiteral("Sent"),
             QStringLiteral("Rcvd"),  QStringLiteral("Name"),
             QStringLiteral("QTH"),   QStringLiteral("Country"),
@@ -85,6 +87,7 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     setModal(false);
     resize(1000, 560);
     buildUi();
+    restoreHeaderState();
     reload();
 }
 
@@ -172,7 +175,17 @@ void LogbookWindow::buildUi()
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setAlternatingRowColors(true);
     m_table->horizontalHeader()->setStretchLastSection(true);
-    m_table->setSortingEnabled(false);   // we own the order
+    // Not QTableWidget's own sorting: it reorders the rows underneath
+    // m_visible, and every row action here — edit, delete, upload, map —
+    // maps a view row back to a log record through that index. Sorting
+    // behind its back would silently act on the wrong contact. We sort
+    // m_visible instead and rebuild.
+    m_table->setSortingEnabled(false);
+    m_table->horizontalHeader()->setSectionsClickable(true);
+    m_table->horizontalHeader()->setSortIndicatorShown(true);
+    m_table->horizontalHeader()->setSortIndicator(m_sortColumn, m_sortOrder);
+    m_table->horizontalHeader()->setSectionsMovable(true);
+    m_table->horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
     m_table->setStyleSheet(QStringLiteral(
         "QTableWidget { background: %1; alternate-background-color: %4;"
         "  color: %2; border: 1px solid %3; gridline-color: %3;"
@@ -195,8 +208,56 @@ void LogbookWindow::buildUi()
         .arg(QString::fromLatin1(Style::kTextSecondary)));
     col->addWidget(m_stats);
 
+    connect(m_table->horizontalHeader(), &QHeaderView::sectionClicked,
+            this, [this](int column) {
+        // Second click on the same column turns it round; a new column
+        // starts ascending, except the date, where the useful first
+        // answer is the most recent contact.
+        if (column == m_sortColumn) {
+            m_sortOrder = (m_sortOrder == Qt::AscendingOrder)
+                              ? Qt::DescendingOrder : Qt::AscendingOrder;
+        } else {
+            m_sortColumn = column;
+            m_sortOrder = (column == ColDate || column == ColTime)
+                              ? Qt::DescendingOrder : Qt::AscendingOrder;
+        }
+        m_table->horizontalHeader()->setSortIndicator(m_sortColumn, m_sortOrder);
+        applySort();
+        refreshTable();
+    });
+
+    // Right-click the header to hide a column. Fourteen columns is more
+    // than most operators want at once, and which ones matter differs
+    // per person — contest, DX chasing and casual logging each care
+    // about a different half.
+    connect(m_table->horizontalHeader(), &QHeaderView::customContextMenuRequested,
+            this, [this](const QPoint& pos) {
+        QMenu menu(this);
+        const QStringList labels = headerLabels();
+        for (int c = 0; c < ColumnCount; ++c) {
+            QAction* a = menu.addAction(labels.at(c));
+            a->setCheckable(true);
+            a->setChecked(!m_table->isColumnHidden(c));
+            connect(a, &QAction::toggled, this, [this, c](bool on) {
+                m_table->setColumnHidden(c, !on);
+                m_headerRestored = true;   // stop auto-fitting over it
+                saveHeaderState();
+            });
+        }
+        menu.exec(m_table->horizontalHeader()->mapToGlobal(pos));
+    });
+
+    connect(m_table->horizontalHeader(), &QHeaderView::sectionResized,
+            this, [this](int, int, int) {
+        // Once a width has been chosen by hand, stop refitting on every
+        // reload — a column that snaps back is worse than a narrow one.
+        m_headerRestored = true;
+        saveHeaderState();
+    });
+
     connect(m_search, &QLineEdit::textChanged, this, [this]() {
         applyFilter();
+        applySort();
         refreshTable();
         updateStats();
     });
@@ -278,6 +339,7 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 
     auto reapply = [this]() {
         applyFilter();
+        applySort();
         refreshTable();
         updateStats();
     };
@@ -371,6 +433,7 @@ void LogbookWindow::reload()
     std::stable_sort(m_all.begin(), m_all.end(), newerFirst);
     refreshFilterChoices();
     applyFilter();
+    applySort();
     refreshTable();
     updateStats();
 }
@@ -384,6 +447,87 @@ void LogbookWindow::applyFilter()
     for (int i = 0; i < m_all.size(); ++i) {
         if (f.matches(m_all.at(i))) { m_visible.append(i); }
     }
+}
+
+void LogbookWindow::saveHeaderState()
+{
+    AppSettings::instance().setValue(
+        QStringLiteral("LogbookHeaderState"),
+        m_table->horizontalHeader()->saveState());
+}
+
+void LogbookWindow::restoreHeaderState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("LogbookHeaderState")).toByteArray();
+    if (st.isEmpty()) { return; }
+    // A saved state from a build with fewer columns restores the old
+    // count and leaves the new ones invisible with no way to find them.
+    // Better to start over than to hide a column the operator never
+    // hid.
+    QHeaderView* h = m_table->horizontalHeader();
+    if (!h->restoreState(st)) { return; }
+    if (h->count() != ColumnCount) { return; }
+    m_headerRestored = true;
+    h->setSortIndicator(m_sortColumn, m_sortOrder);
+}
+
+void LogbookWindow::applySort()
+{
+    const int column = m_sortColumn;
+    const bool asc = m_sortOrder == Qt::AscendingOrder;
+    const QVector<LogEntry>& all = m_all;
+
+    auto text = [&all, column](int i) -> QString {
+        const LogEntry& e = all.at(i);
+        switch (column) {
+        case ColCall:    return e.call;
+        case ColMode:    return e.submode.isEmpty() ? e.mode : e.submode;
+        case ColSent:    return e.rstSent;
+        case ColRcvd:    return e.rstRcvd;
+        case ColName:    return e.name;
+        case ColQth:     return e.qth;
+        case ColCountry: return e.country;
+        case ColGrid:    return e.gridSquare;
+        case ColComment: return e.comment;
+        default:         return {};
+        }
+    };
+
+    std::stable_sort(m_visible.begin(), m_visible.end(),
+                     [&](int lhs, int rhs) {
+        const LogEntry& a = all.at(lhs);
+        const LogEntry& b = all.at(rhs);
+        bool less = false;
+        switch (column) {
+        case ColDate:
+        case ColTime:
+            // Undated contacts sort together at the end whichever way
+            // the column is pointing, rather than jumping between the
+            // top and the bottom as it is toggled.
+            if (a.timeOn.isValid() != b.timeOn.isValid()) {
+                return a.timeOn.isValid() == asc ? false : true;
+            }
+            less = a.timeOn < b.timeOn;
+            break;
+        case ColFreq:
+            less = a.freqMHz < b.freqMHz;
+            break;
+        case ColBand:
+            // By frequency, not by name. Sorted as text, "160m" comes
+            // before "40m" and the band column becomes nonsense.
+            less = AdifLog::bandSortKeyMHz(a.band)
+                 < AdifLog::bandSortKeyMHz(b.band);
+            break;
+        case ColDistance:
+            less = a.distanceKm < b.distanceKm;
+            break;
+        default:
+            less = text(lhs).compare(text(rhs), Qt::CaseInsensitive) < 0;
+            break;
+        }
+        return asc ? less : !less;
+    });
 }
 
 void LogbookWindow::refreshTable()
@@ -401,6 +545,8 @@ void LogbookWindow::refreshTable()
         put(ColTime, u.isValid() ? u.toString(QStringLiteral("hh:mm"))
                                  : QString{});
         put(ColCall, e.call);
+        put(ColFreq, e.freqMHz > 0.0
+                ? QString::number(e.freqMHz, 'f', 3) : QString{});
         put(ColBand, e.band);
         put(ColMode, e.submode.isEmpty() ? e.mode : e.submode);
         put(ColSent, e.rstSent);
@@ -413,7 +559,7 @@ void LogbookWindow::refreshTable()
                 ? QString::number(e.distanceKm, 'f', 0) : QString{});
         put(ColComment, e.comment);
     }
-    m_table->resizeColumnsToContents();
+    if (!m_headerRestored) { m_table->resizeColumnsToContents(); }
 }
 
 void LogbookWindow::updateStats()

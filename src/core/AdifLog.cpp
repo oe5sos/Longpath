@@ -17,6 +17,7 @@
 #include <QDate>
 #include <QFile>
 #include <QHash>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QTextStream>
 #include <QTimeZone>
@@ -244,6 +245,31 @@ MergeResult merge(const QVector<LogEntry>& existing,
         ++r.added;
     }
     return r;
+}
+
+double bandSortKeyMHz(const QString& band)
+{
+    const QString b = band.trimmed().toLower();
+    if (b.isEmpty()) { return 0.0; }
+
+    // Leading number, then a unit. "40m", "70cm", "2190m", "1.25m".
+    static const QRegularExpression re(
+        QStringLiteral("^([0-9]+(?:\\.[0-9]+)?)\\s*(mm|cm|m)$"));
+    const QRegularExpressionMatch m = re.match(b);
+    if (!m.hasMatch()) { return 0.0; }
+
+    bool ok = false;
+    const double value = m.captured(1).toDouble(&ok);
+    if (!ok || value <= 0.0) { return 0.0; }
+
+    const QString unit = m.captured(2);
+    double metres = value;
+    if (unit == QLatin1String("cm")) { metres = value / 100.0; }
+    else if (unit == QLatin1String("mm")) { metres = value / 1000.0; }
+
+    // c / lambda, near enough. The exact figure does not matter; the
+    // ordering does, and this is the order the bands sit in on the dial.
+    return 299.792458 / metres;
 }
 
 QString toCsv(const QVector<LogEntry>& entries)

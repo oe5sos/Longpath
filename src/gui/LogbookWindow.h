@@ -78,6 +78,13 @@ private:
     void refreshFilterChoices();
     LogFilter currentFilter() const;
     void applyFilter();
+    // Order m_visible by the current sort column. Done here rather than
+    // by QTableWidget's own sorting, which reorders rows underneath the
+    // index mapping and would make every row action touch the wrong
+    // contact.
+    void applySort();
+    void saveHeaderState();
+    void restoreHeaderState();
     void refreshTable();
     void updateStats();
     void editSelected();
@@ -115,6 +122,14 @@ private:
     QPushButton*  m_clearBtn{nullptr};
 
     QTableWidget* m_table{nullptr};
+
+    // Which column the table is ordered by. Newest first is the useful
+    // default: the contact you want is nearly always the last one.
+    int m_sortColumn{0};
+    Qt::SortOrder m_sortOrder{Qt::DescendingOrder};
+    // Set once the operator has resized or hidden a column, so the
+    // automatic fit-to-contents stops fighting their choices.
+    bool m_headerRestored{false};
     QLabel*       m_stats{nullptr};
     QPushButton*  m_editBtn{nullptr};
     QPushButton*  m_deleteBtn{nullptr};

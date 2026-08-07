@@ -35,6 +35,10 @@ private slots:
     void merge_adds_only_what_is_new();
     void merge_never_replaces_an_existing_record();
     void merge_dedupes_within_the_incoming_file_too();
+
+    void bands_sort_by_frequency_not_by_name();
+    void centimetre_bands_sort_above_metre_bands();
+    void unrecognised_bands_sort_together();
 };
 
 void TstAdifLog::reads_a_record_we_wrote()
@@ -355,6 +359,55 @@ void TstAdifLog::merge_dedupes_within_the_incoming_file_too()
     QCOMPARE(r.added, 1);
     QCOMPARE(r.skipped, 2);
     QCOMPARE(r.merged.size(), 1);
+}
+
+void TstAdifLog::bands_sort_by_frequency_not_by_name()
+{
+    // The trap this function exists for: as text, "160m" sorts before
+    // "40m" because '1' precedes '4', and a logbook sorted by band then
+    // lists 10m, 160m, 17m, 20m — wrong in a way that looks plausible
+    // enough that nobody checks it.
+    QStringList bands = {QStringLiteral("10m"), QStringLiteral("160m"),
+                         QStringLiteral("20m"), QStringLiteral("40m"),
+                         QStringLiteral("80m"), QStringLiteral("6m")};
+    std::sort(bands.begin(), bands.end(),
+              [](const QString& a, const QString& b) {
+        return AdifLog::bandSortKeyMHz(a) < AdifLog::bandSortKeyMHz(b);
+    });
+    QCOMPARE(bands, QStringList({QStringLiteral("160m"), QStringLiteral("80m"),
+                                 QStringLiteral("40m"), QStringLiteral("20m"),
+                                 QStringLiteral("10m"), QStringLiteral("6m")}));
+
+    // And the plain fact underneath it.
+    QVERIFY(AdifLog::bandSortKeyMHz(QStringLiteral("160m"))
+            < AdifLog::bandSortKeyMHz(QStringLiteral("40m")));
+}
+
+void TstAdifLog::centimetre_bands_sort_above_metre_bands()
+{
+    // 70cm is higher in frequency than 2m. Reading the number alone
+    // would put it below everything.
+    QVERIFY(AdifLog::bandSortKeyMHz(QStringLiteral("70cm"))
+            > AdifLog::bandSortKeyMHz(QStringLiteral("2m")));
+    QVERIFY(AdifLog::bandSortKeyMHz(QStringLiteral("23cm"))
+            > AdifLog::bandSortKeyMHz(QStringLiteral("70cm")));
+    // Roughly right, not just ordered: 70cm is around 430 MHz.
+    const double k = AdifLog::bandSortKeyMHz(QStringLiteral("70cm"));
+    QVERIFY2(k > 400.0 && k < 450.0, qPrintable(QString::number(k)));
+    // Case and whitespace are not a different band.
+    QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral(" 40M ")),
+             AdifLog::bandSortKeyMHz(QStringLiteral("40m")));
+}
+
+void TstAdifLog::unrecognised_bands_sort_together()
+{
+    // Blank and junk both give zero, so they gather at one end instead
+    // of scattering through the list at whatever their text implies.
+    QCOMPARE(AdifLog::bandSortKeyMHz(QString{}), 0.0);
+    QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("  ")), 0.0);
+    QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("banana")), 0.0);
+    QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("40")), 0.0);   // no unit
+    QCOMPARE(AdifLog::bandSortKeyMHz(QStringLiteral("0m")), 0.0);   // no divide
 }
 
 QTEST_APPLESS_MAIN(TstAdifLog)
