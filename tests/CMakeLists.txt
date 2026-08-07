@@ -4567,6 +4567,9 @@ nereus_add_test(tst_applet_visibility_menu_wiring)
 #    rule that makes the long way round the only legal path --
 nereus_add_test(tst_rotor_dial)
 
+# -- Maidenhead helpers, now shared: validation, distance, bearing --
+nereus_add_test(tst_maidenhead)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

@@ -41,6 +41,9 @@
 //                                    Anthropic Claude Code.
 
 #include "FreeDVStationModel.h"
+// Declarations for the three locator helpers defined below, which the
+// rotator dial also uses (2026-08-07).
+#include "core/Maidenhead.h"
 
 #include <QtMath>
 
@@ -62,6 +65,14 @@ inline double RadiansToDegrees(double radians)
     auto result = (radians > 0 ? radians : (2 * M_PI + radians)) * 360 / (2 * M_PI);
     return (result == 360) ? 0 : result;
 }
+
+}  // namespace — the radian conversions stay file-local
+
+// The three locator helpers below are declared in core/Maidenhead.h and
+// have external linkage. They used to sit in the anonymous namespace
+// above, unreachable from anywhere else; the rotator dial needs the
+// same haversine and a second copy would be a bug waiting to diverge
+// (2026-08-07). Definitions are unchanged.
 
 // From freedv-gui src/gui/dialogs/freedv_reporter.cpp:2336-2374 [@77e793a]
 //
@@ -185,7 +196,22 @@ double calculateBearingInDegrees(const QString& gridSquare1, const QString& grid
     return RadiansToDegrees(radians);
 }
 
-} // namespace
+// NereusSDR addition (2026-08-07): the callers of the helpers above
+// need a cheap "is this even a locator" check before spending the
+// maths, and the answer belongs next to the parser that defines it.
+bool isValidGridSquare(const QString& gridSquare)
+{
+    const QString g = gridSquare.trimmed().toUpper();
+    if (g.size() != 4 && g.size() != 6) { return false; }
+    if (!g.at(0).isLetter() || !g.at(1).isLetter()) { return false; }
+    if (g.at(0) > QLatin1Char('R') || g.at(1) > QLatin1Char('R')) { return false; }
+    if (!g.at(2).isDigit() || !g.at(3).isDigit()) { return false; }
+    if (g.size() == 6) {
+        if (!g.at(4).isLetter() || !g.at(5).isLetter()) { return false; }
+        if (g.at(4) > QLatin1Char('X') || g.at(5) > QLatin1Char('X')) { return false; }
+    }
+    return true;
+}
 
 FreeDVStationModel::FreeDVStationModel(QObject* parent)
     : QObject(parent)

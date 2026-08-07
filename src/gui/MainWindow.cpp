@@ -257,6 +257,7 @@ warren@wpratt.com
 #include "models/SliceModel.h"
 #include "widgets/VfoWidget.h"
 #include "widgets/RotorDialWidget.h"
+#include "core/Maidenhead.h"
 #include "widgets/RxDashboard.h"
 #include "widgets/AntennaSwitchToast.h"
 #include "widgets/StatusToast.h"
@@ -8961,11 +8962,12 @@ void MainWindow::openPureSignalDialog()
 // src/gui/MainWindow.cpp openDxClusterDialog() [@0cd4559].
 // ── Antenna rotator dial ────────────────────────────────────────────
 //
-// Step 1: the instrument only. No rotator protocol behind it yet — the
-// target is set by clicking in the rose, and "Rotate" walks a simulated
-// heading towards it so the four states can be seen and judged before
-// any hardware is wired up. The operator's own locator (JN67VV) and a
-// network/serial connection follow in the next steps.
+// Step 2: the instrument plus real bearings. The operator's own square
+// and the target square are entered here and persisted; distance and
+// bearing come from the shared Maidenhead helpers rather than a click
+// in the rose (which still works as a manual override). No rotator
+// protocol yet — "Rotate" walks a simulated heading so the four states
+// remain reachable without hardware.
 void MainWindow::openRotorDial()
 {
     if (!m_rotorWindow) {
@@ -8974,14 +8976,83 @@ void MainWindow::openRotorDial()
         m_rotorWindow->setAttribute(Qt::WA_StyledBackground, true);
         m_rotorWindow->setStyleSheet(
             QStringLiteral("background: %1;").arg(Style::kAppBg));
-        m_rotorWindow->resize(260, 330);
+        m_rotorWindow->resize(280, 420);
 
         auto* col = new QVBoxLayout(m_rotorWindow);
         col->setContentsMargins(10, 10, 10, 10);
         col->setSpacing(8);
 
+        // ── Locators ─────────────────────────────────────────────────
+        auto& settings = AppSettings::instance();
+        const QString myGridKey = QStringLiteral("StationGridSquare");
+
+        auto* gridRow = new QHBoxLayout;
+        gridRow->setSpacing(6);
+
+        auto* myLabel = new QLabel(QStringLiteral("MY"), m_rotorWindow);
+        myLabel->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 9px; }").arg(Style::kTextScale));
+        gridRow->addWidget(myLabel);
+
+        auto* myGridEdit = new QLineEdit(
+            settings.value(myGridKey, QString{}).toString(), m_rotorWindow);
+        // User-visible placeholder — a real example, not an "e.g." prefix.
+        myGridEdit->setPlaceholderText(QStringLiteral("JN67VV"));
+        myGridEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+        gridRow->addWidget(myGridEdit, 1);
+
+        auto* dxLabel = new QLabel(QStringLiteral("DX"), m_rotorWindow);
+        dxLabel->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 9px; }").arg(Style::kTextScale));
+        gridRow->addWidget(dxLabel);
+
+        auto* dxGridEdit = new QLineEdit(m_rotorWindow);
+        dxGridEdit->setPlaceholderText(QStringLiteral("IO91WM"));
+        dxGridEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+        gridRow->addWidget(dxGridEdit, 1);
+        col->addLayout(gridRow);
+
+        auto* gridStatus = new QLabel(QString{}, m_rotorWindow);
+        gridStatus->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
+        col->addWidget(gridStatus);
+
         m_rotorDial = new RotorDialWidget(m_rotorWindow);
         col->addWidget(m_rotorDial, 1);
+
+        // Recompute on every edit of either field. Cheap, and it means
+        // the dial answers while the operator is still typing the
+        // fourth character rather than waiting for a button.
+        auto applyGrids = [this, myGridEdit, dxGridEdit, gridStatus,
+                           myGridKey]() {
+            const QString mine = myGridEdit->text().trimmed().toUpper();
+            const QString dx   = dxGridEdit->text().trimmed().toUpper();
+
+            AppSettings::instance().setValue(myGridKey, mine);
+
+            if (!isValidGridSquare(mine)) {
+                gridStatus->setText(mine.isEmpty()
+                    ? QStringLiteral("Enter your own locator to get bearings")
+                    : QStringLiteral("%1 is not a valid locator").arg(mine));
+                return;
+            }
+            if (!isValidGridSquare(dx)) {
+                gridStatus->setText(dx.isEmpty()
+                    ? QStringLiteral("Enter the station's locator")
+                    : QStringLiteral("%1 is not a valid locator").arg(dx));
+                return;
+            }
+
+            const double km  = calculateDistanceKm(mine, dx);
+            const double deg = calculateBearingInDegrees(mine, dx);
+            m_rotorDial->setTargetBearing(deg);
+            gridStatus->setText(QStringLiteral("%1 → %2 · %3 km")
+                                    .arg(mine, dx)
+                                    .arg(km, 0, 'f', 0));
+        };
+        connect(myGridEdit, &QLineEdit::textChanged, this, applyGrids);
+        connect(dxGridEdit, &QLineEdit::textChanged, this, applyGrids);
+        applyGrids();
 
         auto* row = new QHBoxLayout;
         row->setSpacing(6);
