@@ -1021,12 +1021,19 @@ void RotorLogbookPanel::refreshRecentList()
     m_recent->resizeColumnsToContents();
 }
 
+void RotorLogbookPanel::setUploadTargets(const QVector<QsoUploader*>& targets)
+{
+    m_uploadTargets = targets;
+    if (m_logWindow) { m_logWindow->setUploaders(m_uploadTargets); }
+}
+
 void RotorLogbookPanel::openLogbookWindow()
 {
     // One window, reused. Opening a second copy of the same file in two
     // windows is how one of them ends up writing over the other's edit.
     if (!m_logWindow) {
         m_logWindow = new LogbookWindow(logbookPath(), this);
+        m_logWindow->setUploaders(m_uploadTargets);
         connect(m_logWindow, &LogbookWindow::logChanged,
                 this, &RotorLogbookPanel::refreshRecentList);
     }

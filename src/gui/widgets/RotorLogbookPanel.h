@@ -22,6 +22,7 @@
 #include "core/CallsignInfo.h"
 #include "models/LogEntry.h"
 
+#include <QVector>
 #include <QWidget>
 
 class QLabel;
@@ -35,6 +36,7 @@ namespace NereusSDR {
 
 class QrzClient;
 class QrzLogbookUploader;
+class QsoUploader;
 class RadioModel;
 class GlobeWidget;
 class LogbookWindow;
@@ -59,6 +61,12 @@ public:
 
     // Where the ADIF log is written.
     static QString logbookPath();
+
+    // Destinations offered by the logbook window's Upload menu. Passed
+    // straight through — the panel does not own them and does not use
+    // them itself; live logging still goes to the single uploader given
+    // to the constructor.
+    void setUploadTargets(const QVector<QsoUploader*>& targets);
 
 signals:
     void qsoLogged(const LogEntry& entry);
@@ -128,6 +136,7 @@ private:
     // Created on first use and kept. Two windows over one file is how
     // one of them ends up writing over the other's correction.
     LogbookWindow* m_logWindow{nullptr};
+    QVector<QsoUploader*> m_uploadTargets;
 
     // Best known position of the far end, from whichever source spoke
     // last: a typed locator, a QRZ grid, or the DXCC entity centre

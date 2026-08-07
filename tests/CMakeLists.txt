@@ -4597,6 +4597,11 @@ nereus_add_test(tst_solar_times)
 #    values containing '<', a last record with no <EOR>, atomic rewrite --
 nereus_add_test(tst_adif_log)
 
+# -- Cloudlog/Wavelog: URL normalisation (the part operators get wrong)
+#    and response classification, incl. duplicate-as-success --
+nereus_add_test(tst_cloudlog_uploader)
+target_link_libraries(tst_cloudlog_uploader PRIVATE Qt6::Network)
+
 # ── UI Polish Foundation B3: AntennaPopupBuilder capability-gated popup factory ──
 # 5 tests cover Tier 1 (full Alex + bypass), Tier 2 (mid Alex, no bypass),
 # Tier 3 (no Alex, at most 1 entry), TX mode (no RX-only section), and

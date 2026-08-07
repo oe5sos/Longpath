@@ -261,6 +261,11 @@ warren@wpratt.com
 #include "core/CredentialStore.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
+#include "core/CloudlogUploader.h"
+#include "core/AdifNetworkUploader.h"
+
+#include <QComboBox>
+#include <QDialogButtonBox>
 #include "widgets/RxDashboard.h"
 #include "widgets/AntennaSwitchToast.h"
 #include "widgets/StatusToast.h"
@@ -6238,6 +6243,19 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openRotorDial);
     }
 
+    // Where logged contacts can be sent on to. Separate from the QRZ
+    // account entry, because these are separate services with separate
+    // credentials and one combined dialog would invite mixing them up.
+    {
+        QAction* svcAction =
+            toolsMenu->addAction(QStringLiteral("&Logging services..."));
+        svcAction->setObjectName(QStringLiteral("actLoggingServices"));
+        svcAction->setToolTip(QStringLiteral(
+            "Set up Cloudlog / Wavelog and a local logger such as Log4OM."));
+        connect(svcAction, &QAction::triggered,
+                this, &MainWindow::openLoggingServicesDialog);
+    }
+
     // Phase 3J-2 H1: FreeDV Reporter live station map.
     // Modeless singleton dialog; lazy-constructed in openFreeDVReporter()
     // with FreeDVStationModel + FreeDVReporterClient from RadioModel.
@@ -9000,6 +9018,159 @@ void MainWindow::ensureQrzUploader()
                                   QStringLiteral("logbook")));
 }
 
+void MainWindow::ensureExtraUploaders()
+{
+    if (!m_cloudlogUploader) {
+        m_cloudlogUploader = new CloudlogUploader(this);
+        AppSettings& s = AppSettings::instance();
+        m_cloudlogUploader->setBaseUrl(
+            s.value(QStringLiteral("CloudlogUrl"), QString{}).toString());
+        m_cloudlogUploader->setStationProfileId(
+            s.value(QStringLiteral("CloudlogStationId"), QString{}).toString());
+        // The key is a credential, so it lives in the keychain. Settings
+        // files end up in backups, screenshots and support bundles.
+        m_cloudlogUploader->setApiKey(
+            CredentialStore::retrieve(QStringLiteral("cloudlog.apikey"),
+                                      QStringLiteral("cloudlog")));
+    }
+    if (!m_localLogUploader) {
+        m_localLogUploader = new AdifNetworkUploader(this);
+        AppSettings& s = AppSettings::instance();
+        const QString host =
+            s.value(QStringLiteral("LocalLoggerHost"), QString{}).toString();
+        const int port =
+            s.value(QStringLiteral("LocalLoggerPort"), 0).toInt();
+        const bool tcp =
+            s.value(QStringLiteral("LocalLoggerTcp"), false).toBool();
+        m_localLogUploader->setTarget(host, static_cast<quint16>(port),
+            tcp ? AdifNetworkUploader::Transport::Tcp
+                : AdifNetworkUploader::Transport::Udp);
+    }
+}
+
+QVector<QsoUploader*> MainWindow::qsoUploaders()
+{
+    ensureQrzUploader();
+    ensureExtraUploaders();
+    return {m_qrzUploader, m_cloudlogUploader, m_localLogUploader};
+}
+
+void MainWindow::openLoggingServicesDialog()
+{
+    ensureExtraUploaders();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("Logging services"));
+    Style::applyDarkPageStyle(&dlg);
+
+    auto* col = new QVBoxLayout(&dlg);
+    col->setContentsMargins(14, 14, 14, 14);
+    col->setSpacing(10);
+
+    AppSettings& s = AppSettings::instance();
+
+    // ── Cloudlog / Wavelog ───────────────────────────────────────────
+    auto* clTitle = new QLabel(QStringLiteral("Cloudlog / Wavelog"), &dlg);
+    QFont bold = clTitle->font();
+    bold.setBold(true);
+    clTitle->setFont(bold);
+    col->addWidget(clTitle);
+
+    auto* clForm = new QFormLayout;
+    auto* urlEdit = new QLineEdit(m_cloudlogUploader->baseUrl(), &dlg);
+    urlEdit->setPlaceholderText(
+        QStringLiteral("address of your instance, e.g. log.example.org"));
+    clForm->addRow(QStringLiteral("Instance URL"), urlEdit);
+
+    auto* keyEdit = new QLineEdit(&dlg);
+    keyEdit->setEchoMode(QLineEdit::Password);
+    keyEdit->setPlaceholderText(QStringLiteral("API key with write access"));
+    keyEdit->setText(CredentialStore::retrieve(
+        QStringLiteral("cloudlog.apikey"), QStringLiteral("cloudlog")));
+    clForm->addRow(QStringLiteral("API key"), keyEdit);
+
+    auto* stationEdit = new QLineEdit(
+        m_cloudlogUploader->stationProfileId(), &dlg);
+    stationEdit->setPlaceholderText(
+        QStringLiteral("number from Station Profiles"));
+    clForm->addRow(QStringLiteral("Station profile"), stationEdit);
+    col->addLayout(clForm);
+
+    auto* clNote = new QLabel(QStringLiteral(
+        "The station profile decides which locator and grid the contact "
+        "is filed under. An operator with a home and a portable profile "
+        "has two — the wrong number files the QSO in the wrong place."),
+        &dlg);
+    clNote->setWordWrap(true);
+    clNote->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                              .arg(QString::fromLatin1(Style::kTextSecondary)));
+    col->addWidget(clNote);
+
+    // ── Local logger ─────────────────────────────────────────────────
+    auto* llTitle = new QLabel(
+        QStringLiteral("Local logger (Log4OM, DXKeeper, …)"), &dlg);
+    llTitle->setFont(bold);
+    col->addWidget(llTitle);
+
+    auto* llForm = new QFormLayout;
+    auto* hostEdit = new QLineEdit(m_localLogUploader->host(), &dlg);
+    hostEdit->setPlaceholderText(
+        QStringLiteral("127.0.0.1 if it runs on this machine"));
+    llForm->addRow(QStringLiteral("Host"), hostEdit);
+
+    auto* portEdit = new QLineEdit(
+        m_localLogUploader->port() ? QString::number(m_localLogUploader->port())
+                                   : QString{}, &dlg);
+    portEdit->setPlaceholderText(QStringLiteral("port the logger listens on"));
+    llForm->addRow(QStringLiteral("Port"), portEdit);
+
+    auto* transport = new QComboBox(&dlg);
+    transport->addItem(QStringLiteral("UDP — send only, no confirmation"));
+    transport->addItem(QStringLiteral("TCP — confirms the logger took it"));
+    transport->setCurrentIndex(
+        m_localLogUploader->transport() == AdifNetworkUploader::Transport::Tcp
+            ? 1 : 0);
+    llForm->addRow(QStringLiteral("Transport"), transport);
+    col->addLayout(llForm);
+
+    auto* llNote = new QLabel(QStringLiteral(
+        "Over UDP nothing comes back, so a successful send means the "
+        "datagram left — not that the logger filed it. TCP at least "
+        "confirms the bytes were accepted."), &dlg);
+    llNote->setWordWrap(true);
+    llNote->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                              .arg(QString::fromLatin1(Style::kTextSecondary)));
+    col->addWidget(llNote);
+
+    auto* buttons = new QDialogButtonBox(
+        QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    col->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) { return; }
+
+    m_cloudlogUploader->setBaseUrl(urlEdit->text());
+    m_cloudlogUploader->setApiKey(keyEdit->text());
+    m_cloudlogUploader->setStationProfileId(stationEdit->text());
+    s.setValue(QStringLiteral("CloudlogUrl"), urlEdit->text().trimmed());
+    s.setValue(QStringLiteral("CloudlogStationId"),
+               stationEdit->text().trimmed());
+    // Key to the keychain only — never to the settings XML.
+    CredentialStore::store(QStringLiteral("cloudlog.apikey"),
+                           QStringLiteral("cloudlog"), keyEdit->text());
+
+    const bool tcp = transport->currentIndex() == 1;
+    m_localLogUploader->setTarget(
+        hostEdit->text(), static_cast<quint16>(portEdit->text().toUInt()),
+        tcp ? AdifNetworkUploader::Transport::Tcp
+            : AdifNetworkUploader::Transport::Udp);
+    s.setValue(QStringLiteral("LocalLoggerHost"), hostEdit->text().trimmed());
+    s.setValue(QStringLiteral("LocalLoggerPort"),
+               portEdit->text().trimmed().toInt());
+    s.setValue(QStringLiteral("LocalLoggerTcp"), tcp);
+}
+
 void MainWindow::openQrzCredentialsDialog()
 {
     ensureQrzClient();
@@ -9158,9 +9329,13 @@ void MainWindow::openRotorDial()
         m_rotorDock = new QDockWidget(QStringLiteral("Rotor / Log"), this);
         m_rotorDock->setObjectName(QStringLiteral("rotorLogDock"));
         m_rotorDock->setAllowedAreas(Qt::AllDockWidgetAreas);
-        m_rotorDock->setWidget(
-            new RotorLogbookPanel(m_radioModel, m_qrzClient, m_qrzUploader,
-                                  m_rotorDock));
+        auto* panel = new RotorLogbookPanel(m_radioModel, m_qrzClient,
+                                            m_qrzUploader, m_rotorDock);
+        // Live logging still goes to QRZ alone; the extra destinations
+        // are for sending contacts on afterwards from the logbook
+        // window, where the operator can see what is being sent where.
+        panel->setUploadTargets(qsoUploaders());
+        m_rotorDock->setWidget(panel);
         addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);
     }
     m_rotorDock->show();

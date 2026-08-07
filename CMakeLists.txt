@@ -915,6 +915,8 @@ set(GUI_SOURCES
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp
+    src/core/CloudlogUploader.cpp
+    src/core/AdifNetworkUploader.cpp
     # Header-only Q_OBJECT: AUTOMOC only picks up a header when a source
     # file of the same base name exists, so an interface class with no
     # .cpp has to be listed explicitly or its vtable never gets built.

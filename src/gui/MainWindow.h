@@ -129,6 +129,9 @@ class AppletVisibilityController;
 class AppletWidget;
 class QrzClient;
 class QrzLogbookUploader;
+class CloudlogUploader;
+class AdifNetworkUploader;
+class QsoUploader;
 
 // Phase 23: TCI server + applets forward declarations (all inside NereusSDR
 // namespace — TciServer only exists when HAVE_WEBSOCKETS is defined but we
@@ -555,6 +558,15 @@ private:
     // Logbook: one appended ADIF file, plus the QRZ logbook uploader
     // (a different service and credential from the XML lookup).
     void ensureQrzUploader();
+    // Cloudlog/Wavelog and the local-logger socket. Separate from the
+    // QRZ pair because they are separate services with separate
+    // credentials, and one "logging settings" blob would invite mixing
+    // them up the way the QRZ password and API key already do.
+    void ensureExtraUploaders();
+    void openLoggingServicesDialog();
+    // Every configured destination, for the logbook window's Upload
+    // menu. Ownership stays here.
+    QVector<QsoUploader*> qsoUploaders();
     void buildStatusBar();
     void applyDarkTheme();
     void tryAutoReconnect();
@@ -1125,6 +1137,8 @@ private:
     QDockWidget*     m_rotorDock{nullptr};
     QrzClient*           m_qrzClient{nullptr};
     QrzLogbookUploader*  m_qrzUploader{nullptr};
+    CloudlogUploader*    m_cloudlogUploader{nullptr};
+    AdifNetworkUploader* m_localLogUploader{nullptr};
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;

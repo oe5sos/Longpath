@@ -24,6 +24,7 @@
 #include "models/LogEntry.h"
 
 #include <QDialog>
+#include <QList>
 #include <QVector>
 
 class QLabel;
@@ -33,6 +34,8 @@ class QTableWidget;
 
 namespace NereusSDR {
 
+class QsoUploader;
+
 class LogbookWindow : public QDialog {
     Q_OBJECT
 public:
@@ -41,6 +44,11 @@ public:
     // Re-read the file. Called when the panel logs a contact so the two
     // views cannot drift apart.
     void reload();
+
+    // Places selected contacts can be sent. Not owned — the window is
+    // one of several users of the same uploaders, and whoever holds the
+    // credentials holds the objects.
+    void setUploaders(const QVector<QsoUploader*>& uploaders);
 
 signals:
     // The file changed underneath other views (edit or delete).
@@ -55,9 +63,12 @@ private:
     void deleteSelected();
     void exportAdif();
     void exportCsv();
+    void uploadSelected(QsoUploader* target);
 
     // Index into m_all for the given visible row, or -1.
     int sourceRow(int viewRow) const;
+    // Source indices of every selected row, in display order.
+    QList<int> selectedSourceRows() const;
     bool saveAll();
 
     QString m_path;
@@ -70,6 +81,16 @@ private:
     QLabel*       m_stats{nullptr};
     QPushButton*  m_editBtn{nullptr};
     QPushButton*  m_deleteBtn{nullptr};
+    QPushButton*  m_uploadBtn{nullptr};
+
+    QVector<QsoUploader*> m_uploaders;
+
+    // Outstanding uploads for the current batch, so the summary can be
+    // reported once instead of one message box per contact.
+    int m_pending{0};
+    int m_okCount{0};
+    int m_dupCount{0};
+    QStringList m_failures;
 };
 
 } // namespace NereusSDR

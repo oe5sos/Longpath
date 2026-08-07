@@ -13,9 +13,13 @@
 #include "LogbookWindow.h"
 
 #include "core/AdifLog.h"
+#include "core/QsoUploader.h"
 #include "gui/StyleConstants.h"
 
+#include <QAction>
 #include <QDateTimeEdit>
+#include <QHash>
+#include <QMenu>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
@@ -102,13 +106,45 @@ void LogbookWindow::buildUi()
 
     m_editBtn   = new QPushButton(QStringLiteral("Edit…"), this);
     m_deleteBtn = new QPushButton(QStringLiteral("Delete"), this);
+    m_uploadBtn = new QPushButton(QStringLiteral("Upload…"), this);
+    m_uploadBtn->setToolTip(
+        QStringLiteral("Send the selected contacts to a logging service"));
     auto* adifBtn = new QPushButton(QStringLiteral("Export ADIF…"), this);
     auto* csvBtn  = new QPushButton(QStringLiteral("Export CSV…"), this);
-    for (QPushButton* b : {m_editBtn, m_deleteBtn, adifBtn, csvBtn}) {
+    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn,
+                           adifBtn, csvBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
     col->addLayout(top);
+
+    connect(m_uploadBtn, &QPushButton::clicked, this, [this]() {
+        if (m_uploaders.isEmpty()) {
+            QMessageBox::information(this, QStringLiteral("Upload"),
+                QStringLiteral("No logging service is set up yet.\n\n"
+                               "Add one under Tools."));
+            return;
+        }
+        QMenu menu(this);
+        QHash<QAction*, QsoUploader*> map;
+        for (QsoUploader* u : m_uploaders) {
+            QAction* a = menu.addAction(u->serviceName());
+            // Listed but disabled rather than hidden: an operator who
+            // set one up last week and sees it missing assumes the
+            // feature is broken, not that a credential went astray.
+            a->setEnabled(u->isConfigured());
+            if (!u->isConfigured()) {
+                a->setText(u->serviceName()
+                           + QStringLiteral("  (not configured)"));
+            }
+            map.insert(a, u);
+        }
+        QAction* chosen = menu.exec(m_uploadBtn->mapToGlobal(
+            QPoint(0, m_uploadBtn->height())));
+        if (chosen && map.contains(chosen)) {
+            uploadSelected(map.value(chosen));
+        }
+    });
 
     // Table
     m_table = new QTableWidget(0, ColumnCount, this);
@@ -268,6 +304,109 @@ int LogbookWindow::sourceRow(int viewRow) const
     return m_visible.at(viewRow);
 }
 
+QList<int> LogbookWindow::selectedSourceRows() const
+{
+    // Collect distinct rows first: selectedItems() yields one entry per
+    // cell, so a three-row selection arrives as thirty-odd items.
+    QSet<int> rows;
+    for (QTableWidgetItem* it : m_table->selectedItems()) {
+        rows.insert(it->row());
+    }
+    QList<int> viewRows(rows.begin(), rows.end());
+    std::sort(viewRows.begin(), viewRows.end());
+
+    QList<int> out;
+    for (int r : viewRows) {
+        const int idx = sourceRow(r);
+        if (idx >= 0) { out.append(idx); }
+    }
+    return out;
+}
+
+void LogbookWindow::setUploaders(const QVector<QsoUploader*>& uploaders)
+{
+    m_uploaders = uploaders;
+    for (QsoUploader* u : m_uploaders) {
+        if (!u) { continue; }
+        // Uploads from the panel use the same objects, so filter by
+        // whether a batch of ours is outstanding. Without that, logging
+        // a contact live would pop a summary box from this window.
+        connect(u, &QsoUploader::uploadFinished, this,
+                [this](const QString& call, bool ok, bool duplicate,
+                       const QString& message) {
+            if (m_pending <= 0) { return; }
+            --m_pending;
+            if (ok) {
+                ++m_okCount;
+                if (duplicate) { ++m_dupCount; }
+            } else {
+                m_failures << QStringLiteral("%1: %2").arg(call, message);
+            }
+            if (m_pending > 0) { return; }
+
+            // One summary at the end, not a box per contact.
+            QString text = QStringLiteral("%1 accepted").arg(m_okCount);
+            if (m_dupCount > 0) {
+                text += QStringLiteral(", of which %1 already present")
+                            .arg(m_dupCount);
+            }
+            if (!m_failures.isEmpty()) {
+                text += QStringLiteral("\n\n%1 failed:\n%2")
+                            .arg(m_failures.size())
+                            .arg(m_failures.mid(0, 10)
+                                     .join(QLatin1Char('\n')));
+                if (m_failures.size() > 10) {
+                    text += QStringLiteral("\n…and %1 more")
+                                .arg(m_failures.size() - 10);
+                }
+            }
+            const bool anyFailed = !m_failures.isEmpty();
+            m_okCount = 0;
+            m_dupCount = 0;
+            m_failures.clear();
+            m_uploadBtn->setEnabled(true);
+
+            if (anyFailed) {
+                QMessageBox::warning(this, QStringLiteral("Upload"), text);
+            } else {
+                QMessageBox::information(this, QStringLiteral("Upload"), text);
+            }
+        }, Qt::UniqueConnection);
+    }
+}
+
+void LogbookWindow::uploadSelected(QsoUploader* target)
+{
+    if (!target) { return; }
+    const QList<int> rows = selectedSourceRows();
+    if (rows.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("Upload"),
+            QStringLiteral("Select the contacts to upload first."));
+        return;
+    }
+    if (m_pending > 0) { return; }   // a batch is already running
+
+    // Confirm the count. Sending 400 contacts because a stray Ctrl-A
+    // selected the whole log is not recoverable at the far end.
+    if (rows.size() > 1) {
+        if (QMessageBox::question(this, QStringLiteral("Upload"),
+                QStringLiteral("Send %1 contacts to %2?")
+                    .arg(rows.size(), 0).arg(target->serviceName()),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+            != QMessageBox::Yes) {
+            return;
+        }
+    }
+
+    m_pending  = rows.size();
+    m_okCount  = 0;
+    m_dupCount = 0;
+    m_failures.clear();
+    m_uploadBtn->setEnabled(false);
+
+    for (int idx : rows) { target->upload(m_all.at(idx)); }
+}
+
 bool LogbookWindow::saveAll()
 {
     // The table shows newest first, but the file stays chronological.
@@ -380,14 +519,7 @@ void LogbookWindow::deleteSelected()
 {
     // Collect source indices first: deleting by view row while the view
     // is being rebuilt underneath is how you remove the wrong contact.
-    QList<int> victims;
-    const QList<QTableWidgetItem*> sel = m_table->selectedItems();
-    QSet<int> rows;
-    for (QTableWidgetItem* it : sel) { rows.insert(it->row()); }
-    for (int r : rows) {
-        const int idx = sourceRow(r);
-        if (idx >= 0) { victims.append(idx); }
-    }
+    QList<int> victims = selectedSourceRows();
     if (victims.isEmpty()) { return; }
 
     const QString question = victims.size() == 1
