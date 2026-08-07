@@ -9037,16 +9037,48 @@ void MainWindow::openQrzCredentialsDialog()
     row->addWidget(saveBtn);
     col->addLayout(row);
 
-    connect(testBtn, &QPushButton::clicked, &dlg, [&]() {
-        status->setText(QStringLiteral("Testing…"));
-        m_qrzClient->testLogin(userEdit->text().trimmed(), passEdit->text());
+    // A dialog that says nothing back is indistinguishable from a
+    // broken one. Every path below ends in a sentence: refusal to send,
+    // a reply, or a timeout.
+    auto* timeout = new QTimer(&dlg);
+    timeout->setSingleShot(true);
+    timeout->setInterval(20000);
+    connect(timeout, &QTimer::timeout, &dlg, [status]() {
+        status->setText(QStringLiteral(
+            "No answer from QRZ after 20 seconds — check the network"));
+    });
+
+    connect(testBtn, &QPushButton::clicked, &dlg, [&, timeout]() {
+        const QString user = userEdit->text().trimmed();
+        if (user.isEmpty() || passEdit->text().isEmpty()) {
+            status->setText(QStringLiteral(
+                "Enter your QRZ callsign and password first"));
+            return;
+        }
+        status->setText(QStringLiteral("Testing %1…").arg(user));
+        timeout->start();
+        m_qrzClient->testLogin(user, passEdit->text());
     });
     connect(m_qrzClient, &QrzClient::loginTestFinished, &dlg,
-            [status](bool ok, const QString& message) {
-        status->setText(ok
-            ? (message.isEmpty() ? QStringLiteral("Login accepted")
-                                 : QStringLiteral("Login accepted — %1").arg(message))
-            : QStringLiteral("Login failed — %1").arg(message));
+            [status, timeout](bool ok, const QString& message) {
+        timeout->stop();
+        if (ok) {
+            // A key without a subscription still logs in but returns
+            // little; say so rather than letting lookups look broken.
+            status->setText(message.isEmpty()
+                ? QStringLiteral("Login accepted")
+                : QStringLiteral("Login accepted — %1").arg(message));
+            return;
+        }
+        QString hint;
+        if (message.contains(QLatin1String("incorrect"), Qt::CaseInsensitive)
+            || message.contains(QLatin1String("password"), Qt::CaseInsensitive)) {
+            // The commonest cause by far: QRZ wants the callsign, and
+            // people type the address they log in to the website with.
+            hint = QStringLiteral(
+                " — QRZ wants your callsign as the username, not your email");
+        }
+        status->setText(QStringLiteral("Login failed — %1%2").arg(message, hint));
     });
     connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
     connect(saveBtn, &QPushButton::clicked, &dlg, [&]() {
@@ -9119,8 +9151,10 @@ void MainWindow::openRotorDial()
 
         auto* myGridEdit = new QLineEdit(
             settings.value(myGridKey, QString{}).toString(), m_rotorWindow);
-        // User-visible placeholder — a real example, not an "e.g." prefix.
-        myGridEdit->setPlaceholderText(QStringLiteral("JN67VV"));
+        // Deliberately NOT a realistic locator: a grey "JN67VV" in an
+        // empty field reads as already filled in, and the operator then
+        // wonders why every bearing is zero. Say what goes here instead.
+        myGridEdit->setPlaceholderText(QStringLiteral("your locator"));
         myGridEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
         gridRow->addWidget(myGridEdit, 1);
 
@@ -9130,7 +9164,7 @@ void MainWindow::openRotorDial()
         gridRow->addWidget(dxLabel);
 
         auto* dxGridEdit = new QLineEdit(m_rotorWindow);
-        dxGridEdit->setPlaceholderText(QStringLiteral("IO91WM"));
+        dxGridEdit->setPlaceholderText(QStringLiteral("their locator"));
         dxGridEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
         gridRow->addWidget(dxGridEdit, 1);
         col->addLayout(gridRow);
@@ -9146,14 +9180,26 @@ void MainWindow::openRotorDial()
         // Recompute on every edit of either field. Cheap, and it means
         // the dial answers while the operator is still typing the
         // fourth character rather than waiting for a button.
+        // A field the operator MUST fill gets an accent border until it
+        // is valid. A status line alone is easy to read past — the
+        // empty own-locator was mistaken for a filled one exactly once,
+        // and once is enough.
+        const QString kNeedsInput = QString::fromLatin1(Style::kLineEditStyle)
+            + QStringLiteral("QLineEdit { border: 1px solid %1; }")
+                  .arg(Style::kAmberBorder);
+
         auto applyGrids = [this, myGridEdit, dxGridEdit, gridStatus,
-                           myGridKey]() {
+                           myGridKey, kNeedsInput]() {
             const QString mine = myGridEdit->text().trimmed().toUpper();
             const QString dx   = dxGridEdit->text().trimmed().toUpper();
 
             AppSettings::instance().setValue(myGridKey, mine);
 
-            if (!isValidGridSquare(mine)) {
+            const bool myOk = isValidGridSquare(mine);
+            myGridEdit->setStyleSheet(
+                myOk ? QString::fromLatin1(Style::kLineEditStyle) : kNeedsInput);
+
+            if (!myOk) {
                 gridStatus->setText(mine.isEmpty()
                     ? QStringLiteral("Enter your own locator to get bearings")
                     : QStringLiteral("%1 is not a valid locator").arg(mine));
