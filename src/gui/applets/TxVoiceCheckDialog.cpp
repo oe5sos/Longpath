@@ -56,6 +56,12 @@ TxVoiceCheckDialog::TxVoiceCheckDialog(RadioModel* radio, QWidget* parent)
     setModal(false);
     m_recorder.setSampleRate(kMicRateHz);
     buildUi();
+    // The meter runs from the moment the window opens, not from the
+    // moment the operator ticks a box. Whatever else is wrong, "is the
+    // microphone reaching the transmit chain" should be answerable by
+    // looking, and the answer must not depend on having found the right
+    // control first.
+    startLevelWatch();
     refreshButtons();
 }
 
@@ -237,7 +243,6 @@ void TxVoiceCheckDialog::buildUi()
 
     connect(m_listenBox, &QCheckBox::toggled, this, [this](bool on) {
         setSelfMonitor(on);
-        if (on) { startLevelWatch(); } else { stopLevelWatch(); }
     });
 
     connect(m_volume, &QSlider::valueChanged, this, [this](int v) {
@@ -382,6 +387,7 @@ void TxVoiceCheckDialog::updateLevel()
         ? int(std::lround(std::clamp(20.0 * std::log10(peak), -60.0, 0.0)))
         : -60;
     m_levelBar->setValue(dbfs);
+    m_peakSeenDb = std::max(m_peakSeenDb, double(dbfs));
 
     // Give it a moment before complaining. The pump is woken by mic
     // frames from the radio, so the first block can be a few tens of
@@ -441,6 +447,9 @@ void TxVoiceCheckDialog::startRecording()
 
     m_haveResult = false;
     m_recorder.clear();
+    m_micBlocksAtStart = m_micBlocks.load(std::memory_order_acquire);
+    m_monBlocksAtStart = m_monBlocks.load(std::memory_order_acquire);
+    m_peakSeenDb = -60.0;
 
     // DirectConnection is mandatory, not a preference: the tap hands out
     // a pointer to its own scratch buffer, which the next block
@@ -477,12 +486,9 @@ void TxVoiceCheckDialog::stopRecording()
 
     if (m_radio && m_radio->txChannel()) {
         TxChannel* tx = m_radio->txChannel();
-        // The level meter wants the tap too; only close it if nobody
-        // else is listening.
-        if (!m_listenBox->isChecked()) {
-            tx->setMicTapEnabled(false);
-            tx->setOffAirMonitor(false);
-        }
+        // The tap stays on: the meter uses it too, and it is the only
+        // thing that can answer "is anything arriving at all".
+        if (!m_listenBox->isChecked()) { tx->setOffAirMonitor(false); }
     }
     QObject::disconnect(m_micTap);
 
@@ -523,9 +529,27 @@ void TxVoiceCheckDialog::runAnalysis()
 void TxVoiceCheckDialog::showFindings()
 {
     if (!m_result.valid) {
-        m_findings->setText(m_result.problem.isEmpty()
+        // The bare refusal is not enough. "Recording is too short" after
+        // a full fifteen seconds is a contradiction from the operator's
+        // side, and the only way to tell a silent microphone from a
+        // microphone that never arrived is to print what was counted.
+        const QString why = m_result.problem.isEmpty()
             ? QStringLiteral("The recording could not be analysed.")
-            : m_result.problem);
+            : m_result.problem;
+        m_findings->setText(QStringLiteral(
+            "%1\n\nWhat arrived: %2 s of audio (%3 samples) from %4 mic "
+            "blocks, %5 monitor blocks, peak %6 dBFS.\n"
+            "At 48 kHz a full %7 s take is about %8 blocks — anything far "
+            "short of that means the microphone is not reaching the "
+            "transmit chain, and the source is the place to look.")
+                .arg(why)
+                .arg(m_recorder.recordedSeconds(), 0, 'f', 2)
+                .arg(m_recorder.recordedFrames())
+                .arg(m_micBlocks.load(std::memory_order_acquire) - m_micBlocksAtStart)
+                .arg(m_monBlocks.load(std::memory_order_acquire) - m_monBlocksAtStart)
+                .arg(m_peakSeenDb, 0, 'f', 1)
+                .arg(kRecordSeconds)
+                .arg(kRecordSeconds * kMicRateHz / 64));
         return;
     }
     if (m_result.findings.isEmpty()) {

@@ -122,6 +122,14 @@ private:
 
     QTimer* m_levelTimer{nullptr};
     int     m_watchTicks{0};
+    // Loudest peak seen since the window opened, so a failed
+    // analysis can say whether there was ever any signal at all.
+    double  m_peakSeenDb{-60.0};
+    // Block counts at the moment recording started, so the report can
+    // say what arrived during the take rather than since the window
+    // opened.
+    unsigned m_micBlocksAtStart{0};
+    unsigned m_monBlocksAtStart{0};
 
     // QPointer, not a raw pointer: this window outlives nothing,
     // but the destructor restores the monitor through the radio
