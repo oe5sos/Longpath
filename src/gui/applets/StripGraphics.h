@@ -179,6 +179,13 @@ protected:
     void mouseMoveEvent(QMouseEvent* ev) override;
     void mouseReleaseEvent(QMouseEvent* ev) override;
     void wheelEvent(QWheelEvent* ev) override;
+    // Double-click a handle to change its shape — peak, low shelf, high
+    // shelf, notch. Double-click empty space to add a band there, and
+    // right-click a handle to take it away. Shape, position and count
+    // are the three things an equaliser has, and until now only two of
+    // them were reachable from the picture.
+    void mouseDoubleClickEvent(QMouseEvent* ev) override;
+    void contextMenuEvent(QContextMenuEvent* ev) override;
     void leaveEvent(QEvent* ev) override;
 
 private:

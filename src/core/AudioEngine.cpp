@@ -1114,7 +1114,13 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // Mute rides in as an argument rather than through setSliceMuted(),
     // which takes the slice-map mutex: this is the audio thread, and
     // CLAUDE.md's rule is that it never holds a lock.
-    m_masterMix.accumulate(sliceId, samples, frames, slice->muted());
+    // Muted at the accumulate rather than at the push, so the monitor —
+    // which is a different slot in the same mix — still reaches the
+    // speakers. See setRxMutedForMonitor().
+    m_masterMix.accumulate(sliceId, samples, frames,
+                           slice->muted()
+                               || m_rxMutedForMonitor.load(
+                                      std::memory_order_acquire));
 
     // Anti-VOX hears exactly what the speakers hear. From Thetis
     // cmaster.c:370-372 [v2.10.3.15], every sub-receiver's audio is handed
@@ -1603,6 +1609,15 @@ void AudioEngine::onActiveSliceChanged()
 }
 
 // Plan: 3M-1b E.2. Pre-code review §4.4.
+void AudioEngine::setRxMutedForMonitor(bool muted)
+{
+    // Mixer-level mute, so the slice fades over MasterMixer's ramp
+    // instead of stepping. A hard cut here would click every time the
+    // operator ticked the box, which is the sort of thing that gets
+    // blamed on the transmit chain.
+    m_rxMutedForMonitor.store(muted, std::memory_order_release);
+}
+
 void AudioEngine::setTxMonitorEnabled(bool enabled)
 {
     // Same acq_rel / acquire pairing as setMasterMuted above — the

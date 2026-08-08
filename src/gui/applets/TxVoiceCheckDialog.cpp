@@ -318,6 +318,11 @@ void TxVoiceCheckDialog::setSelfMonitor(bool on)
     // alone, and tst_tx_offair_monitor holds it there.
     tx->setOffAirMonitor(on);
     m_radio->transmitModel().setMonEnabled(on);
+    // And silence the band, or you are listening to your voice and the
+    // noise floor at once and can judge neither.
+    if (AudioEngine* ae = m_radio->audioEngine()) {
+        ae->setRxMutedForMonitor(on);
+    }
 }
 
 // ── Saying why nothing is happening ──────────────────────────────────

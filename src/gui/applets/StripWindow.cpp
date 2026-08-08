@@ -19,6 +19,7 @@
 
 #include <QInputDialog>
 #include <QMessageBox>
+#include "core/AudioEngine.h"
 #include "core/TxChannel.h"
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
@@ -234,6 +235,11 @@ void StripWindow::setSelfMonitor(bool on)
     // alone, and tst_tx_offair_monitor holds it there.
     tx->setOffAirMonitor(on);
     m_radio->transmitModel().setMonEnabled(on);
+    // And silence the band, or you are listening to your voice and the
+    // noise floor at once and can judge neither.
+    if (AudioEngine* ae = m_radio->audioEngine()) {
+        ae->setRxMutedForMonitor(on);
+    }
 }
 
 void StripWindow::persist()
@@ -686,9 +692,10 @@ QWidget* StripWindow::buildEqPanel()
         });
 
         auto* hint = new QLabel(QStringLiteral(
-            "Drag the dots: sideways for frequency, up and down for "
-            "gain, wheel for width. Amber is your voice, rose is where "
-            "it should sit, blue is the equaliser."), page);
+            "Drag a dot for frequency and gain · wheel for width · "
+            "double-click a dot to change its shape · double-click "
+            "empty space to add one · right-click the last one to "
+            "remove it."), page);
         hint->setWordWrap(true);
         hint->setStyleSheet(dimStyle());
         row->addWidget(hint, 1);
@@ -715,7 +722,9 @@ QWidget* StripWindow::buildEqPanel()
             "4 &nbsp;Press <i>Hold</i> to stop it moving.<br>"
             "5 &nbsp;Drag the blue dots onto the rose line. Rose is not "
             "your target voice — it is where the equaliser should sit to "
-            "get you there, so when blue lies on rose you are done."), page);
+            "get you there, so when blue lies on rose you are done.<br>"
+            "<br>The receiver is silenced while you listen, and comes "
+            "back when you stop."), page);
         guide->setWordWrap(true);
         guide->setStyleSheet(
             QStringLiteral("QLabel { color: %1; font-size: 11px; "

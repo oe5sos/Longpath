@@ -481,6 +481,27 @@ public:
     // AudioEngine). Sub-Phase 10 Task 10a; persistence + menu-bar
     // MasterOutputWidget wiring land in Task 10b.
     void setMasterMuted(bool muted);
+
+    /// Silence the receiver while the operator listens to themselves.
+    ///
+    /// Reported from the bench: with "Hear myself" on, the band noise
+    /// and your own voice arrive together and neither can be judged.
+    /// Muting the receiver by hand and forgetting to unmute it is worse,
+    /// so this is tied to the monitor and restored with it.
+    ///
+    /// NOT setMasterMuted(): that gates the push to the speakers, which
+    /// happens AFTER the master mix has been drained, so it would
+    /// silence the monitor along with the receiver. This gates the RX
+    /// accumulate instead — the monitor is a separate slot and goes
+    /// through untouched.
+    ///
+    /// The operator's own mute and volume are not read or written here.
+    /// A temporary state that borrows a control the operator also uses
+    /// is a state that eventually gets left behind in the wrong
+    /// position.
+    void setRxMutedForMonitor(bool muted);
+    bool rxMutedForMonitor() const
+    { return m_rxMutedForMonitor.load(std::memory_order_acquire); }
     bool masterMuted() const { return m_masterMuted.load(std::memory_order_acquire); }
 
     /// Update the cross-thread MOX-state mirror used by rxBlockReady.
@@ -839,6 +860,7 @@ private:
     // Written by setTxMonitorEnabled() on the main thread, read by the
     // audio thread in E.3's txMonitorBlockReady slot. Same acq_rel /
     // acquire pairing as m_masterMuted above.
+    std::atomic<bool>  m_rxMutedForMonitor{false};
     std::atomic<bool>  m_txMonitorEnabled{false};  // default off per plan §0 row 9
     // Default 0.5f — mirrors the fixed coefficient used in Thetis audio.cs
     // for the aaudio mix path; NereusSDR exposes this as user-adjustable

@@ -18,6 +18,7 @@
 
 #include <QEvent>
 #include <QMouseEvent>
+#include <QContextMenuEvent>
 #include <QWheelEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -618,6 +619,85 @@ void StripEqCurve::wheelEvent(QWheelEvent* ev)
     ev->accept();
 }
 
+void StripEqCurve::mouseDoubleClickEvent(QMouseEvent* ev)
+{
+    if (!m_chain) { return; }
+    const int band = handleAt(ev->pos());
+
+    if (band < 0) {
+        // Empty space: add a band here. The count is the third thing an
+        // equaliser has, and an operator who can see a problem the
+        // existing bands cannot reach should be able to put one where
+        // it is rather than moving two others to approximate it.
+        const int n = m_chain->eq().activeBandCount();
+        if (n >= ClientEq::kMaxBands) { return; }
+        const QRect r = plotRect();
+        ClientEq::BandParams p;
+        p.type    = ClientEq::FilterType::Peak;
+        p.freqHz  = float(std::clamp(hzForX(ev->position().x(), r),
+                                     20.0, 12000.0));
+        p.gainDb  = float(std::clamp(dbForY(ev->position().y(), r),
+                                     -kRangeDb, kRangeDb));
+        p.q       = 1.0f;
+        p.enabled = true;
+        m_chain->eq().setBand(n, p);
+        m_chain->eq().setActiveBandCount(n + 1);
+        emit bandChanged(n);
+        update();
+        return;
+    }
+
+    // On a handle: cycle its shape. A peak fixes one spot, a shelf
+    // tilts everything past it, a notch removes a tone — three
+    // different jobs that no amount of dragging a peak will do.
+    ClientEq::BandParams p = m_chain->eq().band(band);
+    switch (p.type) {
+    case ClientEq::FilterType::Peak:
+        p.type = ClientEq::FilterType::LowShelf;  break;
+    case ClientEq::FilterType::LowShelf:
+        p.type = ClientEq::FilterType::HighShelf; break;
+    case ClientEq::FilterType::HighShelf:
+        // Round trip back to a peak, but narrow — the notch a peak
+        // becomes when you pull it down hard, offered directly.
+        p.type = ClientEq::FilterType::Peak;
+        p.q    = 6.0f;
+        break;
+    case ClientEq::FilterType::HighPass:
+    case ClientEq::FilterType::LowPass:
+        // The high-pass keeps its job. Turning the one control that
+        // removes rumble into a shelf by mis-clicking would be a poor
+        // trade for the convenience.
+        return;
+    }
+    p.enabled = true;
+    m_chain->eq().setBand(band, p);
+    emit bandChanged(band);
+    update();
+}
+
+void StripEqCurve::contextMenuEvent(QContextMenuEvent* ev)
+{
+    if (!m_chain) { return; }
+    const int band = handleAt(ev->pos());
+    // Only the bands added on top of the fixed layout can go. The
+    // high-pass, the three mains notches and the six shaping bands are
+    // referred to by index from the panel, the tuner and the settings
+    // file; removing one would renumber the rest and quietly move
+    // somebody else's setting.
+    if (band < kFirstToneBand + 6) { ev->ignore(); return; }
+
+    const int n = m_chain->eq().activeBandCount();
+    if (band != n - 1) {
+        // Only the last one, for the same reason.
+        ev->ignore();
+        return;
+    }
+    m_chain->eq().setActiveBandCount(n - 1);
+    emit bandChanged(band);
+    update();
+    ev->accept();
+}
+
 void StripEqCurve::mouseReleaseEvent(QMouseEvent*)
 {
     if (m_dragBand >= 0) {
@@ -919,10 +999,21 @@ void StripEqCurve::paintEvent(QPaintEvent*)
 
         if (active) {
             const ClientEq::BandParams bp = eq.band(b);
+            auto shapeName = [](ClientEq::FilterType t) {
+                switch (t) {
+                case ClientEq::FilterType::Peak:      return "peak";
+                case ClientEq::FilterType::LowShelf:  return "low shelf";
+                case ClientEq::FilterType::HighShelf: return "high shelf";
+                case ClientEq::FilterType::HighPass:  return "high-pass";
+                case ClientEq::FilterType::LowPass:   return "low-pass";
+                }
+                return "";
+            };
             const QString label = bp.type == ClientEq::FilterType::HighPass
-                ? QStringLiteral("%1 Hz  %2 dB/oct")
+                ? QStringLiteral("high-pass  %1 Hz  %2 dB/oct")
                       .arg(bp.freqHz, 0, 'f', 0).arg(bp.slopeDbPerOct)
-                : QStringLiteral("%1 Hz  %2 dB  Q %3")
+                : QStringLiteral("%1  %2 Hz  %3 dB  Q %4")
+                      .arg(QString::fromLatin1(shapeName(bp.type)))
                       .arg(bp.freqHz, 0, 'f', 0).arg(bp.gainDb, 0, 'f', 1)
                       .arg(bp.q, 0, 'f', 2);
             p.setPen(c(Style::kTextPrimary));
