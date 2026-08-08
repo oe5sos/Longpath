@@ -4653,6 +4653,11 @@ nereus_add_test(tst_strip_tuner)
 #    never claiming more than it has --
 nereus_add_test(tst_mic_spectrum)
 
+# -- Loudness matching: the two weighting curves against the published
+#    tables in IEC 61672 and ITU-R BS.1770, and the properties the
+#    average must have whatever the weighting is --
+nereus_add_test(tst_eq_loudness)
+
 # -- Match-EQ from a recording. Real WAV bytes, including the chunk
 #    order that breaks every reader assuming byte 44, and a tone that
 #    has to come back at its own frequency and not an octave away --

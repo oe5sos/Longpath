@@ -338,6 +338,7 @@ void StripEqCurve::setSmoothing(bool on)
 
 void StripEqCurve::setShowTarget(bool on) { m_showTarget = on; update(); }
 void StripEqCurve::setShowResult(bool on) { m_showResult = on; update(); }
+void StripEqCurve::setShowBands(bool on) { m_showBands = on; update(); }
 
 void StripEqCurve::setProfile(const QString& name)
 {
@@ -610,6 +611,9 @@ void StripEqCurve::mousePressEvent(QMouseEvent* ev)
 
 void StripEqCurve::mouseMoveEvent(QMouseEvent* ev)
 {
+    m_cursor     = ev->pos();
+    m_haveCursor = true;
+
     if (m_dragTarget >= 0) {
         const QRect r = plotRect();
         QVector<double> v = StripTargets::userTarget();
@@ -630,8 +634,11 @@ void StripEqCurve::mouseMoveEvent(QMouseEvent* ev)
         if (h != m_hoverBand) {
             m_hoverBand = h;
             setCursor(h >= 0 ? Qt::OpenHandCursor : Qt::ArrowCursor);
-            update();
         }
+        // Repaint on every move, not only when the hovered band
+        // changes: the readout follows the pointer and a readout that
+        // only updates when you cross a handle is worse than none.
+        update();
         return;
     }
     if (!m_chain) { return; }
@@ -779,7 +786,8 @@ void StripEqCurve::mouseReleaseEvent(QMouseEvent*)
 
 void StripEqCurve::leaveEvent(QEvent*)
 {
-    m_hoverBand = -1;
+    m_hoverBand  = -1;
+    m_haveCursor = false;
     setCursor(Qt::ArrowCursor);
     update();
 }
@@ -1076,6 +1084,42 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     const bool eqOn = m_chain->stageEnabled(StripChain::Stage::Eq)
                       && m_chain->isEnabled();
 
+    // ── Each band on its own, behind the sum ─────────────────────────
+    //
+    // Ten overlapping bands make a composite curve that cannot be read
+    // backwards: a dip at 700 Hz is either one band cutting or two
+    // neighbours boosting around it, and those want opposite
+    // corrections. Faint, so they inform without competing with the
+    // line that says what actually happens; the one under the pointer
+    // brightens, which is how you find out which handle owns a feature.
+    p.setClipRect(r);
+    if (m_showBands && eqOn) {
+        for (int b : handleBands()) {
+            if (b >= bands) { continue; }
+            const ClientEq::BandParams bp = eq.band(b);
+            if (!bp.enabled) { continue; }
+            // A band sitting at unity draws a straight line along zero
+            // and adds nothing but clutter.
+            if (bp.type != ClientEq::FilterType::HighPass
+                && std::abs(double(bp.gainDb)) < 0.05) { continue; }
+
+            QPainterPath bpath;
+            for (int x = r.left(); x <= r.right(); ++x) {
+                const double hz = hzForX(x, r);
+                const double db = double(ClientEq::bandMagnitudeDb(
+                    bp, float(hz), eq.sampleRate(), eq.filterFamily()));
+                const QPointF pt(x, yForDb(db, r));
+                if (x == r.left()) { bpath.moveTo(pt); }
+                else               { bpath.lineTo(pt); }
+            }
+            const bool lit = (b == m_dragBand) || (b == m_hoverBand);
+            QColor col = c(Style::kAccent);
+            col.setAlpha(lit ? 190 : 70);
+            p.setPen(QPen(col, lit ? 1.6 : 1.0));
+            p.drawPath(bpath);
+        }
+    }
+
     QPainterPath path;
     const int steps = std::max(2, r.width());
     for (int i = 0; i <= steps; ++i) {
@@ -1088,7 +1132,26 @@ void StripEqCurve::paintEvent(QPaintEvent*)
         const QPointF pt(xForHz(hz, r), yForDb(db, r));
         if (i == 0) { path.moveTo(pt); } else { path.lineTo(pt); }
     }
-    p.setClipRect(r);
+
+    // Filled back to the zero line, so boost and cut read as areas
+    // rather than as a wiggle to be traced. Faint, and only when the
+    // equaliser is actually in circuit — a filled shape is a claim that
+    // something is happening.
+    if (eqOn) {
+        const double zeroY = yForDb(0.0, r);
+        QPainterPath fill = path;
+        fill.lineTo(QPointF(r.right(), zeroY));
+        fill.lineTo(QPointF(r.left(), zeroY));
+        fill.closeSubpath();
+        QLinearGradient g(0, r.top(), 0, r.bottom());
+        QColor top = c(Style::kAccent);   top.setAlpha(70);
+        QColor mid = c(Style::kAccent);   mid.setAlpha(10);
+        g.setColorAt(0.0, top);
+        g.setColorAt(0.5, mid);
+        g.setColorAt(1.0, top);
+        p.fillPath(fill, g);
+    }
+
     p.setPen(QPen(eqOn ? c(Style::kAccent) : c(Style::kTextInactive),
                   eqOn ? 2.0 : 1.0));
     p.drawPath(path);
@@ -1154,6 +1217,32 @@ void StripEqCurve::paintEvent(QPaintEvent*)
 
         if (active) {
             const ClientEq::BandParams bp = eq.band(b);
+
+            // ── How wide is this band? ───────────────────────────
+            //
+            // Q is a number nobody has an intuition for. Drawn as the
+            // span between the half-gain points it becomes the thing
+            // it actually is: how much of the voice this handle
+            // touches. Only on the active band — ten brackets at once
+            // would be a picture of brackets.
+            if (bp.type == ClientEq::FilterType::Peak
+                && std::abs(double(bp.gainDb)) > 0.05) {
+                // Bandwidth in octaves from Q, the standard relation.
+                const double q  = std::max(0.1, double(bp.q));
+                const double bw = (2.0 / std::log(2.0))
+                    * std::asinh(1.0 / (2.0 * q));
+                const double lo = double(bp.freqHz) * std::pow(2.0, -bw / 2.0);
+                const double hi = double(bp.freqHz) * std::pow(2.0,  bw / 2.0);
+                const double y  = yForDb(double(bp.gainDb) / 2.0, r);
+                const double x1 = xForHz(std::max(kMinHz, lo), r);
+                const double x2 = xForHz(std::min(kMaxHz, hi), r);
+                QColor bracket = c(Style::kAccent);
+                bracket.setAlpha(150);
+                p.setPen(QPen(bracket, 1.0));
+                p.drawLine(QPointF(x1, y), QPointF(x2, y));
+                p.drawLine(QPointF(x1, y - 3), QPointF(x1, y + 3));
+                p.drawLine(QPointF(x2, y - 3), QPointF(x2, y + 3));
+            }
             auto shapeName = [](ClientEq::FilterType t) {
                 switch (t) {
                 case ClientEq::FilterType::Peak:      return "peak";
@@ -1186,6 +1275,67 @@ void StripEqCurve::paintEvent(QPaintEvent*)
         p.setPen(c(Style::kTextSecondary));
         p.drawText(r.adjusted(0, 0, -6, -4), Qt::AlignRight | Qt::AlignBottom,
                    QStringLiteral("not in circuit"));
+    }
+
+    // ── What is under the pointer ────────────────────────────────────
+    //
+    // A frequency axis that spans nine octaves in five hundred pixels
+    // cannot be read by eye: an estimate off a log scale is routinely a
+    // third of an octave out, and it is worst in the middle of the range
+    // where every decision gets made. So the picture says where the
+    // pointer is, in the two units the operator is thinking in.
+    if (m_haveCursor && r.contains(m_cursor)) {
+        p.setClipRect(r);
+        QColor guide = c(Style::kTextInactive);
+        guide.setAlpha(90);
+        p.setPen(QPen(guide, 1, Qt::DotLine));
+        p.drawLine(m_cursor.x(), r.top(), m_cursor.x(), r.bottom());
+        p.drawLine(r.left(), m_cursor.y(), r.right(), m_cursor.y());
+        p.setClipping(false);
+
+        const double hz = hzForX(m_cursor.x(), r);
+        const QString text = QStringLiteral("%1  %2 dB")
+            .arg(hz >= 1000.0
+                     ? QStringLiteral("%1 kHz").arg(hz / 1000.0, 0, 'f', 2)
+                     : QStringLiteral("%1 Hz").arg(hz, 0, 'f', 0))
+            .arg(dbForY(m_cursor.y(), r), 0, 'f', 1);
+
+        QFont rf = p.font();
+        rf.setPointSizeF(8.5);
+        p.setFont(rf);
+        const int w = QFontMetrics(rf).horizontalAdvance(text) + 12;
+        const QRect box(r.right() - w - 4, r.top() + 3, w, 16);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 150));
+        p.drawRoundedRect(box, 3, 3);
+        p.setPen(c(Style::kTextPrimary));
+        p.drawText(box, Qt::AlignCenter, text);
+    }
+
+    // ── The trim the equaliser is taking off ─────────────────────────
+    //
+    // Shown because it is a gain change nobody asked for by hand. It is
+    // the right thing to do — see EqLoudness.h — but a control that
+    // quietly moves the level and does not say so is a control that
+    // gets blamed for something else later.
+    if (eqOn) {
+        const double trim = 20.0 * std::log10(
+            std::max(1e-6, double(eq.masterGain())));
+        if (std::abs(trim) > 0.05) {
+            QFont tf = p.font();
+            tf.setPointSizeF(8.0);
+            p.setFont(tf);
+            p.setPen(c(Style::kTextInactive));
+            // Below where the pointer readout sits, so the two never
+            // overlap when the operator is hovering — which is exactly
+            // when both are wanted.
+            p.drawText(QRect(r.right() - 180, r.top() + 21, 176, 14),
+                       Qt::AlignRight | Qt::AlignVCenter,
+                       QStringLiteral("loudness matched  %1%2 dB")
+                           .arg(trim > 0 ? QStringLiteral("+")
+                                         : QString())
+                           .arg(trim, 0, 'f', 1));
+        }
     }
 
     // A key, because three curves in three colours is two more than

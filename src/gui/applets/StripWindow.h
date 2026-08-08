@@ -137,6 +137,20 @@ private:
     // without also being remembered.
     void persist();
 
+    // ── Loudness matching ────────────────────────────────────────────
+    //
+    // Recompute the output trim so that switching the equaliser in and
+    // out changes the shape and not the level. Called after anything
+    // that can move a band: a drag, a table edit, a preset, a restore.
+    //
+    // On by default, and it should be: louder always sounds better, so
+    // an unmatched comparison is not a comparison. It is a switch rather
+    // than a rule because an operator who has set their gain staging by
+    // hand around a particular curve is entitled to keep it.
+    void applyLoudnessMatch();
+    bool m_matchLoudness{true};
+    QCheckBox* m_matchBox{nullptr};
+
     // A control's opening position: the chain's value when there is a
     // chain, the literal default otherwise. See the note on the
     // definition — without it, persistence undoes itself on the first

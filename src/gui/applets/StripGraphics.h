@@ -164,6 +164,18 @@ public:
     void setShowResult(bool on);
     bool showResult() const noexcept { return m_showResult; }
 
+    // ── Each band on its own ─────────────────────────────────────────
+    //
+    // The composite curve says what the equaliser does; it does not say
+    // WHICH BAND is doing it. With ten bands overlapping, a dip at
+    // 700 Hz can be one band cutting or two neighbours boosting around
+    // it, and those want opposite corrections. Drawing each band's own
+    // response faintly behind the sum answers that at a glance, which is
+    // why every professional equaliser made in the last fifteen years
+    // does it.
+    void setShowBands(bool on);
+    bool showBands() const noexcept { return m_showBands; }
+
     // Which target the rose line aims at. Changing it redraws; it does
     // not touch the equaliser.
     void setProfile(const QString& name);
@@ -262,6 +274,7 @@ private:
     bool m_smooth{true};
     bool m_showTarget{true};
     bool m_showResult{true};
+    bool m_showBands{true};
     bool m_haveMag{false};
 
     // Dragging the rose line itself, when the profile is the
@@ -274,6 +287,13 @@ private:
 
     int m_dragBand{-1};
     int m_hoverBand{-1};
+
+    // Where the pointer is, for the readout. A curve without one makes
+    // the operator estimate frequency off a log axis by eye, and the
+    // estimate is wrong by a third of an octave in the middle of the
+    // range where it matters most.
+    QPoint m_cursor{-1, -1};
+    bool   m_haveCursor{false};
 
     // The level the spectrum is drawn relative to, kept from the last
     // time there was speech. Without this the picture vanishes between

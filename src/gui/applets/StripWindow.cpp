@@ -15,6 +15,8 @@
 
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
+#include "core/AppSettings.h"
+#include "core/strip/EqLoudness.h"
 #include "core/strip/StripTargets.h"
 #include "core/strip/TargetFromFile.h"
 
@@ -134,7 +136,10 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
         seedEqLayout();
         m_hadChain = true;
     }
+    m_matchLoudness = AppSettings::instance()
+        .value(QStringLiteral("ChannelStrip/MatchLoudness"), true).toBool();
     buildUi();
+    applyLoudnessMatch();
     refreshChainRow();
 }
 
@@ -154,6 +159,7 @@ void StripWindow::adoptChainIfArrived()
     StripSettings::restore(*c);
     seedEqLayout();
     reloadControls();
+    applyLoudnessMatch();
     refreshChainRow();
     if (m_note) {
         m_note->setText(QStringLiteral(
@@ -251,7 +257,14 @@ void StripWindow::setSelfMonitor(bool on)
 
 void StripWindow::persist()
 {
-    if (StripChain* c = chain()) { StripSettings::save(*c); }
+    StripChain* c = chain();
+    if (!c) { return; }
+    // Recomputed before saving, not after: the trim is part of what
+    // gets written, so a curve restored next session comes back already
+    // matched instead of arriving loud and being corrected on the first
+    // nudge of a slider.
+    if (m_matchLoudness) { EqLoudness::apply(c->eq()); }
+    StripSettings::save(*c);
 }
 
 StripChain* StripWindow::chain() const
@@ -1041,6 +1054,40 @@ QWidget* StripWindow::buildEqPanel()
             if (m_eqCurve) { m_eqCurve->setShowResult(on); }
         });
 
+        // Each band drawn on its own, faintly, behind the sum. With ten
+        // overlapping bands the composite curve cannot be read
+        // backwards — a dip is either one band cutting or two
+        // neighbours boosting, and those want opposite corrections.
+        auto* ghosts = new QCheckBox(QStringLiteral("Bands"), page);
+        ghosts->setChecked(true);
+        ghosts->setToolTip(QStringLiteral(
+            "Show each band's own response behind the sum. The one under "
+            "the pointer brightens, which is how you find out which "
+            "handle owns a bump."));
+        row->addWidget(ghosts);
+        connect(ghosts, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_eqCurve) { m_eqCurve->setShowBands(on); }
+        });
+
+        // ── Loudness matching ────────────────────────────────────────
+        m_matchBox = new QCheckBox(QStringLiteral("Match loudness"), page);
+        m_matchBox->setChecked(m_matchLoudness);
+        m_matchBox->setToolTip(QStringLiteral(
+            "Take off at the output whatever the curve adds, so that "
+            "switching the equaliser in and out changes the shape and "
+            "not the level.\n\nLouder always sounds better — reliably, "
+            "in every listening test ever run, and regardless of whether "
+            "it actually is better. Without this, every judgement you "
+            "make here is a judgement about which side was louder."));
+        row->addWidget(m_matchBox);
+        connect(m_matchBox, &QCheckBox::toggled, this, [this](bool on) {
+            m_matchLoudness = on;
+            AppSettings::instance().setValue(
+                QStringLiteral("ChannelStrip/MatchLoudness"), on);
+            applyLoudnessMatch();
+            persist();
+        });
+
         auto* hint = new QLabel(QStringLiteral(
             "Drag a dot for frequency and gain · wheel for width · "
             "double-click a dot to change its shape · double-click "
@@ -1076,6 +1123,18 @@ QWidget* StripWindow::buildEqPanel()
             "6 &nbsp;Watch the green line: that is your voice with the "
             "equaliser applied, so it is where you will actually end "
             "up.<br>"
+            "<br><b>Match loudness</b> is on, and should be. Whatever the "
+            "curve adds is taken off again at the output, so switching "
+            "the equaliser in and out changes the shape and not the "
+            "level. Without it you would be comparing loudness — louder "
+            "always wins, whether or not it is better.<br>"
+            "<b>Bands</b> draws each band's own response faintly behind "
+            "the sum. With ten of them overlapping, a dip is either one "
+            "band cutting or two neighbours boosting, and those want "
+            "opposite corrections.<br>"
+            "Move the pointer over the picture for the frequency and "
+            "level under it; the active handle also shows how wide it "
+            "is.<br>"
             "<br>None of the six built-in shapes is your voice or your "
             "microphone. Pick <i>Mine</i> and the rose line grows its own "
             "handles — copy the nearest profile, take your own average, or "
@@ -1829,6 +1888,9 @@ void StripWindow::applyPreset(const QString& name)
     // that cannot drift: each control reads its own value from the
     // chain when it is built, so there is no second copy to forget.
     reloadControls();
+    // A preset replaces every band, so the trim it was saved with is
+    // the trim for a different curve.
+    applyLoudnessMatch();
     refreshChainRow();
     persist();
 }
@@ -1937,6 +1999,21 @@ void StripWindow::targetFromRecording()
             "built-in curves can say.")
             .arg(StripTargets::activeUserSlot() == 1
                      ? QStringLiteral("B") : QStringLiteral("A")));
+}
+
+void StripWindow::applyLoudnessMatch()
+{
+    StripChain* ch = chain();
+    if (!ch) { return; }
+    if (m_matchLoudness) {
+        EqLoudness::apply(ch->eq());
+    } else {
+        // Unity, not "whatever it was". Turning the switch off must
+        // leave a state the operator can reason about, and a leftover
+        // trim from the last curve is not one.
+        ch->eq().setMasterGain(1.0f);
+    }
+    if (m_eqCurve) { m_eqCurve->refresh(); }
 }
 
 void StripWindow::refreshChainRow()
