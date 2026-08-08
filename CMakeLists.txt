@@ -943,6 +943,7 @@ set(GUI_SOURCES
     src/core/strip/ClientFinalLimiter.cpp
     # The runner: the eight stages in order, with the master bypass the
     # operator's A/B comparison depends on.
+    src/core/strip/MicSpectrum.cpp
     src/core/strip/StripChain.cpp
     src/core/strip/StripSettings.cpp
     src/core/strip/StripTuner.cpp

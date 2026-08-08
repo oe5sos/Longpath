@@ -36,11 +36,13 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
+#include "core/strip/MicSpectrum.h"
 #include "core/strip/StripChain.h"
 
 #include <QWidget>
 
 #include <array>
+#include <vector>
 
 namespace NereusSDR {
 
@@ -120,25 +122,85 @@ public:
 
     void setChain(StripChain* chain);
 
-    // Repaint from the chain's current bands. Called after any EQ
-    // control moves; the curve is computed from ClientEq's own static
-    // magnitude function, so it cannot disagree with the filter.
+    // The live microphone, drawn behind the curve. Not owned; null
+    // simply means no spectrum is shown.
+    void setSpectrum(const MicSpectrum* spec);
+
+    // Recompute the spectrum from the tap. Called from the meter timer.
+    void tick();
+
+    // Freeze what is on screen. The whole reason for this control: you
+    // cannot aim an equaliser at a shape that is moving. Speak a
+    // sentence, press Hold, and then shape the curve against the voice
+    // that was actually there rather than against whatever the last
+    // hundred milliseconds happened to contain.
+    void setHeld(bool on);
+    bool isHeld() const noexcept { return m_held; }
+
+    // Repaint from the chain's current bands. The curve is computed
+    // from ClientEq's own static magnitude function, so it cannot
+    // disagree with the filter.
     void refresh();
+
+    // Three sentences naming the biggest differences between the held
+    // spectrum and the target, worst first. Empty when nothing is held
+    // — advice from a moving picture would change while it was read.
+    QStringList tips() const;
 
     QSize sizeHint() const override;
 
+signals:
+    // A band was dragged. The window persists and redraws; this widget
+    // deliberately does not save anything itself, so there is one place
+    // that decides when settings are written.
+    void bandChanged(int bandIndex);
+
 protected:
     void paintEvent(QPaintEvent*) override;
+    void mousePressEvent(QMouseEvent* ev) override;
+    void mouseMoveEvent(QMouseEvent* ev) override;
+    void mouseReleaseEvent(QMouseEvent* ev) override;
+    void leaveEvent(QEvent* ev) override;
 
 private:
     static constexpr double kMinHz  = 20.0;
     static constexpr double kMaxHz  = 16000.0;
     static constexpr double kRangeDb = 18.0;   // ± on the vertical axis
 
+    // 4096 at 48 kHz is 12 Hz per bin — enough to separate a 50 Hz hum
+    // from the voice above it, which is the one thing this picture
+    // exists to make visible.
+    static constexpr int kFft = 4096;
+
+    // Which bands get a handle. The high-pass and the three tone
+    // controls; the hum notches deliberately do not, because dragging
+    // a notch by hand is a worse way to place it than typing 50 or 60.
+    static constexpr int kHandleBands[4] = {0, 4, 5, 6};
+
     double xForHz(double hz, const QRect& r) const;
     double yForDb(double db, const QRect& r) const;
+    double hzForX(double x, const QRect& r) const;
+    double dbForY(double y, const QRect& r) const;
+    QRect  plotRect() const;
+    int    handleAt(const QPoint& p) const;
+    QPointF handlePos(int band, const QRect& r) const;
 
-    StripChain* m_chain{nullptr};
+    void recomputeSpectrum();
+
+    StripChain*        m_chain{nullptr};
+    const MicSpectrum* m_spec{nullptr};
+
+    // Magnitude in dB per FFT bin, exponentially averaged. Averaged
+    // rather than instantaneous because a single frame of speech is
+    // mostly gaps between harmonics, and aiming an equaliser at those
+    // gaps is aiming at nothing.
+    std::vector<double> m_mag;
+    std::vector<double> m_heldMag;
+    bool m_held{false};
+    bool m_haveMag{false};
+
+    int m_dragBand{-1};
+    int m_hoverBand{-1};
 };
 
 } // namespace NereusSDR

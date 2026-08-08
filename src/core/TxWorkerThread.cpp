@@ -885,6 +885,18 @@ void TxWorkerThread::dispatchOneBlock()
     // Switched off, this is one null check and one atomic load. Switched
     // on, it is a function from samples to samples: it reads nothing
     // that could key the radio and writes nothing but m_in's I channel.
+    // The spectrum is fed whether or not the strip is switched on. It
+    // is what the operator looks at to decide, so gating it on the
+    // decision would be circular.
+    if (m_stripChain != nullptr
+        && static_cast<int>(m_stripBuf.size()) >= kBlockFrames) {
+        for (int i = 0; i < kBlockFrames; ++i) {
+            m_stripBuf[static_cast<size_t>(i)] =
+                static_cast<float>(m_in[static_cast<size_t>(2 * i)]);
+        }
+        m_stripChain->micSpectrum().feed(m_stripBuf.data(), kBlockFrames);
+    }
+
     if (m_stripChain != nullptr && m_stripChain->isEnabled()
         && static_cast<int>(m_stripBuf.size()) >= kBlockFrames) {
         for (int i = 0; i < kBlockFrames; ++i) {

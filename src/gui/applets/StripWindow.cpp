@@ -478,7 +478,61 @@ QWidget* StripWindow::buildEqPanel()
     // being three numbers and become a shape you can aim.
     m_eqCurve = new StripEqCurve(page);
     m_eqCurve->setChain(chain());
+    if (StripChain* ch = chain()) { m_eqCurve->setSpectrum(&ch->micSpectrum()); }
     outer->addWidget(m_eqCurve);
+
+    // Dragging the curve writes straight into the chain; the window
+    // decides when that reaches the settings file, so there is one
+    // place that saves rather than one per control.
+    connect(m_eqCurve, &StripEqCurve::bandChanged, this, [this](int) {
+        persist();
+    });
+
+    {
+        auto* row = new QHBoxLayout;
+        m_holdBtn = new QPushButton(QStringLiteral("Hold"), page);
+        m_holdBtn->setCheckable(true);
+        m_holdBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_holdBtn->setToolTip(QStringLiteral(
+            "Freeze the voice behind the curve. You cannot aim an "
+            "equaliser at a shape that is moving — speak a sentence, "
+            "press Hold, then drag the dots onto what you froze."));
+        row->addWidget(m_holdBtn);
+
+        auto* hint = new QLabel(QStringLiteral(
+            "Drag the dots: sideways for frequency, up and down for "
+            "gain. The leftmost is the high-pass and only moves "
+            "sideways."), page);
+        hint->setWordWrap(true);
+        hint->setStyleSheet(dimStyle());
+        row->addWidget(hint, 1);
+        outer->addLayout(row);
+
+        m_tips = new QLabel(page);
+        m_tips->setWordWrap(true);
+        m_tips->setStyleSheet(dimStyle());
+        outer->addWidget(m_tips);
+
+        connect(m_holdBtn, &QPushButton::toggled, this, [this](bool on) {
+            if (!m_eqCurve) { return; }
+            m_eqCurve->setHeld(on);
+            if (!on) { m_tips->clear(); return; }
+
+            const QStringList t = m_eqCurve->tips();
+            if (t.isEmpty()) {
+                m_tips->setText(QStringLiteral(
+                    "Nothing stands out — what you froze is already close "
+                    "to a shape that carries. Either speak a little longer "
+                    "before holding, or leave it alone."));
+                return;
+            }
+            QString text;
+            for (int i = 0; i < t.size(); ++i) {
+                text += QStringLiteral("%1. %2\n").arg(i + 1).arg(t.at(i));
+            }
+            m_tips->setText(text.trimmed());
+        });
+    }
 
     auto* body = new QWidget(page);
     outer->addWidget(body, 1);
@@ -1152,6 +1206,8 @@ void StripWindow::reloadControls()
         w->deleteLater();
     }
     m_eqCurve = nullptr;          // owned by the page just removed
+    m_holdBtn = nullptr;
+    m_tips    = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
     m_stageBoxes.fill(nullptr);
 
@@ -1200,6 +1256,7 @@ void StripWindow::refreshMeters()
     // The tiles are the primary reading; the text below each panel is
     // for someone who wants the number rather than the shape.
     if (m_levels) { m_levels->tick(); }
+    if (m_eqCurve) { m_eqCurve->tick(); }
     if (m_chainView) {
         m_chainView->setReduction(StripChain::Stage::Gate,
                                   c->gate().gainReductionDb());

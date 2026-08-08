@@ -51,6 +51,7 @@
 #include "core/strip/ClientPudu.h"
 #include "core/strip/ClientReverb.h"
 #include "core/strip/ClientTube.h"
+#include "core/strip/MicSpectrum.h"
 
 #include <array>
 #include <atomic>
@@ -114,6 +115,20 @@ public:
     float inputPeakDb() const noexcept;
     float outputPeakDb() const noexcept;
 
+    // ── The microphone, for drawing over ─────────────────────────────
+    //
+    // Fed by whoever owns the mic tap, read by the EQ curve. It lives
+    // here rather than in the window because the window is opened and
+    // closed and the spectrum should not restart each time — an
+    // operator who closes the strip to look at something else and comes
+    // back should not have to speak for two seconds again.
+    //
+    // Deliberately NOT fed from processMono(): that only runs when the
+    // strip is switched on, and the whole point of the picture is to
+    // decide whether to switch it on.
+    MicSpectrum&       micSpectrum()       noexcept { return m_micSpectrum; }
+    const MicSpectrum& micSpectrum() const noexcept { return m_micSpectrum; }
+
     // The stages themselves, for the panels to bind to. Not owned by
     // the caller and not valid across a prepare().
     ClientGate&         gate()    noexcept { return m_gate; }
@@ -150,6 +165,7 @@ private:
     ClientPudu         m_pudu;
     ClientReverb       m_reverb;
     ClientFinalLimiter m_limiter;
+    MicSpectrum        m_micSpectrum;
 };
 
 } // namespace NereusSDR

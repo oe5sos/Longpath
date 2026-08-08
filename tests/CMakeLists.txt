@@ -4649,6 +4649,10 @@ nereus_add_test(tst_strip_chain)
 #    decisions as pure functions, and the rule that it explains itself --
 nereus_add_test(tst_strip_tuner)
 
+# -- The ring behind the EQ picture: oldest-first, newest-kept, and
+#    never claiming more than it has --
+nereus_add_test(tst_mic_spectrum)
+
 # -- The one rule of the off-air monitor: it may be heard, it may not be
 #    transmitted. Truth table over both listening gates --
 nereus_add_test(tst_tx_offair_monitor)

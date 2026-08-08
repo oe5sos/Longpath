@@ -128,6 +128,8 @@ private:
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_compareBtn{nullptr};
+    QPushButton*    m_holdBtn{nullptr};
+    QLabel*         m_tips{nullptr};
     // What the master switch was before A/B was pressed, so releasing
     // it puts things back rather than leaving the strip in whichever
     // state the comparison happened to end on.
