@@ -48,6 +48,8 @@
 #include <QMetaObject>
 #include <QPointer>
 
+#include <atomic>
+
 class QCheckBox;
 class QLabel;
 class QProgressBar;
@@ -92,6 +94,35 @@ private:
     void fillAdvancedTable();
     void refreshButtons();
 
+    // ── Saying why nothing is happening ──────────────────────────────
+    //
+    // Hearing yourself needs six things to be true at once: a radio
+    // connection, a running transmit pump, mic blocks arriving, the
+    // right mic source selected, the mic not muted, and the monitor
+    // mixed into the speakers. Shipping one checkbox over six invisible
+    // preconditions means that when it does not work the operator has
+    // nowhere to start — which is exactly what happened.
+    //
+    // So the taps are always listening while this window is open, and
+    // the watchdog reports the first broken link rather than the last.
+    void startLevelWatch();
+    void stopLevelWatch();
+    void updateLevel();
+    QString micSourceName() const;
+
+    QMetaObject::Connection m_monitorTap;
+    QMetaObject::Connection m_levelTap;
+
+    // Written on the transmit worker thread, read on the GUI thread.
+    std::atomic<unsigned> m_micBlocks{0};
+    std::atomic<unsigned> m_monBlocks{0};
+    // Peak since the last read, as an integer so it can be atomic
+    // without a compare-exchange loop: millionths of full scale.
+    std::atomic<unsigned> m_micPeakMicros{0};
+
+    QTimer* m_levelTimer{nullptr};
+    int     m_watchTicks{0};
+
     // QPointer, not a raw pointer: this window outlives nothing,
     // but the destructor restores the monitor through the radio
     // model, and teardown order between two children of the main
@@ -111,6 +142,8 @@ private:
     QMetaObject::Connection m_micTap;
 
     QCheckBox*    m_listenBox{nullptr};
+    QLabel*       m_liveStatus{nullptr};
+    QProgressBar* m_levelBar{nullptr};
     QSlider*      m_volume{nullptr};
     QPushButton*  m_recordBtn{nullptr};
     QProgressBar* m_progress{nullptr};

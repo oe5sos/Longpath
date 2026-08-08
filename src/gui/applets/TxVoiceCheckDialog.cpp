@@ -14,6 +14,7 @@
 #include "gui/applets/TxVoiceCheckDialog.h"
 
 #include "core/AudioEngine.h"
+#include "core/audio/CompositeTxMicRouter.h"
 #include "core/TxChannel.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -32,6 +33,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 
 namespace NereusSDR {
@@ -68,6 +70,8 @@ TxVoiceCheckDialog::~TxVoiceCheckDialog()
         m_radio->txChannel()->setMicTapEnabled(false);
     }
     QObject::disconnect(m_micTap);
+    QObject::disconnect(m_levelTap);
+    QObject::disconnect(m_monitorTap);
 
     if (m_restoreMonitor) { setSelfMonitor(m_monitorWasOn); }
 }
@@ -104,6 +108,26 @@ void TxVoiceCheckDialog::buildUi()
         note->setWordWrap(true);
         note->setStyleSheet(secondaryLabelStyle());
         col->addWidget(note);
+
+        // The meter is the honest part. If it moves, the microphone is
+        // reaching the transmit chain and any silence is on the output
+        // side; if it does not, nothing downstream can help.
+        auto* meterRow = new QHBoxLayout;
+        auto* meterCap = new QLabel(QStringLiteral("Mic"), this);
+        meterCap->setStyleSheet(secondaryLabelStyle());
+        meterRow->addWidget(meterCap);
+        m_levelBar = new QProgressBar(this);
+        m_levelBar->setRange(-60, 0);
+        m_levelBar->setValue(-60);
+        m_levelBar->setFormat(QStringLiteral("%v dBFS"));
+        m_levelBar->setFixedHeight(14);
+        meterRow->addWidget(m_levelBar, 1);
+        col->addLayout(meterRow);
+
+        m_liveStatus = new QLabel(this);
+        m_liveStatus->setWordWrap(true);
+        m_liveStatus->setStyleSheet(secondaryLabelStyle());
+        col->addWidget(m_liveStatus);
     }
 
     // ── Recording ────────────────────────────────────────────────────
@@ -206,8 +230,15 @@ void TxVoiceCheckDialog::buildUi()
     m_countdown = new QTimer(this);
     m_countdown->setInterval(1000);
 
-    connect(m_listenBox, &QCheckBox::toggled, this,
-            [this](bool on) { setSelfMonitor(on); });
+    m_levelTimer = new QTimer(this);
+    m_levelTimer->setInterval(100);
+    connect(m_levelTimer, &QTimer::timeout,
+            this, &TxVoiceCheckDialog::updateLevel);
+
+    connect(m_listenBox, &QCheckBox::toggled, this, [this](bool on) {
+        setSelfMonitor(on);
+        if (on) { startLevelWatch(); } else { stopLevelWatch(); }
+    });
 
     connect(m_volume, &QSlider::valueChanged, this, [this](int v) {
         if (m_radio) {
@@ -264,6 +295,138 @@ void TxVoiceCheckDialog::setSelfMonitor(bool on)
     m_radio->transmitModel().setMonEnabled(on);
 }
 
+// ── Saying why nothing is happening ──────────────────────────────────
+
+QString TxVoiceCheckDialog::micSourceName() const
+{
+    if (!m_radio) { return QStringLiteral("unknown"); }
+    switch (m_radio->transmitModel().micSource()) {
+    case MicSource::Pc:    return QStringLiteral("the computer's microphone");
+    case MicSource::Radio: return QStringLiteral("the radio's mic socket");
+    case MicSource::Vax:   return QStringLiteral("the VAX virtual device");
+    }
+    return QStringLiteral("unknown");
+}
+
+void TxVoiceCheckDialog::startLevelWatch()
+{
+    if (!m_radio || !m_radio->txChannel()) {
+        m_liveStatus->setText(QStringLiteral(
+            "Not connected to a radio. The microphone is read through the "
+            "radio's transmit chain, so there is nothing to listen to "
+            "yet — connect first."));
+        return;
+    }
+    TxChannel* tx = m_radio->txChannel();
+
+    m_micBlocks.store(0, std::memory_order_release);
+    m_monBlocks.store(0, std::memory_order_release);
+    m_micPeakMicros.store(0, std::memory_order_release);
+    m_watchTicks = 0;
+
+    // Both taps are DirectConnection for the same reason as everywhere
+    // else in this file: the pointers belong to the emitting channel's
+    // scratch buffers and are gone by the next block. Neither lambda
+    // does anything but arithmetic on atomics.
+    QObject::disconnect(m_levelTap);
+    m_levelTap = connect(tx, &TxChannel::micInputReady, this,
+                         [this](const float* samples, int frames) {
+        m_micBlocks.fetch_add(1, std::memory_order_acq_rel);
+        float peak = 0.0f;
+        for (int i = 0; i < frames; ++i) {
+            peak = std::max(peak, std::fabs(samples[i]));
+        }
+        const auto micros = static_cast<unsigned>(
+            std::min(1.0f, peak) * 1'000'000.0f);
+        unsigned prev = m_micPeakMicros.load(std::memory_order_acquire);
+        while (micros > prev
+               && !m_micPeakMicros.compare_exchange_weak(
+                      prev, micros, std::memory_order_acq_rel)) {
+        }
+    }, Qt::DirectConnection);
+
+    QObject::disconnect(m_monitorTap);
+    m_monitorTap = connect(tx, &TxChannel::sip1OutputReady, this,
+                           [this](const float*, int) {
+        m_monBlocks.fetch_add(1, std::memory_order_acq_rel);
+    }, Qt::DirectConnection);
+
+    // The tap has to be on for the meter to see anything. It is off by
+    // default and costs a float conversion per block; while this window
+    // is listening, that is a price worth paying for being able to say
+    // what is wrong.
+    tx->setMicTapEnabled(true);
+
+    m_liveStatus->setText(QStringLiteral("Listening…"));
+    m_levelTimer->start();
+}
+
+void TxVoiceCheckDialog::stopLevelWatch()
+{
+    m_levelTimer->stop();
+    QObject::disconnect(m_levelTap);
+    QObject::disconnect(m_monitorTap);
+    if (m_radio && m_radio->txChannel() && !m_recorder.isRecording()) {
+        m_radio->txChannel()->setMicTapEnabled(false);
+    }
+    if (m_levelBar) { m_levelBar->setValue(-60); }
+    if (m_liveStatus) { m_liveStatus->clear(); }
+}
+
+void TxVoiceCheckDialog::updateLevel()
+{
+    const unsigned micros = m_micPeakMicros.exchange(
+        0, std::memory_order_acq_rel);
+    const double peak = double(micros) / 1'000'000.0;
+    const int dbfs = peak > 0.0
+        ? int(std::lround(std::clamp(20.0 * std::log10(peak), -60.0, 0.0)))
+        : -60;
+    m_levelBar->setValue(dbfs);
+
+    // Give it a moment before complaining. The pump is woken by mic
+    // frames from the radio, so the first block can be a few tens of
+    // milliseconds behind the checkbox.
+    ++m_watchTicks;
+    if (m_watchTicks < 12) { return; }          // 1.2 s
+
+    const unsigned mic = m_micBlocks.load(std::memory_order_acquire);
+    const unsigned mon = m_monBlocks.load(std::memory_order_acquire);
+
+    // First broken link, not the last. Each of these is a different
+    // thing to go and do, and naming two at once helps nobody.
+    if (mic == 0) {
+        m_liveStatus->setText(QStringLiteral(
+            "No microphone blocks are arriving. The transmit chain is "
+            "fed from %1 — if your headset is plugged into the computer, "
+            "that has to be selected under Setup ▸ Audio ▸ TX input, and "
+            "the input device opened there.").arg(micSourceName()));
+        return;
+    }
+    if (m_radio && m_radio->transmitModel().micMute()) {
+        m_liveStatus->setText(QStringLiteral(
+            "The microphone is muted. Unmute it in the TX panel."));
+        return;
+    }
+    if (peak <= 0.0 && m_watchTicks > 30) {
+        m_liveStatus->setText(QStringLiteral(
+            "The chain is running and blocks are arriving from %1, but "
+            "they are silent. Check that this is the right input and "
+            "that its level is up.").arg(micSourceName()));
+        return;
+    }
+    if (mon == 0) {
+        m_liveStatus->setText(QStringLiteral(
+            "The microphone is being heard, but the monitor is producing "
+            "nothing. This is a fault on my side rather than in your "
+            "setup — please say so."));
+        return;
+    }
+    m_liveStatus->setText(QStringLiteral(
+        "Hearing you through %1. If the meter moves and you hear nothing, "
+        "the problem is on the output side: the volume slider above, the "
+        "master output, or the wrong output device.").arg(micSourceName()));
+}
+
 // ── Recording ────────────────────────────────────────────────────────
 
 void TxVoiceCheckDialog::startRecording()
@@ -314,9 +477,12 @@ void TxVoiceCheckDialog::stopRecording()
 
     if (m_radio && m_radio->txChannel()) {
         TxChannel* tx = m_radio->txChannel();
-        tx->setMicTapEnabled(false);
-        // Leave the chain running only if the operator asked to hear it.
-        if (!m_listenBox->isChecked()) { tx->setOffAirMonitor(false); }
+        // The level meter wants the tap too; only close it if nobody
+        // else is listening.
+        if (!m_listenBox->isChecked()) {
+            tx->setMicTapEnabled(false);
+            tx->setOffAirMonitor(false);
+        }
     }
     QObject::disconnect(m_micTap);
 
