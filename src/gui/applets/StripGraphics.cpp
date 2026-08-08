@@ -159,6 +159,114 @@ void StripChainView::mousePressEvent(QMouseEvent* ev)
     }
 }
 
+// ── StripLevelBars ───────────────────────────────────────────────────
+
+StripLevelBars::StripLevelBars(QWidget* parent) : QWidget(parent)
+{
+    setMinimumHeight(52);
+}
+
+void StripLevelBars::setChain(StripChain* chain) { m_chain = chain; update(); }
+
+QSize StripLevelBars::sizeHint() const { return QSize(320, 56); }
+
+void StripLevelBars::tick()
+{
+    if (!m_chain) { return; }
+    m_in  = m_chain->inputPeakDb();
+    m_out = m_chain->outputPeakDb();
+
+    // 20 dB per second of decay: fast enough that the hold tracks
+    // speech, slow enough that a single syllable can be read.
+    constexpr double kDecayDbPerTick = 2.0;   // at the 10 Hz meter timer
+    m_inHold  = std::max(m_in,  m_inHold  - kDecayDbPerTick);
+    m_outHold = std::max(m_out, m_outHold - kDecayDbPerTick);
+    update();
+}
+
+void StripLevelBars::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, false);
+    p.fillRect(rect(), c(Style::kInsetBg));
+
+    QFont f = p.font();
+    f.setPointSizeF(8.5);
+    p.setFont(f);
+
+    const int labelW = 30;
+    const int barH   = 12;
+    const int gap    = 6;
+    const QRect area = rect().adjusted(labelW + 4, 6, -70, -6);
+
+    auto drawBar = [&](int y, const QString& name, double db, double hold,
+                       const QColor& fill) {
+        p.setPen(c(Style::kTextSecondary));
+        p.drawText(QRect(2, y, labelW, barH), Qt::AlignRight | Qt::AlignVCenter,
+                   name);
+
+        const QRect track(area.left(), y, area.width(), barH);
+        p.setPen(QPen(c(Style::kInsetBorder), 1));
+        p.setBrush(Qt::NoBrush);
+        p.drawRect(track);
+
+        auto xOf = [&](double v) {
+            const double t = std::clamp((v - kFloorDb) / -kFloorDb, 0.0, 1.0);
+            return track.left() + 1 + t * (track.width() - 2);
+        };
+        if (db > kFloorDb) {
+            p.setPen(Qt::NoPen);
+            p.setBrush(fill);
+            p.drawRect(QRectF(track.left() + 1, y + 1,
+                              xOf(db) - track.left() - 1, barH - 2));
+        }
+        if (hold > kFloorDb) {
+            p.setPen(QPen(c(Style::kTextPrimary), 1));
+            const int hx = int(xOf(hold));
+            p.drawLine(hx, y + 1, hx, y + barH - 1);
+        }
+        // -6 dBFS mark: the level above which an SSB transmitter has
+        // nothing left to give and the ALC starts making the decisions.
+        p.setPen(QPen(QColor(0xd0, 0x60, 0x40), 1, Qt::DotLine));
+        const int wx = int(xOf(-6.0));
+        p.drawLine(wx, y, wx, y + barH);
+
+        p.setPen(c(Style::kTextSecondary));
+        p.drawText(QRect(track.right() + 6, y, 62, barH),
+                   Qt::AlignLeft | Qt::AlignVCenter,
+                   db > kFloorDb ? QStringLiteral("%1 dB").arg(db, 0, 'f', 1)
+                                 : QStringLiteral("--"));
+    };
+
+    const bool running = m_chain && m_chain->isEnabled();
+    if (!running) {
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(rect(), Qt::AlignCenter,
+                   QStringLiteral("strip off — nothing to measure"));
+        return;
+    }
+
+    drawBar(6, QStringLiteral("in"), m_in, m_inHold,
+            QColor(0x00, 0xb4, 0xd8, 170));
+    drawBar(6 + barH + gap, QStringLiteral("out"), m_out, m_outHold,
+            QColor(0x40, 0xc0, 0x80, 170));
+
+    // The one number an operator actually needs from this picture: did
+    // the strip make them louder, and by how much. Everything above the
+    // limiter can add gain, and the total is not obvious from eight
+    // separate settings.
+    if (m_in > kFloorDb && m_out > kFloorDb) {
+        const double delta = m_out - m_in;
+        p.setPen(delta > 6.0 ? QColor(0xd0, 0x60, 0x40)
+                             : c(Style::kTextSecondary));
+        p.drawText(rect().adjusted(0, 0, -4, -2),
+                   Qt::AlignRight | Qt::AlignBottom,
+                   QStringLiteral("%1%2 dB")
+                       .arg(delta >= 0 ? QStringLiteral("+") : QString())
+                       .arg(delta, 0, 'f', 1));
+    }
+}
+
 // ── StripEqCurve ─────────────────────────────────────────────────────
 
 StripEqCurve::StripEqCurve(QWidget* parent)

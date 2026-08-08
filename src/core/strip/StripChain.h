@@ -99,6 +99,21 @@ public:
 
     void reset() noexcept;
 
+    // ── What the strip did to the level ──────────────────────────────
+    //
+    // Peak in and peak out, in dBFS, measured across the last block
+    // that was actually processed. The difference between them is the
+    // number that matters: every stage above the limiter can add gain —
+    // the tube, the exciter, the compressor's make-up — and an operator
+    // who cannot see the total is one who finds out from a report of
+    // splatter.
+    //
+    // Held at -120 while the strip is off rather than reporting the
+    // input twice. A gain change of zero and a strip that is not
+    // running are different facts and should not read the same.
+    float inputPeakDb() const noexcept;
+    float outputPeakDb() const noexcept;
+
     // The stages themselves, for the panels to bind to. Not owned by
     // the caller and not valid across a prepare().
     ClientGate&         gate()    noexcept { return m_gate; }
@@ -119,6 +134,13 @@ private:
     // to ask questions it could answer from one cache line — and
     // tst_strip_chain holds the two in step.
     std::array<std::atomic<bool>, kStageCount> m_stageOn;
+
+    // Written on the audio thread once per block, read by the meter.
+    // Plain relaxed stores: a meter that is one block stale is a meter,
+    // and paying for ordering on the transmit path to make a picture
+    // slightly fresher is the wrong trade.
+    std::atomic<float> m_inPeakDb{-120.0f};
+    std::atomic<float> m_outPeakDb{-120.0f};
 
     ClientGate         m_gate;
     ClientEq           m_eq;

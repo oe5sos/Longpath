@@ -213,4 +213,134 @@ void restore(StripChain& c)
     // And the master stays where it is — off. See StripSettings.h.
 }
 
+// ── Starting points ──────────────────────────────────────────────────
+
+QVector<Preset> builtInPresets()
+{
+    return {
+        {QStringLiteral("Clean voice"),
+         QStringLiteral("High-pass, a little compression, nothing else. "
+                        "What a voice should sound like before anyone "
+                        "decides to improve it — and the right place to "
+                        "start from.")},
+        {QStringLiteral("DX — punchy"),
+         QStringLiteral("Harder compression, presence lifted, low end "
+                        "cut further. Costs naturalness and buys "
+                        "intelligibility through noise. For working "
+                        "stations you can barely hear.")},
+        {QStringLiteral("Ragchew — easy"),
+         QStringLiteral("Gentle throughout, gate as an expander rather "
+                        "than a gate, more low end. For a long contact "
+                        "with a strong signal, where the other operator "
+                        "has to listen to you for an hour.")},
+    };
+}
+
+bool applyBuiltIn(const QString& name, StripChain& c)
+{
+    auto band = [&c](int idx, ClientEq::FilterType t, float hz, float gain,
+                     float q, bool on, int slope) {
+        ClientEq::BandParams p;
+        p.type = t; p.freqHz = hz; p.gainDb = gain; p.q = q;
+        p.enabled = on; p.slopeDbPerOct = slope;
+        c.eq().setBand(idx, p);
+    };
+    auto allOff = [&c]() {
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
+        }
+    };
+
+    if (name == QLatin1String("Clean voice")) {
+        allOff();
+        band(0, ClientEq::FilterType::HighPass, 100.0f, 0.0f, 0.707f, true, 24);
+        band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
+        band(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
+        band(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
+        band(4, ClientEq::FilterType::LowShelf,   200.0f,  0.0f, 0.707f, true, 12);
+        band(5, ClientEq::FilterType::Peak,      2000.0f,  1.5f, 1.0f,   true, 12);
+        band(6, ClientEq::FilterType::HighShelf, 3000.0f,  0.0f, 0.707f, true, 12);
+        c.eq().setActiveBandCount(7);
+        c.comp().setThresholdDb(-18.0f);
+        c.comp().setRatio(2.5f);
+        c.comp().setAttackMs(8.0f);
+        c.comp().setReleaseMs(150.0f);
+        c.comp().setKneeDb(8.0f);
+        c.comp().setMakeupDb(3.0f);
+        c.comp().setPhaseRotatorStages(4);
+        c.setStageEnabled(StripChain::Stage::Eq, true);
+        c.setStageEnabled(StripChain::Stage::Comp, true);
+        c.setStageEnabled(StripChain::Stage::Limiter, true);
+        c.limiter().setCeilingDb(-1.0f);
+        return true;
+    }
+
+    if (name == QLatin1String("DX — punchy")) {
+        allOff();
+        band(0, ClientEq::FilterType::HighPass, 150.0f, 0.0f, 0.707f, true, 24);
+        band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
+        band(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
+        band(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
+        band(4, ClientEq::FilterType::LowShelf,   200.0f, -3.0f, 0.707f, true, 12);
+        band(5, ClientEq::FilterType::Peak,      2200.0f,  5.0f, 1.2f,   true, 12);
+        band(6, ClientEq::FilterType::HighShelf, 3000.0f, -3.0f, 0.707f, true, 12);
+        c.eq().setActiveBandCount(7);
+        c.gate().setThresholdDb(-38.0f);
+        c.gate().setFloorDb(-18.0f);
+        c.gate().setHoldMs(30.0f);
+        c.gate().setReleaseMs(150.0f);
+        c.comp().setThresholdDb(-26.0f);
+        c.comp().setRatio(5.0f);
+        c.comp().setAttackMs(3.0f);
+        c.comp().setReleaseMs(90.0f);
+        c.comp().setKneeDb(4.0f);
+        c.comp().setMakeupDb(7.0f);
+        c.comp().setPhaseRotatorStages(6);
+        c.deEss().setFrequencyHz(6500.0f);
+        c.deEss().setThresholdDb(-28.0f);
+        c.deEss().setAmountDb(-8.0f);
+        // The de-esser is on here and not in "Clean voice" on purpose:
+        // this much presence lift makes sibilance that was not a problem
+        // before into one, and a preset that creates a fault it does not
+        // then fix is a bad preset.
+        for (auto st : {StripChain::Stage::Gate, StripChain::Stage::Eq,
+                        StripChain::Stage::DeEss, StripChain::Stage::Comp,
+                        StripChain::Stage::Limiter}) {
+            c.setStageEnabled(st, true);
+        }
+        c.limiter().setCeilingDb(-1.0f);
+        return true;
+    }
+
+    if (name == QLatin1String("Ragchew — easy")) {
+        allOff();
+        band(0, ClientEq::FilterType::HighPass, 80.0f, 0.0f, 0.707f, true, 12);
+        band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
+        band(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
+        band(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
+        band(4, ClientEq::FilterType::LowShelf,   200.0f,  2.0f, 0.707f, true, 12);
+        band(5, ClientEq::FilterType::Peak,      2000.0f,  1.0f, 0.8f,   true, 12);
+        band(6, ClientEq::FilterType::HighShelf, 3000.0f,  1.0f, 0.707f, true, 12);
+        c.eq().setActiveBandCount(7);
+        c.gate().setMode(ClientGate::Mode::Expander);
+        c.gate().setThresholdDb(-45.0f);
+        c.gate().setReleaseMs(250.0f);
+        c.comp().setThresholdDb(-14.0f);
+        c.comp().setRatio(2.0f);
+        c.comp().setAttackMs(15.0f);
+        c.comp().setReleaseMs(250.0f);
+        c.comp().setKneeDb(12.0f);
+        c.comp().setMakeupDb(2.0f);
+        c.comp().setPhaseRotatorStages(2);
+        for (auto st : {StripChain::Stage::Gate, StripChain::Stage::Eq,
+                        StripChain::Stage::Comp, StripChain::Stage::Limiter}) {
+            c.setStageEnabled(st, true);
+        }
+        c.limiter().setCeilingDb(-1.0f);
+        return true;
+    }
+
+    return false;
+}
+
 } // namespace NereusSDR::StripSettings

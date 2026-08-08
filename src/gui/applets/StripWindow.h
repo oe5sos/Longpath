@@ -98,6 +98,12 @@ private:
     // this window can outlive one.
     StripChain* chain() const;
 
+    void applyPreset(const QString& name);
+    // Push the chain's values back into every control after a preset
+    // has changed them underneath. Without it the panel shows the old
+    // settings and the first slider touch undoes the preset.
+    void reloadControls();
+
     void refreshChainRow();
     void refreshMeters();
 
@@ -110,8 +116,11 @@ private:
 
     StripChainView* m_chainView{nullptr};
     StripEqCurve*   m_eqCurve{nullptr};
+    StripLevelBars* m_levels{nullptr};
+    QComboBox*      m_presetBox{nullptr};
     std::array<QCheckBox*, StripChain::kStageCount> m_stageBoxes{};
 
+    QLabel* m_presetNote{nullptr};
     QLabel* m_gateMeter{nullptr};
     QLabel* m_deEssMeter{nullptr};
     QCheckBox* m_humBox{nullptr};

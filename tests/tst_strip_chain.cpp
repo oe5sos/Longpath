@@ -15,6 +15,7 @@
 #include <QtTest/QtTest>
 
 #include "core/strip/StripChain.h"
+#include "core/strip/StripSettings.h"
 
 #include <cmath>
 #include <vector>
@@ -67,6 +68,8 @@ private slots:
     void the_whole_chain_stays_finite();
     void every_stage_has_a_name();
     void the_limiter_is_last();
+    void every_preset_leaves_the_master_alone();
+    void every_preset_names_itself_and_applies();
 };
 
 void TstStripChain::a_fresh_chain_is_off_and_every_stage_with_it()
@@ -209,6 +212,53 @@ void TstStripChain::the_limiter_is_last()
     QCOMPARE(static_cast<int>(StripChain::Stage::Comp),  3);
     QCOMPARE(static_cast<int>(StripChain::Stage::Tube),  4);
     QCOMPARE(static_cast<int>(StripChain::Stage::Pudu),  5);
+}
+
+void TstStripChain::every_preset_leaves_the_master_alone()
+{
+    // A preset is a starting point, not a decision to go on the air
+    // with it. Whether the strip is in circuit stays the operator's
+    // call — and a preset that switched it on would change the transmit
+    // audio of someone who was only browsing the list.
+    StripChain c;
+    c.prepare(kRate);
+    QVERIFY(!c.isEnabled());
+    for (const auto& p : StripSettings::builtInPresets()) {
+        QVERIFY2(StripSettings::applyBuiltIn(p.name, c), qPrintable(p.name));
+        QVERIFY2(!c.isEnabled(),
+                 qPrintable(QStringLiteral("%1 switched the strip on")
+                                .arg(p.name)));
+    }
+}
+
+void TstStripChain::every_preset_names_itself_and_applies()
+{
+    const auto presets = StripSettings::builtInPresets();
+    QVERIFY(!presets.isEmpty());
+
+    StripChain c;
+    c.prepare(kRate);
+    for (const auto& p : presets) {
+        QVERIFY(!p.name.trimmed().isEmpty());
+        // The description is the whole point of a preset list. A name
+        // like "DX" tells an operator nothing about what it will do to
+        // their voice or what it costs.
+        QVERIFY2(p.description.length() > 40, qPrintable(p.name));
+        QVERIFY(StripSettings::applyBuiltIn(p.name, c));
+
+        // Each one must actually put something in circuit, or choosing
+        // it does nothing and the operator concludes presets are broken.
+        int on = 0;
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            if (c.stageEnabled(static_cast<StripChain::Stage>(i))) { ++on; }
+        }
+        QVERIFY2(on >= 2, qPrintable(QStringLiteral("%1 enabled %2 stages")
+                                         .arg(p.name).arg(on)));
+    }
+
+    // And an unknown name is refused rather than silently doing nothing
+    // that looks like success.
+    QVERIFY(!StripSettings::applyBuiltIn(QStringLiteral("nonesuch"), c));
 }
 
 QTEST_APPLESS_MAIN(TstStripChain)

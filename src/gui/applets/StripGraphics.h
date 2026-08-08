@@ -82,6 +82,35 @@ private:
     static constexpr double kBarFullScaleDb = 24.0;
 };
 
+// ── In, out, and the difference ──────────────────────────────────────
+
+class StripLevelBars : public QWidget {
+    Q_OBJECT
+public:
+    explicit StripLevelBars(QWidget* parent = nullptr);
+
+    void setChain(StripChain* chain);
+    // Called from the meter timer.
+    void tick();
+
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+
+private:
+    static constexpr double kFloorDb = -60.0;
+
+    StripChain* m_chain{nullptr};
+    double m_in{-120.0};
+    double m_out{-120.0};
+    // Peak hold, so a transient that the eye would miss stays visible
+    // long enough to be read. Decays rather than latching: a hold that
+    // never falls stops being information after the first loud word.
+    double m_inHold{-120.0};
+    double m_outHold{-120.0};
+};
+
 // ── The equaliser's response ─────────────────────────────────────────
 
 class StripEqCurve : public QWidget {

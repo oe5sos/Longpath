@@ -37,6 +37,7 @@
 // =================================================================
 
 #include <QString>
+#include <QVector>
 
 namespace NereusSDR {
 
@@ -55,6 +56,28 @@ void save(const StripChain& chain);
 // Read it back into a prepared chain. Stage parameters and per-stage
 // enables are restored; the master switch is not — see the header note.
 void restore(StripChain& chain);
+
+// ── Starting points ──────────────────────────────────────────────────
+//
+// Three built-in settings, because the honest answer to "what should I
+// set all this to" is not a manual. Each one is a whole chain, and each
+// says out loud what it is for; the operator adjusts from there rather
+// than from eight stages at their defaults.
+//
+// They are starting points and named as such. A preset that claims to
+// be the right answer for every voice and every microphone is a preset
+// that will be wrong for most of them.
+struct Preset {
+    QString name;
+    QString description;
+};
+
+QVector<Preset> builtInPresets();
+
+// Apply one by name. Sets every stage's parameters and which stages are
+// on, but never the master switch — the operator decides when the strip
+// goes into circuit, not a preset.
+bool applyBuiltIn(const QString& name, StripChain& chain);
 
 } // namespace StripSettings
 } // namespace NereusSDR

@@ -15,6 +15,8 @@
 
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
+
+#include <QMessageBox>
 #include "models/RadioModel.h"
 
 #include <QCheckBox>
@@ -177,6 +179,35 @@ void StripWindow::buildUi()
         col->addWidget(m_note);
     }
 
+    // ── Starting points ──────────────────────────────────────────────
+    //
+    // First, above everything, because "what should I set all this to"
+    // is the question an operator actually arrives with. Eight stages
+    // at their defaults is not an answer.
+    {
+        auto* row = new QHBoxLayout;
+        row->addWidget(new QLabel(QStringLiteral("Start from:"), this));
+        m_presetBox = new QComboBox(this);
+        m_presetBox->addItem(QStringLiteral("— choose —"), QString());
+        for (const auto& p : StripSettings::builtInPresets()) {
+            m_presetBox->addItem(p.name, p.name);
+        }
+        row->addWidget(m_presetBox);
+        row->addStretch(1);
+        col->addLayout(row);
+
+        m_presetNote = new QLabel(this);
+        m_presetNote->setWordWrap(true);
+        m_presetNote->setStyleSheet(dimStyle());
+        col->addWidget(m_presetNote);
+
+        connect(m_presetBox, &QComboBox::currentIndexChanged, this,
+                [this](int) {
+            const QString n = m_presetBox->currentData().toString();
+            if (!n.isEmpty()) { applyPreset(n); }
+        });
+    }
+
     // ── Chain row ────────────────────────────────────────────────────
     //
     // Painted rather than eight labels: each tile carries its own
@@ -188,6 +219,12 @@ void StripWindow::buildUi()
         if (m_tabs) { m_tabs->setCurrentIndex(i); }
     });
     col->addWidget(m_chainView);
+
+    // In, out, and the difference. Directly under the chain, because
+    // the chain is what changed the level and this is by how much.
+    m_levels = new StripLevelBars(this);
+    m_levels->setChain(chain());
+    col->addWidget(m_levels);
 
     // ── One tab per stage ────────────────────────────────────────────
     m_tabs = new QTabWidget(this);
@@ -679,12 +716,68 @@ QWidget* StripWindow::buildPlaceholder(StripChain::Stage s)
 
 // ── Refresh ──────────────────────────────────────────────────────────
 
+void StripWindow::applyPreset(const QString& name)
+{
+    StripChain* c = chain();
+    if (!c) { return; }
+    if (!StripSettings::applyBuiltIn(name, *c)) { return; }
+
+    for (const auto& p : StripSettings::builtInPresets()) {
+        if (p.name == name) { m_presetNote->setText(p.description); break; }
+    }
+
+    // A preset changes the chain underneath every control in the
+    // window. Rebuilding the panels is the only version of "refresh"
+    // that cannot drift: each control reads its own value from the
+    // chain when it is built, so there is no second copy to forget.
+    reloadControls();
+    refreshChainRow();
+    persist();
+}
+
+void StripWindow::reloadControls()
+{
+    if (!m_tabs) { return; }
+    const int keep = m_tabs->currentIndex();
+    while (m_tabs->count() > 0) {
+        QWidget* w = m_tabs->widget(0);
+        m_tabs->removeTab(0);
+        w->deleteLater();
+    }
+    m_eqCurve = nullptr;          // owned by the page just removed
+    m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
+    m_stageBoxes.fill(nullptr);
+
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        const auto s = static_cast<StripChain::Stage>(i);
+        QWidget* page = nullptr;
+        switch (s) {
+        case StripChain::Stage::Gate:  page = buildGatePanel();  break;
+        case StripChain::Stage::Eq:    page = buildEqPanel();    break;
+        case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
+        case StripChain::Stage::Comp:  page = buildCompPanel();  break;
+        default:                       page = buildPlaceholder(s); break;
+        }
+        m_tabs->addTab(page, QString::fromLatin1(StripChain::stageName(s)));
+    }
+    if (StripChain* c = chain()) {
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            QCheckBox* box = m_stageBoxes[static_cast<size_t>(i)];
+            if (!box) { continue; }
+            const QSignalBlocker block(box);
+            box->setChecked(c->stageEnabled(static_cast<StripChain::Stage>(i)));
+        }
+    }
+    if (keep >= 0 && keep < m_tabs->count()) { m_tabs->setCurrentIndex(keep); }
+}
+
 void StripWindow::refreshChainRow()
 {
     if (m_chainView) {
         m_chainView->setChain(chain());
         m_chainView->update();
     }
+    if (m_levels) { m_levels->setChain(chain()); }
     if (m_eqCurve) { m_eqCurve->refresh(); }
 }
 
@@ -695,6 +788,7 @@ void StripWindow::refreshMeters()
 
     // The tiles are the primary reading; the text below each panel is
     // for someone who wants the number rather than the shape.
+    if (m_levels) { m_levels->tick(); }
     if (m_chainView) {
         m_chainView->setReduction(StripChain::Stage::Gate,
                                   c->gate().gainReductionDb());

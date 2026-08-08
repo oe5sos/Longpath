@@ -13,6 +13,9 @@
 
 #include "core/strip/StripChain.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace NereusSDR {
 
 StripChain::StripChain()
@@ -103,8 +106,21 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // notice it is disabled": that would make the guarantee depend on
     // eight separate stages each getting their own bypass right, and
     // this is the transmit path.
-    if (!m_enabled.load(std::memory_order_acquire)) { return; }
+    if (!m_enabled.load(std::memory_order_acquire)) {
+        // Not "input twice with no change" — off and unity are
+        // different facts. See the note on inputPeakDb().
+        m_inPeakDb.store(-120.0f, std::memory_order_relaxed);
+        m_outPeakDb.store(-120.0f, std::memory_order_relaxed);
+        return;
+    }
     if (samples == nullptr || frames <= 0) { return; }
+
+    auto peakDb = [](const float* s, int n) {
+        float p = 0.0f;
+        for (int i = 0; i < n; ++i) { p = std::max(p, std::fabs(s[i])); }
+        return p > 1e-6f ? 20.0f * std::log10(p) : -120.0f;
+    };
+    m_inPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
 
     // Every stage has its own enable and the chain mirrors it, so the
     // two always agree. Skipping the call as well is not redundant: a
@@ -127,6 +143,18 @@ void StripChain::processMono(float* samples, int frames) noexcept
     if (stageEnabled(Stage::Limiter)) {
         m_limiter.process(samples, frames, kMono);
     }
+
+    m_outPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
+}
+
+float StripChain::inputPeakDb() const noexcept
+{
+    return m_inPeakDb.load(std::memory_order_relaxed);
+}
+
+float StripChain::outputPeakDb() const noexcept
+{
+    return m_outPeakDb.load(std::memory_order_relaxed);
 }
 
 void StripChain::reset() noexcept
