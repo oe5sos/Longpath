@@ -1513,4 +1513,140 @@ void RotorLogbookPanel::setStatus(const QString& text, bool warn)
                                    : Style::kTextSecondary)));
 }
 
+// ── QRZ wiring and locator maths ────────────────────────────────────
+//
+// Lost the same way as the logbook's editing slots: a scripted edit
+// dropped the tail of a region. Restored verbatim from ea7b31c2.
+
+void RotorLogbookPanel::wireQrz()
+{
+    if (!m_qrz) {
+        m_lookupBtn->setEnabled(false);
+        m_lookupBtn->setToolTip(
+            QStringLiteral("Add your QRZ account in Tools to enable lookups"));
+        return;
+    }
+
+    connect(m_qrz, &QrzClient::lookupSucceeded, this,
+            [this](const QString& call, const CallsignInfo& info) {
+        // A queued reply for a callsign the operator has already typed
+        // past must not overwrite the card.
+        // Remember it whatever the operator has typed since — the next
+        // time this callsign comes round, the answer is already here.
+        m_qrzCache.insert(call, info);
+
+        if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
+        m_lastInfo = info;
+
+        adoptGridFromQrz(info);
+        QStringList bits;
+        if (!info.displayName().isEmpty()) { bits << info.displayName(); }
+        if (!info.city.isEmpty())          { bits << info.city; }
+        if (!info.country.isEmpty())       { bits << info.country; }
+        updateFlagFor(info.call);
+        setStationLine(bits.join(QStringLiteral(" · ")));
+        showStationVisuals(info);
+        setStatus(QString{});
+    });
+
+    connect(m_qrz, &QrzClient::lookupFailed, this,
+            [this](const QString& call, QrzClient::Error err,
+                   const QString& msg) {
+        if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
+        m_lastInfo = CallsignInfo{};
+        switch (err) {
+        case QrzClient::Error::NotFound:
+            setStatus(QStringLiteral("%1 isn't in QRZ — country estimate kept")
+                          .arg(call), true);
+            break;
+        case QrzClient::Error::AuthFailed:
+            setStatus(QStringLiteral("QRZ rejected the login"), true);
+            break;
+        case QrzClient::Error::Network:
+            setStatus(QStringLiteral("Couldn't reach QRZ — estimate kept"), true);
+            break;
+        case QrzClient::Error::Provider:
+            setStatus(msg.isEmpty() ? QStringLiteral("QRZ returned no data")
+                                    : msg, true);
+            break;
+        }
+    });
+
+    if (m_uploader) {
+        connect(m_uploader, &QsoUploader::uploadFinished, this,
+                [this](const QString& call, bool ok, bool duplicate,
+                       const QString& message) {
+            if (ok) {
+                // Record that it got through. Without this the answer
+                // is forgotten at the next restart, and the only safe
+                // thing left is to send everything again.
+                markUploaded(call);
+            }
+            setStatus(ok
+                ? QStringLiteral("%1 — %2").arg(call,
+                      duplicate ? QStringLiteral("already in your QRZ logbook")
+                                : message)
+                // The contact is in the local file regardless; say so,
+                // or a failed upload reads as a lost QSO.
+                : QStringLiteral("%1 logged locally, QRZ upload failed: %2")
+                      .arg(call, message),
+                !ok);
+        });
+    }
+}
+
+void RotorLogbookPanel::applyLocators()
+{
+    const QString mine = m_myGrid->text().trimmed().toUpper();
+    const QString dx   = m_dxGrid->text().trimmed().toUpper();
+    AppSettings::instance().setValue(kMyGridKey, mine);
+
+    const QString needsInput = QString::fromLatin1(Style::kLineEditStyle)
+        + QStringLiteral("QLineEdit { border: 1px solid %1; }")
+              .arg(Style::kAmberBorder);
+    const bool myOk = isValidGridSquare(mine);
+    m_myGrid->setStyleSheet(myOk ? QString::fromLatin1(Style::kLineEditStyle)
+                                 : needsInput);
+    if (!myOk) {
+        setStatus(mine.isEmpty()
+            ? QStringLiteral("Enter your own locator to get bearings")
+            : QStringLiteral("%1 is not a valid locator").arg(mine), true);
+        return;
+    }
+    if (!isValidGridSquare(dx)) { return; }
+
+    const double km  = calculateDistanceKm(mine, dx);
+    const double deg = calculateBearingInDegrees(mine, dx);
+    m_dial->setTargetBearing(deg);
+    updateGlobeFromLocators();
+    updateSolarLine();
+    setStatus(QStringLiteral("%1 km · %2° %3")
+                  .arg(km, 0, 'f', 0).arg(deg, 0, 'f', 0)
+                  .arg(compassPoint(deg)));
+}
+
+void RotorLogbookPanel::updateGlobeFromLocators()
+{
+    if (!m_globe) { return; }
+    const QString mine = m_myGrid->text().trimmed().toUpper();
+    const QString dx   = m_dxGrid->text().trimmed().toUpper();
+
+    if (isValidGridSquare(mine)) {
+        double lat = 0.0, lon = 0.0;
+        calculateLatLonFromGridSquare(mine, lat, lon);
+        m_globe->setHome(lat, lon);
+    }
+    if (isValidGridSquare(dx)) {
+        double lat = 0.0, lon = 0.0;
+        calculateLatLonFromGridSquare(dx, lat, lon);
+        m_globe->setTarget(lat, lon);
+        m_dxLat = lat; m_dxLon = lon; m_hasDxPos = true;
+    } else {
+        m_globe->clearTarget();
+    }
+    // The sun moves; a terminator computed once at startup would be
+    // visibly wrong by evening.
+    m_globe->useCurrentSubsolarPoint();
+}
+
 } // namespace NereusSDR

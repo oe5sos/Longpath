@@ -288,7 +288,6 @@ private:
     void buildUi();
     void wireSignals();
     void seedWidgetsFromTransmitModel();
-    void seedTransmitModelFromWidgets();
     void updateSelectedRowEnable();
     void updateEditRowFromSelection(int index);
     void pushCfcProfileToModel();

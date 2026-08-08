@@ -767,6 +767,142 @@ void LogbookWindow::uploadEntries(const QList<int>& sourceRows,
     for (int idx : sourceRows) { target->upload(m_all.at(idx)); }
 }
 
+// ── Saving and correcting ───────────────────────────────────────────
+//
+// These three went missing in the one-click-logging commit: an edit
+// script replaced a region and took the tail of the file with it.
+// Nothing complained until the linker did, because a definition that
+// is simply absent compiles perfectly well.
+
+bool LogbookWindow::saveAll()
+{
+    // The table shows newest first, but the file stays chronological.
+    // Writing m_all in display order would silently reverse the log on
+    // the first correction, and every other reader of the file — the
+    // dock's recent list, another logger's import — assumes oldest
+    // first.
+    QVector<LogEntry> chronological = m_all;
+    std::stable_sort(chronological.begin(), chronological.end(),
+                     [](const LogEntry& a, const LogEntry& b) {
+        if (a.timeOn.isValid() != b.timeOn.isValid()) {
+            return b.timeOn.isValid();
+        }
+        return a.timeOn < b.timeOn;
+    });
+
+    QString err;
+    if (AdifLog::write(m_path, chronological, &err)) {
+        emit logChanged();
+        return true;
+    }
+    QMessageBox::critical(this, QStringLiteral("Logbook"),
+        QStringLiteral("Couldn't save the log:\n%1\n\n"
+                       "Your previous log file is untouched.").arg(err));
+    return false;
+}
+
+void LogbookWindow::editSelected()
+{
+    const int view = m_table->currentRow();
+    const int idx  = sourceRow(view);
+    if (idx < 0) { return; }
+
+    LogEntry e = m_all.at(idx);
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("Edit %1").arg(e.call));
+    auto* form = new QFormLayout(&dlg);
+
+    auto* call    = new QLineEdit(e.call, &dlg);
+    auto* when    = new QDateTimeEdit(e.timeOn.toUTC(), &dlg);
+    when->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+    when->setCalendarPopup(true);
+    // The stored time is UTC and stays UTC. A widget that silently
+    // showed local time would rewrite every edited contact by the
+    // offset, and nothing would look wrong until someone compared logs.
+    when->setTimeZone(QTimeZone::UTC);
+
+    auto* band    = new QLineEdit(e.band, &dlg);
+    auto* mode    = new QLineEdit(e.mode, &dlg);
+    auto* submode = new QLineEdit(e.submode, &dlg);
+    auto* sent    = new QLineEdit(e.rstSent, &dlg);
+    auto* rcvd    = new QLineEdit(e.rstRcvd, &dlg);
+    auto* grid    = new QLineEdit(e.gridSquare, &dlg);
+    auto* myGrid  = new QLineEdit(e.myGridSquare, &dlg);
+    auto* name    = new QLineEdit(e.name, &dlg);
+    auto* qth     = new QLineEdit(e.qth, &dlg);
+    auto* country = new QLineEdit(e.country, &dlg);
+    auto* comment = new QLineEdit(e.comment, &dlg);
+
+    form->addRow(QStringLiteral("Call"),        call);
+    form->addRow(QStringLiteral("UTC"),         when);
+    form->addRow(QStringLiteral("Band"),        band);
+    form->addRow(QStringLiteral("Mode"),        mode);
+    form->addRow(QStringLiteral("Submode"),     submode);
+    form->addRow(QStringLiteral("RST sent"),    sent);
+    form->addRow(QStringLiteral("RST rcvd"),    rcvd);
+    form->addRow(QStringLiteral("Their grid"),  grid);
+    form->addRow(QStringLiteral("My grid"),     myGrid);
+    form->addRow(QStringLiteral("Name"),        name);
+    form->addRow(QStringLiteral("QTH"),         qth);
+    form->addRow(QStringLiteral("Country"),     country);
+    form->addRow(QStringLiteral("Comment"),     comment);
+
+    auto* box = new QDialogButtonBox(QDialogButtonBox::Save
+                                     | QDialogButtonBox::Cancel, &dlg);
+    form->addRow(box);
+    connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) { return; }
+
+    if (call->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("Logbook"),
+            QStringLiteral("A contact needs a callsign."));
+        return;
+    }
+
+    e.call         = call->text().trimmed().toUpper();
+    e.timeOn       = when->dateTime();
+    e.band         = band->text().trimmed();
+    e.mode         = mode->text().trimmed().toUpper();
+    e.submode      = submode->text().trimmed().toUpper();
+    e.rstSent      = sent->text().trimmed();
+    e.rstRcvd      = rcvd->text().trimmed();
+    e.gridSquare   = grid->text().trimmed().toUpper();
+    e.myGridSquare = myGrid->text().trimmed().toUpper();
+    e.name         = name->text().trimmed();
+    e.qth          = qth->text().trimmed();
+    e.country      = country->text().trimmed();
+    e.comment      = comment->text().trimmed();
+
+    m_all[idx] = e;
+    if (saveAll()) { reload(); }
+}
+
+void LogbookWindow::deleteSelected()
+{
+    // Collect source indices first: deleting by view row while the view
+    // is being rebuilt underneath is how you remove the wrong contact.
+    QList<int> victims = selectedSourceRows();
+    if (victims.isEmpty()) { return; }
+
+    const QString question = victims.size() == 1
+        ? QStringLiteral("Delete the contact with %1?")
+              .arg(m_all.at(victims.first()).call)
+        : QStringLiteral("Delete %1 contacts?").arg(victims.size());
+
+    if (QMessageBox::question(this, QStringLiteral("Logbook"), question,
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+        != QMessageBox::Yes) {
+        return;
+    }
+
+    std::sort(victims.begin(), victims.end(), std::greater<int>());
+    for (int idx : victims) { m_all.removeAt(idx); }
+    if (saveAll()) { reload(); }
+}
+
 // ── Map ─────────────────────────────────────────────────────────────
 
 void LogbookWindow::setPositionFallback(PositionFallback fn)

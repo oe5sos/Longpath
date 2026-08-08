@@ -154,7 +154,6 @@ private slots:
     void onCopyNodeNameClicked();
 
 private:
-    void buildSpecLayout(QVBoxLayout* outerLayout);
     void updateNodeDescLabel();
 
     int          m_channel;
