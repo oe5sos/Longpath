@@ -165,6 +165,13 @@ public:
     // — advice from a moving picture would change while it was read.
     QStringList tips() const;
 
+    // The measured curve sampled at the target's twelve frequencies,
+    // relative to 1 kHz. Empty until there is a fifteen-second average.
+    // Used by "my voice → target": the most honest starting point there
+    // is, because it is the only one that is actually about this
+    // operator and this microphone.
+    QVector<double> measuredAtTargetPoints() const;
+
     QSize sizeHint() const override;
 
 signals:
@@ -241,6 +248,14 @@ private:
     bool m_smooth{true};
     bool m_showTarget{true};
     bool m_haveMag{false};
+
+    // Dragging the rose line itself, when the profile is the
+    // operator's own. -1 when not dragging a target point.
+    bool editingTarget() const;
+    int  targetPointAt(const QPoint& p) const;
+    QPointF targetPointPos(int idx, const QRect& r, double ref) const;
+    double  m_targetRef{0.0};    // where the rose sits, from the last paint
+    int m_dragTarget{-1};
 
     int m_dragBand{-1};
     int m_hoverBand{-1};

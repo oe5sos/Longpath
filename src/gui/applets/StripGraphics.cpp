@@ -14,6 +14,7 @@
 #include "gui/applets/StripGraphics.h"
 
 #include "core/VoiceAnalyzer.h"
+#include "core/strip/StripTargets.h"
 #include "gui/StyleConstants.h"
 
 #include <QEvent>
@@ -550,14 +551,70 @@ int StripEqCurve::handleAt(const QPoint& pt) const
 
 // ── Mouse ────────────────────────────────────────────────────────────
 
+bool StripEqCurve::editingTarget() const
+{
+    return m_showTarget && m_haveHold
+           && m_profile == QLatin1String(StripTargets::kUserProfileName);
+}
+
+QPointF StripEqCurve::targetPointPos(int idx, const QRect& r,
+                                     double ref) const
+{
+    const double* f = StripTargets::userPointFreqs();
+    const QVector<double> v = StripTargets::userTarget();
+    const double hz = f[idx];
+    // The rose line is drawn as target-minus-measured, so its handle
+    // must sit on that same curve — not on the target in isolation, or
+    // the dot would be nowhere near the line it belongs to.
+    const double measured = ref;
+    Q_UNUSED(measured);
+    const double db = (idx < v.size() ? v.at(idx) : 0.0);
+    return QPointF(xForHz(hz, r), yForDb(db - m_targetRef, r));
+}
+
+int StripEqCurve::targetPointAt(const QPoint& pt) const
+{
+    if (!editingTarget()) { return -1; }
+    const QRect r = plotRect();
+    constexpr double kGrab = 12.0;
+    int best = -1;
+    double bestD = kGrab;
+    for (int i = 0; i < StripTargets::kUserPointCount; ++i) {
+        const QPointF h = targetPointPos(i, r, 0.0);
+        const double d = std::hypot(h.x() - pt.x(), h.y() - pt.y());
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
 void StripEqCurve::mousePressEvent(QMouseEvent* ev)
 {
+    // The equaliser's own handles win a tie: they are what the operator
+    // is usually reaching for, and the target's are only live at all
+    // when the profile is theirs.
     m_dragBand = handleAt(ev->pos());
-    if (m_dragBand >= 0) { setCursor(Qt::ClosedHandCursor); }
+    if (m_dragBand >= 0) { setCursor(Qt::ClosedHandCursor); return; }
+    m_dragTarget = targetPointAt(ev->pos());
+    if (m_dragTarget >= 0) { setCursor(Qt::ClosedHandCursor); }
 }
 
 void StripEqCurve::mouseMoveEvent(QMouseEvent* ev)
 {
+    if (m_dragTarget >= 0) {
+        const QRect r = plotRect();
+        QVector<double> v = StripTargets::userTarget();
+        while (v.size() < StripTargets::kUserPointCount) { v.append(0.0); }
+        // Only up and down. The frequencies are fixed so that the saved
+        // file and the handles agree without storing a frequency beside
+        // every gain, and so that two points cannot be dragged past
+        // each other into a curve that doubles back on itself.
+        v[m_dragTarget] = std::clamp(
+            dbForY(ev->position().y(), r) + m_targetRef, -30.0, 12.0);
+        StripTargets::setUserTarget(v);
+        emit bandChanged(-1);     // the window persists and redraws
+        update();
+        return;
+    }
     if (m_dragBand < 0) {
         const int h = handleAt(ev->pos());
         if (h != m_hoverBand) {
@@ -700,6 +757,10 @@ void StripEqCurve::contextMenuEvent(QContextMenuEvent* ev)
 
 void StripEqCurve::mouseReleaseEvent(QMouseEvent*)
 {
+    if (m_dragTarget >= 0) {
+        m_dragTarget = -1;
+        setCursor(Qt::OpenHandCursor);
+    }
     if (m_dragBand >= 0) {
         m_dragBand = -1;
         setCursor(Qt::OpenHandCursor);
@@ -806,6 +867,26 @@ QStringList StripEqCurve::tips() const
     // starts.
     for (int i = 0; i < int(found.size()) && i < 3; ++i) {
         out << found[static_cast<size_t>(i)].text;
+    }
+    return out;
+}
+
+QVector<double> StripEqCurve::measuredAtTargetPoints() const
+{
+    QVector<double> out;
+    const std::vector<double>& mag =
+        m_heldShown.empty() ? m_heldMag : m_heldShown;
+    if (!m_haveHold || mag.empty() || !m_spec) { return out; }
+
+    const double binHz = m_spec->sampleRate() / double(kFft);
+    const auto b1k = static_cast<size_t>(1000.0 / binHz);
+    if (b1k >= mag.size()) { return out; }
+    const double ref = mag[b1k];
+
+    const double* f = StripTargets::userPointFreqs();
+    for (int i = 0; i < StripTargets::kUserPointCount; ++i) {
+        const auto bin = static_cast<size_t>(f[i] / binHz);
+        out.append(bin < mag.size() ? mag[bin] - ref : 0.0);
     }
     return out;
 }
@@ -939,6 +1020,27 @@ void StripEqCurve::paintEvent(QPaintEvent*)
                 rose.setStyle(Qt::DashLine);
                 p.setPen(rose);
                 p.drawPath(tp);
+
+                // Handles on the target itself, when it is the
+                // operator's own. Five built-in curves are five
+                // opinions; the sixth option is that the operator draws
+                // it, and then the rose line stops being something to
+                // argue with and becomes something to aim at.
+                if (editingTarget()) {
+                    // The rose is drawn relative to the measured curve,
+                    // so a handle at the point's own dB has to be
+                    // offset by the same amount. Stored from here
+                    // because the hit test runs outside paint.
+                    const auto b1k = static_cast<size_t>(1000.0 / binHz);
+                    const_cast<StripEqCurve*>(this)->m_targetRef =
+                        (b1k < mag.size()) ? (mag[b1k] - ref) : 0.0;
+
+                    p.setPen(QPen(QColor(0xe8, 0x78, 0xb0), 1.5));
+                    p.setBrush(QColor(0x30, 0x18, 0x24));
+                    for (int i = 0; i < StripTargets::kUserPointCount; ++i) {
+                        p.drawEllipse(targetPointPos(i, r, ref), 3.5, 3.5);
+                    }
+                }
             }
             p.setClipping(false);
         }

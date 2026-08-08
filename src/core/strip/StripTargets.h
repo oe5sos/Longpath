@@ -45,6 +45,37 @@ struct Profile {
 
 QVector<Profile> profiles();
 
+// ── The operator's own target ────────────────────────────────────────
+//
+// Five built-in curves are five opinions, and the bench's answer to all
+// five was "that is not what I want". That is not a reason for a sixth
+// opinion — it is a reason for the target to stop being an opinion at
+// all and become something the operator draws.
+//
+// Twelve control points, log-spaced across the voice range, in dB
+// relative to 1 kHz. Twelve because it is enough to describe any shape
+// a voice needs and few enough to drag; the curve between them is
+// interpolated the same way the built-ins are, so a custom target and a
+// built-in one behave identically everywhere downstream.
+inline constexpr int kUserPointCount = 12;
+
+// The frequencies of those points. Fixed, so the saved file and the
+// drag handles agree about which is which without storing frequencies
+// alongside every gain.
+const double* userPointFreqs();
+
+// Read and write the operator's curve. Persisted under the same
+// settings prefix as the rest of the strip.
+QVector<double> userTarget();
+void setUserTarget(const QVector<double>& db);
+
+// Fill the operator's curve from a built-in, so "not quite right" can
+// start from the nearest thing rather than from flat.
+void seedUserTargetFrom(const QString& profileName);
+
+// The name the picker shows for it.
+inline constexpr char kUserProfileName[] = "Mine";
+
 // The target in dB relative to 1 kHz, for a named profile. An unknown
 // name falls back to the general SSB curve rather than to silence — a
 // missing profile should not produce a flat line that looks deliberate.

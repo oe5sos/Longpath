@@ -13,6 +13,8 @@
 
 #include "core/strip/StripTargets.h"
 
+#include "core/AppSettings.h"
+
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -69,12 +71,65 @@ QVector<Profile> profiles()
                         "one thing that matters in a pile-up: being "
                         "picked out on the first call."),
          2500.0},
+        {QString::fromLatin1(kUserProfileName),
+         QStringLiteral("Your own curve. Drag the rose line to shape it, "
+                        "or copy a built-in and adjust from there. This "
+                        "is the one that should win — the others are "
+                        "starting points, and none of them is your "
+                        "voice or your microphone."),
+         3000.0},
         {QStringLiteral("DX / Voodoo"),
          QStringLiteral("Harder still. A narrow, forward sound built to "
                         "cut through noise at the far end. Tiring over a "
                         "long contact and unmistakable over a short one."),
          2400.0},
     };
+}
+
+const double* userPointFreqs()
+{
+    // Log-spaced from 50 Hz to 6 kHz. Denser through 300-3000 where the
+    // decisions are, because a point at 12 kHz would be a handle nobody
+    // can usefully move on an SSB signal.
+    static const double kF[kUserPointCount] = {
+        50, 80, 125, 200, 315, 500, 800, 1250, 2000, 3000, 4500, 6000
+    };
+    return kF;
+}
+
+namespace {
+const char kUserKey[] = "ChannelStrip/UserTargetDb";
+}
+
+QVector<double> userTarget()
+{
+    const QVariantList raw =
+        AppSettings::instance().value(QString::fromLatin1(kUserKey)).toList();
+    QVector<double> out;
+    out.reserve(kUserPointCount);
+    for (int i = 0; i < kUserPointCount; ++i) {
+        out.append(i < raw.size() ? raw.at(i).toDouble() : 0.0);
+    }
+    return out;
+}
+
+void setUserTarget(const QVector<double>& db)
+{
+    QVariantList raw;
+    for (int i = 0; i < kUserPointCount; ++i) {
+        raw.append(i < db.size() ? db.at(i) : 0.0);
+    }
+    AppSettings::instance().setValue(QString::fromLatin1(kUserKey), raw);
+}
+
+void seedUserTargetFrom(const QString& profileName)
+{
+    QVector<double> v;
+    const double* f = userPointFreqs();
+    for (int i = 0; i < kUserPointCount; ++i) {
+        v.append(targetDb(profileName, f[i]));
+    }
+    setUserTarget(v);
 }
 
 double targetDb(const QString& profile, double hz)
@@ -112,6 +167,16 @@ double targetDb(const QString& profile, double hz)
         {6000, -32}, {16000, -40},
     };
 
+    if (profile == QLatin1String(kUserProfileName)) {
+        const QVector<double> v = userTarget();
+        const double* f = userPointFreqs();
+        std::vector<Point> pts;
+        pts.reserve(kUserPointCount);
+        for (int i = 0; i < kUserPointCount; ++i) {
+            pts.push_back({f[i], i < v.size() ? v.at(i) : 0.0});
+        }
+        return interp(pts, hz);
+    }
     if (profile == QLatin1String("SSB 3.0 kHz")) { return interp(kSsb30, hz); }
     if (profile == QLatin1String("SSB 3.3 kHz")) { return interp(kSsb33, hz); }
     if (profile == QLatin1String("Contest"))     { return interp(kContest, hz); }

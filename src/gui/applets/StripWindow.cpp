@@ -749,8 +749,73 @@ QWidget* StripWindow::buildEqPanel()
         }
         m_profileBox->setMinimumWidth(150);
         row->addWidget(m_profileBox);
+
+        // ── Three ways to get the target you want ────────────────────
+        //
+        // The bench's verdict on all five built-ins was "not what I
+        // want", which is the correct verdict on somebody else's
+        // opinion about your voice. So: copy the nearest one and adjust
+        // it, take your own current sound as the target, or start from
+        // flat. All three write the same twelve points, and the rose
+        // line grows handles once "Mine" is chosen.
+        auto* copyBtn = new QPushButton(QStringLiteral("Copy to Mine"), page);
+        copyBtn->setStyleSheet(Style::buttonBaseStyle());
+        copyBtn->setToolTip(QStringLiteral(
+            "Take the profile shown and make it your own starting point. "
+            "Nothing is lost — the built-ins are still there."));
+        row->addWidget(copyBtn);
+
+        auto* fromVoiceBtn = new QPushButton(
+            QStringLiteral("My voice → Mine"), page);
+        fromVoiceBtn->setStyleSheet(Style::buttonBaseStyle());
+        fromVoiceBtn->setToolTip(QStringLiteral(
+            "Use the fifteen-second average as the target. The rose line "
+            "then sits flat, and every change you make afterwards is "
+            "measured against how you sound today rather than against "
+            "somebody's idea of how a voice should sound."));
+        row->addWidget(fromVoiceBtn);
+
+        auto* flatBtn = new QPushButton(QStringLiteral("Flat"), page);
+        flatBtn->setStyleSheet(Style::buttonBaseStyle());
+        flatBtn->setToolTip(QStringLiteral(
+            "Clear your curve. A flat target means the equaliser is "
+            "asked to leave the voice alone."));
+        row->addWidget(flatBtn);
+
         row->addStretch(1);
         outer->addLayout(row);
+
+        connect(copyBtn, &QPushButton::clicked, this, [this]() {
+            StripTargets::seedUserTargetFrom(
+                m_profileBox->currentData().toString());
+            const int at = m_profileBox->findData(
+                QString::fromLatin1(StripTargets::kUserProfileName));
+            if (at >= 0) { m_profileBox->setCurrentIndex(at); }
+            if (m_eqCurve) { m_eqCurve->refresh(); }
+        });
+        connect(flatBtn, &QPushButton::clicked, this, [this]() {
+            StripTargets::setUserTarget(
+                QVector<double>(StripTargets::kUserPointCount, 0.0));
+            const int at = m_profileBox->findData(
+                QString::fromLatin1(StripTargets::kUserProfileName));
+            if (at >= 0) { m_profileBox->setCurrentIndex(at); }
+            if (m_eqCurve) { m_eqCurve->refresh(); }
+        });
+        connect(fromVoiceBtn, &QPushButton::clicked, this, [this]() {
+            if (!m_eqCurve) { return; }
+            const QVector<double> mine = m_eqCurve->measuredAtTargetPoints();
+            if (mine.isEmpty()) {
+                QMessageBox::information(this, QStringLiteral("Target"),
+                    QStringLiteral("Speak for a few seconds first — there "
+                                   "is no measured curve to copy yet."));
+                return;
+            }
+            StripTargets::setUserTarget(mine);
+            const int at = m_profileBox->findData(
+                QString::fromLatin1(StripTargets::kUserProfileName));
+            if (at >= 0) { m_profileBox->setCurrentIndex(at); }
+            m_eqCurve->refresh();
+        });
 
         m_profileNote = new QLabel(page);
         m_profileNote->setWordWrap(true);
@@ -778,9 +843,11 @@ QWidget* StripWindow::buildEqPanel()
     // Dragging the curve writes straight into the chain; the window
     // decides when that reaches the settings file, so there is one
     // place that saves rather than one per control.
-    connect(m_eqCurve, &StripEqCurve::bandChanged, this, [this](int) {
-        refreshEqTable();
-        persist();
+    connect(m_eqCurve, &StripEqCurve::bandChanged, this, [this](int band) {
+        // -1 means the target moved, not a band. It is already stored in
+        // its own settings key, so there is nothing to persist and no
+        // table row to refresh.
+        if (band >= 0) { refreshEqTable(); persist(); }
     });
 
     {
