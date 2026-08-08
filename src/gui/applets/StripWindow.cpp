@@ -23,6 +23,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSlider>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTimer>
@@ -121,6 +122,20 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
     refreshChainRow();
 }
 
+// Read a stage value for a control's initial position.
+//
+// Without this the panels are a lie after a restart: StripSettings has
+// already put the operator's values into the chain, but every slider
+// would open at the literal default written in the call below — and the
+// first touch of any slider would then write that default over the
+// restored value. Persistence that silently undoes itself on the next
+// nudge is worse than none, because it looks like it works.
+double StripWindow::cur(const std::function<float()>& read,
+                        double fallback) const
+{
+    return chain() ? double(read()) : fallback;
+}
+
 void StripWindow::persist()
 {
     if (StripChain* c = chain()) { StripSettings::save(*c); }
@@ -164,32 +179,20 @@ void StripWindow::buildUi()
 
     // ── Chain row ────────────────────────────────────────────────────
     //
-    // Read-only on purpose. It answers "what is running" at a glance
-    // while a stage is being edited; a row that also accepts clicks is
-    // a row people change by accident while reaching for a tab.
-    {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(4);
-        for (int i = 0; i < StripChain::kStageCount; ++i) {
-            auto* tile = new QLabel(
-                QString::fromLatin1(StripChain::stageName(
-                    static_cast<StripChain::Stage>(i))), this);
-            tile->setAlignment(Qt::AlignCenter);
-            tile->setMinimumWidth(72);
-            m_chainTiles[static_cast<size_t>(i)] = tile;
-            row->addWidget(tile);
-            if (i < StripChain::kStageCount - 1) {
-                auto* arrow = new QLabel(QStringLiteral("▸"), this);
-                arrow->setStyleSheet(dimStyle());
-                row->addWidget(arrow);
-            }
-        }
-        row->addStretch(1);
-        col->addLayout(row);
-    }
+    // Painted rather than eight labels: each tile carries its own
+    // gain-reduction bar, and the whole chain's behaviour becomes one
+    // glance instead of eight numbers to read while speaking.
+    m_chainView = new StripChainView(this);
+    m_chainView->setChain(chain());
+    connect(m_chainView, &StripChainView::stageClicked, this, [this](int i) {
+        if (m_tabs) { m_tabs->setCurrentIndex(i); }
+    });
+    col->addWidget(m_chainView);
 
     // ── One tab per stage ────────────────────────────────────────────
     m_tabs = new QTabWidget(this);
+    // Built below; each panel registers its own enable box, and they are
+    // synced to the chain immediately afterwards.
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         const auto s = static_cast<StripChain::Stage>(i);
         QWidget* page = nullptr;
@@ -204,6 +207,18 @@ void StripWindow::buildUi()
                        QString::fromLatin1(StripChain::stageName(s)));
     }
     col->addWidget(m_tabs, 1);
+
+    // The enable boxes are created unchecked and the chain may already
+    // have stages on from the saved settings. Sync with signals blocked
+    // so this does not write the pre-sync state straight back out.
+    if (StripChain* c = chain()) {
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            QCheckBox* box = m_stageBoxes[static_cast<size_t>(i)];
+            if (!box) { continue; }
+            const QSignalBlocker block(box);
+            box->setChecked(c->stageEnabled(static_cast<StripChain::Stage>(i)));
+        }
+    }
 
     auto* closeRow = new QHBoxLayout;
     closeRow->addStretch(1);
@@ -259,26 +274,27 @@ QWidget* StripWindow::buildGatePanel()
     form->addRow(QStringLiteral("Character"), mode);
 
     addKnob(form, QStringLiteral("Threshold"),
-        -80.0, 0.0, 1.0, -40.0, QStringLiteral("dB"), [this](double v) {
+        -80.0, 0.0, 1.0, cur([this]{ return chain()->gate().thresholdDb(); }, -40.0),
+        QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setThresholdDb(float(v)); }
         }, 0);
-    addKnob(form, QStringLiteral("Attack"), 0.1, 100.0, 0.1, 0.5,
+    addKnob(form, QStringLiteral("Attack"), 0.1, 100.0, 0.1, cur([this]{ return chain()->gate().attackMs(); }, 0.5),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setAttackMs(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Hold"), 0.0, 500.0, 5.0, 20.0,
+    addKnob(form, QStringLiteral("Hold"), 0.0, 500.0, cur([this]{ return chain()->comp().attackMs(); }, 5.0), cur([this]{ return chain()->gate().holdMs(); }, 20.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setHoldMs(float(v)); }
         }, 0);
-    addKnob(form, QStringLiteral("Release"), 5.0, 2000.0, 5.0, 100.0,
+    addKnob(form, QStringLiteral("Release"), 5.0, 2000.0, 5.0, cur([this]{ return chain()->gate().releaseMs(); }, 100.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setReleaseMs(float(v)); }
         }, 0);
-    addKnob(form, QStringLiteral("Depth"), -80.0, 0.0, 1.0, -15.0,
+    addKnob(form, QStringLiteral("Depth"), -80.0, 0.0, 1.0, cur([this]{ return chain()->gate().floorDb(); }, -15.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setFloorDb(float(v)); }
         }, 0);
-    addKnob(form, QStringLiteral("Hysteresis"), 0.0, 20.0, 0.5, 2.0,
+    addKnob(form, QStringLiteral("Hysteresis"), 0.0, 20.0, 0.5, cur([this]{ return chain()->gate().returnDb(); }, 2.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setReturnDb(float(v)); }
         }, 1, [this]{ persist(); });
@@ -367,13 +383,26 @@ void StripWindow::applyHumNotches(int baseHz, bool on)
         p.enabled = on;
         c->eq().setBand(h, p);
     }
+    if (m_eqCurve) { m_eqCurve->refresh(); }
     persist();
 }
 
 QWidget* StripWindow::buildEqPanel()
 {
     auto* page = new QWidget(this);
-    auto* form = new QFormLayout(page);
+    auto* outer = new QVBoxLayout(page);
+    outer->setContentsMargins(0, 0, 0, 0);
+
+    // The curve first, and large. This is the whole reason the EQ tab
+    // is worth opening: the high-pass corner and the mains notches stop
+    // being three numbers and become a shape you can aim.
+    m_eqCurve = new StripEqCurve(page);
+    m_eqCurve->setChain(chain());
+    outer->addWidget(m_eqCurve);
+
+    auto* body = new QWidget(page);
+    outer->addWidget(body, 1);
+    auto* form = new QFormLayout(body);
 
     const int idx = static_cast<int>(StripChain::Stage::Eq);
     auto* on = new QCheckBox(QStringLiteral("EQ on"), page);
@@ -396,7 +425,7 @@ QWidget* StripWindow::buildEqPanel()
     };
 
     // ── High-pass ────────────────────────────────────────────────────
-    addKnob(form, QStringLiteral("High-pass"), 20.0, 400.0, 5.0, 100.0,
+    addKnob(form, QStringLiteral("High-pass"), 20.0, 400.0, 5.0, cur([this]{ return chain()->eq().band(0).freqHz; }, 100.0),
         QStringLiteral("Hz"), [setBandField](double v) {
             setBandField(0, &ClientEq::BandParams::freqHz, v);
         }, 0, [this]{ persist(); });
@@ -460,15 +489,15 @@ QWidget* StripWindow::buildEqPanel()
     }
 
     // ── Tone ─────────────────────────────────────────────────────────
-    addKnob(form, QStringLiteral("Low"), -12.0, 12.0, 0.5, 0.0,
+    addKnob(form, QStringLiteral("Low"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(4).gainDb; }, 0.0),
         QStringLiteral("dB"), [setBandField](double v) {
             setBandField(4, &ClientEq::BandParams::gainDb, v);
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Presence"), -12.0, 12.0, 0.5, 0.0,
+    addKnob(form, QStringLiteral("Presence"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(5).gainDb; }, 0.0),
         QStringLiteral("dB"), [setBandField](double v) {
             setBandField(5, &ClientEq::BandParams::gainDb, v);
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("High"), -12.0, 12.0, 0.5, 0.0,
+    addKnob(form, QStringLiteral("High"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(6).gainDb; }, 0.0),
         QStringLiteral("dB"), [setBandField](double v) {
             setBandField(6, &ClientEq::BandParams::gainDb, v);
         }, 1, [this]{ persist(); });
@@ -503,27 +532,27 @@ QWidget* StripWindow::buildDeEssPanel()
         persist();
     });
 
-    addKnob(form, QStringLiteral("Frequency"), 1000.0, 12000.0, 100.0, 6000.0,
+    addKnob(form, QStringLiteral("Frequency"), 1000.0, 12000.0, 100.0, cur([this]{ return chain()->deEss().frequencyHz(); }, 6000.0),
         QStringLiteral("Hz"), [this](double v) {
             if (StripChain* c = chain()) { c->deEss().setFrequencyHz(float(v)); }
         }, 0, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Width"), 0.5, 5.0, 0.1, 2.0,
+    addKnob(form, QStringLiteral("Width"), 0.5, 5.0, 0.1, cur([this]{ return chain()->deEss().q(); }, 2.0),
         QStringLiteral("Q"), [this](double v) {
             if (StripChain* c = chain()) { c->deEss().setQ(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Threshold"), -60.0, 0.0, 1.0, -25.0,
+    addKnob(form, QStringLiteral("Threshold"), -60.0, 0.0, 1.0, cur([this]{ return chain()->deEss().thresholdDb(); }, -25.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->deEss().setThresholdDb(float(v)); }
         }, 0, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Amount"), -24.0, 0.0, 0.5, -6.0,
+    addKnob(form, QStringLiteral("Amount"), -24.0, 0.0, 0.5, cur([this]{ return chain()->deEss().amountDb(); }, -6.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->deEss().setAmountDb(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Attack"), 0.1, 30.0, 0.1, 1.0,
+    addKnob(form, QStringLiteral("Attack"), 0.1, 30.0, 0.1, cur([this]{ return chain()->deEss().attackMs(); }, 1.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->deEss().setAttackMs(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Release"), 10.0, 500.0, 5.0, 80.0,
+    addKnob(form, QStringLiteral("Release"), 10.0, 500.0, 5.0, cur([this]{ return chain()->deEss().releaseMs(); }, 80.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->deEss().setReleaseMs(float(v)); }
         }, 0, [this]{ persist(); });
@@ -565,11 +594,11 @@ QWidget* StripWindow::buildCompPanel()
         persist();
     });
 
-    addKnob(form, QStringLiteral("Threshold"), -60.0, 0.0, 1.0, -20.0,
+    addKnob(form, QStringLiteral("Threshold"), -60.0, 0.0, 1.0, cur([this]{ return chain()->comp().thresholdDb(); }, -20.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setThresholdDb(float(v)); }
         }, 0);
-    addKnob(form, QStringLiteral("Ratio"), 1.0, 20.0, 0.5, 3.0,
+    addKnob(form, QStringLiteral("Ratio"), 1.0, 20.0, 0.5, cur([this]{ return chain()->comp().ratio(); }, 3.0),
         QStringLiteral(": 1"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setRatio(float(v)); }
         }, 1, [this]{ persist(); });
@@ -577,15 +606,15 @@ QWidget* StripWindow::buildCompPanel()
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setAttackMs(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Release"), 5.0, 2000.0, 5.0, 120.0,
+    addKnob(form, QStringLiteral("Release"), 5.0, 2000.0, 5.0, cur([this]{ return chain()->comp().releaseMs(); }, 120.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setReleaseMs(float(v)); }
         }, 0);
-    addKnob(form, QStringLiteral("Knee"), 0.0, 24.0, 0.5, 6.0,
+    addKnob(form, QStringLiteral("Knee"), 0.0, 24.0, 0.5, cur([this]{ return chain()->comp().kneeDb(); }, 6.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setKneeDb(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Make-up"), 0.0, 24.0, 0.5, 0.0,
+    addKnob(form, QStringLiteral("Make-up"), cur([this]{ return chain()->comp().makeupDb(); }, 0.0), 24.0, 0.5, 0.0,
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setMakeupDb(float(v)); }
         }, 1, [this]{ persist(); });
@@ -652,35 +681,28 @@ QWidget* StripWindow::buildPlaceholder(StripChain::Stage s)
 
 void StripWindow::refreshChainRow()
 {
-    StripChain* c = chain();
-    const bool master = c && c->isEnabled();
-
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
-        QLabel* tile = m_chainTiles[static_cast<size_t>(i)];
-        if (!tile) { continue; }
-        const bool on = c
-            && c->stageEnabled(static_cast<StripChain::Stage>(i));
-        // Three states, not two: a stage can be switched on and still
-        // be doing nothing because the master is off, and showing that
-        // as "on" is how an operator concludes the strip is broken.
-        const QString bg  = (on && master)
-            ? QString::fromLatin1(Style::kButtonBg)
-            : QString::fromLatin1(Style::kInsetBg);
-        const QString fg  = !on
-            ? QString::fromLatin1(Style::kTextInactive)
-            : (master ? QString::fromLatin1(Style::kAccent)
-                      : QString::fromLatin1(Style::kTextSecondary));
-        tile->setStyleSheet(
-            QStringLiteral("QLabel { background: %1; color: %2; border: "
-                           "1px solid %3; padding: 3px; font-size: 10px; }")
-                .arg(bg, fg, QString::fromLatin1(Style::kInsetBorder)));
+    if (m_chainView) {
+        m_chainView->setChain(chain());
+        m_chainView->update();
     }
+    if (m_eqCurve) { m_eqCurve->refresh(); }
 }
 
 void StripWindow::refreshMeters()
 {
     StripChain* c = chain();
     if (!c) { return; }
+
+    // The tiles are the primary reading; the text below each panel is
+    // for someone who wants the number rather than the shape.
+    if (m_chainView) {
+        m_chainView->setReduction(StripChain::Stage::Gate,
+                                  c->gate().gainReductionDb());
+        m_chainView->setReduction(StripChain::Stage::Comp,
+                                  c->comp().gainReductionDb());
+        m_chainView->setReduction(StripChain::Stage::DeEss,
+                                  c->deEss().gainReductionDb());
+    }
 
     if (m_gateMeter) {
         m_gateMeter->setText(QStringLiteral(

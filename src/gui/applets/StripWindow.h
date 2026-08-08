@@ -44,11 +44,13 @@
 // =================================================================
 
 #include "core/strip/StripChain.h"
+#include "gui/applets/StripGraphics.h"
 
 #include <QDialog>
 #include <QPointer>
 
 #include <array>
+#include <functional>
 
 class QCheckBox;
 class QComboBox;
@@ -85,6 +87,12 @@ private:
     // without also being remembered.
     void persist();
 
+    // A control's opening position: the chain's value when there is a
+    // chain, the literal default otherwise. See the note on the
+    // definition — without it, persistence undoes itself on the first
+    // nudge of any slider.
+    double cur(const std::function<float()>& read, double fallback) const;
+
     // The chain the window edits, or null when there is no connection.
     // Every control checks: the chain lives with the connection, and
     // this window can outlive one.
@@ -100,7 +108,8 @@ private:
     QTabWidget* m_tabs{nullptr};
     QTimer*     m_meterTimer{nullptr};
 
-    std::array<QLabel*, StripChain::kStageCount> m_chainTiles{};
+    StripChainView* m_chainView{nullptr};
+    StripEqCurve*   m_eqCurve{nullptr};
     std::array<QCheckBox*, StripChain::kStageCount> m_stageBoxes{};
 
     QLabel* m_gateMeter{nullptr};

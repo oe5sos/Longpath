@@ -959,6 +959,7 @@ set(GUI_SOURCES
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp
     src/gui/applets/TxVoiceCheckDialog.cpp
+    src/gui/applets/StripGraphics.cpp
     src/gui/applets/StripWindow.cpp
     src/gui/applets/TxCfcDialog.cpp
     src/gui/applets/PhoneCwApplet.cpp
