@@ -139,6 +139,7 @@ class WidebandFftEngine;
 // 3M-1a G.1: forward declarations for TX-side components.
 class MoxController;
 class TxChannel;
+class StripChain;
 // Phase 3F Sub-Epic J Task 11: forward decl for rxChannelForSlice()'s
 // return type (see below, near txChannel()).
 class RxChannel;
@@ -1071,6 +1072,14 @@ public:
     // in TxChannel drives fexchange2 → sendTxIq (SPSC ring) while running.
     // Wired by 3M-1a Task G.1 (bench fix: TUNE carrier now reaches the radio).
     TxChannel* txChannel() const { return m_txChannel; }
+
+    /// Aetherial Audio Channel Strip — the client-side transmit chain.
+    ///
+    /// Lives for as long as the connection does, because the strip's
+    /// stages hold prepared delay lines sized to the sample rate.
+    /// Null before connectToRadio() and after teardown; the panels
+    /// must check.
+    StripChain* stripChain() const { return m_stripChain.get(); }
 
     // Phase 3F Sub-Epic J Task 11: the one place GUI code may resolve a
     // slice's WDSP channel. Mirrors txChannel()'s shape. Added so MainWindow
@@ -3508,6 +3517,9 @@ private:
     // safe to call from the main thread per the WDSP API contract.
     // From Thetis dsp.cs:926-944 [v2.10.3.13] — WDSP.id(1, 0) = channel 1.
     TxChannel* m_txChannel{nullptr};
+    // Off by default and owned here rather than by the worker, so the
+    // panels can reach it without going through the audio thread.
+    std::unique_ptr<StripChain> m_stripChain;
 
     // TX mic source — strategy interface for silence (3M-1a) or real mic (3M-1b).
     // Owned by RadioModel via unique_ptr. NullMicSource for 3M-1a; replaced with

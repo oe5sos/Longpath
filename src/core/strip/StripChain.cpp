@@ -1,0 +1,142 @@
+// =================================================================
+// src/core/strip/StripChain.cpp  (NereusSDR)
+// =================================================================
+//
+// NereusSDR-original. See StripChain.h for the order, the two rules
+// and why the runner is ours rather than ported.
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
+// =================================================================
+
+#include "core/strip/StripChain.h"
+
+namespace NereusSDR {
+
+StripChain::StripChain()
+{
+    for (auto& f : m_stageOn) { f.store(false, std::memory_order_relaxed); }
+}
+
+void StripChain::prepare(double sampleRate)
+{
+    m_sampleRate = sampleRate;
+    m_gate.prepare(sampleRate);
+    m_eq.prepare(sampleRate);
+    m_deEss.prepare(sampleRate);
+    m_comp.prepare(sampleRate);
+    m_tube.prepare(sampleRate);
+    m_pudu.prepare(sampleRate);
+    m_reverb.prepare(sampleRate);
+    m_limiter.prepare(sampleRate);
+}
+
+void StripChain::setEnabled(bool on) noexcept
+{
+    m_enabled.store(on, std::memory_order_release);
+}
+
+bool StripChain::isEnabled() const noexcept
+{
+    return m_enabled.load(std::memory_order_acquire);
+}
+
+void StripChain::setStageEnabled(Stage s, bool on) noexcept
+{
+    const int i = static_cast<int>(s);
+    if (i < 0 || i >= kStageCount) { return; }
+    m_stageOn[static_cast<size_t>(i)].store(on, std::memory_order_release);
+
+    // Mirror into the stage's own switch where it has one. Keeping both
+    // in step means there is a single answer to "is the compressor on",
+    // whether it is asked of the chain or of the compressor.
+    switch (s) {
+    case Stage::Gate:  m_gate.setEnabled(on);  break;
+    case Stage::Eq:    m_eq.setEnabled(on);    break;
+    case Stage::DeEss: m_deEss.setEnabled(on); break;
+    case Stage::Comp:  m_comp.setEnabled(on);  break;
+    case Stage::Tube:  m_tube.setEnabled(on);  break;
+    case Stage::Pudu:  m_pudu.setEnabled(on);  break;
+    // Reverb and the limiter have no enable upstream. The chain's own
+    // flag is the only switch they get, and processMono honours it by
+    // not calling them.
+    case Stage::Reverb:
+    case Stage::Limiter:
+    case Stage::Count:
+        break;
+    }
+}
+
+bool StripChain::stageEnabled(Stage s) const noexcept
+{
+    const int i = static_cast<int>(s);
+    if (i < 0 || i >= kStageCount) { return false; }
+    return m_stageOn[static_cast<size_t>(i)].load(std::memory_order_acquire);
+}
+
+const char* StripChain::stageName(Stage s) noexcept
+{
+    switch (s) {
+    case Stage::Gate:    return "Gate";
+    case Stage::Eq:      return "EQ";
+    case Stage::DeEss:   return "De-Esser";
+    case Stage::Comp:    return "Compressor";
+    case Stage::Tube:    return "Tube";
+    case Stage::Pudu:    return "PUDU";      // the AetherVoice exciter
+    case Stage::Reverb:  return "Reverb";
+    case Stage::Limiter: return "Limiter";
+    case Stage::Count:   break;
+    }
+    return "";
+}
+
+void StripChain::processMono(float* samples, int frames) noexcept
+{
+    // One atomic load and out. Not "run every stage and let each one
+    // notice it is disabled": that would make the guarantee depend on
+    // eight separate stages each getting their own bypass right, and
+    // this is the transmit path.
+    if (!m_enabled.load(std::memory_order_acquire)) { return; }
+    if (samples == nullptr || frames <= 0) { return; }
+
+    // Each stage's own enable flag decides whether it does anything;
+    // the chain's flag decides whether it is called at all. For the six
+    // that have both, the two agree because setStageEnabled writes
+    // both. Calling through anyway would be harmless — their bypass is
+    // bit-exact, and tst_strip_dsp holds it to that — but a stage that
+    // is off should cost nothing.
+    constexpr int kMono = 1;
+
+    if (stageEnabled(Stage::Gate))  { m_gate.process(samples, frames, kMono); }
+    if (stageEnabled(Stage::Eq))    { m_eq.process(samples, frames, kMono); }
+    if (stageEnabled(Stage::DeEss)) { m_deEss.process(samples, frames, kMono); }
+    if (stageEnabled(Stage::Comp))  { m_comp.process(samples, frames, kMono); }
+    if (stageEnabled(Stage::Tube))  { m_tube.process(samples, frames, kMono); }
+    if (stageEnabled(Stage::Pudu))  { m_pudu.process(samples, frames, kMono); }
+    if (stageEnabled(Stage::Reverb)) {
+        m_reverb.process(samples, frames, kMono);
+    }
+    // Last, and for a reason: a brickwall that anything runs after is
+    // not a brickwall. Everything above can add gain — the tube, the
+    // exciter, the compressor's make-up — and this is what stops the
+    // sum reaching the modulator hotter than it should.
+    if (stageEnabled(Stage::Limiter)) {
+        m_limiter.process(samples, frames, kMono);
+    }
+}
+
+void StripChain::reset() noexcept
+{
+    m_gate.reset();
+    m_eq.reset();
+    m_deEss.reset();
+    m_comp.reset();
+    m_tube.reset();
+    m_pudu.reset();
+    m_reverb.reset();
+    m_limiter.reset();
+}
+
+} // namespace NereusSDR

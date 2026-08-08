@@ -46,6 +46,7 @@ class AudioEngine;
 class RadeChannel;
 class TxChannel;
 class TxMicSource;
+class StripChain;
 
 // ---------------------------------------------------------------------------
 // TxWorkerThread — dedicated QThread for the TX DSP pump.
@@ -125,6 +126,24 @@ public:
     void setTxChannel(TxChannel* ch);
     void setAudioEngine(AudioEngine* engine);
     void setMicSource(TxMicSource* src);
+
+    /// Aetherial Audio Channel Strip — client-side transmit processing.
+    ///
+    /// Runs on the raw microphone block, before pumpDexp and before
+    /// WDSP. That ordering is deliberate and matches upstream: the
+    /// strip is a pre-processor sitting in front of the radio's own
+    /// chain, so the radio's VOX detector and WDSP's EQ / compressor
+    /// see what the operator actually intends to send.
+    ///
+    /// Not owned. Null is the normal state until RadioModel installs
+    /// one, and processMono() on a chain that is switched off returns
+    /// before touching a sample — so this costs one null check and one
+    /// atomic load per block when nobody is using it.
+    ///
+    /// Cannot key the radio: it is a function from samples to samples.
+    /// The pump's own gates are untouched — see
+    /// TxChannel::writesToRadio().
+    void setStripChain(StripChain* chain);
 
     /// Phase 3R K-bench: set / clear the RadeChannel the worker emits
     /// RADE mic blocks toward when m_currentTxPath == Rade.  Wired by
@@ -409,6 +428,13 @@ private:
     // PC-mic-override scratch — float buffer for AudioEngine::pullTxMic.
     // Sized kBlockFrames floats.
     std::vector<float> m_pcMicBuf;
+
+    // Channel strip and its mono scratch. m_in is interleaved double;
+    // the strip works on mono float, so the I channel is lifted out,
+    // processed and written back. Sized in setStripChain rather than
+    // per block — no allocation on the audio thread.
+    StripChain*        m_stripChain{nullptr};
+    std::vector<float> m_stripBuf;
 
     // Anti-VOX run gate (3M-3a-iv).  Mirrors the most-recent
     // setAntiVoxRun(bool) call.  Read with acquire in

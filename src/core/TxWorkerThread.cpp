@@ -101,6 +101,7 @@
 #include "TxChannel.h"
 #include "audio/RealtimeAudioPriority.h"
 #include "audio/TxMicSource.h"
+#include "core/strip/StripChain.h"
 
 #include <QCoreApplication>
 #include <QLoggingCategory>
@@ -463,6 +464,14 @@ void TxWorkerThread::run()
     txAudioPrio = nullptr;
 
     qCInfo(lcTxWorker) << "run: worker thread loop exited";
+}
+
+void TxWorkerThread::setStripChain(StripChain* chain)
+{
+    m_stripChain = chain;
+    // Allocate once, here, on the main thread. The strip runs on the
+    // worker and must never allocate.
+    m_stripBuf.assign(static_cast<size_t>(kBlockFrames), 0.0f);
 }
 
 void TxWorkerThread::dispatchOneBlock()
@@ -865,6 +874,35 @@ void TxWorkerThread::dispatchOneBlock()
     //
     // Null-safe inside pumpDexp: degrades to a no-op if pdexp[id] /
     // txa[].rsmpin.p / m_dexpBuffer are missing.
+    // ── Aetherial Audio Channel Strip ────────────────────────────────
+    //
+    // Here, and not later: this is the last point at which the block is
+    // still the operator's microphone, and everything downstream — the
+    // DEXP/VOX detector immediately below, then WDSP's own EQ,
+    // compressor and modulator — should see what the operator means to
+    // send rather than what the microphone happened to produce.
+    //
+    // Switched off, this is one null check and one atomic load. Switched
+    // on, it is a function from samples to samples: it reads nothing
+    // that could key the radio and writes nothing but m_in's I channel.
+    if (m_stripChain != nullptr && m_stripChain->isEnabled()
+        && static_cast<int>(m_stripBuf.size()) >= kBlockFrames) {
+        for (int i = 0; i < kBlockFrames; ++i) {
+            m_stripBuf[static_cast<size_t>(i)] =
+                static_cast<float>(m_in[static_cast<size_t>(2 * i)]);
+        }
+        m_stripChain->processMono(m_stripBuf.data(), kBlockFrames);
+        for (int i = 0; i < kBlockFrames; ++i) {
+            m_in[static_cast<size_t>(2 * i)] =
+                static_cast<double>(m_stripBuf[static_cast<size_t>(i)]);
+            // Q stays zero — the mic is mono and every path that fills
+            // m_in already leaves it so. Writing it explicitly means a
+            // future stereo stage cannot leak into the Q channel by
+            // accident.
+            m_in[static_cast<size_t>(2 * i + 1)] = 0.0;
+        }
+    }
+
     m_txChannel->pumpDexp(m_in.data());
 
     // fexchange0 — mirrors cmaster.c:389 [v2.10.3.13]:

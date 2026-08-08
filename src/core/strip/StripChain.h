@@ -1,0 +1,132 @@
+#pragma once
+
+// =================================================================
+// src/core/strip/StripChain.h  (NereusSDR)
+// =================================================================
+//
+// NereusSDR-original, over DSP ported from AetherSDR
+// (https://github.com/aethersdr/AetherSDR, GPLv3, primary author
+// Jeremy [KK7GWY]). The stage order and the stage set follow
+// AetherSDR's `defaultChain()` in src/core/AudioEngine.cpp at
+// `31b29583`; the runner itself is written for NereusSDR because
+// AetherSDR dispatches its chain from inside AudioEngine and
+// NereusSDR's transmit audio does not pass through there.
+//
+// The Aetherial Audio Channel Strip's stages, in order, as one object
+// that can be handed to the transmit pump.
+//
+//   gate → EQ → de-esser → compressor → tube → PUDU → reverb → limiter
+//
+// PUDU is the AetherVoice exciter. The phase rotator lives inside the
+// compressor upstream and is not a separate link here.
+//
+// Two rules, both about the fact that this sits in the transmit path:
+//
+//   Off by default. A fresh install sounds exactly as it did before
+//   this file existed, and the operator turns the strip on when they
+//   mean to.
+//
+//   Bypass is bit-exact and total. Master off returns before touching
+//   a single sample — not "every stage disabled", which would still
+//   depend on nine separate stages each honouring their own bypass.
+//   tst_strip_dsp pins the per-stage version of that promise;
+//   tst_strip_chain pins this one.
+//
+// What it cannot do: key the radio. It has no access to anything that
+// could. It is a function from samples to samples, called from the
+// pump, and the pump's own gates are unchanged — see
+// TxChannel::writesToRadio().
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
+// =================================================================
+
+#include "core/strip/ClientComp.h"
+#include "core/strip/ClientDeEss.h"
+#include "core/strip/ClientEq.h"
+#include "core/strip/ClientFinalLimiter.h"
+#include "core/strip/ClientGate.h"
+#include "core/strip/ClientPudu.h"
+#include "core/strip/ClientReverb.h"
+#include "core/strip/ClientTube.h"
+
+#include <array>
+#include <atomic>
+#include <cstdint>
+#include <vector>
+
+namespace NereusSDR {
+
+class StripChain {
+public:
+    // Order matches AetherSDR's defaultChain(); the limiter is not in
+    // that list because upstream applies it separately at the very end
+    // of the output path, and it is last here for the same reason.
+    enum class Stage : uint8_t {
+        Gate = 0, Eq, DeEss, Comp, Tube, Pudu, Reverb, Limiter, Count
+    };
+    static constexpr int kStageCount = static_cast<int>(Stage::Count);
+
+    StripChain();
+    ~StripChain() = default;
+
+    StripChain(const StripChain&)            = delete;
+    StripChain& operator=(const StripChain&) = delete;
+
+    // Main thread. Call before the first process() and on any rate
+    // change; every stage reallocates its own delay lines here.
+    void prepare(double sampleRate);
+    double sampleRate() const noexcept { return m_sampleRate; }
+
+    // Main thread, lock-free. Off by default — see the header note.
+    void setEnabled(bool on) noexcept;
+    bool isEnabled() const noexcept;
+
+    // Per-stage bypass. Delegates to the stage's own switch, except
+    // for reverb and the limiter, which upstream gives no switch: for
+    // those the chain skips the call.
+    void setStageEnabled(Stage s, bool on) noexcept;
+    bool stageEnabled(Stage s) const noexcept;
+
+    static const char* stageName(Stage s) noexcept;
+
+    // Audio thread. Mono, in place. Returns immediately when the
+    // master switch is off, so bypass costs one atomic load and the
+    // samples are untouched.
+    void processMono(float* samples, int frames) noexcept;
+
+    void reset() noexcept;
+
+    // The stages themselves, for the panels to bind to. Not owned by
+    // the caller and not valid across a prepare().
+    ClientGate&         gate()    noexcept { return m_gate; }
+    ClientEq&           eq()      noexcept { return m_eq; }
+    ClientDeEss&        deEss()   noexcept { return m_deEss; }
+    ClientComp&         comp()    noexcept { return m_comp; }
+    ClientTube&         tube()    noexcept { return m_tube; }
+    ClientPudu&         pudu()    noexcept { return m_pudu; }
+    ClientReverb&       reverb()  noexcept { return m_reverb; }
+    ClientFinalLimiter& limiter() noexcept { return m_limiter; }
+
+private:
+    double m_sampleRate{48000.0};
+
+    std::atomic<bool> m_enabled{false};
+    // Reverb and the limiter have no enable of their own upstream, so
+    // the chain keeps one here for them. The other six mirror the
+    // stage's own flag so there is only ever one answer.
+    std::array<std::atomic<bool>, kStageCount> m_stageOn;
+
+    ClientGate         m_gate;
+    ClientEq           m_eq;
+    ClientDeEss        m_deEss;
+    ClientComp         m_comp;
+    ClientTube         m_tube;
+    ClientPudu         m_pudu;
+    ClientReverb       m_reverb;
+    ClientFinalLimiter m_limiter;
+};
+
+} // namespace NereusSDR

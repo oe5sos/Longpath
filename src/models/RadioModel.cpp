@@ -269,6 +269,7 @@ warren@wpratt.com
 // 3M-1c TX pump architecture redesign — dedicated worker thread for
 // TX DSP pump (replaces D.1/E.1/L.4 chain).
 #include "core/TxWorkerThread.h"
+#include "core/strip/StripChain.h"
 // 3M-1b L.1: concrete mic-source strategy objects.
 #include "core/audio/PcMicSource.h"
 #include "core/audio/RadioMicSource.h"
@@ -7748,6 +7749,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txWorker->setTxChannel(m_txChannel);
                 m_txWorker->setAudioEngine(m_audioEngine);
                 m_txWorker->setMicSource(m_txMicSource.get());
+
+                // Aetherial Audio Channel Strip. Created with the pump
+                // and handed to it before it starts, so there is no
+                // window in which the worker holds a half-prepared
+                // chain. Off by default — see StripChain.h.
+                m_stripChain = std::make_unique<StripChain>();
+                m_stripChain->prepare(48000.0);   // TXA input rate
+                m_txWorker->setStripChain(m_stripChain.get());
                 m_txChannel->moveToThread(m_txWorker.get());
                 m_txWorker->startPump();
 
@@ -11479,6 +11488,9 @@ void RadioModel::teardownConnection()
             m_txChannel->moveToThread(this->thread());
         }
         m_txWorker.reset();
+        // After the worker, never before: the worker holds a raw
+        // pointer to the chain and runs it on the audio thread.
+        m_stripChain.reset();
     }
     // Phase 3M-1c TX pump v3: drop the connection's view of the mic
     // source BEFORE destroying it.  Otherwise the next inbound mic
