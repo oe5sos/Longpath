@@ -55,7 +55,9 @@
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QTableWidget;
 class QTabWidget;
+class QVBoxLayout;
 class QTimer;
 class QWidget;
 
@@ -94,6 +96,19 @@ private:
     static constexpr int kBandHighShelf = 9;
 
     void seedEqLayout();
+
+    // The numbers under the picture, one row per draggable band.
+    //
+    // A graph is the right tool for "make this bit quieter" and the
+    // wrong one for "put it at exactly 2200". Both belong, and they are
+    // the same bands seen twice — the table is not a second setting to
+    // keep in step, it reads and writes the chain like everything else.
+    void buildEqTable(QWidget* parent, QVBoxLayout* into);
+    void refreshEqTable();
+    void onEqTableEdited(int row, int column);
+
+    QTableWidget* m_eqTable{nullptr};
+    bool          m_fillingTable{false};
     void applyHumNotches(int baseHz, bool on);
 
     // Everything writes through here, so nothing can change the chain

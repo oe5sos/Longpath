@@ -33,6 +33,8 @@
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QHeaderView>
+#include <QTableWidget>
 #include <QTabWidget>
 #include <QTimer>
 #include <QPushButton>
@@ -581,6 +583,130 @@ void StripWindow::seedEqLayout()
     c->eq().setActiveBandCount(kEqBandCount);
 }
 
+void StripWindow::buildEqTable(QWidget* parent, QVBoxLayout* into)
+{
+    m_eqTable = new QTableWidget(0, 5, parent);
+    m_eqTable->setHorizontalHeaderLabels({
+        QStringLiteral("#"), QStringLiteral("Hz"), QStringLiteral("dB"),
+        QStringLiteral("Q"), QStringLiteral("Shape")});
+    m_eqTable->verticalHeader()->setVisible(false);
+    m_eqTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_eqTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_eqTable->setMaximumHeight(190);
+    m_eqTable->setStyleSheet(
+        QStringLiteral("QTableWidget { font-size: 11px; }"));
+    into->addWidget(m_eqTable);
+
+    connect(m_eqTable, &QTableWidget::cellChanged,
+            this, &StripWindow::onEqTableEdited);
+
+    auto* note = new QLabel(QStringLiteral(
+        "Type a number when you know it, drag the dot when you don't. "
+        "Both are the same band — there is one setting, seen twice."),
+        parent);
+    note->setWordWrap(true);
+    note->setStyleSheet(dimStyle());
+    into->addWidget(note);
+
+    refreshEqTable();
+}
+
+void StripWindow::refreshEqTable()
+{
+    if (!m_eqTable) { return; }
+    StripChain* c = chain();
+
+    // Guarded, because filling the table emits cellChanged for every
+    // cell, and each of those would be read back as an edit. Without
+    // this the table writes its own contents into the chain on every
+    // refresh — harmless while the values agree and quietly destructive
+    // the moment rounding makes them differ.
+    m_fillingTable = true;
+
+    std::vector<int> rows;
+    if (c) {
+        const int n = c->eq().activeBandCount();
+        if (n > 0) { rows.push_back(0); }
+        for (int b = kBandLowShelf; b < n; ++b) { rows.push_back(b); }
+    }
+    m_eqTable->setRowCount(int(rows.size()));
+
+    for (int r = 0; r < int(rows.size()); ++r) {
+        const int band = rows[static_cast<size_t>(r)];
+        const ClientEq::BandParams p = c->eq().band(band);
+
+        auto put = [this, r](int col, const QString& text, bool editable) {
+            auto* item = new QTableWidgetItem(text);
+            item->setTextAlignment(Qt::AlignCenter);
+            if (!editable) {
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            }
+            m_eqTable->setItem(r, col, item);
+        };
+        put(0, QString::number(r + 1), false);
+        put(1, QString::number(p.freqHz, 'f', 0), true);
+
+        const bool isHp = p.type == ClientEq::FilterType::HighPass;
+        // A high-pass has no gain and its width is a slope from a list
+        // of four, so those two cells show what it has rather than a
+        // number that would do nothing if typed into.
+        put(2, isHp ? QStringLiteral("—")
+                    : QString::number(p.gainDb, 'f', 1), !isHp);
+        put(3, isHp ? QStringLiteral("%1 dB/oct").arg(p.slopeDbPerOct)
+                    : QString::number(p.q, 'f', 2), !isHp);
+
+        QString shape;
+        switch (p.type) {
+        case ClientEq::FilterType::HighPass:  shape = QStringLiteral("high-pass"); break;
+        case ClientEq::FilterType::LowPass:   shape = QStringLiteral("low-pass");  break;
+        case ClientEq::FilterType::LowShelf:  shape = QStringLiteral("low shelf"); break;
+        case ClientEq::FilterType::HighShelf: shape = QStringLiteral("high shelf");break;
+        case ClientEq::FilterType::Peak:      shape = QStringLiteral("peak");      break;
+        }
+        put(4, shape, false);
+
+        // Row index carries the band, because the table only shows the
+        // draggable ones and the two numberings would otherwise drift
+        // apart the first time a band is added.
+        m_eqTable->item(r, 0)->setData(Qt::UserRole, band);
+    }
+    m_fillingTable = false;
+}
+
+void StripWindow::onEqTableEdited(int row, int column)
+{
+    if (m_fillingTable || !m_eqTable) { return; }
+    StripChain* c = chain();
+    if (!c) { return; }
+    QTableWidgetItem* idx = m_eqTable->item(row, 0);
+    QTableWidgetItem* cell = m_eqTable->item(row, column);
+    if (!idx || !cell) { return; }
+
+    const int band = idx->data(Qt::UserRole).toInt();
+    ClientEq::BandParams p = c->eq().band(band);
+
+    bool ok = false;
+    const double v = cell->text().trimmed().toDouble(&ok);
+    if (!ok) {
+        // Put the old value back rather than leaving the operator's
+        // typo on screen looking like a setting.
+        refreshEqTable();
+        return;
+    }
+
+    switch (column) {
+    case 1: p.freqHz = float(std::clamp(v, 20.0, 16000.0)); break;
+    case 2: p.gainDb = float(std::clamp(v, -24.0, 24.0));   break;
+    case 3: p.q      = float(std::clamp(v, 0.3, 12.0));     break;
+    default: return;
+    }
+    p.enabled = true;
+    c->eq().setBand(band, p);
+    if (m_eqCurve) { m_eqCurve->refresh(); }
+    refreshEqTable();     // shows the clamp, if one happened
+    persist();
+}
+
 void StripWindow::applyHumNotches(int baseHz, bool on)
 {
     StripChain* c = chain();
@@ -653,6 +779,7 @@ QWidget* StripWindow::buildEqPanel()
     // decides when that reaches the settings file, so there is one
     // place that saves rather than one per control.
     connect(m_eqCurve, &StripEqCurve::bandChanged, this, [this](int) {
+        refreshEqTable();
         persist();
     });
 
@@ -755,6 +882,8 @@ QWidget* StripWindow::buildEqPanel()
             m_tips->setText(text.trimmed());
         });
     }
+
+    buildEqTable(page, outer);
 
     auto* body = new QWidget(page);
     outer->addWidget(body, 1);
@@ -1458,6 +1587,7 @@ void StripWindow::reloadControls()
         w->deleteLater();
     }
     m_eqCurve = nullptr;          // owned by the page just removed
+    m_eqTable = nullptr;
     m_holdBtn = nullptr;
     m_tips    = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
