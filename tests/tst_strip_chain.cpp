@@ -70,6 +70,8 @@ private slots:
     void the_limiter_is_last();
     void every_preset_leaves_the_master_alone();
     void every_preset_names_itself_and_applies();
+    void a_user_preset_round_trips();
+    void a_bad_preset_name_is_refused();
 };
 
 void TstStripChain::a_fresh_chain_is_off_and_every_stage_with_it()
@@ -259,6 +261,62 @@ void TstStripChain::every_preset_names_itself_and_applies()
     // And an unknown name is refused rather than silently doing nothing
     // that looks like success.
     QVERIFY(!StripSettings::applyBuiltIn(QStringLiteral("nonesuch"), c));
+}
+
+void TstStripChain::a_user_preset_round_trips()
+{
+    // The whole point of saving one: what comes back has to be what
+    // went in. A preset system that stores a subset of the settings is
+    // worse than none, because the operator recalls their sound and
+    // gets most of it — and cannot tell which part is missing.
+    StripChain a;
+    a.prepare(kRate);
+    a.gate().setThresholdDb(-33.0f);
+    a.comp().setRatio(4.5f);
+    a.comp().setMakeupDb(5.5f);
+    a.deEss().setFrequencyHz(7100.0f);
+    a.tube().setDriveDb(9.0f);
+    a.limiter().setCeilingDb(-2.5f);
+    a.setStageEnabled(StripChain::Stage::Gate, true);
+    a.setStageEnabled(StripChain::Stage::Tube, true);
+
+    const QString name = QStringLiteral("tst round trip");
+    QVERIFY(StripSettings::saveUserPreset(name, a));
+    QVERIFY(StripSettings::userPresetNames().contains(name));
+
+    StripChain b;
+    b.prepare(kRate);
+    QVERIFY(StripSettings::applyUserPreset(name, b));
+
+    QCOMPARE(b.gate().thresholdDb(), -33.0f);
+    QCOMPARE(b.comp().ratio(), 4.5f);
+    QCOMPARE(b.comp().makeupDb(), 5.5f);
+    QCOMPARE(b.deEss().frequencyHz(), 7100.0f);
+    QCOMPARE(b.tube().driveDb(), 9.0f);
+    QCOMPARE(b.limiter().ceilingDb(), -2.5f);
+    QVERIFY(b.stageEnabled(StripChain::Stage::Gate));
+    QVERIFY(b.stageEnabled(StripChain::Stage::Tube));
+    QVERIFY(!b.stageEnabled(StripChain::Stage::Reverb));
+
+    // And like the built-ins, it does not put the strip on the air.
+    QVERIFY(!b.isEnabled());
+
+    QVERIFY(StripSettings::removeUserPreset(name));
+    QVERIFY(!StripSettings::userPresetNames().contains(name));
+    QVERIFY(!StripSettings::applyUserPreset(name, b));
+}
+
+void TstStripChain::a_bad_preset_name_is_refused()
+{
+    // A slash would open a second level of settings keys and the preset
+    // would reappear somewhere unexpected, or not at all. Refused
+    // rather than quietly mangled into something that nearly works.
+    StripChain c;
+    c.prepare(kRate);
+    QVERIFY(!StripSettings::saveUserPreset(QString(), c));
+    QVERIFY(!StripSettings::saveUserPreset(QStringLiteral("   "), c));
+    QVERIFY(!StripSettings::saveUserPreset(QStringLiteral("a/b"), c));
+    QVERIFY(!StripSettings::removeUserPreset(QStringLiteral("never existed")));
 }
 
 QTEST_APPLESS_MAIN(TstStripChain)

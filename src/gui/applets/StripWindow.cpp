@@ -16,6 +16,7 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
 
+#include <QInputDialog>
 #include <QMessageBox>
 #include "models/RadioModel.h"
 
@@ -24,6 +25,7 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -186,14 +188,29 @@ void StripWindow::buildUi()
     // at their defaults is not an answer.
     {
         auto* row = new QHBoxLayout;
-        row->addWidget(new QLabel(QStringLiteral("Start from:"), this));
+        row->addWidget(new QLabel(QStringLiteral("Preset:"), this));
         m_presetBox = new QComboBox(this);
-        m_presetBox->addItem(QStringLiteral("— choose —"), QString());
-        for (const auto& p : StripSettings::builtInPresets()) {
-            m_presetBox->addItem(p.name, p.name);
-        }
+        m_presetBox->setMinimumWidth(200);
         row->addWidget(m_presetBox);
+
+        m_presetSave = new QPushButton(QStringLiteral("Save as…"), this);
+        m_presetSave->setStyleSheet(Style::buttonBaseStyle());
+        row->addWidget(m_presetSave);
+        m_presetDelete = new QPushButton(QStringLiteral("Delete"), this);
+        m_presetDelete->setStyleSheet(Style::buttonBaseStyle());
+        row->addWidget(m_presetDelete);
         row->addStretch(1);
+
+        // A/B. Held down, not toggled: a comparison you have to keep
+        // your finger on is one you cannot walk away from and forget,
+        // and forgetting which state you left it in is the failure that
+        // makes people distrust their own ears.
+        m_compareBtn = new QPushButton(QStringLiteral("A/B — hold"), this);
+        m_compareBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_compareBtn->setToolTip(QStringLiteral(
+            "While held, the strip is bypassed so you hear the raw "
+            "microphone. Releasing puts it back exactly as it was."));
+        row->addWidget(m_compareBtn);
         col->addLayout(row);
 
         m_presetNote = new QLabel(this);
@@ -201,10 +218,32 @@ void StripWindow::buildUi()
         m_presetNote->setStyleSheet(dimStyle());
         col->addWidget(m_presetNote);
 
+        rebuildPresetBox();
+
         connect(m_presetBox, &QComboBox::currentIndexChanged, this,
                 [this](int) {
             const QString n = m_presetBox->currentData().toString();
             if (!n.isEmpty()) { applyPreset(n); }
+            m_presetDelete->setEnabled(
+                m_presetBox->currentData(Qt::UserRole + 1).toBool());
+        });
+        connect(m_presetSave, &QPushButton::clicked,
+                this, &StripWindow::saveUserPreset);
+        connect(m_presetDelete, &QPushButton::clicked,
+                this, &StripWindow::deleteUserPreset);
+
+        connect(m_compareBtn, &QPushButton::pressed, this, [this]() {
+            if (StripChain* c = chain()) {
+                m_masterBeforeCompare = c->isEnabled();
+                c->setEnabled(false);
+                refreshChainRow();
+            }
+        });
+        connect(m_compareBtn, &QPushButton::released, this, [this]() {
+            if (StripChain* c = chain()) {
+                c->setEnabled(m_masterBeforeCompare);
+                refreshChainRow();
+            }
         });
     }
 
@@ -1000,12 +1039,96 @@ QWidget* StripWindow::buildPlaceholder(StripChain::Stage s)
 
 // ── Refresh ──────────────────────────────────────────────────────────
 
+void StripWindow::rebuildPresetBox(const QString& select)
+{
+    if (!m_presetBox) { return; }
+    const QSignalBlocker block(m_presetBox);
+    m_presetBox->clear();
+    m_presetBox->addItem(QStringLiteral("— choose —"), QString());
+
+    // Built-ins first and the operator's own below, separated, so it is
+    // always obvious which of the two a name is. A flat merged list is
+    // where someone deletes a built-in they cannot delete and concludes
+    // the button is broken.
+    for (const auto& p : StripSettings::builtInPresets()) {
+        m_presetBox->addItem(p.name, p.name);
+        m_presetBox->setItemData(m_presetBox->count() - 1, false,
+                                 Qt::UserRole + 1);
+    }
+    const QStringList mine = StripSettings::userPresetNames();
+    if (!mine.isEmpty()) {
+        m_presetBox->insertSeparator(m_presetBox->count());
+        for (const QString& n : mine) {
+            m_presetBox->addItem(n, n);
+            m_presetBox->setItemData(m_presetBox->count() - 1, true,
+                                     Qt::UserRole + 1);
+        }
+    }
+    if (!select.isEmpty()) {
+        const int i = m_presetBox->findData(select);
+        if (i >= 0) { m_presetBox->setCurrentIndex(i); }
+    }
+    if (m_presetDelete) {
+        m_presetDelete->setEnabled(
+            m_presetBox->currentData(Qt::UserRole + 1).toBool());
+    }
+}
+
+void StripWindow::saveUserPreset()
+{
+    StripChain* c = chain();
+    if (!c) { return; }
+
+    bool ok = false;
+    const QString name = QInputDialog::getText(
+        this, QStringLiteral("Save preset"),
+        QStringLiteral("Name:"), QLineEdit::Normal,
+        m_presetBox ? m_presetBox->currentData().toString() : QString(), &ok);
+    if (!ok) { return; }
+
+    if (!StripSettings::saveUserPreset(name, *c)) {
+        QMessageBox::warning(this, QStringLiteral("Save preset"),
+            QStringLiteral("That name can't be used. It needs at least one "
+                           "character and no slashes."));
+        return;
+    }
+    rebuildPresetBox(name.trimmed());
+    m_presetNote->setText(QStringLiteral("Saved as \u201c%1\u201d.")
+                              .arg(name.trimmed()));
+}
+
+void StripWindow::deleteUserPreset()
+{
+    const QString name = m_presetBox
+        ? m_presetBox->currentData().toString() : QString();
+    if (name.isEmpty()) { return; }
+    if (!m_presetBox->currentData(Qt::UserRole + 1).toBool()) { return; }
+
+    if (QMessageBox::question(this, QStringLiteral("Delete preset"),
+            QStringLiteral("Delete \u201c%1\u201d? The settings in use now "
+                           "stay as they are.").arg(name),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+        != QMessageBox::Yes) {
+        return;
+    }
+    StripSettings::removeUserPreset(name);
+    rebuildPresetBox();
+    m_presetNote->clear();
+}
+
 void StripWindow::applyPreset(const QString& name)
 {
     StripChain* c = chain();
     if (!c) { return; }
-    if (!StripSettings::applyBuiltIn(name, *c)) { return; }
 
+    // A user preset of the same name wins: it is the one the operator
+    // made, and shadowing a built-in with your own version of it is a
+    // reasonable thing to want.
+    bool applied = StripSettings::applyUserPreset(name, *c);
+    if (!applied) { applied = StripSettings::applyBuiltIn(name, *c); }
+    if (!applied) { return; }
+
+    m_presetNote->setText(QStringLiteral("Your own setting: %1").arg(name));
     for (const auto& p : StripSettings::builtInPresets()) {
         if (p.name == name) { m_presetNote->setText(p.description); break; }
     }

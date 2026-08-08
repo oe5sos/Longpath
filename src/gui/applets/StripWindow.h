@@ -103,6 +103,9 @@ private:
     StripChain* chain() const;
 
     void applyPreset(const QString& name);
+    void rebuildPresetBox(const QString& select = QString());
+    void saveUserPreset();
+    void deleteUserPreset();
     // Push the chain's values back into every control after a preset
     // has changed them underneath. Without it the panel shows the old
     // settings and the first slider touch undoes the preset.
@@ -122,6 +125,13 @@ private:
     StripEqCurve*   m_eqCurve{nullptr};
     StripLevelBars* m_levels{nullptr};
     QComboBox*      m_presetBox{nullptr};
+    QPushButton*    m_presetSave{nullptr};
+    QPushButton*    m_presetDelete{nullptr};
+    QPushButton*    m_compareBtn{nullptr};
+    // What the master switch was before A/B was pressed, so releasing
+    // it puts things back rather than leaving the strip in whichever
+    // state the comparison happened to end on.
+    bool            m_masterBeforeCompare{false};
     std::array<QCheckBox*, StripChain::kStageCount> m_stageBoxes{};
 
     QLabel* m_presetNote{nullptr};

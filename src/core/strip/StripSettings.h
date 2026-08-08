@@ -37,6 +37,7 @@
 // =================================================================
 
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 namespace NereusSDR {
@@ -56,6 +57,24 @@ void save(const StripChain& chain);
 // Read it back into a prepared chain. Stage parameters and per-stage
 // enables are restored; the master switch is not — see the header note.
 void restore(StripChain& chain);
+
+// ── The operator's own presets ───────────────────────────────────────
+//
+// Stored through exactly the same reader and writer as the live
+// settings, under their own prefix. One code path means a preset can
+// never hold a different set of fields from the live state.
+
+QStringList userPresetNames();
+
+// Saves under `name`, overwriting an existing one of that name. Refuses
+// an empty name or one containing a slash. Returns false on refusal.
+bool saveUserPreset(const QString& name, const StripChain& chain);
+
+// Loads a saved preset into the chain. Like the built-ins, this never
+// touches the master switch.
+bool applyUserPreset(const QString& name, StripChain& chain);
+
+bool removeUserPreset(const QString& name);
 
 // ── Starting points ──────────────────────────────────────────────────
 //
