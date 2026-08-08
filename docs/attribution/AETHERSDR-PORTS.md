@@ -45,3 +45,35 @@ NereusSDR has no such dependency, so `src/core/CredentialStore.{h,cpp}`
 is NereusSDR-original: macOS login keychain through the `security` CLI,
 session-memory everywhere else, with `isPersistent()` so the UI can say
 which of the two it got.
+
+## ZeusSDR — design inspiration, no code and no data
+
+The channel strip's equaliser picture was shown ZeusSDR's CFC editor as
+a reference: numbered knots, two curves on one plot with a legend, a
+numeric table under the graph, named preset buttons, a filled area under
+the curve. Those patterns influenced the layout here.
+
+ZeusSDR is not open source and its licence is unknown to this project.
+So the line drawn is:
+
+**Taken:** the shape of the interaction. Numbering the knots, putting
+the numbers under the picture, naming the presets, drawing the target as
+a second dashed curve. Layout conventions are not anybody's property and
+several of these predate both programs by decades in studio equipment.
+
+**Not taken:** any code, and any data. In particular the CFC preset
+values visible in the reference screenshots — FLAT / VOICE / STUDIO /
+ESSB / DX, each with ten frequency, compression and post-gain figures —
+were NOT copied. Somebody chose those numbers and that is their work.
+
+Every curve in `src/core/strip/StripTargets.cpp` is this project's own,
+derived from the transmit bandwidth each profile is for and from what a
+speech spectrum needs to survive it. They are opinions, they are
+labelled as opinions in the code, and they can be argued with on their
+own terms — which would be impossible if their real origin were an
+undocumented copy.
+
+This note exists because the alternative is somebody finding those
+curves in two years, noticing the resemblance to a screenshot in the
+issue tracker, and having no way to tell whether the project has a
+licensing problem. It does not.
