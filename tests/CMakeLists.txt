@@ -4636,6 +4636,11 @@ nereus_add_test(tst_rotctld_process)
 #    install command may never ask for administrator rights --
 nereus_add_test(tst_hamlib_installer)
 
+# -- The channel strip's nine DSP stages, checked as a port: bit-exact
+#    bypass, silence in silence out, never a NaN, no wind-up over ten
+#    seconds — plus the gate's documented behaviour --
+nereus_add_test(tst_strip_dsp)
+
 # -- The one rule of the off-air monitor: it may be heard, it may not be
 #    transmitted. Truth table over both listening gates --
 nereus_add_test(tst_tx_offair_monitor)

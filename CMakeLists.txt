@@ -925,6 +925,22 @@ set(GUI_SOURCES
     src/core/RotctldClient.cpp
     src/core/RotctldProcess.cpp
     src/core/HamlibInstaller.cpp
+
+    # ── Aetherial Audio Channel Strip — DSP (ported from AetherSDR) ──
+    #
+    # The strip's nine stages, taken before any of its user interface.
+    # They are Qt-free apart from QtGlobal and lock-free by construction,
+    # so they can be tested without a radio, an audio device or a window
+    # — which is why they come first.
+    src/core/strip/ClientPhaseRotator.cpp
+    src/core/strip/ClientGate.cpp
+    src/core/strip/ClientEq.cpp
+    src/core/strip/ClientDeEss.cpp
+    src/core/strip/ClientComp.cpp
+    src/core/strip/ClientTube.cpp
+    src/core/strip/ClientPudu.cpp
+    src/core/strip/ClientReverb.cpp
+    src/core/strip/ClientFinalLimiter.cpp
     src/core/TxAudioRecorder.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
