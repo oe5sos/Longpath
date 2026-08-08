@@ -111,6 +111,17 @@ private:
     // settings and the first slider touch undoes the preset.
     void reloadControls();
 
+    // Notice the radio arriving. The window can be opened before the
+    // connection exists, and every control then binds to nothing: the
+    // curve draws "Not connected", the combos open at their literal
+    // defaults, and it all stays that way for the session. Exactly the
+    // fault just fixed in the voice check, and worth writing down as a
+    // pattern — a panel that asks "is X there" once, at construction,
+    // is a panel that is wrong for the rest of the session in the one
+    // case where the operator most needs it.
+    void adoptChainIfArrived();
+    bool m_hadChain{false};
+
     void refreshChainRow();
     void refreshMeters();
 

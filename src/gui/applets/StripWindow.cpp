@@ -121,9 +121,41 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
     if (StripChain* c = chain()) {
         StripSettings::restore(*c);
         seedEqLayout();
+        m_hadChain = true;
     }
     buildUi();
     refreshChainRow();
+}
+
+void StripWindow::adoptChainIfArrived()
+{
+    const bool have = chain() != nullptr;
+    if (have == m_hadChain) { return; }
+    m_hadChain = have;
+    if (!have) { return; }
+
+    // The radio turned up after this window opened. Restore, lay the
+    // bands out, and rebuild every panel — a rebuild rather than a
+    // refresh for the same reason as applying a preset: each control
+    // reads its own value from the chain when it is built, so there is
+    // no second copy to forget.
+    StripChain* c = chain();
+    StripSettings::restore(*c);
+    seedEqLayout();
+    reloadControls();
+    refreshChainRow();
+    if (m_note) {
+        m_note->setText(QStringLiteral(
+            "Sits in front of the radio's own processing, on the "
+            "microphone before WDSP sees it. Switched off, the audio is "
+            "bit-for-bit what it was before this window existed — so "
+            "switching off is a real comparison, not an approximate "
+            "one."));
+    }
+    if (m_master) {
+        const QSignalBlocker block(m_master);
+        m_master->setChecked(c->isEnabled());
+    }
 }
 
 // Read a stage value for a control's initial position.
@@ -351,6 +383,12 @@ QWidget* StripWindow::buildGatePanel()
                   int(ClientGate::Mode::Expander));
     mode->addItem(QStringLiteral("Gate — hard, removes it"),
                   int(ClientGate::Mode::Gate));
+    {
+        const int have = chain() ? int(chain()->gate().mode())
+                                 : int(ClientGate::Mode::Expander);
+        const int at = mode->findData(have);
+        if (at >= 0) { mode->setCurrentIndex(at); }
+    }
     form->addRow(QStringLiteral("Character"), mode);
 
     addKnob(form, QStringLiteral("Threshold"),
@@ -568,7 +606,15 @@ QWidget* StripWindow::buildEqPanel()
     for (int db : {12, 24, 36, 48}) {
         slope->addItem(QStringLiteral("%1 dB/octave").arg(db), db);
     }
-    slope->setCurrentIndex(1);
+    // From the chain, not a hardcoded index. Same class of bug as the
+    // sliders had: the panel would show 48 dB/octave while the filter
+    // ran at 24, and the first touch of the combo would then make the
+    // filter agree with the wrong label.
+    {
+        const int have = chain() ? chain()->eq().band(0).slopeDbPerOct : 24;
+        const int at = slope->findData(have);
+        slope->setCurrentIndex(at >= 0 ? at : 1);
+    }
     form->addRow(QStringLiteral("High-pass slope"), slope);
     connect(slope, &QComboBox::currentIndexChanged, this,
             [this, slope, setBandField](int) {
@@ -599,6 +645,16 @@ QWidget* StripWindow::buildEqPanel()
         h->addWidget(m_humBase);
         h->addStretch(1);
         form->addRow(row);
+
+        if (StripChain* ch = chain()) {
+            const ClientEq::BandParams p = ch->eq().band(1);
+            const QSignalBlocker b1(m_humBox);
+            const QSignalBlocker b2(m_humBase);
+            m_humBox->setChecked(p.enabled);
+            const int at = m_humBase->findData(
+                int(std::lround(double(p.freqHz))) >= 55 ? 60 : 50);
+            if (at >= 0) { m_humBase->setCurrentIndex(at); }
+        }
 
         auto apply = [this]() {
             applyHumNotches(m_humBase->currentData().toInt(),
@@ -804,6 +860,12 @@ QWidget* StripWindow::buildTubePanel()
     model->addItem(QStringLiteral("A — soft"), int(ClientTube::Model::A));
     model->addItem(QStringLiteral("B — hard"), int(ClientTube::Model::B));
     model->addItem(QStringLiteral("C — asymmetric"), int(ClientTube::Model::C));
+    {
+        const int have = chain() ? int(chain()->tube().model())
+                                 : int(ClientTube::Model::A);
+        const int at = model->findData(have);
+        if (at >= 0) { model->setCurrentIndex(at); }
+    }
     form->addRow(QStringLiteral("Character"), model);
     connect(model, &QComboBox::currentIndexChanged, this, [this, model](int) {
         if (StripChain* c = chain()) {
@@ -873,6 +935,12 @@ QWidget* StripWindow::buildPuduPanel()
                   int(ClientPudu::Mode::Aphex));
     mode->addItem(QStringLiteral("Sonic exciter"),
                   int(ClientPudu::Mode::Behringer));
+    {
+        const int have = chain() ? int(chain()->pudu().mode())
+                                 : int(ClientPudu::Mode::Aphex);
+        const int at = mode->findData(have);
+        if (at >= 0) { mode->setCurrentIndex(at); }
+    }
     form->addRow(QStringLiteral("Model"), mode);
     connect(mode, &QComboBox::currentIndexChanged, this, [this, mode](int) {
         if (StripChain* c = chain()) {
@@ -1245,11 +1313,22 @@ void StripWindow::refreshChainRow()
         m_chainView->update();
     }
     if (m_levels) { m_levels->setChain(chain()); }
+    if (m_eqCurve) {
+        // Re-bound here, not only at construction. Without this the
+        // curve keeps whatever it was given when the tab was built —
+        // which, for a window opened before the radio, is nothing.
+        m_eqCurve->setChain(chain());
+        if (StripChain* ch = chain()) {
+            m_eqCurve->setSpectrum(&ch->micSpectrum());
+        }
+    }
     if (m_eqCurve) { m_eqCurve->refresh(); }
 }
 
 void StripWindow::refreshMeters()
 {
+    adoptChainIfArrived();
+
     StripChain* c = chain();
     if (!c) { return; }
 
