@@ -80,6 +80,12 @@ public:
     // file.
     void showLogbook();
 
+    // Open the rotator setup dialog. Public for the same reason as
+    // showLogbook(): an operator whose rotator is not working yet
+    // should not have to discover the dock in order to find the place
+    // that installs Hamlib and connects the controller.
+    void showRotorSetup();
+
 signals:
     void qsoLogged(const LogEntry& entry);
 

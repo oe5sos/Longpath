@@ -19,6 +19,7 @@
 #include "core/CtyDatParser.h"
 #include "core/DxccColorProvider.h"
 #include "core/DxccFlag.h"
+#include "core/HamlibInstaller.h"
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
@@ -50,7 +51,10 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QPixmap>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QStackedWidget>
@@ -608,6 +612,11 @@ void RotorLogbookPanel::ensureRotor()
     });
 }
 
+void RotorLogbookPanel::showRotorSetup()
+{
+    openRotorSetupDialog();
+}
+
 void RotorLogbookPanel::openRotorSetupDialog()
 {
     ensureRotor();
@@ -672,6 +681,70 @@ void RotorLogbookPanel::openRotorSetupDialog()
     baudCombo->setCurrentIndex(bat >= 0 ? bat : baudCombo->findData(9600));
     localForm->addRow(QStringLiteral("Speed"), baudCombo);
     col->addWidget(localBox);
+
+    // ── Hamlib itself ────────────────────────────────────────────────
+    //
+    // Everything above is useless without rotctld, and rotctld comes
+    // from Hamlib, which is not part of this program. Telling the
+    // operator to open a terminal is where the feature stopped being
+    // used, so the install happens here.
+    //
+    // Both queries below shell out to rotctl, so they are read once and
+    // kept. Running them from refreshUi() would spawn two processes
+    // every time the operator touched a combo box.
+    auto* hamlibBox = new QWidget(&dlg);
+    auto* hamlibCol = new QVBoxLayout(hamlibBox);
+    hamlibCol->setContentsMargins(0, 0, 0, 0);
+    hamlibCol->setSpacing(6);
+
+    auto* hamlibLabel = new QLabel(hamlibBox);
+    hamlibLabel->setWordWrap(true);
+    hamlibLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                   .arg(QString::fromLatin1(Style::kTextSecondary)));
+    hamlibCol->addWidget(hamlibLabel);
+
+    auto* hamlibBtns = new QHBoxLayout;
+    auto* installBtn = new QPushButton(hamlibBox);
+    installBtn->setStyleSheet(Style::buttonBaseStyle());
+    hamlibBtns->addWidget(installBtn);
+    auto* copyCmdBtn = new QPushButton(QStringLiteral("Copy command"), hamlibBox);
+    copyCmdBtn->setStyleSheet(Style::buttonBaseStyle());
+    hamlibBtns->addWidget(copyCmdBtn);
+    hamlibBtns->addStretch(1);
+    hamlibCol->addLayout(hamlibBtns);
+
+    // Homebrew takes minutes and says a great deal while it works. A
+    // dialog that sits silent for that long looks hung, and an operator
+    // who cannot see the output has nothing to paste into a question.
+    auto* installLog = new QPlainTextEdit(hamlibBox);
+    installLog->setReadOnly(true);
+    installLog->setMaximumHeight(150);
+    installLog->setVisible(false);
+    installLog->setStyleSheet(
+        QStringLiteral("QPlainTextEdit { background: %1; color: %2; "
+                       "font-family: Menlo, monospace; font-size: 10px; "
+                       "border: 1px solid %3; }")
+            .arg(QString::fromLatin1(Style::kInsetBg),
+                 QString::fromLatin1(Style::kTextSecondary),
+                 QString::fromLatin1(Style::kInsetBorder)));
+    hamlibCol->addWidget(installLog);
+    col->addWidget(hamlibBox);
+
+    // No parent: this lives on the stack beside the dialog, and giving
+    // it a parent that outlives nothing would only invite a double
+    // delete the day the declarations are reordered.
+    HamlibInstaller installer;
+    QString hamlibVersion;
+    QVector<HamlibRotorEntry> hamlibKnows;
+    auto rescanHamlib = [&]() {
+        hamlibVersion = HamlibInstaller::installedVersion();
+        // Only worth asking when there is something to ask. Each of
+        // these runs rotctl, and the answer is kept rather than fetched
+        // again on every keystroke.
+        hamlibKnows = hamlibVersion.isEmpty()
+            ? QVector<HamlibRotorEntry>{} : HamlibInstaller::supportedModels();
+    };
+    rescanHamlib();
 
     auto refreshPorts = [portCombo, &s]() {
         const QString keep = portCombo->currentText();
@@ -748,15 +821,67 @@ void RotorLogbookPanel::openRotorSetupDialog()
         for (const RotorModel& m : models) {
             if (m.hamlibId == id) { note = m.note; break; }
         }
-        if (note.isEmpty() && RotctldProcess::findBinary().isEmpty()) {
-            note = QStringLiteral("Hamlib is not installed — "
-                                  "brew install hamlib");
-        }
         noteLabel->setText(note);
         noteLabel->setVisible(!note.isEmpty());
 
+        // ── What to say about Hamlib ─────────────────────────────────
+        const bool installed = !hamlibVersion.isEmpty();
+        const bool installing = installer.isRunning();
+        hamlibBox->setVisible(local);
+
+        if (!installed) {
+            hamlibLabel->setText(QStringLiteral(
+                "Hamlib isn't installed. It provides rotctld, which is "
+                "the piece that talks to the controller — without it "
+                "nothing below can connect."));
+            installBtn->setVisible(HamlibInstaller::canInstallAutomatically());
+            installBtn->setEnabled(!installing);
+            installBtn->setText(installing
+                ? QStringLiteral("Installing…")
+                : QStringLiteral("Install Hamlib and connect"));
+            copyCmdBtn->setVisible(true);
+            copyCmdBtn->setText(
+                HamlibInstaller::canInstallAutomatically()
+                    ? QStringLiteral("Copy command")
+                    : QStringLiteral("Copy instructions"));
+            if (!HamlibInstaller::canInstallAutomatically()) {
+                hamlibLabel->setText(hamlibLabel->text()
+                    + QStringLiteral("\n\n")
+                    + HamlibInstaller::manualInstructions());
+            }
+        } else {
+            QString line = QStringLiteral("Hamlib %1 · %2")
+                               .arg(hamlibVersion,
+                                    RotctldProcess::findBinary());
+
+            // The number matters more than the name. Hamlib gains
+            // drivers between releases, so a controller in the picker
+            // can be missing from the copy that is actually installed —
+            // and rotctld's way of saying so is to exit, which reads as
+            // a cable fault rather than as an out-of-date Hamlib.
+            if (!hamlibKnows.isEmpty() && id > 0) {
+                bool has = false;
+                for (const HamlibRotorEntry& e : hamlibKnows) {
+                    if (e.model == id) { has = true; break; }
+                }
+                if (!has) {
+                    line += QStringLiteral(
+                        "\n⚠ This Hamlib doesn't have model %1. Update "
+                        "Hamlib, or pick one of the emulations listed "
+                        "under the controller.").arg(id);
+                }
+            }
+            hamlibLabel->setText(line);
+            installBtn->setVisible(false);
+            copyCmdBtn->setVisible(false);
+        }
+
         connectBtn->setText(m_rotor->isConnected()
             ? QStringLiteral("Disconnect") : QStringLiteral("Connect"));
+        // Offering Connect with no rotctld to run only produces a
+        // puzzling failure; the install button above is the thing to
+        // press.
+        connectBtn->setEnabled(!local || installed);
         status->setText(m_rotor->isConnected()
             ? QStringLiteral("Connected — %1").arg(m_rotor->description())
             : QStringLiteral("Not connected"));
@@ -817,6 +942,48 @@ void RotorLogbookPanel::openRotorSetupDialog()
         m_rotor->connectToRotor();
     });
     connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    // ── Installing Hamlib, then connecting ───────────────────────────
+
+    connect(copyCmdBtn, &QPushButton::clicked, &dlg, [&]() {
+        const QStringList cmd = HamlibInstaller::installCommand();
+        QGuiApplication::clipboard()->setText(
+            cmd.isEmpty() ? HamlibInstaller::manualInstructions()
+                          : cmd.join(QLatin1Char(' ')));
+        status->setText(QStringLiteral("Copied. Paste it into a terminal, "
+                                       "then press Connect."));
+    });
+
+    connect(&installer, &HamlibInstaller::output, &dlg,
+            [installLog](const QString& line) {
+        installLog->appendPlainText(line);
+    });
+
+    connect(&installer, &HamlibInstaller::finished, &dlg,
+            [&](bool ok, const QString& message) {
+        rescanHamlib();
+        status->setText(message);
+        refreshUi();
+        // "Install and connect" means both. Stopping at "installed" and
+        // making the operator find the next button is the small gap the
+        // whole exercise was meant to close.
+        if (ok && !m_rotor->isConnected()) { connectBtn->click(); }
+    });
+
+    connect(installBtn, &QPushButton::clicked, &dlg, [&]() {
+        installLog->clear();
+        installLog->setVisible(true);
+        status->setText(QStringLiteral(
+            "Installing Hamlib. This takes a few minutes the first time "
+            "— Homebrew's output is below."));
+        refreshUi();
+
+        QString err;
+        if (!installer.install(&err)) {
+            status->setText(err);
+            refreshUi();
+        }
+    });
 
     dlg.exec();
     disconnect(reportConn);

@@ -6244,6 +6244,22 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openRotorDial);
     }
 
+    // Setting the rotator up, reachable without first finding the dock
+    // and the small button inside it. This is also where Hamlib gets
+    // installed, so it is the first place an operator with a rotator
+    // and no rotctld needs to arrive at — putting it behind two other
+    // discoveries was the reason the feature went unused.
+    {
+        QAction* rotorSetupAction =
+            toolsMenu->addAction(QStringLiteral("Rotator &setup..."));
+        rotorSetupAction->setObjectName(QStringLiteral("actRotorSetup"));
+        rotorSetupAction->setToolTip(QStringLiteral(
+            "Choose the rotator controller, install Hamlib if it is "
+            "missing, and connect."));
+        connect(rotorSetupAction, &QAction::triggered,
+                this, &MainWindow::openRotorSetup);
+    }
+
     // The logbook, reachable without going through the dock. It is the
     // same window the dock's button opens — one window over one file.
     {
@@ -9392,6 +9408,13 @@ void MainWindow::openLogbookWindow()
 {
     if (RotorLogbookPanel* panel = ensureRotorPanel()) {
         panel->showLogbook();
+    }
+}
+
+void MainWindow::openRotorSetup()
+{
+    if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+        panel->showRotorSetup();
     }
 }
 

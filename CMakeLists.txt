@@ -924,6 +924,7 @@ set(GUI_SOURCES
     src/core/AdifNetworkUploader.cpp
     src/core/RotctldClient.cpp
     src/core/RotctldProcess.cpp
+    src/core/HamlibInstaller.cpp
     src/core/TxAudioRecorder.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as

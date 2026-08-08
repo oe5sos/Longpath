@@ -4631,6 +4631,11 @@ nereus_add_test(tst_anf_tuning)
 #    only, no stray -r, and ARCO/ERC reachable from the picker --
 nereus_add_test(tst_rotctld_process)
 
+# -- Installing Hamlib for the operator: reading `rotctl --list` and
+#    `--version` by shape rather than by column, and the rule that the
+#    install command may never ask for administrator rights --
+nereus_add_test(tst_hamlib_installer)
+
 # -- The one rule of the off-air monitor: it may be heard, it may not be
 #    transmitted. Truth table over both listening gates --
 nereus_add_test(tst_tx_offair_monitor)
