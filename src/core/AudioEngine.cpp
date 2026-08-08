@@ -126,6 +126,8 @@
 
 #include <portaudio.h>
 
+#include <QDateTime>
+
 #include <algorithm>
 #include <vector>
 
@@ -1669,9 +1671,50 @@ void AudioEngine::txMonitorBlockReady(const float* samples, int frames)
     if (static_cast<int>(stereoScratch.size()) < stereoFloats) {
         stereoScratch.resize(static_cast<size_t>(stereoFloats));
     }
+    // Clamped, and this is the crackle.
+    //
+    // Reported from the bench as "crackling, latency is fine", and then
+    // the observation that settled it: with the channel strip switched
+    // on the crackle disappears. That rules out every timing
+    // explanation. A buffer underrun does not care what the signal is;
+    // an overload does, and the strip's limiter is exactly what would
+    // remove one.
+    //
+    // The siphon carries the post-modulator I channel, after WDSP's mic
+    // preamp, compressor and ALC. Nothing between there and the speaker
+    // bounded it, so whenever the transmit chain ran hot the monitor
+    // handed samples past full scale to CoreAudio, which clips them
+    // square. Square edges at audio rate are heard as crackling — and
+    // they get worse the louder you speak, not the smaller the buffer.
+    //
+    // A hard clamp rather than a soft limiter on purpose: this is a
+    // listening aid, not part of the transmitted signal. It must never
+    // colour what the operator hears in a way that flatters the
+    // setting, and it must never be the reason a chain that is
+    // overdriven sounds acceptable in the monitor. Clipping that
+    // remains audible as clipping is the honest behaviour; what is
+    // fixed here is that it is now the transmit chain's clipping and
+    // not the sound card's.
+    bool overRange = false;
     for (int i = 0; i < frames; ++i) {
-        stereoScratch[i * 2 + 0] = samples[i];  // L
-        stereoScratch[i * 2 + 1] = samples[i];  // R
+        const float v = samples[i];
+        if (v > 1.0f || v < -1.0f) { overRange = true; }
+        const float clamped = std::clamp(v, -1.0f, 1.0f);
+        stereoScratch[i * 2 + 0] = clamped;  // L
+        stereoScratch[i * 2 + 1] = clamped;  // R
+    }
+    if (overRange) {
+        // Once per second at most: this runs on the audio thread and a
+        // log line per block would be the next performance defect.
+        static thread_local qint64 lastWarn = 0;
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (now - lastWarn > 1000) {
+            lastWarn = now;
+            qCWarning(lcAudio)
+                << "TX monitor over full scale — the transmit chain is "
+                   "clipping before the monitor, not in it. Reduce mic "
+                   "gain or drive.";
+        }
     }
 
     // Accumulate into MasterMixer. The slot's gain (= m_txMonitorVolume)

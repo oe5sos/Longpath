@@ -205,6 +205,13 @@ public:
     // that again on every transition.
     void setSliceOpportunistic(int sliceId, bool opportunistic);
 
+    // How far ahead an opportunistic slot gets before it is heard.
+    // 1024 frames at 48 kHz is 21 ms — well under the delay of the
+    // transmit chain it is monitoring, so it costs the operator nothing
+    // they can hear, and it is several times the jitter of a producer
+    // paced by network arrivals.
+    static constexpr int kOpportunisticCushionFrames = 1024;
+
     // Audio thread: queue a slice's stereo block. samples is interleaved
     // L/R float32, frames = sample pairs. Enrols the slice as a barrier
     // member. Drop-oldest if the ring overflows, matching PortAudioBus's
@@ -332,6 +339,25 @@ private:
         // Never a barrier member; mixed in when it happens to have
         // audio. Written on the UI thread before streaming starts.
         std::atomic<bool> opportunistic{false};
+
+        // ── Jitter cushion, opportunistic slots only ─────────────────
+        //
+        // An opportunistic slot never enrols in the barrier, so the
+        // drain does not wait for it. The old code then took
+        // `min(n, avail)` from it — and when the slot was short, the
+        // rest of the output block simply had no contribution from it.
+        // That is not a dropped block: it is the waveform stopping
+        // dead partway through and resuming next time. A step at audio
+        // rate, several times a second. It is heard as crackling, and
+        // it is louder the quieter the buffer size, which is why it
+        // survived being blamed on latency.
+        //
+        // The TX monitor is fed from a thread woken by mic frames
+        // arriving over the network, so being briefly short is normal
+        // and cannot be engineered away at the source. What it needs is
+        // slack: hold back until a cushion exists, then keep it, and
+        // contribute whole blocks or none.
+        bool primed{false};
 
         // Ramped gains. Start at silence so a slice's first block fades
         // in instead of stepping in.

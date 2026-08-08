@@ -509,7 +509,91 @@ private slots:
         QVERIFY(out[2] < out[0]);
         QVERIFY(std::abs(out[6]) < 0.0001f);
     }
+
+    // ── The TX monitor's jitter cushion ──────────────────────────────
+    //
+    // The crackle this exists to remove, and it is worth stating
+    // precisely because it was blamed on latency twice. An
+    // opportunistic slot never enrols in the barrier, so the drain does
+    // not wait for it. Taking min(n, avail) from a short one does not
+    // drop a block — it stops the waveform dead partway through the
+    // block and resumes on the next. That is a step at audio rate,
+    // several times a second, and the smaller the output buffer the
+    // more often it happens, which is exactly backwards from what
+    // "latency" would predict.
+
+    void anOpportunisticSliceStaysSilentUntilItHasSlack() {
+        MasterMixer mix;
+        mix.setSliceGain(-2, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(-2, true);
+
+        std::vector<float> in(256 * 2, 0.5f);
+        std::vector<float> out(4096 * 2, 0.0f);
+
+        // A few blocks in, still under the cushion: nothing comes out.
+        // Being heard here is what leaves the monitor with no slack for
+        // the rest of the session.
+        mix.accumulate(-2, in.data(), 256);
+        QCOMPARE(mix.tryDrain(out.data(), 128), 0);
+
+        // Fill past the cushion; now it plays.
+        while (true) {
+            mix.accumulate(-2, in.data(), 256);
+            if (mix.tryDrain(out.data(), 128) > 0) { break; }
+        }
+        QVERIFY2(std::abs(out[0]) > 0.0f, "primed but silent");
+    }
+
+    void aShortOpportunisticSliceGivesNothingRatherThanHalfABlock() {
+        MasterMixer mix;
+        mix.setSliceGain(-2, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(-2, true);
+
+        std::vector<float> in(2048 * 2, 0.5f);
+        std::vector<float> out(4096 * 2, 0.0f);
+
+        // Prime it well past the cushion.
+        mix.accumulate(-2, in.data(), 2048);
+        QVERIFY(mix.tryDrain(out.data(), 64) > 0);
+
+        // Drain it dry, then ask for more than is left. The answer must
+        // be a whole block or none — never the first few frames
+        // followed by a cliff.
+        int guard = 200;
+        while (mix.tryDrain(out.data(), 512) > 0 && guard-- > 0) { }
+
+        std::fill(out.begin(), out.end(), 7.0f);   // poison
+        mix.accumulate(-2, in.data(), 100);        // less than one block
+        const int got = mix.tryDrain(out.data(), 512);
+        QVERIFY2(got == 0,
+                 qPrintable(QStringLiteral("drained %1 frames from a slice "
+                                           "holding 100").arg(got)));
+    }
+
+    void aPrimedSliceThatRunsShortGoesBackToFilling() {
+        // Otherwise it limps along one block behind for the rest of the
+        // session, short every time, crackling every time.
+        MasterMixer mix;
+        mix.setSliceGain(-2, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(-2, true);
+
+        std::vector<float> in(2048 * 2, 0.5f);
+        std::vector<float> out(4096 * 2, 0.0f);
+
+        mix.accumulate(-2, in.data(), 2048);
+        QVERIFY(mix.tryDrain(out.data(), 64) > 0);
+        int guard = 200;
+        while (mix.tryDrain(out.data(), 1024) > 0 && guard-- > 0) { }
+
+        // One small block: refused, and the slot is now refilling — so
+        // another small block is still refused rather than let through.
+        mix.accumulate(-2, in.data(), 64);
+        QCOMPARE(mix.tryDrain(out.data(), 512), 0);
+        mix.accumulate(-2, in.data(), 64);
+        QCOMPARE(mix.tryDrain(out.data(), 512), 0);
+    }
 };
+
 
 QTEST_APPLESS_MAIN(TstMasterMixer)
 #include "tst_master_mixer.moc"
