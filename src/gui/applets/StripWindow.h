@@ -89,8 +89,30 @@ private:
     // first two harmonics; 4-6 are the tone controls.
     // The EQ layout, fixed so the panel, the drag handles and the saved
     // settings all agree about which slot is which. 0 is the high-pass,
-    // 1-3 the mains notches, 4-9 the shaping bands.
-    static constexpr int kEqBandCount   = 10;
+    // 1-3 the mains notches, 4-13 the shaping bands.
+    //
+    // Ten shaping bands, asked for directly. Six could put a dip where
+    // the problem was; ten can put a dip where the problem is and leave
+    // its neighbours alone, which is the difference between correcting a
+    // resonance and tilting the whole voice to hide it. Log-spaced from
+    // 180 Hz to 3.4 kHz — 180, 250, 350, 500, 700, 1000, 1400, 1900,
+    // 2400, 3400 — with a shelf at each end and peaks between: shelves
+    // are the right shape for "everything below this" and peaks for
+    // "this bit here".
+    //
+    // The four new ones are slots 10-13 rather than being inserted in
+    // frequency order, so that 4, 8 and 9 still mean low shelf, presence
+    // and high shelf and a settings file written by the previous version
+    // still says what it said. Index order and frequency order have to
+    // part company somewhere, and they part company the moment anyone
+    // drags a handle anyway — so the picture and the table sort by
+    // frequency for display and nothing else depends on the order.
+    //
+    // Slots 10-13 did not exist in the first shipped layout. seedEqLayout
+    // therefore APPENDS them to an existing chain at 0 dB rather than
+    // re-seeding, so an operator who had already shaped a curve gets four
+    // more handles and not a reset.
+    static constexpr int kEqBandCount   = 14;
     static constexpr int kBandLowShelf  = 4;
     static constexpr int kBandPresence  = 8;   // 2.4 kHz — where words live
     static constexpr int kBandHighShelf = 9;
@@ -198,6 +220,29 @@ private:
     QLabel*         m_tips{nullptr};
     QComboBox*      m_profileBox{nullptr};
     QLabel*         m_profileNote{nullptr};
+
+    // ── The operator's own targets, A and B ──────────────────────────
+    //
+    // Adjusting one curve and trying to remember the other is a memory
+    // test, and the ear loses it in about two seconds. Two slots and an
+    // instant switch turn "is this better?" into a question that can be
+    // answered while still talking.
+    //
+    // Shown only when the target being shaped is the operator's own:
+    // there is no A and B of a built-in profile, and a pair of buttons
+    // that do nothing for four of the six entries in the picker is a
+    // pair of buttons that teaches people to distrust the panel.
+    QPushButton*    m_slotA{nullptr};
+    QPushButton*    m_slotB{nullptr};
+    QLabel*         m_slotLabel{nullptr};
+    QPushButton*    m_fromFileBtn{nullptr};
+    void selectTargetSlot(int slot);
+    void updateTargetControls();
+
+    // Match a recording. The one method here where nobody's opinion sits
+    // between the operator's ear and the number: load a WAV of a signal
+    // that sounded right and its long-term spectrum becomes the target.
+    void targetFromRecording();
     // What the master switch was before A/B was pressed, so releasing
     // it puts things back rather than leaving the strip in whichever
     // state the comparison happened to end on.

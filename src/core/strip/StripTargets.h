@@ -64,10 +64,28 @@ inline constexpr int kUserPointCount = 12;
 // alongside every gain.
 const double* userPointFreqs();
 
+// ── Two of them, A and B ─────────────────────────────────────────────
+//
+// Adjusting one curve and trying to remember the other is not a
+// comparison; it is a memory test, and the ear loses it in about two
+// seconds. Two slots, switched while talking, turn "is this better?"
+// into a question that can actually be answered.
+//
+// Two and not five: the value is in the switch being instant and the
+// alternative being one keystroke away. A list of ten targets is a
+// filing system, and a filing system is not what settles an argument
+// about presence.
+inline constexpr int kUserSlotCount = 2;
+
+int  activeUserSlot();
+void setActiveUserSlot(int slot);
+
 // Read and write the operator's curve. Persisted under the same
-// settings prefix as the rest of the strip.
-QVector<double> userTarget();
-void setUserTarget(const QVector<double>& db);
+// settings prefix as the rest of the strip. A slot of -1 means
+// whichever is active, which is what every caller but the A/B switch
+// itself wants.
+QVector<double> userTarget(int slot = -1);
+void setUserTarget(const QVector<double>& db, int slot = -1);
 
 // Fill the operator's curve from a built-in, so "not quite right" can
 // start from the nearest thing rather than from flat.

@@ -25,6 +25,13 @@
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
 //                 NereusSDR; include paths rebased onto core/strip/.
 //                 DSP unchanged.
+//   2026-08-08 — kMaxBands 16 → 24. The default layout here is a
+//                 high-pass, three mains notches and ten shaping bands;
+//                 at 16 that left two spare, and double-clicking the
+//                 curve to add a band would have stopped working after
+//                 two clicks with no explanation. The arrays are
+//                 fixed-size and per-band state is small, so the cost
+//                 is a few hundred bytes and no change to the DSP.
 // =================================================================
 
 
@@ -36,7 +43,7 @@ namespace NereusSDR {
 
 // Client-side parametric EQ. Runs inside AudioEngine for both the RX and
 // TX audio paths — independent of the radio-side EQ applet, which sends
-// commands to the radio's own DSP. Supports up to 16 simultaneous bands
+// commands to the radio's own DSP. Supports up to 24 simultaneous bands
 // of peak, low/high shelf, low/high pass filters.
 //
 // Thread model: the UI thread writes parameters via set*() / setBand();
@@ -67,7 +74,7 @@ public:
         Elliptic    = 3,   // steepest rolloff, ripple in both bands
     };
 
-    static constexpr int kMaxBands    = 16;
+    static constexpr int kMaxBands    = 24;
     static constexpr int kMaxSections = 4;  // up to 48 dB/oct HP/LP
 
     struct BandParams {

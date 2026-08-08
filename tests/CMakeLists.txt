@@ -4653,6 +4653,11 @@ nereus_add_test(tst_strip_tuner)
 #    never claiming more than it has --
 nereus_add_test(tst_mic_spectrum)
 
+# -- Match-EQ from a recording. Real WAV bytes, including the chunk
+#    order that breaks every reader assuming byte 44, and a tone that
+#    has to come back at its own frequency and not an octave away --
+nereus_add_test(tst_target_from_file)
+
 # -- The one rule of the off-air monitor: it may be heard, it may not be
 #    transmitted. Truth table over both listening gates --
 nereus_add_test(tst_tx_offair_monitor)

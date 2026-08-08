@@ -98,13 +98,38 @@ const double* userPointFreqs()
 }
 
 namespace {
-const char kUserKey[] = "ChannelStrip/UserTargetDb";
+
+// Slot 0 keeps the original key. A settings file written before there
+// were two slots therefore still means what it meant, which is the
+// whole of what backward compatibility has to achieve here.
+QString userKey(int slot)
+{
+    return slot <= 0 ? QStringLiteral("ChannelStrip/UserTargetDb")
+                     : QStringLiteral("ChannelStrip/UserTargetDb%1").arg(slot);
 }
 
-QVector<double> userTarget()
+const char kSlotKey[] = "ChannelStrip/UserTargetSlot";
+
+} // namespace
+
+int activeUserSlot()
 {
+    const int s = AppSettings::instance()
+                      .value(QString::fromLatin1(kSlotKey), 0).toInt();
+    return std::clamp(s, 0, kUserSlotCount - 1);
+}
+
+void setActiveUserSlot(int slot)
+{
+    AppSettings::instance().setValue(QString::fromLatin1(kSlotKey),
+                                     std::clamp(slot, 0, kUserSlotCount - 1));
+}
+
+QVector<double> userTarget(int slot)
+{
+    if (slot < 0) { slot = activeUserSlot(); }
     const QVariantList raw =
-        AppSettings::instance().value(QString::fromLatin1(kUserKey)).toList();
+        AppSettings::instance().value(userKey(slot)).toList();
     QVector<double> out;
     out.reserve(kUserPointCount);
     for (int i = 0; i < kUserPointCount; ++i) {
@@ -113,13 +138,14 @@ QVector<double> userTarget()
     return out;
 }
 
-void setUserTarget(const QVector<double>& db)
+void setUserTarget(const QVector<double>& db, int slot)
 {
+    if (slot < 0) { slot = activeUserSlot(); }
     QVariantList raw;
     for (int i = 0; i < kUserPointCount; ++i) {
         raw.append(i < db.size() ? db.at(i) : 0.0);
     }
-    AppSettings::instance().setValue(QString::fromLatin1(kUserKey), raw);
+    AppSettings::instance().setValue(userKey(slot), raw);
 }
 
 void seedUserTargetFrom(const QString& profileName)

@@ -337,6 +337,7 @@ void StripEqCurve::setSmoothing(bool on)
 }
 
 void StripEqCurve::setShowTarget(bool on) { m_showTarget = on; update(); }
+void StripEqCurve::setShowResult(bool on) { m_showResult = on; update(); }
 
 void StripEqCurve::setProfile(const QString& name)
 {
@@ -530,7 +531,16 @@ std::vector<int> StripEqCurve::handleBands() const
     if (!m_chain) { return v; }
     const int n = m_chain->eq().activeBandCount();
     if (n > 0) { v.push_back(0); }                 // the high-pass
-    for (int b = kFirstToneBand; b < n; ++b) { v.push_back(b); }
+    std::vector<int> tone;
+    for (int b = kFirstToneBand; b < n; ++b) { tone.push_back(b); }
+    // Left to right, so the numbers over the handles count along the
+    // axis. Slot order and frequency order are the same only until the
+    // first drag, and a knot numbered 7 sitting between 3 and 4 is a
+    // label that makes the picture harder to read than no label.
+    std::sort(tone.begin(), tone.end(), [this](int a, int b) {
+        return m_chain->eq().band(a).freqHz < m_chain->eq().band(b).freqHz;
+    });
+    v.insert(v.end(), tone.begin(), tone.end());
     return v;
 }
 
@@ -951,6 +961,12 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     // arriving.
     const std::vector<double>& mag =
         m_haveHold ? (m_heldShown.empty() ? m_heldMag : m_heldShown) : m_mag;
+    // Kept outside the block so the result curve, drawn after the
+    // equaliser further down, can sit on the same measurement rather
+    // than recomputing a reference that would differ by a fraction of a
+    // decibel and make the two curves disagree about where 0 dB is.
+    double voiceRef  = -1000.0;
+    bool   haveVoice = false;
     if (!mag.empty() && m_spec) {
         const double binHz = m_spec->sampleRate() / double(kFft);
         double ref = -120.0;
@@ -970,6 +986,8 @@ void StripEqCurve::paintEvent(QPaintEvent*)
         if (ref > -70.0) { m_lastRef = ref; }
         else if (m_lastRef > -1000.0) { m_lastRef -= 0.3; ref = m_lastRef; }
         if (ref > -100.0) {
+            voiceRef  = ref;
+            haveVoice = true;
             QPainterPath sp;
             bool started = false;
             for (int x = r.left(); x <= r.right(); ++x) {
@@ -1076,6 +1094,41 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     p.drawPath(path);
     p.setClipping(false);
 
+    // ── Where you will actually end up ───────────────────────────────
+    //
+    // Measurement plus equaliser, in one line. Drawn last of the three
+    // so it sits on top, and only when the equaliser is in circuit:
+    // with the strip bypassed the result IS the measurement, and two
+    // curves lying exactly on top of each other is a picture that
+    // invites the operator to hunt for a difference that is not there.
+    //
+    // Green, and solid, because unlike the rose line this is not an
+    // opinion — given the measurement and the filter it is arithmetic,
+    // and the same arithmetic the filter itself will do.
+    if (m_showResult && haveVoice && eqOn && !mag.empty() && m_spec) {
+        const double binHz = m_spec->sampleRate() / double(kFft);
+        QPainterPath rp;
+        bool begun = false;
+        for (int x = r.left(); x <= r.right(); ++x) {
+            const double hz  = hzForX(x, r);
+            const auto   bin = static_cast<size_t>(hz / binHz);
+            if (bin < 1 || bin >= mag.size()) { continue; }
+            double db = mag[bin] - voiceRef;
+            for (int b = 0; b < bands; ++b) {
+                db += double(ClientEq::bandMagnitudeDb(
+                    eq.band(b), float(hz), eq.sampleRate(),
+                    eq.filterFamily()));
+            }
+            const QPointF pt(x, yForDb(db, r));
+            if (!begun) { rp.moveTo(pt); begun = true; }
+            else        { rp.lineTo(pt); }
+        }
+        p.setClipRect(r);
+        p.setPen(QPen(QColor(0x50, 0xd0, 0x80, 230), 2.0));
+        p.drawPath(rp);
+        p.setClipping(false);
+    }
+
     // ── Handles ──────────────────────────────────────────────────────
     //
     // Numbered, the way a channel strip's knots always are, so the
@@ -1161,6 +1214,10 @@ void StripEqCurve::paintEvent(QPaintEvent*)
         swatch(QColor(0xe8, 0x78, 0xb0, 210),
                QStringLiteral("put the blue here"), true);
         swatch(c(Style::kAccent), QStringLiteral("equaliser"), false);
+        if (m_showResult) {
+            swatch(QColor(0x50, 0xd0, 0x80, 230),
+                   QStringLiteral("result"), false);
+        }
     }
 }
 

@@ -150,6 +150,20 @@ public:
     // Only meaningful when something is held.
     void setShowTarget(bool on);
 
+    // ── The result ───────────────────────────────────────────────────
+    //
+    // The measured voice with the equaliser applied: green, solid,
+    // where you will actually end up.
+    //
+    // Without it the window shows the measurement and the intent and
+    // leaves the operator to add two curves by eye across a log axis.
+    // People are bad at that, and they are bad at it in a consistent
+    // direction — the sum is read as flatter than it is, so the next
+    // adjustment overshoots. Every other control here opens that loop;
+    // this is the one that closes it.
+    void setShowResult(bool on);
+    bool showResult() const noexcept { return m_showResult; }
+
     // Which target the rose line aims at. Changing it redraws; it does
     // not touch the equaliser.
     void setProfile(const QString& name);
@@ -247,6 +261,7 @@ private:
     bool m_held{false};
     bool m_smooth{true};
     bool m_showTarget{true};
+    bool m_showResult{true};
     bool m_haveMag{false};
 
     // Dragging the rose line itself, when the profile is the

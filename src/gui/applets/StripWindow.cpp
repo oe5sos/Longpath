@@ -16,8 +16,12 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/StripTargets.h"
+#include "core/strip/TargetFromFile.h"
 
 #include <QInputDialog>
+#include <QFileDialog>
+#include <QScrollArea>
+#include <QSizePolicy>
 #include <QMessageBox>
 #include "core/AudioEngine.h"
 #include "core/TxChannel.h"
@@ -40,6 +44,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 
@@ -547,7 +552,8 @@ void StripWindow::seedEqLayout()
     // Only seed a chain that has not been set up before. Overwriting a
     // restored layout would throw away the operator's settings every
     // time the window opened.
-    if (c->eq().activeBandCount() >= kEqBandCount) { return; }
+    const int have = c->eq().activeBandCount();
+    if (have >= kEqBandCount) { return; }
 
     auto put = [c](int idx, ClientEq::FilterType t, float hz, float gain,
                    float q, bool on, int slope) {
@@ -557,6 +563,24 @@ void StripWindow::seedEqLayout()
         c->eq().setBand(idx, p);
     };
 
+    // ── Growing an existing layout ───────────────────────────────────
+    //
+    // The first shipped layout had ten slots. A chain restored from that
+    // settings file must not be re-seeded: the operator's curve is in
+    // slots 0-9 and overwriting it is exactly the failure this whole
+    // function's guard exists to prevent. So the four new bands are
+    // appended at 0 dB, which is audibly nothing, and the curve the
+    // operator had is the curve they still have — with four more handles
+    // on it.
+    if (have == 10) {
+        put(10, ClientEq::FilterType::Peak,  250.0f, 0.0f, 1.0f, true, 12);
+        put(11, ClientEq::FilterType::Peak,  500.0f, 0.0f, 1.0f, true, 12);
+        put(12, ClientEq::FilterType::Peak, 1000.0f, 0.0f, 1.0f, true, 12);
+        put(13, ClientEq::FilterType::Peak, 1900.0f, 0.0f, 1.0f, true, 12);
+        c->eq().setActiveBandCount(kEqBandCount);
+        return;
+    }
+
     put(0, ClientEq::FilterType::HighPass, 100.0f, 0.0f, 0.707f, true, 24);
     // Notches off until asked for: a notch at 50 Hz on a station that
     // runs at 60 removes nothing and costs phase.
@@ -564,22 +588,32 @@ void StripWindow::seedEqLayout()
     put(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
     put(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
 
-    // Six shaping bands rather than three, spread over the range a
-    // voice actually occupies and log-spaced so each one covers about
-    // the same musical distance. Three points can only tilt a curve;
-    // six can put a dip where the problem is, which is what an operator
-    // looking at their own spectrum wants to do.
+    // Ten shaping bands, log-spaced so each covers about the same
+    // musical distance. Three points can only tilt a curve; ten can put
+    // a dip exactly where the problem is and leave its neighbours alone,
+    // which is the difference between correcting a resonance and tilting
+    // the whole voice to hide it.
     //
     // A shelf at each end and peaks between them: shelves are the right
     // shape for "everything below this" and peaks for "this bit here",
     // and offering a peak at 200 Hz where a shelf is wanted is how a
     // curve ends up with two bands fighting each other.
+    //
+    // All at 0 dB. A default layout that already shapes the voice is a
+    // layout the operator has to undo before they can start.
     put(4, ClientEq::FilterType::LowShelf,   180.0f, 0.0f, 0.707f, true, 12);
     put(5, ClientEq::FilterType::Peak,       350.0f, 0.0f, 1.0f,   true, 12);
     put(6, ClientEq::FilterType::Peak,       700.0f, 0.0f, 1.0f,   true, 12);
     put(7, ClientEq::FilterType::Peak,      1400.0f, 0.0f, 1.0f,   true, 12);
     put(8, ClientEq::FilterType::Peak,      2400.0f, 0.0f, 1.0f,   true, 12);
     put(9, ClientEq::FilterType::HighShelf, 3400.0f, 0.0f, 0.707f, true, 12);
+    // The four that make it ten. Slots at the end, frequencies in the
+    // gaps — see StripWindow.h for why index order and frequency order
+    // are allowed to differ.
+    put(10, ClientEq::FilterType::Peak,  250.0f, 0.0f, 1.0f, true, 12);
+    put(11, ClientEq::FilterType::Peak,  500.0f, 0.0f, 1.0f, true, 12);
+    put(12, ClientEq::FilterType::Peak, 1000.0f, 0.0f, 1.0f, true, 12);
+    put(13, ClientEq::FilterType::Peak, 1900.0f, 0.0f, 1.0f, true, 12);
     c->eq().setActiveBandCount(kEqBandCount);
 }
 
@@ -623,11 +657,22 @@ void StripWindow::refreshEqTable()
     // the moment rounding makes them differ.
     m_fillingTable = true;
 
+    // Sorted by frequency, not by slot. The high-pass is always first
+    // because it is always the lowest thing on the plot; the rest are
+    // ordered the way they appear left to right, so row 4 in the table
+    // and knot 4 on the curve are the same band. Slot order stopped
+    // matching frequency order the first time anyone dragged a handle,
+    // and matching the picture is worth more than matching the array.
     std::vector<int> rows;
     if (c) {
         const int n = c->eq().activeBandCount();
         if (n > 0) { rows.push_back(0); }
-        for (int b = kBandLowShelf; b < n; ++b) { rows.push_back(b); }
+        std::vector<int> tone;
+        for (int b = kBandLowShelf; b < n; ++b) { tone.push_back(b); }
+        std::sort(tone.begin(), tone.end(), [c](int a, int b) {
+            return c->eq().band(a).freqHz < c->eq().band(b).freqHz;
+        });
+        rows.insert(rows.end(), tone.begin(), tone.end());
     }
     m_eqTable->setRowCount(int(rows.size()));
 
@@ -729,6 +774,45 @@ QWidget* StripWindow::buildEqPanel()
     auto* page = new QWidget(this);
     auto* outer = new QVBoxLayout(page);
     outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(4);
+
+    // ── Everything cannot be on screen at once ───────────────────────
+    //
+    // Reported from the bench, and true: this tab had grown a profile
+    // picker, two button rows, a description, the curve, a control row,
+    // three lines of advice, a five-step guide, a ten-row table and a
+    // dozen knobs, all stacked. On a laptop the curve — the only part
+    // that has to be large — was a strip in the middle with the useful
+    // things above and below it off screen.
+    //
+    // Two fixes, and they are different fixes for different problems.
+    // The scroll area below means nothing is unreachable, which is
+    // correctness. Folding away the prose and the numbers means the
+    // curve is large without scrolling at all, which is the actual
+    // complaint: an operator dragging an equaliser should not have to
+    // scroll past a paragraph they read once, three weeks ago.
+    //
+    // Reference and instructions fold; the picture and its controls do
+    // not, because those are what the tab is for.
+    auto fold = [this, page, outer](const QString& title, QWidget* body,
+                                    bool openAtStart) {
+        auto* head = new QPushButton(
+            (openAtStart ? QStringLiteral("▾  ") : QStringLiteral("▸  "))
+                + title, page);
+        head->setCheckable(true);
+        head->setChecked(openAtStart);
+        head->setStyleSheet(Style::buttonBaseStyle());
+        head->setCursor(Qt::PointingHandCursor);
+        outer->addWidget(head);
+        outer->addWidget(body);
+        body->setVisible(openAtStart);
+        connect(head, &QPushButton::toggled, this,
+                [head, body, title](bool on) {
+            body->setVisible(on);
+            head->setText((on ? QStringLiteral("▾  ")
+                              : QStringLiteral("▸  ")) + title);
+        });
+    };
 
     // The curve first, and large. This is the whole reason the EQ tab
     // is worth opening: the high-pass corner and the mains notches stop
@@ -817,6 +901,54 @@ QWidget* StripWindow::buildEqPanel()
             m_eqCurve->refresh();
         });
 
+        // ── A and B, and a recording to match ────────────────────────
+        {
+            auto* ab = new QHBoxLayout;
+            m_slotLabel = new QLabel(QStringLiteral("My curve:"), page);
+            ab->addWidget(m_slotLabel);
+
+            m_slotA = new QPushButton(QStringLiteral("A"), page);
+            m_slotB = new QPushButton(QStringLiteral("B"), page);
+            for (QPushButton* b : {m_slotA, m_slotB}) {
+                b->setCheckable(true);
+                b->setAutoExclusive(true);
+                b->setFixedWidth(34);
+                b->setStyleSheet(Style::buttonBaseStyle());
+                b->setToolTip(QStringLiteral(
+                    "Two targets, switched while you talk. Comparing by "
+                    "memory does not work — the ear forgets a curve in "
+                    "about two seconds, which is less time than it takes "
+                    "to drag one."));
+                ab->addWidget(b);
+            }
+
+            m_fromFileBtn = new QPushButton(
+                QStringLiteral("From recording…"), page);
+            m_fromFileBtn->setStyleSheet(Style::buttonBaseStyle());
+            m_fromFileBtn->setToolTip(QStringLiteral(
+                "Load a WAV of audio that sounded right — your own from a "
+                "good day, or somebody else's off the air — and use its "
+                "long-term spectrum as the target. The only method here "
+                "with nobody's opinion between your ear and the number. "
+                "Bear in mind that a recording off a receiver carries that "
+                "receiver's filter, and another operator's voice carries "
+                "their larynx: it gives you a target, not a transplant."));
+            ab->addWidget(m_fromFileBtn);
+
+            ab->addStretch(1);
+            outer->addLayout(ab);
+
+            connect(m_slotA, &QPushButton::clicked, this,
+                    [this]() { selectTargetSlot(0); });
+            connect(m_slotB, &QPushButton::clicked, this,
+                    [this]() { selectTargetSlot(1); });
+            connect(m_fromFileBtn, &QPushButton::clicked, this,
+                    [this]() { targetFromRecording(); });
+
+            (StripTargets::activeUserSlot() == 1 ? m_slotB : m_slotA)
+                ->setChecked(true);
+        }
+
         m_profileNote = new QLabel(page);
         m_profileNote->setWordWrap(true);
         m_profileNote->setStyleSheet(dimStyle());
@@ -828,6 +960,7 @@ QWidget* StripWindow::buildEqPanel()
                 if (pr.name == n) { m_profileNote->setText(pr.description); }
             }
             if (m_eqCurve) { m_eqCurve->setProfile(n); }
+            updateTargetControls();
         };
         connect(m_profileBox, &QComboBox::currentIndexChanged, this,
                 [describe](int) { describe(); });
@@ -836,9 +969,14 @@ QWidget* StripWindow::buildEqPanel()
     }
 
     m_eqCurve = new StripEqCurve(page);
+    // The one thing on this tab that must be big. Given a stretch of 1
+    // as well, so folding a section open or shut gives the space to the
+    // picture rather than to the gap under it.
+    m_eqCurve->setMinimumHeight(260);
+    m_eqCurve->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_eqCurve->setChain(chain());
     if (StripChain* ch = chain()) { m_eqCurve->setSpectrum(&ch->micSpectrum()); }
-    outer->addWidget(m_eqCurve);
+    outer->addWidget(m_eqCurve, 1);
 
     // Dragging the curve writes straight into the chain; the window
     // decides when that reaches the settings file, so there is one
@@ -885,6 +1023,24 @@ QWidget* StripWindow::buildEqPanel()
             if (m_eqCurve) { m_eqCurve->setShowTarget(on); }
         });
 
+        // ── The result ───────────────────────────────────────────────
+        //
+        // On by default, because the alternative is asking the operator
+        // to add two curves by eye across a log axis. People are bad at
+        // that, and bad at it in one direction: the sum reads flatter
+        // than it is, so the next adjustment overshoots. Every other
+        // control in this row opens that loop; this one closes it.
+        auto* result = new QCheckBox(QStringLiteral("Result"), page);
+        result->setChecked(true);
+        result->setToolTip(QStringLiteral(
+            "Draw your voice with the equaliser applied, in green. That "
+            "is where you actually end up — not something to aim at, "
+            "just arithmetic, and the same arithmetic the filter does."));
+        row->addWidget(result);
+        connect(result, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_eqCurve) { m_eqCurve->setShowResult(on); }
+        });
+
         auto* hint = new QLabel(QStringLiteral(
             "Drag a dot for frequency and gain · wheel for width · "
             "double-click a dot to change its shape · double-click "
@@ -917,6 +1073,14 @@ QWidget* StripWindow::buildEqPanel()
             "5 &nbsp;Drag the blue dots onto the rose line. Rose is not "
             "your target voice — it is where the equaliser should sit to "
             "get you there, so when blue lies on rose you are done.<br>"
+            "6 &nbsp;Watch the green line: that is your voice with the "
+            "equaliser applied, so it is where you will actually end "
+            "up.<br>"
+            "<br>None of the six built-in shapes is your voice or your "
+            "microphone. Pick <i>Mine</i> and the rose line grows its own "
+            "handles — copy the nearest profile, take your own average, or "
+            "match a recording you liked, then drag it where you want it. "
+            "Keep two of them as A and B and switch while talking.<br>"
             "<br>The receiver is silenced while you listen, and comes "
             "back when you stop."), page);
         guide->setWordWrap(true);
@@ -927,7 +1091,10 @@ QWidget* StripWindow::buildEqPanel()
                 .arg(QString::fromLatin1(Style::kTextSecondary),
                      QString::fromLatin1(Style::kInsetBg),
                      QString::fromLatin1(Style::kInsetBorder)));
-        outer->addWidget(guide);
+        // Closed. It is worth reading once and worth scrolling past
+        // never, and the row of colours in the key under the curve is
+        // the part anyone needs on the tenth visit.
+        fold(QStringLiteral("How to use this"), guide, false);
 
         connect(m_holdBtn, &QPushButton::toggled, this, [this](bool on) {
             if (!m_eqCurve) { return; }
@@ -950,11 +1117,22 @@ QWidget* StripWindow::buildEqPanel()
         });
     }
 
-    buildEqTable(page, outer);
+    // The numbers, folded away. A graph is the right tool for "make
+    // this bit quieter" and the wrong one for "put it at exactly 2200";
+    // both belong, but only one of them belongs on screen while the
+    // other is being dragged.
+    {
+        auto* tableHost = new QWidget(page);
+        auto* tl = new QVBoxLayout(tableHost);
+        tl->setContentsMargins(0, 0, 0, 0);
+        buildEqTable(tableHost, tl);
+        fold(QStringLiteral("Bands, as numbers"), tableHost, false);
+    }
 
     auto* body = new QWidget(page);
-    outer->addWidget(body, 1);
     auto* form = new QFormLayout(body);
+    form->setContentsMargins(0, 4, 0, 0);
+    fold(QStringLiteral("High-pass, hum and tone controls"), body, false);
 
     const int idx = static_cast<int>(StripChain::Stage::Eq);
     auto* on = new QCheckBox(QStringLiteral("EQ on"), page);
@@ -1080,7 +1258,18 @@ QWidget* StripWindow::buildEqPanel()
     toneHelp->setStyleSheet(dimStyle());
     form->addRow(toneHelp);
 
-    return page;
+    outer->addStretch(0);
+
+    // Scrolling is the backstop, not the plan: with everything folded
+    // the tab fits, and the scroll bar only appears for an operator who
+    // has opened the knobs and the table on a short screen. A panel
+    // that always scrolls has been designed for nobody's screen.
+    auto* scroll = new QScrollArea(this);
+    scroll->setWidget(page);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    return scroll;
 }
 
 // ── De-esser ─────────────────────────────────────────────────────────
@@ -1685,6 +1874,69 @@ void StripWindow::reloadControls()
         }
     }
     if (keep >= 0 && keep < m_tabs->count()) { m_tabs->setCurrentIndex(keep); }
+}
+
+void StripWindow::selectTargetSlot(int slot)
+{
+    StripTargets::setActiveUserSlot(slot);
+    // Switching slots does not change the picker, so if the operator is
+    // looking at a built-in the switch is silent and correct: it changes
+    // which of their own curves is armed for when they choose Mine.
+    if (m_eqCurve) { m_eqCurve->refresh(); }
+}
+
+void StripWindow::updateTargetControls()
+{
+    const bool mine = m_profileBox
+        && m_profileBox->currentData().toString()
+               == QLatin1String(StripTargets::kUserProfileName);
+    for (QWidget* w : {static_cast<QWidget*>(m_slotLabel),
+                       static_cast<QWidget*>(m_slotA),
+                       static_cast<QWidget*>(m_slotB)}) {
+        if (w) { w->setVisible(mine); }
+    }
+}
+
+void StripWindow::targetFromRecording()
+{
+    // Reading the file is the easy part; refusing it clearly is the part
+    // that matters. A target silently derived from a misparsed header
+    // is worse than no target, because it looks like a measurement.
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Match a recording"), QString(),
+        QStringLiteral("Audio (*.wav *.WAV)"));
+    if (path.isEmpty()) { return; }
+
+    QString err;
+    const QVector<double> curve = TargetFromFile::fromWavFile(path, &err);
+    if (curve.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("Match a recording"),
+                             err.isEmpty()
+                                 ? QStringLiteral("The file could not be "
+                                                  "read.")
+                                 : err);
+        return;
+    }
+
+    StripTargets::setUserTarget(curve);
+    const int at = m_profileBox->findData(
+        QString::fromLatin1(StripTargets::kUserProfileName));
+    if (at >= 0) { m_profileBox->setCurrentIndex(at); }
+    if (m_eqCurve) { m_eqCurve->refresh(); }
+    updateTargetControls();
+
+    QMessageBox::information(
+        this, QStringLiteral("Match a recording"),
+        QStringLiteral(
+            "The target is now the long-term average of that recording, "
+            "in slot %1.\n\nWorth knowing what this can and cannot do: a "
+            "recording made through a receiver carries that receiver's "
+            "filter, and another operator's voice carries their larynx. "
+            "You have a target, not a transplant — but it is a target "
+            "nobody's opinion went into, which is more than any of the "
+            "built-in curves can say.")
+            .arg(StripTargets::activeUserSlot() == 1
+                     ? QStringLiteral("B") : QStringLiteral("A")));
 }
 
 void StripWindow::refreshChainRow()

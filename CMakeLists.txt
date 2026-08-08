@@ -948,6 +948,7 @@ set(GUI_SOURCES
     src/core/strip/StripSettings.cpp
     src/core/strip/StripTuner.cpp
     src/core/strip/StripTargets.cpp
+    src/core/strip/TargetFromFile.cpp
     src/core/TxAudioRecorder.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
