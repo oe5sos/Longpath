@@ -256,6 +256,7 @@ warren@wpratt.com
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "widgets/VfoWidget.h"
+#include "applets/StripWindow.h"
 #include "applets/TxVoiceCheckDialog.h"
 #include "widgets/RotorLogbookPanel.h"
 #include "core/Maidenhead.h"
@@ -6245,6 +6246,19 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openRotorDial);
     }
 
+    // The channel strip. Next to the voice check because they are two
+    // halves of one job: one measures the voice, the other changes it.
+    {
+        QAction* stripAction =
+            toolsMenu->addAction(QStringLiteral("&Channel strip..."));
+        stripAction->setObjectName(QStringLiteral("actChannelStrip"));
+        stripAction->setToolTip(QStringLiteral(
+            "Gate, EQ, de-esser, compressor, tube, exciter, reverb and "
+            "limiter, ahead of the radio's own processing."));
+        connect(stripAction, &QAction::triggered,
+                this, &MainWindow::openChannelStrip);
+    }
+
     // Transmit audio, measured rather than guessed at. Under Tools
     // because it is a thing you go and do, not a control you leave
     // sitting on screen.
@@ -9439,6 +9453,19 @@ void MainWindow::openVoiceCheck()
     m_voiceCheckDialog->show();
     m_voiceCheckDialog->raise();
     m_voiceCheckDialog->activateWindow();
+}
+
+void MainWindow::openChannelStrip()
+{
+    if (!m_radioModel) { return; }
+    // Modeless, like the voice check and for the same reason: the loop
+    // is turn a knob, listen, turn it back.
+    if (!m_stripWindow) {
+        m_stripWindow = new StripWindow(m_radioModel, this);
+    }
+    m_stripWindow->show();
+    m_stripWindow->raise();
+    m_stripWindow->activateWindow();
 }
 
 void MainWindow::openRotorSetup()

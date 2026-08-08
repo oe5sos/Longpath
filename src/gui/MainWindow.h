@@ -116,6 +116,7 @@ class PsForm;
 // Phase 3J-2 H1: Tools menu modeless singletons.
 class SpotHubDialog;
 class TxVoiceCheckDialog;
+class StripWindow;
 class FreeDVReporterDialog;
 
 class RxDashboard;
@@ -558,6 +559,7 @@ private:
     void openLogbookWindow();
     void openRotorSetup();
     void openVoiceCheck();
+    void openChannelStrip();
     class RotorLogbookPanel* ensureRotorPanel();
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
@@ -731,6 +733,7 @@ private:
     // the H1 test seam below.
     QPointer<SpotHubDialog>        m_spotHubDialog;
     QPointer<TxVoiceCheckDialog>   m_voiceCheckDialog;
+    QPointer<StripWindow>          m_stripWindow;
     QPointer<FreeDVReporterDialog> m_freeDVReporterDialog;
 
     // Status bar widgets (double-height AetherSDR design, 46px)
