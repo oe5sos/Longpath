@@ -74,6 +74,10 @@ private:
     QWidget* buildEqPanel();
     QWidget* buildDeEssPanel();
     QWidget* buildCompPanel();
+    QWidget* buildTubePanel();
+    QWidget* buildPuduPanel();
+    QWidget* buildReverbPanel();
+    QWidget* buildLimiterPanel();
     QWidget* buildPlaceholder(StripChain::Stage s);
 
     // The EQ's bands are laid out once, in a fixed order, so that the

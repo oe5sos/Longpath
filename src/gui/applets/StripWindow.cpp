@@ -237,8 +237,12 @@ void StripWindow::buildUi()
         case StripChain::Stage::Gate:  page = buildGatePanel();  break;
         case StripChain::Stage::Eq:    page = buildEqPanel();    break;
         case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
-        case StripChain::Stage::Comp:  page = buildCompPanel();  break;
-        default:                       page = buildPlaceholder(s); break;
+        case StripChain::Stage::Comp:    page = buildCompPanel();    break;
+        case StripChain::Stage::Tube:    page = buildTubePanel();    break;
+        case StripChain::Stage::Pudu:    page = buildPuduPanel();    break;
+        case StripChain::Stage::Reverb:  page = buildReverbPanel();  break;
+        case StripChain::Stage::Limiter: page = buildLimiterPanel(); break;
+        default:                         page = buildPlaceholder(s); break;
         }
         m_tabs->addTab(page,
                        QString::fromLatin1(StripChain::stageName(s)));
@@ -684,6 +688,286 @@ QWidget* StripWindow::buildCompPanel()
     return page;
 }
 
+// ── Tube ─────────────────────────────────────────────────────────────
+
+QWidget* StripWindow::buildTubePanel()
+{
+    auto* page = new QWidget(this);
+    auto* form = new QFormLayout(page);
+
+    const int idx = static_cast<int>(StripChain::Stage::Tube);
+    auto* on = new QCheckBox(QStringLiteral("Tube on"), page);
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    form->addRow(on);
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Tube, v);
+        }
+        refreshChainRow();
+        persist();
+    });
+
+    auto* model = new QComboBox(page);
+    model->addItem(QStringLiteral("A — soft"), int(ClientTube::Model::A));
+    model->addItem(QStringLiteral("B — hard"), int(ClientTube::Model::B));
+    model->addItem(QStringLiteral("C — asymmetric"), int(ClientTube::Model::C));
+    form->addRow(QStringLiteral("Character"), model);
+    connect(model, &QComboBox::currentIndexChanged, this, [this, model](int) {
+        if (StripChain* c = chain()) {
+            c->tube().setModel(
+                static_cast<ClientTube::Model>(model->currentData().toInt()));
+        }
+        persist();
+    });
+
+    addKnob(form, QStringLiteral("Drive"), 0.0, 24.0, 0.5,
+        cur([this]{ return chain()->tube().driveDb(); }, 0.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) { c->tube().setDriveDb(float(v)); }
+        }, 1, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Tone"), -1.0, 1.0, 0.05,
+        cur([this]{ return chain()->tube().tone(); }, 0.0),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->tube().setTone(float(v)); }
+        }, 2, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Mix"), 0.0, 1.0, 0.05,
+        cur([this]{ return chain()->tube().dryWet(); }, 1.0),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->tube().setDryWet(float(v)); }
+        }, 2, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Output"), -24.0, 24.0, 0.5,
+        cur([this]{ return chain()->tube().outputGainDb(); }, 0.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) { c->tube().setOutputGainDb(float(v)); }
+        }, 1, [this]{ persist(); });
+
+    auto* help = new QLabel(QStringLiteral(
+        "Saturation adds harmonics that were not in your voice. On SSB "
+        "that is not free: they land inside the transmitted bandwidth and "
+        "some of them sound like distortion to the far end even when they "
+        "sound flattering in headphones.\n\n"
+        "Mix is the useful control. A little of the saturated signal "
+        "under the clean one thickens a thin voice; all of it is an "
+        "effect. Drive past about 6 dB with Mix at 1.0 is where operators "
+        "start being told they sound rough."), page);
+    help->setWordWrap(true);
+    help->setStyleSheet(dimStyle());
+    form->addRow(help);
+    return page;
+}
+
+// ── PUDU — the AetherVoice exciter ───────────────────────────────────
+
+QWidget* StripWindow::buildPuduPanel()
+{
+    auto* page = new QWidget(this);
+    auto* form = new QFormLayout(page);
+
+    const int idx = static_cast<int>(StripChain::Stage::Pudu);
+    auto* on = new QCheckBox(QStringLiteral("Exciter on"), page);
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    form->addRow(on);
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Pudu, v);
+        }
+        refreshChainRow();
+        persist();
+    });
+
+    auto* mode = new QComboBox(page);
+    mode->addItem(QStringLiteral("Aural exciter + big bottom"),
+                  int(ClientPudu::Mode::Aphex));
+    mode->addItem(QStringLiteral("Sonic exciter"),
+                  int(ClientPudu::Mode::Behringer));
+    form->addRow(QStringLiteral("Model"), mode);
+    connect(mode, &QComboBox::currentIndexChanged, this, [this, mode](int) {
+        if (StripChain* c = chain()) {
+            c->pudu().setMode(
+                static_cast<ClientPudu::Mode>(mode->currentData().toInt()));
+        }
+        persist();
+    });
+
+    auto* lowLbl = new QLabel(QStringLiteral("<b>Low end</b>"), page);
+    form->addRow(lowLbl);
+    addKnob(form, QStringLiteral("Tune"), 50.0, 160.0, 1.0,
+        cur([this]{ return chain()->pudu().pooTuneHz(); }, 90.0),
+        QStringLiteral("Hz"), [this](double v) {
+            if (StripChain* c = chain()) { c->pudu().setPooTuneHz(float(v)); }
+        }, 0, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Drive"), 0.0, 24.0, 0.5,
+        cur([this]{ return chain()->pudu().pooDriveDb(); }, 0.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) { c->pudu().setPooDriveDb(float(v)); }
+        }, 1, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Amount"), 0.0, 1.0, 0.05,
+        cur([this]{ return chain()->pudu().pooMix(); }, 0.0),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->pudu().setPooMix(float(v)); }
+        }, 2, [this]{ persist(); });
+
+    auto* hiLbl = new QLabel(QStringLiteral("<b>Top end</b>"), page);
+    form->addRow(hiLbl);
+    addKnob(form, QStringLiteral("Tune "), 1000.0, 10000.0, 100.0,
+        cur([this]{ return chain()->pudu().dooTuneHz(); }, 3000.0),
+        QStringLiteral("Hz"), [this](double v) {
+            if (StripChain* c = chain()) { c->pudu().setDooTuneHz(float(v)); }
+        }, 0, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Harmonics"), 0.0, 24.0, 0.5,
+        cur([this]{ return chain()->pudu().dooHarmonicsDb(); }, 0.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) {
+                c->pudu().setDooHarmonicsDb(float(v));
+            }
+        }, 1, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Amount "), 0.0, 1.0, 0.05,
+        cur([this]{ return chain()->pudu().dooMix(); }, 0.0),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->pudu().setDooMix(float(v)); }
+        }, 2, [this]{ persist(); });
+
+    auto* help = new QLabel(QStringLiteral(
+        "An exciter does not lift the top end — it invents harmonics "
+        "above what is there and mixes them in, which the ear reads as "
+        "detail that was always present. That is why a little sounds "
+        "like a better microphone and a lot sounds artificial.\n\n"
+        "On SSB the top-end tune is the control to watch. Set it above "
+        "about 2.5 kHz and most of what it generates lands outside the "
+        "transmit filter: you hear the effect in the monitor and the far "
+        "end gets nothing but the intermodulation that came with it.\n\n"
+        "The low end works the other way round — it synthesises an "
+        "octave below the tune frequency, which on a 2.8 kHz SSB channel "
+        "is largely inaudible at the far end too. Both are worth trying "
+        "and neither is free."), page);
+    help->setWordWrap(true);
+    help->setStyleSheet(dimStyle());
+    form->addRow(help);
+    return page;
+}
+
+// ── Reverb ───────────────────────────────────────────────────────────
+
+QWidget* StripWindow::buildReverbPanel()
+{
+    auto* page = new QWidget(this);
+    auto* form = new QFormLayout(page);
+
+    const int idx = static_cast<int>(StripChain::Stage::Reverb);
+    auto* on = new QCheckBox(QStringLiteral("Reverb on"), page);
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    form->addRow(on);
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Reverb, v);
+        }
+        refreshChainRow();
+        persist();
+    });
+
+    addKnob(form, QStringLiteral("Size"), 0.0, 1.0, 0.05,
+        cur([this]{ return chain()->reverb().size(); }, 0.3),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->reverb().setSize(float(v)); }
+        }, 2, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Decay"), 0.3, 5.0, 0.1,
+        cur([this]{ return chain()->reverb().decayS(); }, 0.8),
+        QStringLiteral("s"), [this](double v) {
+            if (StripChain* c = chain()) { c->reverb().setDecayS(float(v)); }
+        }, 1, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Damping"), 0.0, 1.0, 0.05,
+        cur([this]{ return chain()->reverb().damping(); }, 0.5),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->reverb().setDamping(float(v)); }
+        }, 2, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Pre-delay"), 0.0, 100.0, 1.0,
+        cur([this]{ return chain()->reverb().preDelayMs(); }, 20.0),
+        QStringLiteral("ms"), [this](double v) {
+            if (StripChain* c = chain()) { c->reverb().setPreDelayMs(float(v)); }
+        }, 0, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Mix"), 0.0, 1.0, 0.01,
+        cur([this]{ return chain()->reverb().mix(); }, 0.0),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->reverb().setMix(float(v)); }
+        }, 2, [this]{ persist(); });
+
+    auto* help = new QLabel(QStringLiteral(
+        "Almost nobody should use this, and it is here because the DSP "
+        "is and hiding a stage that is running would be worse.\n\n"
+        "Reverb on transmit audio fills the gaps between words with a "
+        "tail, and those gaps are what a listener uses to separate you "
+        "from the noise. On a weak signal it costs readability directly. "
+        "If you want it at all, Mix below 0.1 with a short decay is the "
+        "only setting that will not draw comment."), page);
+    help->setWordWrap(true);
+    help->setStyleSheet(dimStyle());
+    form->addRow(help);
+    return page;
+}
+
+// ── Limiter ──────────────────────────────────────────────────────────
+
+QWidget* StripWindow::buildLimiterPanel()
+{
+    auto* page = new QWidget(this);
+    auto* form = new QFormLayout(page);
+
+    const int idx = static_cast<int>(StripChain::Stage::Limiter);
+    auto* on = new QCheckBox(QStringLiteral("Limiter on"), page);
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    form->addRow(on);
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Limiter, v);
+        }
+        refreshChainRow();
+        persist();
+    });
+
+    addKnob(form, QStringLiteral("Ceiling"), -12.0, 0.0, 0.1,
+        cur([this]{ return chain()->limiter().ceilingDb(); }, -1.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) { c->limiter().setCeilingDb(float(v)); }
+        }, 1, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Output trim"), -12.0, 12.0, 0.5,
+        cur([this]{ return chain()->limiter().outputTrimDb(); }, 0.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) {
+                c->limiter().setOutputTrimDb(float(v));
+            }
+        }, 1, [this]{ persist(); });
+
+    auto* dc = new QCheckBox(QStringLiteral("Remove DC offset"), page);
+    dc->setChecked(chain() ? chain()->limiter().dcBlockEnabled() : true);
+    form->addRow(dc);
+    connect(dc, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) { c->limiter().setDcBlockEnabled(v); }
+        persist();
+    });
+
+    auto* help = new QLabel(QStringLiteral(
+        "The last thing in the chain, and it should stay that way. "
+        "Everything above it can add gain — the tube, the exciter, the "
+        "compressor's make-up — and this is what stops the sum arriving "
+        "at the modulator hotter than it should.\n\n"
+        "Leave it on. A ceiling of -1 dB gives the transmit chain a "
+        "little room without costing anything audible; the reason not to "
+        "use 0 is that everything downstream — resampling, the "
+        "modulator — can overshoot slightly, and a signal already at "
+        "full scale has nowhere to put the overshoot.\n\n"
+        "DC offset removal matters more than it sounds: a microphone "
+        "with a small offset spends part of the transmitter's headroom "
+        "on a signal nobody can hear."), page);
+    help->setWordWrap(true);
+    help->setStyleSheet(dimStyle());
+    form->addRow(help);
+    return page;
+}
+
+// Every stage now has a real panel, so this is only reached if a stage
+// is added and its panel is not. Kept for exactly that: a new stage
+// should appear with an honest empty tab rather than crash or silently
+// vanish from the window.
 QWidget* StripWindow::buildPlaceholder(StripChain::Stage s)
 {
     auto* page = new QWidget(this);
@@ -755,8 +1039,12 @@ void StripWindow::reloadControls()
         case StripChain::Stage::Gate:  page = buildGatePanel();  break;
         case StripChain::Stage::Eq:    page = buildEqPanel();    break;
         case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
-        case StripChain::Stage::Comp:  page = buildCompPanel();  break;
-        default:                       page = buildPlaceholder(s); break;
+        case StripChain::Stage::Comp:    page = buildCompPanel();    break;
+        case StripChain::Stage::Tube:    page = buildTubePanel();    break;
+        case StripChain::Stage::Pudu:    page = buildPuduPanel();    break;
+        case StripChain::Stage::Reverb:  page = buildReverbPanel();  break;
+        case StripChain::Stage::Limiter: page = buildLimiterPanel(); break;
+        default:                         page = buildPlaceholder(s); break;
         }
         m_tabs->addTab(page, QString::fromLatin1(StripChain::stageName(s)));
     }
