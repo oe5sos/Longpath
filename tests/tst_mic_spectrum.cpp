@@ -21,6 +21,7 @@ private slots:
     void a_snapshot_is_oldest_first();
     void it_keeps_the_newest_audio_when_it_wraps();
     void it_never_returns_more_than_it_has();
+    void it_holds_enough_for_the_fifteen_second_average();
 };
 
 void TstMicSpectrum::an_empty_ring_gives_nothing_rather_than_zeros()
@@ -56,16 +57,17 @@ void TstMicSpectrum::it_keeps_the_newest_audio_when_it_wraps()
     // Opposite policy to TxAudioRecorder, which drops the tail. A live
     // view that stopped updating once its ring filled would be a
     // picture of two seconds ago, forever.
-    MicSpectrum s(8);                  // 8 Hz × 2 s = 16 frames
-    std::vector<float> a(16, 1.0f);
-    std::vector<float> b(16, 2.0f);
-    s.feed(a.data(), 16);
-    s.feed(b.data(), 16);
+    const int cap = 8 * MicSpectrum::kSeconds;
+    MicSpectrum s(8);
+    std::vector<float> a(static_cast<size_t>(cap), 1.0f);
+    std::vector<float> b(static_cast<size_t>(cap), 2.0f);
+    s.feed(a.data(), cap);
+    s.feed(b.data(), cap);
 
-    std::vector<float> out(16, 0.0f);
-    QCOMPARE(s.snapshot(out.data(), 16), 16);
+    std::vector<float> out(static_cast<size_t>(cap), 0.0f);
+    QCOMPARE(s.snapshot(out.data(), cap), cap);
     for (float v : out) { QCOMPARE(v, 2.0f); }
-    QCOMPARE(s.framesSeen(), 32ULL);
+    QCOMPARE(s.framesSeen(), static_cast<unsigned long long>(cap) * 2);
 }
 
 void TstMicSpectrum::it_never_returns_more_than_it_has()
@@ -81,6 +83,24 @@ void TstMicSpectrum::it_never_returns_more_than_it_has()
     QCOMPARE(s.snapshot(out.data(), 4096), 100);
     QCOMPARE(out[99], 0.5f);
     QCOMPARE(out[100], 9.0f);          // beyond what was written: untouched
+}
+
+void TstMicSpectrum::it_holds_enough_for_the_fifteen_second_average()
+{
+    // Hold averages fifteen seconds. The ring must be able to give
+    // that, with room to spare so a full fifteen is there even when the
+    // newest block landed a moment ago — otherwise the average is
+    // silently taken over whatever happened to fit.
+    QVERIFY2(MicSpectrum::kSeconds > MicSpectrum::kHoldSeconds,
+             "the ring must be longer than the window it is asked for");
+
+    MicSpectrum s(8000);
+    const int want = 8000 * MicSpectrum::kHoldSeconds;
+    std::vector<float> in(static_cast<size_t>(want), 0.25f);
+    s.feed(in.data(), want);
+
+    std::vector<float> out(static_cast<size_t>(want), 0.0f);
+    QCOMPARE(s.snapshot(out.data(), want), want);
 }
 
 QTEST_APPLESS_MAIN(TstMicSpectrum)

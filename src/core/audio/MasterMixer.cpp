@@ -207,7 +207,6 @@ void MasterMixer::accumulate(int sliceId, const float* samples, int frames,
         st.rd = 0;
         st.wr = 0;
         st.avail = 0;
-        st.primed = false;   // the cushion went with the ring
         st.ringGeneration = generation;
     }
 
@@ -282,19 +281,6 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
             != st.streamGeneration.load(std::memory_order_acquire)) {
             continue;
         }
-        if (opportunistic) {
-            // Build the cushion before being heard, and keep it. Until
-            // then this slot is silent on purpose — a monitor that
-            // starts the instant its first block lands has no slack at
-            // all and spends the rest of the session running out.
-            if (!st.primed) {
-                if (st.avail >= kOpportunisticCushionFrames) {
-                    st.primed = true;
-                } else {
-                    continue;   // still filling; contributes nothing yet
-                }
-            }
-        }
         maxAvail = std::max(maxAvail, st.avail);
         if (!st.producing.load(std::memory_order_acquire)) { continue; }
         anyMember = true;
@@ -351,20 +337,6 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
         if (st.ringGeneration
             != st.streamGeneration.load(std::memory_order_acquire)) {
             continue;
-        }
-        if (opportunistic) {
-            if (!st.primed) { continue; }
-            if (st.avail < n) {
-                // Short. Contribute nothing rather than the first
-                // `avail` frames of the block: a partial contribution
-                // stops the waveform dead partway through and resumes
-                // next time, which is a step at audio rate — the
-                // crackle this whole cushion exists to remove. Drop
-                // back to filling, so the next block starts from slack
-                // rather than from the same shortfall.
-                st.primed = false;
-                continue;
-            }
         }
         const int take = std::min(n, st.avail);
         if (take <= 0) { continue; }

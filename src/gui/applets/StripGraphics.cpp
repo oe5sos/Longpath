@@ -13,6 +13,7 @@
 
 #include "gui/applets/StripGraphics.h"
 
+#include "core/VoiceAnalyzer.h"
 #include "gui/StyleConstants.h"
 
 #include <QEvent>
@@ -319,8 +320,93 @@ void StripEqCurve::refresh() { update(); }
 void StripEqCurve::setHeld(bool on)
 {
     m_held = on;
-    if (on && m_haveMag) { m_heldMag = m_mag; }
+    if (on) { captureHold(); }
     update();
+}
+
+void StripEqCurve::setSmoothing(bool on)
+{
+    m_smooth = on;
+    applySmoothing();
+    update();
+}
+
+void StripEqCurve::setShowTarget(bool on) { m_showTarget = on; update(); }
+
+void StripEqCurve::captureHold()
+{
+    m_heldMag.clear();
+    m_heldShown.clear();
+    if (!m_spec) { return; }
+
+    const int rate = m_spec->sampleRate();
+    const int want = rate * MicSpectrum::kHoldSeconds;
+    std::vector<float> buf(static_cast<size_t>(want), 0.0f);
+    const int got = m_spec->snapshot(buf.data(), want);
+    if (got < kFft * 2) { return; }    // not enough to average anything
+
+    // Overlapping windows, half a window apart. Averaged in the POWER
+    // domain, not in decibels: averaging logarithms gives a quiet
+    // window the same weight as a loud one, so the pauses between words
+    // pull the whole curve down and flatten exactly the peaks that
+    // matter.
+    const int bins = kFft / 2;
+    std::vector<double> power(static_cast<size_t>(bins), 0.0);
+    int windows = 0;
+
+    std::vector<std::complex<double>> a(kFft);
+    for (int start = 0; start + kFft <= got; start += kFft / 2) {
+        for (int i = 0; i < kFft; ++i) {
+            const double w =
+                0.5 * (1.0 - std::cos(2.0 * M_PI * i / (kFft - 1)));
+            a[static_cast<size_t>(i)] =
+                std::complex<double>(buf[static_cast<size_t>(start + i)] * w,
+                                     0.0);
+        }
+        fftInPlace(a);
+        for (int i = 0; i < bins; ++i) {
+            const double m = std::abs(a[static_cast<size_t>(i)]) / (kFft / 4.0);
+            power[static_cast<size_t>(i)] += m * m;
+        }
+        ++windows;
+    }
+    if (windows == 0) { return; }
+
+    m_heldMag.assign(static_cast<size_t>(bins), -120.0);
+    for (int i = 0; i < bins; ++i) {
+        const double mean = power[static_cast<size_t>(i)] / windows;
+        m_heldMag[static_cast<size_t>(i)] =
+            mean > 1e-18 ? 10.0 * std::log10(mean) : -120.0;
+    }
+    applySmoothing();
+}
+
+void StripEqCurve::applySmoothing()
+{
+    m_heldShown = m_heldMag;
+    if (!m_smooth || m_heldMag.empty() || !m_spec) { return; }
+
+    // A third of an octave, which is roughly how finely the ear
+    // separates tone. Narrower than that and the picture shows the
+    // harmonics of the voice — real, but not something an equaliser
+    // should be aimed at, because they move with every note the
+    // operator speaks on.
+    const double binHz = m_spec->sampleRate() / double(kFft);
+    const double factor = std::pow(2.0, 1.0 / 6.0);   // ± 1/6 octave
+    const int n = int(m_heldMag.size());
+
+    for (int i = 1; i < n; ++i) {
+        const double hz = i * binHz;
+        const int lo = std::max(1, int(hz / factor / binHz));
+        const int hi = std::min(n - 1, int(hz * factor / binHz));
+        double sum = 0.0; int cnt = 0;
+        for (int k = lo; k <= hi; ++k) {
+            sum += m_heldMag[static_cast<size_t>(k)];
+            ++cnt;
+        }
+        m_heldShown[static_cast<size_t>(i)] =
+            cnt ? sum / cnt : m_heldMag[static_cast<size_t>(i)];
+    }
 }
 
 QSize StripEqCurve::sizeHint() const { return QSize(560, 230); }
@@ -675,7 +761,8 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     // thing being set. Scaled so the clarity band sits near the 0 dB
     // line, because the absolute level is a microphone-gain question
     // and this picture is about shape.
-    const std::vector<double>& mag = m_held ? m_heldMag : m_mag;
+    const std::vector<double>& mag =
+        m_held ? (m_heldShown.empty() ? m_heldMag : m_heldShown) : m_mag;
     if (!mag.empty() && m_spec) {
         const double binHz = m_spec->sampleRate() / double(kFft);
         double ref = -120.0;
@@ -707,9 +794,43 @@ void StripEqCurve::paintEvent(QPaintEvent*)
                 else          { sp.lineTo(pt); }
             }
             p.setClipRect(r);
-            p.setPen(QPen(m_held ? QColor(0xd0, 0x90, 0x20, 200)
-                                 : QColor(0x60, 0x80, 0xa0, 130), 1));
+            p.setPen(QPen(m_held ? QColor(0xd0, 0x90, 0x20, 220)
+                                 : QColor(0x60, 0x80, 0xa0, 130),
+                          m_held ? 2.0 : 1.0));
             p.drawPath(sp);
+
+            // ── Where it ought to be ─────────────────────────────────
+            //
+            // The same target curve the voice check measures against,
+            // offset onto the held one at 1 kHz so the two can be
+            // compared by eye. Rose, and dashed, because it is not a
+            // measurement and must never be mistaken for one: it is an
+            // opinion about what a voice that carries looks like.
+            //
+            // Read it as "lift the amber onto the rose". Where amber is
+            // below rose, that band is missing; where above, it is too
+            // much — and the blue curve underneath is what you move to
+            // close the gap.
+            if (m_held && m_showTarget) {
+                double at1k = 0.0;
+                {
+                    const auto bin = static_cast<size_t>(1000.0 / binHz);
+                    if (bin < mag.size()) { at1k = mag[bin] - ref; }
+                }
+                QPainterPath tp;
+                bool begun = false;
+                for (int x = r.left(); x <= r.right(); ++x) {
+                    const double hz = hzForX(x, r);
+                    const double db = VoiceAnalyzer::targetDb(hz) + at1k;
+                    const QPointF pt(x, yForDb(db, r));
+                    if (!begun) { tp.moveTo(pt); begun = true; }
+                    else        { tp.lineTo(pt); }
+                }
+                QPen rose(QColor(0xe0, 0x70, 0xa0, 200), 1.6);
+                rose.setStyle(Qt::DashLine);
+                p.setPen(rose);
+                p.drawPath(tp);
+            }
             p.setClipping(false);
         }
     }
@@ -770,7 +891,10 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     if (m_held) {
         p.setPen(QColor(0xd0, 0x90, 0x20));
         p.drawText(r.adjusted(6, 2, 0, 0), Qt::AlignLeft | Qt::AlignTop,
-                   QStringLiteral("HOLD"));
+                   QStringLiteral("HOLD — last %1 s%2")
+                       .arg(MicSpectrum::kHoldSeconds)
+                       .arg(m_smooth ? QStringLiteral(", smoothed")
+                                     : QString()));
     }
     if (!eqOn) {
         p.setPen(c(Style::kTextSecondary));

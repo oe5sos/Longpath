@@ -588,10 +588,34 @@ QWidget* StripWindow::buildEqPanel()
             "press Hold, then drag the dots onto what you froze."));
         row->addWidget(m_holdBtn);
 
+        auto* smooth = new QCheckBox(QStringLiteral("Smooth"), page);
+        smooth->setChecked(true);
+        smooth->setToolTip(QStringLiteral(
+            "Average the held curve to a third of an octave. The raw "
+            "spectrum of a voice is a comb of harmonics that move with "
+            "every note you speak on; the smoothed one is the shape "
+            "underneath, which is what an equaliser can actually act "
+            "on."));
+        row->addWidget(smooth);
+        connect(smooth, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_eqCurve) { m_eqCurve->setSmoothing(on); }
+        });
+
+        auto* target = new QCheckBox(QStringLiteral("Target"), page);
+        target->setChecked(true);
+        target->setToolTip(QStringLiteral(
+            "Draw where a voice that carries would sit, in rose, over "
+            "what you froze. Lift the amber onto the rose and the blue "
+            "curve is what you move to do it."));
+        row->addWidget(target);
+        connect(target, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_eqCurve) { m_eqCurve->setShowTarget(on); }
+        });
+
         auto* hint = new QLabel(QStringLiteral(
             "Drag the dots: sideways for frequency, up and down for "
-            "gain. The leftmost is the high-pass and only moves "
-            "sideways."), page);
+            "gain, wheel for width. Amber is your voice, rose is where "
+            "it should sit, blue is the equaliser."), page);
         hint->setWordWrap(true);
         hint->setStyleSheet(dimStyle());
         row->addWidget(hint, 1);

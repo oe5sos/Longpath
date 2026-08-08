@@ -137,6 +137,18 @@ public:
     void setHeld(bool on);
     bool isHeld() const noexcept { return m_held; }
 
+    // Smooth the held curve to a third of an octave. The raw average of
+    // a voice is a comb of harmonics; the peaks and troughs between
+    // them are real and are not something an equaliser should be aimed
+    // at. Smoothing shows the shape underneath.
+    void setSmoothing(bool on);
+    bool smoothing() const noexcept { return m_smooth; }
+
+    // Draw the target — where a voice that carries would sit — over the
+    // held curve, offset onto it so the two can be compared by eye.
+    // Only meaningful when something is held.
+    void setShowTarget(bool on);
+
     // Repaint from the chain's current bands. The curve is computed
     // from ClientEq's own static magnitude function, so it cannot
     // disagree with the filter.
@@ -190,6 +202,11 @@ private:
     QPointF handlePos(int band, const QRect& r) const;
 
     void recomputeSpectrum();
+    // Average the last fifteen seconds into one curve, in the power
+    // domain rather than in decibels — averaging logarithms weights a
+    // quiet window the same as a loud one and flatters the pauses.
+    void captureHold();
+    void applySmoothing();
 
     StripChain*        m_chain{nullptr};
     const MicSpectrum* m_spec{nullptr};
@@ -199,8 +216,11 @@ private:
     // mostly gaps between harmonics, and aiming an equaliser at those
     // gaps is aiming at nothing.
     std::vector<double> m_mag;
-    std::vector<double> m_heldMag;
+    std::vector<double> m_heldMag;       // as captured
+    std::vector<double> m_heldShown;     // after smoothing, what is drawn
     bool m_held{false};
+    bool m_smooth{true};
+    bool m_showTarget{true};
     bool m_haveMag{false};
 
     int m_dragBand{-1};

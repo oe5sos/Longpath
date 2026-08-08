@@ -42,11 +42,19 @@ namespace NereusSDR {
 
 class MicSpectrum {
 public:
-    // Two seconds at 48 kHz. Long enough that the average settles into
-    // the shape of a voice rather than of one vowel, short enough that
-    // moving the microphone shows up while the operator is still
-    // holding it.
-    static constexpr int kSeconds = 2;
+    // Sixteen seconds at 48 kHz — six megabytes, and worth it.
+    //
+    // The live view only needs a fraction of a second. The long window
+    // is for Hold, which averages the last fifteen seconds into one
+    // curve: a spectrum of two seconds of speech is a spectrum of two
+    // or three vowels, and shaping an equaliser against that shapes it
+    // against whichever sounds you happened to make.
+    //
+    // Fifteen seconds is the same figure the voice check asks for, and
+    // for the same reason. Sixteen is allocated so a full fifteen is
+    // always there even if the last block landed a moment ago.
+    static constexpr int kSeconds = 16;
+    static constexpr int kHoldSeconds = 15;
 
     explicit MicSpectrum(int sampleRate = 48000);
 
