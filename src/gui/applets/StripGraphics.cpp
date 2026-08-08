@@ -17,6 +17,7 @@
 
 #include <QEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPainter>
 #include <QPainterPath>
 
@@ -413,6 +414,16 @@ QPointF StripEqCurve::handlePos(int band, const QRect& r) const
     return QPointF(xForHz(double(p.freqHz), r), yForDb(db, r));
 }
 
+std::vector<int> StripEqCurve::handleBands() const
+{
+    std::vector<int> v;
+    if (!m_chain) { return v; }
+    const int n = m_chain->eq().activeBandCount();
+    if (n > 0) { v.push_back(0); }                 // the high-pass
+    for (int b = kFirstToneBand; b < n; ++b) { v.push_back(b); }
+    return v;
+}
+
 int StripEqCurve::handleAt(const QPoint& pt) const
 {
     if (!m_chain) { return -1; }
@@ -420,7 +431,7 @@ int StripEqCurve::handleAt(const QPoint& pt) const
     constexpr double kGrabPx = 14.0;
     int best = -1;
     double bestD = kGrabPx;
-    for (int b : kHandleBands) {
+    for (int b : handleBands()) {
         const QPointF h = handlePos(b, r);
         const double d = std::hypot(h.x() - pt.x(), h.y() - pt.y());
         if (d < bestD) { bestD = d; best = b; }
@@ -468,6 +479,35 @@ void StripEqCurve::mouseMoveEvent(QMouseEvent* ev)
     m_chain->eq().setBand(m_dragBand, p);
     emit bandChanged(m_dragBand);
     update();
+}
+
+void StripEqCurve::wheelEvent(QWheelEvent* ev)
+{
+    // The wheel over a handle changes its width, which is the third
+    // thing an equaliser has after frequency and gain and the one no
+    // slider was ever going to make intuitive. Narrow for a notch,
+    // wide for a tilt; the shape follows under the pointer.
+    const int band = m_hoverBand >= 0 ? m_hoverBand : handleAt(ev->position().toPoint());
+    if (band < 0 || !m_chain) { ev->ignore(); return; }
+
+    ClientEq::BandParams p = m_chain->eq().band(band);
+    if (p.type == ClientEq::FilterType::HighPass) {
+        // A high-pass has slope rather than Q, and the four the filter
+        // supports are a list rather than a continuum.
+        static const int kSlopes[] = {12, 24, 36, 48};
+        int idx = 1;
+        for (int i = 0; i < 4; ++i) { if (kSlopes[i] == p.slopeDbPerOct) { idx = i; } }
+        idx = std::clamp(idx + (ev->angleDelta().y() > 0 ? 1 : -1), 0, 3);
+        p.slopeDbPerOct = kSlopes[idx];
+    } else {
+        const double step = ev->angleDelta().y() > 0 ? 1.15 : 1.0 / 1.15;
+        p.q = float(std::clamp(double(p.q) * step, 0.3, 8.0));
+    }
+    p.enabled = true;
+    m_chain->eq().setBand(band, p);
+    emit bandChanged(band);
+    update();
+    ev->accept();
 }
 
 void StripEqCurve::mouseReleaseEvent(QMouseEvent*)
@@ -647,6 +687,13 @@ void StripEqCurve::paintEvent(QPaintEvent*)
             }
             if (n) { ref = sum / n; }
         }
+        // Between words the reference collapses toward the noise floor
+        // and the shape would leap or vanish. Keep the last one that
+        // came from actual speech, and let it fall only slowly, so the
+        // picture stays still while the level moves — which is what
+        // makes it possible to look at the shape at all.
+        if (ref > -70.0) { m_lastRef = ref; }
+        else if (m_lastRef > -1000.0) { m_lastRef -= 0.3; ref = m_lastRef; }
         if (ref > -100.0) {
             QPainterPath sp;
             bool started = false;
@@ -698,7 +745,7 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     p.setClipping(false);
 
     // ── Handles ──────────────────────────────────────────────────────
-    for (int b : kHandleBands) {
+    for (int b : handleBands()) {
         if (b >= bands) { continue; }
         const QPointF h = handlePos(b, r);
         const bool active = (b == m_dragBand) || (b == m_hoverBand);
@@ -709,9 +756,11 @@ void StripEqCurve::paintEvent(QPaintEvent*)
         if (active) {
             const ClientEq::BandParams bp = eq.band(b);
             const QString label = bp.type == ClientEq::FilterType::HighPass
-                ? QStringLiteral("%1 Hz").arg(bp.freqHz, 0, 'f', 0)
-                : QStringLiteral("%1 Hz  %2 dB")
-                      .arg(bp.freqHz, 0, 'f', 0).arg(bp.gainDb, 0, 'f', 1);
+                ? QStringLiteral("%1 Hz  %2 dB/oct")
+                      .arg(bp.freqHz, 0, 'f', 0).arg(bp.slopeDbPerOct)
+                : QStringLiteral("%1 Hz  %2 dB  Q %3")
+                      .arg(bp.freqHz, 0, 'f', 0).arg(bp.gainDb, 0, 'f', 1)
+                      .arg(bp.q, 0, 'f', 2);
             p.setPen(c(Style::kTextPrimary));
             p.drawText(QRectF(h.x() - 60, h.y() - 24, 120, 14),
                        Qt::AlignCenter, label);

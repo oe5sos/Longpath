@@ -160,6 +160,7 @@ protected:
     void mousePressEvent(QMouseEvent* ev) override;
     void mouseMoveEvent(QMouseEvent* ev) override;
     void mouseReleaseEvent(QMouseEvent* ev) override;
+    void wheelEvent(QWheelEvent* ev) override;
     void leaveEvent(QEvent* ev) override;
 
 private:
@@ -172,10 +173,13 @@ private:
     // exists to make visible.
     static constexpr int kFft = 4096;
 
-    // Which bands get a handle. The high-pass and the three tone
-    // controls; the hum notches deliberately do not, because dragging
-    // a notch by hand is a worse way to place it than typing 50 or 60.
-    static constexpr int kHandleBands[4] = {0, 4, 5, 6};
+    // Which bands get a handle: the high-pass, and every tone band
+    // from kFirstToneBand up. The three mains notches in between
+    // deliberately get none — dragging a notch by hand is a worse way
+    // to place it than choosing 50 or 60 from a list, and a handle
+    // sitting 18 dB down would be off the bottom of the plot anyway.
+    static constexpr int kFirstToneBand = 4;
+    std::vector<int> handleBands() const;
 
     double xForHz(double hz, const QRect& r) const;
     double yForDb(double db, const QRect& r) const;
@@ -201,6 +205,14 @@ private:
 
     int m_dragBand{-1};
     int m_hoverBand{-1};
+
+    // The level the spectrum is drawn relative to, kept from the last
+    // time there was speech. Without this the picture vanishes between
+    // words: in a pause the reference collapses toward the noise floor,
+    // and a curve drawn relative to it either flies off the top or is
+    // rejected as unusable. Holding the last good reference is what
+    // makes the shape stay still while the level moves.
+    double m_lastRef{-1000.0};
 };
 
 } // namespace NereusSDR

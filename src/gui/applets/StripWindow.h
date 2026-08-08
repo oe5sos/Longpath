@@ -67,6 +67,7 @@ class StripWindow : public QDialog {
     Q_OBJECT
 public:
     explicit StripWindow(RadioModel* radio, QWidget* parent = nullptr);
+    ~StripWindow() override;
 
 private:
     void buildUi();
@@ -84,6 +85,14 @@ private:
     // panel and the saved settings agree about which slot is which.
     // Band 0 is the high-pass; 1-3 are notches for the mains and its
     // first two harmonics; 4-6 are the tone controls.
+    // The EQ layout, fixed so the panel, the drag handles and the saved
+    // settings all agree about which slot is which. 0 is the high-pass,
+    // 1-3 the mains notches, 4-9 the shaping bands.
+    static constexpr int kEqBandCount   = 10;
+    static constexpr int kBandLowShelf  = 4;
+    static constexpr int kBandPresence  = 8;   // 2.4 kHz — where words live
+    static constexpr int kBandHighShelf = 9;
+
     void seedEqLayout();
     void applyHumNotches(int baseHz, bool on);
 
@@ -122,6 +131,15 @@ private:
     void adoptChainIfArrived();
     bool m_hadChain{false};
 
+    // Hearing yourself while shaping the curve. The voice check has the
+    // same control, and putting it only there was a mistake: an
+    // equaliser you cannot hear while dragging is an equaliser adjusted
+    // by looking, which is how a curve that measures well and sounds
+    // wrong gets made. Closing the voice check also restores the
+    // monitor to whatever it was, which is correct of it and left this
+    // window silent.
+    void setSelfMonitor(bool on);
+
     void refreshChainRow();
     void refreshMeters();
 
@@ -140,6 +158,9 @@ private:
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_compareBtn{nullptr};
     QPushButton*    m_holdBtn{nullptr};
+    QCheckBox*      m_listen{nullptr};
+    bool            m_monitorWasOn{false};
+    bool            m_restoreMonitor{false};
     QLabel*         m_tips{nullptr};
     // What the master switch was before A/B was pressed, so releasing
     // it puts things back rather than leaving the strip in whichever

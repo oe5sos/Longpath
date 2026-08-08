@@ -18,7 +18,9 @@
 
 #include <QInputDialog>
 #include <QMessageBox>
+#include "core/TxChannel.h"
 #include "models/RadioModel.h"
+#include "models/TransmitModel.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -172,6 +174,32 @@ double StripWindow::cur(const std::function<float()>& read,
     return chain() ? double(read()) : fallback;
 }
 
+StripWindow::~StripWindow()
+{
+    // Put the monitor back. Someone who opens this window to listen
+    // while shaping a curve and then closes it should not be left with
+    // a monitor they did not ask for and can no longer see.
+    if (m_restoreMonitor) { setSelfMonitor(m_monitorWasOn); }
+}
+
+void StripWindow::setSelfMonitor(bool on)
+{
+    if (!m_radio) { return; }
+    TxChannel* tx = m_radio->txChannel();
+    if (!tx) { return; }
+
+    if (on && !m_restoreMonitor) {
+        m_monitorWasOn = m_radio->transmitModel().monEnabled();
+        m_restoreMonitor = true;
+    }
+    // Two switches, both needed: one runs the transmit chain off air,
+    // the other mixes its output into the speakers. Neither writes to
+    // the radio — TxChannel::writesToRadio() is gated on transmitting
+    // alone, and tst_tx_offair_monitor holds it there.
+    tx->setOffAirMonitor(on);
+    m_radio->transmitModel().setMonEnabled(on);
+}
+
 void StripWindow::persist()
 {
     if (StripChain* c = chain()) { StripSettings::save(*c); }
@@ -194,6 +222,15 @@ void StripWindow::buildUi()
         m_master = new QCheckBox(QStringLiteral("Channel strip"), this);
         m_master->setChecked(chain() && chain()->isEnabled());
         row->addWidget(m_master);
+
+        m_listen = new QCheckBox(QStringLiteral("Hear myself"), this);
+        m_listen->setToolTip(QStringLiteral(
+            "Run the transmit chain and listen to the result without "
+            "going on the air. Nothing is transmitted."));
+        row->addWidget(m_listen);
+        connect(m_listen, &QCheckBox::toggled,
+                this, &StripWindow::setSelfMonitor);
+
         row->addStretch(1);
         col->addLayout(row);
 
@@ -466,7 +503,7 @@ void StripWindow::seedEqLayout()
     // Only seed a chain that has not been set up before. Overwriting a
     // restored layout would throw away the operator's settings every
     // time the window opened.
-    if (c->eq().activeBandCount() >= 7) { return; }
+    if (c->eq().activeBandCount() >= kEqBandCount) { return; }
 
     auto put = [c](int idx, ClientEq::FilterType t, float hz, float gain,
                    float q, bool on, int slope) {
@@ -482,10 +519,24 @@ void StripWindow::seedEqLayout()
     put(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
     put(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
     put(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
-    put(4, ClientEq::FilterType::LowShelf,   200.0f, 0.0f, 0.707f, true, 12);
-    put(5, ClientEq::FilterType::Peak,      2000.0f, 0.0f, 1.0f,   true, 12);
-    put(6, ClientEq::FilterType::HighShelf, 3000.0f, 0.0f, 0.707f, true, 12);
-    c->eq().setActiveBandCount(7);
+
+    // Six shaping bands rather than three, spread over the range a
+    // voice actually occupies and log-spaced so each one covers about
+    // the same musical distance. Three points can only tilt a curve;
+    // six can put a dip where the problem is, which is what an operator
+    // looking at their own spectrum wants to do.
+    //
+    // A shelf at each end and peaks between them: shelves are the right
+    // shape for "everything below this" and peaks for "this bit here",
+    // and offering a peak at 200 Hz where a shelf is wanted is how a
+    // curve ends up with two bands fighting each other.
+    put(4, ClientEq::FilterType::LowShelf,   180.0f, 0.0f, 0.707f, true, 12);
+    put(5, ClientEq::FilterType::Peak,       350.0f, 0.0f, 1.0f,   true, 12);
+    put(6, ClientEq::FilterType::Peak,       700.0f, 0.0f, 1.0f,   true, 12);
+    put(7, ClientEq::FilterType::Peak,      1400.0f, 0.0f, 1.0f,   true, 12);
+    put(8, ClientEq::FilterType::Peak,      2400.0f, 0.0f, 1.0f,   true, 12);
+    put(9, ClientEq::FilterType::HighShelf, 3400.0f, 0.0f, 0.707f, true, 12);
+    c->eq().setActiveBandCount(kEqBandCount);
 }
 
 void StripWindow::applyHumNotches(int baseHz, bool on)
@@ -679,17 +730,17 @@ QWidget* StripWindow::buildEqPanel()
     }
 
     // ── Tone ─────────────────────────────────────────────────────────
-    addKnob(form, QStringLiteral("Low"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(4).gainDb; }, 0.0),
+    addKnob(form, QStringLiteral("Low"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(kBandLowShelf).gainDb; }, 0.0),
         QStringLiteral("dB"), [setBandField](double v) {
-            setBandField(4, &ClientEq::BandParams::gainDb, v);
+            setBandField(kBandLowShelf, &ClientEq::BandParams::gainDb, v);
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Presence"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(5).gainDb; }, 0.0),
+    addKnob(form, QStringLiteral("Presence"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(kBandPresence).gainDb; }, 0.0),
         QStringLiteral("dB"), [setBandField](double v) {
-            setBandField(5, &ClientEq::BandParams::gainDb, v);
+            setBandField(kBandPresence, &ClientEq::BandParams::gainDb, v);
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("High"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(6).gainDb; }, 0.0),
+    addKnob(form, QStringLiteral("High"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(kBandHighShelf).gainDb; }, 0.0),
         QStringLiteral("dB"), [setBandField](double v) {
-            setBandField(6, &ClientEq::BandParams::gainDb, v);
+            setBandField(kBandHighShelf, &ClientEq::BandParams::gainDb, v);
         }, 1, [this]{ persist(); });
 
     auto* toneHelp = new QLabel(QStringLiteral(
