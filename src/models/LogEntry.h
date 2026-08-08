@@ -24,7 +24,9 @@
 
 #include <QDateTime>
 #include <QMetaType>
+#include <QPair>
 #include <QString>
+#include <QVector>
 
 namespace NereusSDR {
 
@@ -57,6 +59,31 @@ struct LogEntry {
     // send everything again.
     bool uploadedToQrz{false};
 
+    // ── Everything this struct does not model ────────────────────────
+    //
+    // Kept verbatim, in file order, and written back out unchanged.
+    //
+    // This is not a nicety. The fields NereusSDR models are the ones it
+    // shows; the ones it does not include QSL_RCVD, QSL_SENT,
+    // LOTW_QSL_RCVD, LOTW_QSL_SENT, EQSL_QSL_RCVD, DXCC, CQZ, ITUZ,
+    // STATE, CNTY, IOTA, CONTEST_ID, SRX, STX, SAT_NAME, PROP_MODE and
+    // every APP_ tag any other logger ever wrote. Ignoring them on
+    // import was defensible; ignoring them on import and then
+    // REWRITING THE FILE was data loss, because the writer replaces the
+    // whole log and anything not held here ceased to exist.
+    //
+    // What that costs in practice: an operator imports their log from
+    // Log4OM, edits one comment, and every LoTW and QSL confirmation
+    // they have ever earned is gone from the file. Those cannot be
+    // reconstructed from anything local — they are somebody else's
+    // record of a contact having been confirmed.
+    //
+    // A vector of pairs rather than a map: ADIF forbids a repeated
+    // field name within a record, so a map would be correct, but order
+    // is free to preserve here and a file that round-trips
+    // byte-for-byte is far easier to trust and to diff.
+    QVector<QPair<QString, QString>> extras;
+
     // Derived from the two locators; not written to ADIF, which has no
     // field for either — every logger recomputes them.
     double distanceKm{0.0};
@@ -69,6 +96,18 @@ struct LogEntry {
     // ADIF parameter, so there is exactly one place that decides how a
     // contact is spelled.
     QString toAdifRecord() const;
+
+    // Does this struct have a member for that ADIF field?
+    //
+    // The one place that answers it, so the reader and the writer
+    // cannot disagree. They did not disagree before only because the
+    // reader dropped what it did not know and the writer never saw it;
+    // now that unknown fields survive, a field modelled by one and
+    // treated as an extra by the other would appear twice in the file.
+    //
+    // `upperName` must already be upper-cased — ADIF field names are
+    // case-insensitive and are canonicalised on the way in.
+    static bool modelsAdifField(const QString& upperName);
 };
 
 } // namespace NereusSDR

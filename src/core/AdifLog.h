@@ -33,9 +33,10 @@ namespace NereusSDR {
 
 namespace AdifLog {
 
-// Parse ADIF text into records. Unknown fields are ignored rather than
-// rejected: every logger writes its own extras, and a log that refuses
-// to open because it met an APP_LOG4OM_ tag would be useless.
+// Parse ADIF text into records. Fields this program does not model are
+// kept in LogEntry::extras rather than dropped, and written back out
+// untouched — see the note there for why dropping them was data loss
+// and not merely untidy.
 QVector<LogEntry> parse(const QString& text);
 
 // Read the file at `path`. A missing file is not an error — it is an
@@ -92,11 +93,31 @@ struct MergeResult {
     QVector<LogEntry> merged;   // existing plus whatever was new
     int added{0};
     int skipped{0};             // already present
+    // Duplicates that were not merely skipped: the incoming copy
+    // carried fields the local one did not have, and those were taken.
+    // Reported separately because "0 added, 340 skipped" after
+    // importing a confirmation report reads like nothing happened, and
+    // the operator needs to know that 340 confirmations arrived.
+    int enriched{0};
 };
 
-// Fold `incoming` into `existing`. Never replaces an existing record:
-// the local log is the one the operator has been correcting, and an
-// import overwriting those corrections would be silent damage.
+// Fold `incoming` into `existing`. Never replaces a field the operator
+// can see and edit: the local log is the one they have been
+// correcting, and an import overwriting those corrections would be
+// silent damage.
+//
+// Unmodelled fields are different, and are taken from the incoming
+// record when the local one has nothing there. The operator cannot have
+// corrected a field this program has never shown them, so there is no
+// local edit to protect — while the thing an operator most often
+// imports a duplicate FOR is exactly such a field. Downloading a LoTW
+// or eQSL confirmation report and having it counted as 340 skipped
+// duplicates, changing nothing, is the failure this rule exists to
+// prevent.
+//
+// Still conservative in one respect: a value already present locally is
+// left alone rather than overwritten. Adding what is missing cannot
+// destroy anything; replacing what is there can.
 MergeResult merge(const QVector<LogEntry>& existing,
                   const QVector<LogEntry>& incoming);
 

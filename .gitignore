@@ -20,3 +20,4 @@ Testing/CTestTestfile.cmake
 third_party/deepfilter/lib/
 third_party/deepfilter/models/*.tar.gz
 .aether-sha
+build-tests/

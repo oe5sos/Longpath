@@ -132,9 +132,20 @@ QVector<LogEntry> parse(const QString& text)
             cur.uploadedToQrz = value.trimmed().compare(QLatin1String("Y"),
                                     Qt::CaseInsensitive) == 0;
         }
-        // Anything else is somebody's private extension. Ignored, not
-        // rejected — a log that refuses to open because it met an
-        // APP_LOG4OM_ tag would be useless.
+        // ── Everything else is kept, not dropped ─────────────────
+        //
+        // It used to be ignored, and that was data loss the moment the
+        // file was rewritten: the writer replaces the whole log, so a
+        // QSL_RCVD or LOTW_QSL_RCVD that nothing was holding simply
+        // ceased to exist. Confirmations are the one thing in a logbook
+        // that cannot be reconstructed locally — they are somebody
+        // else's record that a contact happened.
+        //
+        // So they are carried, in file order, and written back
+        // untouched. See LogEntry::extras.
+        else if (!LogEntry::modelsAdifField(key)) {
+            cur.extras.append(qMakePair(key, value));
+        }
     }
 
     // A final record with no <EOR>: some writers omit it on the last
@@ -238,11 +249,30 @@ MergeResult merge(const QVector<LogEntry>& existing,
         if (!in.isValid()) { continue; }
         const QString key = in.call.trimmed().toUpper();
 
-        bool dup = false;
+        int dupAt = -1;
         for (int idx : byCall.value(key)) {
-            if (isSameQso(r.merged.at(idx), in)) { dup = true; break; }
+            if (isSameQso(r.merged.at(idx), in)) { dupAt = idx; break; }
         }
-        if (dup) { ++r.skipped; continue; }
+        if (dupAt >= 0) {
+            ++r.skipped;
+            // Take what the local copy does not have. See AdifLog.h:
+            // the operator cannot have corrected a field this program
+            // never showed them, and a confirmation report is nothing
+            // but such fields.
+            LogEntry& have = r.merged[dupAt];
+            bool grew = false;
+            for (const auto& kv : in.extras) {
+                bool present = false;
+                for (const auto& mine : have.extras) {
+                    if (mine.first == kv.first) { present = true; break; }
+                }
+                if (present) { continue; }
+                have.extras.append(kv);
+                grew = true;
+            }
+            if (grew) { ++r.enriched; }
+            continue;
+        }
 
         byCall[key].append(r.merged.size());
         r.merged.append(in);

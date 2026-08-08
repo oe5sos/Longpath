@@ -10,6 +10,8 @@
 
 #include "LogEntry.h"
 
+#include <QSet>
+
 namespace NereusSDR {
 
 namespace {
@@ -24,7 +26,33 @@ void field(QString& out, const QString& name, const QString& value)
     out += QStringLiteral("<%1:%2>%3 ").arg(name).arg(v.length()).arg(v);
 }
 
+// The same, but without the trim and without dropping an empty value.
+// Used for fields NereusSDR does not model: those are somebody else's
+// data and go back out exactly as they came in, including a legal
+// zero-length one.
+void rawField(QString& out, const QString& name, const QString& value)
+{
+    out += QStringLiteral("<%1:%2>%3 ").arg(name).arg(value.length())
+                                        .arg(value);
+}
+
 } // namespace
+
+bool LogEntry::modelsAdifField(const QString& upperName)
+{
+    static const QSet<QString> kMine = {
+        QStringLiteral("CALL"),          QStringLiteral("QSO_DATE"),
+        QStringLiteral("TIME_ON"),       QStringLiteral("FREQ"),
+        QStringLiteral("BAND"),          QStringLiteral("MODE"),
+        QStringLiteral("SUBMODE"),       QStringLiteral("RST_SENT"),
+        QStringLiteral("RST_RCVD"),      QStringLiteral("GRIDSQUARE"),
+        QStringLiteral("MY_GRIDSQUARE"), QStringLiteral("NAME"),
+        QStringLiteral("QTH"),           QStringLiteral("COUNTRY"),
+        QStringLiteral("COMMENT"),       QStringLiteral("TX_PWR"),
+        QStringLiteral("APP_NEREUS_QRZUP"),
+    };
+    return kMine.contains(upperName);
+}
 
 QString LogEntry::toAdifRecord() const
 {
@@ -66,6 +94,20 @@ QString LogEntry::toAdifRecord() const
     if (txPowerW > 0.0) {
         field(r, QStringLiteral("TX_PWR"), QString::number(txPowerW, 'f', 0));
     }
+
+    // ── Everything else, back out untouched ──────────────────────────
+    //
+    // Last, so the fields this program understands stay together at the
+    // front and the file remains readable by a human. The guard against
+    // a modelled name is defensive: the reader will never put one here,
+    // but if it ever did, the field would be written twice and the
+    // second one would win in most readers — a corruption that no test
+    // of either half on its own would catch.
+    for (const auto& kv : extras) {
+        if (modelsAdifField(kv.first)) { continue; }
+        rawField(r, kv.first, kv.second);
+    }
+
     r += QStringLiteral("<EOR>");
     return r;
 }

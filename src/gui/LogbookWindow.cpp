@@ -988,20 +988,36 @@ void LogbookWindow::importAdif()
 
     const AdifLog::MergeResult r = AdifLog::merge(m_all, incoming);
 
-    if (r.added == 0) {
+    // "Nothing new" is not the same as "nothing to do". A confirmation
+    // report from LoTW or eQSL is a file of contacts you already have,
+    // and the whole point of importing it is the fields it carries that
+    // your copies do not. Bailing out on added == 0 threw those away
+    // and told the operator everything was fine.
+    if (r.added == 0 && r.enriched == 0) {
         QMessageBox::information(this, QStringLiteral("Import"),
             QStringLiteral("All %1 contacts in that file are already in "
-                           "your log. Nothing to do.").arg(incoming.size()));
+                           "your log, and none of them carried anything "
+                           "your copies were missing. Nothing to do.")
+                .arg(incoming.size()));
         return;
     }
 
-    const QString question =
+    QString question =
         QStringLiteral("%1 contacts in the file.\n\n"
                        "%2 are new and will be added.\n"
-                       "%3 are already in your log and will be skipped.\n\n"
-                       "Your current log is copied to a dated backup "
-                       "first. Go ahead?")
+                       "%3 are already in your log.\n")
             .arg(incoming.size()).arg(r.added).arg(r.skipped);
+    if (r.enriched > 0) {
+        question += QStringLiteral(
+            "\nOf those, %1 carry fields your copies do not have — "
+            "confirmations, awards data or another logger's notes. Those "
+            "fields will be filled in. Nothing you can see and edit in "
+            "this window is overwritten.\n")
+            .arg(r.enriched);
+    }
+    question += QStringLiteral(
+        "\nYour current log is copied to a dated backup first. "
+        "Go ahead?");
 
     if (QMessageBox::question(this, QStringLiteral("Import"), question,
             QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
@@ -1034,6 +1050,10 @@ void LogbookWindow::importAdif()
 
     QString done = QStringLiteral("Added %1 contacts, skipped %2 already "
                                   "present.").arg(r.added).arg(r.skipped);
+    if (r.enriched > 0) {
+        done += QStringLiteral("\nFilled in missing fields on %1 of them.")
+                    .arg(r.enriched);
+    }
     if (!backup.isEmpty()) {
         done += QStringLiteral("\n\nBackup: %1").arg(backup);
     }

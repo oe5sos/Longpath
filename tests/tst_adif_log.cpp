@@ -17,7 +17,12 @@ class TstAdifLog : public QObject {
 private slots:
     void reads_a_record_we_wrote();
     void header_before_eoh_is_not_a_contact();
-    void unknown_fields_are_ignored_not_fatal();
+    void unknown_fields_are_kept_not_fatal();
+    void a_confirmation_survives_import_then_export();
+    void extras_keep_their_order_and_their_exact_value();
+    void a_modelled_field_is_never_written_twice();
+    void merge_fills_in_fields_the_local_copy_lacks();
+    void merge_does_not_overwrite_an_extra_it_already_has();
     void value_containing_a_bracket_survives();
     void four_digit_time_is_accepted();
     void last_record_without_eor_is_kept();
@@ -75,7 +80,7 @@ void TstAdifLog::header_before_eoh_is_not_a_contact()
     QCOMPARE(v.at(0).call, QStringLiteral("OE1W"));
 }
 
-void TstAdifLog::unknown_fields_are_ignored_not_fatal()
+void TstAdifLog::unknown_fields_are_kept_not_fatal()
 {
     const QString text = QStringLiteral(
         "<EOH>\n"
@@ -85,6 +90,147 @@ void TstAdifLog::unknown_fields_are_ignored_not_fatal()
     QCOMPARE(v.size(), 1);
     QCOMPARE(v.at(0).call, QStringLiteral("OE1W"));
     QCOMPARE(v.at(0).band, QStringLiteral("40m"));
+
+    // Kept, not merely tolerated. They used to be dropped, which was
+    // fine until the writer rewrote the file and they ceased to exist.
+    QCOMPARE(v.at(0).extras.size(), 2);
+}
+
+// ── The data loss this file exists to prevent ────────────────────────
+//
+// A logbook is rewritten in full on every save. Anything the parser did
+// not keep was therefore deleted from the operator's file the first
+// time they corrected a comment — including every LoTW and QSL
+// confirmation they had ever earned, which is the one class of data in
+// a logbook that cannot be reconstructed locally. It is somebody else's
+// record that a contact happened.
+void TstAdifLog::a_confirmation_survives_import_then_export()
+{
+    const QString text = QStringLiteral(
+        "<EOH>\n"
+        "<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141500 "
+        "<BAND:3>20m <MODE:3>SSB "
+        "<QSL_RCVD:1>Y <QSL_SENT:1>Y "
+        "<LOTW_QSL_RCVD:1>Y <LOTW_QSLRDATE:8>20260810 "
+        "<EQSL_QSL_RCVD:1>Y <DXCC:3>230 <CQZ:2>14 <ITUZ:2>28 "
+        "<STATE:2>BY <IOTA:6>EU-005 <CONTEST_ID:6>CQ-WPX <SRX:3>042 "
+        "<EOR>\n");
+
+    const QVector<LogEntry> in = AdifLog::parse(text);
+    QCOMPARE(in.size(), 1);
+
+    // Out and back in again, which is exactly what an edit does.
+    const QVector<LogEntry> out = AdifLog::parse(in.at(0).toAdifRecord());
+    QCOMPARE(out.size(), 1);
+
+    for (const auto& kv : in.at(0).extras) {
+        bool found = false;
+        for (const auto& back : out.at(0).extras) {
+            if (back.first == kv.first) {
+                QCOMPARE(back.second, kv.second);
+                found = true;
+                break;
+            }
+        }
+        QVERIFY2(found, qPrintable(QStringLiteral("%1 was lost in the "
+                                                  "round trip")
+                                       .arg(kv.first)));
+    }
+    QCOMPARE(out.at(0).extras.size(), in.at(0).extras.size());
+
+    // And the fields the struct does model still work.
+    QCOMPARE(out.at(0).call, QStringLiteral("DL2AB"));
+    QCOMPARE(out.at(0).band, QStringLiteral("20m"));
+}
+
+void TstAdifLog::extras_keep_their_order_and_their_exact_value()
+{
+    // Order, so a file diffs cleanly against the one that came in.
+    // Exactness, so a value with leading space or none at all is not
+    // quietly tidied — it is somebody else's data.
+    const QString text = QStringLiteral(
+        "<EOH>\n<CALL:4>OE1W "
+        "<ZULU:1>1 <ALPHA:1>2 <MIKE:0> <EOR>\n");
+    const QVector<LogEntry> v = AdifLog::parse(text);
+    QCOMPARE(v.size(), 1);
+    QCOMPARE(v.at(0).extras.size(), 3);
+    QCOMPARE(v.at(0).extras.at(0).first, QStringLiteral("ZULU"));
+    QCOMPARE(v.at(0).extras.at(1).first, QStringLiteral("ALPHA"));
+    QCOMPARE(v.at(0).extras.at(2).first, QStringLiteral("MIKE"));
+    QCOMPARE(v.at(0).extras.at(2).second, QString());
+
+    // A zero-length field is legal ADIF and must come back out.
+    QVERIFY(v.at(0).toAdifRecord().contains(QStringLiteral("<MIKE:0>")));
+}
+
+void TstAdifLog::a_modelled_field_is_never_written_twice()
+{
+    // The reader will not put a modelled name into extras, but if it
+    // ever did, the record would carry it twice and most readers take
+    // the last — a corruption neither half would show on its own.
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    e.band = QStringLiteral("40m");
+    e.extras.append(qMakePair(QStringLiteral("BAND"),
+                              QStringLiteral("20m")));
+    const QString rec = e.toAdifRecord();
+    QCOMPARE(rec.count(QStringLiteral("<BAND:")), 1);
+    QVERIFY(rec.contains(QStringLiteral("<BAND:3>40m")));
+}
+
+// ── Importing a confirmation report ──────────────────────────────────
+//
+// A LoTW or eQSL report is a file of contacts you already have. Every
+// record is a duplicate, and before this the whole import was reported
+// as "340 skipped" and changed nothing — which is the exact opposite of
+// what the operator downloaded it for.
+void TstAdifLog::merge_fills_in_fields_the_local_copy_lacks()
+{
+    const QVector<LogEntry> mine = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141500 "
+        "<BAND:3>20m <MODE:3>SSB <COMMENT:8>my notes <EOR>\n"));
+    const QVector<LogEntry> report = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141530 "
+        "<BAND:3>20m <MODE:3>SSB <LOTW_QSL_RCVD:1>Y <EOR>\n"));
+    QCOMPARE(mine.size(), 1);
+    QCOMPARE(report.size(), 1);
+
+    const AdifLog::MergeResult r = AdifLog::merge(mine, report);
+    QCOMPARE(r.added, 0);
+    QCOMPARE(r.skipped, 1);
+    QCOMPARE(r.enriched, 1);
+    QCOMPARE(r.merged.size(), 1);
+
+    // The confirmation arrived...
+    QCOMPARE(r.merged.at(0).extras.size(), 1);
+    QCOMPARE(r.merged.at(0).extras.at(0).first,
+             QStringLiteral("LOTW_QSL_RCVD"));
+    // ...and the operator's own comment was not touched.
+    QCOMPARE(r.merged.at(0).comment, QStringLiteral("my notes"));
+}
+
+void TstAdifLog::merge_does_not_overwrite_an_extra_it_already_has()
+{
+    // Adding what is missing cannot destroy anything; replacing what is
+    // there can. So a value already present locally wins.
+    const QVector<LogEntry> mine = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141500 "
+        "<BAND:3>20m <MODE:3>SSB <QSL_RCVD:1>Y <EOR>\n"));
+    const QVector<LogEntry> other = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141500 "
+        "<BAND:3>20m <MODE:3>SSB <QSL_RCVD:1>N <IOTA:6>EU-005 <EOR>\n"));
+
+    const AdifLog::MergeResult r = AdifLog::merge(mine, other);
+    QCOMPARE(r.enriched, 1);
+    QCOMPARE(r.merged.size(), 1);
+
+    QString qsl, iota;
+    for (const auto& kv : r.merged.at(0).extras) {
+        if (kv.first == QLatin1String("QSL_RCVD")) { qsl = kv.second; }
+        if (kv.first == QLatin1String("IOTA"))     { iota = kv.second; }
+    }
+    QCOMPARE(qsl, QStringLiteral("Y"));        // kept, not replaced by N
+    QCOMPARE(iota, QStringLiteral("EU-005"));  // added, it was missing
 }
 
 void TstAdifLog::value_containing_a_bracket_survives()
