@@ -71,13 +71,17 @@ float peak(const std::vector<float>& v)
     return p;
 }
 
-// One stage, reduced to the two calls every stage shares. Reverb and
-// the final limiter have no setEnabled(), so their entry supplies a
-// no-op and the passthrough question is skipped for them.
+// One stage, reduced to the calls every stage shares.
+//
+// All nine have setEnabled(). An earlier version of this file said
+// reverb and the limiter did not, because a grep missed them: both are
+// declared with two spaces after `void`. They were therefore excluded
+// from the bit-exact-bypass test — the one test that most needed to
+// cover them, since a reverb whose bypass leaks is audible immediately.
 struct Stage {
     const char* name;
     std::function<void(double)>              prepare;
-    std::function<void(bool)>                setEnabled;   // may be null
+    std::function<void(bool)>                setEnabled;
     std::function<void(float*, int, int)>    process;
     std::function<void()>                    reset;
 };
@@ -148,12 +152,12 @@ std::vector<Stage> makeStages(ClientGate& gate, ClientEq& eq,
         [&](){ rot.reset(); }});
     v.push_back({"reverb",
         [&](double r){ verb.prepare(r); },
-        nullptr,
+        [&](bool on){ verb.setEnabled(on); },
         [&](float* b, int f, int c){ verb.process(b, f, c); },
         [&](){ verb.reset(); }});
     v.push_back({"final limiter",
         [&](double r){ lim.prepare(r); },
-        nullptr,
+        [&](bool on){ lim.setEnabled(on); },
         [&](float* b, int f, int c){ lim.process(b, f, c); },
         [&](){ lim.reset(); }});
     return v;
@@ -171,7 +175,6 @@ void TstStripDsp::every_stage_passes_through_untouched_when_disabled()
 {
     STAGES;
     for (const Stage& s : stages) {
-        if (!s.setEnabled) { continue; }   // reverb / limiter have no gate
         s.prepare(kRate);
         s.setEnabled(false);
 

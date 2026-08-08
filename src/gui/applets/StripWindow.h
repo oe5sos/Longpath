@@ -51,6 +51,7 @@
 #include <array>
 
 class QCheckBox;
+class QComboBox;
 class QLabel;
 class QTabWidget;
 class QTimer;
@@ -68,8 +69,21 @@ public:
 private:
     void buildUi();
     QWidget* buildGatePanel();
+    QWidget* buildEqPanel();
+    QWidget* buildDeEssPanel();
     QWidget* buildCompPanel();
     QWidget* buildPlaceholder(StripChain::Stage s);
+
+    // The EQ's bands are laid out once, in a fixed order, so that the
+    // panel and the saved settings agree about which slot is which.
+    // Band 0 is the high-pass; 1-3 are notches for the mains and its
+    // first two harmonics; 4-6 are the tone controls.
+    void seedEqLayout();
+    void applyHumNotches(int baseHz, bool on);
+
+    // Everything writes through here, so nothing can change the chain
+    // without also being remembered.
+    void persist();
 
     // The chain the window edits, or null when there is no connection.
     // Every control checks: the chain lives with the connection, and
@@ -90,6 +104,9 @@ private:
     std::array<QCheckBox*, StripChain::kStageCount> m_stageBoxes{};
 
     QLabel* m_gateMeter{nullptr};
+    QLabel* m_deEssMeter{nullptr};
+    QCheckBox* m_humBox{nullptr};
+    QComboBox* m_humBase{nullptr};
     QLabel* m_compMeter{nullptr};
 };
 

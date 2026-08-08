@@ -58,12 +58,17 @@ void StripChain::setStageEnabled(Stage s, bool on) noexcept
     case Stage::DeEss: m_deEss.setEnabled(on); break;
     case Stage::Comp:  m_comp.setEnabled(on);  break;
     case Stage::Tube:  m_tube.setEnabled(on);  break;
-    case Stage::Pudu:  m_pudu.setEnabled(on);  break;
-    // Reverb and the limiter have no enable upstream. The chain's own
-    // flag is the only switch they get, and processMono honours it by
-    // not calling them.
-    case Stage::Reverb:
-    case Stage::Limiter:
+    case Stage::Pudu:    m_pudu.setEnabled(on);    break;
+    // These two were nearly missed. A grep for `void setEnabled(`
+    // found neither, because both are written with two spaces after
+    // the return type — so the first version of this switch treated
+    // them as having no bypass at all, and their own flags would have
+    // sat at their defaults while the chain believed it was in
+    // control. The lesson is not about spaces: a search that says
+    // "this API does not exist" deserves a second look at the header
+    // before it becomes a design decision.
+    case Stage::Reverb:  m_reverb.setEnabled(on);  break;
+    case Stage::Limiter: m_limiter.setEnabled(on); break;
     case Stage::Count:
         break;
     }
@@ -101,12 +106,11 @@ void StripChain::processMono(float* samples, int frames) noexcept
     if (!m_enabled.load(std::memory_order_acquire)) { return; }
     if (samples == nullptr || frames <= 0) { return; }
 
-    // Each stage's own enable flag decides whether it does anything;
-    // the chain's flag decides whether it is called at all. For the six
-    // that have both, the two agree because setStageEnabled writes
-    // both. Calling through anyway would be harmless — their bypass is
-    // bit-exact, and tst_strip_dsp holds it to that — but a stage that
-    // is off should cost nothing.
+    // Every stage has its own enable and the chain mirrors it, so the
+    // two always agree. Skipping the call as well is not redundant: a
+    // stage that is off should cost nothing, and going through it
+    // anyway would rest the guarantee on eight separate bypasses being
+    // bit-exact rather than on not calling them.
     constexpr int kMono = 1;
 
     if (stageEnabled(Stage::Gate))  { m_gate.process(samples, frames, kMono); }
@@ -115,9 +119,7 @@ void StripChain::processMono(float* samples, int frames) noexcept
     if (stageEnabled(Stage::Comp))  { m_comp.process(samples, frames, kMono); }
     if (stageEnabled(Stage::Tube))  { m_tube.process(samples, frames, kMono); }
     if (stageEnabled(Stage::Pudu))  { m_pudu.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::Reverb)) {
-        m_reverb.process(samples, frames, kMono);
-    }
+    if (stageEnabled(Stage::Reverb)) { m_reverb.process(samples, frames, kMono); }
     // Last, and for a reason: a brickwall that anything runs after is
     // not a brickwall. Everything above can add gain — the tube, the
     // exciter, the compressor's make-up — and this is what stops the

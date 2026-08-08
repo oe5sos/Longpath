@@ -270,6 +270,7 @@ warren@wpratt.com
 // TX DSP pump (replaces D.1/E.1/L.4 chain).
 #include "core/TxWorkerThread.h"
 #include "core/strip/StripChain.h"
+#include "core/strip/StripSettings.h"
 // 3M-1b L.1: concrete mic-source strategy objects.
 #include "core/audio/PcMicSource.h"
 #include "core/audio/RadioMicSource.h"
@@ -7756,6 +7757,10 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 // chain. Off by default — see StripChain.h.
                 m_stripChain = std::make_unique<StripChain>();
                 m_stripChain->prepare(48000.0);   // TXA input rate
+                // Restore here rather than when the window opens: the
+                // operator's settings should be in force from the first
+                // block, whether or not they ever open the strip.
+                StripSettings::restore(*m_stripChain);
                 m_txWorker->setStripChain(m_stripChain.get());
                 m_txChannel->moveToThread(m_txWorker.get());
                 m_txWorker->startPump();

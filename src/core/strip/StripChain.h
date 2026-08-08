@@ -84,9 +84,9 @@ public:
     void setEnabled(bool on) noexcept;
     bool isEnabled() const noexcept;
 
-    // Per-stage bypass. Delegates to the stage's own switch, except
-    // for reverb and the limiter, which upstream gives no switch: for
-    // those the chain skips the call.
+    // Per-stage bypass. Writes both the chain's flag and the stage's
+    // own, so there is one answer to "is the compressor on" whichever
+    // is asked.
     void setStageEnabled(Stage s, bool on) noexcept;
     bool stageEnabled(Stage s) const noexcept;
 
@@ -114,9 +114,10 @@ private:
     double m_sampleRate{48000.0};
 
     std::atomic<bool> m_enabled{false};
-    // Reverb and the limiter have no enable of their own upstream, so
-    // the chain keeps one here for them. The other six mirror the
-    // stage's own flag so there is only ever one answer.
+    // Mirrors each stage's own flag. Two copies of one fact is a risk,
+    // but the alternative is the audio thread doing eight virtual calls
+    // to ask questions it could answer from one cache line — and
+    // tst_strip_chain holds the two in step.
     std::array<std::atomic<bool>, kStageCount> m_stageOn;
 
     ClientGate         m_gate;

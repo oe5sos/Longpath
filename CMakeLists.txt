@@ -944,6 +944,7 @@ set(GUI_SOURCES
     # The runner: the eight stages in order, with the master bypass the
     # operator's A/B comparison depends on.
     src/core/strip/StripChain.cpp
+    src/core/strip/StripSettings.cpp
     src/core/TxAudioRecorder.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
