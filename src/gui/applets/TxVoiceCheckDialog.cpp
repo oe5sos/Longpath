@@ -408,9 +408,16 @@ void TxVoiceCheckDialog::updateLevel()
             "the input device opened there.").arg(micSourceName()));
         return;
     }
-    if (m_radio && m_radio->transmitModel().micMute()) {
+    // Only worth saying when there is nothing to hear. Reported from the
+    // bench: this claimed the microphone was muted while the meter read
+    // -18 dBFS and the operator could hear themselves. A status line
+    // that contradicts the meter beside it teaches people to ignore
+    // both, so the flag is now a possible explanation for silence
+    // rather than an announcement in its own right.
+    if (peak <= 0.0 && m_radio && m_radio->transmitModel().micMute()) {
         m_liveStatus->setText(QStringLiteral(
-            "The microphone is muted. Unmute it in the TX panel."));
+            "Nothing is arriving and the microphone is muted — unmute it "
+            "in the TX panel."));
         return;
     }
     if (peak <= 0.0 && m_watchTicks > 30) {

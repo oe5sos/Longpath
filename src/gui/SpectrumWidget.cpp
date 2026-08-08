@@ -7958,10 +7958,35 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
     batch->uploadStaticBuffer(m_wfVbo, kQuadData);
     batch->uploadStaticBuffer(m_ovVbo, kQuadData);
 
-    // Initial full waterfall texture upload
-    if (!m_waterfall.isNull()) {
-        QImage rgba = m_waterfall.convertToFormat(QImage::Format_RGBA8888);
-        QRhiTextureSubresourceUploadDescription desc(rgba);
+    // Initial full waterfall texture upload.
+    //
+    // Unconditional, and at the texture's own size rather than the
+    // image's. This is the magenta waterfall, reported three times and
+    // wrongly blamed on the palette twice.
+    //
+    // A newly created QRhiTexture has undefined contents. The old code
+    // uploaded m_waterfall only when it existed, and only at m_waterfall's
+    // size — but at initialize() time the texture is sized from width(),
+    // while the image is sized from width() minus the dBm strip, and the
+    // image may not exist at all yet. Any of those leaves part or all of
+    // the texture never written, and the shader then samples whatever
+    // that GPU memory happened to hold. On Metal that is very often
+    // magenta, which is exactly what the bench saw: a solid magenta
+    // waterfall that no palette in this file can produce, because none
+    // of them has a magenta stop any more.
+    //
+    // The two earlier fixes were both real — the collapsed dB window and
+    // the palette hue reversal — and neither was this. That is worth
+    // recording: the same symptom had three independent causes, and
+    // fixing two of them made the third look like a regression.
+    {
+        QImage seed(m_wfGpuTexW, m_wfGpuTexH, QImage::Format_RGBA8888);
+        seed.fill(QColor(0x0f, 0x0f, 0x1a));    // same as m_waterfall's fill
+        if (!m_waterfall.isNull()) {
+            QPainter sp(&seed);
+            sp.drawImage(0, 0, m_waterfall);
+        }
+        QRhiTextureSubresourceUploadDescription desc(seed);
         batch->uploadTexture(m_wfGpuTex, QRhiTextureUploadEntry(0, 0, desc));
     }
 
@@ -8024,7 +8049,22 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         if (m_wfTexFullUpload) {
-            QImage rgba = m_waterfall.convertToFormat(QImage::Format_RGBA8888);
+            // Sizes agree by construction at this point, but the
+            // consequence of them ever not agreeing is a texture with
+            // undefined regions — see the note in initialize(). Assert
+            // it in the cheapest way available: if they disagree, fill
+            // first and draw the image into it.
+            QImage rgba;
+            if (m_waterfall.width() == m_wfGpuTexW
+                && m_waterfall.height() == m_wfGpuTexH) {
+                rgba = m_waterfall.convertToFormat(QImage::Format_RGBA8888);
+            } else {
+                rgba = QImage(m_wfGpuTexW, m_wfGpuTexH,
+                              QImage::Format_RGBA8888);
+                rgba.fill(QColor(0x0f, 0x0f, 0x1a));
+                QPainter sp(&rgba);
+                sp.drawImage(0, 0, m_waterfall);
+            }
             batch->uploadTexture(m_wfGpuTex, QRhiTextureUploadEntry(0, 0,
                 QRhiTextureSubresourceUploadDescription(rgba)));
             m_wfLastUploadedRow = m_wfWriteRow;
