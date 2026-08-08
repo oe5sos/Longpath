@@ -140,6 +140,25 @@ private:
     // window silent.
     void setSelfMonitor(bool on);
 
+    // ── The radio's own processing, while listening ──────────────────
+    //
+    // Asked for directly, and right: with the strip in front of WDSP's
+    // equaliser, leveler and CFC, listening to yourself means listening
+    // to two chains in series. Neither can then be judged — every
+    // change you make to one is partly undone or doubled by the other,
+    // and the operator ends up tuning the sum.
+    //
+    // So "Hear myself" bypasses the radio's own processing for as long
+    // as it is on, and puts it back exactly as it was afterwards. That
+    // is a change to settings the operator did not make by hand, which
+    // is why it is announced on screen and why the restore is not
+    // optional.
+    void setRadioBypass(bool on);
+    bool m_radioBypassed{false};
+    bool m_hadTxEq{false};
+    bool m_hadLeveler{false};
+    bool m_hadCfc{false};
+
     void refreshChainRow();
     void refreshMeters();
 
@@ -162,6 +181,8 @@ private:
     bool            m_monitorWasOn{false};
     bool            m_restoreMonitor{false};
     QLabel*         m_tips{nullptr};
+    QComboBox*      m_profileBox{nullptr};
+    QLabel*         m_profileNote{nullptr};
     // What the master switch was before A/B was pressed, so releasing
     // it puts things back rather than leaving the strip in whichever
     // state the comparison happened to end on.

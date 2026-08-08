@@ -15,6 +15,7 @@
 
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
+#include "core/strip/StripTargets.h"
 
 #include <QInputDialog>
 #include <QMessageBox>
@@ -180,6 +181,36 @@ StripWindow::~StripWindow()
     // while shaping a curve and then closes it should not be left with
     // a monitor they did not ask for and can no longer see.
     if (m_restoreMonitor) { setSelfMonitor(m_monitorWasOn); }
+    // Belt and braces: setSelfMonitor(false) restores it, but if the
+    // window is destroyed while listening with m_restoreMonitor unset
+    // the radio would keep a bypass it never asked for.
+    setRadioBypass(false);
+}
+
+void StripWindow::setRadioBypass(bool on)
+{
+    if (!m_radio) { return; }
+    TransmitModel& tx = m_radio->transmitModel();
+
+    if (on) {
+        if (m_radioBypassed) { return; }
+        m_hadTxEq    = tx.txEqEnabled();
+        m_hadLeveler = tx.txLevelerOn();
+        m_hadCfc     = tx.cfcEnabled();
+        m_radioBypassed = true;
+        tx.setTxEqEnabled(false);
+        tx.setTxLevelerOn(false);
+        tx.setCfcEnabled(false);
+        return;
+    }
+    if (!m_radioBypassed) { return; }
+    m_radioBypassed = false;
+    // Exactly as they were, not "off". An operator who had the leveler
+    // on before opening this window must have it on afterwards, and
+    // finding out otherwise on the air is not acceptable.
+    tx.setTxEqEnabled(m_hadTxEq);
+    tx.setTxLevelerOn(m_hadLeveler);
+    tx.setCfcEnabled(m_hadCfc);
 }
 
 void StripWindow::setSelfMonitor(bool on)
@@ -187,6 +218,11 @@ void StripWindow::setSelfMonitor(bool on)
     if (!m_radio) { return; }
     TxChannel* tx = m_radio->txChannel();
     if (!tx) { return; }
+
+    // The radio's own chain steps aside while you listen, and comes
+    // back when you stop. Without this you are hearing the strip and
+    // WDSP in series and can judge neither.
+    setRadioBypass(on);
 
     if (on && !m_restoreMonitor) {
         m_monitorWasOn = m_radio->transmitModel().monEnabled();
@@ -565,6 +601,43 @@ QWidget* StripWindow::buildEqPanel()
     // The curve first, and large. This is the whole reason the EQ tab
     // is worth opening: the high-pass corner and the mains notches stop
     // being three numbers and become a shape you can aim.
+    // ── What are we shaping for? ─────────────────────────────────────
+    //
+    // Asked before shaping rather than discovered afterwards. A contest
+    // signal and a ragchew signal want opposite things, and the
+    // transmit bandwidth changes the answer again — aiming a 2.7 kHz
+    // channel at a 3.3 kHz shape wastes the wider one and overdrives
+    // the narrower.
+    {
+        auto* row = new QHBoxLayout;
+        row->addWidget(new QLabel(QStringLiteral("Shaping for:"), page));
+        m_profileBox = new QComboBox(page);
+        for (const auto& pr : StripTargets::profiles()) {
+            m_profileBox->addItem(pr.name, pr.name);
+        }
+        m_profileBox->setMinimumWidth(150);
+        row->addWidget(m_profileBox);
+        row->addStretch(1);
+        outer->addLayout(row);
+
+        m_profileNote = new QLabel(page);
+        m_profileNote->setWordWrap(true);
+        m_profileNote->setStyleSheet(dimStyle());
+        outer->addWidget(m_profileNote);
+
+        auto describe = [this]() {
+            const QString n = m_profileBox->currentData().toString();
+            for (const auto& pr : StripTargets::profiles()) {
+                if (pr.name == n) { m_profileNote->setText(pr.description); }
+            }
+            if (m_eqCurve) { m_eqCurve->setProfile(n); }
+        };
+        connect(m_profileBox, &QComboBox::currentIndexChanged, this,
+                [describe](int) { describe(); });
+        // Called after the curve exists, below.
+        QTimer::singleShot(0, this, describe);
+    }
+
     m_eqCurve = new StripEqCurve(page);
     m_eqCurve->setChain(chain());
     if (StripChain* ch = chain()) { m_eqCurve->setSpectrum(&ch->micSpectrum()); }
@@ -625,6 +698,33 @@ QWidget* StripWindow::buildEqPanel()
         m_tips->setWordWrap(true);
         m_tips->setStyleSheet(dimStyle());
         outer->addWidget(m_tips);
+
+        // Five lines, in order, because an operator opening this for the
+        // first time has no way to know that the amber curve is not
+        // something they set, or that the rose one is where the blue one
+        // goes rather than where the voice goes.
+        auto* guide = new QLabel(QStringLiteral(
+            "<b>How to use this</b><br>"
+            "1 &nbsp;Tick <i>Hear myself</i>. The radio's own EQ, leveler "
+            "and CFC step aside while you listen, and come back when you "
+            "stop.<br>"
+            "2 &nbsp;Choose what you are shaping for, above.<br>"
+            "3 &nbsp;Talk normally for a quarter of a minute. The amber "
+            "curve is your own voice, averaged over the last 15 seconds — "
+            "it builds itself, you do not have to press anything.<br>"
+            "4 &nbsp;Press <i>Hold</i> to stop it moving.<br>"
+            "5 &nbsp;Drag the blue dots onto the rose line. Rose is not "
+            "your target voice — it is where the equaliser should sit to "
+            "get you there, so when blue lies on rose you are done."), page);
+        guide->setWordWrap(true);
+        guide->setStyleSheet(
+            QStringLiteral("QLabel { color: %1; font-size: 11px; "
+                           "background: %2; border: 1px solid %3; "
+                           "padding: 8px; }")
+                .arg(QString::fromLatin1(Style::kTextSecondary),
+                     QString::fromLatin1(Style::kInsetBg),
+                     QString::fromLatin1(Style::kInsetBorder)));
+        outer->addWidget(guide);
 
         connect(m_holdBtn, &QPushButton::toggled, this, [this](bool on) {
             if (!m_eqCurve) { return; }

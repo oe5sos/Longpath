@@ -37,6 +37,7 @@
 // =================================================================
 
 #include "core/strip/MicSpectrum.h"
+#include "core/strip/StripTargets.h"
 #include "core/strip/StripChain.h"
 
 #include <QWidget>
@@ -149,6 +150,11 @@ public:
     // Only meaningful when something is held.
     void setShowTarget(bool on);
 
+    // Which target the rose line aims at. Changing it redraws; it does
+    // not touch the equaliser.
+    void setProfile(const QString& name);
+    QString profile() const { return m_profile; }
+
     // Repaint from the chain's current bands. The curve is computed
     // from ClientEq's own static magnitude function, so it cannot
     // disagree with the filter.
@@ -218,6 +224,12 @@ private:
     std::vector<double> m_mag;
     std::vector<double> m_heldMag;       // as captured
     std::vector<double> m_heldShown;     // after smoothing, what is drawn
+    // True once a fifteen-second average exists. The average is taken
+    // continuously, not only on Hold — an operator should be able to
+    // glance at the window and see their own standard curve without
+    // having pressed anything.
+    bool m_haveHold{false};
+    int  m_sinceCapture{0};
     bool m_held{false};
     bool m_smooth{true};
     bool m_showTarget{true};
@@ -233,6 +245,7 @@ private:
     // rejected as unusable. Holding the last good reference is what
     // makes the shape stay still while the level moves.
     double m_lastRef{-1000.0};
+    QString m_profile{QStringLiteral("SSB 2.7 kHz")};
 };
 
 } // namespace NereusSDR

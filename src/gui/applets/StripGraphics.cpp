@@ -319,6 +319,9 @@ void StripEqCurve::refresh() { update(); }
 
 void StripEqCurve::setHeld(bool on)
 {
+    // Hold no longer captures — the average is always being captured.
+    // It just stops the capture, which is what "hold" should have meant
+    // all along.
     m_held = on;
     if (on) { captureHold(); }
     update();
@@ -332,6 +335,12 @@ void StripEqCurve::setSmoothing(bool on)
 }
 
 void StripEqCurve::setShowTarget(bool on) { m_showTarget = on; update(); }
+
+void StripEqCurve::setProfile(const QString& name)
+{
+    m_profile = name;
+    update();
+}
 
 void StripEqCurve::captureHold()
 {
@@ -372,6 +381,7 @@ void StripEqCurve::captureHold()
     }
     if (windows == 0) { return; }
 
+    m_haveHold = true;
     m_heldMag.assign(static_cast<size_t>(bins), -120.0);
     for (int i = 0; i < bins; ++i) {
         const double mean = power[static_cast<size_t>(i)] / windows;
@@ -413,7 +423,19 @@ QSize StripEqCurve::sizeHint() const { return QSize(560, 230); }
 
 void StripEqCurve::tick()
 {
-    if (!m_held) { recomputeSpectrum(); }
+    if (m_held) { update(); return; }
+
+    recomputeSpectrum();
+
+    // The fifteen-second average is refreshed on its own, about once a
+    // second, whether or not Hold has ever been pressed. Asked for
+    // directly: the operator wants to open the window and see their own
+    // standard curve, not a live wriggle that only becomes a curve if
+    // they know to press a button first. Hold then stops it moving.
+    if (++m_sinceCapture >= 10) {
+        m_sinceCapture = 0;
+        captureHold();
+    }
     update();
 }
 
@@ -761,8 +783,13 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     // thing being set. Scaled so the clarity band sits near the 0 dB
     // line, because the absolute level is a microphone-gain question
     // and this picture is about shape.
+    // The fifteen-second average when there is one, live otherwise.
+    // The average is what an equaliser can be aimed at; the live trace
+    // is only there for the first few seconds after the window opens,
+    // so that something moves and the operator knows the microphone is
+    // arriving.
     const std::vector<double>& mag =
-        m_held ? (m_heldShown.empty() ? m_heldMag : m_heldShown) : m_mag;
+        m_haveHold ? (m_heldShown.empty() ? m_heldMag : m_heldShown) : m_mag;
     if (!mag.empty() && m_spec) {
         const double binHz = m_spec->sampleRate() / double(kFft);
         double ref = -120.0;
@@ -799,34 +826,36 @@ void StripEqCurve::paintEvent(QPaintEvent*)
                           m_held ? 2.0 : 1.0));
             p.drawPath(sp);
 
-            // ── Where it ought to be ─────────────────────────────────
+            // ── Where the blue line should go ────────────────────
             //
-            // The same target curve the voice check measures against,
-            // offset onto the held one at 1 kHz so the two can be
-            // compared by eye. Rose, and dashed, because it is not a
-            // measurement and must never be mistaken for one: it is an
-            // opinion about what a voice that carries looks like.
+            // Not the target for the voice — the CORRECTION. Rose is
+            // target minus measured, which is exactly the equaliser
+            // curve that would put this voice on this profile. So the
+            // instruction is one sentence with no arithmetic in it:
+            // lay the blue line on the rose line.
             //
-            // Read it as "lift the amber onto the rose". Where amber is
-            // below rose, that band is missing; where above, it is too
-            // much — and the blue curve underneath is what you move to
-            // close the gap.
-            if (m_held && m_showTarget) {
-                double at1k = 0.0;
-                {
-                    const auto bin = static_cast<size_t>(1000.0 / binHz);
-                    if (bin < mag.size()) { at1k = mag[bin] - ref; }
-                }
+            // Drawing the voice target instead, as this did at first,
+            // asks the operator to do the subtraction by eye across a
+            // log axis — and the answer they arrive at is wrong in the
+            // direction that flatters whatever they already have.
+            //
+            // Dashed, and its own colour, because it is not a
+            // measurement: it is an opinion about what the chosen
+            // profile wants, and must never be mistaken for the voice.
+            if (m_showTarget && m_haveHold) {
                 QPainterPath tp;
                 bool begun = false;
                 for (int x = r.left(); x <= r.right(); ++x) {
                     const double hz = hzForX(x, r);
-                    const double db = VoiceAnalyzer::targetDb(hz) + at1k;
-                    const QPointF pt(x, yForDb(db, r));
+                    const auto bin = static_cast<size_t>(hz / binHz);
+                    if (bin < 1 || bin >= mag.size()) { continue; }
+                    const double measured = mag[bin] - ref;
+                    const double want = StripTargets::targetDb(m_profile, hz);
+                    const QPointF pt(x, yForDb(want - measured, r));
                     if (!begun) { tp.moveTo(pt); begun = true; }
                     else        { tp.lineTo(pt); }
                 }
-                QPen rose(QColor(0xe0, 0x70, 0xa0, 200), 1.6);
+                QPen rose(QColor(0xe8, 0x78, 0xb0, 210), 1.8);
                 rose.setStyle(Qt::DashLine);
                 p.setPen(rose);
                 p.drawPath(tp);
@@ -866,9 +895,23 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     p.setClipping(false);
 
     // ── Handles ──────────────────────────────────────────────────────
+    //
+    // Numbered, the way a channel strip's knots always are, so the
+    // picture and the numbers underneath refer to each other without
+    // the operator having to count along the axis.
+    int knot = 0;
     for (int b : handleBands()) {
         if (b >= bands) { continue; }
+        ++knot;
         const QPointF h = handlePos(b, r);
+        {
+            QFont nf = p.font();
+            nf.setPointSizeF(7.5);
+            p.setFont(nf);
+            p.setPen(c(Style::kTextInactive));
+            p.drawText(QRectF(h.x() - 10, r.top() + 1, 20, 11),
+                       Qt::AlignCenter, QString::number(knot));
+        }
         const bool active = (b == m_dragBand) || (b == m_hoverBand);
         p.setPen(QPen(c(Style::kAccent), active ? 2.0 : 1.0));
         p.setBrush(active ? c(Style::kAccent) : c(Style::kInsetBg));
@@ -891,15 +934,40 @@ void StripEqCurve::paintEvent(QPaintEvent*)
     if (m_held) {
         p.setPen(QColor(0xd0, 0x90, 0x20));
         p.drawText(r.adjusted(6, 2, 0, 0), Qt::AlignLeft | Qt::AlignTop,
-                   QStringLiteral("HOLD — last %1 s%2")
-                       .arg(MicSpectrum::kHoldSeconds)
-                       .arg(m_smooth ? QStringLiteral(", smoothed")
-                                     : QString()));
+                   QStringLiteral("HOLD"));
     }
     if (!eqOn) {
         p.setPen(c(Style::kTextSecondary));
         p.drawText(r.adjusted(0, 0, -6, -4), Qt::AlignRight | Qt::AlignBottom,
                    QStringLiteral("not in circuit"));
+    }
+
+    // A key, because three curves in three colours is two more than
+    // anyone remembers between sessions.
+    {
+        QFont kf = p.font();
+        kf.setPointSizeF(8.0);
+        p.setFont(kf);
+        int x = r.left() + 6;
+        const int y = r.bottom() - 14;
+        auto swatch = [&](const QColor& col, const QString& text,
+                          bool dashed) {
+            QPen pen(col, 2.0);
+            if (dashed) { pen.setStyle(Qt::DashLine); }
+            p.setPen(pen);
+            p.drawLine(x, y + 6, x + 16, y + 6);
+            p.setPen(c(Style::kTextSecondary));
+            const int w = QFontMetrics(kf).horizontalAdvance(text) + 6;
+            p.drawText(QRect(x + 20, y, w + 4, 13),
+                       Qt::AlignLeft | Qt::AlignVCenter, text);
+            x += 20 + w + 10;
+        };
+        swatch(QColor(0xd0, 0x90, 0x20, 220),
+               QStringLiteral("your voice, %1 s").arg(MicSpectrum::kHoldSeconds),
+               false);
+        swatch(QColor(0xe8, 0x78, 0xb0, 210),
+               QStringLiteral("put the blue here"), true);
+        swatch(c(Style::kAccent), QStringLiteral("equaliser"), false);
     }
 }
 
