@@ -339,7 +339,15 @@ void TxVoiceCheckDialog::startLevelWatch()
         m_liveStatus->setText(QStringLiteral(
             "Not connected to a radio. The microphone is read through the "
             "radio's transmit chain, so there is nothing to listen to "
-            "yet — connect first."));
+            "yet — connect first. This window will pick it up on its own "
+            "once you do."));
+        // The timer still runs. It is the only thing that will notice
+        // the radio arriving: this window has no other way to hear
+        // about a connection, and the version without this sat dead for
+        // the rest of the session — meter frozen, status line stale,
+        // while recording worked perfectly beside it.
+        m_tapsArmed = false;
+        if (m_levelTimer && !m_levelTimer->isActive()) { m_levelTimer->start(); }
         return;
     }
     TxChannel* tx = m_radio->txChannel();
@@ -382,12 +390,14 @@ void TxVoiceCheckDialog::startLevelWatch()
     // what is wrong.
     tx->setMicTapEnabled(true);
 
+    m_tapsArmed = true;
     m_liveStatus->setText(QStringLiteral("Listening…"));
-    m_levelTimer->start();
+    if (!m_levelTimer->isActive()) { m_levelTimer->start(); }
 }
 
 void TxVoiceCheckDialog::stopLevelWatch()
 {
+    m_tapsArmed = false;
     m_levelTimer->stop();
     QObject::disconnect(m_levelTap);
     QObject::disconnect(m_monitorTap);
@@ -400,6 +410,12 @@ void TxVoiceCheckDialog::stopLevelWatch()
 
 void TxVoiceCheckDialog::updateLevel()
 {
+    // Arm late if the radio was connected after this window opened.
+    if (!m_tapsArmed) {
+        if (m_radio && m_radio->txChannel()) { startLevelWatch(); }
+        return;
+    }
+
     const unsigned micros = m_micPeakMicros.exchange(
         0, std::memory_order_acq_rel);
     const double peak = double(micros) / 1'000'000.0;

@@ -121,6 +121,12 @@ private:
     // without a compare-exchange loop: millionths of full scale.
     std::atomic<unsigned> m_micPeakMicros{0};
 
+    // True once the taps are on a live transmit channel. The window
+    // can be opened before the radio is connected, and until this fix
+    // it stayed dead for the rest of the session — the meter frozen at
+    // -60 and the status line still saying "not connected" while a
+    // recording ran perfectly well beside it.
+    bool    m_tapsArmed{false};
     QTimer* m_levelTimer{nullptr};
     int     m_watchTicks{0};
     // Loudest peak seen since the window opened, so a failed
