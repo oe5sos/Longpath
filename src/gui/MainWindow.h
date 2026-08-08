@@ -115,6 +115,7 @@ class VaxFirstRunDialog;
 class PsForm;
 // Phase 3J-2 H1: Tools menu modeless singletons.
 class SpotHubDialog;
+class TxVoiceCheckDialog;
 class FreeDVReporterDialog;
 
 class RxDashboard;
@@ -556,6 +557,7 @@ private:
     // never a second window over the same file.
     void openLogbookWindow();
     void openRotorSetup();
+    void openVoiceCheck();
     class RotorLogbookPanel* ensureRotorPanel();
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
@@ -728,6 +730,7 @@ private:
     // preserves geometry / table state). Both members are accessed by
     // the H1 test seam below.
     QPointer<SpotHubDialog>        m_spotHubDialog;
+    QPointer<TxVoiceCheckDialog>   m_voiceCheckDialog;
     QPointer<FreeDVReporterDialog> m_freeDVReporterDialog;
 
     // Status bar widgets (double-height AetherSDR design, 46px)

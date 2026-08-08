@@ -729,6 +729,44 @@ public:
         return running || offAirMonitor;
     }
 
+    // ── Raw microphone tap ──────────────────────────────────────────────────
+
+    /// Emit micInputReady for every mic block, before WDSP touches it.
+    ///
+    /// The voice analyser needs the microphone, not the result of the
+    /// chain. Measuring the siphon instead would be measuring the EQ's
+    /// own output and then recommending an EQ to correct it — advice
+    /// that changes every time it is followed. The siphon is also past
+    /// the compressor, which flattens the very spectrum being measured,
+    /// and past the 2.7 kHz transmit filter, which removes the bands the
+    /// sibilance check needs.
+    ///
+    /// So the tap sits at pumpDexp, which is the last point where the
+    /// block is still the microphone and the first point where every
+    /// source — radio mic, PC mic, VAX — has already been resolved into
+    /// one buffer.
+    ///
+    /// Off by default and gated, because it costs a float conversion per
+    /// block on the audio thread and almost no session ever needs it.
+    void setMicTapEnabled(bool on);
+
+    bool micTapEnabledForTest() const noexcept {
+        return m_micTap.load(std::memory_order_acquire);
+    }
+
+    /// Does this gate combination tap the microphone?
+    ///
+    /// Here for the same reason as writesToRadio() and feedsMonitor():
+    /// so the answer is one readable function rather than a condition
+    /// spread through the pump. Note what it does not take — running,
+    /// MOX, anything about transmitting. Listening to the microphone and
+    /// putting a signal on the air are unrelated, and the type of this
+    /// function is what says so.
+    static constexpr bool tapsMic(bool micTapEnabled) noexcept
+    {
+        return micTapEnabled;
+    }
+
     // ── Per-mode TXA configuration (3M-1b D.2) ──────────────────────────────
 
     /// Set the TXA channel's DSP mode (LSB / USB / DIGL / DIGU / etc.).
@@ -2565,6 +2603,23 @@ signals:
     /// Plan: 3M-1b D.5 (this commit). Pre-code review §4.3.
     void sip1OutputReady(const float* samples, int frames);
 
+    // ── Raw microphone tap ───────────────────────────────────────────────────
+    //
+    /// Emitted from pumpDexp() on the TX worker thread, once per mic
+    /// block, when setMicTapEnabled(true). Mono: the I channel of the
+    /// interleaved mic buffer, before WDSP's DEXP, EQ, compressor,
+    /// leveler, CFC and modulator have seen it.
+    ///
+    /// **DirectConnection ONLY**, same contract and same reason as
+    /// sip1OutputReady: the pointer is the channel's own scratch buffer
+    /// and is overwritten on the next block. A queued connection would
+    /// read whatever arrived after.
+    ///
+    /// Sample rate is the TXA input rate — the microphone rate, 48 kHz
+    /// on every current path. Not the dsp rate, which is where
+    /// sip1OutputReady lives.
+    void micInputReady(const float* samples, int frames);
+
     // ── Phase 3M-3a-iii Task 17 — DEXP pushvox bridge signal ─────────────────
     //
     /// Emitted from the WDSP DEXP detector's pushvox callback when the mic
@@ -2675,6 +2730,16 @@ private:
     // sip1OutputReady signal carries `const float*`, but m_out is double,
     // so cache a downcast I-only view here.  Size: m_outputBufferSize floats.
     std::vector<float> m_outIFloatScratch;
+
+    // Float scratch for the raw-mic tap, mono. Sized m_inputBufferSize,
+    // allocated on the first tapped block rather than at construction —
+    // the tap is off for all but a handful of sessions, and this is the
+    // transmit path, where an allocation nobody needs is an allocation
+    // that can go wrong for everybody.
+    std::vector<float> m_micTapScratch;
+
+    /// Raw-mic tap gate. See setMicTapEnabled() and tapsMic().
+    std::atomic<bool> m_micTap{false};
 
 #ifdef NEREUS_BUILD_TESTS
     // Mutable test caches — populated lazily by inIForTest/inQForTest so

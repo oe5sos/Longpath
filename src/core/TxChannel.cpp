@@ -675,8 +675,35 @@ void TxChannel::setDexpBuffer(double* dexpBuf, std::size_t sizeDoubles)
 // ---------------------------------------------------------------------------
 void TxChannel::pumpDexp(const double* interleavedIn)
 {
-    if (interleavedIn == nullptr || m_dexpBuffer == nullptr ||
-        m_dexpBufferSizeDoubles == 0) {
+    if (interleavedIn == nullptr) {
+        return;
+    }
+
+    // ── Raw microphone tap ───────────────────────────────────────────
+    //
+    // Before every guard below, deliberately. The DEXP guards are about
+    // whether WDSP has a channel open; the microphone block is here
+    // either way, and a voice check that worked only when the DEXP
+    // module happened to be present would be a puzzle rather than a
+    // feature.
+    //
+    // Reads nothing that could key the radio and writes nothing but its
+    // own scratch buffer. tapsMic() is the whole condition.
+    if (tapsMic(m_micTap.load(std::memory_order_acquire))
+        && m_inputBufferSize > 0) {
+        if (m_micTapScratch.size() != static_cast<size_t>(m_inputBufferSize)) {
+            m_micTapScratch.resize(static_cast<size_t>(m_inputBufferSize));
+        }
+        // I channel only. The mic is mono; the Q side of this buffer is
+        // zero on every path that feeds it.
+        for (int i = 0; i < m_inputBufferSize; ++i) {
+            m_micTapScratch[static_cast<size_t>(i)] =
+                static_cast<float>(interleavedIn[static_cast<size_t>(2 * i)]);
+        }
+        emit micInputReady(m_micTapScratch.data(), m_inputBufferSize);
+    }
+
+    if (m_dexpBuffer == nullptr || m_dexpBufferSizeDoubles == 0) {
         return;
     }
 #ifdef HAVE_WDSP
@@ -1113,6 +1140,17 @@ void TxChannel::setOffAirMonitor(bool on)
         SetChannelState(m_channelId, 0, 1);
     }
 #endif
+}
+
+void TxChannel::setMicTapEnabled(bool on)
+{
+    // Nothing else. No channel state, no WDSP call, no interaction with
+    // running or MOX — unlike setOffAirMonitor above, which has to turn
+    // the TXA channel on because it needs the chain to process audio.
+    // This one only decides whether a buffer that already exists gets
+    // copied out, so it stays a single atomic and the pump's guarantees
+    // are untouched.
+    m_micTap.store(on, std::memory_order_release);
 }
 
 void TxChannel::setVoxListening(bool on)

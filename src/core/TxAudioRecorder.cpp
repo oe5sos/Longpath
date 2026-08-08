@@ -111,6 +111,12 @@ void TxAudioRecorder::feed(const float* samples, int frames) noexcept
     m_written.store(at + n, std::memory_order_release);
 }
 
+const float* TxAudioRecorder::samples() const
+{
+    if (m_recording.load(std::memory_order_acquire)) { return nullptr; }
+    return recordedFrames() > 0 ? m_buffer.data() : nullptr;
+}
+
 QByteArray TxAudioRecorder::toWav() const
 {
     const int frames = recordedFrames();

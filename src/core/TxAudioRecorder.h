@@ -71,6 +71,18 @@ public:
     // recording the operator is still speaking into.
     void feed(const float* samples, int frames) noexcept;
 
+    // The captured samples, for analysis rather than for saving.
+    //
+    // Returns nullptr while recording. Reading the buffer under the
+    // audio thread's appends would be a race, and — worse than a race —
+    // it would give an analysis of a moving target that looks perfectly
+    // plausible. The alternative, round-tripping through toWav() and
+    // decoding the result, throws away precision to answer a question
+    // the buffer already holds.
+    //
+    // Valid until the next start() or clear().
+    const float* samples() const;
+
     // A 16-bit mono WAV of what was captured. Empty if nothing is.
     QByteArray toWav() const;
     bool saveWav(const QString& path, QString* error = nullptr) const;

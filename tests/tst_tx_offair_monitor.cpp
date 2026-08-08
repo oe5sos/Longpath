@@ -22,6 +22,7 @@ private slots:
     void the_monitor_runs_off_air_only_when_asked();
     void transmitting_still_does_both();
     void vox_listening_stays_silent_and_off_air();
+    void the_mic_tap_is_unrelated_to_transmitting();
     void the_gates_are_compile_time_constants();
 };
 
@@ -75,6 +76,24 @@ void TstTxOffAirMonitor::vox_listening_stays_silent_and_off_air()
     QVERIFY(!TxChannel::writesToRadio(false, true, false));
 }
 
+void TstTxOffAirMonitor::the_mic_tap_is_unrelated_to_transmitting()
+{
+    // The raw-mic tap feeds the voice analyser. It listens to the
+    // microphone, which has nothing whatever to do with putting a
+    // signal on the air — and the type of tapsMic() is what says so:
+    // it cannot consult `running`, because it is not given it.
+    QVERIFY(TxChannel::tapsMic(true));
+    QVERIFY(!TxChannel::tapsMic(false));
+
+    // The reverse direction is the one that matters. Whatever the tap
+    // is doing, the radio write is still decided by transmitting alone.
+    for (bool vox : {false, true}) {
+        for (bool mon : {false, true}) {
+            QVERIFY(!TxChannel::writesToRadio(false, vox, mon));
+        }
+    }
+}
+
 void TstTxOffAirMonitor::the_gates_are_compile_time_constants()
 {
     // constexpr, so the compiler can check the important case before
@@ -88,6 +107,8 @@ void TstTxOffAirMonitor::the_gates_are_compile_time_constants()
                   "transmitting must still transmit");
     static_assert(TxChannel::feedsMonitor(false, false, true),
                   "the off-air monitor must feed the monitor");
+    static_assert(TxChannel::tapsMic(true),
+                  "the analyser must be able to hear the microphone");
     QVERIFY(true);
 }
 
