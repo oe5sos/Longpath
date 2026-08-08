@@ -4645,6 +4645,10 @@ nereus_add_test(tst_strip_dsp)
 #    that "off" is bit-exact even with all eight stages set up --
 nereus_add_test(tst_strip_chain)
 
+# -- One voice measurement into a whole chain: the refusals, the four
+#    decisions as pure functions, and the rule that it explains itself --
+nereus_add_test(tst_strip_tuner)
+
 # -- The one rule of the off-air monitor: it may be heard, it may not be
 #    transmitted. Truth table over both listening gates --
 nereus_add_test(tst_tx_offair_monitor)

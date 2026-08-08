@@ -945,6 +945,7 @@ set(GUI_SOURCES
     # operator's A/B comparison depends on.
     src/core/strip/StripChain.cpp
     src/core/strip/StripSettings.cpp
+    src/core/strip/StripTuner.cpp
     src/core/TxAudioRecorder.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as

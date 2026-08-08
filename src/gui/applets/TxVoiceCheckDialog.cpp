@@ -16,6 +16,8 @@
 #include "core/AudioEngine.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/TxChannel.h"
+#include "core/strip/StripChain.h"
+#include "core/strip/StripTuner.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
@@ -175,9 +177,25 @@ void TxVoiceCheckDialog::buildUi()
 
     {
         auto* row = new QHBoxLayout;
+        // The strip first and named plainly, because it is the one the
+        // operator can see a curve for. Setting two equalisers from two
+        // windows is how a sound becomes impossible to explain — the
+        // radio's own EQ is still available below, and says so.
+        m_stripBtn = new QPushButton(
+            QStringLiteral("Set up the channel strip"), this);
+        m_stripBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_stripBtn->setToolTip(QStringLiteral(
+            "Sets the high-pass, hum notches, tone, gate, de-esser and "
+            "compressor from this measurement, and explains each one. "
+            "Leaves the strip switched off."));
+        row->addWidget(m_stripBtn);
+
         m_applyBtn = new QPushButton(
-            QStringLiteral("Apply the suggested EQ"), this);
+            QStringLiteral("…or just the radio's EQ"), this);
         m_applyBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_applyBtn->setToolTip(QStringLiteral(
+            "The older path: writes the ten bands into WDSP's own "
+            "transmit equaliser instead of the strip."));
         row->addWidget(m_applyBtn);
 
         m_advancedBtn = new QPushButton(QStringLiteral("Advanced ▸"), this);
@@ -269,6 +287,8 @@ void TxVoiceCheckDialog::buildUi()
 
     connect(m_applyBtn, &QPushButton::clicked,
             this, &TxVoiceCheckDialog::applySuggestion);
+    connect(m_stripBtn, &QPushButton::clicked,
+            this, &TxVoiceCheckDialog::applyToStrip);
     connect(m_saveBtn, &QPushButton::clicked,
             this, &TxVoiceCheckDialog::saveRecording);
     connect(m_advancedBtn, &QPushButton::toggled, this, [this](bool on) {
@@ -683,6 +703,33 @@ void TxVoiceCheckDialog::applySuggestion()
                   .arg(applied.join(QStringLiteral(", "))).arg(preamp));
 }
 
+void TxVoiceCheckDialog::applyToStrip()
+{
+    if (!m_radio || !m_haveResult) { return; }
+    StripChain* chain = m_radio->stripChain();
+    if (!chain) {
+        m_findings->setText(QStringLiteral(
+            "There is no channel strip — it is created with the transmit "
+            "pump, so connect to the radio first."));
+        return;
+    }
+
+    const StripTuner::Result r = StripTuner::applyAnalysis(m_result, *chain);
+
+    QString text;
+    for (const QString& n : r.notes) {
+        text += QStringLiteral("• %1\n\n").arg(n);
+    }
+    if (r.changed) {
+        text += QStringLiteral(
+            "Open Tools ▸ Channel strip to hear it, switch it on there, "
+            "and use A/B to compare. Then record again — the second "
+            "measurement is the one that tells you whether any of this "
+            "helped.");
+    }
+    m_findings->setText(text.trimmed());
+}
+
 void TxVoiceCheckDialog::saveRecording()
 {
     if (!m_recorder.hasRecording()) { return; }
@@ -706,6 +753,7 @@ void TxVoiceCheckDialog::refreshButtons()
         ? QStringLiteral("Stop")
         : QStringLiteral("Record %1 s and analyse").arg(kRecordSeconds));
     m_applyBtn->setEnabled(m_haveResult && !recording);
+    if (m_stripBtn) { m_stripBtn->setEnabled(m_haveResult && !recording); }
     if (m_saveBtn) { m_saveBtn->setEnabled(m_recorder.hasRecording()); }
     m_listenBox->setEnabled(!recording);
 }

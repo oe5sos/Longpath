@@ -87,7 +87,8 @@ private:
     void startRecording();
     void stopRecording();
     void runAnalysis();
-    void applySuggestion();
+    void applySuggestion();       // WDSP's own equaliser
+    void applyToStrip();          // the channel strip, whole chain
     void saveRecording();
 
     void showFindings();
@@ -160,6 +161,7 @@ private:
 
     QLabel*       m_findings{nullptr};
     QPushButton*  m_applyBtn{nullptr};
+    QPushButton*  m_stripBtn{nullptr};
     QPushButton*  m_saveBtn{nullptr};
 
     QPushButton*  m_advancedBtn{nullptr};
