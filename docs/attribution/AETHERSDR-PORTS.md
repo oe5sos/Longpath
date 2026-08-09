@@ -113,3 +113,47 @@ Read, and adopted:
 Constants that are AetherSDR's judgement rather than arithmetic — the
 0.30 smoothing alpha, the 33 ms interval, the 12 dB tick spacing — are
 noted as theirs at the point of use in `StripGraphics.h`.
+
+## The equaliser's user interface — whole-file ports
+
+Requested at the bench: "copy AetherSDR's EQ, functions and display,
+1:1". `core/strip/ClientEq` was already a verbatim port of the same
+upstream, so this reunites the DSP with the interface written for it.
+
+| NereusSDR file | AetherSDR source | Rev | Ported | Notes |
+|---|---|---|---|---|
+| `src/gui/applets/eq/ClientEqCurveWidget.h`, `.cpp` | `src/gui/ClientEqCurveWidget.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change; includes rebased. Seven colour literals bound to NereusSDR style tokens — see below. Behaviour unchanged. |
+| `src/gui/applets/eq/ClientEqFftAnalyzer.h`, `.cpp` | `src/gui/ClientEqFftAnalyzer.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change only. Takes `update(samples, count)`, so NereusSDR's `MicSpectrum` can feed it unchanged. |
+| `src/gui/applets/eq/ClientEqEditorCanvas.h`, `.cpp` | `src/gui/ClientEqEditorCanvas.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change; includes rebased. |
+| `src/gui/applets/eq/ClientEqParamRow.h`, `.cpp` | `src/gui/ClientEqParamRow.{h,cpp}` | `31b29583` | 2026-08-09 | As above. |
+| `src/gui/applets/eq/ClientEqIconRow.h`, `.cpp` | `src/gui/ClientEqIconRow.{h,cpp}` | `31b29583` | 2026-08-09 | As above. |
+
+### Colours: kept as NereusSDR's, which cost almost nothing
+
+The bench asked for AetherSDR's functions with NereusSDR's colours. That
+turned out to be nearly free, and the reason is worth recording: **seven
+of the nine colours these widgets paint with are byte-identical to
+NereusSDR's own style tokens**, because NereusSDR's palette descends
+from AetherSDR in the first place — see `aethersdr-reconciliation.md`,
+which lists the style palette among the structural debt.
+
+  #0a0a18 → kPanelBg        #00b4d8 → kAccent
+  #203040 → kButtonHover    #0f0f1a → kAppBg
+  #405060 → kTextInactive   #1a2a38 → kTitleGradBot
+  #304050 → kOverlayBorder  #0070c0 → kBlueBg
+
+Those are now written as the tokens in painting code, so they follow
+NereusSDR if it ever repaints. Inside Qt stylesheet strings they are
+left as literals: substituting there means `.arg()` formatting through a
+verbatim port, which is churn for no visual difference, since the values
+already agree.
+
+Five have no NereusSDR equivalent — #506070, #08121d, #7f93a5, #243a4e,
+#1a2e42, #0e1b28 — and are left alone rather than snapped to a near
+neighbour. A colour chosen to sit between two others stops working when
+moved to one of them.
+
+**One new colour set, and it is functional.** `kPalette` in
+ClientEqCurveWidget is eight hues that tell one band from another when
+several overlap. NereusSDR has no equivalent because it never had
+per-band colouring. It is one table and trivially removable if unwanted.
