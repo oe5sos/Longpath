@@ -245,10 +245,14 @@ jobs:
   # --------------------------------------------------------------------
   # Per-platform build + C++ test gate.
   #
-  # Linux is the source-of-truth gate for the C++ test suite (see the
-  # Configure (Linux) and Test step comments below for the reasoning).
-  # macOS + Windows still build the main app and configure with tests
-  # OFF because the test fakes are Linux/Qt-specific.
+  # Linux and macOS both build and run the C++ test suite; Windows still
+  # builds the app alone, because its test fakes are genuinely unported
+  # (mingw paths) and that is separate work.
+  #
+  # macOS was added 2026-08-09. Until then it configured with tests OFF
+  # on the grounds that the fakes were Linux-specific — which was true of
+  # some of them and became a reason not to test the platform the project
+  # is actually developed and shipped on.
   # --------------------------------------------------------------------
   build:
     strategy:
@@ -260,14 +264,30 @@ jobs:
         # them. Wall-clock to all-green matches macOS / Windows because
         # all four shards run concurrently.
         #
-        # macOS + Windows stay single-job: they don't build the test
-        # suite (the fakes are Linux-specific) so a single runner is
-        # already at parity with each Linux shard.
+        # macOS now builds and runs the suite too, sharded in two.
         #
-        # `shard` / `shards` only apply on Linux entries; macOS / Windows
-        # leave them unset so CMake's NEREUS_TEST_SHARDS defaults to 0
-        # (no sharding) — but they don't build tests anyway, so the
-        # variable is moot for them.
+        # 2026-08-09: it did not, and that was the largest hole in this
+        # project's testing. Every platform-specific path — CoreAudio,
+        # QRhi/Metal, Accelerate (MNR), the macOS keychain in
+        # CredentialStore — had 644 test executables pointed away from
+        # it. The magenta waterfall, the Metal texture seeding and the
+        # off-air monitor faults all lived in exactly that gap, and the
+        # suite could not have caught any of them because it was never
+        # compiled there.
+        #
+        # Two shards rather than four: macOS runners are billed at a
+        # multiple of Linux, and the earlier bake-off in this file put a
+        # full macOS app build at ~6 minutes against Linux's ~33, so two
+        # is enough to stay near the Linux shards' wall-clock without
+        # quadrupling the bill.
+        #
+        # Windows stays single-job and test-free: its fakes really are
+        # unported (mingw paths), and that is a separate piece of work
+        # from this one.
+        #
+        # `shard` / `shards` are unset for Windows, so CMake's
+        # NEREUS_TEST_SHARDS defaults to 0 — no sharding, and moot there
+        # because it builds no tests.
         include:
           - os: ubuntu-24.04
             name: Linux x64 (1/4)
@@ -286,7 +306,13 @@ jobs:
             shard: 3
             shards: 4
           - os: macos-15
-            name: macOS Apple Silicon
+            name: macOS Apple Silicon (1/2)
+            shard: 0
+            shards: 2
+          - os: macos-15
+            name: macOS Apple Silicon (2/2)
+            shard: 1
+            shards: 2
           - os: windows-latest
             name: Windows x64
 
@@ -452,7 +478,8 @@ jobs:
         # bypasses any TU compiled with -include-pch (treats them as
         # "no_input_file"). hash_dir=false improves cross-runner cache reuse
         # by removing the absolute path from the hash inputs.  max-size at
-        # 500M per shard so 4 Linux shards × 500M stays well under the
+        # 500M per shard so 6 shards (4 Linux + 2 macOS) × 500M stays
+        # under the
         # 10 GB repo cache pool ceiling (with codeql + Qt install caches
         # also competing for space).
         run: |
@@ -511,12 +538,31 @@ jobs:
             -DNEREUS_TEST_SHARDS=${{ matrix.shards }} \
             -DNEREUS_TEST_SHARD=${{ matrix.shard }}
 
+      # 2026-08-09: NEREUS_BUILD_TESTS=ON here for the first time. See
+      # the matrix comment for why the absence mattered; in short, the
+      # platform this project is developed and used on was the one
+      # platform the suite never touched.
+      #
+      # Expect the first run to be red. That redness is the information
+      # being bought: the test fakes were written against Linux, and
+      # whatever assumes an ALSA-shaped world or a Linux path layout
+      # will say so now instead of never. Triage it by name — a handful
+      # of genuinely Linux-only tests can be excluded explicitly, by a
+      # listed name, so the exclusion stays visible and can shrink.
+      #
+      # Deliberately NOT continue-on-error. A test job that cannot fail
+      # the build is a test job that does not exist, and this repository
+      # has already learned that lesson once — see the v0.1.1 note in
+      # CMakeLists.txt about a warning nobody read.
       - name: Configure (macOS)
         if: runner.os == 'macOS'
         run: |
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
+            -DNEREUS_BUILD_TESTS=ON \
+            -DNEREUS_TEST_SHARDS=${{ matrix.shards }} \
+            -DNEREUS_TEST_SHARD=${{ matrix.shard }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
@@ -562,6 +608,10 @@ jobs:
         if: runner.os == 'Linux'
         run: cmake --build build -j$(nproc) --target all_tests
 
+      - name: Build test executables (macOS)
+        if: runner.os == 'macOS'
+        run: cmake --build build -j$(sysctl -n hw.ncpu) --target all_tests
+
       # ------------------------------------------------------------------
       # Test
       # ------------------------------------------------------------------
@@ -593,10 +643,22 @@ jobs:
         # asserting on a successful open.  tst_port_audio_bus is
         # the one outstanding case; tracked as out-of-scope for
         # this PR.
+        #
+        # macOS: the offscreen platform plugin, same as Linux, but no
+        # xvfb — there is no X server on a mac and none is wanted. The
+        # runner has no audio device either, so anything touching
+        # PortAudio has to cope with "no devices" rather than asserting
+        # a successful open, exactly as on Linux.
+        #
+        # Windows alone keeps --no-tests=ignore, because it alone still
+        # configures without tests.
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             export QT_QPA_PLATFORM=offscreen
             xvfb-run -a ctest --output-on-failure
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            export QT_QPA_PLATFORM=offscreen
+            ctest --output-on-failure
           else
             ctest --output-on-failure --no-tests=ignore
           fi
