@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include "core/strip/ClientEq.h"
+
 #include <QElapsedTimer>
 #include <QFont>
 #include <QPixmap>
@@ -214,7 +216,18 @@ private:
         int activeBandCount{0};
         // Keep in sync with ClientEq::kMaxBands. responseCacheKey() pins
         // the relationship with a static_assert where ClientEq is complete.
-        std::array<BandCacheState, 16> bands{};
+        // ── 16 upstream, ClientEq::kMaxBands here ────────────────
+        //
+        // Upstream this was a literal 16, matching AetherSDR's
+        // ClientEq::kMaxBands. NereusSDR raised that constant to 24 to
+        // fit a ten-band default layout with room to add more, and the
+        // static_assert below caught the mismatch the moment this file
+        // was compiled — which is exactly what it is for.
+        //
+        // Bound to the constant rather than bumped to 24, so the next
+        // person to change kMaxBands does not have to know this array
+        // exists.
+        std::array<BandCacheState, ClientEq::kMaxBands> bands{};
 
         bool operator==(const ResponseCacheKey&) const = default;
     };

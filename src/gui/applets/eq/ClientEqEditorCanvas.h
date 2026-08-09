@@ -30,7 +30,7 @@
 
 namespace NereusSDR {
 
-class AudioEngine;
+class EqHost;
 
 // Interactive version of the curve widget used inside the floating editor.
 // Adds mouse handling on top of ClientEqCurveWidget's rendering:
@@ -54,7 +54,7 @@ public:
 
     // Audio-engine pointer is needed for persistence callbacks after each
     // edit.  The ClientEq pointer itself is set via setEq() on the base.
-    void setAudioEngine(AudioEngine* engine);
+    void setAudioEngine(EqHost* engine);
 
 signals:
     // Emitted live during a cutoff-line drag.  Audio-domain Hz values;
@@ -83,7 +83,7 @@ private:
     // the user doesn't lose work on crash / quit).
     void persist();
 
-    AudioEngine* m_audio{nullptr};
+    EqHost* m_audio{nullptr};
     int  m_draggingBand{-1};
     bool m_dragShift{false};
     QPointF m_dragStart;

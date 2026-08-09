@@ -26,7 +26,7 @@
 
 #include "gui/applets/eq/ClientEqIconRow.h"
 #include "gui/applets/eq/ClientEqCurveWidget.h"
-#include "core/AudioEngine.h"
+#include "gui/applets/eq/EqHost.h"
 
 #include <QHBoxLayout>
 #include <QMouseEvent>
@@ -40,7 +40,7 @@ namespace NereusSDR {
 // palette slot. Click cycles type.
 class ClientEqIconRow::IconButton : public QWidget {
 public:
-    IconButton(int bandIdx, ClientEq* eq, AudioEngine* audio,
+    IconButton(int bandIdx, ClientEq* eq, EqHost* audio,
                ClientEqIconRow* row, QWidget* parent = nullptr)
         : QWidget(parent), m_bandIdx(bandIdx),
           m_eq(eq), m_audio(audio), m_row(row)
@@ -176,7 +176,7 @@ protected:
 private:
     int          m_bandIdx{0};
     ClientEq*    m_eq{nullptr};
-    AudioEngine* m_audio{nullptr};
+    EqHost* m_audio{nullptr};
     ClientEqIconRow* m_row{nullptr};
     bool         m_selected{false};
 };
@@ -198,7 +198,7 @@ void ClientEqIconRow::setEq(ClientEq* eq)
     refresh();
 }
 
-void ClientEqIconRow::setAudioEngine(AudioEngine* engine)
+void ClientEqIconRow::setAudioEngine(EqHost* engine)
 {
     m_audio = engine;
     refresh();

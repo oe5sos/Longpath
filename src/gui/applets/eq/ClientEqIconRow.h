@@ -33,7 +33,7 @@ class QHBoxLayout;
 
 namespace NereusSDR {
 
-class AudioEngine;
+class EqHost;
 
 // Top-of-editor row: one small icon button per active band showing the
 // filter-type curve shape (HP slope, low shelf, bell, high shelf, LP slope)
@@ -51,7 +51,7 @@ public:
     explicit ClientEqIconRow(QWidget* parent = nullptr);
 
     void setEq(ClientEq* eq);
-    void setAudioEngine(AudioEngine* engine);  // for persistence on edit
+    void setAudioEngine(EqHost* engine);  // for persistence on edit
 
 signals:
     void bandSelected(int idx);
@@ -69,7 +69,7 @@ private:
     void rebuild();
 
     ClientEq*    m_eq{nullptr};
-    AudioEngine* m_audio{nullptr};
+    EqHost* m_audio{nullptr};
     QHBoxLayout* m_layout{nullptr};
     int          m_selectedBand{-1};
 };

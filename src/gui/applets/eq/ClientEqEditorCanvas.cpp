@@ -25,7 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/ClientEqEditorCanvas.h"
-#include "core/AudioEngine.h"
+#include "gui/applets/eq/EqHost.h"
 #include "core/strip/ClientEq.h"
 
 #include <QMouseEvent>
@@ -50,7 +50,7 @@ ClientEqEditorCanvas::ClientEqEditorCanvas(QWidget* parent)
     setMouseTracking(true);
 }
 
-void ClientEqEditorCanvas::setAudioEngine(AudioEngine* engine)
+void ClientEqEditorCanvas::setAudioEngine(EqHost* engine)
 {
     m_audio = engine;
 }
