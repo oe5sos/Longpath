@@ -263,6 +263,22 @@ private:
     bool            m_masterBeforeCompare{false};
     std::array<QCheckBox*, StripChain::kStageCount> m_stageBoxes{};
 
+    // ── One picture per stage ────────────────────────────────────────
+    //
+    // Each answers one question about its stage and is driven entirely
+    // from that stage's own getters, so a picture cannot disagree with
+    // the DSP. Refreshed from the same meter timer as the level bars.
+    StripDynamicsCurve* m_gateCurve{nullptr};
+    StripDynamicsCurve* m_compCurve{nullptr};
+    StripDynamicsCurve* m_limiterCurve{nullptr};
+    StripShaperCurve*   m_tubeCurve{nullptr};
+    StripBandCurve*     m_deEssCurve{nullptr};
+    StripBandCurve*     m_puduCurve{nullptr};
+    // Point every picture at the chain. Called when the radio arrives
+    // after the window opened — the same late-binding trap the curve
+    // and the voice check both fell into once already.
+    void refreshStagePictures();
+
     QLabel* m_presetNote{nullptr};
     QLabel* m_gateMeter{nullptr};
     QLabel* m_deEssMeter{nullptr};

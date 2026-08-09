@@ -14,6 +14,12 @@
 #include "gui/applets/StripGraphics.h"
 
 #include "core/VoiceAnalyzer.h"
+#include "core/strip/ClientTube.h"
+#include "core/strip/ClientPudu.h"
+#include "core/strip/ClientDeEss.h"
+#include "core/strip/ClientGate.h"
+#include "core/strip/ClientComp.h"
+#include "core/strip/ClientFinalLimiter.h"
 #include "core/strip/StripTargets.h"
 #include "gui/StyleConstants.h"
 
@@ -1369,6 +1375,497 @@ void StripEqCurve::paintEvent(QPaintEvent*)
                    QStringLiteral("result"), false);
         }
     }
+}
+
+
+// ── StripDynamicsCurve ───────────────────────────────────────────────
+
+StripDynamicsCurve::StripDynamicsCurve(Stage s, QWidget* parent)
+    : QWidget(parent), m_stage(s)
+{
+    setMinimumHeight(150);
+    setMouseTracking(true);
+}
+
+void StripDynamicsCurve::mouseMoveEvent(QMouseEvent* ev)
+{
+    m_cursor     = ev->pos();
+    m_haveCursor = true;
+    update();
+}
+
+void StripDynamicsCurve::leaveEvent(QEvent*)
+{
+    m_haveCursor = false;
+    update();
+}
+
+namespace {
+
+// ── The recessed frame ───────────────────────────────────────────────
+//
+// The same sunken glass as the frequency display: a dark inner edge at
+// the top and a faint lit one at the bottom. Two lines, not a
+// stylesheet, because these widgets paint themselves.
+void drawInset(QPainter& p, const QRect& r)
+{
+    p.fillRect(r, QColor(0x08, 0x08, 0x10));
+    p.setPen(QPen(QColor(0x16, 0x20, 0x2e), 1));
+    p.drawRect(r);
+    p.setPen(QPen(QColor(0, 0, 0, 190), 1));
+    p.drawLine(r.left() + 1, r.top() + 1, r.right() - 1, r.top() + 1);
+    p.setPen(QPen(QColor(0x50, 0x78, 0x96, 40), 1));
+    p.drawLine(r.left() + 1, r.bottom() - 1, r.right() - 1, r.bottom() - 1);
+}
+
+// The readout box, bottom-right so it never sits under the pointer.
+void drawReadout(QPainter& p, const QRect& r, const QString& text)
+{
+    QFont rf = p.font();
+    rf.setPointSizeF(8.0);
+    p.setFont(rf);
+    const int w = QFontMetrics(rf).horizontalAdvance(text) + 12;
+    const QRect box(r.right() - w - 4, r.bottom() - 20, w, 16);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 170));
+    p.drawRoundedRect(box, 3, 3);
+    p.setPen(c(Style::kTextPrimary));
+    p.drawText(box, Qt::AlignCenter, text);
+}
+
+} // namespace
+
+void StripDynamicsCurve::setChain(StripChain* chain)
+{
+    m_chain = chain;
+    update();
+}
+
+QSize StripDynamicsCurve::sizeHint() const { return QSize(220, 170); }
+
+void StripDynamicsCurve::refresh()
+{
+    if (!m_chain) { return; }
+    switch (m_stage) {
+    case Stage::Gate:
+        m_liveIn  = double(m_chain->gate().inputPeakDb());
+        m_liveOut = double(m_chain->gate().outputPeakDb());
+        break;
+    case Stage::Compressor:
+        m_liveIn  = double(m_chain->comp().inputPeakDb());
+        m_liveOut = double(m_chain->comp().outputPeakDb());
+        break;
+    case Stage::Limiter:
+        m_liveIn  = double(m_chain->limiter().inputPeakDb());
+        m_liveOut = double(m_chain->limiter().outputPeakDb());
+        break;
+    }
+    update();
+}
+
+double StripDynamicsCurve::outputDb(double inDb) const
+{
+    if (!m_chain) { return inDb; }
+
+    switch (m_stage) {
+    case Stage::Gate: {
+        // A downward expander. Above the threshold it is a straight
+        // wire; below it, every decibel down costs `ratio` decibels,
+        // and the total attenuation stops at the floor.
+        ClientGate& g = m_chain->gate();
+        const double t = double(g.thresholdDb());
+        const double r = std::max(1.0, double(g.ratio()));
+        const double floorDb = double(g.floorDb());
+        if (inDb >= t) { return inDb; }
+        const double cut = std::max((inDb - t) * (r - 1.0), floorDb);
+        return inDb + cut;
+    }
+    case Stage::Compressor: {
+        // Soft knee, the standard formulation: straight below the knee,
+        // quadratic through it, straight again above.
+        ClientComp& c = m_chain->comp();
+        const double t = double(c.thresholdDb());
+        const double r = std::max(1.0, double(c.ratio()));
+        const double w = std::max(0.0, double(c.kneeDb()));
+        const double m = double(c.makeupDb());
+        double y;
+        if (w > 0.0 && std::abs(inDb - t) * 2.0 <= w) {
+            const double d = inDb - t + w / 2.0;
+            y = inDb + (1.0 / r - 1.0) * d * d / (2.0 * w);
+        } else if (inDb < t) {
+            y = inDb;
+        } else {
+            y = t + (inDb - t) / r;
+        }
+        return y + m;
+    }
+    case Stage::Limiter: {
+        const double ceil = double(m_chain->limiter().ceilingDb());
+        const double trim = double(m_chain->limiter().outputTrimDb());
+        return std::min(inDb, ceil) + trim;
+    }
+    }
+    return inDb;
+}
+
+double StripDynamicsCurve::xFor(double db, const QRect& r) const
+{
+    const double t = (db - kMinDb) / (kMaxDb - kMinDb);
+    return r.left() + std::clamp(t, 0.0, 1.0) * r.width();
+}
+
+double StripDynamicsCurve::yFor(double db, const QRect& r) const
+{
+    const double t = (db - kMinDb) / (kMaxDb - kMinDb);
+    return r.bottom() - std::clamp(t, 0.0, 1.0) * r.height();
+}
+
+void StripDynamicsCurve::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect r = rect().adjusted(4, 4, -5, -5);
+    p.fillRect(rect(), c(Style::kAppBg));
+    drawInset(p, r);
+
+    QFont f = p.font();
+    f.setPointSizeF(7.5);
+    p.setFont(f);
+
+    // Grid every 12 dB, and the unity diagonal dashed. The distance
+    // between the curve and that diagonal is what the stage is doing.
+    p.setPen(QPen(c(Style::kGroove), 1, Qt::DotLine));
+    for (double db = -48.0; db < 0.0; db += 12.0) {
+        const int x = int(xFor(db, r));
+        const int y = int(yFor(db, r));
+        p.drawLine(x, r.top(), x, r.bottom());
+        p.drawLine(r.left(), y, r.right(), y);
+    }
+    p.setPen(QPen(c(Style::kTextInactive), 1, Qt::DashLine));
+    p.drawLine(QPointF(xFor(kMinDb, r), yFor(kMinDb, r)),
+               QPointF(xFor(kMaxDb, r), yFor(kMaxDb, r)));
+
+    if (!m_chain) {
+        p.setPen(c(Style::kTextSecondary));
+        p.drawText(r, Qt::AlignCenter, QStringLiteral("Not connected"));
+        return;
+    }
+
+    // The threshold, marked. It is the one number on this picture the
+    // operator actually sets, so it gets a line rather than being left
+    // to be inferred from where the curve bends.
+    double thr = 0.0;
+    bool haveThr = true;
+    switch (m_stage) {
+    case Stage::Gate:       thr = double(m_chain->gate().thresholdDb()); break;
+    case Stage::Compressor: thr = double(m_chain->comp().thresholdDb()); break;
+    case Stage::Limiter:    thr = double(m_chain->limiter().ceilingDb()); break;
+    }
+    if (haveThr) {
+        p.setPen(QPen(QColor(0xd0, 0x90, 0x20, 160), 1, Qt::DashLine));
+        const int tx = int(xFor(thr, r));
+        p.drawLine(tx, r.top(), tx, r.bottom());
+    }
+
+    // The gate's hysteresis: it closes at one level and re-opens at a
+    // higher one, and the gap between them is the whole reason a gate
+    // does not chatter on a breath. Two lines, because one would be a
+    // lie about a stage that deliberately has two.
+    if (m_stage == Stage::Gate) {
+        const double ret = double(m_chain->gate().returnDb());
+        if (std::abs(ret - thr) > 0.1) {
+            p.setPen(QPen(QColor(0x50, 0xd0, 0x80, 130), 1, Qt::DotLine));
+            const int rx = int(xFor(ret, r));
+            p.drawLine(rx, r.top(), rx, r.bottom());
+        }
+    }
+
+    QPainterPath path;
+    for (int x = r.left(); x <= r.right(); ++x) {
+        const double inDb = kMinDb
+            + (double(x - r.left()) / std::max(1, r.width()))
+              * (kMaxDb - kMinDb);
+        const QPointF pt(x, yFor(outputDb(inDb), r));
+        if (x == r.left()) { path.moveTo(pt); } else { path.lineTo(pt); }
+    }
+    p.setClipRect(r);
+
+    // Filled to the floor, so the shape reads as an area rather than as
+    // a line to be traced.
+    {
+        QPainterPath fill = path;
+        fill.lineTo(QPointF(r.right(), r.bottom()));
+        fill.lineTo(QPointF(r.left(), r.bottom()));
+        fill.closeSubpath();
+        QLinearGradient g(0, r.top(), 0, r.bottom());
+        QColor top = c(Style::kAccent); top.setAlpha(76);
+        QColor bot = c(Style::kAccent); bot.setAlpha(0);
+        g.setColorAt(0.0, top);
+        g.setColorAt(1.0, bot);
+        p.fillPath(fill, g);
+    }
+    p.setPen(QPen(QColor(0x00, 0xe5, 0xff), 2.1));
+    p.drawPath(path);
+
+    // ── Where the signal is, right now ───────────────────────────────
+    //
+    // The dot is the point of the whole picture. A transfer curve on its
+    // own is a manual page; the dot turns it into an instrument, because
+    // it answers the only question the operator actually has — am I
+    // hitting this stage at all, and where.
+    if (m_liveIn > kMinDb + 1.0) {
+        const QPointF dot(xFor(m_liveIn, r), yFor(m_liveOut, r));
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0xff, 0xb8, 0x00, 36));
+        p.drawEllipse(dot, 9.0, 9.0);
+        p.setPen(QPen(QColor(0xff, 0xb8, 0x00), 1.5));
+        p.setBrush(QColor(0xff, 0xb8, 0x00, 200));
+        p.drawEllipse(dot, 4.0, 4.0);
+    }
+
+    // ── The scale, only when asked for ───────────────────────────────
+    if (m_haveCursor && r.contains(m_cursor)) {
+        QColor guide = c(Style::kTextInactive);
+        guide.setAlpha(110);
+        p.setPen(QPen(guide, 1, Qt::DotLine));
+        p.drawLine(m_cursor.x(), r.top(), m_cursor.x(), r.bottom());
+        p.drawLine(r.left(), m_cursor.y(), r.right(), m_cursor.y());
+        p.setClipping(false);
+
+        const double inDb = kMinDb + (double(m_cursor.x() - r.left())
+            / std::max(1, r.width())) * (kMaxDb - kMinDb);
+        drawReadout(p, r, QStringLiteral("%1 → %2 dB")
+                              .arg(inDb, 0, 'f', 1)
+                              .arg(outputDb(inDb), 0, 'f', 1));
+    }
+    p.setClipping(false);
+
+    p.setPen(c(Style::kTextInactive));
+    p.drawText(r.adjusted(3, 0, 0, -1), Qt::AlignLeft | Qt::AlignBottom,
+               QStringLiteral("in"));
+    p.drawText(r.adjusted(0, 2, -3, 0), Qt::AlignRight | Qt::AlignTop,
+               QStringLiteral("out"));
+}
+
+// ── StripShaperCurve ─────────────────────────────────────────────────
+
+StripShaperCurve::StripShaperCurve(QWidget* parent) : QWidget(parent)
+{
+    setMinimumHeight(150);
+}
+
+void StripShaperCurve::setChain(StripChain* chain) { m_chain = chain; update(); }
+QSize StripShaperCurve::sizeHint() const { return QSize(220, 170); }
+
+void StripShaperCurve::refresh()
+{
+    if (m_chain) { m_livePeak = double(m_chain->tube().inputPeakDb()); }
+    update();
+}
+
+void StripShaperCurve::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect r = rect().adjusted(4, 4, -5, -5);
+    p.fillRect(rect(), c(Style::kAppBg));
+    drawInset(p, r);
+
+    p.setPen(QPen(c(Style::kGroove), 1, Qt::DotLine));
+    p.drawLine(r.left(), r.center().y(), r.right(), r.center().y());
+    p.drawLine(r.center().x(), r.top(), r.center().x(), r.bottom());
+
+    // Unity, dashed. The gap between it and the curve IS the distortion.
+    p.setPen(QPen(c(Style::kTextInactive), 1, Qt::DashLine));
+    p.drawLine(QPointF(r.left(), r.bottom()), QPointF(r.right(), r.top()));
+
+    if (!m_chain) {
+        p.setPen(c(Style::kTextSecondary));
+        p.drawText(r, Qt::AlignCenter, QStringLiteral("Not connected"));
+        return;
+    }
+
+    ClientTube& t = m_chain->tube();
+    const double drive = std::pow(10.0, double(t.driveDb()) / 20.0);
+    const double bias  = double(t.biasAmount());
+    const ClientTube::Model model = t.model();
+
+    // Drawn from ClientTube::shapeAt — the function the audio thread
+    // runs. Not a lookalike.
+    QPainterPath path;
+    for (int px = r.left(); px <= r.right(); ++px) {
+        const double x =
+            -1.5 + 3.0 * double(px - r.left()) / std::max(1, r.width());
+        const double y = double(ClientTube::shapeAt(float(x * drive),
+                                                    float(bias), model));
+        const double yy = r.center().y() - std::clamp(y, -1.6, 1.6)
+                          * (r.height() / 3.2);
+        const QPointF pt(px, yy);
+        if (px == r.left()) { path.moveTo(pt); } else { path.lineTo(pt); }
+    }
+    p.setClipRect(r);
+    p.setPen(QPen(QColor(0xf0, 0x9a, 0x30), 2.0));
+    p.drawPath(path);
+
+    // How far up the curve the signal is actually reaching. A shaper
+    // driven at -40 dBFS is a straight wire no matter how the knobs are
+    // set, and the picture should say so rather than implying warmth
+    // that is not happening.
+    if (m_livePeak > -60.0) {
+        const double amp = std::pow(10.0, m_livePeak / 20.0);
+        for (double sgn : {-1.0, 1.0}) {
+            const double x = sgn * amp;
+            const double px = r.left()
+                + (x + 1.5) / 3.0 * r.width();
+            const double y = double(ClientTube::shapeAt(float(x * drive),
+                                                        float(bias), model));
+            const double py = r.center().y() - std::clamp(y, -1.6, 1.6)
+                              * (r.height() / 3.2);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(0xff, 0xb8, 0x00, 36));
+            p.drawEllipse(QPointF(px, py), 8.0, 8.0);
+            p.setPen(QPen(QColor(0xff, 0xb8, 0x00), 1.5));
+            p.setBrush(QColor(0xff, 0xb8, 0x00, 200));
+            p.drawEllipse(QPointF(px, py), 3.5, 3.5);
+        }
+    }
+    p.setClipping(false);
+}
+
+// ── StripBandCurve ───────────────────────────────────────────────────
+
+StripBandCurve::StripBandCurve(Stage s, QWidget* parent)
+    : QWidget(parent), m_stage(s)
+{
+    setMinimumHeight(150);
+}
+
+void StripBandCurve::setChain(StripChain* chain) { m_chain = chain; update(); }
+QSize StripBandCurve::sizeHint() const { return QSize(220, 170); }
+
+void StripBandCurve::refresh()
+{
+    if (m_chain && m_stage == Stage::DeEsser) {
+        m_liveGr = double(m_chain->deEss().gainReductionDb());
+    }
+    update();
+}
+
+double StripBandCurve::xForHz(double hz, const QRect& r) const
+{
+    const double lo = std::log10(100.0);
+    const double hi = std::log10(12000.0);
+    const double t  = (std::log10(std::max(20.0, hz)) - lo) / (hi - lo);
+    return r.left() + std::clamp(t, 0.0, 1.0) * r.width();
+}
+
+void StripBandCurve::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect r = rect().adjusted(4, 4, -5, -18);
+    p.fillRect(rect(), c(Style::kAppBg));
+    drawInset(p, r);
+
+    QFont f = p.font();
+    f.setPointSizeF(7.5);
+    p.setFont(f);
+
+    for (double hz : {100.0, 300.0, 1000.0, 3000.0, 10000.0}) {
+        const int x = int(xForHz(hz, r));
+        p.setPen(QPen(c(Style::kGroove), 1, Qt::DotLine));
+        p.drawLine(x, r.top(), x, r.bottom());
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(QRect(x - 20, r.bottom() + 2, 40, 12), Qt::AlignCenter,
+                   hz >= 1000.0
+                       ? QStringLiteral("%1k").arg(hz / 1000.0, 0, 'g', 2)
+                       : QStringLiteral("%1").arg(hz, 0, 'f', 0));
+    }
+
+    if (!m_chain) {
+        p.setPen(c(Style::kTextSecondary));
+        p.drawText(r, Qt::AlignCenter, QStringLiteral("Not connected"));
+        return;
+    }
+
+    p.setClipRect(r);
+
+    if (m_stage == Stage::DeEsser) {
+        ClientDeEss& d = m_chain->deEss();
+        const double f0 = double(d.frequencyHz());
+        const double q  = std::max(0.2, double(d.q()));
+
+        // The sidechain's own response — the band the de-esser LISTENS
+        // to, not the cut it applies. Which band it is listening to is
+        // the setting people get wrong, and it is invisible otherwise.
+        QPainterPath band;
+        for (int x = r.left(); x <= r.right(); ++x) {
+            const double lo = std::log10(100.0), hi = std::log10(12000.0);
+            const double hz = std::pow(10.0, lo
+                + (hi - lo) * double(x - r.left())
+                  / std::max(1, r.width()));
+            const double rel = hz / f0;
+            const double mag = 1.0 / std::sqrt(1.0
+                + std::pow(q * (rel - 1.0 / rel), 2.0));
+            const QPointF pt(x, r.bottom() - mag * r.height() * 0.85);
+            if (x == r.left()) { band.moveTo(pt); } else { band.lineTo(pt); }
+        }
+        QPainterPath fill = band;
+        fill.lineTo(QPointF(r.right(), r.bottom()));
+        fill.lineTo(QPointF(r.left(), r.bottom()));
+        fill.closeSubpath();
+        QLinearGradient g(0, r.top(), 0, r.bottom());
+        g.setColorAt(0.0, QColor(0xf0, 0x9a, 0x30, 90));
+        g.setColorAt(1.0, QColor(0xf0, 0x9a, 0x30, 10));
+        p.fillPath(fill, g);
+        p.setPen(QPen(QColor(0xf0, 0x9a, 0x30), 1.8));
+        p.drawPath(band);
+
+        const int fx = int(xForHz(f0, r));
+        p.setPen(QPen(QColor(0xf0, 0x9a, 0x30, 200), 1, Qt::DashLine));
+        p.drawLine(fx, r.top(), fx, r.bottom());
+        p.setPen(c(Style::kTextPrimary));
+        p.drawText(QRect(fx - 34, r.top() + 2, 68, 12), Qt::AlignCenter,
+                   QStringLiteral("%1 Hz").arg(f0, 0, 'f', 0));
+
+        // How hard it is working, now. Without this the picture says
+        // where it is listening and never whether it heard anything.
+        if (m_liveGr > 0.1) {
+            const double h = std::clamp(m_liveGr / 12.0, 0.0, 1.0)
+                             * r.height();
+            p.fillRect(QRectF(r.right() - 8, r.bottom() - h, 6, h),
+                       QColor(0xff, 0xb8, 0x00, 200));
+        }
+    } else {
+        // The exciter's two tunings: where the low generator works and
+        // where the high one does.
+        ClientPudu& pu = m_chain->pudu();
+        struct Mark { double hz; double mix; QColor col; QString name; };
+        const Mark marks[2] = {
+            {double(pu.pooTuneHz()), double(pu.pooMix()),
+             QColor(0x50, 0xa0, 0xf0), QStringLiteral("low")},
+            {double(pu.dooTuneHz()), double(pu.dooMix()),
+             QColor(0xf0, 0x9a, 0x30), QStringLiteral("high")},
+        };
+        for (const Mark& m : marks) {
+            if (m.hz <= 0.0) { continue; }
+            const int x = int(xForHz(m.hz, r));
+            const double h = std::clamp(m.mix, 0.0, 1.0) * r.height() * 0.8;
+            QColor fillCol = m.col;
+            fillCol.setAlpha(70);
+            p.fillRect(QRectF(x - 10, r.bottom() - h, 20, h), fillCol);
+            p.setPen(QPen(m.col, 1.5));
+            p.drawLine(x, int(r.bottom() - h), x, r.bottom());
+            p.setPen(c(Style::kTextInactive));
+            p.drawText(QRect(x - 30, r.top() + 2, 60, 12), Qt::AlignCenter,
+                       QStringLiteral("%1 %2 Hz").arg(m.name)
+                           .arg(m.hz, 0, 'f', 0));
+        }
+    }
+    p.setClipping(false);
 }
 
 } // namespace NereusSDR

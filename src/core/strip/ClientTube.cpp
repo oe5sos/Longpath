@@ -23,6 +23,10 @@
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
 //                 NereusSDR; include paths rebased onto core/strip/.
 //                 DSP unchanged.
+//   2026-08-09 — shape() split into a public static shapeAt(x, bias,
+//                 model) so the editor draws the curve the DSP runs
+//                 rather than a second copy of it. Byte-identical
+//                 arithmetic; shape() is now one call to it.
 // =================================================================
 
 #include "core/strip/ClientTube.h"
@@ -203,12 +207,16 @@ void ClientTube::recacheIfDirty() noexcept
 
 float ClientTube::shape(float x) const noexcept
 {
-    const float bias = m_cached.bias;
+    return shapeAt(x, m_cached.bias, static_cast<Model>(m_cached.model));
+}
+
+float ClientTube::shapeAt(float x, float bias, Model model) noexcept
+{
     // Asymmetric term — always non-negative, produces DC offset +
     // even harmonics.  tanh-bounded so it never blows up at high
     // drive; peak contribution capped at ±bias.
     const float asym = bias * std::tanh(x * x);
-    switch (m_cached.model) {
+    switch (static_cast<uint8_t>(model)) {
         case static_cast<uint8_t>(Model::A):   // soft tanh
             return std::tanh(x) + asym;
         case static_cast<uint8_t>(Model::B): { // hard clip + tanh hybrid

@@ -159,6 +159,7 @@ void StripWindow::adoptChainIfArrived()
     StripSettings::restore(*c);
     seedEqLayout();
     reloadControls();
+    refreshStagePictures();
     applyLoudnessMatch();
     refreshChainRow();
     if (m_note) {
@@ -469,6 +470,18 @@ QWidget* StripWindow::buildGatePanel()
     auto* on = new QCheckBox(QStringLiteral("Gate on"), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
+
+    // The picture, first and above the controls: it is what the operator
+    // is actually watching while a knob moves.
+    m_gateCurve = new StripDynamicsCurve(StripDynamicsCurve::Stage::Gate, page);
+    m_gateCurve->setChain(chain());
+    form->addRow(m_gateCurve);
+    {
+        auto* cap = new QLabel(QStringLiteral("In against out. Amber marks the threshold, green where it re-opens — the gap between them is what stops a gate chattering on a breath. The dot is your voice now."), page);
+        cap->setWordWrap(true);
+        cap->setStyleSheet(dimStyle());
+        form->addRow(cap);
+    }
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Gate, v);
@@ -1342,6 +1355,18 @@ QWidget* StripWindow::buildDeEssPanel()
     auto* on = new QCheckBox(QStringLiteral("De-esser on"), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
+
+    // The picture, first and above the controls: it is what the operator
+    // is actually watching while a knob moves.
+    m_deEssCurve = new StripBandCurve(StripBandCurve::Stage::DeEsser, page);
+    m_deEssCurve->setChain(chain());
+    form->addRow(m_deEssCurve);
+    {
+        auto* cap = new QLabel(QStringLiteral("The band the de-esser LISTENS to, not the cut it makes. Aiming it at the wrong band is the mistake people make here, and it is invisible without this. The bar on the right is how hard it is working."), page);
+        cap->setWordWrap(true);
+        cap->setStyleSheet(dimStyle());
+        form->addRow(cap);
+    }
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::DeEss, v);
@@ -1404,6 +1429,18 @@ QWidget* StripWindow::buildCompPanel()
     auto* on = new QCheckBox(QStringLiteral("Compressor on"), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
+
+    // The picture, first and above the controls: it is what the operator
+    // is actually watching while a knob moves.
+    m_compCurve = new StripDynamicsCurve(StripDynamicsCurve::Stage::Compressor, page);
+    m_compCurve->setChain(chain());
+    form->addRow(m_compCurve);
+    {
+        auto* cap = new QLabel(QStringLiteral("In against out, with the knee. The dashed diagonal is doing nothing, so the gap between it and the curve is the compression. Point at the picture for the numbers."), page);
+        cap->setWordWrap(true);
+        cap->setStyleSheet(dimStyle());
+        form->addRow(cap);
+    }
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Comp, v);
@@ -1476,6 +1513,18 @@ QWidget* StripWindow::buildTubePanel()
     auto* on = new QCheckBox(QStringLiteral("Tube on"), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
+
+    // The picture, first and above the controls: it is what the operator
+    // is actually watching while a knob moves.
+    m_tubeCurve = new StripShaperCurve(page);
+    m_tubeCurve->setChain(chain());
+    form->addRow(m_tubeCurve);
+    {
+        auto* cap = new QLabel(QStringLiteral("The waveshaper itself, drawn from the function the audio thread runs. The two dots show how far up it your voice actually reaches — driven quietly, this stage is a straight wire whatever the knobs say."), page);
+        cap->setWordWrap(true);
+        cap->setStyleSheet(dimStyle());
+        form->addRow(cap);
+    }
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Tube, v);
@@ -1550,6 +1599,18 @@ QWidget* StripWindow::buildPuduPanel()
     auto* on = new QCheckBox(QStringLiteral("Exciter on"), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
+
+    // The picture, first and above the controls: it is what the operator
+    // is actually watching while a knob moves.
+    m_puduCurve = new StripBandCurve(StripBandCurve::Stage::Exciter, page);
+    m_puduCurve->setChain(chain());
+    form->addRow(m_puduCurve);
+    {
+        auto* cap = new QLabel(QStringLiteral("Where the two generators sit and how much of each is mixed in. Height is the mix, position is the tuning."), page);
+        cap->setWordWrap(true);
+        cap->setStyleSheet(dimStyle());
+        form->addRow(cap);
+    }
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Pudu, v);
@@ -1705,6 +1766,21 @@ QWidget* StripWindow::buildLimiterPanel()
     auto* on = new QCheckBox(QStringLiteral("Limiter on"), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
+
+    m_limiterCurve =
+        new StripDynamicsCurve(StripDynamicsCurve::Stage::Limiter, page);
+    m_limiterCurve->setChain(chain());
+    form->addRow(m_limiterCurve);
+    {
+        auto* cap = new QLabel(QStringLiteral(
+            "Flat above the ceiling: everything louder comes out at the "
+            "same level. If the dot is sitting on the flat part most of "
+            "the time, the limiter is doing the compressor's job and "
+            "doing it worse."), page);
+        cap->setWordWrap(true);
+        cap->setStyleSheet(dimStyle());
+        form->addRow(cap);
+    }
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Limiter, v);
@@ -1909,6 +1985,13 @@ void StripWindow::reloadControls()
     m_holdBtn = nullptr;
     m_tips    = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
+    // Owned by the pages just removed. Left dangling, the next
+    // refreshMeters() would call isVisible() on freed memory — the same
+    // class of fault as the late-binding one this window already had,
+    // and one that only shows up under a rebuild.
+    m_gateCurve = m_compCurve = m_limiterCurve = nullptr;
+    m_tubeCurve = nullptr;
+    m_deEssCurve = m_puduCurve = nullptr;
     m_stageBoxes.fill(nullptr);
 
     for (int i = 0; i < StripChain::kStageCount; ++i) {
@@ -2001,6 +2084,17 @@ void StripWindow::targetFromRecording()
                      ? QStringLiteral("B") : QStringLiteral("A")));
 }
 
+void StripWindow::refreshStagePictures()
+{
+    StripChain* ch = chain();
+    if (m_gateCurve)     { m_gateCurve->setChain(ch); }
+    if (m_compCurve)     { m_compCurve->setChain(ch); }
+    if (m_limiterCurve)  { m_limiterCurve->setChain(ch); }
+    if (m_tubeCurve)     { m_tubeCurve->setChain(ch); }
+    if (m_deEssCurve)    { m_deEssCurve->setChain(ch); }
+    if (m_puduCurve)     { m_puduCurve->setChain(ch); }
+}
+
 void StripWindow::applyLoudnessMatch()
 {
     StripChain* ch = chain();
@@ -2046,6 +2140,21 @@ void StripWindow::refreshMeters()
     // for someone who wants the number rather than the shape.
     if (m_levels) { m_levels->tick(); }
     if (m_eqCurve) { m_eqCurve->tick(); }
+
+    // Each stage's picture, from that stage's own atomics. Only the
+    // visible tab is worth repainting — the others are hidden and a
+    // repaint of a hidden widget is work nobody sees.
+    for (QWidget* w : {static_cast<QWidget*>(m_gateCurve),
+                       static_cast<QWidget*>(m_compCurve),
+                       static_cast<QWidget*>(m_limiterCurve),
+                       static_cast<QWidget*>(m_tubeCurve),
+                       static_cast<QWidget*>(m_deEssCurve),
+                       static_cast<QWidget*>(m_puduCurve)}) {
+        if (!w || !w->isVisible()) { continue; }
+        if (auto* d = qobject_cast<StripDynamicsCurve*>(w)) { d->refresh(); }
+        else if (auto* sh = qobject_cast<StripShaperCurve*>(w)) { sh->refresh(); }
+        else if (auto* b = qobject_cast<StripBandCurve*>(w))  { b->refresh(); }
+    }
     if (m_chainView) {
         m_chainView->setReduction(StripChain::Stage::Gate,
                                   c->gate().gainReductionDb());

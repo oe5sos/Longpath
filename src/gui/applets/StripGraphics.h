@@ -305,4 +305,122 @@ private:
     QString m_profile{QStringLiteral("SSB 2.7 kHz")};
 };
 
+// ── One picture per stage, each answering one question ───────────────
+//
+// Modelled on how Zeus lays out a channel strip, and on the reason it
+// works: every stage gets a small picture that answers exactly one
+// question about that stage, with a live dot showing where the signal
+// is on it right now. A static curve is a manual page. The dot is what
+// makes it an instrument.
+//
+// Three widgets cover seven stages, because the stages only ask three
+// questions between them. Seven bespoke pictures would be six more
+// things to keep in step with the DSP.
+//
+// Everything is read from the stage's own getters, and the tube curve
+// comes from ClientTube::shapeAt — the function the audio thread runs.
+// A picture computed from a second copy of the maths is a picture that
+// will eventually disagree with the sound, and the operator will
+// believe the picture.
+
+// ── "What does it do to my level?" ───────────────────────────────────
+//
+// Input on one axis, output on the other, for the three stages that are
+// transfer functions: the gate expanding downward, the compressor
+// bending at its knee, the limiter flattening at its ceiling.
+class StripDynamicsCurve : public QWidget {
+    Q_OBJECT
+public:
+    enum class Stage { Gate, Compressor, Limiter };
+
+    explicit StripDynamicsCurve(Stage s, QWidget* parent = nullptr);
+
+    void setChain(StripChain* chain);
+    // Called from the meter timer. Cheap: reads a handful of atomics.
+    void refresh();
+
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+    // Quiet while you look at it, precise when you point at it. The
+    // permanent axis labels were the alternative and they cost about a
+    // fifth of the curve area on a card this size; a crosshair costs
+    // nothing until it is wanted. Same behaviour as the EQ curve, so
+    // there is one gesture to learn rather than two.
+    void mouseMoveEvent(QMouseEvent* ev) override;
+    void leaveEvent(QEvent* ev) override;
+
+private:
+    QPoint m_cursor{-1, -1};
+    bool   m_haveCursor{false};
+
+    static constexpr double kMinDb = -60.0;
+    static constexpr double kMaxDb = 0.0;
+
+    // The curve itself, as a pure function of the stage's parameters.
+    // Static so it can be tested without a widget, a chain or a screen.
+    double outputDb(double inDb) const;
+
+    double xFor(double db, const QRect& r) const;
+    double yFor(double db, const QRect& r) const;
+
+    Stage       m_stage;
+    StripChain* m_chain{nullptr};
+    // Where the signal is now, held briefly so a transient is readable.
+    double m_liveIn{-120.0};
+    double m_liveOut{-120.0};
+};
+
+// ── "What is it doing to the waveform?" ──────────────────────────────
+//
+// The waveshaper transfer curve, drawn from ClientTube::shapeAt with
+// the stage's own drive and bias. The dashed diagonal is unity, so the
+// distance between the two IS the distortion.
+class StripShaperCurve : public QWidget {
+    Q_OBJECT
+public:
+    explicit StripShaperCurve(QWidget* parent = nullptr);
+
+    void setChain(StripChain* chain);
+    void refresh();
+
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+
+private:
+    StripChain* m_chain{nullptr};
+    double m_livePeak{-120.0};
+};
+
+// ── "Which part of the voice is it listening to?" ────────────────────
+//
+// A band emphasis shape with its centre marked, for the stages that act
+// on one region rather than on the whole signal: the de-esser's
+// sidechain, and the exciter's two tunings.
+class StripBandCurve : public QWidget {
+    Q_OBJECT
+public:
+    enum class Stage { DeEsser, Exciter };
+
+    explicit StripBandCurve(Stage s, QWidget* parent = nullptr);
+
+    void setChain(StripChain* chain);
+    void refresh();
+
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+
+private:
+    double xForHz(double hz, const QRect& r) const;
+
+    Stage       m_stage;
+    StripChain* m_chain{nullptr};
+    double m_liveGr{0.0};
+};
+
 } // namespace NereusSDR

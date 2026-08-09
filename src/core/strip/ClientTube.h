@@ -75,6 +75,18 @@ public:
     void  setModel(Model m) noexcept;
     Model model() const noexcept;
 
+    // ── The waveshaper, as a pure function ───────────────────────────
+    //
+    // Public and static so the editor can draw the curve the DSP
+    // actually runs, rather than a curve that resembles it. The private
+    // shape() below is now a one-line call to this.
+    //
+    // Same discipline as ClientEq::bandMagnitudeDb, and for the same
+    // reason: a picture computed from a second copy of the maths is a
+    // picture that will eventually disagree with the sound, and the
+    // operator will believe the picture.
+    static float shapeAt(float x, float bias, Model m) noexcept;
+
     // Core drive + asymmetry.
     void  setDriveDb(float db) noexcept;             // 0..24 dB
     float driveDb() const noexcept;
