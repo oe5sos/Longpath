@@ -228,6 +228,12 @@ private:
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_compareBtn{nullptr};
     QPushButton*    m_holdBtn{nullptr};
+    // Measure, then shape. See the note at the button's construction
+    // for why a take with a start and a stop replaced the rolling
+    // average the bench could not interpret.
+    QPushButton*    m_recordBtn{nullptr};
+    QLabel*         m_takeLabel{nullptr};
+    void refreshTakeUi();
     QCheckBox*      m_listen{nullptr};
     bool            m_monitorWasOn{false};
     bool            m_restoreMonitor{false};

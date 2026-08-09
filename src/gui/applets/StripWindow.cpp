@@ -1016,14 +1016,33 @@ QWidget* StripWindow::buildEqPanel()
 
     {
         auto* row = new QHBoxLayout;
-        m_holdBtn = new QPushButton(QStringLiteral("Hold"), page);
-        m_holdBtn->setCheckable(true);
-        m_holdBtn->setStyleSheet(Style::buttonBaseStyle());
-        m_holdBtn->setToolTip(QStringLiteral(
-            "Freeze the voice behind the curve. You cannot aim an "
-            "equaliser at a shape that is moving — speak a sentence, "
-            "press Hold, then drag the dots onto what you froze."));
-        row->addWidget(m_holdBtn);
+        // ── Measure, then shape ──────────────────────────────────────
+        //
+        // Hold used to freeze a rolling fifteen-second average, and the
+        // bench's objection to it was right: you never know what is in
+        // it. It carries the sentence you just said, the cough before
+        // it and the silence you left while reading the screen, in
+        // proportions that change every second.
+        //
+        // A take has a start and a stop that you chose. It is
+        // reproducible — you can say the same sentence again with the
+        // compressor off and compare — and that is the difference
+        // between a measurement and a picture.
+        m_recordBtn = new QPushButton(QStringLiteral("● Record 15 s"), page);
+        m_recordBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_recordBtn->setToolTip(QStringLiteral(
+            "Press, talk normally for fifteen seconds, and it stops "
+            "itself — or press again to stop early.\n\nWhat comes out is "
+            "frozen as the measured state of your voice, and every other "
+            "curve on the plot is drawn against it until you measure "
+            "again. Say something you would actually say on the air: a "
+            "count to twenty measures your counting voice."));
+        row->addWidget(m_recordBtn);
+
+        m_takeLabel = new QLabel(page);
+        m_takeLabel->setStyleSheet(dimStyle());
+        m_takeLabel->setMinimumWidth(150);
+        row->addWidget(m_takeLabel);
 
         auto* smooth = new QCheckBox(QStringLiteral("Smooth"), page);
         smooth->setChecked(true);
@@ -1126,10 +1145,13 @@ QWidget* StripWindow::buildEqPanel()
             "and CFC step aside while you listen, and come back when you "
             "stop.<br>"
             "2 &nbsp;Choose what you are shaping for, above.<br>"
-            "3 &nbsp;Talk normally for a quarter of a minute. The amber "
-            "curve is your own voice, averaged over the last 15 seconds — "
-            "it builds itself, you do not have to press anything.<br>"
-            "4 &nbsp;Press <i>Hold</i> to stop it moving.<br>"
+            "3 &nbsp;Press <b>Record</b> and talk normally — something you "
+            "would actually say on the air. It stops itself after fifteen "
+            "seconds, or press again to stop early.<br>"
+            "4 &nbsp;The amber curve is now your voice as measured, and it "
+            "stays put. That is the state you are correcting FROM; the "
+            "corner of the plot says whether you are looking at a "
+            "measurement or at a live preview.<br>"
             "5 &nbsp;Drag the blue dots onto the rose line. Rose is not "
             "your target voice — it is where the equaliser should sit to "
             "get you there, so when blue lies on rose you are done.<br>"
@@ -1167,6 +1189,19 @@ QWidget* StripWindow::buildEqPanel()
         // never, and the row of colours in the key under the curve is
         // the part anyone needs on the tenth visit.
         fold(QStringLiteral("How to use this"), guide, false);
+
+        connect(m_recordBtn, &QPushButton::clicked, this, [this]() {
+            if (!m_eqCurve) { return; }
+            if (m_eqCurve->recording()) { m_eqCurve->stopTake(); }
+            else                        { m_eqCurve->startTake(); }
+        });
+
+        // Driven from the curve's own signal rather than from the
+        // click, because the take also ends on its own at fifteen
+        // seconds and the button has to be right in both cases.
+        connect(m_eqCurve, &StripEqCurve::takeStateChanged, this,
+                [this]() { refreshTakeUi(); });
+        refreshTakeUi();
 
         connect(m_holdBtn, &QPushButton::toggled, this, [this](bool on) {
             if (!m_eqCurve) { return; }
@@ -1983,6 +2018,8 @@ void StripWindow::reloadControls()
     m_eqCurve = nullptr;          // owned by the page just removed
     m_eqTable = nullptr;
     m_holdBtn = nullptr;
+    m_recordBtn = nullptr;
+    m_takeLabel = nullptr;
     m_tips    = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
     // Owned by the pages just removed. Left dangling, the next
@@ -2082,6 +2119,60 @@ void StripWindow::targetFromRecording()
             "built-in curves can say.")
             .arg(StripTargets::activeUserSlot() == 1
                      ? QStringLiteral("B") : QStringLiteral("A")));
+}
+
+void StripWindow::refreshTakeUi()
+{
+    if (!m_eqCurve || !m_recordBtn) { return; }
+
+    if (m_eqCurve->recording()) {
+        m_recordBtn->setText(QStringLiteral("■ Stop"));
+        if (m_takeLabel) {
+            m_takeLabel->setText(QStringLiteral("recording — keep talking"));
+        }
+        return;
+    }
+
+    m_recordBtn->setText(m_eqCurve->haveTake()
+                             ? QStringLiteral("● Measure again")
+                             : QStringLiteral("● Record 15 s"));
+    if (!m_takeLabel) { return; }
+
+    if (!m_eqCurve->haveTake()) {
+        m_takeLabel->setText(QStringLiteral(
+            "not measured yet — the curve is a live preview"));
+        return;
+    }
+
+    const double secs = m_eqCurve->takeSeconds();
+    if (secs < 0.5) {
+        // A take too short to average is refused rather than drawn, and
+        // the operator has to be told why — otherwise pressing stop
+        // early looks like it worked and quietly did nothing.
+        m_takeLabel->setText(QStringLiteral(
+            "that was too short to measure — try again and talk for at "
+            "least a few seconds"));
+        return;
+    }
+    m_takeLabel->setText(QStringLiteral("measured over %1 s")
+                             .arg(secs, 0, 'f', 1));
+
+    // The advice belongs to the take, so it arrives with it rather than
+    // waiting for a separate button press.
+    if (m_tips) {
+        const QStringList t = m_eqCurve->tips();
+        if (t.isEmpty()) {
+            m_tips->setText(QStringLiteral(
+                "Nothing stands out — what you measured is already close "
+                "to a shape that carries."));
+        } else {
+            QString text;
+            for (int i = 0; i < t.size(); ++i) {
+                text += QStringLiteral("%1. %2\n").arg(i + 1).arg(t.at(i));
+            }
+            m_tips->setText(text.trimmed());
+        }
+    }
 }
 
 void StripWindow::refreshStagePictures()

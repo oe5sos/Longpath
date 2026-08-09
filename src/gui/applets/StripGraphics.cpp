@@ -346,6 +346,98 @@ void StripEqCurve::setShowTarget(bool on) { m_showTarget = on; update(); }
 void StripEqCurve::setShowResult(bool on) { m_showResult = on; update(); }
 void StripEqCurve::setShowBands(bool on) { m_showBands = on; update(); }
 
+// ── The take ─────────────────────────────────────────────────────────
+
+void StripEqCurve::startTake()
+{
+    m_recording  = true;
+    m_haveTake   = false;
+    m_takeLenSec = 0.0;
+    m_takeMag.clear();
+    m_takeClock.restart();
+    emit takeStateChanged();
+    update();
+}
+
+void StripEqCurve::stopTake()
+{
+    if (!m_recording) { return; }
+    m_recording  = false;
+    m_takeLenSec = m_takeClock.elapsed() / 1000.0;
+    captureTake();
+    emit takeStateChanged();
+    update();
+}
+
+double StripEqCurve::takeSeconds() const
+{
+    if (m_recording) { return m_takeClock.elapsed() / 1000.0; }
+    return m_takeLenSec;
+}
+
+void StripEqCurve::captureTake()
+{
+    // Exactly the audio between start and stop, taken from the ring at
+    // the end rather than accumulated as it arrived. The ring holds
+    // sixteen seconds and a take is capped at fifteen, so the whole take
+    // is certainly still in there — but only just, which is why the cap
+    // is not fifteen point five.
+    if (!m_spec) { m_takeLenSec = 0.0; return; }
+
+    const int rate = m_spec->sampleRate();
+    const int want = int(std::min(m_takeLenSec,
+                                  double(MicSpectrum::kHoldSeconds)) * rate);
+    if (want < kFft * 2) {
+        // Under about two-tenths of a second there is nothing to
+        // average. Refused rather than shown as a jagged line that
+        // looks like a measurement.
+        m_takeLenSec = 0.0;
+        return;
+    }
+
+    std::vector<float> buf(static_cast<size_t>(want), 0.0f);
+    const int got = m_spec->snapshot(buf.data(), want);
+    if (got < kFft * 2) { m_takeLenSec = 0.0; return; }
+
+    const int bins = kFft / 2;
+    std::vector<double> power(static_cast<size_t>(bins), 0.0);
+    int windows = 0;
+    std::vector<std::complex<double>> a(kFft);
+    for (int start = 0; start + kFft <= got; start += kFft / 2) {
+        for (int i = 0; i < kFft; ++i) {
+            const double w =
+                0.5 * (1.0 - std::cos(2.0 * M_PI * i / (kFft - 1)));
+            a[static_cast<size_t>(i)] = std::complex<double>(
+                buf[static_cast<size_t>(start + i)] * w, 0.0);
+        }
+        fftInPlace(a);
+        for (int i = 0; i < bins; ++i) {
+            const double m = std::abs(a[static_cast<size_t>(i)]) / (kFft / 4.0);
+            power[static_cast<size_t>(i)] += m * m;
+        }
+        ++windows;
+    }
+    if (windows == 0) { m_takeLenSec = 0.0; return; }
+
+    // Power domain, as everywhere else in this file: averaging decibels
+    // would give the pauses the same weight as the words.
+    m_heldMag.assign(static_cast<size_t>(bins), -120.0);
+    for (int i = 0; i < bins; ++i) {
+        const double mean = power[static_cast<size_t>(i)] / windows;
+        m_heldMag[static_cast<size_t>(i)] =
+            mean > 1e-18 ? 10.0 * std::log10(mean) : -120.0;
+    }
+    applySmoothing();
+
+    // The take becomes the held curve and the reference for everything
+    // else on the plot, so there is one measured state rather than two
+    // that can disagree.
+    m_takeMag  = m_heldShown.empty() ? m_heldMag : m_heldShown;
+    m_haveTake = true;
+    m_haveHold = true;
+    m_held     = true;
+}
+
 void StripEqCurve::setProfile(const QString& name)
 {
     m_profile = name;
@@ -433,15 +525,30 @@ QSize StripEqCurve::sizeHint() const { return QSize(560, 230); }
 
 void StripEqCurve::tick()
 {
+    // Stop itself at the limit. Fifteen seconds is what the ring can
+    // certainly still hold, and it is long enough that the average is
+    // of a person talking rather than of two vowels.
+    if (m_recording
+        && m_takeClock.elapsed() >= MicSpectrum::kHoldSeconds * 1000) {
+        stopTake();
+    }
+
+    // A finished take is the measured state and nothing may overwrite
+    // it. Without this the rolling average — which runs once a second —
+    // would replace the take about a second after it was made, and the
+    // operator would watch their careful fifteen-second measurement
+    // quietly turn back into a rolling average with no indication that
+    // anything had happened.
+    if (m_haveTake) { update(); return; }
+
     if (m_held) { update(); return; }
 
     recomputeSpectrum();
 
-    // The fifteen-second average is refreshed on its own, about once a
-    // second, whether or not Hold has ever been pressed. Asked for
-    // directly: the operator wants to open the window and see their own
-    // standard curve, not a live wriggle that only becomes a curve if
-    // they know to press a button first. Hold then stops it moving.
+    // With no take yet, the fifteen-second average still runs on its
+    // own so that opening the window shows something rather than an
+    // empty plot. It is a preview, not a measurement, and the plot says
+    // which of the two it is showing.
     if (++m_sinceCapture >= 10) {
         m_sinceCapture = 0;
         captureHold();
@@ -1272,10 +1379,33 @@ void StripEqCurve::paintEvent(QPaintEvent*)
         }
     }
 
-    if (m_held) {
-        p.setPen(QColor(0xd0, 0x90, 0x20));
-        p.drawText(r.adjusted(6, 2, 0, 0), Qt::AlignLeft | Qt::AlignTop,
-                   QStringLiteral("HOLD"));
+    // ── What is this curve? ──────────────────────────────────────────
+    //
+    // A measured take and a rolling preview look identical, and acting
+    // on the second while believing it is the first is the whole reason
+    // the take exists. So the plot says which one it is drawing, every
+    // frame, in the corner.
+    {
+        QString badge;
+        QColor  badgeCol = QColor(0xd0, 0x90, 0x20);
+        if (m_recording) {
+            badge = QStringLiteral("● RECORDING  %1 s")
+                        .arg(takeSeconds(), 0, 'f', 1);
+            badgeCol = QColor(0xe0, 0x50, 0x50);
+        } else if (m_haveTake) {
+            badge = QStringLiteral("MEASURED  %1 s")
+                        .arg(m_takeLenSec, 0, 'f', 1);
+        } else if (m_held) {
+            badge = QStringLiteral("HOLD");
+        } else if (m_haveHold) {
+            badge = QStringLiteral("preview — press Record to measure");
+            badgeCol = c(Style::kTextInactive);
+        }
+        if (!badge.isEmpty()) {
+            p.setPen(badgeCol);
+            p.drawText(r.adjusted(6, 2, 0, 0), Qt::AlignLeft | Qt::AlignTop,
+                       badge);
+        }
     }
     if (!eqOn) {
         p.setPen(c(Style::kTextSecondary));
@@ -1460,6 +1590,21 @@ void StripDynamicsCurve::refresh()
         m_liveOut = double(m_chain->limiter().outputPeakDb());
         break;
     }
+
+    // Peak hold, 20 dB/s, the same constant the level bars use.
+    constexpr double kDecayDbPerTick = 2.0;   // at the 10 Hz meter timer
+    m_holdIn  = std::max(m_liveIn,  m_holdIn  - kDecayDbPerTick);
+    m_holdOut = std::max(m_liveOut, m_holdOut - kDecayDbPerTick);
+
+    // The trail records where the signal ACTUALLY went, not where the
+    // hold says it has been — a trail of held values would be a trail of
+    // the same decaying point and would show nothing.
+    if (m_liveIn > kMinDb + 1.0) {
+        m_trail[static_cast<size_t>(m_trailNext)] =
+            QPointF(m_liveIn, m_liveOut);
+        m_trailNext = (m_trailNext + 1) % kTrail;
+        m_trailCount = std::min(m_trailCount + 1, kTrail);
+    }
     update();
 }
 
@@ -1614,14 +1759,28 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     // own is a manual page; the dot turns it into an instrument, because
     // it answers the only question the operator actually has — am I
     // hitting this stage at all, and where.
-    if (m_liveIn > kMinDb + 1.0) {
-        const QPointF dot(xFor(m_liveIn, r), yFor(m_liveOut, r));
+    // The range the signal has swept recently, oldest faintest. On a
+    // transfer curve this is the useful part: a single point says where
+    // you are, the trail says how much of the curve you are using.
+    for (int i = 0; i < m_trailCount; ++i) {
+        const int age = (m_trailCount - 1)
+            - ((i - m_trailNext + kTrail) % kTrail);
+        const QPointF& v = m_trail[static_cast<size_t>(i)];
+        if (v.x() <= kMinDb + 1.0) { continue; }
+        const int alpha = 12 + 60 * (kTrail - std::min(age, kTrail)) / kTrail;
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0xff, 0xb8, 0x00, 36));
-        p.drawEllipse(dot, 9.0, 9.0);
-        p.setPen(QPen(QColor(0xff, 0xb8, 0x00), 1.5));
-        p.setBrush(QColor(0xff, 0xb8, 0x00, 200));
-        p.drawEllipse(dot, 4.0, 4.0);
+        p.setBrush(QColor(0xff, 0xb8, 0x00, alpha));
+        p.drawEllipse(QPointF(xFor(v.x(), r), yFor(v.y(), r)), 2.4, 2.4);
+    }
+
+    if (m_holdIn > kMinDb + 1.0) {
+        const QPointF dot(xFor(m_holdIn, r), yFor(m_holdOut, r));
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0xff, 0xb8, 0x00, 40));
+        p.drawEllipse(dot, 10.0, 10.0);
+        p.setPen(QPen(QColor(0xff, 0xb8, 0x00), 1.6));
+        p.setBrush(QColor(0xff, 0xb8, 0x00, 210));
+        p.drawEllipse(dot, 4.5, 4.5);
     }
 
     // ── The scale, only when asked for ───────────────────────────────
@@ -1661,6 +1820,8 @@ QSize StripShaperCurve::sizeHint() const { return QSize(220, 170); }
 void StripShaperCurve::refresh()
 {
     if (m_chain) { m_livePeak = double(m_chain->tube().inputPeakDb()); }
+    constexpr double kDecayDbPerTick = 2.0;
+    m_holdPeak = std::max(m_livePeak, m_holdPeak - kDecayDbPerTick);
     update();
 }
 
@@ -1713,8 +1874,8 @@ void StripShaperCurve::paintEvent(QPaintEvent*)
     // driven at -40 dBFS is a straight wire no matter how the knobs are
     // set, and the picture should say so rather than implying warmth
     // that is not happening.
-    if (m_livePeak > -60.0) {
-        const double amp = std::pow(10.0, m_livePeak / 20.0);
+    if (m_holdPeak > -60.0) {
+        const double amp = std::pow(10.0, m_holdPeak / 20.0);
         for (double sgn : {-1.0, 1.0}) {
             const double x = sgn * amp;
             const double px = r.left()

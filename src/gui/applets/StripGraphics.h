@@ -42,6 +42,8 @@
 
 #include <QWidget>
 
+#include <QElapsedTimer>
+
 #include <array>
 #include <vector>
 
@@ -137,6 +139,39 @@ public:
     // hundred milliseconds happened to contain.
     void setHeld(bool on);
     bool isHeld() const noexcept { return m_held; }
+
+    // ── A take, with a start and a stop ──────────────────────────────
+    //
+    // The rolling fifteen-second average was the wrong instrument, and
+    // the bench said so: you never know what is in it. It includes the
+    // sentence you just said, the cough before it and the silence you
+    // left while reading the screen, in proportions that change every
+    // second — so two people cannot compare curves, and one person
+    // cannot compare their own from yesterday.
+    //
+    // A take has a beginning and an end that the operator chose. It is
+    // reproducible, it can be repeated deliberately, and it is the only
+    // form of measurement that supports "say the same thing again with
+    // the compressor off".
+    //
+    // Press start, talk, press stop — or let it stop itself at fifteen
+    // seconds. What comes out is frozen as THE measured state, and every
+    // curve on the plot is drawn against it until the next take.
+    void startTake();
+    void stopTake();
+    bool recording() const noexcept { return m_recording; }
+    bool haveTake()  const noexcept { return m_haveTake; }
+    // Seconds elapsed while recording; the length of the take once
+    // stopped. Zero when neither.
+    double takeSeconds() const;
+
+signals:
+    // Emitted when a take ends, whether by the operator or by the
+    // fifteen-second limit. The window updates its own buttons from
+    // this rather than assuming which of the two happened.
+    void takeStateChanged();
+
+public:
 
     // Smooth the held curve to a third of an octave. The raw average of
     // a voice is a comb of harmonics; the peaks and troughs between
@@ -271,6 +306,14 @@ private:
     bool m_haveHold{false};
     int  m_sinceCapture{0};
     bool m_held{false};
+
+    // The take: what was actually measured, and when.
+    std::vector<double> m_takeMag;      // smoothed, as drawn
+    bool          m_recording{false};
+    bool          m_haveTake{false};
+    QElapsedTimer m_takeClock;
+    double        m_takeLenSec{0.0};
+    void captureTake();
     bool m_smooth{true};
     bool m_showTarget{true};
     bool m_showResult{true};
@@ -367,9 +410,34 @@ private:
 
     Stage       m_stage;
     StripChain* m_chain{nullptr};
-    // Where the signal is now, held briefly so a transient is readable.
+
+    // ── Why the dot needs a hold ─────────────────────────────────────
+    //
+    // Reported from the bench: "the dots are gone so fast you cannot see
+    // them." Correct, and the fault was showing the instantaneous peak.
+    // Speech is mostly gaps; between syllables the peak collapses and
+    // the dot jumps to the bottom-left corner and back thirty times a
+    // second, which the eye reads as flicker rather than as a level.
+    //
+    // The level bars in this same file have had peak-hold-with-decay
+    // since they were written, at 20 dB per second — fast enough to
+    // track speech, slow enough that one syllable can be read. The dot
+    // now uses exactly that, and the same constant, because two decay
+    // rates in one window would make two pictures of one signal
+    // disagree.
+    //
+    // A short trail of recent positions as well: on a transfer curve the
+    // interesting thing is not where the signal is but the range it
+    // sweeps, and a single point cannot show a range.
     double m_liveIn{-120.0};
     double m_liveOut{-120.0};
+    double m_holdIn{-120.0};
+    double m_holdOut{-120.0};
+
+    static constexpr int kTrail = 12;
+    std::array<QPointF, kTrail> m_trail{};
+    int  m_trailCount{0};
+    int  m_trailNext{0};
 };
 
 // ── "What is it doing to the waveform?" ──────────────────────────────
@@ -393,6 +461,7 @@ protected:
 private:
     StripChain* m_chain{nullptr};
     double m_livePeak{-120.0};
+    double m_holdPeak{-120.0};   // same decay as everything else here
 };
 
 // ── "Which part of the voice is it listening to?" ────────────────────
