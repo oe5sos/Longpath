@@ -16,10 +16,9 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
 #include "core/AppSettings.h"
-#include "core/strip/EqLoudness.h"
+#include "gui/applets/eq/EqHost.h"
+#include "gui/applets/eq/StripEqPanel.h"
 #include "core/strip/StripCharacters.h"
-#include "core/strip/StripTargets.h"
-#include "core/strip/TargetFromFile.h"
 
 #include <QInputDialog>
 #include <QFileDialog>
@@ -134,13 +133,9 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
     // would then write back over the top.
     if (StripChain* c = chain()) {
         StripSettings::restore(*c);
-        seedEqLayout();
         m_hadChain = true;
     }
-    m_matchLoudness = AppSettings::instance()
-        .value(QStringLiteral("ChannelStrip/MatchLoudness"), true).toBool();
     buildUi();
-    applyLoudnessMatch();
     refreshChainRow();
 }
 
@@ -158,10 +153,8 @@ void StripWindow::adoptChainIfArrived()
     // no second copy to forget.
     StripChain* c = chain();
     StripSettings::restore(*c);
-    seedEqLayout();
     reloadControls();
     refreshStagePictures();
-    applyLoudnessMatch();
     refreshChainRow();
     if (m_note) {
         m_note->setText(QStringLiteral(
@@ -261,11 +254,6 @@ void StripWindow::persist()
 {
     StripChain* c = chain();
     if (!c) { return; }
-    // Recomputed before saving, not after: the trim is part of what
-    // gets written, so a curve restored next session comes back already
-    // matched instead of arriving loud and being corrected on the first
-    // nudge of a slider.
-    if (m_matchLoudness) { EqLoudness::apply(c->eq()); }
     StripSettings::save(*c);
 }
 
@@ -548,812 +536,41 @@ QWidget* StripWindow::buildGatePanel()
 // The fixed layout is also what makes the saved settings meaningful:
 // band 2 is always the first mains harmonic, in the file as on screen.
 
-void StripWindow::seedEqLayout()
-{
-    StripChain* c = chain();
-    if (!c) { return; }
-    // Only seed a chain that has not been set up before. Overwriting a
-    // restored layout would throw away the operator's settings every
-    // time the window opened.
-    const int have = c->eq().activeBandCount();
-    if (have >= kEqBandCount) { return; }
 
-    auto put = [c](int idx, ClientEq::FilterType t, float hz, float gain,
-                   float q, bool on, int slope) {
-        ClientEq::BandParams p;
-        p.type = t; p.freqHz = hz; p.gainDb = gain; p.q = q;
-        p.enabled = on; p.slopeDbPerOct = slope;
-        c->eq().setBand(idx, p);
-    };
 
-    // ── Growing an existing layout ───────────────────────────────────
-    //
-    // The first shipped layout had ten slots. A chain restored from that
-    // settings file must not be re-seeded: the operator's curve is in
-    // slots 0-9 and overwriting it is exactly the failure this whole
-    // function's guard exists to prevent. So the four new bands are
-    // appended at 0 dB, which is audibly nothing, and the curve the
-    // operator had is the curve they still have — with four more handles
-    // on it.
-    if (have == 10) {
-        put(10, ClientEq::FilterType::Peak,  250.0f, 0.0f, 1.0f, true, 12);
-        put(11, ClientEq::FilterType::Peak,  500.0f, 0.0f, 1.0f, true, 12);
-        put(12, ClientEq::FilterType::Peak, 1000.0f, 0.0f, 1.0f, true, 12);
-        put(13, ClientEq::FilterType::Peak, 1900.0f, 0.0f, 1.0f, true, 12);
-        c->eq().setActiveBandCount(kEqBandCount);
-        return;
-    }
 
-    put(0, ClientEq::FilterType::HighPass, 100.0f, 0.0f, 0.707f, true, 24);
-    // Notches off until asked for: a notch at 50 Hz on a station that
-    // runs at 60 removes nothing and costs phase.
-    put(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
-    put(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
-    put(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
 
-    // Ten shaping bands, log-spaced so each covers about the same
-    // musical distance. Three points can only tilt a curve; ten can put
-    // a dip exactly where the problem is and leave its neighbours alone,
-    // which is the difference between correcting a resonance and tilting
-    // the whole voice to hide it.
-    //
-    // A shelf at each end and peaks between them: shelves are the right
-    // shape for "everything below this" and peaks for "this bit here",
-    // and offering a peak at 200 Hz where a shelf is wanted is how a
-    // curve ends up with two bands fighting each other.
-    //
-    // All at 0 dB. A default layout that already shapes the voice is a
-    // layout the operator has to undo before they can start.
-    put(4, ClientEq::FilterType::LowShelf,   180.0f, 0.0f, 0.707f, true, 12);
-    put(5, ClientEq::FilterType::Peak,       350.0f, 0.0f, 1.0f,   true, 12);
-    put(6, ClientEq::FilterType::Peak,       700.0f, 0.0f, 1.0f,   true, 12);
-    put(7, ClientEq::FilterType::Peak,      1400.0f, 0.0f, 1.0f,   true, 12);
-    put(8, ClientEq::FilterType::Peak,      2400.0f, 0.0f, 1.0f,   true, 12);
-    put(9, ClientEq::FilterType::HighShelf, 3400.0f, 0.0f, 0.707f, true, 12);
-    // The four that make it ten. Slots at the end, frequencies in the
-    // gaps — see StripWindow.h for why index order and frequency order
-    // are allowed to differ.
-    put(10, ClientEq::FilterType::Peak,  250.0f, 0.0f, 1.0f, true, 12);
-    put(11, ClientEq::FilterType::Peak,  500.0f, 0.0f, 1.0f, true, 12);
-    put(12, ClientEq::FilterType::Peak, 1000.0f, 0.0f, 1.0f, true, 12);
-    put(13, ClientEq::FilterType::Peak, 1900.0f, 0.0f, 1.0f, true, 12);
-    c->eq().setActiveBandCount(kEqBandCount);
-}
-
-void StripWindow::buildEqTable(QWidget* parent, QVBoxLayout* into)
-{
-    m_eqTable = new QTableWidget(0, 5, parent);
-    m_eqTable->setHorizontalHeaderLabels({
-        QStringLiteral("#"), QStringLiteral("Hz"), QStringLiteral("dB"),
-        QStringLiteral("Q"), QStringLiteral("Shape")});
-    m_eqTable->verticalHeader()->setVisible(false);
-    m_eqTable->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_eqTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_eqTable->setMaximumHeight(190);
-    m_eqTable->setStyleSheet(
-        QStringLiteral("QTableWidget { font-size: 11px; }"));
-    into->addWidget(m_eqTable);
-
-    connect(m_eqTable, &QTableWidget::cellChanged,
-            this, &StripWindow::onEqTableEdited);
-
-    auto* note = new QLabel(QStringLiteral(
-        "Type a number when you know it, drag the dot when you don't. "
-        "Both are the same band — there is one setting, seen twice."),
-        parent);
-    note->setWordWrap(true);
-    note->setStyleSheet(dimStyle());
-    into->addWidget(note);
-
-    refreshEqTable();
-}
-
-void StripWindow::refreshEqTable()
-{
-    if (!m_eqTable) { return; }
-    StripChain* c = chain();
-
-    // Guarded, because filling the table emits cellChanged for every
-    // cell, and each of those would be read back as an edit. Without
-    // this the table writes its own contents into the chain on every
-    // refresh — harmless while the values agree and quietly destructive
-    // the moment rounding makes them differ.
-    m_fillingTable = true;
-
-    // Sorted by frequency, not by slot. The high-pass is always first
-    // because it is always the lowest thing on the plot; the rest are
-    // ordered the way they appear left to right, so row 4 in the table
-    // and knot 4 on the curve are the same band. Slot order stopped
-    // matching frequency order the first time anyone dragged a handle,
-    // and matching the picture is worth more than matching the array.
-    std::vector<int> rows;
-    if (c) {
-        const int n = c->eq().activeBandCount();
-        if (n > 0) { rows.push_back(0); }
-        std::vector<int> tone;
-        for (int b = kBandLowShelf; b < n; ++b) { tone.push_back(b); }
-        std::sort(tone.begin(), tone.end(), [c](int a, int b) {
-            return c->eq().band(a).freqHz < c->eq().band(b).freqHz;
-        });
-        rows.insert(rows.end(), tone.begin(), tone.end());
-    }
-    m_eqTable->setRowCount(int(rows.size()));
-
-    for (int r = 0; r < int(rows.size()); ++r) {
-        const int band = rows[static_cast<size_t>(r)];
-        const ClientEq::BandParams p = c->eq().band(band);
-
-        auto put = [this, r](int col, const QString& text, bool editable) {
-            auto* item = new QTableWidgetItem(text);
-            item->setTextAlignment(Qt::AlignCenter);
-            if (!editable) {
-                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-            }
-            m_eqTable->setItem(r, col, item);
-        };
-        put(0, QString::number(r + 1), false);
-        put(1, QString::number(p.freqHz, 'f', 0), true);
-
-        const bool isHp = p.type == ClientEq::FilterType::HighPass;
-        // A high-pass has no gain and its width is a slope from a list
-        // of four, so those two cells show what it has rather than a
-        // number that would do nothing if typed into.
-        put(2, isHp ? QStringLiteral("—")
-                    : QString::number(p.gainDb, 'f', 1), !isHp);
-        put(3, isHp ? QStringLiteral("%1 dB/oct").arg(p.slopeDbPerOct)
-                    : QString::number(p.q, 'f', 2), !isHp);
-
-        QString shape;
-        switch (p.type) {
-        case ClientEq::FilterType::HighPass:  shape = QStringLiteral("high-pass"); break;
-        case ClientEq::FilterType::LowPass:   shape = QStringLiteral("low-pass");  break;
-        case ClientEq::FilterType::LowShelf:  shape = QStringLiteral("low shelf"); break;
-        case ClientEq::FilterType::HighShelf: shape = QStringLiteral("high shelf");break;
-        case ClientEq::FilterType::Peak:      shape = QStringLiteral("peak");      break;
-        }
-        put(4, shape, false);
-
-        // Row index carries the band, because the table only shows the
-        // draggable ones and the two numberings would otherwise drift
-        // apart the first time a band is added.
-        m_eqTable->item(r, 0)->setData(Qt::UserRole, band);
-    }
-    m_fillingTable = false;
-}
-
-void StripWindow::onEqTableEdited(int row, int column)
-{
-    if (m_fillingTable || !m_eqTable) { return; }
-    StripChain* c = chain();
-    if (!c) { return; }
-    QTableWidgetItem* idx = m_eqTable->item(row, 0);
-    QTableWidgetItem* cell = m_eqTable->item(row, column);
-    if (!idx || !cell) { return; }
-
-    const int band = idx->data(Qt::UserRole).toInt();
-    ClientEq::BandParams p = c->eq().band(band);
-
-    bool ok = false;
-    const double v = cell->text().trimmed().toDouble(&ok);
-    if (!ok) {
-        // Put the old value back rather than leaving the operator's
-        // typo on screen looking like a setting.
-        refreshEqTable();
-        return;
-    }
-
-    switch (column) {
-    case 1: p.freqHz = float(std::clamp(v, 20.0, 16000.0)); break;
-    case 2: p.gainDb = float(std::clamp(v, -24.0, 24.0));   break;
-    case 3: p.q      = float(std::clamp(v, 0.3, 12.0));     break;
-    default: return;
-    }
-    p.enabled = true;
-    c->eq().setBand(band, p);
-    if (m_eqCurve) { m_eqCurve->refresh(); }
-    refreshEqTable();     // shows the clamp, if one happened
-    persist();
-}
-
-void StripWindow::applyHumNotches(int baseHz, bool on)
-{
-    StripChain* c = chain();
-    if (!c) { return; }
-    // Three of them, because mains hum is never just the fundamental —
-    // a transformer produces the harmonics too, and removing only 50 Hz
-    // leaves 100 and 150 sitting in the middle of the low end.
-    for (int h = 1; h <= 3; ++h) {
-        ClientEq::BandParams p = c->eq().band(h);
-        p.freqHz  = float(baseHz * h);
-        p.enabled = on;
-        c->eq().setBand(h, p);
-    }
-    if (m_eqCurve) { m_eqCurve->refresh(); }
-    persist();
-}
 
 QWidget* StripWindow::buildEqPanel()
 {
-    auto* page = new QWidget(this);
-    auto* outer = new QVBoxLayout(page);
-    outer->setContentsMargins(0, 0, 0, 0);
-    outer->setSpacing(4);
-
-    // ── Everything cannot be on screen at once ───────────────────────
+    // ── AetherSDR's equaliser, whole ─────────────────────────────────
     //
-    // Reported from the bench, and true: this tab had grown a profile
-    // picker, two button rows, a description, the curve, a control row,
-    // three lines of advice, a five-step guide, a ten-row table and a
-    // dozen knobs, all stacked. On a laptop the curve — the only part
-    // that has to be large — was a strip in the middle with the useful
-    // things above and below it off screen.
+    // Asked for at the bench: "delete what is here and take AetherSDR's".
+    // What stood here before was roughly 700 lines of NereusSDR-original
+    // interface — the fifteen-second take recorder, editable target
+    // curves with A/B slots, loudness-matched bypass, match-EQ from a
+    // WAV, band solo, the numeric table, the folding sections. All of it
+    // is gone from the tab; all of it is still in the history, and this
+    // commit is a single `git revert` away from bringing it back.
     //
-    // Two fixes, and they are different fixes for different problems.
-    // The scroll area below means nothing is unreachable, which is
-    // correctness. Folding away the prose and the numbers means the
-    // curve is large without scrolling at all, which is the actual
-    // complaint: an operator dragging an equaliser should not have to
-    // scroll past a paragraph they read once, three weeks ago.
+    // The DSP underneath never changed: core/strip/ClientEq was already
+    // a verbatim port of AetherSDR's at the same revision. This puts the
+    // interface that was written for it back on top of it.
     //
-    // Reference and instructions fold; the picture and its controls do
-    // not, because those are what the tab is for.
-    auto fold = [this, page, outer](const QString& title, QWidget* body,
-                                    bool openAtStart) {
-        auto* head = new QPushButton(
-            (openAtStart ? QStringLiteral("▾  ") : QStringLiteral("▸  "))
-                + title, page);
-        head->setCheckable(true);
-        head->setChecked(openAtStart);
-        head->setStyleSheet(Style::buttonBaseStyle());
-        head->setCursor(Qt::PointingHandCursor);
-        outer->addWidget(head);
-        outer->addWidget(body);
-        body->setVisible(openAtStart);
-        connect(head, &QPushButton::toggled, this,
-                [head, body, title](bool on) {
-            body->setVisible(on);
-            head->setText((on ? QStringLiteral("▾  ")
-                              : QStringLiteral("▸  ")) + title);
-        });
-    };
-
-    // The curve first, and large. This is the whole reason the EQ tab
-    // is worth opening: the high-pass corner and the mains notches stop
-    // being three numbers and become a shape you can aim.
-    // ── What are we shaping for? ─────────────────────────────────────
-    //
-    // Asked before shaping rather than discovered afterwards. A contest
-    // signal and a ragchew signal want opposite things, and the
-    // transmit bandwidth changes the answer again — aiming a 2.7 kHz
-    // channel at a 3.3 kHz shape wastes the wider one and overdrives
-    // the narrower.
-    {
-        auto* row = new QHBoxLayout;
-        row->addWidget(new QLabel(QStringLiteral("Shaping for:"), page));
-        m_profileBox = new QComboBox(page);
-        for (const auto& pr : StripTargets::profiles()) {
-            m_profileBox->addItem(pr.name, pr.name);
-        }
-        m_profileBox->setMinimumWidth(150);
-        row->addWidget(m_profileBox);
-
-        // ── Three ways to get the target you want ────────────────────
-        //
-        // The bench's verdict on all five built-ins was "not what I
-        // want", which is the correct verdict on somebody else's
-        // opinion about your voice. So: copy the nearest one and adjust
-        // it, take your own current sound as the target, or start from
-        // flat. All three write the same twelve points, and the rose
-        // line grows handles once "Mine" is chosen.
-        auto* copyBtn = new QPushButton(QStringLiteral("Copy to Mine"), page);
-        copyBtn->setStyleSheet(Style::buttonBaseStyle());
-        copyBtn->setToolTip(QStringLiteral(
-            "Take the profile shown and make it your own starting point. "
-            "Nothing is lost — the built-ins are still there."));
-        row->addWidget(copyBtn);
-
-        auto* fromVoiceBtn = new QPushButton(
-            QStringLiteral("My voice → Mine"), page);
-        fromVoiceBtn->setStyleSheet(Style::buttonBaseStyle());
-        fromVoiceBtn->setToolTip(QStringLiteral(
-            "Use the fifteen-second average as the target. The rose line "
-            "then sits flat, and every change you make afterwards is "
-            "measured against how you sound today rather than against "
-            "somebody's idea of how a voice should sound."));
-        row->addWidget(fromVoiceBtn);
-
-        auto* flatBtn = new QPushButton(QStringLiteral("Flat"), page);
-        flatBtn->setStyleSheet(Style::buttonBaseStyle());
-        flatBtn->setToolTip(QStringLiteral(
-            "Clear your curve. A flat target means the equaliser is "
-            "asked to leave the voice alone."));
-        row->addWidget(flatBtn);
-
-        row->addStretch(1);
-        outer->addLayout(row);
-
-        connect(copyBtn, &QPushButton::clicked, this, [this]() {
-            StripTargets::seedUserTargetFrom(
-                m_profileBox->currentData().toString());
-            const int at = m_profileBox->findData(
-                QString::fromLatin1(StripTargets::kUserProfileName));
-            if (at >= 0) { m_profileBox->setCurrentIndex(at); }
-            if (m_eqCurve) { m_eqCurve->refresh(); }
-        });
-        connect(flatBtn, &QPushButton::clicked, this, [this]() {
-            StripTargets::setUserTarget(
-                QVector<double>(StripTargets::kUserPointCount, 0.0));
-            const int at = m_profileBox->findData(
-                QString::fromLatin1(StripTargets::kUserProfileName));
-            if (at >= 0) { m_profileBox->setCurrentIndex(at); }
-            if (m_eqCurve) { m_eqCurve->refresh(); }
-        });
-        connect(fromVoiceBtn, &QPushButton::clicked, this, [this]() {
-            if (!m_eqCurve) { return; }
-            const QVector<double> mine = m_eqCurve->measuredAtTargetPoints();
-            if (mine.isEmpty()) {
-                QMessageBox::information(this, QStringLiteral("Target"),
-                    QStringLiteral("Speak for a few seconds first — there "
-                                   "is no measured curve to copy yet."));
-                return;
-            }
-            StripTargets::setUserTarget(mine);
-            const int at = m_profileBox->findData(
-                QString::fromLatin1(StripTargets::kUserProfileName));
-            if (at >= 0) { m_profileBox->setCurrentIndex(at); }
-            m_eqCurve->refresh();
-        });
-
-        // ── A and B, and a recording to match ────────────────────────
-        {
-            auto* ab = new QHBoxLayout;
-            m_slotLabel = new QLabel(QStringLiteral("My curve:"), page);
-            ab->addWidget(m_slotLabel);
-
-            m_slotA = new QPushButton(QStringLiteral("A"), page);
-            m_slotB = new QPushButton(QStringLiteral("B"), page);
-            for (QPushButton* b : {m_slotA, m_slotB}) {
-                b->setCheckable(true);
-                b->setAutoExclusive(true);
-                b->setFixedWidth(34);
-                b->setStyleSheet(Style::buttonBaseStyle());
-                b->setToolTip(QStringLiteral(
-                    "Two targets, switched while you talk. Comparing by "
-                    "memory does not work — the ear forgets a curve in "
-                    "about two seconds, which is less time than it takes "
-                    "to drag one."));
-                ab->addWidget(b);
-            }
-
-            m_fromFileBtn = new QPushButton(
-                QStringLiteral("From recording…"), page);
-            m_fromFileBtn->setStyleSheet(Style::buttonBaseStyle());
-            m_fromFileBtn->setToolTip(QStringLiteral(
-                "Load a WAV of audio that sounded right — your own from a "
-                "good day, or somebody else's off the air — and use its "
-                "long-term spectrum as the target. The only method here "
-                "with nobody's opinion between your ear and the number. "
-                "Bear in mind that a recording off a receiver carries that "
-                "receiver's filter, and another operator's voice carries "
-                "their larynx: it gives you a target, not a transplant."));
-            ab->addWidget(m_fromFileBtn);
-
-            ab->addStretch(1);
-            outer->addLayout(ab);
-
-            connect(m_slotA, &QPushButton::clicked, this,
-                    [this]() { selectTargetSlot(0); });
-            connect(m_slotB, &QPushButton::clicked, this,
-                    [this]() { selectTargetSlot(1); });
-            connect(m_fromFileBtn, &QPushButton::clicked, this,
-                    [this]() { targetFromRecording(); });
-
-            (StripTargets::activeUserSlot() == 1 ? m_slotB : m_slotA)
-                ->setChecked(true);
-        }
-
-        m_profileNote = new QLabel(page);
-        m_profileNote->setWordWrap(true);
-        m_profileNote->setStyleSheet(dimStyle());
-        outer->addWidget(m_profileNote);
-
-        auto describe = [this]() {
-            const QString n = m_profileBox->currentData().toString();
-            for (const auto& pr : StripTargets::profiles()) {
-                if (pr.name == n) { m_profileNote->setText(pr.description); }
-            }
-            if (m_eqCurve) { m_eqCurve->setProfile(n); }
-            updateTargetControls();
-        };
-        connect(m_profileBox, &QComboBox::currentIndexChanged, this,
-                [describe](int) { describe(); });
-        // Called after the curve exists, below.
-        QTimer::singleShot(0, this, describe);
+    // EqHost is the seam. See gui/applets/eq/EqHost.h — the ported
+    // widgets talk to an AudioEngine with five methods on it, and rather
+    // than editing five borrowed files to reach into StripChain, the
+    // five names are presented over NereusSDR's own parts. The borrowed
+    // code stays byte-comparable against upstream.
+    if (!m_eqHost) {
+        m_eqHost = std::make_unique<EqHost>(chain());
+    } else {
+        m_eqHost->setChain(chain());
     }
 
-    m_eqCurve = new StripEqCurve(page);
-    // The one thing on this tab that must be big. Given a stretch of 1
-    // as well, so folding a section open or shut gives the space to the
-    // picture rather than to the gap under it.
-    m_eqCurve->setMinimumHeight(260);
-    m_eqCurve->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_eqCurve->setChain(chain());
-    if (StripChain* ch = chain()) { m_eqCurve->setSpectrum(&ch->micSpectrum()); }
-    outer->addWidget(m_eqCurve, 1);
-
-    // Dragging the curve writes straight into the chain; the window
-    // decides when that reaches the settings file, so there is one
-    // place that saves rather than one per control.
-    connect(m_eqCurve, &StripEqCurve::bandChanged, this, [this](int band) {
-        // -1 means the target moved, not a band. It is already stored in
-        // its own settings key, so there is nothing to persist and no
-        // table row to refresh.
-        if (band >= 0) { refreshEqTable(); persist(); }
-    });
-
-    {
-        auto* row = new QHBoxLayout;
-        // ── Measure, then shape ──────────────────────────────────────
-        //
-        // Hold used to freeze a rolling fifteen-second average, and the
-        // bench's objection to it was right: you never know what is in
-        // it. It carries the sentence you just said, the cough before
-        // it and the silence you left while reading the screen, in
-        // proportions that change every second.
-        //
-        // A take has a start and a stop that you chose. It is
-        // reproducible — you can say the same sentence again with the
-        // compressor off and compare — and that is the difference
-        // between a measurement and a picture.
-        m_recordBtn = new QPushButton(QStringLiteral("● Record 15 s"), page);
-        m_recordBtn->setStyleSheet(Style::buttonBaseStyle());
-        m_recordBtn->setToolTip(QStringLiteral(
-            "Press, talk normally for fifteen seconds, and it stops "
-            "itself — or press again to stop early.\n\nWhat comes out is "
-            "frozen as the measured state of your voice, and every other "
-            "curve on the plot is drawn against it until you measure "
-            "again. Say something you would actually say on the air: a "
-            "count to twenty measures your counting voice."));
-        row->addWidget(m_recordBtn);
-
-        m_takeLabel = new QLabel(page);
-        m_takeLabel->setStyleSheet(dimStyle());
-        m_takeLabel->setMinimumWidth(150);
-        row->addWidget(m_takeLabel);
-
-        auto* smooth = new QCheckBox(QStringLiteral("Smooth"), page);
-        smooth->setChecked(true);
-        smooth->setToolTip(QStringLiteral(
-            "Average the held curve to a third of an octave. The raw "
-            "spectrum of a voice is a comb of harmonics that move with "
-            "every note you speak on; the smoothed one is the shape "
-            "underneath, which is what an equaliser can actually act "
-            "on."));
-        row->addWidget(smooth);
-        connect(smooth, &QCheckBox::toggled, this, [this](bool on) {
-            if (m_eqCurve) { m_eqCurve->setSmoothing(on); }
-        });
-
-        auto* target = new QCheckBox(QStringLiteral("Target"), page);
-        target->setChecked(true);
-        target->setToolTip(QStringLiteral(
-            "Draw where a voice that carries would sit, in rose, over "
-            "what you froze. Lift the amber onto the rose and the blue "
-            "curve is what you move to do it."));
-        row->addWidget(target);
-        connect(target, &QCheckBox::toggled, this, [this](bool on) {
-            if (m_eqCurve) { m_eqCurve->setShowTarget(on); }
-        });
-
-        // ── The result ───────────────────────────────────────────────
-        //
-        // On by default, because the alternative is asking the operator
-        // to add two curves by eye across a log axis. People are bad at
-        // that, and bad at it in one direction: the sum reads flatter
-        // than it is, so the next adjustment overshoots. Every other
-        // control in this row opens that loop; this one closes it.
-        auto* result = new QCheckBox(QStringLiteral("Result"), page);
-        result->setChecked(true);
-        result->setToolTip(QStringLiteral(
-            "Draw your voice with the equaliser applied, in green. That "
-            "is where you actually end up — not something to aim at, "
-            "just arithmetic, and the same arithmetic the filter does."));
-        row->addWidget(result);
-        connect(result, &QCheckBox::toggled, this, [this](bool on) {
-            if (m_eqCurve) { m_eqCurve->setShowResult(on); }
-        });
-
-        // Each band drawn on its own, faintly, behind the sum. With ten
-        // overlapping bands the composite curve cannot be read
-        // backwards — a dip is either one band cutting or two
-        // neighbours boosting, and those want opposite corrections.
-        auto* ghosts = new QCheckBox(QStringLiteral("Bands"), page);
-        ghosts->setChecked(true);
-        ghosts->setToolTip(QStringLiteral(
-            "Show each band's own response behind the sum. The one under "
-            "the pointer brightens, which is how you find out which "
-            "handle owns a bump."));
-        row->addWidget(ghosts);
-        connect(ghosts, &QCheckBox::toggled, this, [this](bool on) {
-            if (m_eqCurve) { m_eqCurve->setShowBands(on); }
-        });
-
-        // ── Loudness matching ────────────────────────────────────────
-        m_matchBox = new QCheckBox(QStringLiteral("Match loudness"), page);
-        m_matchBox->setChecked(m_matchLoudness);
-        m_matchBox->setToolTip(QStringLiteral(
-            "Take off at the output whatever the curve adds, so that "
-            "switching the equaliser in and out changes the shape and "
-            "not the level.\n\nLouder always sounds better — reliably, "
-            "in every listening test ever run, and regardless of whether "
-            "it actually is better. Without this, every judgement you "
-            "make here is a judgement about which side was louder."));
-        row->addWidget(m_matchBox);
-        connect(m_matchBox, &QCheckBox::toggled, this, [this](bool on) {
-            m_matchLoudness = on;
-            AppSettings::instance().setValue(
-                QStringLiteral("ChannelStrip/MatchLoudness"), on);
-            applyLoudnessMatch();
-            persist();
-        });
-
-        auto* hint = new QLabel(QStringLiteral(
-            "Drag a dot for frequency and gain · wheel for width · "
-            "double-click a dot to change its shape · double-click "
-            "empty space to add one · right-click the last one to "
-            "remove it."), page);
-        hint->setWordWrap(true);
-        hint->setStyleSheet(dimStyle());
-        row->addWidget(hint, 1);
-        outer->addLayout(row);
-
-        m_tips = new QLabel(page);
-        m_tips->setWordWrap(true);
-        m_tips->setStyleSheet(dimStyle());
-        outer->addWidget(m_tips);
-
-        // Five lines, in order, because an operator opening this for the
-        // first time has no way to know that the amber curve is not
-        // something they set, or that the rose one is where the blue one
-        // goes rather than where the voice goes.
-        auto* guide = new QLabel(QStringLiteral(
-            "<b>How to use this</b><br>"
-            "1 &nbsp;Tick <i>Hear myself</i>. The radio's own EQ, leveler "
-            "and CFC step aside while you listen, and come back when you "
-            "stop.<br>"
-            "2 &nbsp;Choose what you are shaping for, above.<br>"
-            "3 &nbsp;Press <b>Record</b> and talk normally — something you "
-            "would actually say on the air. It stops itself after fifteen "
-            "seconds, or press again to stop early.<br>"
-            "4 &nbsp;The amber curve is now your voice as measured, and it "
-            "stays put. That is the state you are correcting FROM; the "
-            "corner of the plot says whether you are looking at a "
-            "measurement or at a live preview.<br>"
-            "5 &nbsp;Drag the blue dots onto the rose line. Rose is not "
-            "your target voice — it is where the equaliser should sit to "
-            "get you there, so when blue lies on rose you are done.<br>"
-            "6 &nbsp;Watch the green line: that is your voice with the "
-            "equaliser applied, so it is where you will actually end "
-            "up.<br>"
-            "<br><b>Match loudness</b> is on, and should be. Whatever the "
-            "curve adds is taken off again at the output, so switching "
-            "the equaliser in and out changes the shape and not the "
-            "level. Without it you would be comparing loudness — louder "
-            "always wins, whether or not it is better.<br>"
-            "<b>Bands</b> draws each band's own response faintly behind "
-            "the sum. With ten of them overlapping, a dip is either one "
-            "band cutting or two neighbours boosting, and those want "
-            "opposite corrections.<br>"
-            "Move the pointer over the picture for the frequency and "
-            "level under it; the active handle also shows how wide it "
-            "is.<br>"
-            "<br>None of the six built-in shapes is your voice or your "
-            "microphone. Pick <i>Mine</i> and the rose line grows its own "
-            "handles — copy the nearest profile, take your own average, or "
-            "match a recording you liked, then drag it where you want it. "
-            "Keep two of them as A and B and switch while talking.<br>"
-            "<br>The receiver is silenced while you listen, and comes "
-            "back when you stop."), page);
-        guide->setWordWrap(true);
-        guide->setStyleSheet(
-            QStringLiteral("QLabel { color: %1; font-size: 11px; "
-                           "background: %2; border: 1px solid %3; "
-                           "padding: 8px; }")
-                .arg(QString::fromLatin1(Style::kTextSecondary),
-                     QString::fromLatin1(Style::kInsetBg),
-                     QString::fromLatin1(Style::kInsetBorder)));
-        // Closed. It is worth reading once and worth scrolling past
-        // never, and the row of colours in the key under the curve is
-        // the part anyone needs on the tenth visit.
-        fold(QStringLiteral("How to use this"), guide, false);
-
-        connect(m_recordBtn, &QPushButton::clicked, this, [this]() {
-            if (!m_eqCurve) { return; }
-            if (m_eqCurve->recording()) { m_eqCurve->stopTake(); }
-            else                        { m_eqCurve->startTake(); }
-        });
-
-        // Driven from the curve's own signal rather than from the
-        // click, because the take also ends on its own at fifteen
-        // seconds and the button has to be right in both cases.
-        connect(m_eqCurve, &StripEqCurve::takeStateChanged, this,
-                [this]() { refreshTakeUi(); });
-        refreshTakeUi();
-
-        connect(m_holdBtn, &QPushButton::toggled, this, [this](bool on) {
-            if (!m_eqCurve) { return; }
-            m_eqCurve->setHeld(on);
-            if (!on) { m_tips->clear(); return; }
-
-            const QStringList t = m_eqCurve->tips();
-            if (t.isEmpty()) {
-                m_tips->setText(QStringLiteral(
-                    "Nothing stands out — what you froze is already close "
-                    "to a shape that carries. Either speak a little longer "
-                    "before holding, or leave it alone."));
-                return;
-            }
-            QString text;
-            for (int i = 0; i < t.size(); ++i) {
-                text += QStringLiteral("%1. %2\n").arg(i + 1).arg(t.at(i));
-            }
-            m_tips->setText(text.trimmed());
-        });
-    }
-
-    // The numbers, folded away. A graph is the right tool for "make
-    // this bit quieter" and the wrong one for "put it at exactly 2200";
-    // both belong, but only one of them belongs on screen while the
-    // other is being dragged.
-    {
-        auto* tableHost = new QWidget(page);
-        auto* tl = new QVBoxLayout(tableHost);
-        tl->setContentsMargins(0, 0, 0, 0);
-        buildEqTable(tableHost, tl);
-        fold(QStringLiteral("Bands, as numbers"), tableHost, false);
-    }
-
-    auto* body = new QWidget(page);
-    auto* form = new QFormLayout(body);
-    form->setContentsMargins(0, 4, 0, 0);
-    fold(QStringLiteral("High-pass, hum and tone controls"), body, false);
-
-    const int idx = static_cast<int>(StripChain::Stage::Eq);
-    auto* on = new QCheckBox(QStringLiteral("EQ on"), page);
-    m_stageBoxes[static_cast<size_t>(idx)] = on;
-    form->addRow(on);
-    connect(on, &QCheckBox::toggled, this, [this](bool v) {
-        if (StripChain* c = chain()) {
-            c->setStageEnabled(StripChain::Stage::Eq, v);
-        }
-        refreshChainRow();
-        persist();
-    });
-
-    auto setBandField = [this](int band, auto member, double v) {
-        if (StripChain* c = chain()) {
-            ClientEq::BandParams p = c->eq().band(band);
-            p.*member = decltype(p.*member)(v);
-            c->eq().setBand(band, p);
-        }
-    };
-
-    // ── High-pass ────────────────────────────────────────────────────
-    addKnob(form, QStringLiteral("High-pass"), 20.0, 400.0, 5.0, cur([this]{ return chain()->eq().band(0).freqHz; }, 100.0),
-        QStringLiteral("Hz"), [setBandField](double v) {
-            setBandField(0, &ClientEq::BandParams::freqHz, v);
-        }, 0, [this]{ persist(); });
-
-    auto* slope = new QComboBox(page);
-    for (int db : {12, 24, 36, 48}) {
-        slope->addItem(QStringLiteral("%1 dB/octave").arg(db), db);
-    }
-    // From the chain, not a hardcoded index. Same class of bug as the
-    // sliders had: the panel would show 48 dB/octave while the filter
-    // ran at 24, and the first touch of the combo would then make the
-    // filter agree with the wrong label.
-    {
-        const int have = chain() ? chain()->eq().band(0).slopeDbPerOct : 24;
-        const int at = slope->findData(have);
-        slope->setCurrentIndex(at >= 0 ? at : 1);
-    }
-    form->addRow(QStringLiteral("High-pass slope"), slope);
-    connect(slope, &QComboBox::currentIndexChanged, this,
-            [this, slope, setBandField](int) {
-        setBandField(0, &ClientEq::BandParams::slopeDbPerOct,
-                     slope->currentData().toInt());
-        persist();
-    });
-
-    auto* hpHelp = new QLabel(QStringLiteral(
-        "Nothing below about 100 Hz survives an SSB transmitter, but it "
-        "does reach the compressor first and eat its headroom. Cutting it "
-        "here makes everything above it louder without touching a gain "
-        "control."), page);
-    hpHelp->setWordWrap(true);
-    hpHelp->setStyleSheet(dimStyle());
-    form->addRow(hpHelp);
-
-    // ── Mains hum ────────────────────────────────────────────────────
-    {
-        auto* row = new QWidget(page);
-        auto* h = new QHBoxLayout(row);
-        h->setContentsMargins(0, 0, 0, 0);
-        m_humBox = new QCheckBox(QStringLiteral("Remove mains hum"), row);
-        h->addWidget(m_humBox);
-        m_humBase = new QComboBox(row);
-        m_humBase->addItem(QStringLiteral("50 Hz"), 50);
-        m_humBase->addItem(QStringLiteral("60 Hz"), 60);
-        h->addWidget(m_humBase);
-        h->addStretch(1);
-        form->addRow(row);
-
-        if (StripChain* ch = chain()) {
-            const ClientEq::BandParams p = ch->eq().band(1);
-            const QSignalBlocker b1(m_humBox);
-            const QSignalBlocker b2(m_humBase);
-            m_humBox->setChecked(p.enabled);
-            const int at = m_humBase->findData(
-                int(std::lround(double(p.freqHz))) >= 55 ? 60 : 50);
-            if (at >= 0) { m_humBase->setCurrentIndex(at); }
-        }
-
-        auto apply = [this]() {
-            applyHumNotches(m_humBase->currentData().toInt(),
-                            m_humBox->isChecked());
-        };
-        connect(m_humBox, &QCheckBox::toggled, this, [apply](bool) { apply(); });
-        connect(m_humBase, &QComboBox::currentIndexChanged, this,
-                [apply](int) { apply(); });
-
-        auto* humHelp = new QLabel(QStringLiteral(
-            "Three narrow notches, at the mains frequency and its first "
-            "two harmonics — hum from a transformer is never just the "
-            "fundamental, and removing only the first leaves the other "
-            "two sitting in the low end.\n\n"
-            "This is a repair, not a cure. If the voice check reports hum "
-            "less than about 20 dB below your speech, the cause is a "
-            "ground loop or a power supply, and the notches only hide it. "
-            "Find it if you can; use these if you can't."), page);
-        humHelp->setWordWrap(true);
-        humHelp->setStyleSheet(dimStyle());
-        form->addRow(humHelp);
-    }
-
-    // ── Tone ─────────────────────────────────────────────────────────
-    addKnob(form, QStringLiteral("Low"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(kBandLowShelf).gainDb; }, 0.0),
-        QStringLiteral("dB"), [setBandField](double v) {
-            setBandField(kBandLowShelf, &ClientEq::BandParams::gainDb, v);
-        }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Presence"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(kBandPresence).gainDb; }, 0.0),
-        QStringLiteral("dB"), [setBandField](double v) {
-            setBandField(kBandPresence, &ClientEq::BandParams::gainDb, v);
-        }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("High"), -12.0, 12.0, 0.5, cur([this]{ return chain()->eq().band(kBandHighShelf).gainDb; }, 0.0),
-        QStringLiteral("dB"), [setBandField](double v) {
-            setBandField(kBandHighShelf, &ClientEq::BandParams::gainDb, v);
-        }, 1, [this]{ persist(); });
-
-    auto* toneHelp = new QLabel(QStringLiteral(
-        "Presence sits at 2 kHz — the band that decides whether a signal "
-        "is understood rather than whether it sounds pleasant. A little "
-        "here is worth a lot anywhere else."), page);
-    toneHelp->setWordWrap(true);
-    toneHelp->setStyleSheet(dimStyle());
-    form->addRow(toneHelp);
-
-    outer->addStretch(0);
-
-    // Scrolling is the backstop, not the plan: with everything folded
-    // the tab fits, and the scroll bar only appears for an operator who
-    // has opened the knobs and the table on a short screen. A panel
-    // that always scrolls has been designed for nobody's screen.
-    auto* scroll = new QScrollArea(this);
-    scroll->setWidget(page);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    return scroll;
+    m_eqPanel = new StripEqPanel(m_eqHost.get(), this);
+    m_eqPanel->showForPath(ClientEqApplet::Path::Tx);
+    return m_eqPanel;
 }
 
 // ── De-esser ─────────────────────────────────────────────────────────
@@ -1939,9 +1156,6 @@ void StripWindow::applyPreset(const QString& name)
     // that cannot drift: each control reads its own value from the
     // chain when it is built, so there is no second copy to forget.
     reloadControls();
-    // A preset replaces every band, so the trim it was saved with is
-    // the trim for a different curve.
-    applyLoudnessMatch();
     refreshChainRow();
     persist();
 }
@@ -1955,12 +1169,11 @@ void StripWindow::reloadControls()
         m_tabs->removeTab(0);
         w->deleteLater();
     }
-    m_eqCurve = nullptr;          // owned by the page just removed
-    m_eqTable = nullptr;
-    m_holdBtn = nullptr;
-    m_recordBtn = nullptr;
-    m_takeLabel = nullptr;
-    m_tips    = nullptr;
+    // Owned by the pages just removed. The equaliser panel goes with
+    // them; the host it talks through is owned by this window and
+    // survives, so the rebuilt panel gets a live engine rather than a
+    // dangling one.
+    m_eqPanel = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
     // Owned by the pages just removed. Left dangling, the next
     // refreshMeters() would call isVisible() on freed memory — the same
@@ -1999,122 +1212,9 @@ void StripWindow::reloadControls()
     if (keep >= 0 && keep < m_tabs->count()) { m_tabs->setCurrentIndex(keep); }
 }
 
-void StripWindow::selectTargetSlot(int slot)
-{
-    StripTargets::setActiveUserSlot(slot);
-    // Switching slots does not change the picker, so if the operator is
-    // looking at a built-in the switch is silent and correct: it changes
-    // which of their own curves is armed for when they choose Mine.
-    if (m_eqCurve) { m_eqCurve->refresh(); }
-}
 
-void StripWindow::updateTargetControls()
-{
-    const bool mine = m_profileBox
-        && m_profileBox->currentData().toString()
-               == QLatin1String(StripTargets::kUserProfileName);
-    for (QWidget* w : {static_cast<QWidget*>(m_slotLabel),
-                       static_cast<QWidget*>(m_slotA),
-                       static_cast<QWidget*>(m_slotB)}) {
-        if (w) { w->setVisible(mine); }
-    }
-}
 
-void StripWindow::targetFromRecording()
-{
-    // Reading the file is the easy part; refusing it clearly is the part
-    // that matters. A target silently derived from a misparsed header
-    // is worse than no target, because it looks like a measurement.
-    const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("Match a recording"), QString(),
-        QStringLiteral("Audio (*.wav *.WAV)"));
-    if (path.isEmpty()) { return; }
 
-    QString err;
-    const QVector<double> curve = TargetFromFile::fromWavFile(path, &err);
-    if (curve.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("Match a recording"),
-                             err.isEmpty()
-                                 ? QStringLiteral("The file could not be "
-                                                  "read.")
-                                 : err);
-        return;
-    }
-
-    StripTargets::setUserTarget(curve);
-    const int at = m_profileBox->findData(
-        QString::fromLatin1(StripTargets::kUserProfileName));
-    if (at >= 0) { m_profileBox->setCurrentIndex(at); }
-    if (m_eqCurve) { m_eqCurve->refresh(); }
-    updateTargetControls();
-
-    QMessageBox::information(
-        this, QStringLiteral("Match a recording"),
-        QStringLiteral(
-            "The target is now the long-term average of that recording, "
-            "in slot %1.\n\nWorth knowing what this can and cannot do: a "
-            "recording made through a receiver carries that receiver's "
-            "filter, and another operator's voice carries their larynx. "
-            "You have a target, not a transplant — but it is a target "
-            "nobody's opinion went into, which is more than any of the "
-            "built-in curves can say.")
-            .arg(StripTargets::activeUserSlot() == 1
-                     ? QStringLiteral("B") : QStringLiteral("A")));
-}
-
-void StripWindow::refreshTakeUi()
-{
-    if (!m_eqCurve || !m_recordBtn) { return; }
-
-    if (m_eqCurve->recording()) {
-        m_recordBtn->setText(QStringLiteral("■ Stop"));
-        if (m_takeLabel) {
-            m_takeLabel->setText(QStringLiteral("recording — keep talking"));
-        }
-        return;
-    }
-
-    m_recordBtn->setText(m_eqCurve->haveTake()
-                             ? QStringLiteral("● Measure again")
-                             : QStringLiteral("● Record 15 s"));
-    if (!m_takeLabel) { return; }
-
-    if (!m_eqCurve->haveTake()) {
-        m_takeLabel->setText(QStringLiteral(
-            "not measured yet — the curve is a live preview"));
-        return;
-    }
-
-    const double secs = m_eqCurve->takeSeconds();
-    if (secs < 0.5) {
-        // A take too short to average is refused rather than drawn, and
-        // the operator has to be told why — otherwise pressing stop
-        // early looks like it worked and quietly did nothing.
-        m_takeLabel->setText(QStringLiteral(
-            "that was too short to measure — try again and talk for at "
-            "least a few seconds"));
-        return;
-    }
-    m_takeLabel->setText(QStringLiteral("measured over %1 s")
-                             .arg(secs, 0, 'f', 1));
-
-    // The advice belongs to the take, so it arrives with it rather than
-    // waiting for a separate button press.
-    if (m_tips) {
-        const QStringList t = m_eqCurve->tips();
-        if (t.isEmpty()) {
-            m_tips->setText(QStringLiteral(
-                "Nothing stands out — what you measured is already close "
-                "to a shape that carries."));
-        } else {
-            QString text;
-            for (int i = 0; i < t.size(); ++i) {
-                text += QStringLiteral("%1. %2\n").arg(i + 1).arg(t.at(i));
-            }
-            m_tips->setText(text.trimmed());
-        }
-    }
-}
 
 QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
                                      StripChain::Stage stage)
@@ -2248,20 +1348,6 @@ void StripWindow::refreshStagePictures()
     if (m_puduCurve)     { m_puduCurve->setChain(ch); }
 }
 
-void StripWindow::applyLoudnessMatch()
-{
-    StripChain* ch = chain();
-    if (!ch) { return; }
-    if (m_matchLoudness) {
-        EqLoudness::apply(ch->eq());
-    } else {
-        // Unity, not "whatever it was". Turning the switch off must
-        // leave a state the operator can reason about, and a leftover
-        // trim from the last curve is not one.
-        ch->eq().setMasterGain(1.0f);
-    }
-    if (m_eqCurve) { m_eqCurve->refresh(); }
-}
 
 void StripWindow::refreshChainRow()
 {
@@ -2270,16 +1356,11 @@ void StripWindow::refreshChainRow()
         m_chainView->update();
     }
     if (m_levels) { m_levels->setChain(chain()); }
-    if (m_eqCurve) {
-        // Re-bound here, not only at construction. Without this the
-        // curve keeps whatever it was given when the tab was built —
-        // which, for a window opened before the radio, is nothing.
-        m_eqCurve->setChain(chain());
-        if (StripChain* ch = chain()) {
-            m_eqCurve->setSpectrum(&ch->micSpectrum());
-        }
-    }
-    if (m_eqCurve) { m_eqCurve->refresh(); }
+    // Same late-binding trap as before, now one line: the host is what
+    // the ported panel reaches through, so pointing it at the current
+    // chain is enough for every widget inside it.
+    if (m_eqHost) { m_eqHost->setChain(chain()); }
+    if (m_eqPanel) { m_eqPanel->refreshFromEngine(); }
 }
 
 void StripWindow::refreshMeters()
@@ -2292,7 +1373,8 @@ void StripWindow::refreshMeters()
     // The tiles are the primary reading; the text below each panel is
     // for someone who wants the number rather than the shape.
     if (m_levels) { m_levels->tick(); }
-    if (m_eqCurve) { m_eqCurve->tick(); }
+    // The ported equaliser panel drives its own analyser on its own
+    // timer, as AetherSDR does; nothing here needs to pump it.
 
     // Each stage's picture, from that stage's own atomics. Only the
     // visible tab is worth repainting — the others are hidden and a

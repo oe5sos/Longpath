@@ -45,6 +45,9 @@
 
 #include "core/strip/StripChain.h"
 #include "gui/applets/StripGraphics.h"
+#include "gui/applets/eq/ClientEqApplet.h"
+
+#include <memory>
 
 #include <QDialog>
 #include <QPointer>
@@ -63,7 +66,9 @@ class QWidget;
 
 namespace NereusSDR {
 
+class EqHost;
 class RadioModel;
+class StripEqPanel;
 
 class StripWindow : public QDialog {
     Q_OBJECT
@@ -112,12 +117,7 @@ private:
     // therefore APPENDS them to an existing chain at 0 dB rather than
     // re-seeding, so an operator who had already shaped a curve gets four
     // more handles and not a reset.
-    static constexpr int kEqBandCount   = 14;
-    static constexpr int kBandLowShelf  = 4;
-    static constexpr int kBandPresence  = 8;   // 2.4 kHz — where words live
-    static constexpr int kBandHighShelf = 9;
 
-    void seedEqLayout();
 
     // The numbers under the picture, one row per draggable band.
     //
@@ -125,13 +125,7 @@ private:
     // wrong one for "put it at exactly 2200". Both belong, and they are
     // the same bands seen twice — the table is not a second setting to
     // keep in step, it reads and writes the chain like everything else.
-    void buildEqTable(QWidget* parent, QVBoxLayout* into);
-    void refreshEqTable();
-    void onEqTableEdited(int row, int column);
 
-    QTableWidget* m_eqTable{nullptr};
-    bool          m_fillingTable{false};
-    void applyHumNotches(int baseHz, bool on);
 
     // Everything writes through here, so nothing can change the chain
     // without also being remembered.
@@ -147,9 +141,6 @@ private:
     // an unmatched comparison is not a comparison. It is a switch rather
     // than a rule because an operator who has set their gain staging by
     // hand around a particular curve is entitled to keep it.
-    void applyLoudnessMatch();
-    bool m_matchLoudness{true};
-    QCheckBox* m_matchBox{nullptr};
 
     // A control's opening position: the chain's value when there is a
     // chain, the literal default otherwise. See the note on the
@@ -213,6 +204,15 @@ private:
     void refreshChainRow();
     void refreshMeters();
 
+    // ── The equaliser tab is AetherSDR's, whole ──────────────────────
+    //
+    // The ported panel and the adapter it talks through. The host is
+    // owned here rather than by the panel because the panel is destroyed
+    // and rebuilt with the tab, and the host must outlive that so the
+    // panel is never handed a dangling engine.
+    std::unique_ptr<EqHost> m_eqHost;
+    StripEqPanel*           m_eqPanel{nullptr};
+
     QPointer<RadioModel> m_radio;
 
     QCheckBox*  m_master{nullptr};
@@ -221,25 +221,17 @@ private:
     QTimer*     m_meterTimer{nullptr};
 
     StripChainView* m_chainView{nullptr};
-    StripEqCurve*   m_eqCurve{nullptr};
     StripLevelBars* m_levels{nullptr};
     QComboBox*      m_presetBox{nullptr};
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_compareBtn{nullptr};
-    QPushButton*    m_holdBtn{nullptr};
     // Measure, then shape. See the note at the button's construction
     // for why a take with a start and a stop replaced the rolling
     // average the bench could not interpret.
-    QPushButton*    m_recordBtn{nullptr};
-    QLabel*         m_takeLabel{nullptr};
-    void refreshTakeUi();
     QCheckBox*      m_listen{nullptr};
     bool            m_monitorWasOn{false};
     bool            m_restoreMonitor{false};
-    QLabel*         m_tips{nullptr};
-    QComboBox*      m_profileBox{nullptr};
-    QLabel*         m_profileNote{nullptr};
 
     // ── The operator's own targets, A and B ──────────────────────────
     //
@@ -252,17 +244,10 @@ private:
     // there is no A and B of a built-in profile, and a pair of buttons
     // that do nothing for four of the six entries in the picker is a
     // pair of buttons that teaches people to distrust the panel.
-    QPushButton*    m_slotA{nullptr};
-    QPushButton*    m_slotB{nullptr};
-    QLabel*         m_slotLabel{nullptr};
-    QPushButton*    m_fromFileBtn{nullptr};
-    void selectTargetSlot(int slot);
-    void updateTargetControls();
 
     // Match a recording. The one method here where nobody's opinion sits
     // between the operator's ear and the number: load a WAV of a signal
     // that sounded right and its long-term spectrum becomes the target.
-    void targetFromRecording();
     // What the master switch was before A/B was pressed, so releasing
     // it puts things back rather than leaving the strip in whichever
     // state the comparison happened to end on.
@@ -317,8 +302,6 @@ private:
     QLabel* m_presetNote{nullptr};
     QLabel* m_gateMeter{nullptr};
     QLabel* m_deEssMeter{nullptr};
-    QCheckBox* m_humBox{nullptr};
-    QComboBox* m_humBase{nullptr};
     QLabel* m_compMeter{nullptr};
 };
 
