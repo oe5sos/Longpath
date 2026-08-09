@@ -4653,6 +4653,12 @@ nereus_add_test(tst_strip_tuner)
 #    never claiming more than it has --
 nereus_add_test(tst_mic_spectrum)
 
+# -- What actually goes out: occupied bandwidth measured from the
+#    post-modulator tap. The dip test is the one that matters — the
+#    naive outward walk is wrong by a factor of two, in the direction
+#    that tells a splattering station it is clean --
+nereus_add_test(tst_tx_spectrum_analysis)
+
 # -- Loudness matching: the two weighting curves against the published
 #    tables in IEC 61672 and ITU-R BS.1770, and the properties the
 #    average must have whatever the weighting is --
