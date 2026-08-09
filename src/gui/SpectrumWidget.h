@@ -156,6 +156,7 @@ mw0lge@grange-lane.co.uk
 #include <QPainterPath>
 #include <QPixmap>
 #include <QColor>
+#include <QString>
 #include <QPoint>
 #include <QMap>
 #include <QHash>
