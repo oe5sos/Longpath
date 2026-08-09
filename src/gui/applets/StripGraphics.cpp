@@ -1515,6 +1515,38 @@ StripDynamicsCurve::StripDynamicsCurve(Stage s, QWidget* parent)
 {
     setMinimumHeight(150);
     setMouseTracking(true);
+
+    // The ball runs on its own 30 Hz clock, not on the window's 10 Hz
+    // meter tick. At 10 Hz a smoothed ball is visibly steppy — it is
+    // gliding, and you can count the steps. AetherSDR uses 33 ms and
+    // that is what makes the motion read as motion.
+    m_ballTimer = new QTimer(this);
+    m_ballTimer->setInterval(kBallTimerMs);
+    connect(m_ballTimer, &QTimer::timeout, this, [this]() {
+        if (!m_chain || !isVisible()) { return; }
+        double target = -120.0;
+        double out    = -120.0;
+        switch (m_stage) {
+        case Stage::Gate:
+            target = double(m_chain->gate().inputPeakDb());
+            out    = double(m_chain->gate().outputPeakDb());
+            break;
+        case Stage::Compressor:
+            target = double(m_chain->comp().inputPeakDb());
+            out    = double(m_chain->comp().outputPeakDb());
+            break;
+        case Stage::Limiter:
+            target = double(m_chain->limiter().inputPeakDb());
+            out    = double(m_chain->limiter().outputPeakDb());
+            break;
+        }
+        // One pole, both directions. The point is that there is never a
+        // jump for the eye to chase.
+        m_liveIn  += kBallSmoothAlpha * (target - m_liveIn);
+        m_liveOut += kBallSmoothAlpha * (out - m_liveOut);
+        update();
+    });
+    m_ballTimer->start();
 }
 
 void StripDynamicsCurve::mouseMoveEvent(QMouseEvent* ev)
@@ -1575,36 +1607,8 @@ QSize StripDynamicsCurve::sizeHint() const { return QSize(220, 170); }
 
 void StripDynamicsCurve::refresh()
 {
-    if (!m_chain) { return; }
-    switch (m_stage) {
-    case Stage::Gate:
-        m_liveIn  = double(m_chain->gate().inputPeakDb());
-        m_liveOut = double(m_chain->gate().outputPeakDb());
-        break;
-    case Stage::Compressor:
-        m_liveIn  = double(m_chain->comp().inputPeakDb());
-        m_liveOut = double(m_chain->comp().outputPeakDb());
-        break;
-    case Stage::Limiter:
-        m_liveIn  = double(m_chain->limiter().inputPeakDb());
-        m_liveOut = double(m_chain->limiter().outputPeakDb());
-        break;
-    }
-
-    // Peak hold, 20 dB/s, the same constant the level bars use.
-    constexpr double kDecayDbPerTick = 2.0;   // at the 10 Hz meter timer
-    m_holdIn  = std::max(m_liveIn,  m_holdIn  - kDecayDbPerTick);
-    m_holdOut = std::max(m_liveOut, m_holdOut - kDecayDbPerTick);
-
-    // The trail records where the signal ACTUALLY went, not where the
-    // hold says it has been — a trail of held values would be a trail of
-    // the same decaying point and would show nothing.
-    if (m_liveIn > kMinDb + 1.0) {
-        m_trail[static_cast<size_t>(m_trailNext)] =
-            QPointF(m_liveIn, m_liveOut);
-        m_trailNext = (m_trailNext + 1) % kTrail;
-        m_trailCount = std::min(m_trailCount + 1, kTrail);
-    }
+    // The ball has its own timer; this only exists so the parameters
+    // that came from a knob turn are redrawn promptly.
     update();
 }
 
@@ -1655,13 +1659,13 @@ double StripDynamicsCurve::outputDb(double inDb) const
 
 double StripDynamicsCurve::xFor(double db, const QRect& r) const
 {
-    const double t = (db - kMinDb) / (kMaxDb - kMinDb);
+    const double t = (db - minDb()) / (kMaxDb - minDb());
     return r.left() + std::clamp(t, 0.0, 1.0) * r.width();
 }
 
 double StripDynamicsCurve::yFor(double db, const QRect& r) const
 {
-    const double t = (db - kMinDb) / (kMaxDb - kMinDb);
+    const double t = (db - minDb()) / (kMaxDb - minDb());
     return r.bottom() - std::clamp(t, 0.0, 1.0) * r.height();
 }
 
@@ -1678,17 +1682,45 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     f.setPointSizeF(7.5);
     p.setFont(f);
 
-    // Grid every 12 dB, and the unity diagonal dashed. The distance
-    // between the curve and that diagonal is what the stage is doing.
+    // ── The grid, and why it is labelled ─────────────────────────────
+    //
+    // "You sometimes cannot tell what you are looking at" — and the
+    // reason was that I left the axes unlabelled on purpose, reasoning
+    // that Zeus does. AetherSDR, the thing actually named as the
+    // reference, labels them: majors every 12 dB on BOTH axes, minors
+    // every 12 dB in between, unity dashed. That turns two anonymous
+    // directions into decibels, and it is the single change that makes
+    // the picture readable rather than decorative.
+    //
+    // Both axes, not one. The horizontal is input and the vertical is
+    // output; labelling only one leaves the reader to assume the other
+    // matches, which is exactly the assumption a compressor breaks.
     p.setPen(QPen(c(Style::kGroove), 1, Qt::DotLine));
-    for (double db = -48.0; db < 0.0; db += 12.0) {
+    for (double db = minDb() + 6.0; db < 0.0; db += 12.0) {
         const int x = int(xFor(db, r));
         const int y = int(yFor(db, r));
         p.drawLine(x, r.top(), x, r.bottom());
         p.drawLine(r.left(), y, r.right(), y);
     }
+    p.setPen(QPen(c(Style::kBorderSubtle), 1));
+    for (double db = minDb(); db <= 0.0; db += 12.0) {
+        const int x = int(xFor(db, r));
+        const int y = int(yFor(db, r));
+        p.drawLine(x, r.top(), x, r.bottom());
+        p.drawLine(r.left(), y, r.right(), y);
+        if (db > minDb() && db < 0.0) {
+            p.setPen(c(Style::kTextScale));
+            p.drawText(QRectF(x + 2, r.bottom() - 12, 24, 10),
+                       Qt::AlignLeft | Qt::AlignVCenter,
+                       QString::number(int(db)));
+            p.drawText(QRectF(r.left() + 2, y - 11, 24, 10),
+                       Qt::AlignLeft | Qt::AlignVCenter,
+                       QString::number(int(db)));
+            p.setPen(QPen(c(Style::kBorderSubtle), 1));
+        }
+    }
     p.setPen(QPen(c(Style::kTextInactive), 1, Qt::DashLine));
-    p.drawLine(QPointF(xFor(kMinDb, r), yFor(kMinDb, r)),
+    p.drawLine(QPointF(xFor(minDb(), r), yFor(minDb(), r)),
                QPointF(xFor(kMaxDb, r), yFor(kMaxDb, r)));
 
     if (!m_chain) {
@@ -1713,24 +1745,32 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
         p.drawLine(tx, r.top(), tx, r.bottom());
     }
 
-    // The gate's hysteresis: it closes at one level and re-opens at a
-    // higher one, and the gap between them is the whole reason a gate
-    // does not chatter on a breath. Two lines, because one would be a
-    // lie about a stage that deliberately has two.
+    // ── The gate's deadband, as a band ───────────────────────────────
+    //
+    // I drew this as a second dotted line. AetherSDR shades the region
+    // between (threshold − return) and threshold instead, and that is
+    // better for a reason worth writing down: the operator's question is
+    // not "where are the two levels" but "is my voice inside the sticky
+    // zone right now", and a filled region answers it by containing the
+    // ball or not containing it. Two lines make you measure.
     if (m_stage == Stage::Gate) {
         const double ret = double(m_chain->gate().returnDb());
-        if (std::abs(ret - thr) > 0.1) {
-            p.setPen(QPen(QColor(0x50, 0xd0, 0x80, 130), 1, Qt::DotLine));
-            const int rx = int(xFor(ret, r));
-            p.drawLine(rx, r.top(), rx, r.bottom());
+        if (ret > 0.05) {
+            const double xR = xFor(thr, r);
+            const double xL = xFor(thr - ret, r);
+            if (xR > xL) {
+                QColor band = c(Style::kAccent);
+                band.setAlpha(45);
+                p.fillRect(QRectF(xL, r.top(), xR - xL, r.height()), band);
+            }
         }
     }
 
     QPainterPath path;
     for (int x = r.left(); x <= r.right(); ++x) {
-        const double inDb = kMinDb
+        const double inDb = minDb()
             + (double(x - r.left()) / std::max(1, r.width()))
-              * (kMaxDb - kMinDb);
+              * (kMaxDb - minDb());
         const QPointF pt(x, yFor(outputDb(inDb), r));
         if (x == r.left()) { path.moveTo(pt); } else { path.lineTo(pt); }
     }
@@ -1750,8 +1790,24 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
         g.setColorAt(1.0, bot);
         p.fillPath(fill, g);
     }
-    p.setPen(QPen(QColor(0x00, 0xe5, 0xff), 2.1));
+    // Amber for the gate, cyan for the others — AetherSDR's convention,
+    // and it works: the colour says which kind of stage you are looking
+    // at before you have read the title.
+    const QColor curveCol = (m_stage == Stage::Gate)
+        ? QColor(0xf0, 0x9a, 0x30) : QColor(0x00, 0xe5, 0xff);
+    QPen curvePen(curveCol, 2.1);
+    curvePen.setJoinStyle(Qt::RoundJoin);
+    curvePen.setCapStyle(Qt::RoundCap);
+    p.setPen(curvePen);
     p.drawPath(path);
+
+    // A dot where the threshold meets the curve, so the eye finds the
+    // knee without tracing the dashed line down to the axis.
+    {
+        p.setPen(Qt::NoPen);
+        p.setBrush(curveCol);
+        p.drawEllipse(QPointF(xFor(thr, r), yFor(outputDb(thr), r)), 3.0, 3.0);
+    }
 
     // ── Where the signal is, right now ───────────────────────────────
     //
@@ -1759,28 +1815,24 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     // own is a manual page; the dot turns it into an instrument, because
     // it answers the only question the operator actually has — am I
     // hitting this stage at all, and where.
-    // The range the signal has swept recently, oldest faintest. On a
-    // transfer curve this is the useful part: a single point says where
-    // you are, the trail says how much of the curve you are using.
-    for (int i = 0; i < m_trailCount; ++i) {
-        const int age = (m_trailCount - 1)
-            - ((i - m_trailNext + kTrail) % kTrail);
-        const QPointF& v = m_trail[static_cast<size_t>(i)];
-        if (v.x() <= kMinDb + 1.0) { continue; }
-        const int alpha = 12 + 60 * (kTrail - std::min(age, kTrail)) / kTrail;
+    // A radial gradient, so the ball reads as a light source rather than
+    // as a translucent disc, and a white core inside it. My first
+    // version was a flat amber circle with a flat amber halo, and it
+    // disappeared against the amber threshold line. The white core is
+    // what makes it findable against anything.
+    if (m_liveIn > minDb() + 1.0) {
+        const QPointF dot(xFor(std::clamp(m_liveIn, minDb(), kMaxDb), r),
+                          yFor(std::clamp(m_liveOut, minDb(), kMaxDb), r));
+        constexpr double kGlow = 11.0;
+        QRadialGradient g(dot, kGlow);
+        QColor glow(0xff, 0xb8, 0x00);
+        glow.setAlpha(200); g.setColorAt(0.0, glow);
+        glow.setAlpha(0);   g.setColorAt(1.0, glow);
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0xff, 0xb8, 0x00, alpha));
-        p.drawEllipse(QPointF(xFor(v.x(), r), yFor(v.y(), r)), 2.4, 2.4);
-    }
-
-    if (m_holdIn > kMinDb + 1.0) {
-        const QPointF dot(xFor(m_holdIn, r), yFor(m_holdOut, r));
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0xff, 0xb8, 0x00, 40));
-        p.drawEllipse(dot, 10.0, 10.0);
-        p.setPen(QPen(QColor(0xff, 0xb8, 0x00), 1.6));
-        p.setBrush(QColor(0xff, 0xb8, 0x00, 210));
-        p.drawEllipse(dot, 4.5, 4.5);
+        p.setBrush(g);
+        p.drawEllipse(dot, kGlow, kGlow);
+        p.setBrush(c(Style::kTextPrimary));
+        p.drawEllipse(dot, 3.5, 3.5);
     }
 
     // ── The scale, only when asked for ───────────────────────────────
@@ -1792,19 +1844,22 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
         p.drawLine(r.left(), m_cursor.y(), r.right(), m_cursor.y());
         p.setClipping(false);
 
-        const double inDb = kMinDb + (double(m_cursor.x() - r.left())
-            / std::max(1, r.width())) * (kMaxDb - kMinDb);
+        const double inDb = minDb() + (double(m_cursor.x() - r.left())
+            / std::max(1, r.width())) * (kMaxDb - minDb());
         drawReadout(p, r, QStringLiteral("%1 → %2 dB")
                               .arg(inDb, 0, 'f', 1)
                               .arg(outputDb(inDb), 0, 'f', 1));
     }
     p.setClipping(false);
 
-    p.setPen(c(Style::kTextInactive));
-    p.drawText(r.adjusted(3, 0, 0, -1), Qt::AlignLeft | Qt::AlignBottom,
-               QStringLiteral("in"));
-    p.drawText(r.adjusted(0, 2, -3, 0), Qt::AlignRight | Qt::AlignTop,
-               QStringLiteral("out"));
+    p.setPen(c(Style::kTextScale));
+    p.drawText(r.adjusted(3, 0, 0, -1), Qt::AlignRight | Qt::AlignBottom,
+               QStringLiteral("input dBFS →"));
+    p.save();
+    p.translate(r.left() + 11, r.top() + 4);
+    p.rotate(90);
+    p.drawText(0, 0, QStringLiteral("output dBFS →"));
+    p.restore();
 }
 
 // ── StripShaperCurve ─────────────────────────────────────────────────
@@ -1812,18 +1867,21 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
 StripShaperCurve::StripShaperCurve(QWidget* parent) : QWidget(parent)
 {
     setMinimumHeight(150);
+    m_ballTimer = new QTimer(this);
+    m_ballTimer->setInterval(33);
+    connect(m_ballTimer, &QTimer::timeout, this, [this]() {
+        if (!m_chain || !isVisible()) { return; }
+        const double target = double(m_chain->tube().inputPeakDb());
+        m_livePeak += 0.30 * (target - m_livePeak);
+        update();
+    });
+    m_ballTimer->start();
 }
 
 void StripShaperCurve::setChain(StripChain* chain) { m_chain = chain; update(); }
 QSize StripShaperCurve::sizeHint() const { return QSize(220, 170); }
 
-void StripShaperCurve::refresh()
-{
-    if (m_chain) { m_livePeak = double(m_chain->tube().inputPeakDb()); }
-    constexpr double kDecayDbPerTick = 2.0;
-    m_holdPeak = std::max(m_livePeak, m_holdPeak - kDecayDbPerTick);
-    update();
-}
+void StripShaperCurve::refresh() { update(); }
 
 void StripShaperCurve::paintEvent(QPaintEvent*)
 {
@@ -1841,6 +1899,21 @@ void StripShaperCurve::paintEvent(QPaintEvent*)
     // Unity, dashed. The gap between it and the curve IS the distortion.
     p.setPen(QPen(c(Style::kTextInactive), 1, Qt::DashLine));
     p.drawLine(QPointF(r.left(), r.bottom()), QPointF(r.right(), r.top()));
+
+    // Say what the axes are. Without this the picture is two curves and
+    // a dot, and "what am I looking at" is a fair question.
+    {
+        QFont sf = p.font();
+        sf.setPointSizeF(7.5);
+        p.setFont(sf);
+        p.setPen(c(Style::kTextScale));
+        p.drawText(r.adjusted(3, 0, -3, -1), Qt::AlignRight | Qt::AlignBottom,
+                   QStringLiteral("input →"));
+        p.drawText(r.adjusted(3, 3, 0, 0), Qt::AlignLeft | Qt::AlignTop,
+                   QStringLiteral("output"));
+        p.drawText(r.adjusted(0, 3, -3, 0), Qt::AlignRight | Qt::AlignTop,
+                   QStringLiteral("dashed = no distortion"));
+    }
 
     if (!m_chain) {
         p.setPen(c(Style::kTextSecondary));
@@ -1874,8 +1947,8 @@ void StripShaperCurve::paintEvent(QPaintEvent*)
     // driven at -40 dBFS is a straight wire no matter how the knobs are
     // set, and the picture should say so rather than implying warmth
     // that is not happening.
-    if (m_holdPeak > -60.0) {
-        const double amp = std::pow(10.0, m_holdPeak / 20.0);
+    if (m_livePeak > -60.0) {
+        const double amp = std::pow(10.0, m_livePeak / 20.0);
         for (double sgn : {-1.0, 1.0}) {
             const double x = sgn * amp;
             const double px = r.left()
@@ -1884,12 +1957,15 @@ void StripShaperCurve::paintEvent(QPaintEvent*)
                                                         float(bias), model));
             const double py = r.center().y() - std::clamp(y, -1.6, 1.6)
                               * (r.height() / 3.2);
+            QRadialGradient g(QPointF(px, py), 10.0);
+            QColor glow(0xff, 0xb8, 0x00);
+            glow.setAlpha(200); g.setColorAt(0.0, glow);
+            glow.setAlpha(0);   g.setColorAt(1.0, glow);
             p.setPen(Qt::NoPen);
-            p.setBrush(QColor(0xff, 0xb8, 0x00, 36));
-            p.drawEllipse(QPointF(px, py), 8.0, 8.0);
-            p.setPen(QPen(QColor(0xff, 0xb8, 0x00), 1.5));
-            p.setBrush(QColor(0xff, 0xb8, 0x00, 200));
-            p.drawEllipse(QPointF(px, py), 3.5, 3.5);
+            p.setBrush(g);
+            p.drawEllipse(QPointF(px, py), 10.0, 10.0);
+            p.setBrush(c(Style::kTextPrimary));
+            p.drawEllipse(QPointF(px, py), 3.0, 3.0);
         }
     }
     p.setClipping(false);
@@ -1991,6 +2067,11 @@ void StripBandCurve::paintEvent(QPaintEvent*)
         p.setPen(c(Style::kTextPrimary));
         p.drawText(QRect(fx - 34, r.top() + 2, 68, 12), Qt::AlignCenter,
                    QStringLiteral("%1 Hz").arg(f0, 0, 'f', 0));
+        p.setPen(c(Style::kTextScale));
+        p.drawText(r.adjusted(4, 3, -4, 0), Qt::AlignLeft | Qt::AlignTop,
+                   QStringLiteral("what it listens to"));
+        p.drawText(r.adjusted(4, 0, -4, -2), Qt::AlignRight | Qt::AlignBottom,
+                   QStringLiteral("bar right = working now"));
 
         // How hard it is working, now. Without this the picture says
         // where it is listening and never whether it heard anything.

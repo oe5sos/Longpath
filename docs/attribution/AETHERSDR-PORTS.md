@@ -77,3 +77,39 @@ This note exists because the alternative is somebody finding those
 curves in two years, noticing the resemblance to a screenshot in the
 issue tracker, and having no way to tell whether the project has a
 licensing problem. It does not.
+
+## Channel-strip stage graphics — behaviour taken from AetherSDR
+
+`src/gui/applets/StripGraphics.cpp`, 2026-08-09. No code copied; these
+widgets are NereusSDR-original and are written against NereusSDR's own
+style tokens. What was taken is a set of decisions, from AetherSDR's
+`src/gui/ClientCompCurveWidget.cpp` and `ClientGateCurveWidget.cpp` at
+`31b29583`, after the bench reported that our first attempt was hard to
+read and named AetherSDR as the thing that gets it right.
+
+Read, and adopted:
+
+  - **The ball is a one-pole smoother, not a peak hold.** Alpha 0.30 per
+    tick on the widget's own 33 ms timer. AetherSDR's comment gives the
+    reason — it "keeps the ball from twitching on silent frames where
+    the peak meter reads -120 dBFS". Our first version used peak hold
+    with decay, copied from our own level bars, which is right for a bar
+    and wrong for a ball: it snaps up on every syllable.
+  - **A 30 Hz timer per widget** rather than the window's 10 Hz meter
+    tick. At 10 Hz a gliding ball is visibly stepped.
+  - **A radial-gradient glow with a white core**, so the ball reads as a
+    light source and stays findable over an amber threshold line.
+  - **Labelled major ticks on BOTH axes**, minors between, unity dashed.
+    We had deliberately left the axes bare; that was the main reason the
+    picture was hard to read.
+  - **The gate's deadband as a shaded band**, not two lines. The
+    operator's question is whether the ball is inside the sticky zone,
+    and a region answers it by containing the ball.
+  - **A tick range of -80 dB for the gate** and -60 for the others,
+    because a gate attenuates below where a compressor ever goes.
+  - **Amber for the gate, cyan for the rest**, so the colour says what
+    kind of stage it is before the title is read.
+
+Constants that are AetherSDR's judgement rather than arithmetic — the
+0.30 smoothing alpha, the 33 ms interval, the 12 dB tick spacing — are
+noted as theirs at the point of use in `StripGraphics.h`.

@@ -43,6 +43,7 @@
 #include <QWidget>
 
 #include <QElapsedTimer>
+#include <QTimer>
 
 #include <array>
 #include <vector>
@@ -398,7 +399,11 @@ private:
     QPoint m_cursor{-1, -1};
     bool   m_haveCursor{false};
 
-    static constexpr double kMinDb = -60.0;
+    // A gate can attenuate far below anything a compressor does, so it
+    // gets a taller scale. AetherSDR does the same and for the same
+    // reason: on a -60 dB axis a gate's floor is off the bottom of the
+    // picture and the curve looks like it just stops.
+    double minDb() const { return m_stage == Stage::Gate ? -80.0 : -60.0; }
     static constexpr double kMaxDb = 0.0;
 
     // The curve itself, as a pure function of the stage's parameters.
@@ -411,33 +416,34 @@ private:
     Stage       m_stage;
     StripChain* m_chain{nullptr};
 
-    // ── Why the dot needs a hold ─────────────────────────────────────
+    // ── How the ball moves, taken from AetherSDR ─────────────────────
     //
     // Reported from the bench: "the dots are gone so fast you cannot see
-    // them." Correct, and the fault was showing the instantaneous peak.
-    // Speech is mostly gaps; between syllables the peak collapses and
-    // the dot jumps to the bottom-left corner and back thirty times a
-    // second, which the eye reads as flicker rather than as a level.
+    // them", with AetherSDR named as the thing that gets this right.
+    // Reading AetherSDR's ClientCompCurveWidget showed that my first
+    // attempt used the wrong mechanism entirely.
     //
-    // The level bars in this same file have had peak-hold-with-decay
-    // since they were written, at 20 dB per second — fast enough to
-    // track speech, slow enough that one syllable can be read. The dot
-    // now uses exactly that, and the same constant, because two decay
-    // rates in one window would make two pictures of one signal
-    // disagree.
+    // I reached for peak-hold-with-decay, copying the level bars in this
+    // same file. That jumps instantly to a new peak and ratchets down,
+    // which suits a bar — a bar is asking "how loud was the loudest
+    // thing" — and is wrong for a ball on a curve, which is asking
+    // "where is the signal sitting". It still snaps on every syllable.
     //
-    // A short trail of recent positions as well: on a transfer curve the
-    // interesting thing is not where the signal is but the range it
-    // sweeps, and a single point cannot show a range.
-    double m_liveIn{-120.0};
-    double m_liveOut{-120.0};
-    double m_holdIn{-120.0};
-    double m_holdOut{-120.0};
+    // AetherSDR uses a one-pole smoother on the input level, run from
+    // the widget's own 30 Hz timer, and its comment says exactly why:
+    // it "keeps the ball from twitching on silent frames where the peak
+    // meter reads -120 dBFS". The ball glides in BOTH directions, so
+    // there is never a jump to follow. Alpha 0.30 per tick, about eight
+    // ticks to settle.
+    //
+    // Both the rate and the mechanism are AetherSDR's, and this is the
+    // NereusSDR-side note recording where they came from.
+    static constexpr double kBallSmoothAlpha = 0.30;
+    static constexpr int    kBallTimerMs     = 33;   // ~30 Hz
 
-    static constexpr int kTrail = 12;
-    std::array<QPointF, kTrail> m_trail{};
-    int  m_trailCount{0};
-    int  m_trailNext{0};
+    double m_liveIn{-120.0};    // smoothed input, what the ball follows
+    double m_liveOut{-120.0};
+    QTimer* m_ballTimer{nullptr};
 };
 
 // ── "What is it doing to the waveform?" ──────────────────────────────
@@ -460,8 +466,8 @@ protected:
 
 private:
     StripChain* m_chain{nullptr};
-    double m_livePeak{-120.0};
-    double m_holdPeak{-120.0};   // same decay as everything else here
+    double  m_livePeak{-120.0};   // one-pole smoothed, as the ball is
+    QTimer* m_ballTimer{nullptr};
 };
 
 // ── "Which part of the voice is it listening to?" ────────────────────
