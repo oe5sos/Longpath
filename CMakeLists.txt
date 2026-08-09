@@ -424,6 +424,13 @@ option(NEREUS_GPU_SPECTRUM "Enable GPU-accelerated spectrum/waterfall via QRhi (
 set(_nereus_gpu_spectrum_requested ${NEREUS_GPU_SPECTRUM})
 set(_nereus_gpu_fail_reason "")
 
+# Defined here, before any branch, so that every later use is against a
+# variable that certainly exists. An undefined variable in an if() is
+# false, which would have made a missing definition look exactly like a
+# missing ShaderTools — the same silent skip this is guarding against.
+set(_nereus_have_shadertools FALSE)
+set(_nereus_have_guiprivate  FALSE)
+
 if(NEREUS_GPU_SPECTRUM)
     if(Qt6_VERSION VERSION_LESS "6.7")
         set(_nereus_gpu_fail_reason
@@ -440,8 +447,6 @@ if(NEREUS_GPU_SPECTRUM)
         # shipped Qt 6.7/6.8 layouts where Qt6GuiPrivate_FOUND is not
         # set even though the Qt6::GuiPrivate target exists, which is
         # what silently broke v0.1.1.
-        set(_nereus_have_shadertools FALSE)
-        set(_nereus_have_guiprivate  FALSE)
         if(Qt6ShaderTools_FOUND OR TARGET Qt6::ShaderTools)
             set(_nereus_have_shadertools TRUE)
         endif()
@@ -1378,7 +1383,22 @@ if(NEREUS_GPU_SPECTRUM)
     target_link_libraries(NereusSDRObjs PUBLIC Qt6::GuiPrivate)
     target_compile_definitions(NereusSDRObjs PUBLIC NEREUS_GPU_SPECTRUM)
 
-    if(Qt6ShaderTools_FOUND)
+    # NOTE: this must use the SAME test as the gate at the top of this
+    # file, and for a long time it did not.
+    #
+    # The gate accepts `Qt6ShaderTools_FOUND OR TARGET Qt6::ShaderTools`,
+    # precisely because Qt's private-module exports have shipped layouts
+    # where the target exists and the _FOUND variable is never set. This
+    # block tested only _FOUND. In that layout the gate passes, no
+    # FATAL_ERROR fires, NEREUS_GPU_SPECTRUM stays ON and is defined —
+    # and then the shaders are silently skipped. The result is a full GPU
+    # build with zero shaders embedded, no warning anywhere, and a
+    # waterfall that draws whatever undefined GPU memory holds.
+    #
+    # That is the v0.1.1 footgun rebuilt out of an inconsistent copy of
+    # its own fix. One variable, set once at the gate, is the only way
+    # these two places cannot drift apart again.
+    if(_nereus_have_shadertools)
         qt_add_shaders(NereusSDRObjs "nereus_shaders"
             PREFIX "/shaders"
             FILES

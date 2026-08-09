@@ -153,6 +153,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QFile>
+#include <QLibraryInfo>
 
 #ifdef NEREUS_GPU_SPECTRUM
 #include <rhi/qshader.h>
@@ -7729,37 +7730,82 @@ static QShader loadShader(const QString& path)
     return s;
 }
 
+// ── Did that actually work? ──────────────────────────────────────────
+//
+// Every QRhi create() returns a bool and this file used to discard all
+// twenty-five of them. That is why the magenta waterfall took three
+// attempts to diagnose: when a texture or a pipeline fails to come up,
+// the draw call is issued against a null or incomplete object, the
+// shader samples whatever that GPU memory happened to hold, and the
+// only evidence anywhere is the colour on screen. On Metal the garbage
+// is very often magenta.
+//
+// A failure here is not recoverable and is not meant to be. What it is
+// meant to be is LOUD, and named, so the next person reads one log line
+// instead of bisecting three subsystems.
+template <typename T>
+static bool rhiCreate(T* obj, const char* what, QString* firstFailure)
+{
+    if (!obj) {
+        qWarning() << "SpectrumWidget: could not allocate" << what;
+        if (firstFailure && firstFailure->isEmpty()) {
+            *firstFailure = QStringLiteral("allocation of %1")
+                                .arg(QLatin1String(what));
+        }
+        return false;
+    }
+    if (!obj->create()) {
+        qWarning() << "SpectrumWidget: QRhi create() FAILED for" << what
+                   << "— the GPU spectrum will not draw correctly";
+        if (firstFailure && firstFailure->isEmpty()) {
+            *firstFailure = QLatin1String(what);
+        }
+        return false;
+    }
+    return true;
+}
+
+
 void SpectrumWidget::initWaterfallPipeline()
 {
     QRhi* r = rhi();
 
     m_wfVbo = r->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(kQuadData));
-    m_wfVbo->create();
+    if (!rhiCreate(m_wfVbo, "waterfall vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_wfUbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
-    m_wfUbo->create();
+    if (!rhiCreate(m_wfUbo, "waterfall uniform buffer", &m_gpuInitFailure)) { return; }
 
     m_wfGpuTexW = qMax(width(), 64);
     m_wfGpuTexH = qMax(m_waterfall.height(), 64);
     m_wfGpuTex = r->newTexture(QRhiTexture::RGBA8, QSize(m_wfGpuTexW, m_wfGpuTexH));
-    m_wfGpuTex->create();
+    if (!rhiCreate(m_wfGpuTex, "waterfall texture", &m_gpuInitFailure)) { return; }
 
     // From AetherSDR: ClampToEdge U, Repeat V (for ring buffer wrap)
     m_wfSampler = r->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
                                  QRhiSampler::None,
                                  QRhiSampler::ClampToEdge, QRhiSampler::Repeat);
-    m_wfSampler->create();
+    if (!rhiCreate(m_wfSampler, "waterfall sampler", &m_gpuInitFailure)) { return; }
 
     m_wfSrb = r->newShaderResourceBindings();
     m_wfSrb->setBindings({
         QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::FragmentStage, m_wfUbo),
         QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, m_wfGpuTex, m_wfSampler),
     });
-    m_wfSrb->create();
+    if (!rhiCreate(m_wfSrb, "waterfall shader bindings", &m_gpuInitFailure)) { return; }
 
     QShader vs = loadShader(QStringLiteral(":/shaders/resources/shaders/waterfall.vert.qsb"));
     QShader fs = loadShader(QStringLiteral(":/shaders/resources/shaders/waterfall.frag.qsb"));
-    if (!vs.isValid() || !fs.isValid()) { return; }
+    if (!vs.isValid() || !fs.isValid()) {
+        // Reached when the .qsb is absent from the binary, or present
+        // but with no variant for the running backend. The second case
+        // is the nastier one: the resource loads, the file is valid, and
+        // there is simply no Metal shader inside it.
+        if (m_gpuInitFailure.isEmpty()) {
+            m_gpuInitFailure = QStringLiteral("waterfall shaders");
+        }
+        return;
+    }
 
     m_wfPipeline = r->newGraphicsPipeline();
     m_wfPipeline->setShaderStages({
@@ -7777,7 +7823,7 @@ void SpectrumWidget::initWaterfallPipeline()
     m_wfPipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
     m_wfPipeline->setShaderResourceBindings(m_wfSrb);
     m_wfPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
-    m_wfPipeline->create();
+    if (!rhiCreate(m_wfPipeline, "waterfall pipeline", &m_gpuInitFailure)) { return; }
 }
 
 void SpectrumWidget::initOverlayPipeline()
@@ -7785,7 +7831,7 @@ void SpectrumWidget::initOverlayPipeline()
     QRhi* r = rhi();
 
     m_ovVbo = r->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(kQuadData));
-    m_ovVbo->create();
+    if (!rhiCreate(m_ovVbo, "overlay vertex buffer", &m_gpuInitFailure)) { return; }
 
     int w = qMax(width(), 64);
     int h = qMax(height(), 64);
@@ -7793,21 +7839,27 @@ void SpectrumWidget::initOverlayPipeline()
     const int pw = static_cast<int>(w * dpr);
     const int ph = static_cast<int>(h * dpr);
     m_ovGpuTex = r->newTexture(QRhiTexture::RGBA8, QSize(pw, ph));
-    m_ovGpuTex->create();
+    if (!rhiCreate(m_ovGpuTex, "overlay texture", &m_gpuInitFailure)) { return; }
 
     m_ovSampler = r->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
                                  QRhiSampler::None,
                                  QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
-    m_ovSampler->create();
+    if (!rhiCreate(m_ovSampler, "overlay sampler", &m_gpuInitFailure)) { return; }
 
     m_ovSrb = r->newShaderResourceBindings();
     m_ovSrb->setBindings({
         QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, m_ovGpuTex, m_ovSampler),
     });
-    m_ovSrb->create();
+    if (!rhiCreate(m_ovSrb, "overlay shader bindings", &m_gpuInitFailure)) { return; }
 
     QShader vs = loadShader(QStringLiteral(":/shaders/resources/shaders/overlay.vert.qsb"));
     QShader fs = loadShader(QStringLiteral(":/shaders/resources/shaders/overlay.frag.qsb"));
+    if (!vs.isValid() || !fs.isValid()) {
+        if (m_gpuInitFailure.isEmpty()) {
+            m_gpuInitFailure = QStringLiteral("overlay shaders");
+        }
+        return;
+    }
     if (!vs.isValid() || !fs.isValid()) { return; }
 
     m_ovPipeline = r->newGraphicsPipeline();
@@ -7835,7 +7887,7 @@ void SpectrumWidget::initOverlayPipeline()
     blend.srcAlpha = QRhiGraphicsPipeline::One;
     blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
     m_ovPipeline->setTargetBlends({blend});
-    m_ovPipeline->create();
+    if (!rhiCreate(m_ovPipeline, "overlay pipeline", &m_gpuInitFailure)) { return; }
 
     m_overlayStatic = QImage(pw, ph, QImage::Format_RGBA8888_Premultiplied);
     m_overlayStatic.setDevicePixelRatio(dpr);
@@ -7855,14 +7907,14 @@ void SpectrumWidget::initOverlayPipeline()
     // is the layer that carries peak-hold trace / peak blobs /
     // noise-floor overlays.  Chrome stays in the static layer.
     m_ovDynGpuTex = r->newTexture(QRhiTexture::RGBA8, QSize(pw, ph));
-    m_ovDynGpuTex->create();
+    if (!rhiCreate(m_ovDynGpuTex, "dynamic overlay texture", &m_gpuInitFailure)) { return; }
     m_ovDynSrb = r->newShaderResourceBindings();
     m_ovDynSrb->setBindings({
         QRhiShaderResourceBinding::sampledTexture(1,
             QRhiShaderResourceBinding::FragmentStage,
             m_ovDynGpuTex, m_ovSampler),
     });
-    m_ovDynSrb->create();
+    if (!rhiCreate(m_ovDynSrb, "dynamic overlay shader bindings", &m_gpuInitFailure)) { return; }
     m_overlayDynamic = QImage(pw, ph, QImage::Format_RGBA8888_Premultiplied);
     m_overlayDynamic.setDevicePixelRatio(dpr);
     // QImage's buffer is uninitialized, and the dynamic quad is composited
@@ -7883,23 +7935,29 @@ void SpectrumWidget::initSpectrumPipeline()
 
     m_fftLineVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
                                  kMaxFftBins * kFftVertStride * sizeof(float));
-    m_fftLineVbo->create();
+    if (!rhiCreate(m_fftLineVbo, "spectrum line vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftFillVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
                                  kMaxFftBins * 2 * kFftVertStride * sizeof(float));
-    m_fftFillVbo->create();
+    if (!rhiCreate(m_fftFillVbo, "spectrum fill vertex buffer", &m_gpuInitFailure)) { return; }
 
     // Phase 3G-8 commit 10: peak hold VBO (same layout as line VBO).
     m_fftPeakVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
                                  kMaxFftBins * kFftVertStride * sizeof(float));
-    m_fftPeakVbo->create();
+    if (!rhiCreate(m_fftPeakVbo, "spectrum peak vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftSrb = r->newShaderResourceBindings();
     m_fftSrb->setBindings({});
-    m_fftSrb->create();
+    if (!rhiCreate(m_fftSrb, "spectrum shader bindings", &m_gpuInitFailure)) { return; }
 
     QShader vs = loadShader(QStringLiteral(":/shaders/resources/shaders/spectrum.vert.qsb"));
     QShader fs = loadShader(QStringLiteral(":/shaders/resources/shaders/spectrum.frag.qsb"));
+    if (!vs.isValid() || !fs.isValid()) {
+        if (m_gpuInitFailure.isEmpty()) {
+            m_gpuInitFailure = QStringLiteral("spectrum shaders");
+        }
+        return;
+    }
     if (!vs.isValid() || !fs.isValid()) { return; }
 
     QRhiVertexInputLayout layout;
@@ -7924,7 +7982,7 @@ void SpectrumWidget::initSpectrumPipeline()
     m_fftFillPipeline->setShaderResourceBindings(m_fftSrb);
     m_fftFillPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
     m_fftFillPipeline->setTargetBlends({blend});
-    m_fftFillPipeline->create();
+    if (!rhiCreate(m_fftFillPipeline, "spectrum fill pipeline", &m_gpuInitFailure)) { return; }
 
     // Line pipeline (line strip)
     m_fftLinePipeline = r->newGraphicsPipeline();
@@ -7934,7 +7992,7 @@ void SpectrumWidget::initSpectrumPipeline()
     m_fftLinePipeline->setShaderResourceBindings(m_fftSrb);
     m_fftLinePipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
     m_fftLinePipeline->setTargetBlends({blend});
-    m_fftLinePipeline->create();
+    if (!rhiCreate(m_fftLinePipeline, "spectrum line pipeline", &m_gpuInitFailure)) { return; }
 }
 
 void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
@@ -7953,6 +8011,24 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
     initWaterfallPipeline();
     initOverlayPipeline();
     initSpectrumPipeline();
+
+    // Say it once, and say what it was.
+    //
+    // A partial GPU setup does not fail visibly — it draws. It draws
+    // whatever is in the memory it was pointed at, and the operator gets
+    // a colour instead of an error. Anyone who has to debug this next
+    // should be able to start from a log line naming the object, the
+    // backend and the Qt build, rather than from a screenshot.
+    if (!m_gpuInitFailure.isEmpty()) {
+        qCritical().noquote()
+            << "SpectrumWidget: GPU spectrum setup FAILED at"
+            << m_gpuInitFailure
+            << "\n  backend:" << r->backendName()
+            << "\n  Qt:" << QLibraryInfo::version().toString()
+            << "\n  The spectrum and waterfall will not render correctly."
+            << "\n  A solid block of colour here is undefined GPU memory,"
+            << "\n  not a palette fault — do not go looking at the palette.";
+    }
 
     // Upload quad VBO data
     batch->uploadStaticBuffer(m_wfVbo, kQuadData);

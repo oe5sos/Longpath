@@ -2329,6 +2329,20 @@ private:
     QRhiBuffer*                 m_wfUbo{nullptr};
     QRhiTexture*                m_wfGpuTex{nullptr};
     QRhiSampler*                m_wfSampler{nullptr};
+    // ── Why the GPU path did not come up ─────────────────────────────
+    //
+    // Empty means everything created cleanly. Otherwise it names the
+    // first thing that failed, and initialize() says so once, loudly.
+    //
+    // This exists because the magenta waterfall was diagnosed three
+    // times and misattributed twice. Every QRhi create() in this file
+    // returned a bool that was thrown away, so a failed texture or
+    // pipeline produced no log line at all — the draw went ahead against
+    // an incomplete object and the shader sampled undefined GPU memory,
+    // which on Metal is very often exactly magenta. The colour on screen
+    // was the entire diagnostic output of the failure.
+    QString m_gpuInitFailure;
+
     int  m_wfGpuTexW{0};
     int  m_wfGpuTexH{0};
     bool m_wfTexFullUpload{true};
