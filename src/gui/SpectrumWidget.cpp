@@ -8062,6 +8062,31 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
             QPainter sp(&seed);
             sp.drawImage(0, 0, m_waterfall);
         }
+        // The seed is the ONLY thing standing between an operator with no
+        // radio connected and a screenful of undefined GPU memory. With
+        // nothing streaming, m_waterfall is never fed, the incremental
+        // path never runs, and every pixel on screen comes from this one
+        // upload. If the QImage is null — because a dimension came out
+        // zero, or the allocation failed — uploadTexture silently does
+        // nothing and the texture keeps whatever Metal left in it.
+        //
+        // Reported from the bench: magenta with the radio disconnected.
+        // That is exactly this case, so this is the line that has to be
+        // provably right rather than probably right.
+        if (seed.isNull()) {
+            qCritical() << "SpectrumWidget: waterfall seed image is NULL at"
+                        << m_wfGpuTexW << "x" << m_wfGpuTexH
+                        << "— the texture will never be written and will"
+                        << "show undefined GPU memory.";
+        } else if (qEnvironmentVariableIntValue("NEREUS_WF_DEBUG") > 0) {
+            qDebug() << "SpectrumWidget: waterfall seeded"
+                     << seed.width() << "x" << seed.height()
+                     << "fmt" << int(seed.format())
+                     << "| tex" << m_wfGpuTexW << "x" << m_wfGpuTexH
+                     << "| widget" << width() << "x" << height()
+                     << "dpr" << devicePixelRatioF()
+                     << "| m_waterfall null=" << m_waterfall.isNull();
+        }
         QRhiTextureSubresourceUploadDescription desc(seed);
         batch->uploadTexture(m_wfGpuTex, QRhiTextureUploadEntry(0, 0, desc));
     }
