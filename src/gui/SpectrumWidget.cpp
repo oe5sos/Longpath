@@ -8109,6 +8109,54 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
 
     auto* batch = r->nextResourceUpdateBatch();
 
+    // ── One measurement that halves the search space ─────────────────
+    //
+    // The magenta waterfall has now had five theories killed against the
+    // source: missing shaders, an LTO target that never had them, an
+    // RGBA/BGRA swap, a palette with a magenta stop, and custom stops
+    // loaded from settings. None of them survives reading the code, and
+    // the colour mapping cannot emit magenta — NaN is guarded, the
+    // normalised value is qBound to 0..1, and no palette ends there.
+    //
+    // So either m_waterfall itself contains magenta, in which case the
+    // fault is on the CPU side and above, or it does not, in which case
+    // the pixels on screen never came from it and the fault is between
+    // the upload and the sampler. One pixel value decides which half to
+    // look in, and no amount of further reading will.
+    //
+    // Off unless asked for: NEREUS_WF_DEBUG=1. A diagnostic that costs a
+    // qDebug per frame in normal use is a diagnostic that gets deleted.
+    static const bool kWfDebug =
+        qEnvironmentVariableIntValue("NEREUS_WF_DEBUG") > 0;
+    if (kWfDebug) {
+        static int frame = 0;
+        if (frame < 3 || frame % 120 == 0) {
+            QString px = QStringLiteral("(no image)");
+            if (!m_waterfall.isNull()) {
+                const int sy = qBound(0, m_wfWriteRow,
+                                      m_waterfall.height() - 1);
+                const QRgb c0 = m_waterfall.pixel(m_waterfall.width() / 2, sy);
+                px = QStringLiteral("newest row %1 mid-pixel #%2%3%4")
+                         .arg(sy)
+                         .arg(qRed(c0),   2, 16, QLatin1Char('0'))
+                         .arg(qGreen(c0), 2, 16, QLatin1Char('0'))
+                         .arg(qBlue(c0),  2, 16, QLatin1Char('0'));
+            }
+            qDebug().noquote()
+                << QStringLiteral("WF[%1] tex %2x%3  img %4x%5 fmt %6 null=%7"
+                                  "  writeRow=%8 lastUp=%9  full=%10  %11")
+                       .arg(frame)
+                       .arg(m_wfGpuTexW).arg(m_wfGpuTexH)
+                       .arg(m_waterfall.width()).arg(m_waterfall.height())
+                       .arg(int(m_waterfall.format()))
+                       .arg(m_waterfall.isNull())
+                       .arg(m_wfWriteRow).arg(m_wfLastUploadedRow)
+                       .arg(m_wfTexFullUpload)
+                       .arg(px);
+        }
+        ++frame;
+    }
+
     // ---- Waterfall texture upload (incremental) ----
     if (!m_waterfall.isNull()) {
         if (m_waterfall.width() != m_wfGpuTexW || m_waterfall.height() != m_wfGpuTexH) {
