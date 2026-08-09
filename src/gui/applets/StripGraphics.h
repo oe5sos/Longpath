@@ -383,6 +383,25 @@ public:
     // Called from the meter timer. Cheap: reads a handful of atomics.
     void refresh();
 
+    // ── What am I looking at, right now ──────────────────────────────
+    //
+    // A sentence about the current state, in HTML, for the panel beside
+    // the picture. Not a help text — a help text is read once and never
+    // again, because it says the same thing every time. This changes
+    // with the signal, so it is worth glancing at while turning a knob,
+    // which is exactly when the operator needs it.
+    //
+    // It lives on the widget rather than in the window because the
+    // widget is the thing that already knows what it drew. A second
+    // copy of that knowledge in the panel would be a second thing to
+    // keep in step.
+    QString explain() const;
+
+    // The colours, named. Three lines, drawn from the same constants
+    // the picture uses, so a legend cannot describe a colour the
+    // picture stopped using.
+    QString legend() const;
+
     QSize sizeHint() const override;
 
 protected:
@@ -459,6 +478,9 @@ public:
     void setChain(StripChain* chain);
     void refresh();
 
+    QString explain() const;
+    QString legend() const;
+
     QSize sizeHint() const override;
 
 protected:
@@ -484,6 +506,9 @@ public:
 
     void setChain(StripChain* chain);
     void refresh();
+
+    QString explain() const;
+    QString legend() const;
 
     QSize sizeHint() const override;
 

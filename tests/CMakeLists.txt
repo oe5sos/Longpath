@@ -4659,6 +4659,11 @@ nereus_add_test(tst_mic_spectrum)
 #    that tells a splattering station it is clean --
 nereus_add_test(tst_tx_spectrum_analysis)
 
+# -- Characters: the list makes claims (gentlest first, Off really off,
+#    the two voice de-essers listen in different places) and nothing but
+#    these tests keeps them true --
+nereus_add_test(tst_strip_characters)
+
 # -- Loudness matching: the two weighting curves against the published
 #    tables in IEC 61672 and ITU-R BS.1770, and the properties the
 #    average must have whatever the weighting is --

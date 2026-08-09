@@ -17,6 +17,7 @@
 #include "core/strip/StripSettings.h"
 #include "core/AppSettings.h"
 #include "core/strip/EqLoudness.h"
+#include "core/strip/StripCharacters.h"
 #include "core/strip/StripTargets.h"
 #include "core/strip/TargetFromFile.h"
 
@@ -471,17 +472,10 @@ QWidget* StripWindow::buildGatePanel()
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
 
-    // The picture, first and above the controls: it is what the operator
-    // is actually watching while a knob moves.
     m_gateCurve = new StripDynamicsCurve(StripDynamicsCurve::Stage::Gate, page);
     m_gateCurve->setChain(chain());
-    form->addRow(m_gateCurve);
-    {
-        auto* cap = new QLabel(QStringLiteral("In against out. Amber marks the threshold, green where it re-opens — the gap between them is what stops a gate chattering on a breath. The dot is your voice now."), page);
-        cap->setWordWrap(true);
-        cap->setStyleSheet(dimStyle());
-        form->addRow(cap);
-    }
+    form->addRow(buildStageCard(page, m_gateCurve,
+                                StripChain::Stage::Gate));
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Gate, v);
@@ -490,18 +484,11 @@ QWidget* StripWindow::buildGatePanel()
         persist();
     });
 
-    auto* mode = new QComboBox(page);
-    mode->addItem(QStringLiteral("Expander — gentle, keeps the room"),
-                  int(ClientGate::Mode::Expander));
-    mode->addItem(QStringLiteral("Gate — hard, removes it"),
-                  int(ClientGate::Mode::Gate));
-    {
-        const int have = chain() ? int(chain()->gate().mode())
-                                 : int(ClientGate::Mode::Expander);
-        const int at = mode->findData(have);
-        if (at >= 0) { mode->setCurrentIndex(at); }
-    }
-    form->addRow(QStringLiteral("Character"), mode);
+    // The two-entry "Character" combo that used to sit here is gone. It
+    // wrote ratio and depth, and so does the character picker on the
+    // card above — two controls owning one piece of state, which is the
+    // drift this project has already paid for more than once. The
+    // picker supersedes it and offers four more entries.
 
     addKnob(form, QStringLiteral("Threshold"),
         -80.0, 0.0, 1.0, cur([this]{ return chain()->gate().thresholdDb(); }, -40.0),
@@ -528,16 +515,6 @@ QWidget* StripWindow::buildGatePanel()
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setReturnDb(float(v)); }
         }, 1, [this]{ persist(); });
-
-    // Mode snaps ratio and depth, so the depth slider has to follow or
-    // it will show one number while the gate uses another.
-    connect(mode, &QComboBox::currentIndexChanged, this, [this, mode](int) {
-        if (StripChain* c = chain()) {
-            c->gate().setMode(
-                static_cast<ClientGate::Mode>(mode->currentData().toInt()));
-        }
-        persist();
-    });
 
     auto* help = new QLabel(QStringLiteral(
         "Threshold is the level below which the gate starts working — set "
@@ -1391,17 +1368,10 @@ QWidget* StripWindow::buildDeEssPanel()
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
 
-    // The picture, first and above the controls: it is what the operator
-    // is actually watching while a knob moves.
     m_deEssCurve = new StripBandCurve(StripBandCurve::Stage::DeEsser, page);
     m_deEssCurve->setChain(chain());
-    form->addRow(m_deEssCurve);
-    {
-        auto* cap = new QLabel(QStringLiteral("The band the de-esser LISTENS to, not the cut it makes. Aiming it at the wrong band is the mistake people make here, and it is invisible without this. The bar on the right is how hard it is working."), page);
-        cap->setWordWrap(true);
-        cap->setStyleSheet(dimStyle());
-        form->addRow(cap);
-    }
+    form->addRow(buildStageCard(page, m_deEssCurve,
+                                StripChain::Stage::DeEss));
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::DeEss, v);
@@ -1465,17 +1435,10 @@ QWidget* StripWindow::buildCompPanel()
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
 
-    // The picture, first and above the controls: it is what the operator
-    // is actually watching while a knob moves.
     m_compCurve = new StripDynamicsCurve(StripDynamicsCurve::Stage::Compressor, page);
     m_compCurve->setChain(chain());
-    form->addRow(m_compCurve);
-    {
-        auto* cap = new QLabel(QStringLiteral("In against out, with the knee. The dashed diagonal is doing nothing, so the gap between it and the curve is the compression. Point at the picture for the numbers."), page);
-        cap->setWordWrap(true);
-        cap->setStyleSheet(dimStyle());
-        form->addRow(cap);
-    }
+    form->addRow(buildStageCard(page, m_compCurve,
+                                StripChain::Stage::Comp));
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Comp, v);
@@ -1549,17 +1512,10 @@ QWidget* StripWindow::buildTubePanel()
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
 
-    // The picture, first and above the controls: it is what the operator
-    // is actually watching while a knob moves.
     m_tubeCurve = new StripShaperCurve(page);
     m_tubeCurve->setChain(chain());
-    form->addRow(m_tubeCurve);
-    {
-        auto* cap = new QLabel(QStringLiteral("The waveshaper itself, drawn from the function the audio thread runs. The two dots show how far up it your voice actually reaches — driven quietly, this stage is a straight wire whatever the knobs say."), page);
-        cap->setWordWrap(true);
-        cap->setStyleSheet(dimStyle());
-        form->addRow(cap);
-    }
+    form->addRow(buildStageCard(page, m_tubeCurve,
+                                StripChain::Stage::Tube));
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Tube, v);
@@ -1635,17 +1591,10 @@ QWidget* StripWindow::buildPuduPanel()
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     form->addRow(on);
 
-    // The picture, first and above the controls: it is what the operator
-    // is actually watching while a knob moves.
     m_puduCurve = new StripBandCurve(StripBandCurve::Stage::Exciter, page);
     m_puduCurve->setChain(chain());
-    form->addRow(m_puduCurve);
-    {
-        auto* cap = new QLabel(QStringLiteral("Where the two generators sit and how much of each is mixed in. Height is the mix, position is the tuning."), page);
-        cap->setWordWrap(true);
-        cap->setStyleSheet(dimStyle());
-        form->addRow(cap);
-    }
+    form->addRow(buildStageCard(page, m_puduCurve,
+                                StripChain::Stage::Pudu));
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Pudu, v);
@@ -1805,17 +1754,8 @@ QWidget* StripWindow::buildLimiterPanel()
     m_limiterCurve =
         new StripDynamicsCurve(StripDynamicsCurve::Stage::Limiter, page);
     m_limiterCurve->setChain(chain());
-    form->addRow(m_limiterCurve);
-    {
-        auto* cap = new QLabel(QStringLiteral(
-            "Flat above the ceiling: everything louder comes out at the "
-            "same level. If the dot is sitting on the flat part most of "
-            "the time, the limiter is doing the compressor's job and "
-            "doing it worse."), page);
-        cap->setWordWrap(true);
-        cap->setStyleSheet(dimStyle());
-        form->addRow(cap);
-    }
+    form->addRow(buildStageCard(page, m_limiterCurve,
+                                StripChain::Stage::Limiter));
     connect(on, &QCheckBox::toggled, this, [this](bool v) {
         if (StripChain* c = chain()) {
             c->setStageEnabled(StripChain::Stage::Limiter, v);
@@ -2029,6 +1969,7 @@ void StripWindow::reloadControls()
     m_gateCurve = m_compCurve = m_limiterCurve = nullptr;
     m_tubeCurve = nullptr;
     m_deEssCurve = m_puduCurve = nullptr;
+    m_stageText.fill(StageText{});
     m_stageBoxes.fill(nullptr);
 
     for (int i = 0; i < StripChain::kStageCount; ++i) {
@@ -2175,6 +2116,127 @@ void StripWindow::refreshTakeUi()
     }
 }
 
+QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
+                                     StripChain::Stage stage)
+{
+    auto* card = new QWidget(page);
+    auto* row  = new QHBoxLayout(card);
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(10);
+
+    // Square, and it stays square: a transfer curve has the same unit
+    // on both axes and a stretched one lies about the 45° diagonal.
+    picture->setParent(card);
+    picture->setMinimumSize(260, 260);
+    picture->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    row->addWidget(picture, 1);
+
+    auto* words = new QWidget(card);
+    auto* col   = new QVBoxLayout(words);
+    col->setContentsMargins(0, 0, 0, 0);
+    col->setSpacing(7);
+
+    const int idx = static_cast<int>(stage);
+    StageText& st = m_stageText[static_cast<size_t>(idx)];
+    st.picture = picture;
+
+    st.live = new QLabel(words);
+    st.live->setWordWrap(true);
+    st.live->setTextFormat(Qt::RichText);
+    st.live->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    st.live->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; font-size: 12px; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+    col->addWidget(st.live);
+
+    st.legend = new QLabel(words);
+    st.legend->setWordWrap(true);
+    st.legend->setTextFormat(Qt::RichText);
+    st.legend->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary)));
+    col->addWidget(st.legend);
+
+    // ── The character picker ─────────────────────────────────────────
+    //
+    // Only where there is something to pick. An empty combo on the
+    // stages that have no characters would be a control that teaches
+    // people the controls are decorative.
+    const QVector<StripCharacters::Character> chars =
+        StripCharacters::forStage(stage);
+    if (!chars.isEmpty()) {
+        auto* pickRow = new QHBoxLayout;
+        pickRow->addWidget(new QLabel(QStringLiteral("Character:"), words));
+        auto* box = new QComboBox(words);
+        for (const auto& ch : chars) { box->addItem(ch.name, ch.name); }
+        box->setMinimumWidth(150);
+        pickRow->addWidget(box, 1);
+        col->addLayout(pickRow);
+
+        st.charNote = new QLabel(words);
+        st.charNote->setWordWrap(true);
+        st.charNote->setStyleSheet(
+            QStringLiteral("QLabel { color: %1; font-size: 11px; "
+                           "background: %2; border: 1px solid %3; "
+                           "padding: 6px; }")
+                .arg(QString::fromLatin1(Style::kTextSecondary),
+                     QString::fromLatin1(Style::kInsetBg),
+                     QString::fromLatin1(Style::kInsetBorder)));
+        col->addWidget(st.charNote);
+
+        auto describe = [this, box, stage, idx]() {
+            const QString name = box->currentData().toString();
+            for (const auto& ch : StripCharacters::forStage(stage)) {
+                if (ch.name == name) {
+                    if (m_stageText[static_cast<size_t>(idx)].charNote) {
+                        m_stageText[static_cast<size_t>(idx)]
+                            .charNote->setText(ch.description);
+                    }
+                    break;
+                }
+            }
+        };
+        connect(box, &QComboBox::currentIndexChanged, this,
+                [this, box, stage, describe](int) {
+            describe();
+            // Applying a character moves several knobs at once, so the
+            // panel is rebuilt rather than refreshed — every control
+            // reads its own value from the chain when it is built, and
+            // that is the only version of "refresh" that cannot drift.
+            if (StripChain* c = chain()) {
+                if (StripCharacters::apply(*c, stage,
+                                           box->currentData().toString())) {
+                    persist();
+                    reloadControls();
+                    refreshChainRow();
+                }
+            }
+        });
+        describe();
+    }
+
+    col->addStretch(1);
+    row->addWidget(words, 1);       // half and half
+    return card;
+}
+
+void StripWindow::refreshStageText()
+{
+    for (auto& st : m_stageText) {
+        if (!st.picture || !st.picture->isVisible()) { continue; }
+        QString live, legend;
+        if (auto* d = qobject_cast<StripDynamicsCurve*>(st.picture)) {
+            live = d->explain(); legend = d->legend();
+        } else if (auto* sh = qobject_cast<StripShaperCurve*>(st.picture)) {
+            live = sh->explain(); legend = sh->legend();
+        } else if (auto* b = qobject_cast<StripBandCurve*>(st.picture)) {
+            live = b->explain(); legend = b->legend();
+        }
+        if (st.live)   { st.live->setText(live); }
+        if (st.legend) { st.legend->setText(legend); }
+    }
+}
+
 void StripWindow::refreshStagePictures()
 {
     StripChain* ch = chain();
@@ -2246,6 +2308,7 @@ void StripWindow::refreshMeters()
         else if (auto* sh = qobject_cast<StripShaperCurve*>(w)) { sh->refresh(); }
         else if (auto* b = qobject_cast<StripBandCurve*>(w))  { b->refresh(); }
     }
+    refreshStageText();
     if (m_chainView) {
         m_chainView->setReduction(StripChain::Stage::Gate,
                                   c->gate().gainReductionDb());

@@ -285,6 +285,35 @@ private:
     // and the voice check both fell into once already.
     void refreshStagePictures();
 
+    // ── The 50/50 stage card ─────────────────────────────────────────
+    //
+    // Picture on the left, words on the right, half each. Asked for at
+    // the bench and right for a reason worth writing down: the picture
+    // and the sentence explaining it are the same size because they are
+    // equally important. A caption under a graph is read once; a panel
+    // beside it, the same height, that changes as you talk, is read
+    // every time.
+    //
+    // The picture is kept SQUARE. A transfer curve has the same unit on
+    // both axes, and stretching it wide distorts the 45° diagonal that
+    // the whole reading rests on — "here nothing happens" stops being a
+    // recognisable angle.
+    //
+    // `explain` and `legend` are pulled from the widget each tick; the
+    // widget is the thing that already knows what it drew, so there is
+    // no second copy of that knowledge to keep in step.
+    QWidget* buildStageCard(QWidget* page, QWidget* picture,
+                            StripChain::Stage stage);
+    void refreshStageText();
+
+    struct StageText {
+        QWidget* picture{nullptr};
+        QLabel*  live{nullptr};
+        QLabel*  legend{nullptr};
+        QLabel*  charNote{nullptr};
+    };
+    std::array<StageText, StripChain::kStageCount> m_stageText{};
+
     QLabel* m_presetNote{nullptr};
     QLabel* m_gateMeter{nullptr};
     QLabel* m_deEssMeter{nullptr};
