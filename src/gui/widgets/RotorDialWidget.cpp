@@ -128,6 +128,13 @@ void RotorDialWidget::setBeamWidth(double deg)
     update();
 }
 
+void RotorDialWidget::setSimulated(bool on)
+{
+    if (m_simulated == on) { return; }
+    m_simulated = on;
+    update();
+}
+
 void RotorDialWidget::setArrivalTolerance(double deg)
 {
     m_tolerance = std::max(0.5, deg);
@@ -325,10 +332,15 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
         drawNeedle(m_target, kTarget, 0.90, /*dashed=*/true, 2.4);
     }
 
-    const QColor actualCol = (m_state == State::Turning)  ? QColor(0xff, 0xfb, 0xe8)
+    // A simulated needle is drawn dashed and dim. It is the same shape
+    // as a real reading otherwise, and an operator who mistakes one for
+    // the other turns the wrong way at three in the morning — or,
+    // worse, believes the antenna moved when it did not. (2026-08-10)
+    const QColor actualCol = m_simulated                  ? kMuted
+                           : (m_state == State::Turning)  ? QColor(0xff, 0xfb, 0xe8)
                            : (m_state == State::OnTarget) ? QColor(0xea, 0xff, 0xf4)
                                                           : kActual;
-    drawNeedle(m_actual, actualCol, 0.90, /*dashed=*/false, 2.6);
+    drawNeedle(m_actual, actualCol, 0.90, m_simulated, m_simulated ? 2.0 : 2.6);
 
     // Hub
     const QColor hubCol = (m_state == State::Turning)  ? kTurning
@@ -347,6 +359,17 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     p.setBrush(Qt::NoBrush);
 
     // Elevation, top-right, only for rotators that report one.
+    // Top-left, opposite the elevation readout, so the two never
+    // collide on an az/el rotator.
+    if (m_simulated) {
+        QFont sf = p.font();
+        sf.setPixelSize(10);
+        sf.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
+        p.setFont(sf);
+        p.setPen(QColor(Style::kAmberWarn));
+        p.drawText(QPointF(6.0, 14.0), QStringLiteral("NO ROTATOR"));
+    }
+
     if (m_hasElevation) {
         QFont ef = p.font();
         ef.setPixelSize(10);

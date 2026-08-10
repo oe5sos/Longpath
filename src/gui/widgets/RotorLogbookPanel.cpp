@@ -576,6 +576,7 @@ void RotorLogbookPanel::beginTurn()
     m_dial->setState(RotorDialWidget::State::Turning);
 
     if (m_rotor && m_rotor->isConnected()) {
+        m_dial->setSimulated(false);
         m_rotor->moveTo(bearing);
         return;
     }
@@ -583,6 +584,12 @@ void RotorLogbookPanel::beginTurn()
     // needle moving is otherwise indistinguishable from the mast
     // moving, and that is a mistake an operator makes exactly once
     // before they stop trusting the display.
+    //
+    // The status line is not enough on its own: it scrolls away, and
+    // what is left afterwards is a dial that looks like a reading. So
+    // the needle itself goes dashed and dim and the rose is labelled
+    // for as long as the reading is invented. (2026-08-10)
+    m_dial->setSimulated(true);
     setStatus(QStringLiteral("No rotator connected — needle simulated"), true);
     m_simTimer->start();
 }
@@ -608,7 +615,14 @@ void RotorLogbookPanel::ensureRotor()
     // may write it while a rotator is connected, or the dial would show
     // where the software thinks the mast is rather than where it is.
     connect(m_rotor, &RotorController::positionChanged, this,
-            [this](double az) { m_dial->setActualBearing(az); });
+            [this](double az) {
+        // A real reading has arrived, so the needle stops being a
+        // pretence — and the stand-in timer must stop too, or it would
+        // keep nudging the needle away from what the mast reports.
+        m_simTimer->stop();
+        m_dial->setSimulated(false);
+        m_dial->setActualBearing(az);
+    });
 
     // Az/el rotators: the reported elevation appears on the dial. The
     // signal only fires when the value actually changes, so an
@@ -1785,19 +1799,29 @@ void RotorLogbookPanel::openLogbookWindow()
         // The dial follows too, not only the rotor: leaving it showing
         // the old heading while the antenna turns is the kind of small
         // lie that gets believed at three in the morning.
+        //
+        // ── One path, not two (2026-08-10) ───────────────────────────
+        //
+        // This used to refuse with a modal box when no rotator was
+        // connected, while the panel's own Rotate button, one control
+        // away, cheerfully turned the needle and said so in the status
+        // line. Same request, two different programs.
+        //
+        // The box was the wrong half of that pair. It interrupted —
+        // during a contact, which is when you look a station up — and
+        // it withheld the part that needs no rotator at all: showing
+        // where the station is. Setting the target and swinging the
+        // globe is display, not motion.
+        //
+        // So the target goes on the dial and beginTurn() decides the
+        // rest, exactly as it does for the button. Whatever it does, it
+        // now does the same thing from both places.
         connect(m_logWindow, &LogbookWindow::turnRotorRequested, this,
                 [this](double bearing, const QString& call) {
-            if (!m_rotor || !m_rotor->isConnected()) {
-                QMessageBox::information(this, QStringLiteral("Rotor"),
-                    QStringLiteral("No rotor connected, so there is "
-                                   "nothing to turn. The bearing to %1 "
-                                   "is %2°.")
-                        .arg(call).arg(bearing, 0, 'f', 0));
-                return;
-            }
-            if (m_dial) { m_dial->setTargetBearing(bearing); }
-            if (m_globe) { m_globe->lookAlongBearing(bearing); }
-            m_rotor->moveTo(bearing);
+            Q_UNUSED(call);
+            if (!m_dial) { return; }
+            m_dial->setTargetBearing(bearing);
+            beginTurn();   // same call workSpot() and the button make
         });
 
         // Hand cty.dat down to the map. Contacts logged before a QRZ

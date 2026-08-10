@@ -81,6 +81,21 @@ public:
     // Antenna beam width, drawn as a wedge around the actual heading.
     void setBeamWidth(double deg);
 
+    // ── Is the actual needle reporting, or pretending? ───────────────
+    //
+    // With no rotator connected the panel drives the actual needle from
+    // a timer so the dial is demonstrable. The needle then looks
+    // exactly like a real reading, which is a display that says the
+    // antenna is at 42° when nothing is at 42° — and an operator only
+    // has to believe that once before they stop trusting the dial at
+    // all.
+    //
+    // So a simulated needle is drawn hollow and dashed and the rose is
+    // labelled. The status line already says it in words; words
+    // scroll away and the needle does not. (2026-08-10)
+    void setSimulated(bool on);
+    bool isSimulated() const noexcept { return m_simulated; }
+
     // How close counts as arrived.
     void setArrivalTolerance(double deg);
 
@@ -127,6 +142,7 @@ private:
     double m_endStop{-1.0};        // <0 = free rotation
     double m_beamWidth{40.0};
     double m_tolerance{3.0};
+    bool   m_simulated{false};
     State  m_state{State::Idle};
 };
 

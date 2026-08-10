@@ -22,6 +22,7 @@ private slots:
     void state_follows_target_and_tolerance();
     void turning_state_is_not_overwritten_by_movement();
     void bearings_are_normalised();
+    void a_simulated_needle_says_so_and_changes_nothing_else();
 };
 
 void TstRotorDial::no_target_means_no_travel()
@@ -126,6 +127,34 @@ void TstRotorDial::bearings_are_normalised()
 
     d.setTargetBearing(450);
     QVERIFY(qAbs(d.targetBearing() - 90.0) < 0.01);
+}
+
+// The flag exists so a needle driven by a timer cannot be mistaken for
+// a needle driven by a mast. What it must NOT do is change any of the
+// arithmetic — a simulated dial that computed travel differently would
+// be a second rotator model, and the one thing worse than a needle that
+// lies is two of them disagreeing.
+void TstRotorDial::a_simulated_needle_says_so_and_changes_nothing_else()
+{
+    RotorDialWidget d;
+    d.setActualBearing(350);
+    d.setTargetBearing(10);
+    d.setEndStop(0.0);                       // north stop: the long way
+    const double travelBefore = d.travelDegrees();
+    const auto   stateBefore  = d.state();
+
+    QVERIFY(!d.isSimulated());               // a real reading by default
+    d.setSimulated(true);
+    QVERIFY(d.isSimulated());
+
+    QCOMPARE(d.travelDegrees(), travelBefore);
+    QCOMPARE(d.state(), stateBefore);
+    QCOMPARE(d.actualBearing(), 350.0);
+    QCOMPARE(d.targetBearing(), 10.0);
+
+    d.setSimulated(false);
+    QVERIFY(!d.isSimulated());
+    QCOMPARE(d.travelDegrees(), travelBefore);
 }
 
 QTEST_MAIN(TstRotorDial)
