@@ -497,6 +497,7 @@ endif()
 # --------------------------------------------------------------------------
 set(CORE_SOURCES
     src/core/AntennaLabels.cpp
+    src/core/antenna/AmateurBands.cpp
     src/core/antenna/Touchstone.cpp
     src/core/antenna/AntennaSweep.cpp
     src/core/antenna/AntennaTrim.cpp
@@ -728,6 +729,8 @@ set(GUI_SOURCES
     src/gui/widgets/ParametricEqWidget.h
     src/gui/widgets/ParametricEqWidget.cpp
     src/gui/widgets/ResetSlider.h
+    src/gui/widgets/SwrCurveWidget.h
+    src/gui/widgets/SwrCurveWidget.cpp
     src/gui/widgets/QsoDetailPane.h
     src/gui/widgets/QsoDetailPane.cpp
     src/gui/widgets/ScrollableLabel.cpp

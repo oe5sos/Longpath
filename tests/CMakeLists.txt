@@ -4693,6 +4693,11 @@ nereus_add_test(tst_callsign_cache)
 #    anti-resonance is NOT offered as something to trim towards --
 nereus_add_test(tst_antenna_sweep)
 
+# -- Band edges. The project's existing table is Region 2, so drawing a
+#    40 m edge from it puts 100 kHz of "your antenna is fine here" over
+#    spectrum a Region 1 operator may not transmit in --
+nereus_add_test(tst_amateur_bands)
+
 # -- Characters: the list makes claims (gentlest first, Off really off,
 #    the two voice de-essers listen in different places) and nothing but
 #    these tests keeps them true --
