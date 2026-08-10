@@ -37,6 +37,7 @@
 #include "core/SolarTimes.h"
 #include "gui/LogbookWindow.h"
 #include "gui/StyleConstants.h"
+#include "gui/widgets/StationPhoto.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -143,25 +144,10 @@ const QStringList& largeCandidates()
     return l;
 }
 
-// Portraits live beside the log, not in the system cache: they are small,
-// they belong to contacts the operator made, and a cache the OS may clear
-// would silently start costing a request per lookup again.
-QString photoCacheDir()
-{
-    const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-        + QStringLiteral("/qrz-photos");
-    QDir().mkpath(dir);
-    return dir;
-}
-
-QString photoCachePath(const QString& url)
-{
-    const QByteArray h =
-        QCryptographicHash::hash(url.toUtf8(), QCryptographicHash::Sha1);
-    return photoCacheDir() + QLatin1Char('/') + QString::fromLatin1(h.toHex())
-           + QStringLiteral(".img");
-}
+// The portrait cache used to be described here. It moved to
+// StationPhoto::cacheDir() along with the rest of the fetching rules
+// (2026-08-10) — the logbook detail pane needs the same directory, and
+// two functions deciding where the cache lives is one too many.
 
 QLabel* caption(const QString& text, QWidget* parent)
 {
@@ -265,30 +251,34 @@ void RotorLogbookPanel::buildUi()
     auto* cardRow = new QHBoxLayout;
     cardRow->setSpacing(8);
 
-    m_photo = new QLabel(this);
+    // The fetching rules — https only, no downgrade on redirect, a size
+    // cap, a cache beside the log — used to live in this file. The
+    // logbook detail pane needs the same ones, and two copies of a
+    // security decision is one copy too many, so they moved into
+    // StationPhoto and both callers use it. (2026-08-10)
+    m_photo = new StationPhoto(this);
     m_photo->setFixedSize(78, 78);
-    m_photo->setAlignment(Qt::AlignCenter);
-    m_photo->setScaledContents(false);
-    m_photo->setStyleSheet(QStringLiteral(
-        "QLabel { background: %1; border: 1px solid %2; border-radius: 3px; }")
-        .arg(QString::fromLatin1(Style::kInsetBg),
-             QString::fromLatin1(Style::kBorderSubtle)));
     m_photo->setVisible(false);
     // A portrait is one network request per station, so it has to be
     // switchable — and a setting nobody can find is not a switch.
     m_photo->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_photo, &QLabel::customContextMenuRequested, this,
+    connect(m_photo, &QWidget::customContextMenuRequested, this,
             [this](const QPoint& pos) {
         QMenu menu(this);
         QAction* off = menu.addAction(QStringLiteral("Don't show QRZ photos"));
         if (menu.exec(m_photo->mapToGlobal(pos)) == off) {
             AppSettings::instance().setValue(kShowPhotoKey, false);
-            m_photo->clear();
+            m_photo->showPlaceholder(QString{});
             m_photo->setVisible(false);
             setStatus(QStringLiteral("QRZ photos off — re-enable in settings "
                                      "(%1)").arg(kShowPhotoKey));
         }
     });
+    // The panel's frame is small and beside a callsign that already
+    // says who this is, so it stays hidden until there is a picture
+    // rather than explaining itself in 78 pixels.
+    connect(m_photo, &StationPhoto::photoShown, this,
+            [this]() { m_photo->setVisible(true); });
     cardRow->addWidget(m_photo, 0, Qt::AlignTop);
 
     auto* cardCol = new QVBoxLayout;
@@ -1222,7 +1212,7 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
         m_stationLine->clear();
         m_solarLine->clear();
         m_workedLine->clear();
-        m_photo->clear();
+        m_photo->showPlaceholder(QString{});
         m_photo->setVisible(false);
         m_hasDxPos = false;
         m_lastInfo = CallsignInfo{};
@@ -1416,60 +1406,15 @@ void RotorLogbookPanel::showStationVisuals(const CallsignInfo& info)
 {
     if (AppSettings::instance().value(kShowPhotoKey, true).toBool()
         && !info.imageUrl.isEmpty()) {
-        loadStationPhoto(info.imageUrl);
+        // StationPhoto owns the rules now — https only, no downgrade on
+        // redirect, a size cap, the cache. It shows itself once a
+        // picture actually decodes; see the photoShown connection in
+        // buildUi. (2026-08-10)
+        m_photo->setUrl(info.imageUrl);
     } else {
-        m_photo->clear();
+        m_photo->showPlaceholder(QString{});
         m_photo->setVisible(false);
     }
-}
-
-void RotorLogbookPanel::loadStationPhoto(const QString& url)
-{
-    const QUrl u(url);
-    // QRZ portraits are ordinary https URLs; anything else is not a
-    // portrait and should not be fetched just because a field said so.
-    if (!u.isValid() || u.scheme() != QLatin1String("https")) { return; }
-
-    auto show = [this](const QByteArray& bytes) {
-        QPixmap pm;
-        if (!pm.loadFromData(bytes)) { return false; }
-        m_photo->setPixmap(pm.scaled(m_photo->size() - QSize(2, 2),
-                                     Qt::KeepAspectRatio,
-                                     Qt::SmoothTransformation));
-        m_photo->setVisible(true);
-        return true;
-    };
-
-    const QString cached = photoCachePath(url);
-    QFile cf(cached);
-    if (cf.open(QIODevice::ReadOnly)) {
-        const QByteArray bytes = cf.readAll();
-        cf.close();
-        if (show(bytes)) { return; }
-    }
-
-    if (!m_net) { m_net = new QNetworkAccessManager(this); }
-    QNetworkRequest req(u);
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                     QNetworkRequest::NoLessSafeRedirectPolicy);
-    QNetworkReply* reply = m_net->get(req);
-
-    // No `this` in the capture list: `show` already holds it, and the
-    // context object above is what governs the lifetime.
-    connect(reply, &QNetworkReply::finished, this,
-            [reply, cached, show]() {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) { return; }
-
-        const QByteArray bytes = reply->readAll();
-        // Cap what gets written: a redirect to something huge should not
-        // fill the config directory with a file nobody asked for.
-        if (bytes.isEmpty() || bytes.size() > 4 * 1024 * 1024) { return; }
-        if (!show(bytes)) { return; }
-
-        QFile out(cached);
-        if (out.open(QIODevice::WriteOnly)) { out.write(bytes); }
-    });
 }
 
 void RotorLogbookPanel::onLookupRequested()
@@ -1822,6 +1767,11 @@ void RotorLogbookPanel::openLogbookWindow()
     if (!m_logWindow) {
         m_logWindow = new LogbookWindow(logbookPath(), this);
         m_logWindow->setUploaders(m_uploadTargets);
+        // The same QRZ client the panel uses, so the detail pane can
+        // put a name and a portrait against a selected contact. Shared
+        // rather than a second client: one session key, one queue, and
+        // one place the credentials live.
+        m_logWindow->setQrzClient(m_qrz);
         connect(m_logWindow, &LogbookWindow::logChanged,
                 this, &RotorLogbookPanel::refreshRecentList);
 

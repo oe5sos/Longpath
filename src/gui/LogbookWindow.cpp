@@ -20,6 +20,9 @@
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/StyleConstants.h"
+#include "gui/widgets/QsoDetailPane.h"
+
+#include <QSplitter>
 
 #include <QAction>
 #include <QCheckBox>
@@ -92,10 +95,31 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     // Not modal: you look things up in the log *while* working a
     // station, which is exactly when a modal dialog would be in the way.
     setModal(false);
-    resize(1000, 560);
+    resize(1240, 620);
+    // Read before the pane is built so the first selection already has
+    // whatever QRZ said last time — otherwise the first contact clicked
+    // after every start looks like a station nobody has ever heard of.
+    m_callCache.load();
     buildUi();
     restoreHeaderState();
+    restoreSplitState();
     reload();
+}
+
+void LogbookWindow::restoreSplitState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("LogbookSplitState")).toByteArray();
+    if (!st.isEmpty() && m_split->restoreState(st)) { return; }
+    // A first run, or a saved state from a build with a different
+    // number of panes. Give the table the room and the pane enough to
+    // read a callsign in.
+    m_split->setSizes({860, 300});
+}
+
+void LogbookWindow::setQrzClient(QrzClient* qrz)
+{
+    if (m_detail) { m_detail->setQrzClient(qrz); }
 }
 
 // ── UI ──────────────────────────────────────────────────────────────
@@ -240,7 +264,37 @@ void LogbookWindow::buildUi()
           QString::fromLatin1(Style::kButtonBg),
           QString::fromLatin1(Style::kTextSecondary),
           QString::fromLatin1(Style::kAccent)));
-    col->addWidget(m_table, 1);
+
+    // ── Table beside a detail pane (L1, 2026-08-10) ──────────────────
+    //
+    // The log keeps every ADIF field it does not model, and until now
+    // kept them invisibly. A column each is not the answer — there is
+    // no bound on how many a foreign logger writes — so they go in a
+    // pane beside the table, which costs the table no width and shows
+    // all of them for the row in hand.
+    //
+    // A splitter rather than a fixed width: on a laptop the pane is
+    // most of the window, and an operator who wants the table back
+    // should be able to drag it away rather than turn the feature off.
+    m_split = new QSplitter(Qt::Horizontal, this);
+    m_split->setChildrenCollapsible(true);
+    m_split->addWidget(m_table);
+
+    m_detail = new QsoDetailPane(m_split);
+    m_detail->setMinimumWidth(230);
+    m_detail->setCache(&m_callCache);
+    m_split->addWidget(m_detail);
+    m_split->setStretchFactor(0, 1);
+    m_split->setStretchFactor(1, 0);
+    col->addWidget(m_split, 1);
+
+    // The pane can turn the antenna, but it must not know there is one
+    // — same reason the window does not. Pass it on and let whoever
+    // owns a rotor decide.
+    connect(m_detail, &QsoDetailPane::turnRotorRequested,
+            this, &LogbookWindow::turnRotorRequested);
+    connect(m_detail, &QsoDetailPane::editRequested,
+            this, &LogbookWindow::editSelected);
 
     m_stats = new QLabel(QString{}, this);
     m_stats->setWordWrap(true);
@@ -299,6 +353,22 @@ void LogbookWindow::buildUi()
         // reload — a column that snaps back is worse than a narrow one.
         m_headerRestored = true;
         saveHeaderState();
+    });
+
+    // The pane follows the current row. currentCellChanged rather than
+    // itemSelectionChanged: with several rows marked for an upload
+    // there is no single contact to describe, and the one the operator
+    // last touched is the one they are looking at.
+    connect(m_table, &QTableWidget::currentCellChanged, this,
+            [this](int row, int, int, int) {
+        const int idx = sourceRow(row);
+        if (idx < 0) { m_detail->clearEntry(); return; }
+        m_detail->setEntry(m_all.at(idx));
+    });
+
+    connect(m_split, &QSplitter::splitterMoved, this, [this](int, int) {
+        AppSettings::instance().setValue(QStringLiteral("LogbookSplitState"),
+                                         m_split->saveState());
     });
 
     connect(m_search, &QLineEdit::textChanged, this, [this]() {
@@ -525,7 +595,21 @@ void LogbookWindow::restoreHeaderState()
 {
     const QByteArray st = AppSettings::instance()
         .value(QStringLiteral("LogbookHeaderState")).toByteArray();
-    if (st.isEmpty()) { return; }
+    if (st.isEmpty()) {
+        // First run with the detail pane. Five columns say exactly what
+        // the pane says, and with both on screen the table needs
+        // horizontal scrolling to show the ones that are its own job —
+        // date, callsign, band, mode, confirmed.
+        //
+        // Only when nothing was saved. An operator who has already
+        // arranged their columns has said what they want, and quietly
+        // hiding five of them because a new pane arrived would be the
+        // program overruling them.
+        for (int c : {ColName, ColQth, ColCountry, ColGrid, ColDistance}) {
+            m_table->setColumnHidden(c, true);
+        }
+        return;
+    }
     // A saved state from a build with fewer columns restores the old
     // count and leaves the new ones invisible with no way to find them.
     // Better to start over than to hide a column the operator never

@@ -26,6 +26,7 @@
 //                 (Cowork), operator Martin Fischer.
 // =================================================================
 
+#include "core/CallsignCache.h"
 #include "core/LogFilter.h"
 #include "models/LogEntry.h"
 
@@ -41,11 +42,14 @@ class QDateEdit;
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QSplitter;
 class QTableWidget;
 class QVBoxLayout;
 
 namespace NereusSDR {
 
+class QrzClient;
+class QsoDetailPane;
 class QsoUploader;
 
 class LogbookWindow : public QDialog {
@@ -66,6 +70,11 @@ public:
     // one of several users of the same uploaders, and whoever holds the
     // credentials holds the objects.
     void setUploaders(const QVector<QsoUploader*>& uploaders);
+
+    // Lets the detail pane fetch a name and a portrait for the selected
+    // contact. Not owned, and optional: the logbook is opened on
+    // machines with no QRZ account, where the pane simply says so.
+    void setQrzClient(QrzClient* qrz);
 
 signals:
     // ── Point the beam at a contact ──────────────────────────────────
@@ -111,6 +120,7 @@ private:
     void applySort();
     void saveHeaderState();
     void restoreHeaderState();
+    void restoreSplitState();
     void refreshTable();
     void updateStats();
     void editSelected();
@@ -160,7 +170,15 @@ private:
     QDateEdit*    m_toDate{nullptr};
     QPushButton*  m_clearBtn{nullptr};
 
-    QTableWidget* m_table{nullptr};
+    QTableWidget*  m_table{nullptr};
+    QSplitter*     m_split{nullptr};
+    QsoDetailPane* m_detail{nullptr};
+
+    // What QRZ said about the callsigns in this log, kept between runs.
+    // Owned here rather than shared with the rotor panel: the window
+    // outlives a single lookup and a log of two thousand contacts is
+    // the only place the persistence actually earns its keep.
+    CallsignCache m_callCache;
 
     // Which column the table is ordered by. Newest first is the useful
     // default: the contact you want is nearly always the last one.

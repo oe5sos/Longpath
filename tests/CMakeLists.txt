@@ -4681,6 +4681,12 @@ nereus_add_test(tst_beam_heading)
 #    you REQUESTED as one you received --
 nereus_add_test(tst_qso_confirmation)
 
+# -- What QRZ said, kept between runs so a two-thousand-contact log is
+#    not two thousand requests. Keyed on the call ASKED (a portable
+#    query gets a different call back), and a stale entry is handed
+#    over rather than deleted — last year's name beats no name --
+nereus_add_test(tst_callsign_cache)
+
 # -- Characters: the list makes claims (gentlest first, Off really off,
 #    the two voice de-essers listen in different places) and nothing but
 #    these tests keeps them true --

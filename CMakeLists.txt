@@ -500,6 +500,7 @@ set(CORE_SOURCES
     src/core/AppSettings.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
+    src/core/CallsignCache.cpp
     src/core/BuildIdentity.cpp
     src/core/FFTRouter.cpp
     src/core/SliceStreamAllocator.cpp
@@ -724,7 +725,11 @@ set(GUI_SOURCES
     src/gui/widgets/ParametricEqWidget.h
     src/gui/widgets/ParametricEqWidget.cpp
     src/gui/widgets/ResetSlider.h
+    src/gui/widgets/QsoDetailPane.h
+    src/gui/widgets/QsoDetailPane.cpp
     src/gui/widgets/ScrollableLabel.cpp
+    src/gui/widgets/StationPhoto.h
+    src/gui/widgets/StationPhoto.cpp
     src/gui/widgets/TriBtn.h
     src/gui/widgets/TriBtn.cpp
     src/gui/widgets/VfoLevelBar.cpp

@@ -31,6 +31,7 @@
 class QTimer;
 
 class QLabel;
+namespace NereusSDR { class StationPhoto; }
 class QLineEdit;
 class QNetworkAccessManager;
 class QPushButton;
@@ -131,7 +132,6 @@ private:
     void setStatus(const QString& text, bool warn = false);
     // Fetch and show the QRZ portrait. Cached on disk so working the
     // same station twice costs one request, not two.
-    void loadStationPhoto(const QString& url);
     void showStationVisuals(const CallsignInfo& info);
     // Flag emoji for the callsign's DXCC prefix, or empty. Kept as a
     // separate step from displaying it so the lookup can be tested and
@@ -174,7 +174,7 @@ private:
     GlobeWidget*     m_globe{nullptr};
     QStackedWidget*  m_viewStack{nullptr};
     QPushButton*     m_globeBtn{nullptr};
-    QLabel*          m_photo{nullptr};
+    StationPhoto*    m_photo{nullptr};
     QString          m_flagEmoji;
     // Created on first portrait fetch — a panel that never looks anyone
     // up should not open a network stack.
