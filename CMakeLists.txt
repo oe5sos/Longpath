@@ -498,6 +498,7 @@ endif()
 set(CORE_SOURCES
     src/core/AntennaLabels.cpp
     src/core/AppSettings.cpp
+    src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/BuildIdentity.cpp
     src/core/FFTRouter.cpp
@@ -966,6 +967,7 @@ set(GUI_SOURCES
     # Header-only Q_OBJECT: AUTOMOC only picks up a header when a source
     # file of the same base name exists, so an interface class with no
     # .cpp has to be listed explicitly or its vtable never gets built.
+    src/core/QsoConfirmation.cpp
     src/core/QsoUploader.h
     src/models/LogEntry.cpp
     src/gui/applets/RxApplet.cpp

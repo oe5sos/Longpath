@@ -4672,6 +4672,15 @@ nereus_add_test(tst_mic_spectrum)
 #    that tells a splattering station it is clean --
 nereus_add_test(tst_tx_spectrum_analysis)
 
+# -- Which way to point, and how far the rotor actually turns. The end
+#    stop is the part that is easy to get wrong and expensive: a
+#    north-stop rotor asked 350 -> 10 travels 340 the other way --
+nereus_add_test(tst_beam_heading)
+
+# -- Is this contact confirmed? "Non-empty means yes" would read a QSL
+#    you REQUESTED as one you received --
+nereus_add_test(tst_qso_confirmation)
+
 # -- Characters: the list makes claims (gentlest first, Off really off,
 #    the two voice de-essers listen in different places) and nothing but
 #    these tests keeps them true --

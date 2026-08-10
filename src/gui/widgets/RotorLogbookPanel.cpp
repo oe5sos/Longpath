@@ -1825,6 +1825,31 @@ void RotorLogbookPanel::openLogbookWindow()
         connect(m_logWindow, &LogbookWindow::logChanged,
                 this, &RotorLogbookPanel::refreshRecentList);
 
+        // ── Point the beam at a logged contact ───────────────────────
+        //
+        // The logbook knows the bearing to every contact and this panel
+        // owns the rotor; until now nobody had joined them, so working
+        // a station again meant reading a number off one half of the
+        // screen and typing it into the other.
+        //
+        // The dial follows too, not only the rotor: leaving it showing
+        // the old heading while the antenna turns is the kind of small
+        // lie that gets believed at three in the morning.
+        connect(m_logWindow, &LogbookWindow::turnRotorRequested, this,
+                [this](double bearing, const QString& call) {
+            if (!m_rotor || !m_rotor->isConnected()) {
+                QMessageBox::information(this, QStringLiteral("Rotor"),
+                    QStringLiteral("No rotor connected, so there is "
+                                   "nothing to turn. The bearing to %1 "
+                                   "is %2°.")
+                        .arg(call).arg(bearing, 0, 'f', 0));
+                return;
+            }
+            if (m_dial) { m_dial->setTargetBearing(bearing); }
+            if (m_globe) { m_globe->lookAlongBearing(bearing); }
+            m_rotor->moveTo(bearing);
+        });
+
         // Hand cty.dat down to the map. Contacts logged before a QRZ
         // lookup filled in a locator — and most contacts in a log
         // imported from another program — have no GRIDSQUARE at all,

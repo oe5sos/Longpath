@@ -57,10 +57,31 @@ public:
     // views cannot drift apart.
     void reload();
 
+private:
+    void showRowMenu(const QPoint& pos);
+
+public:
+
     // Places selected contacts can be sent. Not owned — the window is
     // one of several users of the same uploaders, and whoever holds the
     // credentials holds the objects.
     void setUploaders(const QVector<QsoUploader*>& uploaders);
+
+signals:
+    // ── Point the beam at a contact ──────────────────────────────────
+    //
+    // Every entry already carries the bearing to it, and the rotor
+    // panel that owns this window can already turn. The two have never
+    // been connected, so an operator wanting to work a station again
+    // read the bearing off the screen and typed it into the dial.
+    //
+    // A signal rather than a direct call because this window must not
+    // know about a rotor: it is opened on machines that have none, and
+    // a logbook that needs a rotor to compile is a logbook with a
+    // rotor-shaped hole in it.
+    void turnRotorRequested(double bearingDeg, const QString& call);
+
+public:
 
     // Passed straight to the map: the centre of a contact's DXCC entity,
     // for contacts that carry no locator. cty.dat lives with the radio
@@ -133,6 +154,7 @@ private:
     QComboBox*    m_modeBox{nullptr};
     QLineEdit*    m_gridEdit{nullptr};
     QLineEdit*    m_countryEdit{nullptr};
+    QCheckBox*    m_unconfirmedOnly{nullptr};
     QCheckBox*    m_useDates{nullptr};
     QDateEdit*    m_fromDate{nullptr};
     QDateEdit*    m_toDate{nullptr};

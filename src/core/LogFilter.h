@@ -59,6 +59,15 @@ struct LogFilter {
     // Off by default. A date range that defaults to something would
     // hide contacts the moment the window opened, and an operator who
     // sees an empty log concludes the log is empty.
+    // Hide what is already confirmed. The question an operator asks of
+    // a logbook is rarely "which are confirmed" — it is "which are not
+    // yet", because that is the list you chase.
+    //
+    // A QSL merely REQUESTED counts as unconfirmed here, because it is.
+    // See core/QsoConfirmation.h for why that distinction is worth the
+    // code it costs.
+    bool  unconfirmedOnly{false};
+
     bool  useDates{false};
     QDate from;
     QDate to;

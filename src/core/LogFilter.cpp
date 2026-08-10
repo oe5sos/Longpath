@@ -12,6 +12,8 @@
 
 #include "LogFilter.h"
 
+#include "core/QsoConfirmation.h"
+
 namespace NereusSDR {
 
 namespace {
@@ -28,11 +30,14 @@ bool sameIgnoringCase(const QString& a, const QString& b)
 bool LogFilter::isActive() const
 {
     return !blank(text) || !blank(band) || !blank(mode) || !blank(grid)
-           || !blank(country) || useDates;
+           || !blank(country) || useDates || unconfirmedOnly;
 }
 
 bool LogFilter::matches(const LogEntry& e) const
 {
+    // Cheapest and most selective first.
+    if (unconfirmedOnly && QsoConfirmation::isConfirmed(e)) { return false; }
+
     if (!blank(band) && !sameIgnoringCase(e.band, band)) { return false; }
 
     if (!blank(mode)) {

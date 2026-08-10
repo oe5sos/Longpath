@@ -13,6 +13,8 @@
 #include "LogbookWindow.h"
 
 #include "core/AdifLog.h"
+#include "core/BeamHeading.h"
+#include "core/QsoConfirmation.h"
 #include "core/AppSettings.h"
 #include "core/CallsignInfo.h"
 #include "core/QsoUploader.h"
@@ -55,7 +57,7 @@ namespace {
 enum Column {
     ColDate = 0, ColTime, ColCall, ColFreq, ColBand, ColMode,
     ColSent, ColRcvd, ColName, ColQth, ColCountry,
-    ColGrid, ColDistance, ColQrz, ColComment, ColumnCount
+    ColGrid, ColDistance, ColQrz, ColConfirmed, ColComment, ColumnCount
 };
 
 QStringList headerLabels()
@@ -67,7 +69,8 @@ QStringList headerLabels()
             QStringLiteral("Rcvd"),  QStringLiteral("Name"),
             QStringLiteral("QTH"),   QStringLiteral("Country"),
             QStringLiteral("Grid"),  QStringLiteral("km"),
-            QStringLiteral("QRZ"),   QStringLiteral("Comment")};
+            QStringLiteral("QRZ"),   QStringLiteral("QSL"),
+            QStringLiteral("Comment")};
 }
 
 // Newest first. Contacts with no timestamp sort last rather than being
@@ -268,6 +271,11 @@ void LogbookWindow::buildUi()
     // than most operators want at once, and which ones matter differs
     // per person — contest, DX chasing and casual logging each care
     // about a different half.
+    // Right-click a contact to point the beam at it.
+    m_table->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_table, &QTableWidget::customContextMenuRequested, this,
+            [this](const QPoint& pos) { showRowMenu(pos); });
+
     connect(m_table->horizontalHeader(), &QHeaderView::customContextMenuRequested,
             this, [this](const QPoint& pos) {
         QMenu menu(this);
@@ -345,6 +353,22 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 
     // Off by default. A live date range would hide contacts the moment
     // the window opened, and an empty log reads as an empty log.
+    // ── Only what is still outstanding ───────────────────────────────
+    //
+    // The question an operator actually asks of a logbook is not "which
+    // contacts are confirmed" but "which are not yet" — that is the list
+    // you chase, and the one you send to LoTW again.
+    m_unconfirmedOnly = new QCheckBox(QStringLiteral("Unconfirmed only"),
+                                      this);
+    m_unconfirmedOnly->setStyleSheet(
+        QStringLiteral("QCheckBox { color: %1; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+    m_unconfirmedOnly->setToolTip(QStringLiteral(
+        "Hide contacts confirmed by LoTW, a card or eQSL.\n\nA contact "
+        "with a QSL merely REQUESTED still counts as unconfirmed, "
+        "because it is."));
+    row->addWidget(m_unconfirmedOnly);
+
     m_useDates = new QCheckBox(QStringLiteral("Dates"), this);
     m_useDates->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                   .arg(QString::fromLatin1(Style::kTextPrimary)));
@@ -387,6 +411,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     connect(m_countryEdit, &QLineEdit::textChanged, this, reapply);
     connect(m_fromDate, &QDateEdit::dateChanged, this, reapply);
     connect(m_toDate, &QDateEdit::dateChanged, this, reapply);
+    connect(m_unconfirmedOnly, &QCheckBox::toggled, this,
+            [reapply](bool) { reapply(); });
     connect(m_useDates, &QCheckBox::toggled, this, [this, reapply](bool on) {
         m_fromDate->setEnabled(on);
         m_toDate->setEnabled(on);
@@ -450,6 +476,7 @@ LogFilter LogbookWindow::currentFilter() const
     if (m_bandBox->currentIndex() > 0) { f.band = m_bandBox->currentText(); }
     if (m_modeBox->currentIndex() > 0) { f.mode = m_modeBox->currentText(); }
 
+    f.unconfirmedOnly = m_unconfirmedOnly->isChecked();
     f.useDates = m_useDates->isChecked();
     if (f.useDates) {
         f.from = m_fromDate->date();
@@ -565,12 +592,69 @@ void LogbookWindow::applySort()
             // "what is still outstanding", not "what is done".
             less = a.uploadedToQrz < b.uploadedToQrz;
             break;
+        case ColConfirmed:
+            // Same reasoning: unconfirmed first, because that is the
+            // list you act on.
+            less = QsoConfirmation::isConfirmed(a)
+                 < QsoConfirmation::isConfirmed(b);
+            break;
         default:
             less = text(lhs).compare(text(rhs), Qt::CaseInsensitive) < 0;
             break;
         }
         return asc ? less : !less;
     });
+}
+
+void LogbookWindow::showRowMenu(const QPoint& pos)
+{
+    const int view = m_table->rowAt(pos.y());
+    const int idx  = sourceRow(view);
+    if (idx < 0) { return; }
+    const LogEntry& e = m_all.at(idx);
+
+    QMenu menu(this);
+
+    // The bearing is only meaningful when both locators are known —
+    // ours and theirs. Without it the entry has a bearing field holding
+    // zero, and offering to turn the antenna due north because a grid
+    // square is missing would be worse than offering nothing.
+    const bool haveBearing = e.distanceKm > 0.0
+                          && !e.gridSquare.trimmed().isEmpty()
+                          && !e.myGridSquare.trimmed().isEmpty();
+
+    if (haveBearing) {
+        const double sp = BeamHeading::wrap360(e.bearingDeg);
+        const double lp = BeamHeading::longPath(sp);
+        QAction* a1 = menu.addAction(
+            QStringLiteral("Turn rotor to %1 — short path %2°")
+                .arg(e.call).arg(sp, 0, 'f', 0));
+        QAction* a2 = menu.addAction(
+            QStringLiteral("Turn rotor to %1 — long path %2°")
+                .arg(e.call).arg(lp, 0, 'f', 0));
+        a2->setToolTip(QStringLiteral(
+            "The other way round the world. On the low bands and at grey "
+            "line this is often the stronger signal."));
+        connect(a1, &QAction::triggered, this,
+                [this, sp, call = e.call]() {
+            emit turnRotorRequested(sp, call);
+        });
+        connect(a2, &QAction::triggered, this,
+                [this, lp, call = e.call]() {
+            emit turnRotorRequested(lp, call);
+        });
+        menu.addSeparator();
+    } else {
+        QAction* none = menu.addAction(
+            QStringLiteral("No bearing — needs both locators"));
+        none->setEnabled(false);
+        menu.addSeparator();
+    }
+
+    QAction* edit = menu.addAction(QStringLiteral("Edit…"));
+    connect(edit, &QAction::triggered, this, &LogbookWindow::editSelected);
+
+    menu.exec(m_table->viewport()->mapToGlobal(pos));
 }
 
 void LogbookWindow::refreshTable()
@@ -627,6 +711,24 @@ void LogbookWindow::refreshTable()
                 ? QString::number(e.distanceKm, 'f', 0) : QString{});
         // A tick, not the word "yes": the column is scanned, not read.
         put(ColQrz, e.uploadedToQrz ? QStringLiteral("\u2713") : QString{});
+
+        // ── Confirmations, at last visible ───────────────────────────
+        //
+        // These fields have survived an import since the ADIF
+        // round-trip was fixed, and until now nothing showed them. A
+        // confirmation you cannot see is not much better than one that
+        // was deleted, which is what used to happen to it.
+        //
+        // Blank when nothing is confirmed, deliberately: an unconfirmed
+        // contact should be quiet rather than compete with the
+        // confirmed ones for attention.
+        put(ColConfirmed, QsoConfirmation::badge(e));
+        if (QTableWidgetItem* it = m_table->item(row, ColConfirmed)) {
+            it->setToolTip(QsoConfirmation::describe(e));
+            if (QsoConfirmation::isConfirmed(e)) {
+                it->setForeground(QColor(0x00, 0xff, 0x88));
+            }
+        }
         put(ColComment, e.comment);
     }
     if (!m_headerRestored) { m_table->resizeColumnsToContents(); }
