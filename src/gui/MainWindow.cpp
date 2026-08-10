@@ -472,6 +472,23 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_radioModel(new RadioModel(this))
 {
+    // ── 2026-08-10: WSJT-X auto-logging ──────────────────────────────
+    // When WSJT-X logs a QSO it broadcasts the finished ADIF record;
+    // route it into the Rotor/Log panel's logbook. Connected here in
+    // the constructor rather than where the Spot Hub wires its other
+    // WSJT-X signals, because the listener can auto-start with the app
+    // (WsjtxAutoStart) long before any dialog is opened — a contact
+    // logged in the first minute must not be lost to lazy wiring. The
+    // panel itself is created on demand inside the lambda.
+    if (auto* wsjtx = m_radioModel->wsjtx()) {
+        connect(wsjtx, &WsjtxClient::qsoLogged,
+                this, [this](const LogEntry& e) {
+            if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+                panel->logExternalQso(e);
+            }
+        });
+    }
+
     // ── Phase 23 (bench fix 2026-05-10): TCI Server BEFORE buildUI ───────────
     // TciApplet + ClientChainApplet are constructed by populateDefaultMeter()
     // (called from buildUI), gated on `if (m_tciServer)`. The original Phase
@@ -9503,6 +9520,18 @@ void MainWindow::openSpotHub()
                 this, [this](double freqMhz) {
                     if (auto* slice = m_radioModel->activeSlice()) {
                         slice->setFrequency(freqMhz * 1.0e6);
+                    }
+                });
+        // 2026-08-10: Spot List right-click → aim the rotor. The panel
+        // owns the bearing maths and the rotator link; bring the dock
+        // into view so the operator sees the needle they just
+        // commanded rather than trusting that something happened.
+        connect(m_spotHubDialog.data(), &SpotHubDialog::rotorRequested,
+                this, [this](const QString& dxCall) {
+                    if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+                        m_rotorDock->show();
+                        m_rotorDock->raise();
+                        panel->workSpot(dxCall);
                     }
                 });
         // Phase 3J-2 + 3R M2: Display tab knob round-trip.

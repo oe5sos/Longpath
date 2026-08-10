@@ -88,6 +88,13 @@ public:
     void setAutoRotate(bool on);
     bool autoRotate() const { return m_autoRotate; }
 
+    // The blue atmosphere rim around the disc. Off by default
+    // (2026-08-10): in a narrow dock the ring reads as a strange
+    // circular bar over the globe rather than as air, and the operator
+    // asked for it gone. The code stays for anyone who wants it back.
+    void setShowAtmosphere(bool on);
+    bool showAtmosphere() const { return m_showAtmosphere; }
+
     // Sun position drives the day/night terminator. Defaults to the
     // real subsolar point for the current UTC time.
     void setSubsolarPoint(double lat, double lon);
@@ -169,6 +176,7 @@ private:
 
     QVector<MapPoint> m_points;
     bool m_showPointPaths{true};
+    bool m_showAtmosphere{false};
 
     // Magnification. 1.0 fits the disc in the widget.
     double m_zoom{1.0};

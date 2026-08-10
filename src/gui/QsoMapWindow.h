@@ -21,17 +21,27 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Band and mode filter pills, a station card for a
+//                 clicked marker, the Maidenhead grid overlay switch,
+//                 and export of the filtered view to Google Earth
+//                 (KML). The pills are rebuilt from whatever bands and
+//                 modes the log actually contains — a fixed list would
+//                 offer 60 m to an operator who has never used it and
+//                 omit whatever oddity they have. AI-assisted via
+//                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================
 
 #include "models/LogEntry.h"
 
 #include <QDialog>
+#include <QSet>
 #include <QVector>
 
 #include <functional>
 
 class QCheckBox;
 class QDateEdit;
+class QHBoxLayout;
 class QLabel;
 class QPushButton;
 class QStackedWidget;
@@ -89,6 +99,20 @@ private:
     void zoomActiveView(double factor);
     void resetActiveView();
 
+    // Pills for the bands and modes the log actually contains,
+    // recreated whenever the entries change.
+    void rebuildFilterPills();
+    // The filtered view, as a KML file, opened in Google Earth.
+    void exportKml();
+    // Everything the log knows about a clicked marker's station.
+    void showStationInfo(const QString& label);
+    // How many contacts sit in a clicked grid square, and who.
+    void showGridInfo(const QString& locator);
+
+    // Filter keys: band lower-cased, mode upper-cased, blanks as "?".
+    static QString bandKey(const LogEntry& e);
+    static QString modeKey(const LogEntry& e);
+
     QVector<LogEntry> m_all;
     QVector<LogEntry> m_selected;
     QString m_homeGrid;
@@ -101,9 +125,21 @@ private:
     QDateEdit*   m_from{nullptr};
     QDateEdit*   m_to{nullptr};
     QCheckBox*   m_paths{nullptr};
+    QCheckBox*   m_grid{nullptr};
     QCheckBox*   m_onlySelected{nullptr};
     QLabel*      m_summary{nullptr};
+    QLabel*      m_info{nullptr};        // station card / grid answer
     QPushButton* m_viewBtn{nullptr};
+
+    // Filter pills and their state. An empty active set means "no
+    // filtering" (everything shown), so a fresh window hides nothing.
+    QHBoxLayout*  m_pillRow{nullptr};
+    QSet<QString> m_offBands;    // pills the operator has turned OFF
+    QSet<QString> m_offModes;
+
+    // What the current filters left visible — the set the KML export
+    // sends, so Google Earth shows exactly what the window shows.
+    QVector<LogEntry> m_lastShown;
     // The date controls and the quick-range buttons, greyed together
     // while only the selection is shown — a live date field that
     // changes nothing is worse than a disabled one.

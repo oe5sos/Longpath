@@ -21,6 +21,13 @@
 //     <eor> / <EOR> / <Eor> all parse the same.
 //   - rejectsMalformedAdif: arbitrary garbage bytes yield an
 //     empty record vector.
+//
+// 2026-08-10 (KG4VCF, AI tooling: Anthropic Claude Code) — sixth
+// test added alongside the extractField regex fix:
+//   - handlesTypeIndicatorTags: fields carrying an ADIF data type
+//     indicator (<CALL:6:S>, <FREQ:6:N>, lowercase <call:4:s>)
+//     parse identically to plain <FIELD:len> tags. The previous
+//     regex silently dropped every such field.
 
 #include <QtTest>
 #include <QSignalSpy>
@@ -48,6 +55,7 @@ private slots:
     void emitsFinishedSignal();
     void skipsHeaderSection();
     void handlesCaseInsensitiveTags();
+    void handlesTypeIndicatorTags();
     void rejectsMalformedAdif();
 };
 
@@ -137,6 +145,31 @@ void TestAdifParser::handlesCaseInsensitiveTags()
     QCOMPARE(records[1].callsign, QStringLiteral("JA1ABC"));
     QCOMPARE(records[1].band, QStringLiteral("40m"));
     QCOMPARE(records[1].modeGroup, QStringLiteral("CW"));
+}
+
+void TestAdifParser::handlesTypeIndicatorTags()
+{
+    // ADIF permits an optional single-letter data type indicator after
+    // the length segment: <FIELDNAME:length:T>.  Loggers that emit it
+    // (e.g. <CALL:6:S>, <FREQ:6:N>) must parse identically to the plain
+    // form.  Regression test for the extractField regex fix (2026-08-10):
+    // the old pattern put the optional type group before the length
+    // capture, so typed fields never matched and were silently dropped.
+    const QByteArray adif =
+        "<EOH>\n"
+        "<CALL:6:S>JA1ABC <BAND:3:E>40m <MODE:2:E>CW <EOR>\n"
+        "<call:4:s>W1AW <FREQ:6:N>14.074 <MODE:3>FT8 <eor>\n";
+
+    const QVector<QsoRecord> records =
+        AdifParser::parseBytesForTest(adif);
+    QCOMPARE(records.size(), 2);
+    QCOMPARE(records[0].callsign, QStringLiteral("JA1ABC"));
+    QCOMPARE(records[0].band, QStringLiteral("40m"));
+    QCOMPARE(records[0].modeGroup, QStringLiteral("CW"));
+    // Second record has no BAND — falls back to FREQ (typed :N) -> 20m.
+    QCOMPARE(records[1].callsign, QStringLiteral("W1AW"));
+    QCOMPARE(records[1].band, QStringLiteral("20m"));
+    QCOMPARE(records[1].modeGroup, QStringLiteral("DATA"));
 }
 
 void TestAdifParser::rejectsMalformedAdif()

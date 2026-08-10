@@ -109,6 +109,13 @@ void RotorDialWidget::clearTarget()
     update();
 }
 
+void RotorDialWidget::setElevation(double deg)
+{
+    m_elevation = std::clamp(deg, 0.0, 90.0);
+    m_hasElevation = true;
+    update();
+}
+
 void RotorDialWidget::setEndStop(double stopDeg)
 {
     m_endStop = stopDeg < 0.0 ? -1.0 : norm360(stopDeg);
@@ -338,6 +345,18 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     p.setBrush(hubCol);
     p.drawEllipse(c, 3.6, 3.6);
     p.setBrush(Qt::NoBrush);
+
+    // Elevation, top-right, only for rotators that report one.
+    if (m_hasElevation) {
+        QFont ef = p.font();
+        ef.setPixelSize(10);
+        p.setFont(ef);
+        p.setPen(kMuted);
+        const QString etext =
+            QStringLiteral("EL %1°").arg(qRound(m_elevation));
+        p.drawText(QPointF(w - QFontMetrics(ef).horizontalAdvance(etext)
+                               - 6.0, 14.0), etext);
+    }
 
     // ── Readout under the rose ───────────────────────────────────────
     QFont big = p.font();

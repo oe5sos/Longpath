@@ -8,6 +8,10 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Atmosphere rim off by default, behind
+//                 setShowAtmosphere(); see GlobeWidget.h. AI-assisted
+//                 via Anthropic Claude (Cowork), operator Martin
+//                 Fischer.
 // =================================================================
 
 #include "GlobeWidget.h"
@@ -160,6 +164,12 @@ void GlobeWidget::setAutoRotate(bool on)
 {
     m_autoRotate = on;
     if (on && !m_anim->isActive()) { m_anim->start(); }
+}
+
+void GlobeWidget::setShowAtmosphere(bool on)
+{
+    m_showAtmosphere = on;
+    update();
 }
 
 void GlobeWidget::setBeamSpread(double deg)
@@ -567,15 +577,19 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     const double r  = radiusPx();
     const QPointF c(width() * 0.5, height() * 0.5);
 
-    // Atmosphere: a soft rim just outside the disc.
-    QRadialGradient halo(c, r * 1.16);
-    halo.setColorAt(0.86, QColor(0, 0, 0, 0));
-    halo.setColorAt(0.94, QColor(80, 160, 230, 46));
-    halo.setColorAt(1.00, QColor(80, 160, 230, 0));
-    p.setPen(Qt::NoPen);
-    p.setBrush(halo);
-    p.drawEllipse(c, r * 1.16, r * 1.16);
-    p.setBrush(Qt::NoBrush);
+    // Atmosphere: a soft rim just outside the disc. Optional and off by
+    // default — in a narrow dock it reads as a circular bar over the
+    // globe rather than as air.
+    if (m_showAtmosphere) {
+        QRadialGradient halo(c, r * 1.16);
+        halo.setColorAt(0.86, QColor(0, 0, 0, 0));
+        halo.setColorAt(0.94, QColor(80, 160, 230, 46));
+        halo.setColorAt(1.00, QColor(80, 160, 230, 0));
+        p.setPen(Qt::NoPen);
+        p.setBrush(halo);
+        p.drawEllipse(c, r * 1.16, r * 1.16);
+        p.setBrush(Qt::NoBrush);
+    }
 
     p.drawImage(0, 0, m_frame);
 

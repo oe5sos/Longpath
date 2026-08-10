@@ -12,6 +12,12 @@
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-08-10 — setElevation() moved out-of-line: it now feeds the
+//                 elevation smoothing state (m_smoothedEle), which was
+//                 previously never updated, so the ELE needle always
+//                 rendered 0°. smoothedAzimuth()/smoothedElevation()
+//                 test seams added. AI-assisted via Anthropic Claude
+//                 Code.
 // =================================================================
 
 /*  MeterManager.cs
@@ -112,8 +118,14 @@ public:
     QString backgroundImagePath() const { return m_bgImagePath; }
 
     // Elevation value (for BOTH mode — azimuth uses base m_value)
-    void setElevation(float ele) { m_elevation = ele; }
+    // Advances the elevation smoothing state on each call (poll tick),
+    // mirroring the azimuth smoothing in setValue().
+    void setElevation(float ele);
     float elevation() const { return m_elevation; }
+
+    // Test seams (precedent: parseBytesForTest in AdifParser)
+    float smoothedAzimuth() const { return m_smoothedAz; }
+    float smoothedElevation() const { return m_smoothedEle; }
 
     void setValue(double v) override;
 

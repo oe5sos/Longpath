@@ -8,6 +8,22 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Two fixes, AI-assisted via Anthropic Claude (Cowork),
+//                 operator Martin Fischer:
+//                 (1) parse() walks BYTES of the UTF-8 input, not
+//                     QChars. ADIF lengths count what is on disk, and a
+//                     char-counted walk mis-sliced every record whose
+//                     NAME/QTH/COMMENT carried an umlaut. Pairs with
+//                     LogEntry::field() now writing byte counts.
+//                 (2) The final record of a file without a trailing
+//                     <EOR> now gets distance and bearing computed like
+//                     every other record, instead of silently lacking
+//                     them.
+//                 (3) write() keeps three rotating backups of the file
+//                     it is about to replace, and value decoding falls
+//                     back to Latin-1 when the bytes are not valid
+//                     UTF-8 — old Windows loggers wrote Latin-1, and
+//                     their umlauts arrived as replacement characters.
 // =================================================================
 
 #include "AdifLog.h"
@@ -19,6 +35,7 @@
 #include <QHash>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QStringConverter>
 #include <QTextStream>
 #include <QTimeZone>
 
@@ -48,40 +65,84 @@ QDateTime combine(const QString& date, const QString& time)
     return QDateTime(d, t, QTimeZone::UTC);
 }
 
+// A field value, as text. Strict UTF-8 first; when the bytes are not
+// valid UTF-8 the file is almost certainly Latin-1 — the encoding old
+// Windows loggers wrote — and decoding it as UTF-8 anyway would turn
+// every umlaut into a replacement character. Latin-1 maps every byte,
+// so the fallback cannot fail, only be wrong for encodings nobody's
+// logger has used.
+QString decodeValue(const QByteArray& raw)
+{
+    QStringDecoder utf8(QStringConverter::Utf8,
+                        QStringConverter::Flag::Stateless);
+    const QString s = utf8.decode(raw);
+    if (!utf8.hasError()) { return s; }
+    return QString::fromLatin1(raw);
+}
+
+// Keep the last three generations of the file about to be replaced.
+// write() rewrites the whole log, so one bad merge or import replaces
+// everything at once — atomicity protects against a crash mid-write,
+// but not against successfully writing the wrong thing. Three
+// generations rather than one: the mistake is often noticed after the
+// next save has already happened.
+void rotateBackups(const QString& path)
+{
+    if (!QFile::exists(path)) { return; }
+    const QString b1 = path + QStringLiteral(".bak1");
+    const QString b2 = path + QStringLiteral(".bak2");
+    const QString b3 = path + QStringLiteral(".bak3");
+    QFile::remove(b3);
+    QFile::rename(b2, b3);
+    QFile::rename(b1, b2);
+    QFile::copy(path, b1);
+}
+
 } // namespace
 
-QVector<LogEntry> parse(const QString& text)
+QVector<LogEntry> parse(const QByteArray& bytes)
 {
     QVector<LogEntry> out;
     LogEntry cur;
     QString date, time;
     bool sawField = false;
 
+    // Timestamp, distance and bearing — the same completion whether the
+    // record ended in <EOR> or the file just stopped.
+    auto finalize = [&date, &time](LogEntry& e) {
+        e.timeOn = combine(date, time);
+        if (isValidGridSquare(e.myGridSquare)
+            && isValidGridSquare(e.gridSquare)) {
+            e.distanceKm =
+                calculateDistanceKm(e.myGridSquare, e.gridSquare);
+            e.bearingDeg =
+                calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+        }
+    };
+
     // ADIF is length-prefixed, so a value may legally contain '<'.
     // Walking lengths is the only correct way to read it; splitting on
     // brackets would corrupt any comment containing one.
+    //
+    // The walk is over BYTES: <NAME:length> counts octets on disk, and
+    // that is also what every other logger writes. Values become
+    // QStrings only after their byte extent is known.
     int pos = 0;
-    const int n = text.size();
+    const int n = bytes.size();
     while (pos < n) {
-        const int lt = text.indexOf(QLatin1Char('<'), pos);
+        const int lt = bytes.indexOf('<', pos);
         if (lt < 0) { break; }
-        const int gt = text.indexOf(QLatin1Char('>'), lt);
+        const int gt = bytes.indexOf('>', lt);
         if (gt < 0) { break; }
 
-        const QString spec = text.mid(lt + 1, gt - lt - 1);
+        // Field names are ASCII, so bytes-as-Latin1 is exact here.
+        const QString spec =
+            QString::fromLatin1(bytes.mid(lt + 1, gt - lt - 1));
         pos = gt + 1;
 
         if (spec.compare(QStringLiteral("EOR"), Qt::CaseInsensitive) == 0) {
             if (cur.isValid()) {
-                cur.timeOn = combine(date, time);
-                if (isValidGridSquare(cur.myGridSquare)
-                    && isValidGridSquare(cur.gridSquare)) {
-                    cur.distanceKm =
-                        calculateDistanceKm(cur.myGridSquare, cur.gridSquare);
-                    cur.bearingDeg =
-                        calculateBearingInDegrees(cur.myGridSquare,
-                                                  cur.gridSquare);
-                }
+                finalize(cur);
                 out.append(cur);
             }
             cur = LogEntry{};
@@ -107,7 +168,7 @@ QVector<LogEntry> parse(const QString& text)
         const int len = parts.at(1).toInt(&ok);
         if (!ok || len < 0 || pos + len > n) { continue; }
 
-        const QString value = text.mid(pos, len);
+        const QString value = decodeValue(bytes.mid(pos, len));
         pos += len;
         sawField = true;
 
@@ -152,10 +213,15 @@ QVector<LogEntry> parse(const QString& text)
     // one. Losing a contact to a missing terminator would be a poor
     // trade for strictness.
     if (sawField && cur.isValid()) {
-        cur.timeOn = combine(date, time);
+        finalize(cur);
         out.append(cur);
     }
     return out;
+}
+
+QVector<LogEntry> parse(const QString& text)
+{
+    return parse(text.toUtf8());
 }
 
 QVector<LogEntry> read(const QString& path, QString* error)
@@ -169,12 +235,19 @@ QVector<LogEntry> read(const QString& path, QString* error)
         if (error) { *error = f.errorString(); }
         return {};
     }
-    return parse(QString::fromUtf8(f.readAll()));
+    // Bytes straight into the byte-walking parser — converting to
+    // QString first would reintroduce the char/byte length mismatch.
+    return parse(f.readAll());
 }
 
 bool write(const QString& path, const QVector<LogEntry>& entries,
            QString* error)
 {
+    // Backups first: QSaveFile protects against a crash mid-write, but
+    // not against successfully writing a log that a bad merge or import
+    // just gutted. Three generations sit beside the file as .bak1-3.
+    rotateBackups(path);
+
     // QSaveFile writes to a temporary and renames on commit, so a crash
     // or a full disk mid-write leaves the previous log intact rather
     // than a truncated one.

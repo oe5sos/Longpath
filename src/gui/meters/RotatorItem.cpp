@@ -10,6 +10,19 @@
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-08-10 — Three fixes, AI-assisted via Anthropic Claude Code:
+//                 (1) setElevation() implemented out-of-line and now
+//                     advances m_smoothedEle — previously nothing ever
+//                     wrote the smoothed value, so the ELE needle was
+//                     stuck at 0°.
+//                 (2) paintHeading(): elevation display value clamped
+//                     to [0, 90] instead of fmod(…, 90), which mapped
+//                     a legitimate 90° (zenith) reading to 0°.
+//                 (3) setValue(): the snap branch condition
+//                     |diff| < 0.2*|diff| was never true, so the
+//                     needle only ever approached the target
+//                     asymptotically. Snap now triggers below a
+//                     0.5° epsilon.
 // =================================================================
 
 /*  MeterManager.cs
@@ -106,14 +119,48 @@ void RotatorItem::setValue(double v)
 
     float adjustmentSpeed = 0.2f * std::abs(difference);
 
-    if (std::abs(difference) < adjustmentSpeed) {
-        m_smoothedAz = static_cast<float>(v);
+    // NereusSDR fix (2026-08-10): upstream's snap condition
+    // (|difference| < adjustmentSpeed, i.e. |d| < 0.2*|d|) can never be
+    // true for a non-zero difference, so the needle approached the target
+    // geometrically but never landed on it. Snap once we are within half
+    // a degree — visually indistinguishable, and the readout settles on
+    // the exact reported heading.
+    constexpr float kSnapEpsilonDeg = 0.5f;
+
+    if (std::abs(difference) < kSnapEpsilonDeg) {
+        m_smoothedAz = normalizedReading;
     } else {
         m_smoothedAz += (difference > 0.0f ? 1.0f : -1.0f) * adjustmentSpeed;
     }
 
     m_smoothedAz = std::fmod(m_smoothedAz, 360.0f);
     if (m_smoothedAz < 0.0f) { m_smoothedAz += 360.0f; }
+}
+
+// ---------------------------------------------------------------------------
+// setElevation()
+// Elevation smoothing — mirrors the azimuth smoothing in setValue(), but
+// without angular wrap (elevation is a bounded 0-90° quantity, not modular).
+//
+// NereusSDR fix (2026-08-10): previously this was an inline setter that
+// only stored m_elevation, while paintHeading() renders m_smoothedEle —
+// which nothing ever updated, so the elevation needle was stuck at 0°.
+// ---------------------------------------------------------------------------
+void RotatorItem::setElevation(float ele)
+{
+    m_elevation = ele;
+
+    const float target     = std::clamp(ele, 0.0f, 90.0f);
+    const float difference = target - m_smoothedEle;
+
+    const float adjustmentSpeed = 0.2f * std::abs(difference);
+    constexpr float kSnapEpsilonDeg = 0.5f;
+
+    if (std::abs(difference) < kSnapEpsilonDeg) {
+        m_smoothedEle = target;
+    } else {
+        m_smoothedEle += (difference > 0.0f ? 1.0f : -1.0f) * adjustmentSpeed;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +536,9 @@ void RotatorItem::paintHeading(QPainter& p, const QRect& compassRect)
             cy_ele = static_cast<float>(compassRect.top()) + h / 2.0f;
         }
 
-        const float degrees_ele = std::fmod(std::abs(m_smoothedEle), 90.0f);
+        // NereusSDR fix (2026-08-10): clamp instead of fmod — fmod mapped a
+        // legitimate 90° (zenith) reading back to 0°.
+        const float degrees_ele = std::clamp(std::abs(m_smoothedEle), 0.0f, 90.0f);
 
         // Arrow — elevation: 0°=right, 90°=top (negated angle)
         // From Thetis MeterManager.cs:35536-35554

@@ -16,6 +16,11 @@
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //                 Step 1 of the QRZ logbook work: display only, no
 //                 rotator protocol behind it yet.
+//   2026-08-10 — Elevation readout: shown in the top-right corner once
+//                 a rotator has reported one. An azimuth-only rotator
+//                 never triggers it, so nothing changes for the common
+//                 case. AI-assisted via Anthropic Claude (Cowork),
+//                 operator Martin Fischer.
 // =================================================================
 
 #include <QPointF>
@@ -52,6 +57,11 @@ public:
     void setActualBearing(double deg);
     void setTargetBearing(double deg);
     void clearTarget();
+
+    // Reported elevation, for az/el rotators. Drawn only after the
+    // first call — an azimuth-only rotator never makes one, and a
+    // permanent "EL 0°" would be noise on every dial.
+    void setElevation(double deg);
     double actualBearing() const noexcept { return m_actual; }
     double targetBearing() const noexcept { return m_target; }
     bool   hasTarget()     const noexcept { return m_hasTarget; }
@@ -112,6 +122,8 @@ private:
     double m_actual{0.0};
     double m_target{0.0};
     bool   m_hasTarget{false};
+    double m_elevation{0.0};
+    bool   m_hasElevation{false};
     double m_endStop{-1.0};        // <0 = free rotation
     double m_beamWidth{40.0};
     double m_tolerance{3.0};

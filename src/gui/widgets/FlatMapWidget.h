@@ -20,6 +20,13 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Maidenhead grid overlay (fields, then squares as the
+//                 zoom allows, click to identify), and contact markers
+//                 became clickable — pointClicked carries the callsign
+//                 so the map window can show the station's data. A
+//                 click is distinguished from a drag by movement, not
+//                 by timing. AI-assisted via Anthropic Claude (Cowork),
+//                 operator Martin Fischer.
 // =================================================================
 
 #include "MapPoint.h"
@@ -50,6 +57,12 @@ public:
     // world map while operating, not decoration.
     void setShowTerminator(bool on);
 
+    // Maidenhead overlay: fields (AA-RR) always, squares once the zoom
+    // gives them room. Clicking an empty spot with the grid on
+    // identifies the square under the cursor and highlights it.
+    void setShowGrid(bool on);
+    bool showGrid() const { return m_showGrid; }
+
     // Re-read the shared world image, e.g. after a download.
     void refreshTexture();
 
@@ -76,6 +89,21 @@ public:
                                                double lat2, double lon2,
                                                int steps);
 
+    // The 4-character Maidenhead square containing a position. Static
+    // and here rather than in core/Maidenhead: the overlay needs the
+    // square's IDENTITY at arbitrary coarseness, not its centre.
+    static QString gridSquare4(double lat, double lon);
+
+signals:
+    // A contact marker was clicked. label is the MapPoint's label —
+    // the callsign, prefixed with '~' when the position was a country
+    // guess rather than a locator.
+    void pointClicked(const QString& label, double lat, double lon);
+
+    // With the grid overlay on, a click that hit no marker names the
+    // square it landed in.
+    void gridClicked(const QString& locator);
+
 protected:
     void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent*) override;
@@ -89,7 +117,12 @@ private:
     // Map area inside the widget at the current zoom and pan.
     QRectF mapRect() const;
     QPointF project(double lat, double lon) const;
+    // Inverse of project(). False when the pixel lies off the map.
+    bool unproject(const QPointF& pos, double& lat, double& lon) const;
     void buildNightOverlay();
+    void paintGridOverlay(QPainter& p, const QRectF& r);
+    // The marker under (or within a few pixels of) a click, or -1.
+    int pointAt(const QPointF& pos) const;
 
     QVector<MapPoint> m_points;
     double m_homeLat{0.0}, m_homeLon{0.0};
@@ -97,6 +130,8 @@ private:
 
     bool m_showPaths{true};
     bool m_showTerminator{true};
+    bool m_showGrid{false};
+    QString m_clickedGrid;   // highlighted square, empty for none
 
     QImage m_night;          // coarse shading, scaled up on draw
     bool   m_nightDirty{true};
@@ -104,6 +139,9 @@ private:
     double  m_zoom{1.0};
     QPointF m_pan{0.0, 0.0};   // pixels
     bool    m_dragging{false};
+    // A press is a click until it moves. Distinguishing by distance
+    // rather than time: a slow deliberate click is still a click.
+    bool    m_moved{false};
     QPoint  m_dragFrom;
     QPointF m_panFrom;
 };

@@ -7,6 +7,16 @@
 // Modification history (NereusSDR)
 //   2026-08-07  Martin Fischer  Initial create. AI tooling: Anthropic
 //                               Claude (Cowork).
+//   2026-08-10  Martin Fischer  ADIF lengths in UTF-8 bytes, not
+//                               QString::length() code units. The file
+//                               is written UTF-8, and <NAME:length>
+//                               counts octets on disk — "Jürgen" is 6
+//                               chars but 7 bytes, and the char count
+//                               mis-sliced every byte-counting reader,
+//                               QRZ and Cloudlog included (they receive
+//                               exactly this string). Pairs with
+//                               AdifLog::parse() now walking bytes.
+//                               AI tooling: Anthropic Claude (Cowork).
 
 #include "LogEntry.h"
 
@@ -16,14 +26,21 @@ namespace NereusSDR {
 
 namespace {
 
-// ADIF field: <NAME:LENGTH>VALUE. Length counts characters, which is
-// why a value may legally contain '<' — readers walk lengths, they do
-// not split on the bracket.
+// ADIF field: <NAME:LENGTH>VALUE. Length counts BYTES of the value as
+// it sits in the (UTF-8) file, which is why a value may legally contain
+// '<' — readers walk lengths, they do not split on the bracket.
+//
+// QString::length() would count UTF-16 code units instead, and the two
+// disagree the moment a name or comment carries an umlaut: "Jürgen" is
+// 6 code units but 7 bytes, and a byte-counting reader — every other
+// logger, plus QRZ and Cloudlog, which are sent exactly this string —
+// then mis-slices the record from that field onwards.
 void field(QString& out, const QString& name, const QString& value)
 {
     const QString v = value.trimmed();
     if (v.isEmpty()) { return; }
-    out += QStringLiteral("<%1:%2>%3 ").arg(name).arg(v.length()).arg(v);
+    out += QStringLiteral("<%1:%2>%3 ").arg(name).arg(v.toUtf8().size())
+                                        .arg(v);
 }
 
 // The same, but without the trim and without dropping an empty value.
@@ -32,7 +49,7 @@ void field(QString& out, const QString& name, const QString& value)
 // zero-length one.
 void rawField(QString& out, const QString& name, const QString& value)
 {
-    out += QStringLiteral("<%1:%2>%3 ").arg(name).arg(value.length())
+    out += QStringLiteral("<%1:%2>%3 ").arg(name).arg(value.toUtf8().size())
                                         .arg(value);
 }
 

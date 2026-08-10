@@ -130,6 +130,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMetaObject>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -2345,6 +2346,40 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         double freq = m_spotTableModel->freqAtRow(srcIdx.row());
         if (freq > 0.0)
             emit tuneRequested(freq);
+    });
+
+    // 2026-08-10: right-click → aim the antenna at the spotted station.
+    // The spot list only names the callsign; the bearing maths, the QRZ
+    // locator and the turn itself all live in the Rotor/Log panel,
+    // which MainWindow routes rotorRequested() to. Tune is offered in
+    // the same menu so the discoverable path and the double-click do
+    // the same thing.
+    m_spotTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_spotTable, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint& pos) {
+        const QModelIndex idx = m_spotTable->indexAt(pos);
+        if (!idx.isValid() || !m_spotProxyModel || !m_spotTableModel) {
+            return;
+        }
+        const QModelIndex srcIdx = m_spotProxyModel->mapToSource(idx);
+        const QString call = m_spotTableModel->data(
+            m_spotTableModel->index(srcIdx.row(), SpotTableModel::ColDxCall),
+            Qt::DisplayRole).toString().trimmed().toUpper();
+        const double freq = m_spotTableModel->freqAtRow(srcIdx.row());
+        if (call.isEmpty()) { return; }
+
+        QMenu menu(this);
+        QAction* tune  = menu.addAction(
+            QStringLiteral("Tune to %1").arg(call));
+        QAction* rotor = menu.addAction(
+            QStringLiteral("Turn rotor to %1").arg(call));
+        QAction* chosen =
+            menu.exec(m_spotTable->viewport()->mapToGlobal(pos));
+        if (chosen == tune && freq > 0.0) {
+            emit tuneRequested(freq);
+        } else if (chosen == rotor) {
+            emit rotorRequested(call);
+        }
     });
 
     // 2026-05-12 bench fix (Gap #6 — list → panadapter hover sync).

@@ -24,6 +24,18 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Reply watchdog: an outstanding command that never gets
+//                 an answer used to leave m_awaiting set forever — the
+//                 poll timer's "one command at a time" guard then never
+//                 passed again, and a rotctld that froze without closing
+//                 the socket silently stopped the whole client. Now the
+//                 connection is cut after kReplyTimeoutMs and the
+//                 existing auto-reconnect takes over. Elevation is also
+//                 kept instead of discarded, and moveTo() sends the last
+//                 reported elevation rather than forcing 0 — an az/el
+//                 rotator no longer has its elevation slammed down by
+//                 every azimuth command. AI-assisted via Anthropic
+//                 Claude (Cowork), operator Martin Fischer.
 // =================================================================
 
 #include "RotorController.h"
@@ -55,10 +67,21 @@ public:
     // quiet.
     static constexpr int kStaleAfterMs = 1500;
 
+    // How long an outstanding command may wait for its reply before the
+    // link is declared dead and cut. Generous next to kStaleAfterMs on
+    // purpose: this is the last resort for a daemon that froze without
+    // closing the socket, not a latency budget. Cutting the connection
+    // hands recovery to the auto-reconnect that already exists.
+    static constexpr int kReplyTimeoutMs = 4000;
+
     QString description() const override;
     State state() const override { return m_state; }
     double azimuth() const override { return m_azimuth; }
     bool hasFreshPosition() const override;
+
+    // Last reported elevation, degrees. 0 for an azimuth-only rotator —
+    // rotctld reports 0 for those, so the two cases are one case.
+    double elevation() const { return m_elevation; }
 
     void connectToRotor() override;
     void disconnectFromRotor() override;
@@ -85,6 +108,13 @@ public:
     // decimals, and a locale that writes 145,0 would be rejected.
     static QByteArray moveCommand(double azimuthDeg, double elevationDeg = 0.0);
 
+signals:
+    // The elevation from the same position report that fed
+    // positionChanged. A separate signal rather than a wider
+    // positionChanged: RotorController's contract stays azimuth-only,
+    // and every existing connect keeps compiling.
+    void elevationChanged(double elevationDeg);
+
 private:
     enum class Pending { None, Position, Report };
 
@@ -109,10 +139,12 @@ private:
 
     QTimer* m_poll{nullptr};
     QTimer* m_retry{nullptr};
+    QTimer* m_deadline{nullptr};       // reply watchdog, see kReplyTimeoutMs
     int     m_pollMs{500};
 
     State     m_state{State::Disconnected};
     double    m_azimuth{0.0};
+    double    m_elevation{0.0};
     double    m_commanded{0.0};
     bool      m_haveCommanded{false};
     QDateTime m_lastPosition;

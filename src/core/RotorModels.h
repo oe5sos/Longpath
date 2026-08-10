@@ -34,6 +34,10 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — GS-232A note now explains the network form of the
+//                 device field (address:port), which is how an ARCO on
+//                 the LAN is reached. AI-assisted via Anthropic Claude
+//                 (Cowork), operator Martin Fischer.
 // =================================================================
 
 #include <QString>
@@ -55,7 +59,11 @@ inline QVector<RotorModel> commonRotorModels()
     return {
         {601,  QStringLiteral("Yaesu GS-232A"),
                QStringLiteral("Also the setting for microHAM ARCO and "
-                              "ARCO Junior, and for ERC in GS-232A mode")},
+                              "ARCO Junior, and for ERC in GS-232A mode. "
+                              "For an ARCO on the network, enter its "
+                              "address and GS-232A port as the serial "
+                              "port, e.g. 192.168.1.50:4001 — Hamlib "
+                              "then talks TCP instead of a serial line")},
         {603,  QStringLiteral("Yaesu GS-232B"),
                QStringLiteral("G-800DXA, G-1000DXA, G-2800DXA with the "
                               "B-series controller")},

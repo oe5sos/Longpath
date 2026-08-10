@@ -8,6 +8,9 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Grid overlay + clickable markers; see FlatMapWidget.h.
+//                 AI-assisted via Anthropic Claude (Cowork), operator
+//                 Martin Fischer.
 // =================================================================
 
 #include "FlatMapWidget.h"
@@ -79,6 +82,13 @@ void FlatMapWidget::setShowTerminator(bool on)
 {
     m_showTerminator = on;
     m_nightDirty = true;
+    update();
+}
+
+void FlatMapWidget::setShowGrid(bool on)
+{
+    m_showGrid = on;
+    if (!on) { m_clickedGrid.clear(); }
     update();
 }
 
@@ -202,6 +212,47 @@ QPointF FlatMapWidget::project(double lat, double lon) const
                    r.top()  + (90.0 - lat) / 180.0 * r.height());
 }
 
+bool FlatMapWidget::unproject(const QPointF& pos, double& lat, double& lon) const
+{
+    const QRectF r = mapRect();
+    if (!r.contains(pos) || r.width() <= 0.0 || r.height() <= 0.0) {
+        return false;
+    }
+    lon = (pos.x() - r.left()) / r.width() * 360.0 - 180.0;
+    lat = 90.0 - (pos.y() - r.top()) / r.height() * 180.0;
+    return true;
+}
+
+QString FlatMapWidget::gridSquare4(double lat, double lon)
+{
+    // Clamp instead of wrap: 90°N belongs to the topmost square, not to
+    // a wrap back to the bottom of the alphabet.
+    const double lo = std::clamp(norm180(lon) + 180.0, 0.0, 359.999);
+    const double la = std::clamp(lat + 90.0, 0.0, 179.999);
+    QString g;
+    g += QChar('A' + static_cast<int>(lo / 20.0));
+    g += QChar('A' + static_cast<int>(la / 10.0));
+    g += QChar('0' + static_cast<int>(std::fmod(lo, 20.0) / 2.0));
+    g += QChar('0' + static_cast<int>(std::fmod(la, 10.0)));
+    return g;
+}
+
+int FlatMapWidget::pointAt(const QPointF& pos) const
+{
+    // Nearest marker within a comfortable click radius, not merely the
+    // first hit — in a pile-up of dots the nearest one is the one the
+    // operator aimed at.
+    constexpr double kRadius = 9.0;
+    int best = -1;
+    double bestD = kRadius;
+    for (int i = 0; i < m_points.size(); ++i) {
+        const QPointF s = project(m_points.at(i).lat, m_points.at(i).lon);
+        const double d = std::hypot(s.x() - pos.x(), s.y() - pos.y());
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
 void FlatMapWidget::resizeEvent(QResizeEvent*)
 {
     m_nightDirty = true;
@@ -278,6 +329,8 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     }
     p.setPen(QPen(QColor(255, 255, 255, 55), 1.0));
     p.drawLine(project(0, -180), project(0, 180));
+
+    if (m_showGrid) { paintGridOverlay(p, r); }
 
     p.setPen(QPen(QColor(Style::kBorderSubtle), 1.0));
     p.setBrush(Qt::NoBrush);
@@ -395,12 +448,133 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     }
 }
 
+// ── Maidenhead overlay ──────────────────────────────────────────────
+
+void FlatMapWidget::paintGridOverlay(QPainter& p, const QRectF& r)
+{
+    // Everything is clipped to the visible slice of the map, and the
+    // loops below run only over that slice — at 180 x 180 squares an
+    // unclipped label pass would be thirty-two thousand drawTexts.
+    const QRectF vis = r.intersected(QRectF(rect()));
+    if (vis.isEmpty()) { return; }
+    p.save();
+    p.setClipRect(vis);
+
+    double latTop = 0, lonLeft = 0, latBot = 0, lonRight = 0;
+    unproject(vis.topLeft() + QPointF(1, 1), latTop, lonLeft);
+    unproject(vis.bottomRight() - QPointF(1, 1), latBot, lonRight);
+
+    const double pxPerLon = r.width() / 360.0;
+    const double pxPerLat = r.height() / 180.0;
+
+    // Fields: 20° x 10°, AA at the south pole / date line.
+    //
+    // Deliberately faint (2026-08-10, operator feedback): the overlay
+    // is a reference, not the subject — at the first alphas the grid
+    // shouted over the map it was meant to annotate.
+    const QColor gridCol(255, 210, 120, 42);
+    const QColor gridColSoft(255, 210, 120, 22);
+    p.setPen(QPen(gridCol, 0.8));
+    for (int lon = -180; lon <= 180; lon += 20) {
+        p.drawLine(project(90, lon), project(-90, lon));
+    }
+    for (int lat = -90; lat <= 90; lat += 10) {
+        p.drawLine(project(lat, -180), project(lat, 180));
+    }
+
+    // Squares: 2° x 1°, once they have room to be squares on screen.
+    const bool squares = pxPerLon * 2.0 >= 24.0;
+    if (squares) {
+        p.setPen(QPen(gridColSoft, 0.6));
+        const int lonFrom = static_cast<int>(std::floor(lonLeft / 2.0)) * 2;
+        const int lonTo   = static_cast<int>(std::ceil(lonRight / 2.0)) * 2;
+        const int latFrom = static_cast<int>(std::floor(latBot));
+        const int latTo   = static_cast<int>(std::ceil(latTop));
+        for (int lon = lonFrom; lon <= lonTo; lon += 2) {
+            p.drawLine(project(latTo, lon), project(latFrom, lon));
+        }
+        for (int lat = latFrom; lat <= latTo; ++lat) {
+            p.drawLine(project(lat, lonFrom), project(lat, lonTo));
+        }
+    }
+
+    // Labels, at whichever coarseness has room. Field letters first.
+    QFont f = p.font();
+    if (!squares && pxPerLon * 20.0 >= 34.0) {
+        f.setPixelSize(std::min(11.0, pxPerLon * 20.0 * 0.20));
+        p.setFont(f);
+        p.setPen(QColor(255, 220, 150, 70));
+        const int lonFrom =
+            static_cast<int>(std::floor((lonLeft + 180.0) / 20.0));
+        const int lonTo =
+            static_cast<int>(std::floor((lonRight + 180.0) / 20.0));
+        const int latFrom =
+            static_cast<int>(std::floor((latBot + 90.0) / 10.0));
+        const int latTo =
+            static_cast<int>(std::floor((latTop + 90.0) / 10.0));
+        for (int fx = std::max(0, lonFrom); fx <= std::min(17, lonTo); ++fx) {
+            for (int fy = std::max(0, latFrom); fy <= std::min(17, latTo);
+                 ++fy) {
+                const double lon = fx * 20.0 - 180.0 + 10.0;
+                const double lat = fy * 10.0 - 90.0 + 5.0;
+                const QString name = QString(QChar('A' + fx))
+                                     + QChar('A' + fy);
+                const QPointF c = project(lat, lon);
+                p.drawText(QRectF(c.x() - 20, c.y() - 8, 40, 16),
+                           Qt::AlignCenter, name);
+            }
+        }
+    } else if (squares && pxPerLon * 2.0 >= 34.0) {
+        f.setPixelSize(std::min(10.0, pxPerLon * 2.0 * 0.18));
+        p.setFont(f);
+        p.setPen(QColor(255, 220, 150, 70));
+        const int lonFrom = static_cast<int>(std::floor(lonLeft / 2.0)) * 2;
+        const int lonTo   = static_cast<int>(std::ceil(lonRight / 2.0)) * 2;
+        const int latFrom = static_cast<int>(std::floor(latBot));
+        const int latTo   = static_cast<int>(std::ceil(latTop));
+        for (int lon = lonFrom; lon < lonTo; lon += 2) {
+            for (int lat = latFrom; lat < latTo; ++lat) {
+                const QPointF c = project(lat + 0.5, lon + 1.0);
+                p.drawText(QRectF(c.x() - 22, c.y() - 8, 44, 16),
+                           Qt::AlignCenter,
+                           gridSquare4(lat + 0.5, lon + 1.0));
+            }
+        }
+    }
+
+    // The square the operator clicked, picked out until the next click.
+    if (m_clickedGrid.size() == 4) {
+        const int fx = m_clickedGrid.at(0).toLatin1() - 'A';
+        const int fy = m_clickedGrid.at(1).toLatin1() - 'A';
+        const int sx = m_clickedGrid.at(2).toLatin1() - '0';
+        const int sy = m_clickedGrid.at(3).toLatin1() - '0';
+        const double lonW = fx * 20.0 - 180.0 + sx * 2.0;
+        const double latS = fy * 10.0 - 90.0 + sy;
+        const QPointF tl = project(latS + 1.0, lonW);
+        const QPointF br = project(latS, lonW + 2.0);
+        QColor fill(Style::kAmberText);
+        fill.setAlpha(60);
+        p.setPen(QPen(QColor(Style::kAmberText), 1.4));
+        p.setBrush(fill);
+        p.drawRect(QRectF(tl, br));
+        p.setBrush(Qt::NoBrush);
+        QFont bf = p.font();
+        bf.setPixelSize(11);
+        bf.setBold(true);
+        p.setFont(bf);
+        p.drawText(QRectF(tl, br), Qt::AlignCenter, m_clickedGrid);
+    }
+
+    p.restore();
+}
+
 // ── Mouse ───────────────────────────────────────────────────────────
 
 void FlatMapWidget::mousePressEvent(QMouseEvent* e)
 {
     if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
     m_dragging = true;
+    m_moved = false;
     m_dragFrom = e->position().toPoint();
     m_panFrom = m_pan;
     setCursor(Qt::ClosedHandCursor);
@@ -410,6 +584,8 @@ void FlatMapWidget::mouseMoveEvent(QMouseEvent* e)
 {
     if (!m_dragging) { QWidget::mouseMoveEvent(e); return; }
     const QPoint d = e->position().toPoint() - m_dragFrom;
+    if (!m_moved && d.manhattanLength() > 4) { m_moved = true; }
+    if (!m_moved) { return; }
     m_pan = m_panFrom + QPointF(d.x(), d.y());
     update();
 }
@@ -419,6 +595,25 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
     if (e->button() == Qt::LeftButton && m_dragging) {
         m_dragging = false;
         setCursor(Qt::OpenHandCursor);
+
+        // No movement means this was a click, and a click means a
+        // question: which station is that — or, failing a station,
+        // which square is that.
+        if (!m_moved) {
+            const QPointF pos = e->position();
+            const int hit = pointAt(pos);
+            if (hit >= 0) {
+                const MapPoint& pt = m_points.at(hit);
+                emit pointClicked(pt.label, pt.lat, pt.lon);
+            } else if (m_showGrid) {
+                double lat = 0, lon = 0;
+                if (unproject(pos, lat, lon)) {
+                    m_clickedGrid = gridSquare4(lat, lon);
+                    update();
+                    emit gridClicked(m_clickedGrid);
+                }
+            }
+        }
         return;
     }
     QWidget::mouseReleaseEvent(e);

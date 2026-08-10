@@ -8,11 +8,17 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Band/mode filter pills, station card on marker click,
+//                 grid overlay switch, Google Earth (KML) export; see
+//                 QsoMapWindow.h. AI-assisted via Anthropic Claude
+//                 (Cowork), operator Martin Fischer.
 // =================================================================
 
 #include "QsoMapWindow.h"
 
+#include "core/AdifLog.h"
 #include "core/AppSettings.h"
+#include "core/KmlExport.h"
 #include "core/Maidenhead.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
@@ -21,14 +27,20 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QDateEdit>
+#include <QDesktopServices>
+#include <QFileDialog>
 #include <QKeyEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QSet>
 #include <QStackedWidget>
+#include <QStandardPaths>
 #include <QTimeZone>
+#include <QUrl>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace NereusSDR {
 
@@ -161,6 +173,24 @@ void QsoMapWindow::buildUi()
                                .arg(QString::fromLatin1(Style::kTextPrimary)));
     bar->addWidget(m_paths);
 
+    m_grid = new QCheckBox(QStringLiteral("Grid"), this);
+    m_grid->setToolTip(QStringLiteral(
+        "Maidenhead locator overlay on the flat map. Click a square to "
+        "see its name and what the log has there."));
+    m_grid->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                              .arg(QString::fromLatin1(Style::kTextPrimary)));
+    bar->addWidget(m_grid);
+
+    auto* earthBtn = new QPushButton(QStringLiteral("Google Earth…"), this);
+    earthBtn->setStyleSheet(Style::buttonBaseStyle());
+    earthBtn->setToolTip(QStringLiteral(
+        "Export what the filters currently show as a KML file and open "
+        "it in Google Earth — pins with the OM's data, lines from home, "
+        "one folder per band, time slider ready"));
+    bar->addWidget(earthBtn);
+    connect(earthBtn, &QPushButton::clicked,
+            this, &QsoMapWindow::exportKml);
+
     // Zoom controls. The wheel already did this; nothing said so.
     auto* zoomOut = new QPushButton(QStringLiteral("−"), this);
     auto* zoomIn  = new QPushButton(QStringLiteral("+"), this);
@@ -188,6 +218,12 @@ void QsoMapWindow::buildUi()
     bar->addWidget(m_viewBtn);
     col->addLayout(bar);
 
+    // Second row: one pill per band and mode the log actually has,
+    // filled in by rebuildFilterPills() once entries arrive.
+    m_pillRow = new QHBoxLayout;
+    m_pillRow->setSpacing(4);
+    col->addLayout(m_pillRow);
+
     m_globe = new GlobeWidget(this);
     // No beam spread here: the flanking arcs answer a question about
     // aiming right now, and drawing them for every logged contact would
@@ -206,6 +242,34 @@ void QsoMapWindow::buildUi()
         "QLabel { color: %1; font-size: 11px; }")
         .arg(QString::fromLatin1(Style::kTextSecondary)));
     col->addWidget(m_summary);
+
+    // The answer to a click: a station's data, or a grid square's
+    // contents. A label rather than a popup — a popup over a map hides
+    // the very thing that was clicked.
+    m_info = new QLabel(QString{}, this);
+    m_info->setWordWrap(true);
+    m_info->setTextFormat(Qt::RichText);
+    m_info->setVisible(false);
+    m_info->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; background: %2; "
+        "border: 1px solid %3; border-radius: 3px; padding: 6px; }")
+        .arg(QString::fromLatin1(Style::kTextPrimary),
+             QString::fromLatin1(Style::kInsetBg),
+             QString::fromLatin1(Style::kBorderSubtle)));
+    col->addWidget(m_info);
+
+    connect(m_grid, &QCheckBox::toggled, this, [this](bool on) {
+        m_flat->setShowGrid(on);
+        // The overlay lives on the flat map; looking at the globe with
+        // Grid ticked would show nothing and look broken.
+        if (on && m_stack->currentIndex() == 0) { m_viewBtn->click(); }
+    });
+    connect(m_flat, &FlatMapWidget::pointClicked, this,
+            [this](const QString& label, double, double) {
+        showStationInfo(label);
+    });
+    connect(m_flat, &FlatMapWidget::gridClicked,
+            this, &QsoMapWindow::showGridInfo);
 
     connect(m_viewBtn, &QPushButton::clicked, this, [this]() {
         const bool toFlat = m_stack->currentIndex() == 0;
@@ -300,7 +364,85 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
 void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)
 {
     m_all = entries;
+    rebuildFilterPills();
     rebuild();
+}
+
+// ── Filters ─────────────────────────────────────────────────────────
+
+QString QsoMapWindow::bandKey(const LogEntry& e)
+{
+    const QString b = e.band.trimmed().toLower();
+    return b.isEmpty() ? QStringLiteral("?") : b;
+}
+
+QString QsoMapWindow::modeKey(const LogEntry& e)
+{
+    const QString m = e.mode.trimmed().toUpper();
+    return m.isEmpty() ? QStringLiteral("?") : m;
+}
+
+void QsoMapWindow::rebuildFilterPills()
+{
+    while (QLayoutItem* it = m_pillRow->takeAt(0)) {
+        delete it->widget();
+        delete it;
+    }
+
+    QSet<QString> bands, modes;
+    for (const LogEntry& e : m_all) {
+        bands.insert(bandKey(e));
+        modes.insert(modeKey(e));
+    }
+    // A pill switched off for a band that later vanishes from the log
+    // must not go on silently filtering from beyond the grave.
+    m_offBands.intersect(bands);
+    m_offModes.intersect(modes);
+
+    QStringList bandList = bands.values();
+    std::sort(bandList.begin(), bandList.end(),
+              [](const QString& a, const QString& b) {
+        return AdifLog::bandSortKeyMHz(a) < AdifLog::bandSortKeyMHz(b);
+    });
+    QStringList modeList = modes.values();
+    std::sort(modeList.begin(), modeList.end());
+
+    auto addCaption = [this](const QString& t) {
+        auto* l = new QLabel(t, this);
+        l->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 10px; }")
+            .arg(QString::fromLatin1(Style::kTextScale)));
+        m_pillRow->addWidget(l);
+    };
+    auto addPill = [this](const QString& key, const QString& label,
+                          bool isBand) {
+        auto* b = new QPushButton(label, this);
+        b->setCheckable(true);
+        b->setChecked(isBand ? !m_offBands.contains(key)
+                             : !m_offModes.contains(key));
+        b->setStyleSheet(Style::buttonBaseStyle()
+                         + Style::greenCheckedStyle());
+        b->setFocusPolicy(Qt::NoFocus);   // keep the +/- keys working
+        connect(b, &QPushButton::toggled, this,
+                [this, key, isBand](bool on) {
+            QSet<QString>& off = isBand ? m_offBands : m_offModes;
+            if (on) { off.remove(key); } else { off.insert(key); }
+            rebuild();
+        });
+        m_pillRow->addWidget(b);
+    };
+
+    // Pills only earn their row when there is something to choose
+    // between; a log entirely on one band in one mode gets no row.
+    if (bandList.size() > 1) {
+        addCaption(QStringLiteral("BAND"));
+        for (const QString& b : bandList) { addPill(b, b, true); }
+    }
+    if (modeList.size() > 1) {
+        addCaption(QStringLiteral("MODE"));
+        for (const QString& m : modeList) { addPill(m, m, false); }
+    }
+    m_pillRow->addStretch(1);
 }
 
 namespace {
@@ -342,6 +484,8 @@ void QsoMapWindow::rebuild()
     int markedNoGrid = 0;
     int approxCount  = 0;
 
+    m_lastShown.clear();
+
     for (const LogEntry& e : source) {
         const bool marked = markedRows.contains(entryKey(e));
 
@@ -352,7 +496,17 @@ void QsoMapWindow::rebuild()
             const QDate d = e.timeOn.toUTC().date();
             if (d.isValid() && (d < from || d > to)) { continue; }
         }
+
+        // Band and mode pills. Applied to the marked view too — a pill
+        // switched off means "I do not want to see 40 m right now", and
+        // that intent does not flip with the Only-marked tick.
+        if (m_offBands.contains(bandKey(e))) { continue; }
+        if (m_offModes.contains(modeKey(e))) { continue; }
+
         ++considered;
+        // What the KML export sends: exactly what the filters let
+        // through, placed or not — the exporter has its own fallback.
+        m_lastShown.append(e);
 
         double lat = 0, lon = 0;
         QString place;
@@ -453,6 +607,161 @@ void QsoMapWindow::rebuild()
             "QLabel { color: %1; font-size: 11px; }")
             .arg(QString::fromLatin1(Style::kTextSecondary)));
     }
+}
+
+// ── Click answers ───────────────────────────────────────────────────
+
+void QsoMapWindow::showStationInfo(const QString& label)
+{
+    // A '~' marks a country-guess position; the callsign follows it.
+    const QString call = (label.startsWith(QLatin1Char('~'))
+                              ? label.mid(1) : label).trimmed().toUpper();
+    if (call.isEmpty()) { return; }
+
+    QVector<const LogEntry*> mine;
+    for (const LogEntry& e : m_all) {
+        if (e.call.trimmed().toUpper() == call) { mine.append(&e); }
+    }
+    if (mine.isEmpty()) {
+        m_info->setText(QStringLiteral("<b>%1</b> — not in the log")
+                            .arg(call.toHtmlEscaped()));
+        m_info->setVisible(true);
+        return;
+    }
+
+    // Newest first; the newest record has the freshest name and QTH.
+    std::sort(mine.begin(), mine.end(),
+              [](const LogEntry* a, const LogEntry* b) {
+        return a->timeOn > b->timeOn;
+    });
+    const LogEntry& last = *mine.first();
+
+    QStringList who;
+    if (!last.name.trimmed().isEmpty())    { who << last.name.toHtmlEscaped(); }
+    if (!last.qth.trimmed().isEmpty())     { who << last.qth.toHtmlEscaped(); }
+    if (!last.country.trimmed().isEmpty()) { who << last.country.toHtmlEscaped(); }
+
+    QString text = QStringLiteral("<b>%1</b> — %2 QSO%3")
+        .arg(call.toHtmlEscaped())
+        .arg(mine.size())
+        .arg(mine.size() == 1 ? QString{} : QStringLiteral("s"));
+    if (!who.isEmpty()) {
+        text += QStringLiteral(" · ") + who.join(QStringLiteral(" · "));
+    }
+    if (isValidGridSquare(last.gridSquare)) {
+        text += QStringLiteral(" · %1").arg(last.gridSquare.toHtmlEscaped());
+        if (isValidGridSquare(m_homeGrid)) {
+            text += QStringLiteral(" · %1 km · %2°")
+                .arg(calculateDistanceKm(m_homeGrid, last.gridSquare),
+                     0, 'f', 0)
+                .arg(calculateBearingInDegrees(m_homeGrid, last.gridSquare),
+                     0, 'f', 0);
+        }
+    }
+
+    // The most recent few, so "when did I last work him" is answered
+    // without opening anything else.
+    text += QStringLiteral("<br>");
+    QStringList recent;
+    for (int i = 0; i < mine.size() && i < 5; ++i) {
+        const LogEntry& e = *mine.at(i);
+        QStringList bits;
+        const QDateTime u = e.timeOn.toUTC();
+        if (u.isValid()) {
+            bits << u.toString(QStringLiteral("yyyy-MM-dd hh:mm"));
+        }
+        if (!e.band.trimmed().isEmpty()) { bits << e.band.toHtmlEscaped(); }
+        const QString m = e.submode.isEmpty() ? e.mode : e.submode;
+        if (!m.trimmed().isEmpty()) { bits << m.toHtmlEscaped(); }
+        recent << bits.join(QStringLiteral(" "));
+    }
+    text += recent.join(QStringLiteral(" &nbsp;·&nbsp; "));
+    if (mine.size() > 5) {
+        text += QStringLiteral(" &nbsp;·&nbsp; +%1 more").arg(mine.size() - 5);
+    }
+
+    m_info->setText(text);
+    m_info->setVisible(true);
+}
+
+void QsoMapWindow::showGridInfo(const QString& locator)
+{
+    const QString loc = locator.trimmed().toUpper();
+    if (loc.isEmpty()) { return; }
+
+    QStringList calls;
+    int count = 0;
+    for (const LogEntry& e : m_all) {
+        if (!e.gridSquare.trimmed().toUpper().startsWith(loc)) { continue; }
+        ++count;
+        const QString c = e.call.trimmed().toUpper();
+        if (!calls.contains(c) && calls.size() < 8) { calls << c; }
+    }
+
+    if (count == 0) {
+        m_info->setText(QStringLiteral(
+            "<b>%1</b> — nothing in the log from this square")
+            .arg(loc.toHtmlEscaped()));
+    } else {
+        QString text = QStringLiteral("<b>%1</b> — %2 QSO%3: %4")
+            .arg(loc.toHtmlEscaped())
+            .arg(count)
+            .arg(count == 1 ? QString{} : QStringLiteral("s"))
+            .arg(calls.join(QStringLiteral(", ")).toHtmlEscaped());
+        if (count > calls.size()) {
+            text += QStringLiteral(" …");
+        }
+        m_info->setText(text);
+    }
+    m_info->setVisible(true);
+}
+
+// ── Google Earth ────────────────────────────────────────────────────
+
+void QsoMapWindow::exportKml()
+{
+    if (m_lastShown.isEmpty()) {
+        m_info->setText(QStringLiteral(
+            "Nothing to export — the current filters show no contacts."));
+        m_info->setVisible(true);
+        return;
+    }
+
+    const QString suggested =
+        QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
+        + QStringLiteral("/NereusSDR-log.kml");
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("Export for Google Earth"), suggested,
+        QStringLiteral("Google Earth KML (*.kml)"));
+    if (path.isEmpty()) { return; }
+
+    KmlExport::Options opt;
+    opt.myGrid = m_homeGrid;
+    opt.fallback = m_fallback;
+
+    QString err;
+    KmlExport::Result res;
+    if (!KmlExport::writeKml(path, m_lastShown, opt, &err, &res)) {
+        m_info->setText(QStringLiteral("KML export failed: %1")
+                            .arg(err.toHtmlEscaped()));
+        m_info->setVisible(true);
+        return;
+    }
+
+    QString text = QStringLiteral(
+        "<b>%1</b> contacts exported to %2 — opening it now. Bands are "
+        "folders in Google Earth's sidebar; the time slider filters by "
+        "date.").arg(res.placed).arg(path.toHtmlEscaped());
+    if (res.skipped > 0) {
+        text += QStringLiteral(" %1 without a locator were left out.")
+                    .arg(res.skipped);
+    }
+    m_info->setText(text);
+    m_info->setVisible(true);
+
+    // Whatever handles .kml — Google Earth when installed, otherwise
+    // the OS says so, which is a better error than any dialog here.
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
 } // namespace NereusSDR

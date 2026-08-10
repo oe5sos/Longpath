@@ -296,6 +296,11 @@ signals:
     void pskStopRequested();
     // Forwarded from the Spot List click-to-tune + the spot overlay.
     void tuneRequested(double freqMhz);
+    // 2026-08-10: Spot List right-click → "Turn rotor to <call>".
+    // Carries only the callsign — the Rotor/Log panel owns the bearing
+    // maths (prefix → entity centre, QRZ locator) and the rotator link,
+    // and MainWindow does the routing.
+    void rotorRequested(const QString& dxCall);
     // Forwarded from the Display tab's "Clear All Spots" button.
     void spotsClearedAll();
 

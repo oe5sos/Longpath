@@ -5,6 +5,7 @@
 // no-port-check: NereusSDR-original.
 
 #include <QtTest/QtTest>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTimeZone>
 
@@ -46,6 +47,15 @@ private slots:
     void unrecognised_bands_sort_together();
     void the_upload_mark_survives_a_round_trip();
     void an_unmarked_contact_writes_no_upload_field();
+
+    // 2026-08-10: ADIF lengths count UTF-8 bytes, not QChars.
+    void lengths_count_utf8_bytes_not_qchars();
+    void a_byte_counted_umlaut_record_parses_exactly();
+    void last_record_without_eor_gets_distance_and_bearing();
+
+    // 2026-08-10: hardening — Latin-1 fallback + rotating backups.
+    void latin1_from_an_old_logger_is_not_mojibake();
+    void write_keeps_rotating_backups();
 };
 
 void TstAdifLog::reads_a_record_we_wrote()
@@ -593,6 +603,107 @@ void TstAdifLog::an_unmarked_contact_writes_no_upload_field()
 
     e.uploadedToQrz = true;
     QVERIFY(e.toAdifRecord().contains(QStringLiteral("APP_NEREUS_QRZUP")));
+}
+
+void TstAdifLog::lengths_count_utf8_bytes_not_qchars()
+{
+    // ADIF's <NAME:length> counts octets on disk, and the file is
+    // UTF-8. "Jürgen" is 6 QChars but 7 bytes; writing the char count
+    // mis-sliced every byte-counting reader — every other logger, plus
+    // QRZ and Cloudlog, which receive exactly this string as their
+    // upload payload.
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    e.name = QString::fromUtf8("J\xc3\xbcrgen");
+    e.comment = QString::fromUtf8("Gr\xc3\xbc\xc3\x9f" "e aus \xc3\x96sterreich");
+
+    const QString rec = e.toAdifRecord();
+    QVERIFY(rec.contains(QStringLiteral("<NAME:7>")));
+
+    QRegularExpression re(QStringLiteral("<COMMENT:(\\d+)>"));
+    const QRegularExpressionMatch m = re.match(rec);
+    QVERIFY(m.hasMatch());
+    QCOMPARE(m.captured(1).toInt(), e.comment.toUtf8().size());
+
+    // And our own parser walks bytes, so the round trip is exact.
+    const QVector<LogEntry> back = AdifLog::parse(rec.toUtf8());
+    QCOMPARE(back.size(), 1);
+    QCOMPARE(back.at(0).name, e.name);
+    QCOMPARE(back.at(0).comment, e.comment);
+}
+
+void TstAdifLog::a_byte_counted_umlaut_record_parses_exactly()
+{
+    // What every other logger writes: lengths in bytes. "München" is 7
+    // chars, 8 bytes — the tag says 8, and a char-counting walk would
+    // swallow the following space and shift every later field.
+    const QByteArray foreign =
+        "<EOH> <CALL:5>DL1AA <QTH:8>M\xc3\xbcnchen <BAND:3>40m <EOR>";
+    const QVector<LogEntry> v = AdifLog::parse(foreign);
+    QCOMPARE(v.size(), 1);
+    QCOMPARE(v.at(0).qth, QString::fromUtf8("M\xc3\xbcnchen"));
+    QCOMPARE(v.at(0).band, QStringLiteral("40m"));
+}
+
+void TstAdifLog::last_record_without_eor_gets_distance_and_bearing()
+{
+    // The tail record (no <EOR>) used to skip the distance/bearing
+    // computation the <EOR> path does; same contact, same locators,
+    // blank distance column.
+    const QVector<LogEntry> v = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:4>OE1W <MY_GRIDSQUARE:6>JN67VV "
+        "<GRIDSQUARE:6>FN30IV\n"));
+    QCOMPARE(v.size(), 1);
+    QVERIFY(v.at(0).distanceKm > 0.0);
+    QVERIFY(v.at(0).bearingDeg > 0.0);
+}
+
+void TstAdifLog::latin1_from_an_old_logger_is_not_mojibake()
+{
+    // Old Windows loggers wrote Latin-1, where ü is the single byte
+    // 0xFC — invalid as UTF-8. Decoded strictly as UTF-8 it became a
+    // replacement character; the fallback must recover the umlaut.
+    // Note the length: 7 BYTES, which in Latin-1 is also 7 characters.
+    const QByteArray latin1 =
+        "<EOH> <CALL:5>DL1AA <QTH:7>M\xfcnchen <BAND:3>40m <EOR>";
+    const QVector<LogEntry> v = AdifLog::parse(latin1);
+    QCOMPARE(v.size(), 1);
+    QCOMPARE(v.at(0).qth, QString::fromUtf8("M\xc3\xbcnchen"));
+    QCOMPARE(v.at(0).band, QStringLiteral("40m"));
+}
+
+void TstAdifLog::write_keeps_rotating_backups()
+{
+    // Atomic writes protect against a crash mid-write; backups protect
+    // against successfully writing a log that a bad merge or import
+    // just gutted. Three saves → the two previous generations must sit
+    // beside the file, newest first.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("logbook.adi"));
+
+    auto entry = [](const char* call) {
+        LogEntry e;
+        e.call = QString::fromLatin1(call);
+        return e;
+    };
+    auto callsIn = [](const QString& p) {
+        QStringList calls;
+        for (const LogEntry& e : AdifLog::read(p)) { calls << e.call; }
+        return calls.join(QLatin1Char(','));
+    };
+
+    QVERIFY(AdifLog::write(path, {entry("OE1A")}));
+    QVERIFY(!QFile::exists(path + QStringLiteral(".bak1")));  // nothing to back up yet
+
+    QVERIFY(AdifLog::write(path, {entry("OE1B")}));
+    QCOMPARE(callsIn(path), QStringLiteral("OE1B"));
+    QCOMPARE(callsIn(path + QStringLiteral(".bak1")), QStringLiteral("OE1A"));
+
+    QVERIFY(AdifLog::write(path, {entry("OE1C")}));
+    QCOMPARE(callsIn(path), QStringLiteral("OE1C"));
+    QCOMPARE(callsIn(path + QStringLiteral(".bak1")), QStringLiteral("OE1B"));
+    QCOMPARE(callsIn(path + QStringLiteral(".bak2")), QStringLiteral("OE1A"));
 }
 
 QTEST_APPLESS_MAIN(TstAdifLog)

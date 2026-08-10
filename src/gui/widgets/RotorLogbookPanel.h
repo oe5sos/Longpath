@@ -86,6 +86,19 @@ public:
     // that installs Hamlib and connects the controller.
     void showRotorSetup();
 
+    // 2026-08-10: a spot elsewhere in the app named a station — point
+    // the panel at it and, if a bearing can be computed, start the
+    // turn. Setting the callsign runs the panel's whole existing
+    // pipeline (worked-before line, prefix bearing, QRZ auto-lookup),
+    // so this is one line of behaviour, not a second code path.
+    void workSpot(const QString& call);
+
+    // 2026-08-10: a contact logged by another program (WSJT-X's
+    // Logged-ADIF message). Written to the same file through the same
+    // duplicate check and upload path as a hand-logged QSO — one log,
+    // however the contact arrived.
+    void logExternalQso(const LogEntry& entry);
+
 signals:
     void qsoLogged(const LogEntry& entry);
 
@@ -126,6 +139,11 @@ private:
     void updateFlagFor(const QString& call);
     // Station line, with the current flag in front of it.
     void setStationLine(const QString& text);
+    // Everything worth reading from a lookup answer, as two lines:
+    // who/where on the first, county, licence class, QSL routes and
+    // distance/bearing on the second. One place, so the fresh-answer
+    // and the cached-answer paths cannot drift apart.
+    QString stationText(const CallsignInfo& info) const;
     // "New DXCC" / "worked 3x, last 2024-05-02" for the callsign being
     // typed, on the current band and mode.
     void updateWorkedLine(const QString& call);

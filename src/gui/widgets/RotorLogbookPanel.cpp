@@ -8,6 +8,14 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — workSpot() entry point for "Turn rotor to <call>" from
+//                 the Spot Hub. Enter in the callsign field now only
+//                 looks the station up (it used to also start the
+//                 rotator — moving the mast is not what Enter means).
+//                 The QRZ locator is shown on the station card instead
+//                 of only being written silently into the DX field.
+//                 AI-assisted via Anthropic Claude (Cowork), operator
+//                 Martin Fischer.
 // =================================================================
 
 #include "RotorLogbookPanel.h"
@@ -84,6 +92,10 @@ const QString kRotorUseSerialKey = QStringLiteral("RotorUseLocalSerial");
 const QString kRotorModelKey     = QStringLiteral("RotorHamlibModel");
 const QString kRotorDeviceKey    = QStringLiteral("RotorSerialDevice");
 const QString kRotorBaudKey      = QStringLiteral("RotorSerialBaud");
+// Mechanical end stop, degrees; negative = turns freely. Drives the
+// dial's travel-path maths so the shown direction is the one the mast
+// can actually take.
+const QString kRotorEndStopKey   = QStringLiteral("RotorEndStopDeg");
 const QString kAutoLookupKey = QStringLiteral("QrzAutoLookupWhileTyping");
 
 // Long enough that typing a callsign is one request, short enough that
@@ -328,6 +340,8 @@ void RotorLogbookPanel::buildUi()
     // dock this narrow, two 260 px squares would push the log off screen,
     // and they answer the same question in two ways.
     m_dial  = new RotorDialWidget(this);
+    m_dial->setEndStop(AppSettings::instance()
+                           .value(kRotorEndStopKey, -1.0).toDouble());
     m_globe = new GlobeWidget(this);
 
     auto* globePage = new QWidget(this);
@@ -390,6 +404,31 @@ void RotorLogbookPanel::buildUi()
     btnRow->addWidget(setupBtn);
     connect(setupBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::openRotorSetupDialog);
+
+    // Compass presets (2026-08-10): one click aims at a cardinal
+    // course; the turn itself stays behind Rotate, same as a click on
+    // the rose — a preset must never move the mast by itself.
+    auto* presetRow = new QHBoxLayout;
+    presetRow->setSpacing(4);
+    struct Preset { const char* label; double deg; };
+    static constexpr Preset kPresets[] = {
+        {"N", 0}, {"NE", 45}, {"E", 90}, {"SE", 135},
+        {"S", 180}, {"SW", 225}, {"W", 270}, {"NW", 315},
+    };
+    for (const Preset& pre : kPresets) {
+        auto* b = new QPushButton(QString::fromLatin1(pre.label), this);
+        b->setStyleSheet(Style::buttonBaseStyle());
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setToolTip(QStringLiteral("Aim %1° — then Rotate to turn")
+                          .arg(pre.deg, 0, 'f', 0));
+        const double deg = pre.deg;
+        connect(b, &QPushButton::clicked, this, [this, deg]() {
+            m_dial->setTargetBearing(deg);
+        });
+        presetRow->addWidget(b);
+    }
+    presetRow->addStretch(1);
+    col->addLayout(presetRow);
 
     m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
     m_globeBtn->setCheckable(true);
@@ -476,12 +515,12 @@ void RotorLogbookPanel::buildUi()
     // ── Wiring ───────────────────────────────────────────────────────
     connect(m_callEdit, &QLineEdit::textChanged,
             this, &RotorLogbookPanel::onCallsignEdited);
-    connect(m_callEdit, &QLineEdit::returnPressed, this, [this]() {
-        onLookupRequested();
-        if (m_dial->hasTarget()) {
-            emit m_dial->rotateRequested(m_dial->targetBearing());
-        }
-    });
+    // Enter looks the station up, full stop (2026-08-10). It used to
+    // also start the rotator turning, which meant confirming a callsign
+    // moved the mast — an action nobody expects from the Enter key. The
+    // turn stays on the Rotate button and the dial's double-click.
+    connect(m_callEdit, &QLineEdit::returnPressed,
+            this, &RotorLogbookPanel::onLookupRequested);
     connect(m_lookupBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::onLookupRequested);
     connect(m_myGrid, &QLineEdit::textChanged,
@@ -581,6 +620,12 @@ void RotorLogbookPanel::ensureRotor()
     connect(m_rotor, &RotorController::positionChanged, this,
             [this](double az) { m_dial->setActualBearing(az); });
 
+    // Az/el rotators: the reported elevation appears on the dial. The
+    // signal only fires when the value actually changes, so an
+    // azimuth-only rotator never triggers the readout.
+    connect(m_rotor, &RotctldClient::elevationChanged, this,
+            [this](double el) { m_dial->setElevation(el); });
+
     connect(m_rotor, &RotorController::stateChanged, this,
             [this](RotorController::State st) {
         switch (st) {
@@ -617,6 +662,21 @@ void RotorLogbookPanel::showRotorSetup()
     openRotorSetupDialog();
 }
 
+// 2026-08-10: entry point for "Turn rotor to <call>" from the Spot Hub.
+// Everything after setText is the panel's normal typing pipeline —
+// onCallsignEdited resolves the prefix and sets the dial target when an
+// own locator is present; a QRZ answer refines it later. If a bearing
+// came out of that, the turn starts at once; if not (no own locator),
+// the status line already says what is missing, which beats turning to
+// a bearing that does not exist.
+void RotorLogbookPanel::workSpot(const QString& call)
+{
+    const QString c = call.trimmed().toUpper();
+    if (c.isEmpty()) { return; }
+    m_callEdit->setText(c);
+    if (m_dial->hasTarget()) { beginTurn(); }
+}
+
 void RotorLogbookPanel::openRotorSetupDialog()
 {
     ensureRotor();
@@ -640,6 +700,40 @@ void RotorLogbookPanel::openRotorSetupDialog()
     modeBox->setCurrentIndex(
         s.value(kRotorUseSerialKey, true).toBool() ? 0 : 1);
     col->addWidget(modeBox);
+
+    // Mechanical end stop (2026-08-10). The dial computes its travel
+    // path around this, so the sector it draws is the way the mast will
+    // actually turn instead of the way a free compass would.
+    auto* stopRow = new QHBoxLayout;
+    auto* stopLabel = new QLabel(QStringLiteral("End stop"), &dlg);
+    stopLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(Style::kTextSecondary)));
+    stopRow->addWidget(stopLabel);
+    auto* stopCombo = new QComboBox(&dlg);
+    stopCombo->addItem(QStringLiteral("none — turns freely"), -1.0);
+    stopCombo->addItem(QStringLiteral("North (0°)"), 0.0);
+    stopCombo->addItem(QStringLiteral("East (90°)"), 90.0);
+    stopCombo->addItem(QStringLiteral("South (180°)"), 180.0);
+    stopCombo->addItem(QStringLiteral("West (270°)"), 270.0);
+    {
+        const double savedStop =
+            s.value(kRotorEndStopKey, -1.0).toDouble();
+        int at = 0;
+        for (int i = 0; i < stopCombo->count(); ++i) {
+            if (qFuzzyCompare(stopCombo->itemData(i).toDouble() + 1.0,
+                              savedStop + 1.0)) { at = i; break; }
+        }
+        stopCombo->setCurrentIndex(at);
+    }
+    connect(stopCombo, &QComboBox::currentIndexChanged, &dlg,
+            [this, stopCombo](int) {
+        const double deg = stopCombo->currentData().toDouble();
+        AppSettings::instance().setValue(kRotorEndStopKey, deg);
+        m_dial->setEndStop(deg);
+    });
+    stopRow->addWidget(stopCombo, 1);
+    col->addLayout(stopRow);
 
     // ── Local: model + port + baud ───────────────────────────────────
     auto* localBox = new QWidget(&dlg);
@@ -1264,6 +1358,49 @@ void RotorLogbookPanel::updateFlagFor(const QString& call)
     m_flagEmoji = dxccFlagEmoji(dxcc->ctyDat().resolvePrimaryPrefix(call));
 }
 
+// 2026-08-10, operator wish: "more data after Enter". Everything the
+// lookup answer carries that an operator in QSO actually uses, on two
+// readable lines instead of one thin one.
+QString RotorLogbookPanel::stationText(const CallsignInfo& info) const
+{
+    QStringList top;
+    if (!info.displayName().isEmpty()) { top << info.displayName(); }
+    if (!info.city.trimmed().isEmpty())    { top << info.city.trimmed(); }
+    if (!info.state.trimmed().isEmpty())   { top << info.state.trimmed(); }
+    if (!info.country.trimmed().isEmpty()) { top << info.country.trimmed(); }
+    if (isValidGridSquare(info.grid)) {
+        top << info.grid.trimmed().toUpper();
+    }
+
+    QStringList more;
+    if (!info.county.trimmed().isEmpty()) { more << info.county.trimmed(); }
+    if (!info.licenseClass.trimmed().isEmpty()) {
+        more << QStringLiteral("class %1").arg(info.licenseClass.trimmed());
+    }
+    // Which QSL routes the station answers on — the question that
+    // decides whether working them will ever count for an award.
+    QStringList qsl;
+    if (info.lotw)    { qsl << QStringLiteral("LoTW"); }
+    if (info.eqsl)    { qsl << QStringLiteral("eQSL"); }
+    if (info.mailQsl) { qsl << QStringLiteral("card"); }
+    if (!qsl.isEmpty()) {
+        more << QStringLiteral("QSL: %1").arg(qsl.join(QLatin1Char(' ')));
+    }
+    const QString mine = m_myGrid->text().trimmed().toUpper();
+    if (isValidGridSquare(mine) && isValidGridSquare(info.grid)) {
+        more << QStringLiteral("%1 km · %2°")
+                    .arg(calculateDistanceKm(mine, info.grid), 0, 'f', 0)
+                    .arg(calculateBearingInDegrees(mine, info.grid),
+                         0, 'f', 0);
+    }
+
+    QString text = top.join(QStringLiteral(" · "));
+    if (!more.isEmpty()) {
+        text += QLatin1Char('\n') + more.join(QStringLiteral(" · "));
+    }
+    return text;
+}
+
 void RotorLogbookPanel::setStationLine(const QString& text)
 {
     if (m_flagEmoji.isEmpty()) {
@@ -1353,11 +1490,7 @@ void RotorLogbookPanel::onLookupRequested()
         m_lastInfo = cached;
         adoptGridFromQrz(cached);
         updateFlagFor(cached.call);
-        QStringList bits;
-        if (!cached.displayName().isEmpty()) { bits << cached.displayName(); }
-        if (!cached.city.isEmpty())          { bits << cached.city; }
-        if (!cached.country.isEmpty())       { bits << cached.country; }
-        setStationLine(bits.join(QStringLiteral(" · ")));
+        setStationLine(stationText(cached));
         showStationVisuals(cached);
         return;
     }
@@ -1538,6 +1671,54 @@ void RotorLogbookPanel::onLogQso()
     m_callEdit->setFocus();
 }
 
+// 2026-08-10: WSJT-X (or any program speaking its UDP protocol) logged
+// a contact. Same file, same duplicate rule, same uploader as manual
+// logging — the only differences are that nothing here asks questions
+// (an FT8 run must not stop for a dialog) and the status line says
+// where the contact came from.
+void RotorLogbookPanel::logExternalQso(const LogEntry& entry)
+{
+    if (!entry.isValid()) { return; }
+
+    LogEntry e = entry;
+    if (e.myGridSquare.trimmed().isEmpty()) {
+        e.myGridSquare = m_myGrid->text().trimmed().toUpper();
+    }
+    if (isValidGridSquare(e.myGridSquare)
+        && isValidGridSquare(e.gridSquare)) {
+        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
+        e.bearingDeg =
+            calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+    }
+
+    // Silently skip duplicates instead of asking: WSJT-X re-sends its
+    // message when its own log is edited, and a dialog popping up mid
+    // FT8 sequence would cost the next transmit period.
+    if (m_worked.wouldDuplicate(e)) {
+        setStatus(QStringLiteral("%1 already logged — WSJT-X duplicate "
+                                 "skipped").arg(e.call));
+        return;
+    }
+
+    QString err;
+    if (!appendToLogFile(e, &err)) {
+        setStatus(QStringLiteral("Couldn't write WSJT-X contact: %1")
+                      .arg(err), true);
+        return;
+    }
+
+    QString msg = QStringLiteral("Logged %1 from WSJT-X").arg(e.call);
+    if (!e.band.isEmpty()) { msg += QStringLiteral(" on %1").arg(e.band); }
+    if (m_uploader && m_uploader->isConfigured()) {
+        msg += QStringLiteral(" · uploading…");
+        m_lastLogged = e;
+        m_uploader->upload(e);
+    }
+    setStatus(msg);
+    refreshRecentList();
+    emit qsoLogged(e);
+}
+
 void RotorLogbookPanel::markUploaded(const QString& call)
 {
     // Only the contact just logged, not every past QSO with the same
@@ -1706,14 +1887,21 @@ void RotorLogbookPanel::wireQrz()
         m_lastInfo = info;
 
         adoptGridFromQrz(info);
-        QStringList bits;
-        if (!info.displayName().isEmpty()) { bits << info.displayName(); }
-        if (!info.city.isEmpty())          { bits << info.city; }
-        if (!info.country.isEmpty())       { bits << info.country; }
         updateFlagFor(info.call);
-        setStationLine(bits.join(QStringLiteral(" · ")));
+        setStationLine(stationText(info));
         showStationVisuals(info);
         setStatus(QString{});
+
+        // Show the answer as a picture too (2026-08-10, operator wish):
+        // a successful lookup brings the globe up and swings it along
+        // the path to the station. The dial is one click away on the
+        // same button.
+        if (m_dial->hasTarget()) {
+            if (m_globeBtn && !m_globeBtn->isChecked()) {
+                m_globeBtn->setChecked(true);   // switches the stack
+            }
+            m_globe->lookAlongBearing(m_dial->targetBearing());
+        }
     });
 
     connect(m_qrz, &QrzClient::lookupFailed, this,

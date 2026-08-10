@@ -31,6 +31,14 @@
 //                                    instantiating a QUdpSocket or
 //                                    simulating a multicast sender.
 //                                    AI tooling: Anthropic Claude Code.
+//   2026-08-10  Martin Fischer      Logged-ADIF message (type 12)
+//                                    parsed: when WSJT-X logs a QSO it
+//                                    broadcasts the finished ADIF
+//                                    record, and qsoLogged() hands it
+//                                    on as a LogEntry so the logbook
+//                                    fills itself during an FT8
+//                                    session. AI tooling: Anthropic
+//                                    Claude (Cowork).
 
 #pragma once
 
@@ -42,6 +50,7 @@
 #include <atomic>
 
 #include "DxSpot.h"
+#include "models/LogEntry.h"
 
 namespace NereusSDR {
 
@@ -84,6 +93,10 @@ signals:
     void spotReceived(const DxSpot& spot);
     void rawLineReceived(const QString& line);
     void statusReceived(const QString& id, double dialFreqHz, const QString& mode);
+    // WSJT-X logged a contact (message type 12, "Logged ADIF"). The
+    // entry is the parsed ADIF record WSJT-X broadcast — band, mode,
+    // reports and grid included.
+    void qsoLogged(const NereusSDR::LogEntry& entry);
 
 private slots:
     void onReadyRead();
@@ -98,6 +111,7 @@ private:
     void parseMessage(const QByteArray& data);
     void parseStatus(QDataStream& ds);
     void parseDecode(QDataStream& ds);
+    void parseLoggedAdif(QDataStream& ds);
     QString extractCallsign(const QString& message) const;
 
     QUdpSocket* m_socket;

@@ -37,6 +37,13 @@ namespace AdifLog {
 // kept in LogEntry::extras rather than dropped, and written back out
 // untouched — see the note there for why dropping them was data loss
 // and not merely untidy.
+//
+// Lengths are counted in BYTES of the UTF-8 file, not in QChars
+// (2026-08-10). ADIF's <NAME:length> counts what is on disk, and every
+// other logger counts bytes; counting UTF-16 code units mis-sliced any
+// record whose NAME, QTH or COMMENT carried an umlaut. The byte
+// overload is the real parser; the QString one converts and delegates.
+QVector<LogEntry> parse(const QByteArray& bytes);
 QVector<LogEntry> parse(const QString& text);
 
 // Read the file at `path`. A missing file is not an error — it is an

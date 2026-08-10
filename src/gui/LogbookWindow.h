@@ -19,6 +19,11 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Statistics view (per band / mode / year, unique calls
+//                 and squares, furthest DX), Cabrillo skeleton export,
+//                 and the Band column coloured by band so a mixed log
+//                 can be scanned. AI-assisted via Anthropic Claude
+//                 (Cowork), operator Martin Fischer.
 // =================================================================
 
 #include "core/LogFilter.h"
@@ -91,7 +96,15 @@ private:
     void deleteSelected();
     void exportAdif();
     void exportCsv();
+    // Cabrillo 3.0 skeleton (2026-08-10): QSO lines from the filtered
+    // view, exchange column filled with the grid where one is known.
+    // Contests differ in what they exchange, so the file is a starting
+    // point to edit, and the dialog says so.
+    void exportCabrillo();
     void importAdif();
+    // Numbers about the filtered view: per band, per mode, per year,
+    // unique calls and squares, furthest DX. (2026-08-10)
+    void showStatistics();
     // Send these records. With rows marked in the table it is those;
     // with none marked it is everything not yet uploaded, which is the
     // question an operator actually has after a session.

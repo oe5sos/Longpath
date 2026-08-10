@@ -36,6 +36,17 @@
 //                                    QFile round-trip.
 //                                    AI tooling: Anthropic Claude
 //                                    Code.
+//   2026-08-10  J.J. Boyd / KG4VCF  extractField: fix tag regex so
+//                                    fields carrying an ADIF data
+//                                    type indicator (<CALL:6:S>)
+//                                    match. The optional type group
+//                                    sat BEFORE the length capture,
+//                                    so <FIELD:len:T> could never
+//                                    match and such fields were
+//                                    silently dropped. New pattern:
+//                                    <FIELD:(\d+)(?::[A-Z])?>.
+//                                    AI tooling: Anthropic Claude
+//                                    Code.
 
 #include "AdifParser.h"
 
@@ -57,9 +68,11 @@ namespace NereusSDR {
 static QString extractField(const QString& block, const QString& fieldName)
 {
     // e.g. <CALL:6>G3ABC  or <CALL:6:S>G3ABC
+    // Tag grammar: <FIELDNAME:length> with an optional trailing
+    // :DataTypeIndicator (single letter, e.g. :S, :N, :D).
     // NOTE: do NOT make this regex static — the pattern depends on fieldName.
     const QRegularExpression re(
-        R"(<)" + QRegularExpression::escape(fieldName) + R"((?::\d+(?::[A-Z])?)?:(\d+)>)",
+        R"(<)" + QRegularExpression::escape(fieldName) + R"(:(\d+)(?::[A-Z])?>)",
         QRegularExpression::CaseInsensitiveOption);
     auto m = re.match(block);
     if (!m.hasMatch()) return {};

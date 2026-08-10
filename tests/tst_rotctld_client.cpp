@@ -47,6 +47,10 @@ public:
     double elevation{0.0};
     int    moveReport{0};     // what P replies with
     bool   splitReplies{false};
+    // A daemon that has frozen: commands are read and recorded, but no
+    // reply ever comes. The TCP side stays open — that is the case the
+    // client's reply watchdog exists for.
+    bool   mute{false};
     QStringList received;
 
     void closeConnection()
@@ -84,7 +88,7 @@ private slots:
 private:
     void reply(const QByteArray& bytes)
     {
-        if (!m_conn) { return; }
+        if (!m_conn || mute) { return; }
         if (!splitReplies) {
             m_conn->write(bytes);
             return;
@@ -117,6 +121,8 @@ private slots:
     void replies_split_across_packets_still_parse();
     void a_dropped_connection_marks_the_position_stale();
     void moving_while_disconnected_complains_rather_than_silently_failing();
+    void a_frozen_daemon_is_cut_and_reconnected();
+    void elevation_is_kept_and_sent_back_on_a_move();
 };
 
 // ── Pure parsing ────────────────────────────────────────────────────
@@ -313,6 +319,71 @@ void TstRotctldClient::moving_while_disconnected_complains_rather_than_silently_
     QCOMPARE(err.count(), 1);
     QVERIFY(err.first().first().toString()
                 .contains(QStringLiteral("not connected")));
+}
+
+void TstRotctldClient::a_frozen_daemon_is_cut_and_reconnected()
+{
+    // 2026-08-10 regression test. A rotctld that freezes while its TCP
+    // side stays open used to leave m_awaiting set forever: the poll
+    // timer's one-command-at-a-time guard never passed again and the
+    // client was silently dead until someone reconnected by hand. The
+    // reply watchdog must cut the link, and the existing retry must
+    // then bring it back once the daemon answers again.
+    FakeRotctld fake;
+    QVERIFY(fake.listen());
+    fake.azimuth = 200.0;
+
+    RotctldClient c;
+    c.setPollIntervalMs(100);
+    c.setTarget(QStringLiteral("127.0.0.1"), fake.port());
+    QSignalSpy pos(&c, &RotorController::positionChanged);
+    QSignalSpy err(&c, &RotorController::errorOccurred);
+    c.connectToRotor();
+    QVERIFY(pos.wait(3000));
+
+    // Freeze the daemon. The next poll goes unanswered, and after
+    // kReplyTimeoutMs the client must declare the link dead.
+    fake.mute = true;
+    QTRY_VERIFY_WITH_TIMEOUT(!c.isConnected(),
+                             RotctldClient::kReplyTimeoutMs + 2000);
+    QVERIFY(!err.isEmpty());
+
+    // Thaw it. The retry timer must reconnect and positions must flow
+    // again without anyone touching the client.
+    fake.mute = false;
+    const int before = pos.count();
+    QTRY_VERIFY_WITH_TIMEOUT(pos.count() > before, 8000);
+    QVERIFY(c.isConnected());
+    QVERIFY(c.hasFreshPosition());
+}
+
+void TstRotctldClient::elevation_is_kept_and_sent_back_on_a_move()
+{
+    // 2026-08-10 regression test. parsePosition() always produced the
+    // elevation, but the client used to throw it away — and moveTo()
+    // sent "P az 0.00", which on an az/el rotator slams the elevation
+    // to the horizon with every azimuth command.
+    FakeRotctld fake;
+    QVERIFY(fake.listen());
+    fake.azimuth = 120.0;
+    fake.elevation = 30.5;
+
+    RotctldClient c;
+    c.setPollIntervalMs(100);
+    c.setTarget(QStringLiteral("127.0.0.1"), fake.port());
+    QSignalSpy pos(&c, &RotorController::positionChanged);
+    QSignalSpy elev(&c, &RotctldClient::elevationChanged);
+    c.connectToRotor();
+    QVERIFY(pos.wait(3000));
+
+    QTRY_COMPARE_WITH_TIMEOUT(c.elevation(), 30.5, 3000);
+    QVERIFY(!elev.isEmpty());
+    QCOMPARE(elev.last().first().toDouble(), 30.5);
+
+    // A turn must carry the reported elevation, not zero it.
+    c.moveTo(240.0);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        fake.received.contains(QStringLiteral("P 240.00 30.50")), 3000);
 }
 
 QTEST_MAIN(TstRotctldClient)

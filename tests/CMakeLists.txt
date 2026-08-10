@@ -230,6 +230,14 @@ nereus_add_test(tst_reading_name)
 nereus_add_test(tst_meter_item_scale)
 nereus_add_test(tst_meter_presets)
 
+# ── 2026-08-10: RotatorItem smoothing fixes ───────────────────────────────
+# Pins the compass smoothing contract after three fixes: azimuth snap
+# (upstream's |d| < 0.2*|d| snap branch was dead code), elevation
+# smoothing actually fed by setElevation() (m_smoothedEle was never
+# written, needle stuck at 0°), and zenith clamp (fmod(90, 90) == 0
+# wrapped a legitimate 90° reading to 0°).
+nereus_add_test(tst_rotator_item)
+
 # ── Phase 3M-1c G.1 / G.2: VfoDisplayItem TX-state badge + Phase L routing ──
 # Verifies the existing 3G-8 widget machinery (setTransmitting / isTransmitting
 # round-trip + paint() colour-swap rendered to QImage) AND demonstrates the
@@ -4596,6 +4604,11 @@ nereus_add_test(tst_solar_times)
 # -- Logbook file round-trip: other loggers' extension tags, hhmm times,
 #    values containing '<', a last record with no <EOR>, atomic rewrite --
 nereus_add_test(tst_adif_log)
+
+# -- 2026-08-10: the log as KML for Google Earth — longitude-first
+#    coordinates, band folders in dial order, timestamps for the time
+#    slider, escaping, and honest skip counts --
+nereus_add_test(tst_kml_export)
 
 # -- Cloudlog/Wavelog: URL normalisation (the part operators get wrong)
 #    and response classification, incl. duplicate-as-success --

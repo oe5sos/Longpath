@@ -29,6 +29,7 @@
 //                                    Anthropic Claude Code.
 
 #include "WsjtxClient.h"
+#include "AdifLog.h"
 #include "LogCategories.h"
 
 #include <QDataStream>
@@ -150,8 +151,32 @@ void WsjtxClient::parseMessage(const QByteArray& data)
     switch (msgType) {
     case 1:  parseStatus(ds);  break;  // Status — dial freq, mode
     case 2:  parseDecode(ds);  break;  // Decode — the spots
+    case 12: parseLoggedAdif(ds); break;  // Logged ADIF — a finished QSO
     default: break;
     }
+}
+
+// ── Logged ADIF (type 12) — a QSO WSJT-X just wrote to its own log ──────────
+//
+// Fields: Id(QString), ADIF text(QString). The text is one complete
+// ADIF record with header, exactly what WSJT-X appended to wsjtx_log.adi
+// — so the shared parser reads it and the logbook can fill itself while
+// an FT8 session runs. (2026-08-10, operator request.)
+void WsjtxClient::parseLoggedAdif(QDataStream& ds)
+{
+    QString id;
+    if (!readQString(ds, id)) return;
+
+    QString adif;
+    if (!readQString(ds, adif)) return;
+
+    const QVector<LogEntry> parsed = AdifLog::parse(adif);
+    if (parsed.isEmpty() || !parsed.first().isValid()) {
+        qCWarning(lcSpots) << "WSJT-X Logged-ADIF message did not parse:"
+                           << adif.left(120);
+        return;
+    }
+    emit qsoLogged(parsed.first());
 }
 
 // ── Status message (type 1) — track dial frequency ──────────────────────────

@@ -8,6 +8,9 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-10 — Reply watchdog + elevation kept; see RotctldClient.h.
+//                 AI-assisted via Anthropic Claude (Cowork), operator
+//                 Martin Fischer.
 // =================================================================
 
 #include "RotctldClient.h"
@@ -63,6 +66,30 @@ RotctldClient::RotctldClient(QObject* parent) : RotorController(parent)
         }
     });
 
+    // Reply watchdog. Without it, a rotctld that freezes while its TCP
+    // side stays open leaves m_awaiting set forever: the poll timer's
+    // "one command at a time" guard never passes again, and the client
+    // is silently dead until someone reconnects by hand. Cutting the
+    // connection routes recovery through the disconnect path above,
+    // which already knows how to retry.
+    m_deadline = new QTimer(this);
+    m_deadline->setSingleShot(true);
+    m_deadline->setInterval(kReplyTimeoutMs);
+    connect(m_deadline, &QTimer::timeout, this, [this]() {
+        if (m_awaiting == Pending::None) { return; }
+        emit errorOccurred(
+            QStringLiteral("Rotator stopped answering — reconnecting"));
+        // abort() emits no disconnected(); do the teardown here and let
+        // the retry timer bring the link back.
+        m_socket.abort();
+        m_poll->stop();
+        m_queue.clear();
+        m_buffer.clear();
+        m_awaiting = Pending::None;
+        setState(State::Disconnected);
+        if (!m_host.isEmpty()) { m_retry->start(); }
+    });
+
     connect(&m_socket, &QTcpSocket::connected, this, [this]() {
         m_buffer.clear();
         m_queue.clear();
@@ -77,6 +104,7 @@ RotctldClient::RotctldClient(QObject* parent) : RotorController(parent)
 
     connect(&m_socket, &QTcpSocket::disconnected, this, [this]() {
         m_poll->stop();
+        m_deadline->stop();
         setState(State::Disconnected);
         // Keep trying. A rotator controller that is power-cycled mid
         // session should come back on its own rather than needing the
@@ -138,6 +166,7 @@ void RotctldClient::disconnectFromRotor()
     // three seconds later and looks like the button does nothing.
     m_retry->stop();
     m_poll->stop();
+    m_deadline->stop();
     m_queue.clear();
     m_awaiting = Pending::None;
     m_socket.abort();
@@ -174,7 +203,11 @@ void RotctldClient::moveTo(double azimuthDeg)
     }
     m_commanded = norm360(azimuthDeg);
     m_haveCommanded = true;
-    send(moveCommand(m_commanded), Pending::Report);
+    // Send the elevation the rotator last reported, not 0: "P az el"
+    // sets both axes, and forcing 0 would slam an az/el rotator's
+    // elevation down with every azimuth command. For an azimuth-only
+    // rotator the reported elevation IS 0, so nothing changes there.
+    send(moveCommand(m_commanded, m_elevation), Pending::Report);
     setState(State::Moving);
 }
 
@@ -201,6 +234,7 @@ void RotctldClient::pump()
     const Command c = m_queue.dequeue();
     m_awaiting = c.expect;
     m_socket.write(c.bytes);
+    m_deadline->start();
 }
 
 // ── Replies ─────────────────────────────────────────────────────────
@@ -278,6 +312,7 @@ void RotctldClient::onReadyRead()
         m_buffer.remove(0, cut + 1);
         const Pending was = m_awaiting;
         m_awaiting = Pending::None;
+        m_deadline->stop();
 
         if (was == Pending::Position) {
             double az = 0.0, el = 0.0;
@@ -285,6 +320,10 @@ void RotctldClient::onReadyRead()
                 m_azimuth = norm360(az);
                 m_lastPosition = QDateTime::currentDateTimeUtc();
                 emit positionChanged(m_azimuth);
+                if (!qFuzzyCompare(m_elevation + 1.0, el + 1.0)) {
+                    m_elevation = el;
+                    emit elevationChanged(m_elevation);
+                }
 
                 if (m_state == State::Moving && m_haveCommanded
                     && shortestGap(m_azimuth, m_commanded) <= kArrivedDeg) {

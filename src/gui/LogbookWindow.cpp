@@ -35,6 +35,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSet>
 #include <QSignalBlocker>
@@ -42,6 +43,8 @@
 #include <QTextStream>
 #include <QTimeZone>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 #include <algorithm>
 
@@ -127,13 +130,26 @@ void LogbookWindow::buildUi()
         "Merge an ADIF file into this log, skipping contacts it already has"));
     auto* adifBtn = new QPushButton(QStringLiteral("Export ADIF…"), this);
     auto* csvBtn  = new QPushButton(QStringLiteral("Export CSV…"), this);
+    auto* cabrBtn = new QPushButton(QStringLiteral("Cabrillo…"), this);
+    cabrBtn->setToolTip(QStringLiteral(
+        "Export the filtered view as a Cabrillo 3.0 skeleton — check "
+        "the exchange column against the contest's rules before "
+        "submitting"));
+    auto* statsBtn = new QPushButton(QStringLiteral("Stats…"), this);
+    statsBtn->setToolTip(QStringLiteral(
+        "Contacts per band, mode and year, unique calls and squares, "
+        "furthest DX — for whatever the filters currently show"));
     for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
-                           importBtn, adifBtn, csvBtn}) {
+                           statsBtn, importBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
     col->addLayout(top);
     connect(mapBtn, &QPushButton::clicked, this, &LogbookWindow::openMap);
+    connect(statsBtn, &QPushButton::clicked,
+            this, &LogbookWindow::showStatistics);
+    connect(cabrBtn, &QPushButton::clicked,
+            this, &LogbookWindow::exportCabrillo);
     connect(importBtn, &QPushButton::clicked,
             this, &LogbookWindow::importAdif);
 
@@ -575,6 +591,31 @@ void LogbookWindow::refreshTable()
         put(ColFreq, e.freqMHz > 0.0
                 ? QString::number(e.freqMHz, 'f', 3) : QString{});
         put(ColBand, e.band);
+        // Band coloured by band (2026-08-10): a mixed log is scanned by
+        // this column, and colour reads faster than text.
+        if (QTableWidgetItem* bi = m_table->item(row, ColBand)) {
+            static const QHash<QString, QColor> kBandCol = {
+                {QStringLiteral("160m"), QColor(0xc0, 0x40, 0x40)},
+                {QStringLiteral("80m"),  QColor(0xff, 0x70, 0x40)},
+                {QStringLiteral("60m"),  QColor(0xff, 0xa0, 0x40)},
+                {QStringLiteral("40m"),  QColor(0xff, 0xd0, 0x40)},
+                {QStringLiteral("30m"),  QColor(0xff, 0xff, 0x40)},
+                {QStringLiteral("20m"),  QColor(0x40, 0xff, 0x40)},
+                {QStringLiteral("17m"),  QColor(0x40, 0xff, 0xb0)},
+                {QStringLiteral("15m"),  QColor(0x40, 0xd0, 0xff)},
+                {QStringLiteral("12m"),  QColor(0x40, 0x80, 0xff)},
+                {QStringLiteral("10m"),  QColor(0xa0, 0x40, 0xff)},
+                {QStringLiteral("6m"),   QColor(0xff, 0x40, 0xff)},
+                {QStringLiteral("2m"),   QColor(0xff, 0x40, 0xc0)},
+            };
+            const QColor c = kBandCol.value(e.band.trimmed().toLower());
+            if (c.isValid()) {
+                bi->setForeground(c);
+                QFont bf = bi->font();
+                bf.setBold(true);
+                bi->setFont(bf);
+            }
+        }
         put(ColMode, e.submode.isEmpty() ? e.mode : e.submode);
         put(ColSent, e.rstSent);
         put(ColRcvd, e.rstRcvd);
@@ -1111,6 +1152,199 @@ void LogbookWindow::exportCsv()
     out.flush();
     QMessageBox::information(this, QStringLiteral("Logbook"),
         QStringLiteral("Exported %1 contacts.").arg(subset.size()));
+}
+
+// ── Cabrillo (2026-08-10) ───────────────────────────────────────────
+
+void LogbookWindow::exportCabrillo()
+{
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("Export Cabrillo"),
+        QStringLiteral("nereus-log.cbr"),
+        QStringLiteral("Cabrillo (*.cbr *.log)"));
+    if (path.isEmpty()) { return; }
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, QStringLiteral("Logbook"),
+            QStringLiteral("Export failed:\n%1").arg(f.errorString()));
+        return;
+    }
+
+    const QString myCall = AppSettings::instance()
+        .value(QStringLiteral("User/Callsign"), QString{})
+        .toString().trimmed().toUpper();
+
+    // Mode → Cabrillo's two letters. Everything digital is DG except
+    // RTTY, which contests treat as its own thing.
+    auto cbrMode = [](const LogEntry& e) {
+        const QString m = e.mode.trimmed().toUpper();
+        if (m == QLatin1String("CW"))  { return QStringLiteral("CW"); }
+        if (m == QLatin1String("SSB") || m == QLatin1String("USB")
+            || m == QLatin1String("LSB") || m == QLatin1String("AM")
+            || m == QLatin1String("FM")) { return QStringLiteral("PH"); }
+        if (m == QLatin1String("RTTY")) { return QStringLiteral("RY"); }
+        return QStringLiteral("DG");
+    };
+    // Frequency in kHz; when only the band is known, its lower edge —
+    // Cabrillo robots accept a band-representative figure.
+    auto cbrFreq = [](const LogEntry& e) {
+        if (e.freqMHz > 0.0) {
+            return QString::number(qRound(e.freqMHz * 1000.0));
+        }
+        static const QHash<QString, int> kEdge = {
+            {QStringLiteral("160m"), 1800}, {QStringLiteral("80m"), 3500},
+            {QStringLiteral("60m"), 5330},  {QStringLiteral("40m"), 7000},
+            {QStringLiteral("30m"), 10100}, {QStringLiteral("20m"), 14000},
+            {QStringLiteral("17m"), 18068}, {QStringLiteral("15m"), 21000},
+            {QStringLiteral("12m"), 24890}, {QStringLiteral("10m"), 28000},
+            {QStringLiteral("6m"), 50000},  {QStringLiteral("2m"), 144000},
+        };
+        return QString::number(
+            kEdge.value(e.band.trimmed().toLower(), 0));
+    };
+
+    QTextStream out(&f);
+    out << "START-OF-LOG: 3.0\n"
+        << "CREATED-BY: NereusSDR\n"
+        << "CALLSIGN: " << (myCall.isEmpty()
+                                ? QStringLiteral("NOCALL") : myCall)
+        << "\n";
+
+    int written = 0;
+    for (int i : m_visible) {
+        const LogEntry& e = m_all.at(i);
+        const QDateTime u = e.timeOn.toUTC();
+        if (!u.isValid() || e.call.trimmed().isEmpty()) { continue; }
+
+        // Exchange: the grid where one is known, a placeholder where
+        // not. Contests differ; the dialog below says to check this.
+        const QString sentX = QStringLiteral("---");
+        const QString rcvdX = e.gridSquare.trimmed().isEmpty()
+            ? QStringLiteral("---")
+            : e.gridSquare.trimmed().toUpper().left(4);
+
+        out << QStringLiteral("QSO: %1 %2 %3 %4 %5 %6 %7 %8 %9 %10\n")
+            .arg(cbrFreq(e), 5)
+            .arg(cbrMode(e))
+            .arg(u.toString(QStringLiteral("yyyy-MM-dd")))
+            .arg(u.toString(QStringLiteral("hhmm")))
+            .arg(myCall.isEmpty() ? QStringLiteral("NOCALL") : myCall, -10)
+            .arg(e.rstSent.trimmed().isEmpty()
+                     ? QStringLiteral("59") : e.rstSent.trimmed(), 3)
+            .arg(sentX, 6)
+            .arg(e.call.trimmed().toUpper(), -10)
+            .arg(e.rstRcvd.trimmed().isEmpty()
+                     ? QStringLiteral("59") : e.rstRcvd.trimmed(), 3)
+            .arg(rcvdX, 6);
+        ++written;
+    }
+    out << "END-OF-LOG:\n";
+    out.flush();
+
+    QMessageBox::information(this, QStringLiteral("Logbook"),
+        QStringLiteral("Wrote %1 QSO lines.\n\nCabrillo exchanges differ "
+                       "by contest — check the exchange columns against "
+                       "the rules before submitting.").arg(written));
+}
+
+// ── Statistics (2026-08-10) ─────────────────────────────────────────
+
+void LogbookWindow::showStatistics()
+{
+    // Over the filtered view, same as every export here: filter to one
+    // year or one band and the numbers answer for exactly that.
+    QHash<QString, int> perBand, perMode, perYear;
+    QSet<QString> calls, squares;
+    double longest = 0.0;
+    QString longestCall;
+    int total = 0;
+
+    for (int i : m_visible) {
+        const LogEntry& e = m_all.at(i);
+        ++total;
+        ++perBand[e.band.trimmed().isEmpty()
+                      ? QStringLiteral("?") : e.band.trimmed().toLower()];
+        ++perMode[e.mode.trimmed().isEmpty()
+                      ? QStringLiteral("?") : e.mode.trimmed().toUpper()];
+        const QDateTime u = e.timeOn.toUTC();
+        if (u.isValid()) {
+            ++perYear[u.toString(QStringLiteral("yyyy"))];
+        }
+        calls.insert(e.call.trimmed().toUpper());
+        if (e.gridSquare.trimmed().size() >= 4) {
+            squares.insert(e.gridSquare.trimmed().toUpper().left(4));
+        }
+        if (e.distanceKm > longest) {
+            longest = e.distanceKm;
+            longestCall = e.call;
+        }
+    }
+
+    auto section = [](const QString& title, QHash<QString, int> counts,
+                      bool byBand) {
+        QStringList keys = counts.keys();
+        if (byBand) {
+            std::sort(keys.begin(), keys.end(),
+                      [](const QString& a, const QString& b) {
+                return AdifLog::bandSortKeyMHz(a)
+                     < AdifLog::bandSortKeyMHz(b);
+            });
+        } else {
+            std::sort(keys.begin(), keys.end());
+        }
+        int max = 1;
+        for (const QString& k : keys) { max = std::max(max, counts[k]); }
+        QString out = title + QLatin1Char('\n');
+        for (const QString& k : keys) {
+            const int n = counts[k];
+            const int bar = std::max(1, n * 28 / max);
+            out += QStringLiteral("  %1 %2 %3\n")
+                .arg(k, -6)
+                .arg(QString(bar, QChar(0x2588)))
+                .arg(n);
+        }
+        return out;
+    };
+
+    QString text;
+    text += QStringLiteral("%1 contacts · %2 unique calls · %3 grid "
+                           "squares\n")
+        .arg(total).arg(calls.size()).arg(squares.size());
+    if (longest > 0.0) {
+        text += QStringLiteral("furthest: %1 km (%2)\n")
+            .arg(longest, 0, 'f', 0).arg(longestCall);
+    }
+    text += QLatin1Char('\n');
+    text += section(QStringLiteral("By band"), perBand, true);
+    text += QLatin1Char('\n');
+    text += section(QStringLiteral("By mode"), perMode, false);
+    text += QLatin1Char('\n');
+    text += section(QStringLiteral("By year"), perYear, false);
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("Logbook statistics"));
+    dlg.resize(420, 480);
+    auto* lay = new QVBoxLayout(&dlg);
+    auto* view = new QPlainTextEdit(&dlg);
+    view->setReadOnly(true);
+    view->setPlainText(text);
+    QFont mono(QStringLiteral("Menlo"));
+    mono.setStyleHint(QFont::Monospace);
+    mono.setPixelSize(12);
+    view->setFont(mono);
+    view->setStyleSheet(QStringLiteral(
+        "QPlainTextEdit { background: %1; color: %2; border: 1px solid "
+        "%3; }")
+        .arg(QString::fromLatin1(Style::kInsetBg),
+             QString::fromLatin1(Style::kTextPrimary),
+             QString::fromLatin1(Style::kBorderSubtle)));
+    lay->addWidget(view);
+    auto* closeBtn = new QPushButton(QStringLiteral("Close"), &dlg);
+    closeBtn->setStyleSheet(Style::buttonBaseStyle());
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    lay->addWidget(closeBtn, 0, Qt::AlignRight);
+    dlg.exec();
 }
 
 } // namespace NereusSDR

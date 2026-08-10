@@ -920,6 +920,7 @@ set(GUI_SOURCES
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
     src/core/AdifLog.cpp
+    src/core/KmlExport.cpp
     src/core/WorkedBefore.cpp
     src/core/LogFilter.cpp
     src/core/CredentialStore.cpp
