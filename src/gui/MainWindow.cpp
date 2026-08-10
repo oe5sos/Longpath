@@ -262,6 +262,7 @@ warren@wpratt.com
 #include "core/Maidenhead.h"
 #include "core/CredentialStore.h"
 #include "core/QrzClient.h"
+#include "gui/AntennaWindow.h"
 #include "core/QrzLogbookUploader.h"
 #include "core/CloudlogUploader.h"
 #include "core/AdifNetworkUploader.h"
@@ -6306,6 +6307,20 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openRotorSetup);
     }
 
+    // The antenna window. Next to the rotator setup because the two are
+    // the same errand — the mast and what is on top of it — and because
+    // an operator who has just found one will look here for the other.
+    {
+        QAction* antAction =
+            toolsMenu->addAction(QStringLiteral("&Antenna..."));
+        antAction->setObjectName(QStringLiteral("actAntenna"));
+        antAction->setToolTip(QStringLiteral(
+            "Open a sweep from your analyser and see where the antenna "
+            "is resonant, and how much wire to add or remove."));
+        connect(antAction, &QAction::triggered,
+                this, &MainWindow::openAntennaWindow);
+    }
+
     // The logbook, reachable without going through the dock. It is the
     // same window the dock's button opens — one window over one file.
     {
@@ -9455,6 +9470,21 @@ void MainWindow::openLogbookWindow()
     if (RotorLogbookPanel* panel = ensureRotorPanel()) {
         panel->showLogbook();
     }
+}
+
+void MainWindow::openAntennaWindow()
+{
+    // One window, reused and never destroyed on close. The workflow is
+    // measure, walk to the antenna, adjust, measure again — a window
+    // that forgot the wire length and the target between sweeps would
+    // make the operator retype them every round.
+    if (!m_antennaWindow) {
+        m_antennaWindow = new AntennaWindow(this);
+        m_antennaWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+    }
+    m_antennaWindow->show();
+    m_antennaWindow->raise();
+    m_antennaWindow->activateWindow();
 }
 
 void MainWindow::openVoiceCheck()

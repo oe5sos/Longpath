@@ -729,6 +729,8 @@ set(GUI_SOURCES
     src/gui/widgets/ParametricEqWidget.h
     src/gui/widgets/ParametricEqWidget.cpp
     src/gui/widgets/ResetSlider.h
+    src/gui/AntennaWindow.h
+    src/gui/AntennaWindow.cpp
     src/gui/widgets/SwrCurveWidget.h
     src/gui/widgets/SwrCurveWidget.cpp
     src/gui/widgets/QsoDetailPane.h

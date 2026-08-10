@@ -115,6 +115,7 @@ class VaxFirstRunDialog;
 class PsForm;
 // Phase 3J-2 H1: Tools menu modeless singletons.
 class SpotHubDialog;
+class AntennaWindow;
 class TxVoiceCheckDialog;
 class StripWindow;
 class FreeDVReporterDialog;
@@ -559,6 +560,9 @@ private:
     void openLogbookWindow();
     void openRotorSetup();
     void openVoiceCheck();
+    // Open the antenna window: a measured sweep turned into a length of
+    // wire. Reads a file, touches nothing else.
+    void openAntennaWindow();
     void openChannelStrip();
     class RotorLogbookPanel* ensureRotorPanel();
     // QRZ XML client, created on first use. Username from AppSettings,
@@ -1148,6 +1152,9 @@ private:
     // Rotor + logbook dock (Tools > Rotor...). Lazy; owned by `this`.
     QDockWidget*     m_rotorDock{nullptr};
     QrzClient*           m_qrzClient{nullptr};
+    // One window, reused. Kept so a second measurement lands in the
+    // same place as the first rather than beside it.
+    AntennaWindow*       m_antennaWindow{nullptr};
     QrzLogbookUploader*  m_qrzUploader{nullptr};
     CloudlogUploader*    m_cloudlogUploader{nullptr};
     AdifNetworkUploader* m_localLogUploader{nullptr};
