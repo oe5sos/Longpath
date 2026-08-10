@@ -96,6 +96,13 @@ public:
     void setSimulated(bool on);
     bool isSimulated() const noexcept { return m_simulated; }
 
+    // An extra line for the tooltip, set by whoever owns the dial —
+    // the panel uses it to explain the double-click once it has hidden
+    // the buttons. Kept separate from the simulated warning so the two
+    // cannot overwrite each other, which is what happened when both
+    // called setToolTip.
+    void setHint(const QString& text);
+
     // How close counts as arrived.
     void setArrivalTolerance(double deg);
 
@@ -133,6 +140,24 @@ private:
     // hub's dead zone, where the angle is meaningless.
     double bearingAt(const QPointF& pos) const;
     void recomputeState();
+    // Tooltip from both facts at once: the simulated warning first,
+    // then whatever hint the owner set.
+    void refreshTooltip();
+
+    // ── Where the rose is, in one place ──────────────────────────────
+    //
+    // The rose normally sits high, with the readout under it; when the
+    // widget is small it takes the whole face instead. Two functions
+    // need to agree about that: the one that draws it and the one that
+    // works out which bearing the mouse landed on.
+    //
+    // They did not. paintEvent moved the centre and bearingAt() kept
+    // its own copy of the old formula, so on a small dial a click aimed
+    // at a heading several degrees from the one under the cursor —
+    // silently, and worse the smaller it got.
+    bool    isCompassOnly() const;
+    QPointF roseCentre()    const;
+    double  roseRadius()    const;
 
     double m_actual{0.0};
     double m_target{0.0};
@@ -143,6 +168,7 @@ private:
     double m_beamWidth{40.0};
     double m_tolerance{3.0};
     bool   m_simulated{false};
+    QString m_hint;
     State  m_state{State::Idle};
 };
 

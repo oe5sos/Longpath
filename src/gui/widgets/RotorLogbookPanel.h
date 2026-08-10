@@ -35,8 +35,10 @@ namespace NereusSDR { class StationPhoto; }
 class QLineEdit;
 class QNetworkAccessManager;
 class QPushButton;
+class QResizeEvent;
 class QStackedWidget;
 class QTableWidget;
+class QVBoxLayout;
 
 namespace NereusSDR {
 
@@ -103,6 +105,11 @@ public:
 signals:
     void qsoLogged(const LogEntry& entry);
 
+protected:
+    // Every resize re-decides which rows still fit — see
+    // updateCompactness().
+    void resizeEvent(QResizeEvent* ev) override;
+
 private:
     void buildUi();
     void wireQrz();
@@ -124,6 +131,9 @@ private:
     void ensureRotor();
     void beginTurn();
     void haltTurn();
+    // Hide rows from the bottom of the priority list as height runs
+    // out, so the compass survives being dragged small.
+    void updateCompactness();
     void applyLocators();
     void refreshRecentList();
     // Note in the log file that this contact reached QRZ.
@@ -242,6 +252,32 @@ private:
     // Set when the operator edits the locator by hand. A later QRZ
     // answer must not overwrite what a person deliberately entered.
     bool m_dxGridIsManual{false};
+
+    // ── Shrinking down to the compass (2026-08-10) ───────────────────
+    //
+    // A panel with ten rows has a minimum height of all ten, and the
+    // dial was what got squeezed when the dock got narrow. Backwards:
+    // the dial is the one part that is readable at a glance from across
+    // the room.
+    //
+    // These rows are hidden from the front of the list as height runs
+    // out, so the compass keeps whatever is left. Wrapper widgets
+    // rather than the layouts themselves, because QLayout has no
+    // setVisible().
+    QWidget* m_rowCall{nullptr};
+    QWidget* m_rowCard{nullptr};
+    QWidget* m_rowGrid{nullptr};
+    QWidget* m_rowPreset{nullptr};
+    QWidget* m_rowBtn{nullptr};
+    QWidget* m_rowRst{nullptr};
+    QWidget* m_rowLog{nullptr};
+
+    QVBoxLayout*     m_column{nullptr};
+    QVector<QWidget*> m_shedOrder;      // least useful first
+    // Measured while each row was last visible. A hidden widget's hint
+    // is still valid, but a row laid out for the first time reports one
+    // before its children have theirs.
+    QVector<int>      m_shedHeights;
 };
 
 } // namespace NereusSDR

@@ -4,6 +4,9 @@
 // no-port-check: NereusSDR-original — Thetis has no rotator control.
 
 #include <QApplication>
+#include <QMouseEvent>
+
+#include <cmath>
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include "gui/widgets/RotorDialWidget.h"
@@ -23,6 +26,7 @@ private slots:
     void turning_state_is_not_overwritten_by_movement();
     void bearings_are_normalised();
     void a_simulated_needle_says_so_and_changes_nothing_else();
+    void a_click_aims_where_the_rose_actually_is();
 };
 
 void TstRotorDial::no_target_means_no_travel()
@@ -155,6 +159,50 @@ void TstRotorDial::a_simulated_needle_says_so_and_changes_nothing_else()
     d.setSimulated(false);
     QVERIFY(!d.isSimulated());
     QCOMPARE(d.travelDegrees(), travelBefore);
+}
+
+// The rose sits at 42% of the height normally and at 50% once the dial
+// is small enough to drop its readout. Two functions have to agree
+// about that: the one that draws the rose and the one that decides
+// which bearing a click landed on.
+//
+// They did not, briefly. paintEvent moved the centre for the small case
+// and the hit test kept the old formula, so a click on a compass-only
+// dial aimed several degrees away from the cursor — silently, and worse
+// the smaller the dial got. This pins both sizes.
+void TstRotorDial::a_click_aims_where_the_rose_actually_is()
+{
+    // Due east of the rose centre must read 90° at any size. The offset
+    // is small enough to stay inside the face and large enough to clear
+    // the hub's dead zone.
+    // The press event is posted by hand rather than through
+    // QTest::mouseClick: that helper needs the widgets module wired
+    // into the test harness, and the thing under test here is the
+    // arithmetic in mousePressEvent, not Qt's event delivery.
+    auto clickEastOfCentre = [](RotorDialWidget& d,
+                                double centreFraction) -> double {
+        QSignalSpy spy(&d, &RotorDialWidget::targetPicked);
+        const QPointF at(d.width() * 0.5 + d.width() * 0.30,
+                         d.height() * centreFraction);
+        QMouseEvent ev(QEvent::MouseButtonPress, at, at,
+                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(&d, &ev);
+        if (spy.count() != 1) { return -1.0; }
+        return spy.at(0).at(0).toDouble();
+    };
+
+    {   // Full size: rose centred at 42% of the height.
+        RotorDialWidget d;
+        d.resize(220, 260);
+        QVERIFY2(std::abs(clickEastOfCentre(d, 0.42) - 90.0) < 1.0,
+                 "a click due east of the rose did not read 90 degrees");
+    }
+    {   // Compass only: rose centred, readout gone.
+        RotorDialWidget d;
+        d.resize(110, 110);
+        QVERIFY2(std::abs(clickEastOfCentre(d, 0.50) - 90.0) < 1.0,
+                 "on a small dial the hit test is using the wrong centre");
+    }
 }
 
 QTEST_MAIN(TstRotorDial)

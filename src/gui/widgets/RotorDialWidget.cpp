@@ -15,6 +15,7 @@
 
 #include <QMouseEvent>
 #include <QPainter>
+#include <QStringList>
 #include <QRadialGradient>
 #include <QtMath>
 
@@ -70,12 +71,20 @@ RotorDialWidget::RotorDialWidget(QWidget* parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
     setCursor(Qt::CrossCursor);
-    // User-visible tooltip — plain English, no source cites.
-    setToolTip(QStringLiteral("Click inside the rose to aim the antenna"));
+    // Through setHint rather than setToolTip: the simulated warning
+    // also wants the tooltip, and refreshTooltip() is what keeps the
+    // two from overwriting each other.
+    setHint(QStringLiteral("Click inside the rose to aim the antenna"));
 }
 
 QSize RotorDialWidget::sizeHint()        const { return {190, 210}; }
-QSize RotorDialWidget::minimumSizeHint() const { return {130, 150}; }
+
+// Small enough that the panel can be dragged down to a compass and
+// nothing else. Below about this the ticks stop being distinguishable
+// and the needles overlap the hub, so it is a floor rather than a
+// preference. (2026-08-10 — was {130, 150}, which set the panel's
+// minimum height high enough that the dial was the thing squeezed.)
+QSize RotorDialWidget::minimumSizeHint() const { return {84, 84}; }
 
 double RotorDialWidget::bearingToRadians(double deg)
 {
@@ -132,7 +141,53 @@ void RotorDialWidget::setSimulated(bool on)
 {
     if (m_simulated == on) { return; }
     m_simulated = on;
+    refreshTooltip();
     update();
+}
+
+void RotorDialWidget::setHint(const QString& text)
+{
+    if (m_hint == text) { return; }
+    m_hint = text;
+    refreshTooltip();
+}
+
+void RotorDialWidget::refreshTooltip()
+{
+    QStringList parts;
+    // The full sentence lives here, where it fits at every size. The
+    // dashed amber ring and the three letters on the face are the
+    // summary.
+    if (m_simulated) {
+        parts << QStringLiteral(
+            "No rotator is connected. This needle is driven by a timer, "
+            "not by the mast — nothing has moved.");
+    }
+    if (!m_hint.isEmpty()) { parts << m_hint; }
+    setToolTip(parts.join(QStringLiteral("\n\n")));
+}
+
+// ── Geometry, shared by drawing and hit-testing ─────────────────────
+
+bool RotorDialWidget::isCompassOnly() const
+{
+    // The rose normally sits in the top 84% and the two readout lines
+    // take the rest. Dragged small, that split leaves a thumbnail rose
+    // above text nobody can read — the worst of both. Below this size
+    // the readout goes and the rose takes the whole face.
+    return height() < 150 || width() < 118;
+}
+
+QPointF RotorDialWidget::roseCentre() const
+{
+    return {width() * 0.5, height() * (isCompassOnly() ? 0.5 : 0.42)};
+}
+
+double RotorDialWidget::roseRadius() const
+{
+    return isCompassOnly()
+               ? std::min(width(), height()) * 0.46 - 3.0
+               : std::min(width() * 0.42, height() * 0.36);
 }
 
 void RotorDialWidget::setArrivalTolerance(double deg)
@@ -196,9 +251,12 @@ double RotorDialWidget::travelDegrees() const
 // the target wildly).
 double RotorDialWidget::bearingAt(const QPointF& pos) const
 {
-    const QPointF c(width() * 0.5, height() * 0.42);
-    const QPointF p = pos - c;
-    if (std::hypot(p.x(), p.y()) < 8.0) { return -1.0; }
+    const QPointF p = pos - roseCentre();
+    // The dead zone scales with the rose. A fixed 8 px hub was most of
+    // a compass-only dial, so on a small one the middle third of the
+    // face quietly ignored clicks.
+    const double dead = std::max(5.0, roseRadius() * 0.16);
+    if (std::hypot(p.x(), p.y()) < dead) { return -1.0; }
     return norm360(qRadiansToDegrees(std::atan2(p.x(), -p.y())));
 }
 
@@ -247,12 +305,26 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     glow.setColorAt(1.0, QColor(0, 0, 0, 0));
     p.fillRect(rect(), glow);
 
-    const QPointF c(w * 0.5, h * 0.42);
-    const double r = std::min(w * 0.42, h * 0.36);
+    // Compass-only mode (2026-08-10). The geometry lives in
+    // isCompassOnly/roseCentre/roseRadius so that bearingAt() cannot
+    // drift away from it — see the note on those declarations.
+    const bool compassOnly = isCompassOnly();
+    const QPointF c = roseCentre();
+    const double  r = roseRadius();
 
-    // Rings
-    p.setPen(QPen(kRing, 1));
+    // Rings. The outer one turns amber and dashed while the needle is
+    // invented — a mark that costs no space, so it survives at any size
+    // the dial can be dragged to. The words below may not fit; this
+    // always does.
+    if (m_simulated) {
+        QPen warn(QColor(Style::kAmberWarn), 1.2);
+        warn.setStyle(Qt::DashLine);
+        p.setPen(warn);
+    } else {
+        p.setPen(QPen(kRing, 1));
+    }
     p.drawEllipse(c, r, r);
+    p.setPen(QPen(kRing, 1));
     p.setPen(QPen(kRingInner, 1));
     p.drawEllipse(c, r * 0.83, r * 0.83);
 
@@ -367,7 +439,12 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
         sf.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
         p.setFont(sf);
         p.setPen(QColor(Style::kAmberWarn));
-        p.drawText(QPointF(6.0, 14.0), QStringLiteral("NO ROTATOR"));
+        // Three letters when there is no room for eleven. The dashed
+        // amber ring carries the meaning either way; this only names
+        // it.
+        p.drawText(QPointF(6.0, 14.0),
+                   w < 150.0 ? QStringLiteral("SIM")
+                             : QStringLiteral("NO ROTATOR"));
     }
 
     if (m_hasElevation) {
@@ -382,6 +459,12 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     }
 
     // ── Readout under the rose ───────────────────────────────────────
+    //
+    // Skipped entirely when the widget is small: there is no room under
+    // the rose because the rose now fills the widget, and drawing over
+    // it would be worse than saying nothing.
+    if (compassOnly) { return; }
+
     QFont big = p.font();
     big.setPixelSize(std::max(13, static_cast<int>(h * 0.075)));
     big.setBold(true);

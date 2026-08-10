@@ -52,6 +52,8 @@
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QMargins>
+#include <QResizeEvent>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
@@ -149,6 +151,20 @@ const QStringList& largeCandidates()
 // (2026-08-10) — the logbook detail pane needs the same directory, and
 // two functions deciding where the cache lives is one too many.
 
+// A row that can be hidden when the panel is dragged small.
+//
+// QLayout has no setVisible(), so every row that might be shed needs a
+// widget of its own to hide. Zero margins so wrapping changes nothing
+// about how the row looks while it is up. (2026-08-10)
+QWidget* addShedRow(QVBoxLayout* col, QLayout* row, QWidget* parent)
+{
+    auto* w = new QWidget(parent);
+    row->setContentsMargins(0, 0, 0, 0);
+    w->setLayout(row);
+    col->addWidget(w);
+    return w;
+}
+
 QLabel* caption(const QString& text, QWidget* parent)
 {
     auto* l = new QLabel(text, parent);
@@ -243,7 +259,7 @@ void RotorLogbookPanel::buildUi()
     connect(quickLogBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::onLogQso);
 
-    col->addLayout(callRow);
+    m_rowCall = addShedRow(col, callRow, this);
 
     // Station card: portrait, flag, name line. The portrait is on the
     // left and fixed-width so the text below never reflows as images of
@@ -310,7 +326,7 @@ void RotorLogbookPanel::buildUi()
     cardCol->addStretch(1);
 
     cardRow->addLayout(cardCol, 1);
-    col->addLayout(cardRow);
+    m_rowCard = addShedRow(col, cardRow, this);
 
     // Locators
     auto* gridRow = new QHBoxLayout;
@@ -324,7 +340,7 @@ void RotorLogbookPanel::buildUi()
     m_dxGrid = new QLineEdit(this);
     m_dxGrid->setPlaceholderText(QStringLiteral("their locator"));
     gridRow->addWidget(m_dxGrid, 1);
-    col->addLayout(gridRow);
+    m_rowGrid = addShedRow(col, gridRow, this);
 
     // Dial and globe share one slot rather than stacking vertically: in a
     // dock this narrow, two 260 px squares would push the log off screen,
@@ -418,7 +434,7 @@ void RotorLogbookPanel::buildUi()
         presetRow->addWidget(b);
     }
     presetRow->addStretch(1);
-    col->addLayout(presetRow);
+    m_rowPreset = addShedRow(col, presetRow, this);
 
     m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
     m_globeBtn->setCheckable(true);
@@ -433,7 +449,7 @@ void RotorLogbookPanel::buildUi()
         m_globe->setAutoRotate(false);
         if (on) { updateGlobeFromLocators(); }
     });
-    col->addLayout(btnRow);
+    m_rowBtn = addShedRow(col, btnRow, this);
 
     // Report + log
     auto* rstRow = new QHBoxLayout;
@@ -451,7 +467,7 @@ void RotorLogbookPanel::buildUi()
     m_comment = new QLineEdit(this);
     m_comment->setPlaceholderText(QStringLiteral("comment"));
     rstRow->addWidget(m_comment, 1);
-    col->addLayout(rstRow);
+    m_rowRst = addShedRow(col, rstRow, this);
 
     for (QLineEdit* e : {m_myGrid, m_dxGrid, m_rstSent, m_rstRcvd, m_comment}) {
         e->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
@@ -468,7 +484,7 @@ void RotorLogbookPanel::buildUi()
     bookBtn->setToolTip(QStringLiteral(
         "Search, correct and export the whole log"));
     logRow->addWidget(bookBtn);
-    col->addLayout(logRow);
+    m_rowLog = addShedRow(col, logRow, this);
     connect(bookBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::openLogbookWindow);
 
@@ -501,6 +517,27 @@ void RotorLogbookPanel::buildUi()
           QString::fromLatin1(Style::kButtonBg),
           QString::fromLatin1(Style::kTextSecondary)));
     col->addWidget(m_recent);
+
+    // ── Shrinking down to the compass (2026-08-10) ───────────────────
+    //
+    // Everything above competes for the same column, and a panel with
+    // ten rows in it has a minimum height of all ten. Dragged narrow in
+    // a dock, the dial was the thing that got squeezed — which is
+    // backwards, because the dial is the one part that is useful at a
+    // glance from across the room.
+    //
+    // So the rows are shed from the bottom of this list upwards as the
+    // panel loses height, and the dial keeps whatever is left. Order is
+    // least useful first. The recent-contacts table goes early because
+    // it is by far the tallest and the logbook window shows the same
+    // thing properly. The status line goes late because it is one line
+    // and it is where the panel says what went wrong. The rotate and
+    // stop buttons go last of all, and even then the dial itself can
+    // still be double-clicked to turn.
+    m_shedOrder = {m_recent, m_rowLog, m_rowRst, m_rowCard, m_rowPreset,
+                   m_rowGrid, m_rowCall, m_status, m_rowBtn};
+    m_shedHeights.resize(m_shedOrder.size());
+    m_column = col;
 
     // ── Wiring ───────────────────────────────────────────────────────
     connect(m_callEdit, &QLineEdit::textChanged,
@@ -561,6 +598,73 @@ void RotorLogbookPanel::buildUi()
             m_dial->setTargetBearing(m_dial->targetBearing() + 180.0);
         }
     });
+}
+
+// ── Shrinking down to the compass ───────────────────────────────────
+
+void RotorLogbookPanel::resizeEvent(QResizeEvent* ev)
+{
+    QWidget::resizeEvent(ev);
+    updateCompactness();
+}
+
+void RotorLogbookPanel::updateCompactness()
+{
+    if (m_shedOrder.isEmpty() || !m_column) { return; }
+
+    // Remember how tall each row is while it is up. A hidden widget's
+    // sizeHint is still valid in Qt, but a row that has never been laid
+    // out reports its hint before its children have theirs, so the
+    // first honest measurement is cached and reused.
+    for (int i = 0; i < m_shedOrder.size(); ++i) {
+        QWidget* w = m_shedOrder.at(i);
+        if (!w || !w->isVisible()) { continue; }
+        const int h = w->sizeHint().height();
+        if (h > 0) { m_shedHeights[i] = h; }
+    }
+
+    const QMargins m = m_column->contentsMargins();
+    const int spacing = m_column->spacing();
+    int avail = height() - m.top() - m.bottom();
+
+    // What the dial insists on keeping. Below this there is no compass
+    // left to protect and shedding another row buys nothing.
+    const int dialFloor =
+        m_viewStack ? m_viewStack->minimumSizeHint().height() : 96;
+
+    int needed = dialFloor;
+    for (int i = 0; i < m_shedOrder.size(); ++i) {
+        if (m_shedHeights.at(i) > 0) {
+            needed += m_shedHeights.at(i) + spacing;
+        }
+    }
+
+    // Shed from the front of the list — least useful first — until what
+    // is left fits. Purely a function of the height we were handed, so
+    // it cannot oscillate: hiding a row does not change `avail`.
+    int shed = 0;
+    while (needed > avail && shed < m_shedOrder.size()) {
+        if (m_shedHeights.at(shed) > 0) {
+            needed -= m_shedHeights.at(shed) + spacing;
+        }
+        ++shed;
+    }
+
+    for (int i = 0; i < m_shedOrder.size(); ++i) {
+        QWidget* w = m_shedOrder.at(i);
+        if (!w) { continue; }
+        const bool show = i >= shed;
+        if (w->isVisible() != show) { w->setVisible(show); }
+    }
+
+    // With the buttons gone there is nothing left saying how to turn,
+    // so the dial has to say it itself.
+    if (m_dial) {
+        m_dial->setHint(shed >= m_shedOrder.size()
+            ? QStringLiteral("Click to aim, double-click to turn. Drag the "
+                             "panel taller to get the controls back.")
+            : QString{});
+    }
 }
 
 // ── Rotator ─────────────────────────────────────────────────────────
