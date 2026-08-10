@@ -4687,6 +4687,12 @@ nereus_add_test(tst_qso_confirmation)
 #    over rather than deleted — last year's name beats no name --
 nereus_add_test(tst_callsign_cache)
 
+# -- Turning a measured sweep into "add 22 cm to each leg". The tests
+#    that matter are the refusals: a Touchstone header with no unit is
+#    NOT read as gigahertz (the standard's default), and the full-wave
+#    anti-resonance is NOT offered as something to trim towards --
+nereus_add_test(tst_antenna_sweep)
+
 # -- Characters: the list makes claims (gentlest first, Off really off,
 #    the two voice de-essers listen in different places) and nothing but
 #    these tests keeps them true --
