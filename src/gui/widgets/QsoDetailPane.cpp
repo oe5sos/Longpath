@@ -38,9 +38,18 @@
 namespace NereusSDR {
 namespace {
 
-// Off by default. Turning it on is a decision to spend requests, and a
-// default that spends them for you is a default that gets discovered
-// when the API stops answering.
+// ── On by default, which reverses the first decision here ────────────
+//
+// It shipped off, on the argument that arrow-keying down a log would be
+// one QRZ request per row. That argument was already answered by the
+// two things sitting either side of it: the delay below means a row
+// scrolled past is never looked up at all, and the cache on disk means
+// a row looked up once is never looked up again.
+//
+// What was left of the caution was a pane that showed nothing until you
+// found a button — which reads as broken, because a detail pane that
+// needs to be asked for details is not doing its job. Off is still
+// available for a metered subscription; it is no longer the default.
 const QString kAutoLookupKey =
     QStringLiteral("LogbookDetailAutoQrzLookup");
 
@@ -128,7 +137,7 @@ QsoDetailPane::QsoDetailPane(QWidget* parent)
 
 bool QsoDetailPane::autoLookupEnabled()
 {
-    return AppSettings::instance().value(kAutoLookupKey, false).toBool();
+    return AppSettings::instance().value(kAutoLookupKey, true).toBool();
 }
 
 void QsoDetailPane::buildUi()
@@ -403,6 +412,7 @@ void QsoDetailPane::clearEntry()
 {
     m_lookupDelay->stop();
     m_haveEntry = false;
+    m_notLogged = false;
     m_entry = LogEntry{};
     m_info  = CallsignInfo{};
     refresh();
@@ -416,6 +426,7 @@ void QsoDetailPane::setEntry(const LogEntry& entry)
 
     m_entry = entry;
     m_haveEntry = true;
+    m_notLogged = false;
     m_info = CallsignInfo{};
 
     const QString call = Callsigns::normalized(entry.call);
@@ -433,6 +444,31 @@ void QsoDetailPane::setEntry(const LogEntry& entry)
     // a miss waits for the button unless they asked for that too.
     if (m_info.isValid() && !stale) { return; }
     if (autoLookupEnabled()) { m_lookupDelay->start(); }
+}
+
+void QsoDetailPane::lookUpNow()
+{
+    m_lookupDelay->stop();
+    // A cached answer needs no request. The photo and the name are
+    // already on screen from setEntry; asking again would spend a
+    // request to be told the same thing.
+    if (m_info.isValid() && m_cache && !m_cache->isStale(m_info)) { return; }
+    requestLookup();
+}
+
+void QsoDetailPane::showCallsign(const QString& call)
+{
+    LogEntry bare;
+    bare.call = Callsigns::normalized(call);
+    if (bare.call.isEmpty()) { clearEntry(); return; }
+    setEntry(bare);
+    // setEntry clears the flag, so it is set afterwards and the pane
+    // redrawn — this is the one path where the subject is somebody who
+    // is not in the log, and three parts of the pane say something
+    // different because of it.
+    m_notLogged = true;
+    refresh();
+    lookUpNow();
 }
 
 void QsoDetailPane::requestLookup()
@@ -524,9 +560,17 @@ void QsoDetailPane::refreshBeam()
         m_longPath->setText(dash);
         m_distance->setText(dash);
         m_turnShort->setText(QStringLiteral("Turn rotor"));
-        m_travel->setText(m_haveEntry
-            ? QStringLiteral("No bearing — needs your locator and theirs.")
-            : QString{});
+        if (!m_haveEntry) {
+            m_travel->clear();
+        } else if (m_notLogged) {
+            // Not "your locator and theirs are missing" — there is no
+            // contact here to have locators. Say the true thing.
+            m_travel->setText(QStringLiteral(
+                "Not in your log — no bearing until you work them."));
+        } else {
+            m_travel->setText(QStringLiteral(
+                "No bearing — needs your locator and theirs."));
+        }
         m_travel->setVisible(m_haveEntry);
         return;
     }
@@ -605,9 +649,11 @@ void QsoDetailPane::refreshExtras()
     m_extrasBox->setVisible(shown > 0);
     m_extrasEmpty->setVisible(shown == 0);
     if (shown == 0) {
-        m_extrasEmpty->setText(QStringLiteral(
-            "Nothing beyond the columns. Contacts imported from another "
-            "logger usually carry DXCC, zones and QSL state here."));
+        m_extrasEmpty->setText(m_notLogged
+            ? QStringLiteral("No contact with this station in the log.")
+            : QStringLiteral("Nothing beyond the columns. Contacts "
+                             "imported from another logger usually carry "
+                             "DXCC, zones and QSL state here."));
     }
 }
 
@@ -630,8 +676,11 @@ void QsoDetailPane::refresh()
     }
 
     m_call->setText(m_entry.call);
-    m_badges->setVisible(true);
-    m_editBtn->setEnabled(true);
+    // Nothing to confirm when there is no contact. Three grey chips
+    // reading "nothing recorded" would be technically true and would
+    // look like a QSO that nobody ever confirmed.
+    m_badges->setVisible(!m_notLogged);
+    m_editBtn->setEnabled(!m_notLogged);
     m_qrzPageBtn->setEnabled(true);
     m_lookupBtn->setEnabled(true);
 

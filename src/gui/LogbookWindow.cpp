@@ -377,6 +377,39 @@ void LogbookWindow::buildUi()
         refreshTable();
         updateStats();
     });
+
+    // ── Return on a callsign means "tell me about this station" ──────
+    //
+    // Typing filters; Return is a decision. That distinction is what
+    // makes it safe to spend a QRZ request here without asking: nobody
+    // presses Return by scrolling past something.
+    //
+    // Three cases, and the third is the one that was missing. The call
+    // is in the log — select the matching contact, which brings its
+    // bearing, confirmations and ADIF fields with it. It is in the log
+    // several times — the newest, because the sort already put it
+    // first. It is not in the log at all — show what QRZ knows anyway,
+    // because "who is this" is a fair question about a station you have
+    // never worked, and an empty pane is a poor answer to it.
+    connect(m_search, &QLineEdit::returnPressed, this, [this]() {
+        const QString call = Callsigns::normalized(m_search->text());
+        if (call.isEmpty()) { return; }
+
+        for (int row = 0; row < m_visible.size(); ++row) {
+            const int idx = sourceRow(row);
+            if (idx < 0) { continue; }
+            if (Callsigns::normalized(m_all.at(idx).call) != call) {
+                continue;
+            }
+            m_table->setCurrentCell(row, ColCall);
+            m_detail->setEntry(m_all.at(idx));
+            m_detail->lookUpNow();
+            return;
+        }
+
+        if (!Callsigns::isLikelyCallsign(call)) { return; }
+        m_detail->showCallsign(call);
+    });
     connect(m_editBtn,   &QPushButton::clicked, this, &LogbookWindow::editSelected);
     connect(m_deleteBtn, &QPushButton::clicked, this, &LogbookWindow::deleteSelected);
     connect(adifBtn,     &QPushButton::clicked, this, &LogbookWindow::exportAdif);
@@ -816,6 +849,31 @@ void LogbookWindow::refreshTable()
         put(ColComment, e.comment);
     }
     if (!m_headerRestored) { m_table->resizeColumnsToContents(); }
+
+    // ── Something has to be selected for the pane to have a subject ──
+    //
+    // setRowCount() drops the current cell, so after every filter
+    // keystroke and every reload there was no current row and the
+    // detail pane read "Select a contact" — including the moment the
+    // window opens, which is when an operator first looks at it and
+    // concludes the pane is broken.
+    //
+    // The first row is the right default because the table is sorted
+    // newest-first: the contact you want is nearly always the last one
+    // you made. (2026-08-10)
+    if (m_table->rowCount() > 0) {
+        if (m_table->currentRow() < 0) {
+            m_table->setCurrentCell(0, ColCall);
+        } else {
+            // The row count changed underneath the current row and the
+            // signal does not fire for that, so the pane would keep
+            // describing whichever contact used to be at this index.
+            const int idx = sourceRow(m_table->currentRow());
+            if (idx >= 0) { m_detail->setEntry(m_all.at(idx)); }
+        }
+    } else {
+        m_detail->clearEntry();
+    }
 }
 
 void LogbookWindow::updateStats()

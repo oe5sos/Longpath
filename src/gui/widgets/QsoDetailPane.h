@@ -83,6 +83,19 @@ public:
     void setEntry(const LogEntry& entry);
     void clearEntry();
 
+    // Ask QRZ now, whatever the automatic setting says. For the places
+    // where the operator has plainly asked — pressing Return on a
+    // callsign is not the same as scrolling past one, and the whole
+    // reason lookups are throttled is scrolling.
+    void lookUpNow();
+
+    // Show a station that is not in the log. "Who is this?" is a fair
+    // question about somebody you have never worked, and there is no
+    // LogEntry to hang the answer on — so one is made with nothing in
+    // it but the callsign, and the pane says the rest is unknown rather
+    // than inventing a bearing.
+    void showCallsign(const QString& call);
+
     // Where the rotor is now, so the pane can say how far it will turn
     // rather than only where it will end up. NaN when unknown, which is
     // the honest state when no rotor is connected.
@@ -107,6 +120,11 @@ private:
     LogEntry     m_entry;
     CallsignInfo m_info;
     bool         m_haveEntry{false};
+    // Set by showCallsign(): this is a station looked up by name, not a
+    // contact out of the log. It changes what the empty states should
+    // say — "no bearing, needs both locators" is wrong advice for
+    // somebody you have never worked.
+    bool         m_notLogged{false};
 
     QrzClient*     m_qrz{nullptr};
     CallsignCache* m_cache{nullptr};
