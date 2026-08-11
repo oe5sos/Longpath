@@ -1647,6 +1647,12 @@ public:
     // lifecycle.
     // Test-only accessor — do not use in production code.
     const TxWorkerThread* txWorkerForTest() const { return m_txWorker.get(); }
+
+    // Voice-check access to the worker's pre/post-strip taps
+    // (2026-08-11). Null until a connection constructs the worker — the
+    // dialog re-arms on its level-watch tick exactly as it does for
+    // txChannel().
+    TxWorkerThread* txWorker() { return m_txWorker.get(); }
     // Phase 3M-1c TX pump v3 — TxMicSource is constructed alongside
     // TxWorkerThread; allow tests to verify the pre/post-connect ownership.
     const class TxMicSource* txMicSourceForTest() const { return m_txMicSource.get(); }

@@ -371,6 +371,19 @@ warren@wpratt.com
 #include "gui/chrome/ChromeBarItems.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/AudioEngine.h"
+#include "core/ClientPuduMonitor.h"
+#include "core/TxWorkerThread.h"
+#include "core/strip/StripChain.h"
+#include "core/strip/StripSettings.h"
+
+#include <QAudioDevice>
+#include <QAudioFormat>
+#include <QAudioSource>
+#include <QMediaDevices>
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
 #include "core/audio/VirtualCableDetector.h"
 #include "core/audio/RealtimeAudioPriority.h"
 
@@ -9499,6 +9512,198 @@ void MainWindow::openAntennaWindow()
     m_antennaWindow->activateWindow();
 }
 
+// ── The AetherSDR monitor, wired the AetherSDR way (2026-08-11) ──────
+//
+// Structure copied 1:1 from upstream MainWindow (@31b29583):
+//   - MainWindow owns the ClientPuduMonitor;
+//   - the strip surface hosts two buttons and three state setters;
+//   - muteRxRequested gates the live RX feed for the whole
+//     record→auto-play cycle (NereusSDR's gate is
+//     AudioEngine::setRxMutedForMonitor — one call, idempotent);
+//   - recordingStopped auto-starts playback.
+// NereusSDR-specific: the capture feed. Upstream's engine pushes int16
+// stereo 24 kHz from its client chain tail; here the TX worker's
+// post-strip tap delivers float mono 48 kHz, so the feed lambda
+// converts (average adjacent samples → 24 kHz, duplicate L=R) before
+// ClientPuduMonitor::feedTxPostDsp — the ported class stays untouched.
+// The tap is (re)wired per recording because the worker is rebuilt on
+// every connect.
+void MainWindow::wirePuduMonitor()
+{
+    if (m_finalMonitor || !m_stripWindow) { return; }
+    m_finalMonitor = new ClientPuduMonitor(this);
+
+    connect(m_finalMonitor, &ClientPuduMonitor::muteRxRequested,
+            this, [this](bool mute) {
+        if (m_radioModel && m_radioModel->audioEngine()) {
+            m_radioModel->audioEngine()->setRxMutedForMonitor(mute);
+        }
+    });
+
+    // Strip buttons → monitor, same toggle logic as upstream. The stop
+    // side runs through finishPuduTake(), which is where the captured
+    // device audio meets the offline strip pass before the monitor
+    // finalises — see the capture note below.
+    connect(m_stripWindow.data(), &StripWindow::monitorRecordClicked,
+            this, [this]() {
+        if (m_finalMonitor->isRecording()) {
+            finishPuduTake();
+        } else {
+            if (m_finalMonitor->isPlaying()) m_finalMonitor->stopPlayback();
+            m_finalMonitor->startRecording();
+        }
+    });
+    connect(m_stripWindow.data(), &StripWindow::monitorPlayClicked,
+            this, [this]() {
+        if (m_finalMonitor->isPlaying()) m_finalMonitor->stopPlayback();
+        else                             m_finalMonitor->startPlayback();
+    });
+
+    // ── Capture: the SOUND CARD paces it, never the radio ────────────
+    //
+    // The first feed rode the TX worker's post-strip tap, and the tap's
+    // own cadence diagnostic condemned it on this bench: 3190-3639
+    // pump ticks where 3755 belong — the radio's mic-frame stream loses
+    // 3-15% of its blocks over the network, and a sample that never
+    // arrived cannot be buffered back into existence. That loss is why
+    // every self-listening construction today stuttered, whatever sat
+    // downstream.
+    //
+    // This is also the real reason AetherSDR's monitor sounds right:
+    // its entire client chain runs on the PC's audio device clock and
+    // never ticks on the radio. Copied properly now: a QAudioSource on
+    // the default input captures the take gapless at 48 kHz mono, and
+    // when recording stops the channel strip runs OFFLINE over the
+    // whole take (a private StripChain configured from the same
+    // persisted settings — never the live one, which the worker owns),
+    // then the result is decimated to the monitor's 24 kHz stereo diet
+    // and fed in one pass. No real-time seam anywhere in the loop.
+    connect(m_finalMonitor, &ClientPuduMonitor::recordingStarted,
+            this, [this]() {
+        if (m_stripWindow) { m_stripWindow->setMonitorRecording(true); }
+
+        m_puduRawTake.clear();
+        QAudioFormat f;
+        f.setSampleRate(48000);
+        f.setChannelCount(1);
+        f.setSampleFormat(QAudioFormat::Int16);
+        const QAudioDevice dev = QMediaDevices::defaultAudioInput();
+        if (dev.isNull()) {
+            qCWarning(lcAudio) << "PUDU capture: no audio input device";
+            return;
+        }
+        m_puduCapture = new QAudioSource(dev, f, this);
+        m_puduCaptureIo = m_puduCapture->start();
+        if (!m_puduCaptureIo) {
+            qCWarning(lcAudio) << "PUDU capture failed to start:"
+                               << static_cast<int>(m_puduCapture->error());
+            m_puduCapture->deleteLater();
+            m_puduCapture = nullptr;
+            return;
+        }
+        connect(m_puduCaptureIo, &QIODevice::readyRead, this, [this]() {
+            if (!m_puduCaptureIo || !m_finalMonitor) { return; }
+            m_puduRawTake += m_puduCaptureIo->readAll();
+            // Same 30-second cap as the monitor's own buffer.
+            constexpr int kCapBytes = 30 * 48000 * 2;
+            if (m_puduRawTake.size() >= kCapBytes
+                && m_finalMonitor->isRecording()) {
+                finishPuduTake();
+            }
+        });
+    });
+    connect(m_finalMonitor, &ClientPuduMonitor::recordingStopped,
+            this, [this](int /*durationMs*/) {
+        if (m_stripWindow) {
+            m_stripWindow->setMonitorRecording(false);
+            m_stripWindow->setMonitorHasRecording(
+                m_finalMonitor->hasRecording());
+        }
+        // Auto-start playback — the mute stays installed across the
+        // transition because the monitor only emits muteRxRequested
+        // (false) at stopPlayback().
+        m_finalMonitor->startPlayback();
+    });
+    connect(m_finalMonitor, &ClientPuduMonitor::playbackStarted,
+            this, [this]() {
+        if (m_stripWindow) { m_stripWindow->setMonitorPlaying(true); }
+    });
+    connect(m_finalMonitor, &ClientPuduMonitor::playbackStopped,
+            this, [this]() {
+        if (m_stripWindow) { m_stripWindow->setMonitorPlaying(false); }
+    });
+
+    // Seed the strip with the monitor's current state.
+    m_stripWindow->setMonitorRecording(m_finalMonitor->isRecording());
+    m_stripWindow->setMonitorPlaying(m_finalMonitor->isPlaying());
+    m_stripWindow->setMonitorHasRecording(m_finalMonitor->hasRecording());
+}
+
+// Stop the device capture, run the channel strip offline over the whole
+// take, feed the monitor, finalise. See the capture note in
+// wirePuduMonitor for why nothing here is real-time.
+void MainWindow::finishPuduTake()
+{
+    if (m_puduCapture) {
+        m_puduCapture->stop();
+        m_puduCapture->deleteLater();
+        m_puduCapture = nullptr;
+        m_puduCaptureIo = nullptr;   // owned by the source; dies with it
+    }
+    if (!m_finalMonitor || !m_finalMonitor->isRecording()) { return; }
+
+    const int inFrames = m_puduRawTake.size()
+                         / static_cast<int>(sizeof(int16_t));
+    if (inFrames > 0) {
+        // int16 mono 48 kHz → float for the strip.
+        std::vector<float> mono(static_cast<size_t>(inFrames));
+        const auto* s16 =
+            reinterpret_cast<const int16_t*>(m_puduRawTake.constData());
+        for (int i = 0; i < inFrames; ++i) {
+            mono[static_cast<size_t>(i)] = s16[i] / 32768.0f;
+        }
+
+        // Offline strip pass. A PRIVATE chain, configured from the
+        // same persisted settings the live one writes on every edit —
+        // the live chain is owned by the worker thread and must not be
+        // touched from here. The master switch is deliberately not
+        // persisted (loads off), so it is mirrored from the live chain
+        // (an atomic read); stage enables come with the settings. When
+        // the strip master is off, the take stays raw — which is the
+        // honest A of the A/B.
+        StripChain* live =
+            m_radioModel ? m_radioModel->stripChain() : nullptr;
+        if (live && live->isEnabled()) {
+            StripChain offline;
+            StripSettings::restore(offline);
+            offline.setEnabled(true);
+            constexpr int kBlock = 64;
+            for (int at = 0; at + kBlock <= inFrames; at += kBlock) {
+                offline.processMono(mono.data() + at, kBlock);
+            }
+        }
+
+        // float mono 48 kHz → int16 stereo 24 kHz, the ported
+        // monitor's native diet: average adjacent samples (the correct
+        // 2:1 decimator for a voice-band signal), L = R.
+        const int outFrames = inFrames / 2;
+        QByteArray pcm(outFrames * ClientPuduMonitor::kBytesPerFrame,
+                       Qt::Uninitialized);
+        auto* dst = reinterpret_cast<int16_t*>(pcm.data());
+        for (int i = 0; i < outFrames; ++i) {
+            const float v = 0.5f * (mono[static_cast<size_t>(2 * i)]
+                                    + mono[static_cast<size_t>(2 * i + 1)]);
+            const auto q = static_cast<int16_t>(
+                std::lround(std::clamp(v, -1.0f, 1.0f) * 32767.0f));
+            *dst++ = q;
+            *dst++ = q;
+        }
+        m_finalMonitor->feedTxPostDsp(pcm);
+    }
+    m_puduRawTake.clear();
+    m_finalMonitor->stopRecording();
+}
+
 void MainWindow::openVoiceCheck()
 {
     if (!m_radioModel) { return; }
@@ -9517,6 +9722,7 @@ void MainWindow::openChannelStrip()
     // is turn a knob, listen, turn it back.
     if (!m_stripWindow) {
         m_stripWindow = new StripWindow(m_radioModel, this);
+        wirePuduMonitor();
     }
     m_stripWindow->show();
     m_stripWindow->raise();

@@ -84,6 +84,8 @@ class QProgressDialog;
 class QThread;
 class QSplitter;
 class QMenu;
+class QAudioSource;
+class QIODevice;
 
 namespace NereusSDR {
 
@@ -117,6 +119,7 @@ class PsForm;
 class SpotHubDialog;
 class AntennaWindow;
 class StripWindow;
+class ClientPuduMonitor;
 class FreeDVReporterDialog;
 
 class RxDashboard;
@@ -559,6 +562,8 @@ private:
     void openLogbookWindow();
     void openRotorSetup();
     void openVoiceCheck();
+    void wirePuduMonitor();
+    void finishPuduTake();
     // Open the antenna window: a measured sweep turned into a length of
     // wire. Reads a file, touches nothing else.
     void openAntennaWindow();
@@ -738,6 +743,21 @@ private:
     // m_voiceCheckDialog is gone (2026-08-11): the voice check is an
     // embedded tab of StripWindow now; openVoiceCheck() routes there.
     QPointer<StripWindow>          m_stripWindow;
+
+    // The AetherSDR record-then-listen monitor, structure copied 1:1
+    // (2026-08-11): MainWindow owns it, the strip window hosts its two
+    // buttons, muteRxRequested gates live RX, recordingStopped
+    // auto-plays. Created alongside the strip window; the feed tap is
+    // (re)wired per recording because the TX worker is rebuilt on every
+    // connect.
+    ClientPuduMonitor*      m_finalMonitor{nullptr};
+    QMetaObject::Connection m_puduFeedTap;   // retired feed path; kept for teardown safety
+    // Device-paced capture for the monitor (2026-08-11): QAudioSource
+    // on the default input, int16 mono 48 kHz, accumulated on the UI
+    // thread. The radio never paces this — see wirePuduMonitor.
+    QAudioSource* m_puduCapture{nullptr};
+    QIODevice*    m_puduCaptureIo{nullptr};
+    QByteArray    m_puduRawTake;
     QPointer<FreeDVReporterDialog> m_freeDVReporterDialog;
 
     // Status bar widgets (double-height AetherSDR design, 46px)

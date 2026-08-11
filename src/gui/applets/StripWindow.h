@@ -81,6 +81,21 @@ public:
     // route here since 2026-08-11 — the standalone dialog is gone).
     void showVoiceCheckTab();
 
+    // ── PUDU monitor buttons (AetherSDR contract, 2026-08-11) ────────
+    //
+    // The same two-button, three-setter surface AetherialAudioStrip
+    // gives AetherSDR's MainWindow: the strip hosts the buttons and
+    // paints the state; the monitor itself lives in MainWindow, which
+    // connects the clicked signals to ClientPuduMonitor exactly as
+    // upstream does.
+    void setMonitorRecording(bool on);
+    void setMonitorPlaying(bool on);
+    void setMonitorHasRecording(bool has);
+
+signals:
+    void monitorRecordClicked();
+    void monitorPlayClicked();
+
 private:
     void buildUi();
     QWidget* buildGatePanel();
@@ -187,14 +202,9 @@ private:
     void adoptChainIfArrived();
     bool m_hadChain{false};
 
-    // Hearing yourself while shaping the curve. The voice check has the
-    // same control, and putting it only there was a mistake: an
-    // equaliser you cannot hear while dragging is an equaliser adjusted
-    // by looking, which is how a curve that measures well and sounds
-    // wrong gets made. Closing the voice check also restores the
-    // monitor to whatever it was, which is correct of it and left this
-    // window silent.
-    void setSelfMonitor(bool on);
+    // setSelfMonitor is gone (2026-08-11): live listening left this
+    // window with the "Hear myself" checkbox. The record-then-listen
+    // monitor (buttons above) replaced it — the AetherSDR way.
 
     // ── The radio's own processing, while listening ──────────────────
     //
@@ -246,12 +256,14 @@ private:
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_compareBtn{nullptr};
+
+    // PUDU monitor buttons — state painted by the three setters above.
+    QPushButton*    m_monRecordBtn{nullptr};
+    QPushButton*    m_monPlayBtn{nullptr};
+    bool            m_monHasRecording{false};
     // Measure, then shape. See the note at the button's construction
     // for why a take with a start and a stop replaced the rolling
     // average the bench could not interpret.
-    QCheckBox*      m_listen{nullptr};
-    bool            m_monitorWasOn{false};
-    bool            m_restoreMonitor{false};
 
     // ── The operator's own targets, A and B ──────────────────────────
     //

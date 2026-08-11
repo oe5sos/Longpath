@@ -189,12 +189,7 @@ double StripWindow::cur(const std::function<float()>& read,
 
 StripWindow::~StripWindow()
 {
-    // Put the monitor back. Someone who opens this window to listen
-    // while shaping a curve and then closes it should not be left with
-    // a monitor they did not ask for and can no longer see.
-    if (m_restoreMonitor) { setSelfMonitor(m_monitorWasOn); }
-    // Belt and braces: setSelfMonitor(false) restores it, but if the
-    // window is destroyed while listening with m_restoreMonitor unset
+    // If the window is destroyed with the apply-path bypass engaged,
     // the radio would keep a bypass it never asked for.
     setRadioBypass(false);
 }
@@ -225,32 +220,34 @@ void StripWindow::setRadioBypass(bool on)
     tx.setCfcEnabled(m_hadCfc);
 }
 
-void StripWindow::setSelfMonitor(bool on)
+// setSelfMonitor is gone (2026-08-11) — the live listen path left this
+// window with the "Hear myself" checkbox; the record-then-listen
+// monitor never engages the off-air chain or the MON mix. setRadioBypass
+// stays: the voice-check's strip apply-path still uses it.
+
+// ── PUDU monitor button surface (AetherSDR contract) ────────────────
+
+void StripWindow::setMonitorRecording(bool on)
 {
-    if (!m_radio) { return; }
-    TxChannel* tx = m_radio->txChannel();
-    if (!tx) { return; }
-
-    // The radio's own chain steps aside while you listen, and comes
-    // back when you stop. Without this you are hearing the strip and
-    // WDSP in series and can judge neither.
-    setRadioBypass(on);
-
-    if (on && !m_restoreMonitor) {
-        m_monitorWasOn = m_radio->transmitModel().monEnabled();
-        m_restoreMonitor = true;
+    if (!m_monRecordBtn) { return; }
+    m_monRecordBtn->setText(on ? QStringLiteral("■ Stop")
+                               : QStringLiteral("● Record"));
+    if (m_monPlayBtn) {
+        m_monPlayBtn->setEnabled(!on && m_monHasRecording);
     }
-    // Two switches, both needed: one runs the transmit chain off air,
-    // the other mixes its output into the speakers. Neither writes to
-    // the radio — TxChannel::writesToRadio() is gated on transmitting
-    // alone, and tst_tx_offair_monitor holds it there.
-    tx->setOffAirMonitor(on);
-    m_radio->transmitModel().setMonEnabled(on);
-    // And silence the band, or you are listening to your voice and the
-    // noise floor at once and can judge neither.
-    if (AudioEngine* ae = m_radio->audioEngine()) {
-        ae->setRxMutedForMonitor(on);
-    }
+}
+
+void StripWindow::setMonitorPlaying(bool on)
+{
+    if (!m_monPlayBtn) { return; }
+    m_monPlayBtn->setText(on ? QStringLiteral("■ Stop")
+                             : QStringLiteral("▶ Play"));
+}
+
+void StripWindow::setMonitorHasRecording(bool has)
+{
+    m_monHasRecording = has;
+    if (m_monPlayBtn) { m_monPlayBtn->setEnabled(has); }
 }
 
 void StripWindow::persist()
@@ -278,13 +275,35 @@ void StripWindow::buildUi()
         m_master->setChecked(chain() && chain()->isEnabled());
         row->addWidget(m_master);
 
-        m_listen = new QCheckBox(QStringLiteral("Hear myself"), this);
-        m_listen->setToolTip(QStringLiteral(
-            "Run the transmit chain and listen to the result without "
-            "going on the air. Nothing is transmitted."));
-        row->addWidget(m_listen);
-        connect(m_listen, &QCheckBox::toggled,
-                this, &StripWindow::setSelfMonitor);
+        // ── The AetherSDR monitor buttons (2026-08-11) ───────────────
+        //
+        // The "Hear myself" live checkbox that stood here is gone —
+        // asked for at the bench after a day of almost-right: no
+        // direct listening anywhere, only AetherSDR's record-then-
+        // listen loop. These are AetherialAudioStrip's two buttons,
+        // verbatim in behaviour: Record toggles the capture (30 s cap,
+        // auto-plays when it stops), Play replays the last take. The
+        // monitor itself lives in MainWindow; this window only hosts
+        // the buttons — same division of labour as upstream.
+        m_monRecordBtn = new QPushButton(QStringLiteral("● Record"), this);
+        m_monRecordBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_monRecordBtn->setToolTip(QStringLiteral(
+            "Record your processed voice off the strip (up to 30 s) — "
+            "it plays back by itself when you stop. Nothing is "
+            "transmitted; the band is quiet while you record and "
+            "listen."));
+        connect(m_monRecordBtn, &QPushButton::clicked,
+                this, &StripWindow::monitorRecordClicked);
+        row->addWidget(m_monRecordBtn);
+
+        m_monPlayBtn = new QPushButton(QStringLiteral("▶ Play"), this);
+        m_monPlayBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_monPlayBtn->setEnabled(false);
+        m_monPlayBtn->setToolTip(QStringLiteral(
+            "Replay the last take."));
+        connect(m_monPlayBtn, &QPushButton::clicked,
+                this, &StripWindow::monitorPlayClicked);
+        row->addWidget(m_monPlayBtn);
 
         row->addStretch(1);
         col->addLayout(row);
