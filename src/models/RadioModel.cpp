@@ -15043,6 +15043,25 @@ std::optional<NereusSDR::DdcAssignment> RadioModel::computeDdcAssignment() const
 
 void RadioModel::publishDdcAssignment(const NereusSDR::DdcAssignment& assignment)
 {
+    // Remote bench 2026-08-11 (second round): sync the PS-orchestration
+    // rates from the stream allocator on EVERY assignment publish — the
+    // allocator is the live source of truth the codec was just handed
+    // via buildStreamConfigsForCodec(). The first-round fix mirrored
+    // setReceiverSampleRate, but that setter only runs on live rate
+    // CHANGES; a plain connect restores the persisted stream rate
+    // through this publish path without ever touching it, so the MOX
+    // fire still carried the connect-time hardware rate (192 kHz onto
+    // a 48 kHz session — DDCAssign showed rx1Rate=192000 at mox=true
+    // after the first fix). Publishing is the choke point every path
+    // funnels through: connect, live rate change, stream add/remove.
+    if (m_receiverManager) {
+        const int r1 = m_streamAllocator.isStreamActive(0)
+            ? m_streamAllocator.streamSampleRateHz(0) : -1;
+        const int r2 = m_streamAllocator.isStreamActive(1)
+            ? m_streamAllocator.streamSampleRateHz(1) : -1;
+        m_receiverManager->syncPsOrchestrationRates(r1, r2);
+    }
+
     // Phase 3F Sub-Epic I Task 7b: cache the codec's per-stream choice.
     // Idle streams keep the -1 sentinel, so an emptied stream leaves no
     // stale DDC behind for ddcForStream() to report.

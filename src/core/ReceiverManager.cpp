@@ -291,6 +291,22 @@ void ReceiverManager::setReceiverSampleRate(int receiverIndex, int sampleRate)
     }
 }
 
+void ReceiverManager::syncPsOrchestrationRates(int rx1RateHz, int rx2RateHz)
+{
+    // Deliberately silent — no updateDdcAssignment() fire. The caller
+    // (RadioModel::publishDdcAssignment) has just pushed the complete
+    // assignment through the codec's applyDdcAssignment path; this only
+    // keeps the PS-orchestration mirror coherent for the NEXT
+    // event-driven fire (MOX / PS / diversity toggle). See the header
+    // comment for the 2026-08-11 remote-bench bug this closes.
+    if (rx1RateHz > 0) {
+        m_rx1Rate = rx1RateHz;
+    }
+    if (rx2RateHz > 0) {
+        m_rx2Rate = rx2RateHz;
+    }
+}
+
 void ReceiverManager::setDdcMapping(int receiverIndex, int ddcIndex)
 {
     if (!m_receivers.contains(receiverIndex)) {

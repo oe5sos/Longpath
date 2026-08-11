@@ -228,6 +228,18 @@ public:
     void setRx1Rate(int rateHz);
     void setRx2Rate(int rateHz);
 
+    /// Remote bench 2026-08-11: SILENT sync of the PS-orchestration
+    /// rates (m_rx1Rate / m_rx2Rate) — no updateDdcAssignment() fire.
+    /// Called from RadioModel::publishDdcAssignment with the stream
+    /// allocator's live rates on every assignment publish, so the next
+    /// event-driven fire (MOX / PS / diversity toggle) emits the rate
+    /// the wire is actually running instead of the connect-time seed.
+    /// Passing a value <= 0 leaves that slot untouched (inactive
+    /// stream). The drift this closes was a live bug: a 48 kHz session
+    /// snapped back to 192 kHz on the first TX, quadrupling the DDC
+    /// stream and saturating the remote link.
+    void syncPsOrchestrationRates(int rx1RateHz, int rx2RateHz);
+
     // RX2 enable.  When true, additional DDC (DDC3 on G2-class, DDC1 on
     // HL2 PS-off path) is added to ddcEnable.
     void setRx2Enabled(bool on);

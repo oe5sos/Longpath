@@ -220,13 +220,25 @@ during MOX), and both directions drowned. The dispatch-tick "3-15%
 mic loss" from the original crackle hunt was this exact mechanism,
 measured two layers downstream.
 
-Fix: `setReceiverSampleRate` now mirrors indices 0/1 into
-`m_rx1Rate`/`m_rx2Rate` silently (no assignment fire — every caller
-pushes the full assignment itself; the mirror only has to be correct
-by the next event-driven fire), and `setSampleRateLive` step 12 syncs
-explicitly on the radio-wide path. Regression pinned in
-tests/tst_receiver_manager_ps_ddc.cpp
-(`perReceiverRateChangeMirrorsIntoPsRate`).
+Fix, in two rounds — the second is the one that holds:
+
+1. `setReceiverSampleRate` mirrors indices 0/1 into
+   `m_rx1Rate`/`m_rx2Rate` silently, and `setSampleRateLive` step 12
+   syncs the radio-wide path. Bench re-test showed this was NOT
+   sufficient: a plain connect restores the persisted stream rate
+   through `publishDdcAssignment` without ever calling either setter,
+   so `mox=true` still emitted 192 kHz.
+2. `RadioModel::publishDdcAssignment` now calls the new silent
+   `ReceiverManager::syncPsOrchestrationRates` with the stream
+   allocator's live rates on EVERY assignment publish — the choke
+   point every path funnels through (connect, live rate change,
+   stream add/remove). The allocator is the same source of truth the
+   codec is handed via `buildStreamConfigsForCodec`, so the PS store
+   can no longer drift.
+
+Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
+(`perReceiverRateChangeMirrorsIntoPsRate`,
+`publishTimeSyncOverridesConnectSeed`).
 
 Residual for remote TX: the P2 upstream TX I/Q at 192 kHz
 (~9.2 Mbit/s while transmitting) is protocol-fixed and remains the

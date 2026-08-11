@@ -70,6 +70,15 @@ private slots:
     // 192 kHz on first TX, saturating the remote link).
     void perReceiverRateChangeMirrorsIntoPsRate();
 
+    // Second round of the same bench bug: a plain CONNECT restores the
+    // persisted stream rate through publishDdcAssignment without ever
+    // calling setReceiverSampleRate, so the mirror above never ran and
+    // mox=true still emitted 192 kHz. publishDdcAssignment now calls
+    // syncPsOrchestrationRates on every publish; this pins that the
+    // silent sync (a) overrides the connect seed, (b) does not itself
+    // fire ddcConfigChanged, (c) skips <= 0 slots.
+    void publishTimeSyncOverridesConnectSeed();
+
     // Idempotence
     void setSameStateDoesNotEmit();
 
@@ -261,6 +270,35 @@ void TstReceiverManagerPsDdc::perReceiverRateChangeMirrorsIntoPsRate()
     // rate[2]=192000 here.
     QCOMPARE(int(config.ddcEnable), int(DDC2));
     QCOMPARE(int(config.rate[2]),   48000);
+}
+
+void TstReceiverManagerPsDdc::publishTimeSyncOverridesConnectSeed()
+{
+    P2CodecOrionMkII codec;
+    ReceiverManager mgr;
+    mgr.setP2Codec(&codec);
+    mgr.setHpsdrModel(HPSDRModel::ANAN_G2);
+
+    mgr.setRx1Rate(192000);        // connect-time seed
+    mgr.setRx2Rate(96000);
+
+    QSignalSpy spy(&mgr, &ReceiverManager::ddcConfigChanged);
+
+    // (b) silent: the sync itself must not fire an assignment.
+    mgr.syncPsOrchestrationRates(48000, -1);
+    QCOMPARE(spy.count(), 0);
+
+    // (a) the next event-driven fire carries the synced live rate.
+    mgr.setMox(true);
+    QVERIFY(spy.count() >= 1);
+    auto config = spy.last().first().value<PsDdcConfig>();
+    QCOMPARE(int(config.ddcEnable), int(DDC2));
+    QCOMPARE(int(config.rate[2]),   48000);
+
+    // (c) the -1 slot left rx2 untouched: enable RX2 and check its rate.
+    mgr.setRx2Enabled(true);
+    config = spy.last().first().value<PsDdcConfig>();
+    QCOMPARE(int(config.rate[3]),   96000);
 }
 
 void TstReceiverManagerPsDdc::setSameStateDoesNotEmit()
