@@ -328,6 +328,13 @@ warren@wpratt.com
 //                 Source: Thetis wdsp/calcc.c:891-1132 [v2.10.3.13] +
 //                 Thetis cmaster.cs:143-147 [v2.10.3.13].  AI-assisted
 //                 transformation via Anthropic Claude Code.
+//   2026-08-11 — MON siphon decimated from the DUC rate back to the mic
+//                 rate before sip1OutputReady (box average, factor =
+//                 outN / m_inputBufferSize). Bench fix: on P2 the 192 kHz
+//                 output fed the 48 kHz monitor mixer raw — heard as pure
+//                 crackling with no intelligible audio. P1 (48 kHz DUC,
+//                 factor 1) unaffected. By Martin Fischer, AI-assisted via
+//                 Anthropic Claude (Cowork).
 // =================================================================
 
 #include "TxChannel.h"  // brings in WdspTypes.h (DSPMode)
@@ -3080,13 +3087,50 @@ void TxChannel::driveOneTxBlockFromInterleaved(const double* interleavedIn)
     // (AudioEngine::txMonitorBlockReady wired in Phase L).  Cache an I-only
     // float view in m_outIFloatScratch for the legacy float* signal API.
     //
+    // ── Decimate back to the mic rate first (bench fix 2026-08-11) ────
+    //
+    // m_out runs at the DUC rate: outN pairs per block, 192 kHz on
+    // Protocol 2. The consumers of this signal run at the mic rate —
+    // AudioEngine::txMonitorBlockReady feeds a 48 kHz speaker mixer, and
+    // m_txSiphonRing is a MicSpectrum with the same contract. Handing
+    // them the raw output oversupplied the mixer 4× and played the audio
+    // 4× too fast; heard on the bench (ANAN-G2) as pure crackling with
+    // no intelligible audio. P1 boards transmit at 48 kHz, so the factor
+    // there is 1 and the mismatch never showed.
+    //
+    // The block ratio IS the rate ratio (WDSP keeps block duration
+    // constant: 64 in → 256 out on P2), so no rate plumbing is needed.
+    // Box-average each group of `factor` samples: unity DC gain, and the
+    // wanted signal — post-modulator I, band-limited by the TX filter to
+    // a few kHz — sits far below the post-decimation Nyquist, so this is
+    // ample anti-alias for a listening aid. The monitor is not part of
+    // the transmitted signal; the radio still gets the full-rate I/Q
+    // above.
+    //
     // CRITICAL: DirectConnection ONLY. The pointer is valid only during
     // this synchronous slot dispatch.  See sip1OutputReady doc-comment.
-    for (int i = 0; i < outN; ++i) {
-        m_outIFloatScratch[static_cast<size_t>(i)] =
-            static_cast<float>(m_out[static_cast<size_t>(2 * i + 0)]);
+    const int factor = (m_inputBufferSize > 0 && outN >= m_inputBufferSize)
+                           ? (outN / m_inputBufferSize)
+                           : 1;
+    if (factor <= 1) {
+        for (int i = 0; i < outN; ++i) {
+            m_outIFloatScratch[static_cast<size_t>(i)] =
+                static_cast<float>(m_out[static_cast<size_t>(2 * i + 0)]);
+        }
+        emit sip1OutputReady(m_outIFloatScratch.data(), outN);
+    } else {
+        const int    monFrames = outN / factor;
+        const double norm      = 1.0 / static_cast<double>(factor);
+        for (int i = 0; i < monFrames; ++i) {
+            double acc = 0.0;
+            for (int k = 0; k < factor; ++k) {
+                acc += m_out[static_cast<size_t>(2 * (i * factor + k))];
+            }
+            m_outIFloatScratch[static_cast<size_t>(i)] =
+                static_cast<float>(acc * norm);
+        }
+        emit sip1OutputReady(m_outIFloatScratch.data(), monFrames);
     }
-    emit sip1OutputReady(m_outIFloatScratch.data(), m_outputBufferSize);
 }
 
 // ---------------------------------------------------------------------------

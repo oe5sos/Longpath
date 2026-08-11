@@ -2594,13 +2594,20 @@ signals:
     /// can be wired in 3M-3 if a different processing point is needed for
     /// acoustic monitoring; for 3M-1b the m_outI path is sufficient.
     ///
-    /// Sample rate: matches TXA dsp-rate —
-    ///   96 kHz on P2 (Saturn / Orion-II with 192 kHz ADC output rate);
-    ///   48 kHz on P1 (Hermes / HL2 / Angelia).
-    /// Subscribers (AudioEngine::txMonitorBlockReady in Phase L) are
-    /// responsible for downmix / resample to speaker output rate.
+    /// Sample rate: the MIC rate (48 kHz on every current path), always.
+    /// driveOneTxBlock() box-average-decimates the DUC-rate output back
+    /// to the mic rate before emitting (factor = outN / inN; 4 on P2's
+    /// 192 kHz DUC, 1 on P1's 48 kHz). Subscribers get speaker-ready
+    /// audio and must NOT resample.
     ///
-    /// Plan: 3M-1b D.5 (this commit). Pre-code review §4.3.
+    /// History: this comment used to claim the signal ran at the TXA
+    /// dsp-rate with subscribers responsible for resampling. Neither was
+    /// true — the emit carried the raw OUT-rate buffer and no subscriber
+    /// resampled, which on P2 fed 192 kHz into the 48 kHz monitor mixer
+    /// (bench 2026-08-11, ANAN-G2: pure crackling, no intelligible
+    /// audio). The decimation in driveOneTxBlock() is the fix.
+    ///
+    /// Plan: 3M-1b D.5. Pre-code review §4.3. Bench fix 2026-08-11.
     void sip1OutputReady(const float* samples, int frames);
 
     // ── Raw microphone tap ───────────────────────────────────────────────────
