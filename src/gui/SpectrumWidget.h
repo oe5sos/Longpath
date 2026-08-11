@@ -2389,6 +2389,12 @@ private:
     QImage m_overlayDynamic;
     bool   m_overlayDynamicDirty{true};
     bool   m_overlayDynamicNeedsUpload{true};
+    // One full-image upload owed after every (re)create of
+    // m_ovDynGpuTex — the partial spectrum-band upload relies on the
+    // waterfall region having been written ONCE, and a recreated
+    // texture is undefined until it has (the 2026-08-11 magenta
+    // waterfall). True initially so the very first upload is full.
+    bool   m_ovDynNeedsFullUpload{true};
 
     // 2026-05-25 perf fix: timestamp of the last per-frame "dynamic
     // overlay" force-dirty in updateSpectrumLinear.  Rate-limits the

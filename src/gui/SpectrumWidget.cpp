@@ -8160,8 +8160,21 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     //
     // Off unless asked for: NEREUS_WF_DEBUG=1. A diagnostic that costs a
     // qDebug per frame in normal use is a diagnostic that gets deleted.
-    static const bool kWfDebug =
-        qEnvironmentVariableIntValue("NEREUS_WF_DEBUG") > 0;
+    static const int kWfDebugLevel =
+        qEnvironmentVariableIntValue("NEREUS_WF_DEBUG");
+    static const bool kWfDebug = kWfDebugLevel > 0;
+
+    // Level 2: the one-shot discriminator. Fill the CPU image solid
+    // green and force a full upload EVERY frame. A green screen proves
+    // the entire upload→texture→sampler→quad chain end to end, which
+    // pins the fault in the image's CONTENT (and convicts the
+    // single-pixel probe below of under-sampling); a screen that stays
+    // magenta convicts the chain. One run with NEREUS_WF_DEBUG=2
+    // answers what four theories could not.
+    if (kWfDebugLevel >= 2 && !m_waterfall.isNull()) {
+        m_waterfall.fill(QColor(0, 170, 0));
+        m_wfTexFullUpload = true;
+    }
     if (kWfDebug) {
         static int frame = 0;
         if (frame < 3 || frame % 120 == 0) {
@@ -8196,14 +8209,70 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         if (m_waterfall.width() != m_wfGpuTexW || m_waterfall.height() != m_wfGpuTexH) {
             m_wfGpuTexW = m_waterfall.width();
             m_wfGpuTexH = m_waterfall.height();
-            m_wfGpuTex->setPixelSize(QSize(m_wfGpuTexW, m_wfGpuTexH));
-            m_wfGpuTex->create();
-            m_wfSrb->setBindings({
-                QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::FragmentStage, m_wfUbo),
-                QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, m_wfGpuTex, m_wfSampler),
-            });
-            m_wfSrb->create();
-            m_wfTexFullUpload = true;
+            // FRESH OBJECTS, not an in-place recreate (2026-08-11).
+            //
+            // The sixth and final theory, and the one the evidence
+            // finally allows: with NEREUS_WF_DEBUG=2 the CPU image was
+            // force-filled solid green and full-uploaded EVERY frame —
+            // recorded into the same submitted batch whose other
+            // resources demonstrably work — and the screen stayed
+            // magenta. The only remaining explanation is that the draw
+            // samples a texture other than the one being uploaded: the
+            // original init-time 483x64 texture, never written, whose
+            // undefined Metal memory is exactly that magenta. The old
+            // code resized IN PLACE (setPixelSize + create on the same
+            // objects) and rebuilt the same QRhiShaderResourceBindings
+            // instance; on this bench's Qt 6.11.1 Metal backend the
+            // draw kept using the pre-rebuild binding. A brand-new
+            // texture and a brand-new SRB object cannot alias any
+            // cached state — the pipeline only requires layout
+            // compatibility, which is unchanged. QRhi defers the
+            // native releases until the frame completes, so deleting
+            // the old objects here is safe.
+            QRhi* rr = rhi();
+            QRhiTexture* newTex = rr->newTexture(
+                QRhiTexture::RGBA8, QSize(m_wfGpuTexW, m_wfGpuTexH));
+            const bool texOk = newTex && newTex->create();
+            QRhiShaderResourceBindings* newSrb =
+                texOk ? rr->newShaderResourceBindings() : nullptr;
+            bool srbOk = false;
+            if (newSrb) {
+                newSrb->setBindings({
+                    QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::FragmentStage, m_wfUbo),
+                    QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, newTex, m_wfSampler),
+                });
+                srbOk = newSrb->create();
+            }
+            if (!texOk || !srbOk) {
+                static qint64 lastResizeFailLog = 0;
+                const qint64 now = QDateTime::currentMSecsSinceEpoch();
+                if (now - lastResizeFailLog > 2000) {
+                    lastResizeFailLog = now;
+                    qCritical() << "SpectrumWidget: waterfall texture resize"
+                                << m_wfGpuTexW << "x" << m_wfGpuTexH
+                                << "FAILED (tex" << texOk << "srb" << srbOk
+                                << ") — keeping the previous texture; will"
+                                << "retry next frame.";
+                }
+                delete newSrb;
+                delete newTex;
+                // Old objects stay live and consistent; retry via the
+                // size mismatch next frame.
+                m_wfGpuTexW = -1;
+                m_wfGpuTexH = -1;
+            } else {
+                delete m_wfSrb;
+                delete m_wfGpuTex;
+                m_wfGpuTex = newTex;
+                m_wfSrb    = newSrb;
+                if (kWfDebug) {
+                    qDebug().noquote() << QStringLiteral(
+                        "WF resize: fresh texture+srb %1x%2")
+                        .arg(m_wfGpuTex->pixelSize().width())
+                        .arg(m_wfGpuTex->pixelSize().height());
+                }
+                m_wfTexFullUpload = true;
+            }
         }
 
         if (m_wfTexFullUpload) {
@@ -8641,6 +8710,20 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             });
             m_ovDynSrb->create();
             m_overlayDynamicDirty = true;
+            // THE MAGENTA WATERFALL, cause number six — the real one
+            // (2026-08-11, found by force-filling the waterfall image
+            // green and watching the screen stay pink). The comment
+            // above names the uninitialized-buffer hazard and the
+            // partial-upload path below assumes "the waterfall portion
+            // of the texture stays transparent from the first
+            // full-window init" — but THIS branch just re-CREATED the
+            // texture, and a recreated texture has no init upload: its
+            // waterfall region is undefined Metal memory (magenta on
+            // this bench), alpha-blended OVER the perfectly healthy
+            // waterfall quad every frame. One full upload after every
+            // recreate restores the invariant the partial path relies
+            // on.
+            m_ovDynNeedsFullUpload = true;
         }
 
         if (m_overlayDynamicDirty) {
@@ -8693,16 +8776,30 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             PerfMonitor::instance().recordOverlayRebuild(
                 static_cast<double>(dynTimer.nsecsElapsed()) / 1e6);
 
-            // Partial-region upload.  setSourceTopLeft / setSourceSize
-            // tell QRhi to copy only the spectrum portion of the QImage
-            // into the matching region of the texture; the rest of the
-            // texture is untouched.  Cuts Metal command-buffer payload
-            // by 30-50% depending on spectrum / waterfall split.
-            QRhiTextureSubresourceUploadDescription desc(m_overlayDynamic);
-            desc.setSourceTopLeft(QPoint(0, 0));
-            desc.setSourceSize(dynRectDevPx.size());
-            desc.setDestinationTopLeft(QPoint(0, 0));
-            batch->uploadTexture(m_ovDynGpuTex, QRhiTextureUploadEntry(0, 0, desc));
+            if (m_ovDynNeedsFullUpload) {
+                // First upload after a texture (re)create: the WHOLE
+                // image, so the waterfall region is really transparent
+                // instead of undefined GPU memory. See the note at the
+                // recreate site — this is the magenta-waterfall fix.
+                QRhiTextureSubresourceUploadDescription desc(m_overlayDynamic);
+                batch->uploadTexture(m_ovDynGpuTex,
+                                     QRhiTextureUploadEntry(0, 0, desc));
+                m_ovDynNeedsFullUpload = false;
+            } else {
+                // Partial-region upload.  setSourceTopLeft / setSourceSize
+                // tell QRhi to copy only the spectrum portion of the QImage
+                // into the matching region of the texture; the rest of the
+                // texture is untouched.  Cuts Metal command-buffer payload
+                // by 30-50% depending on spectrum / waterfall split.
+                // Safe ONLY because the full upload above re-established
+                // the transparent waterfall region after every recreate.
+                QRhiTextureSubresourceUploadDescription desc(m_overlayDynamic);
+                desc.setSourceTopLeft(QPoint(0, 0));
+                desc.setSourceSize(dynRectDevPx.size());
+                desc.setDestinationTopLeft(QPoint(0, 0));
+                batch->uploadTexture(m_ovDynGpuTex,
+                                     QRhiTextureUploadEntry(0, 0, desc));
+            }
             m_overlayDynamicDirty = false;
         }
     }
