@@ -22,6 +22,11 @@
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
 //                 NereusSDR; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
+//   2026-08-11 — Undo/Redo buttons + Ctrl+Z / Ctrl+Shift+Z shortcuts
+//                 added (NereusSDR-original, backed by EqHistory/EqHost);
+//                 three copies of the row-button stylesheet folded into
+//                 kRowButtonStyle. By Martin Fischer, AI-assisted via
+//                 Anthropic Claude (Cowork).
 // =================================================================
 
 #include "gui/applets/eq/StripEqPanel.h"

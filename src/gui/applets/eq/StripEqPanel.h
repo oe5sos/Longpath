@@ -22,6 +22,10 @@
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
 //                 NereusSDR; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
+//   2026-08-11 — Undo/Redo members + afterHistoryStep()/
+//                 refreshHistoryButtons() added (NereusSDR-original,
+//                 backed by EqHistory/EqHost). By Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
 #pragma once

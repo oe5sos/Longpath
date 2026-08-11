@@ -127,6 +127,8 @@ upstream, so this reunites the DSP with the interface written for it.
 | `src/gui/applets/eq/ClientEqEditorCanvas.h`, `.cpp` | `src/gui/ClientEqEditorCanvas.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change; includes rebased. |
 | `src/gui/applets/eq/ClientEqParamRow.h`, `.cpp` | `src/gui/ClientEqParamRow.{h,cpp}` | `31b29583` | 2026-08-09 | As above. |
 | `src/gui/applets/eq/ClientEqIconRow.h`, `.cpp` | `src/gui/ClientEqIconRow.{h,cpp}` | `31b29583` | 2026-08-09 | As above. |
+| `src/gui/applets/eq/ClientEqOutputFader.h`, `.cpp` | `src/gui/ClientEqOutputFader.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change; includes rebased. |
+| `src/gui/applets/eq/StripEqPanel.h`, `.cpp` | `src/gui/StripEqPanel.{h,cpp}` | `31b29583` | 2026-08-09, extended 2026-08-11 | Namespace change; includes rebased; talks to `EqHost` instead of AetherSDR's `AudioEngine`. 2026-08-11: NereusSDR-original Undo/Redo buttons + Ctrl+Z / Ctrl+Shift+Z window-scoped shortcuts added (backed by `EqHistory`/`EqHost`, both NereusSDR-original); three copies of the row-button stylesheet folded into `kRowButtonStyle`. |
 
 ### Colours: kept as NereusSDR's, which cost almost nothing
 

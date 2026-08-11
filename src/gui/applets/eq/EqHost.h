@@ -57,8 +57,6 @@
 
 #include "gui/applets/eq/EqHistory.h"
 
-#include <QPointer>
-
 namespace NereusSDR {
 
 class ClientEq;
