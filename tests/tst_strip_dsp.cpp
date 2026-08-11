@@ -100,6 +100,13 @@ private slots:
     void the_gate_has_hysteresis();
     void the_gate_mode_snaps_ratio_and_range();
     void the_gate_floor_bounds_the_attenuation();
+
+    // 2026-08-11 crash regression: the first offline Voice-Check take
+    // SIGSEGV'd in ClientReverb::process because the offline chain
+    // skipped prepare() and the reverb was ENABLED (disabled stages
+    // bypass before touching their delay lines, which is why no bench
+    // saw it earlier). The reverb now bypasses when unprepared.
+    void reverb_survives_process_before_prepare();
 };
 
 // ── The four questions, asked of everything ──────────────────────────
@@ -369,6 +376,24 @@ void TstStripDsp::the_gate_floor_bounds_the_attenuation()
              qPrintable(QStringLiteral("attenuation %1 dB went past the "
                                        "-10 dB floor")
                             .arg(g.gainReductionDb())));
+}
+
+void TstStripDsp::reverb_survives_process_before_prepare()
+{
+    ClientReverb verb;            // no prepare() — the crash condition
+    verb.setEnabled(true);
+    std::vector<float> buf = tone(500.0, 0.5f, kFrames, 1);
+    const std::vector<float> before = buf;
+    verb.process(buf.data(), kFrames, 1);   // must not crash
+    // Unprepared = bypass: the samples come back untouched.
+    QCOMPARE(buf, before);
+
+    // And prepare() afterwards restores normal operation.
+    verb.prepare(48000.0);
+    verb.process(buf.data(), kFrames, 1);
+    for (float v : buf) {
+        QVERIFY(std::isfinite(v));
+    }
 }
 
 QTEST_APPLESS_MAIN(TstStripDsp)

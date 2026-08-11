@@ -9691,6 +9691,17 @@ void MainWindow::finishPuduTake()
             m_radioModel ? m_radioModel->stripChain() : nullptr;
         if (live && live->isEnabled()) {
             StripChain offline;
+            // 2026-08-11 crash fix (first Voice-Check take on this
+            // bench, SIGSEGV in ClientReverb::process): prepare()
+            // allocates every stage's delay lines and was never
+            // called on the offline instance. Stages that are
+            // DISABLED bypass before touching buffers — which is why
+            // the earlier bench (reverb off) never hit it — but any
+            // ENABLED stage with internal state dereferenced empty
+            // vectors. Capture format is fixed 48 kHz mono, so the
+            // rate is a constant here, matching the QAudioFormat
+            // above.
+            offline.prepare(48000.0);
             StripSettings::restore(offline);
             offline.setEnabled(true);
             constexpr int kBlock = 64;

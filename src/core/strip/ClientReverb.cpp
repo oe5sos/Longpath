@@ -271,6 +271,14 @@ void ClientReverb::process(float* interleaved, int frames, int channels) noexcep
     if (frames <= 0) return;
     if (channels != 1 && channels != 2) return;
 
+    // 2026-08-11 crash guard: process() before prepare() used to
+    // dereference the unallocated comb/pre-delay lines (SIGSEGV on the
+    // first offline Voice-Check take, where the caller had skipped
+    // prepare()). The caller is fixed too; this makes the failure mode
+    // "reverb silently bypasses" instead of a crash for any future
+    // unprepared path.
+    if (m_preDelayCap == 0) return;
+
     recacheIfDirty();
     const bool enabled = m_atomics.enabled.load(std::memory_order_acquire);
 
