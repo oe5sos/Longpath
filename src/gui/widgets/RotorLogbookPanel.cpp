@@ -406,8 +406,10 @@ void RotorLogbookPanel::buildUi()
     btnRow->setSpacing(6);
     auto* rotateBtn = new QPushButton(QStringLiteral("Rotate"), this);
     auto* stopBtn   = new QPushButton(QStringLiteral("Stop"), this);
-    auto* longBtn   = new QPushButton(QStringLiteral("Long path"), this);
-    for (QPushButton* b : {rotateBtn, stopBtn, longBtn}) {
+    // The wide "Long path" button that used to sit here was retired on
+    // 2026-08-11 (bench finding #4): it duplicated the preset row's
+    // "LP", minus LP's empty-aim hint. One control, one behaviour.
+    for (QPushButton* b : {rotateBtn, stopBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         btnRow->addWidget(b);
     }
@@ -681,11 +683,6 @@ void RotorLogbookPanel::buildUi()
             [this](double) { beginTurn(); });
     connect(stopBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::haltTurn);
-    connect(longBtn, &QPushButton::clicked, this, [this]() {
-        if (m_dial->hasTarget()) {
-            m_dial->setTargetBearing(m_dial->targetBearing() + 180.0);
-        }
-    });
 }
 
 // ── Shrinking down to the compass ───────────────────────────────────
