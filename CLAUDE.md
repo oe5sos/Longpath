@@ -525,6 +525,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [skin-compatibility.md](docs/architecture/skin-compatibility.md) | SkinParser, extended skin format, Thetis import, 4-pan support |
 | [adc-ddc-panadapter-mapping.md](docs/architecture/adc-ddc-panadapter-mapping.md) | ADC->DDC->Receiver->FFT->Pan signal chain, Thetis UpdateDDCs() analysis, per-board DDC assignment, bandwidth limits |
 | [ctun-zoom-design.md](docs/architecture/ctun-zoom-design.md) | CTUN zoom bin subsetting: visibleBinRange(), hybrid FFT replan, DDC center tracking |
+| [2026-08-11-tx-monitor-audio-path.md](docs/architecture/2026-08-11-tx-monitor-audio-path.md) | TX self-monitor path: DUC-rate decimation, headphones bus, adaptive jitter cushion + seam fades in MasterMixer, latency budget, cadence-simulation verification |
 
 ### Implementation Plans (`docs/architecture/phase*-plan.md`)
 

@@ -429,6 +429,15 @@ private:
     // Sized kBlockFrames floats.
     std::vector<float> m_pcMicBuf;
 
+    // Diagnostic (2026-08-11 monitor-crackle hunt): a short pullTxMic
+    // means the PC-clocked mic ring ran dry against the radio-clocked
+    // pump — the zero-fill that follows is a mid-word silence
+    // insertion, i.e. an audible click that no downstream buffering
+    // can remove. Counted here, reported at most every 5 s.
+    quint64 m_pcMicShortPulls{0};
+    quint64 m_pcMicTotalPulls{0};
+    qint64  m_pcMicLastReportMs{0};
+
     // Channel strip and its mono scratch. m_in is interleaved double;
     // the strip works on mono float, so the I channel is lifted out,
     // processed and written back. Sized in setStripChain rather than

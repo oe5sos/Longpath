@@ -24,6 +24,10 @@
 #include <QCommandLineOption>
 #include <QMetaObject>
 #include <csignal>
+#include <cstdlib>
+#ifndef Q_OS_WIN
+#include <execinfo.h>   // backtrace() for the null-widget diagnostic
+#endif
 #include <QCommandLineParser>
 #include <QIcon>
 #include <QStyleFactory>
@@ -82,6 +86,33 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
         ts.flush();
     }
     fprintf(stderr, "%s", line.toLocal8Bit().constData());
+
+#ifndef Q_OS_WIN
+    // Diagnostic aid (2026-08-11): one field warning has resisted every
+    // static hunt — "QLayout: Cannot add a null widget", seen when a
+    // window opens mid-session. Qt raises it from inside qlayout.cpp,
+    // so the context carries no caller. When it fires, append a native
+    // backtrace so the call site identifies itself in the log; costs
+    // nothing on every other message. Remove once the caller is found.
+    if (type == QtWarningMsg
+        && msg.contains(QLatin1String("Cannot add a null widget"))) {
+        void* frames[32];
+        const int n = backtrace(frames, 32);
+        if (char** syms = backtrace_symbols(frames, n)) {
+            for (int i = 0; i < n; ++i) {
+                const QString bt = QStringLiteral("  [bt] %1\n")
+                                       .arg(QString::fromLocal8Bit(syms[i]));
+                if (s_logFile && s_logFile->isOpen()) {
+                    QTextStream ts(s_logFile);
+                    ts << bt;
+                    ts.flush();
+                }
+                fprintf(stderr, "%s", bt.toLocal8Bit().constData());
+            }
+            free(syms);
+        }
+    }
+#endif
 }
 
 // Parse --profile <name> out of argv *before* constructing QApplication so

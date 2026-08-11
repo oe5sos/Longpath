@@ -104,6 +104,7 @@
 #include "core/strip/StripChain.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QLoggingCategory>
 
 #include <algorithm>
@@ -836,6 +837,26 @@ void TxWorkerThread::dispatchOneBlock()
                && m_audioEngine != nullptr && m_audioEngine->isPcMicOverrideActive()) {
         const int got = m_audioEngine->pullTxMic(m_pcMicBuf.data(), kBlockFrames);
         const int n   = std::clamp(got, 0, kBlockFrames);
+        // Diagnostic (2026-08-11): count short pulls — each one is a
+        // zero-fill click in the TX audio itself (monitor AND air).
+        // Throttled to one line per 5 s; only logs when shorts occurred.
+        ++m_pcMicTotalPulls;
+        if (n < kBlockFrames) { ++m_pcMicShortPulls; }
+        {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (now - m_pcMicLastReportMs > 5000) {
+                if (m_pcMicShortPulls > 0) {
+                    qCWarning(lcTxWorker)
+                        << "PC-mic pulls ran short" << m_pcMicShortPulls
+                        << "of" << m_pcMicTotalPulls
+                        << "times in 5 s — each short pull is an audible"
+                           " click (PC/radio clock jitter at the mic ring)";
+                }
+                m_pcMicLastReportMs = now;
+                m_pcMicShortPulls = 0;
+                m_pcMicTotalPulls = 0;
+            }
+        }
         for (int i = 0; i < n; ++i) {
             m_in[static_cast<size_t>(2 * i + 0)] =
                 static_cast<double>(m_pcMicBuf[static_cast<size_t>(i)]);
