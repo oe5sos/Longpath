@@ -924,6 +924,14 @@ void AudioEngine::setHeadphonesConfig(const AudioDeviceConfig& cfg)
     emit headphonesConfigChanged(cfg);
 }
 
+void AudioEngine::flushTxInputBus()
+{
+    // See the header note. Callable from the worker thread: flush()
+    // equalises the ring cursors atomically, same contract as the
+    // master-mute flush.
+    if (m_txInputBus) { m_txInputBus->flush(); }
+}
+
 void AudioEngine::setTxInputConfig(const AudioDeviceConfig& cfg)
 {
     // TX pull() wiring lands in Phase 3M. We declare ownership + setter

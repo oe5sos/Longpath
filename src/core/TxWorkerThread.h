@@ -145,6 +145,11 @@ public:
     /// TxChannel::writesToRadio().
     void setStripChain(StripChain* chain);
 
+    // Voice-check tap gate (see the pre/postStripAudioReady signals).
+    // Thread-safe: atomic store, read once per block on the worker.
+    void setVoiceTapEnabled(bool on)
+    { m_voiceTapEnabled.store(on, std::memory_order_release); }
+
     /// Phase 3R K-bench: set / clear the RadeChannel the worker emits
     /// RADE mic blocks toward when m_currentTxPath == Rade.  Wired by
     /// RadioModel::wireRadeChannel on mode swap into RADE_U / RADE_L
@@ -190,6 +195,33 @@ public:
 #endif
 
 signals:
+    /// ── Voice-check taps (2026-08-11, AetherSDR PUDU-monitor shape) ──
+    ///
+    /// The record-then-listen voice check taps the mic HERE, in the
+    /// audio domain, on both sides of the channel strip — NOT behind
+    /// the SSB modulator. The sip1 tap it used before carries the
+    /// 2.7 kHz TX filter, DEXP and ALC, which made every take sound
+    /// dull and pumped regardless of what the strip did; AetherSDR's
+    /// monitor records its client chain's own output for exactly this
+    /// reason (ClientPuduMonitor @31b29583), and this is that tap in
+    /// NereusSDR's geometry.
+    ///
+    /// preStripAudioReady:  the I channel as the mic delivered it,
+    ///                      before the strip touched it (mono, mic
+    ///                      rate). The analysis take.
+    /// postStripAudioReady: the same block after StripChain::
+    ///                      processMono — or identical to pre when the
+    ///                      strip master is off, which is itself the
+    ///                      honest answer. The listening take.
+    ///
+    /// **DirectConnection ONLY**, same contract as TxChannel's taps:
+    /// the pointers are this worker's own scratch buffers, overwritten
+    /// on the next block. Both gated on one atomic
+    /// (setVoiceTapEnabled), so the cost while the voice check is
+    /// closed is one relaxed load.
+    void preStripAudioReady(const float* samples, int frames);
+    void postStripAudioReady(const float* samples, int frames);
+
     /// Phase 3R K-bench: RADE TX mic block — emitted by the RADE
     /// branch of dispatchOneBlock when the worker has processed one
     /// pump tick's worth of mic samples through the HPF + 48->16
@@ -428,6 +460,22 @@ private:
     // PC-mic-override scratch — float buffer for AudioEngine::pullTxMic.
     // Sized kBlockFrames floats.
     std::vector<float> m_pcMicBuf;
+
+    // Rising-edge memory for the PC-mic splice: on the first block
+    // after the override becomes active the input ring is flushed —
+    // see the comment at the call site. Worker thread only.
+    bool m_pcMicSpliceWasActive{false};
+
+    // Pump-cadence diagnostic while the voice tap is on (2026-08-11
+    // "stockend" bench). Worker thread only.
+    quint64 m_tapTickCount{0};
+    qint64  m_tapTickReportMs{0};
+
+    // Voice-check tap gate + scratch (see the signals). The scratch
+    // holds the PRE-strip copy across the strip's in-place processing
+    // of m_in; the post-strip emit reads m_in again. Audio-thread only.
+    std::atomic<bool>  m_voiceTapEnabled{false};
+    std::vector<float> m_voiceTapBuf;
 
     // Diagnostic (2026-08-11 monitor-crackle hunt): a short pullTxMic
     // means the PC-clocked mic ring ran dry against the radio-clocked

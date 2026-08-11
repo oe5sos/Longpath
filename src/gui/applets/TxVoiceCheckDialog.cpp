@@ -16,6 +16,7 @@
 #include "core/AudioEngine.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/TxChannel.h"
+#include "core/TxWorkerThread.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripTuner.h"
 #include "gui/StyleConstants.h"
@@ -26,7 +27,6 @@
 #include <QAudioFormat>
 #include <QAudioSink>
 #include <QBuffer>
-#include <QCheckBox>
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -35,7 +35,6 @@
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
-#include <QSlider>
 #include <QTableWidget>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -69,9 +68,8 @@ TxVoiceCheckDialog::TxVoiceCheckDialog(RadioModel* radio, QWidget* parent,
         setWindowFlags(Qt::Widget);
     }
     m_recorder.setSampleRate(kMicRateHz);
-    // The monitor tap arrives at the mic rate too — TxChannel decimates
-    // the DUC-rate output back to 48 kHz before sip1OutputReady (see
-    // the 2026-08-11 note there).
+    // Both worker taps run at the mic rate by construction — they read
+    // m_in before WDSP ever resamples anything.
     m_procRecorder.setSampleRate(kMicRateHz);
     buildUi();
     // The meter runs from the moment the window opens, not from the
@@ -93,13 +91,13 @@ TxVoiceCheckDialog::~TxVoiceCheckDialog()
     if (m_radio && m_radio->txChannel()) {
         m_radio->txChannel()->setMicTapEnabled(false);
     }
+    if (m_radio && m_radio->txWorker()) {
+        m_radio->txWorker()->setVoiceTapEnabled(false);
+    }
     QObject::disconnect(m_micTap);
     QObject::disconnect(m_procTap);
     QObject::disconnect(m_levelTap);
-    QObject::disconnect(m_monitorTap);
-    stopPlayback();
-
-    if (m_restoreMonitor) { setSelfMonitor(m_monitorWasOn); }
+    stopPlayback();   // also lifts the RX quiet gate
 }
 
 // ── Building ─────────────────────────────────────────────────────────
@@ -110,27 +108,22 @@ void TxVoiceCheckDialog::buildUi()
     col->setContentsMargins(16, 16, 16, 16);
     col->setSpacing(12);
 
-    // ── Hearing yourself ─────────────────────────────────────────────
+    // ── Speak, then listen (2026-08-11, the AetherSDR way) ──────────
+    //
+    // The live "Hear myself" checkbox that used to sit here is gone,
+    // asked for in plain words at the bench: real-time self-monitoring
+    // through a block-batched network path carries latency and seams
+    // no amount of buffering fully hides, and AetherSDR — where this
+    // panel's whole workflow feels right — never does it. Its PUDU
+    // monitor records the processed chain output and plays it back
+    // (ClientPuduMonitor @31b29583); that is now the ONLY loop here:
+    // record 15 s, hear it played back automatically, adjust, repeat.
+    // (The on-air MON path for actual transmissions is untouched.)
     {
-        auto* row = new QHBoxLayout;
-        m_listenBox = new QCheckBox(QStringLiteral("Hear myself"), this);
-        m_listenBox->setToolTip(QStringLiteral(
-            "Run the transmit chain and listen to the result without "
-            "going on the air."));
-        row->addWidget(m_listenBox);
-
-        m_volume = new QSlider(Qt::Horizontal, this);
-        m_volume->setRange(0, 100);
-        m_volume->setValue(50);
-        m_volume->setFixedWidth(140);
-        row->addWidget(m_volume);
-        row->addStretch(1);
-        col->addLayout(row);
-
         auto* note = new QLabel(QStringLiteral(
-            "Nothing is transmitted. You are hearing the processed audio, "
-            "so there is the chain's own delay — use headphones, or the "
-            "sound of the room will arrive first and confuse you."), this);
+            "Speak, then listen: recording captures your voice straight "
+            "off the channel strip and plays it back to you when the "
+            "countdown ends. Nothing is transmitted."), this);
         note->setWordWrap(true);
         note->setStyleSheet(secondaryLabelStyle());
         col->addWidget(note);
@@ -308,16 +301,6 @@ void TxVoiceCheckDialog::buildUi()
     connect(m_levelTimer, &QTimer::timeout,
             this, &TxVoiceCheckDialog::updateLevel);
 
-    connect(m_listenBox, &QCheckBox::toggled, this, [this](bool on) {
-        setSelfMonitor(on);
-    });
-
-    connect(m_volume, &QSlider::valueChanged, this, [this](int v) {
-        if (m_radio) {
-            m_radio->transmitModel().setMonitorVolume(float(v) / 100.0f);
-        }
-    });
-
     connect(m_recordBtn, &QPushButton::clicked, this, [this]() {
         if (m_recorder.isRecording()) { stopRecording(); }
         else                          { startRecording(); }
@@ -357,29 +340,23 @@ void TxVoiceCheckDialog::buildUi()
     });
 }
 
-// ── Self-monitor ─────────────────────────────────────────────────────
+// ── Band quiet during the record/listen cycle ────────────────────────
+//
+// The AetherSDR shape (ClientPuduMonitor::muteRxRequested): live RX is
+// silenced from record start until playback ends, so the operator's
+// voice is captured against silence and heard against silence — hum,
+// hiss and pumping all become audible instead of drowning in band
+// noise. This uses the same RX-only gate the live monitor used, but
+// there is no monitor any more: no off-air chain switch, no MON mix-in.
 
-void TxVoiceCheckDialog::setSelfMonitor(bool on)
+void TxVoiceCheckDialog::setRxQuiet(bool on)
 {
-    if (!m_radio) { return; }
-    TxChannel* tx = m_radio->txChannel();
-    if (!tx) { return; }
-
-    if (on && !m_restoreMonitor) {
-        m_monitorWasOn  = m_radio->transmitModel().monEnabled();
-        m_restoreMonitor = true;
-    }
-
-    // Two switches, and both are needed: one runs the transmit chain off
-    // air, the other mixes its output into the speakers. Neither writes
-    // to the radio — TxChannel::writesToRadio() is gated on transmitting
-    // alone, and tst_tx_offair_monitor holds it there.
-    tx->setOffAirMonitor(on);
-    m_radio->transmitModel().setMonEnabled(on);
-    // And silence the band, or you are listening to your voice and the
-    // noise floor at once and can judge neither.
-    if (AudioEngine* ae = m_radio->audioEngine()) {
-        ae->setRxMutedForMonitor(on);
+    if (m_rxQuiet == on) { return; }
+    m_rxQuiet = on;
+    if (m_radio) {
+        if (AudioEngine* ae = m_radio->audioEngine()) {
+            ae->setRxMutedForMonitor(on);
+        }
     }
 }
 
@@ -416,7 +393,6 @@ void TxVoiceCheckDialog::startLevelWatch()
     TxChannel* tx = m_radio->txChannel();
 
     m_micBlocks.store(0, std::memory_order_release);
-    m_monBlocks.store(0, std::memory_order_release);
     m_micPeakMicros.store(0, std::memory_order_release);
     m_watchTicks = 0;
 
@@ -441,12 +417,6 @@ void TxVoiceCheckDialog::startLevelWatch()
         }
     }, Qt::DirectConnection);
 
-    QObject::disconnect(m_monitorTap);
-    m_monitorTap = connect(tx, &TxChannel::sip1OutputReady, this,
-                           [this](const float*, int) {
-        m_monBlocks.fetch_add(1, std::memory_order_acq_rel);
-    }, Qt::DirectConnection);
-
     // The tap has to be on for the meter to see anything. It is off by
     // default and costs a float conversion per block; while this window
     // is listening, that is a price worth paying for being able to say
@@ -463,7 +433,6 @@ void TxVoiceCheckDialog::stopLevelWatch()
     m_tapsArmed = false;
     m_levelTimer->stop();
     QObject::disconnect(m_levelTap);
-    QObject::disconnect(m_monitorTap);
     if (m_radio && m_radio->txChannel() && !m_recorder.isRecording()) {
         m_radio->txChannel()->setMicTapEnabled(false);
     }
@@ -495,7 +464,6 @@ void TxVoiceCheckDialog::updateLevel()
     if (m_watchTicks < 12) { return; }          // 1.2 s
 
     const unsigned mic = m_micBlocks.load(std::memory_order_acquire);
-    const unsigned mon = m_monBlocks.load(std::memory_order_acquire);
 
     // First broken link, not the last. Each of these is a different
     // thing to go and do, and naming two at once helps nobody.
@@ -526,17 +494,8 @@ void TxVoiceCheckDialog::updateLevel()
             "that its level is up.").arg(micSourceName()));
         return;
     }
-    if (mon == 0) {
-        m_liveStatus->setText(QStringLiteral(
-            "The microphone is being heard, but the monitor is producing "
-            "nothing. This is a fault on my side rather than in your "
-            "setup — please say so."));
-        return;
-    }
     m_liveStatus->setText(QStringLiteral(
-        "Hearing you through %1. If the meter moves and you hear nothing, "
-        "the problem is on the output side: the volume slider above, the "
-        "master output, or the wrong output device.").arg(micSourceName()));
+        "Hearing you through %1 — ready to record.").arg(micSourceName()));
 }
 
 // ── Recording ────────────────────────────────────────────────────────
@@ -550,46 +509,63 @@ void TxVoiceCheckDialog::startRecording()
         return;
     }
     TxChannel* tx = m_radio->txChannel();
+    TxWorkerThread* worker = m_radio->txWorker();
+    if (!worker) {
+        m_findings->setText(QStringLiteral(
+            "The transmit pump is not running yet — connect to the radio "
+            "first."));
+        return;
+    }
 
     m_haveResult = false;
     stopPlayback();
     m_recorder.clear();
     m_procRecorder.clear();
     m_micBlocksAtStart = m_micBlocks.load(std::memory_order_acquire);
-    m_monBlocksAtStart = m_monBlocks.load(std::memory_order_acquire);
     m_peakSeenDb = -60.0;
 
-    // DirectConnection is mandatory, not a preference: the tap hands out
-    // a pointer to its own scratch buffer, which the next block
-    // overwrites. A queued connection would copy whatever arrived after.
+    // ── The AetherSDR shape, both halves (2026-08-11) ────────────────
+    //
+    // Both takes come from the WORKER's pre/post-strip taps — the audio
+    // domain, full bandwidth, before WDSP's DEXP, ALC and the 2.7 kHz
+    // TX filter ever see the block. The old sip1 source sat BEHIND all
+    // of that, which is why every take sounded dull and pumped no
+    // matter what the strip did. No off-air chain switch is needed any
+    // more: the worker runs whenever mic frames arrive.
+    //
+    // DirectConnection is mandatory, not a preference: the tap hands
+    // out a pointer to the worker's scratch, overwritten next block.
     QObject::disconnect(m_micTap);
-    m_micTap = connect(tx, &TxChannel::micInputReady, &m_recorder,
+    m_micTap = connect(worker, &TxWorkerThread::preStripAudioReady,
+                       &m_recorder,
                        [this](const float* samples, int frames) {
         m_recorder.feed(samples, frames);
     }, Qt::DirectConnection);
 
-    // Same take, other end of the chain: the post-strip/EQ monitor
-    // signal, for the play-back A/B. The off-air switch below is what
-    // makes sip1OutputReady fire without keying.
     QObject::disconnect(m_procTap);
-    m_procTap = connect(tx, &TxChannel::sip1OutputReady, &m_procRecorder,
+    m_procTap = connect(worker, &TxWorkerThread::postStripAudioReady,
+                        &m_procRecorder,
                         [this](const float* samples, int frames) {
         m_procRecorder.feed(samples, frames);
     }, Qt::DirectConnection);
 
-    // The chain has to be running for mic blocks to arrive at all. This
-    // is the same off-air switch as the listen box and just as unable to
-    // transmit; the difference is only that the operator may not want to
-    // hear it while measuring.
-    tx->setOffAirMonitor(true);
-    tx->setMicTapEnabled(true);
+    worker->setVoiceTapEnabled(true);
+    tx->setMicTapEnabled(true);   // the level meter's tap, unchanged
+
+    // Quiet the band for the whole record-then-listen cycle, exactly
+    // as AetherSDR's monitor does: captured against silence, heard
+    // against silence. Lifted when playback finishes.
+    setRxQuiet(true);
+
     m_recorder.start();
     m_procRecorder.start();
 
     m_secondsLeft = kRecordSeconds;
     m_progress->setValue(0);
     m_countdown->start();
-    m_findings->setText(QStringLiteral("Listening… speak normally."));
+    m_findings->setText(QStringLiteral(
+        "Listening… speak normally. Playback starts by itself when the "
+        "countdown ends."));
     refreshButtons();
 }
 
@@ -603,11 +579,8 @@ void TxVoiceCheckDialog::stopRecording()
     m_recorder.stop();
     m_procRecorder.stop();
 
-    if (m_radio && m_radio->txChannel()) {
-        TxChannel* tx = m_radio->txChannel();
-        // The tap stays on: the meter uses it too, and it is the only
-        // thing that can answer "is anything arriving at all".
-        if (!m_listenBox->isChecked()) { tx->setOffAirMonitor(false); }
+    if (m_radio && m_radio->txWorker()) {
+        m_radio->txWorker()->setVoiceTapEnabled(false);
     }
     QObject::disconnect(m_micTap);
     QObject::disconnect(m_procTap);
@@ -615,6 +588,15 @@ void TxVoiceCheckDialog::stopRecording()
     m_progress->setValue(kRecordSeconds);
     runAnalysis();
     refreshButtons();
+
+    // The AetherSDR loop closes itself: the take plays back the moment
+    // it ends, processed side first — speak, then listen, no third
+    // click in between. The band stays quiet until playback finishes.
+    if (m_procRecorder.hasRecording()) {
+        playRecording(/*processed=*/true);
+    } else {
+        setRxQuiet(false);
+    }
 }
 
 // ── Playback ─────────────────────────────────────────────────────────
@@ -630,6 +612,10 @@ void TxVoiceCheckDialog::playRecording(bool processed)
 
     const TxAudioRecorder& rec = processed ? m_procRecorder : m_recorder;
     if (!rec.hasRecording() || rec.isRecording()) { return; }
+
+    // Band quiet while listening — the other half of the AetherSDR
+    // contract. Lifted in stopPlayback (which every path ends in).
+    setRxQuiet(true);
     const float* src = rec.samples();
     if (src == nullptr) { return; }
     const int frames = rec.recordedFrames();
@@ -673,6 +659,10 @@ void TxVoiceCheckDialog::playRecording(bool processed)
 
 void TxVoiceCheckDialog::stopPlayback()
 {
+    // Every playback path ends here, so this is where the band comes
+    // back — mirrors ClientPuduMonitor lifting its RX mute on playback
+    // end, whatever ended it.
+    setRxQuiet(false);
     if (m_playSink) {
         // Null the member BEFORE stop(): stop() re-emits stateChanged
         // synchronously, and the handler calls back in here.
@@ -733,15 +723,14 @@ void TxVoiceCheckDialog::showFindings()
             : m_result.problem;
         m_findings->setText(QStringLiteral(
             "%1\n\nWhat arrived: %2 s of audio (%3 samples) from %4 mic "
-            "blocks, %5 monitor blocks, peak %6 dBFS.\n"
-            "At 48 kHz a full %7 s take is about %8 blocks — anything far "
+            "blocks, peak %5 dBFS.\n"
+            "At 48 kHz a full %6 s take is about %7 blocks — anything far "
             "short of that means the microphone is not reaching the "
             "transmit chain, and the source is the place to look.")
                 .arg(why)
                 .arg(m_recorder.recordedSeconds(), 0, 'f', 2)
                 .arg(m_recorder.recordedFrames())
                 .arg(m_micBlocks.load(std::memory_order_acquire) - m_micBlocksAtStart)
-                .arg(m_monBlocks.load(std::memory_order_acquire) - m_monBlocksAtStart)
                 .arg(m_peakSeenDb, 0, 'f', 1)
                 .arg(kRecordSeconds)
                 .arg(kRecordSeconds * kMicRateHz / 64));
@@ -923,7 +912,6 @@ void TxVoiceCheckDialog::refreshButtons()
     m_applyBtn->setEnabled(m_haveResult && !recording);
     if (m_stripBtn) { m_stripBtn->setEnabled(m_haveResult && !recording); }
     if (m_saveBtn) { m_saveBtn->setEnabled(m_recorder.hasRecording()); }
-    m_listenBox->setEnabled(!recording);
 
     const bool playing = (m_playSink != nullptr);
     if (m_playRawBtn) {

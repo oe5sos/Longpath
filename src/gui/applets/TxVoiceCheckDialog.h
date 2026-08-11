@@ -25,30 +25,41 @@
 //             the suggestion per band, the noise floor, crest factor,
 //             hum and sibilance, and the recording itself as a WAV.
 //
-// Nothing here can transmit. The self-monitor runs the chain off air —
-// see TxChannel::writesToRadio() — and the analysis reads the raw
-// microphone before WDSP touches it, which is a tap and not a path.
+// Nothing here can transmit, and nothing here monitors live any more.
+// Both takes come from TxWorkerThread's pre/post-strip taps — plain
+// audio-domain taps, not paths, and nothing touches the radio.
 //
-// Why the raw microphone and not the monitor output: measuring the
-// chain's own output and then recommending an EQ to fix it gives advice
-// that changes every time it is taken. The compressor would also have
+// Why the raw microphone for the ANALYSIS: measuring the chain's own
+// output and then recommending an EQ to fix it gives advice that
+// changes every time it is taken. The compressor would also have
 // flattened the spectrum being measured, and the 2.7 kHz transmit
 // filter would have removed the bands the sibilance check needs.
 //
-// ── Record, then listen (2026-08-11) ─────────────────────────────────
+// ── Speak, then listen (2026-08-11, the AetherSDR way) ───────────────
 //
-// The ANALYSIS wants the raw microphone; the OPERATOR wants to hear
-// the processed result. Judging an EQ change through the live monitor
-// means judging it in real time against the memory of how it sounded a
-// knob ago, which nobody can do — AetherSDR answers this with its PUDU
-// monitor (src/core/ClientPuduMonitor.{h,cpp} @3a1f59e, GPLv3, same
-// licence): capture the post-DSP output, play it back on demand. Same
-// shape here, none of its code: every take records BOTH taps at once —
-// the raw mic for the analysis, the post-strip/EQ monitor signal for
-// the operator's ears — and two play buttons A/B them afterwards.
-// Playback is a plain QAudioSink from a memory buffer on the UI
-// thread, which is why it cannot crackle: nothing real-time is
-// involved.
+// The live "Hear myself" path is GONE from this window, asked for at
+// the bench in plain words after it never got past "almost right":
+// real-time self-monitoring through a block-batched network path
+// carries latency and seams, and AetherSDR — whose workflow the bench
+// wants 1:1 — never does it. Its PUDU monitor records the processed
+// chain output and plays it back (ClientPuduMonitor @31b29583); this
+// window now runs exactly that loop, with NereusSDR's own parts:
+//
+//   Record 15 s  → both worker taps captured simultaneously —
+//                  PRE-strip for the analysis, POST-strip for the ear.
+//                  The band is muted for the whole cycle so the take
+//                  is captured against silence (Aether's muteRx).
+//   Countdown 0  → the processed take AUTO-PLAYS. Speak, then listen,
+//                  no third click.
+//   A/B buttons  → raw vs processed of the same words, from memory
+//                  through a QAudioSink — off the real-time path, so
+//                  it cannot crackle and carries no latency.
+//
+// The taps sit BEFORE WDSP's DEXP, ALC and TX bandpass on purpose:
+// the earlier sip1 source sat behind all three, which made every take
+// sound dull and pumped regardless of what the strip did. What plays
+// back is what the strip does to the voice — full bandwidth. (The
+// on-air MON path for real transmissions is untouched by all this.)
 //
 // =================================================================
 // Modification history (NereusSDR):
@@ -58,6 +69,12 @@
 //                 raw/processed playback (AetherSDR PUDU-monitor shape,
 //                 no code reused). By Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
+//   2026-08-11 — Rebuilt on the AetherSDR record-then-listen contract:
+//                 live monitoring removed, takes moved to the worker's
+//                 pre/post-strip taps (audio domain, pre-WDSP),
+//                 band-quiet across the record/playback cycle,
+//                 auto-play at countdown end. By Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
 #include "core/TxAudioRecorder.h"
@@ -71,11 +88,9 @@
 
 class QAudioSink;
 class QBuffer;
-class QCheckBox;
 class QLabel;
 class QProgressBar;
 class QPushButton;
-class QSlider;
 class QTableWidget;
 class QTimer;
 class QWidget;
@@ -110,7 +125,7 @@ public:
 private:
     void buildUi();
 
-    void setSelfMonitor(bool on);
+    void setRxQuiet(bool on);
     void startRecording();
     void stopRecording();
     // Playback of the last take, from memory through a QAudioSink.
@@ -144,12 +159,10 @@ private:
     void updateLevel();
     QString micSourceName() const;
 
-    QMetaObject::Connection m_monitorTap;
     QMetaObject::Connection m_levelTap;
 
     // Written on the transmit worker thread, read on the GUI thread.
     std::atomic<unsigned> m_micBlocks{0};
-    std::atomic<unsigned> m_monBlocks{0};
     // Peak since the last read, as an integer so it can be atomic
     // without a compare-exchange loop: millionths of full scale.
     std::atomic<unsigned> m_micPeakMicros{0};
@@ -169,7 +182,6 @@ private:
     // say what arrived during the take rather than since the window
     // opened.
     unsigned m_micBlocksAtStart{0};
-    unsigned m_monBlocksAtStart{0};
 
     // Hosted inside the strip window's tab bar rather than standing
     // alone. Only buildUi() reads it (no Close button when embedded).
@@ -182,10 +194,12 @@ private:
     QPointer<RadioModel> m_radio;
 
     TxAudioRecorder m_recorder;
-    // The same take through the whole strip + EQ + modulator, recorded
-    // simultaneously from the monitor tap (sip1OutputReady, 48 kHz
-    // mono). The analysis never reads this one; only the play button
-    // does.
+    // The same take through the channel strip, recorded simultaneously
+    // from the worker's POST-STRIP tap (2026-08-11 — audio domain,
+    // full bandwidth, before WDSP's DEXP/ALC/TX-filter; the earlier
+    // sip1 source sat behind all of those and made every take sound
+    // dull and pumped). The analysis never reads this one; only the
+    // play button and the auto-play do.
     TxAudioRecorder m_procRecorder;
     QMetaObject::Connection m_procTap;
     VoiceAnalysis   m_result;
@@ -198,18 +212,14 @@ private:
     QByteArray  m_playPcm;
     bool        m_playingProcessed{false};
 
-    // Restored on the way out. An operator who opens this window, turns
-    // the monitor on to listen, and closes it again should not be left
-    // with a monitor they did not ask for and cannot see.
-    bool m_monitorWasOn{false};
-    bool m_restoreMonitor{false};
+    // The band-quiet gate (setRxQuiet). True from record start until
+    // playback ends — the AetherSDR record/listen contract.
+    bool m_rxQuiet{false};
 
     QMetaObject::Connection m_micTap;
 
-    QCheckBox*    m_listenBox{nullptr};
     QLabel*       m_liveStatus{nullptr};
     QProgressBar* m_levelBar{nullptr};
-    QSlider*      m_volume{nullptr};
     QPushButton*  m_recordBtn{nullptr};
     QPushButton*  m_playRawBtn{nullptr};
     QPushButton*  m_playProcBtn{nullptr};

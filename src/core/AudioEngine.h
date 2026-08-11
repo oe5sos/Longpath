@@ -282,6 +282,17 @@ public:
     void setHeadphonesConfig(const AudioDeviceConfig& cfg);
     void setTxInputConfig(const AudioDeviceConfig& cfg);
 
+    /// Drop everything the TX-input (PC mic) ring has hoarded.
+    /// (2026-08-11 voice-check bench.) The bus opens eagerly at
+    /// connect, seconds before the TX pump takes its first pull, so
+    /// the 1-second ring arrives at its first use PINNED FULL — and a
+    /// full drop-oldest ring clips its oldest samples on every jitter
+    /// burst, forever: a click straight into the mic signal that every
+    /// take and every transmission inherits. TxWorkerThread calls this
+    /// on the rising edge of the PC-mic splice; flush() is an atomic
+    /// cursor equalisation and safe from the audio thread.
+    void flushTxInputBus();
+
     // Per-VAX device configuration. On Mac/Linux the VAX slots are populated
     // eagerly by start() with the platform-native virtual bus
     // (CoreAudioHalBus / LinuxPipeBus); calling setVaxConfig there replaces

@@ -815,6 +815,9 @@ void TxWorkerThread::dispatchOneBlock()
     // below must see ONLY the RADE audio.
     if (path != TxPath::Rade
         && m_audioEngine != nullptr && m_audioEngine->isVaxMicOverrideActive()) {
+        // A later VAX→PC switch must re-flush the PC ring on its next
+        // rising edge; see the PC branch below.
+        m_pcMicSpliceWasActive = false;
         // VAX TX override (eager-borg-d64bed, 2026-05-06).  Mirrors the
         // PC mic override path below, but pulls from the VAX TX shared-
         // memory bus that the HAL plugin populates from a 3rd-party
@@ -835,6 +838,20 @@ void TxWorkerThread::dispatchOneBlock()
         }
     } else if (path != TxPath::Rade
                && m_audioEngine != nullptr && m_audioEngine->isPcMicOverrideActive()) {
+        // Rising edge of the PC-mic splice (2026-08-11 voice-check
+        // bench): the input bus opens eagerly at connect, seconds
+        // before this loop's first pull, so its 1-second ring arrives
+        // here PINNED FULL — and a full drop-oldest ring clips its
+        // oldest samples on every jitter burst, forever. That clipping
+        // is a click in the mic signal itself, which every recording
+        // and every transmission inherits; it also means the spliced
+        // audio ran a second late. One flush on activation restores a
+        // full second of headroom (clock drift needs hours to eat it)
+        // and makes the splice current.
+        if (!m_pcMicSpliceWasActive) {
+            m_pcMicSpliceWasActive = true;
+            m_audioEngine->flushTxInputBus();
+        }
         const int got = m_audioEngine->pullTxMic(m_pcMicBuf.data(), kBlockFrames);
         const int n   = std::clamp(got, 0, kBlockFrames);
         // Diagnostic (2026-08-11): count short pulls — each one is a
@@ -871,6 +888,10 @@ void TxWorkerThread::dispatchOneBlock()
             m_in[static_cast<size_t>(2 * i + 0)] = 0.0;
             m_in[static_cast<size_t>(2 * i + 1)] = 0.0;
         }
+    } else {
+        // Radio mic (or RADE): the PC splice is inactive, so its next
+        // activation is a rising edge again and re-flushes the ring.
+        m_pcMicSpliceWasActive = false;
     }
 
     // VOX / DEXP detector — mirrors Thetis cmaster.c:388 [v2.10.3.13]:
@@ -918,6 +939,47 @@ void TxWorkerThread::dispatchOneBlock()
         m_stripChain->micSpectrum().feed(m_stripBuf.data(), kBlockFrames);
     }
 
+    // ── Voice-check tap, PRE-strip (2026-08-11) ─────────────────────
+    // The analysis take: the mic as delivered, before the strip. See
+    // the signal doc in the header for the whole story; the flag keeps
+    // the disabled cost at one relaxed load.
+    const bool voiceTap = m_voiceTapEnabled.load(std::memory_order_acquire);
+
+    // Pump cadence diagnostic (2026-08-11 "stockend" bench): while the
+    // voice tap is on, count dispatch ticks and report per 5 s. A
+    // healthy pump ticks at exactly kMicRate/kBlockFrames = 750/s; a
+    // recording can only be as continuous as this number is steady,
+    // because every missing tick is 1.3 ms of voice that never existed.
+    if (voiceTap) {
+        ++m_tapTickCount;
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (m_tapTickReportMs == 0) { m_tapTickReportMs = now; }
+        if (now - m_tapTickReportMs >= 5000) {
+            qCInfo(lcTxWorker)
+                << "voice-tap pump cadence:" << m_tapTickCount << "ticks in"
+                << (now - m_tapTickReportMs) << "ms (expected ~"
+                << (750.0 * (now - m_tapTickReportMs) / 1000.0) << ")";
+            m_tapTickCount = 0;
+            m_tapTickReportMs = now;
+        }
+    } else {
+        m_tapTickCount = 0;
+        m_tapTickReportMs = 0;
+    }
+    if (voiceTap) {
+        if (static_cast<int>(m_voiceTapBuf.size()) < kBlockFrames) {
+            // First use after enabling; the UI thread enabled the tap,
+            // and one allocation on the transition is acceptable — the
+            // steady state never allocates.
+            m_voiceTapBuf.assign(static_cast<size_t>(kBlockFrames), 0.0f);
+        }
+        for (int i = 0; i < kBlockFrames; ++i) {
+            m_voiceTapBuf[static_cast<size_t>(i)] =
+                static_cast<float>(m_in[static_cast<size_t>(2 * i)]);
+        }
+        emit preStripAudioReady(m_voiceTapBuf.data(), kBlockFrames);
+    }
+
     if (m_stripChain != nullptr && m_stripChain->isEnabled()
         && static_cast<int>(m_stripBuf.size()) >= kBlockFrames) {
         for (int i = 0; i < kBlockFrames; ++i) {
@@ -934,6 +996,20 @@ void TxWorkerThread::dispatchOneBlock()
             // accident.
             m_in[static_cast<size_t>(2 * i + 1)] = 0.0;
         }
+    }
+
+    // ── Voice-check tap, POST-strip (2026-08-11) ────────────────────
+    // The listening take: what the strip made of the block above — or
+    // the identical block when the strip master is off, which is the
+    // honest answer to "what am I comparing against". Reuses the same
+    // scratch; the pre-strip copy was already consumed synchronously
+    // by the DirectConnection above.
+    if (voiceTap && static_cast<int>(m_voiceTapBuf.size()) >= kBlockFrames) {
+        for (int i = 0; i < kBlockFrames; ++i) {
+            m_voiceTapBuf[static_cast<size_t>(i)] =
+                static_cast<float>(m_in[static_cast<size_t>(2 * i)]);
+        }
+        emit postStripAudioReady(m_voiceTapBuf.data(), kBlockFrames);
     }
 
     m_txChannel->pumpDexp(m_in.data());
