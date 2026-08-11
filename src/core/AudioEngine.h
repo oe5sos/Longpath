@@ -768,6 +768,11 @@ private:
     // (≤1 ms of silence is inaudible vs. a use-after-free). NOT held in the
     // audio callback path (acquires try_lock only; never blocks).
     std::mutex m_speakersBusMutex;
+    // Same contract for the headphones bus: rxBlockReady try_locks it
+    // around the push, setHeadphonesConfig holds it across tear-down +
+    // rebuild. Added with the 2026-08-11 bench fix that first wired the
+    // headphones bus into the mix path at all.
+    std::mutex m_headphonesBusMutex;
 
     std::unique_ptr<IAudioBus> m_speakersBus;
     std::unique_ptr<IAudioBus> m_headphonesBus;

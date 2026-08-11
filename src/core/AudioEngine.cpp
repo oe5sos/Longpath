@@ -101,6 +101,16 @@
 //                 macOS Intel / Core Audio.  Pairs with new IAudioBus::flush()
 //                 (default no-op) and PortAudioBus::flush() (atomic
 //                 ringRead := ringWrite).
+//   2026-08-11 — Headphones bus wired into the mix path (bench fix).
+//                 setHeadphonesConfig opened the bus but nothing ever
+//                 pushed audio into it: meters moved, headphone device
+//                 stayed silent. rxBlockReady now pushes the same mix
+//                 under a new m_headphonesBusMutex (try_lock, same
+//                 contract as speakers); setHeadphonesConfig holds that
+//                 mutex across tear-down + rebuild; master-mute flushes
+//                 the headphones ring like the speakers ring (#201).
+//                 By Martin Fischer, AI-assisted via Anthropic Claude
+//                 (Cowork).
 // =================================================================
 
 #include "AudioEngine.h"
@@ -894,8 +904,15 @@ void AudioEngine::applySpeakersConfig(const AudioDeviceConfig& cfg)
 
 void AudioEngine::setHeadphonesConfig(const AudioDeviceConfig& cfg)
 {
+    // Hold the bus mutex across tear-down + rebuild so rxBlockReady's
+    // try_lock push can never touch a half-destroyed bus. Mirrors
+    // setSpeakersConfig; unlock before the emit so handlers can call
+    // back in without deadlocking.
+    std::unique_lock<std::mutex> lk(m_headphonesBusMutex);
     m_headphonesBus.reset();
     if (!m_paInitialized) {
+        lk.unlock();
+        emit headphonesConfigChanged(cfg);
         return;
     }
     m_headphonesBus = makeBus(cfg, /*capture=*/false);
@@ -903,6 +920,7 @@ void AudioEngine::setHeadphonesConfig(const AudioDeviceConfig& cfg)
         qCInfo(lcAudio) << "Headphones bus opened"
                         << "[" << m_headphonesBus->backendName() << "]";
     }
+    lk.unlock();
     emit headphonesConfigChanged(cfg);
 }
 
@@ -1339,6 +1357,26 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
         // the push specifically to keep that drop window short and
         // bounded; we no longer trace mutex misses since the bench
         // confirmed the contention is rare enough to be inaudible.
+
+        // ── Headphones bus (bench fix 2026-08-11) ────────────────────
+        //
+        // Same mix, same block, same try_lock contract as the speakers
+        // push above. Until this push existed the headphones bus was
+        // opened by setHeadphonesConfig and then never written — an
+        // operator who selected a headphone device saw every meter move
+        // and heard nothing. Both buses get the full mix; whether one
+        // device or two are audible is the operator's device choice,
+        // not a routing decision made here.
+        std::unique_lock<std::mutex> phonesLk(m_headphonesBusMutex,
+                                              std::try_to_lock);
+        if (phonesLk.owns_lock()) {
+            IAudioBus* phonesBus = m_headphonesBus.get();
+            if (phonesBus != nullptr && phonesBus->isOpen()) {
+                phonesBus->push(
+                    reinterpret_cast<const char*>(mix.data()),
+                    static_cast<qint64>(stereoFloats) * sizeof(float));
+            }
+        }
     }
 }
 
@@ -1539,6 +1577,16 @@ void AudioEngine::setMasterMuted(bool muted)
         std::lock_guard<std::mutex> lk(m_speakersBusMutex);
         if (m_speakersBus) {
             m_speakersBus->flush();
+        }
+    }
+    // Same #201 echo-tail reasoning for the headphones bus, now that it
+    // is fed by rxBlockReady (bench fix 2026-08-11). Separate scope —
+    // the two mutexes are never held together, so no ordering to get
+    // wrong.
+    if (muted) {
+        std::lock_guard<std::mutex> lk(m_headphonesBusMutex);
+        if (m_headphonesBus) {
+            m_headphonesBus->flush();
         }
     }
 
