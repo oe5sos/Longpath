@@ -220,7 +220,8 @@ during MOX), and both directions drowned. The dispatch-tick "3-15%
 mic loss" from the original crackle hunt was this exact mechanism,
 measured two layers downstream.
 
-Fix, in two rounds — the second is the one that holds:
+Fix, in two rounds — **both landed, bench shows NEITHER closes it;
+investigation parked 2026-08-11 evening, resume planned 2026-08-13**:
 
 1. `setReceiverSampleRate` mirrors indices 0/1 into
    `m_rx1Rate`/`m_rx2Rate` silently, and `setSampleRateLive` step 12
@@ -239,6 +240,31 @@ Fix, in two rounds — the second is the one that holds:
 Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
 (`perReceiverRateChangeMirrorsIntoPsRate`,
 `publishTimeSyncOverridesConnectSeed`).
+
+**State at park (2026-08-11 22:20), for the 2026-08-13 resume:**
+
+- Re-test AFTER round 2: `mox=true` DDCAssign still shows
+  `rx1Rate=192000`, IQ still jumps ~1000 → ~3900 pkts/5 s, loss 3-5%.
+- Established since: the DDCAssign lines are OBSERVATION ONLY on P2 —
+  the wire push at MOX comes from `refreshDdcAssignmentForRadioState`
+  → `requestDdcAssignment` → codec `applyDdcAssignment(ctx, streams)`
+  (RadioModel.cpp:8404 comment: "The P2 wire deliberately does not
+  consume that partial PsDdcConfig signal"). So the fix target was
+  wrong TWICE: the stale rate reaching the radio at MOX rides the
+  STREAM path, whose rates come from buildStreamConfigsForCodec.
+- Leading hypothesis: the persisted hardware rate is 192 kHz; the
+  wire idles on P2RadioConnection's constructor-default 48 kHz
+  because the early assignment pushes are gated on isConnected();
+  the first MOX (or first requestDdcAssignment after connect) then
+  "corrects" the wire to the configured 192 kHz — which the remote
+  link cannot carry. Under this hypothesis the MOX behaviour is
+  CORRECT and the bugs are (a) connect not applying the configured
+  rate, (b) the user needing 48 kHz for remote operation.
+- Decisive next step (waiting on the operator):
+  `grep -iE "sampleRate" ~/.config/NereusSDR/NereusSDR.settings`
+  plus the question which pan width he actually operates with.
+- Keep in mind: rounds 1+2 (silent PS-rate mirrors) are correct
+  hygiene regardless and stay in.
 
 Residual for remote TX: the P2 upstream TX I/Q at 192 kHz
 (~9.2 Mbit/s while transmitting) is protocol-fixed and remains the
