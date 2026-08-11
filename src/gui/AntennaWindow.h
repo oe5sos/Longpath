@@ -84,6 +84,10 @@ private:
     // m_measured — one place, so no view can be looking at the raw
     // sweep while another looks at the corrected one.
     void applyFeedline();
+    // The cable currently selected, with the custom fields folded in
+    // when "Custom" is chosen. One place, so the de-embedding and the
+    // label under the curve cannot disagree about which cable it is.
+    Feedline::Cable currentCable() const;
     // Rebuild the per-band table. Separate from refresh() only because
     // it is thirty lines of table filling and refresh() is already the
     // longest function here.
@@ -124,6 +128,17 @@ private:
     QComboBox*      m_regionBox{nullptr};
     QComboBox*      m_cableBox{nullptr};
     QDoubleSpinBox* m_cableLenBox{nullptr};
+    // Only shown for the "Custom" catalogue entry, which was otherwise
+    // a menu item that did nothing. Real cable varies by make and by
+    // age, so somebody who has measured their own should be able to
+    // enter it.
+    QDoubleSpinBox* m_vfBox{nullptr};
+    QDoubleSpinBox* m_lossBox{nullptr};
+    // The coax controls are refinement, not the question, so they stay
+    // folded away until asked for. Somebody who calibrated at the
+    // antenna — which is the right way — never needs them at all.
+    QPushButton* m_coaxToggle{nullptr};
+    QWidget*     m_coaxGroup{nullptr};
     QDoubleSpinBox* m_limitBox{nullptr};
     // ── The exact span to read off ───────────────────────────────────
     //

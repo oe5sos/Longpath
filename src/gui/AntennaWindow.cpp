@@ -51,6 +51,9 @@ const QString kCableKey  = QStringLiteral("AntennaCableType");
 const QString kCableLenKey = QStringLiteral("AntennaCableLengthM");
 const QString kFromKey   = QStringLiteral("AntennaReadFromMHz");
 const QString kToKey     = QStringLiteral("AntennaReadToMHz");
+const QString kVfKey     = QStringLiteral("AntennaCableVf");
+const QString kLossKey   = QStringLiteral("AntennaCableLossDb100m");
+const QString kCoaxShownKey = QStringLiteral("AntennaCoaxRowShown");
 
 QLabel* caption(const QString& text, QWidget* parent)
 {
@@ -276,7 +279,29 @@ void AntennaWindow::buildUi()
     // way to do it and costs nothing here. For everyone else this is
     // the difference between measuring the antenna and measuring the
     // antenna plus a transformer of unknown ratio.
-    row2->addWidget(caption(QStringLiteral("COAX"), this));
+    // ── Folded away by default ───────────────────────────────────
+    //
+    // De-embedding a feedline matters, and it is not what most people
+    // open this window for. Anyone who calibrated at the antenna end —
+    // the right way — never needs it. So it sits behind a toggle
+    // instead of taking four controls' worth of attention from the
+    // question actually being asked.
+    m_coaxToggle = new QPushButton(QStringLiteral("coax…"), this);
+    m_coaxToggle->setCheckable(true);
+    m_coaxToggle->setStyleSheet(Style::buttonBaseStyle());
+    m_coaxToggle->setToolTip(QStringLiteral(
+        "Only needed if you calibrated at the analyser rather than at "
+        "the antenna. A length of coax rotates the impedance and hides "
+        "the real resonance."));
+    row2->addWidget(m_coaxToggle);
+
+    m_coaxGroup = new QWidget(this);
+    auto* coax = new QHBoxLayout(m_coaxGroup);
+    coax->setContentsMargins(0, 0, 0, 0);
+    coax->setSpacing(7);
+    row2->addWidget(m_coaxGroup);
+
+    coax->addWidget(caption(QStringLiteral("COAX"), m_coaxGroup));
     m_cableBox = new QComboBox(this);
     for (int i = 0; i < Feedline::catalogue().size(); ++i) {
         m_cableBox->addItem(Feedline::catalogue().at(i).name, i);
@@ -291,7 +316,7 @@ void AntennaWindow::buildUi()
     m_cableBox->setToolTip(QStringLiteral(
         "The cable between the analyser and the antenna. Nominal "
         "figures — real cable varies by make and by age."));
-    row2->addWidget(m_cableBox);
+    coax->addWidget(m_cableBox);
 
     m_cableLenBox = new QDoubleSpinBox(this);
     m_cableLenBox->setRange(0.0, 300.0);
@@ -303,7 +328,32 @@ void AntennaWindow::buildUi()
     m_cableLenBox->setToolTip(QStringLiteral(
         "How much of it. Leave at none if you calibrated at the antenna "
         "end — then there is nothing to take out."));
-    row2->addWidget(m_cableLenBox);
+    coax->addWidget(m_cableLenBox);
+
+    // Only meaningful for the "Custom" entry, and hidden otherwise —
+    // two spin boxes that silently do nothing next to eight named
+    // cables would be worse than the dead menu item they replace.
+    m_vfBox = new QDoubleSpinBox(this);
+    m_vfBox->setRange(0.05, 1.0);
+    m_vfBox->setDecimals(2);
+    m_vfBox->setSingleStep(0.01);
+    m_vfBox->setPrefix(QStringLiteral("vf "));
+    m_vfBox->setValue(s.value(kVfKey, 0.66).toDouble());
+    m_vfBox->setToolTip(QStringLiteral(
+        "Velocity factor. 0.66 for solid polyethylene, about 0.82 for "
+        "foam, 0.85 for LMR-400."));
+    coax->addWidget(m_vfBox);
+
+    m_lossBox = new QDoubleSpinBox(this);
+    m_lossBox->setRange(0.0, 100.0);
+    m_lossBox->setDecimals(1);
+    m_lossBox->setSingleStep(0.5);
+    m_lossBox->setSuffix(QStringLiteral(" dB/100m"));
+    m_lossBox->setValue(s.value(kLossKey, 4.5).toDouble());
+    m_lossBox->setToolTip(QStringLiteral(
+        "Matched loss per 100 m at 10 MHz. Scaled as the square root of "
+        "frequency from there."));
+    coax->addWidget(m_lossBox);
 
     row2->addStretch(1);
 
@@ -511,9 +561,49 @@ void AntennaWindow::buildUi()
     connect(m_cableBox, &QComboBox::currentIndexChanged, this, [this](int) {
         AppSettings::instance().setValue(kCableKey,
                                          m_cableBox->currentText());
+        const bool custom =
+            m_cableBox->currentText() == QStringLiteral("Custom");
+        m_vfBox->setVisible(custom);
+        m_lossBox->setVisible(custom);
         applyFeedline();
         refresh();
     });
+    for (QDoubleSpinBox* b : {m_vfBox, m_lossBox}) {
+        connect(b, &QDoubleSpinBox::valueChanged, this, [this]() {
+            AppSettings::instance().setValue(kVfKey, m_vfBox->value());
+            AppSettings::instance().setValue(kLossKey, m_lossBox->value());
+            applyFeedline();
+            refresh();
+        });
+    }
+    {
+        const bool custom =
+            m_cableBox->currentText() == QStringLiteral("Custom");
+        m_vfBox->setVisible(custom);
+        m_lossBox->setVisible(custom);
+    }
+
+    connect(m_coaxToggle, &QPushButton::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(kCoaxShownKey, on);
+        m_coaxGroup->setVisible(on);
+        // Folding it away does NOT quietly stop de-embedding — a hidden
+        // control that still acts is worse than a visible one. The
+        // length is zeroed so what is on screen matches what is being
+        // computed.
+        if (!on && m_cableLenBox->value() > 0.0) {
+            m_cableLenBox->setValue(0.0);
+        }
+    });
+    {
+        // Shown again if it was left open, or if a cable length
+        // survived in the settings — hiding a control that is actively
+        // changing the answer would be the same lie the other way
+        // round.
+        const bool open = s.value(kCoaxShownKey, false).toBool()
+                          || m_cableLenBox->value() > 0.0;
+        m_coaxToggle->setChecked(open);
+        m_coaxGroup->setVisible(open);
+    }
     connect(m_cableLenBox, &QDoubleSpinBox::valueChanged,
             this, [this](double v) {
         AppSettings::instance().setValue(kCableLenKey, v);
@@ -577,16 +667,34 @@ void AntennaWindow::openFile(const QString& path)
     setSweep(Touchstone::readS1p(path));
 }
 
+Feedline::Cable AntennaWindow::currentCable() const
+{
+    const int idx = m_cableBox ? m_cableBox->currentIndex() : 0;
+    if (idx < 0 || idx >= Feedline::catalogue().size()) { return {}; }
+
+    Feedline::Cable c = Feedline::catalogue().at(idx);
+    // "Custom" is the last entry and the only one whose numbers come
+    // from the operator. Everything else keeps its nominal figures,
+    // which the tooltip already says are nominal.
+    if (c.name == QStringLiteral("Custom") && m_vfBox && m_lossBox) {
+        c.velocityFactor = m_vfBox->value();
+        c.lossDb100m     = m_lossBox->value();
+        c.refHz          = 10e6;
+    }
+    return c;
+}
+
 void AntennaWindow::applyFeedline()
 {
     const double len = m_cableLenBox ? m_cableLenBox->value() : 0.0;
     const int idx = m_cableBox ? m_cableBox->currentIndex() : 0;
-    if (len <= 0.0 || idx < 0 || idx >= Feedline::catalogue().size()) {
+    if (len <= 0.0 || idx <= 0 || idx >= Feedline::catalogue().size()) {
+        // Index 0 is "None — calibrated at the antenna", which is not a
+        // cable to remove.
         m_sweep = m_measured;
         return;
     }
-    const auto out = Feedline::deEmbed(m_measured, len,
-                                       Feedline::catalogue().at(idx));
+    const auto out = Feedline::deEmbed(m_measured, len, currentCable());
     m_sweep = out.sweep;
 }
 
@@ -733,9 +841,12 @@ void AntennaWindow::refresh()
     const double cableLen = m_cableLenBox->value();
     const int    cableIdx = m_cableBox->currentIndex();
     const QString plane = (cableLen > 0.0 && cableIdx > 0)
-        ? QStringLiteral("at the antenna, %1 m of %2 removed")
+        ? QStringLiteral("at the antenna, %1 m of %2 removed (vf %3, "
+                         "%4 dB/100m at 10 MHz)")
               .arg(cableLen, 0, 'f', 1)
-              .arg(Feedline::catalogue().at(cableIdx).name)
+              .arg(currentCable().name)
+              .arg(currentCable().velocityFactor, 0, 'f', 2)
+              .arg(currentCable().lossDb100m, 0, 'f', 1)
         : QStringLiteral("at the analyser port");
 
     // ── What the antenna is doing at the target ──────────────────────
@@ -882,18 +993,43 @@ void AntennaWindow::refresh()
 
     const auto res = AntennaSweep::nearestResonance(m_sweep, targetHz);
     if (!res.found) {
-        m_action->setText(QStringLiteral("?"));
+        m_action->setText(QStringLiteral("not resonant"));
+        m_action->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; border: none; }")
+                .arg(QLatin1String(Style::kRedBorder)));
         m_actionSub->setText(QStringLiteral(
-            "No resonance in this sweep — the reactance never reaches "
-            "zero. Sweep wider to find it before trimming anything."));
+            "Not between %1 and %2 MHz, anyway — the reactance never "
+            "reaches zero. Sweep wider.")
+                .arg(m_sweep.startHz() / 1e6, 0, 'f', 3)
+                .arg(m_sweep.stopHz()  / 1e6, 0, 'f', 3));
         m_caution->setVisible(false);
         return;
     }
+    // ── The headline is the answer to the question asked ─────────────
+    //
+    // Most people opening this window want one thing: where is my
+    // antenna resonant. Cable loss, velocity factors and learned
+    // exponents are refinements for somebody trimming to a target, and
+    // leading with "—" until they fill in three more boxes buries the
+    // answer they came for.
+    //
+    // So the big number is the RESONANCE until there is both a target
+    // and a length, and only then becomes the centimetres.
+    auto showResonance = [this, &res](const QString& extra) {
+        m_action->setText(QStringLiteral("%1 MHz")
+                              .arg(res.freqHz / 1e6, 0, 'f', 3));
+        m_action->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; border: none; }")
+                .arg(QLatin1String(Style::kAmberText)));
+        QString sub = QStringLiteral("resonant · %1 Ω · SWR %2")
+                          .arg(res.resistanceOhms, 0, 'f', 0)
+                          .arg(res.swrThere, 0, 'f', 2);
+        if (!extra.isEmpty()) { sub += QStringLiteral(" · ") + extra; }
+        m_actionSub->setText(sub);
+    };
+
     if (targetHz <= 0.0) {
-        m_action->setText(QStringLiteral("—"));
-        m_actionSub->setText(QStringLiteral(
-            "Resonant at %1 MHz. Set a target frequency to get the "
-            "change in centimetres.").arg(res.freqHz / 1e6, 0, 'f', 3));
+        showResonance(QStringLiteral("set a target to get centimetres"));
         m_caution->setVisible(false);
         return;
     }
@@ -917,22 +1053,24 @@ void AntennaWindow::refresh()
                                        m_lengthBox->value());
 
     if (std::abs(t.percentChange) < 0.1) {
-        m_action->setText(QStringLiteral("nothing"));
-        m_actionSub->setText(QStringLiteral(
-            "Already resonant where you want it. Leave the wire alone."));
+        showResonance(QStringLiteral("already where you want it — leave "
+                                     "the wire alone"));
+        m_action->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; border: none; }")
+                .arg(QLatin1String(Style::kGreenText)));
         m_caution->setVisible(false);
         return;
     }
 
     if (t.totalChangeM == 0.0) {
-        m_action->setText(QStringLiteral("%1 %2 %")
-                              .arg(t.lengthen ? QStringLiteral("+")
-                                              : QStringLiteral("−"))
-                              .arg(std::abs(t.percentChange), 0, 'f', 2));
-        m_actionSub->setText(QStringLiteral(
-            "%1. Enter the current length to get centimetres.")
-                .arg(t.lengthen ? QStringLiteral("Longer")
-                                : QStringLiteral("Shorter")));
+        // A percentage is not an instruction anybody can act on with a
+        // tape measure, so the resonance stays the headline and the
+        // percentage goes underneath with what is missing.
+        showResonance(QStringLiteral("%1 %2 % — enter the wire length "
+                                     "for centimetres")
+                          .arg(t.lengthen ? QStringLiteral("+")
+                                          : QStringLiteral("−"))
+                          .arg(std::abs(t.percentChange), 0, 'f', 2));
     } else {
         m_action->setText(QStringLiteral("%1 %2 cm")
                               .arg(t.lengthen ? QStringLiteral("+")
