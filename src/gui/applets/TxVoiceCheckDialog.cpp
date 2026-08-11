@@ -22,11 +22,16 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
+#include <QAudio>
+#include <QAudioFormat>
+#include <QAudioSink>
+#include <QBuffer>
 #include <QCheckBox>
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMediaDevices>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
@@ -50,13 +55,24 @@ QString secondaryLabelStyle()
 
 } // namespace
 
-TxVoiceCheckDialog::TxVoiceCheckDialog(RadioModel* radio, QWidget* parent)
+TxVoiceCheckDialog::TxVoiceCheckDialog(RadioModel* radio, QWidget* parent,
+                                       bool embedded)
     : QDialog(parent)
+    , m_embedded(embedded)
     , m_radio(radio)
 {
     setWindowTitle(QStringLiteral("Voice check"));
     setModal(false);
+    if (m_embedded) {
+        // A QDialog dropped into a layout must not be a window, or Qt
+        // floats it. This is the documented way to host one.
+        setWindowFlags(Qt::Widget);
+    }
     m_recorder.setSampleRate(kMicRateHz);
+    // The monitor tap arrives at the mic rate too — TxChannel decimates
+    // the DUC-rate output back to 48 kHz before sip1OutputReady (see
+    // the 2026-08-11 note there).
+    m_procRecorder.setSampleRate(kMicRateHz);
     buildUi();
     // The meter runs from the moment the window opens, not from the
     // moment the operator ticks a box. Whatever else is wrong, "is the
@@ -78,8 +94,10 @@ TxVoiceCheckDialog::~TxVoiceCheckDialog()
         m_radio->txChannel()->setMicTapEnabled(false);
     }
     QObject::disconnect(m_micTap);
+    QObject::disconnect(m_procTap);
     QObject::disconnect(m_levelTap);
     QObject::disconnect(m_monitorTap);
+    stopPlayback();
 
     if (m_restoreMonitor) { setSelfMonitor(m_monitorWasOn); }
 }
@@ -160,6 +178,33 @@ void TxVoiceCheckDialog::buildUi()
         m_progress->setTextVisible(true);
         row->addWidget(m_progress, 1);
         col->addLayout(row);
+
+        // ── Listen back — the AetherSDR way ──────────────────────────
+        //
+        // Every take records both taps at once, so these two are an
+        // A/B of the same words: what the microphone heard, and what
+        // the strip + EQ made of it. Playback is from memory, off the
+        // real-time path entirely — it cannot crackle, which is the
+        // property that makes it fit to judge an EQ change with.
+        auto* playRow = new QHBoxLayout;
+        m_playRawBtn = new QPushButton(
+            QStringLiteral("▶ Play mic (raw)"), this);
+        m_playRawBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_playRawBtn->setToolTip(QStringLiteral(
+            "The last take as the microphone heard it, before any "
+            "processing. Press again to stop."));
+        playRow->addWidget(m_playRawBtn);
+
+        m_playProcBtn = new QPushButton(
+            QStringLiteral("▶ Play after strip && EQ"), this);
+        m_playProcBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_playProcBtn->setToolTip(QStringLiteral(
+            "The same take through the whole transmit chain — strip, "
+            "EQ, compressor, filter. Change a setting, record again, "
+            "compare. Press again to stop."));
+        playRow->addWidget(m_playProcBtn);
+        playRow->addStretch(1);
+        col->addLayout(playRow);
     }
 
     // ── What it found ────────────────────────────────────────────────
@@ -204,10 +249,14 @@ void TxVoiceCheckDialog::buildUi()
         row->addWidget(m_advancedBtn);
         row->addStretch(1);
 
-        auto* closeBtn = new QPushButton(QStringLiteral("Close"), this);
-        closeBtn->setStyleSheet(Style::buttonBaseStyle());
-        row->addWidget(closeBtn);
-        connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
+        // Embedded in the strip's tab bar there is nothing to close —
+        // the host window has its own button.
+        if (!m_embedded) {
+            auto* closeBtn = new QPushButton(QStringLiteral("Close"), this);
+            closeBtn->setStyleSheet(Style::buttonBaseStyle());
+            row->addWidget(closeBtn);
+            connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
+        }
         col->addLayout(row);
     }
 
@@ -272,6 +321,15 @@ void TxVoiceCheckDialog::buildUi()
     connect(m_recordBtn, &QPushButton::clicked, this, [this]() {
         if (m_recorder.isRecording()) { stopRecording(); }
         else                          { startRecording(); }
+    });
+
+    connect(m_playRawBtn, &QPushButton::clicked, this, [this]() {
+        if (m_playSink && !m_playingProcessed) { stopPlayback(); }
+        else { playRecording(/*processed=*/false); }
+    });
+    connect(m_playProcBtn, &QPushButton::clicked, this, [this]() {
+        if (m_playSink && m_playingProcessed) { stopPlayback(); }
+        else { playRecording(/*processed=*/true); }
     });
 
     connect(m_countdown, &QTimer::timeout, this, [this]() {
@@ -494,7 +552,9 @@ void TxVoiceCheckDialog::startRecording()
     TxChannel* tx = m_radio->txChannel();
 
     m_haveResult = false;
+    stopPlayback();
     m_recorder.clear();
+    m_procRecorder.clear();
     m_micBlocksAtStart = m_micBlocks.load(std::memory_order_acquire);
     m_monBlocksAtStart = m_monBlocks.load(std::memory_order_acquire);
     m_peakSeenDb = -60.0;
@@ -508,6 +568,15 @@ void TxVoiceCheckDialog::startRecording()
         m_recorder.feed(samples, frames);
     }, Qt::DirectConnection);
 
+    // Same take, other end of the chain: the post-strip/EQ monitor
+    // signal, for the play-back A/B. The off-air switch below is what
+    // makes sip1OutputReady fire without keying.
+    QObject::disconnect(m_procTap);
+    m_procTap = connect(tx, &TxChannel::sip1OutputReady, &m_procRecorder,
+                        [this](const float* samples, int frames) {
+        m_procRecorder.feed(samples, frames);
+    }, Qt::DirectConnection);
+
     // The chain has to be running for mic blocks to arrive at all. This
     // is the same off-air switch as the listen box and just as unable to
     // transmit; the difference is only that the operator may not want to
@@ -515,6 +584,7 @@ void TxVoiceCheckDialog::startRecording()
     tx->setOffAirMonitor(true);
     tx->setMicTapEnabled(true);
     m_recorder.start();
+    m_procRecorder.start();
 
     m_secondsLeft = kRecordSeconds;
     m_progress->setValue(0);
@@ -531,6 +601,7 @@ void TxVoiceCheckDialog::stopRecording()
     if (!m_recorder.isRecording() && !m_countdown->isActive()) { return; }
     m_countdown->stop();
     m_recorder.stop();
+    m_procRecorder.stop();
 
     if (m_radio && m_radio->txChannel()) {
         TxChannel* tx = m_radio->txChannel();
@@ -539,10 +610,86 @@ void TxVoiceCheckDialog::stopRecording()
         if (!m_listenBox->isChecked()) { tx->setOffAirMonitor(false); }
     }
     QObject::disconnect(m_micTap);
+    QObject::disconnect(m_procTap);
 
     m_progress->setValue(kRecordSeconds);
     runAnalysis();
     refreshButtons();
+}
+
+// ── Playback ─────────────────────────────────────────────────────────
+//
+// The AetherSDR shape (ClientPuduMonitor @3a1f59e): a memory buffer
+// through a QAudioSink on the UI thread. Nothing here touches the
+// real-time path, which is the whole point — a recording judged
+// through a crackling live monitor is a recording judged wrong.
+
+void TxVoiceCheckDialog::playRecording(bool processed)
+{
+    stopPlayback();
+
+    const TxAudioRecorder& rec = processed ? m_procRecorder : m_recorder;
+    if (!rec.hasRecording() || rec.isRecording()) { return; }
+    const float* src = rec.samples();
+    if (src == nullptr) { return; }
+    const int frames = rec.recordedFrames();
+
+    // Mono float → mono int16, once, into a member the QBuffer wraps
+    // without copying.
+    m_playPcm.resize(frames * int(sizeof(qint16)));
+    auto* dst = reinterpret_cast<qint16*>(m_playPcm.data());
+    for (int i = 0; i < frames; ++i) {
+        const float v = std::clamp(src[i], -1.0f, 1.0f);
+        dst[i] = static_cast<qint16>(std::lround(v * 32767.0f));
+    }
+
+    QAudioFormat fmt;
+    fmt.setSampleRate(rec.sampleRate());
+    fmt.setChannelCount(1);
+    fmt.setSampleFormat(QAudioFormat::Int16);
+
+    const QAudioDevice dev = QMediaDevices::defaultAudioOutput();
+    if (!dev.isFormatSupported(fmt)) {
+        m_findings->setText(QStringLiteral(
+            "The output device refused 48 kHz mono — playback is not "
+            "possible on it. The recording itself is fine and can be "
+            "saved from Advanced."));
+        return;
+    }
+
+    m_playBuf = new QBuffer(&m_playPcm, this);
+    m_playBuf->open(QIODevice::ReadOnly);
+    m_playSink = new QAudioSink(dev, fmt, this);
+    m_playingProcessed = processed;
+    connect(m_playSink, &QAudioSink::stateChanged, this,
+            [this](QAudio::State s) {
+        if (s == QAudio::IdleState || s == QAudio::StoppedState) {
+            stopPlayback();
+        }
+    });
+    m_playSink->start(m_playBuf);
+    refreshButtons();
+}
+
+void TxVoiceCheckDialog::stopPlayback()
+{
+    if (m_playSink) {
+        // Null the member BEFORE stop(): stop() re-emits stateChanged
+        // synchronously, and the handler calls back in here.
+        QAudioSink* sink = m_playSink;
+        m_playSink = nullptr;
+        sink->disconnect(this);
+        sink->stop();
+        sink->deleteLater();
+    }
+    if (m_playBuf) {
+        m_playBuf->close();
+        m_playBuf->deleteLater();
+        m_playBuf = nullptr;
+    }
+    // Buttons exist for every call after buildUi(); the destructor path
+    // may arrive here with the UI already half-gone.
+    if (m_playRawBtn && m_playProcBtn) { refreshButtons(); }
 }
 
 // ── Analysis ─────────────────────────────────────────────────────────
@@ -777,6 +924,21 @@ void TxVoiceCheckDialog::refreshButtons()
     if (m_stripBtn) { m_stripBtn->setEnabled(m_haveResult && !recording); }
     if (m_saveBtn) { m_saveBtn->setEnabled(m_recorder.hasRecording()); }
     m_listenBox->setEnabled(!recording);
+
+    const bool playing = (m_playSink != nullptr);
+    if (m_playRawBtn) {
+        m_playRawBtn->setEnabled(!recording && m_recorder.hasRecording());
+        m_playRawBtn->setText(playing && !m_playingProcessed
+            ? QStringLiteral("■ Stop")
+            : QStringLiteral("▶ Play mic (raw)"));
+    }
+    if (m_playProcBtn) {
+        m_playProcBtn->setEnabled(!recording
+                                  && m_procRecorder.hasRecording());
+        m_playProcBtn->setText(playing && m_playingProcessed
+            ? QStringLiteral("■ Stop")
+            : QStringLiteral("▶ Play after strip && EQ"));
+    }
 }
 
 } // namespace NereusSDR

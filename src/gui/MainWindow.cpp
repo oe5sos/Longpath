@@ -257,7 +257,6 @@ warren@wpratt.com
 #include "models/SliceModel.h"
 #include "widgets/VfoWidget.h"
 #include "applets/StripWindow.h"
-#include "applets/TxVoiceCheckDialog.h"
 #include "widgets/RotorLogbookPanel.h"
 #include "core/Maidenhead.h"
 #include "core/CredentialStore.h"
@@ -9490,16 +9489,12 @@ void MainWindow::openAntennaWindow()
 void MainWindow::openVoiceCheck()
 {
     if (!m_radioModel) { return; }
-    // Modeless and remembered: the whole point is to change a setting,
-    // listen, and measure again, which is impossible through a window
-    // that has to be dismissed to reach the equaliser.
-    if (!m_voiceCheckDialog) {
-        m_voiceCheckDialog = new TxVoiceCheckDialog(m_radioModel, this);
-        m_voiceCheckDialog->setAttribute(Qt::WA_DeleteOnClose, false);
-    }
-    m_voiceCheckDialog->show();
-    m_voiceCheckDialog->raise();
-    m_voiceCheckDialog->activateWindow();
+    // 2026-08-11: the voice check lives inside the channel strip window
+    // now — asked for at the bench, so the change-record-listen loop is
+    // one window instead of two. The menu entry stays and simply lands
+    // on the right tab.
+    openChannelStrip();
+    if (m_stripWindow) { m_stripWindow->showVoiceCheckTab(); }
 }
 
 void MainWindow::openChannelStrip()

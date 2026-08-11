@@ -69,12 +69,17 @@ namespace NereusSDR {
 class EqHost;
 class RadioModel;
 class StripEqPanel;
+class TxVoiceCheckDialog;
 
 class StripWindow : public QDialog {
     Q_OBJECT
 public:
     explicit StripWindow(RadioModel* radio, QWidget* parent = nullptr);
     ~StripWindow() override;
+
+    // Land on the embedded voice-check tab (menu entry + MainWindow
+    // route here since 2026-08-11 — the standalone dialog is gone).
+    void showVoiceCheckTab();
 
 private:
     void buildUi();
@@ -222,6 +227,11 @@ private:
     std::unique_ptr<EqHost> m_eqHost;
     StripEqPanel*           m_eqPanel{nullptr};
     class TxSpectrumWidget* m_txSpectrum{nullptr};
+
+    // The embedded voice check. Created ONCE in buildUi and owned by
+    // this window, not by the tab bar: reloadControls() deletes every
+    // stage page on a preset apply, and a recording must survive that.
+    TxVoiceCheckDialog* m_voiceCheck{nullptr};
 
     QPointer<RadioModel> m_radio;
 

@@ -116,7 +116,6 @@ class PsForm;
 // Phase 3J-2 H1: Tools menu modeless singletons.
 class SpotHubDialog;
 class AntennaWindow;
-class TxVoiceCheckDialog;
 class StripWindow;
 class FreeDVReporterDialog;
 
@@ -736,7 +735,8 @@ private:
     // preserves geometry / table state). Both members are accessed by
     // the H1 test seam below.
     QPointer<SpotHubDialog>        m_spotHubDialog;
-    QPointer<TxVoiceCheckDialog>   m_voiceCheckDialog;
+    // m_voiceCheckDialog is gone (2026-08-11): the voice check is an
+    // embedded tab of StripWindow now; openVoiceCheck() routes there.
     QPointer<StripWindow>          m_stripWindow;
     QPointer<FreeDVReporterDialog> m_freeDVReporterDialog;
 

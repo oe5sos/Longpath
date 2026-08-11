@@ -35,10 +35,29 @@
 // flattened the spectrum being measured, and the 2.7 kHz transmit
 // filter would have removed the bands the sibilance check needs.
 //
+// ── Record, then listen (2026-08-11) ─────────────────────────────────
+//
+// The ANALYSIS wants the raw microphone; the OPERATOR wants to hear
+// the processed result. Judging an EQ change through the live monitor
+// means judging it in real time against the memory of how it sounded a
+// knob ago, which nobody can do — AetherSDR answers this with its PUDU
+// monitor (src/core/ClientPuduMonitor.{h,cpp} @3a1f59e, GPLv3, same
+// licence): capture the post-DSP output, play it back on demand. Same
+// shape here, none of its code: every take records BOTH taps at once —
+// the raw mic for the analysis, the post-strip/EQ monitor signal for
+// the operator's ears — and two play buttons A/B them afterwards.
+// Playback is a plain QAudioSink from a memory buffer on the UI
+// thread, which is why it cannot crackle: nothing real-time is
+// involved.
+//
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-08-11 — Second recorder on the post-strip monitor tap +
+//                 raw/processed playback (AetherSDR PUDU-monitor shape,
+//                 no code reused). By Martin Fischer, AI-assisted via
+//                 Anthropic Claude (Cowork).
 // =================================================================
 
 #include "core/TxAudioRecorder.h"
@@ -50,6 +69,8 @@
 
 #include <atomic>
 
+class QAudioSink;
+class QBuffer;
 class QCheckBox;
 class QLabel;
 class QProgressBar;
@@ -66,7 +87,13 @@ class RadioModel;
 class TxVoiceCheckDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit TxVoiceCheckDialog(RadioModel* radio, QWidget* parent = nullptr);
+    // embedded=true turns the dialog into a plain widget for hosting
+    // inside the channel strip's tab bar (2026-08-11, asked for at the
+    // bench: one window for the change-record-listen loop). Same code,
+    // two homes; embedded drops the Close button, the host closes.
+    explicit TxVoiceCheckDialog(RadioModel* radio,
+                                QWidget* parent = nullptr,
+                                bool embedded = false);
     ~TxVoiceCheckDialog() override;
 
     // How long to speak for. Long enough that the long-term average is
@@ -86,6 +113,12 @@ private:
     void setSelfMonitor(bool on);
     void startRecording();
     void stopRecording();
+    // Playback of the last take, from memory through a QAudioSink.
+    // processed=false plays the raw microphone, true plays the
+    // post-strip/EQ monitor signal. Pressing the active button again
+    // stops. See the header note for why this exists.
+    void playRecording(bool processed);
+    void stopPlayback();
     void runAnalysis();
     void applySuggestion();       // WDSP's own equaliser
     void applyToStrip();          // the channel strip, whole chain
@@ -138,6 +171,10 @@ private:
     unsigned m_micBlocksAtStart{0};
     unsigned m_monBlocksAtStart{0};
 
+    // Hosted inside the strip window's tab bar rather than standing
+    // alone. Only buildUi() reads it (no Close button when embedded).
+    bool m_embedded{false};
+
     // QPointer, not a raw pointer: this window outlives nothing,
     // but the destructor restores the monitor through the radio
     // model, and teardown order between two children of the main
@@ -145,8 +182,21 @@ private:
     QPointer<RadioModel> m_radio;
 
     TxAudioRecorder m_recorder;
+    // The same take through the whole strip + EQ + modulator, recorded
+    // simultaneously from the monitor tap (sip1OutputReady, 48 kHz
+    // mono). The analysis never reads this one; only the play button
+    // does.
+    TxAudioRecorder m_procRecorder;
+    QMetaObject::Connection m_procTap;
     VoiceAnalysis   m_result;
     bool            m_haveResult{false};
+
+    // Playback state. The sink is rebuilt per play — a QAudioSink is
+    // cheap and rebuilding sidesteps every stale-device question.
+    QAudioSink* m_playSink{nullptr};
+    QBuffer*    m_playBuf{nullptr};
+    QByteArray  m_playPcm;
+    bool        m_playingProcessed{false};
 
     // Restored on the way out. An operator who opens this window, turns
     // the monitor on to listen, and closes it again should not be left
@@ -161,6 +211,8 @@ private:
     QProgressBar* m_levelBar{nullptr};
     QSlider*      m_volume{nullptr};
     QPushButton*  m_recordBtn{nullptr};
+    QPushButton*  m_playRawBtn{nullptr};
+    QPushButton*  m_playProcBtn{nullptr};
     QProgressBar* m_progress{nullptr};
     QTimer*       m_countdown{nullptr};
     int           m_secondsLeft{0};

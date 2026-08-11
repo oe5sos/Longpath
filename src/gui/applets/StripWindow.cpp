@@ -18,6 +18,7 @@
 #include "core/AppSettings.h"
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
+#include "gui/applets/TxVoiceCheckDialog.h"
 #include "core/strip/StripCharacters.h"
 #include "core/AudioEngine.h"
 #include "gui/widgets/TxSpectrumWidget.h"
@@ -412,6 +413,15 @@ void StripWindow::buildUi()
 
     // After all the stages, because it measures the result of them.
     m_tabs->addTab(buildTxSpectrumPanel(), QStringLiteral("On air"));
+
+    // ── Voice check, embedded (2026-08-11) ───────────────────────────
+    // Asked for at the bench: one window for the whole loop — change a
+    // stage, record, listen, compare. The dialog already knows how;
+    // embedding it here retires the standalone window. Created once and
+    // parented to the window (see the member note), then handed to the
+    // tab bar.
+    m_voiceCheck = new TxVoiceCheckDialog(m_radio, this, /*embedded=*/true);
+    m_tabs->addTab(m_voiceCheck, QStringLiteral("Voice check"));
 
     col->addWidget(m_tabs, 1);
 
@@ -1313,6 +1323,16 @@ void StripWindow::reloadControls()
 {
     if (!m_tabs) { return; }
     const int keep = m_tabs->currentIndex();
+    // The voice check is not a stage panel and may hold a recording the
+    // operator is comparing against — pull it out before the loop
+    // deletes pages, put it back at the end. Parent goes back to the
+    // window so the widget is owned even while off the tab bar.
+    if (m_voiceCheck) {
+        const int vcIdx = m_tabs->indexOf(m_voiceCheck);
+        if (vcIdx >= 0) { m_tabs->removeTab(vcIdx); }
+        m_voiceCheck->setParent(this);
+        m_voiceCheck->hide();
+    }
     while (m_tabs->count() > 0) {
         QWidget* w = m_tabs->widget(0);
         m_tabs->removeTab(0);
@@ -1358,6 +1378,10 @@ void StripWindow::reloadControls()
         m_tabs->addTab(page, QString::fromLatin1(StripChain::stageName(s)));
     }
     m_tabs->addTab(buildTxSpectrumPanel(), QStringLiteral("On air"));
+    // Back where buildUi() put it, same instance, recording intact.
+    if (m_voiceCheck) {
+        m_tabs->addTab(m_voiceCheck, QStringLiteral("Voice check"));
+    }
     if (StripChain* c = chain()) {
         for (int i = 0; i < StripChain::kStageCount; ++i) {
             QCheckBox* box = m_stageBoxes[static_cast<size_t>(i)];
@@ -1367,6 +1391,13 @@ void StripWindow::reloadControls()
         }
     }
     if (keep >= 0 && keep < m_tabs->count()) { m_tabs->setCurrentIndex(keep); }
+}
+
+void StripWindow::showVoiceCheckTab()
+{
+    if (m_tabs && m_voiceCheck) {
+        m_tabs->setCurrentWidget(m_voiceCheck);
+    }
 }
 
 
