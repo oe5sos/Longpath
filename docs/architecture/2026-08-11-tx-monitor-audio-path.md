@@ -116,6 +116,29 @@ is a coarse check.
   pump — the one seam that would put clicks in the TX audio itself.
   A clean bench log means the mic seam is healthy.
 
+## Postscript (same day, evening): the sixth defect was upstream of all five
+
+The scratch survived every fix above because its deepest source was
+none of them: **the radio's mic-frame stream loses 3-15% of its blocks
+on this bench** (pump-cadence diagnostic: 3190-3639 dispatch ticks per
+5 s where 3755 belong). A sample that never arrived cannot be buffered
+back into existence, so everything paced by the radio — the live
+monitor, the sip1 takes, the worker-tap takes — stuttered no matter
+what sat downstream.
+
+The resolution is AetherSDR's actual architecture, ported whole at the
+bench's request: `ClientPuduMonitor` (record-then-listen, auto-play,
+RX muted across the cycle) fed by a **device-paced** capture — a
+QAudioSource on the PC input, gapless by construction — with the
+channel strip run OFFLINE over the finished take on a private
+StripChain. The radio paces nothing in the loop; there is no live
+self-monitoring anywhere any more. Bench-confirmed clean.
+
+Standing consequence to investigate: the same mic-frame loss feeds the
+REAL transmit path. On-air SSB voice from this bench inherits those
+gaps. Needs a network-level look (WLAN vs. wired, packet captures)
+before the next TX-quality pass.
+
 ## Open items
 
 - "QLayout: Cannot add a null widget" fires once when some window
