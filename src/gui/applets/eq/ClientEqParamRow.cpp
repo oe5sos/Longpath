@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/ClientEqParamRow.h"
+#include "gui/applets/eq/EqPalette.h"
 #include "gui/applets/eq/ClientEqCurveWidget.h"
 
 #include <QDoubleValidator>
@@ -322,7 +323,7 @@ private:
     void applyStyle()
     {
         QColor accent = ClientEqCurveWidget::bandColor(m_bandIdx);
-        QColor qCol("#7f93a5");
+        QColor qCol(EqPalette::textDim().name());
         if (!m_bandEnabled) {
             accent.setAlphaF(0.35f);
             qCol.setAlphaF(0.35f);

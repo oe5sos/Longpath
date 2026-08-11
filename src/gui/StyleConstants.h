@@ -77,6 +77,30 @@ constexpr auto kRedText         = "#ffffff";
 constexpr auto kRedBorder       = "#ff4444";
 
 // Gauge Fill Zones
+// ── Telling one equaliser band from another ──────────────────────────
+//
+// Eight hues so that overlapping bands on one curve can be told apart.
+// This is not decoration: with eight filters on top of each other, hue
+// is the only thing that says which handle belongs to which curve.
+//
+// Grey at both ends on purpose — those slots hold the high-pass and
+// low-pass slopes, which are shapes rather than bumps and should not
+// compete for attention with the shaping bands in the middle.
+//
+// Four of the eight are NereusSDR's existing accents. Three are new
+// (2026-08-11): the palette needs six distinguishable hues between the
+// greys and NereusSDR only had four, so a coral, a blue and a violet
+// were added, spaced to stay apart on #0a0a18 and chosen to sit with
+// the accents rather than beside them.
+constexpr auto kEqBand0 = "#8090a0";   // grey — kTextSecondary, HP slot
+constexpr auto kEqBand1 = "#ff8850";   // coral, new
+constexpr auto kEqBand2 = "#ffb800";   // amber — kAmberText
+constexpr auto kEqBand3 = "#00ff88";   // green — kGreenText
+constexpr auto kEqBand4 = "#00b4d8";   // teal  — kAccent
+constexpr auto kEqBand5 = "#4a80ff";   // blue, new
+constexpr auto kEqBand6 = "#a070e0";   // violet, new
+constexpr auto kEqBand7 = "#8090a0";   // grey — kTextSecondary, LP slot
+
 constexpr auto kGaugeNormal     = "#00b4d8";
 constexpr auto kGaugeWarning    = "#ddbb00";
 constexpr auto kGaugeDanger     = "#ff4444";

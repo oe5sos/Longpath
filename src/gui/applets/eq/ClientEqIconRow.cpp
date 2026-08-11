@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/ClientEqIconRow.h"
+#include "gui/applets/eq/EqPalette.h"
 #include "gui/applets/eq/ClientEqCurveWidget.h"
 #include "gui/applets/eq/EqHost.h"
 
@@ -67,9 +68,9 @@ protected:
         const QRect r = rect();
 
         // Background — darker pill, brightened when selected.
-        QColor bg = m_selected ? QColor("#1a2e42") : QColor("#0e1b28");
+        QColor bg = m_selected ? QColor(EqPalette::buttonBg().name()) : QColor(EqPalette::insetBg().name());
         p.setPen(QPen(m_selected ? ClientEqCurveWidget::bandColor(m_bandIdx)
-                                 : QColor("#243a4e"), 1.0));
+                                 : QColor(EqPalette::buttonHi().name()), 1.0));
         p.setBrush(bg);
         p.drawRoundedRect(r.adjusted(1, 1, -1, -1), 4.0, 4.0);
 

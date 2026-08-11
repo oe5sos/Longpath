@@ -27,6 +27,7 @@
 #include "gui/applets/eq/ClientEqCurveWidget.h"
 #include "core/strip/ClientEq.h"
 #include "gui/StyleConstants.h"
+#include "gui/applets/eq/EqPalette.h"
 
 #include <QPainter>
 #include <QPaintEvent>
@@ -87,29 +88,22 @@ QString freqLabel(float hz)
 // are now written as those tokens rather than as literals, so they
 // follow NereusSDR if it ever repaints.
 //
-// Two have no NereusSDR token — #506070 for a scale label and #08121d
-// for a handle outline — and are left as literals rather than snapped
-// to a near neighbour, because a colour chosen to sit between two
-// others stops working when moved to one of them.
+// Two were left as literals in that pass — #506070 for a scale label
+// and #08121d for a handle outline — on the reasoning that a colour
+// chosen to sit between two others stops working when snapped to one of
+// them. Sound reasoning, and it did not survive the instruction that
+// everything is to look like NereusSDR. They are kTextScale and
+// kPanelBg now; the difference is a few percent of luminance.
 //
-// The band palette below IS new, and is the one thing here that will
-// look foreign. It is not decoration: it is how one band is told from
-// another when eight of them overlap, and NereusSDR has no equivalent.
-// Easy to remove if it is unwanted — it is one table.
-//
-// Logic-Pro-style palette across the audio spectrum. Gray at the extremes
-// reserves those slots visually for HP / LP slopes; the middle rainbow is
-// for peaks and shelves. Interpolated beyond 8 slots (up to kMaxBands=16).
-const std::array<QColor, 8> kPalette = {
-    QColor("#9aa4ad"),  // gray
-    QColor("#e8a35a"),  // amber
-    QColor("#e8d65a"),  // yellow
-    QColor("#66d19e"),  // green
-    QColor("#66c8d1"),  // teal
-    QColor("#6b92d6"),  // blue
-    QColor("#a888d6"),  // purple
-    QColor("#9aa4ad"),  // gray
-};
+// Everything else here — the band palette, the analyser gradient, the
+// peak line, the mode strip — now comes from EqPalette, which is one
+// table mapping AetherSDR's colours onto NereusSDR's. See that header
+// for why the mapping lives in one place rather than in five borrowed
+// files. (2026-08-11)
+// NereusSDR's, from EqPalette. AetherSDR's eight were a Logic-Pro
+// rainbow; these are NereusSDR's four accents plus a coral, a blue and
+// a violet added for the purpose, spaced to stay apart on #0a0a18.
+const std::array<QColor, 8>& kPalette = EqPalette::bands();
 
 } // namespace
 
@@ -490,7 +484,7 @@ void ClientEqCurveWidget::drawBackground(QPainter& p, const QRect& r) const
     // passed to the radio.  Drawn behind the EQ curves and analyzer.
     // Cutoffs of 0 mean "not set / RX path" — skip drawing.
     if (m_filterLowCutHz > 0 || m_filterHighCutHz > 0) {
-        QPen pen(QColor(220, 200, 80, 110));
+        QPen pen([]{ QColor c = EqPalette::warnDim(); c.setAlpha(110); return c; }());
         pen.setWidth(1);
         pen.setStyle(Qt::DashLine);
         p.setPen(pen);
@@ -509,7 +503,7 @@ void ClientEqCurveWidget::drawBackground(QPainter& p, const QRect& r) const
         QFont f = p.font();
         f.setPointSizeF(7.0);
         p.setFont(f);
-        p.setPen(QColor("#506070"));
+        p.setPen(EqPalette::textScale());
         const int fh = p.fontMetrics().height();
         for (float hz : kGridFreqs) {
             const QString lbl = freqLabel(hz);
@@ -537,7 +531,7 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
             if (i == 0) refPath.moveTo(x, y);
             else        refPath.lineTo(x, y);
         }
-        QPen refPen(QColor(220, 180, 60, 220));
+        QPen refPen([]{ QColor c = EqPalette::warn(); c.setAlpha(220); return c; }());
         refPen.setWidth(2);
         refPen.setJoinStyle(Qt::RoundJoin);
         refPen.setCapStyle(Qt::RoundCap);
@@ -650,7 +644,7 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
     // Summed curve — bolder stroke in slightly saturated cyan when enabled,
     // dimmed when bypassed.
     {
-        QColor c = eqOn ? QColor(QString::fromLatin1(Style::kAccent)) : QColor("#506070");
+        QColor c = eqOn ? QColor(QString::fromLatin1(Style::kAccent)) : EqPalette::textScale();
         QPen pen(c);
         pen.setWidthF(1.6);
         pen.setCapStyle(Qt::RoundCap);
@@ -688,7 +682,7 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
             p.drawEllipse(center, 8.0, 8.0);
         }
         p.setBrush(c);
-        p.setPen(QPen(QColor("#08121d"), 1.5));
+        p.setPen(QPen(EqPalette::panelBg(), 1.5));
         p.drawEllipse(center, 4.0, 4.0);
     }
 
@@ -705,10 +699,10 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
             const char* label;
         };
         static const Seg segs[] = {
-            {   20.0f,    99.0f, QColor(0x30, 0x60, 0xff), 0.40f, "E-SSB"   },
-            {  100.0f,  3000.0f, QColor(0xff, 0x80, 0x00), 0.40f, "SSB"     },
-            { 3000.0f,  6000.0f, QColor(0x30, 0x60, 0xff), 0.40f, "E-SSB"   },
-            { 6000.0f, 20000.0f, QColor(0xc0, 0x30, 0x30), 0.40f, "AM / FM" },
+            {   20.0f,    99.0f, EqPalette::modeEssb(), 0.40f, "E-SSB"   },
+            {  100.0f,  3000.0f, EqPalette::modeSsb(),  0.40f, "SSB"     },
+            { 3000.0f,  6000.0f, EqPalette::modeEssb(), 0.40f, "E-SSB"   },
+            { 6000.0f, 20000.0f, EqPalette::modeWide(), 0.40f, "AM / FM" },
         };
         const QColor bg(0x0a, 0x0a, 0x14);
         const int stripY = r.height() - kAudioBandStripH;
@@ -730,7 +724,8 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
                 static_cast<int>(seg.color.blue()  * seg.blend + bg.blue()  * (1.0f - seg.blend)),
                 255);
             p.fillRect(x1, stripY, x2 - x1, kAudioBandStripH, fill);
-            p.setPen(QColor(0x0f, 0x0f, 0x1a, 200));
+            p.setPen(QColor(EqPalette::pageBg().red(), EqPalette::pageBg().green(),
+                        EqPalette::pageBg().blue(), 200));
             p.drawLine(x1, stripY, x1, stripY + kAudioBandStripH);
             if (x2 - x1 > 24) {
                 p.setPen(Qt::white);
@@ -819,9 +814,9 @@ void ClientEqCurveWidget::paintEvent(QPaintEvent* /*ev*/)
         }
         fftPath.closeSubpath();
         QLinearGradient grad(0, 0, 0, h);
-        grad.setColorAt(0.0, QColor(88, 200, 232, 140));
-        grad.setColorAt(0.6, QColor(30, 110, 170, 70));
-        grad.setColorAt(1.0, QColor(12, 40, 70, 0));
+        grad.setColorAt(0.0, EqPalette::analyserTop());
+        grad.setColorAt(0.6, EqPalette::analyserMid());
+        grad.setColorAt(1.0, EqPalette::analyserBottom());
         p.setPen(Qt::NoPen);
         p.setBrush(grad);
         p.drawPath(fftPath);
@@ -847,7 +842,7 @@ void ClientEqCurveWidget::paintEvent(QPaintEvent* /*ev*/)
                     peakPath.lineTo(x, y);
                 }
             }
-            QPen peakPen(QColor(220, 222, 230, 210), 1.4);
+            QPen peakPen(EqPalette::analyserPeak(), 1.4);
             peakPen.setJoinStyle(Qt::RoundJoin);
             peakPen.setCapStyle(Qt::RoundCap);
             p.setPen(peakPen);

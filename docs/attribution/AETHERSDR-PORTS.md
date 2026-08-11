@@ -122,7 +122,7 @@ upstream, so this reunites the DSP with the interface written for it.
 
 | NereusSDR file | AetherSDR source | Rev | Ported | Notes |
 |---|---|---|---|---|
-| `src/gui/applets/eq/ClientEqCurveWidget.h`, `.cpp` | `src/gui/ClientEqCurveWidget.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change; includes rebased. Seven colour literals bound to NereusSDR style tokens — see below. Behaviour unchanged. |
+| `src/gui/applets/eq/ClientEqCurveWidget.h`, `.cpp` | `src/gui/ClientEqCurveWidget.{h,cpp}` | `31b29583` | 2026-08-09, repainted 2026-08-11 | Namespace change; includes rebased. **All** colours now come from EqPalette.h — see below. Behaviour unchanged. |
 | `src/gui/applets/eq/ClientEqFftAnalyzer.h`, `.cpp` | `src/gui/ClientEqFftAnalyzer.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change only. Takes `update(samples, count)`, so NereusSDR's `MicSpectrum` can feed it unchanged. |
 | `src/gui/applets/eq/ClientEqEditorCanvas.h`, `.cpp` | `src/gui/ClientEqEditorCanvas.{h,cpp}` | `31b29583` | 2026-08-09 | Namespace change; includes rebased. |
 | `src/gui/applets/eq/ClientEqParamRow.h`, `.cpp` | `src/gui/ClientEqParamRow.{h,cpp}` | `31b29583` | 2026-08-09 | As above. |
@@ -148,12 +148,34 @@ left as literals: substituting there means `.arg()` formatting through a
 verbatim port, which is churn for no visual difference, since the values
 already agree.
 
-Five have no NereusSDR equivalent — #506070, #08121d, #7f93a5, #243a4e,
-#1a2e42, #0e1b28 — and are left alone rather than snapped to a near
-neighbour. A colour chosen to sit between two others stops working when
-moved to one of them.
+**Superseded 2026-08-11 — every colour is now NereusSDR's.**
 
-**One new colour set, and it is functional.** `kPalette` in
-ClientEqCurveWidget is eight hues that tell one band from another when
-several overlap. NereusSDR has no equivalent because it never had
-per-band colouring. It is one table and trivially removable if unwanted.
+The paragraph above used to say that six literals had no NereusSDR
+equivalent and were left alone, on the reasoning that a colour chosen to
+sit between two others stops working when snapped to one of them. Sound
+reasoning; it did not survive the instruction that the equaliser is to
+look like the rest of the program and nothing else.
+
+Every colour in `src/gui/applets/eq/` now comes from
+`src/gui/applets/eq/EqPalette.h`, which is **one table** mapping
+AetherSDR's palette onto NereusSDR style tokens. The borrowed files
+reference names from that table; none of them contains a hex literal.
+
+That is deliberate and it is the same device as EqHost: a re-sync
+against upstream re-applies one substitution rather than reconstructing
+a hundred separate decisions. The port is no longer byte-identical to
+`31b29583`, but the difference is mechanical and reviewable in a single
+header.
+
+**Three new colours.** The eight-hue band palette is functional — it is
+how one band is told from another when several overlap, and it could not
+be dropped. NereusSDR had four accents to spend on it, so a coral, a
+blue and a violet were added to `StyleConstants.h` as
+`kEqBand0`..`kEqBand7`, spaced to stay apart on #0a0a18.
+
+**One behavioural change, and it is not AetherSDR's.** The default band
+layout is NereusSDR's own — see `src/core/strip/EqBandLayout.h`.
+`ClientEq::defaultBand()` is untouched; the panel and the presets call
+the NereusSDR table instead, which adds seven spare shaping handles at
+unity gain and switched off. AetherSDR's DSP is unaffected and the three
+presets sound exactly as they did.

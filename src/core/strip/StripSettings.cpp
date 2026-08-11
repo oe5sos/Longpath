@@ -12,6 +12,7 @@
 // =================================================================
 
 #include "core/strip/StripSettings.h"
+#include "core/strip/EqBandLayout.h"
 
 #include "core/AppSettings.h"
 #include "core/strip/StripChain.h"
@@ -337,7 +338,14 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         band(4, ClientEq::FilterType::LowShelf,   200.0f,  0.0f, 0.707f, true, 12);
         band(5, ClientEq::FilterType::Peak,      2000.0f,  1.5f, 1.0f,   true, 12);
         band(6, ClientEq::FilterType::HighShelf, 3000.0f,  0.0f, 0.707f, true, 12);
-        c.eq().setActiveBandCount(7);
+        // Seven shaped bands, then seven spare handles at unity and
+        // switched off. The presets are tuned and must sound exactly as
+        // they did before the handles arrived — see EqBandLayout.h.
+        for (int i = EqBandLayout::kFirstSpare;
+             i < EqBandLayout::kBandCount; ++i) {
+            c.eq().setBand(i, EqBandLayout::spare(i - EqBandLayout::kFirstSpare));
+        }
+        c.eq().setActiveBandCount(EqBandLayout::kBandCount);
         c.comp().setThresholdDb(-18.0f);
         c.comp().setRatio(2.5f);
         c.comp().setAttackMs(8.0f);
@@ -361,7 +369,14 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         band(4, ClientEq::FilterType::LowShelf,   200.0f, -3.0f, 0.707f, true, 12);
         band(5, ClientEq::FilterType::Peak,      2200.0f,  5.0f, 1.2f,   true, 12);
         band(6, ClientEq::FilterType::HighShelf, 3000.0f, -3.0f, 0.707f, true, 12);
-        c.eq().setActiveBandCount(7);
+        // Seven shaped bands, then seven spare handles at unity and
+        // switched off. The presets are tuned and must sound exactly as
+        // they did before the handles arrived — see EqBandLayout.h.
+        for (int i = EqBandLayout::kFirstSpare;
+             i < EqBandLayout::kBandCount; ++i) {
+            c.eq().setBand(i, EqBandLayout::spare(i - EqBandLayout::kFirstSpare));
+        }
+        c.eq().setActiveBandCount(EqBandLayout::kBandCount);
         c.gate().setThresholdDb(-38.0f);
         c.gate().setFloorDb(-18.0f);
         c.gate().setHoldMs(30.0f);
@@ -398,7 +413,14 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         band(4, ClientEq::FilterType::LowShelf,   200.0f,  2.0f, 0.707f, true, 12);
         band(5, ClientEq::FilterType::Peak,      2000.0f,  1.0f, 0.8f,   true, 12);
         band(6, ClientEq::FilterType::HighShelf, 3000.0f,  1.0f, 0.707f, true, 12);
-        c.eq().setActiveBandCount(7);
+        // Seven shaped bands, then seven spare handles at unity and
+        // switched off. The presets are tuned and must sound exactly as
+        // they did before the handles arrived — see EqBandLayout.h.
+        for (int i = EqBandLayout::kFirstSpare;
+             i < EqBandLayout::kBandCount; ++i) {
+            c.eq().setBand(i, EqBandLayout::spare(i - EqBandLayout::kFirstSpare));
+        }
+        c.eq().setActiveBandCount(EqBandLayout::kBandCount);
         c.gate().setMode(ClientGate::Mode::Expander);
         c.gate().setThresholdDb(-45.0f);
         c.gate().setReleaseMs(250.0f);

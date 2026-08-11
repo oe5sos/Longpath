@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/ClientEqOutputFader.h"
+#include "gui/applets/eq/EqPalette.h"
 #include "gui/StyleConstants.h"
 
 #include <QEvent>
@@ -60,7 +61,7 @@ void applyThemed(QWidget* w, QString sheet)
     sheet.replace(QStringLiteral("{{color.background.1}}"),
                   QString::fromLatin1(NereusSDR::Style::kButtonBg));
     sheet.replace(QStringLiteral("{{color.background.3}}"),
-                  QStringLiteral("#506070"));
+                  NereusSDR::EqPalette::textScale().name());
     w->setStyleSheet(sheet);
 }
 
@@ -258,7 +259,7 @@ void ClientEqOutputFader::paintEvent(QPaintEvent*)
     const QRect barR(barLeft, stripTop, kBarW, m_stripH);
 
     // Background for the bar — dark inset.
-    p.fillRect(barR, QColor("#06111c"));
+    p.fillRect(barR, QColor(EqPalette::panelBg().name()));
 
     // Level fill — gradient bottom green → top red, clipped to the level
     // height derived from the smoothed peak.
@@ -270,16 +271,16 @@ void ClientEqOutputFader::paintEvent(QPaintEvent*)
         const QRect fill(barR.x(), barR.y() + m_stripH - fillH,
                          kBarW, fillH);
         QLinearGradient grad(0, barR.y() + m_stripH, 0, barR.y());
-        grad.setColorAt(0.0, QColor("#2f9e6a"));   // green bottom
-        grad.setColorAt(0.55, QColor("#6cc56a"));  // lime
-        grad.setColorAt(0.80, QColor("#e8b94c"));  // amber
-        grad.setColorAt(0.95, QColor("#e8553c"));  // red top
-        grad.setColorAt(1.0, QColor("#f2362a"));
+        grad.setColorAt(0.0, QColor(EqPalette::goodDim().name()));   // green bottom
+        grad.setColorAt(0.55, QColor(EqPalette::good().name()));  // lime
+        grad.setColorAt(0.80, QColor(EqPalette::warn().name()));  // amber
+        grad.setColorAt(0.95, QColor(EqPalette::bad().name()));  // red top
+        grad.setColorAt(1.0, QColor(EqPalette::badBg().name()));
         p.fillRect(fill, grad);
     }
 
     // Bar outline.
-    p.setPen(QPen(QColor("#243a4e"), 1));
+    p.setPen(QPen(QColor(EqPalette::buttonHi().name()), 1));
     p.setBrush(Qt::NoBrush);
     p.drawRect(barR.adjusted(0, 0, -1, -1));
 
@@ -302,7 +303,7 @@ void ClientEqOutputFader::paintEvent(QPaintEvent*)
         const float norm = (t.db - kMeterMinDb) / (kMeterMaxDb - kMeterMinDb);
         const int y = stripTop + static_cast<int>((1.0f - norm) * m_stripH);
 
-        p.setPen(QColor("#7f93a5"));
+        p.setPen(QColor(EqPalette::textDim().name()));
         const QString s = QString::fromLatin1(t.label);
         const int tw = fm.horizontalAdvance(s);
         const int ty = std::clamp(y + fm.ascent() / 2 - 1,
@@ -324,12 +325,12 @@ void ClientEqOutputFader::paintEvent(QPaintEvent*)
                         handleY - kHandleH / 2,
                         kBarW + kHandleOverhang * 2,
                         kHandleH);
-    p.setPen(QPen(QColor("#0a1a28"), 1));
-    p.setBrush(QColor("#d7e7f2"));   // cream / bright off-white
+    p.setPen(QPen(QColor(EqPalette::insetBg().name()), 1));
+    p.setBrush(QColor(EqPalette::textBright().name()));   // cream / bright off-white
     p.drawRect(handleR);
     // Centre line — a single pixel on the handle so the exact gain level
     // reads clearly against the bar's colour.
-    p.setPen(QColor("#1a2a3a"));
+    p.setPen(QColor(EqPalette::buttonBg().name()));
     p.drawLine(handleR.left() + 1, handleY,
                handleR.right() - 1, handleY);
 

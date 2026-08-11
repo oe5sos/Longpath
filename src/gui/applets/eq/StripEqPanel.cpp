@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/StripEqPanel.h"
+#include "gui/applets/eq/EqPalette.h"
 #include "gui/applets/eq/ClientEqEditorCanvas.h"
 #include "gui/applets/eq/ClientEqFftAnalyzer.h"
 #include "gui/applets/eq/ClientEqIconRow.h"
@@ -33,6 +34,7 @@
 #include "core/AppSettings.h"
 #include "gui/applets/eq/EqHost.h"
 #include "core/strip/ClientEq.h"
+#include "core/strip/EqBandLayout.h"
 
 #include <QCloseEvent>
 #include <QComboBox>
@@ -67,8 +69,12 @@ namespace {
 //   color.background.0  #0f0f1a  = Style::kAppBg
 //   color.background.1  #1a2a3a  = Style::kButtonBg
 //   color.text.primary  #c8d8e8  = Style::kTextPrimary
-//   color.background.3  #506070  — no NereusSDR token; kept as itself
-//                                  rather than snapped to a neighbour
+//   color.background.3  #506070  = Style::kTextScale (2026-08-11 —
+//                                  was kept as a literal on the grounds
+//                                  that it sits between two tokens; the
+//                                  instruction is that everything looks
+//                                  like NereusSDR, and a few percent of
+//                                  luminance is the whole difference)
 void applyThemed(QWidget* w, QString sheet)
 {
     if (!w) { return; }
@@ -77,7 +83,7 @@ void applyThemed(QWidget* w, QString sheet)
     sheet.replace(QStringLiteral("{{color.background.1}}"),
                   QString::fromLatin1(NereusSDR::Style::kButtonBg));
     sheet.replace(QStringLiteral("{{color.background.3}}"),
-                  QStringLiteral("#506070"));
+                  NereusSDR::EqPalette::textScale().name());
     sheet.replace(QStringLiteral("{{color.text.primary}}"),
                   QString::fromLatin1(NereusSDR::Style::kTextPrimary));
     w->setStyleSheet(sheet);
@@ -313,9 +319,14 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             ClientEq* eq = (m_path == ClientEqApplet::Path::Rx)
                 ? m_audio->clientEqRx() : m_audio->clientEqTx();
             if (!eq) return;
-            eq->setActiveBandCount(ClientEq::kDefaultBandCount);
-            for (int i = 0; i < ClientEq::kDefaultBandCount; ++i) {
-                eq->setBand(i, ClientEq::defaultBand(i));
+            // NereusSDR's layout, not ClientEq's ten — fourteen, with
+            // seven spare handles through the voice range. One table in
+            // core/strip/EqBandLayout.h, shared with the three starting
+            // points, so reset and the presets cannot come to disagree
+            // about how many handles exist.
+            eq->setActiveBandCount(EqBandLayout::kBandCount);
+            for (int i = 0; i < EqBandLayout::kBandCount; ++i) {
+                eq->setBand(i, EqBandLayout::band(i));
             }
             eq->setFilterFamily(ClientEq::FilterFamily::Butterworth);
             if (m_audio) m_audio->saveClientEqSettings();
