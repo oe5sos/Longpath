@@ -1990,6 +1990,17 @@ private:
     // ---- Overlay menu ----
     SpectrumOverlayMenu* m_overlayMenu{nullptr};
 
+    // Finding #3, rotor bench 2026-08-11: after ANY spot-menu action
+    // ("Tune to", "Turn rotor") the pan overlay menu opened at the
+    // same position — a re-delivered press reaching the native QRhi
+    // surface once the QMenu goes away. Two-layer fix: the spot and
+    // notch menus are now shown async via popup() (no nested exec()
+    // inside mousePressEvent), and every right-press arriving within
+    // kContextMenuReplayGuardMs of a context-menu close is swallowed
+    // before it can reach the overlay-menu fallback.
+    qint64 m_contextMenuClosedMs{0};
+    static constexpr qint64 kContextMenuReplayGuardMs = 250;
+
     // ---- Spot overlay state (Phase 3J-2 Task E1) ----
     // Backing store + per-frame click-rect / cluster vectors. Defaults
     // match AetherSDR src/gui/SpectrumWidget.h:634-651 [@0cd4559].

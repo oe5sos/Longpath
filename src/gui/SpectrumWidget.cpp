@@ -6007,6 +6007,11 @@ void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoi
         });
     }
 
+    // Finding #3 replay guard (see mousePressEvent): stamp the close
+    // so a re-delivered press can't fall through to the overlay menu.
+    connect(menu, &QMenu::aboutToHide, this, [this]() {
+        m_contextMenuClosedMs = QDateTime::currentMSecsSinceEpoch();
+    });
     menu->popup(globalPos);
     // QMenu self-deletes on close with WA_DeleteOnClose
     menu->setAttribute(Qt::WA_DeleteOnClose);
@@ -6706,6 +6711,18 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     }
 
     if (event->button() == Qt::RightButton) {
+        // Finding #3 (rotor bench 2026-08-11): a right-press arriving
+        // immediately after a spot/notch context menu closed is the
+        // replayed remnant of the click that dismissed it — swallow it
+        // instead of letting it open the overlay menu at the same
+        // position. See the member comment in SpectrumWidget.h.
+        if (m_contextMenuClosedMs != 0
+            && QDateTime::currentMSecsSinceEpoch() - m_contextMenuClosedMs
+                   < kContextMenuReplayGuardMs) {
+            event->accept();
+            return;
+        }
+
         // Ctrl + right-click adds a notch at the clicked frequency; Shift
         // makes it narrow.  Checked before the spot menu and the overlay
         // menu, so plain right-click behaviour is unchanged when Ctrl is
@@ -6740,9 +6757,16 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         if (my < specH && mx <= specRect.right()) {
             const int hitNotch = notchAtPixel(mx, specRect);
             if (hitNotch >= 0) {
-                QMenu menu(this);
-                buildNotchContextMenu(hitNotch, menu);
-                menu.exec(event->globalPosition().toPoint());
+                // popup() instead of exec() — no nested event loop
+                // inside mousePressEvent on the native QRhi surface
+                // (finding #3; same treatment as the spot menu below).
+                QMenu* menu = new QMenu(this);
+                menu->setAttribute(Qt::WA_DeleteOnClose);
+                buildNotchContextMenu(hitNotch, *menu);
+                connect(menu, &QMenu::aboutToHide, this, [this]() {
+                    m_contextMenuClosedMs = QDateTime::currentMSecsSinceEpoch();
+                });
+                menu->popup(event->globalPosition().toPoint());
                 event->accept();
                 return;
             }
@@ -6779,18 +6803,31 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                 const double freqHz   = sm.freqMhz * 1.0e6;
                 const QString source  = sm.source;
 
-                QMenu menu(this);
+                // Heap + popup() + WA_DeleteOnClose instead of a
+                // stack QMenu exec()'d from inside mousePressEvent
+                // (finding #3, rotor bench 2026-08-11): the nested
+                // exec() loop on the native QRhi surface let the
+                // dismissing click re-reach this widget as a fresh
+                // right-press, which fell through to the overlay
+                // menu. popup() returns immediately; the lambdas
+                // capture by value and use `this` as context object,
+                // so they stay valid for the menu's async lifetime.
+                QMenu* menu = new QMenu(this);
+                menu->setAttribute(Qt::WA_DeleteOnClose);
+                connect(menu, &QMenu::aboutToHide, this, [this]() {
+                    m_contextMenuClosedMs = QDateTime::currentMSecsSinceEpoch();
+                });
                 if (source == QStringLiteral("Memory")) {
                     const QString title = call.isEmpty()
                         ? QStringLiteral("Apply Memory")
                         : QString("Apply %1").arg(call);
-                    menu.addAction(title, this,
+                    menu->addAction(title, this,
                         [this, freqHz, spotIndex]() {
                             emit frequencyClicked(freqHz);
                             emit spotTriggered(spotIndex);
                         });
                 } else {
-                    menu.addAction(QString("Tune to %1").arg(call), this,
+                    menu->addAction(QString("Tune to %1").arg(call), this,
                         [this, freqHz]() {
                             emit frequencyClicked(freqHz);
                         });
@@ -6798,28 +6835,28 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                     // Spot List's right-click (2026-08-11) — the
                     // panadapter label is just the other place the
                     // operator meets the same spot.
-                    menu.addAction(
+                    menu->addAction(
                         QString("Turn rotor to %1").arg(call), this,
                         [this, call]() {
                             emit spotRotorRequested(call);
                         });
-                    menu.addAction(QStringLiteral("Copy Callsign"), this,
+                    menu->addAction(QStringLiteral("Copy Callsign"), this,
                         [call]() {
                             QApplication::clipboard()->setText(call);
                         });
-                    menu.addAction(QStringLiteral("Lookup on QRZ"), this,
+                    menu->addAction(QStringLiteral("Lookup on QRZ"), this,
                         [call]() {
                             QDesktopServices::openUrl(
                                 QUrl(QStringLiteral("https://www.qrz.com/db/")
                                      + call));
                         });
-                    menu.addSeparator();
-                    menu.addAction(QStringLiteral("Remove Spot"), this,
+                    menu->addSeparator();
+                    menu->addAction(QStringLiteral("Remove Spot"), this,
                         [this, spotIndex]() {
                             emit spotRemoveRequested(spotIndex);
                         });
                 }
-                menu.exec(event->globalPosition().toPoint());
+                menu->popup(event->globalPosition().toPoint());
                 event->accept();
                 return;
             }
