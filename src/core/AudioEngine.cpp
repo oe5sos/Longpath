@@ -1671,10 +1671,25 @@ void AudioEngine::setTxMonitorVolume(float volume)
 //     structurally stable after ctor pre-registration; gains are atomics).
 void AudioEngine::txMonitorBlockReady(const float* samples, int frames)
 {
-    if (!m_txMonitorEnabled.load(std::memory_order_acquire)) {
+    if (samples == nullptr || frames <= 0) {
         return;
     }
-    if (samples == nullptr || frames <= 0) {
+
+    // ── Measure first, listen second ─────────────────────────────────
+    //
+    // Before the monitor-enabled check on purpose. What goes out of the
+    // transmitter is a fact about the transmitter; whether the operator
+    // is listening to themselves is a preference. Gating the
+    // measurement on the preference would mean the occupied-bandwidth
+    // reading silently stops existing the moment somebody turns the
+    // monitor down — which is exactly when they are least likely to
+    // notice they are splattering.
+    //
+    // A memcpy into a ring. No FFT, no allocation, no lock: this is the
+    // one thread in the program that must never be late.
+    m_txSiphonRing.feed(samples, frames);
+
+    if (!m_txMonitorEnabled.load(std::memory_order_acquire)) {
         return;
     }
 

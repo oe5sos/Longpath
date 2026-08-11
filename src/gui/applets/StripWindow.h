@@ -88,6 +88,15 @@ private:
     QWidget* buildLimiterPanel();
     QWidget* buildPlaceholder(StripChain::Stage s);
 
+    // ── Not a stage ──────────────────────────────────────────────────
+    //
+    // Every other tab is one processing stage with its own knobs. This
+    // one processes nothing: it measures what the whole chain and the
+    // modulator produced, after everything else has had its say. It
+    // sits last for that reason, and it is the only tab in the strip
+    // whose number is about somebody other than the operator.
+    QWidget* buildTxSpectrumPanel();
+
     // The EQ's bands are laid out once, in a fixed order, so that the
     // panel and the saved settings agree about which slot is which.
     // Band 0 is the high-pass; 1-3 are notches for the mains and its
@@ -212,6 +221,7 @@ private:
     // panel is never handed a dangling engine.
     std::unique_ptr<EqHost> m_eqHost;
     StripEqPanel*           m_eqPanel{nullptr};
+    class TxSpectrumWidget* m_txSpectrum{nullptr};
 
     QPointer<RadioModel> m_radio;
 

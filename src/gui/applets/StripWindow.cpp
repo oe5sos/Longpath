@@ -19,6 +19,8 @@
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
 #include "core/strip/StripCharacters.h"
+#include "core/AudioEngine.h"
+#include "gui/widgets/TxSpectrumWidget.h"
 
 #include <QInputDialog>
 #include <QFileDialog>
@@ -407,6 +409,10 @@ void StripWindow::buildUi()
         m_tabs->addTab(page,
                        QString::fromLatin1(StripChain::stageName(s)));
     }
+
+    // After all the stages, because it measures the result of them.
+    m_tabs->addTab(buildTxSpectrumPanel(), QStringLiteral("On air"));
+
     col->addWidget(m_tabs, 1);
 
     // The enable boxes are created unchecked and the chain may already
@@ -571,6 +577,81 @@ QWidget* StripWindow::buildEqPanel()
     m_eqPanel = new StripEqPanel(m_eqHost.get(), this);
     m_eqPanel->showForPath(ClientEqApplet::Path::Tx);
     return m_eqPanel;
+}
+
+// ── What actually goes out ───────────────────────────────────────────
+
+QWidget* StripWindow::buildTxSpectrumPanel()
+{
+    auto* page = new QWidget(this);
+    auto* col = new QVBoxLayout(page);
+    col->setContentsMargins(8, 8, 8, 8);
+    col->setSpacing(7);
+
+    m_txSpectrum = new TxSpectrumWidget(page);
+    if (m_radio && m_radio->audioEngine()) {
+        m_txSpectrum->setSource(&m_radio->audioEngine()->txSiphonSpectrum());
+    }
+    col->addWidget(m_txSpectrum, 1);
+
+    auto* row = new QHBoxLayout;
+    row->setSpacing(7);
+
+    auto* hold = new QPushButton(QStringLiteral("Hold"), page);
+    hold->setCheckable(true);
+    hold->setStyleSheet(Style::buttonBaseStyle());
+    hold->setToolTip(QStringLiteral(
+        "Keep the highest level reached in every bin. A live curve "
+        "during a call is unreadable; this is what you look at "
+        "afterwards."));
+    row->addWidget(hold);
+
+    auto* reset = new QPushButton(QStringLiteral("Reset"), page);
+    reset->setStyleSheet(Style::buttonBaseStyle());
+    row->addWidget(reset);
+    row->addStretch(1);
+    col->addLayout(row);
+
+    connect(hold, &QPushButton::toggled, this, [this](bool on) {
+        if (m_txSpectrum) { m_txSpectrum->setHold(on); }
+    });
+    connect(reset, &QPushButton::clicked, this, [this]() {
+        if (m_txSpectrum) { m_txSpectrum->resetHold(); }
+    });
+
+    // ── The sentence, which is the point ─────────────────────────────
+    auto* advice = new QLabel(page);
+    advice->setWordWrap(true);
+    advice->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary)));
+    col->addWidget(advice);
+
+    connect(m_txSpectrum, &TxSpectrumWidget::measured, this,
+            [advice](const TxSpectrumAnalysis::Occupancy& occ) {
+        // The filter width the advice is judged against. 2.7 kHz is the
+        // usual SSB filter; reading the real one out of the radio would
+        // be better and is a wire that does not exist yet, so the
+        // number is stated rather than assumed silently.
+        const QString a = TxSpectrumAnalysis::advice(occ, 2700.0);
+        advice->setText(a.isEmpty()
+            ? QStringLiteral("Within a normal 2.7 kHz SSB filter.")
+            : a);
+        advice->setVisible(true);
+    });
+
+    auto* note = new QLabel(QStringLiteral(
+        "This is the post-modulator siphon: what the transmit chain "
+        "produced, before the amplifier, the filters and the antenna. "
+        "A clean reading here with a dirty signal on the air means the "
+        "problem is downstream of this point."), page);
+    note->setWordWrap(true);
+    note->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 10px; }")
+            .arg(QString::fromLatin1(Style::kTextScale)));
+    col->addWidget(note);
+
+    return page;
 }
 
 // ── De-esser ─────────────────────────────────────────────────────────

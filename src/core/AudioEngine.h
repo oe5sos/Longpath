@@ -109,6 +109,7 @@
 #include "AudioDeviceConfig.h"
 #include "IAudioBus.h"
 #include "audio/MasterMixer.h"
+#include "strip/MicSpectrum.h"
 
 #if defined(Q_OS_LINUX)
 #  include "core/audio/LinuxAudioBackend.h"
@@ -373,6 +374,16 @@ public:
     ///
     /// Plan: 3M-1b E.3. Pre-code review §4.3 + §4.4.
     void txMonitorBlockReady(const float* samples, int frames);
+
+    /// The post-modulator siphon, for measuring what actually goes out:
+    /// occupied bandwidth, splatter, the shape of the transmitted
+    /// spectrum. Read from the GUI thread via snapshot(); the audio
+    /// thread only ever memcpys into it.
+    ///
+    /// Filled whether or not the TX monitor is switched on — the
+    /// measurement is about the transmitter, not about listening.
+    const MicSpectrum& txSiphonSpectrum() const noexcept
+    { return m_txSiphonRing; }
 
     // Pull TX-mic audio samples from the bound TX-input bus.
     //
@@ -862,6 +873,22 @@ private:
     // acquire pairing as m_masterMuted above.
     std::atomic<bool>  m_rxMutedForMonitor{false};
     std::atomic<bool>  m_txMonitorEnabled{false};  // default off per plan §0 row 9
+
+    // ── The last sixteen seconds of what is actually going out ───────
+    //
+    // Fed from txMonitorBlockReady BEFORE the monitor-enabled check, so
+    // the measurement does not depend on whether the operator happens
+    // to be listening to themselves. The siphon runs unconditionally
+    // (TXA.c:394, run=1), so this fills whenever the transmit chain is
+    // running — during a real transmission as well as during the
+    // off-air monitor.
+    //
+    // MicSpectrum is reused rather than copied. Despite the name it is
+    // not about microphones: it is a lock-free ring of recent mono
+    // audio with a snapshot read, which is exactly what is wanted, and
+    // a second lock-free ring on the transmit path is not a thing to
+    // have two of.
+    MicSpectrum m_txSiphonRing;
     // Default 0.5f — mirrors the fixed coefficient used in Thetis audio.cs
     // for the aaudio mix path; NereusSDR exposes this as user-adjustable
     // volume (pre-code review §4.4). Not a port; AudioEngine is NereusSDR-native.

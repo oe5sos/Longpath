@@ -733,6 +733,8 @@ set(GUI_SOURCES
     src/gui/widgets/ResetSlider.h
     src/gui/AntennaWindow.h
     src/gui/AntennaWindow.cpp
+    src/gui/widgets/TxSpectrumWidget.h
+    src/gui/widgets/TxSpectrumWidget.cpp
     src/gui/widgets/SwrCurveWidget.h
     src/gui/widgets/SwrCurveWidget.cpp
     src/gui/widgets/QsoDetailPane.h
