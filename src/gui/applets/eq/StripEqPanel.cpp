@@ -195,7 +195,8 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         auto* hint = new QLabel(
             "Drag peak/shelf = freq + gain · "
             "drag HP/LP = freq + Q · Shift + drag for Q · "
-            "click icon to cycle type");
+            "double-click a point to change its filter type · "
+            "right-click for the full menu");
         applyThemed(hint, "QLabel { color: {{color.background.3}}; font-size: 10px; }");
         row->addWidget(hint, 1);
 

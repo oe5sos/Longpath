@@ -4715,6 +4715,12 @@ nereus_add_test(tst_trim_session)
 #    these tests keeps them true --
 nereus_add_test(tst_strip_characters)
 
+# -- One ring of filter types, shared by the icon click, the handle
+#    double-click and the context menu. They were three copies and had
+#    already diverged. Also the Q clamp, which is the only place a type
+#    change touches a number the operator did not --
+nereus_add_test(tst_eq_filter_ring)
+
 # -- Loudness matching: the two weighting curves against the published
 #    tables in IEC 61672 and ITU-R BS.1770, and the properties the
 #    average must have whatever the weighting is --

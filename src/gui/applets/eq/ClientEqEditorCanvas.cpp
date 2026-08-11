@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/ClientEqEditorCanvas.h"
+#include "gui/applets/eq/EqFilterRing.h"
 #include "gui/applets/eq/EqHost.h"
 #include "core/strip/ClientEq.h"
 
@@ -238,10 +239,37 @@ void ClientEqEditorCanvas::mouseReleaseEvent(QMouseEvent* ev)
 
 void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
 {
-    // Double-click is a no-op under the fixed-8-band model. Handle with
-    // a regular press so the user still gets selection + drag on the
-    // second click rather than a dead gesture.
-    QWidget::mouseDoubleClickEvent(ev);
+    if (!m_eq) { QWidget::mouseDoubleClickEvent(ev); return; }
+    if (ev->button() != Qt::LeftButton) {
+        QWidget::mouseDoubleClickEvent(ev); return;
+    }
+
+    const int idx = hitTestHandle(ev->position());
+    if (idx < 0) {
+        // Empty canvas. Under the fixed-band model there is nothing to
+        // create here, and inventing a band on a stray double-click is
+        // worse than doing nothing.
+        QWidget::mouseDoubleClickEvent(ev);
+        return;
+    }
+
+    // The first click of the pair already started a drag and the release
+    // already ended it; nothing to cancel. Belt and braces anyway, since
+    // a platform that delivers the events in another order would
+    // otherwise leave the band stuck to the cursor.
+    m_draggingBand = -1;
+    m_dragShift    = false;
+    setCursor(Qt::CrossCursor);
+
+    setSelectedBand(idx);
+    // Shift steps back round the ring, matching the icon row — five
+    // types means going forward past the one you wanted is a four-click
+    // journey otherwise.
+    const int dir = (ev->modifiers() & Qt::ShiftModifier) ? -1 : 1;
+    EqFilterRing::applyTo(*m_eq, idx,
+                          EqFilterRing::step(m_eq->band(idx).type, dir));
+    persist();
+    ev->accept();
 }
 
 void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
@@ -255,12 +283,8 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     QMenu menu(this);
 
     auto* typeLabel = menu.addAction(
-        QString("Band %1 — %2").arg(idx + 1).arg(
-            bp.type == ClientEq::FilterType::Peak      ? "Peak"
-          : bp.type == ClientEq::FilterType::LowShelf  ? "Low Shelf"
-          : bp.type == ClientEq::FilterType::HighShelf ? "High Shelf"
-          : bp.type == ClientEq::FilterType::LowPass   ? "Low Pass"
-          : "High Pass"));
+        QString("Band %1 — %2").arg(idx + 1)
+            .arg(QLatin1String(EqFilterRing::name(bp.type))));
     typeLabel->setEnabled(false);
     menu.addSeparator();
 
@@ -295,11 +319,12 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     QAction* chosen = menu.exec(ev->globalPos());
     if (!chosen) return;
 
+    // Same path as the double-click and as the icon row. The menu used
+    // to assign the type itself, which meant the three agreed only by
+    // coincidence — and they had already stopped: the icon row's ring
+    // and this canvas's differed.
     auto change = [&](ClientEq::FilterType t) {
-        // Changing the type also enables the band — the user clearly
-        // wants it active if they're reshaping it.
-        ClientEq::BandParams p = bp; p.type = t; p.enabled = true;
-        m_eq->setBand(idx, p);
+        EqFilterRing::applyTo(*m_eq, idx, t);
     };
     if      (chosen == peakAct) change(ClientEq::FilterType::Peak);
     else if (chosen == lsAct)   change(ClientEq::FilterType::LowShelf);

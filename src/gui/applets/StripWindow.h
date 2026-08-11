@@ -301,6 +301,16 @@ private:
                             StripChain::Stage stage);
     void refreshStageText();
 
+    // Which character a stage is showing. Kept in settings rather than
+    // in the chain because it is a fact about the UI, not about the
+    // DSP — the chain holds the numbers the character produced, and
+    // those are what actually process audio. See the note at the
+    // picker's construction for the bug this fixes and the one it
+    // does not.
+    static QString characterSettingsKey(StripChain::Stage s);
+    static QString characterKeyFor(StripChain::Stage s);
+    static void    rememberCharacter(StripChain::Stage s, const QString& name);
+
     struct StageText {
         QWidget* picture{nullptr};
         QLabel*  live{nullptr};

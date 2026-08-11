@@ -104,4 +104,34 @@ inline ClientEq::BandParams band(int idx)
     return ClientEq::defaultBand(idx);
 }
 
+// Bring an existing equaliser up to the full layout WITHOUT touching a
+// single band the operator has already shaped.
+//
+// ── The function the comments promised and nobody wrote ──────────────
+//
+// StripWindow.h has described a "seedEqLayout" since the extra handles
+// were added — "APPENDS them to an existing chain at 0 dB rather than
+// re-seeding, so an operator who had already shaped a curve gets four
+// more handles and not a reset". No such function was ever written. The
+// only code path that raised the band count was applying one of the
+// three presets, so anybody who restored a saved chain and never
+// touched the preset box got the old seven handles and a comment
+// claiming otherwise.
+//
+// Reported from the bench as "the several points on the graph are
+// missing", which is exactly what it looks like from the outside.
+//
+// Appends only: existing slots are left exactly as they are, and the
+// count only ever goes up. A chain that somehow has MORE bands than
+// this layout — the canvas can add them — keeps them.
+inline void ensureSeeded(ClientEq& eq)
+{
+    const int have = eq.activeBandCount();
+    if (have >= kBandCount) { return; }
+    for (int i = have; i < kBandCount; ++i) {
+        eq.setBand(i, band(i));
+    }
+    eq.setActiveBandCount(kBandCount);
+}
+
 } // namespace NereusSDR::EqBandLayout

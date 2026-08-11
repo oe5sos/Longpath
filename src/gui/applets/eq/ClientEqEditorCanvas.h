@@ -37,11 +37,22 @@ class EqHost;
 //
 //   - L-drag on a band handle: freq + gain
 //   - Shift + L-drag on a handle: Q (vertical axis maps to Q)
-//   - Double-click empty area: create a new band; filter type is chosen
-//     by position (HP at left edge, LP at right edge, shelves near top/
-//     bottom extremes, peak everywhere else)
-//   - Right-click on a handle: context menu (cycle type, toggle enable,
-//     delete)
+//   - Double-click ON a handle: step the filter type round the ring
+//   - Right-click on a handle: context menu (set type directly, slope,
+//     toggle enable, reset)
+//
+// ── Why double-click and not something cleverer ──────────────────────
+//
+// Asked for at the bench: change what a point DOES without leaving the
+// curve. Every other gesture on a handle was taken — press selects and
+// starts a drag, shift-drag is Q, right-click is the menu — and
+// double-click was a documented no-op, so it is the one that was free.
+//
+// It steps round a fixed ring rather than picking a type from where the
+// handle sits. Position-aware would be cleverer and worse: this is a
+// gesture people will repeat, and a repeated gesture has to land
+// somewhere they can predict without looking. The right-click menu is
+// still there for going straight to a type.
 //
 // Each mutation writes through to the ClientEq instance and calls
 // AudioEngine::saveClientEqSettings() so the change persists across
@@ -55,6 +66,9 @@ public:
     // Audio-engine pointer is needed for persistence callbacks after each
     // edit.  The ClientEq pointer itself is set via setEq() on the base.
     void setAudioEngine(EqHost* engine);
+
+    // The ring itself lives in EqFilterRing.h, shared with the icon row
+    // — see the note there for why it is not defined in this class.
 
 signals:
     // Emitted live during a cutoff-line drag.  Audio-domain Hz values;

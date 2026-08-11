@@ -198,6 +198,10 @@ void restoreFrom(const QString& prefix, StripChain& c)
         }
         c.eq().setActiveBandCount(bands);
     }
+    // Whatever was on disk — seven bands from an older version, nothing
+    // at all on a first run — the operator gets the full set of handles.
+    // Appends, never overwrites; see the note on ensureSeeded.
+    EqBandLayout::ensureSeeded(c.eq());
     {
         const QVariant g = s.value(key(prefix, "EqMasterGain"));
         if (g.isValid()) { c.eq().setMasterGain(float(g.toDouble())); }

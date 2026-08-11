@@ -1373,6 +1373,27 @@ void StripWindow::reloadControls()
 
 
 
+// Which character the operator last chose for a stage, and where it is
+// kept. One settings key per stage, named after the stage, so a new
+// stage needs no new key and a removed one leaves no orphan behind.
+QString StripWindow::characterSettingsKey(StripChain::Stage s)
+{
+    return QStringLiteral("StripCharacter/")
+           + QString::fromLatin1(StripChain::stageName(s));
+}
+
+QString StripWindow::characterKeyFor(StripChain::Stage s)
+{
+    return AppSettings::instance()
+        .value(characterSettingsKey(s), QString()).toString();
+}
+
+void StripWindow::rememberCharacter(StripChain::Stage s, const QString& name)
+{
+    AppSettings::instance().setValue(characterSettingsKey(s), name);
+    AppSettings::instance().save();
+}
+
 QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
                                      StripChain::Stage stage)
 {
@@ -1428,6 +1449,34 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
         for (const auto& ch : chars) { box->addItem(ch.name, ch.name); }
         box->setMinimumWidth(150);
         pickRow->addWidget(box, 1);
+
+        // ── Show which one is actually chosen ────────────────────────
+        //
+        // Reported from the bench: change the tube's character and the
+        // curve moves but the name does not. The combo was rebuilt from
+        // scratch on every reloadControls() — which is what applying a
+        // character triggers — so it always came back reading its first
+        // entry while the chain held the values of whichever one had
+        // just been picked. The picture and the label disagreed, and
+        // the label was the one lying.
+        //
+        // The name is remembered per stage. Signals are blocked while
+        // restoring it: setting the index would otherwise re-apply the
+        // character and undo any knob the operator has since moved.
+        //
+        // Known limitation, and it is the honest kind: move a knob by
+        // hand afterwards and the combo still names the character you
+        // started from. Detecting "edited since" means comparing every
+        // parameter of the stage against a freshly applied copy, which
+        // is worth doing and is not this change.
+        {
+            const QString remembered = characterKeyFor(stage);
+            const int at = box->findData(remembered);
+            if (at > 0) {
+                const QSignalBlocker block(box);
+                box->setCurrentIndex(at);
+            }
+        }
         col->addLayout(pickRow);
 
         st.charNote = new QLabel(words);
@@ -1461,8 +1510,11 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
             // reads its own value from the chain when it is built, and
             // that is the only version of "refresh" that cannot drift.
             if (StripChain* c = chain()) {
-                if (StripCharacters::apply(*c, stage,
-                                           box->currentData().toString())) {
+                const QString name = box->currentData().toString();
+                if (StripCharacters::apply(*c, stage, name)) {
+                    // Remembered BEFORE the rebuild, because the rebuild
+                    // destroys this combo and reads the name back.
+                    rememberCharacter(stage, name);
                     persist();
                     reloadControls();
                     refreshChainRow();

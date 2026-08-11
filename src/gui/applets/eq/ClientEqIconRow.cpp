@@ -27,6 +27,7 @@
 #include "gui/applets/eq/ClientEqIconRow.h"
 #include "gui/applets/eq/EqPalette.h"
 #include "gui/applets/eq/ClientEqCurveWidget.h"
+#include "gui/applets/eq/EqFilterRing.h"
 #include "gui/applets/eq/EqHost.h"
 
 #include <QHBoxLayout>
@@ -156,18 +157,17 @@ protected:
     {
         if (!m_eq) return;
         if (ev->button() == Qt::LeftButton) {
-            auto bp = m_eq->band(m_bandIdx);
-            // Cycle: Peak -> LS -> HS -> LP -> HP -> Peak.
-            // Shift reverses.
-            const int kTypes = 5;
-            int t = static_cast<int>(bp.type);
-            t += (ev->modifiers() & Qt::ShiftModifier) ? -1 : 1;
-            t = (t % kTypes + kTypes) % kTypes;
-            bp.type = static_cast<ClientEq::FilterType>(t);
-            // Clicking an icon is an explicit interaction — auto-enable
-            // the band so the default disabled layout activates in place.
-            bp.enabled = true;
-            m_eq->setBand(m_bandIdx, bp);
+            // Cycle: Peak -> LS -> HS -> LP -> HP -> Peak, shift
+            // reverses. The ring and the write both live in
+            // EqFilterRing now, shared with the canvas's double-click
+            // and its context menu — this used to be its own copy, and
+            // when the double-click was added it was written with the
+            // two slopes the other way round. See the note in that
+            // header.
+            const int dir = (ev->modifiers() & Qt::ShiftModifier) ? -1 : 1;
+            EqFilterRing::applyTo(
+                *m_eq, m_bandIdx,
+                EqFilterRing::step(m_eq->band(m_bandIdx).type, dir));
             if (m_audio) m_audio->saveClientEqSettings();
             update();
         }
