@@ -6794,6 +6794,15 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                         [this, freqHz]() {
                             emit frequencyClicked(freqHz);
                         });
+                    // Same action and same downstream handler as the
+                    // Spot List's right-click (2026-08-11) — the
+                    // panadapter label is just the other place the
+                    // operator meets the same spot.
+                    menu.addAction(
+                        QString("Turn rotor to %1").arg(call), this,
+                        [this, call]() {
+                            emit spotRotorRequested(call);
+                        });
                     menu.addAction(QStringLiteral("Copy Callsign"), this,
                         [call]() {
                             QApplication::clipboard()->setText(call);

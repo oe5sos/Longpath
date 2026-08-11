@@ -140,6 +140,22 @@ private:
     void markUploaded(const QString& call);
     void openLogbookWindow();
     void setStatus(const QString& text, bool warn = false);
+
+    // ── Teachable presets, park, long path (2026-08-11) ──────────────
+    //
+    // Four slots the operator teaches by right-click — "EU", "JA", the
+    // repeater — plus a park position and a long-path flip. All of them
+    // AIM; none of them turns the mast. That contract comes from the
+    // cardinal preset row above them and holds for every control on
+    // this panel: the turn lives behind Rotate, always.
+    void refreshUserPresetButton(int slot);
+    void refreshParkButton();
+    // Where a right-click teach would point: the dial's current aim if
+    // one is set, else the rotator's fresh reading. False when neither
+    // exists — teaching from a stale needle would store a lie.
+    bool teachableBearing(double* outDeg) const;
+    void userPresetMenu(int slot, const QPoint& posInButton);
+    void parkMenu(const QPoint& posInButton);
     // Fetch and show the QRZ portrait. Cached on disk so working the
     // same station twice costs one request, not two.
     void showStationVisuals(const CallsignInfo& info);
@@ -268,9 +284,16 @@ private:
     QWidget* m_rowCard{nullptr};
     QWidget* m_rowGrid{nullptr};
     QWidget* m_rowPreset{nullptr};
+    QWidget* m_rowUserPreset{nullptr};
     QWidget* m_rowBtn{nullptr};
     QWidget* m_rowRst{nullptr};
     QWidget* m_rowLog{nullptr};
+
+    // Teachable preset slots + park + long-path flip (2026-08-11).
+    static constexpr int kUserPresetSlots = 4;
+    QPushButton* m_userPreset[kUserPresetSlots]{};
+    QPushButton* m_parkBtn{nullptr};
+    QPushButton* m_lpBtn{nullptr};
 
     QVBoxLayout*     m_column{nullptr};
     QVector<QWidget*> m_shedOrder;      // least useful first

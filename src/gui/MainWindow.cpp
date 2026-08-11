@@ -1967,6 +1967,19 @@ void MainWindow::wireSpectrumForPan(SpectrumWidget* sw, const QString& panId)
                 spots, &SpotModel::removeSpot);
     }
 
+    // "Turn rotor to <call>" from THIS pan's spot menu (2026-08-11) —
+    // same handler as the Spot List's right-click: raise the rotor dock
+    // so the operator sees the needle they just commanded, then let the
+    // panel do the bearing maths and the turn.
+    connect(sw, &SpectrumWidget::spotRotorRequested,
+            this, [this](const QString& dxCall) {
+        if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+            m_rotorDock->show();
+            m_rotorDock->raise();
+            panel->workSpot(dxCall);
+        }
+    });
+
     // Hovering a spot on any pan drives the Spot Hub highlight.
     if (m_spotHubDialog) {
         connect(sw, &SpectrumWidget::spotHoverIndexChanged,

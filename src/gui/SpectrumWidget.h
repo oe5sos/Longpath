@@ -1316,6 +1316,14 @@ signals:
     // SpectrumWidget.h:357 [@0cd4559].
     void spotRemoveRequested(int spotIndex);
 
+    // 2026-08-11: "Turn rotor to <call>" from the spot label's context
+    // menu — same verb, same handler as the Spot List's right-click
+    // (SpotHubDialog::rotorRequested): MainWindow raises the rotor dock
+    // and hands the call to RotorLogbookPanel::workSpot, which aims and
+    // turns. Carries the callsign rather than an index because the
+    // rotor path wants the station, not the marker.
+    void spotRotorRequested(const QString& dxCall);
+
     // 2026-05-12 bench fix (Gap #6).  Fires when the mouse enters or
     // leaves a spot label hit-rect.  -1 indicates "no spot under
     // cursor" (use to clear the Spot List highlight).  Drives the

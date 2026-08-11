@@ -57,7 +57,9 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QInputDialog>
 #include <QMenu>
+#include <cmath>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -91,6 +93,12 @@ const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
 const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
 const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
+// Teachable presets + park (2026-08-11). %1 is the slot number 1..4.
+// Empty Deg value = slot not taught yet. Client-authoritative, so
+// AppSettings per the settings policy.
+const QString kPresetLabelKey = QStringLiteral("RotorPreset%1Label");
+const QString kPresetDegKey   = QStringLiteral("RotorPreset%1Deg");
+const QString kParkDegKey     = QStringLiteral("RotorParkDeg");
 const QString kRotorUseSerialKey = QStringLiteral("RotorUseLocalSerial");
 const QString kRotorModelKey     = QStringLiteral("RotorHamlibModel");
 const QString kRotorDeviceKey    = QStringLiteral("RotorSerialDevice");
@@ -436,6 +444,82 @@ void RotorLogbookPanel::buildUi()
     presetRow->addStretch(1);
     m_rowPreset = addShedRow(col, presetRow, this);
 
+    // ── Teachable presets, park, long path (2026-08-11) ──────────────
+    //
+    // The row above aims at compass points; this one aims at the
+    // operator's own targets — "EU", "JA", the repeater — taught by
+    // right-click from whatever the dial is currently aiming at (or
+    // the rotator's fresh reading when nothing is aimed). Same
+    // contract as every preset: aiming never moves the mast; the turn
+    // stays behind Rotate.
+    auto* userRow = new QHBoxLayout;
+    userRow->setSpacing(4);
+    for (int i = 0; i < kUserPresetSlots; ++i) {
+        auto* b = new QPushButton(this);
+        b->setStyleSheet(Style::buttonBaseStyle());
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setContextMenuPolicy(Qt::CustomContextMenu);
+        m_userPreset[i] = b;
+        connect(b, &QPushButton::clicked, this, [this, i]() {
+            const QString deg = AppSettings::instance()
+                .value(kPresetDegKey.arg(i + 1), QString{}).toString();
+            if (deg.isEmpty()) {
+                setStatus(QStringLiteral(
+                    "Empty preset — right-click it to teach the current "
+                    "aim"), true);
+                return;
+            }
+            m_dial->setTargetBearing(deg.toDouble());
+        });
+        connect(b, &QPushButton::customContextMenuRequested, this,
+                [this, i](const QPoint& pos) { userPresetMenu(i, pos); });
+        userRow->addWidget(b);
+        refreshUserPresetButton(i);
+    }
+
+    m_parkBtn = new QPushButton(QStringLiteral("Park"), this);
+    m_parkBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_parkBtn->setFocusPolicy(Qt::NoFocus);
+    m_parkBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_parkBtn, &QPushButton::clicked, this, [this]() {
+        const QString deg = AppSettings::instance()
+            .value(kParkDegKey, QString{}).toString();
+        if (deg.isEmpty()) {
+            setStatus(QStringLiteral(
+                "No park position yet — right-click Park to teach it"),
+                true);
+            return;
+        }
+        m_dial->setTargetBearing(deg.toDouble());
+    });
+    connect(m_parkBtn, &QPushButton::customContextMenuRequested, this,
+            [this](const QPoint& pos) { parkMenu(pos); });
+    userRow->addWidget(m_parkBtn);
+    refreshParkButton();
+
+    // Long path: the same station, the other way round the planet.
+    // Flips the AIM only — deliberately symmetric with everything else
+    // on these rows.
+    m_lpBtn = new QPushButton(QStringLiteral("LP"), this);
+    m_lpBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_lpBtn->setFocusPolicy(Qt::NoFocus);
+    m_lpBtn->setToolTip(QStringLiteral(
+        "Flip the aim to the long path (±180°). Aim first, then LP, "
+        "then Rotate."));
+    connect(m_lpBtn, &QPushButton::clicked, this, [this]() {
+        if (!m_dial->hasTarget()) {
+            setStatus(QStringLiteral(
+                "Nothing aimed yet — click the rose or a preset first, "
+                "then LP flips it"), true);
+            return;
+        }
+        m_dial->setTargetBearing(
+            std::fmod(m_dial->targetBearing() + 180.0, 360.0));
+    });
+    userRow->addWidget(m_lpBtn);
+    userRow->addStretch(1);
+    m_rowUserPreset = addShedRow(col, userRow, this);
+
     m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
     m_globeBtn->setCheckable(true);
     m_globeBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -534,8 +618,12 @@ void RotorLogbookPanel::buildUi()
     // and it is where the panel says what went wrong. The rotate and
     // stop buttons go last of all, and even then the dial itself can
     // still be double-clicked to turn.
+    // The taught presets outrank the cardinal row: cardinals are an
+    // orientation aid, the taught ones are the operator's actual
+    // targets — so the cardinal row sheds first.
     m_shedOrder = {m_recent, m_rowLog, m_rowRst, m_rowCard, m_rowPreset,
-                   m_rowGrid, m_rowCall, m_status, m_rowBtn};
+                   m_rowUserPreset, m_rowGrid, m_rowCall, m_status,
+                   m_rowBtn};
     m_shedHeights.resize(m_shedOrder.size());
     m_column = col;
 
@@ -668,6 +756,156 @@ void RotorLogbookPanel::updateCompactness()
 }
 
 // ── Rotator ─────────────────────────────────────────────────────────
+
+// ── Teachable presets + park (2026-08-11) ───────────────────────────
+
+void RotorLogbookPanel::refreshUserPresetButton(int slot)
+{
+    if (slot < 0 || slot >= kUserPresetSlots || !m_userPreset[slot]) {
+        return;
+    }
+    AppSettings& s = AppSettings::instance();
+    const QString label =
+        s.value(kPresetLabelKey.arg(slot + 1), QString{}).toString();
+    const QString deg =
+        s.value(kPresetDegKey.arg(slot + 1), QString{}).toString();
+
+    QPushButton* b = m_userPreset[slot];
+    if (deg.isEmpty()) {
+        // Untaught. A number would suggest a bearing; a dot suggests a
+        // free slot, which is what it is.
+        b->setText(QStringLiteral("·"));
+        b->setToolTip(QStringLiteral(
+            "Free preset — right-click to store the current aim under a "
+            "name of your own"));
+        return;
+    }
+    b->setText(label.isEmpty()
+                   ? QStringLiteral("%1°").arg(deg.toDouble(), 0, 'f', 0)
+                   : label);
+    b->setToolTip(QStringLiteral(
+        "Aim %1° (%2) — then Rotate to turn. Right-click to re-teach, "
+        "rename or clear.")
+                      .arg(deg.toDouble(), 0, 'f', 0)
+                      .arg(label.isEmpty() ? QStringLiteral("unnamed")
+                                           : label));
+}
+
+void RotorLogbookPanel::refreshParkButton()
+{
+    if (!m_parkBtn) { return; }
+    const QString deg =
+        AppSettings::instance().value(kParkDegKey, QString{}).toString();
+    m_parkBtn->setToolTip(deg.isEmpty()
+        ? QStringLiteral("No park position stored — right-click to teach "
+                         "the current aim as park")
+        : QStringLiteral("Aim the park position (%1°) — then Rotate. "
+                         "Right-click to re-teach or clear.")
+              .arg(deg.toDouble(), 0, 'f', 0));
+}
+
+bool RotorLogbookPanel::teachableBearing(double* outDeg) const
+{
+    if (m_dial && m_dial->hasTarget()) {
+        *outDeg = m_dial->targetBearing();
+        return true;
+    }
+    // No aim set: fall back to where the mast actually points — but
+    // only a FRESH reading. Teaching from a stale needle stores a lie.
+    if (m_rotor && m_rotor->isConnected() && m_rotor->hasFreshPosition()) {
+        *outDeg = m_rotor->azimuth();
+        return true;
+    }
+    return false;
+}
+
+void RotorLogbookPanel::userPresetMenu(int slot, const QPoint& posInButton)
+{
+    if (slot < 0 || slot >= kUserPresetSlots || !m_userPreset[slot]) {
+        return;
+    }
+    AppSettings& s = AppSettings::instance();
+    const QString degKey   = kPresetDegKey.arg(slot + 1);
+    const QString labelKey = kPresetLabelKey.arg(slot + 1);
+    const bool taught = !s.value(degKey, QString{}).toString().isEmpty();
+
+    QMenu menu(this);
+    double teach = 0.0;
+    const bool canTeach = teachableBearing(&teach);
+    QAction* save = menu.addAction(canTeach
+        ? QStringLiteral("Store current aim here (%1°)")
+              .arg(teach, 0, 'f', 0)
+        : QStringLiteral("Store current aim here — aim something first"));
+    save->setEnabled(canTeach);
+    QAction* rename = taught
+        ? menu.addAction(QStringLiteral("Rename…")) : nullptr;
+    QAction* clear = taught
+        ? menu.addAction(QStringLiteral("Clear")) : nullptr;
+
+    QAction* chosen =
+        menu.exec(m_userPreset[slot]->mapToGlobal(posInButton));
+    if (!chosen) { return; }
+
+    if (chosen == save) {
+        s.setValue(degKey, QString::number(teach, 'f', 1));
+        // First teach without a name: ask for one right away — a row of
+        // bare numbers is exactly the unhelpfulness this row replaces.
+        bool ok = false;
+        const QString name = QInputDialog::getText(
+            this, QStringLiteral("Preset name"),
+            QStringLiteral("Name for %1° (blank keeps the number):")
+                .arg(teach, 0, 'f', 0),
+            QLineEdit::Normal,
+            s.value(labelKey, QString{}).toString(), &ok);
+        if (ok) { s.setValue(labelKey, name.trimmed()); }
+        s.save();
+    } else if (rename && chosen == rename) {
+        bool ok = false;
+        const QString name = QInputDialog::getText(
+            this, QStringLiteral("Preset name"),
+            QStringLiteral("New name:"), QLineEdit::Normal,
+            s.value(labelKey, QString{}).toString(), &ok);
+        if (ok) {
+            s.setValue(labelKey, name.trimmed());
+            s.save();
+        }
+    } else if (clear && chosen == clear) {
+        s.setValue(degKey, QString{});
+        s.setValue(labelKey, QString{});
+        s.save();
+    }
+    refreshUserPresetButton(slot);
+}
+
+void RotorLogbookPanel::parkMenu(const QPoint& posInButton)
+{
+    if (!m_parkBtn) { return; }
+    AppSettings& s = AppSettings::instance();
+    const bool taught = !s.value(kParkDegKey, QString{}).toString().isEmpty();
+
+    QMenu menu(this);
+    double teach = 0.0;
+    const bool canTeach = teachableBearing(&teach);
+    QAction* save = menu.addAction(canTeach
+        ? QStringLiteral("Store current aim as park (%1°)")
+              .arg(teach, 0, 'f', 0)
+        : QStringLiteral("Store current aim as park — aim something "
+                         "first"));
+    save->setEnabled(canTeach);
+    QAction* clear = taught
+        ? menu.addAction(QStringLiteral("Clear park position")) : nullptr;
+
+    QAction* chosen = menu.exec(m_parkBtn->mapToGlobal(posInButton));
+    if (!chosen) { return; }
+    if (chosen == save) {
+        s.setValue(kParkDegKey, QString::number(teach, 'f', 1));
+        s.save();
+    } else if (clear && chosen == clear) {
+        s.setValue(kParkDegKey, QString{});
+        s.save();
+    }
+    refreshParkButton();
+}
 
 void RotorLogbookPanel::beginTurn()
 {
