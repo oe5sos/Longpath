@@ -270,6 +270,25 @@ void ReceiverManager::setReceiverSampleRate(int receiverIndex, int sampleRate)
         return;
     }
     m_receivers[receiverIndex].sampleRate = sampleRate;
+
+    // Remote bench 2026-08-11: mirror into the PS-orchestration rate
+    // (m_rx1Rate / m_rx2Rate) SILENTLY — no updateDdcAssignment() fire.
+    // These two stores drifting apart was a live bug: the P2 per-stream
+    // rate path (commitStreamSampleRateChange) updated only the
+    // per-receiver store, so the PS store kept the connect-time rate,
+    // and the next MOX toggle (setMox -> updateDdcAssignment ->
+    // ddcConfigChanged -> CmdRx) re-applied the STALE rate to the
+    // radio: a 48 kHz session snapped back to 192 kHz on the first TX,
+    // quadrupling the DDC stream and saturating the remote link
+    // (3-9% loss on mic AND IQ during MOX, 0.2% idle). Silent because
+    // every caller of this setter pushes the full assignment itself;
+    // the mirror only has to be correct by the time the next
+    // EVENT-driven fire (MOX / diversity / PS toggle) reads it.
+    if (receiverIndex == 0) {
+        m_rx1Rate = sampleRate;
+    } else if (receiverIndex == 1) {
+        m_rx2Rate = sampleRate;
+    }
 }
 
 void ReceiverManager::setDdcMapping(int receiverIndex, int ddcIndex)

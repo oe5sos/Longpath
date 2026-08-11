@@ -13738,6 +13738,21 @@ qint64 RadioModel::setSampleRateLive(int newRateHz,
 
     // ── Step 12: Update state and emit ───────────────────────────────────
     m_connectionSampleRateHz = newRateHz;
+
+    // Remote bench 2026-08-11: keep ReceiverManager's rx1Rate in sync.
+    // It was seeded once at connect (RadioModel.cpp connect path) and
+    // never updated here, so its PsDdcConfig kept the connect-time
+    // rate. Every MOX transition re-emits that config via
+    // updateDdcAssignment() — and CmdRx then re-applied the STALE rate
+    // to the radio: a 48 kHz session snapped back to 192 kHz on the
+    // first TX, quadrupling the DDC stream and saturating the remote
+    // link (measured: 3-9% loss on mic AND IQ during MOX, 0.2% idle;
+    // wire rate 1006 pkts/5s idle -> 3900 pkts/5s under MOX with
+    // ddcEn unchanged). One line, found via the DDCAssign diagnostic.
+    if (m_receiverManager) {
+        m_receiverManager->setRx1Rate(newRateHz);
+    }
+
     emit wireSampleRateChanged(static_cast<double>(newRateHz));
 
     if (restartExternalDiversity && reconcileDiversity) {

@@ -64,6 +64,12 @@ private slots:
     void hl2PsOnMoxEmitsExpectedPsDdcConfig();
     void standardHermesPsOffMoxEmitsExpectedPsDdcConfig();
 
+    // Remote bench 2026-08-11: per-receiver rate must mirror into the
+    // PS-orchestration rate, or the next MOX fire re-applies the stale
+    // connect-time rate to the radio (48 kHz session snapped back to
+    // 192 kHz on first TX, saturating the remote link).
+    void perReceiverRateChangeMirrorsIntoPsRate();
+
     // Idempotence
     void setSameStateDoesNotEmit();
 
@@ -227,6 +233,34 @@ void TstReceiverManagerPsDdc::standardHermesPsOffMoxEmitsExpectedPsDdcConfig()
     QCOMPARE(config.p1DdcConfig,    4);
     QCOMPARE(int(config.ddcEnable), int(DDC0));
     QCOMPARE(int(config.cntrl1),    0);
+}
+
+void TstReceiverManagerPsDdc::perReceiverRateChangeMirrorsIntoPsRate()
+{
+    // The exact remote-bench sequence of 2026-08-11: connect seeds the
+    // PS-orchestration rate at 192 kHz, the P2 per-stream path
+    // (commitStreamSampleRateChange) later applies 48 kHz through
+    // setReceiverSampleRate ONLY — and the next MOX fire must emit the
+    // LIVE 48 kHz, not the stale 192 kHz that saturated the link.
+    P2CodecOrionMkII codec;
+    ReceiverManager mgr;
+    mgr.setP2Codec(&codec);
+    mgr.setHpsdrModel(HPSDRModel::ANAN_G2);
+
+    mgr.setRx1Rate(192000);        // connect-time seed
+    QCOMPARE(mgr.createReceiver(), 0);
+    mgr.setReceiverSampleRate(0, 48000);   // per-stream live apply
+
+    QSignalSpy spy(&mgr, &ReceiverManager::ddcConfigChanged);
+    mgr.setMox(true);
+
+    QVERIFY(spy.count() >= 1);
+    auto config = spy.last().first().value<PsDdcConfig>();
+    // G2-class MOX, !diversity, !PS → DDC2 only at rx1_rate
+    // (console.cs:8246-8255 [v2.10.3.13]); the regression emitted
+    // rate[2]=192000 here.
+    QCOMPARE(int(config.ddcEnable), int(DDC2));
+    QCOMPARE(int(config.rate[2]),   48000);
 }
 
 void TstReceiverManagerPsDdc::setSameStateDoesNotEmit()

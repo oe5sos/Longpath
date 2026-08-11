@@ -197,6 +197,42 @@ pinned by tests/tst_mic_reorder_buffer.cpp; validated pre-merge in an
 offline ASan/UBSan harness including a 20k-frame soak (3% swaps +
 0.1% loss: 588 rescued, 10 concealed, zero out-of-order emissions).
 
+### Second measurement (same evening, under MOX): the 3-15% solved
+
+Under MOX the audit showed 3-9% loss on mic AND IQ simultaneously —
+and the IQ packet rate quadrupled from ~1000 to ~3900 pkts / 5 s the
+moment MOX engaged, with PureSignal OFF and `DDCAssign` reporting the
+same single enabled DDC throughout. 201 pkt/s is exactly 48 kHz;
+807 pkt/s is exactly 192 kHz: the radio was being snapped from the
+session's live 48 kHz to 192 kHz on every TX.
+
+Root cause — two rate stores drifting apart. `ReceiverManager` keeps
+a per-receiver rate (updated by the P2 per-stream path,
+`commitStreamSampleRateChange` → `setReceiverSampleRate`) AND a
+PS-orchestration rate (`m_rx1Rate`, seeded once at connect, read by
+`updateDdcAssignment()` on every MOX/PS/diversity toggle). The
+per-stream 48 kHz apply updated only the former; the first MOX fire
+emitted a PsDdcConfig carrying the stale connect-time 192 kHz, and
+CmdRx obediently reprogrammed the radio. Four times the downstream
+bandwidth met a remote link that could not carry it (on top of the
+protocol-fixed ~9.2 Mbit/s upstream TX I/Q that P2 always sends
+during MOX), and both directions drowned. The dispatch-tick "3-15%
+mic loss" from the original crackle hunt was this exact mechanism,
+measured two layers downstream.
+
+Fix: `setReceiverSampleRate` now mirrors indices 0/1 into
+`m_rx1Rate`/`m_rx2Rate` silently (no assignment fire — every caller
+pushes the full assignment itself; the mirror only has to be correct
+by the next event-driven fire), and `setSampleRateLive` step 12 syncs
+explicitly on the radio-wide path. Regression pinned in
+tests/tst_receiver_manager_ps_ddc.cpp
+(`perReceiverRateChangeMirrorsIntoPsRate`).
+
+Residual for remote TX: the P2 upstream TX I/Q at 192 kHz
+(~9.2 Mbit/s while transmitting) is protocol-fixed and remains the
+remote link's biggest single load. If TX loss persists after this
+fix, the lever is the link (wired bridge / QoS), not the client.
+
 ## Open items
 
 - "QLayout: Cannot add a null widget" fires once when some window
