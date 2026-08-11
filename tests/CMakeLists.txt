@@ -4721,6 +4721,11 @@ nereus_add_test(tst_strip_characters)
 #    change touches a number the operator did not --
 nereus_add_test(tst_eq_filter_ring)
 
+# -- Undo. The ways it breaks are all quiet: a step that restores
+#    nothing, a step that restores the wrong thing, a stack that never
+#    empties because undoing counted as an edit --
+nereus_add_test(tst_eq_history)
+
 # -- Loudness matching: the two weighting curves against the published
 #    tables in IEC 61672 and ITU-R BS.1770, and the properties the
 #    average must have whatever the weighting is --

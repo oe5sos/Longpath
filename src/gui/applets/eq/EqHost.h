@@ -42,6 +42,21 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
+// ── Undo lives here, and only here ───────────────────────────────────
+//
+// saveClientEqSettings() is the one call every equaliser mutation ends
+// with — canvas drag, icon click, typed value, output fader, context
+// menu. That makes this class the only place that sees all of them, so
+// it is where the history goes. Putting it in the panel would mean the
+// panel intercepting five widgets it did not write.
+//
+// The suppression flag matters: undo() writes to the ClientEq and then
+// persists, and persisting goes through the same door that records
+// history. Without the flag, undoing would record the undo as an edit
+// and the stack would never empty.
+
+#include "gui/applets/eq/EqHistory.h"
+
 #include <QPointer>
 
 namespace NereusSDR {
@@ -51,9 +66,13 @@ class StripChain;
 
 class EqHost {
 public:
-    explicit EqHost(StripChain* chain) : m_chain(chain) {}
+    // Takes the equaliser's current state as the undo baseline right
+    // away. Without it the operator's FIRST edit of the session becomes
+    // the baseline instead of a step, and the one edit people most want
+    // back is the first one they were not sure about.
+    explicit EqHost(StripChain* chain) : m_chain(chain) { resetEqHistory(); }
 
-    void setChain(StripChain* chain) { m_chain = chain; }
+    void setChain(StripChain* chain);
 
     // The equaliser the widgets edit. Null when no radio is connected,
     // which every ported widget already handles — they were written
@@ -67,10 +86,31 @@ public:
     int copyRecentClientEqTxSamples(float* dst, int count);
     int copyRecentClientEqRxSamples(float*, int) { return 0; }
 
+    // Called by every ported widget after it changes something. Saves
+    // to disk, as upstream expects, and records an undo step.
     void saveClientEqSettings();
+
+    // ── Stepping back ────────────────────────────────────────────────
+    //
+    // Both persist and both are safe to call when there is nothing to
+    // do; they return false and change nothing, so a caller may leave
+    // its button state to canUndo()/canRedo() without a race.
+    bool undoEqEdit();
+    bool redoEqEdit();
+    bool canUndoEqEdit() const { return m_history.canUndo(); }
+    bool canRedoEqEdit() const { return m_history.canRedo(); }
+    int  undoDepth()     const { return m_history.undoDepth(); }
+
+    // Forget everything and take the current state as the new baseline.
+    // Called when the chain changes underneath — undoing across a
+    // reconnection would restore a curve from a different session.
+    void resetEqHistory();
 
 private:
     StripChain* m_chain{nullptr};
+    EqHistory   m_history;
+    // True while undo/redo is writing. See the note above the class.
+    bool        m_replaying{false};
 };
 
 } // namespace NereusSDR

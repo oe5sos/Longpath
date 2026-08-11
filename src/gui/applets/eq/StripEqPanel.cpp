@@ -43,7 +43,9 @@
 #include <QLabel>
 #include <QMoveEvent>
 #include <QPushButton>
+#include <QKeySequence>
 #include <QResizeEvent>
+#include <QShortcut>
 #include <QShowEvent>
 #include <QSignalBlocker>
 #include <QTimer>
@@ -133,6 +135,20 @@ QString windowStyle()
 // line ~402) and its stylesheet was left behind. Deleted rather than
 // repainted: repainting dead code is how it survives the next audit
 // too.
+
+// The shared look for the small buttons on the control row. Undo, Redo
+// and Reset used to be three copies of the same eight lines of CSS,
+// which is how one of them ends up a different shade after an edit.
+constexpr const char* kRowButtonStyle =
+    "QPushButton {"
+    "  background: {{color.background.0}}; color: {{color.text.primary}};"
+    "  border: 1px solid {{color.background.1}}; border-radius: 3px;"
+    "  padding: 2px 12px; font-size: 11px; font-weight: bold;"
+    "}"
+    "QPushButton:hover { background: {{color.background.1}}; }"
+    "QPushButton:pressed { background: {{color.background.1}}; }"
+    "QPushButton:disabled { color: {{color.background.3}};"
+    "  border-color: {{color.background.0}}; }";
 
 // Peak Hold. Checked is a filled amber block rather than an outline,
 // because a frozen analyser is a state you must not forget you are in —
@@ -323,20 +339,45 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         });
         row->addWidget(m_familyCombo);
 
+        // ── Back, and forward again ──────────────────────────────────
+        //
+        // Asked for at the bench, and the panel needed it more than it
+        // needed anything else on this row: every gesture on the curve
+        // wrote straight through to the DSP and on to disk, so a
+        // mis-aimed drag was permanent the moment it landed. See
+        // EqHistory.h.
+        //
+        // Placed BEFORE Reset deliberately. Reset is the destructive
+        // button on this row and it sat alone; giving it a neighbour
+        // that undoes things makes the pair read as a unit and makes an
+        // accidental Reset survivable — it is one undo step like any
+        // other.
+        m_undoBtn = new QPushButton(QStringLiteral("↶ Undo"));
+        m_undoBtn->setFixedHeight(24);
+        applyThemed(m_undoBtn, kRowButtonStyle);
+        connect(m_undoBtn, &QPushButton::clicked, this, [this]() {
+            if (m_audio && m_audio->undoEqEdit()) { afterHistoryStep(); }
+        });
+        row->addWidget(m_undoBtn);
+
+        m_redoBtn = new QPushButton(QStringLiteral("↷"));
+        m_redoBtn->setFixedHeight(24);
+        m_redoBtn->setToolTip(QStringLiteral("Redo the step just undone"));
+        applyThemed(m_redoBtn, kRowButtonStyle);
+        connect(m_redoBtn, &QPushButton::clicked, this, [this]() {
+            if (m_audio && m_audio->redoEqEdit()) { afterHistoryStep(); }
+        });
+        row->addWidget(m_redoBtn);
+
         // Reset — drops every band back to ClientEq::defaultBand(i),
         // restores the default 10-band count, and resets the filter
         // family to Butterworth.  Saves immediately so the wipe
         // survives a restart.
         auto* resetBtn = new QPushButton("Reset");
         resetBtn->setFixedHeight(24);
-        resetBtn->setToolTip("Reset all bands to default values");
-        applyThemed(resetBtn, "QPushButton {"
-            "  background: {{color.background.0}}; color: {{color.text.primary}};"
-            "  border: 1px solid {{color.background.1}}; border-radius: 3px;"
-            "  padding: 2px 12px; font-size: 11px; font-weight: bold;"
-            "}"
-            "QPushButton:hover { background: {{color.background.1}}; }"
-            "QPushButton:pressed { background: {{color.background.1}}; }");
+        resetBtn->setToolTip("Reset all bands to default values — "
+                             "undoable, like any other step");
+        applyThemed(resetBtn, kRowButtonStyle);
         connect(resetBtn, &QPushButton::clicked, this, [this]() {
             ClientEq* eq = (m_path == ClientEqApplet::Path::Rx)
                 ? m_audio->clientEqRx() : m_audio->clientEqTx();
@@ -451,7 +492,34 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             m_paramRow->refresh();
             m_paramRow->setSelectedBand(m_canvas->selectedBand());
         }
+        // Cheap, and the only signal that fires for every kind of edit.
+        // It also fires DURING a drag, before the commit — so Undo lights
+        // up a moment early. That is the right way round: a button that
+        // is briefly available before there is anything to undo does
+        // nothing when pressed, where one that lights up late looks
+        // broken exactly when it is needed.
+        refreshHistoryButtons();
     });
+
+    // ── Ctrl+Z, and the reason it is scoped to the panel ─────────────
+    //
+    // WindowShortcut, not ApplicationShortcut. The strip is one tab
+    // among nine and the main window has its own editing surfaces; an
+    // application-wide undo owned by the equaliser would swallow the
+    // keystroke wherever the operator happened to be.
+    {
+        auto* undoSc = new QShortcut(QKeySequence::Undo, this);
+        undoSc->setContext(Qt::WindowShortcut);
+        connect(undoSc, &QShortcut::activated, this, [this]() {
+            if (m_audio && m_audio->undoEqEdit()) { afterHistoryStep(); }
+        });
+        auto* redoSc = new QShortcut(QKeySequence::Redo, this);
+        redoSc->setContext(Qt::WindowShortcut);
+        connect(redoSc, &QShortcut::activated, this, [this]() {
+            if (m_audio && m_audio->redoEqEdit()) { afterHistoryStep(); }
+        });
+    }
+    refreshHistoryButtons();
 
     // FFT analyzer ticks on a QTimer while the editor is visible.  Pulls
     // the most-recent post-EQ samples from AudioEngine, runs the FFT on
@@ -465,6 +533,58 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             this, &StripEqPanel::tickFftAnalyzer);
 
     restoreGeometryFromSettings();
+}
+
+void StripEqPanel::refreshHistoryButtons()
+{
+    const bool canUndo = m_audio && m_audio->canUndoEqEdit();
+    const bool canRedo = m_audio && m_audio->canRedoEqEdit();
+    if (m_undoBtn) {
+        m_undoBtn->setEnabled(canUndo);
+        // The depth is in the tooltip rather than on the face of the
+        // button: it changes constantly during shaping and a number
+        // that flickers in the corner of the eye is a distraction from
+        // the curve, which is the thing being looked at.
+        m_undoBtn->setToolTip(
+            canUndo
+                ? QStringLiteral("Undo the last change  (%1 step%2 back, "
+                                 "%3)")
+                      .arg(m_audio->undoDepth())
+                      .arg(m_audio->undoDepth() == 1 ? QString()
+                                                     : QStringLiteral("s"))
+                      .arg(QKeySequence(QKeySequence::Undo)
+                               .toString(QKeySequence::NativeText))
+                : QStringLiteral("Nothing to undo yet"));
+    }
+    if (m_redoBtn) {
+        m_redoBtn->setEnabled(canRedo);
+        m_redoBtn->setToolTip(canRedo
+            ? QStringLiteral("Redo the step just undone  (%1)")
+                  .arg(QKeySequence(QKeySequence::Redo)
+                           .toString(QKeySequence::NativeText))
+            : QStringLiteral("Nothing to redo"));
+    }
+}
+
+void StripEqPanel::afterHistoryStep()
+{
+    ClientEq* eq = (m_path == ClientEqApplet::Path::Rx)
+        ? m_audio->clientEqRx() : m_audio->clientEqTx();
+
+    // Everything, from the engine. An undo can move any band, the band
+    // count, the master gain and the filter family in one step, and a
+    // refresh that only touches what it thinks changed is how the panel
+    // ends up showing a curve the DSP is not playing.
+    if (eq && m_familyCombo) {
+        const QSignalBlocker b(m_familyCombo);
+        m_familyCombo->setCurrentIndex(static_cast<int>(eq->filterFamily()));
+    }
+    if (eq && m_outFader) { m_outFader->setGainLinear(eq->masterGain()); }
+    if (m_canvas)   m_canvas->update();
+    if (m_iconRow)  m_iconRow->refresh();
+    if (m_paramRow) m_paramRow->refresh();
+    syncBypassFromEq();
+    refreshHistoryButtons();
 }
 
 StripEqPanel::~StripEqPanel() = default;

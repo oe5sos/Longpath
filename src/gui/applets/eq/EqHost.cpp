@@ -42,9 +42,51 @@ int EqHost::copyRecentClientEqTxSamples(float* dst, int count)
     return m_chain->micSpectrum().snapshot(dst, count);
 }
 
+void EqHost::setChain(StripChain* chain)
+{
+    if (m_chain == chain) { return; }
+    m_chain = chain;
+    // A different chain is a different session. Undoing across it would
+    // restore a curve the operator shaped on another connection.
+    resetEqHistory();
+}
+
+void EqHost::resetEqHistory()
+{
+    if (ClientEq* eq = clientEqTx()) { m_history.reset(*eq); }
+    else                             { m_history.clear(); }
+}
+
 void EqHost::saveClientEqSettings()
 {
-    if (m_chain) { StripSettings::save(*m_chain); }
+    if (!m_chain) { return; }
+    // Record first, save second. The order does not matter to either,
+    // but reading it in this order makes it obvious that the history is
+    // built from the same event the persistence is.
+    if (!m_replaying) { m_history.noteCommit(m_chain->eq()); }
+    StripSettings::save(*m_chain);
+}
+
+bool EqHost::undoEqEdit()
+{
+    ClientEq* eq = clientEqTx();
+    if (!eq) { return false; }
+    m_replaying = true;
+    const bool did = m_history.undo(*eq);
+    if (did && m_chain) { StripSettings::save(*m_chain); }
+    m_replaying = false;
+    return did;
+}
+
+bool EqHost::redoEqEdit()
+{
+    ClientEq* eq = clientEqTx();
+    if (!eq) { return false; }
+    m_replaying = true;
+    const bool did = m_history.redo(*eq);
+    if (did && m_chain) { StripSettings::save(*m_chain); }
+    m_replaying = false;
+    return did;
 }
 
 } // namespace NereusSDR

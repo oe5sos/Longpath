@@ -993,6 +993,7 @@ set(GUI_SOURCES
     src/gui/applets/TxVoiceCheckDialog.cpp
     src/gui/applets/eq/ClientEqCurveWidget.cpp
     src/gui/applets/eq/ClientEqOutputFader.cpp
+    src/gui/applets/eq/EqHistory.cpp
     src/gui/applets/eq/EqHost.cpp
     src/gui/applets/eq/StripEqPanel.cpp
     src/gui/applets/eq/ClientEqEditorCanvas.cpp

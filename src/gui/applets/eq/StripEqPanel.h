@@ -115,6 +115,20 @@ private:
     // the smoothed bins into the curve widget. Called by m_fftTimer.
     void tickFftAnalyzer();
 
+    // ── Undo ─────────────────────────────────────────────────────────
+    //
+    // The stack itself lives in EqHost, because that is the one object
+    // every mutation already passes through. These two are the panel's
+    // side of it.
+    //
+    // afterHistoryStep() reloads every view from the engine rather than
+    // trying to update the ones it thinks changed. An undo can move any
+    // band, the count, the master gain and the filter family at once,
+    // and a partial refresh is how a panel ends up showing a curve the
+    // DSP is not playing.
+    void afterHistoryStep();
+    void refreshHistoryButtons();
+
     EqHost*               m_audio{nullptr};
     ClientEqApplet::Path       m_path{ClientEqApplet::Path::Rx};
     int                        m_txFilterLowCutHz{0};
@@ -130,6 +144,8 @@ private:
     QWidget*                   m_titleBar{nullptr};
     QComboBox*                 m_familyCombo{nullptr};
     QPushButton*               m_bypass{nullptr};
+    QPushButton*               m_undoBtn{nullptr};
+    QPushButton*               m_redoBtn{nullptr};
     ClientEqIconRow*           m_iconRow{nullptr};
     ClientEqEditorCanvas*      m_canvas{nullptr};
     ClientEqParamRow*          m_paramRow{nullptr};
