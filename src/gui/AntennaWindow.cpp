@@ -15,6 +15,7 @@
 
 #include "core/AppSettings.h"
 #include "core/antenna/AntennaSweep.h"
+#include "core/antenna/Feedline.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/SwrCurveWidget.h"
 
@@ -41,6 +42,8 @@ const QString kLengthKey = QStringLiteral("AntennaTrimLengthM");
 const QString kRegionKey = QStringLiteral("AntennaBandRegion");
 const QString kLimitKey  = QStringLiteral("AntennaSwrLimit");
 const QString kDirKey    = QStringLiteral("AntennaSweepDir");
+const QString kCableKey  = QStringLiteral("AntennaCableType");
+const QString kCableLenKey = QStringLiteral("AntennaCableLengthM");
 
 QLabel* caption(const QString& text, QWidget* parent)
 {
@@ -186,6 +189,37 @@ void AntennaWindow::buildUi()
         "until you choose."));
     top->addWidget(m_targetBox);
 
+    // ── The coax between the analyser and the antenna ────────────
+    //
+    // Zero for anyone who calibrated at the far end, which is the right
+    // way to do it and costs nothing here. For everyone else this is
+    // the difference between measuring the antenna and measuring the
+    // antenna plus a transformer of unknown ratio.
+    top->addWidget(caption(QStringLiteral("COAX"), this));
+    m_cableBox = new QComboBox(this);
+    for (int i = 0; i < Feedline::catalogue().size(); ++i) {
+        m_cableBox->addItem(Feedline::catalogue().at(i).name, i);
+    }
+    m_cableBox->setCurrentIndex(std::clamp(
+        s.value(kCableKey, 0).toInt(), 0,
+        int(Feedline::catalogue().size()) - 1));
+    m_cableBox->setToolTip(QStringLiteral(
+        "The cable between the analyser and the antenna. Nominal "
+        "figures — real cable varies by make and by age."));
+    top->addWidget(m_cableBox);
+
+    m_cableLenBox = new QDoubleSpinBox(this);
+    m_cableLenBox->setRange(0.0, 300.0);
+    m_cableLenBox->setDecimals(1);
+    m_cableLenBox->setSingleStep(0.5);
+    m_cableLenBox->setSuffix(QStringLiteral(" m"));
+    m_cableLenBox->setSpecialValueText(QStringLiteral("none"));
+    m_cableLenBox->setValue(s.value(kCableLenKey, 0.0).toDouble());
+    m_cableLenBox->setToolTip(QStringLiteral(
+        "How much of it. Leave at none if you calibrated at the antenna "
+        "end — then there is nothing to take out."));
+    top->addWidget(m_cableLenBox);
+
     top->addStretch(1);
 
     top->addWidget(caption(QStringLiteral("SWR MAX"), this));
@@ -307,6 +341,17 @@ void AntennaWindow::buildUi()
         AppSettings::instance().setValue(kLimitKey, v);
         refresh();
     });
+    connect(m_cableBox, &QComboBox::currentIndexChanged, this, [this](int i) {
+        AppSettings::instance().setValue(kCableKey, i);
+        applyFeedline();
+        refresh();
+    });
+    connect(m_cableLenBox, &QDoubleSpinBox::valueChanged,
+            this, [this](double v) {
+        AppSettings::instance().setValue(kCableLenKey, v);
+        applyFeedline();
+        refresh();
+    });
     connect(m_targetBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
         // Only a value the operator put there counts as chosen — the
         // band-centre default is written through the same setter.
@@ -332,9 +377,23 @@ void AntennaWindow::openFile(const QString& path)
     setSweep(Touchstone::readS1p(path));
 }
 
+void AntennaWindow::applyFeedline()
+{
+    const double len = m_cableLenBox ? m_cableLenBox->value() : 0.0;
+    const int idx = m_cableBox ? m_cableBox->currentIndex() : 0;
+    if (len <= 0.0 || idx < 0 || idx >= Feedline::catalogue().size()) {
+        m_sweep = m_measured;
+        return;
+    }
+    const auto out = Feedline::deEmbed(m_measured, len,
+                                       Feedline::catalogue().at(idx));
+    m_sweep = out.sweep;
+}
+
 void AntennaWindow::setSweep(const Sweep& s)
 {
-    m_sweep = s;
+    m_measured = s;
+    applyFeedline();
     // A newly loaded sweep may be a different band, so the defaulted
     // target has to be recomputed. A target the operator typed is left
     // alone — see m_targetChosen.
@@ -372,13 +431,25 @@ void AntennaWindow::refresh()
     const double targetHz = m_targetBox->value() * 1e6;
     m_curve->setTargetHz(targetHz);
 
+    // Where the numbers claim to have been measured. An operator
+    // looking at a de-embedded curve and one looking at a raw curve are
+    // looking at different antennas, and the line has to say which.
+    const double cableLen = m_cableLenBox->value();
+    const int    cableIdx = m_cableBox->currentIndex();
+    const QString plane = (cableLen > 0.0 && cableIdx > 0)
+        ? QStringLiteral("at the antenna, %1 m of %2 removed")
+              .arg(cableLen, 0, 'f', 1)
+              .arg(Feedline::catalogue().at(cableIdx).name)
+        : QStringLiteral("at the analyser port");
+
     m_source->setText(m_sweep.source.isEmpty()
         ? QString{}
-        : QStringLiteral("%1 · %2 points · %3 to %4 MHz")
+        : QStringLiteral("%1 · %2 points · %3 to %4 MHz · %5")
               .arg(m_sweep.source)
               .arg(m_sweep.points.size())
               .arg(m_sweep.startHz() / 1e6, 0, 'f', 3)
-              .arg(m_sweep.stopHz()  / 1e6, 0, 'f', 3));
+              .arg(m_sweep.stopHz()  / 1e6, 0, 'f', 3)
+              .arg(plane));
 
     // ── The three tiles ──────────────────────────────────────────────
     const double limit = m_limitBox->value();

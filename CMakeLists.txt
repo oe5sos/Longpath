@@ -499,6 +499,7 @@ set(CORE_SOURCES
     src/core/AntennaLabels.cpp
     src/core/antenna/AmateurBands.cpp
     src/core/antenna/Touchstone.cpp
+    src/core/antenna/Feedline.cpp
     src/core/antenna/AntennaSweep.cpp
     src/core/antenna/AntennaTrim.cpp
     src/core/AppSettings.cpp

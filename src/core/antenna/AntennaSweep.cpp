@@ -126,10 +126,32 @@ Crossing nearestResonance(const Sweep& s, double nearHz)
     double bestDistance = 0.0;
 
     for (const Crossing& c : all) {
-        // Series resonance only. A falling crossing with a huge R is
-        // the anti-resonance — trimming towards it makes the antenna
-        // worse in a way that looks like progress on an SWR meter.
-        if (!c.rising && c.resistanceOhms > kAntiResonanceOhms) { continue; }
+        // ── Rising only, and this was a real bug ─────────────────────
+        //
+        // The first version admitted a falling crossing as long as its
+        // resistance was modest, on the grounds that only the huge-R
+        // anti-resonance was worth excluding.
+        //
+        // A length of coax between the analyser and the antenna breaks
+        // that. The line rotates the impedance, and in the model this
+        // was checked against, five metres of RG-58 left exactly one
+        // crossing in the band — a FALLING one, at 45 Ω. Modest
+        // resistance, entirely an artefact, and the old rule returned
+        // it as the resonance with no hesitation. The trim computed
+        // from it would have been wrong by 20 kHz in the wrong
+        // direction.
+        //
+        // A series resonance rises: capacitive below, inductive above,
+        // because a wire that is too short is capacitive. Anything
+        // falling is either the anti-resonance or the feedline. Neither
+        // is a thing to cut wire for. Callers that find nothing here
+        // should ask anyCrossing() before concluding the antenna has no
+        // resonance at all — the difference is worth telling an
+        // operator about.
+        if (!c.rising) { continue; }
+        // Belt and braces: a rising crossing at four hundred ohms is
+        // not a feed point either.
+        if (c.resistanceOhms > kAntiResonanceOhms) { continue; }
 
         const double d = std::abs(c.freqHz - nearHz);
         if (!best.found || d < bestDistance) {
@@ -138,6 +160,11 @@ Crossing nearestResonance(const Sweep& s, double nearHz)
         }
     }
     return best;
+}
+
+bool anyCrossing(const Sweep& s)
+{
+    return !resonances(s).isEmpty();
 }
 
 Minimum bestMatch(const Sweep& s)
@@ -268,10 +295,15 @@ QString describe(const Sweep& s, double targetHz)
     };
 
     if (!r.found) {
-        // Worth saying rather than reporting the SWR dip as if it were
-        // the answer: no crossing means the antenna is not resonant
-        // anywhere in the swept range, and a wider sweep is the next
-        // step.
+        // Two quite different situations, and the advice differs.
+        if (anyCrossing(s)) {
+            return QStringLiteral(
+                "The reactance crosses zero here, but only downwards — "
+                "that is not a series resonance. Either this is the "
+                "antenna's anti-resonance, or there is coax between the "
+                "analyser and the antenna rotating the impedance. Enter "
+                "the cable length, or calibrate at the antenna end.");
+        }
         return QStringLiteral(
             "The reactance never reaches zero in this sweep, so the "
             "antenna is not resonant between %1 and %2. Sweep wider to "

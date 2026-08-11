@@ -92,8 +92,20 @@ struct Crossing {
 QVector<Crossing> resonances(const Sweep& s);
 
 // The series resonance nearest `nearHz`. Pass 0 for the first one in
-// the sweep. Anti-resonances are skipped — see the header note.
+// the sweep.
+//
+// RISING crossings only. A falling one is either the anti-resonance or
+// — the case that made this strict — a length of coax between the
+// analyser and the antenna, which rotates the impedance until an
+// artefact looks exactly like a resonance at a plausible resistance.
 Crossing nearestResonance(const Sweep& s, double nearHz = 0.0);
+
+// Whether the reactance crosses zero anywhere at all, in either
+// direction. The difference between "no crossing" and "crossings, but
+// none of them a series resonance" is the difference between an
+// antenna far off frequency and a measurement made through a feedline,
+// and an operator should be told which they have.
+bool anyCrossing(const Sweep& s);
 
 struct Minimum {
     bool   found{false};

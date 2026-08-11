@@ -37,6 +37,7 @@
 
 #include "core/antenna/AmateurBands.h"
 #include "core/antenna/AntennaTrim.h"
+#include "core/antenna/Feedline.h"
 #include "core/antenna/Touchstone.h"
 
 #include <QDialog>
@@ -68,6 +69,10 @@ private:
     void refresh();
 
     void chooseFile();
+    // Take the coax back out, if one was entered. Sets m_sweep from
+    // m_measured — one place, so no view can be looking at the raw
+    // sweep while another looks at the corrected one.
+    void applyFeedline();
     // Fill the length box with a half-wave estimate for the target.
     // Labelled as an estimate wherever it lands, because the velocity
     // factor of the operator's actual wire is not known here.
@@ -76,7 +81,11 @@ private:
     AntennaTrim::Kind    currentKind() const;
     AmateurBands::Region currentRegion() const;
 
-    Sweep m_sweep;
+    // As it came out of the file, and as it is after the feedline has
+    // been taken back out. Both kept: the operator can compare, and
+    // reloading is not needed when the cable length changes.
+    Sweep m_measured;
+    Sweep m_sweep;        // what everything downstream reads
 
     QPushButton*    m_openBtn{nullptr};
     QComboBox*      m_kindBox{nullptr};
@@ -84,6 +93,8 @@ private:
     QPushButton*    m_estimateBtn{nullptr};
     QDoubleSpinBox* m_targetBox{nullptr};
     QComboBox*      m_regionBox{nullptr};
+    QComboBox*      m_cableBox{nullptr};
+    QDoubleSpinBox* m_cableLenBox{nullptr};
     QDoubleSpinBox* m_limitBox{nullptr};
 
     QLabel* m_action{nullptr};      // "+ 22 cm", large

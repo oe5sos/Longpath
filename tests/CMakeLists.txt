@@ -4698,6 +4698,12 @@ nereus_add_test(tst_antenna_sweep)
 #    spectrum a Region 1 operator may not transmit in --
 nereus_add_test(tst_amateur_bands)
 
+# -- Taking the coax back out. Loss flatters the SWR, but the one that
+#    ruins a trim is the phase rotation: five metres of RG-58 left the
+#    dipole with exactly one crossing in the band, a FALLING one at
+#    45 ohms, which the first nearestResonance() returned as the answer --
+nereus_add_test(tst_feedline)
+
 # -- Characters: the list makes claims (gentlest first, Off really off,
 #    the two voice de-essers listen in different places) and nothing but
 #    these tests keeps them true --
