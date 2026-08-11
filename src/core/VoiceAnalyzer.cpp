@@ -323,10 +323,44 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
         }
         return total;
     };
-    const double hum50 = humAt(50.0);
-    const double hum60 = humAt(60.0);
-    r.humBaseHz = hum50 >= hum60 ? 50 : 60;
-    r.humDb = toDb(std::max(hum50, hum60)) - toDb(mid);
+    // Which mains? Decided on the FUNDAMENTAL alone, from the
+    // interpolated peak frequency. The ±2-bin harmonic windows above
+    // are ±23 Hz wide at this FFT size, which makes the 50- and
+    // 60-family windows overlap almost completely — a clean 60 Hz hum
+    // scored a dead heat and lost the tie to 50 (caught by
+    // tst_voice_analyzer on the 2026-08-11 full-suite run). humAt()
+    // still measures the STRENGTH, harmonics and all; it just no
+    // longer votes on the base.
+    int    kPeak = -1;
+    double pPeak = 0.0;
+    const int kLo = std::max(1, int(std::floor(40.0 / binHz)));
+    const int kHi = std::min(kFft / 2, int(std::ceil(70.0 / binHz)));
+    for (int k = kLo; k <= kHi; ++k) {
+        if (power[static_cast<size_t>(k)] > pPeak) {
+            pPeak = power[static_cast<size_t>(k)];
+            kPeak = k;
+        }
+    }
+    double fPeak = (kPeak > 0) ? kPeak * binHz : 50.0;
+    if (kPeak > 1 && kPeak < kFft / 2) {
+        // Parabolic interpolation over log power — the standard
+        // fractional-bin refinement; ±23 Hz of bin quantisation
+        // collapses to a fraction of a hertz for a clean tone.
+        const auto lp = [&](int k) {
+            return std::log(std::max(1e-30,
+                power[static_cast<size_t>(k)]));
+        };
+        const double a = lp(kPeak - 1);
+        const double b = lp(kPeak);
+        const double c = lp(kPeak + 1);
+        const double denom = a - 2.0 * b + c;
+        if (std::abs(denom) > 1e-12) {
+            fPeak = (kPeak + 0.5 * (a - c) / denom) * binHz;
+        }
+    }
+    r.humBaseHz =
+        (std::abs(fPeak - 60.0) < std::abs(fPeak - 50.0)) ? 60 : 50;
+    r.humDb = toDb(humAt(double(r.humBaseHz))) - toDb(mid);
 
     // ── Crest factor ─────────────────────────────────────────────────
     double peak = 0.0, sumSq = 0.0;
