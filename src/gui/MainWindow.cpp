@@ -2938,6 +2938,22 @@ void MainWindow::buildUI()
         // above repaints the overlay without it.
         connect(activeSpectrumWidget(), &SpectrumWidget::spotRemoveRequested,
                 spotModel, &SpotModel::removeSpot);
+
+        // 2026-08-11 bench fix, found ON the bench the same afternoon it
+        // shipped: "Turn rotor to <call>" was wired only in
+        // wireSpectrumForPan, and pan-0 — the pan everybody actually
+        // right-clicks — is excluded from that function (its spot hooks
+        // live HERE, as the comment at the exclusion says). So the menu
+        // entry existed and did nothing. Same handler as the per-pan
+        // wiring and the Spot List path.
+        connect(activeSpectrumWidget(), &SpectrumWidget::spotRotorRequested,
+                this, [this](const QString& dxCall) {
+            if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+                m_rotorDock->show();
+                m_rotorDock->raise();
+                panel->workSpot(dxCall);
+            }
+        });
     }
 
     // Zoom slider bar below spectrum
