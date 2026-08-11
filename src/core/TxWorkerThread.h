@@ -127,7 +127,7 @@ public:
     void setAudioEngine(AudioEngine* engine);
     void setMicSource(TxMicSource* src);
 
-    /// Aetherial Audio Channel Strip — client-side transmit processing.
+    /// Nereus Audio Channel Strip — client-side transmit processing.
     ///
     /// Runs on the raw microphone block, before pumpDexp and before
     /// WDSP. That ordering is deliberate and matches upstream: the

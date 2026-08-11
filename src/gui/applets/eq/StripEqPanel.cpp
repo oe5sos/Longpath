@@ -103,29 +103,60 @@ namespace {
 constexpr int kDefaultWidth  = 900;
 constexpr int kDefaultHeight = 520;
 
-constexpr const char* kWindowStyle =
-    "QWidget { background: #08121d; color: #d7e7f2; }"
-    "QLabel  { background: transparent; color: #8aa8c0; font-size: 11px; }";
+// ── The stylesheets the theme seam did not reach ─────────────────────
+//
+// applyThemed() above resolves the {{color.x}} tokens, and on the first
+// pass that looked like the whole job. It was not: the three stylesheets
+// below never used tokens at all — upstream wrote their colours as hex
+// literals — so they came through the port untouched and the equaliser
+// tab kept AetherSDR's window background (#08121d) and its gold
+// (#f2c14e) while everything painted around it had already moved.
+//
+// Written as functions rather than constants because a QColor cannot be
+// lightened at compile time and because the tokens are `const char*`.
+// The cost is one QString built per widget at construction, which is
+// once.
 
-// Bypass button visual: unchecked = EQ active (subtle), checked = bypass
-// engaged (amber, signals "this is muting your work").  Plugin convention.
-const QString kBypassStyle = QStringLiteral(
-    "QPushButton {"
-    "  background: #0e1b28;"
-    "  color: #8aa8c0;"
-    "  border: 1px solid #243a4e;"
-    "  border-radius: 3px;"
-    "  font-size: 11px;"
-    "  font-weight: bold;"
-    "  padding: 3px 12px;"
-    "}"
-    "QPushButton:hover { background: #1a2a3a; }"
-    "QPushButton:checked {"
-    "  background: #3a2a0e;"
-    "  color: #f2c14e;"
-    "  border: 1px solid #f2c14e;"
-    "}"
-    "QPushButton:checked:hover { background: #4a3a1e; }");
+QString windowStyle()
+{
+    return QStringLiteral(
+        "QWidget { background: %1; color: %2; }"
+        "QLabel  { background: transparent; color: %3; font-size: 11px; }")
+        .arg(QString::fromLatin1(Style::kPanelBg),
+             QString::fromLatin1(Style::kTextPrimary),
+             QString::fromLatin1(Style::kTitleText));
+}
+
+// The bypass button's stylesheet used to live here — twenty lines of
+// AetherSDR's gold, with nothing referencing them. The button itself
+// moved to the CHAIN widget's single-click a while ago (see the note at
+// line ~402) and its stylesheet was left behind. Deleted rather than
+// repainted: repainting dead code is how it survives the next audit
+// too.
+
+// Peak Hold. Checked is a filled amber block rather than an outline,
+// because a frozen analyser is a state you must not forget you are in —
+// every reading on screen is stale while it is on.
+QString peakHoldStyle()
+{
+    return QStringLiteral(
+        "QPushButton {"
+        "  background: %1; color: %2;"
+        "  border: 1px solid %3; border-radius: 3px;"
+        "  padding: 2px 12px; font-size: 11px; font-weight: bold;"
+        "}"
+        "QPushButton:hover { background: %3; }"
+        "QPushButton:checked {"
+        "  background: %4; color: %1;"
+        "  border-color: %5;"
+        "}"
+        "QPushButton:checked:hover { background: %5; }")
+        .arg(QString::fromLatin1(Style::kAppBg),
+             QString::fromLatin1(Style::kTextPrimary),
+             QString::fromLatin1(Style::kButtonBg),
+             QString::fromLatin1(Style::kAmberWarn),
+             QString::fromLatin1(Style::kAmberText));
+}
 
 } // namespace
 
@@ -133,8 +164,8 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     : QWidget(parent)
     , m_audio(engine)
 {
-    setWindowTitle("Aetherial Parametric EQ");
-    setStyleSheet(kWindowStyle);
+    setWindowTitle("Nereus Parametric EQ");
+    setStyleSheet(windowStyle());
     resize(kDefaultWidth, kDefaultHeight);
 
     auto* root = new QVBoxLayout(this);
@@ -255,17 +286,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         peakHoldBtn->setToolTip(
             "Freeze the analyzer peak-hold trace at its highest level.\n"
             "Toggle off to resume normal decay.");
-        applyThemed(peakHoldBtn, "QPushButton {"
-            "  background: {{color.background.0}}; color: {{color.text.primary}};"
-            "  border: 1px solid {{color.background.1}}; border-radius: 3px;"
-            "  padding: 2px 12px; font-size: 11px; font-weight: bold;"
-            "}"
-            "QPushButton:hover { background: {{color.background.1}}; }"
-            "QPushButton:checked {"
-            "  background: #c8a040; color: {{color.background.0}};"
-            "  border-color: #d4b050;"
-            "}"
-            "QPushButton:checked:hover { background: #d4b050; }");
+        peakHoldBtn->setStyleSheet(peakHoldStyle());
         connect(peakHoldBtn, &QPushButton::toggled, this, [this](bool on) {
             if (m_canvas) m_canvas->setPeakHoldFrozen(on);
         });
@@ -523,8 +544,8 @@ void StripEqPanel::showForPath(ClientEqApplet::Path path)
     // almost certainly doesn't correspond to the other path's bands.
     syncSelection(-1);
     const QString title = path == ClientEqApplet::Path::Rx
-        ? QStringLiteral("Aetherial Parametric EQ — RX")
-        : QStringLiteral("Aetherial Parametric EQ — TX");
+        ? QStringLiteral("Nereus Parametric EQ — RX")
+        : QStringLiteral("Nereus Parametric EQ — TX");
     // No title bar when embedded; see the note at construction.
     // m_titleBar is always an EditorFramelessTitleBar* — kept as
     // QWidget* in the header so the inline class stays cpp-only.

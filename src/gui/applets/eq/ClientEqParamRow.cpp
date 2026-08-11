@@ -108,7 +108,7 @@ public:
         setMinimumWidth(70);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         setCursor(Qt::PointingHandCursor);
-        // The strip's open `QWidget { background: #08121d }` rule
+        // The panel's open `QWidget { background: <kPanelBg> }` rule
         // would otherwise paint a dark fill across the whole column,
         // bleeding upward over the canvas's band-plan strip.  Make
         // the column itself transparent so only the labels show.
@@ -330,6 +330,11 @@ private:
         }
         const QString accentName = accent.name(QColor::HexArgb);
         const QString qColName   = qCol.name(QColor::HexArgb);
+        // Text-selection background. Upstream's #0070c0 was the last
+        // AetherSDR literal left in this file; derived from NereusSDR's
+        // accent instead, darkened so the selected digits stay readable
+        // rather than being lit from behind.
+        const QString selBg = EqPalette::accent().darker(170).name();
         // Borderless line edits that look exactly like the previous
         // QLabels until focused; subtle dark inset + cyan border on
         // focus to indicate edit mode (matches ClientCompKnob).
@@ -337,24 +342,24 @@ private:
             "QLineEdit { color: %1; font-size: 10px; font-weight: bold;"
             " background: transparent; border: 1px solid transparent;"
             " border-radius: 2px; padding: 0;"
-            " selection-background-color: #0070c0; }"
+            " selection-background-color: %2; }"
             "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
-            ).arg(accentName);
+            ).arg(accentName, selBg);
         const QString gainStyle = QString(
             "QLineEdit { color: %1; font-size: 12px; font-weight: bold;"
             " background: transparent; border: 1px solid transparent;"
             " border-radius: 2px; padding: 1px 0;"
-            " selection-background-color: #0070c0; }"
+            " selection-background-color: %3; }"
             "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
             "QLineEdit:read-only { color: %2; }"
-            ).arg(accentName, accentName);
+            ).arg(accentName, accentName, selBg);
         const QString qStyle = QString(
             "QLineEdit { color: %1; font-size: 10px;"
             " background: transparent; border: 1px solid transparent;"
             " border-radius: 2px; padding: 0;"
-            " selection-background-color: #0070c0; }"
+            " selection-background-color: %2; }"
             "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
-            ).arg(qColName);
+            ).arg(qColName, selBg);
         m_freqEdit->setStyleSheet(freqStyle);
         m_gainEdit->setStyleSheet(gainStyle);
         m_qEdit->setStyleSheet(qStyle);
@@ -377,7 +382,7 @@ ClientEqParamRow::ClientEqParamRow(QWidget* parent) : QWidget(parent)
     // Matches ClientEqIconRow spacing so param column i sits directly
     // beneath icon column i (a single visual strip across the editor).
     m_layout->setSpacing(10);
-    // Transparent so the strip's wide `QWidget { background: #08121d }`
+    // Transparent so the panel's wide `QWidget { background: <kPanelBg> }`
     // rule doesn't bleed dark fill over the canvas's band-plan strip
     // sitting just above this row.
     setAttribute(Qt::WA_StyledBackground, false);

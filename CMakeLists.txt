@@ -950,7 +950,7 @@ set(GUI_SOURCES
     src/core/RotctldProcess.cpp
     src/core/HamlibInstaller.cpp
 
-    # ── Aetherial Audio Channel Strip — DSP (ported from AetherSDR) ──
+    # ── Nereus Audio Channel Strip — DSP (ported from AetherSDR) ──
     #
     # The strip's nine stages, taken before any of its user interface.
     # They are Qt-free apart from QtGlobal and lock-free by construction,

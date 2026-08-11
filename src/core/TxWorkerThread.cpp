@@ -874,7 +874,7 @@ void TxWorkerThread::dispatchOneBlock()
     //
     // Null-safe inside pumpDexp: degrades to a no-op if pdexp[id] /
     // txa[].rsmpin.p / m_dexpBuffer are missing.
-    // ── Aetherial Audio Channel Strip ────────────────────────────────
+    // ── Nereus Audio Channel Strip ────────────────────────────────
     //
     // Here, and not later: this is the last point at which the block is
     // still the operator's microphone, and everything downstream — the

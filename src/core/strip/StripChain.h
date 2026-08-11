@@ -12,7 +12,7 @@
 // AetherSDR dispatches its chain from inside AudioEngine and
 // NereusSDR's transmit audio does not pass through there.
 //
-// The Aetherial Audio Channel Strip's stages, in order, as one object
+// The Nereus Audio Channel Strip's stages, in order, as one object
 // that can be handed to the transmit pump.
 //
 //   gate → EQ → de-esser → compressor → tube → PUDU → reverb → limiter

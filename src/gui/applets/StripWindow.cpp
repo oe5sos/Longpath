@@ -128,7 +128,7 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
     : QDialog(parent)
     , m_radio(radio)
 {
-    setWindowTitle(QStringLiteral("Aetherial Audio Channel Strip"));
+    setWindowTitle(QStringLiteral("Nereus Audio Channel Strip"));
     setModal(false);
     // Restore before the panels are built, so every control opens
     // showing what the chain actually holds rather than a default it
@@ -488,15 +488,21 @@ QWidget* StripWindow::buildGatePanel()
         -80.0, 0.0, 1.0, cur([this]{ return chain()->gate().thresholdDb(); }, -40.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setThresholdDb(float(v)); }
-        }, 0);
+        }, 0, [this]{ persist(); });
     addKnob(form, QStringLiteral("Attack"), 0.1, 100.0, 0.1, cur([this]{ return chain()->gate().attackMs(); }, 0.5),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setAttackMs(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Hold"), 0.0, 500.0, cur([this]{ return chain()->comp().attackMs(); }, 5.0), cur([this]{ return chain()->gate().holdMs(); }, 20.0),
+    // The step used to be `cur(comp().attackMs(), 5.0)` — a copy-paste
+    // from the compressor panel that made the gate's Hold slider step by
+    // whatever the COMPRESSOR's attack happened to be. Invisible while
+    // both defaulted to 5 ms, and a 5000-step slider the moment anyone
+    // set a fast compressor attack.
+    addKnob(form, QStringLiteral("Hold"), 0.0, 500.0, 5.0,
+        cur([this]{ return chain()->gate().holdMs(); }, 20.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setHoldMs(float(v)); }
-        }, 0);
+        }, 0, [this]{ persist(); });
     addKnob(form, QStringLiteral("Release"), 5.0, 2000.0, 5.0, cur([this]{ return chain()->gate().releaseMs(); }, 100.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->gate().setReleaseMs(float(v)); }
@@ -748,24 +754,34 @@ QWidget* StripWindow::buildCompPanel()
     addKnob(form, QStringLiteral("Threshold"), -60.0, 0.0, 1.0, cur([this]{ return chain()->comp().thresholdDb(); }, -20.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setThresholdDb(float(v)); }
-        }, 0);
+        }, 0, [this]{ persist(); });
     addKnob(form, QStringLiteral("Ratio"), 1.0, 20.0, 0.5, cur([this]{ return chain()->comp().ratio(); }, 3.0),
         QStringLiteral(": 1"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setRatio(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Attack"), 0.1, 100.0, 0.1, 5.0,
+    // Opened at a literal 5.0 rather than at the chain's value, so the
+    // compressor's attack was reset to 5 ms every time the panel was
+    // built — and rebuilt is what the panel does on every preset and
+    // every character.
+    addKnob(form, QStringLiteral("Attack"), 0.1, 100.0, 0.1,
+        cur([this]{ return chain()->comp().attackMs(); }, 5.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setAttackMs(float(v)); }
         }, 1, [this]{ persist(); });
     addKnob(form, QStringLiteral("Release"), 5.0, 2000.0, 5.0, cur([this]{ return chain()->comp().releaseMs(); }, 120.0),
         QStringLiteral("ms"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setReleaseMs(float(v)); }
-        }, 0);
+        }, 0, [this]{ persist(); });
     addKnob(form, QStringLiteral("Knee"), 0.0, 24.0, 0.5, cur([this]{ return chain()->comp().kneeDb(); }, 6.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setKneeDb(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Make-up"), cur([this]{ return chain()->comp().makeupDb(); }, 0.0), 24.0, 0.5, 0.0,
+    // The saved value was in the MINIMUM slot and the value was a
+    // literal zero, so the knob's range started wherever make-up
+    // happened to be and the knob itself always opened at the bottom of
+    // it. Slots are (min, max, step, value).
+    addKnob(form, QStringLiteral("Make-up"), 0.0, 24.0, 0.5,
+        cur([this]{ return chain()->comp().makeupDb(); }, 0.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->comp().setMakeupDb(float(v)); }
         }, 1, [this]{ persist(); });
@@ -775,11 +791,58 @@ QWidget* StripWindow::buildCompPanel()
     // anything louder, and nobody guesses that from the name.
     auto* rot = new QSpinBox(page);
     rot->setRange(0, 8);
-    rot->setValue(0);
+    rot->setValue(chain() ? chain()->comp().phaseRotatorStages() : 0);
     form->addRow(QStringLiteral("Phase rotator"), rot);
     connect(rot, &QSpinBox::valueChanged, this, [this](int v) {
         if (StripChain* c = chain()) { c->comp().setPhaseRotatorStages(v); }
+        persist();
     });
+
+    // ── How to set it ────────────────────────────────────────────────
+    //
+    // The compressor had no setting guidance at all — the only help text
+    // on this tab was about the phase rotator, which is the smallest
+    // control on it. Asked for at the bench and correct: a compressor is
+    // four interacting numbers and the order you set them in is most of
+    // the skill.
+    auto* order = new QLabel(QStringLiteral(
+        "<b>Set them in this order.</b> Each one changes what the next "
+        "one should be, so going round the panel left to right means "
+        "doing it twice."
+        "<ol style='margin-left:-22px'>"
+        "<li><b>Ratio</b> first — it decides what kind of processing this "
+        "is. 2:1 is levelling, 6:1 is talk power, 10:1 and up is an "
+        "effect.</li>"
+        "<li><b>Threshold</b> next, watching the gain reduction. Aim for "
+        "6 to 8 dB on your loudest words and nothing at all on your "
+        "quietest. If it never moves, the threshold is too high; if it "
+        "never returns to zero, too low.</li>"
+        "<li><b>Attack</b>. Fast catches the peak and dulls the "
+        "consonant that made it; slow lets the consonant through and "
+        "leaves a peak for the limiter. 5–10 ms keeps the words crisp; "
+        "under 2 ms is for when the limiter is working too hard.</li>"
+        "<li><b>Release</b> last, by ear on continuous speech. Too fast "
+        "and the background pumps up between words; too slow and one "
+        "loud word ducks the sentence after it. 100–200 ms suits most "
+        "voices.</li>"
+        "</ol>"), page);
+    order->setWordWrap(true);
+    order->setStyleSheet(dimStyle());
+    form->addRow(order);
+
+    auto* knee = new QLabel(QStringLiteral(
+        "<b>Knee</b> is how abruptly the ratio arrives. A wide knee "
+        "starts compressing below the threshold and reaches the full "
+        "ratio above it, which is why a 3:1 setting with a 10 dB knee "
+        "sounds gentler than a 3:1 with a hard one — the number is the "
+        "same and the sound is not.<br><br>"
+        "<b>Make-up</b> is not a tone control. Set it so the stage is as "
+        "loud switched on as it is switched off, then judge. Everything "
+        "sounds better louder, and a comparison that is not level-matched "
+        "is not a comparison — it is the make-up gain winning."), page);
+    knee->setWordWrap(true);
+    knee->setStyleSheet(dimStyle());
+    form->addRow(knee);
 
     auto* help = new QLabel(QStringLiteral(
         "The phase rotator makes speech more symmetrical without changing "
@@ -832,7 +895,12 @@ QWidget* StripWindow::buildTubePanel()
         const int at = model->findData(have);
         if (at >= 0) { model->setCurrentIndex(at); }
     }
-    form->addRow(QStringLiteral("Character"), model);
+    // Labelled "Waveshaper", not "Character". The stage card above now
+    // carries a Character picker like every other stage, and two combos
+    // both called Character in one panel is a panel nobody can describe
+    // to anybody else. This one is the genuine algorithm choice; the
+    // character sets it along with drive, bias and mix.
+    form->addRow(QStringLiteral("Waveshaper"), model);
     connect(model, &QComboBox::currentIndexChanged, this, [this, model](int) {
         if (StripChain* c = chain()) {
             c->tube().setModel(
@@ -1263,6 +1331,13 @@ void StripWindow::reloadControls()
     m_gateCurve = m_compCurve = m_limiterCurve = nullptr;
     m_tubeCurve = nullptr;
     m_deEssCurve = m_puduCurve = nullptr;
+    // Same trap, missed once. The "On air" tab was added in buildUi()
+    // and nowhere else, so the first preset or character applied made it
+    // disappear for the rest of the session and left this pointer aimed
+    // at a deleted widget. Both halves are fixed: nulled here, re-added
+    // below. Anything buildUi() puts in the tab bar has to be put back
+    // here too — the loop covers the eight stages and nothing else.
+    m_txSpectrum = nullptr;
     m_stageText.fill(StageText{});
     m_stageBoxes.fill(nullptr);
 
@@ -1282,6 +1357,7 @@ void StripWindow::reloadControls()
         }
         m_tabs->addTab(page, QString::fromLatin1(StripChain::stageName(s)));
     }
+    m_tabs->addTab(buildTxSpectrumPanel(), QStringLiteral("On air"));
     if (StripChain* c = chain()) {
         for (int i = 0; i < StripChain::kStageCount; ++i) {
             QCheckBox* box = m_stageBoxes[static_cast<size_t>(i)];

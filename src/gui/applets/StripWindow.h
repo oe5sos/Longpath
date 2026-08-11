@@ -12,7 +12,7 @@
 // the window is written here against StripChain directly. The control
 // sets and their ranges come from the ported stage headers.
 //
-// The Aetherial Audio Channel Strip, as a window.
+// The Nereus Audio Channel Strip, as a window.
 //
 // Layout follows the same rule as the voice check: the thing you need
 // most often is largest and first, and the numbers are available but

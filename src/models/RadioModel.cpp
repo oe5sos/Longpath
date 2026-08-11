@@ -7751,7 +7751,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txWorker->setAudioEngine(m_audioEngine);
                 m_txWorker->setMicSource(m_txMicSource.get());
 
-                // Aetherial Audio Channel Strip. Created with the pump
+                // Nereus Audio Channel Strip. Created with the pump
                 // and handed to it before it starts, so there is no
                 // window in which the worker holds a half-prepared
                 // chain. Off by default — see StripChain.h.

@@ -53,7 +53,7 @@ private slots:
         // who most needs presets is exactly the one who cannot tell
         // "Voodoo" from "Contest" without being told.
         for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
-                        Stage::Pudu, Stage::Limiter}) {
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
             const auto list = StripCharacters::forStage(s);
             QVERIFY2(!list.isEmpty(), "stage offers no characters");
             for (const auto& ch : list) {
@@ -70,7 +70,7 @@ private slots:
         // Two characters with one name means apply() picks whichever is
         // written first and the other is unreachable.
         for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
-                        Stage::Pudu, Stage::Limiter}) {
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
             QSet<QString> seen;
             for (const auto& ch : StripCharacters::forStage(s)) {
                 QVERIFY2(!seen.contains(ch.name),
@@ -83,13 +83,20 @@ private slots:
 
     void stages_without_characters_offer_none()
     {
-        // The equaliser has its own targets, the tube has real models,
-        // the reverb has nothing worth presetting. An empty list means
-        // the window draws no picker; a one-entry list would be a
-        // control that does nothing.
+        // The equaliser has its own targets and the reverb has nothing
+        // worth presetting. An empty list means the window draws no
+        // picker; a one-entry list would be a control that does nothing.
+        //
+        // The tube was on this list and is not any more. The reasoning
+        // for excluding it — that it has real models, so a second picker
+        // would blur the difference between a model and a parameter set
+        // — was right about the risk and wrong about the remedy. A model
+        // alone is nearly inaudible; the character sets the four numbers
+        // that make it audible, and the window labels the other one
+        // "Waveshaper" so the two cannot be confused.
         QVERIFY(StripCharacters::forStage(Stage::Eq).isEmpty());
-        QVERIFY(StripCharacters::forStage(Stage::Tube).isEmpty());
         QVERIFY(StripCharacters::forStage(Stage::Reverb).isEmpty());
+        QVERIFY(!StripCharacters::forStage(Stage::Tube).isEmpty());
     }
 
     // ── Applying ─────────────────────────────────────────────────────
@@ -100,7 +107,7 @@ private slots:
         // agree, and nothing but this test makes them.
         auto c = makeChain();
         for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
-                        Stage::Pudu, Stage::Limiter}) {
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
             for (const auto& ch : StripCharacters::forStage(s)) {
                 QVERIFY2(StripCharacters::apply(*c, s, ch.name),
                          qPrintable(QStringLiteral("listed but not "
@@ -126,7 +133,7 @@ private slots:
     {
         auto c = makeChain();
         for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
-                        Stage::Pudu, Stage::Limiter}) {
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
             for (bool on : {false, true}) {
                 c->setStageEnabled(s, on);
                 for (const auto& ch : StripCharacters::forStage(s)) {
@@ -253,6 +260,96 @@ private slots:
                                        QStringLiteral("Loud")));
         QVERIFY(double(c->limiter().ceilingDb()) > safe);
         QVERIFY(safe < 0.0);      // never at or above full scale
+    }
+
+    // The list order is the promise, and the limiter's whole character
+    // is one number, so the promise is entirely in the ordering.
+    void the_limiter_list_runs_from_most_headroom_to_least()
+    {
+        auto c = makeChain();
+        double previous = -1e9;
+        for (const auto& ch : StripCharacters::forStage(Stage::Limiter)) {
+            QVERIFY(StripCharacters::apply(*c, Stage::Limiter, ch.name));
+            const double ceil = double(c->limiter().ceilingDb());
+            QVERIFY2(ceil > previous,
+                     qPrintable(QStringLiteral("'%1' leaves no less "
+                                               "headroom than the one "
+                                               "before it (%2 vs %3)")
+                                    .arg(ch.name).arg(ceil).arg(previous)));
+            // Not one of them may sit at or above full scale, however
+            // loud it is called. Everything downstream can overshoot.
+            QVERIFY2(ceil < 0.0,
+                     qPrintable(QStringLiteral("'%1' has no headroom at "
+                                               "all").arg(ch.name)));
+            previous = ceil;
+        }
+    }
+
+    // ── The tube ─────────────────────────────────────────────────────
+    //
+    // Drive is the number on the control and NOT what is heard: 20 dB of
+    // drive with the mix at zero is silence from this stage. The claim
+    // the list makes is about how much saturated signal reaches the
+    // output, so that is what is asserted.
+    void the_tube_list_runs_from_least_saturation_to_most()
+    {
+        auto c = makeChain();
+        double previous = -1.0;
+        for (const auto& ch : StripCharacters::forStage(Stage::Tube)) {
+            QVERIFY(StripCharacters::apply(*c, Stage::Tube, ch.name));
+            const double heard = double(c->tube().driveDb())
+                                 * double(c->tube().dryWet());
+            QVERIFY2(heard >= previous,
+                     qPrintable(QStringLiteral("'%1' saturates less than "
+                                               "the one before it (%2 vs "
+                                               "%3)")
+                                    .arg(ch.name).arg(heard).arg(previous)));
+            previous = heard;
+        }
+    }
+
+    void clean_really_passes_the_dry_signal()
+    {
+        auto c = makeChain();
+        QVERIFY(StripCharacters::apply(*c, Stage::Tube,
+                                       QStringLiteral("Clean")));
+        QCOMPARE(double(c->tube().dryWet()), 0.0);
+    }
+
+    // Bias only does anything on the asymmetric waveshaper. Left behind
+    // by a previous character it would quietly change a model that is
+    // documented as symmetric, which is the kind of state that makes two
+    // identical-looking settings sound different.
+    void bias_is_only_left_set_on_the_asymmetric_model()
+    {
+        auto c = makeChain();
+        for (const auto& ch : StripCharacters::forStage(Stage::Tube)) {
+            QVERIFY(StripCharacters::apply(*c, Stage::Tube, ch.name));
+            if (c->tube().model() != ClientTube::Model::C) {
+                QVERIFY2(qFuzzyIsNull(c->tube().biasAmount()),
+                         qPrintable(QStringLiteral("'%1' left bias set on "
+                                                   "a symmetric model")
+                                        .arg(ch.name)));
+            }
+        }
+    }
+
+    // Louder is not better, it is only louder. A character that adds
+    // drive without taking the same amount off the output turns every
+    // A/B comparison into a volume test.
+    void more_drive_comes_with_more_output_trim()
+    {
+        auto c = makeChain();
+        double previousTrim = 1e9;
+        for (const auto& ch : StripCharacters::forStage(Stage::Tube)) {
+            QVERIFY(StripCharacters::apply(*c, Stage::Tube, ch.name));
+            const double trim = double(c->tube().outputGainDb());
+            QVERIFY2(trim <= previousTrim + 0.001,
+                     qPrintable(QStringLiteral("'%1' is hotter AND louder "
+                                               "than the one before")
+                                    .arg(ch.name)));
+            previousTrim = trim;
+        }
     }
 };
 

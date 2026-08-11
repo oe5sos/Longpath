@@ -16,9 +16,18 @@
 //
 // They are NOT different algorithms. That distinction matters and is
 // worth stating plainly, because the tube stage does have real models —
-// ClientTube::Model A, B and C are three different waveshapers, genuinely
-// different arithmetic — and calling both things "character" in the same
-// window would imply the gate has three kinds of maths when it has one.
+// ClientTube::Model A, B and C are three different waveshapers,
+// genuinely different arithmetic.
+//
+// The tube was left without characters for exactly that reason at first,
+// and that was the wrong call. A model on its own is nearly inaudible:
+// A, B and C only separate once drive, bias and mix move with them, and
+// moving four controls in step is the definition of a character. So the
+// tube has both now — a character that picks a model and sets the four
+// numbers around it, and the model picker underneath still showing which
+// waveshaper is running and still free to be changed. The two are
+// labelled differently in the window so nobody has to guess which is
+// which.
 //
 // The gate already worked this way before any of this: ClientGate::Mode
 // is documented upstream as "snap ratio + range to canonical presets",
@@ -56,7 +65,7 @@ struct Character {
 // The characters offered for a stage, in the order they should be
 // listed — gentlest first, so the list itself reads as a scale.
 // Empty for stages that have none (the equaliser has its own targets,
-// the tube has real models, the reverb has nothing worth presetting).
+// the reverb has nothing worth presetting).
 QVector<Character> forStage(StripChain::Stage stage);
 
 // Apply one by name. Returns false for an unknown name rather than
