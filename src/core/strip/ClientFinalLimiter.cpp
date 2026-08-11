@@ -215,7 +215,14 @@ void ClientFinalLimiter::process(float* interleaved, int frames, int channels) n
 
         // DC-block HPF (applied first so a DC-offset input doesn't
         // skew the limiter's peak detection).
-        if (dcBlock) {
+        //
+        // Gated on `enabled` since 2026-08-11: a DISABLED stage must
+        // not touch the buffer at all, and this filter's transient was
+        // altering the first samples of every block while the stage
+        // was switched off — caught by tst_strip_dsp's
+        // every_stage_passes_through_untouched_when_disabled. The
+        // meters below still read the raw signal either way.
+        if (enabled && dcBlock) {
             const float yL = l - m_dcXprevL + dcCoeff * m_dcYprevL;
             m_dcXprevL = l;
             m_dcYprevL = yL;
@@ -231,8 +238,12 @@ void ClientFinalLimiter::process(float* interleaved, int frames, int channels) n
         // negative trim sits below the ceiling and the limiter passes
         // through.  Output is always ≤ ceiling regardless of trim,
         // because the limiter clamps on the trimmed signal below.
-        l *= trimLin;
-        r *= trimLin;
+        // Enabled-gated for the same pass-through contract as the
+        // DC-block above.
+        if (enabled) {
+            l *= trimLin;
+            r *= trimLin;
+        }
 
         const float maxIn = std::max(std::fabs(l), std::fabs(r));
         if (maxIn > inPeakLin) inPeakLin = maxIn;
@@ -267,8 +278,13 @@ void ClientFinalLimiter::process(float* interleaved, int frames, int channels) n
             }
         }
 
-        interleaved[f * channels] = l;
-        if (channels == 2) interleaved[f * channels + 1] = r;
+        // Write-back only while enabled — a disabled stage is a wire.
+        // l/r still carry the metered values either way, so the panel
+        // keeps reading even when the stage is off.
+        if (enabled) {
+            interleaved[f * channels] = l;
+            if (channels == 2) interleaved[f * channels + 1] = r;
+        }
 
         const float maxOut = std::max(std::fabs(l), std::fabs(r));
         if (maxOut > outPeakLin) outPeakLin = maxOut;

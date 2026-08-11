@@ -261,7 +261,7 @@ bool apply(StripChain& chain, StripChain::Stage stage, const QString& name)
             g.setRatio(1.0f); g.setFloorDb(0.0f);
             return true;
         }
-        if (name == QLatin1String("Expander — soft")) {
+        if (name == QStringLiteral("Expander — soft")) {
             g.setMode(ClientGate::Mode::Expander);
             g.setAttackMs(3.0f); g.setHoldMs(120.0f); g.setReleaseMs(220.0f);
             g.setReturnDb(4.0f); g.setLookaheadMs(1.0f);
@@ -306,7 +306,7 @@ bool apply(StripChain& chain, StripChain::Stage stage, const QString& name)
             g.setReturnDb(3.0f); g.setLookaheadMs(2.0f);
             return true;
         }
-        if (name == QLatin1String("Gate — hard")) {
+        if (name == QStringLiteral("Gate — hard")) {
             g.setMode(ClientGate::Mode::Gate);
             g.setAttackMs(1.0f); g.setHoldMs(100.0f); g.setReleaseMs(150.0f);
             g.setReturnDb(4.0f); g.setLookaheadMs(2.0f);

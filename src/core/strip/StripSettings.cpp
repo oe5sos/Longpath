@@ -136,6 +136,34 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "LimiterCeilingDb",    c.limiter().ceilingDb());
     putF(prefix, "LimiterOutputTrimDb", c.limiter().outputTrimDb());
     s.setValue(key(prefix, "LimiterDcBlock"), c.limiter().dcBlockEnabled());
+
+    // Tube, Reverb, Pudu (2026-08-11). These three stages arrived after
+    // this serializer was written and never joined it — so their knobs
+    // silently reset on every restart AND fell out of user presets,
+    // which is how tst_strip_chain's round-trip caught it: a preset
+    // with 9 dB of tube drive came back with 0.
+    s.setValue(key(prefix, "TubeModel"), int(c.tube().model()));
+    putF(prefix, "TubeDriveDb",        c.tube().driveDb());
+    putF(prefix, "TubeBiasAmount",     c.tube().biasAmount());
+    putF(prefix, "TubeTone",           c.tube().tone());
+    putF(prefix, "TubeOutputGainDb",   c.tube().outputGainDb());
+    putF(prefix, "TubeDryWet",         c.tube().dryWet());
+    putF(prefix, "TubeEnvelopeAmount", c.tube().envelopeAmount());
+    putF(prefix, "TubeAttackMs",       c.tube().attackMs());
+    putF(prefix, "TubeReleaseMs",      c.tube().releaseMs());
+
+    putF(prefix, "ReverbSize",       c.reverb().size());
+    putF(prefix, "ReverbDecayS",     c.reverb().decayS());
+    putF(prefix, "ReverbDamping",    c.reverb().damping());
+    putF(prefix, "ReverbPreDelayMs", c.reverb().preDelayMs());
+    putF(prefix, "ReverbMix",        c.reverb().mix());
+
+    putF(prefix, "PuduPooDriveDb",     c.pudu().pooDriveDb());
+    putF(prefix, "PuduPooTuneHz",      c.pudu().pooTuneHz());
+    putF(prefix, "PuduPooMix",         c.pudu().pooMix());
+    putF(prefix, "PuduDooTuneHz",      c.pudu().dooTuneHz());
+    putF(prefix, "PuduDooHarmonicsDb", c.pudu().dooHarmonicsDb());
+    putF(prefix, "PuduDooMix",         c.pudu().dooMix());
 }
 
 void restoreFrom(const QString& prefix, StripChain& c)
@@ -218,6 +246,36 @@ void restoreFrom(const QString& prefix, StripChain& c)
         getF(prefix, "LimiterOutputTrimDb", c.limiter().outputTrimDb()));
     c.limiter().setDcBlockEnabled(
         getB(prefix, "LimiterDcBlock", c.limiter().dcBlockEnabled()));
+
+    // Tube, Reverb, Pudu — see the matching note in saveTo(). Defaults
+    // are the current values, same convention as every stage above, so
+    // a file from before these keys existed changes nothing.
+    c.tube().setModel(static_cast<ClientTube::Model>(
+        getI(prefix, "TubeModel", int(c.tube().model()))));
+    c.tube().setDriveDb   (getF(prefix, "TubeDriveDb",      c.tube().driveDb()));
+    c.tube().setBiasAmount(getF(prefix, "TubeBiasAmount",   c.tube().biasAmount()));
+    c.tube().setTone      (getF(prefix, "TubeTone",         c.tube().tone()));
+    c.tube().setOutputGainDb(
+        getF(prefix, "TubeOutputGainDb", c.tube().outputGainDb()));
+    c.tube().setDryWet    (getF(prefix, "TubeDryWet",       c.tube().dryWet()));
+    c.tube().setEnvelopeAmount(
+        getF(prefix, "TubeEnvelopeAmount", c.tube().envelopeAmount()));
+    c.tube().setAttackMs  (getF(prefix, "TubeAttackMs",     c.tube().attackMs()));
+    c.tube().setReleaseMs (getF(prefix, "TubeReleaseMs",    c.tube().releaseMs()));
+
+    c.reverb().setSize      (getF(prefix, "ReverbSize",       c.reverb().size()));
+    c.reverb().setDecayS    (getF(prefix, "ReverbDecayS",     c.reverb().decayS()));
+    c.reverb().setDamping   (getF(prefix, "ReverbDamping",    c.reverb().damping()));
+    c.reverb().setPreDelayMs(getF(prefix, "ReverbPreDelayMs", c.reverb().preDelayMs()));
+    c.reverb().setMix       (getF(prefix, "ReverbMix",        c.reverb().mix()));
+
+    c.pudu().setPooDriveDb    (getF(prefix, "PuduPooDriveDb",     c.pudu().pooDriveDb()));
+    c.pudu().setPooTuneHz     (getF(prefix, "PuduPooTuneHz",      c.pudu().pooTuneHz()));
+    c.pudu().setPooMix        (getF(prefix, "PuduPooMix",         c.pudu().pooMix()));
+    c.pudu().setDooTuneHz     (getF(prefix, "PuduDooTuneHz",      c.pudu().dooTuneHz()));
+    c.pudu().setDooHarmonicsDb(
+        getF(prefix, "PuduDooHarmonicsDb", c.pudu().dooHarmonicsDb()));
+    c.pudu().setDooMix        (getF(prefix, "PuduDooMix",         c.pudu().dooMix()));
 
     // Enables last, so no stage starts running with half its parameters
     // restored. On a fast machine the difference is a few microseconds;
@@ -364,7 +422,7 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         return true;
     }
 
-    if (name == QLatin1String("DX — punchy")) {
+    if (name == QStringLiteral("DX — punchy")) {
         allOff();
         band(0, ClientEq::FilterType::HighPass, 150.0f, 0.0f, 0.707f, true, 24);
         band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
@@ -408,7 +466,7 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         return true;
     }
 
-    if (name == QLatin1String("Ragchew — easy")) {
+    if (name == QStringLiteral("Ragchew — easy")) {
         allOff();
         band(0, ClientEq::FilterType::HighPass, 80.0f, 0.0f, 0.707f, true, 12);
         band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
