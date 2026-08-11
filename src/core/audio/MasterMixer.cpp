@@ -22,6 +22,37 @@
 //                 upstream structure are argued in MasterMixer.h.
 //                 Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
+//   2026-08-11 -- ensureRing sizes opportunistic slots (TX monitor) to
+//                 kOpportunisticRingBlocks producer blocks instead of
+//                 kRingBlocks. The 256-frame ring held 5 ms of a ~21 ms
+//                 drain period; drop-oldest shredded the monitor voice
+//                 into 5 ms shards (bench, ANAN-G2). Implements the fix
+//                 the SliceState jitter-cushion note called for. By
+//                 Martin Fischer, AI-assisted via Anthropic Claude
+//                 (Cowork).
+//   2026-08-11 -- Second bench pass (voice clear, light periodic
+//                 scratch): prime gate for opportunistic slots in
+//                 tryDrain. Slot stays silent until it holds one drain
+//                 block + kOpportunisticPrimeMarginFrames, then always
+//                 contributes full blocks; on starvation it de-primes,
+//                 drops the residue, and re-buffers. The jitter cushion
+//                 in its correct form, now that the ring can hold it.
+//                 By Martin Fischer, AI-assisted via Anthropic Claude
+//                 (Cowork).
+//   2026-08-11 -- Third/fourth bench pass: the cushion is ADAPTIVE.
+//                 An offline cadence simulation (64-frame producer,
+//                 1024-frame drains, realistic UDP jitter profiles)
+//                 reproduced the bench scratch exactly: a fixed 256-
+//                 frame cushion starves ~5×/s under normal network
+//                 jitter (50 clicks/30 s), σ=8 ms WLAN clumping gives
+//                 161. Doubling the cushion on each starvation
+//                 (bounded at kOpportunisticCushionMaxFrames) and
+//                 never probing it back down converges every profile
+//                 to ZERO steady-state discontinuities. Backlog cap
+//                 from the same pass keeps latency at [cushion,
+//                 2×cushion] instead of the ring depth. Ring 64 -> 128
+//                 blocks so the worst-case cap fits. By Martin
+//                 Fischer, AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
 // --- From aamix.c ---
@@ -163,7 +194,13 @@ int MasterMixer::producingSliceCount() const {
 }
 
 void MasterMixer::ensureRing(SliceState& st, int frames) {
-    const int want = frames * kRingBlocks;
+    // Opportunistic slots (the TX monitor) buffer across the whole
+    // drain period instead of sharing the barrier's cadence, so they
+    // need a much deeper ring — see kOpportunisticRingBlocks.
+    const int blocks = st.opportunistic.load(std::memory_order_acquire)
+                           ? kOpportunisticRingBlocks
+                           : kRingBlocks;
+    const int want = frames * blocks;
     if (st.capFrames >= want) { return; }
     // Growing discards whatever was queued. This only happens on the
     // first block, or on a block-size change, and both are already
@@ -292,6 +329,13 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
         // to wait for, so drain whatever is queued.
         n = maxAvail;
     }
+    // The prime gate below only makes sense when a barrier member set n:
+    // that is the only case where an opportunistic slot can be SHORT of
+    // n and stop mid-block. When the monitor alone defines n (MOX with
+    // the RX slices withdrawn — the monitor's main use), it drains
+    // exactly what it has by construction, and gating it would silence
+    // it permanently: avail >= avail + margin never holds.
+    const bool barrierPaced = anyMember;
 
     // A member with nothing queued is LATE, not gone, and the barrier
     // holds until it delivers. n == 0 falls through to the guard below
@@ -338,6 +382,74 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
             != st.streamGeneration.load(std::memory_order_acquire)) {
             continue;
         }
+        // Prime gate for opportunistic slots — see SliceState::primed.
+        // A primed slot always has n frames (that is what priming
+        // guarantees), so the waveform never stops partway through the
+        // output block, which was the light periodic scratch on the
+        // 2026-08-11 bench. De-priming on starvation makes the failure
+        // mode one clean dropout instead of per-drain chatter.
+        if (barrierPaced
+            && st.opportunistic.load(std::memory_order_acquire)) {
+            if (st.cushion <= 0) {
+                st.cushion = kOpportunisticPrimeMarginFrames;
+            }
+            if (!st.primed) {
+                if (st.avail >= n + st.cushion) {
+                    st.primed = true;
+                    // Seam fade: come back at zero gain and let the
+                    // per-sample ramp fade the slot in — a prime seam
+                    // is a content discontinuity, and 5 ms of fade is
+                    // what turns it from a click into nothing.
+                    st.curL = 0.0f;
+                    st.curR = 0.0f;
+                } else {
+                    continue;  // stay silent, keep buffering
+                }
+            }
+            // Backlog cap (2026-08-11 third bench pass: "latency too
+            // high to listen to"). The drain only ever takes n frames,
+            // and production matches drain rate, so whatever backlog
+            // exists when the slot primes is carried FOREVER — with the
+            // deep ring that was up to 85 ms of hearing yourself late.
+            // Trim the oldest frames down to the cushion whenever the
+            // backlog exceeds twice the cushion: latency stays inside
+            // [cushion, 2×cushion], and the trim discontinuity only
+            // fires when something actually drifted or clumped — not
+            // every block, which is what the old 256-frame ring's
+            // drop-oldest did.
+            if (st.primed) {
+                const int cap = n + 2 * st.cushion;
+                if (st.avail > cap) {
+                    const int drop = st.avail - (n + st.cushion);
+                    st.rd = (st.rd + drop) % st.capFrames;
+                    st.avail -= drop;
+                    // Same seam fade as at prime: the trim just cut the
+                    // waveform, so re-enter through the ramp.
+                    st.curL = 0.0f;
+                    st.curR = 0.0f;
+                }
+            }
+            if (st.primed && st.avail < n) {
+                st.primed = false;  // ran dry — re-buffer to the cushion
+                // The cushion was too small for this link's jitter:
+                // double it (bounded) before re-buffering. This is the
+                // adaptation the offline cadence simulation validated —
+                // every jitter profile converges to zero
+                // discontinuities once the cushion stops being probed
+                // downward and only ever grows on demand.
+                st.cushion = std::min(kOpportunisticCushionMaxFrames,
+                                      st.cushion * 2);
+                if (st.avail <= 0) { continue; }
+                // Play the residue out as a FADE rather than cutting
+                // the waveform mid-word: the gain target is forced to
+                // zero for this one contribution (flag consumed below),
+                // and the staged drain takes avail down to 0 — so the
+                // next session cannot open on a stale tail either. The
+                // next prime fades back in from zero gain.
+                st.fadeOut = true;
+            }
+        }
+
         const int take = std::min(n, st.avail);
         if (take <= 0) { continue; }
 
@@ -349,8 +461,16 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
                                ? 0.0f
                                : st.gain.load(std::memory_order_acquire);
         const float pan  = st.pan.load(std::memory_order_acquire);
-        const float tgtL = g * (pan <= 0.0f ? 1.0f : 1.0f - pan);
-        const float tgtR = g * (pan >= 0.0f ? 1.0f : 1.0f + pan);
+        float tgtL = g * (pan <= 0.0f ? 1.0f : 1.0f - pan);
+        float tgtR = g * (pan >= 0.0f ? 1.0f : 1.0f + pan);
+        // Starved opportunistic slot: this contribution is its residue,
+        // played out through the ramp toward silence instead of cut
+        // mid-word. See the starve branch above.
+        if (st.fadeOut) {
+            tgtL = 0.0f;
+            tgtR = 0.0f;
+            st.fadeOut = false;
+        }
 
         int stagedRd = st.rd;
         float stagedCurL = st.curL;

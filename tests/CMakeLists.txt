@@ -1153,6 +1153,13 @@ nereus_add_test(tst_vax_channel_selector)
 # ── Phase 3O Sub-Phase 2: MasterMixer ─────────────────────────────────────
 nereus_add_test(tst_master_mixer)
 
+# ── 2026-08-11 TX-monitor crackle: cadence simulation as regression test ──
+# 64-frame opportunistic producer vs. 1024-frame barrier drains under six
+# jitter/drift profiles; asserts zero steady-state discontinuities. This is
+# the simulation that found the fixed-cushion starvation — see the header
+# of the test file for the story and the numbers.
+nereus_add_test(tst_master_mixer_cadence)
+
 # ── Phase 3F Sub-Epic I closeout C1: multi-slice audio reaches the mixer ──
 nereus_add_test(tst_audio_engine_multi_slice_mix)
 

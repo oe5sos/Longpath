@@ -267,6 +267,33 @@ private:
     // header note), so this only has to cover jitter, not drift.
     static constexpr int kRingBlocks = 4;
 
+    // Ring depth for OPPORTUNISTIC slots (the TX monitor), in producer
+    // blocks. These slots do not share the barrier's cadence guarantee:
+    // the monitor produces 64-frame blocks every ~1.33 ms, but tryDrain
+    // runs at the RX block cadence (~1024 frames / ~21 ms). Four
+    // producer blocks (256 frames) held 5 ms of a 21 ms drain period,
+    // so drop-oldest discarded three quarters of the waveform every
+    // cycle — heard on the bench (2026-08-11, ANAN-G2) as the monitor
+    // voice shredded into 5 ms shards. 64 blocks × 64 frames = 4096
+    // frames ≈ 85 ms: two full drain periods plus start-up phase
+    // offset. Production and drain run off the same radio clock, so
+    // the backlog is a constant phase offset, not a drift — the ring
+    // has to absorb it once, not forever. 128 blocks (~170 ms) so the
+    // adaptive cushion's worst case (n + 2 × kOpportunisticCushionMax)
+    // still fits without tripping drop-oldest.
+    static constexpr int kOpportunisticRingBlocks = 128;
+
+    // Starting slack an opportunistic slot must buffer beyond one
+    // drain block before it becomes audible (see SliceState::primed /
+    // cushion). Four monitor blocks ≈ 5 ms — the clean-LAN latency.
+    static constexpr int kOpportunisticPrimeMarginFrames = 256;
+
+    // Upper bound for the adaptive cushion: ~43 ms. Reached only on
+    // links whose jitter actually demanded every doubling step; the
+    // offline cadence simulation needed it for the WLAN-clumping
+    // profile (σ=8 ms drain jitter), which then runs click-free.
+    static constexpr int kOpportunisticCushionMaxFrames = 2048;
+
     // Master up-slew across a membership change, applied to the MIXED
     // output. Without it a slice re-admitted after a transmission resumes
     // at full amplitude in a single sample, which is the "kerplunk at the
@@ -339,14 +366,46 @@ private:
         // is short has min(n, avail) taken from it, which stops the
         // waveform partway through the block — a real defect. But the
         // cushion asked for 1024 frames of slack before the slot would
-        // be heard, and ensureRing sizes a ring to four PRODUCER blocks
-        // — 256 frames for the 64-frame monitor. The condition could
-        // never be met, so the monitor went permanently silent.
+        // be heard, and ensureRing sized every ring to four PRODUCER
+        // blocks — 256 frames for the 64-frame monitor. The condition
+        // could never be met, so the monitor went permanently silent.
         //
-        // Fixing it properly means giving opportunistic slots a larger
-        // ring, not a larger threshold on a ring that cannot hold it.
-        // Until that is done and tested, no cushion: a monitor that
-        // crackles is worth more than one that is silent.
+        // The larger ring landed 2026-08-11 (bench: monitor audible but
+        // shredded into 5 ms shards): ensureRing now sizes opportunistic
+        // slots to kOpportunisticRingBlocks producer blocks, enough to
+        // hold a full drain period of 64-frame monitor blocks with
+        // headroom. See kOpportunisticRingBlocks for the arithmetic.
+        //
+        // And with the ring able to hold it, the cushion is back in its
+        // correct form (same bench, second pass: voice clear but a
+        // light periodic scratch). `primed` below: an opportunistic
+        // slot stays silent until it has buffered a full drain block
+        // plus `cushion` frames of slack, then contributes exactly n
+        // frames per drain. If it ever runs dry it de-primes, doubles
+        // the cushion (bounded), and silently re-buffers — converting
+        // per-drain micro-gap chatter into a couple of adaptation
+        // steps that then never recur. Audio-thread only, deliberately
+        // NOT staged like rd/avail: an aborted drain consumes nothing,
+        // so the next drain re-evaluates and reaches the same answer.
+        //
+        // The cushion is ADAPTIVE (third bench pass, 2026-08-11, and an
+        // offline cadence simulation that reproduced the bench): a
+        // fixed 256-frame cushion is smaller than real UDP jitter, so
+        // the slot starved ~5×/s on a normal network — the scratch.
+        // The simulation (64-frame producer, 1024-frame drains, both
+        // with measured-realistic jitter) converges to ZERO
+        // discontinuities in steady state for every profile from
+        // lockstep through WLAN clumping once the cushion doubles on
+        // starvation; a decay probe was tried and removed because each
+        // downward probe bought 1-2 ms of latency at the price of an
+        // audible click. Latency is therefore only ever spent where
+        // the link's observed jitter demanded it, and stays.
+        bool primed{false};
+        int  cushion{0};
+        // One-shot: this drain plays the slot's residue with gain
+        // target 0 (fade-out) because it just starved. Audio-thread
+        // only, consumed where the gain targets are computed.
+        bool fadeOut{false};
 
         // Ramped gains. Start at silence so a slice's first block fades
         // in instead of stepping in.

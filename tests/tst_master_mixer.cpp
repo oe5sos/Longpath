@@ -303,16 +303,48 @@ private slots:
         std::array<float, 2> blk = {0.5f, 0.5f};
         std::array<float, 2> out{};
 
-        // Both feed once: the opportunistic slot is summed in.
+        // ── Phase A: one block is not enough to be heard any more ────
+        //
+        // 2026-08-11 prime gate: with a barrier member pacing the
+        // drain, an opportunistic slot stays SILENT until it has
+        // buffered one drain block plus kOpportunisticPrimeMarginFrames
+        // (256) of slack — the fix for the light periodic scratch of a
+        // slot that ran dry mid-block. It still must not hold up the
+        // drain while it buffers.
         mix.accumulate(1, blk.data(), 1);
         mix.accumulate(-2, blk.data(), 1);
         QCOMPARE(mix.tryDrain(out.data(), 1), 1);
-        QCOMPARE(out[0], 1.0f);
-        QCOMPARE(mix.producingSliceCount(), 1);   // only slice 1 enrolled
+        QCOMPARE(out[0], 0.5f);                  // member only — buffering
+        QCOMPARE(mix.producingSliceCount(), 1);  // only slice 1 enrolled
 
-        // Now the opportunistic slot goes quiet, as it does the moment TX
-        // ends. The drain must not stall even once.
+        // ── Phase B: primed → summed in ──────────────────────────────
+        // 257 more frames: avail (258) >= n (1) + margin (256).
+        std::vector<float> primeBlk(2 * 257, 0.5f);
+        mix.accumulate(-2, primeBlk.data(), 257);
         mix.accumulate(1, blk.data(), 1);
+        out = {};
+        QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+        QCOMPARE(out[0], 1.0f);
+
+        // ── Phase C: producer stops → plays out, then de-primes ──────
+        //
+        // The moment TX ends the slot stops feeding. It keeps playing
+        // its buffered tail (257 frames left) — but a drain LARGER than
+        // the tail must not stop the waveform mid-block: the slot
+        // de-primes, drops the residue, and goes silent for the whole
+        // block. The drain itself is never held up.
+        std::vector<float> memberBlk(2 * 258, 0.5f);
+        std::vector<float> bigOut(2 * 258, 0.0f);
+        mix.accumulate(1, memberBlk.data(), 258);
+        QCOMPARE(mix.tryDrain(bigOut.data(), 258), 258);
+        QCOMPARE(bigOut[0], 0.5f);               // member only, first frame…
+        QCOMPARE(bigOut[2 * 257], 0.5f);         // …and last frame alike
+
+        // ── Phase D: a single fresh block stays silent again ─────────
+        // De-primed means re-buffering from scratch, not chattering.
+        mix.accumulate(-2, blk.data(), 1);
+        mix.accumulate(1, blk.data(), 1);
+        out = {};
         QCOMPARE(mix.tryDrain(out.data(), 1), 1);
         QCOMPARE(out[0], 0.5f);
     }
