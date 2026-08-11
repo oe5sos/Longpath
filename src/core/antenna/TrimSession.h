@@ -93,6 +93,13 @@ public:
     // and the exponent would be wrong in a way nothing could catch.
     void updateLastLength(double lengthM);
 
+    // Same idea for the resonance. The window finds the crossing
+    // NEAREST THE TARGET, so changing the target can legitimately pick
+    // a different one — on an end-fed swept across HF, certainly. The
+    // last observation describes the measurement currently on screen,
+    // and it has to keep describing it.
+    void updateLastResonance(double resonanceHz);
+
     const QVector<Observation>& observations() const { return m_obs; }
     void clear() { m_obs.clear(); }
     int  count() const { return int(m_obs.size()); }

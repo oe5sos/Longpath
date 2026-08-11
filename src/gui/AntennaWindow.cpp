@@ -738,14 +738,41 @@ void AntennaWindow::refresh()
               .arg(Feedline::catalogue().at(cableIdx).name)
         : QStringLiteral("at the analyser port");
 
+    // ── What the antenna is doing at the target ──────────────────────
+    //
+    // R + jX and the return loss, which is what a VNA screen shows and
+    // what somebody comparing against their instrument will look for.
+    // impedanceAt() and returnLossDb() were written on the first day
+    // and nothing was calling either of them — an audit found them
+    // dead, and the fix is to show them rather than delete them.
+    QString atTarget;
+    if (!m_sweep.isEmpty() && targetHz > 0.0) {
+        const auto z = AntennaSweep::impedanceAt(m_sweep, targetHz);
+        if (z != std::complex<double>{}) {
+            const double rl =
+                AntennaSweep::returnLossDb(
+                    (std::complex<double>(z.real(), z.imag())
+                        - m_sweep.referenceOhms)
+                    / (std::complex<double>(z.real(), z.imag())
+                        + m_sweep.referenceOhms));
+            atTarget = QStringLiteral(" · at %1: %2 %3 j%4 Ω, %5 dB return")
+                           .arg(targetHz / 1e6, 0, 'f', 3)
+                           .arg(z.real(), 0, 'f', 0)
+                           .arg(z.imag() < 0.0 ? QStringLiteral("−")
+                                               : QStringLiteral("+"))
+                           .arg(std::abs(z.imag()), 0, 'f', 0)
+                           .arg(rl, 0, 'f', 1);
+        }
+    }
+
     m_source->setText(m_sweep.source.isEmpty()
         ? QString{}
-        : QStringLiteral("%1 · %2 points · %3 to %4 MHz · %5")
+        : QStringLiteral("%1 · %2 points · %3 to %4 MHz · %5%6")
               .arg(m_sweep.source)
               .arg(m_sweep.points.size())
               .arg(m_sweep.startHz() / 1e6, 0, 'f', 3)
               .arg(m_sweep.stopHz()  / 1e6, 0, 'f', 3)
-              .arg(plane));
+              .arg(plane, atTarget));
 
     // ── The three tiles ──────────────────────────────────────────────
     const double limit = m_limitBox->value();
@@ -872,13 +899,22 @@ void AntennaWindow::refresh()
     }
 
     const AntennaTrim::Kind kind = currentKind();
-    // Through the session, so a measured exponent is used when there is
-    // one. With fewer than two usable measurements this is exactly
-    // AntennaTrim::compute with the textbook rule.
-    const auto t = AntennaTrim::compute(kind, res.freqHz, targetHz,
-                                        m_lengthBox->value(),
-                                        session.valid ? session.exponent
-                                                      : 1.0);
+
+    // ── One path, and it took an audit to notice ─────────────────────
+    //
+    // This used to call AntennaTrim::compute directly and pass the
+    // exponent itself, which is what TrimSession::recommend does. Two
+    // implementations of the same decision — and the tests exercised
+    // recommend(), so the suite was green about a function the program
+    // never ran.
+    //
+    // The observation is refreshed first because the window looks for
+    // the crossing NEAREST THE TARGET: change the target and a
+    // different one can legitimately win, so what was recorded at load
+    // time is no longer what is on screen.
+    m_session.updateLastResonance(res.freqHz);
+    const auto t = m_session.recommend(kind, targetHz,
+                                       m_lengthBox->value());
 
     if (std::abs(t.percentChange) < 0.1) {
         m_action->setText(QStringLiteral("nothing"));
@@ -918,14 +954,13 @@ void AntennaWindow::refresh()
                                           : Style::kAmberText)));
 
     // ── Warnings, only when there are any ────────────────────────────
+    // AntennaTrim::instruction() is the authoritative sentence and it
+    // already carries the halving note and the large-change caution.
+    // The window used to rebuild both from the same fields in slightly
+    // different words — two versions of one sentence, and the tests
+    // checked the version nobody saw.
     QStringList notes;
-    if (t.halved) {
-        notes << QStringLiteral(
-            "This is half of the %1 cm the arithmetic asks for. Cut it in "
-            "two passes and measure between — wire does not grow back.")
-                  .arg(std::abs(t.perElementM) * 100.0, 0, 'f', 1);
-    }
-    if (!t.caution.isEmpty()) { notes << t.caution; }
+    notes << AntennaTrim::instruction(t, kind);
     if (kind == AntennaTrim::Kind::EndFedHalfWave) {
         notes << QStringLiteral(
             "On an end-fed, the harmonic bands do not all move by the "

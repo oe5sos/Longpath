@@ -36,6 +36,12 @@ void TrimSession::updateLastLength(double lengthM)
     m_obs.last().lengthM = lengthM;
 }
 
+void TrimSession::updateLastResonance(double resonanceHz)
+{
+    if (m_obs.isEmpty() || resonanceHz <= 0.0) { return; }
+    m_obs.last().resonanceHz = resonanceHz;
+}
+
 TrimSession::Learned TrimSession::learned() const
 {
     Learned out;

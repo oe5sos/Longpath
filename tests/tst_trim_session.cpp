@@ -228,6 +228,43 @@ private slots:
         QVERIFY2(l.valid, qPrintable(l.note));
     }
 
+    // The window looks for the crossing NEAREST THE TARGET, so changing
+    // the target can legitimately pick a different one — on an end-fed
+    // swept across HF, certainly. The last observation has to keep
+    // describing the measurement on screen, or recommend() answers
+    // about a resonance nobody is looking at.
+    void the_last_measurement_can_be_corrected_after_the_fact()
+    {
+        TrimSession s;
+        s.record(20.00, 7.183e6);
+        s.record(0.0,   7.140e6);          // length not typed yet
+        QVERIFY2(!s.learned().valid, "a missing length cannot teach");
+
+        s.updateLastLength(20.22);
+        const auto l = s.learned();
+        QVERIFY2(l.valid, qPrintable(l.note));
+
+        // And the resonance, for when the target moves.
+        s.updateLastResonance(7.150e6);
+        QCOMPARE(s.observations().last().resonanceHz, 7.150e6);
+        QCOMPARE(s.observations().last().lengthM, 20.22);
+    }
+
+    void correcting_an_empty_session_or_with_nonsense_does_nothing()
+    {
+        TrimSession s;
+        s.updateLastLength(20.0);
+        s.updateLastResonance(7.0e6);
+        QCOMPARE(s.count(), 0);
+
+        s.record(20.00, 7.183e6);
+        s.updateLastResonance(0.0);
+        s.updateLastResonance(-1.0);
+        s.updateLastLength(-5.0);
+        QCOMPARE(s.observations().last().resonanceHz, 7.183e6);
+        QCOMPARE(s.observations().last().lengthM, 20.00);
+    }
+
     void clearing_forgets_everything()
     {
         TrimSession s;
