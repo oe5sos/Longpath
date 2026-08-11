@@ -121,6 +121,58 @@ private slots:
                  QStringLiteral("40 m"));
     }
 
+    // ── Every band a wide sweep touches ──────────────────────────────
+    //
+    // The case an end-fed owner actually has: sweep the whole of HF and
+    // ask where all the resonances are. bestOverlap() answers "10 m",
+    // which is true and useless.
+    void a_wide_sweep_reports_every_band_it_touches()
+    {
+        const auto all = allOverlapping(3.0e6, 30.0e6, Region::One);
+        QStringList names;
+        for (const Band& b : all) { names << b.name; }
+
+        // 80, 60, 40, 30, 20, 17, 15, 12, 10 — but NOT 160, which ends
+        // at 2.000, below the sweep.
+        QVERIFY2(names.contains(QStringLiteral("80 m")), qPrintable(names.join(QStringLiteral(", "))));
+        QVERIFY(names.contains(QStringLiteral("40 m")));
+        QVERIFY(names.contains(QStringLiteral("20 m")));
+        QVERIFY(names.contains(QStringLiteral("10 m")));
+        QVERIFY2(!names.contains(QStringLiteral("160 m")),
+                 "160 m ends at 2.000 and is not in a 3-to-30 sweep");
+        QVERIFY2(!names.contains(QStringLiteral("6 m")),
+                 "6 m starts at 50 and is not in a 3-to-30 sweep");
+        QCOMPARE(all.size(), 9);
+    }
+
+    void the_bands_come_back_in_frequency_order()
+    {
+        const auto all = allOverlapping(3.0e6, 30.0e6, Region::One);
+        for (int i = 1; i < all.size(); ++i) {
+            QVERIFY(all.at(i).lowHz > all.at(i - 1).lowHz);
+        }
+    }
+
+    void a_narrow_sweep_reports_one_band_or_none()
+    {
+        QCOMPARE(allOverlapping(7.0e6, 7.3e6, Region::One).size(), 1);
+        QCOMPARE(allOverlapping(8.0e6, 9.0e6, Region::One).size(), 0);
+    }
+
+    void touching_an_edge_is_not_touching_the_band_here_either()
+    {
+        // Same strictness as bestOverlap, so the two cannot disagree
+        // about whether a sweep is "about" a band.
+        QCOMPARE(allOverlapping(6.5e6, 7.000e6, Region::One).size(), 0);
+        QCOMPARE(allOverlapping(6.5e6, 7.001e6, Region::One).size(), 1);
+    }
+
+    void a_reversed_wide_range_is_accepted_too()
+    {
+        QCOMPARE(allOverlapping(30.0e6, 3.0e6, Region::One).size(),
+                 allOverlapping(3.0e6, 30.0e6, Region::One).size());
+    }
+
     // ── The table itself ─────────────────────────────────────────────
 
     void every_band_is_ordered_and_does_not_overlap_its_neighbour()

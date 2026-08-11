@@ -49,6 +49,7 @@ class QDropEvent;
 class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
+class QTableWidget;
 
 namespace NereusSDR {
 
@@ -83,10 +84,19 @@ private:
     // m_measured — one place, so no view can be looking at the raw
     // sweep while another looks at the corrected one.
     void applyFeedline();
+    // Rebuild the per-band table. Separate from refresh() only because
+    // it is thirty lines of table filling and refresh() is already the
+    // longest function here.
+    void refreshBandTable();
     // Fill the length box with a half-wave estimate for the target.
     // Labelled as an estimate wherever it lands, because the velocity
     // factor of the operator's actual wire is not known here.
     void estimateLength();
+
+    // The span the readouts describe: whatever was typed into the two
+    // range boxes, or the band the sweep is on when they are empty.
+    // Invalid when there is neither.
+    AmateurBands::Band readoutSpan() const;
 
     AntennaTrim::Kind    currentKind() const;
     AmateurBands::Region currentRegion() const;
@@ -115,6 +125,14 @@ private:
     QComboBox*      m_cableBox{nullptr};
     QDoubleSpinBox* m_cableLenBox{nullptr};
     QDoubleSpinBox* m_limitBox{nullptr};
+    // ── The exact span to read off ───────────────────────────────────
+    //
+    // A band is a reasonable default and not always the question. A CW
+    // operator cares about 7.020 to 7.040, not about the whole of 40 m,
+    // and an FT8 user cares about 14.074 give or take a couple of
+    // kilohertz. Both zero means "use the band".
+    QDoubleSpinBox* m_fromBox{nullptr};
+    QDoubleSpinBox* m_toBox{nullptr};
 
     QLabel* m_action{nullptr};      // "+ 22 cm", large
     QLabel* m_actionSub{nullptr};   // "pro Schenkel · Linked Dipol 40 m"
@@ -123,6 +141,11 @@ private:
     QLabel* m_startVal{nullptr};
     QLabel* m_midVal{nullptr};
     QLabel* m_endVal{nullptr};
+    // How wide the antenna actually is at the chosen SWR limit. The
+    // other half of "bandwidth": not the span you asked about, but the
+    // span you have.
+    QLabel* m_spanVal{nullptr};
+    QLabel* m_spanCap{nullptr};
     QLabel* m_startCap{nullptr};
     QLabel* m_midCap{nullptr};
     QLabel* m_endCap{nullptr};
@@ -131,6 +154,10 @@ private:
     QLabel* m_explain{nullptr};     // the sentence under the curve
     QLabel* m_source{nullptr};
     QLabel* m_learned{nullptr};    // what the last change actually did
+    // One row per band the sweep touches. Hidden for a single-band
+    // sweep, where the three tiles at the top already say it and a
+    // one-row table is furniture.
+    QTableWidget* m_bandTable{nullptr};
     QPushButton* m_forgetBtn{nullptr};
 
     // Set once the operator has typed a target, so a newly loaded sweep

@@ -33,6 +33,8 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QStringList>
+#include <QHeaderView>
+#include <QTableWidget>
 #include <QVBoxLayout>
 
 #include <cmath>
@@ -47,6 +49,8 @@ const QString kLimitKey  = QStringLiteral("AntennaSwrLimit");
 const QString kDirKey    = QStringLiteral("AntennaSweepDir");
 const QString kCableKey  = QStringLiteral("AntennaCableType");
 const QString kCableLenKey = QStringLiteral("AntennaCableLengthM");
+const QString kFromKey   = QStringLiteral("AntennaReadFromMHz");
+const QString kToKey     = QStringLiteral("AntennaReadToMHz");
 
 QLabel* caption(const QString& text, QWidget* parent)
 {
@@ -114,6 +118,27 @@ AntennaWindow::AntennaWindow(QWidget* parent)
 AntennaTrim::Kind AntennaWindow::currentKind() const
 {
     return static_cast<AntennaTrim::Kind>(m_kindBox->currentData().toInt());
+}
+
+AmateurBands::Band AntennaWindow::readoutSpan() const
+{
+    const double from = m_fromBox ? m_fromBox->value() * 1e6 : 0.0;
+    const double to   = m_toBox   ? m_toBox->value()   * 1e6 : 0.0;
+
+    if (from > 0.0 && to > from) {
+        AmateurBands::Band b;
+        b.lowHz  = from;
+        b.highHz = to;
+        // Named, so nothing downstream mistakes it for a band plan
+        // entry — the curve prints the name and a green bar labelled
+        // "40 m" when it is really the operator's own 20 kHz would be a
+        // small lie in a place that matters.
+        b.name = QStringLiteral("your range");
+        return b;
+    }
+    // One box filled and the other not is a half-typed instruction, not
+    // an instruction. Fall back rather than guessing the missing end.
+    return m_curve ? m_curve->shownBand() : AmateurBands::Band{};
 }
 
 AmateurBands::Region AntennaWindow::currentRegion() const
@@ -210,13 +235,48 @@ void AntennaWindow::buildUi()
         "until you choose."));
     top->addWidget(m_targetBox);
 
+    top->addStretch(1);
+    col->addLayout(top);
+
+    // ── Second row: what is being measured, rather than what is on
+    //    the mast. Two rows because ten controls on one line wrap into
+    //    unreadability on a laptop. ──────────────────────────────────
+    auto* row2 = new QHBoxLayout;
+    row2->setSpacing(7);
+
+    // The exact span to read off. A band is a reasonable default and
+    // not always the question — a CW operator cares about 7.020 to
+    // 7.040, not about the whole of 40 m.
+    row2->addWidget(caption(QStringLiteral("READ FROM"), this));
+    m_fromBox = new QDoubleSpinBox(this);
+    m_fromBox->setRange(0.0, 500.0);
+    m_fromBox->setDecimals(3);
+    m_fromBox->setSingleStep(0.005);
+    m_fromBox->setSuffix(QStringLiteral(" MHz"));
+    m_fromBox->setSpecialValueText(QStringLiteral("whole band"));
+    m_fromBox->setValue(s.value(kFromKey, 0.0).toDouble());
+    m_fromBox->setToolTip(QStringLiteral(
+        "Read the numbers off this span instead of the whole band. "
+        "Leave both at 'whole band' to use the band edges."));
+    row2->addWidget(m_fromBox);
+
+    row2->addWidget(caption(QStringLiteral("TO"), this));
+    m_toBox = new QDoubleSpinBox(this);
+    m_toBox->setRange(0.0, 500.0);
+    m_toBox->setDecimals(3);
+    m_toBox->setSingleStep(0.005);
+    m_toBox->setSuffix(QStringLiteral(" MHz"));
+    m_toBox->setSpecialValueText(QStringLiteral("whole band"));
+    m_toBox->setValue(s.value(kToKey, 0.0).toDouble());
+    row2->addWidget(m_toBox);
+
     // ── The coax between the analyser and the antenna ────────────
     //
     // Zero for anyone who calibrated at the far end, which is the right
     // way to do it and costs nothing here. For everyone else this is
     // the difference between measuring the antenna and measuring the
     // antenna plus a transformer of unknown ratio.
-    top->addWidget(caption(QStringLiteral("COAX"), this));
+    row2->addWidget(caption(QStringLiteral("COAX"), this));
     m_cableBox = new QComboBox(this);
     for (int i = 0; i < Feedline::catalogue().size(); ++i) {
         m_cableBox->addItem(Feedline::catalogue().at(i).name, i);
@@ -231,7 +291,7 @@ void AntennaWindow::buildUi()
     m_cableBox->setToolTip(QStringLiteral(
         "The cable between the analyser and the antenna. Nominal "
         "figures — real cable varies by make and by age."));
-    top->addWidget(m_cableBox);
+    row2->addWidget(m_cableBox);
 
     m_cableLenBox = new QDoubleSpinBox(this);
     m_cableLenBox->setRange(0.0, 300.0);
@@ -243,17 +303,17 @@ void AntennaWindow::buildUi()
     m_cableLenBox->setToolTip(QStringLiteral(
         "How much of it. Leave at none if you calibrated at the antenna "
         "end — then there is nothing to take out."));
-    top->addWidget(m_cableLenBox);
+    row2->addWidget(m_cableLenBox);
 
-    top->addStretch(1);
+    row2->addStretch(1);
 
-    top->addWidget(caption(QStringLiteral("SWR MAX"), this));
+    row2->addWidget(caption(QStringLiteral("SWR MAX"), this));
     m_limitBox = new QDoubleSpinBox(this);
     m_limitBox->setRange(1.1, 5.0);
     m_limitBox->setDecimals(1);
     m_limitBox->setSingleStep(0.1);
     m_limitBox->setValue(s.value(kLimitKey, 2.0).toDouble());
-    top->addWidget(m_limitBox);
+    row2->addWidget(m_limitBox);
 
     m_regionBox = new QComboBox(this);
     m_regionBox->addItem(QStringLiteral("Region 1"),
@@ -273,9 +333,9 @@ void AntennaWindow::buildUi()
     m_regionBox->setToolTip(QStringLiteral(
         "Which IARU band plan draws the band edges. It is a plan, not a "
         "licence — your own allocation may be narrower."));
-    top->addWidget(m_regionBox);
+    row2->addWidget(m_regionBox);
 
-    col->addLayout(top);
+    col->addLayout(row2);
 
     // ── The answer, large ────────────────────────────────────────────
     auto* head = new QHBoxLayout;
@@ -318,6 +378,11 @@ void AntennaWindow::buildUi()
                          QStringLiteral("BAND MIDDLE")));
     head->addWidget(tile(this, &m_endCap, &m_endVal,
                          QStringLiteral("BAND END")));
+    // The other half of "bandwidth": not the span you asked about, but
+    // the span you have. usableSpan() has existed since the first
+    // commit and nothing was showing it.
+    head->addWidget(tile(this, &m_spanCap, &m_spanVal,
+                         QStringLiteral("USABLE")));
     col->addLayout(head);
 
     m_caution = new QLabel(QString{}, this);
@@ -340,6 +405,35 @@ void AntennaWindow::buildUi()
         "QLabel { color: %1; font-size: 11px; }")
             .arg(QLatin1String(Style::kTextSecondary)));
     col->addWidget(m_explain);
+
+    // ── One row per band the sweep touches ───────────────────────────
+    //
+    // A dipole sweep touches one band and the three tiles above already
+    // say everything; the table stays hidden. An end-fed swept across
+    // HF touches eight, and "where is it resonant" is then a list, not
+    // a number.
+    m_bandTable = new QTableWidget(0, 5, this);
+    m_bandTable->setHorizontalHeaderLabels({
+        QStringLiteral("Band"), QStringLiteral("start"),
+        QStringLiteral("middle"), QStringLiteral("end"),
+        QStringLiteral("resonant at")});
+    m_bandTable->verticalHeader()->setVisible(false);
+    m_bandTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_bandTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_bandTable->setFocusPolicy(Qt::NoFocus);
+    m_bandTable->horizontalHeader()->setStretchLastSection(true);
+    m_bandTable->setStyleSheet(QStringLiteral(
+        "QTableWidget { background: %1; color: %2; border: 1px solid %3;"
+        "  gridline-color: %3; font-size: 11px; }"
+        "QHeaderView::section { background: %4; color: %5; border: none;"
+        "  border-bottom: 1px solid %3; padding: 2px 6px; font-size: 9px; }"
+    ).arg(QLatin1String(Style::kInsetBg),
+          QLatin1String(Style::kTextPrimary),
+          QLatin1String(Style::kBorderSubtle),
+          QLatin1String(Style::kButtonBg),
+          QLatin1String(Style::kTextScale)));
+    m_bandTable->setVisible(false);
+    col->addWidget(m_bandTable);
 
     // What the last change actually did, against what was predicted.
     // Sits under the curve because it is a statement about the pair of
@@ -404,6 +498,14 @@ void AntennaWindow::buildUi()
     });
     connect(m_limitBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
         AppSettings::instance().setValue(kLimitKey, v);
+        refresh();
+    });
+    connect(m_fromBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        AppSettings::instance().setValue(kFromKey, v);
+        refresh();
+    });
+    connect(m_toBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        AppSettings::instance().setValue(kToKey, v);
         refresh();
     });
     connect(m_cableBox, &QComboBox::currentIndexChanged, this, [this](int) {
@@ -529,13 +631,90 @@ void AntennaWindow::estimateLength()
     m_lengthBox->setValue(AntennaTrim::halfWaveEstimateM(target));
 }
 
+void AntennaWindow::refreshBandTable()
+{
+    const auto bands = m_curve->shownBands();
+    const auto res   = m_curve->resonances();
+
+    // One band is what the tiles at the top already show. A one-row
+    // table there is furniture.
+    if (bands.size() < 2) {
+        m_bandTable->setVisible(false);
+        return;
+    }
+
+    const double limit = m_limitBox->value();
+    m_bandTable->setRowCount(bands.size());
+
+    for (int r = 0; r < bands.size(); ++r) {
+        const AmateurBands::Band& b = bands.at(r);
+
+        auto put = [this, r](int c, const QString& text, const QColor& col) {
+            auto* it = new QTableWidgetItem(text);
+            it->setForeground(col);
+            m_bandTable->setItem(r, c, it);
+            return it;
+        };
+
+        put(0, b.name, QColor(Style::kAccent));
+
+        const double at[3] = {b.lowHz, b.centreHz(), b.highHz};
+        for (int i = 0; i < 3; ++i) {
+            const double v = AntennaSweep::swrAt(m_sweep, at[i]);
+            if (v <= 0.0) {
+                // The edge falls outside the swept range. Blank would
+                // read as fine.
+                put(1 + i, QStringLiteral("not swept"),
+                    QColor(Style::kTextInactive));
+            } else {
+                put(1 + i, QStringLiteral("%1").arg(v, 0, 'f', 2),
+                    QColor(v > limit ? Style::kRedBorder
+                                     : Style::kTextPrimary));
+            }
+        }
+
+        // A resonance inside this band is the thing an end-fed owner is
+        // looking for. Saying "none" is as useful as saying where.
+        QString where = QStringLiteral("—");
+        QColor  col(Style::kTextInactive);
+        for (const auto& c : res) {
+            if (!b.contains(c.freqHz)) { continue; }
+            where = QStringLiteral("%1 MHz · %2 Ω")
+                        .arg(c.freqHz / 1e6, 0, 'f', 3)
+                        .arg(c.resistanceOhms, 0, 'f', 0);
+            col = QColor(Style::kAmberText);
+            break;
+        }
+        put(4, where, col);
+    }
+
+    m_bandTable->resizeColumnsToContents();
+    // Tall enough for its rows and no taller — it sits between the
+    // curve and the advice, and neither should be pushed off screen by
+    // an eight-band sweep.
+    const int rowH = m_bandTable->rowHeight(0);
+    // int(), because QVector::size() is a qsizetype and std::min will
+    // not deduce a common type with a plain 6.
+    m_bandTable->setFixedHeight(
+        std::min(int(bands.size()), 6) * rowH
+        + m_bandTable->horizontalHeader()->height() + 4);
+    m_bandTable->setVisible(true);
+}
+
 void AntennaWindow::refresh()
 {
     m_curve->setRegion(currentRegion());
     m_curve->setSwrLimit(m_limitBox->value());
     m_curve->setSweep(m_sweep);
 
-    const AmateurBands::Band band = m_curve->shownBand();
+    // A typed range overrides the band, and the curve is told so its
+    // three verticals land on the same span the tiles describe.
+    const AmateurBands::Band typed = readoutSpan();
+    const bool custom = typed.isValid()
+                        && typed.name == QStringLiteral("your range");
+    m_curve->setBand(custom ? typed : AmateurBands::Band{});
+
+    const AmateurBands::Band band = custom ? typed : m_curve->shownBand();
 
     // Default the target to the middle of the band. Written through the
     // spin box so the operator can see what it decided, and only while
@@ -598,12 +777,56 @@ void AntennaWindow::refresh()
                 .arg(QLatin1String(s > limit ? Style::kRedBorder
                                              : Style::kTextPrimary)));
     };
+    const QString what = custom ? QStringLiteral("RANGE")
+                                : QStringLiteral("BAND");
     setTile(m_startVal, m_startCap, band.isValid() ? band.lowHz : 0.0,
-            QStringLiteral("BAND START"));
+            what + QStringLiteral(" START"));
     setTile(m_midVal, m_midCap, band.isValid() ? band.centreHz() : 0.0,
-            QStringLiteral("BAND MIDDLE"));
+            what + QStringLiteral(" MIDDLE"));
     setTile(m_endVal, m_endCap, band.isValid() ? band.highHz : 0.0,
-            QStringLiteral("BAND END"));
+            what + QStringLiteral(" END"));
+
+    // ── How wide it actually is ──────────────────────────────────────
+    //
+    // Grown outwards from the target — or the middle of the span when
+    // no target was chosen — because a multiband antenna has several
+    // runs under the limit and only the one you are standing in counts.
+    {
+        const double around = targetHz > 0.0 ? targetHz
+                            : band.isValid() ? band.centreHz()
+                                             : 0.0;
+        const auto span = AntennaSweep::usableSpan(m_sweep, limit, around);
+        if (!span.found || around <= 0.0) {
+            m_spanCap->setText(QStringLiteral("USABLE"));
+            m_spanVal->setText(m_sweep.isEmpty() ? QStringLiteral("—")
+                                                 : QStringLiteral("none"));
+            m_spanVal->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; font-size: 15px; border: none; }")
+                    .arg(QLatin1String(m_sweep.isEmpty()
+                                           ? Style::kTextInactive
+                                           : Style::kRedBorder)));
+        } else {
+            const double kHz = span.widthHz() / 1000.0;
+            m_spanCap->setText(QStringLiteral("USABLE  %1–%2")
+                                   .arg(span.lowHz  / 1e6, 0, 'f', 3)
+                                   .arg(span.highHz / 1e6, 0, 'f', 3));
+            m_spanVal->setText(kHz >= 1000.0
+                ? QStringLiteral("%1 MHz").arg(kHz / 1000.0, 0, 'f', 2)
+                : QStringLiteral("%1 kHz").arg(kHz, 0, 'f', 0));
+            // Green only when it covers the whole span being read off —
+            // "300 kHz" is meaningless without knowing whether that is
+            // enough for the band in hand.
+            const bool covers = band.isValid()
+                                && span.lowHz  <= band.lowHz  + 1.0
+                                && span.highHz >= band.highHz - 1.0;
+            m_spanVal->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; border: none; }")
+                    .arg(QLatin1String(covers ? Style::kGreenText
+                                              : Style::kTextPrimary)));
+        }
+    }
+
+    refreshBandTable();
 
     // ── What the last change actually did ────────────────────────────
     //

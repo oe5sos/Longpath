@@ -126,6 +126,20 @@ Band containing(double hz, Region r)
     return Band{};
 }
 
+QVector<Band> allOverlapping(double startHz, double stopHz, Region r)
+{
+    if (stopHz < startHz) { std::swap(startHz, stopHz); }
+    QVector<Band> out;
+    for (const Band& b : forRegion(r)) {
+        // Same strictness as bestOverlap: touching at exactly one point
+        // is not being about a band.
+        if (std::min(stopHz, b.highHz) - std::max(startHz, b.lowHz) > 0.0) {
+            out.append(b);
+        }
+    }
+    return out;
+}
+
 Band bestOverlap(double startHz, double stopHz, Region r)
 {
     if (stopHz < startHz) { std::swap(startHz, stopHz); }

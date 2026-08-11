@@ -105,6 +105,8 @@ void SwrCurveWidget::setSwrLimit(double limit)
 
 void SwrCurveWidget::recompute()
 {
+    m_bands = AmateurBands::allOverlapping(m_sweep.startHz(),
+                                           m_sweep.stopHz(), m_region);
     m_band = m_forcedBand.isValid()
                  ? m_forcedBand
                  : AmateurBands::bestOverlap(m_sweep.startHz(),
@@ -114,6 +116,8 @@ void SwrCurveWidget::recompute()
         m_viewLoHz = m_viewHiHz = 0.0;
         m_resonance = {};
         m_best = {};
+        m_all.clear();
+        m_bands.clear();
         return;
     }
 
@@ -133,6 +137,25 @@ void SwrCurveWidget::recompute()
     m_resonance = AntennaSweep::nearestResonance(m_sweep, near);
     m_best      = AntennaSweep::bestMatch(m_sweep);
 
+    // Every SERIES resonance, for an end-fed swept across all of HF.
+    // Falling crossings are dropped for the same reason nearestResonance
+    // drops them: they are anti-resonances or feedline artefacts, and
+    // marking one would invite somebody to trim towards it.
+    m_all.clear();
+    for (const auto& c : AntennaSweep::resonances(m_sweep)) {
+        if (c.rising && c.resistanceOhms <= 400.0) { m_all.append(c); }
+    }
+
+    // With a target inside one band, put the verticals on that band
+    // rather than on the widest overlap — on a 3-to-30 MHz end-fed
+    // sweep the widest overlap is 10 m, which is unlikely to be what
+    // was asked about.
+    if (!m_forcedBand.isValid() && m_targetHz > 0.0) {
+        const AmateurBands::Band inTarget =
+            AmateurBands::containing(m_targetHz, m_region);
+        if (inTarget.isValid()) { m_band = inTarget; }
+    }
+
     // ── The vertical scale ───────────────────────────────────────────
     //
     // Fitted to what is inside the band rather than to the whole sweep.
@@ -141,10 +164,16 @@ void SwrCurveWidget::recompute()
     // two pixels.
     double worst = 1.0;
     for (const SweepPoint& p : m_sweep.points) {
-        if (m_band.isValid() && !m_band.contains(p.freqHz)) { continue; }
+        // Inside ANY band the sweep touches. Scaling to one band on a
+        // multiband sweep would clip the others off the top.
+        bool inSome = m_bands.isEmpty();
+        for (const AmateurBands::Band& b : m_bands) {
+            if (b.contains(p.freqHz)) { inSome = true; break; }
+        }
+        if (!inSome) { continue; }
         worst = std::max(worst, AntennaSweep::swr(p.gamma));
     }
-    if (worst <= 1.0) {   // no points in the band at all
+    if (worst <= 1.0) {   // no points in any band at all
         for (const SweepPoint& p : m_sweep.points) {
             worst = std::max(worst, AntennaSweep::swr(p.gamma));
         }
@@ -205,14 +234,33 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     QFont small = p.font();
     small.setPixelSize(10);
 
-    // ── The band ─────────────────────────────────────────────────────
-    if (m_band.isValid()) {
-        const double bl = std::max(xFor(m_band.lowHz),  m_plotL);
-        const double br = std::min(xFor(m_band.highHz), m_plotR);
-        if (br > bl) {
+    // ── The bands ────────────────────────────────────────────────────
+    //
+    // All of them, not only the one with the verticals. On an end-fed
+    // sweep across HF the picture IS the set of bands and where the
+    // resonances fall relative to them.
+    p.setFont(small);
+    {
+        const QFontMetrics bfm(small);
+        for (const AmateurBands::Band& b : m_bands) {
+            const double bl = std::max(xFor(b.lowHz),  m_plotL);
+            const double br = std::min(xFor(b.highHz), m_plotR);
+            if (br <= bl) { continue; }
+
             QColor fill = kBandFill;
-            fill.setAlpha(20);
+            // The band the verticals are on is a shade stronger, so it
+            // is findable among eight others.
+            fill.setAlpha(b.name == m_band.name ? 30 : 14);
             p.fillRect(QRectF(bl, m_plotT, br - bl, plot.height()), fill);
+
+            // Name it only where the name fits. A 30 m band on a 3-to-30
+            // sweep is four pixels wide and a label there is a smear.
+            const double tw = bfm.horizontalAdvance(b.name);
+            if (br - bl > tw + 4.0) {
+                p.setPen(QColor(Style::kAccent));
+                p.drawText(QPointF((bl + br) / 2.0 - tw / 2.0,
+                                   m_plotT + 12.0), b.name);
+            }
         }
     }
 
@@ -264,6 +312,26 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     p.setBrush(Qt::NoBrush);
     p.drawPolyline(line);
     p.setClipping(false);
+
+    // ── Every other series resonance, thin ───────────────────────────
+    //
+    // An end-fed has one per harmonic band. They are drawn before the
+    // main one so it reads on top, and without labels — the table under
+    // the picture names them.
+    if (m_all.size() > 1) {
+        QColor thin = kResonant;
+        thin.setAlpha(120);
+        p.setPen(QPen(thin, 1.0, Qt::DotLine));
+        for (const auto& c : m_all) {
+            if (m_resonance.found
+                && std::abs(c.freqHz - m_resonance.freqHz) < 1.0) {
+                continue;   // the amber one, drawn below
+            }
+            if (c.freqHz < m_viewLoHz || c.freqHz > m_viewHiHz) { continue; }
+            const double x = xFor(c.freqHz);
+            p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
+        }
+    }
 
     // ── Resonance, in amber ──────────────────────────────────────────
     //
@@ -340,8 +408,9 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
                hi);
 
     if (m_band.isValid()) {
-        const QString mid = QStringLiteral("%1 · mid %2 MHz")
-                                .arg(m_band.name, mhz(m_band.centreHz()));
+        const QString mid = QStringLiteral("%1 · mid %2 MHz · %3 kHz wide")
+                                .arg(m_band.name, mhz(m_band.centreHz()))
+                                .arg(m_band.widthHz() / 1000.0, 0, 'f', 0);
         p.setPen(kCentre);
         p.drawText(QPointF((m_plotL + m_plotR) / 2.0
                                - sfm.horizontalAdvance(mid) / 2.0,
@@ -352,11 +421,19 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // and the only defence against it being read as one is saying where
     // it came from.
     p.setPen(kDim);
-    const QString prov = m_band.isValid()
-        ? QStringLiteral("Band edges: %1 — check your own licence")
-              .arg(AmateurBands::regionName(m_region))
-        : QStringLiteral("This sweep does not cover an amateur band (%1)")
-              .arg(AmateurBands::regionName(m_region));
+    // Say where the three verticals came from. With a typed range they
+    // are the operator's own and calling them band edges would be a
+    // small lie in a place that matters.
+    const QString prov =
+        m_forcedBand.isValid()
+            ? QStringLiteral("Verticals: your own range. Shaded bands: "
+                             "%1 — check your own licence")
+                  .arg(AmateurBands::regionName(m_region))
+        : m_band.isValid()
+            ? QStringLiteral("Band edges: %1 — check your own licence")
+                  .arg(AmateurBands::regionName(m_region))
+            : QStringLiteral("This sweep does not cover an amateur band (%1)")
+                  .arg(AmateurBands::regionName(m_region));
     p.drawText(QPointF(m_plotL, m_plotB + 28.0), prov);
 
     // ── Title line ───────────────────────────────────────────────────

@@ -75,6 +75,15 @@ Band containing(double hz, Region r = Region::One);
 // Invalid when the sweep touches no band.
 Band bestOverlap(double startHz, double stopHz, Region r = Region::One);
 
+// Every band a sweep touches, in frequency order.
+//
+// An end-fed half-wave is swept across the whole of HF at once, and the
+// question its owner has is not "how is 40 m" but "where are all the
+// resonances and do they land in bands". bestOverlap() answers the
+// first and cannot answer the second.
+QVector<Band> allOverlapping(double startHz, double stopHz,
+                             Region r = Region::One);
+
 QString regionName(Region r);
 
 } // namespace NereusSDR::AmateurBands

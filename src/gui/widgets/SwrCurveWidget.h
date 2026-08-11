@@ -29,6 +29,19 @@
 // chosen region. National allocations differ. The widget prints which
 // region it drew so nobody reads the green bar as a licence.
 //
+// ── One band or many ─────────────────────────────────────────────────
+//
+// A dipole is swept across one band and the three verticals are the
+// answer. An end-fed half-wave is swept across the whole of HF at once,
+// and its owner's question is different: where are ALL the resonances,
+// and do they land in bands?
+//
+// So a sweep touching more than one band shades and names every one of
+// them and marks every series resonance. The three verticals stay, on
+// the band nearest the target — the others get a name and their share
+// of the shading, and the per-band numbers belong in a table beside the
+// picture rather than crowded onto it.
+//
 // ── Why the vertical scale is not fixed ──────────────────────────────
 //
 // A fixed 1..10 axis flattens a good antenna into a straight line along
@@ -90,6 +103,14 @@ public:
     // sweep. Invalid when the sweep touches no band.
     AmateurBands::Band shownBand() const { return m_band; }
 
+    // Every band the sweep touches, in frequency order. The window uses
+    // it to build the per-band table under a wide sweep.
+    QVector<AmateurBands::Band> shownBands() const { return m_bands; }
+
+    // Every series resonance in the sweep. One for a dipole, several
+    // for an end-fed.
+    QVector<AntennaSweep::Crossing> resonances() const { return m_all; }
+
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
@@ -109,14 +130,16 @@ private:
     Sweep m_reference;
     QString m_referenceLabel;
     AmateurBands::Region m_region{AmateurBands::Region::One};
-    AmateurBands::Band   m_band;        // what is drawn
+    AmateurBands::Band   m_band;        // the one with the verticals
+    QVector<AmateurBands::Band> m_bands;   // every one the sweep touches
     AmateurBands::Band   m_forcedBand;  // what the caller insisted on
 
     double m_targetHz{0.0};
     double m_limit{2.0};
     double m_swrTop{3.0};               // top of the vertical scale
 
-    AntennaSweep::Crossing m_resonance;
+    AntennaSweep::Crossing m_resonance;     // nearest the target
+    QVector<AntennaSweep::Crossing> m_all;  // every rising crossing
     AntennaSweep::Minimum  m_best;
 
     // Plot rectangle, in widget coordinates. Recomputed per paint but
