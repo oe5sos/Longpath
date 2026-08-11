@@ -583,6 +583,7 @@ set(CORE_SOURCES
     src/core/accessories/N2adrPreset.cpp
     src/core/accessories/PennyLaneController.cpp
     src/core/audio/MasterMixer.cpp
+    src/core/audio/MicReorderBuffer.cpp
     src/core/audio/PcMicSource.cpp
     src/core/audio/RadeTxFilters.cpp
     src/core/audio/RadeTxFilters.h

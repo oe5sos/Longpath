@@ -1160,6 +1160,15 @@ nereus_add_test(tst_master_mixer)
 # of the test file for the story and the numbers.
 nereus_add_test(tst_master_mixer_cadence)
 
+# ── 2026-08-11 remote-bench mic reordering: MicReorderBuffer contract ─────
+# The socket-level sequence audit showed the routed/WLAN path REORDERS
+# ~0.2-0.5% of mic frames (LOST n == out-of-order n in nearly every
+# window) with true loss ~0.1%. This pins the reorder/concealment stage
+# between the port-1026 decoder and TxMicSource: zero-latency pass-
+# through, swap rescue, depth-bounded concealment via last-block repeat,
+# stale drop, resync, and the 2^32 wrap.
+nereus_add_test(tst_mic_reorder_buffer)
+
 # ── Phase 3F Sub-Epic I closeout C1: multi-slice audio reaches the mixer ──
 nereus_add_test(tst_audio_engine_multi_slice_mix)
 

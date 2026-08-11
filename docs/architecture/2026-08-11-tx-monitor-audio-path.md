@@ -172,6 +172,31 @@ Launch capturing only the audit lines:
 
     ~/Desktop/neureus/NereusSDR/build/NereusSDR.app/Contents/MacOS/NereusSDR 2>&1 | grep --line-buffered "seq audit"
 
+### First measurement (2026-08-11, remote link) and the fix it bought
+
+The remote bench (radio at another site, same routed network) ran the
+audit for ~6 minutes. Verdict: the dominant defect is REORDERING, not
+loss — in almost every window `LOST n == out-of-order n` cancelled out
+(a late frame books a gap, then arrives), true loss sat at 0.1-0.3%
+with occasional correlated bursts up to ~1.5% hitting mic and IQ in
+the same window (a genuine network event). The socket received nearly
+the full 750 frames/s throughout, so the 3-15% dispatch deficit is
+NOT wire loss — it is in-app or TX-load-dependent (measurement under
+MOX still pending).
+
+The actionable finding: 0.2-0.5% late frames ≈ 2-4 splice glitches
+per second in the TX pump, which consumed frames in ARRIVAL order.
+Fixed the same evening by `MicReorderBuffer`
+(src/core/audio/MicReorderBuffer.h — speculative zero-latency
+reordering: in-order frames pass straight through, late frames are
+slotted back into position, true losses concealed by repeating the
+last 1.33 ms block, resync on stream restart). Sits between the
+port-1026 decoder and TxMicSource; stats appear next to the audit as
+"P2 mic reorder: rescued N late, concealed M lost, …". Contract
+pinned by tests/tst_mic_reorder_buffer.cpp; validated pre-merge in an
+offline ASan/UBSan harness including a 20k-frame soak (3% swaps +
+0.1% loss: 588 rescued, 10 concealed, zero out-of-order emissions).
+
 ## Open items
 
 - "QLayout: Cannot add a null widget" fires once when some window

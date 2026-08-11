@@ -174,6 +174,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "RadioConnection.h"
 #include "BoardCapabilities.h"
 #include "WidebandFrameAccumulator.h"
+#include "audio/MicReorderBuffer.h"
 
 #include <QDateTime>
 #include <QDeadlineTimer>
@@ -515,6 +516,13 @@ private:
     quint64 m_iqSeqWndEvents{0};
     qint64  m_iqSeqWndStartMs{0};
     qint64  m_iqSeqLastCleanLogMs{0};
+
+    // Reorder/concealment stage between the port-1026 decoder and
+    // TxMicSource (remote-bench fix 2026-08-11): late frames are
+    // slotted back into sequence position, true losses concealed by
+    // repeating the last block. See MicReorderBuffer.h for design.
+    // Stats reported inside the auditMicSeq() 5 s window.
+    NereusSDR::MicReorderBuffer m_micReorder;
     static constexpr int kMicLosTimeoutMs = 3000;  // network.c:656 [v2.10.3.13]
 
     // --- Run state (from Thetis _radionet, network.h:65-66) ---

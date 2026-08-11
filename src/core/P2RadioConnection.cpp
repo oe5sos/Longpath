@@ -704,6 +704,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
     m_iqSeqWndLost    = 0;
     m_iqSeqWndEvents  = 0;
     m_iqSeqWndStartMs = 0;
+    m_micReorder.reset();
 
     sendCmdGeneral();         // CmdGeneral(); //1024
     sendCmdRx();              // CmdRx(); //1025
@@ -2031,7 +2032,17 @@ void P2RadioConnection::onReadyRead()
                     // become distinguishable. See auditMicSeq().
                     auditMicSeq(seq);
                     if (m_txMicSource != nullptr) {
-                        m_txMicSource->inbound(samples.data(), 64);
+                        // Remote-bench fix 2026-08-11: route through
+                        // the reorder/concealment stage instead of
+                        // pushing in arrival order. In-order frames
+                        // pass straight through (zero added latency);
+                        // late frames get slotted back into place,
+                        // true losses concealed by repeating the last
+                        // block. See MicReorderBuffer.h.
+                        m_micReorder.push(seq, samples,
+                            [this](const float* s, int n) {
+                                m_txMicSource->inbound(s, n);
+                            });
                         m_lastMicAt = QDateTime::currentDateTimeUtc();
                     }
                 }
@@ -2344,6 +2355,19 @@ void P2RadioConnection::auditMicSeq(quint32 seq)
             .arg(m_micSeqWndReceived)
             .arg(secs, 0, 'f', 1);
         m_micSeqLastCleanLogMs = now;
+    }
+    // What the reorder stage did about it, same window.
+    {
+        const auto rs = m_micReorder.takeStats();
+        if (rs.any()) {
+            qCInfo(lcConnection).noquote() << QStringLiteral(
+                "P2 mic reorder: rescued %1 late, concealed %2 lost, "
+                "dropped %3 stale, resyncs %4")
+                .arg(rs.rescued)
+                .arg(rs.concealed)
+                .arg(rs.staleDropped)
+                .arg(rs.resyncs);
+        }
     }
     m_micSeqWndReceived   = 0;
     m_micSeqWndLost       = 0;
