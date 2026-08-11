@@ -68,8 +68,15 @@ QRgb colorAt(float dbm, float runMin, float runMax,
                                           WfColorScheme::ClarityBlue);
 }
 
-// The palette's last stop: the colour the whole screen used to be.
+// The colour the whole screen used to be — the OLD magenta cap. It no
+// longer exists in any palette (269e9676 removed it), so the negative
+// assertions below can never fire on it; they are kept as tripwires
+// against the cap ever coming back.
 constexpr QRgb kClarityTop = qRgb(0xff, 0x40, 0xc0);
+
+// The palette's ACTUAL last stop since 269e9676: red. What a peak is
+// allowed — and expected — to reach.
+constexpr QRgb kClarityPeak = qRgb(0xff, 0x2a, 0x2a);
 
 } // namespace
 
@@ -141,7 +148,10 @@ void TstWaterfallColor::peaks_may_reach_the_top_colour()
     // strong signal. Peaks reaching the top of the palette is correct;
     // the top of the palette swallowing the picture is not.
     const QRgb peak = colorAt(-80.0f, -120.0f, -80.0f);
-    QCOMPARE(peak, kClarityTop);
+    // Against the palette's real top (red since 269e9676) — this test
+    // still compared against the removed magenta cap and failed on the
+    // 2026-08-11 full-suite run.
+    QCOMPARE(peak, kClarityPeak);
 }
 
 void TstWaterfallColor::the_colour_gain_slider_still_does_something()
@@ -205,12 +215,21 @@ QVector<QRgb> rampOf(WfColorScheme scheme)
 {
     QVector<QRgb> out;
     out.reserve(256);
+    // A wide window, so the min-span guard stays out of the way. The
+    // old 0..1 dB window was silently widened to kWfMinSpanDb by the
+    // collapsed-window guard (53f26cc6), which meant these samples
+    // covered only the bottom sliver of the palette — and the CIELAB
+    // step off pure black in that sliver read as a "hard edge" that is
+    // really just L*'s cube-root steepness (2026-08-11 full-suite
+    // failure). dbm = t·span over a 0..span window maps t straight to
+    // palette position again, which is what this helper promises.
+    constexpr float kSpan = 100.0f;
     for (int i = 0; i < 256; ++i) {
         const float t = static_cast<float>(i) / 255.0f;
-        // low=0, high=1 with both sliders neutralised: black level 125
-        // adds nothing, colour gain 0 takes nothing.
-        out.append(SpectrumWidget::waterfallColor(t, 0.0f, 1.0f, 125, 0,
-                                                  scheme));
+        // Sliders neutralised: black level 125 adds nothing, colour
+        // gain 0 takes nothing.
+        out.append(SpectrumWidget::waterfallColor(t * kSpan, 0.0f, kSpan,
+                                                  125, 0, scheme));
     }
     return out;
 }

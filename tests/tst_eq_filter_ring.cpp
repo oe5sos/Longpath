@@ -159,7 +159,11 @@ private slots:
         c->eq().setBand(4, p);
 
         Ring::applyTo(c->eq(), 4, FT::Peak);
-        QCOMPARE(double(c->eq().band(4).q), 0.9);
+        // Compare as FLOAT: q is stored as float, and 0.9 has no exact
+        // float representation — promoting to double manufactures a
+        // difference (0.8999999761…) that QCOMPARE's double-epsilon
+        // rejects. Bitten on the first full-suite run, 2026-08-11.
+        QCOMPARE(c->eq().band(4).q, 0.9f);
     }
 
     void the_clamp_only_ever_lowers_q()
@@ -172,7 +176,7 @@ private slots:
         c->eq().setBand(5, p);
 
         Ring::applyTo(c->eq(), 5, FT::HighPass);
-        QCOMPARE(double(c->eq().band(5).q), 0.3);
+        QCOMPARE(c->eq().band(5).q, 0.3f);  // float compare — see above
     }
 
     // Slopes ignore gain. If the write cleared it, a stray double-click
@@ -199,7 +203,7 @@ private slots:
         QCOMPARE(double(after.freqHz), 1750.0);
         // Q is the one thing a lap is allowed to change, because the lap
         // passes through four types that cannot hold a sharp one.
-        QCOMPARE(double(after.q), 0.8);
+        QCOMPARE(after.q, 0.8f);  // float compare — see above
     }
 };
 

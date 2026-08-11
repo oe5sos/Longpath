@@ -244,25 +244,34 @@ private slots:
         QCOMPARE(spy.count(), 0);
     }
 
-    // ── Frame count is correct for non-default outputBufferSize ──────────────
+    // ── Frame count is the MIC rate's, whatever the DUC rate ─────────────────
+    //
+    // Contract change 2026-08-11 (see TxChannel.h sip1OutputReady):
+    // the siphon decimates the DUC-rate output back to the mic rate
+    // before emitting — factor = outN / inN — because its consumers
+    // (monitor mixer, MicSpectrum ring) are 48 kHz and none of them
+    // ever resampled. On P2 (out 4× in) a 1024-frame output block
+    // therefore emits 256 monitor frames, not 1024; emitting 1024 was
+    // the bug the bench heard as pure crackling.
 
-    void sip1OutputReady_frameCountMatchesNonDefaultOutputBufferSize()
+    void sip1OutputReady_frameCountIsDecimatedToMicRate()
     {
         qRegisterMetaType<const float*>("const float*");
 
         constexpr int kP2OutSize = 1024;  // P2 Saturn: 256 × 192 000 / 48 000
-        TxChannel ch(kChannelId, 256 /*in*/, kP2OutSize /*out*/);
+        constexpr int kInSize    = 256;
+        TxChannel ch(kChannelId, kInSize /*in*/, kP2OutSize /*out*/);
         MockConnection conn;
         ch.setConnection(&conn);
         ch.setRunning(true);
 
         QSignalSpy spy(&ch, &TxChannel::sip1OutputReady);
-        const auto buf = ramp(256);
-        ch.tickForTest(buf.data(), 256);
+        const auto buf = ramp(kInSize);
+        ch.tickForTest(buf.data(), kInSize);
 
         QCOMPARE(spy.count(), 1);
         const QList<QVariant> args = spy.takeFirst();
-        QCOMPARE(args.at(1).value<int>(), kP2OutSize);
+        QCOMPARE(args.at(1).value<int>(), kInSize);  // mic-rate frames
     }
 };
 
