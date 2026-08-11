@@ -93,6 +93,8 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
+#include <cmath>
+
 namespace NereusSDR {
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -647,7 +649,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         // Reverse-scale from WDSP domain: WDSP_val = UI / 1e6 → UI = WDSP_val × 1e6
         // Clamped to 999 (slider max) — WDSP default 16e-4 = 1600 overflows range.
         const int gainDefault = slice
-            ? std::min(999, static_cast<int>(slice->nr1Gain() * 1e6))
+            ? std::min(999, static_cast<int>(std::lround(slice->nr1Gain() * 1e6)))
             : 999;
         auto [gain, gainVal] = addSliderRow(grpLay, "Gain", 0, 999,
             gainDefault,
@@ -659,7 +661,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         // Reverse-scale: WDSP_val = UI / 1e3 → UI = WDSP_val × 1e3
         // Default slice value is 10e-7; scaled UI = 10e-7 × 1e3 ≈ 0
         auto [leak, leakVal] = addSliderRow(grpLay, "Leak", 0, 999,
-            slice ? static_cast<int>(slice->nr1Leakage() * 1e3) : 0,
+            slice ? static_cast<int>(std::lround(slice->nr1Leakage() * 1e3)) : 0,
             tr("LMS leakage factor. UI units × 1e-3 = WDSP domain value. "
                "Default 0 (= 10e-7 WDSP)."));
 
@@ -707,10 +709,10 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             });
             connect(slice, &SliceModel::nr1GainChanged, gain, [gain](double v) {
                 QSignalBlocker b(gain);
-                gain->setValue(std::min(999, static_cast<int>(v * 1e6)));
+                gain->setValue(std::min(999, static_cast<int>(std::lround(v * 1e6))));
             });
             connect(slice, &SliceModel::nr1LeakageChanged, leak, [leak](double v) {
-                QSignalBlocker b(leak); leak->setValue(static_cast<int>(v * 1e3));
+                QSignalBlocker b(leak); leak->setValue(static_cast<int>(std::lround(v * 1e3)));
             });
             connect(slice, &SliceModel::nr1PositionChanged, preRdo,
                     [preRdo, postRdo](NrPosition p) {
@@ -746,7 +748,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         // Same UI scaling as NR1 so the two pages read alike:
         // gain is UI x 1e-6, leakage UI x 1e-3, both in WDSP domain.
         const int gainDefault = slice
-            ? std::min(999, static_cast<int>(slice->anfGain() * 1e6))
+            ? std::min(999, static_cast<int>(std::lround(slice->anfGain() * 1e6)))
             : 1000 - 1;
         auto [gain, gainVal] = addSliderRow(grpLay, "Gain", 0, 999,
             gainDefault,
@@ -754,7 +756,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
                "catches a drifting carrier sooner and is rougher on speech."));
 
         auto [leak, leakVal] = addSliderRow(grpLay, "Leak", 0, 999,
-            slice ? static_cast<int>(slice->anfLeakage() * 1e3) : 0,
+            slice ? static_cast<int>(std::lround(slice->anfLeakage() * 1e3)) : 0,
             tr("Leakage. UI units x 1e-3 = WDSP value. Lets the notch "
                "forget a carrier that has gone away."));
 
@@ -791,10 +793,10 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             });
             connect(slice, &SliceModel::anfGainChanged, gain, [gain](double v) {
                 QSignalBlocker b(gain);
-                gain->setValue(std::min(999, static_cast<int>(v * 1e6)));
+                gain->setValue(std::min(999, static_cast<int>(std::lround(v * 1e6))));
             });
             connect(slice, &SliceModel::anfLeakageChanged, leak, [leak](double v) {
-                QSignalBlocker b(leak); leak->setValue(static_cast<int>(v * 1e3));
+                QSignalBlocker b(leak); leak->setValue(static_cast<int>(std::lround(v * 1e3)));
             });
             connect(slice, &SliceModel::anfPositionChanged, preRdo,
                     [preRdo, postRdo](NrPosition p) {

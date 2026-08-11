@@ -14,15 +14,27 @@
 
 #include "models/SliceModel.h"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace NereusSDR;
 
 // The two conversions the setup page performs. Kept here as the
 // specification: if the page changes, this is what it has to keep
 // agreeing with.
+//
+// lround, not truncation (2026-08-11): 100 × 1e-6 is 9.9999…e-5 in
+// binary, and truncating the way back turned slider position 100 into
+// 99 — the control jumped one tick the moment the model echoed the
+// value. The page rounds now (DspSetupPages.cpp, 8 call sites), and so
+// does this specification. Caught by this very test on the first full
+// macOS suite run.
 static double gainFromSlider(int ui)    { return ui * 1e-6; }
-static int    sliderFromGain(double v)  { return std::min(999, static_cast<int>(v * 1e6)); }
+static int    sliderFromGain(double v)
+{ return std::min(999, static_cast<int>(std::lround(v * 1e6))); }
 static double leakFromSlider(int ui)    { return ui * 1e-3; }
-static int    sliderFromLeak(double v)  { return static_cast<int>(v * 1e3); }
+static int    sliderFromLeak(double v)
+{ return static_cast<int>(std::lround(v * 1e3)); }
 
 class TstAnfTuning : public QObject {
     Q_OBJECT

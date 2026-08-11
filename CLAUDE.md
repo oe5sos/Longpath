@@ -554,6 +554,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [2026-08-02-bottom-banner-and-pan-menu-design.md](docs/architecture/2026-08-02-bottom-banner-and-pan-menu-design.md) | Bottom Banner Cleanup + AetherSDR-Shaped Pan Menu design spec: single `ChromeBarController` layout authority replacing 3 competing responsive systems, 9-layout pan menu thumbnail grid | **Complete (pending PR merge)** |
 | [2026-08-02-bottom-banner-and-pan-menu-plan.md](docs/architecture/2026-08-02-bottom-banner-and-pan-menu-plan.md) | Bottom Banner Cleanup + Pan Menu: 14-task implementation plan (Phase A ChromeBarController + fold ladder, Phase B pan-menu thumbnail grid) plus a final fix wave closing the merge-blocking audit findings | **Complete (14/14 tasks + fix wave; pending PR merge)** |
 | [2026-08-02-bottom-banner-and-pan-menu-verification/README.md](docs/architecture/2026-08-02-bottom-banner-and-pan-menu-verification/README.md) | Bottom Banner + Pan Menu: 7-row bench verification matrix | Matrix drafted (pending live G2 + HL2 hardware) |
+| [2026-08-11-rotor-logbook-verification/README.md](docs/architecture/2026-08-11-rotor-logbook-verification/README.md) | Rotor comfort (taught presets / park / LP / spot→rotor) + logbook regression sweep: 23-row bench matrix | Matrix drafted (pending bench) |
 
 ### Protocol Reference (`docs/protocols/`)
 
