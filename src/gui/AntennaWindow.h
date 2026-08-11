@@ -44,6 +44,8 @@
 #include <QDialog>
 
 class QComboBox;
+class QDragEnterEvent;
+class QDropEvent;
 class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
@@ -61,6 +63,13 @@ public:
     // drop onto the main window, can feed the same path.
     void openFile(const QString& path);
     void setSweep(const Sweep& s);
+
+protected:
+    // Drop a .s1p straight onto the window. A sweep usually arrives as
+    // a file just copied off an SD card, and this is the shortest path
+    // from there.
+    void dragEnterEvent(QDragEnterEvent* e) override;
+    void dropEvent(QDropEvent* e) override;
 
 private:
     void buildUi();

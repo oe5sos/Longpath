@@ -21,6 +21,9 @@
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -99,6 +102,10 @@ AntennaWindow::AntennaWindow(QWidget* parent)
     // again. A window that has to be dismissed to reach anything else
     // would be closed after the first sweep and never reopened.
     setModal(false);
+    // A sweep usually arrives as a file the operator just copied off an
+    // SD card, and the shortest path from there is dragging it onto the
+    // window.
+    setAcceptDrops(true);
     resize(880, 620);
     buildUi();
     refresh();
@@ -143,12 +150,26 @@ void AntennaWindow::buildUi()
                        int(AntennaTrim::Kind::Dipole));
     m_kindBox->addItem(QStringLiteral("End-fed half-wave"),
                        int(AntennaTrim::Kind::EndFedHalfWave));
+    m_kindBox->addItem(QStringLiteral("Beam — driven element"),
+                       int(AntennaTrim::Kind::YagiDrivenElement));
     m_kindBox->addItem(QStringLiteral("Vertical"),
                        int(AntennaTrim::Kind::VerticalRadiator));
     m_kindBox->addItem(QStringLiteral("Loop"),
                        int(AntennaTrim::Kind::Loop));
-    m_kindBox->setCurrentIndex(
-        std::clamp(s.value(kKindKey, 0).toInt(), 0, 3));
+    // ── Stored by VALUE, not by index ────────────────────────────
+    //
+    // It used to save the combo index. Inserting "Beam" at position two
+    // then shifted Vertical from 2 to 3 and Loop from 3 to 4, so an
+    // operator who had chosen Vertical would silently have come back to
+    // a beam — with a halved per-element figure and the wrong warnings.
+    // A saved index is a saved position in a list that changes; a saved
+    // enum value is not.
+    {
+        const int want = s.value(kKindKey, int(AntennaTrim::Kind::Dipole))
+                             .toInt();
+        const int at = m_kindBox->findData(want);
+        m_kindBox->setCurrentIndex(at >= 0 ? at : 0);
+    }
     m_kindBox->setToolTip(QStringLiteral(
         "Decides how the change is shared out. A centre-fed dipole gets "
         "half on each leg; everything else takes it all in one place."));
@@ -200,9 +221,13 @@ void AntennaWindow::buildUi()
     for (int i = 0; i < Feedline::catalogue().size(); ++i) {
         m_cableBox->addItem(Feedline::catalogue().at(i).name, i);
     }
-    m_cableBox->setCurrentIndex(std::clamp(
-        s.value(kCableKey, 0).toInt(), 0,
-        int(Feedline::catalogue().size()) - 1));
+    {
+        // The catalogue is a list that will gain entries, so the same
+        // rule again — remember the cable by NAME.
+        const QString want = s.value(kCableKey, QString{}).toString();
+        const int at = want.isEmpty() ? 0 : m_cableBox->findText(want);
+        m_cableBox->setCurrentIndex(at >= 0 ? at : 0);
+    }
     m_cableBox->setToolTip(QStringLiteral(
         "The cable between the analyser and the antenna. Nominal "
         "figures — real cable varies by make and by age."));
@@ -237,8 +262,14 @@ void AntennaWindow::buildUi()
                          int(AmateurBands::Region::Two));
     m_regionBox->addItem(QStringLiteral("Region 3"),
                          int(AmateurBands::Region::Three));
-    m_regionBox->setCurrentIndex(
-        std::clamp(s.value(kRegionKey, 0).toInt(), 0, 2));
+    {
+        // Same rule as the antenna kind: the enum value, never the
+        // position in the list.
+        const int want = s.value(kRegionKey,
+                                 int(AmateurBands::Region::One)).toInt();
+        const int at = m_regionBox->findData(want);
+        m_regionBox->setCurrentIndex(at >= 0 ? at : 0);
+    }
     m_regionBox->setToolTip(QStringLiteral(
         "Which IARU band plan draws the band edges. It is a plan, not a "
         "licence — your own allocation may be narrower."));
@@ -350,12 +381,14 @@ void AntennaWindow::buildUi()
         refresh();
     });
 
-    connect(m_kindBox, &QComboBox::currentIndexChanged, this, [this](int i) {
-        AppSettings::instance().setValue(kKindKey, i);
+    connect(m_kindBox, &QComboBox::currentIndexChanged, this, [this](int) {
+        AppSettings::instance().setValue(kKindKey,
+                                         m_kindBox->currentData().toInt());
         refresh();
     });
-    connect(m_regionBox, &QComboBox::currentIndexChanged, this, [this](int i) {
-        AppSettings::instance().setValue(kRegionKey, i);
+    connect(m_regionBox, &QComboBox::currentIndexChanged, this, [this](int) {
+        AppSettings::instance().setValue(kRegionKey,
+                                         m_regionBox->currentData().toInt());
         // The band may now be a different one, so the target that was
         // defaulted to the old band centre is no longer right.
         if (!m_targetChosen) { m_targetBox->setValue(0.0); }
@@ -373,8 +406,9 @@ void AntennaWindow::buildUi()
         AppSettings::instance().setValue(kLimitKey, v);
         refresh();
     });
-    connect(m_cableBox, &QComboBox::currentIndexChanged, this, [this](int i) {
-        AppSettings::instance().setValue(kCableKey, i);
+    connect(m_cableBox, &QComboBox::currentIndexChanged, this, [this](int) {
+        AppSettings::instance().setValue(kCableKey,
+                                         m_cableBox->currentText());
         applyFeedline();
         refresh();
     });
@@ -390,6 +424,38 @@ void AntennaWindow::buildUi()
         if (v > 0.0 && m_targetBox->hasFocus()) { m_targetChosen = true; }
         refresh();
     });
+}
+
+void AntennaWindow::dragEnterEvent(QDragEnterEvent* e)
+{
+    // Accept only what can actually be opened. Accepting everything and
+    // then failing on the drop is a worse answer than the cursor saying
+    // no in the first place.
+    if (!e->mimeData()->hasUrls()) { return; }
+    for (const QUrl& u : e->mimeData()->urls()) {
+        if (u.isLocalFile()
+            && u.toLocalFile().endsWith(QStringLiteral(".s1p"),
+                                        Qt::CaseInsensitive)) {
+            e->acceptProposedAction();
+            return;
+        }
+    }
+}
+
+void AntennaWindow::dropEvent(QDropEvent* e)
+{
+    for (const QUrl& u : e->mimeData()->urls()) {
+        if (!u.isLocalFile()) { continue; }
+        const QString path = u.toLocalFile();
+        if (!path.endsWith(QStringLiteral(".s1p"), Qt::CaseInsensitive)) {
+            continue;
+        }
+        e->acceptProposedAction();
+        AppSettings::instance().setValue(kDirKey,
+                                         QFileInfo(path).absolutePath());
+        openFile(path);
+        return;      // one sweep at a time; the rest would just flash past
+    }
 }
 
 void AntennaWindow::chooseFile()
@@ -641,6 +707,23 @@ void AntennaWindow::refresh()
         notes << QStringLiteral(
             "On an end-fed, the harmonic bands do not all move by the "
             "same amount. Re-measure each band rather than assuming.");
+    }
+    if (kind == AntennaTrim::Kind::YagiDrivenElement) {
+        // The two ways to ruin a beam while the SWR meter applauds.
+        notes << QStringLiteral(
+            "This changes the MATCH only. The gain and the front-to-back "
+            "live in the reflector and directors — never trim those to "
+            "fix SWR.");
+        notes << QStringLiteral(
+            "If the beam is fed through a gamma, hairpin or beta match, "
+            "the adjustment is in the match and not in the element. "
+            "Cutting the driven element there makes it worse.");
+    }
+    if (kind == AntennaTrim::Kind::VerticalRadiator) {
+        notes << QStringLiteral(
+            "The radiator sets the resonance; the radials set the feed "
+            "resistance. A high SWR at resonance is a radial problem, "
+            "not a length problem.");
     }
     notes << QStringLiteral(
         "Height above ground shifts the resonance. Adjust at the height "

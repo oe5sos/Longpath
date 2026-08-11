@@ -362,6 +362,52 @@ private slots:
         QVERIFY(t.perElementM < 0.0);
     }
 
+    // Arithmetically a beam's driven element IS a dipole — centre-fed,
+    // half at each end. The kind exists for the advice, not the maths,
+    // and this pins that the maths really is identical so nobody
+    // "improves" one of them alone.
+    void a_beam_driven_element_computes_exactly_as_a_dipole()
+    {
+        const auto d = AntennaTrim::compute(Kind::Dipole, 14.310e6,
+                                            14.100e6, 10.1);
+        const auto y = AntennaTrim::compute(Kind::YagiDrivenElement,
+                                            14.310e6, 14.100e6, 10.1);
+        QCOMPARE(y.percentChange, d.percentChange);
+        QCOMPARE(y.totalChangeM,  d.totalChangeM);
+        QCOMPARE(y.perElementM,   d.perElementM);
+        QCOMPARE(y.firstStepM,    d.firstStepM);
+        QCOMPARE(y.halved,        d.halved);
+
+        // And it must not be the end-fed's whole-change-in-one-place.
+        const auto e = AntennaTrim::compute(Kind::EndFedHalfWave,
+                                            14.310e6, 14.100e6, 10.1);
+        QVERIFY(std::abs(y.perElementM * 2.0 - e.perElementM) < 1e-12);
+    }
+
+    void the_beam_is_told_apart_in_words_even_though_not_in_numbers()
+    {
+        const auto y = AntennaTrim::compute(Kind::YagiDrivenElement,
+                                            14.310e6, 14.100e6, 10.1);
+        const QString s = AntennaTrim::instruction(y, Kind::YagiDrivenElement);
+        QVERIFY2(s.contains(QStringLiteral("driven element")),
+                 qPrintable(s));
+        QVERIFY(!AntennaTrim::kindName(Kind::YagiDrivenElement).isEmpty());
+        QVERIFY(AntennaTrim::kindName(Kind::YagiDrivenElement)
+                    != AntennaTrim::kindName(Kind::Dipole));
+    }
+
+    void every_kind_has_a_name_and_a_place_to_put_the_change()
+    {
+        for (Kind k : {Kind::Dipole, Kind::EndFedHalfWave,
+                       Kind::YagiDrivenElement, Kind::VerticalRadiator,
+                       Kind::Loop}) {
+            QVERIFY2(!AntennaTrim::kindName(k).isEmpty(),
+                     "a kind with no name would appear as a blank entry");
+            QVERIFY2(!AntennaTrim::kindWhere(k).isEmpty(),
+                     "a kind with no 'where' produces 'Lengthen by 22 cm .'");
+        }
+    }
+
     void a_dipole_splits_the_change_and_an_end_fed_does_not()
     {
         const auto d = AntennaTrim::compute(Kind::Dipole, 7.183e6,

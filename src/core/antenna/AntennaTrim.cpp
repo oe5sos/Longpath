@@ -32,6 +32,8 @@ QString kindName(Kind k)
     switch (k) {
     case Kind::Dipole:           return QStringLiteral("Dipole");
     case Kind::EndFedHalfWave:   return QStringLiteral("End-fed half-wave");
+    case Kind::YagiDrivenElement: return QStringLiteral("Beam, driven "
+                                                        "element");
     case Kind::VerticalRadiator: return QStringLiteral("Vertical radiator");
     case Kind::Loop:             return QStringLiteral("Loop");
     }
@@ -45,6 +47,11 @@ QString kindWhere(Kind k)
         return QStringLiteral("on each leg");
     case Kind::EndFedHalfWave:
         return QStringLiteral("at the far end");
+    case Kind::YagiDrivenElement:
+        // Same split as a dipole, said in the words of the thing on the
+        // mast — "per leg" is not what anybody calls half a driven
+        // element.
+        return QStringLiteral("on each side of the driven element");
     case Kind::VerticalRadiator:
         return QStringLiteral("on the radiator");
     case Kind::Loop:
@@ -96,7 +103,12 @@ Trim compute(Kind kind, double measuredHz, double targetHz,
         t.totalChangeM = currentTotalM * (factor - 1.0);
         // Everywhere except a centre-fed dipole, the whole change
         // happens at one place.
-        const double share = (kind == Kind::Dipole) ? 2.0 : 1.0;
+        // A centre-fed element takes half at each end. A beam's driven
+        // element is centre-fed too, which is the whole reason it needs
+        // no arithmetic of its own.
+        const double share = (kind == Kind::Dipole
+                              || kind == Kind::YagiDrivenElement)
+                                 ? 2.0 : 1.0;
         t.perElementM = t.totalChangeM / share;
 
         t.firstStepM = t.perElementM;

@@ -71,6 +71,30 @@ enum class Kind {
     Dipole = 0,
     // One wire, one end. All the change at the far end.
     EndFedHalfWave,
+    // ── A beam, and why it is here at all ────────────────────────────
+    //
+    // Arithmetically this IS a dipole: the driven element is centre-fed
+    // and the change halves per side. Nothing in compute() distinguishes
+    // them.
+    //
+    // It exists because the ADVICE is entirely different, and getting it
+    // wrong is expensive:
+    //
+    //   * the driven element sets the MATCH. The gain and the
+    //     front-to-back come from the reflector and the directors.
+    //     Trimming a parasitic element to fix SWR trades away the thing
+    //     the beam was bought for, and the SWR meter will happily
+    //     reward you for it.
+    //   * most beams are fed through a gamma, hairpin or beta match. The
+    //     resonance then belongs to the element AND the matching
+    //     network, and the adjustment is in the network. Cutting the
+    //     driven element on a gamma-matched Yagi is not a smaller
+    //     version of the right fix, it is the wrong fix.
+    //   * the parasitic elements hold the driven element's resonance, so
+    //     it moves far less per centimetre than a free dipole would.
+    //     TrimSession measures exactly that, which makes a beam the case
+    //     where the learned exponent earns the most.
+    YagiDrivenElement,
     // The radiator sets the resonance. The radials set the feed
     // resistance — a different problem with a different fix.
     VerticalRadiator,
