@@ -139,6 +139,39 @@ REAL transmit path. On-air SSB voice from this bench inherits those
 gaps. Needs a network-level look (WLAN vs. wired, packet captures)
 before the next TX-quality pass.
 
+### The measuring instrument for that look (added same evening)
+
+The dispatch-tick diagnostic sits two layers downstream and cannot
+tell wire loss from in-app loss. `P2RadioConnection` now audits the
+port-1026 mic frames' own 32-bit sequence numbers at the socket
+(`auditMicSeq`), and the DDC I/Q direction aggregates the same way in
+`processIqPacket`. Both report 5 s windows at `qCInfo` whenever a
+window saw loss or reordering, plus a clean heartbeat at most once a
+minute, so a healthy log still proves the audit ran:
+
+    P2 mic seq audit: 3712 frames / 5.0 s, LOST 43 (1.14%), out-of-order 0
+    P2 IQ seq audit: clean (16520 pkts / 5.0 s, no gaps)
+
+Reading the pair:
+
+| mic audit | IQ audit | verdict |
+|---|---|---|
+| gaps | gaps | network path (WLAN/switch/cable) — both directions suffer |
+| gaps | clean | radio→PC path or socket-buffer stalls under load; mic-only loss on a clean IQ stream points at scheduling around the small 132-byte frames |
+| clean | clean | the 3-15% dispatch-tick deficit is IN-APP (TxMicSource ring or worker pacing) — the network is exonerated |
+
+Bench protocol (no MOX needed — mic frames flow whenever the radio
+runs):
+
+1. WLAN: run the app 2-3 minutes connected, collect the audit lines.
+2. Wired: same station, same duration, Ethernet instead.
+3. Compare loss percentages; anything ≥0.1% sustained on the wire is
+   worth chasing with a switch-port/AP change before touching code.
+
+Launch capturing only the audit lines:
+
+    ~/Desktop/neureus/NereusSDR/build/NereusSDR.app/Contents/MacOS/NereusSDR 2>&1 | grep --line-buffered "seq audit"
+
 ## Open items
 
 - "QLayout: Cannot add a null widget" fires once when some window

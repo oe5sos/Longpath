@@ -484,6 +484,37 @@ private:
     // frames and pushes via inbound(); LOS injection on watchdog tick.
     class TxMicSource* m_txMicSource{nullptr};
     QDateTime m_lastMicAt;
+
+    // --- Mic-stream sequence audit (network investigation 2026-08-11) ---
+    //
+    // The TX-monitor bench measured 3-15% of mic BLOCKS missing from
+    // TxWorkerThread's dispatch cadence, but that diagnostic sits two
+    // layers downstream and cannot tell wire loss from in-app loss.
+    // This audit reads the port-1026 frame's own 32-bit sequence
+    // number at the socket and counts gaps (frames the kernel never
+    // handed us: lost on the wire OR dropped from the socket buffer)
+    // separately from out-of-order/duplicate arrivals. Contiguous seq
+    // here + missing dispatch ticks downstream would instead convict
+    // the in-app path. All fields touched only on the connection
+    // thread (onReadyRead + auditMicSeq).
+    quint32 m_micSeqExpected{0};
+    bool    m_micSeqValid{false};
+    quint64 m_micSeqWndReceived{0};
+    quint64 m_micSeqWndLost{0};
+    quint64 m_micSeqWndOutOfOrder{0};
+    qint64  m_micSeqWndStartMs{0};
+    qint64  m_micSeqLastCleanLogMs{0};
+    void auditMicSeq(quint32 seq);
+
+    // Same window discipline for the DDC I/Q direction (aggregate over
+    // all DDCs), so one bench run shows both directions side by side.
+    // Existing per-DDC rxInSeqErr counts error EVENTS at qCDebug only;
+    // these count lost FRAMES and report at qCInfo like the mic audit.
+    quint64 m_iqSeqWndPkts{0};
+    quint64 m_iqSeqWndLost{0};
+    quint64 m_iqSeqWndEvents{0};
+    qint64  m_iqSeqWndStartMs{0};
+    qint64  m_iqSeqLastCleanLogMs{0};
     static constexpr int kMicLosTimeoutMs = 3000;  // network.c:656 [v2.10.3.13]
 
     // --- Run state (from Thetis _radionet, network.h:65-66) ---

@@ -692,6 +692,19 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
 
     // From Thetis SendStart() network.c:362-369
     m_running = true;         // prn->run = 1;
+
+    // Fresh mic-seq audit per session: the radio restarts its counter
+    // on SendStart and a reconnect must not book the jump as loss.
+    m_micSeqValid = false;
+    m_micSeqWndReceived   = 0;
+    m_micSeqWndLost       = 0;
+    m_micSeqWndOutOfOrder = 0;
+    m_micSeqWndStartMs    = 0;
+    m_iqSeqWndPkts    = 0;
+    m_iqSeqWndLost    = 0;
+    m_iqSeqWndEvents  = 0;
+    m_iqSeqWndStartMs = 0;
+
     sendCmdGeneral();         // CmdGeneral(); //1024
     sendCmdRx();              // CmdRx(); //1025
     sendCmdTx();              // CmdTx(); //1026
@@ -2008,11 +2021,19 @@ void P2RadioConnection::onReadyRead()
             // `(int16)(b0<<8 | b1) / 32768` because the upper 16 bits hold
             // a sign-extended int16 — both yield the same float in [-1, 1].
             // We use the int16/32768 form to make the byte order explicit.
-            if (m_txMicSource != nullptr) {
+            {
                 std::array<float, 64> samples{};
-                if (decodeMicFrame132(data, samples)) {
-                    m_txMicSource->inbound(samples.data(), 64);
-                    m_lastMicAt = QDateTime::currentDateTimeUtc();
+                quint32 seq = 0;
+                if (decodeMicFrame132(data, samples, &seq)) {
+                    // Network investigation 2026-08-11: audit the
+                    // frame's own sequence number BEFORE any in-app
+                    // buffering, so wire/kernel loss and in-app loss
+                    // become distinguishable. See auditMicSeq().
+                    auditMicSeq(seq);
+                    if (m_txMicSource != nullptr) {
+                        m_txMicSource->inbound(samples.data(), 64);
+                        m_lastMicAt = QDateTime::currentDateTimeUtc();
+                    }
                 }
             }
             break;
@@ -2252,6 +2273,82 @@ bool P2RadioConnection::decodeMicFrame132(const QByteArray& data,
         outSamples[static_cast<size_t>(s)] = static_cast<float>(v) / 32768.0f;
     }
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// auditMicSeq — mic-stream sequence audit (network investigation 2026-08-11)
+//
+// Called from the port-1026 case of onReadyRead for every decoded mic
+// frame, with the frame's own big-endian 32-bit sequence number. The
+// radio increments it once per frame, so at 48 kHz / 64 samples the
+// wire carries exactly 750 frames per second and every gap is a frame
+// the kernel never handed us — lost on the wire, or dropped from the
+// (4 MB) socket receive buffer under stall. Out-of-order / duplicate
+// arrivals are counted separately and do NOT count as loss (the frame
+// arrived; the TX pump just can't use late audio).
+//
+// Reporting discipline: a 5 s window; the window report logs at
+// qCInfo whenever it saw loss or reordering, plus a clean heartbeat
+// at most once per 60 s so a healthy log still proves the audit ran.
+// Counters are per-window, reset at each report.
+//
+// NereusSDR-original diagnostic (no Thetis equivalent: Thetis
+// network.c:761-772 [v2.10.3.13] discards the mic seq field).
+// ---------------------------------------------------------------------------
+void P2RadioConnection::auditMicSeq(quint32 seq)
+{
+    ++m_micSeqWndReceived;
+    if (m_micSeqValid) {
+        // Signed distance handles the 2^32 wrap transparently.
+        const qint32 delta = static_cast<qint32>(seq - m_micSeqExpected);
+        if (delta > 0) {
+            m_micSeqWndLost += static_cast<quint32>(delta);
+        } else if (delta < 0) {
+            ++m_micSeqWndOutOfOrder;
+        }
+        if (delta >= 0) {
+            m_micSeqExpected = seq + 1;
+        }
+    } else {
+        m_micSeqValid = true;
+        m_micSeqExpected = seq + 1;
+    }
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (m_micSeqWndStartMs == 0) {
+        m_micSeqWndStartMs = now;
+        m_micSeqLastCleanLogMs = now;
+        return;
+    }
+    if (now - m_micSeqWndStartMs < 5000) {
+        return;
+    }
+    const double secs = static_cast<double>(now - m_micSeqWndStartMs) / 1000.0;
+    if (m_micSeqWndLost > 0 || m_micSeqWndOutOfOrder > 0) {
+        const double total = static_cast<double>(m_micSeqWndReceived
+                                                 + m_micSeqWndLost);
+        const double lossPct = total > 0.0
+            ? 100.0 * static_cast<double>(m_micSeqWndLost) / total : 0.0;
+        qCInfo(lcConnection).noquote() << QStringLiteral(
+            "P2 mic seq audit: %1 frames / %2 s, LOST %3 (%4%), "
+            "out-of-order %5")
+            .arg(m_micSeqWndReceived)
+            .arg(secs, 0, 'f', 1)
+            .arg(m_micSeqWndLost)
+            .arg(lossPct, 0, 'f', 2)
+            .arg(m_micSeqWndOutOfOrder);
+        m_micSeqLastCleanLogMs = now;
+    } else if (now - m_micSeqLastCleanLogMs >= 60000) {
+        qCInfo(lcConnection).noquote() << QStringLiteral(
+            "P2 mic seq audit: clean (%1 frames / %2 s, no gaps)")
+            .arg(m_micSeqWndReceived)
+            .arg(secs, 0, 'f', 1);
+        m_micSeqLastCleanLogMs = now;
+    }
+    m_micSeqWndReceived   = 0;
+    m_micSeqWndLost       = 0;
+    m_micSeqWndOutOfOrder = 0;
+    m_micSeqWndStartMs    = now;
 }
 
 // ---------------------------------------------------------------------------
@@ -2894,8 +2991,57 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
         qCDebug(lcProtocol) << "P2: DDC" << ddcIndex
                             << "seq error this:" << seq
                             << "last:" << m_rx[ddcIndex].rxInSeqNo;
+        // Network investigation 2026-08-11: book the gap size for the
+        // window report (positive delta = packets the kernel never
+        // handed us; negative = reorder/duplicate, no loss).
+        const qint32 delta = static_cast<qint32>(
+            seq - (m_rx[ddcIndex].rxInSeqNo + 1));
+        ++m_iqSeqWndEvents;
+        if (delta > 0) {
+            m_iqSeqWndLost += static_cast<quint32>(delta);
+        }
     }
     m_rx[ddcIndex].rxInSeqNo = seq;
+
+    // Window report — same 5 s / 60 s discipline as auditMicSeq() so
+    // one bench log shows both directions in comparable numbers.
+    ++m_iqSeqWndPkts;
+    {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (m_iqSeqWndStartMs == 0) {
+            m_iqSeqWndStartMs = now;
+            m_iqSeqLastCleanLogMs = now;
+        } else if (now - m_iqSeqWndStartMs >= 5000) {
+            const double secs =
+                static_cast<double>(now - m_iqSeqWndStartMs) / 1000.0;
+            if (m_iqSeqWndLost > 0 || m_iqSeqWndEvents > 0) {
+                const double total = static_cast<double>(m_iqSeqWndPkts
+                                                         + m_iqSeqWndLost);
+                const double lossPct = total > 0.0
+                    ? 100.0 * static_cast<double>(m_iqSeqWndLost) / total
+                    : 0.0;
+                qCInfo(lcConnection).noquote() << QStringLiteral(
+                    "P2 IQ seq audit: %1 pkts / %2 s, LOST %3 (%4%), "
+                    "%5 gap events (all DDCs)")
+                    .arg(m_iqSeqWndPkts)
+                    .arg(secs, 0, 'f', 1)
+                    .arg(m_iqSeqWndLost)
+                    .arg(lossPct, 0, 'f', 2)
+                    .arg(m_iqSeqWndEvents);
+                m_iqSeqLastCleanLogMs = now;
+            } else if (now - m_iqSeqLastCleanLogMs >= 60000) {
+                qCInfo(lcConnection).noquote() << QStringLiteral(
+                    "P2 IQ seq audit: clean (%1 pkts / %2 s, no gaps)")
+                    .arg(m_iqSeqWndPkts)
+                    .arg(secs, 0, 'f', 1);
+                m_iqSeqLastCleanLogMs = now;
+            }
+            m_iqSeqWndPkts   = 0;
+            m_iqSeqWndLost   = 0;
+            m_iqSeqWndEvents = 0;
+            m_iqSeqWndStartMs = now;
+        }
+    }
 
     // From Thetis ReadUDPFrame:629 — copy I/Q data (skip 16-byte header)
     // memcpy(bufp, readbuf + 16, 1428);
