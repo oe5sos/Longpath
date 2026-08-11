@@ -24,6 +24,13 @@
 //   - a small bounded number of (faded, but detectable-by-amplitude)
 //     seams during the first-half adaptation.
 //
+// The trim is TWO-PHASE (fade out one drain, skip and fade in the
+// next) since the first macOS run of this test: the one-phase trim
+// left a hard falling edge that a platform-different jitter sequence
+// exposed. After that fix, a 50-seed sweep across all profiles plus a
+// 2× WLAN extreme measured worst-case 1 total discontinuity and zero
+// in any steady state.
+//
 // The detector is amplitude-based: a 1 kHz sine at A=0.5 has a maximum
 // natural sample-to-sample step of A·ω ≈ 0.065; anything above 0.15 is
 // a seam the fades failed to mask.
@@ -54,6 +61,36 @@ struct CadenceResult {
     int drains = 0;
 };
 
+// Deterministic normal deviates. std::normal_distribution's output
+// sequence is implementation-defined — libstdc++ and libc++ disagree —
+// and the first run of this test on macOS failed against bounds tuned
+// on Linux for exactly that reason. Box-Muller over raw mt19937 draws
+// is bit-identical everywhere. The 53-bit uniform construction is the
+// standard (a >> 5, b >> 6) recipe.
+struct DetNormal {
+    std::mt19937 rng;
+    bool   have  = false;
+    double spare = 0.0;
+    explicit DetNormal(unsigned seed) : rng(seed) {}
+    double uniform()
+    {
+        const double a = static_cast<double>(rng() >> 5);
+        const double b = static_cast<double>(rng() >> 6);
+        return (a * 67108864.0 + b) / 9007199254740992.0;
+    }
+    double operator()(double sigma)
+    {
+        if (have) { have = false; return spare * sigma; }
+        const double u1 = std::max(1e-12, uniform());
+        const double u2 = uniform();
+        const double r  = std::sqrt(-2.0 * std::log(u1));
+        const double th = 2.0 * M_PI * u2;
+        spare = r * std::sin(th);
+        have  = true;
+        return r * std::cos(th) * sigma;
+    }
+};
+
 // One simulated session: monitor slot (-2, opportunistic) produces
 // 64-frame blocks of a 1 kHz sine; an RX slice (1, barrier member)
 // produces silent 1024-frame blocks whose arrival paces tryDrain —
@@ -66,9 +103,8 @@ CadenceResult runCadence(int seconds, double monJitterMs, double rxJitterMs,
     mix.setSliceGain(-2, 1.0f, 0.0f);
     mix.setSliceOpportunistic(-2, true);
 
-    std::mt19937 rng(seed);
-    std::normal_distribution<double> monJit(0.0, monJitterMs);
-    std::normal_distribution<double> rxJit(0.0, rxJitterMs);
+    DetNormal monJit(seed * 2 + 1);
+    DetNormal rxJit(seed * 2 + 2);
 
     const double blockMs = 64.0 / 48.0;    // one producer block
     const double rxMs    = 1024.0 / 48.0;  // one drain period
@@ -80,10 +116,10 @@ CadenceResult runCadence(int seconds, double monJitterMs, double rxJitterMs,
     std::vector<std::pair<double, int>> events;
     const double monPeriod = blockMs * (1.0 - driftPpm * 1e-6);
     for (double t = 0.0; t < tEnd; t += monPeriod) {
-        events.push_back({t + monJit(rng), 0});
+        events.push_back({t + monJit(monJitterMs), 0});
     }
     for (double t = 7.0; t < tEnd; t += rxMs) {
-        events.push_back({t + rxJit(rng), 1});
+        events.push_back({t + rxJit(rxJitterMs), 1});
     }
     std::sort(events.begin(), events.end());
 
@@ -140,14 +176,16 @@ private slots:
         QTest::addColumn<double>("driftPpm");
         QTest::addColumn<int>("maxTotalClicks");
 
-        // Bounds are generous multiples of the observed values (0-2 per
-        // 120 s), so the test flags regressions, not noise.
+        // With the two-phase trim, a 50-seed sweep over every profile
+        // measured worst-case 1 total discontinuity (extreme profile,
+        // one seed) and zero everywhere else. Bound 2 = observed
+        // worst + 1 headroom; regressions land far above it.
         QTest::newRow("lockstep")        << 0.0 << 0.0 <<    0.0 << 2;
-        QTest::newRow("light-jitter")    << 0.5 << 1.0 <<    0.0 << 6;
-        QTest::newRow("network-jitter")  << 1.0 << 3.0 <<    0.0 << 8;
-        QTest::newRow("wlan-clumping")   << 2.0 << 8.0 <<    0.0 << 8;
-        QTest::newRow("drift-plus")      << 0.5 << 1.0 <<  100.0 << 6;
-        QTest::newRow("drift-minus")     << 0.5 << 1.0 << -100.0 << 6;
+        QTest::newRow("light-jitter")    << 0.5 << 1.0 <<    0.0 << 2;
+        QTest::newRow("network-jitter")  << 1.0 << 3.0 <<    0.0 << 2;
+        QTest::newRow("wlan-clumping")   << 2.0 << 8.0 <<    0.0 << 2;
+        QTest::newRow("drift-plus")      << 0.5 << 1.0 <<  100.0 << 2;
+        QTest::newRow("drift-minus")     << 0.5 << 1.0 << -100.0 << 2;
     }
 
     void profiles()

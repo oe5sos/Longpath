@@ -53,6 +53,14 @@
 //                 2×cushion] instead of the ring depth. Ring 64 -> 128
 //                 blocks so the worst-case cap fits. By Martin
 //                 Fischer, AI-assisted via Anthropic Claude (Cowork).
+//   2026-08-11 -- Trim made two-phase (fade out one drain, skip + fade
+//                 in the next) after the first macOS run of
+//                 tst_master_mixer_cadence caught the one-phase trim's
+//                 hard falling edge under a platform-different jitter
+//                 sequence. 50-seed sweep across all profiles + a 2x
+//                 WLAN extreme: worst case 1 total discontinuity, zero
+//                 in any steady state. By Martin Fischer, AI-assisted
+//                 via Anthropic Claude (Cowork).
 // =================================================================
 
 // --- From aamix.c ---
@@ -418,15 +426,25 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
             // every block, which is what the old 256-frame ring's
             // drop-oldest did.
             if (st.primed) {
-                const int cap = n + 2 * st.cushion;
-                if (st.avail > cap) {
-                    const int drop = st.avail - (n + st.cushion);
-                    st.rd = (st.rd + drop) % st.capFrames;
-                    st.avail -= drop;
-                    // Same seam fade as at prime: the trim just cut the
-                    // waveform, so re-enter through the ramp.
+                if (st.trimPending) {
+                    // Phase 2: the fade-out played last drain; now do
+                    // the actual skip and fade back in from zero gain
+                    // (curL/curR are already ~0 after the fade-out).
+                    st.trimPending = false;
+                    if (st.avail > n + st.cushion) {
+                        const int drop = st.avail - (n + st.cushion);
+                        st.rd = (st.rd + drop) % st.capFrames;
+                        st.avail -= drop;
+                    }
                     st.curL = 0.0f;
                     st.curR = 0.0f;
+                } else if (st.avail > n + 2 * st.cushion) {
+                    // Phase 1: announce the trim; this contribution
+                    // fades to silence (flag consumed at the gain
+                    // targets below). The ring has ample headroom for
+                    // one more period of backlog growth.
+                    st.trimPending = true;
+                    st.fadeOut = true;
                 }
             }
             if (st.primed && st.avail < n) {

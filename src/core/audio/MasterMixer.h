@@ -406,6 +406,14 @@ private:
         // target 0 (fade-out) because it just starved. Audio-thread
         // only, consumed where the gain targets are computed.
         bool fadeOut{false};
+        // Two-phase trim: a backlog over the cap is announced one
+        // drain early (that block fades out), executed at the next
+        // drain entry (drop, then fade back in). Both edges of the
+        // skip are ramped that way — the one-phase trim left a hard
+        // falling edge no fade could mask retroactively, and the
+        // 50-seed cadence sweep only reached zero steady-state
+        // discontinuities in every profile once both edges faded.
+        bool trimPending{false};
 
         // Ramped gains. Start at silence so a slice's first block fades
         // in instead of stepping in.
