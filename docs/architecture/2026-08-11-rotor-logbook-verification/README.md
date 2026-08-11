@@ -79,6 +79,12 @@ logbook rows that need them.
    Aug-7 palette fixes removed the magenta STOP, so this is not the
    palette cap: suspect the GPU texture upload / AGC window path.
    Reproducible from app start. NOT related to today's rotor work.
+   **RESOLVED same evening**: root cause was the dynamic-overlay
+   texture being partial-uploaded after a recreate, drawing undefined
+   Metal memory (magenta) OVER a healthy waterfall. Found via the
+   NEREUS_WF_DEBUG=2 green-fill discriminator; fixed with a one-shot
+   full upload after every texture (re)create
+   (`m_ovDynNeedsFullUpload`). Bench-confirmed on the live app.
 2. **Spot menu → "Turn rotor" did nothing on pan-0** — root-caused and
    fixed same session (see §4.3). Secondary observation while broken:
    after the dead click, the PAN overlay menu opened in its place —
@@ -90,7 +96,17 @@ logbook rows that need them.
    same position. The action itself fires; the un-consumed release
    reaches the native QRhi surface afterwards. Needs an event->accept
    / popup-boundary fix in SpectrumWidget's right-click path.
+   **FIX LANDED, retest pending**: two layers — the spot and notch
+   menus now show async via `QMenu::popup()` (no nested `exec()` loop
+   inside mousePressEvent on the native QRhi surface), and a
+   250 ms replay guard swallows any right-press that arrives right
+   after a context menu closed, before it can reach the overlay-menu
+   fallback. Retest: right-click spot label → choose "Tune to" →
+   overlay menu must NOT appear.
 4. **"Long path" and "LP" duplicated** — the Rotate row's existing
    "Long path" button and the new preset-row "LP" do the same thing.
    Dedupe (keep LP next to the presets; drop the wide button) or make
    "Long path" a latched mode. Decision pending.
+   **RESOLVED**: the wide "Long path" button is retired; "LP" next to
+   the presets is the one control (it also has the better empty-aim
+   hint). §3 rows keep testing the surviving LP button unchanged.
