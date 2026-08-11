@@ -112,8 +112,24 @@ struct Trim {
 // Compute the change. `currentTotalM` may be 0 when the length is
 // unknown — the percentage is still returned and the metre figures are
 // left at zero rather than invented.
+//
+// ── The exponent ─────────────────────────────────────────────────────
+//
+// The textbook rule is f ∝ 1/L, which is `exponent` = 1 and the default.
+// It assumes an antenna in free space, and a real one is not: ground,
+// nearby wire and the mast all change how much the resonance moves for
+// a given cut.
+//
+// TrimSession measures the real exponent from two sweeps either side of
+// a known change, and it is routinely nowhere near 1 — in the worked
+// case it came out at 0.5, which doubles the wire needed. Passing it
+// here is what turns a textbook answer into an answer about THIS
+// antenna in THIS spot.
+//
+// Exactly 1 short-circuits to a plain multiply rather than pow(), so
+// the common case stays bit-for-bit what it always was.
 Trim compute(Kind kind, double measuredHz, double targetHz,
-             double currentTotalM);
+             double currentTotalM, double exponent = 1.0);
 
 // One sentence for the operator: the action, the amount, and where.
 QString instruction(const Trim& t, Kind kind);

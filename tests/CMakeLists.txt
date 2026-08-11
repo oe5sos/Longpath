@@ -4704,6 +4704,12 @@ nereus_add_test(tst_amateur_bands)
 #    45 ohms, which the first nearestResonance() returned as the answer --
 nereus_add_test(tst_feedline)
 
+# -- Learning how THIS antenna behaves from two sweeps either side of a
+#    known cut. The textbook f proportional to 1/L is free-space; the
+#    worked case came out at L^-0.5, which doubles the wire needed. The
+#    refusals matter more than the arithmetic --
+nereus_add_test(tst_trim_session)
+
 # -- Characters: the list makes claims (gentlest first, Off really off,
 #    the two voice de-essers listen in different places) and nothing but
 #    these tests keeps them true --

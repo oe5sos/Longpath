@@ -60,6 +60,20 @@ void SwrCurveWidget::setSweep(const Sweep& s)
     update();
 }
 
+void SwrCurveWidget::setReference(const Sweep& s, const QString& label)
+{
+    m_reference = s;
+    m_referenceLabel = label;
+    update();
+}
+
+void SwrCurveWidget::clearReference()
+{
+    m_reference = Sweep{};
+    m_referenceLabel.clear();
+    update();
+}
+
 void SwrCurveWidget::setRegion(AmateurBands::Region r)
 {
     if (m_region == r) { return; }
@@ -221,6 +235,23 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
                            QStringLiteral("1")), m_plotB + 3.0),
                QStringLiteral("1"));
 
+    // ── The sweep before this one, faint and behind ──────────────────
+    if (!m_reference.isEmpty()) {
+        QPolygonF prev;
+        prev.reserve(m_reference.points.size());
+        for (const SweepPoint& pt : m_reference.points) {
+            prev << QPointF(xFor(pt.freqHz),
+                            yFor(AntennaSweep::swr(pt.gamma)));
+        }
+        QColor faint = kCurve;
+        faint.setAlpha(70);
+        p.setClipRect(plot.adjusted(1, 1, -1, -1));
+        p.setPen(QPen(faint, 1.6, Qt::DashLine));
+        p.setBrush(Qt::NoBrush);
+        p.drawPolyline(prev);
+        p.setClipping(false);
+    }
+
     // ── The curve ────────────────────────────────────────────────────
     QPolygonF line;
     line.reserve(m_sweep.points.size());
@@ -344,6 +375,19 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         head += QStringLiteral("   — not the same as resonant");
     }
     p.drawText(QPointF(m_plotL, m_plotT - 9.0), head);
+
+    // Name the dashed one, or it is just a second line nobody asked
+    // for.
+    if (!m_reference.isEmpty()) {
+        QColor faint = kCurve;
+        faint.setAlpha(150);
+        p.setPen(faint);
+        const QString ref = m_referenceLabel.isEmpty()
+            ? QStringLiteral("- - -  previous sweep")
+            : QStringLiteral("- - -  %1").arg(m_referenceLabel);
+        p.drawText(QPointF(m_plotR - sfm.horizontalAdvance(ref),
+                           m_plotT - 9.0), ref);
+    }
 }
 
 } // namespace NereusSDR

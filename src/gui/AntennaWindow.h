@@ -38,6 +38,7 @@
 #include "core/antenna/AmateurBands.h"
 #include "core/antenna/AntennaTrim.h"
 #include "core/antenna/Feedline.h"
+#include "core/antenna/TrimSession.h"
 #include "core/antenna/Touchstone.h"
 
 #include <QDialog>
@@ -86,6 +87,15 @@ private:
     // reloading is not needed when the cable length changes.
     Sweep m_measured;
     Sweep m_sweep;        // what everything downstream reads
+    // The sweep before this one, drawn faint behind the live curve.
+    Sweep m_previous;
+    QString m_previousLabel;
+
+    // Two or more measurements either side of a known change let this
+    // work out how much the antenna really moves per centimetre — which
+    // in the worked case was half what the textbook says. See
+    // TrimSession.h.
+    TrimSession m_session;
 
     QPushButton*    m_openBtn{nullptr};
     QComboBox*      m_kindBox{nullptr};
@@ -111,6 +121,8 @@ private:
     SwrCurveWidget* m_curve{nullptr};
     QLabel* m_explain{nullptr};     // the sentence under the curve
     QLabel* m_source{nullptr};
+    QLabel* m_learned{nullptr};    // what the last change actually did
+    QPushButton* m_forgetBtn{nullptr};
 
     // Set once the operator has typed a target, so a newly loaded sweep
     // stops overwriting it with the band centre. Choosing 7.030 and

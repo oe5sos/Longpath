@@ -310,6 +310,27 @@ void AntennaWindow::buildUi()
             .arg(QLatin1String(Style::kTextSecondary)));
     col->addWidget(m_explain);
 
+    // What the last change actually did, against what was predicted.
+    // Sits under the curve because it is a statement about the pair of
+    // curves above it.
+    auto* learnRow = new QHBoxLayout;
+    learnRow->setSpacing(7);
+    m_learned = new QLabel(QString{}, this);
+    m_learned->setWordWrap(true);
+    m_learned->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QLatin1String(Style::kGreenText)));
+    learnRow->addWidget(m_learned, 1);
+
+    m_forgetBtn = new QPushButton(QStringLiteral("Forget history"), this);
+    m_forgetBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_forgetBtn->setToolTip(QStringLiteral(
+        "Start again. Do this when you move the antenna, change its "
+        "height, or start on a different band — none of those keep the "
+        "old measurements comparable."));
+    learnRow->addWidget(m_forgetBtn);
+    col->addLayout(learnRow);
+
     m_source = new QLabel(QString{}, this);
     m_source->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 10px; }")
@@ -321,6 +342,13 @@ void AntennaWindow::buildUi()
             this, &AntennaWindow::chooseFile);
     connect(m_estimateBtn, &QPushButton::clicked,
             this, &AntennaWindow::estimateLength);
+    connect(m_forgetBtn, &QPushButton::clicked, this, [this]() {
+        m_session.clear();
+        m_previous = Sweep{};
+        m_previousLabel.clear();
+        m_curve->clearReference();
+        refresh();
+    });
 
     connect(m_kindBox, &QComboBox::currentIndexChanged, this, [this](int i) {
         AppSettings::instance().setValue(kKindKey, i);
@@ -335,6 +363,10 @@ void AntennaWindow::buildUi()
     });
     connect(m_lengthBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
         AppSettings::instance().setValue(kLengthKey, v);
+        // The natural order is: cut the wire, load the new sweep, then
+        // remember to type the new length. So a length typed after a
+        // load belongs to the measurement currently on screen.
+        m_session.updateLastLength(v);
         refresh();
     });
     connect(m_limitBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
@@ -392,8 +424,27 @@ void AntennaWindow::applyFeedline()
 
 void AntennaWindow::setSweep(const Sweep& s)
 {
+    // The sweep being replaced becomes the faint one behind the new
+    // curve. Only when there was one and it is not this one again —
+    // reloading the same file should not make it its own reference.
+    if (!m_measured.isEmpty() && m_measured.source != s.source) {
+        m_previous = m_sweep;
+        m_previousLabel = m_measured.source;
+    }
+
     m_measured = s;
     applyFeedline();
+
+    m_curve->setReference(m_previous, m_previousLabel);
+
+    // Record it against the length currently entered. If the operator
+    // types the new length afterwards — which is the usual order — the
+    // length box's handler corrects this entry.
+    const auto res = AntennaSweep::nearestResonance(
+        m_sweep, m_targetBox->value() * 1e6);
+    if (res.found) {
+        m_session.record(m_lengthBox->value(), res.freqHz, s.source);
+    }
     // A newly loaded sweep may be a different band, so the defaulted
     // target has to be recomputed. A target the operator typed is left
     // alone — see m_targetChosen.
@@ -488,6 +539,20 @@ void AntennaWindow::refresh()
     setTile(m_endVal, m_endCap, band.isValid() ? band.highHz : 0.0,
             QStringLiteral("BAND END"));
 
+    // ── What the last change actually did ────────────────────────────
+    //
+    // Shown whether or not it produced a usable exponent: "these two
+    // are too close together to learn from" is itself worth reading,
+    // and so is "the resonance went the wrong way".
+    const auto session = m_session.learned();
+    m_learned->setText(m_session.count() >= 2 ? session.note : QString{});
+    m_learned->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QLatin1String(session.valid ? Style::kGreenText
+                                             : Style::kAmberWarn)));
+    m_learned->setVisible(m_session.count() >= 2);
+    m_forgetBtn->setVisible(m_session.count() >= 1);
+
     // ── The answer ───────────────────────────────────────────────────
     m_explain->setText(AntennaSweep::describe(m_sweep, targetHz));
 
@@ -518,8 +583,13 @@ void AntennaWindow::refresh()
     }
 
     const AntennaTrim::Kind kind = currentKind();
+    // Through the session, so a measured exponent is used when there is
+    // one. With fewer than two usable measurements this is exactly
+    // AntennaTrim::compute with the textbook rule.
     const auto t = AntennaTrim::compute(kind, res.freqHz, targetHz,
-                                        m_lengthBox->value());
+                                        m_lengthBox->value(),
+                                        session.valid ? session.exponent
+                                                      : 1.0);
 
     if (std::abs(t.percentChange) < 0.1) {
         m_action->setText(QStringLiteral("nothing"));
@@ -575,6 +645,13 @@ void AntennaWindow::refresh()
     notes << QStringLiteral(
         "Height above ground shifts the resonance. Adjust at the height "
         "the antenna will actually work at.");
+
+    if (session.valid) {
+        notes << QStringLiteral(
+            "Scaled from your own measurements: this antenna moves as "
+            "L^-%1, not the textbook L^-1.")
+                  .arg(session.exponent, 0, 'f', 2);
+    }
 
     m_caution->setText(notes.join(QStringLiteral("  ")));
     m_caution->setVisible(true);

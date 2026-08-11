@@ -59,6 +59,15 @@ public:
     // Show this sweep. An empty one leaves the frame with its reason in
     // the middle rather than an empty box.
     void setSweep(const Sweep& s);
+
+    // ── The sweep before this one ────────────────────────────────────
+    //
+    // Drawn faint, behind the live curve. Trimming an antenna is a loop
+    // — measure, cut, measure — and the single most useful thing a tool
+    // can show is whether the last change did what it was supposed to.
+    // Two numbers cannot say that; two curves can.
+    void setReference(const Sweep& s, const QString& label = {});
+    void clearReference();
     const Sweep& sweep() const { return m_sweep; }
 
     // Which band plan to draw. Region 1 by default — the operator this
@@ -97,6 +106,8 @@ private:
     double yFor(double swr) const;
 
     Sweep m_sweep;
+    Sweep m_reference;
+    QString m_referenceLabel;
     AmateurBands::Region m_region{AmateurBands::Region::One};
     AmateurBands::Band   m_band;        // what is drawn
     AmateurBands::Band   m_forcedBand;  // what the caller insisted on

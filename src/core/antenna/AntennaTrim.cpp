@@ -62,7 +62,7 @@ double halfWaveEstimateM(double freqHz, double velocityFactor)
 }
 
 Trim compute(Kind kind, double measuredHz, double targetHz,
-             double currentTotalM)
+             double currentTotalM, double exponent)
 {
     Trim t;
     if (measuredHz <= 0.0 || targetHz <= 0.0) { return t; }
@@ -71,7 +71,15 @@ Trim compute(Kind kind, double measuredHz, double targetHz,
     t.measuredHz = measuredHz;
     t.targetHz   = targetHz;
 
-    const double factor = measuredHz / targetHz;
+    // f ∝ L^-k, so the length ratio is the frequency ratio to the power
+    // 1/k. The default k of 1 is the textbook rule; anything else came
+    // from watching this antenna actually move.
+    const double k = (exponent > 0.05 && exponent < 20.0) ? exponent : 1.0;
+    const double ratio = measuredHz / targetHz;
+    // Exactly 1 takes the plain path so the ordinary case is unchanged
+    // to the last bit — pow(x, 1.0) is very nearly x, and "very nearly"
+    // is how a test that used to pass starts failing by 1e-16.
+    const double factor = (k == 1.0) ? ratio : std::pow(ratio, 1.0 / k);
     t.percentChange = (factor - 1.0) * 100.0;
     t.lengthen      = factor > 1.0;
 
