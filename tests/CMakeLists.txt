@@ -1160,6 +1160,14 @@ nereus_add_test(tst_master_mixer)
 # of the test file for the story and the numbers.
 nereus_add_test(tst_master_mixer_cadence)
 
+# ── 2026-08-11 remote bench: Connected transition pushes the DDC rate ─────
+# Closes the parked MOX-rate investigation: connect never applied the
+# persisted slice rate to the wire (isConnected() gate), so the first MOX
+# snapped a 48 kHz wire to the configured 192 kHz mid-TX. The Connected
+# branch now re-runs requestDdcAssignment beside the Alex/BPF/TX-LPF
+# pushes; this pins it via the publish's PS-rate re-sync.
+nereus_add_test(tst_connected_pushes_ddc_assignment)
+
 # ── 2026-08-11 remote-bench mic reordering: MicReorderBuffer contract ─────
 # The socket-level sequence audit showed the routed/WLAN path REORDERS
 # ~0.2-0.5% of mic frames (LOST n == out-of-order n in nearly every

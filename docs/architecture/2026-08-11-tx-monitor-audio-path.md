@@ -263,6 +263,34 @@ Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
 - Decisive next step (waiting on the operator):
   `grep -iE "sampleRate" ~/.config/NereusSDR/NereusSDR.settings`
   plus the question which pan width he actually operates with.
+- **ANSWERED same night** (macOS path is
+  `~/Library/Preferences/NereusSDR/NereusSDR.settings`): the slice
+  rates are persisted per band at **192000** (20m, 40m, GEN); no
+  per-MAC hardware sampleRate key exists. The leading hypothesis is
+  CONFIRMED: the session is configured for 192 kHz, the wire idles on
+  the 48 kHz connect default, and the first MOX-time
+  `refreshDdcAssignmentForRadioState` applies the configured rate.
+  The real defect to fix on 2026-08-13 is therefore **connect not
+  applying the persisted slice rate to the wire** (look at the
+  isConnected() gate in invokeCodecDdcAssignment and what re-runs it
+  after the connection goes live — note `tst_restored_sample_rate_
+  reaches_the_ddc` exists and passes, so the gap is timing, not the
+  restore path itself). Operator remedy for the remote link
+  meanwhile: set the span/rate to 48 kHz on the bands in use; it
+  persists per band. MOX will then correctly apply 48 kHz and the
+  only remaining TX load is P2's fixed ~9.2 Mbit/s upstream.
+- **FIX LANDED same night, bench verification pending**: the
+  Connected transition in `RadioModel::onConnectionStateChanged` now
+  calls `requestDdcAssignment()` beside the Alex-antenna /
+  per-ADC-BPF / TX-LPF pushes that exist for the identical reason.
+  The wire agrees with the configuration from the first second and
+  MOX stops being a rate change. Pinned by
+  `tst_connected_pushes_ddc_assignment` (stale PS-store seed +
+  Connected transition + MOX must emit the allocator's rate).
+  Bench check on 2026-08-13: after connect, idle IQ audit must show
+  ~4030 pkts/5 s at a 192 kHz setting (or ~1010 at 48 kHz) — i.e.
+  the CONFIGURED rate — and pressing MOX must NOT change the IQ
+  packet rate. For the remote link, set 48 kHz spans first.
 - Keep in mind: rounds 1+2 (silent PS-rate mirrors) are correct
   hygiene regardless and stay in.
 

@@ -11897,6 +11897,20 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // mask at compose time on the MOX edge, so the mask only has to be
         // correct, not re-sent.
         pushTxFrequencyFromTxSlice();
+        // Remote bench 2026-08-11 (the parked MOX-rate investigation,
+        // closed here): and the DDC assignment itself, for the same
+        // reason as the three pushes above. The restore path had
+        // already moved the stream allocator to the persisted per-band
+        // rate (192 kHz on this bench), but invokeCodecDdcAssignment's
+        // wire push is gated on isConnected() — every pre-Connected
+        // run skipped it, nothing re-ran it afterwards, and the radio
+        // idled on P2RadioConnection's constructor-default 48 kHz
+        // until the first MOX toggle's refreshDdcAssignmentForRadioState
+        // "corrected" the rate mid-TX (quadrupling the DDC stream at
+        // the worst possible moment for a marginal link). One
+        // request here makes the wire agree with the configuration
+        // from the first second, and MOX stops being a rate change.
+        requestDdcAssignment();
         break;
     case ConnectionState::Disconnected:
         qCDebug(lcConnection) << "Disconnected from" << m_name;
