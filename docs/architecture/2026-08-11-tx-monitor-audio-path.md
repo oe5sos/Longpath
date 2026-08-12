@@ -299,6 +299,25 @@ Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
   disconnect, banner dropped to ▼2.4 Mbit/s, latency 29 → 18 ms; the
   48 kHz choice persists per band for remote operation. The
   MOX-must-not-change-the-rate half stays open until TX is possible.
+- **MOX half VERIFIED same morning, plus a NEW residual finding
+  (2026-08-13 work item).** With the wire at 192 kHz, MOX did NOT
+  change the IQ packet rate any more (~3950-4130 pkts/5 s before,
+  during, and after TX — the old 48→192 snap is gone; TX-time loss
+  0.1-2.6% from the link itself, mic concealment working). BUT: after
+  an app RESTART the session came up inconsistent — the rate combo
+  checkmark sat on 192 kHz and the wire ran 192 kHz (`DDCAssign …
+  rx1Rate=192000`, ~4000 pkts/5 s) while the pan restored a 48 kHz
+  span. So the morning's 48 kHz choice did not round-trip the
+  restart: either the VFO-menu rate switch does not persist into the
+  per-band slice key, or the restore applies it to the display but
+  not to the model+wire, and the Connected-transition push (e74be41a)
+  then carries the pre-restore allocator default. TO INVESTIGATE
+  2026-08-13: (1) does setStreamSampleRate persist
+  Slice0/<band>/SampleRate? (2) restore ordering vs. the Connected
+  push — the push may simply run before the per-band restore lands
+  in the allocator. Session remedy that works: re-pick the rate in
+  the VFO menu once after connect (live path is solid: ▼2.3 Mbit/s,
+  10 ms).
 - Keep in mind: rounds 1+2 (silent PS-rate mirrors) are correct
   hygiene regardless and stay in.
 
