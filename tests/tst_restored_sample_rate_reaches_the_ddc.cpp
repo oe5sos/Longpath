@@ -185,6 +185,19 @@ private slots:
         QVERIFY(slice);
         QVERIFY(slice->streamIndex() >= 0);
 
+        // The stomp half of the finding, first: bindSliceToStream just
+        // ADOPTED the stream default (192 kHz) via setSampleRateHz. That
+        // adoption is derived state, not operator intent, and must NOT
+        // schedule a save — the first attempt hooked sampleRateHzChanged
+        // and the adoption overwrote the operator's persisted choice in
+        // the settings map before the restore could read it.
+        model.flushPendingSettingsSave();
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("Slice0/Band20m/SampleRate"), -1)
+                     .toInt(),
+                 -1);
+
+        // The intent site is what persists.
         model.requestSliceSampleRate(id, 48000);
         // The save is debounced 500 ms; the quit path flushes it, so the
         // test flushes the same way.

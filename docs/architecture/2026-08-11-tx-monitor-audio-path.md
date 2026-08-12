@@ -330,11 +330,18 @@ Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
   48 kHz pan SPAN came from the pan's own persisted bandwidth key,
   which is what made the session look contradictory). Startup restore
   (`loadSliceState` → `applyRestoredSampleRate`) and the Connected
-  push were both correct all along. Fix: one connect in
-  wireSliceSignals — `sampleRateHzChanged` → `scheduleSettingsSave()`
-  — beside its sibling properties. Pinned by
-  `a_rate_change_persists_without_a_band_change` in
-  tst_restored_sample_rate_reaches_the_ddc. End-to-end operator
+  push were both correct all along. Fix, in two rounds — the first
+  stomped itself: a signal-level `sampleRateHzChanged` →
+  `scheduleSettingsSave()` hook persisted the wrong writes, because
+  `bindSliceToStream` ADOPTS the stream default via the same setter
+  at connect, and the hook wrote 192000 over the operator's persisted
+  choice in the settings map before the restore could read it (live
+  round-trip failed; file inspection showed the stomp). The save now
+  lives at the INTENT site: `requestSliceSampleRate` schedules it
+  after a successful rate transaction; the adoption stays silent.
+  Pinned both ways in tst_restored_sample_rate_reaches_the_ddc
+  (`a_rate_change_persists_without_a_band_change`): the bind adoption
+  must NOT write the slot, the menu request must. End-to-end operator
   check: pick 48 kHz, quit, relaunch, connect — the banner must show
   ~2.3 Mbit/s with no manual step.
 

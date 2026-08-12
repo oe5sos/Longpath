@@ -3931,7 +3931,23 @@ void RadioModel::requestSliceSampleRate(int sliceId, int rateHz)
                 "Sample-rate change to %1 kHz was rejected; all slices "
                 "stayed on their existing DDC windows.")
                 .arg(rateHz / 1000));
+        return;
     }
+
+    // Persist the operator's rate choice (remote bench 2026-08-12).
+    // The rate was the only slice property whose change never reached
+    // the per-band settings slot outside a band switch: pick 48 kHz
+    // in the VFO menu, quit, and the next launch restored the old
+    // 192 kHz — on the remote link that meant every session started
+    // at 9.5 Mbit/s until the operator re-picked the rate by hand.
+    // Deliberately HERE at the intent site and NOT as a
+    // sampleRateHzChanged connect: bindSliceToStream adopts the
+    // stream default via the same setter at connect time, and a
+    // signal-level hook stomped the persisted choice with that
+    // default before the restore could read it (tried and reverted
+    // same day). applyRestoredSampleRate lands here too — a
+    // same-value write into the slot it was read from, harmless.
+    scheduleSettingsSave();
 }
 
 std::optional<RadioModel::StreamRateChangePlan>
@@ -4831,22 +4847,16 @@ int RadioModel::addSlice(const QString& initialPanId)
     connect(slice, &SliceModel::bandChanged, this,
             [this, slice](Band band) { onSliceBandChanged(slice, band); });
 
-    // Sample rate → per-band persistence (remote bench 2026-08-12).
-    // This was the ONLY slice property whose change had no
-    // scheduleSettingsSave hook: pick 48 kHz in the VFO menu, quit
-    // without a band change, and the next launch restored the old
-    // rate — on the remote link that meant every session started at
-    // 192 kHz (9.5 Mbit/s) until the operator re-picked the rate by
-    // hand. Wired HERE (addSlice, ungated) and not in
-    // wireSliceSignals, because that returns early without a
-    // connection and persistence is a pure client-side concern —
-    // same reasoning as the AlexController persistence connects in
-    // the constructor. The wire push itself needs nothing here (the
-    // per-stream commit already handles it). Fires redundantly
-    // during restoreFromSettings — a coalesced same-value write into
-    // the same slot, harmless.
-    connect(slice, &SliceModel::sampleRateHzChanged, this,
-            [this](int) { scheduleSettingsSave(); });
+    // NOTE deliberately ABSENT here: a sampleRateHzChanged →
+    // scheduleSettingsSave connect. It was tried on 2026-08-12 and
+    // promptly stomped its own persistence: bindSliceToStream ADOPTS
+    // the stream's default rate via setSampleRateHz at connect time
+    // (line ~4394, "adopt the stream's rate"), which fired the hook
+    // and wrote 192000 over the operator's persisted 48000 in the
+    // settings map BEFORE loadSliceState's restore could read it. The
+    // signal cannot distinguish operator intent from derived
+    // adoption; the save therefore lives at the intent site,
+    // requestSliceSampleRate.
 
     // Phase 3F Sub-Epic F Task 11: when the operator flips this slice's
     // wideband-extension flag (e.g. zoom-out past DDC bandwidth, or
