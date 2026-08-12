@@ -320,6 +320,23 @@ Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
   10 ms).
 - Keep in mind: rounds 1+2 (silent PS-rate mirrors) are correct
   hygiene regardless and stay in.
+- **ROOT CAUSE FOUND AND FIXED the same morning — suspect (1), and
+  there was no ordering bug at all.** `saveToSettings(band)` runs
+  only on band changes plus the coalesced `scheduleSettingsSave()`
+  debounce — and `sampleRateHzChanged` was the ONLY slice property
+  whose change had no `scheduleSettingsSave` hook. The morning's
+  48 kHz pick was simply never written; the restart honestly restored
+  the file's 192 kHz to model, wire, and menu (all consistent — the
+  48 kHz pan SPAN came from the pan's own persisted bandwidth key,
+  which is what made the session look contradictory). Startup restore
+  (`loadSliceState` → `applyRestoredSampleRate`) and the Connected
+  push were both correct all along. Fix: one connect in
+  wireSliceSignals — `sampleRateHzChanged` → `scheduleSettingsSave()`
+  — beside its sibling properties. Pinned by
+  `a_rate_change_persists_without_a_band_change` in
+  tst_restored_sample_rate_reaches_the_ddc. End-to-end operator
+  check: pick 48 kHz, quit, relaunch, connect — the banner must show
+  ~2.3 Mbit/s with no manual step.
 
 Residual for remote TX: the P2 upstream TX I/Q at 192 kHz
 (~9.2 Mbit/s while transmitting) is protocol-fixed and remains the

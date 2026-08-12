@@ -31,6 +31,7 @@
 
 #include <QtTest/QtTest>
 
+#include "core/AppSettings.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -164,6 +165,35 @@ private slots:
         seed(model);
         model.applyRestoredSampleRate(nullptr);   // must not crash
         QVERIFY(true);
+    }
+
+    // ── 6. The rate CHANGE persists without a band change ────────────────
+    //
+    // Remote bench 2026-08-12: pick 48 kHz in the VFO menu, change no
+    // band, quit — and the next launch restored the old 192 kHz, because
+    // sampleRateHzChanged was the ONLY slice property whose change had no
+    // scheduleSettingsSave hook (saveToSettings otherwise runs only on
+    // band changes). On the remote link that meant every session started
+    // at 9.5 Mbit/s until the operator re-picked the rate by hand.
+    void a_rate_change_persists_without_a_band_change()
+    {
+        RadioModel model;
+        seed(model);
+
+        const int id = model.addSlice();
+        SliceModel* slice = model.sliceById(id);
+        QVERIFY(slice);
+        QVERIFY(slice->streamIndex() >= 0);
+
+        model.requestSliceSampleRate(id, 48000);
+        // The save is debounced 500 ms; the quit path flushes it, so the
+        // test flushes the same way.
+        model.flushPendingSettingsSave();
+
+        const int persisted = AppSettings::instance()
+            .value(QStringLiteral("Slice0/Band20m/SampleRate"), -1)
+            .toInt();
+        QCOMPARE(persisted, 48000);
     }
 };
 
