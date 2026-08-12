@@ -291,6 +291,14 @@ Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
   ~4030 pkts/5 s at a 192 kHz setting (or ~1010 at 48 kHz) — i.e.
   the CONFIGURED rate — and pressing MOX must NOT change the IQ
   packet rate. For the remote link, set 48 kHz spans first.
+  **Idle half VERIFIED 2026-08-12 morning (remote bench, no MOX
+  available):** the banner showed ▼9.5 Mbit/s immediately after
+  connect — the configured 192 kHz on the wire from the first second
+  (the day before: 2.3 Mbit/s, the 48 kHz constructor default). The
+  live rate switch to 48 kHz (VFO flag → Sample rate) applied without
+  disconnect, banner dropped to ▼2.4 Mbit/s, latency 29 → 18 ms; the
+  48 kHz choice persists per band for remote operation. The
+  MOX-must-not-change-the-rate half stays open until TX is possible.
 - Keep in mind: rounds 1+2 (silent PS-rate mirrors) are correct
   hygiene regardless and stay in.
 

@@ -44,7 +44,7 @@ logbook rows that need them.
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 4.1 | Spot List right-click → "Turn rotor to X" | Rotor dock raises; call fills in; dial aims; turn begins (pre-existing flow — regression check) | |
+| 4.1 | Spot List right-click → "Turn rotor to X" | Rotor dock raises; call fills in; dial aims; turn begins (pre-existing flow — regression check) | PASS (remote bench 2026-08-12 morning, Claude-driven): T77LA from the Spot List — dock raised, call + QRZ resolved (JN63FW, 452 km, 194°), globe swung, honest "no rotator — simulated" status |
 | 4.2 | Panadapter spot label right-click | Menu shows "Turn rotor to X" between Tune and Copy | PASS — entry present between Tune and Copy |
 | 4.3 | Choose it | Same behaviour as 4.1, from every pan (not only pan 0) | FAIL → FIXED same session: connect missing for pan-0 (wireSpectrumForPan excludes it); re-wired at the pan-0 one-shot site. RETESTED after rebuild: PASS — dock opens, call fills, QRZ lookup resolves JO64BB, globe swings, turn begins. |
 | 4.4 | With no rotator connected | Needle goes dashed/dim "simulated", status says so — no silent pretending | PASS — dashed simulated needle + honest status |
@@ -60,10 +60,10 @@ logbook rows that need them.
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 6.1 | Log a QSO from the panel | Row appears; ADIF file grows | |
-| 6.2 | "Point the beam from the log" on a logged contact | Aim from grid bearing still works (unchanged path) | |
-| 6.3 | QRZ upload of a fresh QSO | Uploads; marked as uploaded | |
-| 6.4 | Logbook window: Import merge + Export ADIF/CSV | All three still work | |
+| 6.1 | Log a QSO from the panel | Row appears; ADIF file grows | (skipped on the remote bench — deliberately not polluting the real 9271-QSO log with a fake contact; operator hand-bench row) |
+| 6.2 | "Point the beam from the log" on a logged contact | Aim from grid bearing still works (unchanged path) | PASS (2026-08-12): OE5AOO detail pane → "Turn to 36°" — aim taken, globe swung, simulated-needle status honest |
+| 6.3 | QRZ upload of a fresh QSO | Uploads; marked as uploaded | (depends on 6.1 — operator hand-bench row) |
+| 6.4 | Logbook window: Import merge + Export ADIF/CSV | All three still work | PASS (2026-08-12): Export ADIF 9271 contacts (valid ADIF 3.1.4, checked byte-level), Export CSV (valid header + quoting + distance/bearing), re-import of the own export answered "already in your log … Nothing to do" — merge dedup exact |
 
 ## Open ends going into this bench
 
@@ -103,6 +103,8 @@ logbook rows that need them.
    after a context menu closed, before it can reach the overlay-menu
    fallback. Retest: right-click spot label → choose "Tune to" →
    overlay menu must NOT appear.
+   **RETESTED 2026-08-12 morning: PASS** — right-click N9OHW →
+   "Tune to" → VFO moved to the spot, no overlay menu appeared.
 4. **"Long path" and "LP" duplicated** — the Rotate row's existing
    "Long path" button and the new preset-row "LP" do the same thing.
    Dedupe (keep LP next to the presets; drop the wide button) or make
