@@ -107,6 +107,13 @@ private slots:
     // bypass before touching their delay lines, which is why no bench
     // saw it earlier). The reverb now bypasses when unprepared.
     void reverb_survives_process_before_prepare();
+
+    // The same question asked of EVERY stage, so the next stage that
+    // grows a delay line inherits the protection contract: enabled +
+    // unprepared must neither crash nor emit non-finite samples.
+    // (Survey 2026-08-11: only gate and reverb hold delay lines; the
+    // gate always guarded m_delayCap, the reverb does now.)
+    void every_stage_survives_process_before_prepare();
 };
 
 // ── The four questions, asked of everything ──────────────────────────
@@ -393,6 +400,24 @@ void TstStripDsp::reverb_survives_process_before_prepare()
     verb.process(buf.data(), kFrames, 1);
     for (float v : buf) {
         QVERIFY(std::isfinite(v));
+    }
+}
+
+void TstStripDsp::every_stage_survives_process_before_prepare()
+{
+    STAGES;
+    for (const Stage& s : stages) {
+        // Deliberately NO s.prepare() call — that is the condition
+        // under test.
+        s.setEnabled(true);
+        std::vector<float> buf = tone(500.0, 0.5f, kFrames, 2);
+        s.process(buf.data(), kFrames, 2);   // must not crash
+        for (size_t i = 0; i < buf.size(); ++i) {
+            QVERIFY2(std::isfinite(buf[i]),
+                     qPrintable(QStringLiteral("%1 emitted a non-finite "
+                                               "sample at %2 before prepare")
+                                    .arg(s.name).arg(i)));
+        }
     }
 }
 
