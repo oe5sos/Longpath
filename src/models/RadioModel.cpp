@@ -3895,7 +3895,11 @@ void RadioModel::applyRestoredSampleRate(SliceModel* slice)
     const int stream = slice->streamIndex();
     if (stream < 0) {
         // Not bound to a DDC. The slice adopts its stream's rate when it
-        // binds, so there is nothing to widen yet and nothing to warn about.
+        // binds, so there is nothing to widen yet and nothing to warn
+        // about — loadSliceState has captured the restored value into
+        // m_pendingRestoredRateHz for the Connected-time re-apply
+        // (2026-08-12 restore-to-wire fix; this early return was
+        // silently eating the launch-time restore for every session).
         return;
     }
     if (m_streamAllocator.streamSampleRateHz(stream) == restored) {
@@ -10552,6 +10556,22 @@ void RadioModel::loadSliceState(SliceModel* slice)
 
     slice->restoreFromSettings(currentBand);
 
+    // Capture the restored rate for the post-bind re-apply (2026-08-12,
+    // third round — the instrumented timeline shows why re-READING at
+    // Connected is not enough: the first restore reads the true
+    // persisted value (48000 at 08:50:36 on the bench), but before the
+    // Connected re-apply runs, some coalesced saveSliceState writes ALL
+    // slice keys from PROPERTY values — and after bind's adoption the
+    // property is the stream default again, so the settings key itself
+    // gets stomped back (192000 at 08:51:19). Only the FIRST unbound
+    // restore of a session sees the honest value; hold on to it.
+    // First-capture-wins so the second loadSliceState (connect-time,
+    // post-stomp) cannot overwrite the anchor. Single-slice by design
+    // until Phase 3F gives every slice its own restore lifecycle.
+    if (slice->streamIndex() < 0 && m_pendingRestoredRateHz == 0) {
+        m_pendingRestoredRateHz = slice->sampleRateHz();
+    }
+
     // And put the restored rate on the DDC, not just on the menu. Codex
     // review round 7, PR #293. Same call as the band-change path: this is
     // the launch-time restore, and it was equally display-only.
@@ -11924,6 +11944,25 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // mask at compose time on the MOX edge, so the mask only has to be
         // correct, not re-sent.
         pushTxFrequencyFromTxSlice();
+        // Remote bench 2026-08-12, the restore-to-wire close (round 3):
+        // the full per-band restore (loadSliceState) runs while the
+        // slice is still UNBOUND (streamIndex == -1, instrumented
+        // live), so applyRestoredSampleRate skips silently, the bind's
+        // adoption overwrites the property with the stream default,
+        // and — round 3's finding — a coalesced saveSliceState then
+        // stomps even the settings KEY with that default before
+        // Connected fires (instrumented: key read 48000 at the first
+        // restore, 192000 43 s later at the connect-time restore). So
+        // re-READING here is useless; apply the anchor captured at the
+        // first honest restore instead. Every session's quit used to
+        // re-save the default it actually ran at, self-perpetuating
+        // the loss — this closes the loop at the only trustworthy
+        // point.
+        if (m_activeSlice && m_pendingRestoredRateHz > 0) {
+            m_activeSlice->setSampleRateHz(m_pendingRestoredRateHz);
+            m_pendingRestoredRateHz = 0;
+            applyRestoredSampleRate(m_activeSlice);
+        }
         // Remote bench 2026-08-11 (the parked MOX-rate investigation,
         // closed here): and the DDC assignment itself, for the same
         // reason as the three pushes above. The restore path had

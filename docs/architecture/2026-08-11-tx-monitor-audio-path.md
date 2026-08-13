@@ -344,6 +344,44 @@ Regressions pinned in tests/tst_receiver_manager_ps_ddc.cpp
   must NOT write the slot, the menu request must. End-to-end operator
   check: pick 48 kHz, quit, relaunch, connect — the banner must show
   ~2.3 Mbit/s with no manual step.
+- **Clean-room round-trip (2026-08-12, 08:23-08:31) — SAVE PROVEN,
+  RESTORE-TO-WIRE STILL OPEN.** With zero other instances (two
+  earlier round-trips were invalidated by the INSTALLED 0.5.2 app —
+  accidentally launched twice via open_application — whose
+  SIGTERM/quit handler saved its never-connected default state over
+  the shared settings file): pick 48 kHz → clean quit → file reads
+  **48000** ✓ → relaunch → connect → **wire comes up at 192 kHz**
+  (▼9.2 Mbit/s). The persisted value survives; the connect-time
+  restore does not deliver it to the wire. Deduction exhausted —
+  loadSliceState → restoreFromSettings → applyRestoredSampleRate
+  LOOKS correct and synchronous; candidates are the property being
+  re-adopted between restore and apply, an early-return in
+  applyRestoredSampleRate, or the restore running before the slice is
+  bound (streamIndex < 0 → silent return). NEXT SESSION, first move:
+  three qCInfo lines (in loadSliceState after restore: property value
+  + streamIndex; in applyRestoredSampleRate: each early-return branch
+  taken), one connect, read the answer. Operator workaround
+  unchanged: re-pick the rate once after connect.
+- **CLOSED 2026-08-13 evening, round-trip GREEN.** The
+  instrumentation nailed a three-stage chain: (1) the launch-time
+  restore runs while the slice is UNBOUND (streamIndex == -1), so
+  `applyRestoredSampleRate` silently skips; (2) `bindSliceToStream`'s
+  adoption resets the property to the stream default; (3) a coalesced
+  `saveSliceState` (which writes ALL slice keys from property values)
+  then stomps even the settings KEY with that default before
+  Connected fires — instrumented live: key read 48000 at the first
+  restore, 192000 forty-three seconds later at the connect-time
+  restore. Re-reading at Connected was therefore useless (round 2 of
+  this fix); the working fix ANCHORS the first unbound restore's
+  value in `RadioModel::m_pendingRestoredRateHz` (first-capture-wins)
+  and applies it at the Connected transition. Verified live on
+  2026-08-13: relaunch → connect → `restored=48000 stream=0`, no
+  skip, IQ audit 1009 pkts/5 s (48 kHz), banner ~2.3 Mbit/s, zero
+  manual steps. Pinned by
+  `the_connected_transition_applies_the_first_restored_rate`. The
+  deeper disease — saveToSettings persisting DERIVED property state —
+  is recorded here as a Phase 3F design note (per-slice restore
+  lifecycle), not patched further now.
 
 Residual for remote TX: the P2 upstream TX I/Q at 192 kHz
 (~9.2 Mbit/s while transmitting) is protocol-fixed and remains the

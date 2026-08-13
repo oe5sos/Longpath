@@ -208,6 +208,50 @@ private slots:
             .toInt();
         QCOMPARE(persisted, 48000);
     }
+
+    // ── 7. The launch anchor survives the pre-Connected stomp ───────────
+    //
+    // The full 2026-08-12 remote-bench finding in one test. The launch
+    // sequence restores the slice while it is UNBOUND, so the apply
+    // skips; bind's adoption then resets the property to the stream
+    // default, and a coalesced save stomps even the settings KEY with
+    // that default before Connected fires (instrumented live: key read
+    // 48000 at the first restore, 192000 43 s later). The fix anchors
+    // the FIRST unbound restore's value in m_pendingRestoredRateHz and
+    // applies it at the Connected transition — the only trustworthy
+    // point. Every session's quit used to re-save the default it
+    // actually ran at, self-perpetuating the loss.
+    void the_connected_transition_applies_the_first_restored_rate()
+    {
+        RadioModel model;
+        seed(model);   // pool default 192000
+
+        const int id = model.addSlice();
+        SliceModel* slice = model.sliceById(id);
+        QVERIFY(slice);
+        const int stream = slice->streamIndex();
+        QVERIFY(stream >= 0);
+
+        // The operator's persisted choice.
+        AppSettings::instance().setValue(
+            QStringLiteral("Slice0/Band20m/SampleRate"), 48000);
+
+        // Launch: the restore runs before the slice is bound.
+        slice->setStreamIndex(-1);
+        model.loadSliceState(slice);
+        QCOMPARE(slice->sampleRateHz(), 48000);
+
+        // The stomp: bind adoption resets the property, and a save
+        // overwrites the key. Neither may reach past the anchor.
+        slice->setStreamIndex(stream);
+        slice->setSampleRateHz(192000);
+        AppSettings::instance().setValue(
+            QStringLiteral("Slice0/Band20m/SampleRate"), 192000);
+
+        model.onConnectionStateChangedForTest(ConnectionState::Connected);
+
+        QCOMPARE(model.streamSampleRateHzForTest(stream), 48000);
+    }
 };
 
 QTEST_MAIN(TestRestoredSampleRateReachesTheDdc)

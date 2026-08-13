@@ -3296,6 +3296,18 @@ private:
     // save or restore at the boundary.
     Band m_lastBand{Band::Band20m};
 
+    // Remote bench 2026-08-12 (third round of the restore-to-wire fix):
+    // the persisted per-band rate as the FIRST unbound restore of the
+    // session read it — the only moment the settings key is guaranteed
+    // un-stomped. Between that restore and the Connected transition, a
+    // coalesced saveSliceState can write all slice keys from property
+    // values, and after bindSliceToStream's adoption the property holds
+    // the stream default again, so the key itself gets overwritten.
+    // The Connected re-apply therefore uses THIS anchor instead of
+    // re-reading settings. 0 = nothing pending; consumed (reset to 0)
+    // by the Connected handler. Single-slice by design until Phase 3F.
+    int m_pendingRestoredRateHz{0};
+
     // Settings save coalescing
     bool m_settingsSaveScheduled{false};
     // Phase 3P-I-a — dirty flag for AlexController persistence.
