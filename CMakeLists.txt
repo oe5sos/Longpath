@@ -557,6 +557,7 @@ set(CORE_SOURCES
     src/core/MicProfileManager.cpp
     src/core/ParaEqEnvelope.cpp
     src/core/TwoToneController.cpp
+    src/core/SwrSweepController.cpp
     src/core/TxSliceArbiter.cpp
     src/core/TxSliceArbiter.h
     src/core/FFTEngine.cpp
@@ -739,6 +740,8 @@ set(GUI_SOURCES
     src/gui/widgets/TxSpectrumWidget.cpp
     src/gui/widgets/SwrCurveWidget.h
     src/gui/widgets/SwrCurveWidget.cpp
+    src/gui/widgets/SwrChartWidget.cpp
+    src/gui/widgets/SwrSweepPanel.cpp
     src/gui/widgets/QsoDetailPane.h
     src/gui/widgets/QsoDetailPane.cpp
     src/gui/widgets/ScrollableLabel.cpp

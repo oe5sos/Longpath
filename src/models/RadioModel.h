@@ -154,6 +154,7 @@ class CompositeTxMicRouter;
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
 class MicProfileManager;
 class TwoToneController;
+class SwrSweepController;
 // 3M-4 Task 7: PureSignal coordinator (cal lifecycle, MOX integration,
 // auto-attention, polling, save/restore, two-tone wiring).
 class PureSignal;
@@ -959,6 +960,11 @@ public:
     // TxApplet (J.2 setter) for the 2-TONE button + status mirror.
     // Non-owning; lifetime is RadioModel's lifetime.
     TwoToneController* twoToneController() const { return m_twoToneController; }
+
+    /// 2026-08-13 SWR sweep analyzer (radio as antenna analyzer).
+    /// Non-null from construction; MainWindow hands it to the Antenna
+    /// window's sweep tab. Telemetry-fed from handlePaTelemetry.
+    SwrSweepController* swrSweepController() const { return m_swrSweep; }
 
     // 3M-4 Task 7: expose PureSignal coordinator so PsForm, PureSignalApplet,
     // TxApplet [PS-A], and PsaIndicatorWidget can subscribe to its
@@ -3601,6 +3607,8 @@ private:
     // ctor; setTxChannel(...) is called inside the WDSP-init lambda once
     // m_txChannel is live.  setTxChannel(nullptr) is called in teardown.
     TwoToneController* m_twoToneController{nullptr};
+    // 2026-08-13 SWR sweep analyzer — owned QObject child.
+    SwrSweepController* m_swrSweep{nullptr};
 
     // 3M-4 Task 7: PureSignal coordinator.  Owned via unique_ptr (NOT a
     // raw QObject child) so the destructor can drain the polling timers

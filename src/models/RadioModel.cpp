@@ -259,6 +259,7 @@ warren@wpratt.com
 #include "core/PureSignal.h"
 #include "core/StepAttenuatorController.h"
 #include "core/TwoToneController.h"
+#include "core/SwrSweepController.h"
 // Phase 3F Sub-Epic C Task 6: TxSliceArbiter integration.
 #include "core/TxSliceArbiter.h"
 #include "core/FFTRouter.h"  // Phase 3F Sub-Epic D Task 13
@@ -1047,6 +1048,36 @@ RadioModel::RadioModel(QObject* parent)
     m_twoToneController = new TwoToneController(this);
     m_twoToneController->setTransmitModel(&m_transmitModel);
     m_twoToneController->setMoxController(m_moxController);
+
+    // ── 2026-08-13: SWR sweep analyzer (radio as antenna analyzer) ──────────
+    // Same dependency pattern as TwoToneController above. The TX-frequency
+    // functions marshal to the connection thread exactly like
+    // pushTxFrequencyFromTxSlice; the restore IS pushTxFrequencyFromTxSlice.
+    // Telemetry arrives from handlePaTelemetry (raw-scaled watts — the same
+    // feed SwrProtectionController ingests). Design doc:
+    // docs/architecture/2026-08-13-swr-sweep-analyzer-design.md
+    m_swrSweep = new SwrSweepController(this);
+    m_swrSweep->setMoxController(m_moxController);
+    m_swrSweep->setTxFrequencyFn([this](quint64 hz) {
+        if (!m_connection) {
+            return;
+        }
+        QMetaObject::invokeMethod(m_connection,
+                                  [conn = m_connection, hz]() {
+            conn->setTxFrequency(hz);
+        });
+    });
+    m_swrSweep->setTxFreqRestoreFn([this]() {
+        pushTxFrequencyFromTxSlice();
+    });
+    m_swrSweep->setReadyFn([this]() {
+        return m_connection != nullptr
+               && m_connectionState == ConnectionState::Connected;
+    });
+    m_swrSweep->setAntennaLabelFn([this]() {
+        const SliceModel* slice = txBoundSlice();
+        return slice ? slice->txAntenna() : QString();
+    });
 
     // ── Stage C2: FilterPresetStore ───────────────────────────────────────────
     // Wraps Thetis-verbatim defaults from SliceModel::presetsForMode with a
@@ -9044,6 +9075,14 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
     m_swrProt.ingest(static_cast<float>(fwdW),
                      static_cast<float>(revW),
                      m_transmitModel.isTune());
+
+    // 2026-08-13 SWR sweep analyzer: same raw-scaled watts the
+    // protection controller sees (see the fwdW-not-fwdWCal note above —
+    // SWR is a fwd/rev ratio, so the same reasoning applies). No-op
+    // unless a sweep is measuring.
+    if (m_swrSweep) {
+        m_swrSweep->ingestTelemetry(fwdW, revW);
+    }
 }
 
 // Issue #182 — TransmitModel::micPttDisabled → RadioConnection wire bit.
@@ -11980,6 +12019,12 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         break;
     case ConnectionState::Disconnected:
         qCDebug(lcConnection) << "Disconnected from" << m_name;
+        // 2026-08-13 SWR sweep: a sweep cannot survive its radio.
+        // abortSweep no-ops when idle; the finish path releases TUNE
+        // through MoxController, which is disconnect-safe.
+        if (m_swrSweep) {
+            m_swrSweep->abortSweep(QStringLiteral("Verbindung getrennt"));
+        }
         // Per-radio peripherals refactor (2026-05-26): tear down RF-Kit /
         // 4O3A listener / PGXL / TGXL so they're not still attached to the
         // previous radio's scope when the user reconnects to a different

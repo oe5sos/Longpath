@@ -258,6 +258,7 @@ warren@wpratt.com
 #include "widgets/VfoWidget.h"
 #include "applets/StripWindow.h"
 #include "widgets/RotorLogbookPanel.h"
+#include "widgets/SwrSweepPanel.h"
 #include "core/Maidenhead.h"
 #include "core/CredentialStore.h"
 #include "core/QrzClient.h"
@@ -9522,6 +9523,22 @@ void MainWindow::openAntennaWindow()
     if (!m_antennaWindow) {
         m_antennaWindow = new AntennaWindow(this);
         m_antennaWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+        // 2026-08-13: wire the radio-as-analyzer backend into the
+        // "Sweep (Radio)" tab. Without a RadioModel the tab stays
+        // inert with its explanatory status line.
+        if (m_radioModel && m_antennaWindow->sweepPanel()) {
+            SwrSweepPanel::Backend backend;
+            backend.controller = m_radioModel->swrSweepController();
+            backend.guard      = &m_radioModel->bandPlan();
+            backend.txMode     = [rm = m_radioModel]() {
+                const SliceModel* s = rm->txBoundSlice();
+                return s ? s->dspMode() : DSPMode::USB;
+            };
+            backend.tunePowerForBand = [rm = m_radioModel](Band b) {
+                return rm->transmitModel().tunePowerForBand(b);
+            };
+            m_antennaWindow->sweepPanel()->setBackend(backend);
+        }
     }
     m_antennaWindow->show();
     m_antennaWindow->raise();

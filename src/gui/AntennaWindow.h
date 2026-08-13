@@ -54,6 +54,7 @@ class QTableWidget;
 namespace NereusSDR {
 
 class SwrCurveWidget;
+class SwrSweepPanel;
 
 class AntennaWindow : public QDialog {
     Q_OBJECT
@@ -64,6 +65,12 @@ public:
     // drop onto the main window, can feed the same path.
     void openFile(const QString& path);
     void setSweep(const Sweep& s);
+
+    /// The "Sweep (Radio)" tab (2026-08-13 radio-as-analyzer feature).
+    /// MainWindow injects the SwrSweepController backend through it;
+    /// without injection the tab stays inert and the file half of the
+    /// window keeps working with no radio at all.
+    SwrSweepPanel* sweepPanel() const { return m_sweepPanel; }
 
 protected:
     // Drop a .s1p straight onto the window. A sweep usually arrives as
@@ -180,6 +187,9 @@ private:
     // having it silently become 7.100 on the next measurement is the
     // kind of helpfulness that costs an afternoon.
     bool m_targetChosen{false};
+
+    // The radio-sweep tab (2026-08-13). Owned by the tab widget.
+    SwrSweepPanel* m_sweepPanel{nullptr};
 };
 
 } // namespace NereusSDR

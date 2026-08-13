@@ -18,6 +18,9 @@
 #include "core/antenna/Feedline.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/SwrCurveWidget.h"
+#include "gui/widgets/SwrSweepPanel.h"
+
+#include <QTabWidget>
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -155,7 +158,28 @@ void AntennaWindow::buildUi()
     setStyleSheet(QStringLiteral("QDialog { background: %1; }")
                       .arg(QLatin1String(Style::kAppBg)));
 
-    auto* col = new QVBoxLayout(this);
+    // 2026-08-13: the window grew a second life — the radio-as-antenna-
+    // analyzer sweep (design doc 2026-08-13-swr-sweep-analyzer-design).
+    // The existing file-based analyser becomes tab one, byte-for-byte
+    // unchanged below (`col` now targets the tab page instead of the
+    // dialog); the sweep panel is tab two and receives its backend from
+    // MainWindow via sweepPanel()->setBackend().
+    auto* outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    auto* tabs = new QTabWidget(this);
+    tabs->setStyleSheet(QStringLiteral(
+        "QTabWidget::pane { border: 0; }"
+        "QTabBar::tab { background: #14182a; color: #8090a0;"
+        "  padding: 5px 14px; }"
+        "QTabBar::tab:selected { background: #1a2138; color: #00b4d8; }"));
+    outer->addWidget(tabs);
+
+    auto* filePage = new QWidget(this);
+    tabs->addTab(filePage, QStringLiteral("Datei (VNA)"));
+    m_sweepPanel = new SwrSweepPanel(this);
+    tabs->addTab(m_sweepPanel, QStringLiteral("Sweep (Radio)"));
+
+    auto* col = new QVBoxLayout(filePage);
     col->setContentsMargins(12, 10, 12, 10);
     col->setSpacing(9);
 
