@@ -1168,6 +1168,14 @@ nereus_add_test(tst_master_mixer_cadence)
 # pushes; this pins it via the publish's PS-rate re-sync.
 nereus_add_test(tst_connected_pushes_ddc_assignment)
 
+# ── 2026-08-13 SWR sweep analyzer: the radio as its own antenna analyzer ──
+# Synthetic-dipole harness: telemetry in through ingestTelemetry, TX
+# frequency out through the injected fn — the sweep must find the planted
+# resonance, restore TUNE + TX freq on every exit path (complete, operator
+# abort, telemetry silence, open feedline), and refuse busy/invalid/
+# pseudo-band plans. Regional edge clipping pinned against Region 1 40 m.
+nereus_add_test(tst_swr_sweep_controller)
+
 # ── 2026-08-11 remote-bench mic reordering: MicReorderBuffer contract ─────
 # The socket-level sequence audit showed the routed/WLAN path REORDERS
 # ~0.2-0.5% of mic frames (LOST n == out-of-order n in nearly every

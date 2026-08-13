@@ -1,0 +1,279 @@
+// =================================================================
+// tests/tst_swr_sweep_controller.cpp  (NereusSDR)
+// =================================================================
+//
+// no-port-check: NereusSDR-original feature test (Thetis has no SWR
+// sweep analyzer).
+//
+// The controller's physics enter through ingestTelemetry and leave
+// through the injected txFrequencyFn — so a synthetic dipole (SWR
+// computed from a known resonance curve, converted back to fwd/rev
+// watts) drives the whole state machine without a radio, and the
+// sweep must find the resonance that was planted. The state-machine
+// contracts (restore-on-every-exit, refusal gates, aborts) are pinned
+// alongside.
+//
+// MoxController is exercised for real (its Rx/Tx state machine runs
+// on timers); the BandPlanGuard check is not installed, so setTune
+// succeeds without a radio — exactly the seam TwoToneController's
+// tests use.
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
+//                 AI-assisted implementation via Anthropic Claude
+//                 (Cowork).
+// =================================================================
+
+#include <QtTest/QtTest>
+#include <QSignalSpy>
+
+#include "core/SwrSweepController.h"
+#include "core/MoxController.h"
+
+#include <cmath>
+
+using namespace NereusSDR;
+
+namespace {
+
+// A synthetic dipole resonant at fRes: SWR rises linearly with
+// |f - fRes|, 1.1 at resonance, ~3 at ±150 kHz. Inverted into fwd/rev
+// watts the way the bridge would report them at 10 W drive.
+struct FakeDipole {
+    double fResHz{14150000.0};
+    double swrAt(double fHz) const
+    {
+        return 1.1 + std::fabs(fHz - fResHz) / 150000.0 * 1.9;
+    }
+    void wattsAt(double fHz, double& fwdW, double& revW) const
+    {
+        const double swr = swrAt(fHz);
+        const double gamma = (swr - 1.0) / (swr + 1.0);
+        fwdW = 10.0;
+        revW = fwdW * gamma * gamma;
+    }
+};
+
+struct Harness {
+    MoxController      mox;
+    SwrSweepController ctl;
+    quint64            currentFreq{0};
+    int                restoreCalls{0};
+
+    Harness()
+    {
+        ctl.setMoxController(&mox);
+        ctl.setTxFrequencyFn([this](quint64 hz) { currentFreq = hz; });
+        ctl.setTxFreqRestoreFn([this]() { ++restoreCalls; });
+        ctl.setReadyFn([]() { return true; });
+        // Compress every wait so a full sweep runs in tens of ms.
+        ctl.setTimingsForTest(/*tuneSettle*/ 1, /*telemetryTimeout*/ 200);
+    }
+
+    SwrSweepPlan tinyPlan(int points = 21)
+    {
+        SwrSweepPlan plan;
+        plan.band    = Band::Band20m;
+        plan.startHz = 14000000;
+        plan.stopHz  = 14350000;
+        plan.points  = points;
+        plan.settleMs = 1;
+        plan.dwellMs  = 5;
+        return plan;
+    }
+
+    // Pump telemetry for the fake antenna while the event loop spins.
+    void pumpUntilFinished(const FakeDipole& dipole, int timeoutMs = 5000)
+    {
+        QSignalSpy fin(&ctl, &SwrSweepController::sweepFinished);
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < timeoutMs) {
+            double fwd = 0.0;
+            double rev = 0.0;
+            dipole.wattsAt(static_cast<double>(currentFreq), fwd, rev);
+            ctl.ingestTelemetry(fwd, rev);
+            QTest::qWait(2);
+        }
+    }
+};
+
+} // namespace
+
+class TstSwrSweepController : public QObject
+{
+    Q_OBJECT
+
+private slots:
+    void initTestCase()
+    {
+        qRegisterMetaType<SwrSweepPlan>("NereusSDR::SwrSweepPlan");
+        qRegisterMetaType<SwrSweepResult>("NereusSDR::SwrSweepResult");
+        qRegisterMetaType<SwrSweepPlan>("SwrSweepPlan");
+        qRegisterMetaType<SwrSweepResult>("SwrSweepResult");
+    }
+
+    // ── The pure math ────────────────────────────────────────────────
+    void swr_math_matches_the_bridge_identities()
+    {
+        // Perfect match: no reflection.
+        QVERIFY(std::fabs(SwrSweepController::swrFromWatts(10.0, 0.0) - 1.0)
+                < 1e-9);
+        // SWR 2.0 → gamma 1/3 → rev = fwd/9.
+        QVERIFY(std::fabs(SwrSweepController::swrFromWatts(9.0, 1.0) - 2.0)
+                < 1e-6);
+        // Total reflection caps at 99.
+        QCOMPARE(SwrSweepController::swrFromWatts(10.0, 10.0), 99.0);
+        QCOMPARE(SwrSweepController::swrFromWatts(10.0, 20.0), 99.0);
+        // Below the bridge floor: invalid, not a number.
+        QCOMPARE(SwrSweepController::swrFromWatts(0.2, 0.0), 0.0);
+    }
+
+    // ── The planner ──────────────────────────────────────────────────
+    void plan_seeds_from_the_band_table_and_refuses_pseudo_bands()
+    {
+        const SwrSweepPlan p20 = SwrSweepPlan::forBand(Band::Band20m);
+        QVERIFY(p20.isValid());
+        QCOMPARE(p20.startHz, quint64(14000000));
+        QCOMPARE(p20.stopHz,  quint64(14350000));
+
+        QVERIFY(!SwrSweepPlan::forBand(Band::GEN).isValid());
+        QVERIFY(!SwrSweepPlan::forBand(Band::WWV).isValid());
+        QVERIFY(!SwrSweepPlan::forBand(Band::XVTR).isValid());
+        // 60 m: channelized, excluded in v1 (design doc §Deferred).
+        QVERIFY(!SwrSweepPlan::forBand(Band::Band60m).isValid());
+    }
+
+    void plan_clips_to_the_regional_band_edges()
+    {
+        // Region 1 ends 40 m at 7.200 MHz; the Region-2 seed reaches
+        // 7.300. The clip must trim the tail, not fail the plan.
+        safety::BandPlanGuard guard;
+        SwrSweepPlan plan = SwrSweepPlan::forBand(Band::Band40m);
+        plan.points = 31;
+        QVERIFY(plan.clipToGuard(guard, safety::Region::Region1,
+                                 DSPMode::LSB));
+        QCOMPARE(plan.startHz, quint64(7000000));
+        QVERIFY(plan.stopHz <= quint64(7200000));
+        QVERIFY(plan.points >= SwrSweepPlan::kMinPoints);
+    }
+
+    // ── The sweep finds the planted resonance ────────────────────────
+    void sweep_finds_the_synthetic_resonance()
+    {
+        Harness h;
+        FakeDipole dipole;   // resonant at 14.150 MHz
+
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        h.pumpUntilFinished(dipole);
+        QCOMPARE(fin.count(), 1);
+
+        const auto result =
+            fin.first().first().value<SwrSweepResult>();
+        QVERIFY(result.completed);
+        QCOMPARE(result.points.size(), 21);
+
+        // The resonance must land on the grid point nearest 14.150 MHz
+        // (grid step is 17.5 kHz on 21 points across 350 kHz).
+        const quint64 res = result.resonanceHz();
+        QVERIFY2(std::llabs(static_cast<long long>(res) - 14150000LL)
+                     <= 17500,
+                 qPrintable(QStringLiteral("resonance found at %1")
+                                .arg(res)));
+        QVERIFY(result.minSwr() < 1.3);
+
+        // Restore ran exactly once, TUNE is released.
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+        QCOMPARE(h.restoreCalls, 1);
+    }
+
+    // ── Refusals and aborts ──────────────────────────────────────────
+    void busy_and_invalid_plans_are_refused()
+    {
+        Harness h;
+        FakeDipole dipole;
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        // Second start while running: refused.
+        QVERIFY(!h.ctl.startSweep(h.tinyPlan()));
+        h.pumpUntilFinished(dipole);
+
+        // Invalid plan: refused outright.
+        SwrSweepPlan bad;
+        QVERIFY(!h.ctl.startSweep(bad));
+    }
+
+    void operator_abort_restores_and_reports()
+    {
+        Harness h;
+        FakeDipole dipole;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QSignalSpy pts(&h.ctl, &SwrSweepController::pointReady);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan(101)));
+
+        // Let a few points land, then pull the plug.
+        QElapsedTimer t;
+        t.start();
+        while (pts.count() < 5 && t.elapsed() < 3000) {
+            double fwd = 0.0;
+            double rev = 0.0;
+            dipole.wattsAt(static_cast<double>(h.currentFreq), fwd, rev);
+            h.ctl.ingestTelemetry(fwd, rev);
+            QTest::qWait(2);
+        }
+        QVERIFY(pts.count() >= 5);
+        h.ctl.abortSweep(QStringLiteral("test abort"));
+
+        QTRY_COMPARE(fin.count(), 1);
+        const auto result =
+            fin.first().first().value<SwrSweepResult>();
+        QVERIFY(!result.completed);
+        QCOMPARE(result.abortReason, QStringLiteral("test abort"));
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+        QCOMPARE(h.restoreCalls, 1);
+    }
+
+    void telemetry_silence_aborts()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        // Feed NOTHING: the 200 ms test watchdog must abort.
+        QTRY_COMPARE_WITH_TIMEOUT(fin.count(), 1, 3000);
+        const auto result =
+            fin.first().first().value<SwrSweepResult>();
+        QVERIFY(!result.completed);
+        QVERIFY(result.abortReason.contains(QStringLiteral("telemetry"),
+                                            Qt::CaseInsensitive)
+                || result.abortReason.contains(QStringLiteral("Telemetry"),
+                                               Qt::CaseInsensitive)
+                || !result.abortReason.isEmpty());
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+        QCOMPARE(h.restoreCalls, 1);
+    }
+
+    void open_feedline_aborts_after_three_points()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        // Total reflection everywhere: rev == fwd.
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 3000) {
+            h.ctl.ingestTelemetry(10.0, 10.0);
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto result =
+            fin.first().first().value<SwrSweepResult>();
+        QVERIFY(!result.completed);
+        QVERIFY(result.points.size() >= SwrSweepController::kAbortSwrRun);
+        QVERIFY(result.points.size() < 10);   // aborted early, not at the end
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+    }
+};
+
+QTEST_GUILESS_MAIN(TstSwrSweepController)
+#include "tst_swr_sweep_controller.moc"

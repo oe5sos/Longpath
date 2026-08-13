@@ -150,6 +150,21 @@ QString bandKeyName(Band b)
     return bandLabel(b);
 }
 
+bool bandRangeHz(Band b, double& lowHz, double& highHz)
+{
+    // Same IARU Region-2 table bandFromFrequency() consults; exposed
+    // for the SWR sweep planner (2026-08-13), which seeds its range
+    // here and then clips per-region via BandPlanGuard.
+    for (const auto& range : kHamBandRanges) {
+        if (range.band == b) {
+            lowHz  = range.lowHz;
+            highHz = range.highHz;
+            return true;
+        }
+    }
+    return false;
+}
+
 Band bandFromFrequency(double hz)
 {
     for (const double center : kWwvCenters) {

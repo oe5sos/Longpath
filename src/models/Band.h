@@ -159,6 +159,12 @@ QString bandKeyName(Band b);
 /// via direct setBand() if the auto-derived band is wrong.
 Band bandFromFrequency(double hz);
 
+/// The IARU Region-2 edges of a ham band from the same table
+/// bandFromFrequency() consults. Returns false for GEN / WWV / XVTR /
+/// SWL pseudo-bands. Added 2026-08-13 for the SWR sweep planner, which
+/// seeds its range here and clips per-region via BandPlanGuard.
+bool bandRangeHz(Band b, double& lowHz, double& highHz);
+
 /// Maps a 0-based `BandButtonItem` UI index to the corresponding Band.
 /// Button order: 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m,
 /// GEN, WWV, XVTR. Returns Band::GEN for out-of-range indices.
