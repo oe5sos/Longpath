@@ -405,12 +405,29 @@ void SwrSweepController::closePoint()
                 ? (m_accFwdRawPeak > m_baselineRaw + kMinRawRise)
                 : (pt.fwdW >= kMinFwdW);
 
-        // swrFromWatts still refuses below kMinFwdW on its own, which
-        // would undo the whole point on a QRP rig — so the ratio is
-        // computed here once the bridge has been shown to respond.
-        if (responded && pt.fwdW > 0.0) {
-            double r = std::clamp(revW, 0.0, pt.fwdW);
-            const double gamma = std::sqrt(r / pt.fwdW);
+        // ── The ratio, from counts rather than watts ──────────────────
+        //
+        // See setBridgeRatio() for why. In short: the scaled watts have
+        // a per-board offset already subtracted and clamped at zero,
+        // this radio has no pedestal for that offset to remove, and so
+        // every small REAL reverse reading was being deleted and turned
+        // into SWR exactly 1.00.
+        //
+        // Against the idle baseline instead, which this sweep measured
+        // for itself moments before keying.
+        if (responded) {
+            double gamma = 0.0;
+            const int fwdDelta = int(m_accFwdRawPeak) - int(m_baselineRaw);
+            const int revDelta = int(m_accRevRawPeak) - int(m_baselineRevRaw);
+            if (haveRaw && fwdDelta > 0) {
+                gamma = (double(std::max(0, revDelta)) / double(fwdDelta))
+                        * m_bridgeRatio;
+            } else if (pt.fwdW > 0.0) {
+                // No counts to work from — the tests, and anything that
+                // hands over watts alone.
+                gamma = std::sqrt(std::clamp(revW, 0.0, pt.fwdW) / pt.fwdW);
+            }
+            gamma = std::clamp(gamma, 0.0, 0.999);
             pt.swr = (gamma >= 0.999) ? 99.0
                                       : std::min(99.0,
                                                  (1.0 + gamma) / (1.0 - gamma));

@@ -1068,6 +1068,31 @@ RadioModel::RadioModel(QObject* parent)
     // button, a factor of fifty in power, and the cause of a full day
     // of "the coupler reports nothing".
     m_swrSweep->setTuneFn([this](bool on) { setTune(on); });
+    // sqrt(bridge_fwd / bridge_rev) for the connected board, probed
+    // through the two scaling functions rather than duplicating their
+    // tables: feed both the same large raw count and the watts come
+    // back in inverse proportion to their bridge constants.
+    //
+    //   scaleFwd(x) = v²/b_fwd      scaleRev(x) = v²/b_rev
+    //   scaleRev/scaleFwd = b_fwd/b_rev   →   sqrt of that is the ratio
+    //
+    // REV over FWD, not the other way round. Written the wrong way up
+    // first and caught by working an Anvelina through it by hand:
+    // sqrt(0.12/0.15) = 0.894 is wanted, the reciprocal gives 1.118,
+    // and a 25 % error in |Γ| is most of the difference between an SWR
+    // of 2.5 and one of 3.3.
+    //
+    // A large probe count so the two differing adc_cal_offsets (32 and
+    // 28 here) are a rounding error rather than a term.
+    {
+        const HPSDRModel hw = m_hardwareProfile.model;
+        constexpr quint16 kProbe = 4000;
+        const double fw = NereusSDR::scaleFwdPowerWatts(hw, kProbe);
+        const double rw = scaleRevPowerWatts(kProbe, hw);
+        if (fw > 0.0 && rw > 0.0) {
+            m_swrSweep->setBridgeRatio(std::sqrt(rw / fw));
+        }
+    }
     m_swrSweep->setTxFrequencyFn([this](quint64 hz) {
         if (!m_connection) {
             return;

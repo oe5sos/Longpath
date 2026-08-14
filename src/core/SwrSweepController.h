@@ -205,6 +205,37 @@ public:
     /// class is deliberately testable without one. Defaults to the raw
     /// MoxController path so existing callers and tests keep working.
     void setTuneFn(std::function<void(bool)> fn) { m_tuneFn = std::move(fn); }
+
+    /// sqrt(bridge_fwd / bridge_rev) for the connected board.
+    ///
+    /// ── Why SWR is computed from raw counts here ─────────────────────
+    ///
+    /// The scaled watts arrive with a per-board `adc_cal_offset`
+    /// already subtracted — 32 counts forward and 28 reverse on an
+    /// Anvelina — and clamped at zero. That offset is meant to remove a
+    /// pedestal the ADC sits at with no drive.
+    ///
+    /// This radio has no pedestal: measured on the bench, idle reads
+    /// VOR 0 · RÜCK 0. So the subtraction does not remove a pedestal,
+    /// it removes SIGNAL — and on the reverse channel, where a real
+    /// reading may be a few dozen counts, it removes all of it. Every
+    /// reverse count at or below 28 becomes exactly zero watts, which
+    /// becomes exactly SWR 1.00.
+    ///
+    /// That is why an 80 m sweep drew 1.00 across the bottom of the
+    /// band where the operator's VNA says 2.5: not a curve, a floor.
+    ///
+    /// So the ratio is taken from the counts, against the idle baseline
+    /// this sweep measured for itself, and only the two bridge
+    /// constants are needed:
+    ///
+    ///     |Γ| = (revΔ / fwdΔ) · sqrt(bridge_fwd / bridge_rev)
+    ///
+    /// Everything else — the reference voltage, the 4095 — divides out.
+    /// Default 1.0 covers the boards whose two bridges match and keeps
+    /// every existing caller working.
+    void setBridgeRatio(double sqrtFwdOverRev)
+    { if (sqrtFwdOverRev > 0.0) { m_bridgeRatio = sqrtFwdOverRev; } }
     /// Pushes one TX frequency to the wire (RadioModel marshals to the
     /// connection thread). Required.
     void setTxFrequencyFn(std::function<void(quint64)> fn)
@@ -384,6 +415,7 @@ private:
 
     MoxController* m_mox{nullptr};
     std::function<void(bool)> m_tuneFn;
+    double m_bridgeRatio{1.0};
     /// Key or release through the injected path, falling back to the
     /// bare MoxController when nothing was injected.
     void keyTune(bool on);

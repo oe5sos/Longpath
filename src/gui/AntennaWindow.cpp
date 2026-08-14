@@ -872,9 +872,27 @@ void AntennaWindow::setSweep(const Sweep& s)
     if (res.found) {
         m_session.record(m_lengthBox->value(), res.freqHz, s.source);
     }
-    // A newly loaded sweep may be a different band, so the defaulted
-    // target has to be recomputed. A target the operator typed is left
-    // alone — see m_targetChosen.
+    // ── A target outside the new sweep is not a target ───────────────
+    //
+    // The defaulted one was already recomputed. The one the operator
+    // typed was left alone, on the reasoning that a choice should
+    // survive — and that is right until the choice stops making sense.
+    //
+    // Bench, 2026-08-14: a 20 m sweep left the target at 14.175, then
+    // an 80 m sweep came in. The window shaded and labelled 20 m over a
+    // 3.5–4.0 MHz curve, and the three tiles read "not swept" while the
+    // usable span collapsed to 3 kHz. Everything on screen described a
+    // band that had not been measured.
+    //
+    // A target the sweep does not cover cannot be honoured, so it is
+    // dropped back to the band middle rather than silently misdescribing
+    // the measurement.
+    if (m_targetChosen && !m_sweep.isEmpty()) {
+        const double t = m_targetBox->value() * 1e6;
+        if (t > 0.0 && (t < m_sweep.startHz() || t > m_sweep.stopHz())) {
+            m_targetChosen = false;
+        }
+    }
     if (!m_targetChosen) { m_targetBox->setValue(0.0); }
     refresh();
 }
