@@ -16,7 +16,8 @@
 //                          (mi0bot console.cs:2098-2108 [v2.10.3.13-beta2]
 //                           "MI0BOT: Changes for HL2 only having a 16 step
 //                           output attenuator")
-//   - Tune Power slider:  Maximum 99, single/page step 3
+//   - Tune Power slider:  Maximum kTuneSliderMaxWatts (station
+//     ceiling, 2026-08-14 — was 99 upstream), single/page step 3
 //                          (33 sub-steps for fine TUNE drive control)
 //   - RF Power label:     -X.X dB via mi0bot formula
 //                            (round(drv/6.0)/2) - 7.5
@@ -68,13 +69,18 @@ private slots:
         QCOMPARE(ta.rfPowerSlider()->pageStep(),    6);
     }
 
-    // ── 2. HL2: Tune Power slider rescales to 0..99 step 3 ─────────────
+    // ── 2. HL2: Tune Power slider rescales, step 3 ─────────────────────
+    //
+    // The maximum is no longer the HL2 99 but the station ceiling —
+    // OE5SOS works QRP and asked for five watts. The STEP is what this
+    // test is really about and is unchanged.
     void hl2_tuneSlider_rescales()
     {
         NereusSDR::RadioModel rm;
         NereusSDR::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
-        QCOMPARE(ta.tunePowerSlider()->maximum(),    99);
+        QCOMPARE(ta.tunePowerSlider()->maximum(),
+                 NereusSDR::kTuneSliderMaxWatts);
         QCOMPARE(ta.tunePowerSlider()->singleStep(),  3);
     }
 
@@ -87,7 +93,8 @@ private slots:
         ta.rescalePowerSlidersForModel(HPSDRModel::ANAN100);
         QCOMPARE(ta.rfPowerSlider()->maximum(),     100);
         QCOMPARE(ta.rfPowerSlider()->singleStep(),    1);
-        QCOMPARE(ta.tunePowerSlider()->maximum(),   100);
+        QCOMPARE(ta.tunePowerSlider()->maximum(),
+                 NereusSDR::kTuneSliderMaxWatts);
     }
 
     // ── 4. HL2 RF Power label formula at slider=60 ─────────────────────
