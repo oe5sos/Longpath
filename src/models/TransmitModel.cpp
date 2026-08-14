@@ -1229,41 +1229,30 @@ void TransmitModel::load()
         m_tunePowerByBand[static_cast<std::size_t>(i)] = std::clamp(v, 0, hi);
     }
 
-    // ── One-time correction of the old 50 W default ──────────────────
+    // ── Why there is no one-time correction here ─────────────────────
     //
-    // Lowering kDefaultTunePowerW on its own would not have reached
-    // anybody, and I nearly shipped it that way. save() writes ALL
-    // fourteen bands unconditionally, so every band already has a value
-    // on disk whether the operator ever touched it or not — and for the
-    // untouched ones that value is the ported fifty. load() would have
-    // read them straight back and the new default would never have been
-    // consulted.
+    // I wrote one, and a test caught it destroying data.
     //
-    // Exactly the trap the SWR limit fell into this morning: a spin box
-    // had persisted 2.0 before the default ever changed. Same remedy,
-    // and it is the second time today, which is the point at which a
-    // pattern deserves writing down rather than rediscovering.
+    // The reasoning was the same as this morning's SWR limit: lowering
+    // kDefaultTunePowerW cannot reach anybody, because save() writes all
+    // fourteen bands unconditionally and every band already has a value
+    // on disk. So I added a pass that moved any band sitting at exactly
+    // the old 50 down to the new default, guarded by its own flag.
     //
-    // So: bands sitting at exactly the old default move to the new one,
-    // once, guarded by its own flag rather than by the value. A 50 the
-    // operator chooses AFTER this has run stays at 50 — the flag says
-    // "we have had our one go at this", which is the only honest basis
-    // for changing a number somebody may have meant.
+    // tst_transmit_model_tune_power::persistenceRoundTripAllBands stores
+    // i * 5 % 101 in band i. Band ten gets 50. The migration rewrote it
+    // to 1 and the round trip failed — which is the test doing exactly
+    // its job: a value the operator saved must come back.
     //
-    // The direction is recoverable either way: too little tune power
-    // produces a message naming the ADC counts, and the slider is right
-    // there.
-    const QString fixedKey =
-        QStringLiteral("hardware/%1/tunePowerDefaultFixed").arg(m_mac);
-    if (s.value(fixedKey, QStringLiteral("False")).toString()
-        != QStringLiteral("True")) {
-        constexpr int kOldDefaultW = 50;
-        for (int i = 0; i < kBandCount; ++i) {
-            auto& w = m_tunePowerByBand[static_cast<std::size_t>(i)];
-            if (w == kOldDefaultW) { w = kDefaultTunePowerW; }
-        }
-        s.setValue(fixedKey, QStringLiteral("True"));
-    }
+    // And the flag does not save it. The flag can tell "have we run
+    // this before"; it cannot tell "was this 50 chosen or inherited",
+    // and on the first load after an upgrade those are indistinguishable.
+    // Rewriting a stored number on a guess is not something to do to
+    // somebody else's settings, however good the guess.
+    //
+    // So the new default governs fresh bands only, and existing values
+    // stand. An operator who wants the old fifties gone sets them — the
+    // slider is on the same row as the reading.
 }
 
 void TransmitModel::save()
