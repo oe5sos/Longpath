@@ -99,6 +99,34 @@ static bool bandIsGrey(int bandIdx)
     return b == Band::GEN || b == Band::WWV;
 }
 
+// ── "Stored, not yet acted on" ───────────────────────────────────────────────
+//
+// A one-line notice for controls whose settings key has no reader.
+//
+// Found by a 2026-08-14 audit that listed every AppSettings key written
+// in src/ and never read back. Seven of them are on this page. The same
+// audit found the band-plan region, where two readers and no writer
+// meant an Austrian station was clipped against the US band plan and
+// transmitted 200 kHz out of band — so this is not a theoretical class
+// of fault.
+//
+// Issue #174 was the same thing in this very file and was fixed by
+// deleting the control, leaving "an italic hint pointer in its place to
+// preserve discoverability". These are planned work rather than
+// leftovers, so they stay and say what they are instead.
+static QLabel* notYetWired(QWidget* parent)
+{
+    auto* l = new QLabel(
+        QObject::tr("Wird gespeichert, aber noch nicht an das Gerät "
+                    "gesendet — diese Einstellung hat derzeit keine "
+                    "Wirkung."), parent);
+    l->setWordWrap(true);
+    l->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-style: italic; font-size: 11px; }")
+            .arg(QLatin1String(Style::kAmberText)));
+    return l;
+}
+
 // ── Constructor ──────────────────────────────────────────────────────────────
 
 OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
@@ -125,7 +153,9 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
         auto* row = new QHBoxLayout();
 
         m_pennyExtCtrl = new QCheckBox(tr("Penny Ext Control enabled"), this);
-        m_pennyExtCtrl->setToolTip(tr("Enable the Penelope/Hermes open-collector external control outputs"));
+        m_pennyExtCtrl->setToolTip(tr("Enable the Penelope/Hermes open-collector external control outputs"
+                                      "\n\nHinweis: wird gespeichert, aber noch nicht an das "
+                                      "Gerät gesendet."));
         row->addWidget(m_pennyExtCtrl);
 
         auto* n2adrHint = new QLabel(
@@ -139,7 +169,9 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
         row->addWidget(n2adrHint);
 
         m_allowHotSwitching = new QCheckBox(tr("Allow hot switching"), this);
-        m_allowHotSwitching->setToolTip(tr("Allow OC output lines to switch while transmitting"));
+        m_allowHotSwitching->setToolTip(tr("Allow OC output lines to switch while transmitting"
+                                           "\n\nHinweis: wird gespeichert, aber noch nicht an das "
+                                           "Gerät gesendet."));
         row->addWidget(m_allowHotSwitching);
 
         row->addStretch();
@@ -242,6 +274,23 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
             auto* bcdGroup = new QGroupBox(tr("USB BCD output"), this);
             auto* bcdLayout = new QVBoxLayout(bcdGroup);
 
+            // ── Stored, not yet acted on ────────────────────────────────
+            //
+            // 2026-08-14 audit: every key this group writes —
+            // hardware/oc/usbBcd/{enabled,format,invert} — has exactly
+            // one occurrence in the tree, the setValue below. Nothing
+            // reads them, so nothing reaches the radio.
+            //
+            // That is the same defect as issue #174 in this very file:
+            // a checkbox writing to a key with no consumer, and users
+            // "toggling the dead checkbox and concluding N2ADR was
+            // broken". #174 was fixed by removing the control. These
+            // are planned work rather than a leftover, so they stay —
+            // but a control that silently does nothing is worse here
+            // than elsewhere, because BCD band data drives an external
+            // amplifier. Say so on the face of it.
+            bcdLayout->addWidget(notYetWired(bcdGroup));
+
             m_usbBcdEnabled = new QCheckBox(tr("Enable BCD"), bcdGroup);
             bcdLayout->addWidget(m_usbBcdEnabled);
 
@@ -287,6 +336,12 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
         {
             auto* paGroup = new QGroupBox(tr("External PA control"), this);
             auto* paLayout = new QVBoxLayout(paGroup);
+
+            // hardware/oc/extPa/{model,biasDelayMs}: written here, read
+            // nowhere. A bias delay that is stored and never applied is
+            // the worst one on this page — somebody could set 50 ms,
+            // believe the amplifier is being sequenced, and key it cold.
+            paLayout->addWidget(notYetWired(paGroup));
 
             auto* modelRow = new QHBoxLayout();
             modelRow->addWidget(new QLabel(tr("PA model:"), paGroup));
