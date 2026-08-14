@@ -261,14 +261,20 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             m_status->setText(
                 result.maxFwdW < SwrSweepController::kSilentBridgeW
                 ? QStringLiteral(
-                      "Kein einziger Punkt gemessen. Höchstens %1 W, "
-                      "roher ADC-Höchstwert %2 von 4095 — das ist der "
-                      "Wert, den das Gerät selbst gesendet hat. "
-                      "Wiederhole den Sweep mit deutlich mehr Leistung: "
-                      "steigt die Rohzahl nicht mit, entsteht keine HF "
-                      "oder der Koppler meldet nichts, und weder "
-                      "Skalierung noch Sweep sind daran schuld.")
-                      .arg(result.maxFwdW, 0, 'f', 2)
+                      "Nichts gemessen — roher ADC-Höchstwert %1 von "
+                      "4095.\n\n"
+                      "Der Richtkoppler dieses Geräts ist ein "
+                      "Dämpfungsglied vor einer Diode, und eine Diode "
+                      "leitet erst ab einer gewissen Spannung. "
+                      "Darunter zeigt sie nicht wenig, sondern nichts. "
+                      "Mehr Leistung ist der einzige Hebel, den dieser "
+                      "Messweg hat.\n\n"
+                      "Wenn du bei kleiner Leistung messen willst, "
+                      "nimm den Reiter „Datei (VNA)“: ein NanoVNA "
+                      "misst mit Mikrowatt, weil er einen Empfänger "
+                      "benutzt statt einer Diode, und das Fenster "
+                      "sagt dir daraus, wo die Antenne resonant ist "
+                      "und wie viel Draht fehlt.")
                       .arg(result.maxFwdRaw)
                 : QStringLiteral(
                       "Kein einziger Punkt gemessen. Der Richtkoppler "
@@ -325,23 +331,27 @@ void SwrSweepPanel::startClicked()
     // to know that BEFORE it transmitted, and asked instead of checking.
     //
     // The tune power is on screen two centimetres away. Read it.
+    // ── No longer a refusal ──────────────────────────────────────────
+    //
+    // This blocked the sweep below kMinUsefulTuneW, and that figure was
+    // MINE — I picked five watts as a plausible-sounding floor for a
+    // coupler I have never measured. It then stood between the operator
+    // and his own transmitter for half a morning while he was telling
+    // me, correctly, that he wants to work at low power.
+    //
+    // A guard built on a number I invented is not a safety feature, it
+    // is an opinion with a lock on it. The controller's dead-run abort
+    // is the real protection: it is driven by what the bridge actually
+    // reports and gives up after five points either way. So this warns
+    // and gets out of the way.
     if (m_backend.tuneDrive) {
         const TuneDrive drive = m_backend.tuneDrive(band);
         if (drive.watts < SwrSweepController::kMinUsefulTuneW) {
-            // Names the control, not just the number. "Tune-Leistung
-            // steht auf 1 W" sent the operator to the Tune Pwr slider
-            // twice while TUNE was reading the RF Power one.
             m_status->setText(QStringLiteral(
-                "TUNE würde mit %1 W senden — der Wert kommt aus dem "
-                "%2. Damit misst der Richtkoppler nichts (er braucht "
-                "mindestens %3 W Vorlauf, brauchbar ab etwa %4 W). "
-                "Stell GENAU diesen Regler höher und starte neu. Es "
-                "wurde nichts gesendet.")
-                    .arg(drive.watts)
-                    .arg(drive.sourceLabel)
-                    .arg(SwrSweepController::kMinFwdW, 0, 'f', 1)
-                    .arg(SwrSweepController::kMinUsefulTuneW));
-            return;
+                "Läuft mit %1 W aus dem %2. Wenig für einen "
+                "Richtkoppler — wenn nichts herauskommt, steht der "
+                "Grund gleich hier.")
+                    .arg(drive.watts).arg(drive.sourceLabel));
         }
     }
 
