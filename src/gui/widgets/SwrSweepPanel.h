@@ -29,6 +29,7 @@ class QTimer;
 #include "core/antenna/Touchstone.h"
 
 class QComboBox;
+class QDoubleSpinBox;
 class QSpinBox;
 class QPushButton;
 class QProgressBar;
@@ -188,6 +189,26 @@ private:
     Backend m_backend;
 
     QComboBox*    m_bandBox{nullptr};
+
+    // ── Band, or a range across several ──────────────────────────────
+    //
+    // "Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich auch
+    //  eingeben, von welcher Startfrequenz bis welcher Endfrequenz."
+    //
+    // Band stays the default and the band combo stays where it was.
+    // Choosing "Bereich" swaps it for two frequency boxes.
+    //
+    // The sweep still only keys inside the allocated segments, so a
+    // range across the whole of HF measures one curve per band with
+    // holes between them — see SwrSweepPlan::forRange.
+    QComboBox*       m_modeBox{nullptr};
+    QDoubleSpinBox*  m_fromBox{nullptr};
+    QDoubleSpinBox*  m_toBox{nullptr};
+    QLabel*          m_rangeDash{nullptr};
+
+    bool rangeMode() const;
+    void applyModeVisibility();
+
     QSpinBox*     m_pointsBox{nullptr};
     QLabel*       m_powerLabel{nullptr};
     QLabel*       m_couplerLabel{nullptr};
