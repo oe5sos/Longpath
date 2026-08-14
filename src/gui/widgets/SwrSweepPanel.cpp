@@ -173,7 +173,9 @@ void SwrSweepPanel::setBackend(const Backend& backend)
 
     m_status->setText(QStringLiteral(
         "Bereit. Der Sweep sendet mit Tune-Leistung innerhalb der "
-        "Bandgrenzen; nicht am VFO drehen, solange er läuft."));
+        "Bandgrenzen; nicht am VFO drehen, solange er läuft. Die "
+        "Tune-Leistung muss hoch genug sein, dass der Richtkoppler "
+        "etwas anzeigt — siehe die Zahl links."));
 
     connect(m_startBtn, &QPushButton::clicked,
             this, &SwrSweepPanel::startClicked);
@@ -209,20 +211,39 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             [this](const SwrSweepResult& result) {
         m_startBtn->setEnabled(true);
         m_stopBtn->setEnabled(false);
-        if (result.points.isEmpty()) {
+
+        // points.size() counts the ATTEMPTS. A sweep where the bridge
+        // read nothing comes back with fifty-one of them and not one
+        // measurement, and the old test kept that as a trace: an entry
+        // in the list, a tick beside it, and an empty chart. Count the
+        // measurements.
+        if (result.validPoints() == 0) {
             m_chart->dropLiveTrace();
         } else {
             m_chart->finishLiveTrace();
-            refreshTraceList();
         }
-        if (result.completed) {
+        refreshTraceList();
+
+        if (result.completed && result.validPoints() > 0) {
             const quint64 res = result.resonanceHz();
             m_status->setText(res > 0
-                ? QStringLiteral("Fertig. Resonanz bei %1 MHz, SWR %2.")
+                ? QStringLiteral("Fertig. Resonanz bei %1 MHz, SWR %2 "
+                                 "(%3 von %4 Punkten gemessen).")
                       .arg(static_cast<double>(res) / 1e6, 0, 'f', 3)
                       .arg(result.minSwr(), 0, 'f', 2)
-                : QStringLiteral("Fertig — keine gültigen Messpunkte "
-                                 "(Vorlauf­leistung zu niedrig?)."));
+                      .arg(result.validPoints())
+                      .arg(result.points.size())
+                : QStringLiteral("Fertig, aber ohne verwertbares Minimum."));
+        } else if (result.completed) {
+            // Completed and measured nothing. Say the watts — "zu
+            // niedrig?" was a guess, and the numbers were there all
+            // along.
+            m_status->setText(QStringLiteral(
+                "Kein einziger Punkt gemessen. Der Richtkoppler meldete "
+                "höchstens %1 W Vorlauf; ab %2 W ist die Anzeige eine "
+                "Messung. Tune-Leistung höher stellen.")
+                    .arg(result.maxFwdW, 0, 'f', 2)
+                    .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
         } else {
             m_status->setText(QStringLiteral("Abgebrochen: %1")
                                   .arg(result.abortReason));
@@ -262,6 +283,31 @@ void SwrSweepPanel::startClicked()
         return;
     }
 
+    // ── Refuse before keying, not after ──────────────────────────────
+    //
+    // 2026-08-14 at the bench: Tune Pwr sat at 1 W, the sweep keyed all
+    // fifty-one points, and the verdict arrived seventeen seconds later
+    // as "keine gültigen Messpunkte (Vorlaufleistung zu niedrig?)". The
+    // question mark is the tell — the panel had every number it needed
+    // to know that BEFORE it transmitted, and asked instead of checking.
+    //
+    // The tune power is on screen two centimetres away. Read it.
+    if (m_backend.tunePowerForBand) {
+        const int watts = m_backend.tunePowerForBand(band);
+        if (watts < SwrSweepController::kMinUsefulTuneW) {
+            m_status->setText(QStringLiteral(
+                "Tune-Leistung steht auf %1 W — damit misst der "
+                "Richtkoppler nichts (er braucht mindestens %2 W "
+                "Vorlauf, brauchbar ab etwa %3 W). Stell die "
+                "Tune-Leistung im TX-Feld höher und starte neu. Es "
+                "wurde nichts gesendet.")
+                    .arg(watts)
+                    .arg(SwrSweepController::kMinFwdW, 0, 'f', 1)
+                    .arg(SwrSweepController::kMinUsefulTuneW));
+            return;
+        }
+    }
+
     m_backend.controller->startSweep(plan);
 }
 
@@ -274,9 +320,33 @@ void SwrSweepPanel::refreshTunePowerLabel()
     const Band band =
         static_cast<Band>(m_bandBox->currentData().toInt());
     const int watts = m_backend.tunePowerForBand(band);
+
+    // Two ways to have it wrong and only one of them was shown. Too
+    // much power is a warning; too little is the reason the sweep
+    // measures nothing, and it stayed invisible until after the radio
+    // had transmitted fifty-one times.
+    QString note;
+    QString colour = QString::fromLatin1(Style::kTextPrimary);
+    if (watts < SwrSweepController::kMinUsefulTuneW) {
+        note   = QStringLiteral("  ⚠ zu wenig zum Messen — mindestens %1 W")
+                     .arg(SwrSweepController::kMinUsefulTuneW);
+        colour = QString::fromLatin1(Style::kAmberText);
+    } else if (watts > 10) {
+        note   = QStringLiteral("  ⚠ >10 W");
+        colour = QString::fromLatin1(Style::kAmberText);
+    }
+    m_powerLabel->setStyleSheet(QStringLiteral("color:%1;").arg(colour));
     m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W%2")
-        .arg(watts)
-        .arg(watts > 10 ? QStringLiteral("  ⚠ >10 W") : QString()));
+                              .arg(watts).arg(note));
+
+    m_powerLabel->setToolTip(QStringLiteral(
+        "Die Leistung, mit der der Sweep sendet — dieselbe, die TUNE "
+        "benutzt. Der Richtkoppler ist ein Dämpfungsglied vor einer "
+        "Diode und hat unten eine Schwelle: unter %1 W Vorlauf ist die "
+        "Anzeige Rauschen und der Punkt wird verworfen. Mehr als nötig "
+        "bringt nichts — SWR ist ein Verhältnis und ändert sich mit der "
+        "Leistung nicht.")
+            .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
 }
 
 void SwrSweepPanel::refreshTraceList()

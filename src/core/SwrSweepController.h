@@ -67,9 +67,20 @@ struct SwrSweepResult {
     bool                    completed{false};   // false = aborted
     QString                 abortReason;        // empty when completed
 
+    /// The highest per-point forward power the bridge reported during
+    /// the sweep. Carried so a sweep that measured nothing can say WHY
+    /// in watts instead of guessing out loud — see the note on
+    /// kMinFwdW.
+    double maxFwdW{0.0};
+
     /// Frequency of the minimum valid SWR, 0 when no valid point.
     quint64 resonanceHz() const;
     double  minSwr() const;
+
+    /// How many points carry a real reading. `points.size()` counts the
+    /// attempts; this counts the measurements, and the difference is
+    /// the whole of what went wrong on 2026-08-14.
+    int validPoints() const;
 };
 
 /// What to sweep. Build via forBand() and clip via clipToGuard().
@@ -153,6 +164,32 @@ public:
     /// measurement; the point is recorded as invalid. NereusSDR-native
     /// threshold — see design doc §Safety.
     static constexpr double kMinFwdW = 0.5;
+
+    /// The lowest tune power worth keying for.
+    ///
+    /// ── Why this number exists ───────────────────────────────────────
+    ///
+    /// 2026-08-14, OE5SOS's ANAN with Tune Pwr at 1 W: the sweep ran to
+    /// completion, transmitted at all fifty-one points, and reported
+    /// "no valid measurements (forward power too low?)". Every point
+    /// had been thrown away by kMinFwdW, and the operator found out
+    /// after seventeen seconds of pointless transmission — from a
+    /// sentence ending in a question mark.
+    ///
+    /// A directional coupler is a fixed attenuator into a diode
+    /// detector. It has a floor, and 1 W is under it. This is the same
+    /// fact stated where it can be checked BEFORE anything is keyed.
+    /// Five watts is the practical figure for an ANAN's bridge with
+    /// room above the 0.5 W floor for the reflected side to mean
+    /// something too.
+    static constexpr int kMinUsefulTuneW = 5;
+
+    /// Consecutive points with no usable reading before giving up. The
+    /// mirror of kAbortSwrRun: that one catches an open feedline, this
+    /// one catches a bridge that is not reading at all. Without it a
+    /// sweep with a dead bridge transmits the full plan and reports
+    /// failure at the end.
+    static constexpr int kAbortDeadRun = 5;
     /// Three consecutive points at or above this SWR abort the sweep:
     /// that is an open feedline or no antenna, not a bad antenna.
     static constexpr double kAbortSwr = 25.0;
@@ -197,6 +234,7 @@ private:
     SwrSweepResult m_result;
     int            m_index{0};
     int            m_highSwrRun{0};
+    int            m_deadRun{0};
 
     // Per-point accumulation while Measuring.
     double m_accFwd{0.0};

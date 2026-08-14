@@ -273,6 +273,82 @@ private slots:
         QVERIFY(result.points.size() < 10);   // aborted early, not at the end
         QTRY_COMPARE(h.mox.state(), MoxState::Rx);
     }
+
+    // ── The bench, 2026-08-14 ────────────────────────────────────────
+    //
+    // Tune Pwr sat at 1 W. The sweep keyed all fifty-one points, the
+    // bridge never rose above its floor, every point was discarded, and
+    // the verdict — "no valid measurements, forward power too low?" —
+    // arrived seventeen seconds later with a question mark. Seventeen
+    // seconds of transmitting to learn nothing, and then a guess.
+    //
+    // The mirror of the open-feedline guard: stop when the bridge is
+    // telling us nothing, and say it in watts.
+    void a_bridge_that_reads_nothing_stops_the_sweep_early()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan(/*points*/ 21)));
+
+        // Under the floor at every point — 1 W of tune power into an
+        // ANAN's coupler, near enough.
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 3000) {
+            h.ctl.ingestTelemetry(0.2, 0.02);
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+
+        QVERIFY(!result.completed);
+        QCOMPARE(result.validPoints(), 0);
+        QVERIFY2(result.points.size() >= SwrSweepController::kAbortDeadRun,
+                 "gave up before it had grounds to");
+        QVERIFY2(result.points.size() < 21,
+                 "transmitted the whole plan before noticing it was "
+                 "measuring nothing");
+
+        // The reason has to carry the number. "Too low" is not
+        // actionable; "0.20 W measured, 0.5 W needed" is.
+        QVERIFY2(result.abortReason.contains(QStringLiteral("0.20")),
+                 qPrintable(result.abortReason));
+        QVERIFY(result.maxFwdW > 0.0 && result.maxFwdW < 0.5);
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+    }
+
+    // points.size() counts attempts, validPoints() counts measurements.
+    // The panel used the first to decide whether to keep a trace, so a
+    // sweep that measured nothing still produced a named entry with a
+    // tick beside it and an empty chart.
+    void a_good_sweep_reports_every_point_as_valid()
+    {
+        Harness h;
+        FakeDipole dipole;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        h.pumpUntilFinished(dipole);
+
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+        QVERIFY(result.completed);
+        QCOMPARE(result.validPoints(), int(result.points.size()));
+        QVERIFY2(result.maxFwdW >= SwrSweepController::kMinFwdW,
+                 "a sweep that measured cleanly reported no forward "
+                 "power");
+    }
+
+    // The floor is a fact about the bridge; the tune-power minimum is
+    // that fact expressed where it can be checked before keying. If one
+    // ever drops below the other the guard stops guarding.
+    void the_tune_power_minimum_leaves_room_above_the_bridge_floor()
+    {
+        QVERIFY2(double(SwrSweepController::kMinUsefulTuneW)
+                     > SwrSweepController::kMinFwdW * 2.0,
+                 "the minimum tune power must leave headroom over the "
+                 "bridge floor, or the pre-flight check passes sweeps "
+                 "that cannot measure");
+    }
 };
 
 QTEST_GUILESS_MAIN(TstSwrSweepController)

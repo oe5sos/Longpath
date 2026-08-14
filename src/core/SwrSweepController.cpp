@@ -18,6 +18,8 @@
 #include "core/LogCategories.h"
 
 #include <QDateTime>
+
+#include <algorithm>
 #include <cmath>
 
 namespace NereusSDR {
@@ -48,6 +50,15 @@ double SwrSweepResult::minSwr() const
         }
     }
     return best;
+}
+
+int SwrSweepResult::validPoints() const
+{
+    int n = 0;
+    for (const SwrSweepPoint& p : points) {
+        if (p.swr > 0.0) { ++n; }
+    }
+    return n;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +236,7 @@ bool SwrSweepController::startSweep(const SwrSweepPlan& plan)
     }
     m_index = 0;
     m_highSwrRun = 0;
+    m_deadRun = 0;
 
     // Key the carrier through the fully-gated TUNE path. Every
     // existing safety check (band plan, CW block, TX inhibit) runs
@@ -304,6 +316,7 @@ void SwrSweepController::closePoint()
         pt.swr = swrFromWatts(pt.fwdW, revW);
     }
     m_result.points.append(pt);
+    m_result.maxFwdW = std::max(m_result.maxFwdW, pt.fwdW);
     emit pointReady(m_index, pt.freqHz, pt.swr, pt.fwdW);
     emit progressChanged(m_index + 1, m_plan.points);
 
@@ -318,6 +331,33 @@ void SwrSweepController::closePoint()
         }
     } else {
         m_highSwrRun = 0;
+    }
+
+    // ── Nothing is being measured ────────────────────────────────────
+    //
+    // The mirror of the guard above. A run of points with no usable
+    // forward reading means the bridge is not telling us anything, and
+    // carrying on means transmitting another forty-odd times to learn
+    // the same nothing. 2026-08-14 that is exactly what happened: the
+    // full plan was keyed at 1 W tune power and the verdict — "no valid
+    // measurements, forward power too low?" — arrived at the end, with
+    // a question mark.
+    //
+    // The reason names the watts, because "too low" is not actionable
+    // and "0.2 W measured, 0.5 W needed" is.
+    if (pt.swr <= 0.0) {
+        if (++m_deadRun >= kAbortDeadRun) {
+            finish(false, QStringLiteral(
+                "No usable reading on %1 points in a row — the bridge "
+                "reported at most %2 W forward and %3 W is the floor. "
+                "Raise the tune power.")
+                    .arg(kAbortDeadRun)
+                    .arg(m_result.maxFwdW, 0, 'f', 2)
+                    .arg(kMinFwdW, 0, 'f', 1));
+            return;
+        }
+    } else {
+        m_deadRun = 0;
     }
 
     ++m_index;
