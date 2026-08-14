@@ -25,6 +25,8 @@
 #include "gui/widgets/SwrCurveWidget.h"
 #include "core/antenna/Touchstone.h"
 
+#include <QImage>
+
 #include <cmath>
 #include <complex>
 
@@ -47,6 +49,37 @@ Sweep flatSweep(double loHz, double hiHz, const QString& source)
         s.points.append(p);
     }
     return s;
+}
+
+/// Render the sweep and count pixels differing from the background in
+/// the column at atHz. The absolute number is meaningless — grid lines
+/// cross every column — so callers must only ever compare two of these
+/// against each other.
+int inkAt(const Sweep& s, double atHz, double sweepLoHz, double sweepHiHz)
+{
+    SwrCurveWidget w;
+    w.setRegion(AmateurBands::Region::One);
+    w.resize(800, 420);
+    w.setSweep(s);
+
+    QImage img(w.size(), QImage::Format_ARGB32);
+    w.render(&img);
+
+    // Mirror of recompute()'s 12 % margin and paintEvent's plot rect.
+    // If either changes this lands in the wrong column and the two
+    // counts converge, which the caller's assertion catches.
+    const double pad = (sweepHiHz - sweepLoHz) * 0.12;
+    const double lo  = std::max(0.0, sweepLoHz - pad);
+    const double hi  = sweepHiHz + pad;
+    const int x = int(44.0 + (atHz - lo) / (hi - lo) * ((800.0 - 12.0) - 44.0));
+    if (x <= 44 || x >= 788) { return -1; }
+
+    const QRgb bg = img.pixel(x, 40);
+    int ink = 0;
+    for (int y = 40; y < img.height() - 60; ++y) {
+        if (img.pixel(x, y) != bg) { ++ink; }
+    }
+    return ink;
 }
 
 } // namespace
@@ -122,13 +155,16 @@ private slots:
     // a straight stroke from 7.200 to 14.000 MHz — full confidence
     // across almost seven megahertz nobody measured.
     //
-    // The first version of these two rendered the widget and counted
-    // ink in one column. It failed, and it deserved to: the horizontal
-    // SWR grid lines cross every column, so the count was mostly grid,
-    // and the threshold I compared it against was a guess. A test whose
-    // pass condition I cannot derive is not a test.
+    // These check the decision. gapThresholdHz is the whole of it, and
+    // it is arithmetic, so it can be checked exactly.
     //
-    // So: check the decision itself. gapThresholdHz is the whole of it.
+    // A note on how they came to exist. The file failed; I assumed the
+    // render-and-count-pixels tests below were the cause, replaced them
+    // with these, and it failed again. The pixel tests had been passing
+    // the whole time — the failure was somewhere else entirely, and one
+    // look at the output would have said so. Both kinds are here now:
+    // these because they are exact, those because they are the only
+    // ones that would notice if the drawing stopped happening at all.
 
     void aBandGapIsFarAboveTheGapThreshold()
     {
@@ -212,6 +248,39 @@ private slots:
         }
         QVERIFY(!std::isfinite(SwrCurveWidget::gapThresholdHz(s))
                 || SwrCurveWidget::gapThresholdHz(s) > 1e12);
+    }
+
+    // ── And it must actually reach the paint ─────────────────────────
+    //
+    // The four above check the decision. None of them would notice if
+    // drawBrokenCurve stopped being called at all.
+    //
+    // The first version of this rendered once and compared the ink in
+    // one column against a number I had guessed. That number happened
+    // to be right — the test passed, and I removed it anyway on a wrong
+    // hypothesis about why the file was failing. Restored, but without
+    // the guess: render the same widget twice, once with the hole and
+    // once with it filled in, and require strictly less ink in the
+    // column when the hole is there. The comparison calibrates itself,
+    // so the grid lines that cross that column cancel out.
+    void theGapIsActuallyMissingFromThePaint()
+    {
+        Sweep gapped = flatSweep(7.0e6, 7.2e6, QStringLiteral("40m"));
+        gapped.points.append(
+            flatSweep(14.0e6, 14.35e6, QStringLiteral("20m")).points);
+
+        // Same span, same ends, no hole — the control.
+        Sweep filled = flatSweep(7.0e6, 14.35e6, QStringLiteral("filled"));
+
+        const int inkGapped = inkAt(gapped, 10.6e6, 7.0e6, 14.35e6);
+        const int inkFilled = inkAt(filled, 10.6e6, 7.0e6, 14.35e6);
+
+        QVERIFY2(inkFilled > inkGapped,
+                 qPrintable(QStringLiteral(
+                     "the control drew no more ink at 10.6 MHz than the "
+                     "gapped sweep did (%1 vs %2) — this test cannot "
+                     "tell the two apart and proves nothing")
+                         .arg(inkFilled).arg(inkGapped)));
     }
 
     void aForcedBandStillWins()

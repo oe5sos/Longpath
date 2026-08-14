@@ -183,6 +183,22 @@ void SwrCurveWidget::setTargetHz(double hz)
 {
     if (qFuzzyCompare(m_targetHz + 1.0, hz + 1.0)) { return; }
     m_targetHz = hz;
+    // ── The one setter that did not recompute ────────────────────────
+    //
+    // Every other one does. This did not, and the target feeds two
+    // things recompute() decides:
+    //
+    //   * which band gets the three verticals, when the sweep spans
+    //     several of them;
+    //   * which resonance counts as "the" one, the nearest to it.
+    //
+    // So on an end-fed swept from 3 to 30 MHz, setting the target to
+    // 7.100 left the band at 10 m — the widest overlap, which is what
+    // bestOverlap() answers and precisely what the target exists to
+    // override. It only ever took effect if a setSweep() or setRegion()
+    // happened to follow, which in the window it usually did. Found by
+    // a test written for something else.
+    recompute();
     update();
 }
 
