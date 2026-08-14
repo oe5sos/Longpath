@@ -287,11 +287,13 @@ void SwrSweepController::beginMeasure()
     m_accFwd = 0.0;
     m_accRev = 0.0;
     m_accN   = 0;
+    m_accFwdRawPeak = 0;
     m_state  = State::Measuring;
     m_stepTimer.start(m_plan.dwellMs);
 }
 
-void SwrSweepController::ingestTelemetry(double fwdW, double revW)
+void SwrSweepController::ingestTelemetry(double fwdW, double revW,
+                                         quint16 fwdRaw)
 {
     if (m_state == State::Idle || m_state == State::Finishing) {
         return;
@@ -303,6 +305,11 @@ void SwrSweepController::ingestTelemetry(double fwdW, double revW)
     }
     m_accFwd += fwdW;
     m_accRev += revW;
+    // Peak rather than mean: the question the raw count answers is
+    // "did the board EVER report anything", and an average over a
+    // 220 ms dwell buries a single honest sample under the silence
+    // either side of it.
+    m_accFwdRawPeak = std::max(m_accFwdRawPeak, fwdRaw);
     ++m_accN;
 }
 
@@ -316,7 +323,8 @@ void SwrSweepController::closePoint()
         pt.swr = swrFromWatts(pt.fwdW, revW);
     }
     m_result.points.append(pt);
-    m_result.maxFwdW = std::max(m_result.maxFwdW, pt.fwdW);
+    m_result.maxFwdW   = std::max(m_result.maxFwdW, pt.fwdW);
+    m_result.maxFwdRaw = std::max(m_result.maxFwdRaw, m_accFwdRawPeak);
     emit pointReady(m_index, pt.freqHz, pt.swr, pt.fwdW);
     emit progressChanged(m_index + 1, m_plan.points);
 
@@ -349,15 +357,17 @@ void SwrSweepController::closePoint()
         if (++m_deadRun >= kAbortDeadRun) {
             finish(false, m_result.maxFwdW < kSilentBridgeW
                 ? QStringLiteral(
-                      "Der Richtkoppler meldet gar nichts — höchstens "
-                      "%1 W Vorlauf über %2 Punkte. Das ist keine zu "
-                      "kleine Messung, das ist keine. Prüfe von Hand: "
-                      "TUNE drücken und den RF-Pwr-Balken ansehen. "
-                      "Bleibt er auch dort auf null, liegt es nicht am "
-                      "Sweep, sondern am Träger oder an der "
-                      "Leistungstelemetrie.")
+                      "Der Richtkoppler meldet gar nichts: höchstens "
+                      "%1 W über %2 Punkte, roher ADC-Höchstwert %3 "
+                      "von 4095. Der rohe Wert ist das, was das Gerät "
+                      "gesendet hat — bewegt der sich nicht, wenn du "
+                      "die Leistung erhöhst, liegt es nicht an der "
+                      "Skalierung und nicht am Sweep, sondern daran, "
+                      "dass keine HF entsteht oder der Koppler nichts "
+                      "meldet.")
                       .arg(m_result.maxFwdW, 0, 'f', 2)
                       .arg(kAbortDeadRun)
+                      .arg(m_result.maxFwdRaw)
                 : QStringLiteral(
                       "Zu wenig Vorlauf über %1 Punkte — höchstens %2 W "
                       "gemessen, ab %3 W ist die Anzeige eine Messung. "

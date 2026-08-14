@@ -261,13 +261,15 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             m_status->setText(
                 result.maxFwdW < SwrSweepController::kSilentBridgeW
                 ? QStringLiteral(
-                      "Kein einziger Punkt gemessen, und der "
-                      "Richtkoppler meldete überhaupt nichts "
-                      "(höchstens %1 W). Prüfe von Hand: TUNE drücken "
-                      "und den RF-Pwr-Balken ansehen — bleibt der auch "
-                      "auf null, liegt es am Träger oder an der "
-                      "Leistungstelemetrie, nicht am Sweep.")
+                      "Kein einziger Punkt gemessen. Höchstens %1 W, "
+                      "roher ADC-Höchstwert %2 von 4095 — das ist der "
+                      "Wert, den das Gerät selbst gesendet hat. "
+                      "Wiederhole den Sweep mit deutlich mehr Leistung: "
+                      "steigt die Rohzahl nicht mit, entsteht keine HF "
+                      "oder der Koppler meldet nichts, und weder "
+                      "Skalierung noch Sweep sind daran schuld.")
                       .arg(result.maxFwdW, 0, 'f', 2)
+                      .arg(result.maxFwdRaw)
                 : QStringLiteral(
                       "Kein einziger Punkt gemessen. Der Richtkoppler "
                       "meldete höchstens %1 W Vorlauf; ab %2 W ist die "

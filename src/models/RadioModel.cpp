@@ -9081,7 +9081,9 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
     // SWR is a fwd/rev ratio, so the same reasoning applies). No-op
     // unless a sweep is measuring.
     if (m_swrSweep) {
-        m_swrSweep->ingestTelemetry(fwdW, revW);
+        // fwdRaw as well as the watts: see SwrSweepResult::maxFwdRaw for
+        // why a failed sweep has to be able to name the unscaled count.
+        m_swrSweep->ingestTelemetry(fwdW, revW, fwdRaw);
     }
 }
 

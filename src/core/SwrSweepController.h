@@ -73,6 +73,20 @@ struct SwrSweepResult {
     /// kMinFwdW.
     double maxFwdW{0.0};
 
+    /// The highest RAW forward ADC count seen, straight off the wire
+    /// before any per-board scaling.
+    ///
+    /// ── Why the raw count and not just the watts ─────────────────────
+    ///
+    /// Three rounds of "0.01 W" told us nothing new each time, because
+    /// watts are the far end of a chain — ADC count, board triplet,
+    /// calibration — and a small number at the end does not say which
+    /// link is at fault. The count does: it is what the radio actually
+    /// sent. If it does not move when the power is raised, nothing
+    /// downstream of the radio can be blamed, and the next test is a
+    /// measurement instead of another round of the same sentence.
+    quint16 maxFwdRaw{0};
+
     /// Frequency of the minimum valid SWR, 0 when no valid point.
     quint64 resonanceHz() const;
     double  minSwr() const;
@@ -153,7 +167,10 @@ public:
     /// Telemetry feed — RadioModel::handlePaTelemetry calls this with
     /// the same raw-scaled watts it hands SwrProtectionController.
     /// Ignored outside the Measuring state.
-    void ingestTelemetry(double fwdW, double revW);
+    /// `fwdRaw` is the unscaled ADC count the board reported, carried
+    /// only so a failed sweep can name it. Defaulted so the tests and
+    /// any other caller need not care.
+    void ingestTelemetry(double fwdW, double revW, quint16 fwdRaw = 0);
 
     // ── Tuning constants ─────────────────────────────────────────────
     /// Mirrors TwoToneController::kTuneReleaseSettleMs (Thetis
@@ -253,9 +270,10 @@ private:
     int            m_deadRun{0};
 
     // Per-point accumulation while Measuring.
-    double m_accFwd{0.0};
-    double m_accRev{0.0};
-    int    m_accN{0};
+    double  m_accFwd{0.0};
+    double  m_accRev{0.0};
+    int     m_accN{0};
+    quint16 m_accFwdRawPeak{0};
     qint64 m_lastTelemetryMs{0};
 
     QTimer m_stepTimer;      // single-shot, drives every state change
