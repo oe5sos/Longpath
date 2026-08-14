@@ -144,6 +144,45 @@ SwrSweepPlan SwrSweepPlan::forRange(double startLoHz, double stopHiHz,
     }
 
     auto allowed = [&](std::int64_t f) {
+        // ── 60 m is excluded here as it is in forBand ────────────────
+        //
+        // forBand refuses 60 m outright: channelized, deferred in v1.
+        // forRange went through BandPlanGuard instead and let it back
+        // in, and the guard's Europe row is
+        //
+        //     { Band::Band60m, 5'100'000, 5'500'000 }
+        //
+        // — four hundred kilohertz, ported verbatim from Thetis. The
+        // actual Region 1 allocation is 5.3515 to 5.3665 MHz, fifteen
+        // kilohertz, and this program's OWN band table in
+        // core/antenna/AmateurBands.cpp says exactly that. Two tables,
+        // a factor of twenty-seven apart, and the permissive one is the
+        // one that gates the transmitter.
+        //
+        // So a range sweep across HF in Region 1 keyed from 5.100 to
+        // 5.500 MHz: 385 kHz of it outside the allocation. That is the
+        // same fault as the 80 m one this morning, in a feature I wrote
+        // this afternoon, and it reached the air before I found it.
+        //
+        // Excluding 60 m from range sweeps stops it now. Correcting the
+        // guard table is the real repair and is not mine to make while
+        // Martin is away: it narrows what MOX permits for every
+        // European operator, and some countries hold more than the
+        // IARU 15 kHz.
+        // The span below covers every 60 m row in every table — the
+        // guard's widest is Europe's 5.100 to 5.500 — rather than
+        // bandFromFrequency's 5.330 to 5.410, which is the US block and
+        // would have left 5.100 to 5.330 and 5.410 to 5.500 still open.
+        // I wrote that narrower version first and caught it by putting
+        // the two ranges side by side.
+        //
+        // Nothing between 5.0 and 5.6 MHz is amateur spectrum outside
+        // 60 m, so a blunt window costs nothing.
+        constexpr std::int64_t k60mLo = 5'000'000;
+        constexpr std::int64_t k60mHi = 5'600'000;
+        if (f >= k60mLo && f <= k60mHi) {
+            return false;
+        }
         return region
             ? guard.isValidTxFreq(*region, f, mode, /*extended=*/false)
             : safety::isValidTxFreqEverywhere(guard, f, mode, false);

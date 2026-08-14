@@ -733,6 +733,44 @@ private slots:
         }
     }
 
+    // ── 60 m: two tables, a factor of twenty-seven apart ─────────────
+    //
+    // BandPlanGuard's Europe row is { Band60m, 5'100'000, 5'500'000 },
+    // ported verbatim from Thetis. The Region 1 allocation is 5.3515 to
+    // 5.3665 MHz, and this program's own AmateurBands table says so.
+    // The permissive one gates the transmitter, so a range sweep across
+    // HF keyed 385 kHz outside the allocation before this was caught.
+    //
+    // forBand has always refused 60 m outright. forRange now does too.
+    void range_neverKeysAnywhereNear60m()
+    {
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            1.8e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 60);
+        QVERIFY(p.isValid());
+        for (quint64 f : p.freqs) {
+            QVERIFY2(f < 5'000'000ULL || f > 5'600'000ULL,
+                     qPrintable(QStringLiteral(
+                         "range sweep planned %1 MHz — inside the 60 m "
+                         "window, which forBand has always refused")
+                             .arg(f / 1e6, 0, 'f', 4)));
+        }
+    }
+
+    void the60mExclusionCoversTheWidestTableNotTheNarrowest()
+    {
+        // The first version of the exclusion used bandFromFrequency,
+        // whose 60 m is the US block 5.330–5.410. That leaves 5.100 to
+        // 5.330 and 5.410 to 5.500 — both inside the guard's Europe row
+        // — still open. Pin the ends, not just the middle.
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            5.0e6, 5.6e6, guard, safety::Region::Europe, DSPMode::LSB, 51);
+        QVERIFY2(!p.isValid(),
+                 "a range covering only 60 m produced a plan to transmit");
+        QVERIFY(p.freqs.isEmpty());
+    }
+
     void range_sharesPointsEquallyNotByWidth()
     {
         // 160 m is 200 kHz, 10 m is 1.7 MHz. Sharing by width would
