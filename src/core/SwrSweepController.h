@@ -242,6 +242,34 @@ public:
     /// noise is a perfectly good measurement.
     static constexpr quint16 kMinRawRise = 60;
 
+    /// The same test for the REVERSE channel, and it must be far
+    /// smaller.
+    ///
+    /// ── Measured on the bench, 2026-08-14 ────────────────────────────
+    ///
+    /// TUNE at 3 W into OE5SOS's antenna, counts read live off the
+    /// coupler:
+    ///
+    ///     idle      VOR   0  ·  RÜCK  0
+    ///     keyed     VOR 339  ·  RÜCK 38
+    ///
+    /// Both channels work. But 38 is below the 60-count rise that
+    /// forward needs, so the same threshold applied to both would call
+    /// this healthy reverse channel dead, drop the trace and tell the
+    /// operator his coupler is broken.
+    ///
+    /// Which is obvious once seen: forward carries the whole transmit
+    /// power and swings hundreds of counts, reverse carries only what
+    /// the antenna sends back. On a GOOD antenna that is deliberately
+    /// almost nothing — a 1.1 SWR reflects a quarter of one percent of
+    /// the power. Requiring reverse to swing as hard as forward is
+    /// requiring the antenna to be bad before the measurement is
+    /// believed.
+    ///
+    /// Ten counts is a few times the idle scatter and comfortably under
+    /// the 38 a well-matched antenna produced here.
+    static constexpr quint16 kMinRevRise = 10;
+
     /// The lowest tune power worth keying for.
     ///
     /// ── Why this number exists ───────────────────────────────────────

@@ -380,6 +380,64 @@ private slots:
         QVERIFY(SwrSweepController::kSilentBridgeW > 0.0);
     }
 
+    // ── Measured on the bench, and the numbers are the test ──────────
+    //
+    // TUNE at 3 W into OE5SOS's antenna, read live off the coupler:
+    //
+    //     idle    VOR   0  ·  RÜCK  0
+    //     keyed   VOR 339  ·  RÜCK 38
+    //
+    // Both channels working. The first version of the guard used one
+    // rise threshold for both, and 38 is under it — so a healthy
+    // reverse channel was called dead, the trace dropped, and the
+    // operator told his coupler was broken.
+    //
+    // Forward carries the whole transmit power; reverse carries only
+    // what a good antenna fails to absorb, which is deliberately almost
+    // nothing. Holding reverse to forward's threshold demands a bad
+    // antenna before a measurement is believed.
+    void the_bench_reading_of_339_and_38_is_a_working_coupler()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 5000) {
+            const bool keyed = (h.mox.state() != MoxState::Rx);
+            h.ctl.ingestTelemetry(keyed ? 1.9  : 0.0,
+                                  keyed ? 0.02 : 0.0,
+                                  keyed ? quint16(339) : quint16(0),
+                                  keyed ? quint16(38)  : quint16(0));
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto r = fin.first().first().value<SwrSweepResult>();
+
+        QVERIFY2(r.completed, qPrintable(r.abortReason));
+        QVERIFY2(r.validPoints() > 0, "the forward reading was rejected");
+        QVERIFY2(!r.reverseNeverMoved,
+                 "38 counts over an idle 0 is a working reverse channel, "
+                 "not a dead one");
+        QCOMPARE(r.baselineRaw, quint16(0));
+        QCOMPARE(r.maxFwdRaw,   quint16(339));
+        QCOMPARE(r.maxRevRaw,   quint16(38));
+    }
+
+    // The threshold only works while it sits between the idle scatter
+    // and what a well-matched antenna returns. If it ever climbs past
+    // the latter, every good antenna reads as a broken coupler.
+    void the_reverse_threshold_is_far_below_the_forward_one()
+    {
+        QVERIFY(SwrSweepController::kMinRevRise
+                < SwrSweepController::kMinRawRise);
+        QVERIFY(SwrSweepController::kMinRevRise > 0);
+        QVERIFY2(SwrSweepController::kMinRevRise < 38,
+                 "a reverse rise of 38 counts was measured on a healthy "
+                 "antenna; the threshold must sit below it");
+    }
+
     // ── QRP: the reason the baseline exists ──────────────────────────
     //
     // "ich werde mit dem anan 10e sota funken, tunen muss also mit
@@ -478,7 +536,7 @@ private slots:
         QVERIFY(h.ctl.startSweep(h.tinyPlan()));
 
         constexpr quint16 kIdleFwd = 40;
-        constexpr quint16 kIdleRev = 12;
+        constexpr quint16 kIdleRev = 12;   // never leaves this
         QElapsedTimer t;
         t.start();
         while (fin.isEmpty() && t.elapsed() < 5000) {

@@ -482,7 +482,7 @@ void SwrSweepController::finish(bool completed, const QString& reason)
     m_result.reverseNeverMoved =
         (m_result.validPoints() > 0)
         && m_sawAnyRaw
-        && (m_result.maxRevRaw <= m_result.baselineRevRaw + kMinRawRise);
+        && (m_result.maxRevRaw <= m_result.baselineRevRaw + kMinRevRise);
     if (!reason.isEmpty()) {
         emit reasonChanged(reason);
     }
