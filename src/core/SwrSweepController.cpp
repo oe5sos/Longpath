@@ -92,6 +92,14 @@ bool SwrSweepPlan::clipToGuard(const safety::BandPlanGuard& guard,
     if (!isValid() || points < kMinPoints || points > kMaxPoints) {
         return false;
     }
+    // A range plan was built segment by segment against this same
+    // guard, and every one of its frequencies is already inside an
+    // allocation. Running the contiguous-run clip over it would be
+    // actively wrong: it keeps first-valid..last-valid, which for a
+    // 80 m + 20 m plan means everything between them as well.
+    if (!freqs.isEmpty()) {
+        return true;
+    }
     // Probe every planned point once; keep the contiguous valid run
     // containing the band middle (regional edges only ever trim the
     // ends, so first-valid..last-valid is that run).
@@ -124,8 +132,94 @@ bool SwrSweepPlan::clipToGuard(const safety::BandPlanGuard& guard,
     return true;
 }
 
+SwrSweepPlan SwrSweepPlan::forRange(double startLoHz, double stopHiHz,
+                                    const safety::BandPlanGuard& guard,
+                                    std::optional<safety::Region> region,
+                                    DSPMode mode, int totalPoints)
+{
+    SwrSweepPlan plan;
+    plan.band = Band::GEN;          // no single band owns a range
+    if (!(stopHiHz > startLoHz) || startLoHz <= 0.0) {
+        return plan;
+    }
+
+    auto allowed = [&](std::int64_t f) {
+        return region
+            ? guard.isValidTxFreq(*region, f, mode, /*extended=*/false)
+            : safety::isValidTxFreqEverywhere(guard, f, mode, false);
+    };
+
+    // ── Find the segments ────────────────────────────────────────────
+    //
+    // Walk the range on a 1 kHz grid and collect the runs the guard
+    // permits. 28 MHz is 28 000 probes, which costs nothing and is
+    // finer than any band edge in the tables.
+    //
+    // Both ends of a run land INSIDE the allocation, never on the edge
+    // and never past it: the first permitted sample is at or above the
+    // true lower edge, the last is at or below the upper one. Rounding
+    // in the safe direction is the only rounding available here.
+    constexpr std::int64_t kProbeHz = 1000;
+    struct Seg { std::int64_t lo; std::int64_t hi; };
+    QVector<Seg> segs;
+    {
+        const auto from = static_cast<std::int64_t>(startLoHz);
+        const auto to   = static_cast<std::int64_t>(stopHiHz);
+        // Snap the start up to the grid so the probe points are round
+        // numbers — a segment edge at 7.000 000 rather than 7.000 137.
+        std::int64_t f = ((from + kProbeHz - 1) / kProbeHz) * kProbeHz;
+        bool inRun = false;
+        for (; f <= to; f += kProbeHz) {
+            if (allowed(f)) {
+                if (!inRun) { segs.append({f, f}); inRun = true; }
+                else        { segs.back().hi = f; }
+            } else {
+                inRun = false;
+            }
+        }
+    }
+    if (segs.isEmpty()) {
+        return plan;   // still invalid: startHz stays 0
+    }
+
+    // ── Share the points out ─────────────────────────────────────────
+    const int n = static_cast<int>(segs.size());
+    const int want = std::max(totalPoints, kMinPoints);
+    const int per  = std::max(kMinPerSegment, want / n);
+
+    for (const Seg& s : segs) {
+        const int first = static_cast<int>(plan.freqs.size());
+        if (s.hi <= s.lo || per <= 1) {
+            plan.freqs.append(static_cast<quint64>((s.lo + s.hi) / 2));
+        } else {
+            for (int i = 0; i < per; ++i) {
+                const double t = double(i) / double(per - 1);
+                plan.freqs.append(static_cast<quint64>(
+                    double(s.lo) + t * double(s.hi - s.lo) + 0.5));
+            }
+        }
+        plan.segments.append(
+            {first, static_cast<int>(plan.freqs.size()) - 1});
+    }
+
+    plan.points  = static_cast<int>(plan.freqs.size());
+    plan.startHz = plan.freqs.first();
+    plan.stopHz  = plan.freqs.last();
+    // A single-point plan would make startHz == stopHz and read as
+    // invalid, which is the right answer for something unmeasurable.
+    return plan;
+}
+
 quint64 SwrSweepPlan::freqAt(int index) const
 {
+    // A range sweep carries its own list because its points are not
+    // evenly spaced — they cluster inside the bands and skip what lies
+    // between them.
+    if (!freqs.isEmpty()) {
+        if (index < 0) { return freqs.first(); }
+        if (index >= freqs.size()) { return freqs.last(); }
+        return freqs.at(index);
+    }
     if (points <= 1) {
         return startHz;
     }

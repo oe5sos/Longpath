@@ -146,6 +146,50 @@ struct SwrSweepPlan {
     /// design doc).
     static SwrSweepPlan forBand(Band b);
 
+    // ── A range across several bands ─────────────────────────────────
+    //
+    // "Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich auch
+    //  eingeben, von welcher Startfrequenz bis welcher Endfrequenz, und
+    //  sämtliche resonanten Punkte sehen."
+    //
+    // The band sweep stays the default. This is the extra.
+    //
+    // The thing that shapes it: most of 1.8–30 MHz is not ours. A range
+    // sweep may only key inside the allocated segments, so the plan is
+    // a LIST of frequencies with holes in it rather than a span — see
+    // the freqs member. What comes back is one curve per band, not one
+    // curve across the range, and that is a fact about the licence
+    // rather than a limitation of the code.
+    //
+    // Points are shared out equally between the segments rather than by
+    // width, and never fewer than kMinPerSegment. Sharing by width
+    // would give 10 m (1.7 MHz) eight times the resolution of 160 m
+    // (200 kHz), and it is on the narrow low bands that a resonance is
+    // sharpest and easiest to miss.
+    //
+    // Returns an invalid plan when the range holds no allowed segment
+    // at all — it does not quietly wander off to the nearest band.
+    static SwrSweepPlan forRange(double startHz, double stopHz,
+                                 const safety::BandPlanGuard& guard,
+                                 std::optional<safety::Region> region,
+                                 DSPMode mode, int totalPoints);
+
+    /// Explicit frequency list. Empty for a plain band sweep, where the
+    /// points are startHz..stopHz evenly. Non-empty for a range sweep,
+    /// where they are grouped into the allowed segments and freqAt()
+    /// reads straight out of here.
+    QVector<quint64> freqs;
+
+    /// The allowed segments a range sweep found, as [first, last] index
+    /// pairs into freqs. One entry per band touched; empty for a band
+    /// sweep. The chart uses it to break the curve at the holes instead
+    /// of drawing a straight line across unmeasured spectrum.
+    QVector<QPair<int, int>> segments;
+
+    /// Fewest points any one segment gets, however many segments there
+    /// are. Below three there is no shape to read.
+    static constexpr int kMinPerSegment = 3;
+
     /// Clip start/stop to the first/last frequency the band-plan guard
     /// allows for (region, mode) at this plan's point spacing, so a
     /// Region-1 40 m sweep ends at 7.200 MHz instead of failing. Returns
@@ -161,6 +205,11 @@ struct SwrSweepPlan {
 
     bool isValid() const { return startHz > 0 && stopHz > startHz; }
     quint64 freqAt(int index) const;
+
+    /// True when this plan has holes in it — a range sweep across more
+    /// than one band. Callers that describe the result to the operator
+    /// must not call it "3.5 to 28.0 MHz".
+    bool isSegmented() const { return segments.size() > 1; }
 
     static constexpr int kMinPoints = 11;
     static constexpr int kMaxPoints = 401;

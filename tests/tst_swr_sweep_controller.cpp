@@ -694,6 +694,111 @@ private slots:
     // The floor is a fact about the bridge; the tune-power minimum is
     // that fact expressed where it can be checked before keying. If one
     // ever drops below the other the guard stops guarding.
+    // ── The range sweep: several bands in one run ────────────────────
+    //
+    // "Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich eingeben,
+    //  von welcher Startfrequenz bis welcher Endfrequenz."
+    //
+    // The whole difficulty is that most of 1.8–30 MHz is not ours to
+    // transmit on. These pin that the planner produces holes rather
+    // than a span.
+
+    void range_keysOnlyInsideAllocatedSegments()
+    {
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            3.0e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 51);
+
+        QVERIFY(p.isValid());
+        QVERIFY(p.isSegmented());
+        QVERIFY(!p.freqs.isEmpty());
+
+        // Not one planned frequency may be outside an allocation.
+        for (quint64 f : p.freqs) {
+            QVERIFY2(guard.isValidTxFreq(safety::Region::Europe,
+                                         static_cast<std::int64_t>(f),
+                                         DSPMode::LSB, false),
+                     qPrintable(QStringLiteral(
+                         "range sweep planned to transmit on %1 MHz")
+                             .arg(f / 1e6, 0, 'f', 4)));
+        }
+
+        // And the gaps must really be gaps: nothing between 40 m and
+        // 30 m, which is 7.2 to 10.1 MHz of broadcast and utility.
+        for (quint64 f : p.freqs) {
+            QVERIFY2(!(f > 7250000ULL && f < 10050000ULL),
+                     qPrintable(QStringLiteral("planned %1 MHz, which is "
+                                               "between the bands")
+                                    .arg(f / 1e6, 0, 'f', 4)));
+        }
+    }
+
+    void range_sharesPointsEquallyNotByWidth()
+    {
+        // 160 m is 200 kHz, 10 m is 1.7 MHz. Sharing by width would
+        // leave the low bands with almost nothing, and a sharp
+        // resonance is easiest to miss exactly there.
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            1.8e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 60);
+
+        QVERIFY(p.segments.size() > 2);
+        const int firstCount =
+            p.segments.first().second - p.segments.first().first + 1;
+        for (const auto& seg : p.segments) {
+            const int n = seg.second - seg.first + 1;
+            QCOMPARE(n, firstCount);
+            QVERIFY(n >= SwrSweepPlan::kMinPerSegment);
+        }
+        QCOMPARE(p.points, int(p.freqs.size()));
+        QVERIFY(p.points <= SwrSweepPlan::kMaxPoints);
+    }
+
+    void range_withNoAllocatedSegmentIsRefused()
+    {
+        // 8.0 to 9.0 MHz holds no amateur allocation anywhere. The
+        // planner must say so rather than drift to the nearest band.
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            8.0e6, 9.0e6, guard, safety::Region::Europe, DSPMode::LSB, 51);
+        QVERIFY2(!p.isValid(),
+                 "a range with no allocated segment produced a plan");
+        QVERIFY(p.freqs.isEmpty());
+    }
+
+    void range_isNotFlattenedByTheContiguousClip()
+    {
+        // clipToGuard keeps first-valid..last-valid. Run over a
+        // segmented plan that would swallow every gap between the
+        // bands, so it has to leave range plans alone.
+        safety::BandPlanGuard guard;
+        SwrSweepPlan p = SwrSweepPlan::forRange(
+            3.0e6, 15.0e6, guard, safety::Region::Europe, DSPMode::LSB, 40);
+        const QVector<quint64> before = p.freqs;
+
+        QVERIFY(p.clipToGuard(guard, safety::Region::Europe, DSPMode::LSB));
+        QCOMPARE(p.freqs, before);
+        for (quint64 f : p.freqs) {
+            QVERIFY(guard.isValidTxFreq(safety::Region::Europe,
+                                        static_cast<std::int64_t>(f),
+                                        DSPMode::LSB, false));
+        }
+    }
+
+    void range_singleBandBehavesLikeABandSweep()
+    {
+        // A range inside one band is still a legitimate request — a
+        // narrow look around a resonance.
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            14.0e6, 14.35e6, guard, safety::Region::Europe, DSPMode::LSB, 21);
+        QVERIFY(p.isValid());
+        QCOMPARE(p.segments.size(), 1);
+        QVERIFY2(!p.isSegmented(), "one segment is not a segmented plan");
+        QVERIFY(p.freqs.first() >= 14000000ULL);
+        QVERIFY(p.freqs.last()  <= 14350000ULL);
+    }
+
     void the_tune_power_minimum_leaves_room_above_the_bridge_floor()
     {
         QVERIFY2(double(SwrSweepController::kMinUsefulTuneW)
