@@ -380,6 +380,97 @@ private slots:
         QVERIFY(SwrSweepController::kSilentBridgeW > 0.0);
     }
 
+    // ── QRP: the reason the baseline exists ──────────────────────────
+    //
+    // "ich werde mit dem anan 10e sota funken, tunen muss also mit
+    //  1 watt auch gehen, ausgangsleistung qrp maximal 10 watt."
+    //
+    // A ten-watt radio at one watt puts perhaps a fifth of a watt into
+    // the old fixed floor's face and every point was discarded. The
+    // coupler on such a radio is scaled for such a radio: the reading
+    // is SMALL, not ABSENT, and small well clear of the noise is a
+    // perfectly good measurement. Judging against the radio's own idle
+    // count is what tells the two apart.
+    void a_qrp_sweep_measures_even_though_the_watts_are_under_the_old_floor()
+    {
+        Harness h;
+        FakeDipole dipole;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+
+        // Idle ADC sits at 40 counts; keying at ~1 W lifts it to 300.
+        // Watts stay at 0.2 — well under kMinFwdW, which used to throw
+        // the whole sweep away.
+        constexpr quint16 kIdleRaw = 40;
+        constexpr quint16 kKeyedRaw = 300;
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 5000) {
+            double fwd = 0.0;
+            double rev = 0.0;
+            dipole.wattsAt(static_cast<double>(h.currentFreq), fwd, rev);
+            // Scale the fake antenna down to QRP levels; the RATIO,
+            // which is all SWR depends on, is untouched.
+            const double qrpScale = 0.2 / 10.0;
+            const bool keyed = (h.mox.state() != MoxState::Rx);
+            h.ctl.ingestTelemetry(fwd * qrpScale, rev * qrpScale,
+                                  keyed ? kKeyedRaw : kIdleRaw);
+            QTest::qWait(2);
+        }
+
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+        QVERIFY2(result.completed,
+                 qPrintable(QStringLiteral("QRP sweep aborted: %1")
+                                .arg(result.abortReason)));
+        QVERIFY2(result.validPoints() > 0,
+                 "a QRP sweep well clear of the noise measured nothing");
+        QVERIFY2(result.maxFwdW < SwrSweepController::kMinFwdW,
+                 "the test is not exercising the case it claims to — "
+                 "these watts are above the old floor");
+        QVERIFY2(result.baselineRaw >= kIdleRaw - 2
+                     && result.baselineRaw <= kIdleRaw + 2,
+                 qPrintable(QStringLiteral("baseline came out at %1, "
+                                           "expected about %2")
+                                .arg(result.baselineRaw).arg(kIdleRaw)));
+    }
+
+    // The mirror: a count that never leaves the idle reading is not a
+    // measurement however many watts the scaling claims for it.
+    void an_adc_that_never_leaves_its_idle_reading_is_refused()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+
+        // 41 counts throughout, keyed or not — OE5SOS's Anvelina.
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 3000) {
+            h.ctl.ingestTelemetry(5.0, 0.5, 41);
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+        QVERIFY2(!result.completed, "a dead ADC produced a finished sweep");
+        QCOMPARE(result.validPoints(), 0);
+        // Even though the watts handed over were generous.
+        QVERIFY2(result.abortReason.contains(QStringLiteral("ADC")),
+                 qPrintable(result.abortReason));
+    }
+
+    void the_baseline_is_taken_before_anything_is_keyed()
+    {
+        // A baseline sampled with the carrier up is not a baseline. The
+        // controller must still be in Rx while it collects.
+        Harness h;
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        QCOMPARE(h.mox.state(), MoxState::Rx);
+        QVERIFY(h.ctl.isSweeping());
+        h.ctl.abortSweep(QStringLiteral("test"));
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+    }
+
     // points.size() counts attempts, validPoints() counts measurements.
     // The panel used the first to decide whether to keep a trace, so a
     // sweep that measured nothing still produced a named entry with a

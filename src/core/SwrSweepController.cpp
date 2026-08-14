@@ -137,6 +137,9 @@ SwrSweepController::SwrSweepController(QObject* parent)
     m_stepTimer.setSingleShot(true);
     connect(&m_stepTimer, &QTimer::timeout, this, [this]() {
         switch (m_state) {
+        case State::Baseline:
+            beginKeying();
+            break;
         case State::Keying:
             // Carrier is up and settled — measure the first point.
             stepToNextPoint();
@@ -167,7 +170,7 @@ SwrSweepController::SwrSweepController(QObject* parent)
     m_watchdog.setSingleShot(true);
     connect(&m_watchdog, &QTimer::timeout, this, [this]() {
         if (m_state == State::Measuring || m_state == State::Settling
-            || m_state == State::Keying) {
+            || m_state == State::Keying || m_state == State::Baseline) {
             abortSweep(QStringLiteral(
                 "No PA telemetry for %1 ms — link or radio gone")
                     .arg(m_telemetryTimeoutMs));
@@ -237,18 +240,22 @@ bool SwrSweepController::startSweep(const SwrSweepPlan& plan)
     m_index = 0;
     m_highSwrRun = 0;
     m_deadRun = 0;
+    m_baseAcc = 0.0;
+    m_baseN = 0;
+    m_baselineRaw = 0;
 
-    // Key the carrier through the fully-gated TUNE path. Every
-    // existing safety check (band plan, CW block, TX inhibit) runs
-    // inside; a refusal leaves MoxController in Rx.
-    m_mox->setTune(true);
-    if (m_mox->state() == MoxState::Rx) {
-        emit reasonChanged(QStringLiteral(
-            "TUNE was refused (band plan / safety gate)"));
-        return false;
-    }
-
-    m_state = State::Keying;
+    // ── Baseline first, carrier second ───────────────────────────────
+    //
+    // Before anything is keyed, watch the forward ADC for one settle
+    // window with the transmitter OFF. That idle reading is what every
+    // measurement is then judged against.
+    //
+    // It replaces a fixed half-watt floor that was right for a 100 W
+    // radio and wrong for the ten-watt one this is meant to serve on a
+    // summit. A coupler's noise is a property of the board and the day;
+    // asking the board is more honest than a table, and it costs one
+    // settle window of doing nothing.
+    m_state = State::Baseline;
     m_lastTelemetryMs = QDateTime::currentMSecsSinceEpoch();
     m_watchdog.start(m_telemetryTimeoutMs);
     m_stepTimer.start(m_tuneSettleMs);
@@ -268,6 +275,34 @@ void SwrSweepController::abortSweep(const QString& reason)
     }
     qCInfo(lcConnection) << "SWR sweep aborted:" << reason;
     finish(false, reason);
+}
+
+void SwrSweepController::beginKeying()
+{
+    // Latch the idle reading. No samples at all means the link went
+    // quiet during the window; the watchdog handles that, and a zero
+    // baseline is the safe assumption either way.
+    m_baselineRaw = (m_baseN > 0)
+        ? static_cast<quint16>(m_baseAcc / m_baseN + 0.5)
+        : 0;
+    m_result.baselineRaw = m_baselineRaw;
+
+    // Key the carrier through the fully-gated TUNE path. Every existing
+    // safety check (band plan, CW block, TX inhibit) runs inside; a
+    // refusal leaves MoxController in Rx.
+    //
+    // This used to sit in startSweep(), which could then return false.
+    // It cannot any more — the sweep has already been announced — so a
+    // refusal goes out through finish() like every other exit.
+    m_mox->setTune(true);
+    if (m_mox->state() == MoxState::Rx) {
+        finish(false, QStringLiteral(
+            "TUNE was refused (band plan / safety gate)"));
+        return;
+    }
+
+    m_state = State::Keying;
+    m_stepTimer.start(m_tuneSettleMs);
 }
 
 void SwrSweepController::stepToNextPoint()
@@ -300,6 +335,13 @@ void SwrSweepController::ingestTelemetry(double fwdW, double revW,
     }
     m_lastTelemetryMs = QDateTime::currentMSecsSinceEpoch();
     m_watchdog.start(m_telemetryTimeoutMs);
+
+    // The idle window, before anything is keyed.
+    if (m_state == State::Baseline) {
+        m_baseAcc += fwdRaw;
+        ++m_baseN;
+        return;
+    }
     if (m_state != State::Measuring) {
         return;
     }
@@ -320,7 +362,33 @@ void SwrSweepController::closePoint()
     if (m_accN > 0) {
         pt.fwdW = m_accFwd / m_accN;
         const double revW = m_accRev / m_accN;
-        pt.swr = swrFromWatts(pt.fwdW, revW);
+
+        // ── Did the bridge respond? ──────────────────────────────────
+        //
+        // Against the radio's own idle reading, not against a fixed
+        // number of watts. On a 10 W radio at one watt the coupler
+        // gives a small reading — small is fine, absent is not, and
+        // only the baseline can tell those apart.
+        //
+        // The watts floor stays as the fallback for callers that hand
+        // over no raw count (the tests), and as a second opinion when a
+        // baseline could not be taken.
+        const bool haveRaw = (m_accFwdRawPeak > 0 || m_baselineRaw > 0);
+        const bool responded =
+            haveRaw
+                ? (m_accFwdRawPeak > m_baselineRaw + kMinRawRise)
+                : (pt.fwdW >= kMinFwdW);
+
+        // swrFromWatts still refuses below kMinFwdW on its own, which
+        // would undo the whole point on a QRP rig — so the ratio is
+        // computed here once the bridge has been shown to respond.
+        if (responded && pt.fwdW > 0.0) {
+            double r = std::clamp(revW, 0.0, pt.fwdW);
+            const double gamma = std::sqrt(r / pt.fwdW);
+            pt.swr = (gamma >= 0.999) ? 99.0
+                                      : std::min(99.0,
+                                                 (1.0 + gamma) / (1.0 - gamma));
+        }
     }
     m_result.points.append(pt);
     m_result.maxFwdW   = std::max(m_result.maxFwdW, pt.fwdW);
@@ -357,17 +425,17 @@ void SwrSweepController::closePoint()
         if (++m_deadRun >= kAbortDeadRun) {
             finish(false, m_result.maxFwdW < kSilentBridgeW
                 ? QStringLiteral(
-                      "Der Richtkoppler meldet gar nichts: höchstens "
-                      "%1 W über %2 Punkte, roher ADC-Höchstwert %3 "
-                      "von 4095. Der rohe Wert ist das, was das Gerät "
-                      "gesendet hat — bewegt der sich nicht, wenn du "
-                      "die Leistung erhöhst, liegt es nicht an der "
-                      "Skalierung und nicht am Sweep, sondern daran, "
-                      "dass keine HF entsteht oder der Koppler nichts "
-                      "meldet.")
-                      .arg(m_result.maxFwdW, 0, 'f', 2)
-                      .arg(kAbortDeadRun)
+                      "Der Richtkoppler hat nicht reagiert: ADC ruhend "
+                      "%1, beim Senden höchstens %2 — kein Unterschied "
+                      "über %3 Punkte. Die Ruhezahl stammt von deinem "
+                      "Gerät, kurz vor dem Sweep, mit ausgeschaltetem "
+                      "Sender. Bewegt sich der Wert beim Tasten nicht "
+                      "über sie hinaus, entsteht keine HF oder der "
+                      "Koppler meldet sie nicht — an der Leistung "
+                      "liegt es dann nicht.")
+                      .arg(m_result.baselineRaw)
                       .arg(m_result.maxFwdRaw)
+                      .arg(kAbortDeadRun)
                 : QStringLiteral(
                       "Zu wenig Vorlauf über %1 Punkte — höchstens %2 W "
                       "gemessen, ab %3 W ist die Anzeige eine Messung. "

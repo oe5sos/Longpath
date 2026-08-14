@@ -87,6 +87,12 @@ struct SwrSweepResult {
     /// measurement instead of another round of the same sentence.
     quint16 maxFwdRaw{0};
 
+    /// The forward ADC's idle reading, sampled with the transmitter OFF
+    /// immediately before this sweep. Everything is judged against it,
+    /// and a failed sweep can say "43 against an idle 41" instead of
+    /// quoting a number with nothing to compare it to.
+    quint16 baselineRaw{0};
+
     /// Frequency of the minimum valid SWR, 0 when no valid point.
     quint64 resonanceHz() const;
     double  minSwr() const;
@@ -177,10 +183,37 @@ public:
     /// console.cs:44740 [v2.10.3.13] Task.Delay(300) around TUNE
     /// transitions).
     static constexpr int kTuneSettleMs = 300;
-    /// Below this forward power the bridge reading is noise, not a
-    /// measurement; the point is recorded as invalid. NereusSDR-native
-    /// threshold — see design doc §Safety.
+    /// Fallback floor in watts, used only when no raw ADC count is
+    /// available (the tests feed watts alone).
+    ///
+    /// ── Why this is no longer the main test ──────────────────────────
+    ///
+    /// Half a watt is a sensible floor for a 100 W radio and nonsense
+    /// for a QRP one. The operator's SOTA rig is an ANAN-10E: ten watts
+    /// maximum, tuning at one. A fixed 0.5 W gate throws away half of
+    /// everything such a radio can produce, and no amount of raising
+    /// the power fixes it because there is no power to raise.
+    ///
+    /// The real question was never "how many watts" but "did the bridge
+    /// respond at all", and that is answered in ADC counts against the
+    /// radio's own idle reading. See kMinRawRise.
     static constexpr double kMinFwdW = 0.5;
+
+    /// How far the forward ADC must climb above the radio's OWN idle
+    /// reading before the point counts as a measurement.
+    ///
+    /// Measured against a baseline taken with the transmitter off,
+    /// moments before the sweep — so it adapts to the board, the
+    /// coupler and the day, and needs no per-model table. Sixty counts
+    /// out of 4095 is about one and a half percent of full scale: far
+    /// above the handful of counts an idle ADC wanders by, far below
+    /// what any real carrier produces.
+    ///
+    /// This is what makes a QRP sweep possible. A 10 W radio's coupler
+    /// is scaled for a 10 W radio; at one watt it produces a small
+    /// reading, not no reading, and a small reading well clear of the
+    /// noise is a perfectly good measurement.
+    static constexpr quint16 kMinRawRise = 60;
 
     /// The lowest tune power worth keying for.
     ///
@@ -249,12 +282,19 @@ signals:
     void reasonChanged(const QString& reason);
 
 private:
-    enum class State { Idle, Keying, Settling, Measuring, Finishing };
+    // Baseline comes FIRST and before the carrier: it is only a
+    // baseline if the transmitter is off while it is taken.
+    enum class State { Idle, Baseline, Keying, Settling, Measuring,
+                       Finishing };
 
     void stepToNextPoint();
     void beginMeasure();
     void closePoint();
     void finish(bool completed, const QString& reason);
+    /// Baseline window has elapsed: latch the idle reading and key.
+    /// Split out because keying can be refused, and that refusal now
+    /// happens here rather than inside startSweep().
+    void beginKeying();
 
     MoxController* m_mox{nullptr};
     std::function<void(quint64)> m_txFrequencyFn;
@@ -274,6 +314,11 @@ private:
     double  m_accRev{0.0};
     int     m_accN{0};
     quint16 m_accFwdRawPeak{0};
+
+    // Idle-reading accumulation during State::Baseline.
+    double  m_baseAcc{0.0};
+    int     m_baseN{0};
+    quint16 m_baselineRaw{0};
     qint64 m_lastTelemetryMs{0};
 
     QTimer m_stepTimer;      // single-shot, drives every state change

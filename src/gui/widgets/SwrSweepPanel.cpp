@@ -261,20 +261,20 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             m_status->setText(
                 result.maxFwdW < SwrSweepController::kSilentBridgeW
                 ? QStringLiteral(
-                      "Nichts gemessen — roher ADC-Höchstwert %1 von "
-                      "4095.\n\n"
-                      "Der Richtkoppler dieses Geräts ist ein "
-                      "Dämpfungsglied vor einer Diode, und eine Diode "
-                      "leitet erst ab einer gewissen Spannung. "
-                      "Darunter zeigt sie nicht wenig, sondern nichts. "
-                      "Mehr Leistung ist der einzige Hebel, den dieser "
-                      "Messweg hat.\n\n"
-                      "Wenn du bei kleiner Leistung messen willst, "
-                      "nimm den Reiter „Datei (VNA)“: ein NanoVNA "
-                      "misst mit Mikrowatt, weil er einen Empfänger "
-                      "benutzt statt einer Diode, und das Fenster "
-                      "sagt dir daraus, wo die Antenne resonant ist "
-                      "und wie viel Draht fehlt.")
+                      "Der Richtkoppler hat nicht reagiert. ADC ruhend "
+                      "%1, beim Senden höchstens %2 — der Wert ist "
+                      "beim Tasten nicht gestiegen.\n\n"
+                      "Die Ruhezahl kommt von deinem Gerät, kurz vor "
+                      "dem Sweep, mit ausgeschaltetem Sender. Es geht "
+                      "also nicht um zu wenig Leistung, sondern darum, "
+                      "dass sich beim Tasten nichts geändert hat: "
+                      "entweder entsteht keine HF, oder der Koppler "
+                      "meldet sie nicht.\n\n"
+                      "Ohne Senden messen geht über den Reiter "
+                      "„Datei (VNA)“ — ein NanoVNA misst mit "
+                      "Mikrowatt, weil er einen Empfänger benutzt "
+                      "statt einer Diode.")
+                      .arg(result.baselineRaw)
                       .arg(result.maxFwdRaw)
                 : QStringLiteral(
                       "Kein einziger Punkt gemessen. Der Richtkoppler "
