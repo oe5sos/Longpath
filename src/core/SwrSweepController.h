@@ -44,6 +44,8 @@
 
 #include "models/Band.h"
 #include "core/safety/BandPlanGuard.h"
+
+#include <optional>
 #include "core/WdspTypes.h"
 
 namespace NereusSDR {
@@ -148,8 +150,14 @@ struct SwrSweepPlan {
     /// allows for (region, mode) at this plan's point spacing, so a
     /// Region-1 40 m sweep ends at 7.200 MHz instead of failing. Returns
     /// false when fewer than kMinPoints points survive.
+    ///
+    /// A region of std::nullopt means the operator has not said where he
+    /// is. The clip then keeps only frequencies EVERY region permits —
+    /// see safety/RegionSetting.h. The seed range comes from the IARU
+    /// Region-2 table, so skipping the clip means transmitting on the US
+    /// plan; that is not a defensible default and is no longer reachable.
     bool clipToGuard(const safety::BandPlanGuard& guard,
-                     safety::Region region, DSPMode mode);
+                     std::optional<safety::Region> region, DSPMode mode);
 
     bool isValid() const { return startHz > 0 && stopHz > startHz; }
     quint64 freqAt(int index) const;

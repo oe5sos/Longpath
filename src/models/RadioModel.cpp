@@ -252,6 +252,7 @@ warren@wpratt.com
 // 3M-1a G.1: TX-side integration — MoxController + TxChannel view.
 // TxMicRouter is already included via RadioModel.h (for std::unique_ptr destructor).
 #include "core/MoxController.h"
+#include "core/safety/RegionSetting.h"
 #include "core/MicProfileManager.h"
 #include "core/PaProfile.h"
 #include "core/PaProfileManager.h"
@@ -6675,8 +6676,11 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             //
             // Closure captures: m_bandPlan, m_slices, m_hardwareProfile.
             //
-            // The closure derives region from AppSettings (key "BandPlanRegion"
-            // with Region2/UnitedStates as safe default matching Thetis).
+            // The closure derives the region via safety::configuredRegion(),
+            // from the key Setup → General → Region actually writes. It used
+            // to read "BandPlanRegion" and call UnitedStates a "safe default"
+            // — it is the WIDEST major plan, so the failure direction was
+            // permitting out-of-band TX. Unset now means the narrowest plan.
             // preventDifferentBand and extended are not yet plumbed into RadioModel
             // (deferred to 3M-2+ as per the plan §L.1 TODO annotation).
             //
@@ -9286,11 +9290,16 @@ void RadioModel::installBandPlanMoxCheck()
     }
 
     m_moxController->setMoxCheck([this]() -> safety::BandPlanGuard::MoxCheckResult {
-        const int regionInt = AppSettings::instance()
-            .value(QStringLiteral("BandPlanRegion"),
-                   QString::number(static_cast<int>(safety::Region::UnitedStates)))
-            .toInt();
-        const auto region = static_cast<safety::Region>(regionInt);
+        // ── The guard was reading a key nobody wrote ──────────────────
+        //
+        // 2026-08-14. This read "BandPlanRegion" and defaulted to
+        // UnitedStates. Nothing in the program has ever written that
+        // key — Setup → General → Region stores the display string
+        // under "Region" — so the check that exists to refuse
+        // out-of-band transmission has been running on the US band plan
+        // for every operator, whatever they selected. See
+        // core/safety/RegionSetting.h.
+        const safety::RegionChoice choice = safety::configuredRegion();
 
         const SliceModel* slice = txBoundSlice();
         if (!slice) {
@@ -9301,10 +9310,34 @@ void RadioModel::installBandPlanMoxCheck()
         const DSPMode mode = slice->dspMode();
         const Band txBand = bandFromFrequency(slice->frequency());
 
-        return m_bandPlan.checkMoxAllowed(region, freqHz, mode,
-                                          txBand, txBand,
-                                          /*preventDifferentBand=*/false,
-                                          /*extended=*/false);
+        if (choice.configured) {
+            return m_bandPlan.checkMoxAllowed(choice.region, freqHz, mode,
+                                              txBand, txBand,
+                                              /*preventDifferentBand=*/false,
+                                              /*extended=*/false);
+        }
+
+        // Nobody has said where this station is. Allow only what every
+        // band plan allows, and name the reason — a refusal the
+        // operator cannot explain is one he will work around.
+        for (int i = 0; i < safety::kRegionCount; ++i) {
+            const auto r = static_cast<safety::Region>(i);
+            const auto verdict =
+                m_bandPlan.checkMoxAllowed(r, freqHz, mode, txBand, txBand,
+                                           /*preventDifferentBand=*/false,
+                                           /*extended=*/false);
+            if (!verdict.ok) {
+                return {false,
+                        QStringLiteral("Keine Region eingestellt "
+                                       "(Einstellungen → General → "
+                                       "Region). Bis dahin gilt der "
+                                       "engste Bandplan, und %1 verbietet "
+                                       "diese Frequenz: %2")
+                            .arg(safety::regionDisplayName(r),
+                                 verdict.reason)};
+            }
+        }
+        return {true, {}};
     });
 }
 

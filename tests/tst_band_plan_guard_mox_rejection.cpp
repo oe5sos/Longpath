@@ -91,17 +91,21 @@ private slots:
     void initTestCase()
     {
         AppSettings::instance().clear();
-        AppSettings::instance().setValue(
-            QStringLiteral("BandPlanRegion"),
-            QString::number(static_cast<int>(Region::UnitedStates)));
+        // The key the interface writes and the guard now reads. It was
+        // "BandPlanRegion" here, a key nothing in the program ever
+        // wrote — see tst_region_setting.
+        AppSettings::instance().setValue(QStringLiteral("Region"),
+                                         QStringLiteral("United States"));
     }
 
     void cleanup()
     {
         AppSettings::instance().clear();
-        AppSettings::instance().setValue(
-            QStringLiteral("BandPlanRegion"),
-            QString::number(static_cast<int>(Region::UnitedStates)));
+        // The key the interface writes and the guard now reads. It was
+        // "BandPlanRegion" here, a key nothing in the program ever
+        // wrote — see tst_region_setting.
+        AppSettings::instance().setValue(QStringLiteral("Region"),
+                                         QStringLiteral("United States"));
     }
 
     // ── 1. CW mode + setMox(true) → moxRejected("CW TX coming in Phase 3M-2") ─

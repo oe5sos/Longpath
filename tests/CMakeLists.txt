@@ -2125,6 +2125,14 @@ nereus_add_test(tst_band_plan_guard_mox_rejection)
 # console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse).
 nereus_add_test(tst_swr_protection_controller)
 
+# ── The region had three lives and none of them met ─────────────────────────
+# Setup wrote the display string to "Region"; the sweep planner and the MOX
+# band-plan check read an int from "BandPlanRegion", which nothing ever wrote.
+# Both therefore always used the default — United States — and an 80 m sweep
+# in Austria transmitted to 4.000 MHz. Pins the mapping, the key, and the
+# clip.
+nereus_add_test(tst_region_setting)
+
 # ── Phase 3M-0 Task 4: TxInhibitMonitor GPIO poll + 4-source aggregation ─────
 # 8 tests cover: startup no-inhibit, UserIo01 active-low, reverse-logic inversion,
 # immediate Rx2OnlyRadio / OutOfBand / BlockTxAntenna notification paths,

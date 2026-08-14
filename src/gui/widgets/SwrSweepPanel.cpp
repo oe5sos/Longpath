@@ -15,6 +15,7 @@
 #include "SwrChartWidget.h"
 
 #include "core/AppSettings.h"
+#include "core/safety/RegionSetting.h"
 #include "core/antenna/RadioSweep.h"
 #include "gui/StyleConstants.h"
 
@@ -404,12 +405,18 @@ void SwrSweepPanel::startClicked()
     SwrSweepPlan plan = SwrSweepPlan::forBand(band);
     plan.points = m_pointsBox->value();
 
-    const int regionInt = AppSettings::instance()
-        .value(QStringLiteral("BandPlanRegion"),
-               QString::number(static_cast<int>(
-                   safety::Region::UnitedStates)))
-        .toInt();
-    const auto region = static_cast<safety::Region>(regionInt);
+    // ── Where the operator actually is ───────────────────────────────
+    //
+    // This read the key "BandPlanRegion" and defaulted to UnitedStates.
+    // Nothing in the program has ever written that key — Setup →
+    // General → Region writes the display string under "Region" — so
+    // the default was the only value it ever saw, and an 80 m sweep in
+    // Austria was clipped against the US plan and transmitted to
+    // 4.000 MHz. See core/safety/RegionSetting.h.
+    const safety::RegionChoice choice = safety::configuredRegion();
+    const std::optional<safety::Region> region =
+        choice.configured ? std::optional<safety::Region>(choice.region)
+                          : std::nullopt;
     const DSPMode mode =
         m_backend.txMode ? m_backend.txMode() : DSPMode::USB;
 
@@ -419,6 +426,17 @@ void SwrSweepPanel::startClicked()
             "Band %1 ist mit dem aktuellen Bandplan/Modus nicht "
             "sweepbar.").arg(bandLabel(band)));
         return;
+    }
+
+    // Say which plan trimmed it, and say when nobody told us. Silence
+    // here is what let a US-clipped sweep look normal for weeks.
+    if (!choice.configured) {
+        m_status->setText(QStringLiteral(
+            "Keine Region eingestellt (Einstellungen → General → "
+            "Region). Der Sweep bleibt vorsichtshalber in dem Bereich, "
+            "den JEDER Bandplan erlaubt: %1–%2 MHz.")
+                .arg(plan.startHz / 1e6, 0, 'f', 3)
+                .arg(plan.stopHz  / 1e6, 0, 'f', 3));
     }
 
     // ── Refuse before keying, not after ──────────────────────────────

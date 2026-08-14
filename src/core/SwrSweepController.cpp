@@ -16,6 +16,7 @@
 
 #include "core/MoxController.h"
 #include "core/LogCategories.h"
+#include "core/safety/RegionSetting.h"
 
 #include <QDateTime>
 
@@ -85,7 +86,8 @@ SwrSweepPlan SwrSweepPlan::forBand(Band b)
 }
 
 bool SwrSweepPlan::clipToGuard(const safety::BandPlanGuard& guard,
-                               safety::Region region, DSPMode mode)
+                               std::optional<safety::Region> region,
+                               DSPMode mode)
 {
     if (!isValid() || points < kMinPoints || points > kMaxPoints) {
         return false;
@@ -97,7 +99,14 @@ bool SwrSweepPlan::clipToGuard(const safety::BandPlanGuard& guard,
     int lastValid  = -1;
     for (int i = 0; i < points; ++i) {
         const auto f = static_cast<std::int64_t>(freqAt(i));
-        if (guard.isValidTxFreq(region, f, mode, /*extended=*/false)) {
+        // No region configured: allow only what every region allows.
+        // See safety/RegionSetting.h — the alternative was defaulting
+        // to the widest plan, and that is how a sweep on 80 m reached
+        // 4.000 MHz for a station in Region 1.
+        const bool allowed =
+            region ? guard.isValidTxFreq(*region, f, mode, /*extended=*/false)
+                   : safety::isValidTxFreqEverywhere(guard, f, mode, false);
+        if (allowed) {
             if (firstValid < 0) {
                 firstValid = i;
             }
