@@ -183,9 +183,29 @@ SwrSweepPlan SwrSweepPlan::forRange(double startLoHz, double stopHiHz,
     }
 
     // ── Share the points out ─────────────────────────────────────────
-    const int n = static_cast<int>(segs.size());
+    //
+    // Integer division loses the remainder, and with the point count at
+    // its minimum that loss is enough to fail the plan: 11 points over
+    // two segments gives 5 each, so 10 in all, and startSweep refuses
+    // anything under kMinPoints with "Sweep plan invalid" — a sentence
+    // that tells the operator nothing about what to change.
+    //
+    // Eleven is the spin box's lower stop and a range over two bands is
+    // the ordinary case, so this was reachable by anyone who turned the
+    // points down. Found by working the arithmetic out on paper an hour
+    // after writing it; nothing in the tests covered the boundary.
+    //
+    // So the share is raised until the whole plan clears the floor, and
+    // then clamped so it cannot run past the ceiling either.
+    const int n    = static_cast<int>(segs.size());
     const int want = std::max(totalPoints, kMinPoints);
-    const int per  = std::max(kMinPerSegment, want / n);
+    int per = std::max(kMinPerSegment, want / n);
+    if (per * n < kMinPoints) {
+        per = (kMinPoints + n - 1) / n;          // ceil
+    }
+    if (per * n > kMaxPoints) {
+        per = std::max(1, kMaxPoints / n);
+    }
 
     for (const Seg& s : segs) {
         const int first = static_cast<int>(plan.freqs.size());

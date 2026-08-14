@@ -799,6 +799,71 @@ private slots:
         QVERIFY(p.freqs.last()  <= 14350000ULL);
     }
 
+    // ── The boundary I walked straight past ──────────────────────────
+    //
+    // Integer division loses the remainder. Eleven points — the spin
+    // box's lower stop — over two segments gave five each, ten in all,
+    // and startSweep refuses anything under kMinPoints with "Sweep plan
+    // invalid". Turning the point count down and asking for a range
+    // across two bands is not an exotic thing to do.
+    //
+    // Written an hour after forRange, by working the arithmetic out on
+    // paper. None of the five tests I wrote with it touched the edge.
+    void range_neverPlansFewerPointsThanTheControllerAccepts()
+    {
+        safety::BandPlanGuard guard;
+        // Every point count the spin box offers, against ranges holding
+        // one, two, three and many segments.
+        const QList<QPair<double, double>> ranges = {
+            {14.0e6, 14.35e6},   // one band
+            { 7.0e6, 14.35e6},   // 40, 30, 20
+            { 3.4e6, 30.0e6},    // most of HF
+            { 1.8e6, 30.0e6},    // all of it
+        };
+        for (int pts : {SwrSweepPlan::kMinPoints, 12, 13, 15, 21, 51,
+                        201, SwrSweepPlan::kMaxPoints}) {
+            for (const auto& r : ranges) {
+                const SwrSweepPlan p = SwrSweepPlan::forRange(
+                    r.first, r.second, guard, safety::Region::Europe,
+                    DSPMode::LSB, pts);
+                if (!p.isValid()) { continue; }
+                QVERIFY2(p.points >= SwrSweepPlan::kMinPoints,
+                         qPrintable(QStringLiteral(
+                             "%1 points over %2–%3 MHz planned only %4 — "
+                             "startSweep would refuse it as invalid")
+                                 .arg(pts).arg(r.first / 1e6, 0, 'f', 1)
+                                 .arg(r.second / 1e6, 0, 'f', 1)
+                                 .arg(p.points)));
+                QVERIFY2(p.points <= SwrSweepPlan::kMaxPoints,
+                         qPrintable(QStringLiteral(
+                             "%1 points over %2–%3 MHz planned %4")
+                                 .arg(pts).arg(r.first / 1e6, 0, 'f', 1)
+                                 .arg(r.second / 1e6, 0, 'f', 1)
+                                 .arg(p.points)));
+                QCOMPARE(p.points, int(p.freqs.size()));
+            }
+        }
+    }
+
+    void range_aPlanThatSurvivesMustAlsoStart()
+    {
+        // The end-to-end version of the above: whatever forRange
+        // returns as valid, startSweep must accept. Those two
+        // agreeing is the actual contract; the point count is just how
+        // they disagreed.
+        safety::BandPlanGuard guard;
+        SwrSweepPlan p = SwrSweepPlan::forRange(
+            7.0e6, 14.35e6, guard, safety::Region::Europe, DSPMode::LSB,
+            SwrSweepPlan::kMinPoints);
+        QVERIFY(p.isValid());
+
+        Harness h;
+        QVERIFY2(h.ctl.startSweep(p),
+                 "forRange produced a plan the controller refuses");
+        h.ctl.abortSweep(QStringLiteral("test"));
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+    }
+
     void the_tune_power_minimum_leaves_room_above_the_bridge_floor()
     {
         QVERIFY2(double(SwrSweepController::kMinUsefulTuneW)
