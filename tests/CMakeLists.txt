@@ -2140,6 +2140,14 @@ nereus_add_test(tst_swr_protection_controller)
 # clip.
 nereus_add_test(tst_region_setting)
 
+# ── Zwei Bandtabellen, eine davon gatet den Sender ──────────────────────────
+# AmateurBands zeichnet, BandPlanGuard erlaubt. Am 2026-08-14 wichen sie auf
+# 60 m in Region 1 um den Faktor 27 ab (5.3515–5.3665 gezeichnet gegen
+# 5.100–5.500 erlaubt), und die grosszuegigere hat die Autoritaet: ein
+# Bereichs-Sweep tastete 385 kHz ausserhalb der Zuteilung. Alle anderen
+# Baender stimmten exakt — genau deshalb faellt die eine Abweichung nicht auf.
+nereus_add_test(tst_band_tables_agree)
+
 # ── Phase 3M-0 Task 4: TxInhibitMonitor GPIO poll + 4-source aggregation ─────
 # 8 tests cover: startup no-inhibit, UserIo01 active-low, reverse-logic inversion,
 # immediate Rx2OnlyRadio / OutOfBand / BlockTxAntenna notification paths,
