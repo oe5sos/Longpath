@@ -9592,7 +9592,15 @@ void MainWindow::openAntennaWindow()
             // Written through the same handler the band buttons use, so
             // a band change from here does everything one from the panel
             // does — filters, antenna relays, per-band power, the lot.
-            backend.setRadioBand = [this](Band b) { onBandButtonClicked(b); };
+            // RadioModel's handler, not MainWindow's — I read the
+            // declaration out of RadioModel.h and reached for it as
+            // though it were local. Same handler the band buttons and
+            // the band combo already go through (MainWindow.cpp:2249,
+            // :3116), so a band change from the antenna window does
+            // everything one from the panel does.
+            backend.setRadioBand = [rm = m_radioModel](Band b) {
+                rm->onBandButtonClicked(b);
+            };
             m_antennaWindow->sweepPanel()->setBackend(backend);
         }
     }
