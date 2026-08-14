@@ -350,8 +350,26 @@ constexpr int rfPowerSliderStepFor(HPSDRModel m) noexcept {
     return (m == HPSDRModel::HERMESLITE) ? 6 : 1;
 }
 
+/// Upper stop of the Tune Pwr slider.
+///
+/// 2026-08-14, OE5SOS: "tunen nur mit 1 Watt! Max mit 5 Watt!"
+///
+/// Thetis offers 0..100 (0..99 on HL2). Narrowed to five here, which is
+/// where the ceiling can be imposed tonight without rewriting the
+/// 0..100 contract that a dozen power-calibration tests encode — I
+/// tried that first and it moves expected dBm values in tests around
+/// the transmit path, which is not a thing to do at speed.
+///
+/// So this is the stop the hand meets, not a guarantee in the model: a
+/// value already stored above five still loads. The remaining gap is
+/// recorded as a task. For a station with no ATU and a QRP rig it is
+/// the difference that matters — five watts is already twice what the
+/// coupler needs to measure.
+constexpr int kTuneSliderMaxWatts = 5;
+
 constexpr int tuneSliderMaxFor(HPSDRModel m) noexcept {
-    return (m == HPSDRModel::HERMESLITE) ? 99 : 100;
+    const int upstream = (m == HPSDRModel::HERMESLITE) ? 99 : 100;
+    return upstream < kTuneSliderMaxWatts ? upstream : kTuneSliderMaxWatts;
 }
 
 constexpr int tuneSliderStepFor(HPSDRModel m) noexcept {

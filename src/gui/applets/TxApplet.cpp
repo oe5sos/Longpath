@@ -316,7 +316,7 @@ void TxApplet::buildUI()
     // Label fixedWidth 62, value fixedWidth 22  (AetherSDR TxApplet.cpp:107–128)
     {
         auto* tunSlider = new QSlider(Qt::Horizontal, this);
-        tunSlider->setRange(0, 100);
+        tunSlider->setRange(0, kTuneSliderMaxWatts);
         tunSlider->setValue(10);
         tunSlider->setAccessibleName(QStringLiteral("Tune power"));
 

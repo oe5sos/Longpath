@@ -398,6 +398,26 @@ public:
     /// summit tunes at one watt and has no choice about it.
     static constexpr int kDefaultTunePowerW = 1;
 
+    /// Hard ceiling on tune power, in watts.
+    ///
+    /// 2026-08-14, OE5SOS: "tunen nur mit 1 Watt! Max mit 5 Watt!"
+    ///
+    /// This is a real narrowing, not a default: the slider stops here
+    /// and a stored value above it is clamped on load. Said plainly so
+    /// nobody rediscovers it as a bug — Thetis allows 0..100, and the
+    /// upstream code carries a note from W2PA that "some amplifier
+    /// tuners need about 30 W to reliably start working". A station
+    /// with such an ATU cannot tune it through this build until this
+    /// constant is raised. There is no tuner here and the operator
+    /// works QRP.
+    ///
+    /// Measured justification for the ceiling being this low: his
+    /// coupler at 3 W reads 339 forward counts and 38 reverse, the
+    /// counts follow the square root of the power, and the thresholds
+    /// are 60 and 10. Five watts is already twice what the measurement
+    /// needs.
+    static constexpr int kMaxTunePowerW = 5;
+
     /// Return the tune-power value (watts) for the given band.
     /// kDefaultTunePowerW on first init, and the same as the fallback
     /// for an out-of-range band.

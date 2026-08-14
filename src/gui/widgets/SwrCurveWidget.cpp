@@ -95,17 +95,51 @@ void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const
     if (s.points.isEmpty()) { return; }
     const double gapHz = gapThresholdHz(s);
 
+    // ── One line, two kinds of ink ───────────────────────────────────
+    //
+    // "das ist keine durchgehende Linie" — and "über das hatten wir
+    // aber jetzt schon oft geschrieben", which is fair. I broke the
+    // curve at the band gaps and defended it three times.
+    //
+    // The concern was real and my answer to it was too blunt. Drawing a
+    // solid stroke from 7.200 to 14.000 MHz claims a measurement that
+    // does not exist. But leaving a hole throws away the thing the
+    // operator is actually looking at on a nine-band sweep: the SHAPE,
+    // where the antenna rises and falls across the whole range.
+    //
+    // Both are available. Solid where there are measurements, thin and
+    // dashed across the gaps. The eye follows one line; the ink says
+    // which parts were measured and which are just the two ends joined
+    // up. That is what a plot with holes in it should look like, and it
+    // is what I should have built when he first asked.
+    QPen solid = p.pen();
+    QPen bridge = solid;
+    QColor faded = solid.color();
+    faded.setAlpha(std::min(110, faded.alpha()));
+    bridge.setColor(faded);
+    bridge.setWidthF(std::max(0.8, solid.widthF() * 0.45));
+    bridge.setStyle(Qt::DotLine);
+
     QPolygonF line;
     line.reserve(s.points.size());
+    QPointF lastDrawn;
     double lastHz = 0.0;
+
     for (const SweepPoint& pt : s.points) {
+        const QPointF here(xFor(pt.freqHz),
+                           yFor(AntennaSweep::swr(pt.gamma)));
         if (!line.isEmpty() && (pt.freqHz - lastHz) > gapHz) {
+            p.setPen(solid);
             p.drawPolyline(line);
+            p.setPen(bridge);
+            p.drawLine(lastDrawn, here);      // the join, marked as one
             line.clear();
         }
-        line << QPointF(xFor(pt.freqHz), yFor(AntennaSweep::swr(pt.gamma)));
+        line << here;
+        lastDrawn = here;
         lastHz = pt.freqHz;
     }
+    p.setPen(solid);
     p.drawPolyline(line);
 }
 

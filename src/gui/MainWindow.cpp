@@ -9558,17 +9558,30 @@ void MainWindow::openAntennaWindow()
             backend.tuneDrive =
                 [rm = m_radioModel](Band b) -> SwrSweepPanel::TuneDrive {
                 const TransmitModel& tx = rm->transmitModel();
+                // Same ceiling RadioModel::setTune applies before it
+                // keys, so the panel shows what will actually go out
+                // rather than what happens to be stored. A label that
+                // says 50 while 5 leaves the radio is the exact kind of
+                // confident wrong number this window has produced all
+                // day.
+                const auto cap = [](int w) {
+                    return std::min(w, TransmitModel::kMaxTunePowerW);
+                };
                 switch (tx.tuneDrivePowerSource()) {
                 case DrivePowerSource::TuneSlider:
-                    return { tx.tunePowerForBand(b),
+                    return { cap(tx.tunePowerForBand(b)),
                              QStringLiteral("Tune-Pwr-Regler") };
                 case DrivePowerSource::Fixed:
-                    return { tx.tunePower(),
+                    return { cap(tx.tunePower()),
                              QStringLiteral("festen Wert im Setup") };
                 case DrivePowerSource::DriveSlider:
                     break;
                 }
-                return { tx.power(), QStringLiteral("RF-Power-Regler") };
+                // DriveSlider is the default source, so this is the one
+                // most stations actually tune on — it needs the cap
+                // just as much as the other two.
+                return { cap(tx.power()),
+                         QStringLiteral("RF-Power-Regler") };
             };
             backend.rawAdc = [rm = m_radioModel]() {
                 return qMakePair(rm->lastFwdAdcRaw(), rm->lastRevAdcRaw());

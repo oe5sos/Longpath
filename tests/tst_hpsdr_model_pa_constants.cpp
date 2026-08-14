@@ -18,7 +18,9 @@ private slots:
         QCOMPARE(NereusSDR::rfPowerSliderStepFor(HPSDRModel::HERMESLITE),  6);
     }
     void hl2_tuneSlider() {
-        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::HERMESLITE),  99);
+        // Station ceiling: see kTuneSliderMaxWatts. Was 99 upstream.
+        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::HERMESLITE),
+                 NereusSDR::kTuneSliderMaxWatts);
         QCOMPARE(NereusSDR::tuneSliderStepFor(HPSDRModel::HERMESLITE),  3);
     }
     void hl2_fixedTuneSpinbox() {
@@ -37,7 +39,8 @@ private slots:
         // NOTE: enum is ANAN100 (no underscore), not ANAN_100
         QCOMPARE(NereusSDR::rfPowerSliderMaxFor(HPSDRModel::ANAN100), 100);
         QCOMPARE(NereusSDR::rfPowerSliderStepFor(HPSDRModel::ANAN100), 1);
-        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::ANAN100),    100);
+        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::ANAN100),
+                 NereusSDR::kTuneSliderMaxWatts);
         QCOMPARE(NereusSDR::tuneSliderStepFor(HPSDRModel::ANAN100),     1);
         QCOMPARE(NereusSDR::fixedTuneSpinboxMinFor(HPSDRModel::ANAN100),  0.0f);
         QCOMPARE(NereusSDR::fixedTuneSpinboxMaxFor(HPSDRModel::ANAN100), 100.0f);
@@ -48,7 +51,8 @@ private slots:
         // Slider range stays 0-100 on every SKU - the per-band PA gain table
         // does the actual scaling. mi0bot only deviates for HERMESLITE.
         QCOMPARE(NereusSDR::rfPowerSliderMaxFor(HPSDRModel::ANAN_G2_1K), 100);
-        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::ANAN_G2_1K),    100);
+        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::ANAN_G2_1K),
+                 NereusSDR::kTuneSliderMaxWatts);
     }
 };
 
