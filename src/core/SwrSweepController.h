@@ -173,7 +173,38 @@ public:
     explicit SwrSweepController(QObject* parent = nullptr);
 
     // ── Dependency injection (all non-owning; set before startSweep) ──
+    /// Still needed, but only to READ the transmit state. Keying goes
+    /// through setTuneFn — see the note there.
     void setMoxController(MoxController* mox) { m_mox = mox; }
+
+    /// How to key and release TUNE.
+    ///
+    /// ── The bug this exists to fix ───────────────────────────────────
+    ///
+    /// The controller used to call MoxController::setTune() directly.
+    /// MoxController runs the keying state machine and nothing else.
+    /// The tune DRIVE LEVEL is pushed by RadioModel::setTune(), which
+    /// also sets the tune-adjusted TX VFO and arms SWR protection, and
+    /// then calls MoxController itself.
+    ///
+    /// So every sweep keyed the transmitter without ever pushing a
+    /// drive level, and the radio transmitted on whatever was left
+    /// over. Measured on the bench 2026-08-14, same tune power, same
+    /// antenna, same band:
+    ///
+    ///     TUNE button   VOR 339 counts   Power 1 W    carrier visible
+    ///     sweep         VOR  63 counts   Power 0 W    nothing
+    ///
+    /// A factor of fifty in power. Every sweep that day transmitted
+    /// into almost nothing and reported, correctly, that the coupler
+    /// had nothing to report — and the whole day went into suspecting
+    /// the coupler, the board profile, the protocol and the scaling.
+    /// The instrument was right every single time.
+    ///
+    /// Injected rather than calling RadioModel directly, because this
+    /// class is deliberately testable without one. Defaults to the raw
+    /// MoxController path so existing callers and tests keep working.
+    void setTuneFn(std::function<void(bool)> fn) { m_tuneFn = std::move(fn); }
     /// Pushes one TX frequency to the wire (RadioModel marshals to the
     /// connection thread). Required.
     void setTxFrequencyFn(std::function<void(quint64)> fn)
@@ -352,6 +383,10 @@ private:
     void beginKeying();
 
     MoxController* m_mox{nullptr};
+    std::function<void(bool)> m_tuneFn;
+    /// Key or release through the injected path, falling back to the
+    /// bare MoxController when nothing was injected.
+    void keyTune(bool on);
     std::function<void(quint64)> m_txFrequencyFn;
     std::function<void()>        m_txFreqRestoreFn;
     std::function<bool()>        m_readyFn;

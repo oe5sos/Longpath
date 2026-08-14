@@ -428,6 +428,44 @@ private slots:
     // The threshold only works while it sits between the idle scatter
     // and what a well-matched antenna returns. If it ever climbs past
     // the latter, every good antenna reads as a broken coupler.
+    // ── The fault that cost the day ──────────────────────────────────
+    //
+    // The controller keyed MoxController directly. MoxController runs
+    // the keying state machine and nothing else; the tune DRIVE LEVEL
+    // is pushed by RadioModel::setTune, which then calls MoxController
+    // itself. So every sweep transmitted with no drive pushed.
+    //
+    // Bench, same tune power, same antenna, same band:
+    //     TUNE button   339 ADC counts, Power 1 W, carrier visible
+    //     sweep          63 ADC counts, Power 0 W, nothing
+    //
+    // Nothing in the sweep's own logic was wrong, which is why a day
+    // went into the coupler, the board profile, the protocol and the
+    // scaling. It keyed through the wrong door.
+    void the_sweep_keys_through_the_injected_tune_path()
+    {
+        Harness h;
+        int on = 0;
+        int off = 0;
+        h.ctl.setTuneFn([&](bool v) {
+            if (v) { ++on; } else { ++off; }
+            h.mox.setTune(v);       // the orchestrator would do this too
+        });
+
+        FakeDipole dipole;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        h.pumpUntilFinished(dipole);
+
+        QCOMPARE(fin.count(), 1);
+        QVERIFY2(on == 1,
+                 "the sweep did not key through the injected path — it is "
+                 "back to calling MoxController directly, and the drive "
+                 "level will not be pushed");
+        QVERIFY2(off >= 1, "the carrier was never released through it");
+        QTRY_COMPARE(h.mox.state(), MoxState::Rx);
+    }
+
     void the_reverse_threshold_is_far_below_the_forward_one()
     {
         QVERIFY(SwrSweepController::kMinRevRise

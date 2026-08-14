@@ -280,6 +280,21 @@ void SwrSweepController::abortSweep(const QString& reason)
     finish(false, reason);
 }
 
+void SwrSweepController::keyTune(bool on)
+{
+    if (m_tuneFn) { m_tuneFn(on); return; }
+    // No orchestrated path injected: key the bare state machine. Right
+    // for the tests, and wrong on real hardware — which is exactly the
+    // fault this function was extracted to fix, so it is not silent.
+    if (m_mox) {
+        qCWarning(lcConnection)
+            << "SWR sweep: keying MoxController directly — no tune path "
+               "injected, so the drive level will not be pushed and the "
+               "carrier will be far below tune power";
+        m_mox->setTune(on);
+    }
+}
+
 void SwrSweepController::beginKeying()
 {
     // Latch the idle reading. No samples at all means the link went
@@ -301,7 +316,7 @@ void SwrSweepController::beginKeying()
     // This used to sit in startSweep(), which could then return false.
     // It cannot any more — the sweep has already been announced — so a
     // refusal goes out through finish() like every other exit.
-    m_mox->setTune(true);
+    keyTune(true);
     if (m_mox->state() == MoxState::Rx) {
         finish(false, QStringLiteral(
             "TUNE was refused (band plan / safety gate)"));
@@ -490,7 +505,7 @@ void SwrSweepController::finish(bool completed, const QString& reason)
     // TX-frequency restore (mirrors the TwoToneController release
     // choreography and its 300 ms Thetis-derived settle).
     if (m_mox) {
-        m_mox->setTune(false);
+        keyTune(false);
     }
     m_state = State::Finishing;
     m_stepTimer.start(m_tuneSettleMs);

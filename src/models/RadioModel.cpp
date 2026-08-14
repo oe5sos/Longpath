@@ -1058,6 +1058,16 @@ RadioModel::RadioModel(QObject* parent)
     // docs/architecture/2026-08-13-swr-sweep-analyzer-design.md
     m_swrSweep = new SwrSweepController(this);
     m_swrSweep->setMoxController(m_moxController);
+    // ── Key through the ORCHESTRATOR, not the state machine ──────────
+    //
+    // RadioModel::setTune pushes the tune drive level, sets the
+    // tune-adjusted TX VFO and arms SWR protection before it calls
+    // MoxController. The sweep used to call MoxController directly and
+    // therefore keyed the transmitter with no drive pushed at all —
+    // measured on the bench as 63 ADC counts against 339 for the TUNE
+    // button, a factor of fifty in power, and the cause of a full day
+    // of "the coupler reports nothing".
+    m_swrSweep->setTuneFn([this](bool on) { setTune(on); });
     m_swrSweep->setTxFrequencyFn([this](quint64 hz) {
         if (!m_connection) {
             return;
