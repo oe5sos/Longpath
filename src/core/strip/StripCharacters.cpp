@@ -452,4 +452,149 @@ bool apply(StripChain& chain, StripChain::Stage stage, const QString& name)
     }
 }
 
+// ── Reading a stage back out ─────────────────────────────────────────
+//
+// One order, written once, used by both capture and restore. Getting
+// the two out of step would silently shuffle a stage's parameters —
+// attack into release, threshold into ratio — and the only symptom
+// would be that a character stopped being recognised, which is far too
+// quiet for what it would be doing.
+//
+// Enum-valued parameters (the gate's mode, the tube's waveshaper) go in
+// as floats. They are small integers and the round trip is exact; a
+// variant type for two fields would cost more to read than it saves.
+
+QVector<float> captureStage(const StripChain& chain,
+                            StripChain::Stage stage)
+{
+    QVector<float> v;
+    switch (stage) {
+    case StripChain::Stage::Gate: {
+        const ClientGate& g = chain.gate();
+        v = { float(int(g.mode())), g.ratio(), g.floorDb(), g.thresholdDb(),
+              g.attackMs(), g.holdMs(), g.releaseMs(), g.returnDb(),
+              g.lookaheadMs() };
+        break;
+    }
+    case StripChain::Stage::Comp: {
+        const ClientComp& c = chain.comp();
+        v = { c.ratio(), c.kneeDb(), c.thresholdDb(), c.attackMs(),
+              c.releaseMs(), c.driveDb(), c.makeupDb(),
+              float(c.phaseRotatorStages()) };
+        break;
+    }
+    case StripChain::Stage::DeEss: {
+        const ClientDeEss& d = chain.deEss();
+        v = { d.frequencyHz(), d.q(), d.thresholdDb(), d.amountDb(),
+              d.attackMs(), d.releaseMs(), float(d.slopeStages()) };
+        break;
+    }
+    case StripChain::Stage::Tube: {
+        const ClientTube& t = chain.tube();
+        v = { float(int(t.model())), t.driveDb(), t.biasAmount(), t.tone(),
+              t.outputGainDb(), t.dryWet() };
+        break;
+    }
+    case StripChain::Stage::Pudu: {
+        const ClientPudu& p = chain.pudu();
+        v = { float(int(p.mode())), p.pooTuneHz(), p.pooDriveDb(), p.pooMix(),
+              p.dooTuneHz(), p.dooHarmonicsDb(), p.dooMix() };
+        break;
+    }
+    case StripChain::Stage::Limiter: {
+        const ClientFinalLimiter& l = chain.limiter();
+        v = { l.ceilingDb(), l.outputTrimDb() };
+        break;
+    }
+    default:
+        break;
+    }
+    return v;
+}
+
+void restoreStage(StripChain& chain, StripChain::Stage stage,
+                  const QVector<float>& v)
+{
+    // A short list means the caller and this function disagree about
+    // the stage's shape. Writing what there is and leaving the rest
+    // would produce a half-restored stage that looks plausible; better
+    // to do nothing and let the comparison come back "no match".
+    if (v.size() != captureStage(
+            const_cast<const StripChain&>(chain), stage).size()) { return; }
+
+    switch (stage) {
+    case StripChain::Stage::Gate: {
+        ClientGate& g = chain.gate();
+        // Mode first: it snaps ratio and floor, so setting it after
+        // them would overwrite the two values just restored.
+        g.setMode(static_cast<ClientGate::Mode>(int(v[0])));
+        g.setRatio(v[1]);      g.setFloorDb(v[2]);  g.setThresholdDb(v[3]);
+        g.setAttackMs(v[4]);   g.setHoldMs(v[5]);   g.setReleaseMs(v[6]);
+        g.setReturnDb(v[7]);   g.setLookaheadMs(v[8]);
+        break;
+    }
+    case StripChain::Stage::Comp: {
+        ClientComp& c = chain.comp();
+        c.setRatio(v[0]);      c.setKneeDb(v[1]);   c.setThresholdDb(v[2]);
+        c.setAttackMs(v[3]);   c.setReleaseMs(v[4]); c.setDriveDb(v[5]);
+        c.setMakeupDb(v[6]);   c.setPhaseRotatorStages(int(v[7]));
+        break;
+    }
+    case StripChain::Stage::DeEss: {
+        ClientDeEss& d = chain.deEss();
+        d.setFrequencyHz(v[0]); d.setQ(v[1]);       d.setThresholdDb(v[2]);
+        d.setAmountDb(v[3]);    d.setAttackMs(v[4]); d.setReleaseMs(v[5]);
+        d.setSlopeStages(int(v[6]));
+        break;
+    }
+    case StripChain::Stage::Tube: {
+        ClientTube& t = chain.tube();
+        t.setModel(static_cast<ClientTube::Model>(int(v[0])));
+        t.setDriveDb(v[1]);    t.setBiasAmount(v[2]); t.setTone(v[3]);
+        t.setOutputGainDb(v[4]); t.setDryWet(v[5]);
+        break;
+    }
+    case StripChain::Stage::Pudu: {
+        ClientPudu& p = chain.pudu();
+        p.setMode(static_cast<ClientPudu::Mode>(int(v[0])));
+        p.setPooTuneHz(v[1]);  p.setPooDriveDb(v[2]); p.setPooMix(v[3]);
+        p.setDooTuneHz(v[4]);  p.setDooHarmonicsDb(v[5]); p.setDooMix(v[6]);
+        break;
+    }
+    case StripChain::Stage::Limiter: {
+        ClientFinalLimiter& l = chain.limiter();
+        l.setCeilingDb(v[0]);  l.setOutputTrimDb(v[1]);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+QString inEffect(const StripChain& chain, StripChain::Stage stage)
+{
+    const QVector<float> now = captureStage(chain, stage);
+    if (now.isEmpty()) { return {}; }
+
+    // A scratch chain, not a copy of the operator's: applying every
+    // character in turn to the real one and putting it back would be
+    // audible if anything read it mid-loop, and the audio thread does.
+    //
+    // Not prepare()d. Characters only write parameters, which are plain
+    // atomics; allocating eight stages' worth of buffers to compare a
+    // handful of floats would make this too expensive to call from the
+    // panel's refresh timer, which is where it is called from.
+    //
+    // Kept between calls for the same reason. thread_local rather than
+    // a plain static because "only the GUI thread calls this" is true
+    // today and is not the kind of thing that stays true by itself.
+    thread_local StripChain scratch;
+    for (const Character& ch : forStage(stage)) {
+        restoreStage(scratch, stage, now);
+        if (!apply(scratch, stage, ch.name)) { continue; }
+        if (captureStage(scratch, stage) == now) { return ch.name; }
+    }
+    return {};
+}
+
 } // namespace NereusSDR::StripCharacters

@@ -140,6 +140,20 @@ public:
     ClientReverb&       reverb()  noexcept { return m_reverb; }
     ClientFinalLimiter& limiter() noexcept { return m_limiter; }
 
+    // Const overloads, so a caller that only READS the chain can say so
+    // in its signature. Added for StripCharacters::inEffect(), which
+    // compares a stage against every character and must not be able to
+    // change one by accident — the stage it is inspecting is being read
+    // by the audio thread at the same time.
+    const ClientGate&         gate()    const noexcept { return m_gate; }
+    const ClientEq&           eq()      const noexcept { return m_eq; }
+    const ClientDeEss&        deEss()   const noexcept { return m_deEss; }
+    const ClientComp&         comp()    const noexcept { return m_comp; }
+    const ClientTube&         tube()    const noexcept { return m_tube; }
+    const ClientPudu&         pudu()    const noexcept { return m_pudu; }
+    const ClientReverb&       reverb()  const noexcept { return m_reverb; }
+    const ClientFinalLimiter& limiter() const noexcept { return m_limiter; }
+
 private:
     double m_sampleRate{48000.0};
 

@@ -250,6 +250,107 @@ private slots:
         QVERIFY(double(c->pudu().dooMix()) > 0.0);
     }
 
+    // ── Recognising which one is in effect ───────────────────────────
+    //
+    // The window used to remember the last name clicked and show it
+    // forever, so moving one knob left the label naming a character the
+    // stage no longer had. inEffect() replaces that by asking the chain.
+    // Everything the label says now rests on these.
+
+    void a_freshly_applied_character_is_recognised()
+    {
+        auto c = makeChain();
+        for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
+            for (const auto& ch : StripCharacters::forStage(s)) {
+                QVERIFY(StripCharacters::apply(*c, s, ch.name));
+                const QString found = StripCharacters::inEffect(*c, s);
+                QVERIFY2(found == ch.name,
+                         qPrintable(QStringLiteral("applied '%1', recognised "
+                                                   "'%2'").arg(ch.name, found)));
+            }
+        }
+    }
+
+    void moving_one_knob_afterwards_means_no_character_matches()
+    {
+        auto c = makeChain();
+        QVERIFY(StripCharacters::apply(*c, Stage::Comp,
+                                       QStringLiteral("Balanced")));
+        QCOMPARE(StripCharacters::inEffect(*c, Stage::Comp),
+                 QStringLiteral("Balanced"));
+
+        c->comp().setRatio(c->comp().ratio() + 1.0f);
+        QVERIFY2(StripCharacters::inEffect(*c, Stage::Comp).isEmpty(),
+                 "a nudged compressor still claimed to be Balanced");
+
+        // And picking it again puts it back — the tooltip on the
+        // "edited" mark promises exactly this.
+        QVERIFY(StripCharacters::apply(*c, Stage::Comp,
+                                       QStringLiteral("Balanced")));
+        QCOMPARE(StripCharacters::inEffect(*c, Stage::Comp),
+                 QStringLiteral("Balanced"));
+    }
+
+    // Several characters deliberately leave a parameter alone — the
+    // gate's Ragchew sets its timings but not the threshold, which
+    // depends on the room. Comparing against a freshly built stage
+    // would report "not this one" for anybody who had ever set their
+    // threshold, which is everybody.
+    void a_parameter_the_character_does_not_touch_does_not_break_the_match()
+    {
+        auto c = makeChain();
+        QVERIFY(StripCharacters::apply(*c, Stage::Gate,
+                                       QStringLiteral("Ragchew")));
+        QCOMPARE(StripCharacters::inEffect(*c, Stage::Gate),
+                 QStringLiteral("Ragchew"));
+
+        c->gate().setThresholdDb(-33.0f);   // Ragchew never writes this
+        QVERIFY2(StripCharacters::inEffect(*c, Stage::Gate)
+                     == QStringLiteral("Ragchew"),
+                 "setting a threshold Ragchew does not control lost the "
+                 "match");
+    }
+
+    // Recognition must not be able to change the stage it inspects —
+    // the audio thread is reading it at the same time.
+    void recognising_a_character_leaves_the_chain_alone()
+    {
+        auto c = makeChain();
+        QVERIFY(StripCharacters::apply(*c, Stage::Tube,
+                                       QStringLiteral("Full")));
+        for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
+            const auto before = StripCharacters::captureStage(*c, s);
+            StripCharacters::inEffect(*c, s);
+            QVERIFY2(StripCharacters::captureStage(*c, s) == before,
+                     "inEffect() moved a parameter while looking at it");
+        }
+    }
+
+    void capture_and_restore_are_the_same_order()
+    {
+        // If they ever disagree a stage's parameters get shuffled —
+        // attack into release — and the only symptom is that characters
+        // stop being recognised. Far too quiet for what it would do.
+        auto c = makeChain();
+        for (Stage s : {Stage::Gate, Stage::Comp, Stage::DeEss,
+                        Stage::Tube, Stage::Pudu, Stage::Limiter}) {
+            QVERIFY(!StripCharacters::captureStage(*c, s).isEmpty());
+            const auto original = StripCharacters::captureStage(*c, s);
+
+            // Move it somewhere else, then put the capture back.
+            const auto list = StripCharacters::forStage(s);
+            QVERIFY(StripCharacters::apply(*c, s, list.last().name));
+            StripCharacters::restoreStage(*c, s, original);
+
+            QVERIFY2(StripCharacters::captureStage(*c, s) == original,
+                     qPrintable(QStringLiteral("stage %1 did not survive a "
+                                               "capture/restore round trip")
+                                    .arg(int(s))));
+        }
+    }
+
     void safety_leaves_more_headroom_than_loud()
     {
         auto c = makeChain();

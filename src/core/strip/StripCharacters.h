@@ -77,4 +77,42 @@ QVector<Character> forStage(StripChain::Stage stage);
 // preset that surprises people.
 bool apply(StripChain& chain, StripChain::Stage stage, const QString& name);
 
+// ── Which one is actually in effect ──────────────────────────────────
+//
+// Returns the name of the character whose settings the stage currently
+// has, or an empty string if it has none of them.
+//
+// This exists because the window used to remember the last name chosen
+// and show it forever. Move one knob afterwards and the label went on
+// naming a character the stage no longer had — which is the same class
+// of fault as a picture that disagrees with the DSP, and the label was
+// the one lying.
+//
+// ── Only what the character controls is compared ─────────────────────
+//
+// Several characters deliberately leave parameters alone: the gate's
+// "Ragchew" sets its mode, timings and hysteresis but not the
+// threshold, because the threshold depends on the room and is the
+// operator's to keep. Comparing against a freshly built stage would
+// therefore report "not this one" for anybody who had ever touched
+// their threshold — technically defensible and useless.
+//
+// So the comparison starts from the stage AS IT IS, applies the
+// character on top, and asks whether anything moved. Parameters the
+// character does not touch are equal by construction and drop out of
+// the answer, which is exactly the question being asked: is this stage
+// still doing what that character says.
+QString inEffect(const StripChain& chain, StripChain::Stage stage);
+
+// The stage's parameters as a flat list, in a fixed order, for
+// comparing two of them. Exposed because the tests need it and because
+// a comparison function nobody can inspect is one nobody can trust.
+//
+// Only parameters a character may write. The enabled flag is not one —
+// see the note on apply().
+QVector<float> captureStage(const StripChain& chain,
+                            StripChain::Stage stage);
+void restoreStage(StripChain& chain, StripChain::Stage stage,
+                  const QVector<float>& values);
+
 } // namespace NereusSDR::StripCharacters

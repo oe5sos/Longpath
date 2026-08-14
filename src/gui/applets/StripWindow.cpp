@@ -1500,7 +1500,7 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
         box->setMinimumWidth(150);
         pickRow->addWidget(box, 1);
 
-        // ── Show which one is actually chosen ────────────────────────
+        // ── Show which one is actually in effect ─────────────────────
         //
         // Reported from the bench: change the tube's character and the
         // curve moves but the name does not. The combo was rebuilt from
@@ -1510,23 +1510,42 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
         // just been picked. The picture and the label disagreed, and
         // the label was the one lying.
         //
-        // The name is remembered per stage. Signals are blocked while
-        // restoring it: setting the index would otherwise re-apply the
-        // character and undo any knob the operator has since moved.
+        // The answer is not to remember what was clicked. It is to ask
+        // the chain what it currently is: StripCharacters::inEffect()
+        // compares the stage against every character and names the one
+        // it matches, or none. That is true after a preset, after a
+        // restore from disk, and after a knob has been moved — the
+        // three cases a remembered name gets wrong.
         //
-        // Known limitation, and it is the honest kind: move a knob by
-        // hand afterwards and the combo still names the character you
-        // started from. Detecting "edited since" means comparing every
-        // parameter of the stage against a freshly applied copy, which
-        // is worth doing and is not this change.
-        {
-            const QString remembered = characterKeyFor(stage);
-            const int at = box->findData(remembered);
-            if (at > 0) {
-                const QSignalBlocker block(box);
-                box->setCurrentIndex(at);
-            }
-        }
+        // The remembered name is still kept, for one job only: when the
+        // stage matches nothing, it says which character the operator
+        // started from, so the note reads "Voodoo — edited" rather than
+        // going blank and losing the explanation with it.
+        //
+        // Signals are blocked while setting the index. Otherwise
+        // restoring it would re-apply the character and undo whatever
+        // was edited.
+        // Wired up here, kept current by refreshStageText() on the
+        // meter timer. Doing it at build time only would mean the mark
+        // appeared at the next panel rebuild rather than when the knob
+        // moved — and for a stage nobody applies a preset to, that is
+        // never.
+        st.charBox = box;
+
+        // A word after the combo when the stage no longer matches what
+        // the combo names. Beside it rather than inside the entry, so
+        // the list stays a list of characters and does not grow an
+        // entry called "Voodoo — edited" that cannot be chosen.
+        st.charMark = new QLabel(QStringLiteral("edited"), words);
+        st.charMark->setStyleSheet(
+            QStringLiteral("QLabel { color: %1; font-size: 10px; "
+                           "font-style: italic; }")
+                .arg(QString::fromLatin1(Style::kAmberText)));
+        st.charMark->setToolTip(QStringLiteral(
+            "The stage has been adjusted since this character was "
+            "chosen. Picking it again puts the numbers back."));
+        st.charMark->hide();
+        pickRow->addWidget(st.charMark);
         col->addLayout(pickRow);
 
         st.charNote = new QLabel(words);
@@ -1540,21 +1559,13 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
                      QString::fromLatin1(Style::kInsetBorder)));
         col->addWidget(st.charNote);
 
-        auto describe = [this, box, stage, idx]() {
-            const QString name = box->currentData().toString();
-            for (const auto& ch : StripCharacters::forStage(stage)) {
-                if (ch.name == name) {
-                    if (m_stageText[static_cast<size_t>(idx)].charNote) {
-                        m_stageText[static_cast<size_t>(idx)]
-                            .charNote->setText(ch.description);
-                    }
-                    break;
-                }
-            }
-        };
-        connect(box, &QComboBox::currentIndexChanged, this,
-                [this, box, stage, describe](int) {
-            describe();
+        // `activated`, not `currentIndexChanged`. It fires on a choice
+        // the operator made, including re-choosing the entry already
+        // shown — which is what "picking it again puts the numbers
+        // back" in the mark's tooltip depends on, and what
+        // currentIndexChanged would swallow.
+        connect(box, &QComboBox::activated, this,
+                [this, box, stage](int) {
             // Applying a character moves several knobs at once, so the
             // panel is rebuilt rather than refreshed — every control
             // reads its own value from the chain when it is built, and
@@ -1571,7 +1582,11 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
                 }
             }
         });
-        describe();
+
+        // Fill the note now rather than leaving an empty box until the
+        // first meter tick. lastSeen is left empty on purpose so the
+        // comparison inside sees a change and does the work.
+        if (StripChain* c = chain()) { refreshCharacter(st, stage, *c); }
     }
 
     col->addStretch(1);
@@ -1581,7 +1596,9 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
 
 void StripWindow::refreshStageText()
 {
-    for (auto& st : m_stageText) {
+    StripChain* c = chain();
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        StageText& st = m_stageText[static_cast<size_t>(i)];
         if (!st.picture || !st.picture->isVisible()) { continue; }
         QString live, legend;
         if (auto* d = qobject_cast<StripDynamicsCurve*>(st.picture)) {
@@ -1593,6 +1610,68 @@ void StripWindow::refreshStageText()
         }
         if (st.live)   { st.live->setText(live); }
         if (st.legend) { st.legend->setText(legend); }
+
+        if (c && st.charBox) {
+            refreshCharacter(st, static_cast<StripChain::Stage>(i), *c);
+        }
+    }
+}
+
+// ── Keeping the character honest ─────────────────────────────────────
+//
+// Runs on the meter timer, for the visible tab only. Recognising a
+// character means trying every one of them against the stage, which is
+// cheap but not free — so the stage's parameters are compared against
+// the previous tick's first, and the work only happens when a number
+// has actually moved.
+void StripWindow::refreshCharacter(StageText& st, StripChain::Stage stage,
+                                   const StripChain& c)
+{
+    const QVector<float> now = StripCharacters::captureStage(c, stage);
+    if (now == st.lastSeen) { return; }
+    st.lastSeen = now;
+
+    const QString active   = StripCharacters::inEffect(c, stage);
+    const QString started  = characterKeyFor(stage);
+    const bool    edited   = active.isEmpty() && !started.isEmpty();
+    const QString show     = edited ? started : active;
+
+    if (st.charMark) { st.charMark->setVisible(edited); }
+
+    // Blocked: setting the index fires nothing here, but `activated`
+    // aside, a stray signal would re-apply the character and undo the
+    // very edit being reported.
+    if (!show.isEmpty()) {
+        const int at = st.charBox->findData(show);
+        if (at >= 0 && at != st.charBox->currentIndex()) {
+            const QSignalBlocker block(st.charBox);
+            st.charBox->setCurrentIndex(at);
+        }
+    }
+
+    if (!st.charNote) { return; }
+    for (const auto& ch : StripCharacters::forStage(stage)) {
+        if (ch.name != show) { continue; }
+        // A character is a starting point and adjusting from it is the
+        // intended use, so this is not a warning. It is the difference
+        // between a label describing the STAGE and one describing a
+        // button somebody pressed once — without it the description
+        // below explains settings the stage no longer has.
+        st.charNote->setText(edited
+            ? QStringLiteral("Started from %1, adjusted since — what follows "
+                             "is where you began, not where you are.\n\n%2")
+                  .arg(ch.name, ch.description)
+            : ch.description);
+        return;
+    }
+    // Matches nothing and nothing was ever chosen: a hand-built stage,
+    // or one restored from a preset. Say that rather than describing a
+    // character it does not have.
+    if (show.isEmpty()) {
+        st.charNote->setText(QStringLiteral(
+            "Set by hand. Pick a character above to start from a known "
+            "point — it will say what it is for, and you can adjust from "
+            "there."));
     }
 }
 

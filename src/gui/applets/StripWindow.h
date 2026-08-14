@@ -51,6 +51,7 @@
 
 #include <QDialog>
 #include <QPointer>
+#include <QVector>
 
 #include <array>
 #include <functional>
@@ -338,8 +339,30 @@ private:
         QLabel*  live{nullptr};
         QLabel*  legend{nullptr};
         QLabel*  charNote{nullptr};
+
+        // ── The character, kept honest while you turn knobs ──────────
+        //
+        // These three make the label describe the STAGE rather than the
+        // last button pressed. refreshStageText() asks the chain which
+        // character it currently matches and updates all three; move a
+        // knob and the "edited" mark appears on the next tick without
+        // the panel being rebuilt.
+        //
+        // lastSeen is the stage's parameters at the previous tick.
+        // Recognising a character means trying every one of them, which
+        // is cheap but not free, and the answer can only change when a
+        // parameter does — so the comparison is the guard.
+        QComboBox*     charBox{nullptr};
+        QLabel*        charMark{nullptr};
+        QVector<float> lastSeen;
     };
     std::array<StageText, StripChain::kStageCount> m_stageText{};
+
+    // One stage's picker, mark and note, brought into line with what
+    // the chain actually holds. Declared after StageText because it
+    // takes one by reference.
+    void refreshCharacter(StageText& st, StripChain::Stage stage,
+                          const StripChain& c);
 
     QLabel* m_presetNote{nullptr};
     QLabel* m_gateMeter{nullptr};
