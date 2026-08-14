@@ -4754,6 +4754,10 @@ nereus_add_test(tst_strip_characters)
 # -- A radio sweep becoming the same Sweep a .s1p becomes. Mostly about
 #    the boundary: a magnitude with no phase must not become an
 #    impedance, and an unmeasured point must not become a perfect one --
+# -- The coupler's zero, measured instead of tabled. The term that made
+#    an 80 m sweep draw SWR 1.00 where the VNA said 2.5 --
+nereus_add_test(tst_coupler_zero)
+
 nereus_add_test(tst_radio_sweep)
 
 nereus_add_test(tst_eq_filter_ring)

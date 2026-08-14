@@ -385,7 +385,20 @@ namespace {
 //
 // Upstream inline attribution preserved verbatim (console.cs:24965):
 //   case HPSDRModel.REDPITAYA: //DH1KLM
+double scaleRevPowerWattsWithZero(quint16 adcRaw, HPSDRModel model,
+                                  int zeroOverride);
+
 double scaleRevPowerWatts(quint16 adcRaw, HPSDRModel model)
+{
+    return scaleRevPowerWattsWithZero(adcRaw, model, -1);
+}
+
+// The reverse side of PaTelemetryScaling::scaleFwdPowerWattsWithZero.
+// zeroOverride < 0 keeps the tabled adc_cal_offset; anything else
+// replaces it with a zero CouplerZero measured on this radio. See
+// core/CouplerZero.h for why a tabled zero is wrong in both directions.
+double scaleRevPowerWattsWithZero(quint16 adcRaw, HPSDRModel model,
+                                  int zeroOverride)
 {
     double bridge_volt   = 0.09;
     double refvoltage    = 3.3;
@@ -426,6 +439,8 @@ double scaleRevPowerWatts(quint16 adcRaw, HPSDRModel model)
         bridge_volt = 0.09; refvoltage = 3.3; adc_cal_offset = 3;
         break;
     }
+
+    if (zeroOverride >= 0) { adc_cal_offset = zeroOverride; }
 
     double adc = static_cast<double>(adcRaw);
     if (adc < 0) { adc = 0; }
@@ -5865,6 +5880,11 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // broke v0.4.0 PureSignal on Hermes / ANAN-10 / ANAN-10E /
     // ANAN-100 / ANAN-100B / AnvelinaPro3-on-P1.  See the
     // applyHpsdrModel definition for the full bug context.
+    // A zero measured on the previous radio says nothing about this
+    // one, and a stale one is worse than none: it would be applied with
+    // full confidence to a different coupler.
+    m_couplerZero.reset();
+
     HPSDRModel selectedModel = info.modelOverride;
     if (selectedModel == HPSDRModel::FIRST) {
         selectedModel = defaultModelForBoard(info.boardType);
@@ -8995,8 +9015,29 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
     m_lastFwdRaw = fwdRaw;
     m_lastRevRaw = revRaw;
 
-    const double fwdW   = NereusSDR::scaleFwdPowerWatts(model, fwdRaw);
-    const double revW   = scaleRevPowerWatts(revRaw, model);
+    // ── The zero, measured rather than tabled ────────────────────────
+    //
+    // adc_cal_offset is the count the coupler's ADC reads with no
+    // drive. It is a property of the individual board and its
+    // temperature, not of the model, and a table of it is wrong in both
+    // directions: too high deletes small readings, too low invents
+    // power on a receiving radio. See core/CouplerZero.h.
+    //
+    // Learned continuously while not transmitting. MoxController is the
+    // authority on that — the same reasoning as the force-zero below,
+    // where TransmitModel's flags turned out to be orphan state.
+    const bool onAir = m_moxController
+                       && m_moxController->state() != MoxState::Rx;
+    m_couplerZero.observe(fwdRaw, revRaw, onAir);
+
+    const double fwdW = NereusSDR::scaleFwdPowerWattsWithZero(
+        model, fwdRaw,
+        m_couplerZero.forwardZero(NereusSDR::tabledFwdZero(model)));
+    // The reverse table's zero is not exposed, so -1 means "keep the
+    // tabled one" until CouplerZero has grounds of its own.
+    const double revW = scaleRevPowerWattsWithZero(
+        revRaw, model,
+        m_couplerZero.known() ? int(m_couplerZero.reverseZero(0)) : -1);
     const double paV    = scalePaVolts(userAdc0Raw, model);
     const double paA    = scalePaAmps(userAdc1Raw, model);
     const double paTemp = scalePaTemperatureCelsius(0, model);

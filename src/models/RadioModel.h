@@ -68,6 +68,7 @@
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
 #include "core/ConnectionState.h"
+#include "core/CouplerZero.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
 #include "core/TgxlConnection.h"
@@ -3627,6 +3628,9 @@ private:
     // Latest raw coupler counts; see lastFwdAdcRaw().
     quint16 m_lastFwdRaw{0};
     quint16 m_lastRevRaw{0};
+    // The coupler's zero, learned from this radio while it receives.
+    // Replaces the per-model adc_cal_offset table — see CouplerZero.h.
+    CouplerZero m_couplerZero;
 
     // 3M-4 Task 7: PureSignal coordinator.  Owned via unique_ptr (NOT a
     // raw QObject child) so the destructor can drain the polling timers

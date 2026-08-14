@@ -158,16 +158,32 @@ PaFwdTriplet fwdTripletFor(HPSDRModel model) noexcept
 // Lifted verbatim from src/models/RadioModel.cpp scaleFwdPowerWatts
 // (private file-scope helper).  The RadioModel.cpp copy is intentionally
 // retained until Phase 4 Agent 4A migrates the call sites.
-double scaleFwdPowerWatts(HPSDRModel model, quint16 raw) noexcept
+quint16 tabledFwdZero(HPSDRModel model) noexcept
+{
+    return static_cast<quint16>(fwdTripletFor(model).adcCalOffset);
+}
+
+double scaleFwdPowerWattsWithZero(HPSDRModel model, quint16 raw,
+                                  quint16 zero) noexcept
 {
     const PaFwdTriplet t = fwdTripletFor(model);
-    double adc = static_cast<double>(raw);
-    if (adc < 0) { adc = 0; }
-    double volts = (adc - t.adcCalOffset) / 4095.0 * t.refVoltage;
+    // The only change from upstream's formula: the zero comes from the
+    // caller instead of t.adcCalOffset. Everything else — the 4095, the
+    // reference voltage, the square over the bridge constant, the two
+    // clamps at zero — is Thetis console.cs:25056-25071 unchanged.
+    double volts = (static_cast<double>(raw) - static_cast<double>(zero))
+                   / 4095.0 * t.refVoltage;
     if (volts < 0) { volts = 0; }
     double watts = (volts * volts) / t.bridgeVolt;
     if (watts < 0) { watts = 0; }
     return watts;
+}
+
+double scaleFwdPowerWatts(HPSDRModel model, quint16 raw) noexcept
+{
+    // One implementation, so the tabled and measured paths cannot come
+    // to disagree about anything but the zero.
+    return scaleFwdPowerWattsWithZero(model, raw, tabledFwdZero(model));
 }
 
 // From Thetis console.cs:25060-25068 [v2.10.3.13] — the `volts` value

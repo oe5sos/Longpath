@@ -105,6 +105,33 @@ namespace NereusSDR {
 /// tag preserved on REDPITAYA) lives in PaTelemetryScaling.cpp.
 double scaleFwdPowerWatts(HPSDRModel model, quint16 raw) noexcept;
 
+/// The same, but with the zero SUPPLIED rather than looked up.
+///
+/// ── Why there are two ────────────────────────────────────────────────
+///
+/// The three constants in the scaling are not alike. refvoltage and
+/// bridge_volt describe the coupler and belong in the per-board table.
+/// adc_cal_offset does not: it is the count the ADC reads with no
+/// drive, and that varies with the individual board, its temperature
+/// and its age.
+///
+/// A tabled zero is wrong in both directions. Too high and it deletes
+/// signal — an Anvelina Pro 3 idles at 0 counts while the table
+/// subtracts 28 from the reverse channel, which turned every small
+/// reflection into exactly SWR 1.00. Too low and it invents signal,
+/// reporting forward power on a receiving radio.
+///
+/// So CouplerZero measures it and hands it in here. The tabled version
+/// above stays for callers with nothing measured yet, and forwards to
+/// this one with the table's figure — the two cannot drift apart
+/// because there is one implementation.
+double scaleFwdPowerWattsWithZero(HPSDRModel model, quint16 raw,
+                                  quint16 zero) noexcept;
+
+/// The tabled zero for a board, so a caller can pass it as the fallback
+/// while CouplerZero is still learning.
+quint16 tabledFwdZero(HPSDRModel model) noexcept;
+
 /// Scale raw forward-power or reverse-power ADC counts to volts at
 /// the PA output directional coupler. Used to drive the FWD / REV
 /// voltage labels in PaValuesPage (Thetis SetupForm.textFwdVoltage /
