@@ -535,7 +535,11 @@ void AntennaWindow::buildUi()
     // commit and nothing was showing it.
     head->addWidget(tile(this, &m_spanCap, &m_spanVal,
                          QStringLiteral("USABLE")));
-    col->addLayout(head);
+    // Held so the whole row can come off for a multi-band sweep, where
+    // four tiles describing one arbitrary band are worse than nothing.
+    m_tileRow = new QWidget(this);
+    m_tileRow->setLayout(head);
+    col->addWidget(m_tileRow);
     // The trim headline used to sit here, above the tiles. It said
     // "shorten by 49 %" and "enter the wire length for centimetres" —
     // advice, not measurement, and explicitly unwanted now. Retired
@@ -572,11 +576,11 @@ void AntennaWindow::buildUi()
     // say everything; the table stays hidden. An end-fed swept across
     // HF touches eight, and "where is it resonant" is then a list, not
     // a number.
-    m_bandTable = new QTableWidget(0, 5, this);
+    m_bandTable = new QTableWidget(0, 6, this);
     m_bandTable->setHorizontalHeaderLabels({
         QStringLiteral("Band"), QStringLiteral("start"),
         QStringLiteral("middle"), QStringLiteral("end"),
-        QStringLiteral("resonant at")});
+        QStringLiteral("bestes SWR"), QStringLiteral("resonant bei")});
     m_bandTable->verticalHeader()->setVisible(false);
     m_bandTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_bandTable->setSelectionMode(QAbstractItemView::NoSelection);
@@ -593,7 +597,16 @@ void AntennaWindow::buildUi()
           QLatin1String(Style::kButtonBg),
           QLatin1String(Style::kTextScale)));
     m_bandTable->setVisible(false);
-    retiredBox->addWidget(m_bandTable);
+    // ── Out of the retired holder ────────────────────────────────────
+    //
+    // It was parented into the hidden widget with the wire length and
+    // the coax boxes, which meant setVisible(true) on the table itself
+    // could never show it: a child of a hidden parent stays hidden.
+    // So refreshBandTable() has been filling in a table nobody could
+    // see, and a range sweep over nine bands showed four tiles for
+    // whichever single band bestOverlap happened to pick — 10 m, with
+    // "USABLE none", while 40 m sat at 1.10.
+    col->addWidget(m_bandTable);
 
     // What the last change actually did, against what was predicted.
     // Sits under the curve because it is a statement about the pair of
@@ -917,8 +930,29 @@ void AntennaWindow::refreshBandTable()
     // table there is furniture.
     if (bands.size() < 2) {
         m_bandTable->setVisible(false);
+        if (m_tileRow) { m_tileRow->setVisible(true); }
         return;
     }
+    // Several bands: the tiles come off. They describe exactly one, and
+    // which one is decided by widest overlap — on a 1.8-to-30 sweep
+    // that is 10 m, so a nine-band measurement was headlined "BAND
+    // START 28.000 · USABLE none" while 40 m sat at 1.10.
+    if (m_tileRow) { m_tileRow->setVisible(false); }
+
+    // ── What "resonant" can honestly mean here ───────────────────────
+    //
+    // A file from a VNA carries phase, so a true series resonance —
+    // reactance crossing zero — is available, and it is NOT the same
+    // frequency as the SWR minimum. A sweep from the radio is
+    // magnitude-only: forward and reflected power, no phase, no
+    // reactance, no resonance. AntennaSweep::resonances() correctly
+    // returns nothing for it.
+    //
+    // For a radio sweep the useful per-band answer is the dip: lowest
+    // SWR in the band and where it sits. So that column is always
+    // filled, and the resonance column is hidden rather than printed
+    // as a row of dashes that look like a fault.
+    m_bandTable->setColumnHidden(5, m_sweep.magnitudeOnly);
 
     const double limit = m_limitBox->value();
     m_bandTable->setRowCount(bands.size());
@@ -950,8 +984,35 @@ void AntennaWindow::refreshBandTable()
             }
         }
 
+        // ── The dip, which every sweep can answer ────────────────────
+        //
+        // Searched over the measured points inside the band, not by
+        // sampling the interpolation on a grid: the points ARE the
+        // measurement, and a grid can walk straight past a sharp
+        // minimum between two of them.
+        double bestSwr = 0.0;
+        double bestAt  = 0.0;
+        for (const SweepPoint& p : m_sweep.points) {
+            if (!b.contains(p.freqHz)) { continue; }
+            const double v = AntennaSweep::swr(p.gamma);
+            if (v <= 0.0) { continue; }
+            if (bestSwr <= 0.0 || v < bestSwr) { bestSwr = v; bestAt = p.freqHz; }
+        }
+        if (bestSwr > 0.0) {
+            put(4, QStringLiteral("%1 bei %2 MHz")
+                       .arg(bestSwr, 0, 'f', 2)
+                       .arg(bestAt / 1e6, 0, 'f', 3),
+                QColor(bestSwr > limit ? Style::kRedBorder
+                                       : Style::kGreenText));
+        } else {
+            put(4, QStringLiteral("nicht gemessen"),
+                QColor(Style::kTextInactive));
+        }
+
         // A resonance inside this band is the thing an end-fed owner is
         // looking for. Saying "none" is as useful as saying where.
+        // Only meaningful with phase — see the note above; the column
+        // is hidden for a magnitude-only sweep.
         QString where = QStringLiteral("—");
         QColor  col(Style::kTextInactive);
         for (const auto& c : res) {
@@ -962,7 +1023,7 @@ void AntennaWindow::refreshBandTable()
             col = QColor(Style::kAmberText);
             break;
         }
-        put(4, where, col);
+        put(5, where, col);
     }
 
     m_bandTable->resizeColumnsToContents();

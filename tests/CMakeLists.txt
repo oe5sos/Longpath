@@ -2040,6 +2040,13 @@ nereus_add_test(tst_sku_ui_profile)
 # cites Thetis setup.cs:19846-20375 [v2.10.3.13 @501e3f5].
 nereus_add_test(tst_antenna_labels)
 
+# ── Four tiles describing one of nine bands ─────────────────────────────────
+# A 1.8–30 MHz range sweep found 1.10 on 40 m and headlined the window "BAND
+# START 28.000 · USABLE none" — 10 m, because bestOverlap picks the widest.
+# The per-band table written for exactly this was parented into the hidden
+# holder, so it could never appear however often setVisible(true) was called.
+nereus_add_test(tst_antenna_window_multiband)
+
 # ── Phase 3G RX Epic sub-epic D: BandPlanManager loader + active-plan API ───
 # TDD red bar: tests are registered here but BandPlanManager.h does not exist
 # yet. Build of this target will fail until Task 3 ports BandPlanManager from

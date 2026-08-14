@@ -185,6 +185,12 @@ private:
     // One row per band the sweep touches. Hidden for a single-band
     // sweep, where the three tiles at the top already say it and a
     // one-row table is furniture.
+    /// The four headline tiles, as one widget. A sweep across several
+    /// bands gets the table below instead — four numbers describing
+    /// whichever band happened to overlap widest are not a summary of
+    /// nine bands, they are a wrong answer with a confident face.
+    QWidget* m_tileRow{nullptr};
+
     QTableWidget* m_bandTable{nullptr};
     QPushButton* m_forgetBtn{nullptr};
 
