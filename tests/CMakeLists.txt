@@ -4733,6 +4733,13 @@ nereus_add_test(tst_callsign_cache)
 #    anti-resonance is NOT offered as something to trim towards --
 nereus_add_test(tst_antenna_sweep)
 
+# ── The window that stayed on the previous band ─────────────────────────────
+# A 40 m sweep defaulted the target to 7.100; the 20 m sweep that followed was
+# then labelled and tabulated as 40 m, and could not recover because the window
+# re-defaults the target to the middle of whatever band it is shown. Pins the
+# invariant: the band shown is one the sweep covers.
+nereus_add_test(tst_swr_curve_band)
+
 # -- Band edges. The project's existing table is Region 2, so drawing a
 #    40 m edge from it puts 100 kHz of "your antenna is fine here" over
 #    spectrum a Region 1 operator may not transmit in --

@@ -1,0 +1,134 @@
+// tests/tst_swr_curve_band.cpp  (NereusSDR)
+//
+// NereusSDR-original. No Thetis port.
+//
+// ── The window that stayed on the previous band ──────────────────────
+//
+// Bench, 2026-08-14. A 40 m sweep ran; the window defaulted its target
+// to 7.100 MHz. A 20 m sweep followed. The curve drew 14.000–14.350
+// correctly, and everything describing it was still 40 m: the three
+// tiles read "not swept" against 7.000 / 7.100 / 7.200, and the line
+// under the axis said "40 m · mid 7.100 MHz · 200 kHz wide" underneath
+// twenty metres of measured data.
+//
+// recompute() let a target choose the band, and never asked whether the
+// sweep reached that target. Worse, it could not recover on its own:
+// AntennaWindow re-defaults the target to the middle of whichever band
+// it is shown, so 40 m wrote 7.100 straight back and the next sweep
+// found the same stale target waiting for it.
+//
+// The sweep decides which bands are in play. A target may only choose
+// among them.
+
+#include <QtTest>
+
+#include "gui/widgets/SwrCurveWidget.h"
+#include "core/antenna/Touchstone.h"
+
+#include <complex>
+
+using namespace NereusSDR;
+
+namespace {
+
+/// A flat sweep across [loHz, hiHz] at a harmless SWR. The band logic
+/// does not care what the curve does, only where it is.
+Sweep flatSweep(double loHz, double hiHz, const QString& source)
+{
+    Sweep s;
+    s.source = source;
+    s.magnitudeOnly = true;
+    constexpr int kN = 21;
+    for (int i = 0; i < kN; ++i) {
+        SweepPoint p;
+        p.freqHz = loHz + (hiHz - loHz) * i / (kN - 1);
+        p.gamma  = std::complex<double>(0.1, 0.0);   // SWR ≈ 1.22
+        s.points.append(p);
+    }
+    return s;
+}
+
+} // namespace
+
+class TestSwrCurveBand : public QObject
+{
+    Q_OBJECT
+
+private slots:
+    void bandFollowsTheSweep()
+    {
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.setSweep(flatSweep(14.0e6, 14.35e6, QStringLiteral("20m")));
+        QCOMPARE(w.shownBand().name, QStringLiteral("20 m"));
+    }
+
+    void aTargetInsideTheSweepStillChoosesTheBand()
+    {
+        // The behaviour the guard must not break: on a wide end-fed
+        // sweep the target is how the operator says which band he means.
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.setSweep(flatSweep(3.0e6, 30.0e6, QStringLiteral("endfed")));
+        w.setTargetHz(7.1e6);
+        QCOMPARE(w.shownBand().name, QStringLiteral("40 m"));
+    }
+
+    void aTargetOutsideTheSweepDoesNotChooseTheBand()
+    {
+        // The bug, exactly as it happened.
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.setSweep(flatSweep(7.0e6, 7.2e6, QStringLiteral("40m")));
+        w.setTargetHz(7.1e6);
+        QCOMPARE(w.shownBand().name, QStringLiteral("40 m"));
+
+        // Now 20 m arrives with the 40 m target still standing.
+        w.setSweep(flatSweep(14.0e6, 14.35e6, QStringLiteral("20m")));
+        QVERIFY2(w.shownBand().name == QStringLiteral("20 m"),
+                 qPrintable(QStringLiteral(
+                     "a 20 m sweep was labelled '%1' because the target "
+                     "from the previous band was still set")
+                         .arg(w.shownBand().name)));
+    }
+
+    void theBandIsWithinTheSweepWhicheverWayItIsDriven()
+    {
+        // Whatever the caller does with targets, the band it shows must
+        // be one the measurement actually covers. That is the invariant
+        // the window was relying on and the widget was not providing.
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        const double lo = 14.0e6;
+        const double hi = 14.35e6;
+        for (double target : {0.0, 3.6e6, 7.1e6, 14.2e6, 28.5e6}) {
+            w.setSweep(flatSweep(lo, hi, QStringLiteral("20m")));
+            w.setTargetHz(target);
+            const auto b = w.shownBand();
+            if (!b.isValid()) { continue; }
+            QVERIFY2(b.highHz >= lo && b.lowHz <= hi,
+                     qPrintable(QStringLiteral(
+                         "target %1 MHz produced band %2, which the sweep "
+                         "does not touch")
+                             .arg(target / 1e6).arg(b.name)));
+        }
+    }
+
+    void aForcedBandStillWins()
+    {
+        // A range the operator typed is his own instruction and outranks
+        // both the sweep and the target.
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.setSweep(flatSweep(14.0e6, 14.35e6, QStringLiteral("20m")));
+        AmateurBands::Band typed;
+        typed.lowHz  = 14.1e6;
+        typed.highHz = 14.2e6;
+        typed.name   = QStringLiteral("your range");
+        w.setBand(typed);
+        QCOMPARE(w.shownBand().name, QStringLiteral("your range"));
+    }
+};
+
+QTEST_MAIN(TestSwrCurveBand)
+#include "tst_swr_curve_band.moc"

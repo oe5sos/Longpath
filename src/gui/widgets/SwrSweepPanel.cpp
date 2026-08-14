@@ -541,11 +541,24 @@ void SwrSweepPanel::refreshTunePowerLabel()
     // much power is a warning; too little is the reason the sweep
     // measures nothing, and it stayed invisible until after the radio
     // had transmitted fifty-one times.
+    //
+    // "zu wenig zum Messen — mindestens 5 W" was a false statement.
+    // 2026-08-14: the label said it at 3 W while the sweep beside it had
+    // just measured 51 of 51 points on 20 m. Five watts is a number I
+    // picked for a coupler I have never measured, and the operator had
+    // already told me twice that he works at low power — a QRP rig on
+    // a summit tunes at one watt and has no choice about it.
+    //
+    // Whether the bridge can see the drive is not knowable from the
+    // slider; it depends on the coupler, and only the measurement finds
+    // out. So this warns that it MIGHT not be enough and says where the
+    // answer will appear, instead of asserting a failure that has not
+    // happened.
     QString note;
     QString colour = QString::fromLatin1(Style::kTextPrimary);
     if (watts < SwrSweepController::kMinUsefulTuneW) {
-        note   = QStringLiteral("  ⚠ zu wenig zum Messen — mindestens %1 W")
-                     .arg(SwrSweepController::kMinUsefulTuneW);
+        note   = QStringLiteral("  ⚠ wenig — falls nichts herauskommt, "
+                                "steht der Grund unten");
         colour = QString::fromLatin1(Style::kAmberText);
     } else if (watts > 10) {
         note   = QStringLiteral("  ⚠ >10 W");

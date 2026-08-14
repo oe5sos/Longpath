@@ -221,7 +221,23 @@ void SwrCurveWidget::recompute()
     // rather than on the widest overlap — on a 3-to-30 MHz end-fed
     // sweep the widest overlap is 10 m, which is unlikely to be what
     // was asked about.
-    if (!m_forcedBand.isValid() && m_targetHz > 0.0) {
+    //
+    // But only a target the sweep actually reaches. 2026-08-14, on the
+    // bench: a 40 m sweep defaulted the target to 7.100, then a 20 m
+    // sweep arrived. The target was still 7.100, so the band came out
+    // as 40 m over a 14.000–14.350 curve — the three tiles read
+    // "not swept" against 7.000 / 7.100 / 7.200 and the line under the
+    // axis said "40 m · mid 7.100 MHz" beneath twenty metres of data.
+    //
+    // Worse, it could not recover: the window re-defaults the target to
+    // the middle of the band it is shown, so 40 m wrote 7.100 back and
+    // the next sweep found the same stale target waiting.
+    //
+    // The sweep decides which bands are in play. A target may only
+    // choose among them; it may not nominate one that was not measured.
+    if (!m_forcedBand.isValid() && m_targetHz > 0.0
+        && m_targetHz >= m_sweep.startHz()
+        && m_targetHz <= m_sweep.stopHz()) {
         const AmateurBands::Band inTarget =
             AmateurBands::containing(m_targetHz, m_region);
         if (inTarget.isValid()) { m_band = inTarget; }
