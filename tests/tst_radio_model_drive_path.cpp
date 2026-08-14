@@ -181,7 +181,8 @@ private slots:
         // pointer (mirrors tst_radio_model_set_tune.cpp pattern).
         auto detach = qScopeGuard([&]{ model.injectConnectionForTest(nullptr); });
 
-        // TuneSlider source so tunePowerForBand(80m) = 50W is consulted.
+        // TuneSlider source, and 80 m set to 50 W explicitly below so the
+// figure under test does not move with the default.
         model.transmitModel().setTuneDrivePowerSource(
             DrivePowerSource::TuneSlider);
         model.transmitModel().setTunePowerForBand(Band::Band80m, 50);

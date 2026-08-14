@@ -35,12 +35,19 @@ private slots:
 
     // ── Default: all bands return 50W ────────────────────────────────────
 
-    void defaultAllBands50W() {
+    // Named for fifty because that is what Thetis fills in. NereusSDR
+    // lowered it to one on 2026-08-14 — see
+    // TransmitModel::kDefaultTunePowerW for the measurements behind it.
+    // Compared against the constant, not a literal: the whole reason the
+    // SWR limit went wrong this morning was the same number written out
+    // by hand in two places.
+    void defaultAllBandsAreTheDefault() {
         TransmitModel t;
         // Per-band TX power covers HF amateur + GEN/WWV/XVTR (HL2 SWL
         // bands inherit ham values, so iterate to Band::SwlFirst only).
         for (int i = 0; i < static_cast<int>(Band::SwlFirst); ++i) {
-            QCOMPARE(t.tunePowerForBand(static_cast<Band>(i)), 50);
+            QCOMPARE(t.tunePowerForBand(static_cast<Band>(i)),
+                     TransmitModel::kDefaultTunePowerW);
         }
     }
 
@@ -55,13 +62,14 @@ private slots:
     void otherBandsUnaffected() {
         TransmitModel t;
         t.setTunePowerForBand(Band::Band20m, 75);
-        // Every other band should still be 50W.
+        // Every other band should still be at the default.
         // Per-band TX power covers HF amateur + GEN/WWV/XVTR (HL2 SWL
         // bands inherit ham values, so iterate to Band::SwlFirst only).
         for (int i = 0; i < static_cast<int>(Band::SwlFirst); ++i) {
             const Band b = static_cast<Band>(i);
             if (b != Band::Band20m) {
-                QCOMPARE(t.tunePowerForBand(b), 50);
+                QCOMPARE(t.tunePowerForBand(b),
+                         TransmitModel::kDefaultTunePowerW);
             }
         }
     }
@@ -94,7 +102,8 @@ private slots:
         TransmitModel t;
         // Cast a deliberately out-of-range index.
         const Band outOfRange = static_cast<Band>(999);
-        QCOMPARE(t.tunePowerForBand(outOfRange), 50);
+        QCOMPARE(t.tunePowerForBand(outOfRange),
+                 TransmitModel::kDefaultTunePowerW);
     }
 
     void outOfRangeBandSetIsNoOp() {
@@ -102,7 +111,8 @@ private slots:
         const Band outOfRange = static_cast<Band>(999);
         t.setTunePowerForBand(outOfRange, 99);  // must not crash
         // All valid bands still at default.
-        QCOMPARE(t.tunePowerForBand(Band::Band20m), 50);
+        QCOMPARE(t.tunePowerForBand(Band::Band20m),
+                 TransmitModel::kDefaultTunePowerW);
     }
 
     // ── Signal emission ──────────────────────────────────────────────────
@@ -154,8 +164,9 @@ private slots:
         QCOMPARE(t2.tunePowerForBand(Band::Band20m), 75);
         QCOMPARE(t2.tunePowerForBand(Band::Band40m), 30);
         QCOMPARE(t2.tunePowerForBand(Band::Band6m),  10);
-        // Bands we didn't set should still be 50W default.
-        QCOMPARE(t2.tunePowerForBand(Band::Band80m), 50);
+        // Bands we didn't set should still be at the default.
+        QCOMPARE(t2.tunePowerForBand(Band::Band80m),
+                 TransmitModel::kDefaultTunePowerW);
     }
 
     void persistenceRoundTripAllBands() {
@@ -194,8 +205,9 @@ private slots:
         TransmitModel t;  // no setMacAddress → m_mac is empty
         t.load();         // must be a no-op
 
-        // Band::Band20m is index 5; should still be 50W default (not 99).
-        QCOMPARE(t.tunePowerForBand(Band::Band20m), 50);
+        // Band::Band20m is index 5; should still be the default, not 99.
+        QCOMPARE(t.tunePowerForBand(Band::Band20m),
+                 TransmitModel::kDefaultTunePowerW);
     }
 
     void emptyMacSaveIsNoOp() {

@@ -309,7 +309,30 @@ TransmitModel::TransmitModel(QObject* parent)
     // From Thetis console.cs:1819-1820 [v2.10.3.13]:
     //   tunePower_by_band = new int[(int)Band.LAST];
     //   for (int i = 0; i < (int)Band.LAST; i++) tunePower_by_band[i] = 50;
-    m_tunePowerByBand.fill(50);
+    //
+    // ── One watt, not fifty ──────────────────────────────────────────
+    //
+    // Thetis fills every band with 50 W and NereusSDR copied it. 2026-08-14,
+    // OE5SOS: "bitte ändere auf tune min 1 Watt, nicht 50."
+    //
+    // The value is per band and persisted per radio, so this default only
+    // ever applies to a band the operator has not touched — and that is
+    // exactly when it bites. His 40 m sat at the 9 W he had chosen and his
+    // 20 m at 3 W, while 15 m and 160 m, which he had never tuned on, were
+    // still at the ported fifty. He then swept both: 160 m has an SWR of
+    // 7 across the whole band, so that was fifty watts into an eight-to-one
+    // mismatch for forty-eight points.
+    //
+    // One watt is enough. Measured on his own coupler at 3 W — 339 forward
+    // counts, 38 reverse — and the counts go with the square root of the
+    // power, so 1 W gives about 196 and 22. The thresholds are 60 and 10.
+    // The SWR that comes out is the same to within ±0.01.
+    //
+    // And the failure directions are not symmetric. Too little power ends
+    // in a sentence naming the ADC readings and what to check. Too much
+    // ends in heat in a mismatched antenna, and on a QRP rig at a summit
+    // it is not available at all.
+    m_tunePowerByBand.fill(kDefaultTunePowerW);
 
     // Initialise per-band normal-mode power to 50W (#167 Phase 3A).
     // From Thetis console.cs:1813-1814 [v2.10.3.13]:
@@ -557,7 +580,11 @@ int TransmitModel::tunePowerForBand(Band band) const
 {
     const int idx = static_cast<int>(band);
     if (idx < 0 || idx >= kBandCount) {
-        return 50;  // safe fallback for out-of-range band
+        // Same figure as the constructor fills. It was 50 here and 50
+        // there; two copies of one number, and a fallback that quietly
+        // hands back fifty watts for a band it does not recognise is
+        // the wrong way round for a fallback.
+        return kDefaultTunePowerW;
     }
     return m_tunePowerByBand[static_cast<std::size_t>(idx)];
 }

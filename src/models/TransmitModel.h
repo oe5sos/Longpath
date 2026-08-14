@@ -382,9 +382,25 @@ public:
     // NereusSDR uses scalar per-band AppSettings keys instead of Thetis's
     // pipe-delimited string (console.cs:3087-3091 save, :4904-4910 restore).
 
+    /// Tune power, in watts, for a band the operator has never set.
+    ///
+    /// Thetis fills every band with 50 (console.cs:1819-1820) and this
+    /// code copied it. Lowered to 1 on 2026-08-14 at OE5SOS's request,
+    /// after two sweeps ran at fifty watts on bands he had never tuned
+    /// on — one of them 160 m, where his antenna sits at an SWR of 7.
+    ///
+    /// One watt measures just as well: on his coupler at 3 W the counts
+    /// were 339 forward and 38 reverse, and they follow the square root
+    /// of the power, so 1 W gives roughly 196 and 22 against thresholds
+    /// of 60 and 10. The resulting SWR agrees to about ±0.01.
+    ///
+    /// It is also the only figure a QRP rig can offer: the ANAN-10E at a
+    /// summit tunes at one watt and has no choice about it.
+    static constexpr int kDefaultTunePowerW = 1;
+
     /// Return the tune-power value (watts) for the given band.
-    /// Default 50W on first init.  Returns 50 as a safe fallback for
-    /// out-of-range band values.
+    /// kDefaultTunePowerW on first init, and the same as the fallback
+    /// for an out-of-range band.
     int tunePowerForBand(Band band) const;
 
     /// Set the tune-power value (watts) for the given band.

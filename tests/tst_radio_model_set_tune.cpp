@@ -395,7 +395,9 @@ private slots:
     //   PreviousPWR = ptbPWR.Value;  //MW0LGE_22b
     //   PWR = new_pwr; (tune power via SetPowerUsingTargetDBM; 3M-1a uses tunePowerForBand)
     // We verify via the MockConnection::txDriveLog.
-    // tunePowerForBand defaults to 50 for all bands (console.cs:1819-1820 [v2.10.3.13]).
+    // tunePowerForBand defaults to TransmitModel::kDefaultTunePowerW for
+// all bands. Thetis uses 50 (console.cs:1819-1820 [v2.10.3.13]);
+// NereusSDR lowered it to 1 on 2026-08-14 — see the constant.
     void tuneOnPushesTunePower()
     {
         RadioModel model;
@@ -409,10 +411,10 @@ private slots:
         // 14.225 MHz → Band20m.
         slice->setFrequency(14225000.0);
 
-        // Default tunePowerForBand(Band20m) = 50.
         const int expectedTunePower = model.transmitModel().tunePowerForBand(
             Band::Band20m);
-        QCOMPARE(expectedTunePower, 50);  // verify default
+        QCOMPARE(expectedTunePower,
+                 TransmitModel::kDefaultTunePowerW);  // verify default
 
         // Phase 4 Agent 4A of issue #167 (K2GX safety hotfix): seed a
         // PaProfileManager so the rewritten TUN-on path has an active
