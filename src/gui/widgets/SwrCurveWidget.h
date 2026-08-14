@@ -160,6 +160,15 @@ public:
     };
     QVector<Panel> viewPanels() const;
 
+private:
+    /// True when this frequency has a place on the picture: inside the
+    /// view on a linear axis, inside a panel on a segmented one.
+    /// Anything else would be pinned to a panel edge by xFor, and a
+    /// marker drawn there would point at the wrong frequency.
+    bool inSomePanel(double hz) const;
+
+public:
+
 protected:
     void paintEvent(QPaintEvent*) override;
     // ── Reading a value off the curve ────────────────────────────────

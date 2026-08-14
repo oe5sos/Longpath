@@ -508,6 +508,22 @@ void SwrCurveWidget::rebuildViewSegments()
     }
 }
 
+bool SwrCurveWidget::inSomePanel(double hz) const
+{
+    // On a linear axis everything inside the view counts. On a
+    // segmented one, only frequencies that fall in a panel have a place
+    // on the picture at all — anything in a gutter would be pinned to
+    // the nearest panel edge by xFor, and a mark drawn there points at
+    // a frequency it does not belong to.
+    if (m_viewSegs.isEmpty()) {
+        return hz >= m_viewLoHz && hz <= m_viewHiHz;
+    }
+    for (const auto& s : m_viewSegs) {
+        if (hz >= s.loHz && hz <= s.hiHz) { return true; }
+    }
+    return false;
+}
+
 QVector<SwrCurveWidget::Panel> SwrCurveWidget::viewPanels() const
 {
     QVector<Panel> out;
@@ -678,6 +694,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
                 continue;   // the amber one, drawn below
             }
             if (c.freqHz < m_viewLoHz || c.freqHz > m_viewHiHz) { continue; }
+            if (!inSomePanel(c.freqHz)) { continue; }
             const double x = xFor(c.freqHz);
             p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
         }
@@ -703,8 +720,47 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
                    t);
     }
 
+    // ── The best point of every panel ────────────────────────────────
+    //
+    // On a segmented axis the three verticals below would be drawn on
+    // exactly one of nine panels — whichever band bestOverlap picked —
+    // and the other eight would carry nothing. That is the same fault
+    // as the four headline tiles: one band's numbers presented over a
+    // nine-band measurement.
+    //
+    // What every panel can answer is where it is best, so each gets a
+    // dot on its own minimum and the value beside it.
+    if (!m_viewSegs.isEmpty()) {
+        p.setFont(small);
+        for (const auto& seg : m_viewSegs) {
+            double bestSwr = 0.0;
+            double bestAt  = 0.0;
+            for (const SweepPoint& pt : m_sweep.points) {
+                if (pt.freqHz < seg.loHz || pt.freqHz > seg.hiHz) { continue; }
+                const double v = AntennaSweep::swr(pt.gamma);
+                if (v <= 0.0) { continue; }
+                if (bestSwr <= 0.0 || v < bestSwr) {
+                    bestSwr = v;
+                    bestAt  = pt.freqHz;
+                }
+            }
+            if (bestSwr <= 0.0) { continue; }
+
+            const QPointF at(xFor(bestAt), yFor(bestSwr));
+            p.setPen(Qt::NoPen);
+            p.setBrush(bestSwr > m_limit ? kBad : kCentre);
+            p.drawEllipse(at, 3.2, 3.2);
+            p.setBrush(Qt::NoBrush);
+
+            const QString t = QStringLiteral("%1").arg(bestSwr, 0, 'f', 2);
+            p.setPen(bestSwr > m_limit ? kBad : kText);
+            p.drawText(QPointF(at.x() - sfm.horizontalAdvance(t) / 2.0,
+                               at.y() - 7.0), t);
+        }
+    }
+
     // ── Low edge, centre, high edge ──────────────────────────────────
-    if (m_band.isValid()) {
+    if (m_band.isValid() && m_viewSegs.isEmpty()) {
         struct Mark { double hz; QString label; QColor col; };
         const QVector<Mark> marks = {
             {m_band.lowHz,    QStringLiteral("start"),  kEdge},
@@ -743,7 +799,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     }
 
     // ── Target, if one was set ───────────────────────────────────────
-    if (m_targetHz > m_viewLoHz && m_targetHz < m_viewHiHz) {
+    if (m_targetHz > 0.0 && inSomePanel(m_targetHz)) {
         const double x = xFor(m_targetHz);
         QPen pen(kCurve, 1.2, Qt::DashDotLine);
         p.setPen(pen);
