@@ -599,6 +599,7 @@ set(CORE_SOURCES
     src/core/audio/TxMicSource.cpp
     src/core/audio/VirtualCableDetector.cpp
     src/core/safety/BandPlanGuard.cpp
+    src/core/safety/RegionSetting.cpp
     src/core/safety/SwrProtectionController.cpp
     src/core/safety/TxInhibitMonitor.cpp
     src/core/safety/safety_constants.cpp
