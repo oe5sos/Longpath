@@ -2,6 +2,8 @@
 #include <QtTest>
 #include "core/safety/SwrProtectionController.h"
 
+#include <cmath>
+
 using namespace NereusSDR::safety;
 
 class TestSwrProtectionController : public QObject
@@ -33,6 +35,13 @@ private slots:
     void alexFwdLimit_anan8000d_2xSlider_belowFloor_noTrip();
     void tuneBypass_sliderAt70_bypasses();
     void tuneBypass_sliderAt71_doesNotBypass();
+
+    // ── Measurement mode (NereusSDR-original) ──────────────────────────
+    void measurementMode_highSwrAtSweepPower_noFoldback();
+    void measurementMode_stillReportsTheSwr();
+    void measurementMode_aboveCeiling_protectsNormally();
+    void measurementMode_doesNotLiftAnExistingLatch();
+    void measurementMode_off_protectsAgain();
 };
 
 void TestSwrProtectionController::init()
@@ -330,6 +339,82 @@ void TestSwrProtectionController::tuneBypass_sliderAt71_doesNotBypass()
     QVERIFY(m_ctrl->highSwr());
     QVERIFY(m_ctrl->windBackLatched());
     QCOMPARE(m_ctrl->protectFactor(), 0.01f);
+}
+
+// ── Measurement mode ─────────────────────────────────────────────────
+//
+// NereusSDR-original, no Thetis counterpart: Thetis has no band sweep,
+// so it never had to distinguish "the antenna is bad" from "I am
+// currently measuring how bad the antenna is".
+//
+// fwd=6, rev=1.5 → rho = 0.5 → SWR 3.0, above the 2.0 limit set in
+// init(), and above the 5 W alex_fwd floor. Without measurement mode
+// that is four trips and a latch.
+
+void TestSwrProtectionController::measurementMode_highSwrAtSweepPower_noFoldback()
+{
+    m_ctrl->setMeasurementMode(true);
+    for (int i = 0; i < 10; ++i) {
+        m_ctrl->ingest(6.0f, 1.5f, true);
+    }
+    QVERIFY(!m_ctrl->highSwr());
+    QVERIFY(!m_ctrl->windBackLatched());
+    QCOMPARE(m_ctrl->protectFactor(), 1.0f);
+}
+
+void TestSwrProtectionController::measurementMode_stillReportsTheSwr()
+{
+    // Suspending the reaction must not suspend the reading — the sweep
+    // and the LED both need the number.
+    m_ctrl->setMeasurementMode(true);
+    m_ctrl->ingest(6.0f, 1.5f, true);
+    QVERIFY(std::abs(m_ctrl->measuredSwr() - 3.0f) < 0.01f);
+}
+
+void TestSwrProtectionController::measurementMode_aboveCeiling_protectsNormally()
+{
+    // 20 W is not sweep power. Whatever is driving the PA, it is not the
+    // sweep, and the protection comes back.
+    m_ctrl->setMeasurementMode(true);
+    for (int i = 0; i < 4; ++i) {
+        m_ctrl->ingest(20.0f, 5.0f, true);   // rho 0.5 → SWR 3.0
+    }
+    QVERIFY(m_ctrl->highSwr());
+    QVERIFY(m_ctrl->windBackLatched());
+}
+
+void TestSwrProtectionController::measurementMode_doesNotLiftAnExistingLatch()
+{
+    // Latch first, at full power and without the sweep.
+    for (int i = 0; i < 4; ++i) {
+        m_ctrl->ingest(10.0f, 5.56f, false);
+    }
+    QVERIFY(m_ctrl->windBackLatched());
+
+    // Starting a sweep must not be a way to clear it.
+    m_ctrl->setMeasurementMode(true);
+    m_ctrl->ingest(6.0f, 1.5f, true);
+    QVERIFY(m_ctrl->windBackLatched());
+    QCOMPARE(m_ctrl->protectFactor(), 0.01f);
+}
+
+void TestSwrProtectionController::measurementMode_off_protectsAgain()
+{
+    m_ctrl->setMeasurementMode(true);
+    for (int i = 0; i < 10; ++i) {
+        m_ctrl->ingest(6.0f, 1.5f, true);
+    }
+    QVERIFY(!m_ctrl->highSwr());
+
+    // Trips accumulated during the sweep must not carry over, so the
+    // full debounce has to run again from zero.
+    m_ctrl->setMeasurementMode(false);
+    m_ctrl->ingest(6.0f, 1.5f, false);
+    QVERIFY(!m_ctrl->highSwr());          // 1 of 4
+    for (int i = 0; i < 3; ++i) {
+        m_ctrl->ingest(6.0f, 1.5f, false);
+    }
+    QVERIFY(m_ctrl->highSwr());           // 4 of 4
 }
 
 QTEST_GUILESS_MAIN(TestSwrProtectionController)

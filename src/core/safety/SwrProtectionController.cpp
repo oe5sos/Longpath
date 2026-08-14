@@ -220,6 +220,27 @@ void SwrProtectionController::ingest(float fwdW, float revW, bool tuneActive) no
         emit openAntennaDetectedChanged(false);
     }
 
+    // ── Measurement mode ──────────────────────────────────────────────────
+    // NereusSDR-original; see the header for why this is not a hole in
+    // the protection. Publishes the reading, acts on nothing.
+    if (m_measurementMode && !m_windBackLatched
+        && fwdW <= kMeasurementCeilingW) {
+        m_tripCount = 0;
+
+        if (m_protectFactor != 1.0f) {
+            m_protectFactor = 1.0f;
+            emit protectFactorChanged(m_protectFactor);
+        }
+        if (m_highSwr) {
+            m_highSwr = false;
+            emit highSwrChanged(false);
+        }
+
+        m_measuredSwr = (std::isnan(swr) || std::isinf(swr) || swr < 1.0f)
+                            ? 1.0f : swr;
+        return;
+    }
+
     // ── Tune-time bypass ──────────────────────────────────────────────────
     // console.cs:26020-26057 [v2.10.3.13]
     bool swrPass = false;
@@ -305,6 +326,21 @@ void SwrProtectionController::ingest(float fwdW, float revW, bool tuneActive) no
     } else {
         m_measuredSwr = swr;
     }
+}
+
+void SwrProtectionController::setMeasurementMode(bool on) noexcept
+{
+    if (m_measurementMode == on) { return; }
+    m_measurementMode = on;
+    // Leaving it, the next sample decides afresh. Clearing the counter
+    // stops trips accumulated during the sweep from carrying over into
+    // the operator's next transmission.
+    m_tripCount = 0;
+}
+
+bool SwrProtectionController::measurementMode() const noexcept
+{
+    return m_measurementMode;
 }
 
 void SwrProtectionController::onMoxOff() noexcept

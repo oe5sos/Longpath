@@ -1083,6 +1083,26 @@ RadioModel::RadioModel(QObject* parent)
     // button, a factor of fifty in power, and the cause of a full day
     // of "the coupler reports nothing".
     m_swrSweep->setTuneFn([this](bool on) { setTune(on); });
+
+    // ── The sweep tells the protection it is measuring ─────────────────
+    //
+    // 2026-08-14, after a sweep on 80 m painted HIGH SWR and POWER FOLD
+    // BACK across the spectrum. Both were doing exactly what they are
+    // for; the trouble is that a sweep is a deliberate walk into
+    // mismatch, so the protection was folding the drive back on the very
+    // points the sweep exists to measure — and then latching, which left
+    // every remaining point reading against 1 % drive.
+    //
+    // See SwrProtectionController::setMeasurementMode for what it does
+    // and does not suspend.
+    connect(m_swrSweep, &SwrSweepController::sweepStarted, this,
+            [this](const SwrSweepPlan&) {
+                m_swrProt.setMeasurementMode(true);
+            });
+    connect(m_swrSweep, &SwrSweepController::sweepFinished, this,
+            [this](const SwrSweepResult&) {
+                m_swrProt.setMeasurementMode(false);
+            });
     // sqrt(bridge_fwd / bridge_rev) for the connected board, probed
     // through the two scaling functions rather than duplicating their
     // tables: feed both the same large raw count and the watts come
@@ -13576,6 +13596,24 @@ void RadioModel::completeTuneOff()
 
 void RadioModel::onMoxHardwareFlipped(bool isTx)
 {
+    // ── Step 0 — release the SWR windback latch on the way back to RX ──
+    //
+    // 2026-08-14. This was missing entirely. SwrProtectionController
+    // latches m_windBackLatched and pins the drive at 1 % "until
+    // onMoxOff()", and nothing in the application had ever called
+    // onMoxOff() — only a unit test did. So the first POWER FOLD BACK
+    // of a session was permanent: every later transmission went out at
+    // one percent, the red overlay stayed painted over the spectrum,
+    // and the only cure was quitting the app.
+    //
+    // Thetis clears it in UIMOXChangedFalse, which is this edge. It goes
+    // ahead of every early return below on purpose: a latch whose
+    // release depends on a bound TX slice being present is a latch that
+    // will one day fail to release.
+    if (!isTx) {
+        m_swrProt.onMoxOff();
+    }
+
     // Step 1 — Alex antenna routing.  Resolves which TX/RX antenna ports
     // engage for the current band and tx/rx state.  AlexController state
     // is read inside applyAlexAntennaForBand; result is pushed to

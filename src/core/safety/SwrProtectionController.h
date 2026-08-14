@@ -141,6 +141,30 @@ public:
     /// Cite: console.cs:26020-26057 [v2.10.3.13] (tunePowerSliderValue).
     void setTunePowerSliderValue(int value) noexcept;
 
+    // ── Measurement mode (NereusSDR-original, not in Thetis) ───────────────
+    //
+    // The SWR sweep deliberately walks the transmitter across a whole
+    // band at a few watts, into whatever mismatch the antenna has at
+    // each end. High SWR is not a fault there — it is the reading being
+    // taken. Left to itself the protection folds the drive back at the
+    // band edges, which corrupts every point after the first bad one,
+    // then latches at 1 % and paints POWER FOLD BACK over the display.
+    //
+    // While measurement mode is on the controller still computes and
+    // publishes the SWR, so the sweep and the LED get their numbers —
+    // it simply takes no action on it.
+    //
+    // Two things it will NOT do, because a measurement is not a licence
+    // to remove the protection:
+    //
+    //   * it stays out of the way only below kMeasurementCeilingW. Above
+    //     that the sweep is not running at sweep power, something has
+    //     gone wrong, and the normal rules come back in full.
+    //   * it never lifts an already-latched windback. If the latch was
+    //     set before the sweep started, it stands.
+    void setMeasurementMode(bool on) noexcept;
+    bool measurementMode() const noexcept;
+
     /// Feed a new forward/reflected power pair.
     /// @param fwdW   forward power in watts (alex_fwd in Thetis)
     /// @param revW   reflected power in watts (alex_rev in Thetis)
@@ -197,8 +221,14 @@ private:
     // console.cs:26070 — number of consecutive trips before windback latches
     static constexpr int kTripDebounceCount = 4;
 
+    /// Forward power above which measurement mode stops applying.
+    /// A sweep runs at a few watts; 15 W means something other than the
+    /// sweep is driving the PA and the protection is needed again.
+    static constexpr float kMeasurementCeilingW = 15.0f;
+
     // ── State ──────────────────────────────────────────────────────────────
 
+    bool  m_measurementMode     = false; // NereusSDR: sweep in progress
     bool  m_enabled             = true;
     float m_limit               = 3.0f;  // _swrProtectionLimit
     bool  m_windBackEnabled     = false; // _swr_wind_back_power
