@@ -701,8 +701,39 @@ RadioModel::RadioModel(QObject* parent)
         m_swrProt.setEnabled(
             s.value(QStringLiteral("SwrProtectionEnabled"), QStringLiteral("False"))
              .toString() == QStringLiteral("True"));
+        // ── One-time correction of the old 2.0 default ─────────────────
+        //
+        // Changing kDefaultLimit only helps someone who has never had a
+        // value written. Everyone who opened the transmit setup page
+        // once got 2.0 persisted by the spin box without choosing it,
+        // and for them a new default does nothing at all.
+        //
+        // So: if the stored value is still exactly the old default, and
+        // this correction has not run before, move it to 3.0. Guarded by
+        // its own flag rather than by the value, so a later deliberate
+        // 2.0 is left alone — the flag says "we have had our one go at
+        // this", which is the only honest basis for editing a setting
+        // the operator may have meant.
+        if (s.value(QStringLiteral("SwrProtectionLimitDefaultFixed"),
+                    QStringLiteral("False")).toString()
+            != QStringLiteral("True")) {
+            const QString stored =
+                s.value(QStringLiteral("SwrProtectionLimit")).toString();
+            if (stored == QStringLiteral("2.0")) {
+                s.setValue(QStringLiteral("SwrProtectionLimit"),
+                           QStringLiteral("3.0"));
+            }
+            s.setValue(QStringLiteral("SwrProtectionLimitDefaultFixed"),
+                       QStringLiteral("True"));
+        }
+
+        // Default via the constant, not a literal — see kDefaultLimit for
+        // what the duplicated "2.0" cost.
         m_swrProt.setLimit(
-            s.value(QStringLiteral("SwrProtectionLimit"), QStringLiteral("2.0"))
+            s.value(QStringLiteral("SwrProtectionLimit"),
+                    QString::number(
+                        safety::SwrProtectionController::kDefaultLimit,
+                        'f', 1))
              .toString().toFloat());
         m_swrProt.setWindBackEnabled(
             s.value(QStringLiteral("WindBackPowerSwr"), QStringLiteral("False"))

@@ -42,6 +42,9 @@ private slots:
     void measurementMode_aboveCeiling_protectsNormally();
     void measurementMode_doesNotLiftAnExistingLatch();
     void measurementMode_off_protectsAgain();
+
+    void defaultLimitIs3();
+    void setLimit_rejectsUnusableValues();
 };
 
 void TestSwrProtectionController::init()
@@ -415,6 +418,35 @@ void TestSwrProtectionController::measurementMode_off_protectsAgain()
         m_ctrl->ingest(6.0f, 1.5f, false);
     }
     QVERIFY(m_ctrl->highSwr());           // 4 of 4
+}
+
+void TestSwrProtectionController::defaultLimitIs3()
+{
+    // init() sets 2.0 explicitly, so ask a fresh one.
+    SwrProtectionController fresh;
+    QCOMPARE(SwrProtectionController::kDefaultLimit, 3.0f);
+
+    fresh.setEnabled(true);
+    // SWR 2.5 at 10 W: under 3.0, so no trip however long it runs.
+    // rho = (2.5-1)/(2.5+1) = 0.42857 → rev = fwd × rho² = 1.837
+    for (int i = 0; i < 10; ++i) {
+        fresh.ingest(10.0f, 1.837f, false);
+    }
+    QVERIFY(!fresh.highSwr());
+    QVERIFY(std::abs(fresh.measuredSwr() - 2.5f) < 0.01f);
+}
+
+void TestSwrProtectionController::setLimit_rejectsUnusableValues()
+{
+    // toFloat() on a missing or corrupt settings entry answers 0.0.
+    // Taken literally that trips on every sample and the transmitter
+    // never delivers power again.
+    m_ctrl->setLimit(0.0f);
+    for (int i = 0; i < 10; ++i) {
+        m_ctrl->ingest(10.0f, 0.0f, false);   // SWR 1.0, perfect load
+    }
+    QVERIFY(!m_ctrl->highSwr());
+    QCOMPARE(m_ctrl->protectFactor(), 1.0f);
 }
 
 QTEST_GUILESS_MAIN(TestSwrProtectionController)

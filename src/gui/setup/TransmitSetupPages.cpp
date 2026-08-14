@@ -162,6 +162,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 #include "core/StepAttenuatorController.h"
+#include "core/safety/SwrProtectionController.h"
 #include "gui/applets/TxEqDialog.h"
 
 #include <QVBoxLayout>
@@ -673,8 +674,13 @@ void PowerPage::buildSwrProtectionGroup()
     m_udSwrProtectionLimit->setRange(1.0, 5.0);
     m_udSwrProtectionLimit->setSingleStep(0.1);
     m_udSwrProtectionLimit->setDecimals(1);
+    // Same default as RadioModel reads, from the one constant that owns
+    // it — see SwrProtectionController::kDefaultLimit.
     m_udSwrProtectionLimit->setValue(
-        s.value(QStringLiteral("SwrProtectionLimit"), QStringLiteral("2.0")).toDouble());
+        s.value(QStringLiteral("SwrProtectionLimit"),
+                QString::number(
+                    safety::SwrProtectionController::kDefaultLimit, 'f', 1))
+         .toDouble());
     connect(m_udSwrProtectionLimit, &QDoubleSpinBox::valueChanged, this, [](double v) {
         AppSettings::instance().setValue(QStringLiteral("SwrProtectionLimit"), QString::number(v, 'f', 1));
     });

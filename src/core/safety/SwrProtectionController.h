@@ -111,6 +111,19 @@ public:
     void setEnabled(bool on) noexcept;
     bool isEnabled() const noexcept;
 
+    /// The SWR at which protection engages when the operator has never
+    /// chosen one. 3.0, which is also Thetis's default.
+    ///
+    /// It sat at 2.0 in two places until 2026-08-14 — once here and once
+    /// in the setup page, the same magic number written twice, which is
+    /// how it came to disagree with the doc comment above it. 2.0 is a
+    /// sensible target for an antenna and a bad threshold for a PA: a
+    /// real 80 m wire at 2.5 in its best spot then trips protection
+    /// across the whole band, which is not a fault and does not need
+    /// the drive folded back. One constant now, referenced by both
+    /// readers, so it cannot drift apart again.
+    static constexpr float kDefaultLimit = 3.0f;
+
     /// Set the SWR trip threshold. Thetis default is 3.0.
     /// Cite: console.cs:26067 [v2.10.3.13] (_swrProtectionLimit).
     void setLimit(float limit) noexcept;
@@ -230,7 +243,7 @@ private:
 
     bool  m_measurementMode     = false; // NereusSDR: sweep in progress
     bool  m_enabled             = true;
-    float m_limit               = 3.0f;  // _swrProtectionLimit
+    float m_limit               = kDefaultLimit; // _swrProtectionLimit
     bool  m_windBackEnabled     = false; // _swr_wind_back_power
     float m_tunePowerSwrIgnore  = 0.0f;  // _tunePowerSwrIgnore
     bool  m_disableOnTune       = false; // disable_swr_on_tune

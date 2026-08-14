@@ -92,6 +92,16 @@ bool SwrProtectionController::isEnabled() const noexcept
 
 void SwrProtectionController::setLimit(float limit) noexcept
 {
+    // A limit below 1.0 is not a strict setting, it is a broken one:
+    // SWR cannot go under 1, so every sample above the power floor
+    // trips and the drive never comes back. The value arrives from a
+    // settings file via toFloat(), which answers 0.0 for anything it
+    // cannot parse — an empty or corrupt entry would otherwise disable
+    // the transmitter and look like a hardware fault.
+    if (!std::isfinite(limit) || limit < 1.0f) {
+        m_limit = kDefaultLimit;
+        return;
+    }
     m_limit = limit;
 }
 
