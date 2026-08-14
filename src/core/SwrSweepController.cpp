@@ -285,7 +285,11 @@ void SwrSweepController::beginKeying()
     m_baselineRaw = (m_baseN > 0)
         ? static_cast<quint16>(m_baseAcc / m_baseN + 0.5)
         : 0;
-    m_result.baselineRaw = m_baselineRaw;
+    m_baselineRevRaw = (m_baseN > 0)
+        ? static_cast<quint16>(m_baseRevAcc / m_baseN + 0.5)
+        : 0;
+    m_result.baselineRaw    = m_baselineRaw;
+    m_result.baselineRevRaw = m_baselineRevRaw;
 
     // Key the carrier through the fully-gated TUNE path. Every existing
     // safety check (band plan, CW block, TX inhibit) runs inside; a
@@ -323,12 +327,13 @@ void SwrSweepController::beginMeasure()
     m_accRev = 0.0;
     m_accN   = 0;
     m_accFwdRawPeak = 0;
+    m_accRevRawPeak = 0;
     m_state  = State::Measuring;
     m_stepTimer.start(m_plan.dwellMs);
 }
 
 void SwrSweepController::ingestTelemetry(double fwdW, double revW,
-                                         quint16 fwdRaw)
+                                         quint16 fwdRaw, quint16 revRaw)
 {
     if (m_state == State::Idle || m_state == State::Finishing) {
         return;
@@ -338,7 +343,8 @@ void SwrSweepController::ingestTelemetry(double fwdW, double revW,
 
     // The idle window, before anything is keyed.
     if (m_state == State::Baseline) {
-        m_baseAcc += fwdRaw;
+        m_baseAcc    += fwdRaw;
+        m_baseRevAcc += revRaw;
         ++m_baseN;
         return;
     }
@@ -352,6 +358,7 @@ void SwrSweepController::ingestTelemetry(double fwdW, double revW,
     // 220 ms dwell buries a single honest sample under the silence
     // either side of it.
     m_accFwdRawPeak = std::max(m_accFwdRawPeak, fwdRaw);
+    m_accRevRawPeak = std::max(m_accRevRawPeak, revRaw);
     ++m_accN;
 }
 
@@ -393,6 +400,7 @@ void SwrSweepController::closePoint()
     m_result.points.append(pt);
     m_result.maxFwdW   = std::max(m_result.maxFwdW, pt.fwdW);
     m_result.maxFwdRaw = std::max(m_result.maxFwdRaw, m_accFwdRawPeak);
+    m_result.maxRevRaw = std::max(m_result.maxRevRaw, m_accRevRawPeak);
     emit pointReady(m_index, pt.freqHz, pt.swr, pt.fwdW);
     emit progressChanged(m_index + 1, m_plan.points);
 
@@ -459,6 +467,17 @@ void SwrSweepController::finish(bool completed, const QString& reason)
     m_stepTimer.stop();
     m_result.completed  = completed;
     m_result.abortReason = reason;
+
+    // ── The flat 1.00 ────────────────────────────────────────────────
+    //
+    // If the reverse ADC never climbed clear of its own idle reading,
+    // every SWR in this result is 1.00 by arithmetic and none of them
+    // is a measurement. Only flagged when something was measured at
+    // all — a sweep with no forward reading has its own, louder
+    // problem, and two complaints about one silence help nobody.
+    m_result.reverseNeverMoved =
+        (m_result.validPoints() > 0)
+        && (m_result.maxRevRaw <= m_result.baselineRevRaw + kMinRawRise);
     if (!reason.isEmpty()) {
         emit reasonChanged(reason);
     }

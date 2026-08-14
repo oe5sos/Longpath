@@ -9083,7 +9083,7 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
     if (m_swrSweep) {
         // fwdRaw as well as the watts: see SwrSweepResult::maxFwdRaw for
         // why a failed sweep has to be able to name the unscaled count.
-        m_swrSweep->ingestTelemetry(fwdW, revW, fwdRaw);
+        m_swrSweep->ingestTelemetry(fwdW, revW, fwdRaw, revRaw);
     }
 }
 

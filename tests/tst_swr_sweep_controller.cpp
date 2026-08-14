@@ -459,6 +459,79 @@ private slots:
                  qPrintable(result.abortReason));
     }
 
+    // ── The failure that draws a beautiful curve ─────────────────────
+    //
+    // 2026-08-14, the first sweep that ever completed: 51 of 51 points,
+    // SWR 1.00 at every one, a flat line along the bottom of the chart
+    // and "Resonanz bei 14.000 MHz" — the first point, because they
+    // were all identical.
+    //
+    // Reverse reading zero gives gamma zero gives SWR exactly 1.00,
+    // always, everywhere. A dead forward channel draws nothing and is
+    // noticed in seconds; a dead reverse channel draws a perfect
+    // antenna. It is the only outcome here an operator would act on by
+    // doing nothing, which makes it the worst one to get wrong.
+    void a_reverse_channel_that_never_moves_is_not_a_perfect_antenna()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+
+        constexpr quint16 kIdleFwd = 40;
+        constexpr quint16 kIdleRev = 12;
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 5000) {
+            const bool keyed = (h.mox.state() != MoxState::Rx);
+            // Forward responds properly; reverse sits at its idle count
+            // whether keyed or not.
+            h.ctl.ingestTelemetry(keyed ? 8.0 : 0.0, 0.0,
+                                  keyed ? quint16(900) : kIdleFwd,
+                                  kIdleRev);
+            QTest::qWait(2);
+        }
+
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+
+        // It completes and every point "measures" — that is exactly the
+        // trap. What must not happen is presenting it as an answer.
+        QVERIFY(result.completed);
+        QVERIFY(result.validPoints() > 0);
+        QCOMPARE(result.minSwr(), 1.0);
+        QVERIFY2(result.reverseNeverMoved,
+                 "a sweep of identical 1.00s was not flagged, and would "
+                 "be shown as a perfect antenna");
+    }
+
+    // The other side: a reverse channel that DOES respond must not be
+    // flagged, or the warning becomes noise and gets ignored.
+    void a_working_reverse_channel_is_not_flagged()
+    {
+        Harness h;
+        FakeDipole dipole;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 5000) {
+            double fwd = 0.0;
+            double rev = 0.0;
+            dipole.wattsAt(static_cast<double>(h.currentFreq), fwd, rev);
+            const bool keyed = (h.mox.state() != MoxState::Rx);
+            h.ctl.ingestTelemetry(fwd, rev,
+                                  keyed ? quint16(900) : quint16(40),
+                                  keyed ? quint16(400) : quint16(12));
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+        QVERIFY(result.completed);
+        QVERIFY2(!result.reverseNeverMoved,
+                 "a responding reverse channel was flagged as dead");
+    }
+
     void the_baseline_is_taken_before_anything_is_keyed()
     {
         // A baseline sampled with the carrier up is not a baseline. The

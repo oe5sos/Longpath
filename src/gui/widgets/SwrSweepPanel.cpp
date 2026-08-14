@@ -237,14 +237,42 @@ void SwrSweepPanel::setBackend(const Backend& backend)
         // measurement, and the old test kept that as a trace: an entry
         // in the list, a tick beside it, and an empty chart. Count the
         // measurements.
-        if (result.validPoints() == 0) {
+        // A trace of fifty-one identical 1.00s is not a measurement and
+        // must not be kept as one — saved, exported to CSV, compared
+        // against next week's. Dropped for the same reason an empty one
+        // is.
+        if (result.validPoints() == 0 || result.reverseNeverMoved) {
             m_chart->dropLiveTrace();
         } else {
             m_chart->finishLiveTrace();
         }
         refreshTraceList();
 
-        if (result.completed && result.validPoints() > 0) {
+        if (result.completed && result.reverseNeverMoved) {
+            // ── The answer that looks right and is not ───────────────
+            //
+            // Every point 1.00, a flat line along the bottom, and a
+            // "resonance" at whichever frequency happened to come
+            // first. SWR is (1+γ)/(1−γ) with γ = √(rev/fwd): reverse
+            // reading zero gives exactly 1.00 everywhere, always.
+            //
+            // A dead forward channel draws no curve and gets noticed.
+            // A dead reverse channel draws a perfect one. This is the
+            // only failure in the feature an operator would act on —
+            // by leaving an antenna alone that needs work — so it is
+            // said plainly rather than shown as a result.
+            m_status->setText(QStringLiteral(
+                "Vorlauf gemessen, Rücklauf nicht: rückwärtiger ADC "
+                "ruhend %1, beim Senden höchstens %2 — er hat sich "
+                "nicht bewegt.\n\n"
+                "Damit ist jedes SWR hier rechnerisch 1,00 und keines "
+                "gemessen. Die flache Linie bedeutet NICHT, dass die "
+                "Antenne perfekt ist. Entweder liegt am Rücklaufzweig "
+                "des Kopplers nichts an, oder das Gerät meldet ihn "
+                "nicht.")
+                    .arg(result.baselineRevRaw)
+                    .arg(result.maxRevRaw));
+        } else if (result.completed && result.validPoints() > 0) {
             const quint64 res = result.resonanceHz();
             m_status->setText(res > 0
                 ? QStringLiteral("Fertig. Resonanz bei %1 MHz, SWR %2 "

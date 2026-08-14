@@ -93,6 +93,32 @@ struct SwrSweepResult {
     /// quoting a number with nothing to compare it to.
     quint16 baselineRaw{0};
 
+    /// The same two numbers for the REVERSE channel.
+    ///
+    /// ── The failure that looks like success ──────────────────────────
+    ///
+    /// 2026-08-14, first sweep that ever completed: fifty-one of
+    /// fifty-one points measured, SWR 1.00 at every one, a flat line
+    /// along the bottom of the chart and "Resonanz bei 14.000 MHz" —
+    /// the first point, because they were all identical.
+    ///
+    /// SWR is (1+γ)/(1−γ) with γ = √(rev/fwd). Reverse reading exactly
+    /// zero gives exactly 1.00, always, everywhere. So a dead reverse
+    /// channel does not look broken. It looks like a perfect antenna,
+    /// which is the one wrong answer an operator has no reason to
+    /// question — and would act on by not adjusting an antenna that
+    /// needs it.
+    ///
+    /// Forward being dead produces no curve and gets noticed in
+    /// seconds. Reverse being dead produces a beautiful one.
+    quint16 maxRevRaw{0};
+    quint16 baselineRevRaw{0};
+
+    /// True when the reverse ADC never climbed clear of its own idle
+    /// reading during the whole sweep. Then every SWR here is 1.00 by
+    /// arithmetic rather than by measurement.
+    bool reverseNeverMoved{false};
+
     /// Frequency of the minimum valid SWR, 0 when no valid point.
     quint64 resonanceHz() const;
     double  minSwr() const;
@@ -176,7 +202,8 @@ public:
     /// `fwdRaw` is the unscaled ADC count the board reported, carried
     /// only so a failed sweep can name it. Defaulted so the tests and
     /// any other caller need not care.
-    void ingestTelemetry(double fwdW, double revW, quint16 fwdRaw = 0);
+    void ingestTelemetry(double fwdW, double revW,
+                         quint16 fwdRaw = 0, quint16 revRaw = 0);
 
     // ── Tuning constants ─────────────────────────────────────────────
     /// Mirrors TwoToneController::kTuneReleaseSettleMs (Thetis
@@ -314,11 +341,14 @@ private:
     double  m_accRev{0.0};
     int     m_accN{0};
     quint16 m_accFwdRawPeak{0};
+    quint16 m_accRevRawPeak{0};
 
     // Idle-reading accumulation during State::Baseline.
     double  m_baseAcc{0.0};
+    double  m_baseRevAcc{0.0};
     int     m_baseN{0};
     quint16 m_baselineRaw{0};
+    quint16 m_baselineRevRaw{0};
     qint64 m_lastTelemetryMs{0};
 
     QTimer m_stepTimer;      // single-shot, drives every state change
