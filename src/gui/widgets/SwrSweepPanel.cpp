@@ -18,6 +18,7 @@
 #include "core/antenna/RadioSweep.h"
 #include "gui/StyleConstants.h"
 
+#include <QAbstractItemView>
 #include <QComboBox>
 #include <QSpinBox>
 #include <QPushButton>
@@ -176,14 +177,28 @@ void SwrSweepPanel::buildUi()
 
     col->addLayout(row3);
 
+    // `activated`, not `currentIndexChanged`: this must fire for a
+    // choice the OPERATOR made and stay silent when the poll below
+    // moves the combo to follow the radio. Otherwise the two chase each
+    // other round the dial.
+    connect(m_bandBox, QOverload<int>::of(&QComboBox::activated), this,
+            [this](int) {
+        refreshTunePowerLabel();
+        if (m_backend.setRadioBand && !sweepRunning()) {
+            m_backend.setRadioBand(
+                static_cast<Band>(m_bandBox->currentData().toInt()));
+        }
+    });
     connect(m_bandBox, &QComboBox::currentIndexChanged, this,
             [this](int) { refreshTunePowerLabel(); });
 
     // See the note in the header. Only runs while the tab is on screen.
     m_powerPoll = new QTimer(this);
     m_powerPoll->setInterval(1000);
-    connect(m_powerPoll, &QTimer::timeout,
-            this, &SwrSweepPanel::refreshTunePowerLabel);
+    connect(m_powerPoll, &QTimer::timeout, this, [this]() {
+        followRadioBand();          // the radio leads
+        refreshTunePowerLabel();
+    });
 }
 
 void SwrSweepPanel::setCompact(bool compact)
@@ -204,6 +219,7 @@ void SwrSweepPanel::setCompact(bool compact)
 void SwrSweepPanel::showEvent(QShowEvent* e)
 {
     QWidget::showEvent(e);
+    followRadioBand();           // open the window already on the right band
     refreshTunePowerLabel();     // right on the first frame, not a second later
     if (m_powerPoll) { m_powerPoll->start(); }
 }
@@ -423,6 +439,30 @@ void SwrSweepPanel::startClicked()
     }
 
     m_backend.controller->startSweep(plan);
+}
+
+bool SwrSweepPanel::sweepRunning() const
+{
+    return m_backend.controller && m_backend.controller->isSweeping();
+}
+
+void SwrSweepPanel::followRadioBand()
+{
+    if (!m_backend.radioBand || sweepRunning()) { return; }
+    // Not while the list is open: yanking the selection out from under
+    // a hand that is halfway to choosing is worse than a second's lag.
+    if (m_bandBox->view() && m_bandBox->view()->isVisible()) { return; }
+
+    const int want = m_bandBox->findData(
+        static_cast<int>(m_backend.radioBand()));
+    // -1 means the radio is on something this panel cannot sweep — 60 m,
+    // 6 m on some boards, a transverter. Leave the combo alone rather
+    // than snapping it to an unrelated band.
+    if (want < 0 || want == m_bandBox->currentIndex()) { return; }
+
+    const QSignalBlocker block(m_bandBox);
+    m_bandBox->setCurrentIndex(want);
+    refreshTunePowerLabel();   // tune power is per band
 }
 
 void SwrSweepPanel::refreshTunePowerLabel()

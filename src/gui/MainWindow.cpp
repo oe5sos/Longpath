@@ -9573,6 +9573,26 @@ void MainWindow::openAntennaWindow()
             backend.rawAdc = [rm = m_radioModel]() {
                 return qMakePair(rm->lastFwdAdcRaw(), rm->lastRevAdcRaw());
             };
+
+            // ── Band, both ways ──────────────────────────────────────
+            //
+            // Asked for directly, and it is a correctness matter rather
+            // than a convenience: the panel could otherwise offer to
+            // sweep 80 m while the radio sat on 20, and the operator
+            // would read a curve for a band the antenna was never
+            // switched to.
+            //
+            // Read from the TX-bound slice, because that is the one the
+            // sweep will actually key on — not whichever slice happens
+            // to have focus.
+            backend.radioBand = [rm = m_radioModel]() -> Band {
+                const SliceModel* s = rm->txBoundSlice();
+                return s ? bandFromFrequency(s->frequency()) : Band::GEN;
+            };
+            // Written through the same handler the band buttons use, so
+            // a band change from here does everything one from the panel
+            // does — filters, antenna relays, per-band power, the lot.
+            backend.setRadioBand = [this](Band b) { onBandButtonClicked(b); };
             m_antennaWindow->sweepPanel()->setBackend(backend);
         }
     }

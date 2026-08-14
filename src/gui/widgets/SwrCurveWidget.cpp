@@ -121,12 +121,28 @@ void SwrCurveWidget::recompute()
         return;
     }
 
-    // A little air either side so the curve does not run into the
-    // frame, and so a band edge sitting exactly at the sweep end is
-    // still visible as a line rather than as part of the border.
+    // ── Air either side of the measurement ───────────────────────────
+    //
+    // "sollte nicht beginnen bei 7 MHz und enden bei 7,2 MHz, sondern
+    //  den Bereich ein bisschen größer machen, sodass man die Kurve
+    //  besser sieht."
+    //
+    // Two percent was not air, it was a hairline. A radio sweep spans
+    // exactly the band — it may not legally transmit outside it — so
+    // the curve ran from the left frame to the right frame with its
+    // ends clipped into the border, and the band edges, which are the
+    // things being read off, sat underneath that border.
+    //
+    // Twelve percent each side. The measurement occupies the middle
+    // three quarters and both band edges stand clear of the frame with
+    // room for their labels. The empty margin is honest: nothing was
+    // measured out there and nothing is drawn out there.
+    //
+    // This widens the VIEW, not the sweep. Transmitting past a band
+    // edge to make a picture nicer is not a trade available to us.
     const double span = std::max(1.0, m_sweep.stopHz() - m_sweep.startHz());
-    m_viewLoHz = m_sweep.startHz() - span * 0.02;
-    m_viewHiHz = m_sweep.stopHz()  + span * 0.02;
+    m_viewLoHz = m_sweep.startHz() - span * 0.12;
+    m_viewHiHz = m_sweep.stopHz()  + span * 0.12;
 
     // Resonance nearest the target if one was given, otherwise nearest
     // the middle of the band — which is what somebody without a

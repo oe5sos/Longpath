@@ -80,6 +80,25 @@ public:
         /// is the whole diagnosis in one glance, and took a day to
         /// arrive at without it.
         std::function<QPair<quint16, quint16>()> rawAdc;
+
+        /// ── Band, both ways ──────────────────────────────────────────
+        ///
+        /// "wenn ich bei Suite einen Bandwechsel mache, sollte dieser
+        ///  auch automatisch im SDR sein oder umgekehrt."
+        ///
+        /// Right, and the alternative is worse than untidy: the panel
+        /// could offer to sweep 80 m while the radio sat on 20, and the
+        /// operator would read a curve for a band the antenna was never
+        /// switched to.
+        ///
+        /// radioBand() is polled on the second that already refreshes
+        /// the power label; setRadioBand() is called only when the
+        /// operator picks from the combo. Neither fires while a sweep
+        /// runs — changing band mid-sweep would abandon the measurement
+        /// halfway and leave the transmitter on a frequency the plan
+        /// did not choose.
+        std::function<Band()>     radioBand;
+        std::function<void(Band)> setRadioBand;
     };
 
     explicit SwrSweepPanel(QWidget* parent = nullptr);
@@ -139,6 +158,10 @@ private:
     void buildUi();
     void startClicked();
     void refreshTunePowerLabel();
+    /// Move the combo to whatever band the radio is on. Blocked while a
+    /// sweep runs and while the operator has the list open.
+    void followRadioBand();
+    bool sweepRunning() const;
     void refreshTraceList();
     void exportCsv();
 
