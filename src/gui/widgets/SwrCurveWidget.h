@@ -60,6 +60,8 @@
 #include "core/antenna/AntennaSweep.h"
 #include "core/antenna/Touchstone.h"
 
+#include <QPainterPath>
+#include <QPolygonF>
 #include <QWidget>
 
 class QPainter;
@@ -170,6 +172,14 @@ private:
     /// point exists there, and joining across it would draw a confident
     /// line through something nobody measured.
     void drawBrokenCurve(QPainter& p, const Sweep& s) const;
+
+    /// A rounded path through every one of the given points.
+    ///
+    /// Catmull-Rom as cubic Béziers: the path passes exactly through
+    /// each sample, only the stretch between two samples bends. Control
+    /// points are clamped into the plot so a spline overshoot cannot
+    /// draw an SWR below one.
+    QPainterPath smoothPath(const QPolygonF& pts) const;
 
     // Recompute the band, the vertical scale and the cached features.
     // One place, called whenever any input changes, so the paint can

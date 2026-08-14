@@ -130,7 +130,7 @@ void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const
                            yFor(AntennaSweep::swr(pt.gamma)));
         if (!line.isEmpty() && (pt.freqHz - lastHz) > gapHz) {
             p.setPen(solid);
-            p.drawPolyline(line);
+            p.drawPath(smoothPath(line));
             p.setPen(bridge);
             p.drawLine(lastDrawn, here);      // the join, marked as one
             line.clear();
@@ -140,7 +140,58 @@ void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const
         lastHz = pt.freqHz;
     }
     p.setPen(solid);
-    p.drawPolyline(line);
+    p.drawPath(smoothPath(line));
+}
+
+// ── Round, not a chain of straight bits ──────────────────────────────
+//
+// "die Linie sollte aber wie eine Kurve aussehen, mit vielen Punkten,
+//  rund!"
+//
+// A polyline through the samples is what a polyline looks like: on a
+// band segment holding five points it is four visible straight strokes
+// with corners. SWR does not have corners. The measurement is a
+// smooth function sampled coarsely, and drawing it as a smooth curve
+// through the samples is a better picture of it than joining the dots.
+//
+// Catmull-Rom, converted to cubic Béziers. It passes exactly THROUGH
+// every measured point — nothing is moved, nothing is invented at a
+// sample — and only the path between two samples is curved rather than
+// straight.
+//
+// The one thing it can do wrong is overshoot: with a sharp dip the
+// spline can bulge past the neighbouring values, and below SWR 1.0
+// that would draw a physical impossibility. The control points are
+// therefore clamped into the plot, so a bulge flattens instead of
+// leaving the frame.
+QPainterPath SwrCurveWidget::smoothPath(const QPolygonF& pts) const
+{
+    QPainterPath path;
+    if (pts.isEmpty()) { return path; }
+    path.moveTo(pts.first());
+    if (pts.size() < 3) {
+        for (int i = 1; i < pts.size(); ++i) { path.lineTo(pts.at(i)); }
+        return path;
+    }
+
+    const double yTop = m_plotT;
+    const double yBot = m_plotB;
+    auto clampY = [yTop, yBot](QPointF q) {
+        q.setY(std::clamp(q.y(), yTop, yBot));
+        return q;
+    };
+
+    const int n = pts.size();
+    for (int i = 0; i < n - 1; ++i) {
+        const QPointF p0 = pts.at(i > 0 ? i - 1 : 0);
+        const QPointF p1 = pts.at(i);
+        const QPointF p2 = pts.at(i + 1);
+        const QPointF p3 = pts.at(i + 2 < n ? i + 2 : n - 1);
+        const QPointF c1 = clampY(p1 + (p2 - p0) / 6.0);
+        const QPointF c2 = clampY(p2 - (p3 - p1) / 6.0);
+        path.cubicTo(c1, c2, p2);
+    }
+    return path;
 }
 
 double SwrCurveWidget::xToHz(double x) const

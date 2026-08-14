@@ -186,9 +186,6 @@ struct SwrSweepPlan {
     /// of drawing a straight line across unmeasured spectrum.
     QVector<QPair<int, int>> segments;
 
-    /// Fewest points any one segment gets, however many segments there
-    /// are. Below three there is no shape to read.
-    static constexpr int kMinPerSegment = 3;
 
     /// Clip start/stop to the first/last frequency the band-plan guard
     /// allows for (region, mode) at this plan's point spacing, so a
@@ -213,6 +210,21 @@ struct SwrSweepPlan {
 
     static constexpr int kMinPoints = 11;
     static constexpr int kMaxPoints = 401;
+
+    /// Fewest points any one segment gets, however many segments there
+    /// are.
+    ///
+    /// Was three, which is enough to see a trend and not enough to see
+    /// a curve — OE5SOS, 2026-08-14: "die Linie sollte wie eine Kurve
+    /// aussehen, mit vielen Punkten, rund!". Three points per band drew
+    /// two straight strokes.
+    ///
+    /// kMinPoints is what the controller demands of a whole sweep
+    /// before it will call it a measurement, so it is the natural floor
+    /// for one band of one too. At 51 requested over nine bands that
+    /// gives 99 points and about half a minute of transmitting instead
+    /// of seventeen seconds — the cost of the answer being readable.
+    static constexpr int kMinPerSegment = kMinPoints;
 };
 
 // ---------------------------------------------------------------------------
