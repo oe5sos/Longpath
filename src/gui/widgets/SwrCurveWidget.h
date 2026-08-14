@@ -116,6 +116,28 @@ public:
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
+    // ── Where a sweep stops being continuous ─────────────────────────
+    //
+    // A range sweep across several bands has holes: the spectrum
+    // between the bands is not ours to transmit on, so no point exists
+    // there. Joined into one polyline it becomes a straight stroke from
+    // 7.200 to 10.100 MHz — full confidence across three megahertz
+    // nobody measured, which is the shape of every mistake this window
+    // has made.
+    //
+    // A gap is a step much larger than the run's own spacing. The
+    // MEDIAN is the reference, not the mean: with the mean, one hole
+    // widens the threshold until the next hole stops counting as one.
+    //
+    // Returns the step size above which the line must break, or
+    // infinity when there are too few points to judge.
+    //
+    // Public and static because it is the whole decision, and a test
+    // that renders the widget and counts pixels tests the painter's
+    // grid lines as much as this — which is exactly how the first
+    // version of that test failed.
+    static double gapThresholdHz(const Sweep& s);
+
 protected:
     void paintEvent(QPaintEvent*) override;
     // ── Reading a value off the curve ────────────────────────────────

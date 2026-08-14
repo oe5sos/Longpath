@@ -43,40 +43,6 @@ QString mhz(double hz, int digits = 3)
     return QStringLiteral("%1").arg(hz / 1e6, 0, 'f', digits);
 }
 
-// ── Where a sweep stops being continuous ─────────────────────────────
-//
-// A range sweep across several bands has holes: between 40 m and 30 m
-// lie three megahertz we may not transmit on, so there are no points
-// there. Joined into one polyline that becomes a straight stroke from
-// 7.200 to 10.100 — full confidence across spectrum nobody looked at,
-// which is the shape of every mistake this window has made so far.
-//
-// A gap is a step much larger than the run's own spacing. The MEDIAN is
-// the reference, not the mean: with the mean, one hole widens the
-// threshold until the next hole stops counting as one.
-//
-// Returns a step size above which the line must break, or infinity when
-// there are too few points to judge.
-double gapThresholdHz(const Sweep& s)
-{
-    if (s.points.size() <= 2) {
-        return std::numeric_limits<double>::max();
-    }
-    QVector<double> steps;
-    steps.reserve(s.points.size() - 1);
-    for (int i = 1; i < s.points.size(); ++i) {
-        steps.append(s.points.at(i).freqHz - s.points.at(i - 1).freqHz);
-    }
-    std::sort(steps.begin(), steps.end());
-    const double median = steps.at(steps.size() / 2);
-    // Four times the usual spacing: far enough above the jitter in a
-    // file sweep never to fire by accident, far enough below a real
-    // band gap always to fire. The narrowest gap in the HF plan is
-    // 10.150 to 14.000 MHz, thousands of times a band sweep's step.
-    return median > 0.0 ? median * 4.0
-                        : std::numeric_limits<double>::max();
-}
-
 } // namespace
 
 SwrCurveWidget::SwrCurveWidget(QWidget* parent)
@@ -101,6 +67,27 @@ double SwrCurveWidget::tickStepHz(double spanHz, int wanted) const
                       : (n <= 7.5) ? 5.0
                                    : 10.0;
     return nice * mag;
+}
+
+double SwrCurveWidget::gapThresholdHz(const Sweep& s)
+{
+    // See the header for what this decides and why the median.
+    if (s.points.size() <= 2) {
+        return std::numeric_limits<double>::max();
+    }
+    QVector<double> steps;
+    steps.reserve(s.points.size() - 1);
+    for (int i = 1; i < s.points.size(); ++i) {
+        steps.append(s.points.at(i).freqHz - s.points.at(i - 1).freqHz);
+    }
+    std::sort(steps.begin(), steps.end());
+    const double median = steps.at(steps.size() / 2);
+    // Four times the usual spacing: far enough above the jitter in a
+    // file sweep never to fire by accident, far enough below a real
+    // band gap always to fire. The narrowest gap in the HF plan is
+    // 10.150 to 14.000 MHz, thousands of times a band sweep's step.
+    return median > 0.0 ? median * 4.0
+                        : std::numeric_limits<double>::max();
 }
 
 void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const

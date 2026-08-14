@@ -25,8 +25,7 @@
 #include "gui/widgets/SwrCurveWidget.h"
 #include "core/antenna/Touchstone.h"
 
-#include <QImage>
-
+#include <cmath>
 #include <complex>
 
 using namespace NereusSDR;
@@ -119,77 +118,100 @@ private slots:
     // ── The gap must stay a gap ──────────────────────────────────────
     //
     // A range sweep has holes: the spectrum between the bands is not
-    // ours, so no point exists there. Drawn as one polyline that is a
-    // straight stroke from 7.200 to 10.100 MHz — full confidence across
-    // three megahertz nobody measured.
+    // ours, so no point exists there. Drawn as one polyline it becomes
+    // a straight stroke from 7.200 to 14.000 MHz — full confidence
+    // across almost seven megahertz nobody measured.
     //
-    // Comparing rendered pixels would be brittle, so this renders into
-    // an image and asks a question the drawing can only answer one way:
-    // is the middle of the gap empty?
-    void aBandGapIsNotDrawnAcross()
+    // The first version of these two rendered the widget and counted
+    // ink in one column. It failed, and it deserved to: the horizontal
+    // SWR grid lines cross every column, so the count was mostly grid,
+    // and the threshold I compared it against was a guess. A test whose
+    // pass condition I cannot derive is not a test.
+    //
+    // So: check the decision itself. gapThresholdHz is the whole of it.
+
+    void aBandGapIsFarAboveTheGapThreshold()
     {
-        Sweep s = flatSweep(7.0e6, 7.2e6, QStringLiteral("range"));
-        // Second segment, well clear: 14 MHz. Both flat at SWR ≈ 1.22,
-        // so any ink between them can only be an interpolated line.
-        const Sweep upper = flatSweep(14.0e6, 14.35e6, QStringLiteral("x"));
+        Sweep s = flatSweep(7.0e6, 7.2e6, QStringLiteral("40m"));
+        const Sweep upper = flatSweep(14.0e6, 14.35e6, QStringLiteral("20m"));
         s.points.append(upper.points);
 
-        SwrCurveWidget w;
-        w.setRegion(AmateurBands::Region::One);
-        w.resize(800, 420);
-        w.setSweep(s);
+        const double threshold = SwrCurveWidget::gapThresholdHz(s);
+        QVERIFY(threshold > 0.0);
+        QVERIFY(std::isfinite(threshold));
 
-        QImage img(w.size(), QImage::Format_ARGB32);
-        w.render(&img);
+        // Worked out rather than guessed: 41 steps in all — twenty of
+        // 10 kHz from the 40 m half, twenty of 17.5 kHz from the 20 m
+        // half, and one of 6.8 MHz across the hole. The median is the
+        // 17.5, so the threshold is 70 kHz. The hole is ninety-seven
+        // times that, which is not a close call.
+        //
+        // (I first wrote "40 kHz" here from the 40 m spacing alone, and
+        // the arithmetic said 70. The assertion below is deliberately
+        // loose so it tests the order of magnitude, not my mental
+        // arithmetic.)
+        QVERIFY2(threshold < 1.0e6,
+                 qPrintable(QStringLiteral("threshold came out at %1 kHz")
+                                .arg(threshold / 1e3)));
 
-        // 10.6 MHz: the middle of the 7.2–14.0 hole, and inside no
-        // amateur band. Count non-background pixels in that column
-        // across the plot area.
-        const double lo = 7.0e6 - (14.35e6 - 7.0e6) * 0.12;
-        const double hi = 14.35e6 + (14.35e6 - 7.0e6) * 0.12;
-        const int x = int(44.0 + (10.6e6 - lo) / (hi - lo)
-                                     * ((800.0 - 12.0) - 44.0));
-        QVERIFY(x > 44 && x < 788);
-
-        const QRgb bg = img.pixel(x, 40);   // just inside the frame top
-        int ink = 0;
-        for (int y = 40; y < img.height() - 60; ++y) {
-            if (img.pixel(x, y) != bg) { ++ink; }
+        int breaks = 0;
+        for (int i = 1; i < s.points.size(); ++i) {
+            const double step = s.points.at(i).freqHz
+                                - s.points.at(i - 1).freqHz;
+            if (step > threshold) { ++breaks; }
         }
-        // Grid lines and the limit rule cross this column too, so allow
-        // a few pixels. A drawn-through curve is a fat 2.2 px stroke and
-        // would land well above this.
-        QVERIFY2(ink <= 6,
-                 qPrintable(QStringLiteral(
-                     "%1 pixels of ink at 10.6 MHz — the curve was drawn "
-                     "across a band gap it never measured").arg(ink)));
+        QCOMPARE(breaks, 1);
     }
 
-    void aNormalSweepIsStillOneUnbrokenLine()
+    void anOrdinarySweepHasNoBreakAtAll()
     {
-        // The guard must not fire on ordinary point-to-point spacing,
-        // or every curve becomes a dotted line.
-        Sweep s = flatSweep(14.0e6, 14.35e6, QStringLiteral("20m"));
-        SwrCurveWidget w;
-        w.setRegion(AmateurBands::Region::One);
-        w.resize(800, 420);
-        w.setSweep(s);
-
-        QImage img(w.size(), QImage::Format_ARGB32);
-        w.render(&img);
-
-        // Mid-band, where the curve certainly runs.
-        const double lo = 14.0e6 - 0.35e6 * 0.12;
-        const double hi = 14.35e6 + 0.35e6 * 0.12;
-        const int x = int(44.0 + (14.175e6 - lo) / (hi - lo)
-                                     * ((800.0 - 12.0) - 44.0));
-        const QRgb bg = img.pixel(x, 40);
-        int ink = 0;
-        for (int y = 40; y < img.height() - 60; ++y) {
-            if (img.pixel(x, y) != bg) { ++ink; }
+        // The one that matters more. A threshold that fires too easily
+        // turns every curve into a dotted line, and that failure would
+        // look like a rendering quirk rather than a bug.
+        const Sweep s = flatSweep(14.0e6, 14.35e6, QStringLiteral("20m"));
+        const double threshold = SwrCurveWidget::gapThresholdHz(s);
+        for (int i = 1; i < s.points.size(); ++i) {
+            const double step = s.points.at(i).freqHz
+                                - s.points.at(i - 1).freqHz;
+            QVERIFY2(step <= threshold,
+                     qPrintable(QStringLiteral(
+                         "an even sweep was split at %1 MHz")
+                             .arg(s.points.at(i).freqHz / 1e6, 0, 'f', 4)));
         }
-        QVERIFY2(ink > 6, "the curve vanished from the middle of a "
-                          "perfectly ordinary sweep");
+    }
+
+    void unevenSpacingAloneDoesNotSplitTheCurve()
+    {
+        // A file from a VNA need not be evenly spaced. Mild variation
+        // must not read as a band gap.
+        Sweep s;
+        s.source = QStringLiteral("vna");
+        double f = 14.0e6;
+        for (int i = 0; i < 30; ++i) {
+            SweepPoint p;
+            p.freqHz = f;
+            p.gamma  = std::complex<double>(0.1, 0.0);
+            s.points.append(p);
+            f += (i % 3 == 0) ? 12000.0 : 9000.0;   // 9–12 kHz jitter
+        }
+        const double threshold = SwrCurveWidget::gapThresholdHz(s);
+        for (int i = 1; i < s.points.size(); ++i) {
+            QVERIFY(s.points.at(i).freqHz - s.points.at(i - 1).freqHz
+                    <= threshold);
+        }
+    }
+
+    void tooFewPointsToJudgeMeansNoBreak()
+    {
+        Sweep s;
+        for (double hz : {14.0e6, 14.2e6}) {
+            SweepPoint p;
+            p.freqHz = hz;
+            p.gamma  = std::complex<double>(0.1, 0.0);
+            s.points.append(p);
+        }
+        QVERIFY(!std::isfinite(SwrCurveWidget::gapThresholdHz(s))
+                || SwrCurveWidget::gapThresholdHz(s) > 1e12);
     }
 
     void aForcedBandStillWins()
