@@ -241,8 +241,11 @@ bool SwrSweepController::startSweep(const SwrSweepPlan& plan)
     m_highSwrRun = 0;
     m_deadRun = 0;
     m_baseAcc = 0.0;
+    m_baseRevAcc = 0.0;
     m_baseN = 0;
     m_baselineRaw = 0;
+    m_baselineRevRaw = 0;
+    m_sawAnyRaw = false;
 
     // ── Baseline first, carrier second ───────────────────────────────
     //
@@ -340,6 +343,7 @@ void SwrSweepController::ingestTelemetry(double fwdW, double revW,
     }
     m_lastTelemetryMs = QDateTime::currentMSecsSinceEpoch();
     m_watchdog.start(m_telemetryTimeoutMs);
+    if (fwdRaw > 0 || revRaw > 0) { m_sawAnyRaw = true; }
 
     // The idle window, before anything is keyed.
     if (m_state == State::Baseline) {
@@ -477,6 +481,7 @@ void SwrSweepController::finish(bool completed, const QString& reason)
     // problem, and two complaints about one silence help nobody.
     m_result.reverseNeverMoved =
         (m_result.validPoints() > 0)
+        && m_sawAnyRaw
         && (m_result.maxRevRaw <= m_result.baselineRevRaw + kMinRawRise);
     if (!reason.isEmpty()) {
         emit reasonChanged(reason);

@@ -349,6 +349,12 @@ private:
     int     m_baseN{0};
     quint16 m_baselineRaw{0};
     quint16 m_baselineRevRaw{0};
+    // Whether any caller supplied raw ADC counts at all. Without it,
+    // a caller that passes watts only (every test written before the
+    // baseline landed) has baseline 0 and peak 0, which satisfies
+    // "reverse never rose above idle" and gets flagged as a dead
+    // channel. Absence of data is not evidence of a fault.
+    bool    m_sawAnyRaw{false};
     qint64 m_lastTelemetryMs{0};
 
     QTimer m_stepTimer;      // single-shot, drives every state change

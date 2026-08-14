@@ -532,6 +532,28 @@ private slots:
                  "a responding reverse channel was flagged as dead");
     }
 
+    // Absence of data is not evidence of a fault. A caller that hands
+    // over watts and no ADC counts — every test written before the
+    // baseline landed, and any future one — has baseline 0 and peak 0,
+    // which satisfies "reverse never rose above idle" by accident. It
+    // must not be reported as a dead channel.
+    void a_caller_that_supplies_no_raw_counts_is_not_accused_of_a_dead_bridge()
+    {
+        Harness h;
+        FakeDipole dipole;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan()));
+        h.pumpUntilFinished(dipole);          // watts only, no raw
+
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+        QVERIFY(result.completed);
+        QVERIFY(result.validPoints() > 0);
+        QVERIFY2(!result.reverseNeverMoved,
+                 "a sweep that was never given raw counts was reported "
+                 "as having a dead reverse channel");
+    }
+
     void the_baseline_is_taken_before_anything_is_keyed()
     {
         // A baseline sampled with the carrier up is not a baseline. The
