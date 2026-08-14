@@ -15,6 +15,7 @@
 #include "SwrChartWidget.h"
 
 #include "core/AppSettings.h"
+#include "core/antenna/RadioSweep.h"
 #include "gui/StyleConstants.h"
 
 #include <QComboBox>
@@ -262,6 +263,12 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             m_chart->dropLiveTrace();
         } else {
             m_chart->finishLiveTrace();
+            // Hand the measurement to the analysis half of the window,
+            // so a finished radio sweep reads like a loaded file:
+            // band shaded and named, SWR at start / middle / end, the
+            // usable span, the best match. Only for a sweep that is
+            // actually a measurement — see the signal's docstring.
+            emit analysisReady(RadioSweep::fromResult(result));
         }
         refreshTraceList();
 

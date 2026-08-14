@@ -73,6 +73,26 @@ struct Sweep {
     QString source;        // file name, or how else it arrived
     QString note;          // why it is empty, when it is
 
+    // ── No phase in this one ─────────────────────────────────────────
+    //
+    // True when the sweep came from something that measures only the
+    // MAGNITUDE of the reflection — a radio's directional coupler, an
+    // SWR meter, a set of numbers read off a dial. |Γ| is known and its
+    // angle is not.
+    //
+    // Everything that depends on magnitude alone still works: the SWR
+    // curve, the band edges, the usable span, the best match. Anything
+    // that needs the angle does not, and that is the whole point of the
+    // flag — resonance means the REACTANCE crosses zero, and a sweep
+    // without phase has no reactance to cross it.
+    //
+    // Without this, a magnitude-only sweep stored as a real Γ reports
+    // X = 0 at every single point, which reads as "resonant everywhere"
+    // and prints a feed resistance that was never measured. That is the
+    // same failure as the flat SWR 1.00 curve: an answer that looks
+    // right, is fabricated, and would be acted on.
+    bool magnitudeOnly{false};
+
     bool   isEmpty() const { return points.isEmpty(); }
     double startHz() const { return points.isEmpty() ? 0.0
                                                      : points.first().freqHz; }

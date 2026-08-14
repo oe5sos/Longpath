@@ -177,9 +177,30 @@ void AntennaWindow::buildUi()
     outer->addWidget(tabs);
 
     auto* filePage = new QWidget(this);
-    tabs->addTab(filePage, QStringLiteral("Datei (VNA)"));
+    tabs->addTab(filePage, QStringLiteral("Auswertung"));
     m_sweepPanel = new SwrSweepPanel(this);
     tabs->addTab(m_sweepPanel, QStringLiteral("Sweep (Radio)"));
+
+    // ── One analysis, two sources ────────────────────────────────────
+    //
+    // The window had grown two halves that did not know about each
+    // other: a file gave you the band shaded and named, SWR at start,
+    // middle and end, the usable span and the trim advice, while the
+    // radio's own sweep gave a bare line on a second chart.
+    //
+    // "der sweep sollte nach beendigung genauso wie das beispiel
+    //  aussehen." Quite. A finished sweep now goes through the same
+    // analysis a loaded .s1p does, and the tab is called Auswertung
+    // rather than Datei (VNA) because it is no longer only about files.
+    //
+    // It also brings the operator here to look at it, which is the
+    // point — the answer is on this page, not on the one with the
+    // Start button.
+    connect(m_sweepPanel, &SwrSweepPanel::analysisReady,
+            this, [this, tabs](const Sweep& s) {
+        setSweep(s);
+        tabs->setCurrentIndex(0);
+    });
 
     auto* col = new QVBoxLayout(filePage);
     col->setContentsMargins(12, 10, 12, 10);
@@ -1076,6 +1097,44 @@ void AntennaWindow::refresh()
         m_action->setText(QStringLiteral("—"));
         m_actionSub->setText(QStringLiteral(
             "Open a .s1p sweep from your analyser."));
+        m_caution->setVisible(false);
+        return;
+    }
+
+    // ── A sweep with no phase leads with the match ───────────────────
+    //
+    // A radio's coupler measures how much comes back, not when. The
+    // headline below would call that "not resonant" in red, which is a
+    // verdict on the antenna where the truth is a limitation of the
+    // instrument — and the operator would go and cut wire over it.
+    //
+    // So say what WAS measured: where in the band the match is best.
+    // That is most of what a SOTA operator needs, and the missing part
+    // is named rather than left as an absence.
+    if (m_sweep.magnitudeOnly) {
+        const auto best = AntennaSweep::bestMatch(m_sweep);
+        if (best.found) {
+            m_action->setText(QStringLiteral("%1 MHz")
+                                  .arg(best.freqHz / 1e6, 0, 'f', 3));
+            m_action->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; border: none; }")
+                    .arg(QLatin1String(best.swr <= limit
+                                           ? Style::kGreenText
+                                           : Style::kAmberText)));
+            m_actionSub->setText(QStringLiteral(
+                "bester Anpassungspunkt · SWR %1 — gemessen vom "
+                "Funkgerät.\n"
+                "Wo genau die Antenne resonant ist und wie viele "
+                "Zentimeter Draht fehlen, kann diese Messung nicht "
+                "sagen: der Richtkoppler misst nur, wie viel "
+                "zurückkommt, nicht mit welcher Phase. Dafür braucht "
+                "es einen Sweep mit Phase (.s1p).")
+                    .arg(best.swr, 0, 'f', 2));
+        } else {
+            m_action->setText(QStringLiteral("—"));
+            m_actionSub->setText(QStringLiteral(
+                "Keine verwertbaren Punkte in dieser Messung."));
+        }
         m_caution->setVisible(false);
         return;
     }

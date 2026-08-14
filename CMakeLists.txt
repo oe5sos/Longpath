@@ -503,6 +503,7 @@ set(CORE_SOURCES
     src/core/antenna/TrimSession.cpp
     src/core/antenna/AntennaSweep.cpp
     src/core/antenna/AntennaTrim.cpp
+    src/core/antenna/RadioSweep.cpp
     src/core/AppSettings.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp

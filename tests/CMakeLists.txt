@@ -4751,6 +4751,11 @@ nereus_add_test(tst_strip_characters)
 #    double-click and the context menu. They were three copies and had
 #    already diverged. Also the Q clamp, which is the only place a type
 #    change touches a number the operator did not --
+# -- A radio sweep becoming the same Sweep a .s1p becomes. Mostly about
+#    the boundary: a magnitude with no phase must not become an
+#    impedance, and an unmeasured point must not become a perfect one --
+nereus_add_test(tst_radio_sweep)
+
 nereus_add_test(tst_eq_filter_ring)
 
 # -- Undo. The ways it breaks are all quiet: a step that restores

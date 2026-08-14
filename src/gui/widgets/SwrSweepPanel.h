@@ -26,6 +26,7 @@
 class QTimer;
 
 #include "core/SwrSweepController.h"
+#include "core/antenna/Touchstone.h"
 
 class QComboBox;
 class QSpinBox;
@@ -87,6 +88,19 @@ public:
     /// RadioModel exists). Without it the Start button stays disabled
     /// with an explanatory status line.
     void setBackend(const Backend& backend);
+
+signals:
+    /// A sweep finished with something worth analysing. Carries the
+    /// measurement in the same shape a .s1p arrives in, so the file
+    /// half of the window can analyse it identically — asked for
+    /// directly: "der sweep sollte nach beendigung genauso wie das
+    /// beispiel aussehen."
+    ///
+    /// Not emitted for a sweep that measured nothing, and not for one
+    /// whose reverse channel never moved: neither is a measurement, and
+    /// handing either to an analysis that will dutifully draw it is how
+    /// a fabricated curve gets treated as data.
+    void analysisReady(const NereusSDR::Sweep& sweep);
 
 protected:
     // ── The label was lying ──────────────────────────────────────────

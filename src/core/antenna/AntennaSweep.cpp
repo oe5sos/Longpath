@@ -65,6 +65,23 @@ QVector<Crossing> resonances(const Sweep& s)
     QVector<Crossing> out;
     if (s.points.size() < 2) { return out; }
 
+    // ── No phase, no resonance ───────────────────────────────────────
+    //
+    // Resonance is the frequency at which the REACTANCE crosses zero. A
+    // sweep from a directional coupler carries only |Γ|; its angle was
+    // never measured, and RadioSweep stores it on the real axis as the
+    // least misleading placeholder.
+    //
+    // Left unguarded, that placeholder means the imaginary part is zero
+    // at every single point, so this function would report a resonance
+    // between every pair of samples and print a feed resistance nobody
+    // measured. Fifty-one resonances, each with an ohm figure, all
+    // fabricated by a convention chosen for storage.
+    //
+    // Returning nothing is the correct answer to a question the data
+    // cannot answer.
+    if (s.magnitudeOnly) { return out; }
+
     auto reactance = [&s](int i) {
         return impedance(s.points.at(i).gamma, s.referenceOhms).imag();
     };
@@ -200,6 +217,12 @@ double swrAt(const Sweep& s, double freqHz)
 std::complex<double> impedanceAt(const Sweep& s, double freqHz)
 {
     if (s.points.size() < 2) { return {}; }
+    // A magnitude-only sweep has no impedance to report: |Γ| fixes how
+    // much comes back, not what kind of load sent it. Anything here
+    // would be the storage convention read back as a measurement — see
+    // the note in resonances(). Zero is how this function already says
+    // "outside the sweep", and callers treat it as no answer.
+    if (s.magnitudeOnly) { return {}; }
     if (freqHz < s.startHz() || freqHz > s.stopHz()) { return {}; }
 
     for (int i = 1; i < s.points.size(); ++i) {

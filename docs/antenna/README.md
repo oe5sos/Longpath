@@ -1,10 +1,47 @@
 # The antenna window
 
-Tools → Antenna. Open a sweep from your analyser and it tells you where
-the antenna is resonant and how much wire to add or remove.
+Tools → Antenna. It tells you where the antenna is resonant and how
+much wire to add or remove.
 
-It reads a file. It does not touch the radio and it cannot make your
-analyser do anything — there is no driver behind it yet.
+Two ways to get a measurement in, and they are not equivalent.
+
+**Auswertung** — a `.s1p` from an analyser. A VNA measures the
+reflection with a receiver, so it knows both how much comes back and
+*when*: magnitude and phase. That is the full picture, and only this
+path can tell you where the antenna is resonant and how many
+centimetres of wire are missing.
+
+**Sweep (Radio)** — your own transmitter steps across the band and the
+directional coupler reports how much comes back. When it finishes, the
+result goes through the same analysis and lands on the Auswertung tab
+looking like a loaded file.
+
+What a coupler sweep gives you:
+
+* the SWR curve across the band
+* the band edges and centre, with SWR at each
+* the usable span at your limit, in kilohertz
+* the best match, and where in the band it sits
+* comparison against the previous sweep
+
+What it cannot give you, and why: a coupler measures magnitude only.
+There is no phase, so there is no reactance, so there is no resonance
+and no feed impedance — and therefore no trim advice in centimetres.
+The window says so rather than guessing; a resonance invented from a
+storage convention would be a confident number nobody measured.
+
+For SOTA that split usually works out: the radio sweep answers "is it
+usable here, and where is it best", which is the question on the summit.
+The `.s1p` path answers "cut how much", which is the question at home.
+
+### One caution about the radio sweep
+
+It transmits. Fifty-one points is about seventeen seconds of carrier
+swept across the whole band, at your tune power, inside the band-plan
+edges. And the coupler needs enough forward power to read at all — a
+diode below its threshold reports nothing rather than a little. The tab
+shows both raw ADC counts live so you can press TUNE and watch whether
+they move.
 
 ---
 
