@@ -88,6 +88,23 @@ void SwrSweepPanel::buildUi()
     m_powerLabel->setStyleSheet(QStringLiteral("color:#c8d8e8;"));
     row->addWidget(m_powerLabel);
 
+    // ── The coupler, live ────────────────────────────────────────────
+    //
+    // Two unscaled ADC counts, refreshed every second. Press TUNE and
+    // watch them: forward should climb, reverse should climb a little.
+    // Whichever stays put is the fault, and it is visible in one glance
+    // without running a sweep, reading a status line or finding the PA
+    // Values page in Setup — which has shown these numbers all along
+    // and which nobody found in a day of looking.
+    m_couplerLabel = new QLabel(this);
+    m_couplerLabel->setToolTip(QStringLiteral(
+        "Die Rohwerte des Richtkopplers, 0…4095, ungerechnet. Beim "
+        "Tasten müssen beide steigen: der Vorlauf deutlich, der "
+        "Rücklauf je nach Anpassung wenig bis deutlich. Bleibt einer "
+        "stehen, meldet das Gerät ihn nicht — und dann kann daraus "
+        "auch kein SWR entstehen."));
+    row->addWidget(m_couplerLabel);
+
     row->addStretch(1);
 
     m_startBtn = new QPushButton(QStringLiteral("▶ Sweep starten"), this);
@@ -388,6 +405,26 @@ void SwrSweepPanel::startClicked()
 
 void SwrSweepPanel::refreshTunePowerLabel()
 {
+    // The coupler readout rides the same one-second poll.
+    if (m_couplerLabel) {
+        if (m_backend.rawAdc) {
+            const auto raw = m_backend.rawAdc();
+            m_couplerLabel->setText(
+                QStringLiteral("   Koppler-ADC:  VOR %1  ·  RÜCK %2")
+                    .arg(raw.first, 4).arg(raw.second, 4));
+            // Amber while either sits at the bottom of its range: that
+            // is the state in which no SWR can be computed, and it
+            // should be visible before a sweep rather than after.
+            const bool quiet = (raw.first < 100 || raw.second < 20);
+            m_couplerLabel->setStyleSheet(
+                QStringLiteral("color:%1; font-family: monospace;")
+                    .arg(QString::fromLatin1(
+                        quiet ? Style::kTextSecondary : Style::kGreenText)));
+        } else {
+            m_couplerLabel->clear();
+        }
+    }
+
     if (!m_backend.tuneDrive) {
         m_powerLabel->clear();
         return;

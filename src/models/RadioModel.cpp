@@ -8956,6 +8956,10 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
     // private helpers (scaleRevPowerWatts / scalePaVolts / scalePaAmps /
     // scalePaTemperatureCelsius) stay file-scope until they get their
     // own public surface.
+    // Kept unscaled for the coupler readout — see lastFwdAdcRaw().
+    m_lastFwdRaw = fwdRaw;
+    m_lastRevRaw = revRaw;
+
     const double fwdW   = NereusSDR::scaleFwdPowerWatts(model, fwdRaw);
     const double revW   = scaleRevPowerWatts(revRaw, model);
     const double paV    = scalePaVolts(userAdc0Raw, model);

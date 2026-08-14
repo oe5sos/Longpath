@@ -966,6 +966,21 @@ public:
     /// window's sweep tab. Telemetry-fed from handlePaTelemetry.
     SwrSweepController* swrSweepController() const { return m_swrSweep; }
 
+    // ── The directional coupler's raw counts, as last reported ───────
+    //
+    // Unscaled, straight off the wire. Everything else in the program
+    // shows watts, and watts are the far end of a chain — ADC count,
+    // per-board triplet, calibration — so a wrong number there does not
+    // say which link is at fault.
+    //
+    // 2026-08-14 cost a day to that: the forward reading sat at 0.01 W
+    // and no display in the program could say whether the radio was
+    // reporting nothing or the scaling was eating it. These two numbers
+    // answer that in one glance. The PA Values page in Setup has shown
+    // them all along, which nobody found.
+    quint16 lastFwdAdcRaw() const noexcept { return m_lastFwdRaw; }
+    quint16 lastRevAdcRaw() const noexcept { return m_lastRevRaw; }
+
     // 3M-4 Task 7: expose PureSignal coordinator so PsForm, PureSignalApplet,
     // TxApplet [PS-A], and PsaIndicatorWidget can subscribe to its
     // Q_PROPERTY signals (cal lifecycle, MOX integration, FB level updates).
@@ -3609,6 +3624,9 @@ private:
     TwoToneController* m_twoToneController{nullptr};
     // 2026-08-13 SWR sweep analyzer — owned QObject child.
     SwrSweepController* m_swrSweep{nullptr};
+    // Latest raw coupler counts; see lastFwdAdcRaw().
+    quint16 m_lastFwdRaw{0};
+    quint16 m_lastRevRaw{0};
 
     // 3M-4 Task 7: PureSignal coordinator.  Owned via unique_ptr (NOT a
     // raw QObject child) so the destructor can drain the polling timers

@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <QPair>
 #include <QWidget>
 #include <functional>
 
@@ -71,6 +72,13 @@ public:
         /// the control it came from, because "5 W" on its own is what
         /// made this invisible.
         std::function<TuneDrive(Band)> tuneDrive;
+
+        /// The coupler's raw ADC counts, forward and reverse, as last
+        /// reported by the radio. Shown live beside the power so the
+        /// operator can press TUNE and watch whether they move — which
+        /// is the whole diagnosis in one glance, and took a day to
+        /// arrive at without it.
+        std::function<QPair<quint16, quint16>()> rawAdc;
     };
 
     explicit SwrSweepPanel(QWidget* parent = nullptr);
@@ -114,6 +122,7 @@ private:
     QComboBox*    m_bandBox{nullptr};
     QSpinBox*     m_pointsBox{nullptr};
     QLabel*       m_powerLabel{nullptr};
+    QLabel*       m_couplerLabel{nullptr};
     QPushButton*  m_startBtn{nullptr};
     QPushButton*  m_stopBtn{nullptr};
     QProgressBar* m_progress{nullptr};

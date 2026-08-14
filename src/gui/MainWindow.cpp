@@ -9570,6 +9570,9 @@ void MainWindow::openAntennaWindow()
                 }
                 return { tx.power(), QStringLiteral("RF-Power-Regler") };
             };
+            backend.rawAdc = [rm = m_radioModel]() {
+                return qMakePair(rm->lastFwdAdcRaw(), rm->lastRevAdcRaw());
+            };
             m_antennaWindow->sweepPanel()->setBackend(backend);
         }
     }
