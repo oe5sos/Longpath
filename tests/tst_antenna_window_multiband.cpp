@@ -119,7 +119,11 @@ private slots:
         // describing one arbitrary band as though it were the answer.
         bool tileVisible = false;
         for (auto* l : w.findChildren<QLabel*>()) {
-            if (l->text() == QStringLiteral("BAND START")
+            // startsWith, not ==: refresh() rewrites the caption to
+            // "BAND START  14.000". Comparing for equality made this
+            // test pass in the negative case for the wrong reason and
+            // fail in the positive one — my error, not the window's.
+            if (l->text().startsWith(QStringLiteral("BAND START"))
                 && l->isVisible()) {
                 tileVisible = true;
                 break;
@@ -157,7 +161,11 @@ private slots:
 
         bool tileVisible = false;
         for (auto* l : w.findChildren<QLabel*>()) {
-            if (l->text() == QStringLiteral("BAND START")
+            // startsWith, not ==: refresh() rewrites the caption to
+            // "BAND START  14.000". Comparing for equality made this
+            // test pass in the negative case for the wrong reason and
+            // fail in the positive one — my error, not the window's.
+            if (l->text().startsWith(QStringLiteral("BAND START"))
                 && l->isVisible()) {
                 tileVisible = true;
                 break;

@@ -213,6 +213,30 @@ void SwrCurveWidget::recompute()
 {
     m_bands = AmateurBands::allOverlapping(m_sweep.startHz(),
                                            m_sweep.stopHz(), m_region);
+
+    // ── Only bands that were actually measured ───────────────────────
+    //
+    // allOverlapping() works from the first and last frequency, which
+    // is right for a sweep that is continuous between them and wrong
+    // for one with holes. A range sweep may only key inside the
+    // allocations, so 7.0 to 29.7 MHz can hold points on 40 m and 10 m
+    // and nothing at all on the five bands between — and those five
+    // were being listed, each with a row of "not swept".
+    //
+    // Found by a test that put points on two bands and got seven rows.
+    // Same shape as everything else here: describing spectrum nobody
+    // looked at.
+    if (!m_sweep.isEmpty()) {
+        QVector<AmateurBands::Band> measured;
+        measured.reserve(m_bands.size());
+        for (const AmateurBands::Band& b : m_bands) {
+            for (const SweepPoint& p : m_sweep.points) {
+                if (b.contains(p.freqHz)) { measured.append(b); break; }
+            }
+        }
+        m_bands = measured;
+    }
+
     m_band = m_forcedBand.isValid()
                  ? m_forcedBand
                  : AmateurBands::bestOverlap(m_sweep.startHz(),
