@@ -29,6 +29,7 @@
 #include <QTextStream>
 #include <QFile>
 #include <QMessageBox>
+#include <QTimer>
 
 namespace NereusSDR {
 
@@ -159,6 +160,25 @@ void SwrSweepPanel::buildUi()
 
     connect(m_bandBox, &QComboBox::currentIndexChanged, this,
             [this](int) { refreshTunePowerLabel(); });
+
+    // See the note in the header. Only runs while the tab is on screen.
+    m_powerPoll = new QTimer(this);
+    m_powerPoll->setInterval(1000);
+    connect(m_powerPoll, &QTimer::timeout,
+            this, &SwrSweepPanel::refreshTunePowerLabel);
+}
+
+void SwrSweepPanel::showEvent(QShowEvent* e)
+{
+    QWidget::showEvent(e);
+    refreshTunePowerLabel();     // right on the first frame, not a second later
+    if (m_powerPoll) { m_powerPoll->start(); }
+}
+
+void SwrSweepPanel::hideEvent(QHideEvent* e)
+{
+    if (m_powerPoll) { m_powerPoll->stop(); }
+    QWidget::hideEvent(e);
 }
 
 void SwrSweepPanel::setBackend(const Backend& backend)
@@ -238,12 +258,23 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             // Completed and measured nothing. Say the watts — "zu
             // niedrig?" was a guess, and the numbers were there all
             // along.
-            m_status->setText(QStringLiteral(
-                "Kein einziger Punkt gemessen. Der Richtkoppler meldete "
-                "höchstens %1 W Vorlauf; ab %2 W ist die Anzeige eine "
-                "Messung. Tune-Leistung höher stellen.")
-                    .arg(result.maxFwdW, 0, 'f', 2)
-                    .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
+            m_status->setText(
+                result.maxFwdW < SwrSweepController::kSilentBridgeW
+                ? QStringLiteral(
+                      "Kein einziger Punkt gemessen, und der "
+                      "Richtkoppler meldete überhaupt nichts "
+                      "(höchstens %1 W). Prüfe von Hand: TUNE drücken "
+                      "und den RF-Pwr-Balken ansehen — bleibt der auch "
+                      "auf null, liegt es am Träger oder an der "
+                      "Leistungstelemetrie, nicht am Sweep.")
+                      .arg(result.maxFwdW, 0, 'f', 2)
+                : QStringLiteral(
+                      "Kein einziger Punkt gemessen. Der Richtkoppler "
+                      "meldete höchstens %1 W Vorlauf; ab %2 W ist die "
+                      "Anzeige eine Messung. Tune-Leistung höher "
+                      "stellen.")
+                      .arg(result.maxFwdW, 0, 'f', 2)
+                      .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
         } else {
             m_status->setText(QStringLiteral("Abgebrochen: %1")
                                   .arg(result.abortReason));

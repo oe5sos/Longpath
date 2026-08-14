@@ -317,6 +317,69 @@ private slots:
         QTRY_COMPARE(h.mox.state(), MoxState::Rx);
     }
 
+    // ── The bench, second run ────────────────────────────────────────
+    //
+    // Tune power raised to 5 W and the bridge still reported 0.01 W.
+    // That is not a small reading, it is no reading, and "raise the
+    // tune power" would send the operator winding the power up against
+    // a fault somewhere else. The two cases get different sentences.
+    void a_silent_bridge_is_not_reported_as_merely_weak()
+    {
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan(/*points*/ 21)));
+
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 3000) {
+            h.ctl.ingestTelemetry(0.01, 0.0);   // what the ANAN reported
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+
+        QVERIFY(!result.completed);
+        QVERIFY(result.maxFwdW < SwrSweepController::kSilentBridgeW);
+        // Must NOT tell the operator to turn the power up.
+        QVERIFY2(!result.abortReason.contains(QStringLiteral("höher"),
+                                              Qt::CaseInsensitive),
+                 qPrintable(result.abortReason));
+        // Must point at the thing to check by hand instead.
+        QVERIFY2(result.abortReason.contains(QStringLiteral("TUNE")),
+                 qPrintable(result.abortReason));
+    }
+
+    void a_weak_bridge_still_says_raise_the_power()
+    {
+        // The other side of the same fork: 0.3 W IS a reading, just
+        // under the floor, and more power is genuinely the remedy.
+        Harness h;
+        QSignalSpy fin(&h.ctl, &SwrSweepController::sweepFinished);
+        QVERIFY(h.ctl.startSweep(h.tinyPlan(/*points*/ 21)));
+
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < 3000) {
+            h.ctl.ingestTelemetry(0.30, 0.02);
+            QTest::qWait(2);
+        }
+        QCOMPARE(fin.count(), 1);
+        const auto result = fin.first().first().value<SwrSweepResult>();
+        QVERIFY(result.maxFwdW > SwrSweepController::kSilentBridgeW);
+        QVERIFY2(result.abortReason.contains(QStringLiteral("Tune-Leistung")),
+                 qPrintable(result.abortReason));
+    }
+
+    // The fork only works while the silent threshold sits below the
+    // measurement floor; if they ever cross, one branch becomes
+    // unreachable and the operator gets the wrong advice forever.
+    void the_silent_threshold_sits_below_the_measurement_floor()
+    {
+        QVERIFY(SwrSweepController::kSilentBridgeW
+                < SwrSweepController::kMinFwdW);
+        QVERIFY(SwrSweepController::kSilentBridgeW > 0.0);
+    }
+
     // points.size() counts attempts, validPoints() counts measurements.
     // The panel used the first to decide whether to keep a trace, so a
     // sweep that measured nothing still produced a named entry with a

@@ -347,13 +347,24 @@ void SwrSweepController::closePoint()
     // and "0.2 W measured, 0.5 W needed" is.
     if (pt.swr <= 0.0) {
         if (++m_deadRun >= kAbortDeadRun) {
-            finish(false, QStringLiteral(
-                "No usable reading on %1 points in a row — the bridge "
-                "reported at most %2 W forward and %3 W is the floor. "
-                "Raise the tune power.")
-                    .arg(kAbortDeadRun)
-                    .arg(m_result.maxFwdW, 0, 'f', 2)
-                    .arg(kMinFwdW, 0, 'f', 1));
+            finish(false, m_result.maxFwdW < kSilentBridgeW
+                ? QStringLiteral(
+                      "Der Richtkoppler meldet gar nichts — höchstens "
+                      "%1 W Vorlauf über %2 Punkte. Das ist keine zu "
+                      "kleine Messung, das ist keine. Prüfe von Hand: "
+                      "TUNE drücken und den RF-Pwr-Balken ansehen. "
+                      "Bleibt er auch dort auf null, liegt es nicht am "
+                      "Sweep, sondern am Träger oder an der "
+                      "Leistungstelemetrie.")
+                      .arg(m_result.maxFwdW, 0, 'f', 2)
+                      .arg(kAbortDeadRun)
+                : QStringLiteral(
+                      "Zu wenig Vorlauf über %1 Punkte — höchstens %2 W "
+                      "gemessen, ab %3 W ist die Anzeige eine Messung. "
+                      "Tune-Leistung höher stellen.")
+                      .arg(kAbortDeadRun)
+                      .arg(m_result.maxFwdW, 0, 'f', 2)
+                      .arg(kMinFwdW, 0, 'f', 1));
             return;
         }
     } else {

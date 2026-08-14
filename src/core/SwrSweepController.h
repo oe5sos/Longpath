@@ -190,6 +190,22 @@ public:
     /// sweep with a dead bridge transmits the full plan and reports
     /// failure at the end.
     static constexpr int kAbortDeadRun = 5;
+
+    /// Below this, the bridge is not reading LOW — it is not reading.
+    ///
+    /// ── Two faults that look alike and are not ───────────────────────
+    ///
+    /// 2026-08-14, second run: tune power raised to 5 W, and the sweep
+    /// reported at most 0.01 W forward. On an ORIONMKII triplet that is
+    /// about 41 ADC counts where five watts should give roughly 536 —
+    /// not a reading that is too small to use, but no reading at all.
+    ///
+    /// "Raise the tune power" is the right advice at 0.3 W and actively
+    /// misleading at 0.01 W, where the operator will keep winding the
+    /// power up against a fault that is somewhere else entirely: the
+    /// carrier, the drive, or the telemetry. The two get different
+    /// sentences.
+    static constexpr double kSilentBridgeW = 0.05;
     /// Three consecutive points at or above this SWR abort the sweep:
     /// that is an open feedline or no antenna, not a bad antenna.
     static constexpr double kAbortSwr = 25.0;

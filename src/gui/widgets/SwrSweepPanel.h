@@ -22,6 +22,8 @@
 #include <QWidget>
 #include <functional>
 
+class QTimer;
+
 #include "core/SwrSweepController.h"
 
 class QComboBox;
@@ -54,6 +56,28 @@ public:
     /// with an explanatory status line.
     void setBackend(const Backend& backend);
 
+protected:
+    // ── The label was lying ──────────────────────────────────────────
+    //
+    // 2026-08-14: the operator raised Tune Pwr from 1 W to 5 W and the
+    // panel went on reading "Tune-Leistung: 1 W ⚠ zu wenig zum Messen".
+    // It was drawn once, at construction and on a band change, and the
+    // tune power lives in TransmitModel where it changes whenever the
+    // operator touches the slider.
+    //
+    // That is the same fault as the character name three commits ago,
+    // and worse here: this is the number I had just told the operator
+    // to trust. The pre-flight check reads it live and refused
+    // correctly; only the label was stale, which is the combination
+    // that makes a panel look broken.
+    //
+    // A one-second poll while visible, rather than a signal: the value
+    // arrives through a std::function seam that has no signal to
+    // connect to, and inventing one to avoid a timer that costs an
+    // integer read per second is the wrong trade.
+    void showEvent(QShowEvent* e) override;
+    void hideEvent(QHideEvent* e) override;
+
 private:
     void buildUi();
     void startClicked();
@@ -74,6 +98,7 @@ private:
     QListWidget*  m_traceList{nullptr};
     QPushButton*  m_removeTraceBtn{nullptr};
     QPushButton*  m_exportBtn{nullptr};
+    QTimer*       m_powerPoll{nullptr};
 };
 
 } // namespace NereusSDR
