@@ -9534,8 +9534,41 @@ void MainWindow::openAntennaWindow()
                 const SliceModel* s = rm->txBoundSlice();
                 return s ? s->dspMode() : DSPMode::USB;
             };
-            backend.tunePowerForBand = [rm = m_radioModel](Band b) {
-                return rm->transmitModel().tunePowerForBand(b);
+            // ── Which slider TUNE actually reads ──────────────────────
+            //
+            // This used to be a bare tunePowerForBand(), which is only
+            // the right answer when tuneDrivePowerSource() happens to
+            // be TuneSlider. The default is DriveSlider — TUNE reads
+            // the RF Power slider and Tune Pwr does nothing — so the
+            // Antenna window displayed and gated on a number the radio
+            // was not using.
+            //
+            // 2026-08-14: that cost a morning. The operator raised Tune
+            // Pwr twice, the panel dutifully agreed, and the sweep went
+            // on transmitting at the RF Power slider's 1 W and
+            // measuring 0.01 W forward. He diagnosed it himself, from
+            // the outside, while I was reading the wrong end of the
+            // chain.
+            //
+            // Mirrors the switch in TransmitModel::setPowerUsingTargetDbm
+            // (txMode 1). If a fourth source is ever added there, this
+            // has to follow — hence the name of the control travelling
+            // with the number, so a mismatch is visible on screen
+            // instead of silent.
+            backend.tuneDrive =
+                [rm = m_radioModel](Band b) -> SwrSweepPanel::TuneDrive {
+                const TransmitModel& tx = rm->transmitModel();
+                switch (tx.tuneDrivePowerSource()) {
+                case DrivePowerSource::TuneSlider:
+                    return { tx.tunePowerForBand(b),
+                             QStringLiteral("Tune-Pwr-Regler") };
+                case DrivePowerSource::Fixed:
+                    return { tx.tunePower(),
+                             QStringLiteral("festen Wert im Setup") };
+                case DrivePowerSource::DriveSlider:
+                    break;
+                }
+                return { tx.power(), QStringLiteral("RF-Power-Regler") };
             };
             m_antennaWindow->sweepPanel()->setBackend(backend);
         }

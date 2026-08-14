@@ -323,16 +323,20 @@ void SwrSweepPanel::startClicked()
     // to know that BEFORE it transmitted, and asked instead of checking.
     //
     // The tune power is on screen two centimetres away. Read it.
-    if (m_backend.tunePowerForBand) {
-        const int watts = m_backend.tunePowerForBand(band);
-        if (watts < SwrSweepController::kMinUsefulTuneW) {
+    if (m_backend.tuneDrive) {
+        const TuneDrive drive = m_backend.tuneDrive(band);
+        if (drive.watts < SwrSweepController::kMinUsefulTuneW) {
+            // Names the control, not just the number. "Tune-Leistung
+            // steht auf 1 W" sent the operator to the Tune Pwr slider
+            // twice while TUNE was reading the RF Power one.
             m_status->setText(QStringLiteral(
-                "Tune-Leistung steht auf %1 W — damit misst der "
-                "Richtkoppler nichts (er braucht mindestens %2 W "
-                "Vorlauf, brauchbar ab etwa %3 W). Stell die "
-                "Tune-Leistung im TX-Feld höher und starte neu. Es "
+                "TUNE würde mit %1 W senden — der Wert kommt aus dem "
+                "%2. Damit misst der Richtkoppler nichts (er braucht "
+                "mindestens %3 W Vorlauf, brauchbar ab etwa %4 W). "
+                "Stell GENAU diesen Regler höher und starte neu. Es "
                 "wurde nichts gesendet.")
-                    .arg(watts)
+                    .arg(drive.watts)
+                    .arg(drive.sourceLabel)
                     .arg(SwrSweepController::kMinFwdW, 0, 'f', 1)
                     .arg(SwrSweepController::kMinUsefulTuneW));
             return;
@@ -344,13 +348,14 @@ void SwrSweepPanel::startClicked()
 
 void SwrSweepPanel::refreshTunePowerLabel()
 {
-    if (!m_backend.tunePowerForBand) {
+    if (!m_backend.tuneDrive) {
         m_powerLabel->clear();
         return;
     }
     const Band band =
         static_cast<Band>(m_bandBox->currentData().toInt());
-    const int watts = m_backend.tunePowerForBand(band);
+    const TuneDrive drive = m_backend.tuneDrive(band);
+    const int watts = drive.watts;
 
     // Two ways to have it wrong and only one of them was shown. Too
     // much power is a warning; too little is the reason the sweep
@@ -367,15 +372,25 @@ void SwrSweepPanel::refreshTunePowerLabel()
         colour = QString::fromLatin1(Style::kAmberText);
     }
     m_powerLabel->setStyleSheet(QStringLiteral("color:%1;").arg(colour));
-    m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W%2")
-                              .arg(watts).arg(note));
+    // The source is named on the face of the label, not hidden in the
+    // tooltip. Which slider feeds TUNE is a setting most operators have
+    // never looked at, and not naming it is what made a whole morning
+    // disappear into raising the wrong one.
+    m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W (%2)%3")
+                              .arg(watts).arg(drive.sourceLabel).arg(note));
 
     m_powerLabel->setToolTip(QStringLiteral(
         "Die Leistung, mit der der Sweep sendet — dieselbe, die TUNE "
-        "benutzt. Der Richtkoppler ist ein Dämpfungsglied vor einer "
-        "Diode und hat unten eine Schwelle: unter %1 W Vorlauf ist die "
-        "Anzeige Rauschen und der Punkt wird verworfen. Mehr als nötig "
-        "bringt nichts — SWR ist ein Verhältnis und ändert sich mit der "
+        "benutzt.\n\n"
+        "Welcher Regler das ist, steht in Klammern: NereusSDR kennt "
+        "drei Quellen für die Tune-Leistung (RF-Power-Regler, "
+        "Tune-Pwr-Regler, fester Wert aus dem Setup), und in der "
+        "Voreinstellung ist es der RF-Power-Regler — der Tune-Pwr-"
+        "Regler tut dann gar nichts.\n\n"
+        "Der Richtkoppler ist ein Dämpfungsglied vor einer Diode und "
+        "hat unten eine Schwelle: unter %1 W Vorlauf ist die Anzeige "
+        "Rauschen und der Punkt wird verworfen. Mehr als nötig bringt "
+        "nichts — SWR ist ein Verhältnis und ändert sich mit der "
         "Leistung nicht.")
             .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
 }

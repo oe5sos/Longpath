@@ -42,11 +42,35 @@ class SwrSweepPanel : public QWidget
     Q_OBJECT
 
 public:
+    /// The power TUNE will actually use, and which control it came
+    /// from. Both halves matter — see the note on tuneDrive().
+    struct TuneDrive {
+        int     watts{0};
+        QString sourceLabel;     // "RF-Power-Regler", "Tune-Pwr-Regler", …
+    };
+
     struct Backend {
         SwrSweepController*            controller{nullptr};
         const safety::BandPlanGuard*   guard{nullptr};
-        std::function<DSPMode()>       txMode;             // current TX mode
-        std::function<int(Band)>       tunePowerForBand;   // watts
+        std::function<DSPMode()>       txMode;      // current TX mode
+        /// ── Not simply tunePowerForBand() ────────────────────────────
+        ///
+        /// TransmitModel has THREE possible sources for the tune drive
+        /// and picks between them with tuneDrivePowerSource(); the
+        /// default is DriveSlider, which means TUNE reads the RF Power
+        /// slider and the Tune Pwr slider does nothing at all.
+        ///
+        /// The panel asked tunePowerForBand() unconditionally and so
+        /// displayed — and gated on — a number the radio was not using.
+        /// 2026-08-14 that sent the operator raising Tune Pwr from 1 W
+        /// to 5 W twice while the actual drive stayed at the RF Power
+        /// slider's 1 W, and produced the 0.01 W forward reading we
+        /// spent three rounds chasing. He worked it out before I did.
+        ///
+        /// So the seam hands over the resolved value AND the name of
+        /// the control it came from, because "5 W" on its own is what
+        /// made this invisible.
+        std::function<TuneDrive(Band)> tuneDrive;
     };
 
     explicit SwrSweepPanel(QWidget* parent = nullptr);
