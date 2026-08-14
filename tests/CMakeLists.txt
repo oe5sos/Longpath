@@ -4755,6 +4755,13 @@ nereus_add_test(tst_antenna_sweep)
 # invariant: the band shown is one the sweep covers.
 nereus_add_test(tst_swr_curve_band)
 
+# ── Die Achse, mit Zahlen statt mit Augenmass geprueft ──────────────────────
+# Ein Bereichs-Sweep war viermal unlesbar, und jedes Mal habe ich das ZEICHNEN
+# verbessert, obwohl die ACHSE schuld war: auf 1,8-30 MHz linear ist 40 m
+# 0,7 % der Breite, etwa zehn Bildpunkte. Diese Frage hat eine Zahl als
+# Antwort, und eine Zahl laesst sich zusichern.
+nereus_add_test(tst_swr_curve_panels)
+
 # -- Band edges. The project's existing table is Region 2, so drawing a
 #    40 m edge from it puts 100 kHz of "your antenna is fine here" over
 #    spectrum a Region 1 operator may not transmit in --

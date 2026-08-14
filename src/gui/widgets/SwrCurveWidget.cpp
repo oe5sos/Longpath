@@ -508,6 +508,16 @@ void SwrCurveWidget::rebuildViewSegments()
     }
 }
 
+QVector<SwrCurveWidget::Panel> SwrCurveWidget::viewPanels() const
+{
+    QVector<Panel> out;
+    out.reserve(m_viewSegs.size());
+    for (const auto& s : m_viewSegs) {
+        out.append(Panel{s.loHz, s.hiHz, s.f0, s.f1});
+    }
+    return out;
+}
+
 double SwrCurveWidget::xFor(double hz) const
 {
     const double w = m_plotR - m_plotL;

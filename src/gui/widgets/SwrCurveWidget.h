@@ -140,6 +140,26 @@ public:
     // version of that test failed.
     static double gapThresholdHz(const Sweep& s);
 
+    /// The panels the segmented axis is currently divided into.
+    ///
+    /// Empty for an ordinary continuous sweep, which keeps the linear
+    /// axis. One entry per measured stretch otherwise, in frequency
+    /// order: {loHz, hiHz, left edge, right edge}, the edges as
+    /// fractions of the plot width.
+    ///
+    /// Public because it is the layout, and the layout is the thing
+    /// that was wrong four times running. It can be checked with
+    /// arithmetic — does 40 m get a ninth of the width or a
+    /// hundred-and-fortieth — where looking at the picture was the only
+    /// check available before, and I cannot look at the picture.
+    struct Panel {
+        double loHz{0.0};
+        double hiHz{0.0};
+        double f0{0.0};
+        double f1{0.0};
+    };
+    QVector<Panel> viewPanels() const;
+
 protected:
     void paintEvent(QPaintEvent*) override;
     // ── Reading a value off the curve ────────────────────────────────
