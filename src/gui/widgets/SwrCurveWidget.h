@@ -116,8 +116,29 @@ public:
 
 protected:
     void paintEvent(QPaintEvent*) override;
+    // ── Reading a value off the curve ────────────────────────────────
+    //
+    // "wenn man mit der Maus auf dem Chart fährt, Frequenz und SWR
+    //  ablesen können."
+    //
+    // Which is what every VNA does and what a picture of a curve is
+    // otherwise bad at: the eye can see WHERE the dip is and cannot
+    // read WHAT it is to two decimals. A crosshair with the two numbers
+    // beside it turns the chart from an impression into an instrument.
+    //
+    // The SWR is interpolated from the sweep at the cursor's frequency,
+    // not read off the nearest sample: between two points at 7 kHz
+    // spacing the difference is visible, and a readout that jumps in
+    // steps looks broken.
+    void mouseMoveEvent(QMouseEvent* e) override;
+    void leaveEvent(QEvent* e) override;
 
 private:
+    /// Nice round frequency step for the ticks — 1, 2 or 5 × a power of
+    /// ten, whichever gives roughly the wanted number of labels.
+    double tickStepHz(double spanHz, int wanted) const;
+    double xToHz(double x) const;
+
     // Recompute the band, the vertical scale and the cached features.
     // One place, called whenever any input changes, so the paint can
     // assume they agree.
@@ -148,6 +169,10 @@ private:
     // Frequency span drawn, which is the sweep padded a little so the
     // curve does not touch the frame.
     double m_viewLoHz{0.0}, m_viewHiHz{0.0};
+
+    // Cursor position in widget coordinates while it is over the plot,
+    // or a negative x when it is not.
+    QPointF m_cursor{-1.0, -1.0};
 };
 
 } // namespace NereusSDR

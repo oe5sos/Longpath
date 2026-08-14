@@ -15,6 +15,7 @@
 
 #include "gui/StyleConstants.h"
 
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPolygonF>
@@ -48,6 +49,54 @@ SwrCurveWidget::SwrCurveWidget(QWidget* parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
     setMinimumSize(260, 150);
+    // Without this Qt only reports moves while a button is held, and a
+    // readout you have to drag for is worse than no readout.
+    setMouseTracking(true);
+}
+
+double SwrCurveWidget::tickStepHz(double spanHz, int wanted) const
+{
+    if (spanHz <= 0.0 || wanted < 1) { return 1e6; }
+    const double rough = spanHz / wanted;
+    const double mag   = std::pow(10.0, std::floor(std::log10(rough)));
+    const double n     = rough / mag;          // 1 .. 10
+    // 1, 2, 5, 10 — the steps a person reads without arithmetic.
+    const double nice = (n <= 1.5) ? 1.0
+                      : (n <= 3.5) ? 2.0
+                      : (n <= 7.5) ? 5.0
+                                   : 10.0;
+    return nice * mag;
+}
+
+double SwrCurveWidget::xToHz(double x) const
+{
+    if (m_plotR <= m_plotL) { return m_viewLoHz; }
+    const double t = (x - m_plotL) / (m_plotR - m_plotL);
+    return m_viewLoHz + t * (m_viewHiHz - m_viewLoHz);
+}
+
+void SwrCurveWidget::mouseMoveEvent(QMouseEvent* e)
+{
+    const QPointF pos = e->position();
+    // Only inside the frame. Off to the side there is no frequency to
+    // report and a crosshair hanging in the margin invites reading one.
+    const bool inside = pos.x() >= m_plotL && pos.x() <= m_plotR
+                     && pos.y() >= m_plotT && pos.y() <= m_plotB;
+    const QPointF next = inside ? pos : QPointF(-1.0, -1.0);
+    if (next != m_cursor) {
+        m_cursor = next;
+        update();
+    }
+    QWidget::mouseMoveEvent(e);
+}
+
+void SwrCurveWidget::leaveEvent(QEvent* e)
+{
+    if (m_cursor.x() >= 0.0) {
+        m_cursor = QPointF(-1.0, -1.0);
+        update();
+    }
+    QWidget::leaveEvent(e);
 }
 
 QSize SwrCurveWidget::sizeHint()        const { return {620, 300}; }
@@ -227,7 +276,9 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     m_plotL = 44.0;
     m_plotR = w - 12.0;
     m_plotT = 26.0;
-    m_plotB = h - 40.0;
+    // Three rows below the frame now: the frequency ticks, the band
+    // line, and the provenance. 40 px fitted two.
+    m_plotB = h - 48.0;
     const QRectF plot(m_plotL, m_plotT, m_plotR - m_plotL, m_plotB - m_plotT);
 
     p.setPen(QPen(kGrid, 1));
@@ -416,12 +467,45 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
     }
 
-    // ── Axis labels and the provenance line ──────────────────────────
-    p.setPen(kDim);
-    p.drawText(QPointF(m_plotL, m_plotB + 14.0), mhz(m_sweep.startHz()));
-    const QString hi = mhz(m_sweep.stopHz());
-    p.drawText(QPointF(m_plotR - sfm.horizontalAdvance(hi), m_plotB + 14.0),
-               hi);
+    // ── Frequency scale ──────────────────────────────────────────────
+    //
+    // "der dargestellte x-Bereich sollte die Frequenz in Form von
+    //  Marken haben, um leichter ablesen zu können."
+    //
+    // Two numbers at the ends is not a scale. Reading 7.130 off a curve
+    // then meant measuring with a finger. Ticks on round steps — 1, 2
+    // or 5 times a power of ten — so the labels are numbers a person
+    // would say out loud rather than whatever the span divides into.
+    {
+        // How many labels fit, not how many look nice in the abstract:
+        // a narrow panel with eight of them prints them on top of each
+        // other, which reads as a smudge rather than as a scale.
+        const int wanted = std::clamp(
+            static_cast<int>((m_plotR - m_plotL) / 78.0), 3, 10);
+        const double step  = tickStepHz(m_viewHiHz - m_viewLoHz, wanted);
+        const double first = std::ceil(m_viewLoHz / step) * step;
+        // Enough decimals for the step and no more. A 5 MHz step
+        // labelled "15.000" is three zeros of noise.
+        const int digits = (step >= 1e6)   ? 0
+                         : (step >= 1e5)   ? 1
+                         : (step >= 1e4)   ? 2
+                                           : 3;
+        p.setFont(small);
+        for (double f = first; f <= m_viewHiHz + 1.0; f += step) {
+            const double x = xFor(f);
+            if (x < m_plotL - 0.5 || x > m_plotR + 0.5) { continue; }
+            // Short tick outside the frame and a faint grid line inside
+            // it: the line is what lets the eye carry a frequency up to
+            // the curve, which is the whole point of having a scale.
+            p.setPen(QPen(kGrid, 1.0, Qt::DotLine));
+            p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
+            p.setPen(kDim);
+            p.drawLine(QPointF(x, m_plotB), QPointF(x, m_plotB + 4.0));
+            const QString t = mhz(f, digits);
+            p.drawText(QPointF(x - sfm.horizontalAdvance(t) / 2.0,
+                               m_plotB + 15.0), t);
+        }
+    }
 
     if (m_band.isValid()) {
         const QString mid = QStringLiteral("%1 · mid %2 MHz · %3 kHz wide")
@@ -430,7 +514,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         p.setPen(kCentre);
         p.drawText(QPointF((m_plotL + m_plotR) / 2.0
                                - sfm.horizontalAdvance(mid) / 2.0,
-                           m_plotB + 14.0), mid);
+                           m_plotB + 29.0), mid);
     }
 
     // Which band plan drew those edges. A green bar is not a licence,
@@ -450,7 +534,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
                   .arg(AmateurBands::regionName(m_region))
             : QStringLiteral("This sweep does not cover an amateur band (%1)")
                   .arg(AmateurBands::regionName(m_region));
-    p.drawText(QPointF(m_plotL, m_plotB + 28.0), prov);
+    p.drawText(QPointF(m_plotL, m_plotB + 42.0), prov);
 
     // ── Title line ───────────────────────────────────────────────────
     p.setPen(kText);
@@ -480,6 +564,60 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
             : QStringLiteral("- - -  %1").arg(m_referenceLabel);
         p.drawText(QPointF(m_plotR - sfm.horizontalAdvance(ref),
                            m_plotT - 9.0), ref);
+    }
+
+    // ── Cursor readout ───────────────────────────────────────────────
+    //
+    // Drawn last so it sits over everything: it is the one thing on the
+    // picture that answers a question being asked right now.
+    if (m_cursor.x() >= 0.0 && !m_sweep.isEmpty()) {
+        const double hz  = xToHz(m_cursor.x());
+        const double swr = AntennaSweep::swrAt(m_sweep, hz);
+        const bool   have = swr >= 1.0;   // 0 means outside the sweep
+
+        p.setFont(small);
+        p.setPen(QPen(kText, 1.0, Qt::DashLine));
+        p.drawLine(QPointF(m_cursor.x(), m_plotT),
+                   QPointF(m_cursor.x(), m_plotB));
+
+        // A dot on the curve, not at the pointer. The pointer is where
+        // the hand is; the dot is where the answer is, and putting the
+        // marker anywhere else would misreport the reading by however
+        // far the two differ vertically.
+        double markerY = m_cursor.y();
+        if (have) {
+            markerY = yFor(swr);
+            p.setPen(QPen(kText, 1.0, Qt::DashLine));
+            p.drawLine(QPointF(m_plotL, markerY),
+                       QPointF(m_plotR, markerY));
+            p.setPen(Qt::NoPen);
+            p.setBrush(swr > m_limit ? kBad : kCurve);
+            p.drawEllipse(QPointF(m_cursor.x(), markerY), 3.5, 3.5);
+            p.setBrush(Qt::NoBrush);
+        }
+
+        const QString txt = have
+            ? QStringLiteral("%1 MHz   SWR %2")
+                  .arg(mhz(hz, 4)).arg(swr, 0, 'f', 2)
+            : QStringLiteral("%1 MHz   (nicht gemessen)").arg(mhz(hz, 4));
+
+        const double tw = sfm.horizontalAdvance(txt) + 10.0;
+        const double th = sfm.height() + 4.0;
+        // Flip to the other side near the right edge so the box never
+        // runs off the frame and truncates the number being read.
+        double bx = m_cursor.x() + 8.0;
+        if (bx + tw > m_plotR) { bx = m_cursor.x() - 8.0 - tw; }
+        double by = markerY - th - 8.0;
+        if (by < m_plotT) { by = markerY + 8.0; }
+
+        QColor box(Style::kPanelBg);
+        box.setAlpha(235);
+        p.setPen(QPen(kGrid, 1));
+        p.setBrush(box);
+        p.drawRoundedRect(QRectF(bx, by, tw, th), 3.0, 3.0);
+        p.setBrush(Qt::NoBrush);
+        p.setPen(have && swr > m_limit ? kBad : kText);
+        p.drawText(QPointF(bx + 5.0, by + sfm.ascent() + 2.0), txt);
     }
 }
 
