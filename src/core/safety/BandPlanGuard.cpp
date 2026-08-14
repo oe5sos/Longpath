@@ -216,7 +216,27 @@ constexpr std::array<BandRange, 11> kEuropeBandRanges{{
     { Band::Band12m, 24'890'000, 24'990'000 },
     { Band::Band10m, 28'000'000, 29'700'000 },
     { Band::Band6m,  50'000'000, 52'000'000 },
-    { Band::Band60m,  5'100'000,  5'500'000 },
+    // ── 60 m: narrowed from the Thetis figure ────────────────────────────
+    //
+    // Thetis has { 5'100'000, 5'500'000 } here, four hundred kilohertz.
+    // The Region 1 allocation is the WRC-15 one: 5351.5 to 5366.5 kHz,
+    // secondary, fifteen kilohertz. This program's own band table in
+    // core/antenna/AmateurBands.cpp has always said so — the two
+    // disagreed by a factor of twenty-seven, and it was this one, the
+    // permissive one, that gated the transmitter.
+    //
+    // Found 2026-08-14 when a range sweep across HF keyed from 5.100 to
+    // 5.500 MHz for OE5SOS. Every other Region 1 band in the two tables
+    // matched exactly, which is why the odd one out survived so long.
+    //
+    // Narrowing a guard can only ever refuse; it cannot enable anything.
+    // That is the safe direction, and Extended remains for an operator
+    // whose licence genuinely holds more. The countries that fall back
+    // to this row — Denmark, Sweden, Norway, the Netherlands, France,
+    // Germany and the rest without an entry of their own — all hold the
+    // same WRC-15 fifteen kilohertz. The UK and Japan have their own
+    // channel tables and are untouched.
+    { Band::Band60m,  5'351'500,  5'366'500 },
 }};
 
 // United Kingdom (clsBandStackManager.cs AddRegion1BandStack with UK edits)

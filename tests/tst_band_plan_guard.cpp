@@ -29,6 +29,8 @@ private slots:
     void band20m_USB_outOfBand_returnsFalse();
     void europe40m_inBand_returnsTrue();
     void europe40m_outOfBand_returnsFalse();
+    void europe60m_insideWrc15Allocation_returnsTrue();
+    void europe60m_theOldThetisWidthIsRefused();
     void australia60m_wideRange_returnsTrue();
     void australia6m_outOfBand_returnsFalse();
     void spain20m_inBand_returnsTrue();
@@ -190,6 +192,45 @@ void TestBandPlanGuard::europe40m_outOfBand_returnsFalse()
     // (clsBandStackManager.cs:1109 [v2.10.3.13])
     BandPlanGuard guard;
     QVERIFY(!guard.isValidTxFreq(Region::Europe, 7'250'000, DSPMode::USB, false));
+}
+
+// ── 60 m in Region 1: narrowed away from the Thetis figure ─────────────────
+//
+// Thetis carries { 5'100'000, 5'500'000 } for Europe — four hundred
+// kilohertz. The WRC-15 Region 1 allocation is 5351.5 to 5366.5 kHz,
+// secondary, fifteen kilohertz, and NereusSDR's own AmateurBands table
+// has always said exactly that.
+//
+// The two disagreed by a factor of twenty-seven and the permissive one
+// gated the transmitter. Found 2026-08-14 when a range sweep across HF
+// keyed from 5.100 to 5.500 MHz. Narrowed; tst_band_tables_agree now
+// keeps the two tables together.
+//
+// Australia and the US keep their own wide rows — see the tests above
+// and below — so this is Region 1 only.
+void TestBandPlanGuard::europe60m_insideWrc15Allocation_returnsTrue()
+{
+    BandPlanGuard guard;
+    for (std::int64_t f : {5'351'500LL, 5'359'000LL, 5'366'500LL}) {
+        QVERIFY2(guard.isValidTxFreq(Region::Europe, f, DSPMode::USB, false),
+                 qPrintable(QStringLiteral("%1 Hz is inside the WRC-15 "
+                                           "60 m allocation").arg(f)));
+    }
+}
+
+void TestBandPlanGuard::europe60m_theOldThetisWidthIsRefused()
+{
+    BandPlanGuard guard;
+    // Every one of these was permitted before: they sit inside Thetis's
+    // 5.100-5.500 row and outside the allocation.
+    for (std::int64_t f : {5'100'000LL, 5'250'000LL, 5'340'000LL,
+                           5'351'000LL, 5'367'000LL, 5'405'000LL,
+                           5'500'000LL}) {
+        QVERIFY2(!guard.isValidTxFreq(Region::Europe, f, DSPMode::USB, false),
+                 qPrintable(QStringLiteral("%1 Hz is outside the Region 1 "
+                                           "60 m allocation and was "
+                                           "permitted").arg(f)));
+    }
 }
 
 void TestBandPlanGuard::australia60m_wideRange_returnsTrue()

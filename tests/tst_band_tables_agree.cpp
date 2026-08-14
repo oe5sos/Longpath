@@ -135,31 +135,14 @@ private slots:
             }
         }
 
-        // 60 m is the known, recorded disagreement. It stays on this
-        // list until the licence holder decides the edges — but if it
-        // ever stops being the ONLY one, that is new and this fails.
-        const QStringList expected = { QStringLiteral("60 m") };
-        QStringList unexpected;
-        for (const QString& d : drift) {
-            bool known = false;
-            for (const QString& e : expected) {
-                if (d.startsWith(e)) { known = true; break; }
-            }
-            if (!known) { unexpected << d; }
-        }
-
-        QVERIFY2(unexpected.isEmpty(),
+        // No exceptions. There was one — 60 m — and the assertion that
+        // guarded it did its job on the first run after the table was
+        // corrected: it failed, saying "remove it rather than leaving a
+        // standing exception nobody rechecks". So it is removed.
+        QVERIFY2(drift.isEmpty(),
                  qPrintable(QStringLiteral(
                      "the chart and the transmit guard have drifted "
-                     "apart:\n  %1").arg(unexpected.join("\n  "))));
-
-        // And the known one must still be known. If somebody fixes the
-        // 60 m table, this line is the reminder to delete the exception
-        // rather than leave a permanent excuse in the test.
-        QVERIFY2(!drift.isEmpty(),
-                 "60 m now agrees — remove it from `expected` above and "
-                 "close the task, rather than leaving a standing "
-                 "exception nobody rechecks");
+                     "apart:\n  %1").arg(drift.join("\n  "))));
     }
 
     // The guard must never permit LESS than the chart shows either:
@@ -169,7 +152,6 @@ private slots:
     {
         safety::BandPlanGuard g;
         for (const Pairing& p : kPairs) {
-            if (p.band == Band::Band60m) { continue; }   // see above
             const AmateurBands::Band d =
                 drawn(p.name, AmateurBands::Region::One);
             if (!d.isValid()) { continue; }
