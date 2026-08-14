@@ -1222,8 +1222,47 @@ void TransmitModel::load()
     const int hi = (m_hpsdrModel == HPSDRModel::HERMESLITE) ? 99 : 100;
     for (int i = 0; i < kBandCount; ++i) {
         const QString key = prefix + QString::number(i);
-        const int v = s.value(key, QStringLiteral("50")).toInt();
+        // Third copy of the fifty, after the constructor fill and the
+        // out-of-range fallback. All three now name the constant.
+        const int v = s.value(key,
+                              QString::number(kDefaultTunePowerW)).toInt();
         m_tunePowerByBand[static_cast<std::size_t>(i)] = std::clamp(v, 0, hi);
+    }
+
+    // ── One-time correction of the old 50 W default ──────────────────
+    //
+    // Lowering kDefaultTunePowerW on its own would not have reached
+    // anybody, and I nearly shipped it that way. save() writes ALL
+    // fourteen bands unconditionally, so every band already has a value
+    // on disk whether the operator ever touched it or not — and for the
+    // untouched ones that value is the ported fifty. load() would have
+    // read them straight back and the new default would never have been
+    // consulted.
+    //
+    // Exactly the trap the SWR limit fell into this morning: a spin box
+    // had persisted 2.0 before the default ever changed. Same remedy,
+    // and it is the second time today, which is the point at which a
+    // pattern deserves writing down rather than rediscovering.
+    //
+    // So: bands sitting at exactly the old default move to the new one,
+    // once, guarded by its own flag rather than by the value. A 50 the
+    // operator chooses AFTER this has run stays at 50 — the flag says
+    // "we have had our one go at this", which is the only honest basis
+    // for changing a number somebody may have meant.
+    //
+    // The direction is recoverable either way: too little tune power
+    // produces a message naming the ADC counts, and the slider is right
+    // there.
+    const QString fixedKey =
+        QStringLiteral("hardware/%1/tunePowerDefaultFixed").arg(m_mac);
+    if (s.value(fixedKey, QStringLiteral("False")).toString()
+        != QStringLiteral("True")) {
+        constexpr int kOldDefaultW = 50;
+        for (int i = 0; i < kBandCount; ++i) {
+            auto& w = m_tunePowerByBand[static_cast<std::size_t>(i)];
+            if (w == kOldDefaultW) { w = kDefaultTunePowerW; }
+        }
+        s.setValue(fixedKey, QStringLiteral("True"));
     }
 }
 
