@@ -381,6 +381,66 @@ void SwrSweepController::ingestTelemetry(double fwdW, double revW,
     ++m_accN;
 }
 
+// ── Why a sweep measured nothing ─────────────────────────────────────
+//
+// Three different faults used to share two sentences, and the fork
+// between them was made on WATTS — which is precisely the number the
+// baseline work exists because we cannot trust.
+//
+// The case that exposed it: the coupler ADC sits at 41 counts and never
+// moves, keyed or not, while the scaling turns those 41 counts into a
+// confident 5 W. Forward is dead, and the operator was told "too little
+// forward power, turn the tune power up". So he turns it up, against a
+// fault that has nothing to do with power, and the ADC still says 41.
+//
+// The counts decide now, and only fall back to watts when the caller
+// supplied no counts at all.
+QString SwrSweepController::deadRunReason() const
+{
+    const bool sawCounts = (m_result.maxFwdRaw > 0 || m_result.baselineRaw > 0);
+
+    // (a) Counts were supplied and never left the idle reading. The most
+    //     specific fault we can name, and the one where advice about
+    //     power is actively misleading.
+    if (sawCounts && m_result.maxFwdRaw <= m_result.baselineRaw + kMinRawRise) {
+        return QStringLiteral(
+                   "Der Vorlauf-ADC bewegt sich nicht: ruhend %1, beim "
+                   "Senden höchstens %2 — über %3 Punkte kein Anstieg. "
+                   "Die Ruhezahl stammt von deinem Gerät, kurz vor dem "
+                   "Sweep, mit ausgeschaltetem Sender. Bleibt der Wert "
+                   "beim Tasten darauf stehen, entsteht keine HF oder "
+                   "der Koppler meldet sie nicht. An der Leistung liegt "
+                   "es nicht — drücke TUNE von Hand und sieh zu, ob die "
+                   "Zahl steigt.")
+            .arg(m_result.baselineRaw)
+            .arg(m_result.maxFwdRaw)
+            .arg(kAbortDeadRun);
+    }
+
+    // (b) No counts, and the watts are not a small reading but no
+    //     reading. Same advice: check by hand, do not wind the power up.
+    if (!sawCounts && m_result.maxFwdW < kSilentBridgeW) {
+        return QStringLiteral(
+                   "Der Richtkoppler hat über %1 Punkte nichts gemeldet "
+                   "— höchstens %2 W, das ist kein kleiner Messwert "
+                   "sondern keiner. Drücke TUNE von Hand und sieh nach, "
+                   "ob Vorlauf angezeigt wird. An der Leistung liegt es "
+                   "nicht.")
+            .arg(kAbortDeadRun)
+            .arg(m_result.maxFwdW, 0, 'f', 2);
+    }
+
+    // (c) A real but too-small reading. Here, and only here, more power
+    //     is the remedy.
+    return QStringLiteral(
+               "Zu wenig Vorlauf über %1 Punkte — höchstens %2 W "
+               "gemessen, ab %3 W ist die Anzeige eine Messung. "
+               "Tune-Leistung höher stellen.")
+        .arg(kAbortDeadRun)
+        .arg(m_result.maxFwdW, 0, 'f', 2)
+        .arg(kMinFwdW, 0, 'f', 1);
+}
+
 void SwrSweepController::closePoint()
 {
     SwrSweepPoint pt;
@@ -467,26 +527,7 @@ void SwrSweepController::closePoint()
     // and "0.2 W measured, 0.5 W needed" is.
     if (pt.swr <= 0.0) {
         if (++m_deadRun >= kAbortDeadRun) {
-            finish(false, m_result.maxFwdW < kSilentBridgeW
-                ? QStringLiteral(
-                      "Der Richtkoppler hat nicht reagiert: ADC ruhend "
-                      "%1, beim Senden höchstens %2 — kein Unterschied "
-                      "über %3 Punkte. Die Ruhezahl stammt von deinem "
-                      "Gerät, kurz vor dem Sweep, mit ausgeschaltetem "
-                      "Sender. Bewegt sich der Wert beim Tasten nicht "
-                      "über sie hinaus, entsteht keine HF oder der "
-                      "Koppler meldet sie nicht — an der Leistung "
-                      "liegt es dann nicht.")
-                      .arg(m_result.baselineRaw)
-                      .arg(m_result.maxFwdRaw)
-                      .arg(kAbortDeadRun)
-                : QStringLiteral(
-                      "Zu wenig Vorlauf über %1 Punkte — höchstens %2 W "
-                      "gemessen, ab %3 W ist die Anzeige eine Messung. "
-                      "Tune-Leistung höher stellen.")
-                      .arg(kAbortDeadRun)
-                      .arg(m_result.maxFwdW, 0, 'f', 2)
-                      .arg(kMinFwdW, 0, 'f', 1));
+            finish(false, deadRunReason());
             return;
         }
     } else {

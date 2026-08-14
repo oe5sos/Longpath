@@ -553,6 +553,14 @@ private slots:
         // Even though the watts handed over were generous.
         QVERIFY2(result.abortReason.contains(QStringLiteral("ADC")),
                  qPrintable(result.abortReason));
+        // And the part that actually costs the operator time: it must
+        // not send him winding the tune power up against a fault that
+        // has nothing to do with power. 5 W were already reported.
+        QVERIFY2(!result.abortReason.contains(QStringLiteral("Tune-Leistung")),
+                 qPrintable(result.abortReason));
+        QVERIFY2(!result.abortReason.contains(QStringLiteral("höher"),
+                                              Qt::CaseInsensitive),
+                 qPrintable(result.abortReason));
     }
 
     // ── The failure that draws a beautiful curve ─────────────────────

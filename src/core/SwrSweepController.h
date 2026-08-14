@@ -407,6 +407,10 @@ private:
     void stepToNextPoint();
     void beginMeasure();
     void closePoint();
+    /// Which of the three "measured nothing" faults this run hit, in
+    /// words the operator can act on. See the definition — the fork is
+    /// made on ADC counts, not on watts, and the reason matters.
+    QString deadRunReason() const;
     void finish(bool completed, const QString& reason);
     /// Baseline window has elapsed: latch the idle reading and key.
     /// Split out because keying can be refused, and that refusal now

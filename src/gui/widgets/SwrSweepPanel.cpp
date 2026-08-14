@@ -341,8 +341,24 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             // Completed and measured nothing. Say the watts — "zu
             // niedrig?" was a guess, and the numbers were there all
             // along.
+            //
+            // The fork used to be `maxFwdW < kSilentBridgeW` — on the
+            // watts. Same mistake as in the controller, found the same
+            // way: an ADC pinned at 41 counts scales to a confident
+            // 5 W, so the operator was told to turn the power up
+            // against a fault that has nothing to do with power.
+            //
+            // Decide on the counts when there are counts. Watts are the
+            // fallback for a run that never got any.
+            const bool sawCounts =
+                (result.maxFwdRaw > 0 || result.baselineRaw > 0);
+            const bool adcAsleep =
+                sawCounts
+                    ? (result.maxFwdRaw
+                       <= result.baselineRaw + SwrSweepController::kMinRawRise)
+                    : (result.maxFwdW < SwrSweepController::kSilentBridgeW);
             m_status->setText(
-                result.maxFwdW < SwrSweepController::kSilentBridgeW
+                adcAsleep
                 ? QStringLiteral(
                       "Der Richtkoppler hat nicht reagiert. ADC ruhend "
                       "%1, beim Senden höchstens %2 — der Wert ist "
