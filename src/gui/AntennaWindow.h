@@ -87,6 +87,11 @@ private:
     void refresh();
 
     void chooseFile();
+    /// Load the bundled 40 m dipole sweep. Searches beside the app
+    /// bundle and up the source tree, because where the samples end up
+    /// depends on how the build was run — and a demo button that
+    /// cannot find its demo is worse than none.
+    void loadSample();
     // Take the coax back out, if one was entered. Sets m_sweep from
     // m_measured — one place, so no view can be looking at the raw
     // sweep while another looks at the corrected one.
@@ -128,6 +133,7 @@ private:
     TrimSession m_session;
 
     QPushButton*    m_openBtn{nullptr};
+    QPushButton*    m_demoBtn{nullptr};
     QComboBox*      m_kindBox{nullptr};
     QDoubleSpinBox* m_lengthBox{nullptr};
     QPushButton*    m_estimateBtn{nullptr};

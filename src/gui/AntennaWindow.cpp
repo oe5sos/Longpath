@@ -28,7 +28,9 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <QFileDialog>
+#include <QCoreApplication>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -195,6 +197,28 @@ void AntennaWindow::buildUi()
         "A Touchstone .s1p file. Every analyser writes them — on a "
         "NanoVNA, save the sweep to the SD card."));
     top->addWidget(m_openBtn);
+
+    // ── One click to a curve ─────────────────────────────────────────
+    //
+    // Two synthetic sweeps have shipped in docs/antenna/samples since
+    // the window was written, and the README says exactly what they
+    // must produce. Nobody found them: the operator spent a day on the
+    // radio sweep, tried to open one from a shell prompt, got
+    // "permission denied", and concluded the window draws no chart at
+    // all.
+    //
+    // A file that has to be hunted for is a file that does not exist.
+    // This loads it, so the very first thing the window can do is draw
+    // a real curve with a known answer — which is also the fastest way
+    // to tell "the display is broken" from "my radio is not measuring".
+    m_demoBtn = new QPushButton(QStringLiteral("Beispiel"), this);
+    m_demoBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_demoBtn->setToolTip(QStringLiteral(
+        "Lädt einen mitgelieferten 40-m-Dipol-Sweep mit bekanntem "
+        "Ergebnis: resonant bei 7.183 MHz, 55 Ω, SWR 1.10. Zeigt das "
+        "Fenster etwas anderes, liegt es am Fenster — zeigt es das, "
+        "funktioniert die Darstellung und es liegt an der Messung."));
+    top->addWidget(m_demoBtn);
 
     top->addWidget(caption(QStringLiteral("ANTENNA"), this));
     m_kindBox = new QComboBox(this);
@@ -539,6 +563,8 @@ void AntennaWindow::buildUi()
     // ── Wiring ───────────────────────────────────────────────────────
     connect(m_openBtn, &QPushButton::clicked,
             this, &AntennaWindow::chooseFile);
+    connect(m_demoBtn, &QPushButton::clicked,
+            this, &AntennaWindow::loadSample);
     connect(m_estimateBtn, &QPushButton::clicked,
             this, &AntennaWindow::estimateLength);
     connect(m_forgetBtn, &QPushButton::clicked, this, [this]() {
@@ -688,7 +714,46 @@ void AntennaWindow::chooseFile()
 
 void AntennaWindow::openFile(const QString& path)
 {
-    setSweep(Touchstone::readS1p(path));
+    const Sweep s = Touchstone::readS1p(path);
+    // A file that could not be read used to vanish without a word: the
+    // note went into the Sweep and the Sweep went nowhere, so the
+    // window looked exactly as it had before. Say so.
+    if (s.points.isEmpty() && !s.note.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("Sweep"), s.note);
+        return;
+    }
+    setSweep(s);
+}
+
+void AntennaWindow::loadSample()
+{
+    // The samples live in the source tree, not in the bundle. Rather
+    // than install them, look in the places they can be relative to a
+    // running binary — build/NereusSDR.app/Contents/MacOS is three
+    // levels under the repository root, and a plain build is one.
+    const QString rel =
+        QStringLiteral("docs/antenna/samples/dipole-40m-before.s1p");
+    const QString base = QCoreApplication::applicationDirPath();
+    const QStringList candidates = {
+        base + QStringLiteral("/") + rel,
+        base + QStringLiteral("/../") + rel,
+        base + QStringLiteral("/../../") + rel,
+        base + QStringLiteral("/../../../") + rel,
+        base + QStringLiteral("/../../../../") + rel,
+        base + QStringLiteral("/../../../../../") + rel,
+    };
+    for (const QString& c : candidates) {
+        const QFileInfo fi(c);
+        if (fi.exists() && fi.isReadable()) {
+            openFile(fi.absoluteFilePath());
+            return;
+        }
+    }
+    QMessageBox::information(this, QStringLiteral("Beispiel"),
+        QStringLiteral(
+            "Die Beispieldatei wurde nicht gefunden. Sie liegt im "
+            "Quellbaum unter\n\n    %1\n\nund lässt sich mit "
+            "„Open sweep…“ von dort öffnen.").arg(rel));
 }
 
 Feedline::Cable AntennaWindow::currentCable() const
