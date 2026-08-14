@@ -186,6 +186,21 @@ void SwrSweepPanel::buildUi()
             this, &SwrSweepPanel::refreshTunePowerLabel);
 }
 
+void SwrSweepPanel::setCompact(bool compact)
+{
+    // The chart still exists and still receives the live points — the
+    // trace list, the CSV export and the comparison against earlier
+    // sweeps all hang off it. It is simply not the thing on screen any
+    // more; the window's own curve is.
+    if (m_chart)          { m_chart->setVisible(!compact); }
+    if (m_traceList)      { m_traceList->setVisible(!compact); }
+    if (m_removeTraceBtn) { m_removeTraceBtn->setVisible(!compact); }
+    if (m_exportBtn)      { m_exportBtn->setVisible(!compact); }
+    if (compact) {
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    }
+}
+
 void SwrSweepPanel::showEvent(QShowEvent* e)
 {
     QWidget::showEvent(e);

@@ -118,7 +118,10 @@ AntennaWindow::AntennaWindow(QWidget* parent)
     // SD card, and the shortest path from there is dragging it onto the
     // window.
     setAcceptDrops(true);
-    resize(880, 620);
+    // Taller than before: the sweep controls moved onto this page and
+    // the curve must not be the thing that gives up the room. It is
+    // what the window is for.
+    resize(1000, 760);
     buildUi();
     refresh();
 }
@@ -166,20 +169,24 @@ void AntennaWindow::buildUi()
     // unchanged below (`col` now targets the tab page instead of the
     // dialog); the sweep panel is tab two and receives its backend from
     // MainWindow via sweepPanel()->setBackend().
+    // ── One window ───────────────────────────────────────────────────
+    //
+    // "hätte ich gerne alles auf einem fenster. sprich sweep und
+    //  auswertung."
+    //
+    // It was two tabs: measure on one, read the answer on the other,
+    // with a second and poorer chart on the measuring side. Nobody
+    // wants to change tabs to see what their antenna just did. The
+    // sweep panel is now the control strip along the top, in compact
+    // form, and there is one curve underneath it.
     auto* outer = new QVBoxLayout(this);
     outer->setContentsMargins(0, 0, 0, 0);
-    auto* tabs = new QTabWidget(this);
-    tabs->setStyleSheet(QStringLiteral(
-        "QTabWidget::pane { border: 0; }"
-        "QTabBar::tab { background: #14182a; color: #8090a0;"
-        "  padding: 5px 14px; }"
-        "QTabBar::tab:selected { background: #1a2138; color: #00b4d8; }"));
-    outer->addWidget(tabs);
 
     auto* filePage = new QWidget(this);
-    tabs->addTab(filePage, QStringLiteral("Auswertung"));
+    outer->addWidget(filePage);
+
     m_sweepPanel = new SwrSweepPanel(this);
-    tabs->addTab(m_sweepPanel, QStringLiteral("Sweep (Radio)"));
+    m_sweepPanel->setCompact(true);
 
     // ── One analysis, two sources ────────────────────────────────────
     //
@@ -197,16 +204,41 @@ void AntennaWindow::buildUi()
     // point — the answer is on this page, not on the one with the
     // Start button.
     connect(m_sweepPanel, &SwrSweepPanel::analysisReady,
-            this, [this, tabs](const Sweep& s) {
-        setSweep(s);
-        tabs->setCurrentIndex(0);
-    });
+            this, [this](const Sweep& s) { setSweep(s); });
 
     auto* col = new QVBoxLayout(filePage);
     col->setContentsMargins(12, 10, 12, 10);
     col->setSpacing(9);
 
+    // The measuring controls, first thing on the page: band, points,
+    // tune power, the live coupler counts, Start and Stop. Everything
+    // below reads whatever they produced.
+    col->addWidget(m_sweepPanel);
+
     AppSettings& s = AppSettings::instance();
+
+    // ── What is no longer on screen, and why it still exists ─────────
+    //
+    // "ist die drahtlänge usw. unwichtig im diagramm, dass kanns du
+    //  löschen, es soll lediglich eine perfekte kurve zeigen, wie und
+    //  wo das swr ist." And: "lösche auch coax kabel."
+    //
+    // So the antenna kind, the wire length, the estimate button, the
+    // target frequency, the read-from/to span, the coax de-embedding,
+    // the trim headline, the caution paragraph, the learned-exponent
+    // note, the forget button and the multi-band table all come off the
+    // page. What is left is a curve and the numbers that describe it.
+    //
+    // They are still CONSTRUCTED and parented into this hidden holder
+    // rather than deleted, because refresh() reads every one of them
+    // and gutting both at once is how a working window becomes a broken
+    // one at the end of a long day. Hidden now, removed for good once
+    // the new layout has settled — with the trim maths kept, since it
+    // is tested and correct and belongs in a .s1p-only view later.
+    auto* retired = new QWidget(this);
+    retired->hide();
+    auto* retiredBox = new QVBoxLayout(retired);
+    retiredBox->setContentsMargins(0, 0, 0, 0);
 
     // ── Inputs ───────────────────────────────────────────────────────
     auto* top = new QHBoxLayout;
@@ -241,7 +273,9 @@ void AntennaWindow::buildUi()
         "funktioniert die Darstellung und es liegt an der Messung."));
     top->addWidget(m_demoBtn);
 
-    top->addWidget(caption(QStringLiteral("ANTENNA"), this));
+    top->addStretch(1);
+
+    retiredBox->addWidget(caption(QStringLiteral("ANTENNA"), this));
     m_kindBox = new QComboBox(this);
     m_kindBox->addItem(QStringLiteral("Dipole"),
                        int(AntennaTrim::Kind::Dipole));
@@ -270,9 +304,9 @@ void AntennaWindow::buildUi()
     m_kindBox->setToolTip(QStringLiteral(
         "Decides how the change is shared out. A centre-fed dipole gets "
         "half on each leg; everything else takes it all in one place."));
-    top->addWidget(m_kindBox);
+    retiredBox->addWidget(m_kindBox);
 
-    top->addWidget(caption(QStringLiteral("LENGTH"), this));
+    retiredBox->addWidget(caption(QStringLiteral("LENGTH"), this));
     m_lengthBox = new QDoubleSpinBox(this);
     m_lengthBox->setRange(0.0, 500.0);
     m_lengthBox->setDecimals(2);
@@ -283,7 +317,7 @@ void AntennaWindow::buildUi()
     m_lengthBox->setToolTip(QStringLiteral(
         "Total wire length as it is now. Without it the answer can only "
         "be a percentage."));
-    top->addWidget(m_lengthBox);
+    retiredBox->addWidget(m_lengthBox);
 
     m_estimateBtn = new QPushButton(QStringLiteral("estimate"), this);
     m_estimateBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -291,9 +325,9 @@ void AntennaWindow::buildUi()
         "Fill in a half-wave for the target frequency, assuming a "
         "velocity factor of 0.95. A starting point, not a measurement — "
         "measure your own wire if you can."));
-    top->addWidget(m_estimateBtn);
+    retiredBox->addWidget(m_estimateBtn);
 
-    top->addWidget(caption(QStringLiteral("TARGET"), this));
+    retiredBox->addWidget(caption(QStringLiteral("TARGET"), this));
     m_targetBox = new QDoubleSpinBox(this);
     m_targetBox->setRange(0.0, 500.0);
     m_targetBox->setDecimals(3);
@@ -305,7 +339,7 @@ void AntennaWindow::buildUi()
     m_targetBox->setToolTip(QStringLiteral(
         "Where you want it resonant. Defaults to the middle of the band "
         "until you choose."));
-    top->addWidget(m_targetBox);
+    retiredBox->addWidget(m_targetBox);
 
     top->addStretch(1);
     col->addLayout(top);
@@ -319,7 +353,7 @@ void AntennaWindow::buildUi()
     // The exact span to read off. A band is a reasonable default and
     // not always the question — a CW operator cares about 7.020 to
     // 7.040, not about the whole of 40 m.
-    row2->addWidget(caption(QStringLiteral("READ FROM"), this));
+    retiredBox->addWidget(caption(QStringLiteral("READ FROM"), this));
     m_fromBox = new QDoubleSpinBox(this);
     m_fromBox->setRange(0.0, 500.0);
     m_fromBox->setDecimals(3);
@@ -330,9 +364,9 @@ void AntennaWindow::buildUi()
     m_fromBox->setToolTip(QStringLiteral(
         "Read the numbers off this span instead of the whole band. "
         "Leave both at 'whole band' to use the band edges."));
-    row2->addWidget(m_fromBox);
+    retiredBox->addWidget(m_fromBox);
 
-    row2->addWidget(caption(QStringLiteral("TO"), this));
+    retiredBox->addWidget(caption(QStringLiteral("TO"), this));
     m_toBox = new QDoubleSpinBox(this);
     m_toBox->setRange(0.0, 500.0);
     m_toBox->setDecimals(3);
@@ -340,7 +374,7 @@ void AntennaWindow::buildUi()
     m_toBox->setSuffix(QStringLiteral(" MHz"));
     m_toBox->setSpecialValueText(QStringLiteral("whole band"));
     m_toBox->setValue(s.value(kToKey, 0.0).toDouble());
-    row2->addWidget(m_toBox);
+    retiredBox->addWidget(m_toBox);
 
     // ── The coax between the analyser and the antenna ────────────
     //
@@ -362,13 +396,13 @@ void AntennaWindow::buildUi()
         "Only needed if you calibrated at the analyser rather than at "
         "the antenna. A length of coax rotates the impedance and hides "
         "the real resonance."));
-    row2->addWidget(m_coaxToggle);
+    retiredBox->addWidget(m_coaxToggle);
 
     m_coaxGroup = new QWidget(this);
     auto* coax = new QHBoxLayout(m_coaxGroup);
     coax->setContentsMargins(0, 0, 0, 0);
     coax->setSpacing(7);
-    row2->addWidget(m_coaxGroup);
+    retiredBox->addWidget(m_coaxGroup);
 
     coax->addWidget(caption(QStringLiteral("COAX"), m_coaxGroup));
     m_cableBox = new QComboBox(this);
@@ -489,7 +523,6 @@ void AntennaWindow::buildUi()
 
     ac->addWidget(m_action);
     ac->addWidget(m_actionSub);
-    head->addWidget(actionFrame, 1);
 
     head->addWidget(tile(this, &m_startCap, &m_startVal,
                          QStringLiteral("BAND START")));
@@ -503,6 +536,11 @@ void AntennaWindow::buildUi()
     head->addWidget(tile(this, &m_spanCap, &m_spanVal,
                          QStringLiteral("USABLE")));
     col->addLayout(head);
+    // The trim headline used to sit here, above the tiles. It said
+    // "shorten by 49 %" and "enter the wire length for centimetres" —
+    // advice, not measurement, and explicitly unwanted now. Retired
+    // with the rest; the tiles and the curve are the answer.
+    retiredBox->addWidget(actionFrame);
 
     m_caution = new QLabel(QString{}, this);
     m_caution->setWordWrap(true);
@@ -512,10 +550,13 @@ void AntennaWindow::buildUi()
             .arg(QLatin1String(Style::kAmberText),
                  QLatin1String(Style::kAmberBg)));
     m_caution->setVisible(false);
-    col->addWidget(m_caution);
+    retiredBox->addWidget(m_caution);
 
     // ── The evidence ─────────────────────────────────────────────────
     m_curve = new SwrCurveWidget(this);
+    // The one thing on the page that should take every pixel going.
+    m_curve->setMinimumHeight(320);
+    m_curve->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     col->addWidget(m_curve, 1);
 
     m_explain = new QLabel(QString{}, this);
@@ -523,7 +564,7 @@ void AntennaWindow::buildUi()
     m_explain->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }")
             .arg(QLatin1String(Style::kTextSecondary)));
-    col->addWidget(m_explain);
+    retiredBox->addWidget(m_explain);
 
     // ── One row per band the sweep touches ───────────────────────────
     //
@@ -552,7 +593,7 @@ void AntennaWindow::buildUi()
           QLatin1String(Style::kButtonBg),
           QLatin1String(Style::kTextScale)));
     m_bandTable->setVisible(false);
-    col->addWidget(m_bandTable);
+    retiredBox->addWidget(m_bandTable);
 
     // What the last change actually did, against what was predicted.
     // Sits under the curve because it is a statement about the pair of
@@ -573,7 +614,7 @@ void AntennaWindow::buildUi()
         "height, or start on a different band — none of those keep the "
         "old measurements comparable."));
     learnRow->addWidget(m_forgetBtn);
-    col->addLayout(learnRow);
+    retiredBox->addLayout(learnRow);
 
     m_source = new QLabel(QString{}, this);
     m_source->setStyleSheet(QStringLiteral(

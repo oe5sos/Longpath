@@ -89,6 +89,17 @@ public:
     /// with an explanatory status line.
     void setBackend(const Backend& backend);
 
+    /// Strip the panel down to its control strip: band, points, power,
+    /// coupler counts, Start/Stop and the status line. The chart and
+    /// the trace list are hidden.
+    ///
+    /// The antenna window used to be two tabs — measure on one, read
+    /// the result on the other — with a second, poorer chart on the
+    /// measuring side. Asked for directly: "hätte ich gerne alles auf
+    /// einem fenster". One window, one chart, and this panel becomes
+    /// the row of controls above it.
+    void setCompact(bool compact);
+
 signals:
     /// A sweep finished with something worth analysing. Carries the
     /// measurement in the same shape a .s1p arrives in, so the file
