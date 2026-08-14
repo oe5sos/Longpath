@@ -62,6 +62,8 @@
 
 #include <QWidget>
 
+class QPainter;
+
 namespace NereusSDR {
 
 class SwrCurveWidget : public QWidget {
@@ -138,6 +140,14 @@ private:
     /// ten, whichever gives roughly the wanted number of labels.
     double tickStepHz(double spanHz, int wanted) const;
     double xToHz(double x) const;
+
+    /// Draw a sweep as one or more polylines, split wherever the step
+    /// between neighbouring points jumps far above the run's own
+    /// spacing. A range sweep across several bands has such jumps — the
+    /// spectrum between the bands is not ours to transmit on, so no
+    /// point exists there, and joining across it would draw a confident
+    /// line through something nobody measured.
+    void drawBrokenCurve(QPainter& p, const Sweep& s) const;
 
     // Recompute the band, the vertical scale and the cached features.
     // One place, called whenever any input changes, so the paint can

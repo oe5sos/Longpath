@@ -21,6 +21,7 @@
 #include <QPolygonF>
 
 #include <algorithm>
+#include <limits>
 #include <cmath>
 
 namespace NereusSDR {
@@ -40,6 +41,40 @@ const QColor kBad     (Style::kRedBorder);
 QString mhz(double hz, int digits = 3)
 {
     return QStringLiteral("%1").arg(hz / 1e6, 0, 'f', digits);
+}
+
+// ── Where a sweep stops being continuous ─────────────────────────────
+//
+// A range sweep across several bands has holes: between 40 m and 30 m
+// lie three megahertz we may not transmit on, so there are no points
+// there. Joined into one polyline that becomes a straight stroke from
+// 7.200 to 10.100 — full confidence across spectrum nobody looked at,
+// which is the shape of every mistake this window has made so far.
+//
+// A gap is a step much larger than the run's own spacing. The MEDIAN is
+// the reference, not the mean: with the mean, one hole widens the
+// threshold until the next hole stops counting as one.
+//
+// Returns a step size above which the line must break, or infinity when
+// there are too few points to judge.
+double gapThresholdHz(const Sweep& s)
+{
+    if (s.points.size() <= 2) {
+        return std::numeric_limits<double>::max();
+    }
+    QVector<double> steps;
+    steps.reserve(s.points.size() - 1);
+    for (int i = 1; i < s.points.size(); ++i) {
+        steps.append(s.points.at(i).freqHz - s.points.at(i - 1).freqHz);
+    }
+    std::sort(steps.begin(), steps.end());
+    const double median = steps.at(steps.size() / 2);
+    // Four times the usual spacing: far enough above the jitter in a
+    // file sweep never to fire by accident, far enough below a real
+    // band gap always to fire. The narrowest gap in the HF plan is
+    // 10.150 to 14.000 MHz, thousands of times a band sweep's step.
+    return median > 0.0 ? median * 4.0
+                        : std::numeric_limits<double>::max();
 }
 
 } // namespace
@@ -66,6 +101,25 @@ double SwrCurveWidget::tickStepHz(double spanHz, int wanted) const
                       : (n <= 7.5) ? 5.0
                                    : 10.0;
     return nice * mag;
+}
+
+void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const
+{
+    if (s.points.isEmpty()) { return; }
+    const double gapHz = gapThresholdHz(s);
+
+    QPolygonF line;
+    line.reserve(s.points.size());
+    double lastHz = 0.0;
+    for (const SweepPoint& pt : s.points) {
+        if (!line.isEmpty() && (pt.freqHz - lastHz) > gapHz) {
+            p.drawPolyline(line);
+            line.clear();
+        }
+        line << QPointF(xFor(pt.freqHz), yFor(AntennaSweep::swr(pt.gamma)));
+        lastHz = pt.freqHz;
+    }
+    p.drawPolyline(line);
 }
 
 double SwrCurveWidget::xToHz(double x) const
@@ -374,32 +428,23 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
 
     // ── The sweep before this one, faint and behind ──────────────────
     if (!m_reference.isEmpty()) {
-        QPolygonF prev;
-        prev.reserve(m_reference.points.size());
-        for (const SweepPoint& pt : m_reference.points) {
-            prev << QPointF(xFor(pt.freqHz),
-                            yFor(AntennaSweep::swr(pt.gamma)));
-        }
         QColor faint = kCurve;
         faint.setAlpha(70);
         p.setClipRect(plot.adjusted(1, 1, -1, -1));
         p.setPen(QPen(faint, 1.6, Qt::DashLine));
         p.setBrush(Qt::NoBrush);
-        p.drawPolyline(prev);
+        // Same treatment as the live curve: the previous sweep can be a
+        // range sweep too, and a dashed line across a band gap is no
+        // more honest than a solid one.
+        drawBrokenCurve(p, m_reference);
         p.setClipping(false);
     }
 
-    // ── The curve ────────────────────────────────────────────────────
-    QPolygonF line;
-    line.reserve(m_sweep.points.size());
-    for (const SweepPoint& pt : m_sweep.points) {
-        line << QPointF(xFor(pt.freqHz),
-                        yFor(AntennaSweep::swr(pt.gamma)));
-    }
+    // ── The curve, broken where nothing was measured ─────────────────
     p.setClipRect(plot.adjusted(1, 1, -1, -1));
     p.setPen(QPen(kCurve, 2.2));
     p.setBrush(Qt::NoBrush);
-    p.drawPolyline(line);
+    drawBrokenCurve(p, m_sweep);
     p.setClipping(false);
 
     // ── Every other series resonance, thin ───────────────────────────

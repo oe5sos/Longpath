@@ -25,6 +25,8 @@
 #include "gui/widgets/SwrCurveWidget.h"
 #include "core/antenna/Touchstone.h"
 
+#include <QImage>
+
 #include <complex>
 
 using namespace NereusSDR;
@@ -112,6 +114,82 @@ private slots:
                          "does not touch")
                              .arg(target / 1e6).arg(b.name)));
         }
+    }
+
+    // ── The gap must stay a gap ──────────────────────────────────────
+    //
+    // A range sweep has holes: the spectrum between the bands is not
+    // ours, so no point exists there. Drawn as one polyline that is a
+    // straight stroke from 7.200 to 10.100 MHz — full confidence across
+    // three megahertz nobody measured.
+    //
+    // Comparing rendered pixels would be brittle, so this renders into
+    // an image and asks a question the drawing can only answer one way:
+    // is the middle of the gap empty?
+    void aBandGapIsNotDrawnAcross()
+    {
+        Sweep s = flatSweep(7.0e6, 7.2e6, QStringLiteral("range"));
+        // Second segment, well clear: 14 MHz. Both flat at SWR ≈ 1.22,
+        // so any ink between them can only be an interpolated line.
+        const Sweep upper = flatSweep(14.0e6, 14.35e6, QStringLiteral("x"));
+        s.points.append(upper.points);
+
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.resize(800, 420);
+        w.setSweep(s);
+
+        QImage img(w.size(), QImage::Format_ARGB32);
+        w.render(&img);
+
+        // 10.6 MHz: the middle of the 7.2–14.0 hole, and inside no
+        // amateur band. Count non-background pixels in that column
+        // across the plot area.
+        const double lo = 7.0e6 - (14.35e6 - 7.0e6) * 0.12;
+        const double hi = 14.35e6 + (14.35e6 - 7.0e6) * 0.12;
+        const int x = int(44.0 + (10.6e6 - lo) / (hi - lo)
+                                     * ((800.0 - 12.0) - 44.0));
+        QVERIFY(x > 44 && x < 788);
+
+        const QRgb bg = img.pixel(x, 40);   // just inside the frame top
+        int ink = 0;
+        for (int y = 40; y < img.height() - 60; ++y) {
+            if (img.pixel(x, y) != bg) { ++ink; }
+        }
+        // Grid lines and the limit rule cross this column too, so allow
+        // a few pixels. A drawn-through curve is a fat 2.2 px stroke and
+        // would land well above this.
+        QVERIFY2(ink <= 6,
+                 qPrintable(QStringLiteral(
+                     "%1 pixels of ink at 10.6 MHz — the curve was drawn "
+                     "across a band gap it never measured").arg(ink)));
+    }
+
+    void aNormalSweepIsStillOneUnbrokenLine()
+    {
+        // The guard must not fire on ordinary point-to-point spacing,
+        // or every curve becomes a dotted line.
+        Sweep s = flatSweep(14.0e6, 14.35e6, QStringLiteral("20m"));
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.resize(800, 420);
+        w.setSweep(s);
+
+        QImage img(w.size(), QImage::Format_ARGB32);
+        w.render(&img);
+
+        // Mid-band, where the curve certainly runs.
+        const double lo = 14.0e6 - 0.35e6 * 0.12;
+        const double hi = 14.35e6 + 0.35e6 * 0.12;
+        const int x = int(44.0 + (14.175e6 - lo) / (hi - lo)
+                                     * ((800.0 - 12.0) - 44.0));
+        const QRgb bg = img.pixel(x, 40);
+        int ink = 0;
+        for (int y = 40; y < img.height() - 60; ++y) {
+            if (img.pixel(x, y) != bg) { ++ink; }
+        }
+        QVERIFY2(ink > 6, "the curve vanished from the middle of a "
+                          "perfectly ordinary sweep");
     }
 
     void aForcedBandStillWins()
