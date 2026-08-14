@@ -471,9 +471,16 @@ void SwrSweepPanel::refreshTunePowerLabel()
     if (m_couplerLabel) {
         if (m_backend.rawAdc) {
             const auto raw = m_backend.rawAdc();
-            m_couplerLabel->setText(
+            QString text =
                 QStringLiteral("   Koppler-ADC:  VOR %1  ·  RÜCK %2")
-                    .arg(raw.first, 4).arg(raw.second, 4));
+                    .arg(raw.first, 4).arg(raw.second, 4);
+            if (m_backend.couplerProfile) {
+                const QString prof = m_backend.couplerProfile();
+                if (!prof.isEmpty()) {
+                    text += QStringLiteral("  ·  Profil %1").arg(prof);
+                }
+            }
+            m_couplerLabel->setText(text);
             // Amber while either sits at the bottom of its range: that
             // is the state in which no SWR can be computed, and it
             // should be visible before a sweep rather than after.

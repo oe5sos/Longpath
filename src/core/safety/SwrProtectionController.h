@@ -167,14 +167,29 @@ public:
     // publishes the SWR, so the sweep and the LED get their numbers —
     // it simply takes no action on it.
     //
-    // Two things it will NOT do, because a measurement is not a licence
-    // to remove the protection:
+    // Three things it will NOT do, because a measurement is not a
+    // licence to remove the protection:
     //
     //   * it stays out of the way only below kMeasurementCeilingW. Above
     //     that the sweep is not running at sweep power, something has
     //     gone wrong, and the normal rules come back in full.
     //   * it never lifts an already-latched windback. If the latch was
     //     set before the sweep started, it stands.
+    //   * the open-antenna check runs BEFORE it and is not suspended.
+    //     That branch needs fwd > 10 W with almost all of it coming
+    //     back, and it only applies when tune is not active — a sweep
+    //     keys tune, so in practice it never fires during one. The
+    //     ordering is deliberate all the same: between 10 W and the
+    //     15 W ceiling, "the feedline is not connected" outranks "I am
+    //     taking a measurement".
+    //
+    // One thing it does not fix, which belongs here so nobody reads
+    // more into it than is there: at QRP the SWR it publishes is 1.00
+    // regardless. ingest() clamps to 1.0 when fwd and rev are both
+    // under kLowPowerFloor, above this branch, so a 1 W tune reports a
+    // perfect match. The sweep does not use this number — it works from
+    // baseline-corrected ADC counts in SwrSweepController — but anything
+    // that ever does read measuredSwr() needs to know that.
     void setMeasurementMode(bool on) noexcept;
     bool measurementMode() const noexcept;
 

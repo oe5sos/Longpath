@@ -9574,6 +9574,14 @@ void MainWindow::openAntennaWindow()
                 return qMakePair(rm->lastFwdAdcRaw(), rm->lastRevAdcRaw());
             };
 
+            // The model the coupler arithmetic actually uses — see
+            // SwrSweepPanel::Backend::couplerProfile for why that is not
+            // the same thing as the board named in the status bar.
+            backend.couplerProfile = [rm = m_radioModel]() {
+                return QString::fromLatin1(
+                    displayName(rm->hardwareProfile().model));
+            };
+
             // ── Band, both ways ──────────────────────────────────────
             //
             // Asked for directly, and it is a correctness matter rather

@@ -189,8 +189,14 @@ void SwrCurveWidget::recompute()
     //
     // This widens the VIEW, not the sweep. Transmitting past a band
     // edge to make a picture nicer is not a trade available to us.
+    // Not below DC. Twelve percent of a wide sweep is a lot of hertz:
+    // 1.8–30 MHz pads by 3.4 MHz and the axis would start at −1.58 MHz,
+    // which is not a frequency. Nothing crashed — xFor is linear and
+    // draws it happily — it just put a tick labelled "0" on the left and
+    // wasted a tenth of the width on spectrum that cannot exist. Found
+    // by working the tick spacing out on paper for a full-HF sweep.
     const double span = std::max(1.0, m_sweep.stopHz() - m_sweep.startHz());
-    m_viewLoHz = m_sweep.startHz() - span * 0.12;
+    m_viewLoHz = std::max(0.0, m_sweep.startHz() - span * 0.12);
     m_viewHiHz = m_sweep.stopHz()  + span * 0.12;
 
     // Resonance nearest the target if one was given, otherwise nearest

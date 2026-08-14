@@ -12,6 +12,7 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include "gui/setup/TransmitSetupPages.h"
+#include "core/safety/SwrProtectionController.h"
 
 using namespace NereusSDR;
 
@@ -35,7 +36,11 @@ void TestTransmitSetupSwrProtection::groupBoxBuilt_fiveControlsPresent()
 
     auto* udLimit = group->findChild<QDoubleSpinBox*>("udSwrProtectionLimit");
     QVERIFY(udLimit);
-    QCOMPARE(udLimit->value(), 2.0);
+    // Against the constant, not against a copy of it. Writing 3.0 here
+    // would just be the third place the number lives, and the reason
+    // this line needed changing at all is that it was the second.
+    QCOMPARE(static_cast<float>(udLimit->value()),
+             safety::SwrProtectionController::kDefaultLimit);
     QCOMPARE(udLimit->minimum(), 1.0);
     QCOMPARE(udLimit->maximum(), 5.0);
 

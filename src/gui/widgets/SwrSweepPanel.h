@@ -81,6 +81,26 @@ public:
         /// arrive at without it.
         std::function<QPair<quint16, quint16>()> rawAdc;
 
+    // ── Which coupler constants are actually in force ────────────────
+    //
+    // 2026-08-14. The status bar names the board the hardware reports
+    // — an Anvelina Pro 3 announces itself as an OrionMkII, so it says
+    // "OrionMKII" no matter what. The scaling, meanwhile, follows the
+    // model override, which lives on a different page. Two different
+    // answers to "what radio is this", neither of them the one that
+    // decides the SWR.
+    //
+    // It matters more than it sounds. The two profiles differ in the
+    // bridge ratio, 0.894 against 1.000, and worked through: at a true
+    // SWR of 2.5 they disagree by 0.38, at 3.0 by 0.68. That is the
+    // same size as the gap Martin sees against his VNA on 80 m. Below
+    // about 1.5 they agree to within a few hundredths, which is why
+    // this never showed up on a good antenna.
+    //
+    // So the panel says which profile the arithmetic is using, next to
+    // the counts it is using it on.
+    std::function<QString()> couplerProfile;
+
         /// ── Band, both ways ──────────────────────────────────────────
         ///
         /// "wenn ich bei Suite einen Bandwechsel mache, sollte dieser
