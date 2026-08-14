@@ -212,6 +212,42 @@ private:
     // curve does not touch the frame.
     double m_viewLoHz{0.0}, m_viewHiHz{0.0};
 
+    // ── One panel per measured stretch ───────────────────────────────
+    //
+    // 2026-08-15, 00:02. "der chart kann nicht stimmen, von 14 – 22 MHz
+    // komplett gerade?" He was right to distrust it, and the fault was
+    // mine twice over.
+    //
+    // Between 14.35 and 18.07 MHz there is not one measurement — it is
+    // the spectrum between 20 m and 17 m. I drew a dashed bridge across
+    // it, told myself the dashes said "interpolated", and they did not:
+    // they read as curve. So the picture invited exactly the wrong
+    // conclusion.
+    //
+    // And on a 1.8-to-30 MHz axis a band is a sliver. 40 m is 200 kHz,
+    // seven thousandths of the width, about ten pixels. Eleven points
+    // fit in ten pixels; a shape does not. No smoothing and no extra
+    // points can fix that, which is why three attempts at both did not.
+    //
+    // So the axis stops being linear when the sweep has holes. Every
+    // measured stretch gets an equal share of the width and its own
+    // labels, with a visible break between panels. Nine bands, nine
+    // readable curves, and nothing drawn where nothing was measured.
+    //
+    // Empty for an ordinary single-band sweep, which keeps the plain
+    // linear axis it has always had.
+    struct ViewSegment {
+        double loHz{0.0};
+        double hiHz{0.0};
+        double f0{0.0};      // left edge, fraction of the plot width
+        double f1{0.0};      // right edge
+    };
+    QVector<ViewSegment> m_viewSegs;
+
+    /// Rebuild m_viewSegs from the current sweep. Leaves it empty when
+    /// the sweep is continuous.
+    void rebuildViewSegments();
+
     // Cursor position in widget coordinates while it is over the plot,
     // or a negative x when it is not.
     QPointF m_cursor{-1.0, -1.0};

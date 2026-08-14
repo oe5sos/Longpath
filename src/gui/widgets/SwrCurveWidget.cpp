@@ -131,8 +131,18 @@ void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const
         if (!line.isEmpty() && (pt.freqHz - lastHz) > gapHz) {
             p.setPen(solid);
             p.drawPath(smoothPath(line));
-            p.setPen(bridge);
-            p.drawLine(lastDrawn, here);      // the join, marked as one
+            // No bridge on a segmented axis. There the gap is a gutter
+            // with a break line in it and the panels are plainly
+            // separate pictures; a stroke across it would be drawing
+            // over the very thing that says "different frequencies".
+            //
+            // On a linear axis the dashes stay — but they were read as
+            // curve once already ("von 14 – 22 MHz komplett gerade?"),
+            // which is why the segmented axis exists at all.
+            if (m_viewSegs.isEmpty()) {
+                p.setPen(bridge);
+                p.drawLine(lastDrawn, here);
+            }
             line.clear();
         }
         line << here;
@@ -197,8 +207,21 @@ QPainterPath SwrCurveWidget::smoothPath(const QPolygonF& pts) const
 double SwrCurveWidget::xToHz(double x) const
 {
     if (m_plotR <= m_plotL) { return m_viewLoHz; }
-    const double t = (x - m_plotL) / (m_plotR - m_plotL);
-    return m_viewLoHz + t * (m_viewHiHz - m_viewLoHz);
+    const double w = m_plotR - m_plotL;
+    const double f = (x - m_plotL) / w;
+
+    if (!m_viewSegs.isEmpty()) {
+        for (const auto& s : m_viewSegs) {
+            if (f <= s.f1) {
+                if (f < s.f0) { return 0.0; }   // in a break: no frequency
+                const double t = (f - s.f0) / (s.f1 - s.f0);
+                return s.loHz + t * (s.hiHz - s.loHz);
+            }
+        }
+        return m_viewSegs.last().hiHz;
+    }
+
+    return m_viewLoHz + f * (m_viewHiHz - m_viewLoHz);
 }
 
 void SwrCurveWidget::mouseMoveEvent(QMouseEvent* e)
@@ -365,6 +388,9 @@ void SwrCurveWidget::recompute()
     m_viewLoHz = std::max(0.0, m_sweep.startHz() - span * 0.12);
     m_viewHiHz = m_sweep.stopHz()  + span * 0.12;
 
+    // Segmented axis when the sweep has holes — see m_viewSegs.
+    rebuildViewSegments();
+
     // Resonance nearest the target if one was given, otherwise nearest
     // the middle of the band — which is what somebody without a
     // specific frequency in mind actually means.
@@ -438,11 +464,79 @@ void SwrCurveWidget::recompute()
                           3.0, 10.0);
 }
 
+void SwrCurveWidget::rebuildViewSegments()
+{
+    m_viewSegs.clear();
+    if (m_sweep.points.size() < 3) { return; }
+
+    const double gapHz = gapThresholdHz(m_sweep);
+    if (!std::isfinite(gapHz)) { return; }
+
+    // Collect the runs of measured points.
+    QVector<QPair<double, double>> runs;   // lo, hi in Hz
+    double lo = m_sweep.points.first().freqHz;
+    double prev = lo;
+    for (int i = 1; i < m_sweep.points.size(); ++i) {
+        const double f = m_sweep.points.at(i).freqHz;
+        if (f - prev > gapHz) {
+            runs.append({lo, prev});
+            lo = f;
+        }
+        prev = f;
+    }
+    runs.append({lo, prev});
+
+    if (runs.size() < 2) { return; }   // continuous — keep the linear axis
+
+    // Equal width each, with a gutter between panels so the break is
+    // visible rather than implied. The gutter is where the axis stops
+    // being a frequency axis, and it should look like it.
+    const int n = static_cast<int>(runs.size());
+    const double gutter = 0.012;
+    const double each = (1.0 - gutter * (n - 1)) / n;
+    m_viewSegs.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        ViewSegment s;
+        // A little air inside each panel so the curve does not touch
+        // the break lines, mirroring the 12 % on a linear sweep.
+        const double span = std::max(1.0, runs.at(i).second - runs.at(i).first);
+        s.loHz = runs.at(i).first  - span * 0.06;
+        s.hiHz = runs.at(i).second + span * 0.06;
+        s.f0 = i * (each + gutter);
+        s.f1 = s.f0 + each;
+        m_viewSegs.append(s);
+    }
+}
+
 double SwrCurveWidget::xFor(double hz) const
 {
+    const double w = m_plotR - m_plotL;
+
+    if (!m_viewSegs.isEmpty()) {
+        // Segmented axis. Anything inside a panel maps within it;
+        // anything in a break is pinned to the nearer edge so shading
+        // and verticals stop at the panel rather than wandering into
+        // the gutter.
+        const auto& first = m_viewSegs.first();
+        const auto& last  = m_viewSegs.last();
+        if (hz <= first.loHz) { return m_plotL + first.f0 * w; }
+        if (hz >= last.hiHz)  { return m_plotL + last.f1  * w; }
+        for (int i = 0; i < m_viewSegs.size(); ++i) {
+            const auto& s = m_viewSegs.at(i);
+            if (hz <= s.hiHz) {
+                if (hz < s.loHz) {   // in the break before this panel
+                    return m_plotL + s.f0 * w;
+                }
+                const double t = (hz - s.loHz) / (s.hiHz - s.loHz);
+                return m_plotL + (s.f0 + t * (s.f1 - s.f0)) * w;
+            }
+        }
+        return m_plotL + last.f1 * w;
+    }
+
     if (m_viewHiHz <= m_viewLoHz) { return m_plotL; }
     const double t = (hz - m_viewLoHz) / (m_viewHiHz - m_viewLoHz);
-    return m_plotL + t * (m_plotR - m_plotL);
+    return m_plotL + t * w;
 }
 
 double SwrCurveWidget::yFor(double swr) const
@@ -655,7 +749,53 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // then meant measuring with a finger. Ticks on round steps — 1, 2
     // or 5 times a power of ten — so the labels are numbers a person
     // would say out loud rather than whatever the span divides into.
-    {
+    if (!m_viewSegs.isEmpty()) {
+        // ── Segmented axis: one small scale per panel ────────────────
+        //
+        // A running 0..30 MHz scale would be a lie here — the width is
+        // shared out per measured stretch, not per hertz. Each panel
+        // gets its own two end labels and its band name, and the gutter
+        // between panels carries a break line so the discontinuity is
+        // something you can see rather than something you have to know.
+        p.setFont(small);
+        const double w = m_plotR - m_plotL;
+        for (int i = 0; i < m_viewSegs.size(); ++i) {
+            const auto& s = m_viewSegs.at(i);
+            const double x0 = m_plotL + s.f0 * w;
+            const double x1 = m_plotL + s.f1 * w;
+
+            if (i > 0) {
+                // The break. Drawn in the middle of the gutter, full
+                // height, so it reads as "the axis stops here".
+                const double xb =
+                    (m_plotL + m_viewSegs.at(i - 1).f1 * w + x0) / 2.0;
+                p.setPen(QPen(kGrid, 1.0, Qt::DashLine));
+                p.drawLine(QPointF(xb, m_plotT), QPointF(xb, m_plotB + 4.0));
+            }
+
+            p.setPen(QPen(kGrid, 1.0, Qt::DotLine));
+            p.drawLine(QPointF(x0, m_plotT), QPointF(x0, m_plotB));
+            p.drawLine(QPointF(x1, m_plotT), QPointF(x1, m_plotB));
+
+            p.setPen(kDim);
+            const QString lo = mhz(s.loHz);
+            const QString hi = mhz(s.hiHz);
+            p.drawText(QPointF(x0, m_plotB + 15.0), lo);
+            p.drawText(QPointF(x1 - sfm.horizontalAdvance(hi),
+                               m_plotB + 15.0), hi);
+
+            // Which band this panel is, from the drawn table rather
+            // than guessed from the frequencies.
+            const AmateurBands::Band b =
+                AmateurBands::containing((s.loHz + s.hiHz) / 2.0, m_region);
+            if (b.isValid()) {
+                p.setPen(kCentre);
+                p.drawText(QPointF((x0 + x1) / 2.0
+                                       - sfm.horizontalAdvance(b.name) / 2.0,
+                                   m_plotB + 29.0), b.name);
+            }
+        }
+    } else {
         // How many labels fit, not how many look nice in the abstract:
         // a narrow panel with eight of them prints them on top of each
         // other, which reads as a smudge rather than as a scale.
@@ -686,7 +826,10 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         }
     }
 
-    if (m_band.isValid()) {
+    // On a segmented axis each panel already carries its own band name
+    // just above; one more line naming a single band would contradict
+    // the eight others on screen.
+    if (m_band.isValid() && m_viewSegs.isEmpty()) {
         const QString mid = QStringLiteral("%1 · mid %2 MHz · %3 kHz wide")
                                 .arg(m_band.name, mhz(m_band.centreHz()))
                                 .arg(m_band.widthHz() / 1000.0, 0, 'f', 0);
