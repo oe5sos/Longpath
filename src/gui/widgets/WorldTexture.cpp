@@ -12,6 +12,8 @@
 
 #include "WorldTexture.h"
 
+#include "gui/widgets/WorldMapCatalog.h"
+
 #include "core/AppSettings.h"
 
 namespace NereusSDR {
@@ -33,6 +35,12 @@ Cache& cache()
 
 } // namespace
 
+Notifier& Notifier::instance()
+{
+    static Notifier n;
+    return n;
+}
+
 QString settingsKey()
 {
     return QStringLiteral("GlobeWorldImagePath");
@@ -46,6 +54,7 @@ QString currentPath()
 void reload()
 {
     cache() = Cache{};
+    emit Notifier::instance().changed();
 }
 
 QImage image()
@@ -69,6 +78,14 @@ QImage image()
     return c.image;
 }
 
+QString requiredAttribution()
+{
+    const QString path = currentPath();
+    if (path.isEmpty()) { return QString{}; }
+    const WorldMapCatalog::Entry e = WorldMapCatalog::describe(path);
+    return e.attributionRequired ? e.attribution : QString{};
+}
+
 bool setPath(const QString& path)
 {
     QImage img(path);
@@ -81,6 +98,7 @@ bool setPath(const QString& path)
     c.path  = path;
     c.tried = true;
     c.image = img.convertToFormat(QImage::Format_RGB32);
+    emit Notifier::instance().changed();
     return true;
 }
 

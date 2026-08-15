@@ -52,6 +52,14 @@ GlobeWidget::GlobeWidget(QWidget* parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
+    // Siehe FlatMapWidget: derselbe Geber erreicht beide Ansichten.
+    // Ein Bildwechsel erreicht jede Ansicht ueber den Geber in
+    // WorldTexture -- kein Aufruf, den eine neue Ansicht vergessen
+    // koennte. Siehe die Notiz bei WorldTexture::Notifier.
+    connect(&WorldTexture::Notifier::instance(),
+            &WorldTexture::Notifier::changed,
+            this, qOverload<>(&QWidget::update));
+
     // The open hand is the only affordance saying "this turns". Without
     // it the globe reads as a picture.
     setCursor(Qt::OpenHandCursor);

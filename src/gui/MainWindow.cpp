@@ -259,6 +259,7 @@ warren@wpratt.com
 #include "widgets/ProfileRail.h"
 #include "widgets/WidgetPicker.h"
 #include "gui/LayoutProfiles.h"
+#include "gui/widgets/WorldTexture.h"
 #include "widgets/VfoWidget.h"
 #include "applets/StripWindow.h"
 #include "widgets/RotorLogbookPanel.h"
@@ -5656,10 +5657,41 @@ void MainWindow::populateDefaultMeter()
                     for (int v : m_mainSplitter->sizes()) { sizes << v; }
                     s.insert(QStringLiteral("splitter"), sizes);
                 }
+
+                // ── Das Weltbild gehoert ins Profil ─────────────────
+                //
+                // Entscheidung des Betreibers: das PROFIL fuehrt, der
+                // AppSettings-Schluessel GlobeWorldImagePath ist nur der
+                // Rueckfall fuer "kein Profil". Zwei Besitzer fuer eine
+                // Zahl waren an diesem Tag schon zweimal die Ursache,
+                // deshalb steht hier ausdruecklich, welcher gilt.
+                //
+                // Gemeinsam fuer Karte und Globus -- ein Weltbild ist
+                // ein Weltbild.
+                s.insert(QStringLiteral("worldImage"),
+                         WorldTexture::currentPath());
                 return s;
             },
             // ── herstellen ───────────────────────────────────────────
             [this](const QVariantMap& s) {
+                // Erst das Weltbild: es loest den Geber aus, und die
+                // Ansichten sollen einmal neu zeichnen und nicht
+                // zweimal.
+                if (s.contains(QStringLiteral("worldImage"))) {
+                    const QString img =
+                        s.value(QStringLiteral("worldImage")).toString();
+                    if (img.isEmpty()) {
+                        AppSettings::instance().setValue(
+                            WorldTexture::settingsKey(), QString{});
+                        WorldTexture::reload();
+                    } else if (img != WorldTexture::currentPath()) {
+                        // Schlaegt es fehl -- Datei geloescht, Platte
+                        // nicht da -- bleibt das bisherige Bild stehen,
+                        // statt die Karte zu leeren.
+                        WorldTexture::setPath(img);
+                    }
+                }
+
                 const QVariantMap vis =
                     s.value(QStringLiteral("visible")).toMap();
                 for (auto it = vis.constBegin(); it != vis.constEnd(); ++it) {

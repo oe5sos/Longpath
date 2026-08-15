@@ -46,6 +46,9 @@ class QLabel;
 class QPushButton;
 class QStackedWidget;
 
+class QComboBox;
+class QEvent;
+
 namespace NereusSDR {
 
 class FlatMapWidget;
@@ -126,6 +129,20 @@ private:
     QStackedWidget* m_stack{nullptr};
     GlobeWidget*    m_globe{nullptr};
     FlatMapWidget*  m_flat{nullptr};
+
+    // ── Wahl des Kartenhintergrunds ─────────────────────────────────
+    //
+    // Der Ordner wird beim OEFFNEN der Liste gelesen, nicht beim Start:
+    // wer eine Datei ablegt, waehrend das Programm laeuft, soll sie ohne
+    // Neustart sehen. Dafuer der Ereignisfilter auf der Liste selbst --
+    // showPopup() ist kein Signal, an das man sich haengen koennte.
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+private:
+    QComboBox* m_background{nullptr};
+    void reloadBackgroundList();
+    void applyBackgroundChoice(int index);
 
     QDateEdit*   m_from{nullptr};
     QDateEdit*   m_to{nullptr};

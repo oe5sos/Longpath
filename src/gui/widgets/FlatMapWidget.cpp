@@ -59,6 +59,13 @@ FlatMapWidget::FlatMapWidget(QWidget* parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
     setCursor(Qt::OpenHandCursor);
+    // Ein Bildwechsel erreicht jede Ansicht ueber den Geber in
+    // WorldTexture -- kein Aufruf, den eine neue Ansicht vergessen
+    // koennte. Siehe die Notiz bei WorldTexture::Notifier.
+    connect(&WorldTexture::Notifier::instance(),
+            &WorldTexture::Notifier::changed,
+            this, qOverload<>(&QWidget::update));
+
     setToolTip(QStringLiteral(
         "Drag to pan · wheel to zoom · double-click to reset"));
 }
@@ -379,6 +386,40 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     if (m_showTerminator) {
         if (m_nightDirty || m_night.isNull()) { buildNightOverlay(); }
         p.drawImage(r, m_night);
+    }
+
+    // ── Der Urhebervermerk ──────────────────────────────────────────
+    //
+    // An der FENSTERecke, nicht an der Kartenecke. mapRect() waechst mit
+    // dem Zoom ueber das Fenster hinaus -- ein Vermerk an r.bottomRight()
+    // waere ab dem ersten Radschritt ausserhalb des Sichtbaren, und zwar
+    // genau dann, wenn der Betreiber sich die Karte genauer ansieht.
+    //
+    // Nicht abschaltbar, solange das Bild gewaehlt ist: wo die Herkunft
+    // einen Vermerk verlangt, ist er Bedingung der Nutzung und keine
+    // Anzeigeoption.
+    if (!tex.isNull()) {
+        const QString credit = WorldTexture::requiredAttribution();
+        if (!credit.isEmpty()) {
+            QFont f = p.font();
+            f.setPixelSize(9);
+            p.setFont(f);
+            const QFontMetrics fm(f);
+            const int tw = fm.horizontalAdvance(credit);
+            const int x  = width()  - tw - 8;
+            const int y  = height() - 6;
+            // Dunkle Unterlegung: der Vermerk muss auf hellem Eis
+            // genauso lesbar sein wie auf dunklem Ozean.
+            QColor box(Style::kAppBg);
+            box.setAlpha(170);
+            p.setPen(Qt::NoPen);
+            p.setBrush(box);
+            p.drawRect(QRect(x - 4, y - fm.ascent() - 2,
+                             tw + 8, fm.height() + 4));
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
+            p.drawText(x, y, credit);
+        }
     }
 
     // Graticule every 30 degrees, plus the equator picked out.

@@ -26,6 +26,7 @@
 // =================================================================
 
 #include <QImage>
+#include <QObject>
 #include <QString>
 
 namespace NereusSDR {
@@ -43,12 +44,45 @@ QString currentPath();
 // than the whole render.
 QImage image();
 
+/// Der Urhebervermerk des GEWAEHLTEN Bildes, wenn seine Beschreibung
+/// einen verlangt -- sonst leer. Hier und nicht im Katalog, weil die
+/// zeichnenden Widgets nur das aktuelle Bild kennen und nicht den
+/// Ordner: sonst muesste jede Ansicht den Katalog durchsuchen, um zu
+/// wissen, was sie gerade malt.
+QString requiredAttribution();
+
 // Point at a new file. Returns false and keeps the previous image if it
 // cannot be read — a bad choice should not blank a working map.
 bool setPath(const QString& path);
 
 // Drop the cache, e.g. after the file on disk was replaced.
 void reload();
+
+// ── Wer erfaehrt von einem Bildwechsel ──────────────────────────────
+//
+// Bis 2026-08-15 niemand: GlobeWidget rief setPath() und zeichnete sich
+// selbst neu, FlatMapWidget erfuhr davon nichts und zeigte das alte Bild
+// bis zum naechsten Neuzeichnen aus anderem Grund.
+//
+// Der naheliegende Weg waere gewesen, beide Stellen nacheinander
+// aufzurufen. Entscheidung des Betreibers: Signalgeber statt
+// Doppelaufruf -- "ein Aufruf, den jemand spaeter vergisst, ist genau
+// der Fehlertyp von heute Nachmittag". Wer kuenftig eine dritte Ansicht
+// baut, verbindet sich hier und muss von den anderen beiden nichts
+// wissen.
+class Notifier : public QObject {
+    Q_OBJECT
+public:
+    /// Der eine Geber. Lebt so lange wie das Programm.
+    static Notifier& instance();
+signals:
+    /// Das Weltbild hat gewechselt -- neu zeichnen. Wird von setPath()
+    /// und reload() ausgeloest, auch wenn der Pfad derselbe blieb: die
+    /// Datei dahinter kann sich geaendert haben.
+    void changed();
+private:
+    using QObject::QObject;
+};
 
 } // namespace WorldTexture
 } // namespace NereusSDR

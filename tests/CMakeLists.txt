@@ -1346,6 +1346,13 @@ nereus_add_test(tst_spectrum_dbm_range_clamp)
 # nicht in der persistenten Schwelle landen.
 nereus_add_test(tst_waterfall_threshold_fit)
 
+# ── Das Weltbild muss 2:1 sein, sonst sitzen die Marken daneben ────────────
+# Die Karte rechnet gleichabstaendig zylindrisch; ein Bild mit anderem
+# Verhaeltnis wuerde gestreckt, saehe weiterhin wie eine Karte aus, und nur
+# die Stationsmarken waeren falsch. Sichert die Bedingung samt Toleranz und
+# dass der Ablehnungsgrund die gemessene Groesse nennt.
+nereus_add_test(tst_world_map_catalog)
+
 # ── Phase 3P-A Task 15: RxApplet S-ATT slider range from BoardCapabilities ───
 # HL2 → 0-63 dB; Hermes → 0-31 dB. Verifies the spinbox max is sourced from
 # BoardCapabilities::attenuator.maxDb at construction time, not hardcoded.

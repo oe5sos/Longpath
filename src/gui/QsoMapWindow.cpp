@@ -27,6 +27,10 @@
 #include "core/CallsignCache.h"
 
 #include <QCheckBox>
+#include <QComboBox>
+#include <QStandardItemModel>
+#include "gui/widgets/WorldMapCatalog.h"
+#include "gui/widgets/WorldTexture.h"
 #include <QCloseEvent>
 #include <QDateEdit>
 #include <QDesktopServices>
@@ -159,6 +163,30 @@ void QsoMapWindow::buildUi()
         connect(b, &QPushButton::clicked, this,
                 [this, days]() { setQuickRange(days); });
     }
+
+    // ── Kartenhintergrund ───────────────────────────────────────────
+    auto* bgCap = new QLabel(QStringLiteral("KARTE"), this);
+    bgCap->setStyleSheet(QStringLiteral("color: %1; font-size: 9px;")
+                             .arg(QString::fromLatin1(Style::kTextScale)));
+    bar->addWidget(bgCap);
+
+    m_background = new QComboBox(this);
+    m_background->setMinimumWidth(150);
+    m_background->setToolTip(QStringLiteral(
+        "Weltbild fuer Karte und Globus. Die Dateien liegen in\n%1\n\n"
+        "Erwartet wird eine gleichabstaendige Zylinderprojektion im "
+        "Verhaeltnis 2:1 mit Mitte bei 0 Grad Laenge. Ein Bild mit "
+        "anderem Verhaeltnis wird ausgegraut angeboten und nicht "
+        "gezeichnet \u2014 verzerrt saehe die Karte richtig aus und nur "
+        "die Stationsmarken saessen daneben.")
+            .arg(WorldMapCatalog::directory()));
+    // Die Liste erst beim Aufklappen fuellen. Der Filter, weil
+    // showPopup() kein Signal ist.
+    m_background->installEventFilter(this);
+    reloadBackgroundList();
+    connect(m_background, QOverload<int>::of(&QComboBox::activated),
+            this, &QsoMapWindow::applyBackgroundChoice);
+    bar->addWidget(m_background);
 
     bar->addStretch(1);
 
@@ -802,6 +830,67 @@ void QsoMapWindow::exportKml()
     // Whatever handles .kml — Google Earth when installed, otherwise
     // the OS says so, which is a better error than any dialog here.
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+
+bool QsoMapWindow::eventFilter(QObject* obj, QEvent* event)
+{
+    // Vor dem Aufklappen neu einlesen -- siehe die Notiz im Header.
+    if (obj == m_background && event->type() == QEvent::MouseButtonPress) {
+        reloadBackgroundList();
+    }
+    return QDialog::eventFilter(obj, event);
+}
+
+void QsoMapWindow::reloadBackgroundList()
+{
+    if (!m_background) { return; }
+    const QString current = WorldTexture::currentPath();
+
+    QSignalBlocker block(m_background);
+    m_background->clear();
+    m_background->addItem(QStringLiteral("\u2014 kein Bild \u2014"), QString{});
+
+    const auto list = WorldMapCatalog::entries();
+    for (const auto& e : list) {
+        m_background->addItem(e.usable
+                                  ? e.name
+                                  : QStringLiteral("%1  \u2014  %2")
+                                        .arg(e.name, e.reason),
+                              e.path);
+        const int row = m_background->count() - 1;
+        if (!e.usable) {
+            // Ausgegraut MIT Grund statt unsichtbar: ein Bild, das der
+            // Betreiber hingelegt hat und das dann nirgends auftaucht,
+            // liest sich als Fehler des Programms.
+            auto* model = qobject_cast<QStandardItemModel*>(
+                m_background->model());
+            if (model) {
+                if (QStandardItem* it = model->item(row)) {
+                    it->setEnabled(false);
+                }
+            }
+        }
+        if (!current.isEmpty() && e.path == current) {
+            m_background->setCurrentIndex(row);
+        }
+    }
+    if (current.isEmpty()) { m_background->setCurrentIndex(0); }
+}
+
+void QsoMapWindow::applyBackgroundChoice(int index)
+{
+    if (!m_background) { return; }
+    const QString path = m_background->itemData(index).toString();
+    if (path.isEmpty()) {
+        AppSettings::instance().setValue(WorldTexture::settingsKey(),
+                                         QString{});
+        WorldTexture::reload();   // loest den Geber aus
+        return;
+    }
+    // setPath() prueft die Lesbarkeit und loest bei Erfolg den Geber
+    // aus; schlaegt es fehl, bleibt das vorherige Bild stehen.
+    WorldTexture::setPath(path);
 }
 
 } // namespace NereusSDR
