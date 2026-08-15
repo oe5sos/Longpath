@@ -1337,6 +1337,15 @@ nereus_add_test(tst_spectrum_dbm_strip)
 # harmlose Richtung (ruhiges Band, Flur sinkt) NICHT angefasst wird.
 nereus_add_test(tst_spectrum_dbm_range_clamp)
 
+# ── Zwei rote Baender, die niemand gesendet hat ─────────────────────────────
+# Ein Schwellenfenster, das komplett neben den gemessenen Werten lag, saettigte
+# jede Zeile auf die Palettenspitze -- im Schema Enhanced rot, im ClarityBlue
+# magenta (ANAN-7000DLE, 0.5.2). Sichert die BEDINGUNG, nicht die Zahlen: ganz
+# daneben wird auf die Mitte gezogen, teilweise ueberlappend bleibt stehen.
+# Dazu der eigentliche Ausloeser -- eine Kette von Spinbox-Zwischenwerten darf
+# nicht in der persistenten Schwelle landen.
+nereus_add_test(tst_waterfall_threshold_fit)
+
 # ── Phase 3P-A Task 15: RxApplet S-ATT slider range from BoardCapabilities ───
 # HL2 → 0-63 dB; Hermes → 0-31 dB. Verifies the spinbox max is sourced from
 # BoardCapabilities::attenuator.maxDb at construction time, not hardcoded.

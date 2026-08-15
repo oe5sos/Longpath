@@ -625,6 +625,17 @@ public:
     // user fields. Mirrors the Thetis local-variable composition at
     // display.cs:6575-6594 [v2.10.3.13].
     void composeWaterfallActiveThresholds(const QVector<float>& wfPixelsDbm);
+
+    /// Zieht ein Schwellenfenster, das die gemessenen Werte GAR NICHT
+    /// beruehrt, auf deren Mitte; ein teilweise ueberlappendes bleibt
+    /// unangetastet.
+    ///
+    /// Statisch und rein, weil das die ganze Entscheidung ist: sie laesst
+    /// sich mit vier Zahlen pruefen, ohne Widget, ohne Radio und ohne ein
+    /// gerendertes Bild -- und genau das ist der Punkt, denn der Fehler,
+    /// den sie abfaengt, ist zweimal nur als Bild aufgefallen.
+    static void fitThresholdsToData(float& low, float& high,
+                                    float dataMin, float dataMax);
     // NF-AGC: auto-track waterfall thresholds to noise floor + offset.
     void setWaterfallNFAGCEnabled(bool on);
     bool waterfallNFAGCEnabled() const { return m_wfNfAgcEnabled; }

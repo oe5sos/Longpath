@@ -5093,17 +5093,28 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
             if (v < dataMin) { dataMin = v; }
             if (v > dataMax) { dataMax = v; }
         }
-        if (std::isfinite(dataMin) && std::isfinite(dataMax)
-            && (m_wfActiveHighThreshold <= dataMin
-                || m_wfActiveLowThreshold >= dataMax)) {
-            const float span = std::max(
-                kWfAgcPaletteSpanDb,
-                m_wfActiveHighThreshold - m_wfActiveLowThreshold);
-            const float mid = 0.5f * (dataMin + dataMax);
-            m_wfActiveLowThreshold  = mid - 0.5f * span;
-            m_wfActiveHighThreshold = mid + 0.5f * span;
-        }
+        fitThresholdsToData(m_wfActiveLowThreshold,
+                            m_wfActiveHighThreshold, dataMin, dataMax);
     }
+}
+
+void SpectrumWidget::fitThresholdsToData(float& low, float& high,
+                                         float dataMin, float dataMax)
+{
+    if (!std::isfinite(dataMin) || !std::isfinite(dataMax)
+        || !std::isfinite(low) || !std::isfinite(high)) {
+        return;
+    }
+    // Nur der voellig verfehlte Fall. Beruehrt das Fenster die Daten
+    // auch nur teilweise, bleibt es stehen -- genau dafuer sind die
+    // Schieber da.
+    if (high > dataMin && low < dataMax) {
+        return;
+    }
+    const float span = std::max(kWfAgcPaletteSpanDb, high - low);
+    const float mid  = 0.5f * (dataMin + dataMax);
+    low  = mid - 0.5f * span;
+    high = mid + 0.5f * span;
 }
 
 // ---- Waterfall row push ----
