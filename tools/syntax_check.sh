@@ -35,19 +35,123 @@
 # Modification history (NereusSDR):
 #   2026-08-10 — Created for NereusSDR by Martin Fischer, AI-assisted
 #                 via Anthropic Claude (Cowork).
+#   2026-08-15 — Find Qt without being told: qmake -query, then a flat
+#                 include tree, then macOS frameworks (for which a flat
+#                 tree of symlinks is built under .cache/qtinc).
+#                 NEREUS_QTINC still overrides everything.
 
 set -u -o pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 ROOT="$PWD"
 
-# Where the Qt headers were checked out. Overridable, because this path
-# is a property of one machine and the script is not.
-QTINC="${NEREUS_QTINC:-/sessions/relaxed-zealous-mendel/tmp/qtinc}"
+# ── Finding the Qt headers ───────────────────────────────────────────
+#
+# This used to be one hard-coded path from the machine the script was
+# written on. On macOS it could not work at all, and the failure was the
+# script's best behaviour rather than its worst: it refused and said so,
+# instead of compiling against nothing and reporting a clean run.
+#
+# But "refuses on your machine" is only one step better than "lies on
+# your machine". Homebrew installs Qt as FRAMEWORKS —
+#
+#     /opt/homebrew/lib/QtCore.framework/Headers/QObject
+#
+# — where a Linux qtbase tree has
+#
+#     /usr/include/qt6/QtCore/QObject
+#
+# and -I wants the second shape. So on macOS the script builds itself a
+# flat tree of symlinks, one per framework, and points -I at that. The
+# links are rebuilt on every run: it costs milliseconds, and a stale
+# link into a Qt that Homebrew has since upgraded away is exactly the
+# kind of quiet wrongness this script exists to prevent.
+#
+# The shim lives in .cache/ — already gitignored, and on the same disk
+# as the code, for the reason in the header comment.
+#
+# Order: an explicit NEREUS_QTINC always wins; then a flat tree, which
+# is what Linux and a self-built Qt give; then frameworks.
 
-if [ ! -d "$QTINC/QtCore" ]; then
-    echo "syntax_check: no Qt headers at $QTINC" >&2
-    echo "  set NEREUS_QTINC to a qtbase include tree." >&2
+QTINC=""
+
+# 1. The operator's own answer. Said out loud when it is set and does
+#    NOT hold Qt: falling through to auto-detection without a word
+#    would run the check against a Qt the operator did not choose, and
+#    a typo in an exported variable is a hard thing to see afterwards.
+if [ -n "${NEREUS_QTINC:-}" ]; then
+    if [ -d "${NEREUS_QTINC}/QtCore" ]; then
+        QTINC="$NEREUS_QTINC"
+    else
+        echo "syntax_check: NEREUS_QTINC=$NEREUS_QTINC has no QtCore —" >&2
+        echo "  ignoring it and looking for Qt myself." >&2
+    fi
+fi
+
+# Ask Qt itself where it put things, and keep the usual suspects as a
+# fallback for a machine with no qmake on PATH.
+qt_headers=""
+qt_libs=""
+if [ -z "$QTINC" ]; then
+    for q in qmake6 qmake; do
+        if command -v "$q" >/dev/null 2>&1; then
+            qt_headers="$("$q" -query QT_INSTALL_HEADERS 2>/dev/null)"
+            qt_libs="$("$q" -query QT_INSTALL_LIBS 2>/dev/null)"
+            break
+        fi
+    done
+fi
+
+# 2. A flat include tree.
+if [ -z "$QTINC" ]; then
+    for cand in "$qt_headers" \
+                /usr/include/qt6 /usr/include/x86_64-linux-gnu/qt6 \
+                /usr/local/include/qt6; do
+        if [ -n "$cand" ] && [ -d "$cand/QtCore" ]; then
+            QTINC="$cand"
+            break
+        fi
+    done
+fi
+
+# 3. macOS frameworks — build the flat tree the compiler wants.
+if [ -z "$QTINC" ]; then
+    for libdir in "$qt_libs" /opt/homebrew/lib /usr/local/lib \
+                  /opt/homebrew/opt/qt/lib /usr/local/opt/qt/lib; do
+        [ -n "$libdir" ] || continue
+        [ -d "$libdir/QtCore.framework/Headers" ] || continue
+
+        shim="$ROOT/.cache/qtinc"
+        rm -rf "$shim"
+        mkdir -p "$shim" || break
+        for fw in "$libdir"/*.framework; do
+            [ -d "$fw/Headers" ] || continue
+            ln -sfn "$fw/Headers" "$shim/$(basename "$fw" .framework)"
+        done
+        # Qt's private rhi headers, when this Qt ships them. Homebrew
+        # does not, which is why this is conditional rather than an
+        # unconditional link: a dangling one would put an -I on the
+        # command line that silently resolves nothing, and the first
+        # symptom would be a confusing error in a file that includes
+        # <rhi/qrhi.h>.
+        if [ -d "$libdir/QtGui.framework/Headers/rhi" ]; then
+            ln -sfn "$libdir/QtGui.framework/Headers/rhi" "$shim/rhi"
+        fi
+
+        if [ -d "$shim/QtCore" ]; then
+            QTINC="$shim"
+            echo "syntax_check: Qt frameworks at $libdir" >&2
+            echo "  flat tree built at ${shim#$ROOT/}" >&2
+        fi
+        break
+    done
+fi
+
+if [ -z "$QTINC" ] || [ ! -d "$QTINC/QtCore" ]; then
+    echo "syntax_check: no Qt headers found." >&2
+    echo "  Looked at: qmake -query, /usr/include/qt6," >&2
+    echo "  and framework layouts under /opt/homebrew/lib." >&2
+    echo "  Set NEREUS_QTINC to a qtbase include tree to override." >&2
     exit 2
 fi
 
@@ -80,7 +184,16 @@ fi
 
 files=("$@")
 if [ "${1:-}" = "--all-changed" ]; then
-    mapfile -t files < <(git diff --name-only HEAD -- '*.cpp' '*.cc')
+    # A while-read loop, not `mapfile`: that is a bash 4 builtin, and
+    # macOS ships bash 3.2. `--all-changed` therefore failed here with
+    # "mapfile: command not found" and then reported the WORD
+    # "--all-changed" as a missing file — one error, exit non-zero, and
+    # the whole changed set silently unchecked. Found 2026-08-15, the
+    # first time the flag was used on a Mac.
+    files=()
+    while IFS= read -r f; do
+        [ -n "$f" ] && files+=("$f")
+    done < <(git diff --name-only HEAD -- '*.cpp' '*.cc')
     if [ "${#files[@]}" -eq 0 ]; then
         echo "syntax_check: nothing changed."
         exit 0
