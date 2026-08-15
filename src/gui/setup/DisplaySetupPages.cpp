@@ -2014,10 +2014,27 @@ void GridScalesPage::buildUI()
     // Thetis: setup.designer.cs:34745 (udDisplayGridMax) — rewritten
     // Thetis original: "Signal level at top of display in dB."
     m_dbMaxSpin->setToolTip(QStringLiteral("Signal level at the top of the display in dB. Edits the current band's grid slot — band shown in the row label and the section header above."));
-    connect(m_dbMaxSpin, qOverload<int>(&QSpinBox::valueChanged),
-            this, [this](int v) {
+    // ── Erst beim Abschluss, nicht bei jedem Tastendruck ─────────────
+    //
+    // valueChanged feuert je Tastendruck. Wer -190 eintippt, erzeugt
+    // nacheinander -1, -19, -190, und jeder Zwischenwert lief bis 2026-08-15
+    // durch setDbmRange bis in die Wasserfallschwellen -- bei diesem
+    // Betreiber, weil DisplayWfUseSpectrumMinMax an ist. Landet die obere
+    // Schwelle dabei kurz auf oder unter dem Rauschflur, liegt jeder Punkt
+    // der Zeile darueber, und im Schema Enhanced ist die Palettenspitze rot:
+    // ein durchgehend rotes Band ueber die volle Breite, je geaendertem Feld
+    // eines.
+    //
+    // Auffallen konnte das erst, seit levelChanged verbunden ist -- vorher
+    // kam ueberhaupt nichts an. Derselbe Fehlertyp wie die per-Rahmen-
+    // Mutation aus #230, eine Ebene hoeher: hier war es je Tastendruck.
+    //
+    // editingFinished feuert bei Enter und beim Verlassen des Feldes, also
+    // genau einmal mit dem Wert, den der Betreiber gemeint hat.
+    connect(m_dbMaxSpin, &QAbstractSpinBox::editingFinished,
+            this, [this]() {
         if (auto* pan = firstPan(model())) {
-            pan->setPerBandDbMax(pan->band(), v);
+            pan->setPerBandDbMax(pan->band(), m_dbMaxSpin->value());
         }
     });
     m_dbMaxRowLabel = new QLabel(QStringLiteral("dB Max (per band):"), gridGroup);
@@ -2030,10 +2047,10 @@ void GridScalesPage::buildUI()
     // Thetis: setup.designer.cs:34714 (udDisplayGridMin) — rewritten
     // Thetis original: "Signal Level at bottom of display in dB."
     m_dbMinSpin->setToolTip(QStringLiteral("Signal level at the bottom of the display in dB. Edits the current band's grid slot — band shown in the row label and the section header above."));
-    connect(m_dbMinSpin, qOverload<int>(&QSpinBox::valueChanged),
-            this, [this](int v) {
+    connect(m_dbMinSpin, &QAbstractSpinBox::editingFinished,
+            this, [this]() {
         if (auto* pan = firstPan(model())) {
-            pan->setPerBandDbMin(pan->band(), v);
+            pan->setPerBandDbMin(pan->band(), m_dbMinSpin->value());
         }
     });
     m_dbMinRowLabel = new QLabel(QStringLiteral("dB Min (per band):"), gridGroup);
