@@ -6097,6 +6097,13 @@ nereus_add_test(tst_radio_model_max_slices)
 # Design: docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §12.
 nereus_add_test(tst_settings_schema_v6_migration)
 
+# ── v9: der dB-Bereich wird geweitet, aber nicht ueber den Betreiber hinweg ──
+# Der eigentliche Gegenstand ist nicht die neue Zahl, sondern die alte: ein
+# selbst eingestellter Bereich (-73/-138) darf nicht stillschweigend
+# verschwinden. Dazu die Verwechslungsgefahr DisplayGridMax_1 (Panadapter,
+# wird gezogen) gegen DisplayGridMax_20m (Bandgedaechtnis, bleibt).
+nereus_add_test(tst_settings_schema_v9_dbrange)
+
 # Phase 3F Sub-Epic B Task 1: SliceConfig + DdcAssignment shared structs.
 # 2 tests: slice_config_struct_has_required_fields,
 #          ddc_assignment_struct_has_required_fields.

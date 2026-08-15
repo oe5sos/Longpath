@@ -136,7 +136,16 @@ constexpr auto kInstrumentLimit   = "#a86b6d";  // wo es zu viel wird
 // Die Bandkante bleibt rot und wird hier NICHT gedämpft: sie sagt, wo
 // das Senden aufhört, erlaubt zu sein. Eine Sicherheitsmarke leiser zu
 // drehen, weil sie auffällt, hieße das Merkmal abzuschaffen.
-constexpr auto kSpectrumTrace     = "#6f96b8";  // Kurve und Füllung
+// Warm, nicht blau. Der Hausstil trennt nach Aufgabe, nicht nach
+// Geschmack: „Blau = anfassbar. Warm = gemessen." Die Spektrumkurve ist
+// das Gemessene schlechthin, und sie stand als einziger Messwert im
+// Programm auf einem Blauton. HAUSSTIL.md führt beide in einer Zeile:
+// „Messwert / Kurve #c2924f".
+//
+// Die Rolle heißt weiter „trace" und nicht „measured", damit eine
+// Theme-Datei die Kurve getrennt vom übrigen Bernstein setzen kann —
+// nur ihr Ausgangston ist jetzt der Messwert-Ton.
+constexpr auto kSpectrumTrace     = "#c2924f";  // Kurve und Füllung
 constexpr auto kSpectrumGrid      = "#8a8f96";  // Gitterlinien (Alpha im Code)
 constexpr auto kSpectrumGridText  = "#9aa0a8";  // Frequenz- und dBm-Skala
 

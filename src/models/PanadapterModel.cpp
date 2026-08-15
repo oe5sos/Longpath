@@ -75,11 +75,37 @@ namespace NereusSDR {
 
 namespace {
 
-// Thetis uniform per-band default (console.cs:14242-14436). All 14 bands
-// ship with the same values; per-band storage exists so users can
-// customise, not because Thetis hand-tunes each band.
-constexpr int kThetisDefaultDbMax = -40;
-constexpr int kThetisDefaultDbMin = -140;
+// ── Ein Besitzer für den dargestellten Bereich ───────────────────────
+//
+// Hier standen die Thetis-Werte (−40 / −140, console.cs:14242-14436),
+// und SpectrumWidget hatte seine eigenen (−48 / 68 → −116 / −48). Zwei
+// Vorgaben für dieselbe Zahl, in zwei Klassen, unter zwei Schlüsseln:
+// das Widget schrieb DisplayGridMax/Min, dieses Modell
+// DisplayGridMax_<band>. Welche galt, hing davon ab, wer zuletzt schrieb
+// — und gezeichnet hat immer das Widget.
+//
+// Entscheidung des Betreibers, 2026-08-15: das Widget führt, dieses
+// Modell folgt. Der Bandwert wird weiter je Band gespeichert (das ist
+// das Bandgedächtnis und bleibt), aber wo für ein Band noch nichts
+// steht, kommt der Startwert aus dem Schlüssel des Widgets statt aus
+// einer zweiten Vorgabe.
+//
+// Die Zahlen selbst stehen in SpectrumWidget.h und sind dort begründet.
+constexpr int kDefaultDbMax = -30;
+constexpr int kDefaultDbMin = -190;
+
+/// Der Bereich, mit dem ein Band startet, das noch keinen eigenen hat:
+/// was das Widget zuletzt gespeichert hat, sonst die Vorgabe.
+BandGridSettings leadingGrid()
+{
+    AppSettings& s = AppSettings::instance();
+    const QVariant maxV = s.value(QStringLiteral("DisplayGridMax"));
+    const QVariant minV = s.value(QStringLiteral("DisplayGridMin"));
+    return BandGridSettings{
+        maxV.isValid() ? qRound(maxV.toDouble()) : kDefaultDbMax,
+        minV.isValid() ? qRound(minV.toDouble()) : kDefaultDbMin,
+    };
+}
 constexpr int kDefaultGridStep    = 10;  // NereusSDR divergence (§10).
 
 QString gridMaxKey(Band b)      { return QStringLiteral("DisplayGridMax_") + bandKeyName(b); }
@@ -93,16 +119,16 @@ QString bandNFKey(Band b)       { return QStringLiteral("DisplayBandNFEstimate_"
 PanadapterModel::PanadapterModel(QObject* parent)
     : QObject(parent)
 {
-    // Seed every band slot with Thetis uniform defaults before loading
-    // persisted overrides. This matches Q4 resolution (plan §5.3): existing
-    // users will see the grid shift from NereusSDR's -20/-160 to Thetis's
-    // -40/-140 on first launch after upgrade.
+    // Seed every band slot from the leading value before loading
+    // persisted overrides — siehe leadingGrid(). Wer schon einen eigenen
+    // Bandwert gespeichert hat, behaelt ihn: die Schleife legt nur den
+    // Ausgangswert, loadPerBandGridFromSettings() schreibt darueber.
     // Per-band display grid: HF amateur + GEN/WWV/XVTR only.  SWL bands
     // (Phase 3L Band enum extension, indices >= Band::SwlFirst) have no
     // panadapter buttons and inherit the GEN grid slot when tuned.
     for (int i = 0; i < static_cast<int>(Band::SwlFirst); ++i) {
         const Band b = static_cast<Band>(i);
-        m_perBandGrid.insert(b, BandGridSettings{ kThetisDefaultDbMax, kThetisDefaultDbMin });
+        m_perBandGrid.insert(b, leadingGrid());
     }
     loadPerBandGridFromSettings();
 
@@ -180,7 +206,7 @@ void PanadapterModel::setBand(Band b)
 
 BandGridSettings PanadapterModel::perBandGrid(Band b) const
 {
-    return m_perBandGrid.value(b, BandGridSettings{ -40, -140 });
+    return m_perBandGrid.value(b, leadingGrid());
 }
 
 void PanadapterModel::setPerBandDbMax(Band b, int dbMax)
@@ -257,7 +283,7 @@ void PanadapterModel::setGridStep(int step)
 
 void PanadapterModel::applyBandGrid(Band b)
 {
-    const BandGridSettings s = m_perBandGrid.value(b, BandGridSettings{ kThetisDefaultDbMax, kThetisDefaultDbMin });
+    const BandGridSettings s = m_perBandGrid.value(b, leadingGrid());
     setdBmCeiling(s.dbMax);
     setdBmFloor(s.dbMin);
 }
@@ -274,7 +300,7 @@ void PanadapterModel::loadPerBandGridFromSettings()
         const QVariant minV  = s.value(gridMinKey(b));
         const QVariant cfV   = s.value(clarityFloorKey(b));
         const QVariant nfV   = s.value(bandNFKey(b));
-        BandGridSettings slot = m_perBandGrid.value(b, BandGridSettings{ kThetisDefaultDbMax, kThetisDefaultDbMin });
+        BandGridSettings slot = m_perBandGrid.value(b, leadingGrid());
         if (maxV.isValid())  { slot.dbMax          = maxV.toInt();   }
         if (minV.isValid())  { slot.dbMin          = minV.toInt();   }
         if (cfV.isValid())   { slot.clarityFloor   = cfV.toFloat();  }

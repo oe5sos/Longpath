@@ -366,7 +366,7 @@ int main(int argc, char* argv[])
     // v8 zieht die FFT-Größe von 4096 auf 16384, sofern noch der alte
     // Vorgabewert steht — 47 Hz je Bin waren weniger Messwerte als das
     // Fenster Pixel hat.
-    NereusSDR::AppSettings::instance().ensureSettingsAtVersion(8);
+    NereusSDR::AppSettings::instance().ensureSettingsAtVersion(9);
 
     // Restore logging category toggles from settings
     NereusSDR::LogManager::instance().loadSettings();

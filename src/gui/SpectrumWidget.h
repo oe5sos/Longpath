@@ -1777,8 +1777,23 @@ private:
     // loadSettings runs, and the slider in SetupDialog briefly shows
     // the stale value. Calibrated 2026-04-30 against a residential
     // HF noise floor; see loadSettings comment for rationale.
-    float  m_refLevel{-48.0f};        // top of display (dBm)
-    float  m_dynamicRange{68.0f};     // range in dB (bottom = refLevel - dynamicRange)
+    // ── Der dargestellte Bereich ─────────────────────────────────────
+    //
+    // War −48 / 68, also −116 bis −48. Zu eng und zu hoch: bei 16384
+    // Bins auf 192 kHz sind 11,7 Hz je Bin, thermisch also
+    // −174 + 10·log10(11,7) ≈ −163 dBm, und mit der Rauschzahl des
+    // Empfaengers landet der Flur bei etwa −148. Der lag damit UNTER dem
+    // unteren Bildrand, waehrend die 68 dB darueber vom Rauschen
+    // ausgefuellt wurden.
+    //
+    // Jetzt −30 bis −190. Der Flur sitzt damit auf gut einem Viertel der
+    // Hoehe — ein schmales Band unten statt einer gefuellten Flaeche.
+    //
+    // Bewusst nicht die Thetis-Werte (−40 / −140): mit einem Boden bei
+    // −140 faellt derselbe Flur aus dem Bild. Eine Anzeigevorgabe gehoert
+    // dem Betreiber, nicht console.cs.
+    float  m_refLevel{-30.0f};        // top of display (dBm)
+    float  m_dynamicRange{160.0f};    // range in dB (bottom = refLevel - dynamicRange)
 
     // ---- Waterfall ----
     QImage m_waterfall;               // ring buffer (Format_RGB32)
@@ -1860,7 +1875,10 @@ private:
     // ---- Spectrum fill ----
     // From AetherSDR defaults
     QColor m_fillColor{0x00, 0xe5, 0xff};  // cyan
-    float  m_fillAlpha{0.70f};
+    // 22 % an der Kurve, 0 an der Grundlinie — docs/design/HAUSSTIL.md
+    // §Weiche Uebergaenge: "duenne Linie (1,6 px) plus Verlauf darunter,
+    // 22 % -> 0 zur Grundlinie. Gewicht ohne Lautstaerke."
+    float  m_fillAlpha{0.22f};
     bool   m_panFill{true};
 
     // ---- Phase 3G-8 commit 3: spectrum renderer state ----
@@ -1936,8 +1954,10 @@ private:
     QPainterPath m_specFillPathScratch;
     QPainterPath m_specPeakPathScratch;
 
-    float       m_lineWidth{1.5f};
-    bool        m_gradientEnabled{false};
+    float       m_lineWidth{1.6f};
+    // An: die Fuellung IST der Hausstil, nicht eine Zutat. Aus wirkte die
+    // Kurve als blosser Strich ueber dem Rauschteppich.
+    bool        m_gradientEnabled{true};
 
     // Ported from Thetis Display.RX1DisplayCalOffset (display.cs:1372).
     float       m_dbmCalOffset{0.0f};

@@ -822,9 +822,12 @@ void SpectrumWidget::loadSettings()
     // lit up the waterfall floor. Shifting the entire reference plane
     // down 12 dB gives a clean "noise sits low" first impression.
     // Dynamic range (68 dB grid, 60 dB waterfall) is unchanged.
-    m_refLevel       = readFloat(QStringLiteral("DisplayGridMax"), -48.0f);
-    m_dynamicRange   = readFloat(QStringLiteral("DisplayGridMax"), -48.0f)
-                     - readFloat(QStringLiteral("DisplayGridMin"), -116.0f);
+    // Vorgaben wie in SpectrumWidget.h (m_refLevel / m_dynamicRange) —
+    // die beiden Zahlenpaare muessen uebereinstimmen, sonst haengt der
+    // Startwert davon ab, ob je etwas gespeichert wurde.
+    m_refLevel       = readFloat(QStringLiteral("DisplayGridMax"), -30.0f);
+    m_dynamicRange   = readFloat(QStringLiteral("DisplayGridMax"), -30.0f)
+                     - readFloat(QStringLiteral("DisplayGridMin"), -190.0f);
     m_spectrumFrac   = readFloat(QStringLiteral("DisplaySpectrumFrac"), 0.40f);
 
     // Phase 3G-12: persist the spectrum zoom level (visible bandwidth)
@@ -844,7 +847,7 @@ void SpectrumWidget::loadSettings()
     // above stay untouched (issue #230 fix).
     m_wfActiveHighThreshold = m_wfHighThreshold;
     m_wfActiveLowThreshold  = m_wfLowThreshold;
-    m_fillAlpha      = readFloat(QStringLiteral("DisplayFftFillAlpha"), 0.70f);
+    m_fillAlpha      = readFloat(QStringLiteral("DisplayFftFillAlpha"), 0.22f);
     m_panFill        = readBool(QStringLiteral("DisplayPanFill"), true);
 
     m_ctunEnabled    = readBool(QStringLiteral("DisplayCtunEnabled"), true);
@@ -901,10 +904,10 @@ void SpectrumWidget::loadSettings()
     // collision with the retired key and with DisplayActivePeakHoldDurationMs
     // which belongs to the new ActivePeakHold system introduced in Task 2.5).
     m_peakHoldDelayMs  = readInt(QStringLiteral("DisplayPeakHoldResetMs"), 2000);
-    m_lineWidth        = readFloat(QStringLiteral("DisplayLineWidth"), 1.5f);
+    m_lineWidth        = readFloat(QStringLiteral("DisplayLineWidth"), 1.6f);
     m_dbmCalOffset     = readFloat(QStringLiteral("DisplayCalOffset"), 0.0f);
     const bool peakOn = readBool(QStringLiteral("DisplayPeakHoldEnabled"), false);
-    const bool gradOn = readBool(QStringLiteral("DisplayGradientEnabled"), false);
+    const bool gradOn = readBool(QStringLiteral("DisplayGradientEnabled"), true);
     m_gradientEnabled = gradOn;
     // Delay the peak hold enable path until the timer infra is ready.
     if (peakOn) {

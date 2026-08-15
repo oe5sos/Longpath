@@ -1307,6 +1307,61 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
         }
     }
 
+    // v8 → v9: der dargestellte dB-Bereich wird geweitet.
+    //
+    // −48 / −116 waren 68 dB, und sie lagen zu hoch. Bei 16384 Bins auf
+    // 192 kHz sind 11,7 Hz je Bin, thermisch also −174 + 10·log10(11,7)
+    // ≈ −163 dBm; mit der Rauschzahl des Empfängers landet der Flur bei
+    // etwa −148 und damit UNTER dem unteren Bildrand, während die 68 dB
+    // darüber vom Rauschen ausgefüllt wurden. Neu: −30 / −190.
+    //
+    // Wieder nur, wer noch auf dem alten Vorgabewert steht — und hier
+    // ist das keine Höflichkeit, sondern der ausdrückliche Wunsch:
+    // ein selbst eingestellter Bereich darf nicht stillschweigend
+    // verschwinden. Wer eigene Werte hat, behält sie und sieht von
+    // dieser Änderung nichts, bis er in Setup → Display einmal neu
+    // einstellt.
+    //
+    // Die Schlüssel tragen je Panadapter einen Index (DisplayGridMax,
+    // DisplayGridMax_1, …). Die per-Band-Schlüssel des PanadapterModel
+    // heissen DisplayGridMax_<bandname> und werden bewusst NICHT
+    // angefasst: das ist das Bandgedächtnis, dort steht nie ein
+    // Vorgabewert, sondern immer etwas Gemessenes oder Gewähltes.
+    if (storedVersion < 9 && currentVersion >= 9) {
+        struct Pull { const char* prefix; double oldDefault; double newDefault; };
+        static const Pull kPulls[] = {
+            { "DisplayGridMax", -48.0,  -30.0  },
+            { "DisplayGridMin", -116.0, -190.0 },
+        };
+        int pulled = 0;
+        for (const QString& key : allKeys()) {
+            for (const Pull& p : kPulls) {
+                if (!key.startsWith(QLatin1String(p.prefix))) { continue; }
+                // Nur der blanke Schlüssel und die Pan-Indizes (_1, _2 …).
+                // Ein Bandname hinter dem Unterstrich ist Bandgedächtnis.
+                const QString tail = key.mid(int(qstrlen(p.prefix)));
+                if (!tail.isEmpty()) {
+                    if (!tail.startsWith(QLatin1Char('_'))) { continue; }
+                    bool isIndex = false;
+                    tail.mid(1).toInt(&isIndex);
+                    if (!isIndex) { continue; }
+                }
+                bool ok = false;
+                const double v = value(key).toString().toDouble(&ok);
+                if (!ok || !qFuzzyCompare(v + 1.0, p.oldDefault + 1.0)) { continue; }
+                setValue(key, QString::number(p.newDefault));
+                ++pulled;
+            }
+        }
+        if (pulled > 0) {
+            qDebug() << "Schema v9:" << pulled
+                     << "dB-Bereichswert(e) auf -30/-190 gezogen.";
+        } else {
+            qDebug() << "Schema v9: eigener dB-Bereich gefunden, unveraendert"
+                        " gelassen. Setup -> Display, um -30/-190 zu uebernehmen.";
+        }
+    }
+
     setValue(versionKey, QString::number(currentVersion));
 }
 
