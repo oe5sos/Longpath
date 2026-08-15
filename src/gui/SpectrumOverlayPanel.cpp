@@ -418,6 +418,15 @@ SpectrumOverlayPanel::SpectrumOverlayPanel(QWidget* parent)
 
 bool SpectrumOverlayPanel::eventFilter(QObject* obj, QEvent* event)
 {
+    // Wieviel Platz die Spalte hat, haengt an der Hoehe des
+    // Kurvenbereichs -- die aendert sich mit jedem Fenstergriff.
+    // updateLayout() lief bisher nur beim Bau und beim Ein-/Ausklappen,
+    // also blieb eine einmal getroffene Ueberlauf-Entscheidung fuer die
+    // ganze Sitzung stehen.
+    if (obj == parentWidget() && event->type() == QEvent::Resize) {
+        updateLayout();
+    }
+
     // Auto-close flyout on outside click (from AetherSDR)
     if (event->type() == QEvent::MouseButtonPress && m_activeFlyout) {
         auto* me = static_cast<QMouseEvent*>(event);
@@ -501,10 +510,20 @@ void SpectrumOverlayPanel::updateLayout()
     // dem Spektrum liegen Wasserfall, Bandbalken und Frequenzskala, und
     // ueber denen hat die Spalte nichts zu suchen — das war der Befund.
     const auto* sw = qobject_cast<const SpectrumWidget*>(parentWidget());
-    const int avail = sw ? sw->spectrumAreaHeight() - y() - kPad * 2
-                         : (parentWidget()
-                                ? parentWidget()->height() - y() - kPad * 2
-                                : 100000);
+    int avail = sw ? sw->spectrumAreaHeight() - y() - kPad * 2
+                   : (parentWidget()
+                          ? parentWidget()->height() - y() - kPad * 2
+                          : 100000);
+
+    // updateLayout() laeuft auch beim Bau, und da hat das Elternwidget
+    // seine Groesse noch nicht. Ein spectrumAreaHeight() von 0 haette
+    // sonst JEDE Gruppe hinter das "..." geschoben -- und weil die
+    // Entscheidung ohne die Groessenaenderung unten nie wiederholt
+    // wurde, waere sie fuer die ganze Sitzung stehen geblieben.
+    //
+    // Zu frueh gefragt heisst nicht "kein Platz", sondern "noch nicht
+    // bekannt". In dem Fall alles zeigen; der Resize korrigiert.
+    if (avail < kBtnH * 2) { avail = 100000; }
 
     int visibleBtnCount = m_menuBtns.size();
     {
@@ -538,14 +557,26 @@ void SpectrumOverlayPanel::updateLayout()
     int y = kPad + kBtnH + kGroupGap;
     int headIdx = 0;
     for (int i = 0; i < m_menuBtns.size(); ++i) {
-        if (i >= visibleBtnCount) {
-            m_menuBtns[i]->setVisible(false);
-            continue;
-        }
-        // Steht vor diesem Knopf eine Versalzeile?
+        // Die Versalzeile MUSS vor der Sichtbarkeitspruefung behandelt
+        // werden. Stand sie dahinter, uebersprang der continue-Zweig sie
+        // mit: Ueberschriften ausgeblendeter Gruppen wurden weder
+        // versteckt noch bewegt, blieben also auf ihrer Erstposition
+        // (0, 0) liegen und wurden mit dem Panel sichtbar -- alle vier
+        // uebereinander, oben links, als unlesbares Gemisch. Genau so
+        // gemeldet am 2026-08-15.
         const bool startsGroup =
             headIdx < static_cast<int>(std::size(kGroupHeads))
             && kGroupHeads[headIdx].beforeIndex == i;
+        const bool groupShown = (i < visibleBtnCount);
+
+        if (startsGroup && !groupShown) {
+            m_groupHeads[headIdx]->setVisible(false);
+            ++headIdx;
+        }
+        if (!groupShown) {
+            m_menuBtns[i]->setVisible(false);
+            continue;
+        }
 
         if (startsGroup) {
             QLabel* head = m_groupHeads[headIdx];
