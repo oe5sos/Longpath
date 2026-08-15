@@ -8926,6 +8926,39 @@ void MainWindow::wireSliceToSpectrum()
         }
     });
 
+    // --- PanadapterModel → dBm range: die Richtung, die nie existierte ---
+    //
+    // 2026-08-15 am Gerät: dB Max −30 und dB Min −190 in Setup → Display
+    // eingetragen, und die Skala im Hauptfenster blieb stehen.
+    //
+    // levelChanged wurde an zwei Stellen ausgelöst und im ganzen
+    // Quellbaum von niemandem gehört. Die Setup-Seite schreibt ins
+    // Modell, gezeichnet wird aus SpectrumWidget, und dazwischen war
+    // nichts. Aufgefallen ist es erst, als die beiden verschiedene
+    // Vorgaben bekamen — vorher standen sie zufällig nah beieinander und
+    // der fehlende Draht sah aus wie ein träges Feld.
+    //
+    // Keine Rückkopplung: setDbmRange() löst dbmRangeChangeRequested
+    // nicht aus (das tun nur Ziehen und Radschritt, Zeilen 7309 / 7912 /
+    // 8017), der Weg endet also hier. Ein Zug an der Skala läuft
+    // Widget → Modell → Widget und kommt beim zweiten Mal auf denselben
+    // Zahlen an.
+    if (m_radioModel && !m_radioModel->panadapters().isEmpty()) {
+        PanadapterModel* pan = m_radioModel->panadapters().first();
+        connect(pan, &PanadapterModel::levelChanged,
+                this, [this, pan]() {
+            if (auto* sw = activeSpectrumWidget()) {
+                sw->setDbmRange(static_cast<float>(pan->dBmFloor()),
+                                static_cast<float>(pan->dBmCeiling()));
+                // setDbmRange speichert nicht selbst — siehe die Notiz
+                // dort. Das Modell hat seinen Bandeintrag schon
+                // geschrieben; hier geht es um den Schlüssel des Widgets,
+                // der beim nächsten Start gelesen wird.
+                sw->requestSettingsSave();
+            }
+        });
+    }
+
     // Set initial lock state
     m_radioModel->receiverManager()->setDdcFrequencyLocked(
         activeSpectrumWidget()->ctunEnabled());

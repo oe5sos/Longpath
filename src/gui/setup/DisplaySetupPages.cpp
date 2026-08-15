@@ -1931,6 +1931,29 @@ void GridScalesPage::loadFromRenderer()
     if (!pan) { return; }
     QSignalBlocker b2(m_dbStepSpin);
     m_dbStepSpin->setValue(pan->gridStep());
+
+    // ── Der Strich, der nie wegging ──────────────────────────────────
+    //
+    // 2026-08-15 am Gerät: über den Feldern stand dauerhaft
+    // "Editing per-band grid: —", also kein Bandname.
+    //
+    // Die Verbindung auf bandChanged wurde in buildUI() angelegt, und
+    // zwar unter `if (auto* pan = firstPan(model()))`. Steht beim Bau der
+    // Seite noch kein Panadapter bereit — und der entsteht erst mit der
+    // Verbindung zum Gerät —, wird sie NIE angelegt, auch nicht später.
+    // Der Strich blieb dann für den Rest der Sitzung stehen.
+    //
+    // Deshalb hier, wo es einen Panadapter nachweislich gibt.
+    //
+    // Erst trennen, dann verbinden, statt Qt::UniqueConnection: das
+    // greift laut Qt-Dokumentation nur bei Zeigern auf Elementfunktionen
+    // und schweigend NICHT bei Lambdas — die Verbindung hätte sich bei
+    // jedem Öffnen des Dialogs vervielfacht, und applyBandSlot wäre je
+    // Bandwechsel mehrfach gelaufen.
+    disconnect(pan, &PanadapterModel::bandChanged, this, nullptr);
+    connect(pan, &PanadapterModel::bandChanged,
+            this, [this, pan](Band) { applyBandSlot(pan); });
+
     applyBandSlot(pan);
 }
 
