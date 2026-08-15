@@ -68,15 +68,15 @@ static const char* kAmberButtonStyle =
 
 static const char* kComboStyle =
     "QComboBox {"
-    "  background: #152535;"
+    "  background: #1a2a3a;"
     "  border: 1px solid #203040;"
     "  border-radius: 3px;"
     "  color: #c8d8e8;"
     "  padding: 2px 6px;"
     "}"
     "QComboBox::drop-down { border: none; }"
-    "QComboBox QAbstractItemView { background: #152535; color: #c8d8e8; "
-    "  selection-background-color: #1d3045; }";
+    "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
+    "  selection-background-color: #203040; }";
 
 } // namespace
 

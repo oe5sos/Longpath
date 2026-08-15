@@ -26,3 +26,7 @@ third_party/deepfilter/lib/
 third_party/deepfilter/models/*.tar.gz
 .aether-sha
 build-tests/
+
+# Persoenliche Theme-Dateien. Design gehoert dem Betreiber, nicht dem Repo.
+# Siehe docs/design/ROADMAP.md.
+themes/

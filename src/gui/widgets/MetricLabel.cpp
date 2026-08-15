@@ -44,7 +44,7 @@ void MetricLabel::applyStyle()
         "QLabel#MetricLabel_Label { color: #607080;"
         " font-family: 'SF Mono', Menlo, monospace;"
         " font-size: 9px; font-weight: 500; letter-spacing: 0.5px; }"
-        "QLabel#MetricLabel_Value { color: #a0b8c8;"
+        "QLabel#MetricLabel_Value { color: #8aa8c0;"
         " font-family: 'SF Mono', Menlo, monospace;"
         " font-size: 11px; font-weight: 600; }"
     ));

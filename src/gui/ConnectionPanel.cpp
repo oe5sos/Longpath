@@ -362,7 +362,7 @@ void ConnectionPanel::buildUI()
     m_radioTable->setContextMenuPolicy(Qt::CustomContextMenu);
     m_radioTable->setStyleSheet(QStringLiteral(
         "QTableWidget {"
-        "  background: #0a0a15;"
+        "  background: #0a0a14;"
         "  color: #c8d8e8;"
         "  border: 1px solid #203040;"
         "  font-family: Consolas, 'Courier New', monospace;"
@@ -374,11 +374,11 @@ void ConnectionPanel::buildUI()
         "  border: none;"
         "}"
         "QTableWidget::item:selected {"
-        "  background: #005578;"
+        "  background: #205070;"
         "  color: #ffffff;"
         "}"
         "QHeaderView::section {"
-        "  background: #12202e;"
+        "  background: #0a1a28;"
         "  color: #8090a0;"
         "  border: none;"
         "  border-right: 1px solid #203040;"
@@ -439,8 +439,8 @@ void ConnectionPanel::buildUI()
         "QComboBox { background: #1a2a3a; color: #c8d8e8; border: 1px solid #304050;"
         "  border-radius: 3px; padding: 4px 8px; }"
         "QComboBox::drop-down { border: none; }"
-        "QComboBox QAbstractItemView { background: #12202e; color: #c8d8e8;"
-        "  selection-background-color: #005578; }"));
+        "QComboBox QAbstractItemView { background: #0a1a28; color: #c8d8e8;"
+        "  selection-background-color: #205070; }"));
     connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ConnectionPanel::onModelComboChanged);
     modelRow->addWidget(modelLabel);
@@ -502,7 +502,7 @@ void ConnectionPanel::buildUI()
         "  border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold;"
         "}"
         "QPushButton:hover { background: #0096b7; }"
-        "QPushButton:disabled { background: #303850; color: #606878; }");
+        "QPushButton:disabled { background: #2a3040; color: #556070; }");
 
     static const QString kSecondaryStyle = QStringLiteral(
         "QPushButton {"
@@ -510,7 +510,7 @@ void ConnectionPanel::buildUI()
         "  border: 1px solid #405060; border-radius: 4px; padding: 6px 12px;"
         "}"
         "QPushButton:hover { background: #405060; }"
-        "QPushButton:disabled { background: #1a2a3a; color: #404858; border-color: #203040; }");
+        "QPushButton:disabled { background: #1a2a3a; color: #3a4a5a; border-color: #203040; }");
 
     static const QString kDestructiveStyle = QStringLiteral(
         "QPushButton {"
@@ -518,7 +518,7 @@ void ConnectionPanel::buildUI()
         "  border: 1px solid #6a3030; border-radius: 4px; padding: 6px 12px;"
         "}"
         "QPushButton:hover { background: #602020; }"
-        "QPushButton:disabled { background: #1a2a3a; color: #404858; border-color: #203040; }");
+        "QPushButton:disabled { background: #1a2a3a; color: #3a4a5a; border-color: #203040; }");
 
     // Phase 3Q Task 5 — single ↻ Scan button replaces Start + Stop Discovery.
     // One action, one-shot: triggers the same NIC broadcast scan as before.
@@ -602,7 +602,7 @@ QWidget* ConnectionPanel::buildStatusStrip()
     m_statusStrip->setFixedHeight(40);
     m_statusStrip->setStyleSheet(QStringLiteral(
         "QWidget#statusStrip {"
-        "  background: #0d1b28;"
+        "  background: #0a1a28;"
         "  border: 1px solid #203040;"
         "  border-radius: 4px;"
         "}"));
@@ -1340,9 +1340,9 @@ void ConnectionPanel::onContextMenuRequested(const QPoint& pos)
 
     QMenu menu(this);
     menu.setStyleSheet(QStringLiteral(
-        "QMenu { background: #12202e; color: #c8d8e8; border: 1px solid #203040; }"
-        "QMenu::item:selected { background: #005578; }"
-        "QMenu::item:disabled { color: #404858; }"));
+        "QMenu { background: #0a1a28; color: #c8d8e8; border: 1px solid #203040; }"
+        "QMenu::item:selected { background: #205070; }"
+        "QMenu::item:disabled { color: #3a4a5a; }"));
 
     QAction* actConnect    = menu.addAction(QStringLiteral("Connect"));
     QAction* actDisconnect = menu.addAction(QStringLiteral("Disconnect"));

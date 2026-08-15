@@ -43,14 +43,14 @@ static const char* kGroupStyle =
 
 static const char* kComboStyle =
     "QComboBox {"
-    "  background: #152535;"
+    "  background: #1a2a3a;"
     "  border: 1px solid #203040;"
     "  border-radius: 3px;"
     "  color: #c8d8e8;"
     "  padding: 2px 6px;"
     "}"
     "QComboBox::drop-down { border: none; }"
-    "QComboBox QAbstractItemView { background: #152535; color: #c8d8e8; "
+    "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
     "  selection-background-color: #00b4d8; }";
 
 static const char* kCheckStyle =
@@ -66,7 +66,7 @@ static const char* kDimLabelStyle = "QLabel { color: #607080; font-size: 11px; }
 // Pill style for the negotiated-format readout.
 static const char* kPillStyleOk =
     "QLabel {"
-    "  background: #152530;"
+    "  background: #1a2a38;"
     "  border: 1px solid #203040;"
     "  border-radius: 8px;"
     "  color: #80c8a0;"

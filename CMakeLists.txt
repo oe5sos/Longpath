@@ -694,6 +694,19 @@ set(MODEL_SOURCES
 )
 
 set(GUI_SOURCES
+    # Theme substitution for Qt stylesheet strings — see
+    # docs/design/HAUSSTIL.md and gui/styles/ThemeQss.h for why the
+    # palette moves through a table rather than through 1733 edits.
+    src/gui/LayoutProfiles.cpp
+    src/gui/LayoutProfiles.h
+    src/gui/widgets/CommandBar.cpp
+    src/gui/widgets/WidgetPicker.cpp
+    src/gui/widgets/WidgetPicker.h
+    src/gui/widgets/CommandBar.h
+    src/gui/styles/ThemeQss.cpp
+    src/gui/styles/ThemeQss.h
+    src/gui/styles/Theme.cpp
+    src/gui/styles/Theme.h
     src/gui/MainWindow.cpp
     src/gui/AmpViewChart.cpp
     src/gui/AmpViewWindow.cpp
@@ -703,6 +716,10 @@ set(GUI_SOURCES
     src/gui/TitleBar.cpp
     src/gui/RelayBar.cpp
     src/gui/SMeterWidget.cpp
+    src/gui/WaterfallHistoryBuffer.cpp
+    src/gui/WaterfallHistoryBuffer.h
+    src/gui/widgets/ProfileRail.cpp
+    src/gui/widgets/ProfileRail.h
     src/gui/ConnectionPanel.cpp
     src/gui/AddCustomRadioDialog.cpp
     src/gui/SupportDialog.cpp

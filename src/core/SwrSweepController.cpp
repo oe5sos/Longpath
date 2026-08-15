@@ -19,6 +19,7 @@
 #include "core/safety/RegionSetting.h"
 
 #include <QDateTime>
+#include <QStringList>
 
 #include <algorithm>
 #include <cmath>
@@ -218,7 +219,40 @@ SwrSweepPlan SwrSweepPlan::forRange(double startLoHz, double stopHiHz,
         }
     }
     if (segs.isEmpty()) {
+        plan.note = QStringLiteral(
+            "In %1 bis %2 MHz liegt kein Bereich, auf dem gesendet "
+            "werden darf. Prüfe Setup → Allgemein → Region.")
+            .arg(startLoHz / 1e6, 0, 'f', 3)
+            .arg(stopHiHz / 1e6, 0, 'f', 3);
         return plan;   // still invalid: startHz stays 0
+    }
+
+    // ── One band, or nothing ─────────────────────────────────────────
+    //
+    // See the header for why this stopped crossing band edges. A range
+    // that spans several allocations can only be measured in the
+    // allocated pieces, and no arrangement of those pieces reads as the
+    // continuous curve that was asked for. Say so, rather than deliver
+    // a twelfth of the range and let the picture imply the rest.
+    if (segs.size() > 1) {
+        QStringList spans;
+        spans.reserve(static_cast<int>(segs.size()));
+        for (const Seg& s : segs) {
+            spans << QStringLiteral("%1–%2")
+                         .arg(double(s.lo) / 1e6, 0, 'f', 3)
+                         .arg(double(s.hi) / 1e6, 0, 'f', 3);
+        }
+        plan.note = QStringLiteral(
+            "%1 bis %2 MHz überspannt %3 getrennte Bandbereiche "
+            "(%4 MHz). Dazwischen darf das Funkgerät nicht senden — es "
+            "wäre also nur ein Bruchteil der Strecke gemessen.\n\n"
+            "Miss ein Band auf einmal, oder nimm für den ganzen Bereich "
+            "den VNA und lade die .s1p über „VNA-Referenz…“.")
+            .arg(startLoHz / 1e6, 0, 'f', 3)
+            .arg(stopHiHz / 1e6, 0, 'f', 3)
+            .arg(static_cast<int>(segs.size()))
+            .arg(spans.join(QStringLiteral(", ")));
+        return plan;   // invalid: startHz stays 0
     }
 
     // ── Share the points out ─────────────────────────────────────────

@@ -18,10 +18,13 @@
 
 #include "core/SolarTimes.h"
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"   // Style::role() — Malcode hat kein Stylesheet
 
 #include <QDateTime>
+#include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -40,6 +43,16 @@ double norm180(double deg)
     return d - 180.0;
 }
 
+/// Die Beschriftung der Locator-Felder. Warmes Weiß, sehr durchsichtig
+/// — sie soll über der Textur liegen und nicht auf ihr. Über eine
+/// Rolle, weil hier gemalt wird und kein Stylesheet vorbeikommt.
+QColor locatorInk()
+{
+    QColor c(Style::role("map-locator", "#ffdc96"));
+    c.setAlpha(70);
+    return c;
+}
+
 } // namespace
 
 FlatMapWidget::FlatMapWidget(QWidget* parent) : QWidget(parent)
@@ -56,6 +69,7 @@ void FlatMapWidget::setHome(double lat, double lon)
 {
     m_homeLat = lat;
     m_homeLon = norm180(lon);
+
     m_hasHome = true;
     update();
 }
@@ -63,6 +77,53 @@ void FlatMapWidget::setHome(double lat, double lon)
 void FlatMapWidget::clearHome()
 {
     m_hasHome = false;
+    update();
+}
+
+void FlatMapWidget::setStationMarker(const QString& callsign,
+                                     const QImage& photo)
+{
+    m_stationCall = callsign.trimmed().toUpper();
+    m_stationPhoto = QPixmap{};
+
+    if (photo.isNull()) {
+        update();
+        return;
+    }
+
+    // ── Einmal schneiden, nicht bei jedem Bild ───────────────────────
+    //
+    // Die Karte zeichnet beim Ziehen dutzendfach pro Sekunde neu. Ein
+    // volles Foto pro Bild zu skalieren und rund zu maskieren würde man
+    // als Ruckeln merken, und zwar genau dann, wenn man die Karte
+    // bewegt.
+    //
+    // devicePixelRatio, sonst ist der Kreis auf einem Retina-Bildschirm
+    // weich, während alles daneben scharf ist.
+    const qreal dpr = devicePixelRatioF();
+    const int px = static_cast<int>(kStationMarkerPx * dpr);
+
+    // Quadratisch aus der Mitte, damit ein Querformat nicht gestaucht
+    // wird, sondern beschnitten — ein gestauchtes Gesicht fällt auf.
+    const int side = std::min(photo.width(), photo.height());
+    const QImage square = photo.copy((photo.width()  - side) / 2,
+                                     (photo.height() - side) / 2,
+                                     side, side)
+                              .scaled(px, px, Qt::IgnoreAspectRatio,
+                                      Qt::SmoothTransformation);
+
+    QPixmap out(px, px);
+    out.fill(Qt::transparent);
+    {
+        QPainter mp(&out);
+        mp.setRenderHint(QPainter::Antialiasing);
+        QPainterPath clip;
+        clip.addEllipse(0, 0, px, px);
+        mp.setClipPath(clip);
+        mp.drawImage(0, 0, square);
+    }
+    out.setDevicePixelRatio(dpr);
+    m_stationPhoto = out;
     update();
 }
 
@@ -309,7 +370,10 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     if (!tex.isNull()) {
         p.drawImage(r, tex);
     } else {
-        p.fillRect(r, QColor(0x1a, 0x3a, 0x58));
+        // Der Ozean, wenn keine NASA-Textur da ist. Über eine Rolle,
+        // damit die Theme-Datei ihn erreicht — hier wird gemalt, es
+        // gibt kein Stylesheet, an dem der ThemeFilter ansetzen könnte.
+        p.fillRect(r, QColor(Style::role("map-ocean", "#1a3a58")));
     }
 
     if (m_showTerminator) {
@@ -318,7 +382,16 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     }
 
     // Graticule every 30 degrees, plus the equator picked out.
-    p.setPen(QPen(QColor(255, 255, 255, tex.isNull() ? 48 : 30), 0.8));
+    //
+    // Die Deckung bleibt hier und wandert nicht in die Theme-Datei: sie
+    // hängt davon ab, ob eine Textur darunter liegt, und das ist eine
+    // Frage der Lesbarkeit, keine der Gestaltung.
+    auto graticule = [](int alpha) {
+        QColor c(Style::role("map-graticule", "#ffffff"));
+        c.setAlpha(alpha);
+        return c;
+    };
+    p.setPen(QPen(graticule(tex.isNull() ? 48 : 30), 0.8));
     for (int lon = -180; lon <= 180; lon += 30) {
         const QPointF a = project(90, lon);
         const QPointF b = project(-90, lon);
@@ -327,7 +400,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     for (int lat = -60; lat <= 60; lat += 30) {
         p.drawLine(project(lat, -180), project(lat, 180));
     }
-    p.setPen(QPen(QColor(255, 255, 255, 55), 1.0));
+    p.setPen(QPen(graticule(55), 1.0));   // Äquator, eine Spur kräftiger
     p.drawLine(project(0, -180), project(0, 180));
 
     if (m_showGrid) { paintGridOverlay(p, r); }
@@ -421,20 +494,74 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
 
     if (m_hasHome) {
         const QPointF s = project(m_homeLat, m_homeLon);
-        const QColor home(Style::kGreenText);
-        p.setPen(Qt::NoPen);
-        QColor glow = home;
-        glow.setAlpha(90);
-        p.setBrush(glow);
-        p.drawEllipse(s, 8, 8);
-        p.setBrush(home);
-        p.drawEllipse(s, 3.4, 3.4);
-        p.setBrush(Qt::NoBrush);
-        p.setPen(home);
+        const QColor ring(Style::kAccent);
+        const QString caption = m_stationCall.isEmpty()
+                                    ? QStringLiteral("HOME")
+                                    : m_stationCall;
+
         QFont bf = f;
         bf.setBold(true);
+        const QFontMetrics bfm(bf);
+
+        double captionTop = s.y() + 6.0;
+
+        if (!m_stationPhoto.isNull()) {
+            // ── Das Foto ─────────────────────────────────────────────
+            //
+            // Auf einer Karte voller Kontaktmarker ist der eigene
+            // Standort der einzige, den man sofort finden muss. Ein
+            // Bild findet das Auge, bevor es liest.
+            const double r = kStationMarkerPx / 2.0;
+            const QRectF box(s.x() - r, s.y() - r,
+                             kStationMarkerPx, kStationMarkerPx);
+
+            // Ein weicher Schein darunter, damit der Kreis sich auch
+            // über hellem Gelände (Wüste, Wolke) vom Grund löst.
+            QColor halo = ring;
+            halo.setAlpha(70);
+            p.setPen(Qt::NoPen);
+            p.setBrush(halo);
+            p.drawEllipse(s, r + 3.5, r + 3.5);
+            p.setBrush(Qt::NoBrush);
+
+            p.drawPixmap(box.toRect(), m_stationPhoto);
+
+            p.setPen(QPen(ring, 2.0));
+            p.drawEllipse(s, r, r);
+            captionTop = s.y() + r + 5.0;
+        } else {
+            // Ohne Bild der bisherige Punkt — nur trägt er jetzt das
+            // Rufzeichen statt des Wortes „HOME", weil das Rufzeichen
+            // die Information ist.
+            const QColor home(Style::kGreenText);
+            QColor glow = home;
+            glow.setAlpha(90);
+            p.setPen(Qt::NoPen);
+            p.setBrush(glow);
+            p.drawEllipse(s, 8, 8);
+            p.setBrush(home);
+            p.drawEllipse(s, 3.4, 3.4);
+            p.setBrush(Qt::NoBrush);
+            captionTop = s.y() + 10.0;
+        }
+
+        // ── Die Bildunterschrift ─────────────────────────────────────
+        //
+        // Gerahmt und hinterlegt, nicht frei auf der Karte: über einer
+        // Satellitenaufnahme ist jede Textfarbe irgendwo unlesbar.
+        const int tw = bfm.horizontalAdvance(caption);
+        const QRectF plate(s.x() - tw / 2.0 - 5.0, captionTop,
+                           tw + 10.0, bfm.height() + 3.0);
+        QColor plateBg(Style::kAppBg);
+        plateBg.setAlpha(215);
+        p.setPen(QPen(ring, 1.0));
+        p.setBrush(plateBg);
+        p.drawRoundedRect(plate, 3.0, 3.0);
+        p.setBrush(Qt::NoBrush);
+        p.setPen(ring);
         p.setFont(bf);
-        p.drawText(s + QPointF(9, 3), QStringLiteral("HOME"));
+        p.drawText(plate, Qt::AlignCenter, caption);
+        p.setFont(f);
     }
 
     if (tex.isNull()) {
@@ -464,8 +591,15 @@ void FlatMapWidget::paintGridOverlay(QPainter& p, const QRectF& r)
     unproject(vis.topLeft() + QPointF(1, 1), latTop, lonLeft);
     unproject(vis.bottomRight() - QPointF(1, 1), latBot, lonRight);
 
+    // Nur die Längengrad-Skala. Ein pxPerLat stand hier auch, wurde nie
+    // benutzt und hat seit der Maidenhead-Arbeit eine Warnung erzeugt,
+    // die in einem Volldurchlauf zwischen tausend Zeilen unterging —
+    // sichtbar erst, als diese Datei allein gebaut hat. 2026-08-15.
+    //
+    // Bei einer gleichabständigen Zylinderprojektion ist es ohnehin
+    // dasselbe Verhältnis: r.width()/360 und r.height()/180 sind gleich,
+    // solange das Kartenbild sein Seitenverhältnis behält.
     const double pxPerLon = r.width() / 360.0;
-    const double pxPerLat = r.height() / 180.0;
 
     // Fields: 20° x 10°, AA at the south pole / date line.
     //
@@ -503,7 +637,7 @@ void FlatMapWidget::paintGridOverlay(QPainter& p, const QRectF& r)
     if (!squares && pxPerLon * 20.0 >= 34.0) {
         f.setPixelSize(std::min(11.0, pxPerLon * 20.0 * 0.20));
         p.setFont(f);
-        p.setPen(QColor(255, 220, 150, 70));
+        p.setPen(locatorInk());
         const int lonFrom =
             static_cast<int>(std::floor((lonLeft + 180.0) / 20.0));
         const int lonTo =
@@ -527,7 +661,7 @@ void FlatMapWidget::paintGridOverlay(QPainter& p, const QRectF& r)
     } else if (squares && pxPerLon * 2.0 >= 34.0) {
         f.setPixelSize(std::min(10.0, pxPerLon * 2.0 * 0.18));
         p.setFont(f);
-        p.setPen(QColor(255, 220, 150, 70));
+        p.setPen(locatorInk());
         const int lonFrom = static_cast<int>(std::floor(lonLeft / 2.0)) * 2;
         const int lonTo   = static_cast<int>(std::ceil(lonRight / 2.0)) * 2;
         const int latFrom = static_cast<int>(std::floor(latBot));

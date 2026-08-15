@@ -237,6 +237,61 @@ private slots:
         }
     }
 
+    // ── The one the median got wrong ─────────────────────────────────
+    //
+    // A range sweep gives every band an EQUAL SHARE OF THE POINTS, so
+    // the spacing differs from band to band by whatever the widths
+    // differ by. 11 points in 30 m's 50 kHz is 5 kHz apart; 11 points
+    // in 10 m's 1.7 MHz is 170 kHz apart — thirty-four times coarser,
+    // and both are ordinary spacing, not a hole.
+    //
+    // "median × 4" put the threshold at 80 kHz and shredded 10 m into
+    // ten one-point panels, every one of them labelled "10 m". That is
+    // what the operator's chart showed at 00:28 and it is the fault
+    // this test exists for.
+    void theWidestBandIsNotShreddedByTheNarrowestOne()
+    {
+        Sweep s;
+        s.magnitudeOnly = true;
+        struct { double lo, hi; } bands[] = {
+            { 1.810e6,  2.000e6}, { 3.500e6,  3.800e6},
+            { 7.000e6,  7.200e6}, {10.100e6, 10.150e6},
+            {14.000e6, 14.350e6}, {18.068e6, 18.168e6},
+            {21.000e6, 21.450e6}, {24.890e6, 24.990e6},
+            {28.000e6, 29.700e6},
+        };
+        for (const auto& b : bands) {
+            for (int i = 0; i < 11; ++i) {
+                SweepPoint p;
+                p.freqHz = b.lo + (b.hi - b.lo) * i / 10.0;
+                p.gamma  = std::complex<double>(0.1, 0.0);
+                s.points.append(p);
+            }
+        }
+
+        const double threshold = SwrCurveWidget::gapThresholdHz(s);
+        QVERIFY(std::isfinite(threshold));
+
+        // Eight holes between nine bands. Not nine, not seventeen.
+        int breaks = 0;
+        for (int i = 1; i < s.points.size(); ++i) {
+            if (s.points.at(i).freqHz - s.points.at(i - 1).freqHz
+                > threshold) { ++breaks; }
+        }
+        QCOMPARE(breaks, 8);
+
+        // Said the other way round, because it is the way it failed:
+        // 10 m's own 170 kHz spacing must be under the threshold.
+        QVERIFY2(threshold > 170.0e3,
+                 qPrintable(QStringLiteral(
+                     "threshold %1 kHz is below 10 m's own 170 kHz point "
+                     "spacing, so the band splits into eleven pieces")
+                         .arg(threshold / 1e3, 0, 'f', 1)));
+        // ...and the narrowest real hole, 10.150 to 14.000 MHz, must
+        // be above it.
+        QVERIFY(threshold < 3.85e6);
+    }
+
     void tooFewPointsToJudgeMeansNoBreak()
     {
         Sweep s;

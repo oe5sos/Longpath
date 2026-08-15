@@ -126,6 +126,35 @@ private:
     Sweep m_previous;
     QString m_previousLabel;
 
+    // ── The continuous curve the radio may not draw ──────────────────
+    //
+    // 2026-08-15. "es muss eine durchgehende linie sein, es muss der
+    // ganze bereich gemessen werden."
+    //
+    // The radio cannot measure the whole range. Not a limitation of
+    // this program: between 2.000 and 3.500 MHz, and in seven more
+    // stretches up to 30 MHz, an amateur licence does not permit
+    // transmitting, and the sweep keys the transmitter. The holes in
+    // the curve ARE the band plan. BandPlanGuard is what stops it, and
+    // it stopped two real out-of-band sweeps this week — 80 m at
+    // 3.500–4.000 and 60 m at 5.100–5.500.
+    //
+    // The instrument that CAN sweep 1.8 to 30 MHz without a gap is a
+    // vector analyser: microwatts, a measurement instrument, and the
+    // ordinary way antennas are swept. This program already reads its
+    // file.
+    //
+    // So the continuous line comes from the VNA and stays pinned
+    // behind every radio sweep that follows, instead of being replaced
+    // by the next one the way m_previous is. One picture: the whole
+    // range as measured by the analyser, and the radio's own numbers
+    // sitting on top of it in the bands where the radio is allowed to
+    // look — which is also the comparison he asked for on the bench.
+    Sweep m_pinned;
+    QString m_pinnedLabel;
+    void choosePinned();
+    void applyReference();
+
     // Two or more measurements either side of a known change let this
     // work out how much the antenna really moves per centimetre — which
     // in the worked case was half what the textbook says. See
@@ -134,6 +163,7 @@ private:
 
     QPushButton*    m_openBtn{nullptr};
     QPushButton*    m_demoBtn{nullptr};
+    QPushButton*    m_pinBtn{nullptr};
     QComboBox*      m_kindBox{nullptr};
     QDoubleSpinBox* m_lengthBox{nullptr};
     QPushButton*    m_estimateBtn{nullptr};

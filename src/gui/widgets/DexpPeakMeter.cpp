@@ -69,11 +69,11 @@ namespace {
 
 // NereusSDR-original palette per plan §9.1.  Hex callouts kept in
 // the trailing comment so a designer audit can grep for them.
-constexpr QColor kBg            { 14,  17,  21};   // #0e1115 — strip background
-constexpr QColor kBorder        { 24,  28,  32};   // #181c20 — 1 px frame
+constexpr QColor kBg            { 14,  17,  21};   // #0a0a14 — strip background
+constexpr QColor kBorder        { 24,  28,  32};   // #0f0f1a — 1 px frame
 constexpr QColor kGreenPeak     { 76, 208,  72};   // #4cd048 — LimeGreen analogue
-constexpr QColor kRedOverlay    {255,  58,  58};   // #ff3a3a — above-threshold
-constexpr QColor kRedThreshLine {255,  58,  58};   // #ff3a3a — marker line
+constexpr QColor kRedOverlay    {255,  58,  58};   // #ff4444 — above-threshold
+constexpr QColor kRedThreshLine {255,  58,  58};   // #ff4444 — marker line
 
 } // namespace
 

@@ -125,7 +125,7 @@ void OcLedStripWidget::refreshLedColors()
     for (int i = 0; i < static_cast<int>(m_leds.size()); ++i) {
         const bool on = (m_bits >> i) & 0x01;
         m_leds[i]->setStyleSheet(on
-            ? QStringLiteral("QFrame { background: #44ff44; border: 1px solid #88ff88; "
+            ? QStringLiteral("QFrame { background: #44ff44; border: 1px solid #80ff80; "
                              "border-radius: 5px; }")
             : QStringLiteral("QFrame { background: #222; border: 1px solid #555; "
                              "border-radius: 5px; }"));

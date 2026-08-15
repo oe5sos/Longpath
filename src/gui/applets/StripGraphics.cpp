@@ -976,7 +976,7 @@ QString StripBandCurve::legend() const
             "it is working now");
     }
     return QStringLiteral(
-        "<span style='color:#50a0f0'>▬</span> the low generator<br>"
+        "<span style='color:#0090e0'>▬</span> the low generator<br>"
         "<span style='color:#f09a30'>▬</span> the high generator<br>"
         "height is how much is mixed in, position is where it is tuned");
 }

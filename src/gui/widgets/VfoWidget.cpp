@@ -360,7 +360,7 @@ static inline QString vfoTabBtnStyle()
     return QStringLiteral(
         "QPushButton {"
         "  background: transparent; border: none;"
-        "  color: #6888a0; font-size: 12px; font-weight: bold;"
+        "  color: #708090; font-size: 12px; font-weight: bold;"
         "  padding: 2px 6px;"
         "}"
         "QPushButton:checked {"
@@ -634,7 +634,7 @@ void VfoWidget::buildHeaderRow()
     m_txBadge->setCheckable(true);
     m_txBadge->setStyleSheet(
         QStringLiteral("QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-                        "border-radius: 3px; color: #6888a0; font-size: 10px; font-weight: bold; }"
+                        "border-radius: 3px; color: #708090; font-size: 10px; font-weight: bold; }"
                         "QPushButton:checked { background: #6a3030; border-color: #ff4444; color: #ff8080; }"));
     // NereusSDR native — Thetis has no per-slice TX badge (it uses chkMOX for TX state)
     m_txBadge->setToolTip(QStringLiteral("Indicates this slice is the TX slice"));
@@ -651,7 +651,7 @@ void VfoWidget::buildHeaderRow()
     m_splitBadge->setAlignment(Qt::AlignCenter);
     m_splitBadge->setStyleSheet(
         QStringLiteral("background: #1a2a3a; border: 1px solid #304050;"
-                        "border-radius: 3px; color: #6888a0; font-size: 10px; font-weight: bold;"));
+                        "border-radius: 3px; color: #708090; font-size: 10px; font-weight: bold;"));
     m_splitBadge->setVisible(false);
     hdr->addWidget(m_splitBadge);
 

@@ -47,7 +47,7 @@ inline constexpr QStringView kFlatBtn {
 inline constexpr QStringView kTabLblNormal {
     u"QLabel { background: transparent; border: none; "
     u"border-bottom: 2px solid transparent; "
-    u"color: #6888a0; font-size: 13px; font-weight: bold; padding: 3px 0; }"
+    u"color: #708090; font-size: 13px; font-weight: bold; padding: 3px 0; }"
 };
 
 // From AetherSDR src/gui/VfoWidget.cpp:149 — verbatim port

@@ -93,10 +93,42 @@ public:
     // Add a raw widget (e.g., MeterWidget) with a custom title to the scroll area
     void addWidget(QWidget* widget, const QString& title);
 
+    /// Die Applets in der Reihenfolge, in der sie im Stapel STEHEN —
+    /// nicht in der, in der sie angemeldet wurden. Nach einem Zug mit
+    /// der Maus sind das zwei verschiedene Listen, und wer speichern
+    /// will, meint diese hier.
     QList<AppletWidget*> applets() const { return m_applets; }
+
+    // ── Verschieben ──────────────────────────────────────────────────
+    //
+    // OE5SOS, 2026-08-15: „Die einzelnen Widget, sodass man jedes
+    // auswählen, aktivieren und verschieben kann."
+    //
+    // Auswählen und Aktivieren gab es (das Plus, AppletVisibility­-
+    // Controller). Verschieben nicht — die Griffpunkte ⋮⋮ in den
+    // Titelleisten waren gemalt und taten nichts. Ein Griff, der nach
+    // Anfassen aussieht und beim Anfassen nichts tut, ist schlimmer als
+    // gar keiner: er verspricht.
+
+    /// Ein Applet an eine Stelle im Stapel setzen. Stellen außerhalb
+    /// werden auf den Rand geklemmt. Gibt true zurück, wenn sich etwas
+    /// bewegt hat.
+    bool moveApplet(AppletWidget* applet, int toIndex);
+
+    /// Die gespeicherte Reihenfolge herstellen. Applets, die in der
+    /// Liste fehlen, bleiben hinten in ihrer bisherigen Folge stehen —
+    /// so verschwindet ein neu hinzugekommenes Widget nicht, nur weil
+    /// die gespeicherte Liste es noch nicht kennt.
+    void setAppletOrder(const QList<AppletWidget*>& order);
+
+signals:
+    /// Nach einem abgeschlossenen Zug. Nicht während des Ziehens: wer
+    /// darauf hin speichert, soll einmal speichern und nicht vierzigmal.
+    void appletsReordered();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     // Wrap a child widget with a 16 px title bar (grip dots + label).
@@ -114,6 +146,19 @@ private:
     QVBoxLayout* m_stackLayout = nullptr;    // inside scroll area
     QList<AppletWidget*> m_applets;
     QMap<AppletWidget*, QWidget*> m_wrappers;  // applet → wrapper widget
+
+    // ── Ziehen ───────────────────────────────────────────────────────
+    int  stackIndexOf(QWidget* wrapper) const;
+    AppletWidget* appletForWrapper(QWidget* wrapper) const;
+    int  appletPosForStackIndex(int stackIndex) const;
+    void dragTo(int globalY);
+
+    QMap<QWidget*, QWidget*> m_titleBars;   // Titelleiste → Hülle
+    AppletWidget* m_dragApplet{nullptr};
+    int  m_dragStartY{0};
+    bool m_dragging{false};
+    /// Erst ab hier ist es ein Zug und kein verwackelter Klick.
+    static constexpr int kDragThresholdPx = 4;
     QWidget*      m_headerWidget  = nullptr;   // header widget for dynamic resize
     QWidget*      m_headerWrapper = nullptr;   // title-bar wrapper of the header
     float         m_headerAspect  = 0.0f;      // width/height ratio for header

@@ -67,10 +67,10 @@ void FilterPresetsSetupPage::buildUi()
 
     m_modeCombo = new QComboBox(modeBox);
     m_modeCombo->setStyleSheet(
-        QStringLiteral("QComboBox { background: #1a2030; color: #c8d8e8; "
+        QStringLiteral("QComboBox { background: #1a1a2a; color: #c8d8e8; "
                        "border: 1px solid #304050; border-radius: 3px; padding: 2px 6px; }"
-                       "QComboBox::drop-down { background: #202838; }"
-                       "QComboBox QAbstractItemView { background: #131326; color: #c8d8e8; }"));
+                       "QComboBox::drop-down { background: #1a2a3a; }"
+                       "QComboBox QAbstractItemView { background: #1a1a2a; color: #c8d8e8; }"));
 
     // Populate with all DSPMode values in enum order.
     static const DSPMode kModes[] = {
@@ -109,11 +109,11 @@ void FilterPresetsSetupPage::buildUi()
         QStringLiteral("Reorder")
     });
     m_table->setStyleSheet(
-        QStringLiteral("QTableWidget { background: #131326; color: #c8d8e8; "
+        QStringLiteral("QTableWidget { background: #1a1a2a; color: #c8d8e8; "
                        "  gridline-color: #304050; border: 1px solid #304050; }"
                        "QTableWidget::item { padding: 2px 4px; }"
-                       "QTableWidget::item:selected { background: #1a3050; }"
-                       "QHeaderView::section { background: #1a2030; color: #8aa8c0; "
+                       "QTableWidget::item:selected { background: #204060; }"
+                       "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
                        "  border: 1px solid #304050; padding: 4px; }"));
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -142,8 +142,8 @@ void FilterPresetsSetupPage::buildUi()
     static const QString kBtnStyle = QStringLiteral(
         "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
         "  border-radius: 3px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #2a4060; }"
-        "QPushButton:pressed { background: #1a2840; }");
+        "QPushButton:hover { background: #204060; }"
+        "QPushButton:pressed { background: #1a2a3a; }");
 
     auto* resetRowBtn  = new QPushButton(QStringLiteral("Reset Selected Row"), actBox);
     auto* resetModeBtn = new QPushButton(QStringLiteral("Reset All Rows for This Mode"), actBox);
@@ -230,7 +230,7 @@ void FilterPresetsSetupPage::populateTable()
         auto* nameEdit = new QLineEdit(p.name, m_table);
         nameEdit->setMaxLength(32);
         nameEdit->setStyleSheet(QStringLiteral(
-            "QLineEdit { background: #1a2030; color: #c8d8e8; "
+            "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
             "border: 1px solid #304050; border-radius: 2px; padding: 1px 3px; }"));
         // Connect editing to live persist
         const int row = i;
@@ -245,9 +245,9 @@ void FilterPresetsSetupPage::populateTable()
         lowSpin->setValue(p.low);
         lowSpin->setSuffix(QStringLiteral(" Hz"));
         lowSpin->setStyleSheet(QStringLiteral(
-            "QSpinBox { background: #1a2030; color: #c8d8e8; "
+            "QSpinBox { background: #1a1a2a; color: #c8d8e8; "
             "border: 1px solid #304050; border-radius: 2px; padding: 1px; }"
-            "QSpinBox::up-button, QSpinBox::down-button { background: #202838; width: 14px; }"));
+            "QSpinBox::up-button, QSpinBox::down-button { background: #1a2a3a; width: 14px; }"));
         connect(lowSpin, &QSpinBox::editingFinished, this, [this, row] {
             commitTableRow(row);
         });
@@ -279,8 +279,8 @@ void FilterPresetsSetupPage::populateTable()
         static const QString kArrowStyle = QStringLiteral(
             "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
             "  border-radius: 2px; padding: 0px 4px; font-size: 10px; }"
-            "QPushButton:hover { background: #2a4060; }"
-            "QPushButton:disabled { color: #505060; border-color: #202030; }");
+            "QPushButton:hover { background: #204060; }"
+            "QPushButton:disabled { color: #405060; border-color: #1a1a2a; }");
 
         if (i > 0) {
             auto* upBtn = new QPushButton(QStringLiteral("↑"), reorderWidget);

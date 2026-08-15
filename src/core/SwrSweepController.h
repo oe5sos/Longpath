@@ -36,6 +36,7 @@
 #pragma once
 
 #include <QObject>
+#include <QString>
 #include <QTimer>
 #include <QVector>
 #include <QDateTime>
@@ -146,33 +147,45 @@ struct SwrSweepPlan {
     /// design doc).
     static SwrSweepPlan forBand(Band b);
 
-    // ── A range across several bands ─────────────────────────────────
+    // ── A range inside ONE band ──────────────────────────────────────
     //
-    // "Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich auch
-    //  eingeben, von welcher Startfrequenz bis welcher Endfrequenz, und
-    //  sämtliche resonanten Punkte sehen."
+    // A narrow look around a resonance: 14.000 to 14.120 rather than
+    // the whole of 20 m, or the top half of 40 m at fine spacing.
     //
-    // The band sweep stays the default. This is the extra.
+    // ── Why it no longer crosses band edges ──────────────────────────
     //
-    // The thing that shapes it: most of 1.8–30 MHz is not ours. A range
-    // sweep may only key inside the allocated segments, so the plan is
-    // a LIST of frequencies with holes in it rather than a span — see
-    // the freqs member. What comes back is one curve per band, not one
-    // curve across the range, and that is a fact about the licence
-    // rather than a limitation of the code.
+    // It used to. Type 1.8 to 30 MHz and it planned nine stretches with
+    // eight holes between them, because most of 1.8–30 MHz is not ours
+    // to transmit on. The result was nine short curves the chart had to
+    // show as nine panels, and OE5SOS's verdict on 2026-08-15, after
+    // several rounds of trying to make it read as one picture, was
+    // plain: "es muss eine durchgehende linie sein, es muss der ganze
+    // bereich gemessen werden" — and when told the transmitter may not
+    // key between the bands, "diese Option soll es nicht mehr geben".
     //
-    // Points are shared out equally between the segments rather than by
-    // width, and never fewer than kMinPerSegment. Sharing by width
-    // would give 10 m (1.7 MHz) eight times the resolution of 160 m
-    // (200 kHz), and it is on the narrow low bands that a resonance is
-    // sharpest and easiest to miss.
+    // He is right that the feature promised something it cannot give.
+    // A sweep that keys the transmitter can only ever see the twelve
+    // per cent of HF that is allocated to us; presenting that as a
+    // range sweep invites the reading that the range was measured. The
+    // instrument that sweeps 1.8 to 30 MHz unbroken is a vector
+    // analyser, and this program reads its file.
     //
-    // Returns an invalid plan when the range holds no allowed segment
-    // at all — it does not quietly wander off to the nearest band.
+    // So a range must now lie inside a single allocated stretch.
+    // Anything wider comes back invalid with `note` saying why, rather
+    // than quietly measuring a twelfth of what was asked for.
+    //
+    // Returns an invalid plan when the range holds no allowed segment,
+    // and when it holds more than one.
     static SwrSweepPlan forRange(double startHz, double stopHz,
                                  const safety::BandPlanGuard& guard,
                                  std::optional<safety::Region> region,
                                  DSPMode mode, int totalPoints);
+
+    /// Why an invalid plan is invalid, in words the operator can act
+    /// on. Empty on a valid plan. "Sweep plan invalid" told nobody
+    /// anything, which is how the eleven-points-over-two-segments bug
+    /// stayed hidden.
+    QString note;
 
     /// Explicit frequency list. Empty for a plain band sweep, where the
     /// points are startHz..stopHz evenly. Non-empty for a range sweep,

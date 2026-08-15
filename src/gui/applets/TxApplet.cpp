@@ -730,7 +730,7 @@ void TxApplet::buildUI()
             "(configure in Setup → Test → Two-Tone)."));
         row->addWidget(m_twoToneBtn, 1);
 
-        // PS-A: green when checked — #006030/#008040 are a darker green than kGreenBg=#006040.
+        // PS-A: green when checked — #1a6030/#008040 are a darker green than kGreenBg=#006040.
         // Phase 3M-4 Task 13: un-hidden under capability gating.  Visibility
         // is set by setBoardCapabilities() / MainWindow board-change handler;
         // hidden by default until that fires (matches the Phase 3M-1a comment
@@ -742,7 +742,7 @@ void TxApplet::buildUI()
         m_psaBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
         m_psaBtn->setStyleSheet(Style::buttonBaseStyle()
             + QStringLiteral("QPushButton:checked {"
-                             " background: #006030; border: 1px solid #008040; color: #fff; }"));
+                             " background: #1a6030; border: 1px solid #008040; color: #fff; }"));
         m_psaBtn->setAccessibleName(QStringLiteral("PS-A PureSignal"));
         m_psaBtn->setToolTip(QStringLiteral(
             "Toggle PureSignal auto-calibration. Right-click to open PureSignal..."));

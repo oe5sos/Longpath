@@ -58,6 +58,7 @@
 #include <QtMath>
 #include <QFontMetrics>
 
+#include "StyleConstants.h"
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
 
@@ -487,7 +488,7 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     const int h = height();
 
     // Background
-    p.fillRect(rect(), QColor(0x0f, 0x0f, 0x1a));
+    p.fillRect(rect(), QColor(Style::kAppBg));
 
     // -- Arc geometry ---------------------------------------------------------
     // Large radius with center far below widget -> shallow ~70 deg arc segment
@@ -506,59 +507,100 @@ void SMeterWidget::paintEvent(QPaintEvent*)
         return arcEndRad - frac * arcSpanRad;  // radians
     };
 
-    // -- Draw colored outer arc (RX scale) ------------------------------------
-    // White from S0 to S9, red from S9+
+    // ── The glow under the arc ───────────────────────────────────────
+    //
+    // What makes a Zeus gauge read as an instrument rather than as a
+    // diagram: a very faint warm light behind the scale, brightest at
+    // the bottom where the needle is pivoted, gone by the time it
+    // reaches the frame.
+    //
+    // Deliberately not a colour anyone would name. The moment it can be
+    // called olive it is too strong — turn the alpha down, not the hue.
     {
-        const QRectF outerArc(cx - radius, cy - radius, radius * 2, radius * 2);
-        const float s9Deg = qRadiansToDegrees(fractionToAngle(0.6f));
-
-        QPen whitePen(QColor(0xc8, 0xd8, 0xe8), 3);
-        p.setPen(whitePen);
-        p.drawArc(outerArc,
-                  static_cast<int>(s9Deg * 16),
-                  static_cast<int>((ARC_END_DEG - s9Deg) * 16));
-
-        QPen redPen(QColor(0xff, 0x44, 0x44), 3);
-        p.setPen(redPen);
-        p.drawArc(outerArc,
-                  static_cast<int>(ARC_START_DEG * 16),
-                  static_cast<int>((s9Deg - ARC_START_DEG) * 16));
+        // Der Mittelpunkt gehört INS Fenster. Erst lag er auf needleCy,
+        // also sechs Pixel unter dem unteren Rand — sichtbar war
+        // ausschließlich der ausgeblendete Rand des Verlaufs, und das
+        // Ergebnis war schlicht schwarz. 2026-08-15.
+        QRadialGradient glow(QPointF(cx, h * 0.96f), w * 0.60f);
+        QColor hi(Style::kInstrumentGlowHi);
+        QColor lo(Style::kInstrumentGlowLo);
+        hi.setAlpha(190);
+        lo.setAlpha(80);
+        QColor gone(lo);
+        gone.setAlpha(0);
+        glow.setColorAt(0.0,  hi);
+        glow.setColorAt(0.58, lo);
+        glow.setColorAt(1.0,  gone);
+        p.setPen(Qt::NoPen);
+        p.setBrush(glow);
+        p.drawRect(rect());
+        p.setBrush(Qt::NoBrush);
     }
 
-    // -- Draw colored inner arc (TX scale) -- 6px gap -------------------------
+    // ── One arc, one colour ──────────────────────────────────────────
+    //
+    // It used to be half white and half red on the RX scale, and half
+    // blue and half red on the TX scale. Neither split carried
+    // information the ticks did not already carry — it was a scale that
+    // happened to be two-tone, and red is the one colour in this
+    // program that means "attention". Top right of the screen, at all
+    // times, it meant "graduation mark".
+    //
+    // Now the arc is one cream stroke over its whole length and the
+    // limit is marked where limits belong: on the tick. S9 and the
+    // over-scale ticks below take kInstrumentLimit, the rest take the
+    // face colour. Same information, a fraction of the area.
+    const QColor faceColor(Style::kInstrumentFace);
+    const QColor limitColor(Style::kInstrumentLimit);
+
+    // ── Zwei Skalen auf einem Bogen ──────────────────────────────────
+    //
+    // Außen S-Stufen für den Empfang, innen Watt fürs Senden. Vorher hat
+    // die FARBE sie getrennt — weiß gegen blau — und als ich beide
+    // cremefarben machte, war die Unterscheidung weg. Beim Ansehen des
+    // laufenden Programms gefunden, 2026-08-15: „3 5 7 9" und
+    // „0 40 80 120" standen gleich hell nebeneinander auf demselben
+    // Bogen.
+    //
+    // Die Antwort ist nicht, Blau zurückzuholen. Von den beiden Skalen
+    // ist immer nur eine gültig: beim Empfang sagt die Wattskala nichts,
+    // beim Senden die S-Skala. Also wird die abgeblendet, die gerade
+    // nichts zu sagen hat. Das ist auch die Zeus-Regel — der Zustand
+    // entscheidet, was hell ist, nicht die Dekoration.
+    //
+    // m_txPower zusätzlich zu m_transmitting, aus demselben Grund wie
+    // weiter oben in diesem File: VOX und hardwaregetastetes CW
+    // erzeugen Leistung, bevor das Flag ankommt.
+    const bool txLive = m_transmitting || m_txPower > 0.5f;
+    auto forScale = [](QColor c, bool live) {
+        if (!live) { c.setAlpha(80); }
+        return c;
+    };
+    const QColor rxFace  = forScale(faceColor,  !txLive);
+    const QColor rxLimit = forScale(limitColor, !txLive);
+    const QColor txFace  = forScale(faceColor,  txLive);
+    const QColor txLimit = forScale(limitColor, txLive);
+
+    {
+        const QRectF outerArc(cx - radius, cy - radius, radius * 2, radius * 2);
+        p.setPen(QPen(rxFace, 2.4));
+        p.drawArc(outerArc,
+                  static_cast<int>(ARC_START_DEG * 16),
+                  static_cast<int>((ARC_END_DEG - ARC_START_DEG) * 16));
+    }
+
+    // -- Inner arc (TX scale) -- 6px gap --------------------------------------
     const float arcGap = 6.0f;
-    const QColor blueColor(0x00, 0x80, 0xd0);
-    const QColor redColor(0xff, 0x44, 0x44);
+    // Die alten Namen, weil der Zeichencode weiter unten sie liest.
+    const QColor blueColor = txFace;
+    const QColor redColor  = txLimit;
     {
         const float innerR = radius - arcGap;
         const QRectF innerArc(cx - innerR, cy - innerR, innerR * 2, innerR * 2);
-
-        // Determine where the arc color splits (fraction where red begins)
-        float redFrac = -1.0f;  // -1 = no red zone
-        switch (m_txMode) {
-        case TxMode::Power:       redFrac = m_powerRedStart / m_powerScaleMax; break;
-        case TxMode::SWR:         redFrac = (2.5f - 1.0f) / 2.0f; break; // 0.75
-        case TxMode::Level:       redFrac = (0.0f + 40.0f) / 45.0f; break; // ~0.89
-        case TxMode::Compression: redFrac = -1.0f; break; // all blue
-        }
-
-        if (redFrac < 0.0f) {
-            // Entire arc is blue
-            p.setPen(QPen(blueColor, 3));
-            p.drawArc(innerArc,
-                      static_cast<int>(ARC_START_DEG * 16),
-                      static_cast<int>((ARC_END_DEG - ARC_START_DEG) * 16));
-        } else {
-            const float splitDeg = qRadiansToDegrees(fractionToAngle(redFrac));
-            p.setPen(QPen(blueColor, 3));
-            p.drawArc(innerArc,
-                      static_cast<int>(splitDeg * 16),
-                      static_cast<int>((ARC_END_DEG - splitDeg) * 16));
-            p.setPen(QPen(redColor, 3));
-            p.drawArc(innerArc,
-                      static_cast<int>(ARC_START_DEG * 16),
-                      static_cast<int>((splitDeg - ARC_START_DEG) * 16));
-        }
+        p.setPen(QPen(txFace, 1.6));
+        p.drawArc(innerArc,
+                  static_cast<int>(ARC_START_DEG * 16),
+                  static_cast<int>((ARC_END_DEG - ARC_START_DEG) * 16));
     }
 
     // -- Tick drawing helpers -------------------------------------------------
@@ -627,16 +669,24 @@ void SMeterWidget::paintEvent(QPaintEvent*)
         }
     };
 
-    const QColor whiteColor(0xc8, 0xd8, 0xe8);
+    // Die TX-Beschriftungen unten benutzen diesen Namen; er ist die
+    // Schriftfarbe der Wattskala und blendet mit ihr ab.
+    const QColor whiteColor = txFace;
 
     // -- Outside ticks (RX): S-meter scale -- odd S-units only ----------------
+    //
+    // S9 in the limit colour: that is where the red half of the arc
+    // used to begin, and a tick says it just as clearly as forty
+    // degrees of red did.
     for (int s = 1; s <= 9; s += 2) {
         const float dbm = S0_DBM + s * DB_PER_S;
-        drawOutsideTick(dbmToFraction(dbm), QString::number(s), whiteColor, true);
+        drawOutsideTick(dbmToFraction(dbm), QString::number(s),
+                        (s == 9) ? rxLimit : rxFace, true);
     }
     for (int over : {20, 40}) {
         const float dbm = S9_DBM + over;
-        drawOutsideTick(dbmToFraction(dbm), QString("+%1").arg(over), redColor, true);
+        drawOutsideTick(dbmToFraction(dbm), QString("+%1").arg(over),
+                        rxLimit, true);
     }
 
     // -- Inside ticks (TX): scale depends on TX mode --------------------------

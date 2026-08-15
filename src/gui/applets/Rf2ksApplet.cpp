@@ -38,7 +38,7 @@ Rf2ksApplet::Rf2ksApplet(RadioModel* model, QWidget* parent)
     m_deviceLabel   = new QLabel(QStringLiteral("RF-Kit RF2K-S"), headerWrap);
     m_nicknameLabel = new QLabel(QString(), headerWrap);
     m_deviceLabel->setStyleSheet(QStringLiteral("font-weight:600;"));
-    m_nicknameLabel->setStyleSheet(QStringLiteral("color:#7d8893; font-size:10px;"));
+    m_nicknameLabel->setStyleSheet(QStringLiteral("color:#8090a0; font-size:10px;"));
     leftCol->addWidget(m_deviceLabel);
     leftCol->addWidget(m_nicknameLabel);
     header->addLayout(leftCol);
@@ -115,7 +115,7 @@ Rf2ksApplet::Rf2ksApplet(RadioModel* model, QWidget* parent)
     gaugesLay->addWidget(m_tempGauge);
 
     m_telemetryLabel = new QLabel(gaugesWrap);
-    m_telemetryLabel->setStyleSheet(QStringLiteral("color:#9aa5b1; font-size:10px;"));
+    m_telemetryLabel->setStyleSheet(QStringLiteral("color:#8899aa; font-size:10px;"));
     gaugesLay->addWidget(m_telemetryLabel);
     root->addWidget(gaugesWrap);
 
@@ -198,13 +198,13 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
     if (operating) {
         m_operateBtn->setStyleSheet(
             QStringLiteral(
-                "QPushButton { background: #006030; border: 1px solid #008040; "
+                "QPushButton { background: #1a6030; border: 1px solid #008040; "
                 "border-radius: 3px; color: #ffffff; font-size: 10px; font-weight: bold; }"
                 "QPushButton:hover { background: #007040; }"));
     } else {
         m_operateBtn->setStyleSheet(
             QStringLiteral(
-                "QPushButton { background: #1a3a5a; border: 1px solid #205070; "
+                "QPushButton { background: #204060; border: 1px solid #205070; "
                 "border-radius: 3px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
                 "QPushButton:hover { background: #204060; }"));
     }

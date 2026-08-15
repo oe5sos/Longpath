@@ -26,7 +26,16 @@ private slots:
         // is the only acceptable ordering — any shift breaks persisted
         // combo ordinals. This assertion locks that in.
         QCOMPARE(static_cast<int>(WfColorScheme::ClarityBlue), 7);
-        QCOMPARE(static_cast<int>(WfColorScheme::Count), 8);
+        // 2026-08-15: „Gedämpft" kam als Index 8 dazu — ANGEHÄNGT, was
+        // genau das ist, was der Kommentar oben erlaubt. Der Wert dieses
+        // Tests liegt in der Zeile darüber, nicht hier.
+        //
+        // Die vollständige Reihenfolge aller Schemata steht ab jetzt an
+        // EINER Stelle, tst_waterfall_muted::theSchemeOrderIsFrozen.
+        // Zwei Tests, die dieselbe Zahl festnageln, heißt: beim nächsten
+        // Schema fällt wieder einer davon um, und man sucht in der
+        // falschen Datei.
+        QCOMPARE(static_cast<int>(WfColorScheme::Count), 9);
     }
 
     void clarityBlue_gradientIsMonotonicAndSpansZeroToOne()

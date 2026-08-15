@@ -20,7 +20,7 @@ public:
     enum class Variant {
         Info,    // blue (#5fa8ff)   — type/mode badges (USB, AGC-S)
         On,      // green (#5fff8a)  — active toggle (NR2, NB, ANF, SQL)
-        Off,     // dim grey (#404858) — inactive toggle (rendered only when
+        Off,     // dim grey (#3a4a5a) — inactive toggle (rendered only when
                  //                       host opts to show the off state)
         Warn,    // yellow (#ffd700) — degraded (jitter, high CPU)
         Tx,      // solid red (#ff6060) — TX MOX badge

@@ -70,6 +70,11 @@ public:
     void setEntries(const QVector<LogEntry>& entries);
     void setHomeGrid(const QString& grid);
 
+    /// Rufzeichen und Portrait auf den Kartenmarker legen. Aus den
+    /// Einstellungen und den beiden Caches, ohne Netzwerk — was schon
+    /// geholt wurde, liegt auf der Platte; was nicht, bleibt ein Punkt.
+    void applyStationMarker();
+
     // Rows picked out in the log's table. Passing a non-empty selection
     // switches the window to showing only those; the operator can flip
     // back to the date range, where they stay picked out in colour

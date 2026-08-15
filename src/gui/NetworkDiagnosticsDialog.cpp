@@ -190,10 +190,10 @@ void NetworkDiagnosticsDialog::buildTelemetrySection(QGridLayout* grid, int& row
 
 void NetworkDiagnosticsDialog::buildUi()
 {
-    // §D exception: #141c28 — diagnostics dialog bg; darker blue-black than
+    // §D exception: #0a1a28 — diagnostics dialog bg; darker blue-black than
     // kAppBg (#0f0f1a) to visually separate from the main window.
     setStyleSheet(QStringLiteral(
-        "QDialog { background: #141c28; }"  // §D exception: diagnostics-specific bg
+        "QDialog { background: #0a1a28; }"  // §D exception: diagnostics-specific bg
         "QLabel  { background: transparent; }"
     ));
 
@@ -225,21 +225,21 @@ void NetworkDiagnosticsDialog::buildUi()
 
     QPushButton* resetBtn = new QPushButton(tr("Reset session stats"), this);
     // §D: color #8aa8c0 = Style::kTitleText (exact match).
-    // §D exceptions: bg #1e2c3a / border #2e4050 / hover #253545 / pressed #1a2530
+    // §D exceptions: bg #1a2a38 / border #304050 / hover #2a3a4a / pressed #1a2a38
     //   — diagnostics button surface; between kButtonBg (#1a2a3a) and kBorderSubtle
-    //   (#203040), chosen to contrast with the #141c28 dialog bg.
+    //   (#203040), chosen to contrast with the #0a1a28 dialog bg.
     resetBtn->setStyleSheet(
         QStringLiteral(
             "QPushButton {"
             "  color: %1;"                       // Style::kTitleText
-            "  background: #1e2c3a;"             // §D exception: diagnostics btn bg
-            "  border: 1px solid #2e4050;"       // §D exception: diagnostics btn border
+            "  background: #1a2a38;"             // §D exception: diagnostics btn bg
+            "  border: 1px solid #304050;"       // §D exception: diagnostics btn border
             "  border-radius: 3px;"
             "  padding: 4px 10px;"
             "  font-size: 11px;"
             "}"
-            "QPushButton:hover { background: #253545; }"   // §D exception
-            "QPushButton:pressed { background: #1a2530; }" // §D exception
+            "QPushButton:hover { background: #2a3a4a; }"   // §D exception
+            "QPushButton:pressed { background: #1a2a38; }" // §D exception
         ).arg(Style::kTitleText));
     connect(resetBtn, &QPushButton::clicked,
             this, &NetworkDiagnosticsDialog::onResetSessionStats);
@@ -247,20 +247,20 @@ void NetworkDiagnosticsDialog::buildUi()
 
     QPushButton* closeBtn = new QPushButton(tr("Close"), this);
     // §D: color #c8d8e8 = Style::kTextPrimary (exact match).
-    // §D exceptions: bg #1e3050 / border #2e4060 / hover #253d60 / pressed #1a2a48
+    // §D exceptions: bg #204060 / border #204060 / hover #204060 / pressed #1a2a48
     //   — diagnostics close button uses a more prominent blue tint to distinguish
     //   it from the reset button; no canonical match.
     closeBtn->setStyleSheet(
         QStringLiteral(
             "QPushButton {"
             "  color: %1;"                       // Style::kTextPrimary
-            "  background: #1e3050;"             // §D exception: diagnostics close btn bg
-            "  border: 1px solid #2e4060;"       // §D exception
+            "  background: #204060;"             // §D exception: diagnostics close btn bg
+            "  border: 1px solid #204060;"       // §D exception
             "  border-radius: 3px;"
             "  padding: 4px 16px;"
             "  font-size: 11px;"
             "}"
-            "QPushButton:hover { background: #253d60; }"   // §D exception
+            "QPushButton:hover { background: #204060; }"   // §D exception
             "QPushButton:pressed { background: #1a2a48; }" // §D exception
         ).arg(Style::kTextPrimary));
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);

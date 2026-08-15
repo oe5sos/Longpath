@@ -95,17 +95,21 @@ private slots:
         FFTEngine fe(0);
         QSignalSpy spy(&fe, &FFTEngine::spectrumSettingsChanged);
 
-        // Default size is 4096; setting to 4096 should NOT emit.
-        fe.setFftSize(4096);
+        // Setzen auf die VORHANDENE Groesse darf nicht melden. Die
+        // Vorgabe steht hier nicht als Zahl: sie wurde am 2026-08-15 von
+        // 4096 auf 16384 gehoben, und dieser Test fiel darueber — er
+        // pruefte „meldet nur bei echter Aenderung" und stolperte
+        // stattdessen ueber die Zahl selbst.
+        fe.setFftSize(kDefaultFftSize);
         QCOMPARE(spy.count(), 0);
 
         // Setting to a new size -> 1 emit with receiverId=0.
-        fe.setFftSize(8192);
+        fe.setFftSize(kDefaultFftSize == 8192 ? 4096 : 8192);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toInt(), 0);
 
         // Setting to the same new size -> no additional emit.
-        fe.setFftSize(8192);
+        fe.setFftSize(kDefaultFftSize == 8192 ? 4096 : 8192);
         QCOMPARE(spy.count(), 1);
 
         // Different size again -> 2 total emits.
@@ -128,11 +132,14 @@ private slots:
     {
         SpectrumWidget w;
         // Default sample rate is 768000 (per SpectrumWidget.h:990).  No
-        // bins fed yet, so fallback to fftSz=4096.  Expected:
-        //   768000 / 4096 = 187.5 Hz
-        // Pre-fix bug returned 768000 / 8192 = 93.75 Hz (half).
+        // bins fed yet, so the fallback is the engine default.
+        // Die Zahl wird gerechnet, nicht hingeschrieben: der
+        // Rueckfallwert MUSS der Vorgabe folgen, und ein fester
+        // Erwartungswert hier wuerde genau das Auseinanderlaufen
+        // durchwinken, das dieser Test verhindern soll.
         const double bw = w.binWidthHz();
-        QCOMPARE_LT(std::abs(bw - 187.5), 1e-6);
+        const double want = 768000.0 / kDefaultFftSize;
+        QCOMPARE_LT(std::abs(bw - want), 1e-6);
     }
 };
 

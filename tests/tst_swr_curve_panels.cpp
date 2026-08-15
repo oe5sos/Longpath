@@ -185,6 +185,52 @@ private slots:
         }
     }
 
+    // ── The scale must not print a frequency nobody measured ─────────
+    //
+    // The panel is the measured run plus 6 % of air at each end, so the
+    // curve does not touch the break lines. The labels were taken from
+    // the PANEL, which put "1.799 – 2.011" under 160 m: one end below
+    // the band, the other above it, neither swept, and both illegal to
+    // transmit on. A scale that reads out of band beside a transmitting
+    // instrument is worse than no scale.
+    void thePanelScaleReadsWhatWasMeasured()
+    {
+        SwrCurveWidget w;
+        w.setRegion(AmateurBands::Region::One);
+        w.setSweep(hfRangeSweep());
+
+        const QList<QPair<double, double>> measured = {
+            { 1.810e6,  2.000e6}, { 3.500e6,  3.800e6},
+            { 7.000e6,  7.200e6}, {10.100e6, 10.150e6},
+            {14.000e6, 14.350e6}, {18.068e6, 18.168e6},
+            {21.000e6, 21.450e6}, {24.890e6, 24.990e6},
+            {28.000e6, 29.700e6},
+        };
+        const auto panels = w.viewPanels();
+        QCOMPARE(panels.size(), measured.size());
+
+        for (int i = 0; i < panels.size(); ++i) {
+            const auto& p = panels.at(i);
+            QVERIFY2(std::abs(p.dataLoHz - measured.at(i).first) < 1.0,
+                     qPrintable(QStringLiteral(
+                         "panel %1 would label its left end %2 MHz; the "
+                         "first point measured there was %3 MHz")
+                             .arg(i)
+                             .arg(p.dataLoHz / 1e6, 0, 'f', 4)
+                             .arg(measured.at(i).first / 1e6, 0, 'f', 4)));
+            QVERIFY2(std::abs(p.dataHiHz - measured.at(i).second) < 1.0,
+                     qPrintable(QStringLiteral(
+                         "panel %1 would label its right end %2 MHz; the "
+                         "last point measured there was %3 MHz")
+                             .arg(i)
+                             .arg(p.dataHiHz / 1e6, 0, 'f', 4)
+                             .arg(measured.at(i).second / 1e6, 0, 'f', 4)));
+            // ...and the air is real, so the drawn panel is wider.
+            QVERIFY(p.loHz < p.dataLoHz);
+            QVERIFY(p.hiHz > p.dataHiHz);
+        }
+    }
+
     void aTwoBandSweepSplitsInTwo()
     {
         // The smallest segmented case, and the one the antenna-window

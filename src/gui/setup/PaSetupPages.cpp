@@ -235,7 +235,7 @@ QLabel* buildPlaceholderLabel(const QString& body)
 // and so the duplicated "model-less path" / "live editor path" build
 // blocks don't drift.
 constexpr auto kBannerWarningColor = "#d09060";  // amber, fits NereusSDR amber palette
-constexpr auto kBannerInfoColor    = "#80b0d0";  // cyan-blue, fits accent palette
+constexpr auto kBannerInfoColor    = "#8aa8c0";  // cyan-blue, fits accent palette
 
 QString bannerWarningStyle()
 {

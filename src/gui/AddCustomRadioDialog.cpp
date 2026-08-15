@@ -100,16 +100,16 @@ namespace NereusSDR {
 //   Style::kTextSecondary (#8090a0).
 //
 // §D exception values (no canonical match — dialog-specific):
-//   #12202e  — field input background; deeper inset than kButtonBg (#1a2a3a),
+//   #0a1a28  — field input background; deeper inset than kButtonBg (#1a2a3a),
 //               lighter than kPanelBg (#0a0a18). Kept as named constant.
 //   #0096b7  — primary button hover; darker accent variant not in palette.
-//   #303850  — primary button disabled bg; bluish-gray not in palette.
-//   #606878  — primary button disabled fg; not in palette.
+//   #2a3040  — primary button disabled bg; bluish-gray not in palette.
+//   #556070  — primary button disabled fg; not in palette.
 //   #405060  — secondary button border and hover; not in palette.
 
 // Field input background — deeper inset than kButtonBg; no canonical match.
 // §D documented exception.
-static constexpr const char* kFieldInputBg = "#12202e";
+static constexpr const char* kFieldInputBg = "#0a1a28";
 
 static const QString kFieldStyle =
     QStringLiteral(
@@ -131,7 +131,7 @@ static const QString kPrimaryButtonStyle =
         "  border: none; border-radius: 4px; padding: 6px 16px; font-weight: bold;"
         "}"
         "QPushButton:hover { background: #0096b7; }"        // §D exception: accent-dark hover
-        "QPushButton:disabled { background: #303850; color: #606878; }")  // §D exception: disabled
+        "QPushButton:disabled { background: #2a3040; color: #556070; }")  // §D exception: disabled
     .arg(Style::kAccent);
 
 // Secondary (outline) button — kOverlayBorder bg, kTextPrimary fg.
@@ -383,7 +383,7 @@ void AddCustomRadioDialog::buildUi()
     btnRow->addWidget(cancelButton);
     outerLayout->addLayout(btnRow);
 
-    // Dark theme — §D: #a0b0c0 label fg has no canonical match (off-palette
+    // Dark theme — §D: #8aa8c0 label fg has no canonical match (off-palette
     // label warm-blue used in this dialog only; §D documented exception).
     setStyleSheet(
         QStringLiteral(
@@ -400,7 +400,7 @@ void AddCustomRadioDialog::buildUi()
             "  left: 10px;"
             "  padding: 0 3px;"
             "}"
-            "QLabel { color: #a0b0c0; }")          // §D exception: off-palette label warm-blue
+            "QLabel { color: #8aa8c0; }")          // §D exception: off-palette label warm-blue
         .arg(Style::kAppBg, Style::kTextSecondary, Style::kBorderSubtle));
 
     // Wire validation to field changes
@@ -786,9 +786,9 @@ void AddCustomRadioDialog::showInlineInfo(const QString& message)
     // Info band: dark blue border + blue text.
     // Colour: #5985b8 info blue (design §6.4).
     m_feedbackFrame->setStyleSheet(QStringLiteral(
-        "QFrame { background: #101828; border: 1px solid #5985b8; border-radius: 4px; }"));
+        "QFrame { background: #0a1a28; border: 1px solid #5985b8; border-radius: 4px; }"));
     m_feedbackLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8aabcf; font-size: 12px; }"));
+        "QLabel { color: #8aa8c0; font-size: 12px; }"));
     m_feedbackLabel->setText(message);
     m_feedbackFrame->show();
 }

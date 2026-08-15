@@ -190,24 +190,27 @@ private:
 
     QComboBox*    m_bandBox{nullptr};
 
-    // ── Band, or a range across several ──────────────────────────────
+    // ── Wo der Bereich war ───────────────────────────────────────────
     //
-    // "Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich auch
-    //  eingeben, von welcher Startfrequenz bis welcher Endfrequenz."
+    // Hier standen ein „Band / Bereich"-Wähler und zwei Frequenzfelder.
+    // Die Idee kam aus einer echten Frage:
     //
-    // Band stays the default and the band combo stays where it was.
-    // Choosing "Bereich" swaps it for two frequency boxes.
+    //   „Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich auch
+    //    eingeben, von welcher Startfrequenz bis welcher Endfrequenz."
     //
-    // The sweep still only keys inside the allocated segments, so a
-    // range across the whole of HF measures one curve per band with
-    // holes between them — see SwrSweepPlan::forRange.
-    QComboBox*       m_modeBox{nullptr};
-    QDoubleSpinBox*  m_fromBox{nullptr};
-    QDoubleSpinBox*  m_toBox{nullptr};
-    QLabel*          m_rangeDash{nullptr};
-
-    bool rangeMode() const;
-    void applyModeVisibility();
+    // Sie war richtig, und das Funkgerät ist das falsche Werkzeug dafür.
+    // Zwischen den Bändern darf es nicht senden, also blieb die Strecke
+    // dort leer, und heraus kam ein Diagramm mit Löchern, das aussah wie
+    // eine durchgehende Messung. Ein Messgerät, das lückenhaft misst und
+    // vollständig aussieht, ist schlimmer als eines, das die Messung
+    // verweigert.
+    //
+    // Für 1,8 bis 30 MHz am Stück gibt es den VNA — dessen .s1p kommt
+    // über „VNA-Referenz…" in dasselbe Diagramm und ist dort dann auch
+    // durchgehend, weil sie durchgehend gemessen wurde.
+    //
+    // Entfernt am 2026-08-15 auf Wunsch von OE5SOS: „Die Mehrband bitte
+    // weg. Die Solo-Band bitte lassen."
 
     QSpinBox*     m_pointsBox{nullptr};
     QLabel*       m_powerLabel{nullptr};

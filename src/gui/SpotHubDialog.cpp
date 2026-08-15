@@ -154,22 +154,22 @@ namespace {
 // (consistent dark panel + cyan accent + monospace console).
 
 constexpr const char* kLineEditStyle =
-    "QLineEdit { background: #1a1a2e; color: #c8d8e8; "
+    "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
     "border: 1px solid #203040; padding: 3px; }";
 
 constexpr const char* kSpinBoxStyle =
-    "QSpinBox { background: #1a1a2e; color: #c8d8e8; "
+    "QSpinBox { background: #1a1a2a; color: #c8d8e8; "
     "border: 1px solid #203040; padding: 3px; }";
 
 constexpr const char* kAutoToggleStyle =
-    "QPushButton { background: #206030; color: white; "
+    "QPushButton { background: #1a6030; color: white; "
     "border: 1px solid #305040; padding: 4px 10px; }"
     "QPushButton:!checked { background: #603020; }";
 
 constexpr const char* kStartBtnStyle =
     "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
     "border: 1px solid #008ba8; padding: 4px; border-radius: 3px; }"
-    "QPushButton:hover { background: #00c8f0; }"
+    "QPushButton:hover { background: #00b4d8; }"
     "QPushButton:disabled { background: #404060; color: #808080; }";
 
 constexpr const char* kStatusIdleStyle =
@@ -181,7 +181,7 @@ constexpr const char* kStatusActiveStyle =
 constexpr const char* kConsoleStyle =
     "QPlainTextEdit {"
     "  background: #0a0a14;"
-    "  color: #a0b0c0;"
+    "  color: #8aa8c0;"
     "  font-family: monospace;"
     "  font-size: 11px;"
     "  border: 1px solid #203040;"
@@ -189,7 +189,7 @@ constexpr const char* kConsoleStyle =
     "}";
 
 constexpr const char* kCmdEditStyle =
-    "QLineEdit { background: #1a1a2e; color: #c8d8e8; "
+    "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
     "border: 1px solid #203040; padding: 3px; font-family: monospace; }";
 
 // F3 (NereusSDR-native). Pill buttons for the band + source filter
@@ -197,8 +197,8 @@ constexpr const char* kCmdEditStyle =
 // passes that band/source. Unchecked = dim, filter hides it.
 constexpr const char* kFilterPillStyle =
     "QPushButton {"
-    "  background: #1a1a2e;"
-    "  color: #808890;"
+    "  background: #1a1a2a;"
+    "  color: #8090a0;"
     "  border: 1px solid #203040;"
     "  border-radius: 9px;"
     "  padding: 2px 8px;"
@@ -216,18 +216,18 @@ constexpr const char* kFilterPillStyle =
 constexpr const char* kSpotTableStyle =
     "QTableView {"
     "  background: #0a0a14;"
-    "  alternate-background-color: #0f0f1e;"
+    "  alternate-background-color: #0a0a18;"
     "  color: #c8d8e8;"
     "  gridline-color: #1a2a3a;"
     "  border: 1px solid #203040;"
     "  font-size: 11px;"
     "}"
     "QTableView::item:selected {"
-    "  background: #1a3a5a;"
+    "  background: #204060;"
     "  color: #e0f0ff;"
     "}"
     "QHeaderView::section {"
-    "  background: #1a1a2e;"
+    "  background: #1a1a2a;"
     "  color: #00b4d8;"
     "  border: 1px solid #203040;"
     "  padding: 3px 6px;"
@@ -287,7 +287,7 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
     auto* tabs = new QTabWidget;
     tabs->setStyleSheet(
         "QTabWidget::pane { border: 1px solid #203040; }"
-        "QTabBar::tab { background: #1a1a2e; color: #808890; border: 1px solid #203040; "
+        "QTabBar::tab { background: #1a1a2a; color: #8090a0; border: 1px solid #203040; "
         "  padding: 6px 16px; margin-right: 2px; }"
         "QTabBar::tab:selected { background: #0f0f1a; color: #00b4d8; border-bottom: none; }");
 
@@ -606,7 +606,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     m_settingsCurrentLabel = new QLabel(summary);
     m_settingsCurrentLabel->setObjectName("settingsCurrentLabel");
     m_settingsCurrentLabel->setStyleSheet(
-        "QLabel { color: #808890; font-size: 11px; }");
+        "QLabel { color: #8090a0; font-size: 11px; }");
     m_settingsCurrentLabel->setWordWrap(true);
     layout->addWidget(m_settingsCurrentLabel);
 
@@ -759,7 +759,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
                     if (m_statusLabel) {
                         m_statusLabel->setText(QString("Error: %1").arg(error));
                         m_statusLabel->setStyleSheet(
-                            "QLabel { color: #e6c200; font-size: 11px; }");
+                            "QLabel { color: #ddbb00; font-size: 11px; }");
                     }
                 });
         // Stream raw cluster lines into the console widget so the user
@@ -998,7 +998,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
                     if (m_rbnStatusLabel) {
                         m_rbnStatusLabel->setText(QString("Error: %1").arg(error));
                         m_rbnStatusLabel->setStyleSheet(
-                            "QLabel { color: #e6c200; font-size: 11px; }");
+                            "QLabel { color: #ddbb00; font-size: 11px; }");
                     }
                 });
         connect(m_rbnClient, &DxClusterClient::rawLineReceived,
@@ -1205,7 +1205,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     filterRow->addWidget(filterLabel);
 
     const QString cbStyle =
-        "QCheckBox { color: #a0b0c0; font-size: 14px; spacing: 3px; }"
+        "QCheckBox { color: #8aa8c0; font-size: 14px; spacing: 3px; }"
         "QCheckBox::indicator { width: 14px; height: 14px; }";
 
     // CQ color + checkbox
@@ -1319,7 +1319,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     });
     filterRow->addWidget(m_wsjtxColorDefault);
     auto* defaultLabel = new QLabel("Default");
-    defaultLabel->setStyleSheet("QLabel { color: #a0b0c0; font-size: 14px; }");
+    defaultLabel->setStyleSheet("QLabel { color: #8aa8c0; font-size: 14px; }");
     filterRow->addWidget(defaultLabel);
 
     layout->addLayout(filterRow);
@@ -1346,7 +1346,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     auto* wsjtxLifeValue = new QLabel(QString("%1s").arg(wsjtxLife));
     wsjtxLifeValue->setFixedWidth(35);
     wsjtxLifeValue->setAlignment(Qt::AlignRight);
-    wsjtxLifeValue->setStyleSheet("QLabel { color: #a0b0c0; font-size: 12px; }");
+    wsjtxLifeValue->setStyleSheet("QLabel { color: #8aa8c0; font-size: 12px; }");
     decodeRow->addWidget(wsjtxLifeValue);
 
     connect(wsjtxLifeSlider, &QSlider::valueChanged, this, [wsjtxLifeValue](int v) {
@@ -1522,7 +1522,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
 
     grid->addWidget(new QLabel("Server:"), row, 0);
     auto* serverLabel = new QLabel("api.pota.app (HTTP polling)");
-    serverLabel->setStyleSheet("QLabel { color: #808890; }");
+    serverLabel->setStyleSheet("QLabel { color: #8090a0; }");
     grid->addWidget(serverLabel, row, 1);
     row++;
 
@@ -1688,7 +1688,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
         m_freedvIdentityLabel->setWordWrap(true);
         if (call.isEmpty() || gridSquare.isEmpty()) {
             m_freedvIdentityLabel->setText(
-                "<b style='color:#e6c200;'>No identity set.</b> "
+                "<b style='color:#ddbb00;'>No identity set.</b> "
                 "Go to the <b>Settings</b> tab and fill in your callsign "
                 "and grid square before starting FreeDV Reporter.");
         } else {
@@ -1711,7 +1711,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
 
     grid->addWidget(new QLabel("Server:"), row, 0);
     auto* serverLabel = new QLabel("qso.freedv.org (WebSocket)");
-    serverLabel->setStyleSheet("QLabel { color: #808890; }");
+    serverLabel->setStyleSheet("QLabel { color: #8090a0; }");
     grid->addWidget(serverLabel, row, 1);
     row++;
 
@@ -1779,7 +1779,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
                 m_freedvStatusLabel->setText(
                     "Identity missing - set callsign and grid in Settings tab.");
                 m_freedvStatusLabel->setStyleSheet(
-                    "QLabel { color: #e6c200; font-size: 11px; }");
+                    "QLabel { color: #ddbb00; font-size: 11px; }");
             }
             return;
         }
@@ -1818,7 +1818,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
                     if (m_freedvStatusLabel) {
                         m_freedvStatusLabel->setText(QString("Error: %1").arg(error));
                         m_freedvStatusLabel->setStyleSheet(
-                            "QLabel { color: #e6c200; font-size: 11px; }");
+                            "QLabel { color: #ddbb00; font-size: 11px; }");
                     }
                 });
     }
@@ -2500,7 +2500,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
         auto* row = new QHBoxLayout;
         row->setSpacing(6);
         auto* lbl = new QLabel(label + ":");
-        lbl->setStyleSheet("QLabel { color: #808890; }");
+        lbl->setStyleSheet("QLabel { color: #8090a0; }");
         lbl->setMinimumWidth(120);
         row->addWidget(lbl);
         auto* value = new QLabel("0");
@@ -2579,7 +2579,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     int  positionVal = s.value("SpotsStartingHeightPercentage", 50).toInt();
     int  fontSizeVal = s.value("SpotFontSize", 16).toInt();
     QColor spotColor(s.value("SpotsOverrideColor", "#FFFF00").toString());
-    QColor bgColor  (s.value("SpotsOverrideBgColor", "#000000").toString());
+    QColor bgColor  (s.value("SpotsOverrideBgColor", "#0a0a14").toString());
     int  bgOpacityVal = s.value("SpotsBackgroundOpacity", 48).toInt();
     // Migrate from old minutes key to new seconds key. Preserved
     // verbatim from upstream SpotSettingsDialog.cpp:34-37 [@0cd4559].
@@ -2610,7 +2610,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     // Upstream stylesheet fragment for the green/red toggle pair.
     // From SpotSettingsDialog.cpp:63-65 [@0cd4559].
     static constexpr const char* kToggleStyle =
-        "QPushButton { background: #206030; color: white; "
+        "QPushButton { background: #1a6030; color: white; "
         "border: 1px solid #305040; padding: 3px; }"
         "QPushButton:!checked { background: #603020; }";
 
@@ -2825,7 +2825,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     bgColorSwatch->setStyleSheet(swatchStyle(bgColor));
     connect(bgColorSwatch, &QPushButton::clicked, this,
             [this, bgColorSwatch, save] {
-        QColor current(AppSettings::instance().value("SpotsOverrideBgColor", "#000000").toString());
+        QColor current(AppSettings::instance().value("SpotsOverrideBgColor", "#0a0a14").toString());
         QColor c = QColorDialog::getColor(current, this, "Spot Background Color");
         if (c.isValid()) {
             bgColorSwatch->setStyleSheet(swatchStyle(c));

@@ -109,7 +109,7 @@ QWidget* RfKitPage::buildGeneralTab()
         "and TCI band tracking flows to the amp automatically. When disabled, "
         "the applet hides and the RF2K-S tab below greys out."), tab);
     helper->setWordWrap(true);
-    helper->setStyleSheet(QStringLiteral("color: #9aa5b1; font-size: 11px;"));
+    helper->setStyleSheet(QStringLiteral("color: #8899aa; font-size: 11px;"));
     lay->addWidget(helper);
 
     m_liveStatusLabel = new QLabel(tab);
@@ -197,7 +197,7 @@ QWidget* RfKitPage::buildRf2ksTab()
         "RF2K-S firmware does not expose antenna names via REST. "
         "Labels are stored locally in NereusSDR."), labelsBox);
     note->setWordWrap(true);
-    note->setStyleSheet(QStringLiteral("color:#9aa5b1; font-size:10px;"));
+    note->setStyleSheet(QStringLiteral("color:#8899aa; font-size:10px;"));
     labelsFm->addRow(note);
     for (int i = 0; i < 4; ++i) {
         m_antLabelEdits[i] = new QLineEdit(labelsBox);

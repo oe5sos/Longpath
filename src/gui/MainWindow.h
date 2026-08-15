@@ -650,6 +650,27 @@ private:
     /// metaobject rather than naming signals here, so the trigger set has a
     /// single definition and cannot silently fall behind the fields
     /// updateStatusOverlay paints.
+    /// Die Profilschiene an ihre Dialoge hängen (Anlegen, Umbenennen,
+    /// Duplizieren, Löschen) und den Stand beim Beenden sichern.
+    void wireProfileRail();
+
+    // ── Fensterteile, die keine Applets sind ─────────────────────────
+    //
+    // Sie stehen im Auswähler wie die Applets, hängen aber nicht in
+    // m_appletsById — es gibt kein AppletWidget zu ihnen. Deshalb zwei
+    // feste Kennungen und eine eigene Anwendung.
+    static constexpr auto kChromeOverlayId = "ChromeSpectrumButtons";
+    static constexpr auto kChromeStatusId  = "ChromeStatusBar";
+
+    /// Ein solches Fensterteil ein- oder ausblenden. Tut nichts, wenn
+    /// die Kennung keines der beiden ist.
+    void applyChromeVisibility(const QString& id, bool visible);
+
+    /// Der Zustand, den ein frisch angelegtes Profil bekommt: alles
+    /// aus, was im Auswähler steht. Panadapter und Splitterstellung
+    /// bleiben.
+    QVariantMap blankLayoutState() const;
+
     void wireSliceStatusOverlayTriggers(SliceModel* slice);
 
     /// Phase 3F: create the VfoWidget for a secondary slice (B+) on the
@@ -1178,6 +1199,14 @@ private:
     QrzLogbookUploader*  m_qrzUploader{nullptr};
     CloudlogUploader*    m_cloudlogUploader{nullptr};
     AdifNetworkUploader* m_localLogUploader{nullptr};
+
+    // Kopfleiste im Zeus-Zuschnitt und das Plus an ihrem rechten Ende.
+    // Das Plus entsteht erst, wenn m_appletVis alle Kategorien kennt —
+    // deshalb zwei Zeiger und nicht einer.
+    class CommandBar* m_commandBar{nullptr};
+    class AddWidgetButton* m_addWidget{nullptr};
+    class ProfileRail* m_profileRail{nullptr};
+    class LayoutProfiles* m_layoutProfiles{nullptr};
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;

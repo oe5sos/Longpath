@@ -153,8 +153,10 @@ public:
     /// hundred-and-fortieth — where looking at the picture was the only
     /// check available before, and I cannot look at the picture.
     struct Panel {
-        double loHz{0.0};
+        double loHz{0.0};      // drawn edge — the run plus 6 % of air
         double hiHz{0.0};
+        double dataLoHz{0.0};  // first and last frequency measured in it
+        double dataHiHz{0.0};
         double f0{0.0};
         double f1{0.0};
     };
@@ -266,8 +268,18 @@ private:
     // Empty for an ordinary single-band sweep, which keeps the plain
     // linear axis it has always had.
     struct ViewSegment {
-        double loHz{0.0};
+        double loHz{0.0};    // panel edge — the measured run plus margin
         double hiHz{0.0};
+        // ── What was actually measured, for the labels ───────────────
+        //
+        // loHz/hiHz carry 6 % of air on each side so the curve does not
+        // touch the break lines. Labelling the panel with THOSE prints
+        // "1.799" under 160 m: a frequency below the band edge, that
+        // nobody measured and nobody may transmit on. The scale has to
+        // say where the data starts and stops, not where the drawing
+        // does.
+        double dataLoHz{0.0};
+        double dataHiHz{0.0};
         double f0{0.0};      // left edge, fraction of the plot width
         double f1{0.0};      // right edge
     };
@@ -276,6 +288,12 @@ private:
     /// Rebuild m_viewSegs from the current sweep. Leaves it empty when
     /// the sweep is continuous.
     void rebuildViewSegments();
+
+    /// True when a hole-free reference curve covers the whole of the
+    /// live sweep — a VNA file, in practice. Then the axis stays
+    /// linear: there is a continuous line to draw, so breaking the
+    /// picture into panels would be hiding it.
+    bool referenceSpansTheSweep() const;
 
     // Cursor position in widget coordinates while it is over the plot,
     // or a negative x when it is not.

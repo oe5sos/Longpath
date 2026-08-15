@@ -37,6 +37,13 @@ using namespace NereusSDR;
 
 namespace {
 
+// ── Ein Zeitlimit für alle Pumpschleifen ─────────────────────────────
+//
+// Es standen 3000 und 5000 nebeneinander in elf Schleifen, ohne dass
+// der Unterschied etwas bedeutete. Eine Zahl, ein Ort, eine Begründung
+// — siehe pumpUntilFinished() weiter unten.
+constexpr int kPumpTimeoutMs = 30000;
+
 // A synthetic dipole resonant at fRes: SWR rises linearly with
 // |f - fRes|, 1.1 at resonance, ~3 at ±150 kHz. Inverted into fwd/rev
 // watts the way the bridge would report them at 10 W drive.
@@ -84,7 +91,30 @@ struct Harness {
     }
 
     // Pump telemetry for the fake antenna while the event loop spins.
-    void pumpUntilFinished(const FakeDipole& dipole, int timeoutMs = 5000)
+    //
+    // ── Warum dreissig Sekunden und nicht fuenf ──────────────────────
+    //
+    // 2026-08-15: dieser Test fiel EINMAL in einem vollen Lauf durch und
+    // war danach fuenfmal allein gruen. Kein Fehler im Controller — ein
+    // Zeitlimit nach der Wanduhr in einem Test, der mit neun anderen
+    // Qt-Programmen um dieselbe Maschine kaempft.
+    //
+    // Ein Sweep hier dauert normal weit unter einer Sekunde. Die fuenf
+    // Sekunden sahen nach reichlich Luft aus, aber QTest::qWait(2) ist
+    // eine UNTERGRENZE: unter Last werden aus zwei Millisekunden auch
+    // mal fuenfzig, und dann reicht die Luft nicht.
+    //
+    // Das Limit hoeher zu setzen kostet nichts, solange nichts haengt —
+    // die Schleife bricht ab, sobald das Signal da ist. Es kostet nur
+    // dann, wenn wirklich etwas steht, und dann SOLL es kosten.
+    //
+    // Und der Abbruch sagt jetzt, dass er ein Abbruch war. Vorher lief
+    // der Test danach einfach weiter und scheiterte an der naechsten
+    // Zusicherung — die Meldung zeigte auf die falsche Stelle, was der
+    // Grund ist, warum dieser Fehlschlag zwei Runden lang raetselhaft
+    // blieb.
+    void pumpUntilFinished(const FakeDipole& dipole,
+                           int timeoutMs = kPumpTimeoutMs)
     {
         QSignalSpy fin(&ctl, &SwrSweepController::sweepFinished);
         QElapsedTimer t;
@@ -96,6 +126,9 @@ struct Harness {
             ctl.ingestTelemetry(fwd, rev);
             QTest::qWait(2);
         }
+        QVERIFY2(!fin.isEmpty(),
+                 "sweepFinished kam nicht — Zeitlimit abgelaufen, nicht "
+                 "die eigentliche Zusicherung");
     }
 };
 
@@ -215,7 +248,7 @@ private slots:
         // Let a few points land, then pull the plug.
         QElapsedTimer t;
         t.start();
-        while (pts.count() < 5 && t.elapsed() < 3000) {
+        while (pts.count() < 5 && t.elapsed() < kPumpTimeoutMs) {
             double fwd = 0.0;
             double rev = 0.0;
             dipole.wattsAt(static_cast<double>(h.currentFreq), fwd, rev);
@@ -261,7 +294,7 @@ private slots:
         // Total reflection everywhere: rev == fwd.
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 3000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             h.ctl.ingestTelemetry(10.0, 10.0);
             QTest::qWait(2);
         }
@@ -294,7 +327,7 @@ private slots:
         // ANAN's coupler, near enough.
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 3000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             h.ctl.ingestTelemetry(0.2, 0.02);
             QTest::qWait(2);
         }
@@ -331,7 +364,7 @@ private slots:
 
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 3000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             h.ctl.ingestTelemetry(0.01, 0.0);   // what the ANAN reported
             QTest::qWait(2);
         }
@@ -359,7 +392,7 @@ private slots:
 
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 3000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             h.ctl.ingestTelemetry(0.30, 0.02);
             QTest::qWait(2);
         }
@@ -404,7 +437,7 @@ private slots:
 
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 5000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             const bool keyed = (h.mox.state() != MoxState::Rx);
             h.ctl.ingestTelemetry(keyed ? 1.9  : 0.0,
                                   keyed ? 0.02 : 0.0,
@@ -501,7 +534,7 @@ private slots:
         constexpr quint16 kKeyedRaw = 300;
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 5000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             double fwd = 0.0;
             double rev = 0.0;
             dipole.wattsAt(static_cast<double>(h.currentFreq), fwd, rev);
@@ -542,7 +575,7 @@ private slots:
         // 41 counts throughout, keyed or not — OE5SOS's Anvelina.
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 3000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             h.ctl.ingestTelemetry(5.0, 0.5, 41);
             QTest::qWait(2);
         }
@@ -585,7 +618,7 @@ private slots:
         constexpr quint16 kIdleRev = 12;   // never leaves this
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 5000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             const bool keyed = (h.mox.state() != MoxState::Rx);
             // Forward responds properly; reverse sits at its idle count
             // whether keyed or not.
@@ -619,7 +652,7 @@ private slots:
 
         QElapsedTimer t;
         t.start();
-        while (fin.isEmpty() && t.elapsed() < 5000) {
+        while (fin.isEmpty() && t.elapsed() < kPumpTimeoutMs) {
             double fwd = 0.0;
             double rev = 0.0;
             dipole.wattsAt(static_cast<double>(h.currentFreq), fwd, rev);
@@ -694,26 +727,36 @@ private slots:
     // The floor is a fact about the bridge; the tune-power minimum is
     // that fact expressed where it can be checked before keying. If one
     // ever drops below the other the guard stops guarding.
-    // ── The range sweep: several bands in one run ────────────────────
+    // ── The range sweep: ONE band, or nothing ────────────────────────
     //
-    // "Wenn ich eine Endfed von 10 bis 160 m habe, möchte ich eingeben,
-    //  von welcher Startfrequenz bis welcher Endfrequenz."
+    // It used to span several. Typing 1.8 to 30 MHz planned nine
+    // stretches with eight holes between them, because most of HF is
+    // not ours to transmit on, and the chart then had to present nine
+    // short curves as one picture. Several attempts at that; none of
+    // them read as the range having been measured, because it had not.
     //
-    // The whole difficulty is that most of 1.8–30 MHz is not ours to
-    // transmit on. These pin that the planner produces holes rather
-    // than a span.
+    // OE5SOS, 2026-08-15: "es muss eine durchgehende linie sein, es
+    // muss der ganze bereich gemessen werden" — and when told the
+    // transmitter may not key between the bands, "die mehrband bitte
+    // weg. die solo band bitte lassen".
+    //
+    // So a range must lie inside one allocation. These pin that, and
+    // pin that the refusal SAYS WHY: an operator who types 1.8 to 30
+    // and gets "invalid" learns nothing.
 
     void range_keysOnlyInsideAllocatedSegments()
     {
+        // A range inside 20 m: every planned frequency allocated, and
+        // one unbroken stretch.
         safety::BandPlanGuard guard;
         const SwrSweepPlan p = SwrSweepPlan::forRange(
-            3.0e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 51);
+            14.0e6, 14.35e6, guard, safety::Region::Europe, DSPMode::LSB, 51);
 
         QVERIFY(p.isValid());
-        QVERIFY(p.isSegmented());
+        QVERIFY2(!p.isSegmented(), "a range plan may no longer have holes");
+        QCOMPARE(p.segments.size(), 1);
         QVERIFY(!p.freqs.isEmpty());
 
-        // Not one planned frequency may be outside an allocation.
         for (quint64 f : p.freqs) {
             QVERIFY2(guard.isValidTxFreq(safety::Region::Europe,
                                          static_cast<std::int64_t>(f),
@@ -722,15 +765,50 @@ private slots:
                          "range sweep planned to transmit on %1 MHz")
                              .arg(f / 1e6, 0, 'f', 4)));
         }
+    }
 
-        // And the gaps must really be gaps: nothing between 40 m and
-        // 30 m, which is 7.2 to 10.1 MHz of broadcast and utility.
-        for (quint64 f : p.freqs) {
-            QVERIFY2(!(f > 7250000ULL && f < 10050000ULL),
-                     qPrintable(QStringLiteral("planned %1 MHz, which is "
-                                               "between the bands")
-                                    .arg(f / 1e6, 0, 'f', 4)));
+    // ── The one this change exists for ───────────────────────────────
+    void range_acrossSeveralBandsIsRefused()
+    {
+        safety::BandPlanGuard guard;
+        for (const auto& r : {QPair<double,double>{1.8e6,  30.0e6},
+                              QPair<double,double>{3.0e6,  30.0e6},
+                              QPair<double,double>{7.0e6,  14.35e6},
+                              QPair<double,double>{10.1e6, 14.35e6}}) {
+            const SwrSweepPlan p = SwrSweepPlan::forRange(
+                r.first, r.second, guard, safety::Region::Europe,
+                DSPMode::LSB, 99);
+            QVERIFY2(!p.isValid(),
+                     qPrintable(QStringLiteral(
+                         "%1–%2 MHz still produced a multi-band plan")
+                             .arg(r.first / 1e6, 0, 'f', 3)
+                             .arg(r.second / 1e6, 0, 'f', 3)));
+            QVERIFY2(p.freqs.isEmpty(),
+                     "a refused plan still carried frequencies to key");
+            // "Sweep plan invalid" is what the operator saw for the
+            // eleven-points bug, and it told him nothing. The refusal
+            // has to name the fault.
+            QVERIFY2(!p.note.isEmpty(),
+                     qPrintable(QStringLiteral(
+                         "%1–%2 MHz was refused without saying why")
+                             .arg(r.first / 1e6, 0, 'f', 3)
+                             .arg(r.second / 1e6, 0, 'f', 3)));
         }
+    }
+
+    void range_theRefusalNamesTheBandsItFound()
+    {
+        // Not just "no". The message has to be actionable, which means
+        // saying how many allocations are in the way and pointing at
+        // the instrument that can sweep across them.
+        safety::BandPlanGuard guard;
+        const SwrSweepPlan p = SwrSweepPlan::forRange(
+            1.8e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 99);
+        QVERIFY(!p.isValid());
+        QVERIFY2(p.note.contains(QStringLiteral("VNA")),
+                 qPrintable(QStringLiteral(
+                     "the refusal does not mention the instrument that "
+                     "can measure the range:\n%1").arg(p.note)));
     }
 
     // ── 60 m: two tables, a factor of twenty-seven apart ─────────────
@@ -744,9 +822,12 @@ private slots:
     // forBand has always refused 60 m outright. forRange now does too.
     void range_neverKeysAnywhereNear60m()
     {
+        // 5.0–5.6 MHz is the only allocation in this window, and it is
+        // excluded, so the range holds exactly one usable stretch —
+        // 80 m — and must plan nothing near 60 m.
         safety::BandPlanGuard guard;
         const SwrSweepPlan p = SwrSweepPlan::forRange(
-            1.8e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 60);
+            3.5e6, 5.6e6, guard, safety::Region::Europe, DSPMode::LSB, 60);
         QVERIFY(p.isValid());
         for (quint64 f : p.freqs) {
             QVERIFY2(f < 5'000'000ULL || f > 5'600'000ULL,
@@ -771,25 +852,29 @@ private slots:
         QVERIFY(p.freqs.isEmpty());
     }
 
-    void range_sharesPointsEquallyNotByWidth()
+    void range_spendsEveryRequestedPointOnTheOneBand()
     {
-        // 160 m is 200 kHz, 10 m is 1.7 MHz. Sharing by width would
-        // leave the low bands with almost nothing, and a sharp
-        // resonance is easiest to miss exactly there.
+        // With multi-band gone there is nothing to share out: the whole
+        // point budget goes on the single stretch, which is what makes
+        // a range sweep worth having over a band sweep — 99 points
+        // across 350 kHz instead of across nine bands.
         safety::BandPlanGuard guard;
         const SwrSweepPlan p = SwrSweepPlan::forRange(
-            1.8e6, 30.0e6, guard, safety::Region::Europe, DSPMode::LSB, 60);
+            14.0e6, 14.35e6, guard, safety::Region::Europe, DSPMode::LSB, 99);
 
-        QVERIFY(p.segments.size() > 2);
-        const int firstCount =
-            p.segments.first().second - p.segments.first().first + 1;
-        for (const auto& seg : p.segments) {
-            const int n = seg.second - seg.first + 1;
-            QCOMPARE(n, firstCount);
-            QVERIFY(n >= SwrSweepPlan::kMinPerSegment);
-        }
+        QCOMPARE(p.segments.size(), 1);
+        const int n = p.segments.first().second
+                      - p.segments.first().first + 1;
+        QCOMPARE(n, p.points);
+        QCOMPARE(n, 99);
+        QVERIFY(n >= SwrSweepPlan::kMinPerSegment);
         QCOMPARE(p.points, int(p.freqs.size()));
         QVERIFY(p.points <= SwrSweepPlan::kMaxPoints);
+
+        // Ascending, no duplicates: freqAt indexes straight into this.
+        for (int i = 1; i < p.freqs.size(); ++i) {
+            QVERIFY(p.freqs.at(i) > p.freqs.at(i - 1));
+        }
     }
 
     void range_withNoAllocatedSegmentIsRefused()
@@ -806,12 +891,14 @@ private slots:
 
     void range_isNotFlattenedByTheContiguousClip()
     {
-        // clipToGuard keeps first-valid..last-valid. Run over a
-        // segmented plan that would swallow every gap between the
-        // bands, so it has to leave range plans alone.
+        // clipToGuard keeps first-valid..last-valid and rewrites
+        // start/stop from them. A range plan carries its own frequency
+        // list, so the clip has to leave it alone rather than replace
+        // it with an evenly spaced span.
         safety::BandPlanGuard guard;
         SwrSweepPlan p = SwrSweepPlan::forRange(
-            3.0e6, 15.0e6, guard, safety::Region::Europe, DSPMode::LSB, 40);
+            7.0e6, 7.2e6, guard, safety::Region::Europe, DSPMode::LSB, 40);
+        QVERIFY(p.isValid());
         const QVector<quint64> before = p.freqs;
 
         QVERIFY(p.clipToGuard(guard, safety::Region::Europe, DSPMode::LSB));
@@ -842,21 +929,21 @@ private slots:
     // Integer division loses the remainder. Eleven points — the spin
     // box's lower stop — over two segments gave five each, ten in all,
     // and startSweep refuses anything under kMinPoints with "Sweep plan
-    // invalid". Turning the point count down and asking for a range
-    // across two bands is not an exotic thing to do.
+    // invalid".
     //
-    // Written an hour after forRange, by working the arithmetic out on
-    // paper. None of the five tests I wrote with it touched the edge.
+    // Multi-band ranges are gone, so that arithmetic cannot arise the
+    // same way. The test stays: it is the contract between forRange and
+    // startSweep, and the multi-band rows now check the other half of
+    // it — that a refused plan is refused CLEANLY, with no frequencies
+    // left in it for a caller to key anyway.
     void range_neverPlansFewerPointsThanTheControllerAccepts()
     {
         safety::BandPlanGuard guard;
-        // Every point count the spin box offers, against ranges holding
-        // one, two, three and many segments.
         const QList<QPair<double, double>> ranges = {
-            {14.0e6, 14.35e6},   // one band
-            { 7.0e6, 14.35e6},   // 40, 30, 20
-            { 3.4e6, 30.0e6},    // most of HF
-            { 1.8e6, 30.0e6},    // all of it
+            {14.0e6, 14.35e6},   // one band — valid
+            { 7.0e6,  7.05e6},   // a sliver of one band — valid
+            { 7.0e6, 14.35e6},   // 40, 30, 20 — refused
+            { 1.8e6, 30.0e6},    // all of HF — refused
         };
         for (int pts : {SwrSweepPlan::kMinPoints, 12, 13, 15, 21, 51,
                         201, SwrSweepPlan::kMaxPoints}) {
@@ -864,7 +951,13 @@ private slots:
                 const SwrSweepPlan p = SwrSweepPlan::forRange(
                     r.first, r.second, guard, safety::Region::Europe,
                     DSPMode::LSB, pts);
-                if (!p.isValid()) { continue; }
+                if (!p.isValid()) {
+                    QVERIFY2(p.freqs.isEmpty(),
+                             "a refused plan still carried frequencies");
+                    QVERIFY2(!p.note.isEmpty(),
+                             "a refused plan gave no reason");
+                    continue;
+                }
                 QVERIFY2(p.points >= SwrSweepPlan::kMinPoints,
                          qPrintable(QStringLiteral(
                              "%1 points over %2–%3 MHz planned only %4 — "
@@ -891,7 +984,7 @@ private slots:
         // they disagreed.
         safety::BandPlanGuard guard;
         SwrSweepPlan p = SwrSweepPlan::forRange(
-            7.0e6, 14.35e6, guard, safety::Region::Europe, DSPMode::LSB,
+            7.0e6, 7.2e6, guard, safety::Region::Europe, DSPMode::LSB,
             SwrSweepPlan::kMinPoints);
         QVERIFY(p.isValid());
 

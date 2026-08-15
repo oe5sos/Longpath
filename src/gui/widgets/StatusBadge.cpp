@@ -127,7 +127,7 @@ QColor StatusBadge::variantForegroundColor() const
     switch (m_variant) {
         case Variant::Info: return QColor(QStringLiteral("#5fa8ff"));
         case Variant::On:   return QColor(QStringLiteral("#5fff8a"));
-        case Variant::Off:  return QColor(QStringLiteral("#404858"));
+        case Variant::Off:  return QColor(QStringLiteral("#3a4a5a"));
         case Variant::Warn: return QColor(QStringLiteral("#ffd700"));
         case Variant::Tx:   return QColor(QStringLiteral("#ff6060"));
     }
@@ -201,7 +201,7 @@ void StatusBadge::applyStyle()
             bg = QStringLiteral("rgba(95,255,138,26)");
             break;
         case Variant::Off:
-            fg = QStringLiteral("#404858");
+            fg = QStringLiteral("#3a4a5a");
             bg = QStringLiteral("rgba(64,72,88,46)");      // 0.18 alpha
             break;
         case Variant::Warn:

@@ -1575,7 +1575,7 @@ void WaterfallDefaultsPage::buildUI()
     // Task 2.8: Calculated Delay readout — live "Delay: NN.N s".
     // Computed from waterfall height × update period; not persisted.
     m_delayLabel = new QLabel(dispGroup);
-    m_delayLabel->setStyleSheet(QStringLiteral("color: #80a0b0;"));
+    m_delayLabel->setStyleSheet(QStringLiteral("color: #8899aa;"));
     m_delayLabel->setToolTip(
         QStringLiteral("Approximate time covered by the visible waterfall display "
                        "(rows × update period). Longer periods or larger display heights "
@@ -1615,7 +1615,11 @@ void WaterfallDefaultsPage::buildUI()
         QStringLiteral("Spectran"),  QStringLiteral("BlackWhite"),
         QStringLiteral("LinLog"),    QStringLiteral("LinRad"),
         QStringLiteral("Custom"),
-        QStringLiteral("Clarity Blue")   // Phase 3G-9b
+        QStringLiteral("Clarity Blue"),  // Phase 3G-9b
+        // Die Reihenfolge muss WfColorScheme entsprechen — der Index
+        // dieser Liste IST der gespeicherte Wert. Anhängen, nie
+        // einfügen.
+        QStringLiteral("Gedämpft")       // 2026-08-15, folgt dem Theme
     });
     // Thetis: setup.designer.cs:34110 (comboColorPalette) — rewritten
     // Thetis original: "Sets the color scheme"
@@ -1775,7 +1779,7 @@ void WaterfallDefaultsPage::buildUI()
     histForm->addRow(QStringLiteral("Depth:"), m_historyDepthCombo);
 
     m_effectiveDepthLabel = new QLabel(histGroup);
-    m_effectiveDepthLabel->setStyleSheet(QStringLiteral("color: #80a0b0;"));
+    m_effectiveDepthLabel->setStyleSheet(QStringLiteral("color: #8899aa;"));
     histForm->addRow(QStringLiteral(""), m_effectiveDepthLabel);
 
     contentLayout()->addWidget(histGroup);

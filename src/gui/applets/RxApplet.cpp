@@ -304,7 +304,7 @@ void RxApplet::buildUi()
             // Dark popup palette — without this, Ubuntu's default theme renders
             // items as dark-on-dark (only visible on hover). Issue #98.
             menu.setStyleSheet(QStringLiteral(
-                "QMenu { background: #1a2a3a; color: #e0e8f0;"
+                "QMenu { background: #1a2a3a; color: #c8d8e8;"
                 "        border: 1px solid #304050; }"
                 "QMenu::item { padding: 4px 20px; }"
                 "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }"));
@@ -350,7 +350,7 @@ void RxApplet::buildUi()
             QMenu menu(this);
             // Dark popup palette — see RX button above. Issue #98.
             menu.setStyleSheet(QStringLiteral(
-                "QMenu { background: #1a2a3a; color: #e0e8f0;"
+                "QMenu { background: #1a2a3a; color: #c8d8e8;"
                 "        border: 1px solid #304050; }"
                 "QMenu::item { padding: 4px 20px; }"
                 "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }"));
@@ -1273,7 +1273,7 @@ void RxApplet::updateSliceButtons(const QVector<SliceModel*>& slices,
         btn->setStyleSheet(QStringLiteral(
             "QToolButton { background: #2a2a2a; color: %1; border: 1px solid %1;"
             " border-radius: 3px; font-weight: bold; font-size: 10px; padding: 0; }"
-            "QToolButton:checked { background: %1; color: #000000; }")
+            "QToolButton:checked { background: %1; color: #0a0a14; }")
             .arg(c.name()));
         btn->setToolTip(QStringLiteral("Slice %1").arg(s->sliceLetter()));
         btn->setChecked(sliceIdx == activeSliceIndex);

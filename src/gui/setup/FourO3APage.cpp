@@ -271,7 +271,7 @@ void FourO3APage::refreshFlexApiStatus()
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8F TCP 4992 bind failed"));
             m_flexApiStatusLabel->setStyleSheet(
-                QStringLiteral("color: #E53935;"));  // red
+                QStringLiteral("color: #cc2222;"));  // red
         } else {
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8B Disabled "

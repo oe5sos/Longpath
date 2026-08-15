@@ -98,6 +98,11 @@ enum class WindowFunction : int {
 // the main thread (FFT size changes require replan on next frame).
 //
 // From Thetis display.cs:215 — BUFFER_SIZE = 16384 (max FFT size)
+/// Die Vorgabe-FFT-Größe an EINER Stelle. Sie stand vorher als 4096 an
+/// drei Orten — im Feld, im Rückfallwert von SpectrumWidget::binWidthHz()
+/// und in zwei Tests — und beim Anheben blieben zwei davon zurück.
+inline constexpr int kDefaultFftSize = 16384;
+
 class FFTEngine : public QObject {
     Q_OBJECT
 
@@ -237,7 +242,34 @@ private:
     int m_receiverId;
 
     // FFT configuration (atomics for cross-thread access)
-    std::atomic<int>    m_fftSize{4096};
+    // ── Warum 16384 und nicht 4096 ───────────────────────────────────
+    //
+    // 2026-08-15, OE5SOS zum Spektrum: „derzeit schlecht … zu grob."
+    // Nachgerechnet, und er hat recht:
+    //
+    //   4096 Bins bei 192 kHz  = 47 Hz je Bin.
+    //   Ein 45-kHz-Ausschnitt hat davon rund 960 Stück.
+    //   Das Fenster ist rund 1300 Pixel breit.
+    //
+    // Es gab also WENIGER Messwerte als Pixel. Der Detektor konnte
+    // nichts auswählen, er musste dazwischen interpolieren — und
+    // interpolierte Punkte sehen aus wie Messwerte, sind aber keine.
+    // Genau das ist das „Grobe": eine gestreckte Kurve.
+    //
+    //   16384 Bins bei 192 kHz = 11,7 Hz je Bin.
+    //   Derselbe Ausschnitt hat rund 3800 Stück, also drei je Pixel.
+    //
+    // Erst ab da tut der Peak-Detektor, wofür er da ist: aus mehreren
+    // Bins den höchsten nehmen. Ein schmaler CW-Träger zwischen zwei
+    // Stützstellen verschwindet nicht mehr.
+    //
+    // Der Preis ist Rechenzeit — viermal so große Transformation, und
+    // FFTW plant für jede neue Größe einmal neu (der Wisdom-Lauf, der
+    // beim ersten Start nach dieser Änderung Zeit kostet und danach
+    // gespeichert bleibt). Auf dem Gerät, für das dieses Programm
+    // gebaut wird, ist das kein Thema; auf einem sehr alten Rechner
+    // kann man im Setup zurückgehen.
+    std::atomic<int>    m_fftSize{kDefaultFftSize};
     std::atomic<int>    m_pendingFftSize{0};  // 0 = no change pending
     std::atomic<int>    m_windowFunc{static_cast<int>(WindowFunction::BlackmanHarris4)};
     // Kaiser window shape parameter.  Default 14.0 from Thetis specHPSDR.cs:
@@ -249,7 +281,7 @@ private:
     // User's slider-set FFT size baseline (NereusSDR-original auto-zoom
     // anchor).  Default matches m_fftSize so first-launch behavior is
     // identical to a system without auto-zoom (slider == FFT size).
-    std::atomic<int>    m_fftSizeBaseline{4096};
+    std::atomic<int>    m_fftSizeBaseline{kDefaultFftSize};
     // 0 = disabled (use bins-in-window auto-zoom).  > 0 = target Hz/bin.
     std::atomic<double> m_hzPerBinTarget{0.0};
     std::atomic<double> m_sampleRate{48000.0};

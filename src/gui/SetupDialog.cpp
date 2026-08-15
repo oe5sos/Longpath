@@ -172,7 +172,7 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     m_tree->setIndentation(16);
     m_tree->setFixedWidth(200);
     m_tree->setStyleSheet(
-        "QTreeWidget { background: #131326; color: #c8d8e8; border: none; "
+        "QTreeWidget { background: #1a1a2a; color: #c8d8e8; border: none; "
         "font-size: 12px; selection-background-color: #00b4d8; }"
         "QTreeWidget::item { padding: 4px 8px; }"
         "QTreeWidget::item:hover { background: #1a2a3a; }");

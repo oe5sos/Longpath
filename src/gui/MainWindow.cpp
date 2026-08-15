@@ -255,6 +255,10 @@ warren@wpratt.com
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "widgets/CommandBar.h"
+#include "widgets/ProfileRail.h"
+#include "widgets/WidgetPicker.h"
+#include "gui/LayoutProfiles.h"
 #include "widgets/VfoWidget.h"
 #include "applets/StripWindow.h"
 #include "widgets/RotorLogbookPanel.h"
@@ -415,6 +419,7 @@ warren@wpratt.com
 #include <QPainter>
 #include <QPixmap>
 #include <QProgressDialog>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QDialog>
 #include <QDir>
@@ -760,7 +765,7 @@ MainWindow::MainWindow(QWidget* parent)
                 "QProgressBar {"
                 "  text-align: center; font-size: 13px;"
                 "  font-weight: bold; color: #c8d8e8;"
-                "  background: #1a2a3a; border: 1px solid #2e4e6e;"
+                "  background: #1a2a3a; border: 1px solid #205070;"
                 "  border-radius: 3px; min-height: 24px;"
                 "}"
                 "QProgressBar::chunk { background: #00b4d8; }"));
@@ -947,6 +952,151 @@ SpectrumWidget* MainWindow::spectrumForSlice(SliceModel* s) const
 SliceModel* MainWindow::sliceForAddedIdForTest(RadioModel* model, int sliceId)
 {
     return model ? model->sliceById(sliceId) : nullptr;
+}
+
+// ── Die Schiene und ihre Dialoge ─────────────────────────────────────
+//
+// ProfileRail kennt keinen Dialog. Sie meldet nur, was der Betreiber
+// will; den Namen erfragt das Fenster. Damit bleibt die Schiene ohne
+// laufende Oberfläche prüfbar, und die Dialoge liegen dort, wo die
+// anderen Dialoge dieses Programms auch liegen.
+QVariantMap MainWindow::blankLayoutState() const
+{
+    // ── Was „leer“ heißt ─────────────────────────────────────────────
+    //
+    // Alles aus, was im Auswähler steht — auch die Knopfleiste und die
+    // Statuszeile. Sie stehen dort als Widgets, also verhalten sie sich
+    // hier wie Widgets; eine Ausnahme „diese zwei bleiben an, weil ein
+    // leeres Fenster erschrickt“ wäre eine Regel, die man sich merken
+    // muss, und niemand merkt sie sich.
+    //
+    // Panadapter und Wasserfall bleiben. Sie stehen nicht im Auswähler,
+    // weil sie kein Beiwerk sind: ohne sie wäre es kein Empfänger,
+    // sondern ein leeres Fenster mit einem Plus.
+    //
+    // Die Splitterstellung wird MITGENOMMEN, nicht zurückgesetzt. Wer
+    // ein neues Profil anlegt, will eine leere Fläche — nicht ein
+    // Fenster, dessen Aufteilung ohne Vorwarnung springt.
+    QVariantMap s;
+
+    QVariantMap vis;
+    if (m_appletVis) {
+        for (const QString& id : m_appletVis->registeredIds()) {
+            vis.insert(id, false);
+        }
+    }
+    s.insert(QStringLiteral("visible"), vis);
+    s.insert(QStringLiteral("order"), QStringList{});
+
+    if (m_mainSplitter) {
+        QVariantList sizes;
+        for (int v : m_mainSplitter->sizes()) { sizes << v; }
+        s.insert(QStringLiteral("splitter"), sizes);
+    }
+    return s;
+}
+
+void MainWindow::applyChromeVisibility(const QString& id, bool visible)
+{
+    if (id == QLatin1String(kChromeOverlayId)) {
+        // Alle Pans, nicht nur der aktive. Eine Knopfleiste, die auf
+        // Pan 1 verschwindet und auf Pan 2 stehen bleibt, sieht aus
+        // wie ein Fehler und ist einer.
+        for (const QPointer<SpectrumOverlayPanel>& p :
+             std::as_const(m_overlayPanels)) {
+            if (p) { p->setVisible(visible); }
+        }
+        return;
+    }
+    if (id == QLatin1String(kChromeStatusId)) {
+        if (QStatusBar* sb = statusBar()) { sb->setVisible(visible); }
+        return;
+    }
+}
+
+void MainWindow::wireProfileRail()
+{
+    if (!m_profileRail || !m_layoutProfiles) { return; }
+
+    auto askName = [this](const QString& title, const QString& preset)
+                   -> QString {
+        bool ok = false;
+        const QString name = QInputDialog::getText(
+            this, title, QStringLiteral("Name:"), QLineEdit::Normal,
+            preset, &ok).trimmed();
+        return ok ? name : QString();
+    };
+
+    auto complain = [this](const QString& name) {
+        QMessageBox::warning(
+            this, QStringLiteral("Profil"),
+            name.isEmpty()
+                ? QStringLiteral("Ein Profil braucht einen Namen.")
+                : QStringLiteral("„%1“ gibt es schon.").arg(name));
+    };
+
+    connect(m_profileRail, &ProfileRail::newProfileRequested, this,
+            [this, askName, complain]() {
+        const QString name = askName(QStringLiteral("Neues Profil"),
+                                     QStringLiteral("Neu"));
+        if (name.isNull()) { return; }
+        // ── Leer, nicht als Kopie ────────────────────────────────────
+        //
+        // OE5SOS, 2026-08-15: „Wenn ich links ein neues Profil öffne,
+        // sollte dieses leer sein."
+        //
+        // Das Plus legt eine leere Arbeitsfläche an, die man mit dem
+        // anderen Plus füllt. Legte es eine Kopie an, wäre es ein
+        // Duplizieren-Knopf mit falscher Beschriftung — und Duplizieren
+        // gibt es schon, im Rechtsklick auf das Abzeichen.
+        if (!m_layoutProfiles->createWith(name, blankLayoutState())) {
+            complain(name);
+            return;
+        }
+        m_layoutProfiles->save();
+    });
+
+    connect(m_profileRail, &ProfileRail::renameRequested, this,
+            [this, askName, complain](const QString& old) {
+        const QString name = askName(QStringLiteral("Profil umbenennen"), old);
+        if (name.isNull() || name == old) { return; }
+        if (!m_layoutProfiles->rename(old, name)) { complain(name); return; }
+        m_layoutProfiles->save();
+    });
+
+    connect(m_profileRail, &ProfileRail::duplicateRequested, this,
+            [this, askName, complain](const QString& from) {
+        const QString name = askName(QStringLiteral("Profil duplizieren"),
+                                     from + QStringLiteral(" Kopie"));
+        if (name.isNull()) { return; }
+        if (!m_layoutProfiles->duplicate(from, name)) {
+            complain(name);
+            return;
+        }
+        m_layoutProfiles->save();
+    });
+
+    connect(m_profileRail, &ProfileRail::removeRequested, this,
+            [this](const QString& name) {
+        // Nachfragen, weil es kein Rückgängig gibt. In so einem Profil
+        // steckt eine halbe Stunde Einrichten.
+        const auto answer = QMessageBox::question(
+            this, QStringLiteral("Profil löschen"),
+            QStringLiteral("„%1“ mit seinem ganzen Aufbau löschen?")
+                .arg(name),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes) { return; }
+        m_layoutProfiles->remove(name);
+        m_layoutProfiles->save();
+    });
+
+    // Beim Beenden den jetzigen Stand ins aktive Profil. Ohne das
+    // verlöre man alles, was seit dem letzten Umschalten gebaut wurde —
+    // activate() sichert, ein Programmende bisher nicht.
+    connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
+    });
 }
 
 void MainWindow::applyAntennaChangeForTest(RadioModel* model, int sliceId,
@@ -2199,6 +2349,13 @@ void MainWindow::ensureOverlayPanels()
         });
         panel->move(4, 4);
         panel->show();
+        // Ein später angelegter Pan bekommt seine Knopfleiste in dem
+        // Zustand, den der Betreiber gewählt hat. Ohne das erschiene sie
+        // auf jedem neuen Pan wieder, obwohl sie überall sonst aus ist.
+        if (m_appletVis) {
+            panel->setVisible(m_appletVis->isEffectivelyVisible(
+                QString::fromLatin1(kChromeOverlayId)));
+        }
         m_overlayPanels.insert(panId, panel);
 
         // Phase 3O Sub-Phase 9 Task 9.2c — bind the VAX Ch combo to the model.
@@ -2977,7 +3134,34 @@ void MainWindow::buildUI()
     m_mainSplitter->addWidget(spectrumPane);
 
     // Right side: Container #0 will be added by ContainerManager
-    setCentralWidget(m_mainSplitter);
+    //
+    // ── Kommandoleiste über allem ────────────────────────────────────
+    //
+    // Zeus setzt MODE und STEP als Pillenreihe an den oberen Rand, über
+    // die ganze Breite. Deshalb ist das zentrale Widget jetzt eine
+    // Säule: Leiste oben, Splitter darunter. Der Splitter bleibt sonst
+    // unangetastet — alle 900 Zeilen darunter kennen ihn unverändert.
+    m_commandBar = new CommandBar(this);
+    auto* centre = new QWidget(this);
+
+    // Profilschiene ganz links über die volle Höhe, wie bei Zeus.
+    // Daneben die Säule aus Kommandoleiste und Splitter.
+    m_layoutProfiles = new LayoutProfiles(this);
+    m_profileRail = new ProfileRail(m_layoutProfiles, centre);
+
+    auto* centreRow = new QHBoxLayout(centre);
+    centreRow->setContentsMargins(0, 0, 0, 0);
+    centreRow->setSpacing(0);
+    centreRow->addWidget(m_profileRail, 0);
+
+    auto* centreCol = new QVBoxLayout;
+    centreCol->setContentsMargins(6, 6, 6, 0);
+    centreCol->setSpacing(6);
+    centreCol->addWidget(m_commandBar, 0);
+    centreCol->addWidget(m_mainSplitter, 1);
+    centreRow->addLayout(centreCol, 1);
+
+    setCentralWidget(centre);
 
     // --- Container Infrastructure (Phase 3G-1) ---
     m_containerManager = new ContainerManager(spectrumPane, m_mainSplitter, this);
@@ -4323,7 +4507,16 @@ void MainWindow::buildUI()
         // replaces the direct wdspEngine()->rxChannel() reach.
         RxChannel* rxCh = m_radioModel->rxChannelForSlice(slice->sliceIndex());
         if (rxCh) { m_meterPoller->setRxChannel(rxCh); }
+        // Die Kopfleiste zeigt den Modus der Kette, auf der man gerade
+        // ist. attach() löst die vorige — sonst meldete die Leiste nach
+        // dem Umschalten weiter den Modus des alten Pans.
+        if (m_commandBar) { m_commandBar->attach(slice); }
     });
+
+    // Und einmal jetzt, für den Zustand beim Start: das Signal oben
+    // feuert erst beim ersten Wechsel, und bis dahin stünde die Leiste
+    // auf ihrem Vorgabewert statt auf dem, was das Gerät tut.
+    if (m_commandBar) { m_commandBar->attach(m_radioModel->activeSlice()); }
 
     // H.2 (Phase 3M-1a): wire MoxController::moxStateChanged → MeterPoller::setInTx.
     // Switches the poll set between RX meters (TX off) and TX meters (TX on).
@@ -5254,6 +5447,61 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Tuner Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
                                 QStringLiteral("RF-Kit RF2K-S"), true);
+
+    // ── Kategorie und Schlagwoerter ──────────────────────────────────
+    //
+    // Fuer die Spalte links und das Suchfeld im „Widget hinzufuegen"-
+    // Dialog. Die Schlagwoerter sind das, was die Suche brauchbar macht:
+    // wer „swr" tippt, soll die Messanzeigen finden, ohne ihren Namen zu
+    // kennen. Also drin steht, wonach jemand SUCHEN wuerde, nicht was
+    // der Titel ohnehin schon sagt.
+    //
+    // Die Reihenfolge der Kategorien ergibt sich aus der Anmeldung
+    // oben, nicht aus dem Alphabet — siehe categories().
+    m_appletVis->describeApplet(QStringLiteral("Rx"),
+        QStringLiteral("Empfang"),
+        {QStringLiteral("rx"), QStringLiteral("empfang"),
+         QStringLiteral("filter"), QStringLiteral("agc"),
+         QStringLiteral("squelch"), QStringLiteral("daempfung")});
+    m_appletVis->describeApplet(QStringLiteral("Tx"),
+        QStringLiteral("Senden"),
+        {QStringLiteral("tx"), QStringLiteral("senden"),
+         QStringLiteral("leistung"), QStringLiteral("mox"),
+         QStringLiteral("vox"), QStringLiteral("tune"),
+         QStringLiteral("swr"), QStringLiteral("mikrofon")});
+    m_appletVis->describeApplet(QStringLiteral("PhoneCw"),
+        QStringLiteral("Senden"),
+        {QStringLiteral("cw"), QStringLiteral("morse"),
+         QStringLiteral("keyer"), QStringLiteral("phone"),
+         QStringLiteral("wpm"), QStringLiteral("paddle")});
+    m_appletVis->describeApplet(QStringLiteral("Rade"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("rade"), QStringLiteral("freedv"),
+         QStringLiteral("digital"), QStringLiteral("codec"),
+         QStringLiteral("sprache")});
+    m_appletVis->describeApplet(QStringLiteral("Vax"),
+        QStringLiteral("Audio"),
+        {QStringLiteral("vax"), QStringLiteral("audio"),
+         QStringLiteral("routing"), QStringLiteral("kanal")});
+    m_appletVis->describeApplet(QStringLiteral("PureSignal"),
+        QStringLiteral("Senden"),
+        {QStringLiteral("puresignal"), QStringLiteral("ps"),
+         QStringLiteral("linearisierung"), QStringLiteral("vorverzerrung"),
+         QStringLiteral("zweiton")});
+    m_appletVis->describeApplet(QStringLiteral("Amp"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("verstaerker"), QStringLiteral("endstufe"),
+         QStringLiteral("pgxl"), QStringLiteral("power genius"),
+         QStringLiteral("4o3a")});
+    m_appletVis->describeApplet(QStringLiteral("Tuner"),
+        QStringLiteral("Tuner"),
+        {QStringLiteral("tuner"), QStringLiteral("antenne"),
+         QStringLiteral("anpassung"), QStringLiteral("swr"),
+         QStringLiteral("tgxl"), QStringLiteral("4o3a")});
+    m_appletVis->describeApplet(QStringLiteral("RfKit"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("rf-kit"), QStringLiteral("rf2k"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletVis->registerApplet(QStringLiteral("Tci"),
@@ -5264,6 +5512,40 @@ void MainWindow::populateDefaultMeter()
                                     QStringLiteral("TCI Clients"), true);
     }
 #endif
+
+    // ── Was kein Applet ist und trotzdem ins Plus gehört ─────────────
+    //
+    // OE5SOS: „…die einzelnen Widget, sodass man jedes auswählen,
+    // aktivieren und verschieben kann."
+    //
+    // Der Auswähler zeigte bisher nur die neun Applets der rechten
+    // Spalte. Zwei große Teile des Fensters standen nicht darin: die
+    // Knopfleiste über dem Spektrum und die Statuszeile unten. Ein
+    // Auswähler, der „alle Widgets" verspricht und zwei davon
+    // verschweigt, ist schlimmer als eine ehrliche Teilliste.
+    //
+    // VERSCHIEBEN geht bei diesen beiden nicht, und das ist kein
+    // Versäumnis: die Knopfleiste liegt über dem Panadapter und gehört
+    // dorthin, die Statuszeile ist die Statuszeile. Bei Zeus ist es
+    // genauso. Ein- und Ausblenden ist hier die ganze Bedienung.
+    m_appletVis->registerApplet(QString::fromLatin1(kChromeOverlayId),
+                                QStringLiteral("Knopfleiste am Spektrum"),
+                                true);
+    m_appletVis->describeApplet(QString::fromLatin1(kChromeOverlayId),
+        QStringLiteral("Empfang"),
+        {QStringLiteral("knoepfe"), QStringLiteral("band"),
+         QStringLiteral("antenne"), QStringLiteral("tnf"),
+         QStringLiteral("rx"), QStringLiteral("display"),
+         QStringLiteral("vax"), QStringLiteral("overlay")});
+
+    m_appletVis->registerApplet(QString::fromLatin1(kChromeStatusId),
+                                QStringLiteral("Statuszeile"), true);
+    m_appletVis->describeApplet(QString::fromLatin1(kChromeStatusId),
+        QStringLiteral("Fenster"),
+        {QStringLiteral("status"), QStringLiteral("cat"),
+         QStringLiteral("tci"), QStringLiteral("pa"),
+         QStringLiteral("cpu"), QStringLiteral("spannung"),
+         QStringLiteral("unten")});
 
     // Capability gates: applets that depend on an external feature flag
     // get their availability set here. When availability is false, the
@@ -5284,12 +5566,170 @@ void MainWindow::populateDefaultMeter()
     const bool rfKitOn = m_radioModel && m_radioModel->rfKitEnabled();
     m_appletVis->setAvailable(QStringLiteral("RfKit"), rfKitOn);
 
+    // ── Die Reihenfolge im Stapel ────────────────────────────────────
+    //
+    // OE5SOS: „…sodass man jedes auswählen, aktivieren und verschieben
+    // kann." Das Verschieben steckt in AppletPanelWidget; was hier
+    // dazukommt, ist das Merken. Ein Fenster, das man eine Stunde lang
+    // eingerichtet hat und das beim nächsten Start wieder in
+    // Anmeldereihenfolge dasteht, ist kein einrichtbares Fenster.
+    //
+    // Gespeichert werden Kennungen, nicht Positionen: ein Update, das
+    // ein Widget hinzufügt oder eines wegnimmt, verschiebt sonst alles
+    // dahinter um eins.
+    //
+    // ── Zwei Speicher für dasselbe, mit Absicht ──────────────────────
+    //
+    // Die Reihenfolge steht ab jetzt AUCH in jedem Layout-Profil, und
+    // das Profil gewinnt: es wird weiter unten geladen und angewandt,
+    // nachdem dieser Block gelaufen ist.
+    //
+    // Dieser Schlüssel hier bleibt trotzdem, und er ist kein Rest zum
+    // Wegräumen. Er ist der Startwert: beim ersten Start nach diesem
+    // Update gibt es noch kein Profil, das Profil „Standard“ wird aus
+    // dem gebaut, was gerade zu sehen ist — und was gerade zu sehen
+    // ist, kommt von hier. Ohne ihn stünde jeder, der seine Anordnung
+    // vor dem Update gebaut hat, wieder in Anmeldereihenfolge da.
+    // Danach führt er nur noch nach, was das zuletzt aktive Profil sagt.
+    if (m_appletPanel) {
+        static const auto kOrderKey = QStringLiteral("AppletStackOrder");
+
+        const QStringList saved = AppSettings::instance()
+                                      .value(kOrderKey, QString{})
+                                      .toString()
+                                      .split(QLatin1Char(','), Qt::SkipEmptyParts);
+        if (!saved.isEmpty()) {
+            QList<AppletWidget*> order;
+            for (const QString& id : saved) {
+                if (auto* a = m_appletsById.value(id, nullptr)) {
+                    order.append(a);
+                }
+            }
+            m_appletPanel->setAppletOrder(order);
+        }
+
+        connect(m_appletPanel, &AppletPanelWidget::appletsReordered,
+                this, [this]() {
+            QStringList ids;
+            for (AppletWidget* a : m_appletPanel->applets()) {
+                if (a) { ids << a->appletId(); }
+            }
+            AppSettings::instance().setValue(
+                QStringLiteral("AppletStackOrder"), ids.join(QLatin1Char(',')));
+        });
+    }
+
+    // ── Was in einem Profil steht ────────────────────────────────────
+    //
+    // Drei Dinge: welche Widgets sichtbar sind, in welcher Reihenfolge
+    // sie stehen, und wie der Splitter geteilt ist.
+    //
+    // NICHT dabei: die Fenstergröße (OE5SOS, 2026-08-15 — „baue für
+    // große Schirme"; ein Profilwechsel soll Panels tauschen und nicht
+    // das Fenster umspringen lassen) und die frei schwebenden
+    // Meter-Container. Letztere schreibt ContainerManager direkt in die
+    // Einstellungen und legt beim Herstellen NEUE an, statt die
+    // vorhandenen zu ersetzen — ein Profilwechsel würde sie
+    // verdoppeln. Das braucht captureState()/applyState() im Manager
+    // und ist ein eigener Schritt.
+    if (m_layoutProfiles && m_appletVis) {
+        m_layoutProfiles->setHooks(
+            // ── einsammeln ───────────────────────────────────────────
+            [this]() -> QVariantMap {
+                QVariantMap s;
+                QVariantMap vis;
+                for (const QString& id : m_appletVis->registeredIds()) {
+                    vis.insert(id, m_appletVis->isVisible(id));
+                }
+                s.insert(QStringLiteral("visible"), vis);
+
+                QStringList order;
+                if (m_appletPanel) {
+                    for (AppletWidget* a : m_appletPanel->applets()) {
+                        if (a) { order << a->appletId(); }
+                    }
+                }
+                s.insert(QStringLiteral("order"), order);
+
+                if (m_mainSplitter) {
+                    QVariantList sizes;
+                    for (int v : m_mainSplitter->sizes()) { sizes << v; }
+                    s.insert(QStringLiteral("splitter"), sizes);
+                }
+                return s;
+            },
+            // ── herstellen ───────────────────────────────────────────
+            [this](const QVariantMap& s) {
+                const QVariantMap vis =
+                    s.value(QStringLiteral("visible")).toMap();
+                for (auto it = vis.constBegin(); it != vis.constEnd(); ++it) {
+                    // Nur bekannte Kennungen. Eine Aufnahme von vor
+                    // einem Update kann Widgets nennen, die es nicht
+                    // mehr gibt — der Controller soll sie nicht anlegen.
+                    if (m_appletVis->registeredIds().contains(it.key())) {
+                        m_appletVis->setVisible(it.key(), it.value().toBool());
+                    }
+                }
+
+                if (m_appletPanel) {
+                    QList<AppletWidget*> order;
+                    for (const QVariant& v :
+                         s.value(QStringLiteral("order")).toList()) {
+                        if (auto* a = m_appletsById.value(v.toString(),
+                                                          nullptr)) {
+                            order.append(a);
+                        }
+                    }
+                    m_appletPanel->setAppletOrder(order);
+                }
+
+                const QVariantList sizes =
+                    s.value(QStringLiteral("splitter")).toList();
+                if (m_mainSplitter && !sizes.isEmpty()) {
+                    QList<int> px;
+                    for (const QVariant& v : sizes) { px << v.toInt(); }
+                    m_mainSplitter->setSizes(px);
+                }
+            });
+
+        m_layoutProfiles->load();
+        if (m_layoutProfiles->names().isEmpty()) {
+            // Beim allerersten Start gibt es genau ein Profil, und es
+            // hält, was gerade zu sehen ist. Ohne das stünde die
+            // Schiene leer da und das Plus hieße „leg dir erst mal
+            // etwas an" — dabei hat der Betreiber schon ein Fenster.
+            m_layoutProfiles->create(QStringLiteral("Standard"));
+        } else if (!m_layoutProfiles->current().isEmpty()) {
+            m_layoutProfiles->activate(m_layoutProfiles->current());
+        }
+        wireProfileRail();
+    }
+
+    // ── Das Plus ─────────────────────────────────────────────────────
+    //
+    // OE5SOS: „Ich möchte mit einem PLUS Widget hinzufügen können und
+    // entfernen, um so mein eigenes Profil selbst zu gestalten."
+    //
+    // Ein- und Ausblenden konnte AppletVisibilityController schon; es
+    // steckte nur im Menü „Containers", und ein Menüeintrag lädt
+    // niemanden ein, sein Fenster umzubauen. Erst hier, nachdem alle
+    // registerApplet()- und describeApplet()-Aufrufe durch sind, kennt
+    // der Verwalter die Kategorien, die der Auswähler links anzeigt.
+    if (m_commandBar) {
+        m_addWidget = new AddWidgetButton(m_appletVis, m_commandBar);
+        m_commandBar->addTrailing(m_addWidget);
+    }
+
     // Apply initial visibility state from the controller (in case
     // AppSettings already had values from a prior session).
     // Uses effective visibility (user pref AND available).
     for (const QString& id : m_appletVis->registeredIds()) {
         if (auto* a = m_appletsById.value(id, nullptr)) {
             panel->setAppletVisible(a, m_appletVis->isEffectivelyVisible(id));
+        } else {
+            // Kein Applet dahinter — die Knopfleiste und die
+            // Statuszeile gehen ihren eigenen Weg.
+            applyChromeVisibility(id, m_appletVis->isEffectivelyVisible(id));
         }
     }
 
@@ -5303,6 +5743,8 @@ void MainWindow::populateDefaultMeter()
             if (m_appletPanel) {
                 m_appletPanel->setAppletVisible(a, effective);
             }
+        } else {
+            applyChromeVisibility(id, effective);
         }
     });
 
@@ -6646,7 +7088,7 @@ void MainWindow::updateAddPanButtonState()
 QString MainWindow::tnfIndicatorStyleSheet(bool globalEnabled, int notchCount)
 {
     // ON reads accent cyan, matching AetherSDR's status-bar TNF light
-    // (MainWindow_Wiring.cpp:3306-3311 [@c6481cbf], #00b4d8 on / #404858
+    // (MainWindow_Wiring.cpp:3306-3311 [@c6481cbf], #00b4d8 on / #3a4a5a
     // off).
     //
     // The OFF half diverges from upstream, deliberately. AetherSDR's notch
@@ -6657,7 +7099,7 @@ QString MainWindow::tnfIndicatorStyleSheet(bool globalEnabled, int notchCount)
     // until they find this switch. A dim grey label sitting in a row of
     // three permanently dim NYI labels does not communicate that, so:
     //
-    //   off, no notches  -> dim #404858 + struck through. Idle, matched to
+    //   off, no notches  -> dim #3a4a5a + struck through. Idle, matched to
     //                       the CWX / DVK / FDX siblings but visibly a
     //                       toggle rather than a stub.
     //   off, notches set -> amber + struck through. Notches exist and are
@@ -6668,7 +7110,7 @@ QString MainWindow::tnfIndicatorStyleSheet(bool globalEnabled, int notchCount)
     const QString color = globalEnabled
                               ? QString::fromLatin1(Style::kAccent)
                               : (bypassing ? QString::fromLatin1(Style::kAmberWarn)
-                                           : QStringLiteral("#404858"));
+                                           : QStringLiteral("#3a4a5a"));
     const QString decoration = globalEnabled ? QStringLiteral("none")
                                              : QStringLiteral("line-through");
     return QStringLiteral("QLabel { color: %1; font-weight: bold; "
@@ -6908,21 +7350,21 @@ void MainWindow::buildStatusBar()
     // CWX
     auto* cwxLabel = new QLabel(QStringLiteral("CWX"), barWidget);
     cwxLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #404858; font-weight: bold; font-size: 11px; }"));
+        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }"));
     cwxLabel->setToolTip(QStringLiteral("CW Keyer (NYI)"));
     cwxLabel->setCursor(Qt::PointingHandCursor);
 
     // DVK
     auto* dvkLabel = new QLabel(QStringLiteral("DVK"), barWidget);
     dvkLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #404858; font-weight: bold; font-size: 11px; }"));
+        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }"));
     dvkLabel->setToolTip(QStringLiteral("Digital Voice Keyer (NYI)"));
     dvkLabel->setCursor(Qt::PointingHandCursor);
 
     // FDX
     auto* fdxLabel = new QLabel(QStringLiteral("FDX"), barWidget);
     fdxLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #404858; font-weight: bold; font-size: 11px; }"));
+        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }"));
     fdxLabel->setToolTip(QStringLiteral("Full Duplex (NYI)"));
     fdxLabel->setCursor(Qt::PointingHandCursor);
 
@@ -7090,7 +7532,7 @@ void MainWindow::buildStatusBar()
             "QLabel { color: #607080; font-size: 11px; }"));
         auto* botLbl = new QLabel(bottom, w);
         botLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: #404858; font-size: 11px; }"));
+            "QLabel { color: #3a4a5a; font-size: 11px; }"));
         vl->addWidget(topLbl);
         vl->addWidget(botLbl);
         if (outTop) { *outTop = topLbl; }
@@ -7157,7 +7599,7 @@ void MainWindow::buildStatusBar()
     // text reflects operate/bypass/standby state via stateChanged.
     m_tgxlChip = new QLabel(QStringLiteral("TGXL"), barWidget);
     m_tgxlChip->setStyleSheet(QStringLiteral(
-        "QLabel { background:#1a3a5a; border:1px solid #205070; "
+        "QLabel { background:#204060; border:1px solid #205070; "
         "padding:1px 8px; border-radius:3px; color:#88e0ff; }"));
     m_tgxlChip->setVisible(false);
     hbox->addWidget(m_tgxlChip);
@@ -7805,7 +8247,7 @@ void MainWindow::setTxInhibited(bool inhibited)
 // by TciServer signal lambdas) and applies color + text + tooltip.
 //
 // Colors:
-//   Off:       #404858 (dim grey)
+//   Off:       #3a4a5a (dim grey)
 //   On:        #6f6    (green)
 //   On · N:    #6cf    (cyan)
 //   On · N TX: #ec6    (orange)
@@ -7826,7 +8268,7 @@ void MainWindow::updateTciIndicator()
 
     if (!m_tciServerRunning) {
         text    = QStringLiteral("Off");
-        color   = QStringLiteral("#404858");
+        color   = QStringLiteral("#3a4a5a");
         tooltip = QStringLiteral("TCI Server stopped. Click to open Setup.");
     } else if (m_tciClientCount == 0) {
         text    = QStringLiteral("On");
@@ -8903,7 +9345,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                 m_splitterSizesBeforeHide = m_mainSplitter->sizes();
                 rightPane->hide();
                 label->setStyleSheet(QStringLiteral(
-                    "QLabel { color: #404858; font-weight: bold; font-size: 16px; }"));
+                    "QLabel { color: #3a4a5a; font-weight: bold; font-size: 16px; }"));
             } else {
                 // Show: restore saved sizes (or default 80/20 if none saved)
                 rightPane->show();
@@ -11290,7 +11732,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     submitBtn->setStyleSheet(QStringLiteral(
         "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
         "border-radius: 4px; padding: 8px 20px; font-size: 13px; }"
-        "QPushButton:hover { background: #00c8f0; }"));
+        "QPushButton:hover { background: #00b4d8; }"));
     connect(submitBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
             "https://github.com/boydsoftprez/NereusSDR/issues/new?template=feature_request.yml")));

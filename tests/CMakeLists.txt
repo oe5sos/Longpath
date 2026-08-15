@@ -4762,6 +4762,65 @@ nereus_add_test(tst_swr_curve_band)
 # Antwort, und eine Zahl laesst sich zusichern.
 nereus_add_test(tst_swr_curve_panels)
 
+# -- Theme substitution. 1733 Hex-Literale in 130 Dateien, 1141 davon in
+#    Qt-Stylesheet-Strings, die keine Konstante aufnehmen koennen. Bis
+#    die alle umgebaut sind, laeuft der Palettenwechsel ueber eine
+#    Tabelle -- und damit haengt der ganze Umbau an dieser einen
+#    Funktion. Siehe docs/design/HAUSSTIL.md --
+nereus_add_test(tst_theme_qss)
+
+# -- Die Palette als Datei ausserhalb des Repos. „Technik Nereus, Design
+#    ich" scheitert, solange das Design in StyleConstants.h steht: genau
+#    die Datei fasst ein Upstream-Commit auch an --
+nereus_add_test(tst_theme_file)
+
+# -- Der Download-Fall, woertlich: ein Widget, das von diesem Theme nie
+#    gehoert hat, wird eingehaengt und muss hinterher die Farben des
+#    Betreibers tragen, ohne dass jemand es angefasst hat --
+nereus_add_test(tst_theme_filter)
+
+# -- Der Wasserfall ist die groesste Farbflaeche im Programm, und der
+#    Theme-Filter erreicht ihn nicht: er wird gemalt, nicht gestylt.
+#    Nagelt ausserdem die Reihenfolge des Schema-Enums fest — der
+#    gespeicherte Wert ist ein Index --
+nereus_add_test(tst_waterfall_muted)
+
+# -- Standortmarker auf der Weltkarte: rundes Foto statt Punkt. Prueft
+#    das, was Arithmetik hergibt — mittiger Beschnitt statt Stauchung,
+#    runde Maske, einmal geschnitten und behalten --
+nereus_add_test(tst_flatmap_station_marker)
+
+# -- Die Kopfleiste. Prueft, was Arithmetik hergibt: genau eine Pille je
+#    Gruppe an, sie folgt dem Modell statt dem Klick, und beim Wechsel
+#    der Empfangskette laesst sie die alte los --
+nereus_add_test(tst_command_bar)
+
+# -- Das Plus zum Hinzufuegen und Entfernen. Die Auswahl liest die
+#    Anmeldeliste, statt eine eigene zu fuehren — der Test prueft genau
+#    das, plus dass ein Haken wirklich etwas aendert und dass nicht
+#    verfuegbar etwas anderes ist als ausgeblendet --
+nereus_add_test(tst_widget_picker)
+
+# -- Mehrere benannte Ansichten, an Band und Modus bindbar. Prueft vor
+#    allem die drei Arten, wie so etwas Arbeit des Betreibers vernichtet:
+#    Umschalten verwirft den Umbau, Loeschen laesst das Fenster
+#    herrenlos, die Bindung raet --
+nereus_add_test(tst_layout_profiles)
+
+# -- Widgets im rechten Stapel verschieben. Geprueft wird die eine
+#    Eigenschaft, an der so etwas scheitert: dass die sichtbare Reihen-
+#    folge und die gespeicherte Liste dasselbe sagen. Dazu der Zug, der
+#    ueber die Dehnung am Stapelende hinausgeht, und die gespeicherte
+#    Anordnung von vor einem Update, die ein neues Widget nicht kennt --
+nereus_add_test(tst_applet_reorder)
+
+# -- Schritt 1 des Wasserfall-Umbaus (#100): die Historie haelt
+#    Intensitaet statt fertiger Farbe, blockweise belegt. Geprueft wird
+#    vor allem, dass der Speicher WIRKLICH erst beim Beschreiben
+#    entsteht — belegt man ihn versehentlich im Voraus, funktioniert
+#    alles und der ganze Zweck ist weg --
+nereus_add_test(tst_waterfall_history_buffer)
+
 # -- Band edges. The project's existing table is Region 2, so drawing a
 #    40 m edge from it puts 100 kHz of "your antenna is fine here" over
 #    spectrum a Region 1 operator may not transmit in --

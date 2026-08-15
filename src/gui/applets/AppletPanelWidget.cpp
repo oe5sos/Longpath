@@ -40,6 +40,7 @@
 #include <QResizeEvent>
 #include <QPushButton>
 #include <QMenu>
+#include <QMouseEvent>
 
 namespace NereusSDR {
 
@@ -299,7 +300,171 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     wrapLayout->addWidget(titleBar);
     wrapLayout->addWidget(child);
 
+    // Die Titelleiste ist der Griff. Nur sie — nicht das Applet
+    // darunter, sonst zöge jeder Regler das ganze Widget mit.
+    titleBar->installEventFilter(this);
+    titleBar->setCursor(Qt::OpenHandCursor);
+    m_titleBars.insert(titleBar, wrapper);
+
     return wrapper;
+}
+
+// ── Verschieben ──────────────────────────────────────────────────────
+
+int AppletPanelWidget::stackIndexOf(QWidget* wrapper) const
+{
+    if (!wrapper || !m_stackLayout) { return -1; }
+    return m_stackLayout->indexOf(wrapper);
+}
+
+AppletWidget* AppletPanelWidget::appletForWrapper(QWidget* wrapper) const
+{
+    for (auto it = m_wrappers.constBegin(); it != m_wrappers.constEnd(); ++it) {
+        if (it.value() == wrapper) { return it.key(); }
+    }
+    return nullptr;   // Kopfleiste oder ein rohes Widget — kein Applet
+}
+
+bool AppletPanelWidget::moveApplet(AppletWidget* applet, int toIndex)
+{
+    if (!applet || !m_stackLayout) { return false; }
+    QWidget* wrapper = m_wrappers.value(applet, nullptr);
+    if (!wrapper) { return false; }
+
+    const int from = stackIndexOf(wrapper);
+    if (from < 0) { return false; }
+
+    // Die Dehnung am Ende ist keine gültige Stelle. Ohne diese Grenze
+    // landet ein zu weit gezogenes Widget HINTER ihr und klebt danach
+    // unten fest, während alle anderen oben zusammenrücken.
+    const int last = m_stackLayout->count() - 2;
+    const int to = qBound(0, toIndex, qMax(0, last));
+    if (to == from) { return false; }
+
+    m_stackLayout->removeWidget(wrapper);
+    m_stackLayout->insertWidget(to, wrapper);
+
+    // m_applets führt dieselbe Reihenfolge nach. Sie ist das, was
+    // applets() herausgibt und was gespeichert wird — liefe sie
+    // auseinander, käme nach dem Neustart eine andere Anordnung heraus
+    // als die, die man hinterlassen hat.
+    const int oldPos = m_applets.indexOf(applet);
+    if (oldPos >= 0) {
+        m_applets.removeAt(oldPos);
+        const int newPos = qBound(0, appletPosForStackIndex(to), m_applets.size());
+        m_applets.insert(newPos, applet);
+    }
+    return true;
+}
+
+int AppletPanelWidget::appletPosForStackIndex(int stackIndex) const
+{
+    // Im Stapel liegen auch Widgets, die keine Applets sind. Die Stelle
+    // in m_applets ist deshalb die Anzahl der Applets, die im Stapel
+    // VOR dieser Stelle liegen — nicht der Stapelindex selbst.
+    int pos = 0;
+    for (int i = 0; i < stackIndex && i < m_stackLayout->count(); ++i) {
+        QLayoutItem* it = m_stackLayout->itemAt(i);
+        QWidget* w = it ? it->widget() : nullptr;
+        if (w && appletForWrapper(w)) { ++pos; }
+    }
+    return pos;
+}
+
+void AppletPanelWidget::setAppletOrder(const QList<AppletWidget*>& order)
+{
+    int slot = 0;
+    for (AppletWidget* a : order) {
+        if (!a || !m_wrappers.contains(a)) { continue; }
+        moveApplet(a, slot);
+        ++slot;
+    }
+    // Was nicht in der Liste stand, bleibt hinten stehen. Es hier
+    // wegzuräumen wäre der bequeme Weg und der falsche: nach einem
+    // Update kennt die gespeicherte Liste die neuen Widgets nicht, und
+    // sie sollen erscheinen, nicht verschwinden.
+}
+
+bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
+{
+    auto* bar = qobject_cast<QWidget*>(watched);
+    if (!bar || !m_titleBars.contains(bar)) {
+        return QWidget::eventFilter(watched, event);
+    }
+    QWidget* wrapper = m_titleBars.value(bar);
+    AppletWidget* applet = appletForWrapper(wrapper);
+
+    switch (event->type()) {
+    case QEvent::MouseButtonPress: {
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() != Qt::LeftButton || !applet) { break; }
+        m_dragApplet = applet;
+        m_dragStartY = static_cast<int>(me->globalPosition().y());
+        m_dragging = false;
+        break;
+    }
+    case QEvent::MouseMove: {
+        if (!m_dragApplet) { break; }
+        auto* me = static_cast<QMouseEvent*>(event);
+        const int y = static_cast<int>(me->globalPosition().y());
+        if (!m_dragging) {
+            // Erst ab einer Schwelle. Ohne sie verschiebt ein Klick mit
+            // zitternder Hand das Widget, und der Betreiber sucht danach
+            // sein Panel.
+            if (qAbs(y - m_dragStartY) < kDragThresholdPx) { break; }
+            m_dragging = true;
+            bar->setCursor(Qt::ClosedHandCursor);
+        }
+        dragTo(y);
+        return true;
+    }
+    case QEvent::MouseButtonRelease: {
+        const bool moved = m_dragging;
+        if (m_dragApplet) { bar->setCursor(Qt::OpenHandCursor); }
+        m_dragApplet = nullptr;
+        m_dragging = false;
+        if (moved) {
+            // Einmal am Ende, nicht bei jedem Pixel.
+            emit appletsReordered();
+            return true;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
+void AppletPanelWidget::dragTo(int globalY)
+{
+    QWidget* wrapper = m_wrappers.value(m_dragApplet, nullptr);
+    if (!wrapper || !m_stackLayout) { return; }
+    const int here = stackIndexOf(wrapper);
+    if (here < 0) { return; }
+
+    // Live umsortieren statt ein Einfügezeichen zu malen: sobald der
+    // Zeiger die Mitte eines Nachbarn überschreitet, tauschen die
+    // beiden die Plätze. Das Bild zeigt dann immer, was beim Loslassen
+    // herauskommt — bei einem Einfügestrich muss man es sich denken.
+    for (int i = 0; i < m_stackLayout->count() - 1; ++i) {
+        if (i == here) { continue; }
+        QLayoutItem* it = m_stackLayout->itemAt(i);
+        QWidget* other = it ? it->widget() : nullptr;
+        if (!other || !other->isVisible()) { continue; }
+        // Nur mit Applets tauschen. Die Kopfleiste des S-Meters ist
+        // fest verbaut; sie unter ein Applet zu schieben, wäre ein Zug,
+        // den niemand rückgängig machen kann, weil sie keinen Eintrag
+        // im Auswähler hat.
+        if (!appletForWrapper(other)) { continue; }
+
+        const QPoint topLeft = other->mapToGlobal(QPoint(0, 0));
+        const int mid = topLeft.y() + other->height() / 2;
+        if ((i < here && globalY < mid) || (i > here && globalY > mid)) {
+            moveApplet(m_dragApplet, i);
+            return;
+        }
+    }
 }
 
 } // namespace NereusSDR

@@ -1,5 +1,6 @@
 #include "gui/MainWindow.h"
 #include "gui/styles/AppTheme.h"
+#include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
@@ -296,6 +297,40 @@ int main(int argc, char* argv[])
     NereusSDR::applyDarkPalette(app);
     NereusSDR::applyAppBaselineQss(app);
 
+    // ── Technik Nereus, Design der Betreiber ─────────────────────────
+    //
+    // Die persönliche Palette liegt als JSON neben den Einstellungen,
+    // nicht im Quellbaum — sie überlebt damit jeden Download. Keine
+    // Datei ist der Normalfall und kein Fehler; dann gilt die
+    // Nereus-Palette aus StyleConstants.h.
+    //
+    // Der Filter ist der eine Einhängepunkt statt vierhundert
+    // eingewickelter setStyleSheet-Aufrufe: Qt schickt QEvent::Polish
+    // an jedes Widget, kurz bevor es zum ersten Mal gezeichnet wird —
+    // auch an eines, das erst mit einem späteren Download in den Baum
+    // kommt und von diesem Theme nie gehört hat.
+    //
+    // Vor dem Hauptfenster, damit das erste Zeichnen schon stimmt.
+    // Siehe gui/styles/Theme.h und docs/design/ROADMAP.md.
+    {
+        NereusSDR::Style::Theme& theme = NereusSDR::Style::Theme::instance();
+        // printf-Form statt Stream: qInfo() << … braucht QDebug, und ein
+        // Header, der nur über QApplication mitkommt, ist ein Bruch, der
+        // erst bei jemand anderem auffällt.
+        if (theme.loadUserTheme()) {
+            qInfo("Theme: %s aus %s",
+                  qPrintable(theme.name()), qPrintable(theme.loadedFrom()));
+        } else {
+            // Kein Fund ist der Normalfall, aber die Suchpfade gehören
+            // ins Log: „warum greift meine Datei nicht" ist sonst eine
+            // Fehlersuche ohne Anhaltspunkt.
+            qInfo("Kein Theme gefunden. Gesucht in: %s",
+                  qPrintable(NereusSDR::Style::Theme::searchPaths().join(
+                      QStringLiteral(", "))));
+        }
+    }
+    app.installEventFilter(new NereusSDR::Style::ThemeFilter(&app));
+
     // Register custom metatypes for cross-thread signal/slot connections.
     qRegisterMetaType<NereusSDR::RadioConnectionError>();
     qRegisterMetaType<NereusSDR::AudioDeviceConfig>();
@@ -324,9 +359,14 @@ int main(int argc, char* argv[])
     // DspOptionsBufferSize<Mode> / DspOptionsFilterSize<Mode> keys into
     // <Mode>Rx + <Mode>Tx variants so the UI can expose Thetis-faithful
     // per-channel combos; v6 (Phase 3F) is additive only — new per-slice
-    // per-band keys populate lazily on first write.
+    // per-band keys populate lazily on first write; v7 zieht das
+    // Wasserfallschema einmalig auf „Gedämpft", sofern noch der alte
+    // Vorgabewert steht.
     // See AppSettings::ensureSettingsAtVersion for the upstream Thetis cites.
-    NereusSDR::AppSettings::instance().ensureSettingsAtVersion(6);
+    // v8 zieht die FFT-Größe von 4096 auf 16384, sofern noch der alte
+    // Vorgabewert steht — 47 Hz je Bin waren weniger Messwerte als das
+    // Fenster Pixel hat.
+    NereusSDR::AppSettings::instance().ensureSettingsAtVersion(8);
 
     // Restore logging category toggles from settings
     NereusSDR::LogManager::instance().loadSettings();

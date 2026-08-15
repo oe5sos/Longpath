@@ -32,7 +32,7 @@ namespace NereusSDR {
 // CenterMarkSlider — ported from AetherSDR src/gui/VfoWidget.cpp:79-94
 // ResetSlider that paints a small antialiased circle at the slider groove
 // centre, providing a visual reference for the midpoint (e.g. pan = 0,
-// APF offset = 0). Colour #608090, radius 2.5px.
+// APF offset = 0). Colour #708090, radius 2.5px.
 class CenterMarkSlider : public ResetSlider {
 public:
     explicit CenterMarkSlider(int resetVal, Qt::Orientation o, QWidget* parent = nullptr)
@@ -46,7 +46,7 @@ protected:
         int cx = width() / 2;
         int cy = height() / 2;
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor("#608090"));
+        p.setBrush(QColor("#708090"));
         p.drawEllipse(QPointF(cx, cy), 2.5, 2.5);
     }
 };

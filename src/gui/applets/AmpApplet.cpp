@@ -133,7 +133,7 @@ AmpApplet::AmpApplet(RadioModel* model, QWidget* parent)
     m_operateBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     m_operateBtn->setStyleSheet(
         QStringLiteral(
-            "QPushButton { background: #1a3a5a; border: 1px solid #205070; "
+            "QPushButton { background: #204060; border: 1px solid #205070; "
             "border-radius: 3px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
             "QPushButton:hover { background: #204060; }"));
     m_operateBtn->hide();
@@ -207,14 +207,14 @@ void AmpApplet::setState(const QString& state)
         m_operateBtn->setText(QStringLiteral("OPERATE"));
         m_operateBtn->setStyleSheet(
             QStringLiteral(
-                "QPushButton { background: #006030; border: 1px solid #008040; "
+                "QPushButton { background: #1a6030; border: 1px solid #008040; "
                 "border-radius: 3px; color: #ffffff; font-size: 10px; font-weight: bold; }"
                 "QPushButton:hover { background: #007040; }"));
     } else {
         m_operateBtn->setText(QStringLiteral("STANDBY"));
         m_operateBtn->setStyleSheet(
             QStringLiteral(
-                "QPushButton { background: #1a3a5a; border: 1px solid #205070; "
+                "QPushButton { background: #204060; border: 1px solid #205070; "
                 "border-radius: 3px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
                 "QPushButton:hover { background: #204060; }"));
     }

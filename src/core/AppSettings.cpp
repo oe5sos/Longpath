@@ -1214,6 +1214,99 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
         // See docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §12.
     }
 
+    // v6 → v7: der Wasserfall wird gedämpft.
+    //
+    // OE5SOS, 2026-08-15: „Will keine auffälligen Farben, sehr dezent."
+    // Das Schema „Gedämpft" (WfColorScheme::Muted) war gebaut, aber ein
+    // geänderter Vorgabewert erreicht niemanden, der schon einmal
+    // gespeichert hat — und das ist nach der ersten Sitzung jeder. Also
+    // ein einmaliger Zug.
+    //
+    // Nur wer noch auf dem alten Vorgabewert 0 steht, wird gezogen. Wer
+    // sich bewusst ein Schema ausgesucht hat, behält es: eine Migration,
+    // die eine getroffene Wahl überschreibt, ist keine Migration mehr,
+    // sondern ein Bevormunden. Umstellen geht danach im Menü, in beide
+    // Richtungen.
+    if (storedVersion < 7 && currentVersion >= 7) {
+        static constexpr auto kSchemeKey = QLatin1String("DisplayWfColorScheme");
+        static constexpr int kOldDefault = 0;   // WfColorScheme::Default
+        static constexpr int kMuted      = 8;   // WfColorScheme::Muted
+        const int cur = value(QString(kSchemeKey),
+                              QString::number(kOldDefault)).toString().toInt();
+        if (cur == kOldDefault) {
+            setValue(QString(kSchemeKey), QString::number(kMuted));
+            qDebug() << "Schema v7: Wasserfall auf „Gedämpft\" gezogen "
+                        "(war der alte Vorgabewert)";
+        } else {
+            qDebug() << "Schema v7: Wasserfallschema" << cur
+                     << "bleibt — bewusst gewählt";
+        }
+
+        // Dieselbe Regel für die Gitterfarben: nur wer noch auf dem
+        // alten Vorgabewert steht, wird gezogen. Der Schlüssel wird
+        // dabei gelöscht statt überschrieben — dann greift die Vorgabe
+        // aus dem Theme, und zwar auch dann noch, wenn der Betreiber
+        // seine Theme-Datei später ändert. Ein hineingeschriebener
+        // Hexwert wäre ab da wieder eine feste Farbe.
+        //
+        // Die Schlüssel tragen je Panadapter einen Index; deshalb über
+        // alle vorhandenen Schlüssel gehen statt vier feste Namen.
+        struct OldDefault { QLatin1String suffix; QLatin1String hex; };
+        static const OldDefault kOld[] = {
+            { QLatin1String("DisplayGridColor"),     QLatin1String("#28ffffff") },
+            { QLatin1String("DisplayGridFineColor"), QLatin1String("#14ffffff") },
+            { QLatin1String("DisplayHGridColor"),    QLatin1String("#28ffffff") },
+            { QLatin1String("DisplayGridTextColor"), QLatin1String("#ffffff00") },
+        };
+        int pulled = 0;
+        for (const QString& key : allKeys()) {
+            for (const OldDefault& o : kOld) {
+                if (!key.contains(QString(o.suffix))) { continue; }
+                const QString have = value(key).toString().toLower();
+                const QColor a = QColor::fromString(have);
+                const QColor b = QColor::fromString(QString(o.hex));
+                if (a.isValid() && b.isValid() && a == b) {
+                    remove(key);
+                    ++pulled;
+                }
+            }
+        }
+        if (pulled > 0) {
+            qDebug() << "Schema v7:" << pulled
+                     << "Gitterfarben auf die Theme-Vorgabe zurückgesetzt";
+        }
+    }
+
+    // v7 → v8: die FFT wird viermal feiner.
+    //
+    // 4096 Bins bei 192 kHz sind 47 Hz je Bin — auf einem 45-kHz-
+    // Ausschnitt weniger Messwerte als das Fenster Pixel hat. Der
+    // Detektor interpolierte, statt auszuwählen, und das Ergebnis war
+    // eine gestreckte Kurve. 16384 gibt drei Bins je Pixel.
+    //
+    // Wieder nur, wer noch auf dem alten Vorgabewert steht. Wer sich
+    // bewusst für eine Größe entschieden hat — etwa auf einem langsamen
+    // Rechner nach unten — behält sie.
+    //
+    // Die Schlüssel tragen je Panadapter einen Index (DisplayFftSize,
+    // DisplayFftSize_1, …), deshalb über alle vorhandenen gehen.
+    if (storedVersion < 8 && currentVersion >= 8) {
+        static constexpr int kOldDefault = 4096;
+        static constexpr int kNewDefault = 16384;
+        int pulled = 0;
+        for (const QString& key : allKeys()) {
+            if (!key.startsWith(QLatin1String("DisplayFftSize"))) { continue; }
+            if (value(key).toString().toInt() != kOldDefault) { continue; }
+            setValue(key, QString::number(kNewDefault));
+            ++pulled;
+        }
+        if (pulled > 0) {
+            qDebug() << "Schema v8:" << pulled
+                     << "FFT-Groesse(n) von 4096 auf 16384 gezogen. Der erste"
+                        " Start danach plant FFTW einmal neu.";
+        }
+    }
+
     setValue(versionKey, QString::number(currentVersion));
 }
 

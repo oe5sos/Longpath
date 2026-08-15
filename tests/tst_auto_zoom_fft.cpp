@@ -12,7 +12,9 @@
 //   1. setFftSizeBaseline / fftSizeBaseline round-trip across all
 //      slider-valid values (1024..262144 power-of-two).
 //   2. Invalid sizes (out of range, non-power-of-two) rejected.
-//   3. Default baseline matches default fftSize (4096).
+//   3. Default baseline matches default fftSize (16384 seit
+//      2026-08-15 — siehe FFTEngine.h: 4096 gab bei 192 kHz
+//      weniger Messwerte als das Fenster Pixel hat).
 //
 // NB: the auto-zoom formula and hysteresis live in MainWindow's
 // bandwidthChangeRequested lambda (cannot test in headless mode
@@ -92,8 +94,11 @@ private slots:
     void baseline_default_matches_initial_fft_size()
     {
         FFTEngine fe(/*receiverId=*/0);
-        QCOMPARE(fe.fftSizeBaseline(), 4096);
-        QCOMPARE(fe.fftSize(),         4096);
+        // Die Zahl steht hier zweimal absichtlich: der Test soll
+        // scheitern, wenn jemand die Vorgabe aendert, ohne sich die
+        // Begruendung in FFTEngine.h anzusehen.
+        QCOMPARE(fe.fftSizeBaseline(), 16384);
+        QCOMPARE(fe.fftSize(),         16384);
     }
 
     void baseline_round_trip_for_all_slider_values()

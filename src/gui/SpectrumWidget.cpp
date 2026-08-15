@@ -113,6 +113,10 @@
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
 #include "SpectrumWidget.h"
+#include "core/FFTEngine.h"   // kDefaultFftSize
+#include "gui/StyleConstants.h"
+#include "gui/styles/Theme.h"
+#include "gui/styles/ThemeQss.h"
 #include "SpectrumOverlayMenu.h"
 #include "ImdOverlay.h"
 #include "spectrum/WaterfallTicker.h"
@@ -361,9 +365,90 @@ const WfGradientStop* pick(const WfGradientStop (&arr)[N], int& count)
     return arr;
 }
 
+// ── Gedämpft: die Rampe, die dem Theme folgt ─────────────────────────
+//
+// Die einzige der acht, deren Farben nicht in dieser Datei stehen. Sie
+// werden bei jedem Aufruf aus den Rollen geholt, damit eine geänderte
+// Theme-Datei auch den Wasserfall bewegt — er ist die größte Farbfläche
+// im Programm, und ihn beim Palettenwechsel stehen zu lassen wäre die
+// auffälligste Lücke.
+//
+// Die Form der Rampe:
+//
+//   0.00–0.30  Hintergrund → sehr dunkles Grau. Das Grundrauschen
+//              verschwindet, statt eingefärbt zu werden. Vorher lag es
+//              mitten im Blau und lieferte die flimmernde Fläche, die
+//              den halben Bildschirm füllte.
+//   0.30–0.72  Grau → Instrumentenglimmen. Schwache Signale werden
+//              sichtbar, ohne eine Farbe zu bekommen.
+//   0.72–0.94  Glimmen → Messwert. Hier steht, was man tatsächlich
+//              anschaut, und hier bekommt es Wärme.
+//   0.94–1.00  Messwert → Gefahr. Nur die Spitzen, nur ein Sechstel der
+//              obersten zehn Prozent — nicht das durchgehende rote Band
+//              von vorher.
+static const WfGradientStop* mutedStops(int& count)
+{
+    static WfGradientStop stops[7];
+    static quint64 builtFor = 0;
+    const quint64 gen = Style::Theme::instance().generation();
+    if (builtFor != gen) {
+        auto at = [](float pos, const QString& hex, WfGradientStop& s) {
+            const QColor c(hex);
+            s.pos = pos;
+            s.r = c.red();
+            s.g = c.green();
+            s.b = c.blue();
+        };
+        // ── Wo die Stufen sitzen, entscheidet mehr als welche ────────
+        //
+        // Erste Fassung: 0,00 / 0,16 / 0,34 / 0,56 / 0,74 / 0,92 / 1,00.
+        // Gleichmäßig verteilt, und im Betrieb (2026-08-15, 40 m) war
+        // das Ergebnis ein Nebel: der Rauschteppich landete bei etwa
+        // 0,4 bis 0,6 der Spanne und damit mitten im hellen Grau.
+        //
+        // Zweite Fassung schob den Schwarzanteil auf 0,45 — und war
+        // zu weit. Im Bild blieben selbst die Träger, die im Spektrum
+        // darüber deutlich herausragten, im Wasserfall fast unsichtbar.
+        // Ein Wasserfall, in dem man Signale sucht, ist so falsch wie
+        // einer, in dem man sie im Nebel sucht.
+        //
+        // Dritte Fassung, und die Begründung dahinter: das Rauschen
+        // soll verschwinden, das schwächste ERKENNBARE Signal soll
+        // gerade sichtbar werden. Das liegt bei diesem Gerät bei etwa
+        // einem Drittel der Spanne, nicht bei der Hälfte.
+        at(0.00f, Style::role("app-bg",             Style::kAppBg),        stops[0]);
+        at(0.30f, Style::role("panel",              Style::kPanelBg),      stops[1]);
+        at(0.48f, Style::role("border",             Style::kBorder),       stops[2]);
+        at(0.64f, Style::role("text-inactive",      Style::kTextInactive), stops[3]);
+        at(0.78f, Style::role("instrument-glow-hi", Style::kInstrumentGlowHi), stops[4]);
+        at(0.92f, Style::role("measured",           Style::kAmberText),    stops[5]);
+        // ── Oben steht nicht „Achtung“, sondern „laut“ ───────────────
+        //
+        // Hier stand „danger“ (#a86b6d). Im Betrieb bekam damit jeder
+        // kräftige Träger einen rosa Streifen — und ein starkes Signal
+        // auf 20 m ist keine Gefahr, sondern ein starkes Signal.
+        //
+        // Das ist genau der Fehler, der beim S-Meter schon einmal
+        // ausgebaut wurde: dort war der halbe Bogen rot und kodierte
+        // damit nichts. Rot bedeutet in diesem Programm „Achtung“. Wenn
+        // es zusätzlich „oberes Skalenende“ bedeutet, bedeutet es bald
+        // gar nichts mehr — und dann fällt es auch nicht mehr auf, wo
+        // es zählt: an der Bandkante und beim Stehwellenverhältnis.
+        //
+        // Stattdessen das Cremeweiß der Instrumente. Bernstein, das
+        // nach oben hell wird, ist das, was ein Wasserfall seit jeher
+        // tut, und es sagt genau eine Sache: hier ist viel Energie.
+        at(1.00f, Style::role("instrument-face",    Style::kInstrumentFace), stops[6]);
+        builtFor = gen;
+    }
+    count = 7;
+    return stops;
+}
+
 const WfGradientStop* wfSchemeStops(WfColorScheme scheme, int& count)
 {
     switch (scheme) {
+    case WfColorScheme::Muted:       return mutedStops(count);
     case WfColorScheme::Enhanced:    return pick(kEnhancedStops, count);
     case WfColorScheme::Spectran:    return pick(kSpectranStops, count);
     case WfColorScheme::BlackWhite:  return pick(kBlackWhiteStops, count);
@@ -915,10 +1000,32 @@ void SpectrumWidget::loadSettings()
         QColor c = QColor::fromString(hex);
         return c.isValid() ? c : def;
     };
-    m_gridColor     = readColor(QStringLiteral("DisplayGridColor"), m_gridColor);
-    m_gridFineColor = readColor(QStringLiteral("DisplayGridFineColor"), m_gridFineColor);
-    m_hGridColor    = readColor(QStringLiteral("DisplayHGridColor"), m_hGridColor);
-    m_gridTextColor = readColor(QStringLiteral("DisplayGridTextColor"), m_gridTextColor);
+    // Die Kurve wird nicht unter einem eigenen Schlüssel gespeichert —
+    // sie kommt bei jedem Laden frisch aus dem Theme. Ändert jemand sie
+    // im Setup, gilt das für die Sitzung; das war vor dieser Änderung
+    // genauso, nur mit Neonzyan als festem Ausgangspunkt.
+    m_fillColor = QColor(Style::role("trace", Style::kSpectrumTrace));
+
+    // Der eine Spot-Ton, aus derselben Rolle wie die Messwerte. Ein
+    // Spot sagt dasselbe wie ein Zeigerausschlag: hier ist etwas.
+    m_spotColor = QColor(Style::role("measured", Style::kAmberText));
+
+    // Vorgabe aus dem Theme, nicht aus dem Kopf der Klasse. Wer sich im
+    // Setup eine eigene Gitterfarbe ausgesucht hat, behält sie — der
+    // gespeicherte Wert schlägt die Vorgabe wie zuvor.
+    {
+        const QColor grid(Style::role("grid", Style::kSpectrumGrid));
+        auto a = [](QColor c, int v) { c.setAlpha(v); return c; };
+        m_gridColor     = readColor(QStringLiteral("DisplayGridColor"),
+                                    a(grid, 40));
+        m_gridFineColor = readColor(QStringLiteral("DisplayGridFineColor"),
+                                    a(grid, 20));
+        m_hGridColor    = readColor(QStringLiteral("DisplayHGridColor"),
+                                    a(grid, 40));
+        m_gridTextColor = readColor(QStringLiteral("DisplayGridTextColor"),
+                                    QColor(Style::role(
+                                        "grid-text", Style::kSpectrumGridText)));
+    }
     // Plan 4 D9c-1: old single key "DisplayZeroLineColor" dropped (branch not
     // yet on main — no migration burden).  Load the split RX/TX keys.
     m_rxZeroLineColor = readColor(QStringLiteral("DisplayRxZeroLineColor"), m_rxZeroLineColor);
@@ -1324,8 +1431,18 @@ void SpectrumWidget::setDbmRange(float minDbm, float maxDbm)
 
 void SpectrumWidget::setWfColorScheme(WfColorScheme scheme)
 {
+    if (m_wfColorScheme == scheme) { return; }
     m_wfColorScheme = scheme;
     scheduleSettingsSave();
+
+    // Die sichtbaren Zeilen neu einfärben. Ohne das galt das neue
+    // Schema erst ab der nächsten Zeile, und quer über den Wasserfall
+    // lief ein Streifen dort, wo umgeschaltet wurde — bis er nach ein
+    // paar Minuten unten hinausgelaufen war.
+    //
+    // Möglich ist es erst, seit die Historie Intensität hält statt
+    // Farbe. Vorher gab es nichts, woraus man hätte neu färben können.
+    rebuildWaterfallViewport();
     update();
 }
 
@@ -1814,7 +1931,11 @@ double SpectrumWidget::binWidthHz() const
     // math" follow-up) was a pre-1A.4 bug that returned half the actual
     // bin width.  Phase 2 source-first port drops it.  m_fullLinearBins
     // is sized to the full FFT (matches FFTEngine::fftSize()).
-    const int fftSz = m_fullLinearBins.isEmpty() ? 4096
+    // Der Rückfallwert MUSS der Vorgabe der Maschine folgen. Er stand
+    // als 4096 hier fest, während die Vorgabe auf 16384 ging — und dann
+    // meldet die Anzeige vor dem ersten Bild eine Bandbreite, die es
+    // nicht gibt.
+    const int fftSz = m_fullLinearBins.isEmpty() ? kDefaultFftSize
                                                  : m_fullLinearBins.size();
     if (fftSz <= 0 || m_sampleRateHz <= 0.0) { return 0.0; }
     return m_sampleRateHz / fftSz;
@@ -2611,14 +2732,26 @@ void SpectrumWidget::setTxZeroLineColor(const QColor& c)
 // tst_spectrum_tx_overlay::resetDisplayColorsToDefaults() still passes.
 void SpectrumWidget::resetDisplayColorsToDefaults()
 {
-    // Spectrum trace & fill
-    setFillColor(QColor(0x00, 0xe5, 0xff));             // default cyan trace
+    // ── Kurve und Gitter kommen aus dem Theme ────────────────────────
+    //
+    // Vorher standen hier drei feste Werte: Neonzyan für die Kurve,
+    // Weiß mit Alpha für das Gitter, Knallgelb für die Skala. Sie sind
+    // die zwei größten Flächen im Fenster, und solange sie im Malcode
+    // festgenagelt waren, konnte keine Theme-Datei sie erreichen.
+    //
+    // Style::role() nimmt den Rollennamen aus der Theme-Datei und
+    // fällt auf den Wert aus StyleConstants.h zurück, wenn dort nichts
+    // steht. Die Deckung des Gitters bleibt hier: fein und grob sind
+    // dieselbe Farbe bei anderem Alpha.
+    setFillColor(QColor(Style::role("trace", Style::kSpectrumTrace)));
 
-    // Grid colours — defaults match compile-time member initialisers in SpectrumWidget.h
-    setGridColor(QColor(255, 255, 255, 40));             // m_gridColor default
-    setGridFineColor(QColor(255, 255, 255, 20));         // m_gridFineColor default
-    setHGridColor(QColor(255, 255, 255, 40));            // m_hGridColor default
-    setGridTextColor(QColor(255, 255, 0));               // m_gridTextColor default (yellow)
+    const QColor grid(Style::role("grid", Style::kSpectrumGrid));
+    auto withAlpha = [](QColor c, int a) { c.setAlpha(a); return c; };
+    setGridColor(withAlpha(grid, 40));                   // senkrecht, grob
+    setGridFineColor(withAlpha(grid, 20));               // 1/5-Schritt
+    setHGridColor(withAlpha(grid, 40));                  // waagrecht, dBm
+    setGridTextColor(QColor(Style::role("grid-text",
+                                        Style::kSpectrumGridText)));
     setBandEdgeColor(QColor(255, 0, 0));                 // m_bandEdgeColor default (red)
 
     // Zero-line colours — Plan 4 D9c-1 (unchanged values, kept for test compat)
@@ -4356,11 +4489,11 @@ int SpectrumWidget::maxWaterfallHistoryOffsetRows() const
 
 int SpectrumWidget::historyRowIndexForAge(int ageRows) const
 {
-    if (m_waterfallHistory.isNull() || ageRows < 0
+    if (!m_waterfallHistory.isConfigured() || ageRows < 0
         || ageRows >= m_wfHistoryRowCount) {
         return -1;
     }
-    return (m_wfHistoryWriteRow + ageRows) % m_waterfallHistory.height();
+    return (m_wfHistoryWriteRow + ageRows) % m_waterfallHistory.capacityRows();
 }
 
 QString SpectrumWidget::pausedTimeLabelForAge(int ageRows) const
@@ -4394,42 +4527,39 @@ void SpectrumWidget::ensureWaterfallHistory()
         return;
     }
 
-    // Preserve rows across width changes (e.g. divider drag, manual window
-    // resize) by horizontally scaling the existing history image. Height
-    // capacity is fixed via waterfallHistoryCapacityRows() so row indices
-    // and timestamps remain valid.
-    QImage newHistory;
-    if (!m_waterfallHistory.isNull() && m_wfHistoryRowCount > 0
-        && m_waterfallHistory.height() == desiredSize.height()) {
-        newHistory = m_waterfallHistory.scaled(
-            desiredSize, Qt::IgnoreAspectRatio, Qt::FastTransformation);
-    }
-    if (newHistory.isNull() || newHistory.size() != desiredSize) {
-        newHistory = QImage(desiredSize, QImage::Format_RGB32);
-        newHistory.fill(Qt::black);
-        m_wfHistoryTimestamps = QVector<qint64>(desiredSize.height(), 0);
-        m_wfHistoryWriteRow = 0;
-        m_wfHistoryRowCount = 0;
-        m_wfHistoryOffsetRows = 0;
-        m_wfLive = true;
-    }
-    m_waterfallHistory = newHistory;
-}
-
-// From AetherSDR SpectrumWidget.cpp:647-668 [@0cd4559]
-void SpectrumWidget::appendHistoryRow(const QRgb* rowData, qint64 timestampMs)
-{
-    ensureWaterfallHistory();
-    if (m_waterfallHistory.isNull() || rowData == nullptr) {
+    // Nur die Breite hat sich geändert (Teilerziehen, Fenstergröße):
+    // Inhalt mitnehmen. Die Tiefe steht über
+    // waterfallHistoryCapacityRows() fest, damit Zeilenindizes und
+    // Zeitstempel gültig bleiben.
+    if (m_waterfallHistory.isConfigured() && m_wfHistoryRowCount > 0
+        && m_waterfallHistory.capacityRows() == desiredSize.height()
+        && m_waterfallHistory.resizeWidth(desiredSize.width())) {
         return;
     }
 
-    const int h = m_waterfallHistory.height();
+    m_waterfallHistory.configure(desiredSize.width(), desiredSize.height());
+    m_waterfallHistory.discardRows();
+    m_wfHistoryTimestamps = QVector<qint64>(desiredSize.height(), 0);
+    m_wfHistoryWriteRow = 0;
+    m_wfHistoryRowCount = 0;
+    m_wfHistoryOffsetRows = 0;
+    m_wfLive = true;
+}
+
+// From AetherSDR SpectrumWidget.cpp:647-668 [@0cd4559]
+void SpectrumWidget::appendHistoryRow(const quint8* rowData, qint64 timestampMs)
+{
+    ensureWaterfallHistory();
+    if (!m_waterfallHistory.isConfigured() || rowData == nullptr) {
+        return;
+    }
+
+    const int h = m_waterfallHistory.capacityRows();
     m_wfHistoryWriteRow = (m_wfHistoryWriteRow - 1 + h) % h;
-    auto* row = reinterpret_cast<QRgb*>(
-        m_waterfallHistory.bits()
-        + m_wfHistoryWriteRow * m_waterfallHistory.bytesPerLine());
-    std::memcpy(row, rowData, m_waterfallHistory.width() * sizeof(QRgb));
+    quint8* row = m_waterfallHistory.writableRow(m_wfHistoryWriteRow);
+    if (!row) { return; }
+    std::memcpy(row, rowData,
+                static_cast<size_t>(m_waterfallHistory.width()));
     if (m_wfHistoryWriteRow >= 0
         && m_wfHistoryWriteRow < m_wfHistoryTimestamps.size()) {
         m_wfHistoryTimestamps[m_wfHistoryWriteRow] = timestampMs;
@@ -4457,21 +4587,30 @@ void SpectrumWidget::rebuildWaterfallViewport()
     m_waterfall.fill(Qt::black);
     m_wfWriteRow = 0;
 
-    if (m_waterfallHistory.isNull()) {
+    if (!m_waterfallHistory.isConfigured()) {
         update();
         return;
     }
 
-    const int rowWidthBytes = m_waterfall.width() * static_cast<int>(sizeof(QRgb));
+    // Hier wird gefärbt, nicht kopiert. Das ist der Gewinn aus dem
+    // Umbau: die Historie hält Intensität, und jeder Neuaufbau nimmt
+    // das Farbschema von JETZT. Vorher galt ein Schemawechsel erst ab
+    // der nächsten Zeile, und quer durch den Wasserfall lief ein
+    // Streifen dort, wo umgeschaltet wurde.
+    const int w = std::min(m_waterfall.width(), m_waterfallHistory.width());
     for (int y = 0; y < m_waterfall.height(); ++y) {
         const int rowIndex = historyRowIndexForAge(m_wfHistoryOffsetRows + y);
         if (rowIndex < 0) {
             break;
         }
-        const QRgb* src = reinterpret_cast<const QRgb*>(
-            m_waterfallHistory.constScanLine(rowIndex));
+        const quint8* src = m_waterfallHistory.row(rowIndex);
+        // nullptr heißt: dieser Block wurde nie beschrieben. Die Zeile
+        // bleibt schwarz — gefüllt ist das Bild schon.
+        if (!src) { continue; }
         auto* dst = reinterpret_cast<QRgb*>(m_waterfall.scanLine(y));
-        std::memcpy(dst, src, rowWidthBytes);
+        for (int x = 0; x < w; ++x) {
+            dst[x] = waterfallColorForIntensity(src[x], m_wfColorScheme);
+        }
     }
 
     // Force GPU full re-upload — the per-row delta path can't follow a
@@ -4543,9 +4682,11 @@ QRect SpectrumWidget::waterfallLiveButtonRect(const QRect& wfRect) const
 // see plan §authoring-time #3).
 void SpectrumWidget::clearWaterfallHistory()
 {
-    if (!m_waterfallHistory.isNull()) {
-        m_waterfallHistory.fill(Qt::black);
-    }
+    // discardRows() statt „mit Schwarz füllen": die Plätze bleiben, der
+    // Speicher wird zurückgegeben. Bei zwanzig Minuten Historie ist das
+    // der Unterschied zwischen einem geleerten Puffer und einem, der
+    // nach dem Trennen weiter Dutzende Megabyte hält.
+    m_waterfallHistory.discardRows();
     // Codex P2 (PR #140): also clear the live viewport + reset its write
     // head so a disconnect-flush actually shows a clean waterfall on
     // reconnect, instead of stale rows from the previous session rolling
@@ -4666,7 +4807,37 @@ void SpectrumWidget::reprojectWaterfall(double oldCenterHz, double oldBandwidthH
     };
 
     reprojectImage(m_waterfall);
-    reprojectImage(m_waterfallHistory);
+
+    // ── Die Historie beim Schwenken ──────────────────────────────────
+    //
+    // Hier stand derselbe Aufruf für die Historie, als sie noch ein
+    // RGB32-Bild war: die alten Zeilen wurden waagrecht verschoben und
+    // gestreckt, damit sie zum neuen Ausschnitt passen.
+    //
+    // Das ist eine Notlösung, und man sieht es: verschoben wird das
+    // ganze Bild auf einmal, obwohl die Zeilen aus verschiedenen
+    // Ausschnitten stammen können, und was aus dem Fenster fällt, ist
+    // endgültig weg — auch wenn man gleich wieder zurückschwenkt.
+    //
+    // Die richtige Antwort ist Schritt 3 aus docs/design/
+    // WASSERFALL-AETHER.md: jede Zeile merkt sich, bei welcher
+    // Mittenfrequenz und Bandbreite sie aufgenommen wurde, und wird
+    // beim Zeichnen einzeln umgerechnet. Dann ist Schwenken eine
+    // Frage der Anzeige und nicht ein Eingriff in die Aufzeichnung.
+    //
+    // Bis dahin: die Historie wird verworfen. Lieber leer als falsch —
+    // eine gestreckte alte Zeile sieht aus wie eine Messung und ist
+    // keine. Der sichtbare Wasserfall (oben) wird weiter umgerechnet,
+    // damit ein kleiner Schwenk nicht schwarz aufblitzt.
+    if (m_waterfallHistory.isConfigured()) {
+        m_waterfallHistory.discardRows();
+        std::fill(m_wfHistoryTimestamps.begin(),
+                  m_wfHistoryTimestamps.end(), 0);
+        m_wfHistoryWriteRow = 0;
+        m_wfHistoryRowCount = 0;
+        m_wfHistoryOffsetRows = 0;
+        m_wfLive = true;
+    }
 
     // Two-sentinel pattern matches rebuildWaterfallViewport (see Task 3
     // review): m_wfTexFullUpload routes the GPU upload through the full
@@ -4839,10 +5010,21 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     // strip), this is a 1:1 copy; if widths diverge (e.g. resize race),
     // proportional sampling preserves visual continuity.
     const float pxScale = static_cast<float>(n) / static_cast<float>(w);
+
+    // Einmal normieren, zweimal verwenden: die Intensität geht in die
+    // Historie, die Farbe daraus in die sichtbare Zeile. Vorher wurde
+    // gefärbt und die Farbe dann in die Historie kopiert — deshalb
+    // konnte ein Schemawechsel die alten Zeilen nicht mehr erreichen.
+    m_wfRowIntensity.resize(w);
+    quint8* level = m_wfRowIntensity.data();
     for (int x = 0; x < w; ++x) {
         int srcPx = static_cast<int>(static_cast<float>(x) * pxScale);
         srcPx = qBound(0, srcPx, n - 1);
-        scanline[x] = dbmToRgb(wfPixelsDbm[srcPx]);
+        level[x] = waterfallIntensity(wfPixelsDbm[srcPx],
+                                      m_wfActiveLowThreshold,
+                                      m_wfActiveHighThreshold,
+                                      m_wfBlackLevel, m_wfColorGain);
+        scanline[x] = waterfallColorForIntensity(level[x], m_wfColorScheme);
     }
 
     // ── Sub-epic E: mirror the just-written row into the history ring ───
@@ -4851,7 +5033,7 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     //   path), so we always use QDateTime::currentMSecsSinceEpoch().
     {
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-        appendHistoryRow(scanline, nowMs);
+        appendHistoryRow(level, nowMs);
         if (!m_wfLive) {
             // Paused: don't show the new row — auto-bump in appendHistoryRow
             // already shifted offset, just rebuild the viewport.
@@ -4879,53 +5061,86 @@ QRgb SpectrumWidget::dbmToRgb(float dbm) const
                           m_wfBlackLevel, m_wfColorGain, m_wfColorScheme);
 }
 
-QRgb SpectrumWidget::waterfallColor(float dbm, float lowDbm, float highDbm,
-                                    int blackLevel, int colorGain,
-                                    WfColorScheme scheme)
+// ── Zwei Hälften statt einer ─────────────────────────────────────────
+//
+// Diese Funktion war ein Stück: dBm hinein, Farbe heraus. Sie ist jetzt
+// in die zwei Schritte zerlegt, die ohnehin darin steckten —
+// normieren, dann nachschlagen — weil die Historie nur den ersten
+// braucht.
+//
+// Ein Byte je Punkt statt vier, und vor allem: die Historie hält damit
+// eine Messung und keine Anzeige. Ein Wechsel des Farbschemas galt
+// vorher erst ab der nächsten Zeile, und quer über den Wasserfall lief
+// ein Streifen dort, wo umgeschaltet wurde.
+//
+// Die 256 Stufen sind kein Verlust, den man sieht: über eine typische
+// 50-dB-Spanne ist eine Stufe 0,2 dB, und der Wasserfall hat ohnehin
+// nur so viele Farben, wie die Farbtabelle hergibt.
+quint8 SpectrumWidget::waterfallIntensity(float dbm, float lowDbm,
+                                          float highDbm, int blackLevel,
+                                          int colorGain)
 {
-    // Effective thresholds adjusted by gain/black level sliders.
-    // Black level slider (0-125): lower = more black, higher = less black.
-    // Color gain slider (0-100): shifts high threshold DOWN (more color).
-    // From Thetis display.cs:2522-2536 defaults: high=-80, low=-130.
     float effectiveLow  = lowDbm  + wfBlackLevelOffsetDb(blackLevel);
     float effectiveHigh = highDbm - wfColorGainOffsetDb(colorGain);
 
-    // Was `effectiveLow + 1.0f`, which is not a display: a one-decibel
-    // window puts every pixel above the floor at the top of the palette,
-    // and the top of ClarityBlue is magenta. A collapsed window is
-    // always a mistake somewhere upstream, but the mapping should
-    // degrade to a low-contrast picture rather than a solid colour.
+    // War `effectiveLow + 1.0f`, was keine Anzeige ist: ein Fenster von
+    // einem Dezibel setzt jeden Punkt über dem Rauschen an die Spitze
+    // der Farbtabelle, und die Spitze von ClarityBlue ist Magenta. Ein
+    // zusammengefallenes Fenster ist immer ein Fehler weiter oben, aber
+    // das Ergebnis soll ein kontrastarmes Bild sein und keine Fläche.
     if (effectiveHigh - effectiveLow < kWfMinSpanDb) {
         effectiveHigh = effectiveLow + kWfMinSpanDb;
     }
 
-    // From Thetis display.cs:6889-6891
     const float range = effectiveHigh - effectiveLow;
     float adjusted = (dbm - effectiveLow) / range;
-    // A NaN pixel is unknown, not loud. Left to qBound it would fall
-    // through the stop search and take the last stop, painting the
-    // brightest colour in the palette for missing data.
+    // Ein NaN-Punkt ist unbekannt, nicht laut. Ohne diese Zeile fällt er
+    // durch die Stufensuche — jeder Vergleich mit NaN ist falsch — und
+    // nimmt die letzte Stufe: die hellste Farbe der Tabelle für fehlende
+    // Daten.
     if (!std::isfinite(adjusted)) { adjusted = 0.0f; }
     adjusted = qBound(0.0f, adjusted, 1.0f);
 
-    // Look up in gradient stops for current color scheme
+    return static_cast<quint8>(std::lround(adjusted * 255.0f));
+}
+
+QRgb SpectrumWidget::waterfallColorForIntensity(quint8 level,
+                                                WfColorScheme scheme)
+{
+    const float adjusted = static_cast<float>(level) / 255.0f;
+
     int stopCount = 0;
     const WfGradientStop* stops = wfSchemeStops(scheme, stopCount);
 
-    // Find the two surrounding stops and interpolate
     for (int i = 0; i < stopCount - 1; ++i) {
         if (adjusted <= stops[i + 1].pos) {
-            float t = (adjusted - stops[i].pos)
-                    / (stops[i + 1].pos - stops[i].pos);
-            int r = static_cast<int>(stops[i].r + t * (stops[i + 1].r - stops[i].r));
-            int g = static_cast<int>(stops[i].g + t * (stops[i + 1].g - stops[i].g));
-            int b = static_cast<int>(stops[i].b + t * (stops[i + 1].b - stops[i].b));
+            const float t = (adjusted - stops[i].pos)
+                          / (stops[i + 1].pos - stops[i].pos);
+            const int r = static_cast<int>(
+                stops[i].r + t * (stops[i + 1].r - stops[i].r));
+            const int g = static_cast<int>(
+                stops[i].g + t * (stops[i + 1].g - stops[i].g));
+            const int b = static_cast<int>(
+                stops[i].b + t * (stops[i + 1].b - stops[i].b));
             return qRgb(r, g, b);
         }
     }
     return qRgb(stops[stopCount - 1].r,
                 stops[stopCount - 1].g,
                 stops[stopCount - 1].b);
+}
+
+QRgb SpectrumWidget::waterfallColor(float dbm, float lowDbm, float highDbm,
+                                    int blackLevel, int colorGain,
+                                    WfColorScheme scheme)
+{
+    // Die sichtbare Zeile geht denselben Weg wie die gespeicherte.
+    // Täte sie es nicht, unterschieden sich die oberste Zeile und ihre
+    // eigene Aufzeichnung eine Zeile später — ein Unterschied, den
+    // niemand sucht, weil niemand ihn für möglich hält.
+    return waterfallColorForIntensity(
+        waterfallIntensity(dbm, lowDbm, highDbm, blackLevel, colorGain),
+        scheme);
 }
 
 // ---- VFO marker + filter passband overlay ----
@@ -5742,7 +5957,7 @@ void SpectrumWidget::loadSpotDisplaySettings()
                 QStringLiteral("#FFFF00")).toString()));
     setSpotBgColor(QColor(
         s.value(QStringLiteral("SpotsOverrideBgColor"),
-                QStringLiteral("#000000")).toString()));
+                QStringLiteral("#0a0a14")).toString()));
     setSpotBgOpacity(
         s.value(QStringLiteral("SpotsBackgroundOpacity"), 48).toInt());
 
@@ -5975,7 +6190,7 @@ void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoi
     menu->setStyleSheet(
         "QMenu {"
         "  background: #0f0f1a;"
-        "  border: 1px solid #305070;"
+        "  border: 1px solid #205070;"
         "  padding: 4px;"
         "}"
         "QMenu::item {"
@@ -5984,7 +6199,7 @@ void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoi
         "  font-size: 12px;"
         "}"
         "QMenu::item:selected {"
-        "  background: #1a3a5a;"
+        "  background: #204060;"
         "  color: #00b4d8;"
         "}");
 
@@ -6217,7 +6432,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     // column for now — that requires hz_per_pixel + DDC center plumbing
     // which the current mockup doesn't model), then label/val1/val2.
     const auto t = m_imdOverlay->formatReadout();
-    p.setPen(QColor("#cfe1f0"));
+    p.setPen(QColor("#c8d8e8"));
     QFont mono(QStringLiteral("Menlo"));
     mono.setPointSize(9);
     mono.setStyleHint(QFont::Monospace);

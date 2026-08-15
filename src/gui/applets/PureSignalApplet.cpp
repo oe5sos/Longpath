@@ -87,7 +87,7 @@ namespace {
 constexpr const char* kLedActiveStyle =
     "QLabel {"
     "  background: #20c060; border-radius: 4px;"
-    "  color: #000000; font-size: 8px; font-weight: bold;"
+    "  color: #0a0a14; font-size: 8px; font-weight: bold;"
     "  padding: 0px 2px;"
     "}";
 

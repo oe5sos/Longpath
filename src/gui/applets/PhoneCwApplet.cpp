@@ -121,7 +121,7 @@ static const QString kNyiProc   = QStringLiteral("Phase 3I-3");
 static const QString kNyiVax    = QStringLiteral("Phase 3-VAX");
 static const QString kNyiFm     = QStringLiteral("Phase 3I-1");
 
-// Phone/CW-specific button background — bluer (#1a3a5a) than the
+// Phone/CW-specific button background — bluer (#204060) than the
 // canonical kButtonBg (#1a2a3a) used by Style::buttonBaseStyle().
 // Retained as a tightly-scoped file-local exception per
 // docs/architecture/ui-audit-polish-plan.md §A2: "tightly-scoped local
@@ -131,7 +131,7 @@ static const QString kNyiFm     = QStringLiteral("Phase 3I-1");
 static inline QString phoneButtonStyle()
 {
     return QStringLiteral(
-        "QPushButton { background: #1a3a5a; border: 1px solid %1;"
+        "QPushButton { background: #204060; border: 1px solid %1;"
         "  border-radius: 3px; color: %2; font-size: 10px; font-weight: bold; }"
         "QPushButton:hover { background: %3; }"
     ).arg(NereusSDR::Style::kBorder,

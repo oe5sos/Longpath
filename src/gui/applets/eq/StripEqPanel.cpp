@@ -76,7 +76,7 @@ namespace {
 //   color.background.0  #0f0f1a  = Style::kAppBg
 //   color.background.1  #1a2a3a  = Style::kButtonBg
 //   color.text.primary  #c8d8e8  = Style::kTextPrimary
-//   color.background.3  #506070  = Style::kTextScale (2026-08-11 —
+//   color.background.3  #556070  = Style::kTextScale (2026-08-11 —
 //                                  was kept as a literal on the grounds
 //                                  that it sits between two tokens; the
 //                                  instruction is that everything looks
@@ -116,7 +116,7 @@ constexpr int kDefaultHeight = 520;
 // pass that looked like the whole job. It was not: the three stylesheets
 // below never used tokens at all — upstream wrote their colours as hex
 // literals — so they came through the port untouched and the equaliser
-// tab kept AetherSDR's window background (#08121d) and its gold
+// tab kept AetherSDR's window background (#0f0f1a) and its gold
 // (#f2c14e) while everything painted around it had already moved.
 //
 // Written as functions rather than constants because a QColor cannot be

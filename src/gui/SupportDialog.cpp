@@ -106,12 +106,12 @@ void SupportDialog::buildUI()
     m_logViewer->setMaximumBlockCount(kMaxLogViewLines);
     m_logViewer->setFont(QFont(QStringLiteral("Consolas"), 9));
     // §D: #0a0a14 = Style::kStatusBarBg, #203040 = Style::kBorderSubtle, #00b4d8 = Style::kAccent.
-    // §D exception: fg #a0b0c0 (off-palette warm-blue for log text readability).
+    // §D exception: fg #8aa8c0 (off-palette warm-blue for log text readability).
     m_logViewer->setStyleSheet(
         QStringLiteral(
             "QPlainTextEdit {"
             "  background: %1;"                  // Style::kStatusBarBg
-            "  color: #a0b0c0;"                  // §D exception: log text warm-blue
+            "  color: #8aa8c0;"                  // §D exception: log text warm-blue
             "  border: 1px solid %2;"            // Style::kBorderSubtle
             "  selection-background-color: %3;"  // Style::kAccent
             "}")

@@ -23,12 +23,16 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
 #include "gui/widgets/GlobeWidget.h"
+#include "gui/widgets/StationPhoto.h"
+#include "core/CallsignCache.h"
 
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QDateEdit>
 #include <QDesktopServices>
+#include <QFileInfo>
 #include <QFileDialog>
+#include <QImage>
 #include <QKeyEvent>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -356,9 +360,45 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
         m_globe->setHome(lat, lon);
         m_globe->resetView();
         m_flat->setHome(lat, lon);
+        applyStationMarker();
     } else {
         m_flat->clearHome();
     }
+}
+
+// ── Der eigene Standort als Bild ─────────────────────────────────────
+//
+// Rufzeichen aus den Einstellungen, Portraitadresse aus dem
+// Rufzeichen-Cache, Bilddatei aus dem Portrait-Cache.
+//
+// Bewusst OHNE Netzwerk: ein Kartenfenster, das beim Öffnen eine
+// Anfrage stellt, ist ein Kartenfenster, das ohne Internet später
+// aufgeht. Was schon einmal geholt wurde, liegt auf der Platte; was
+// nicht, bleibt ein Punkt mit Rufzeichen daneben. Beides ist brauchbar,
+// nur eines ist hübscher.
+//
+// Jede Stufe darf fehlschlagen, ohne dass etwas kaputtgeht — kein
+// Rufzeichen eingetragen, nie bei QRZ nachgeschlagen, kein Portrait
+// hinterlegt: alle drei enden beim Punkt.
+void QsoMapWindow::applyStationMarker()
+{
+    const QString call = AppSettings::instance()
+                             .value(QStringLiteral("StationCallsign"), QString{})
+                             .toString().trimmed().toUpper();
+    if (call.isEmpty()) {
+        m_flat->setStationMarker(QString{}, QImage{});
+        return;
+    }
+
+    QImage photo;
+    const CallsignInfo info = CallsignCache().get(call);
+    if (!info.imageUrl.isEmpty()) {
+        const QString file = StationPhoto::cachePath(info.imageUrl);
+        if (QFileInfo::exists(file)) {
+            photo.load(file);   // schlägt still fehl -> leeres Bild
+        }
+    }
+    m_flat->setStationMarker(call, photo);
 }
 
 void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)

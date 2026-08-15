@@ -14,6 +14,8 @@
 #include "gui/widgets/SwrCurveWidget.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/styles/Theme.h"      // Theme::generation() — Cache verwerfen
+#include "gui/styles/ThemeQss.h"   // Style::role()
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -27,16 +29,68 @@
 namespace NereusSDR {
 namespace {
 
-const QColor kCurve   (Style::kAccent);
-const QColor kBandFill(Style::kAccent);
-const QColor kEdge    (Style::kTextSecondary);
-const QColor kCentre  (Style::kGreenText);
-const QColor kResonant(Style::kAmberText);
-const QColor kLimit   (Style::kAmberBorder);
-const QColor kGrid    (Style::kBorderSubtle);
-const QColor kText    (Style::kTextPrimary);
-const QColor kDim     (Style::kTextScale);
-const QColor kBad     (Style::kRedBorder);
+// ── Farben aus dem Theme, nicht aus dem Übersetzer ───────────────────
+//
+// Hier standen zehn `const QColor` auf Dateiebene, gebaut aus den
+// Style::-Konstanten. Zwei Dinge waren daran falsch, und beide sieht
+// man nicht:
+//
+//   • Style::kAccent ist ein constexpr-String. Der Wert steht beim
+//     Übersetzen fest, und keine Theme-Datei kommt daran vorbei. Der
+//     ThemeFilter schreibt Stylesheets um — hier wird gemalt, es gibt
+//     kein Stylesheet.
+//
+//   • Objekte auf Dateiebene entstehen vor main(). Das Theme wird in
+//     main() geladen. Selbst wenn die Farbe aus einer Rolle käme,
+//     stünde hier der Wert von vorher.
+//
+// Jetzt: eine Tabelle, die beim ersten Zugriff entsteht und neu gebaut
+// wird, wenn sich das Theme ändert. Die Rollennamen sind dieselben wie
+// im Stylesheet-Weg, damit die Theme-Datei nur EINE Sprache hat.
+struct Pal {
+    QColor curve, bandFill, edge, centre, resonant, limit, grid, text,
+           dim, bad;
+    quint64 generation{0};
+};
+
+const Pal& pal()
+{
+    static Pal p;
+    static bool built = false;
+    const quint64 gen = Style::Theme::instance().generation();
+    if (built && p.generation == gen) { return p; }
+
+    auto c = [](const char* role, const char* fallback) {
+        return QColor(Style::role(role, fallback));
+    };
+    p.curve    = c("accent",         Style::kAccent);
+    p.bandFill = c("accent",         Style::kAccent);
+    p.edge     = c("text-secondary", Style::kTextSecondary);
+    p.centre   = c("ok",             Style::kGreenText);
+    p.resonant = c("measured",       Style::kAmberText);
+    p.limit    = c("measured-border", Style::kAmberBorder);
+    p.grid     = c("border-subtle",  Style::kBorderSubtle);
+    p.text     = c("text",           Style::kTextPrimary);
+    p.dim      = c("text-scale",     Style::kTextScale);
+    // Nicht gedämpft: „bad“ ist ein SWR, bei dem man nicht senden
+    // sollte. Eine Warnfarbe leiser zu drehen, weil sie auffällt,
+    // schafft die Warnung ab.
+    p.bad      = c("danger",         Style::kRedBorder);
+    p.generation = gen;
+    built = true;
+    return p;
+}
+
+inline QColor kCurve()    { return pal().curve; }
+inline QColor kBandFill() { return pal().bandFill; }
+inline QColor kEdge()     { return pal().edge; }
+inline QColor kCentre()   { return pal().centre; }
+inline QColor kResonant() { return pal().resonant; }
+inline QColor kLimit()    { return pal().limit; }
+inline QColor kGrid()     { return pal().grid; }
+inline QColor kText()     { return pal().text; }
+inline QColor kDim()      { return pal().dim; }
+inline QColor kBad()      { return pal().bad; }
 
 QString mhz(double hz, int digits = 3)
 {
@@ -71,23 +125,79 @@ double SwrCurveWidget::tickStepHz(double spanHz, int wanted) const
 
 double SwrCurveWidget::gapThresholdHz(const Sweep& s)
 {
-    // See the header for what this decides and why the median.
+    // ── Why this is no longer the median ─────────────────────────────
+    //
+    // 2026-08-15. It was "median step × 4", and a nine-band range sweep
+    // came out as eighteen panels, ten of them labelled 10 m.
+    //
+    // The arithmetic: a 1.8–30 MHz sweep gives every band an equal
+    // share of the points, so the SPACING is not equal — 11 points in
+    // 30 m's 50 kHz is 5 kHz apart, 11 points in 10 m's 1.7 MHz is
+    // 170 kHz apart. Across all nine bands the median step is 20 kHz,
+    // so the threshold was 80 kHz, and every ordinary step inside 10 m
+    // counted as a band gap.
+    //
+    // The median assumed one spacing. There are nine, spread over a
+    // factor of thirty-four, and the real gaps are a further factor of
+    // nine above the widest of them. So look for that separation
+    // instead of assuming a number: sort the steps and find where the
+    // sorted list JUMPS. Below the jump is spacing, above it is holes,
+    // and the threshold goes in between.
+    //
+    // Nothing is a gap unless the jump is at least fourfold. An evenly
+    // spaced sweep has no jump at all and stays one unbroken curve,
+    // which is the failure that matters more — a threshold that fires
+    // too easily turns every chart into confetti.
+    static constexpr double kMinRatio = 4.0;
+
     if (s.points.size() <= 2) {
         return std::numeric_limits<double>::max();
     }
     QVector<double> steps;
     steps.reserve(s.points.size() - 1);
     for (int i = 1; i < s.points.size(); ++i) {
-        steps.append(s.points.at(i).freqHz - s.points.at(i - 1).freqHz);
+        const double d = s.points.at(i).freqHz - s.points.at(i - 1).freqHz;
+        if (d > 0.0) { steps.append(d); }
+    }
+    if (steps.size() < 2) {
+        return std::numeric_limits<double>::max();
     }
     std::sort(steps.begin(), steps.end());
-    const double median = steps.at(steps.size() / 2);
-    // Four times the usual spacing: far enough above the jitter in a
-    // file sweep never to fire by accident, far enough below a real
-    // band gap always to fire. The narrowest gap in the HF plan is
-    // 10.150 to 14.000 MHz, thousands of times a band sweep's step.
-    return median > 0.0 ? median * 4.0
-                        : std::numeric_limits<double>::max();
+
+    // The widest ratio between neighbours in the sorted list.
+    //
+    // Ties go to the HIGHER boundary. Two bands of very different
+    // width can put the spacing jump (10 kHz → 170 kHz, seventeenfold)
+    // within a whisker of the gap jump (170 kHz → 3.01 MHz,
+    // seventeen-point-sevenfold), and picking the lower of those two
+    // splits 10 m into ten pieces again. Erring upward merges two
+    // bands into one panel at worst; erring downward shreds a band,
+    // and that is the fault this comment exists because of.
+    double bestRatio = 0.0;
+    for (int i = 1; i < steps.size(); ++i) {
+        const double lo = steps.at(i - 1);
+        if (lo <= 0.0) { continue; }
+        bestRatio = std::max(bestRatio, steps.at(i) / lo);
+    }
+    if (bestRatio < kMinRatio) {
+        return std::numeric_limits<double>::max();
+    }
+
+    double loEdge = 0.0, hiEdge = 0.0;
+    for (int i = 1; i < steps.size(); ++i) {
+        const double lo = steps.at(i - 1);
+        if (lo <= 0.0) { continue; }
+        if (steps.at(i) / lo >= bestRatio * 0.75) {   // near-best counts
+            loEdge = lo;
+            hiEdge = steps.at(i);
+        }
+    }
+    if (loEdge <= 0.0 || hiEdge <= loEdge) {
+        return std::numeric_limits<double>::max();
+    }
+    // Geometric middle of the jump: as far above the widest real
+    // spacing as it is below the narrowest hole.
+    return std::sqrt(loEdge * hiEdge);
 }
 
 void SwrCurveWidget::drawBrokenCurve(QPainter& p, const Sweep& s) const
@@ -262,6 +372,10 @@ void SwrCurveWidget::setReference(const Sweep& s, const QString& label)
 {
     m_reference = s;
     m_referenceLabel = label;
+    // recompute(), not just update(): the reference decides whether the
+    // axis stays linear, and setTargetHz was already caught being the
+    // one setter that skipped this. Same mistake, same file.
+    recompute();
     update();
 }
 
@@ -464,10 +578,42 @@ void SwrCurveWidget::recompute()
                           3.0, 10.0);
 }
 
+bool SwrCurveWidget::referenceSpansTheSweep() const
+{
+    // ── When a continuous curve is on the picture, keep the axis ─────
+    //
+    // The segmented axis exists because a radio sweep has holes: the
+    // spectrum between the bands is not the operator's to transmit on.
+    // A vector analyser has no such restriction — microwatts, a
+    // measurement instrument — so a VNA file across 1.8 to 30 MHz is
+    // the continuous curve the radio cannot produce.
+    //
+    // Pin one behind the live sweep and the right axis is the plain
+    // linear one again: the VNA line runs unbroken across the whole
+    // range, and the radio's own measurements sit on top of it as
+    // short solid runs in the bands where the radio was allowed to
+    // look. That is one picture answering both questions instead of
+    // nine panels answering one.
+    if (m_reference.points.size() < 3) { return false; }
+
+    const double gap = gapThresholdHz(m_reference);
+    for (int i = 1; i < m_reference.points.size(); ++i) {
+        if (m_reference.points.at(i).freqHz
+            - m_reference.points.at(i - 1).freqHz > gap) {
+            return false;          // the reference has holes of its own
+        }
+    }
+    // And it has to actually cover what the radio measured, or the
+    // linear axis would stretch across a range with one curve in it.
+    return m_reference.startHz() <= m_sweep.startHz() + 1.0
+        && m_reference.stopHz()  >= m_sweep.stopHz()  - 1.0;
+}
+
 void SwrCurveWidget::rebuildViewSegments()
 {
     m_viewSegs.clear();
     if (m_sweep.points.size() < 3) { return; }
+    if (referenceSpansTheSweep()) { return; }
 
     const double gapHz = gapThresholdHz(m_sweep);
     if (!std::isfinite(gapHz)) { return; }
@@ -500,6 +646,8 @@ void SwrCurveWidget::rebuildViewSegments()
         // A little air inside each panel so the curve does not touch
         // the break lines, mirroring the 12 % on a linear sweep.
         const double span = std::max(1.0, runs.at(i).second - runs.at(i).first);
+        s.dataLoHz = runs.at(i).first;
+        s.dataHiHz = runs.at(i).second;
         s.loHz = runs.at(i).first  - span * 0.06;
         s.hiHz = runs.at(i).second + span * 0.06;
         s.f0 = i * (each + gutter);
@@ -529,7 +677,8 @@ QVector<SwrCurveWidget::Panel> SwrCurveWidget::viewPanels() const
     QVector<Panel> out;
     out.reserve(m_viewSegs.size());
     for (const auto& s : m_viewSegs) {
-        out.append(Panel{s.loHz, s.hiHz, s.f0, s.f1});
+        out.append(Panel{s.loHz, s.hiHz, s.dataLoHz, s.dataHiHz,
+                         s.f0, s.f1});
     }
     return out;
 }
@@ -589,12 +738,12 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     m_plotB = h - 48.0;
     const QRectF plot(m_plotL, m_plotT, m_plotR - m_plotL, m_plotB - m_plotT);
 
-    p.setPen(QPen(kGrid, 1));
+    p.setPen(QPen(kGrid(), 1));
     p.setBrush(QColor(Style::kInsetBg));
     p.drawRect(plot);
 
     if (m_sweep.isEmpty() || plot.width() < 20 || plot.height() < 20) {
-        p.setPen(kDim);
+        p.setPen(kDim());
         QFont f = p.font();
         f.setPixelSize(11);
         p.setFont(f);
@@ -622,16 +771,32 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
             const double br = std::min(xFor(b.highHz), m_plotR);
             if (br <= bl) { continue; }
 
-            QColor fill = kBandFill;
-            // The band the verticals are on is a shade stronger, so it
-            // is findable among eight others.
-            fill.setAlpha(b.name == m_band.name ? 30 : 14);
+            QColor fill = kBandFill();
+            // ── One shade on a segmented axis ────────────────────────
+            //
+            // There, every panel IS a band, so shading marks nothing —
+            // and picking one of nine to shade harder marks the wrong
+            // thing. bestOverlap chooses the WIDEST band, which on a
+            // 1.8-to-30 sweep is always 10 m whatever the operator was
+            // asking about. That is the same fault as the four headline
+            // tiles, in ink instead of text.
+            //
+            // What the fill still earns its place for is the margin:
+            // the panel carries 6 % of air on each side, so the
+            // unfilled strip at each end is the band edge, visible.
+            fill.setAlpha(m_viewSegs.isEmpty()
+                              ? (b.name == m_band.name ? 30 : 14)
+                              : 16);
             p.fillRect(QRectF(bl, m_plotT, br - bl, plot.height()), fill);
 
             // Name it only where the name fits. A 30 m band on a 3-to-30
             // sweep is four pixels wide and a label there is a smear.
+            //
+            // Not at all on a segmented axis: the panel already carries
+            // its name under the scale, and printing it a second time
+            // inside the frame put it straight through the 160 m curve.
             const double tw = bfm.horizontalAdvance(b.name);
-            if (br - bl > tw + 4.0) {
+            if (m_viewSegs.isEmpty() && br - bl > tw + 4.0) {
                 p.setPen(QColor(Style::kAccent));
                 p.drawText(QPointF((bl + br) / 2.0 - tw / 2.0,
                                    m_plotT + 12.0), b.name);
@@ -645,22 +810,22 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     for (double s = 2.0; s <= m_swrTop + 0.01; s += 1.0) {
         const double y = yFor(s);
         const bool isLimit = std::abs(s - m_limit) < 0.01;
-        p.setPen(QPen(isLimit ? kLimit : kGrid, 1,
+        p.setPen(QPen(isLimit ? kLimit() : kGrid(), 1,
                       isLimit ? Qt::DashLine : Qt::DotLine));
         p.drawLine(QPointF(m_plotL, y), QPointF(m_plotR, y));
-        p.setPen(isLimit ? kLimit : kDim);
+        p.setPen(isLimit ? kLimit() : kDim());
         p.drawText(QPointF(m_plotL - 8.0 - sfm.horizontalAdvance(
                                QString::number(int(s))),
                            y + 3.0), QString::number(int(s)));
     }
-    p.setPen(kDim);
+    p.setPen(kDim());
     p.drawText(QPointF(m_plotL - 8.0 - sfm.horizontalAdvance(
                            QStringLiteral("1")), m_plotB + 3.0),
                QStringLiteral("1"));
 
     // ── The sweep before this one, faint and behind ──────────────────
     if (!m_reference.isEmpty()) {
-        QColor faint = kCurve;
+        QColor faint = kCurve();
         faint.setAlpha(70);
         p.setClipRect(plot.adjusted(1, 1, -1, -1));
         p.setPen(QPen(faint, 1.6, Qt::DashLine));
@@ -674,7 +839,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
 
     // ── The curve, broken where nothing was measured ─────────────────
     p.setClipRect(plot.adjusted(1, 1, -1, -1));
-    p.setPen(QPen(kCurve, 2.2));
+    p.setPen(QPen(kCurve(), 2.2));
     p.setBrush(Qt::NoBrush);
     drawBrokenCurve(p, m_sweep);
     p.setClipping(false);
@@ -685,7 +850,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // main one so it reads on top, and without labels — the table under
     // the picture names them.
     if (m_all.size() > 1) {
-        QColor thin = kResonant;
+        QColor thin = kResonant();
         thin.setAlpha(120);
         p.setPen(QPen(thin, 1.0, Qt::DotLine));
         for (const auto& c : m_all) {
@@ -705,11 +870,14 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // Drawn before the band verticals so those read on top of it: the
     // three band numbers are what the operator is here for and the
     // resonance is the explanation.
-    if (m_resonance.found
-        && m_resonance.freqHz >= m_viewLoHz
-        && m_resonance.freqHz <= m_viewHiHz) {
+    // inSomePanel, not just the view: on a segmented axis a resonance
+    // that falls between two bands has no place on the picture, and
+    // xFor would pin it to a panel edge — an amber line labelled
+    // "resonant 16.100" standing exactly on 14.350. The dotted
+    // secondary resonances above already check this; this one did not.
+    if (m_resonance.found && inSomePanel(m_resonance.freqHz)) {
         const double x = xFor(m_resonance.freqHz);
-        p.setPen(QPen(kResonant, 1.4));
+        p.setPen(QPen(kResonant(), 1.4));
         p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
         const QString t = QStringLiteral("resonant %1")
                               .arg(mhz(m_resonance.freqHz));
@@ -748,12 +916,12 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
 
             const QPointF at(xFor(bestAt), yFor(bestSwr));
             p.setPen(Qt::NoPen);
-            p.setBrush(bestSwr > m_limit ? kBad : kCentre);
+            p.setBrush(bestSwr > m_limit ? kBad() : kCentre());
             p.drawEllipse(at, 3.2, 3.2);
             p.setBrush(Qt::NoBrush);
 
             const QString t = QStringLiteral("%1").arg(bestSwr, 0, 'f', 2);
-            p.setPen(bestSwr > m_limit ? kBad : kText);
+            p.setPen(bestSwr > m_limit ? kBad() : kText());
             p.drawText(QPointF(at.x() - sfm.horizontalAdvance(t) / 2.0,
                                at.y() - 7.0), t);
         }
@@ -763,9 +931,9 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     if (m_band.isValid() && m_viewSegs.isEmpty()) {
         struct Mark { double hz; QString label; QColor col; };
         const QVector<Mark> marks = {
-            {m_band.lowHz,    QStringLiteral("start"),  kEdge},
-            {m_band.centreHz(), QStringLiteral("mid"),  kCentre},
-            {m_band.highHz,   QStringLiteral("end"),    kEdge},
+            {m_band.lowHz,    QStringLiteral("start"),  kEdge()},
+            {m_band.centreHz(), QStringLiteral("mid"),  kCentre()},
+            {m_band.highHz,   QStringLiteral("end"),    kEdge()},
         };
 
         for (const Mark& m : marks) {
@@ -778,21 +946,21 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
             if (s <= 0.0) {
                 // The sweep does not reach this edge. Saying nothing
                 // would let an operator assume it was measured.
-                p.setPen(kDim);
+                p.setPen(kDim());
                 p.drawText(QPointF(x + 4.0, m_plotB - 6.0),
                            QStringLiteral("not swept"));
                 continue;
             }
             const QPointF at(x, yFor(s));
             p.setPen(Qt::NoPen);
-            p.setBrush(s > m_limit ? kBad : m.col);
+            p.setBrush(s > m_limit ? kBad() : m.col);
             p.drawEllipse(at, 3.6, 3.6);
 
             const QString t = QStringLiteral("%1  %2")
                                   .arg(m.label).arg(s, 0, 'f', 2);
             const double tw = sfm.horizontalAdvance(t);
             const bool leftOf = x + 6.0 + tw > m_plotR;
-            p.setPen(s > m_limit ? kBad : kText);
+            p.setPen(s > m_limit ? kBad() : kText());
             p.drawText(QPointF(leftOf ? x - 6.0 - tw : x + 6.0,
                                at.y() - 7.0), t);
         }
@@ -801,7 +969,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // ── Target, if one was set ───────────────────────────────────────
     if (m_targetHz > 0.0 && inSomePanel(m_targetHz)) {
         const double x = xFor(m_targetHz);
-        QPen pen(kCurve, 1.2, Qt::DashDotLine);
+        QPen pen(kCurve(), 1.2, Qt::DashDotLine);
         p.setPen(pen);
         p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
     }
@@ -835,27 +1003,39 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
                 // height, so it reads as "the axis stops here".
                 const double xb =
                     (m_plotL + m_viewSegs.at(i - 1).f1 * w + x0) / 2.0;
-                p.setPen(QPen(kGrid, 1.0, Qt::DashLine));
+                p.setPen(QPen(kGrid(), 1.0, Qt::DashLine));
                 p.drawLine(QPointF(xb, m_plotT), QPointF(xb, m_plotB + 4.0));
             }
 
-            p.setPen(QPen(kGrid, 1.0, Qt::DotLine));
+            p.setPen(QPen(kGrid(), 1.0, Qt::DotLine));
             p.drawLine(QPointF(x0, m_plotT), QPointF(x0, m_plotB));
             p.drawLine(QPointF(x1, m_plotT), QPointF(x1, m_plotB));
 
-            p.setPen(kDim);
-            const QString lo = mhz(s.loHz);
-            const QString hi = mhz(s.hiHz);
-            p.drawText(QPointF(x0, m_plotB + 15.0), lo);
-            p.drawText(QPointF(x1 - sfm.horizontalAdvance(hi),
-                               m_plotB + 15.0), hi);
+            // The measured ends, not the padded panel edges. Labelling
+            // the panel gave 160 m a scale reading "1.799 – 2.011": one
+            // end below the band, the other above it, and neither
+            // measured. 2026-08-15.
+            p.setPen(kDim());
+            const QString lo = mhz(s.dataLoHz);
+            const QString hi = mhz(s.dataHiHz);
+            const double xlo = xFor(s.dataLoHz);
+            const double xhi = xFor(s.dataHiHz);
+            p.drawText(QPointF(xlo - sfm.horizontalAdvance(lo) / 2.0,
+                               m_plotB + 15.0), lo);
+            // Only when the two would not collide — a 50 kHz panel on
+            // 30 m has both ends within a few pixels of each other.
+            if (xhi - xlo > sfm.horizontalAdvance(lo) / 2.0
+                              + sfm.horizontalAdvance(hi) / 2.0 + 6.0) {
+                p.drawText(QPointF(xhi - sfm.horizontalAdvance(hi) / 2.0,
+                                   m_plotB + 15.0), hi);
+            }
 
             // Which band this panel is, from the drawn table rather
             // than guessed from the frequencies.
             const AmateurBands::Band b =
                 AmateurBands::containing((s.loHz + s.hiHz) / 2.0, m_region);
             if (b.isValid()) {
-                p.setPen(kCentre);
+                p.setPen(kCentre());
                 p.drawText(QPointF((x0 + x1) / 2.0
                                        - sfm.horizontalAdvance(b.name) / 2.0,
                                    m_plotB + 29.0), b.name);
@@ -882,9 +1062,9 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
             // Short tick outside the frame and a faint grid line inside
             // it: the line is what lets the eye carry a frequency up to
             // the curve, which is the whole point of having a scale.
-            p.setPen(QPen(kGrid, 1.0, Qt::DotLine));
+            p.setPen(QPen(kGrid(), 1.0, Qt::DotLine));
             p.drawLine(QPointF(x, m_plotT), QPointF(x, m_plotB));
-            p.setPen(kDim);
+            p.setPen(kDim());
             p.drawLine(QPointF(x, m_plotB), QPointF(x, m_plotB + 4.0));
             const QString t = mhz(f, digits);
             p.drawText(QPointF(x - sfm.horizontalAdvance(t) / 2.0,
@@ -899,7 +1079,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         const QString mid = QStringLiteral("%1 · mid %2 MHz · %3 kHz wide")
                                 .arg(m_band.name, mhz(m_band.centreHz()))
                                 .arg(m_band.widthHz() / 1000.0, 0, 'f', 0);
-        p.setPen(kCentre);
+        p.setPen(kCentre());
         p.drawText(QPointF((m_plotL + m_plotR) / 2.0
                                - sfm.horizontalAdvance(mid) / 2.0,
                            m_plotB + 29.0), mid);
@@ -908,7 +1088,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // Which band plan drew those edges. A green bar is not a licence,
     // and the only defence against it being read as one is saying where
     // it came from.
-    p.setPen(kDim);
+    p.setPen(kDim());
     // Say where the three verticals came from. With a typed range they
     // are the operator's own and calling them band edges would be a
     // small lie in a place that matters.
@@ -925,7 +1105,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     p.drawText(QPointF(m_plotL, m_plotB + 42.0), prov);
 
     // ── Title line ───────────────────────────────────────────────────
-    p.setPen(kText);
+    p.setPen(kText());
     QFont title = p.font();
     title.setPixelSize(11);
     p.setFont(title);
@@ -936,7 +1116,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     }
     if (m_resonance.found && m_best.found
         && std::abs(m_best.freqHz - m_resonance.freqHz) > 20e3) {
-        p.setPen(kResonant);
+        p.setPen(kResonant());
         head += QStringLiteral("   — not the same as resonant");
     }
     p.drawText(QPointF(m_plotL, m_plotT - 9.0), head);
@@ -944,7 +1124,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // Name the dashed one, or it is just a second line nobody asked
     // for.
     if (!m_reference.isEmpty()) {
-        QColor faint = kCurve;
+        QColor faint = kCurve();
         faint.setAlpha(150);
         p.setPen(faint);
         const QString ref = m_referenceLabel.isEmpty()
@@ -964,7 +1144,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         const bool   have = swr >= 1.0;   // 0 means outside the sweep
 
         p.setFont(small);
-        p.setPen(QPen(kText, 1.0, Qt::DashLine));
+        p.setPen(QPen(kText(), 1.0, Qt::DashLine));
         p.drawLine(QPointF(m_cursor.x(), m_plotT),
                    QPointF(m_cursor.x(), m_plotB));
 
@@ -975,11 +1155,11 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         double markerY = m_cursor.y();
         if (have) {
             markerY = yFor(swr);
-            p.setPen(QPen(kText, 1.0, Qt::DashLine));
+            p.setPen(QPen(kText(), 1.0, Qt::DashLine));
             p.drawLine(QPointF(m_plotL, markerY),
                        QPointF(m_plotR, markerY));
             p.setPen(Qt::NoPen);
-            p.setBrush(swr > m_limit ? kBad : kCurve);
+            p.setBrush(swr > m_limit ? kBad() : kCurve());
             p.drawEllipse(QPointF(m_cursor.x(), markerY), 3.5, 3.5);
             p.setBrush(Qt::NoBrush);
         }
@@ -1000,11 +1180,11 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
 
         QColor box(Style::kPanelBg);
         box.setAlpha(235);
-        p.setPen(QPen(kGrid, 1));
+        p.setPen(QPen(kGrid(), 1));
         p.setBrush(box);
         p.drawRoundedRect(QRectF(bx, by, tw, th), 3.0, 3.0);
         p.setBrush(Qt::NoBrush);
-        p.setPen(have && swr > m_limit ? kBad : kText);
+        p.setPen(have && swr > m_limit ? kBad() : kText());
         p.drawText(QPointF(bx + 5.0, by + sfm.ascent() + 2.0), txt);
     }
 }

@@ -88,8 +88,8 @@ QString freqLabel(float hz)
 // are now written as those tokens rather than as literals, so they
 // follow NereusSDR if it ever repaints.
 //
-// Two were left as literals in that pass — #506070 for a scale label
-// and #08121d for a handle outline — on the reasoning that a colour
+// Two were left as literals in that pass — #556070 for a scale label
+// and #0f0f1a for a handle outline — on the reasoning that a colour
 // chosen to sit between two others stops working when snapped to one of
 // them. Sound reasoning, and it did not survive the instruction that
 // everything is to look like NereusSDR. They are kTextScale and

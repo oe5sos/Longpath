@@ -736,7 +736,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QFrame* bar = new QFrame(this);
     bar->setFrameShape(QFrame::StyledPanel);
     bar->setStyleSheet(
-        "QFrame { background: #111122; border: 1px solid #203040; border-radius: 4px; }");
+        "QFrame { background: #1a1a2a; border: 1px solid #203040; border-radius: 4px; }");
 
     // Phase 3G-6 block 3 commit 17: two-row layout. Row 1 holds the
     // container-switch dropdown, title, bg, rx, and visibility

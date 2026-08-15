@@ -214,13 +214,44 @@ private slots:
                  "the on state must not be struck through");
     }
 
-    // #404858 is the literal the CWX / DVK / FDX labels beside it already
-    // use in buildStatusBar(), so the four stay a matched set while TNF is
-    // off and idle.
+    // ── Die Absicht, nicht der Zahlenwert ────────────────────────────
+    //
+    // Ursprünglich stand hier #404858 — „der Wert, den die Labels CWX /
+    // DVK / FDX daneben in buildStatusBar() schon benutzen, damit die
+    // vier ein zusammengehöriger Satz bleiben, solange TNF aus ist".
+    //
+    // Am 2026-08-15 hat die Farbnormalisierung (tools/colour_audit.py
+    // --apply) #404858 auf #3a4a5a gezogen, weil die beiden in CIELAB
+    // 2,9 auseinanderliegen und damit nicht unterscheidbar sind. Die
+    // Nachbarlabels sind mitgewandert — die Absicht des Tests gilt also
+    // unverändert, nur der Zahlenwert nicht mehr.
+    //
+    // Geprüft, nicht angenommen: MainWindow.cpp:6671 gibt heute #3a4a5a
+    // aus, und die Nachbarlabels in Zeile 6911 und 6918 ebenfalls. Der
+    // Satz ist also zusammengeblieben — genau das, was der Test sichern
+    // soll.
+    //
+    // ── Warum hier eine Zahl steht und keine Konstante ───────────────
+    //
+    // Der naheliegende Fix wäre Style::kTitleGradTop gewesen. Er wäre
+    // falsch: die Normalisierung hat #404858 auf den DAMALIGEN Wert
+    // dieser Konstante gezogen, und eine halbe Stunde später bekam
+    // kTitleGradTop beim Entblauen der Titelleiste #26262b. Das Literal
+    // im Widget ist stehengeblieben, die Konstante darunter ist
+    // weggerutscht.
+    //
+    // Das ist die Schwäche der ΔE-Angleichung, schwarz auf weiß: sie
+    // wählt nach Abstand, nicht nach Bedeutung. #404858 war ein
+    // abgeblendetes Statuslabel und wurde an einen Titelleisten-Ton
+    // gebunden, weil der zufällig 2,9 ΔE entfernt lag. Die richtige
+    // Rolle wäre „inaktiver Text" gewesen.
+    //
+    // Solange das nicht aufgeräumt ist, ist die Zahl ehrlicher als ein
+    // Name, der etwas anderes bedeutet.
     void tnf_indicator_dims_to_its_siblings_when_idle()
     {
         const QString idle = MainWindow::tnfIndicatorStyleSheet(false, 0);
-        QVERIFY2(idle.contains(QStringLiteral("#404858")), qPrintable(idle));
+        QVERIFY2(idle.contains(QStringLiteral("#3a4a5a")), qPrintable(idle));
     }
 
     void tnf_tooltip_reports_an_empty_notch_list()

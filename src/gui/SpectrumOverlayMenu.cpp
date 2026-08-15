@@ -31,7 +31,7 @@ void SpectrumOverlayMenu::buildUI()
     setStyleSheet(QStringLiteral(
         "NereusSDR--SpectrumOverlayMenu {"
         "  background: #1a2a3a;"
-        "  border: 1px solid #2e4e6e;"
+        "  border: 1px solid #205070;"
         "  border-radius: 4px;"
         "}"
         "QLabel { color: #c8d8e8; font-size: 11px; }"
@@ -43,7 +43,7 @@ void SpectrumOverlayMenu::buildUI()
         "  background: #00b4d8; border-radius: 6px;"
         "}"
         "QComboBox {"
-        "  background: #203040; color: #c8d8e8; border: 1px solid #2e4e6e;"
+        "  background: #203040; color: #c8d8e8; border: 1px solid #205070;"
         "  border-radius: 3px; padding: 2px 6px; font-size: 11px;"
         "}"
         "QComboBox::drop-down { border: none; }"
@@ -53,11 +53,11 @@ void SpectrumOverlayMenu::buildUI()
         "QCheckBox { color: #c8d8e8; font-size: 11px; }"
         "QCheckBox::indicator { width: 14px; height: 14px; }"
         "QPushButton {"
-        "  background: #203040; color: #c8d8e8; border: 1px solid #2e4e6e;"
+        "  background: #203040; color: #c8d8e8; border: 1px solid #205070;"
         "  border-radius: 3px; padding: 3px 10px; font-size: 11px;"
         "}"
-        "QPushButton:hover { background: #2a4055; border-color: #00b4d8; }"
-        "QPushButton:pressed { background: #16232f; }"));
+        "QPushButton:hover { background: #304050; border-color: #00b4d8; }"
+        "QPushButton:pressed { background: #1a2a38; }"));
 
     // --- Waterfall section ---
     auto* wfLabel = new QLabel(QStringLiteral("Waterfall"), this);

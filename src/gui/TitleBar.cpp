@@ -229,11 +229,11 @@ QColor ConnectionSegment::stateDotColor() const
             return m_pulseOn ? QColor("#5fff8a") : QColor("#3fcf6a");
         case ConnectionState::Probing:
         case ConnectionState::Connecting:
-            return m_pulseOn ? QColor("#5fa8ff") : QColor("#3f78cf");
+            return m_pulseOn ? QColor("#5fa8ff") : QColor("#0070c0");
         case ConnectionState::LinkLost:
             return m_pulseOn ? QColor("#ff8c00") : QColor("#cf6c00");
         case ConnectionState::Disconnected:
-            return QColor("#ff4040");
+            return QColor("#ff4444");
     }
     return QColor("#607080");
 }
@@ -252,9 +252,9 @@ QColor ConnectionSegment::audioPipColor(AudioEngine::FlowState s) const
         case AudioEngine::FlowState::Healthy:  return QColor("#5fa8ff");
         case AudioEngine::FlowState::Underrun: return QColor("#ffd700");
         case AudioEngine::FlowState::Stalled:  return QColor("#ff6060");
-        case AudioEngine::FlowState::Dead:     return QColor("#404858");
+        case AudioEngine::FlowState::Dead:     return QColor("#3a4a5a");
     }
-    return QColor("#404858");
+    return QColor("#3a4a5a");
 }
 
 QRect ConnectionSegment::rttRect() const
@@ -274,7 +274,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
 
     // Background
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor("#0f1420"));
+    p.setBrush(QColor("#0f0f1a"));
     p.drawRoundedRect(rect(), 3, 3);
 
     p.setFont(QFont(QStringLiteral("SF Mono"), 10, QFont::DemiBold));

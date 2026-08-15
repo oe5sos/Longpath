@@ -2310,11 +2310,11 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
         QString()
     });
     m_notchTable->setStyleSheet(QStringLiteral(
-        "QTableWidget { background: #131326; color: #c8d8e8; "
+        "QTableWidget { background: #1a1a2a; color: #c8d8e8; "
         "  gridline-color: #304050; border: 1px solid #304050; }"
         "QTableWidget::item { padding: 2px 4px; }"
-        "QTableWidget::item:selected { background: #1a3050; }"
-        "QHeaderView::section { background: #1a2030; color: #8aa8c0; "
+        "QTableWidget::item:selected { background: #204060; }"
+        "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
         "  border: 1px solid #304050; padding: 4px; }"));
     m_notchTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_notchTable->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -2333,8 +2333,8 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     static const QString kMnfButtonStyle = QStringLiteral(
         "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
         "  border-radius: 3px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #2a4060; }"
-        "QPushButton:pressed { background: #1a2840; }");
+        "QPushButton:hover { background: #204060; }"
+        "QPushButton:pressed { background: #1a2a3a; }");
 
     m_addBtn = new QPushButton(QStringLiteral("Add"), mnfGrp);
     m_addBtn->setObjectName(QStringLiteral("btnMNFAdd"));
@@ -2464,14 +2464,14 @@ void MnfSetupPage::rebuildTable()
     if (!m_notchTable || !rm || !rm->notchModel()) { return; }
 
     static const QString kMnfEditorStyle = QStringLiteral(
-        "QDoubleSpinBox { background: #1a2030; color: #c8d8e8; "
+        "QDoubleSpinBox { background: #1a1a2a; color: #c8d8e8; "
         "  border: 1px solid #304050; border-radius: 2px; padding: 1px; }"
         "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button "
-        "  { background: #202838; width: 14px; }");
+        "  { background: #1a2a3a; width: 14px; }");
     static const QString kMnfRowButtonStyle = QStringLiteral(
         "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
         "  border-radius: 2px; padding: 1px 6px; font-size: 11px; }"
-        "QPushButton:hover { background: #2a4060; }");
+        "QPushButton:hover { background: #204060; }");
 
     // setRowCount() destroys the outgoing cell widgets; a focused spin box
     // being destroyed emits editingFinished on its way out, so the guard has

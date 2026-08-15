@@ -273,6 +273,22 @@ void AntennaWindow::buildUi()
         "funktioniert die Darstellung und es liegt an der Messung."));
     top->addWidget(m_demoBtn);
 
+    // ── The whole range, from the instrument that may sweep it ───────
+    //
+    // See AntennaWindow.h for why the radio cannot. This pins a VNA
+    // sweep behind the live curve so it survives every radio sweep
+    // afterwards, rather than being pushed out by the next one.
+    m_pinBtn = new QPushButton(QStringLiteral("VNA-Referenz…"), this);
+    m_pinBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_pinBtn->setToolTip(QStringLiteral(
+        "Eine .s1p vom VNA als durchgehende Vergleichskurve dahinter "
+        "legen. Sie bleibt liegen, wenn du danach mit dem Funkgerät "
+        "misst.\n\n"
+        "Das Funkgerät kann den ganzen Bereich nicht messen: zwischen "
+        "den Bändern darf es nicht senden, und der Durchlauf sendet. "
+        "Der VNA darf — er ist ein Messgerät mit Mikrowatt."));
+    top->addWidget(m_pinBtn);
+
     top->addStretch(1);
 
     retiredBox->addWidget(caption(QStringLiteral("ANTENNA"), this));
@@ -640,6 +656,8 @@ void AntennaWindow::buildUi()
             this, &AntennaWindow::chooseFile);
     connect(m_demoBtn, &QPushButton::clicked,
             this, &AntennaWindow::loadSample);
+    connect(m_pinBtn, &QPushButton::clicked,
+            this, &AntennaWindow::choosePinned);
     connect(m_estimateBtn, &QPushButton::clicked,
             this, &AntennaWindow::estimateLength);
     connect(m_forgetBtn, &QPushButton::clicked, this, [this]() {
@@ -800,6 +818,54 @@ void AntennaWindow::openFile(const QString& path)
     setSweep(s);
 }
 
+void AntennaWindow::choosePinned()
+{
+    // Already holding one — the button is the way to put it down again.
+    if (!m_pinned.isEmpty()) {
+        m_pinned = Sweep{};
+        m_pinnedLabel.clear();
+        m_pinBtn->setText(QStringLiteral("VNA-Referenz…"));
+        applyReference();
+        return;
+    }
+
+    AppSettings& s = AppSettings::instance();
+    const QString start = s.value(kDirKey, QString{}).toString();
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("VNA-Sweep als Referenz"), start,
+        QStringLiteral("Touchstone one-port (*.s1p *.S1P);;All files (*)"));
+    if (path.isEmpty()) { return; }
+    s.setValue(kDirKey, QFileInfo(path).absolutePath());
+
+    const Sweep ref = Touchstone::readS1p(path);
+    if (ref.points.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("VNA-Referenz"),
+            ref.note.isEmpty()
+                ? QStringLiteral("Die Datei enthält keine Punkte.")
+                : ref.note);
+        return;
+    }
+    m_pinned = ref;
+    m_pinnedLabel = QFileInfo(path).completeBaseName();
+    // Say what it costs to press again, so the button is not a trap.
+    m_pinBtn->setText(QStringLiteral("Referenz ✕"));
+    applyReference();
+}
+
+void AntennaWindow::applyReference()
+{
+    // A pinned VNA sweep outranks the previous radio sweep. Both drawn
+    // at once would be two faint dashed curves behind one solid one,
+    // and the eye cannot tell which faint line is which.
+    if (!m_pinned.isEmpty()) {
+        m_curve->setReference(m_pinned, m_pinnedLabel.isEmpty()
+            ? QStringLiteral("VNA")
+            : QStringLiteral("VNA · %1").arg(m_pinnedLabel));
+    } else {
+        m_curve->setReference(m_previous, m_previousLabel);
+    }
+}
+
 void AntennaWindow::loadSample()
 {
     // The samples live in the source tree, not in the bundle. Rather
@@ -875,7 +941,7 @@ void AntennaWindow::setSweep(const Sweep& s)
     m_measured = s;
     applyFeedline();
 
-    m_curve->setReference(m_previous, m_previousLabel);
+    applyReference();
 
     // Record it against the length currently entered. If the operator
     // types the new length afterwards — which is the usual order — the

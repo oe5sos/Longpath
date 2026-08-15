@@ -21,7 +21,7 @@ namespace NereusSDR {
 inline constexpr const char* kPopupMenu =
     "QMenu {"
     "  background: #1a2a3a;"
-    "  color: #e0e8f0;"
+    "  color: #c8d8e8;"
     "  border: 1px solid #304050;"
     "}"
     "QMenu::item {"
@@ -32,7 +32,7 @@ inline constexpr const char* kPopupMenu =
     "  color: #ffffff;"
     "}"
     "QMenu::item:disabled {"
-    "  color: #587080;"
+    "  color: #607080;"
     "}";
 
 } // namespace NereusSDR

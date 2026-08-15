@@ -53,9 +53,9 @@ QString formatSnr(double db)
 QString snrColour(double db)
 {
     if (qIsNaN(db)) {
-        return QStringLiteral("#7a8088");
+        return QStringLiteral("#708090");
     }
-    return (db < kGoodSnrDb) ? QStringLiteral("#e6c200")
+    return (db < kGoodSnrDb) ? QStringLiteral("#ddbb00")
                              : QStringLiteral("#4caf50");
 }
 
@@ -112,7 +112,7 @@ void RadeApplet::buildUI()
         m_syncIndicator = new QLabel(body);
         m_syncIndicator->setFixedSize(12, 12);
         m_syncIndicator->setStyleSheet(QStringLiteral(
-            "QLabel { background: #7a8088; border-radius: 6px; }"));
+            "QLabel { background: #708090; border-radius: 6px; }"));
 
         auto* syncLbl = new QLabel(QStringLiteral("Sync"), body);
         syncLbl->setStyleSheet(QStringLiteral(
@@ -120,7 +120,7 @@ void RadeApplet::buildUI()
 
         m_snrLabel = new QLabel(QStringLiteral(" -   - "), body);
         m_snrLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: #7a8088; font-size: 11px; "
+            "QLabel { color: #708090; font-size: 11px; "
             "font-weight: bold; background: transparent; }"));
         m_snrLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -386,15 +386,15 @@ void RadeApplet::repaintSyncIndicator()
         return;
     }
     // Decision matrix:
-    //   not synced              -> dim grey (#7a8088)
-    //   synced + snr < 5 dB    -> yellow   (#e6c200)
+    //   not synced              -> dim grey (#708090)
+    //   synced + snr < 5 dB    -> yellow   (#ddbb00)
     //   synced + snr >= 5 dB   -> green    (#4caf50)
     //   synced + snr NaN        -> yellow (treated as marginal)
     QString colour;
     if (!m_synced) {
-        colour = QStringLiteral("#7a8088");
+        colour = QStringLiteral("#708090");
     } else if (qIsNaN(m_lastSnrDb) || m_lastSnrDb < kGoodSnrDb) {
-        colour = QStringLiteral("#e6c200");
+        colour = QStringLiteral("#ddbb00");
     } else {
         colour = QStringLiteral("#4caf50");
     }

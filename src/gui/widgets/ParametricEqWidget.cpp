@@ -66,6 +66,8 @@ mw0lge@grange-lane.co.uk
 
 #include "ParametricEqWidget.h"
 
+#include "gui/styles/ThemeQss.h"   // Style::role() — Malcode hat kein Stylesheet
+
 #include <QBrush>
 #include <QCursor>
 #include <QDateTime>
@@ -91,6 +93,32 @@ mw0lge@grange-lane.co.uk
 #include <limits>
 
 namespace NereusSDR {
+
+// ── Das Chrome des Entzerrers, erreichbar für die Theme-Datei ────────
+//
+// Hier standen ein Dutzend graue QColor(25,25,25)-Werte, aus dem
+// Thetis-Original übernommen. Sie kommen an keinem Stylesheet vorbei —
+// hier wird gemalt —, also erreichte der ThemeFilter sie nicht.
+//
+// Die Vorgaben sind ABSICHTLICH die alten Werte. Dieser Schritt macht
+// die Farben erreichbar, er ändert sie nicht: wer heute baut, sieht
+// denselben Entzerrer wie gestern, und wer eine Theme-Datei schreibt,
+// kann ihn ab jetzt anfassen. Zwei Dinge auf einmal zu ändern wäre der
+// sichere Weg, hinterher nicht zu wissen, welches davon gewirkt hat.
+//
+// NICHT dabei: die achtzehn Bandtöne unten. Sie halten überlagerte
+// Kurven auseinander und antworten der Lesbarkeit gegeneinander, nicht
+// dem Fensterrahmen. Dieselbe Begründung wie in ThemeQss.cpp.
+namespace {
+
+QColor eqInk(const char* role, const char* fallback, int alpha = -1)
+{
+    QColor c(Style::role(role, fallback));
+    if (alpha >= 0) { c.setAlpha(alpha); }
+    return c;
+}
+
+} // namespace
 
 // From Thetis ucParametricEq.cs:254-274 [v2.10.3.13] -- _default_band_palette.
 // 18 RGB triples, verbatim.  Ports byte-for-byte; do not reorder, recolor, or trim.
@@ -820,7 +848,7 @@ void ParametricEqWidget::paintEvent(QPaintEvent* /*event*/) {
     QRect client = rect();
     if (client.width() < 2 || client.height() < 2) return;
 
-    g.fillRect(client, QColor(25, 25, 25));   // BackColor (ucParametricEq.cs:443)
+    g.fillRect(client, eqInk("eq-bg", "#191919"));   // BackColor (ucParametricEq.cs:443)
 
     QRect plot = computePlotRect();
     if (plot.width() < 2 || plot.height() < 2) return;
@@ -845,11 +873,11 @@ void ParametricEqWidget::paintEvent(QPaintEvent* /*event*/) {
 
 // From Thetis ucParametricEq.cs:2061-2117 [v2.10.3.13].
 void ParametricEqWidget::drawGrid(QPainter& g, const QRect& plot) {
-    g.fillRect(plot, QColor(18, 18, 18));
+    g.fillRect(plot, eqInk("eq-plot", "#121212"));
 
     drawBarChart(g, plot);
 
-    QPen gridPen(QColor(45, 45, 45), 1.0);
+    QPen gridPen(eqInk("eq-grid", "#2d2d2d"), 1.0);
     g.setPen(gridPen);
 
     if (m_logScale) {
@@ -875,13 +903,13 @@ void ParametricEqWidget::drawGrid(QPainter& g, const QRect& plot) {
     }
 
     // Zero-dB grid line: 1.5px width, brighter grey (75,75,75).
-    QPen zeroPen(QColor(75, 75, 75), 1.5);
+    QPen zeroPen(eqInk("eq-zero", "#4b4b4b"), 1.5);
     g.setPen(zeroPen);
     float y0 = yFromDb(plot, 0.0);
     g.drawLine(QPointF(plot.left(), y0), QPointF(plot.right(), y0));
 
     if (m_globalGainIsHorizLine) {
-        QPen globalGainPen(QColor(255, 255, 255, 180), 1.5);
+        QPen globalGainPen(eqInk("eq-gain-line", "#ffffff", 180), 1.5);
         globalGainPen.setStyle(Qt::DashLine);
         g.setPen(globalGainPen);
         float y = yFromDb(plot, m_globalGainDb);
@@ -1158,7 +1186,7 @@ void ParametricEqWidget::drawGlobalGainHandle(QPainter& g, const QRect& plot) {
     g.setPen(Qt::NoPen);
     g.drawPolygon(tri);
 
-    QPen outline(QColor(40, 40, 40), 1.0);
+    QPen outline(eqInk("eq-outline", "#282828"), 1.0);
     g.setPen(outline);
     g.setBrush(Qt::NoBrush);
     g.drawPolygon(tri);
@@ -1183,7 +1211,7 @@ void ParametricEqWidget::drawPoints(QPainter& g, const QRect& plot) {
         g.setPen(Qt::NoPen);
         g.drawEllipse(QPointF(x, y), r, r);
 
-        QPen outline(QColor(35, 35, 35), 1.0);
+        QPen outline(eqInk("eq-outline", "#232323"), 1.0);
         g.setPen(outline);
         g.setBrush(Qt::NoBrush);
         g.drawEllipse(QPointF(x, y), r, r);
@@ -1257,9 +1285,9 @@ void ParametricEqWidget::drawDotReading(QPainter& g, const QRect& plot,
         }
     }
 
-    QBrush panelBrush(QColor(18, 18, 18, 150));
-    QPen   panelPen  (QColor(255, 220, 120, 90), 1.0);
-    QBrush textBrush (QColor(255, 235, 90));
+    QBrush panelBrush(eqInk("eq-plot", "#121212", 150));
+    QPen   panelPen  (eqInk("eq-callout-border", "#ffdc78", 90), 1.0);
+    QBrush textBrush (eqInk("eq-callout-text", "#ffeb5a"));
 
     g.setBrush(panelBrush);
     g.setPen(Qt::NoPen);
@@ -1347,7 +1375,7 @@ void ParametricEqWidget::drawAxisScales(QPainter& g, const QRect& plot) {
 
 // From Thetis ucParametricEq.cs:2645-2651 [v2.10.3.13].
 void ParametricEqWidget::drawBorder(QPainter& g, const QRect& plot) {
-    QPen border(QColor(70, 70, 70), 1.0);
+    QPen border(eqInk("eq-outline", "#464646"), 1.0);
     g.setPen(border);
     g.setBrush(Qt::NoBrush);
     g.drawRect(plot);

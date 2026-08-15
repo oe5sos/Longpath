@@ -67,21 +67,21 @@ static const char* kBadgeStyle =
 
 static const char* kAutoDetectStyle =
     "QPushButton {"
-    "  background: #152535;"
+    "  background: #1a2a3a;"
     "  border: 1px solid #203040;"
     "  border-radius: 3px;"
     "  color: #00b4d8;"
     "  font-size: 11px;"
     "  padding: 3px 8px;"
     "}"
-    "QPushButton:hover { background: #1d3045; }";
+    "QPushButton:hover { background: #203040; }";
 
 // Binding-status banner — persistent one-line indicator kept hidden;
 // queried by test probes (findStatusBanner) via Qt widget hierarchy.
 [[maybe_unused]] static const char* kStatusNativeStyle =
     "QLabel {"
     "  background: #0f2a1a;"
-    "  border: 1px solid #2a6a3a;"
+    "  border: 1px solid #1a6030;"
     "  border-radius: 3px;"
     "  color: #00ff88;"
     "  font-size: 11px;"
@@ -91,7 +91,7 @@ static const char* kAutoDetectStyle =
 
 static const char* kStatusBYOStyle =
     "QLabel {"
-    "  background: #0f2030;"
+    "  background: #0a1a28;"
     "  border: 1px solid #2a5a8a;"
     "  border-radius: 3px;"
     "  color: #00b4d8;"
@@ -119,14 +119,14 @@ static const char* kSpecRowPlaceholderStyle =
 
 static const char* kActionBtnStyle =
     "QPushButton {"
-    "  background: #152535;"
+    "  background: #1a2a3a;"
     "  border: 1px solid #203040;"
     "  border-radius: 3px;"
     "  color: #8aa8c0;"
     "  font-size: 11px;"
     "  padding: 3px 10px;"
     "}"
-    "QPushButton:hover { background: #1d3045; color: #c8d8e8; }";
+    "QPushButton:hover { background: #203040; color: #c8d8e8; }";
 
 static const char* kEnableChkStyle =
     "QCheckBox { color: #8aa8c0; font-size: 11px; font-weight: bold; }"
@@ -700,7 +700,7 @@ void VaxChannelCard::onAutoDetectClicked()
     menu.setStyleSheet(
         "QMenu { background: #0f0f1a; color: #c8d8e8; border: 1px solid #203040; }"
         "QMenu::item:selected { background: #203040; }"
-        "QMenu::item:disabled { color: #506070; }");
+        "QMenu::item:disabled { color: #556070; }");
 
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     int nativeHalCount = 0;

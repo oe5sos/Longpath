@@ -164,6 +164,8 @@ mw0lge@grange-lane.co.uk
 #include <QTimer>
 #include <QPropertyAnimation>
 
+#include "gui/StyleConstants.h"   // kAmberText — Vorgabe des Spot-Tons
+#include "gui/WaterfallHistoryBuffer.h"
 #include "spectrum/ActivePeakHoldTrace.h"
 #include "spectrum/PeakBlobDetector.h"
 #include "spectrum/SpectrumAvenger.h"
@@ -211,6 +213,23 @@ enum class WfColorScheme : int {
     Custom,         // User-defined custom stops (reads from AppSettings)
     ClarityBlue,    // Phase 3G-9b: narrow-band monochrome (80% navy noise floor,
                     // top 20% cyan→white signals). AetherSDR-style readability.
+    // ── Gedämpft ─────────────────────────────────────────────────────
+    //
+    // 2026-08-15. Nach dem Entblauen der Palette war der Wasserfall mit
+    // Abstand das Lauteste im Fenster: ein Regenbogen über vierzig
+    // Prozent der Fläche, mit einem durchgehenden roten Band dort, wo
+    // das Grundrauschen oben an die Rampe stößt.
+    //
+    // Kein Regenbogen. Eine Rampe, die im Hintergrund beginnt — das
+    // Grundrauschen verschwindet also, statt eingefärbt zu werden — über
+    // Grau in den warmen Messwert-Ton läuft und erst ganz oben in die
+    // Gefahrenfarbe kippt. Die Farbwerte kommen aus dem Theme, nicht aus
+    // dieser Datei: siehe wfSchemeStops().
+    //
+    // Ans Ende gehängt, nicht eingefügt: das Schema wird als int
+    // gespeichert, und eine Einfügung in der Mitte würde bei jedem
+    // Anwender das Schema verschieben.
+    Muted,
     Count
 };
 
@@ -1492,7 +1511,7 @@ private:
     void  ensureWaterfallHistory();
     void  rebuildWaterfallViewport();
     void  setWaterfallLive(bool live);
-    void  appendHistoryRow(const QRgb* rowData, qint64 timestampMs);
+    void  appendHistoryRow(const quint8* rowData, qint64 timestampMs);
     int   waterfallHistoryCapacityRows() const;
     int   maxWaterfallHistoryOffsetRows() const;
     int   historyRowIndexForAge(int ageRows) const;
@@ -1675,6 +1694,21 @@ public:
                                int blackLevel, int colorGain,
                                WfColorScheme scheme);
 
+    // ── Die zwei Hälften davon ───────────────────────────────────────
+    //
+    // waterfallColor() ist seit dem 2026-08-15 nur noch die Verkettung
+    // dieser beiden. Getrennt, weil die Historie die erste Hälfte
+    // speichert und die zweite erst beim Zeichnen anwendet — dadurch
+    // erreicht ein Wechsel des Farbschemas auch die alten Zeilen.
+
+    /// dBm auf 0..255 in die Farbtabelle. Enthält die Schieberegler,
+    /// den Mindestabstand der Schwellen und die NaN-Behandlung.
+    static quint8 waterfallIntensity(float dbm, float lowDbm, float highDbm,
+                                     int blackLevel, int colorGain);
+
+    /// 0..255 auf eine Farbe des gewählten Schemas.
+    static QRgb waterfallColorForIntensity(quint8 level, WfColorScheme scheme);
+
 private:
 
     // ---- FFT pipeline state ----
@@ -1723,7 +1757,13 @@ private:
 
     // ── Waterfall scrollback (sub-epic E) ─────────────────────────────────
     // From AetherSDR SpectrumWidget.h:493-502 [@0cd4559]
-    QImage          m_waterfallHistory;            // RGB32 ring buffer
+    // Intensität, nicht Farbe — und blockweise belegt. Siehe
+    // gui/WaterfallHistoryBuffer.h und docs/design/WASSERFALL-AETHER.md.
+    WaterfallHistoryBuffer m_waterfallHistory;
+    /// Puffer für die gerade berechnete Zeile. Als Feld, weil
+    /// pushWaterfallRow() zwanzigmal in der Sekunde läuft und eine
+    /// Neubelegung je Zeile reine Verschwendung wäre.
+    QVector<quint8> m_wfRowIntensity;
     QVector<qint64> m_wfHistoryTimestamps;         // parallel; per-row wall-clock ms
     int             m_wfHistoryWriteRow{0};        // LIFO; index 0 = newest
     int             m_wfHistoryRowCount{0};        // saturates at capacity
@@ -2011,9 +2051,30 @@ private:
     int    m_spotFontSize{16};
     int    m_spotMaxLevels{3};
     int    m_spotStartPct{50};       // % down from top of spectrum
-    bool   m_spotOverrideColors{false};
+    // ── Ein Ton für alle Spots, als Vorgabe ──────────────────────────
+    //
+    // OE5SOS, 2026-08-15: „zu viele Farben, die nicht gut zueinander
+    // passen." Am Bildschirm nachgezählt: neun Farbfamilien in einem
+    // Fenster, und die lautesten davon waren die Rufzeichen — gelb aus
+    // dem DX-Cluster, grün aus POTA, orange aus FreeDV, dazu die
+    // DXCC-Einfärbung. Jede Quelle bringt ihre eigene Farbe mit, und
+    // niemand hat sie aufeinander abgestimmt, weil niemand sie
+    // zusammen gesehen hat.
+    //
+    // Der Schalter dafür gab es schon, er stand nur auf aus. Jetzt an:
+    // ein Ton für alle Spots, und wer die Quelle an der Farbe erkennen
+    // will, schaltet ihn im Spot-Hub wieder ab.
+    //
+    // Das LÖSCHT keine Information: welche Quelle ein Spot hat, steht
+    // weiter im Marker und im Spot-Hub. Es drängt sie nur nicht mehr
+    // in neun Tönen über das halbe Spektrum.
+    bool   m_spotOverrideColors{true};
     bool   m_spotOverrideBg{true};
-    QColor m_spotColor{Qt::yellow};
+    // Der eine Ton. Bernstein statt Knallgelb — dieselbe Familie wie
+    // die Messwerte im S-Meter und die Spitzen im Wasserfall, weil ein
+    // Spot dasselbe sagt: hier ist etwas. Wird in loadSettings() über
+    // die Rolle „measured" aus dem Theme geholt.
+    QColor m_spotColor{QColor(Style::kAmberText)};
     QColor m_spotBgColor{Qt::black};
     int    m_spotBgOpacity{48};
 

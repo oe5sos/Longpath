@@ -32,7 +32,9 @@
 #include "MapPoint.h"
 
 #include <QImage>
+#include <QPixmap>
 #include <QPointF>
+#include <QString>
 #include <QVector>
 #include <QWidget>
 
@@ -46,6 +48,29 @@ public:
     void setHome(double lat, double lon);
     void clearHome();
     void setPoints(const QVector<MapPoint>& points);
+
+    // ── Der eigene Standort als Bild statt als Punkt ─────────────────
+    //
+    // 2026-08-15, nach einer Vorlage des Betreibers: bei Zeus ist der
+    // eigene Standort kein Punkt und keine Nadel, sondern ein rundes
+    // Foto der Station mit einem Ring und dem Rufzeichen darunter.
+    //
+    // Das ist mehr als Zierde. Auf einer Weltkarte voller
+    // Kontaktmarker ist der eigene Standort der einzige, den man sofort
+    // finden muss — und ein Foto findet das Auge, bevor es liest.
+    //
+    // `photo` darf leer sein; dann bleibt der bisherige Punkt, nur mit
+    // dem Rufzeichen statt „HOME". Das Bild wird auf die gezeichnete
+    // Größe vorskaliert und behalten, weil sonst bei jedem Neuzeichnen
+    // — und die Karte zeichnet beim Ziehen dauernd neu — ein volles
+    // Bild skaliert würde.
+    void setStationMarker(const QString& callsign, const QImage& photo);
+
+    /// Das fertig geschnittene Markerbild. Für Tests: ob ein Foto rund
+    /// und mittig beschnitten ankommt, ist mit Arithmetik prüfbar —
+    /// ob es hübsch aussieht, nicht.
+    QPixmap stationMarkerPixmap() const { return m_stationPhoto; }
+    QString stationCallsign() const { return m_stationCall; }
 
     // Draw a great circle from home to each point. Off for very large
     // sets, where the lines become a single smear and the dots alone
@@ -126,6 +151,14 @@ private:
 
     QVector<MapPoint> m_points;
     double m_homeLat{0.0}, m_homeLon{0.0};
+
+    // Der Standortmarker. m_stationPhoto ist bereits rund geschnitten
+    // und auf kStationMarkerPx skaliert — beim Ziehen der Karte wird
+    // dutzendfach pro Sekunde neu gezeichnet, und ein volles Foto pro
+    // Bild zu skalieren würde man merken.
+    QString m_stationCall;
+    QPixmap m_stationPhoto;
+    static constexpr int kStationMarkerPx = 52;
     bool   m_hasHome{false};
 
     bool m_showPaths{true};

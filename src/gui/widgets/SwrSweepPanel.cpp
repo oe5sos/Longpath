@@ -76,48 +76,21 @@ void SwrSweepPanel::buildUi()
     m_bandBox->setCurrentIndex(4);   // 20 m
     row->addWidget(m_bandBox);
 
-    // ── Band, or a range across several ──────────────────────────────
+    // ── Ein Band, und nur ein Band ───────────────────────────────────
     //
-    // Band first in the list and restored as the default, because it is
-    // what an operator wants nine times out of ten and because it is
-    // the cheap one: one band is seventeen seconds of transmitting, the
-    // whole of HF is minutes.
-    AppSettings& modeSettings = AppSettings::instance();
-    m_modeBox = new QComboBox(this);
-    m_modeBox->addItem(QStringLiteral("Band"),    0);
-    m_modeBox->addItem(QStringLiteral("Bereich"), 1);
-    m_modeBox->setToolTip(QStringLiteral(
-        "Band: ein Amateurband, die Vorgabe.\n\n"
-        "Bereich: von Startfrequenz bis Endfrequenz, für eine Antenne "
-        "über mehrere Bänder — eine Endfed etwa. Gesendet wird auch "
-        "dann nur innerhalb der zugeteilten Bänder; dazwischen entsteht "
-        "eine Lücke in der Kurve, weil dort nichts gemessen werden "
-        "darf."));
-    row->addWidget(m_modeBox);
-
-    m_fromBox = new QDoubleSpinBox(this);
-    m_fromBox->setRange(0.1, 60.0);
-    m_fromBox->setDecimals(3);
-    m_fromBox->setSingleStep(0.1);
-    m_fromBox->setSuffix(QStringLiteral(" MHz"));
-    m_fromBox->setValue(
-        modeSettings.value(QStringLiteral("SweepRangeFromMHz"), 1.8)
-                    .toDouble());
-    row->addWidget(m_fromBox);
-
-    m_rangeDash = new QLabel(QStringLiteral("bis"), this);
-    m_rangeDash->setStyleSheet(QStringLiteral("color:#8090a0;"));
-    row->addWidget(m_rangeDash);
-
-    m_toBox = new QDoubleSpinBox(this);
-    m_toBox->setRange(0.1, 60.0);
-    m_toBox->setDecimals(3);
-    m_toBox->setSingleStep(0.1);
-    m_toBox->setSuffix(QStringLiteral(" MHz"));
-    m_toBox->setValue(
-        modeSettings.value(QStringLiteral("SweepRangeToMHz"), 30.0)
-                    .toDouble());
-    row->addWidget(m_toBox);
+    // OE5SOS, 2026-08-15: „Die Mehrband bitte weg. Die Solo-Band bitte
+    // lassen."
+    //
+    // Hier stand eine Auswahl „Band / Bereich" mit zwei Frequenzfeldern.
+    // Der Bereich versprach eine Kurve über mehrere Bänder und konnte
+    // sie nicht halten: zwischen den Bändern darf nicht gesendet werden,
+    // also blieb die Strecke dort leer. Was herauskam, war ein Diagramm
+    // mit Löchern, das aussah wie eine Messung. SwrSweepPlan::forRange
+    // weist mehrbandige Bereiche seit dem 2026-08-15 zurück — die
+    // Auswahl stand aber noch da und bot etwas an, das nicht mehr ging.
+    //
+    // Für 1,8 bis 30 MHz am Stück gibt es den VNA. Die gemessene .s1p
+    // kommt über „VNA-Referenz…" ins selbe Diagramm.
 
     auto* ptsCap = new QLabel(QStringLiteral("PUNKTE"), this);
     ptsCap->setStyleSheet(QStringLiteral("color:#8090a0;font-size:10px;"));
@@ -237,29 +210,15 @@ void SwrSweepPanel::buildUi()
     connect(m_bandBox, &QComboBox::currentIndexChanged, this,
             [this](int) { refreshTunePowerLabel(); });
 
-    // ── Mode wiring ──────────────────────────────────────────────────
+    // Die drei Schlüssel der alten Bereichsauswahl räumen wir mit ab.
+    // Ein Schlüssel ohne Verbraucher ist genau das, was in Aufgabe #81
+    // steht — sieben Einstellungen, die niemand liest.
     {
-        const int savedMode =
-            AppSettings::instance()
-                .value(QStringLiteral("SweepRangeMode"), 0).toInt();
-        m_modeBox->setCurrentIndex(savedMode == 1 ? 1 : 0);
+        AppSettings& s = AppSettings::instance();
+        s.remove(QStringLiteral("SweepRangeMode"));
+        s.remove(QStringLiteral("SweepRangeFromMHz"));
+        s.remove(QStringLiteral("SweepRangeToMHz"));
     }
-    connect(m_modeBox, &QComboBox::currentIndexChanged, this, [this](int) {
-        AppSettings::instance().setValue(
-            QStringLiteral("SweepRangeMode"),
-            m_modeBox->currentData().toInt());
-        applyModeVisibility();
-        refreshTunePowerLabel();
-    });
-    connect(m_fromBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
-        AppSettings::instance().setValue(
-            QStringLiteral("SweepRangeFromMHz"), v);
-    });
-    connect(m_toBox, &QDoubleSpinBox::valueChanged, this, [this](double v) {
-        AppSettings::instance().setValue(
-            QStringLiteral("SweepRangeToMHz"), v);
-    });
-    applyModeVisibility();
 
     // See the note in the header. Only runs while the tab is on screen.
     m_powerPoll = new QTimer(this);
@@ -270,19 +229,6 @@ void SwrSweepPanel::buildUi()
     });
 }
 
-bool SwrSweepPanel::rangeMode() const
-{
-    return m_modeBox && m_modeBox->currentData().toInt() == 1;
-}
-
-void SwrSweepPanel::applyModeVisibility()
-{
-    const bool range = rangeMode();
-    if (m_bandBox)   { m_bandBox->setVisible(!range); }
-    if (m_fromBox)   { m_fromBox->setVisible(range); }
-    if (m_toBox)     { m_toBox->setVisible(range); }
-    if (m_rangeDash) { m_rangeDash->setVisible(range); }
-}
 
 void SwrSweepPanel::setCompact(bool compact)
 {
@@ -499,56 +445,34 @@ void SwrSweepPanel::startClicked()
     const DSPMode mode =
         m_backend.txMode ? m_backend.txMode() : DSPMode::USB;
 
-    // ── Band, or a range across several ──────────────────────────────
-    SwrSweepPlan plan;
-    if (rangeMode()) {
-        const double fromHz = m_fromBox->value() * 1e6;
-        const double toHz   = m_toBox->value()   * 1e6;
-        if (!(toHz > fromHz)) {
-            m_status->setText(QStringLiteral(
-                "Die Endfrequenz muss über der Startfrequenz liegen."));
-            return;
-        }
-        plan = SwrSweepPlan::forRange(fromHz, toHz, *m_backend.guard,
-                                      region, mode, m_pointsBox->value());
-        if (!plan.isValid()) {
-            m_status->setText(QStringLiteral(
-                "Zwischen %1 und %2 MHz liegt kein Amateurband, auf dem "
-                "gesendet werden darf. Der Sweep tastet den Sender — "
-                "ausserhalb der Zuteilung kann er nicht messen. Für "
-                "diesen Bereich brauchst du einen VNA; die .s1p-Datei "
-                "liest dieses Fenster über „Open sweep…“.")
-                    .arg(m_fromBox->value(), 0, 'f', 3)
-                    .arg(m_toBox->value(),   0, 'f', 3));
-            return;
-        }
-    } else {
-        plan = SwrSweepPlan::forBand(band);
-        plan.points = m_pointsBox->value();
-    }
+    // ── Ein Band ─────────────────────────────────────────────────────
+    //
+    // Hier stand daneben ein Zweig für den Bereich über mehrere Bänder.
+    // Er ist mit der Auswahl im Kopf des Fensters weggefallen;
+    // SwrSweepPlan::forRange bleibt bestehen und weist mehrbandige
+    // Bereiche zurück, wird von hier aus aber nicht mehr aufgerufen.
+    SwrSweepPlan plan = SwrSweepPlan::forBand(band);
+    plan.points = m_pointsBox->value();
 
     if (!plan.isValid()
         || !plan.clipToGuard(*m_backend.guard, region, mode)) {
-        m_status->setText(rangeMode()
-            ? QStringLiteral("Der Bereich ist mit dem aktuellen "
-                             "Bandplan/Modus nicht sweepbar.")
-            : QStringLiteral("Band %1 ist mit dem aktuellen "
-                             "Bandplan/Modus nicht sweepbar.")
-                  .arg(bandLabel(band)));
+        m_status->setText(QStringLiteral(
+            "Band %1 ist mit dem aktuellen Bandplan/Modus nicht "
+            "sweepbar.").arg(bandLabel(band)));
         return;
     }
 
-    // A range sweep transmits for minutes, not seconds, and it is worth
-    // saying how many segments and how long before it starts rather
-    // than after.
-    if (plan.isSegmented()) {
+    // Wie lange getastet wird, bevor getastet wird und nicht danach.
+    // Das stand vorher nur im Bereichsmodus da — als hätte man bei
+    // einem einzelnen Band ein Recht darauf, es nicht zu erfahren. 99
+    // Punkte sind auch auf einem Band eine halbe Minute Sendezeit.
+    {
         const double seconds =
             plan.points * (plan.settleMs + plan.dwellMs) / 1000.0;
         m_status->setText(QStringLiteral(
-            "%1 Bandabschnitte, %2 Punkte, etwa %3 s Sendezeit. "
-            "Zwischen den Bändern wird nicht gemessen — dort entsteht "
-            "eine Lücke in der Kurve.")
-                .arg(plan.segments.size())
+            "%1 bis %2 MHz, %3 Punkte, etwa %4 s Sendezeit.")
+                .arg(plan.startHz / 1e6, 0, 'f', 3)
+                .arg(plan.stopHz  / 1e6, 0, 'f', 3)
                 .arg(plan.points)
                 .arg(seconds, 0, 'f', 0));
     }
@@ -694,16 +618,13 @@ void SwrSweepPanel::refreshTunePowerLabel()
     // tooltip. Which slider feeds TUNE is a setting most operators have
     // never looked at, and not naming it is what made a whole morning
     // disappear into raising the wrong one.
-    // In range mode the figure shown is for whichever band the combo
-    // holds, and a range sweep crosses several — tune power is stored
-    // per band, so it will change as the sweep moves. Saying so beats
-    // printing one number as though it applied throughout.
-    const QString scope = rangeMode()
-        ? QStringLiteral("  · pro Band verschieden")
-        : QString();
-    m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W (%2)%3%4")
+    // Hier stand ein Zusatz „pro Band verschieden" für den Bereich über
+    // mehrere Bänder. Der Sweep bleibt jetzt in einem Band, und in einem
+    // Band gilt eine Tune-Leistung — der Hinweis ist mit der Sache
+    // weggefallen, für die er galt.
+    m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W (%2)%3")
                               .arg(watts).arg(drive.sourceLabel)
-                              .arg(scope).arg(note));
+                              .arg(note));
 
     m_powerLabel->setToolTip(QStringLiteral(
         "Die Leistung, mit der der Sweep sendet — dieselbe, die TUNE "

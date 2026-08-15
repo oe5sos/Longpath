@@ -670,7 +670,7 @@ void PsaIndicatorWidget::applyBackground(QLabel* label, const QColor& bg)
     label->setAutoFillBackground(true);
 
     label->setStyleSheet(QStringLiteral(
-        "QLabel { background-color: %1; color: #101010; "
+        "QLabel { background-color: %1; color: #0a0a14; "
         "padding: 1px 6px; border-radius: 3px; "
         "font-weight: bold; font-size: 11px; }")
         .arg(bg.name()));

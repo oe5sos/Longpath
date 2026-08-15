@@ -30,51 +30,115 @@
 
 namespace NereusSDR::Style {
 
-// Core Theme (from AetherSDR source + STYLEGUIDE.md)
-constexpr auto kAppBg           = "#0f0f1a";
-constexpr auto kPanelBg         = "#0a0a18";
-constexpr auto kTextPrimary     = "#c8d8e8";
-constexpr auto kTextSecondary   = "#8090a0";
-constexpr auto kTextTertiary    = "#708090";
-constexpr auto kTextScale       = "#607080";
-constexpr auto kTextInactive    = "#405060";
+// ── Entblaut, 2026-08-15 ──────────────────────────────────────────────
+//
+// „nach zeus sieht das aber nicht aus" — OE5SOS, mit einem Screenshot,
+// auf dem dreißig Knöpfe einen leuchtend blauen Rahmen tragen: 5K, 4.4K,
+// SQL, RIT, XIT, TUNE, MOX, VOX, MON, LEV, EQ, CFC, 2-Tone, PS-A. Bei
+// Zeus ist ein inaktiver Knopf fast unsichtbar; sichtbar ist der eine,
+// der an ist.
+//
+// Die Ursache war kBorder = #205070 — ein kräftiges Blau als Rahmen für
+// ALLES. Dazu der durchgehende Blaustich in den Flächen: #0f0f1a,
+// #0a0a18, #203040, #1a2a3a haben alle mehr Blau als Rot.
+//
+// Die alten Werte stehen daneben, weil das der Umbauzustand ist: was
+// noch als Hex-Literal in einem Widget steht, folgt hier NICHT mit und
+// bleibt alt. Diese Ungleichheit ist beabsichtigt und nützlich — sie
+// zeigt genau, welche Stelle noch Arbeit braucht. Siehe
+// docs/design/HAUSSTIL.md.
+constexpr auto kAppBg           = "#08080a";   // war #0f0f1a
+constexpr auto kPanelBg         = "#0c0c0e";   // war #0a0a18
+constexpr auto kTextPrimary     = "#c4c4c9";   // war #c8d8e8
+constexpr auto kTextSecondary   = "#8e8e93";
+constexpr auto kTextTertiary    = "#76767a";
+constexpr auto kTextScale       = "#5c5c60";
+constexpr auto kTextInactive    = "#3d3d41";
 // NereusSDR-original — used in 5+ places for AGC-T / pan / similar labels;
 // sits between kTextSecondary (#8090a0) and kTextScale (#607080).
-constexpr auto kLabelMid        = "#8899aa";
-constexpr auto kAccent          = "#00b4d8";
-constexpr auto kTitleText       = "#8aa8c0";
+constexpr auto kLabelMid        = "#828288";
+constexpr auto kAccent          = "#4a7ba8";
+constexpr auto kTitleText       = "#a8a8ae";
 
 // Borders & Surfaces
-constexpr auto kButtonBg        = "#1a2a3a";
-constexpr auto kButtonHover     = "#203040";
-constexpr auto kButtonAltHover  = "#204060";
-constexpr auto kBorder          = "#205070";
-constexpr auto kBorderSubtle    = "#203040";
-constexpr auto kInsetBg         = "#0a0a18";
-constexpr auto kInsetBorder     = "#1e2e3e";
-constexpr auto kGroove          = "#203040";
+//
+// kBorder ist der wichtigste Wert hier: er umrandet jeden Knopf im
+// Programm. #205070 machte daraus dreißig blaue Rechtecke. #2c2c31 ist
+// gerade noch da und tritt nicht mehr nach vorne — der ausgewählte
+// Knopf soll auffallen, nicht alle anderen.
+constexpr auto kButtonBg        = "#1a1a1e";   // war #1a2a3a
+constexpr auto kButtonHover     = "#26262b";   // war #203040
+constexpr auto kButtonAltHover  = "#2f3138";   // war #204060
+constexpr auto kBorder          = "#2c2c31";   // war #205070
+constexpr auto kBorderSubtle    = "#1f1f23";   // war #203040
+constexpr auto kInsetBg         = "#08080a";   // war #0a0a18
+constexpr auto kInsetBorder     = "#232329";   // war #1e2e3e
+constexpr auto kGroove          = "#1f1f23";   // war #203040
 
 // Title Bar Gradient
-constexpr auto kTitleGradTop    = "#3a4a5a";
-constexpr auto kTitleGradMid    = "#2a3a4a";
-constexpr auto kTitleGradBot    = "#1a2a38";
-constexpr auto kTitleBorder     = "#0a1a28";
+constexpr auto kTitleGradTop    = "#26262b";
+constexpr auto kTitleGradMid    = "#1c1c20";
+constexpr auto kTitleGradBot    = "#141417";
+constexpr auto kTitleBorder     = "#0d0d0f";
 
 // Active/Checked Button States
-constexpr auto kGreenBg         = "#006040";
-constexpr auto kGreenText       = "#00ff88";
-constexpr auto kGreenBorder     = "#00a060";
-constexpr auto kBlueBg          = "#0070c0";
-constexpr auto kBlueText        = "#ffffff";
-constexpr auto kBlueBorder      = "#0090e0";
-constexpr auto kBlueHover       = "#0088d8";
-constexpr auto kAmberBg         = "#604000";
-constexpr auto kAmberText       = "#ffb800";
-constexpr auto kAmberBorder     = "#906000";
-constexpr auto kAmberWarn       = "#ddbb00";
-constexpr auto kRedBg           = "#cc2222";
-constexpr auto kRedText         = "#ffffff";
-constexpr auto kRedBorder       = "#ff4444";
+constexpr auto kGreenBg         = "#1c3a2a";
+constexpr auto kGreenText       = "#6fa384";
+constexpr auto kGreenBorder     = "#2c5c44";
+constexpr auto kBlueBg          = "#254a72";
+constexpr auto kBlueText        = "#cfe2f5";
+constexpr auto kBlueBorder      = "#2f5c86";
+constexpr auto kBlueHover       = "#2d5885";
+constexpr auto kAmberBg         = "#33280f";
+constexpr auto kAmberText       = "#c2924f";
+constexpr auto kAmberBorder     = "#6b5426";
+constexpr auto kAmberWarn       = "#a8853f";
+constexpr auto kRedBg           = "#7a2c2e";
+constexpr auto kRedText         = "#f0dcdc";
+constexpr auto kRedBorder       = "#a86b6d";
+
+// ── Instrumente ───────────────────────────────────────────────────────
+//
+// S-Meter, SWR-Zifferblatt, Gain Reduction. Ein Instrument bekommt seine
+// Wirkung aus Licht, nicht aus Farbe.
+//
+// Vorher war der S-Meter-Bogen zur Hälfte blau und zur Hälfte rot, und
+// die Teilung kodierte damit nichts — es war eine Skala, die zufällig
+// zweifarbig war. Rot bedeutet in diesem Programm „Achtung"; es bedeutete
+// oben rechts im Bild dauerhaft „Skalenteil".
+//
+// Jetzt: ein cremeweißer Bogen über die ganze Länge, darunter ein
+// entsättigtes Glimmen, und die Grenze als kurze Marke statt als halber
+// Bogen. Die Information bleibt, die Fläche verschwindet.
+//
+// Der Glimmton ist absichtlich keiner, den man benennen würde. Sobald
+// man ihn „olivgrün" nennen kann, ist er zu kräftig.
+constexpr auto kInstrumentFace    = "#c8c8c0";  // Bogen, Zeiger, Teilung
+constexpr auto kInstrumentGlowHi  = "#5c5842";  // Mitte des Glimmens
+constexpr auto kInstrumentGlowLo  = "#33322a";  // Rand des Glimmens
+constexpr auto kInstrumentLimit   = "#a86b6d";  // wo es zu viel wird
+
+// ── Spektrum und Gitter ───────────────────────────────────────────────
+//
+// Die zwei größten Flächen im Fenster. Solange die Kurve neonzyan und
+// die Frequenzskala knallgelb ist, nützt eine dezente Palette drumherum
+// nichts — zwei Drittel des Bildes schreien weiter.
+//
+// Die Kurve gehört zur Akzentfamilie (kAccent #4a7ba8), ist aber eine
+// Spur heller: sie ist das, worauf man den ganzen Abend schaut, und
+// muss vor dem Rauschteppich stehen, ohne zu leuchten.
+//
+// Das Gitter kommt ohne Alpha aus dieser Datei — die Deckung setzt der
+// Malcode, weil fein und grob dieselbe Farbe bei anderer Deckung sind.
+// Eine Farbe hier zu verdoppeln, nur um zwei Alphawerte zu tragen, wäre
+// ein Wert zu viel in der Theme-Datei.
+//
+// Die Bandkante bleibt rot und wird hier NICHT gedämpft: sie sagt, wo
+// das Senden aufhört, erlaubt zu sein. Eine Sicherheitsmarke leiser zu
+// drehen, weil sie auffällt, hieße das Merkmal abzuschaffen.
+constexpr auto kSpectrumTrace     = "#6f96b8";  // Kurve und Füllung
+constexpr auto kSpectrumGrid      = "#8a8f96";  // Gitterlinien (Alpha im Code)
+constexpr auto kSpectrumGridText  = "#9aa0a8";  // Frequenz- und dBm-Skala
 
 // Gauge Fill Zones
 // ── Telling one equaliser band from another ──────────────────────────
@@ -101,21 +165,21 @@ constexpr auto kEqBand5 = "#4a80ff";   // blue, new
 constexpr auto kEqBand6 = "#a070e0";   // violet, new
 constexpr auto kEqBand7 = "#8090a0";   // grey — kTextSecondary, LP slot
 
-constexpr auto kGaugeNormal     = "#00b4d8";
-constexpr auto kGaugeWarning    = "#ddbb00";
-constexpr auto kGaugeDanger     = "#ff4444";
-constexpr auto kGaugePeak       = "#ffffff";
+constexpr auto kGaugeNormal     = "#4a7ba8";
+constexpr auto kGaugeWarning    = "#a8853f";
+constexpr auto kGaugeDanger     = "#a86b6d";
+constexpr auto kGaugePeak       = "#c4c4c9";
 
 // Disabled
-constexpr auto kDisabledBg      = "#1a1a2a";
-constexpr auto kDisabledText    = "#556070";
-constexpr auto kDisabledBorder  = "#2a3040";
+constexpr auto kDisabledBg      = "#141417";
+constexpr auto kDisabledText    = "#4e4e53";
+constexpr auto kDisabledBorder  = "#232327";
 
 // Overlay
 constexpr auto kOverlayBtnBg    = "rgba(20, 30, 45, 240)";
 constexpr auto kOverlayPanelBg  = "rgba(15, 15, 26, 220)";
 constexpr auto kOverlayBtnHover = "rgba(0, 112, 192, 180)";
-constexpr auto kOverlayBorder   = "#304050";
+constexpr auto kOverlayBorder   = "#2c2c31";
 
 // Sizes
 constexpr int kTitleBarH        = 16;
@@ -129,9 +193,9 @@ constexpr int kAppletPanelW     = 260;
 
 // Status Bar
 constexpr int kStatusBarH       = 46;
-constexpr auto kStatusBarBg     = "#0a0a14";
-constexpr auto kStatusBarBorder = "#203040";
-constexpr auto kStatusSep       = "#304050";
+constexpr auto kStatusBarBg     = "#0a0a0c";
+constexpr auto kStatusBarBorder = "#1f1f23";
+constexpr auto kStatusSep       = "#2c2c31";
 
 // Shared Stylesheet Fragments
 inline QString buttonBaseStyle()
@@ -178,9 +242,9 @@ inline QString redCheckedStyle()
 // Source: NereusSDR-original. Distinct semantic from action-button
 // "checked" state because DSP toggles communicate "feature on" not
 // "action engaged."
-constexpr auto kDspToggleBg     = "#1a6030";
-constexpr auto kDspToggleBorder = "#20a040";
-constexpr auto kDspToggleText   = "#80ff80";
+constexpr auto kDspToggleBg     = "#1b3527";
+constexpr auto kDspToggleBorder = "#33684c";
+constexpr auto kDspToggleText   = "#7fae91";
 
 inline QString dspToggleStyle()
 {
@@ -364,8 +428,8 @@ inline void applyDarkPageStyle(QWidget* w)
 // Customisable via ColorSwatchButton on Setup → Display → TX Display per
 // docs/architecture/ui-audit-polish-plan.md §E1.D9b.
 constexpr auto kTxFilterOverlayFill   = "rgba(255, 120, 60, 46)";
-constexpr auto kTxFilterOverlayBorder = "#ff7833";
-constexpr auto kTxFilterOverlayLabel  = "#ffaa70";
+constexpr auto kTxFilterOverlayBorder = "#a8724a";
+constexpr auto kTxFilterOverlayLabel  = "#c2924f";
 
 // RX filter overlay — translucent cyan.
 // Border reuses kAccent (#00b4d8); only the fill variant is new.

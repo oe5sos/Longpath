@@ -460,7 +460,7 @@ void TgxlAdvancedPage::buildNetworkSection(QVBoxLayout* topLay)
         QStringLiteral("TGXL must be unicast-reachable from this host after the change; "
                        "if you lose connection, use Scan LAN to rediscover."));
     warnLabel->setWordWrap(true);
-    warnLabel->setStyleSheet(QStringLiteral("color: #e8c01e;"));
+    warnLabel->setStyleSheet(QStringLiteral("color: #ddbb00;"));
     lay->addWidget(warnLabel);
 
     m_applyIfconfBtn = new QPushButton(QStringLiteral("Apply Network Settings"));

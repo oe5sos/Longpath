@@ -92,7 +92,7 @@ constexpr const char* kDialogStyle =
     "QListWidget, QTreeWidget {"
     "  background: #0a0a18; color: #c8d8e8;"
     "  border: 1px solid #203040;"
-    "  alternate-background-color: #111122;"
+    "  alternate-background-color: #1a1a2a;"
     "}"
     "QPushButton {"
     "  background: #1a2a3a; color: #c8d8e8;"
