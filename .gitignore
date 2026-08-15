@@ -30,3 +30,8 @@ build-tests/
 # Persoenliche Theme-Dateien. Design gehoert dem Betreiber, nicht dem Repo.
 # Siehe docs/design/ROADMAP.md.
 themes/
+
+# Persoenliche Claude-Anweisungen des Betreibers (Leitsatz, Hausstil-Pflicht,
+# Arbeitsregeln). Wird zusaetzlich zur versionierten CLAUDE.md gelesen.
+# Dieselbe Trennung wie bei themes/.
+CLAUDE.local.md
