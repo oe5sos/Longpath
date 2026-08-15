@@ -67,12 +67,29 @@
 namespace NereusSDR {
 
 // ── Constants (from AetherSDR SpectrumOverlayMenu.cpp) ───────────────────────
-static constexpr int kBtnW     = 68;
-static constexpr int kBtnH     = 22;
+// ── Maße aus docs/design/HAUSSTIL.md §Maße ──────────────────────────
+//
+//   Pille          Höhe 26–28 px, Radius 6, Polsterung 0 11 px
+//   Knopfabstand    5 px innerhalb einer Gruppe
+//   Gruppenabstand 22–26 px
+//   Nie Radius 3.  Das ist der Qt-Standardwert und lässt alles nach
+//                  Qt aussehen.
+//
+// Die Spalte stand vorher auf 68 × 22 mit Radius 2 und 2 px Abstand —
+// eng, kantig und ohne jede Gliederung. Die Breite muss mit: bei
+// Polsterung 0 11 px braucht „Display" in 11 px fett rund 70 px, und
+// 68 hätte den Text beschnitten.
+static constexpr int kBtnW     = 80;
+static constexpr int kBtnH     = 27;
+
+// Höhe einer Versalzeile samt ihrem Luftraum nach unten.
+static constexpr int kHeadH    = 13;
+// Abstand zwischen zwei Gruppen, gemessen über der Versalzeile.
+static constexpr int kGroupGap = 24;
 static constexpr int kBandBtnW = 48;
 static constexpr int kBandBtnH = 26;
 static constexpr int kPad      = 2;
-static constexpr int kGap      = 2;
+static constexpr int kGap      = 5;   // innerhalb einer Gruppe
 
 // Translucent overlay colours — intentionally NOT in StyleConstants.h because
 // they are designed to alpha-blend over the changing spectrum background (the
@@ -97,22 +114,51 @@ namespace OverlayColors {
 
     // Menu strip buttons — fully transparent/semi-transparent fills that
     // blend with the spectrum below.
+    // ── Genau ein Knopf je Gruppe leuchtet ──────────────────────────
+    //
+    // docs/design/HAUSSTIL.md Regel 2: „Aktiv gefüllt, inaktiv fast
+    // unsichtbar." Vorher war es umgekehrt gewichtet — jeder Knopf trug
+    // eine deckende Fläche (rgba(20,30,45,240)) und einen hellen Rahmen,
+    // acht davon untereinander, und der aktive unterschied sich nur
+    // durch ein kräftiges Blau. Acht gleich laute Flächen sagen nichts
+    // darüber, welche gerade gilt.
+    //
+    // Jetzt: inaktiv fast nur Text, aktiv der Auswahl-Verlauf.
+    // Radius 6, nie 3.
     constexpr auto kMenuBtnNormal =
-        "QPushButton { background: rgba(20, 30, 45, 240); "
-        "border: 1px solid rgba(255, 255, 255, 40); border-radius: 2px; "
-        "color: #c8d8e8; font-size: 11px; font-weight: bold; }"
-        "QPushButton:hover { background: rgba(0, 112, 192, 180); "
-        "border: 1px solid #0090e0; }";
+        "QPushButton { background: rgba(255, 255, 255, 8); "
+        "border: 1px solid #26262b; border-radius: 6px; "
+        "padding: 0 11px; "
+        "color: #8e8e93; font-size: 11px; font-weight: bold; }"
+        "QPushButton:hover { background: #1e1e22; "
+        "border: 1px solid #2c2c31; color: #c4c4c9; }";
 
+    // Auswahl: Füllung, Rahmen und Text wörtlich aus HAUSSTIL §Token.
     constexpr auto kMenuBtnActive =
-        "QPushButton { background: rgba(0, 112, 192, 180); "
-        "border: 1px solid #0090e0; border-radius: 2px; "
-        "color: #ffffff; font-size: 11px; font-weight: bold; }";
+        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+        "stop:0 #254a72, stop:1 #1e3d5f); "
+        "border: 1px solid #2f5c86; border-radius: 6px; "
+        "padding: 0 11px; "
+        "color: #cfe2f5; font-size: 11px; font-weight: bold; }";
 
     constexpr auto kMenuBtnDisabled =
-        "QPushButton { background: rgba(20, 30, 45, 180); "
-        "border: 1px solid rgba(255, 255, 255, 15); border-radius: 2px; "
-        "color: #556070; font-size: 11px; font-weight: bold; }";
+        "QPushButton { background: transparent; "
+        "border: 1px solid #232327; border-radius: 6px; "
+        "padding: 0 11px; "
+        "color: #3d3d41; font-size: 11px; font-weight: bold; }";
+
+    // ── Die Versalzeile über jeder Gruppe ───────────────────────────
+    //
+    // HAUSSTIL Regel 1: „Über jeder Knopfreihe eine Versalzeile: 8–9 px,
+    // Laufweite .18em, Farbe Skala. Nie ein Knopf ohne Überschrift."
+    //
+    // Die Laufweite steht NICHT hier: Qt-Stylesheets kennen kein
+    // letter-spacing, das wird still verworfen. Sie wird in
+    // makeGroupHead() über QFont::setLetterSpacing gesetzt — 0,18 em bei
+    // 9 px sind 1,62 px absolut.
+    constexpr auto kGroupHeadStyle =
+        "QLabel { color: #5c5c60; font-size: 9px; font-weight: bold; "
+        "background: transparent; }";
 } // namespace OverlayColors
 
 // File-local helpers for opaque styles that diverge from the canonical
@@ -141,6 +187,46 @@ static inline QString overlayDisplayToggleStyle()
 {
     return Style::buttonBaseStyle().replace("padding: 2px 4px", "padding: 2px 6px")
          + Style::greenCheckedStyle();
+}
+
+// ── Wo die Versalzeilen stehen ──────────────────────────────────────
+//
+// Der Index ist die Stelle in m_menuBtns, VOR der die Zeile sitzt.
+// Bewusst eine eigene Tabelle statt Beschriftungen zwischen die Knöpfe
+// zu mischen: m_menuBtns wird an vier Stellen über feste Indizes
+// angesprochen (BAND = 2, ANT = 3, Display = 4, VAX = 5, um die Flyouts
+// zu setzen). Kämen Beschriftungen mit hinein, verschöbe sich jeder
+// dieser Indizes — und zwar lautlos, denn ein Flyout an der falschen
+// Stelle stürzt nicht ab, es geht nur woanders auf.
+//
+// Gruppierung nach Wirkung, entschieden vom Betreiber am 2026-08-15:
+// was etwas anlegt, wohin gehört wird, was zu sehen ist, wie laut.
+// Der Einklapp-Knopf steht ohne Überschrift ganz oben — er bedient das
+// Panel selbst und nicht das Radio.
+struct GroupHead { int beforeIndex; const char* title; };
+static constexpr GroupHead kGroupHeads[] = {
+    { 0, "NEU"     },   // +RX, +TNF
+    { 2, "BAND"    },   // BAND, ANT
+    { 4, "ANSICHT" },   // Display
+    { 5, "PEGEL"   },   // VAX, ATT
+};
+
+// Helper: eine Versalzeile.
+//
+// Die Laufweite kommt hier her und nicht aus dem Stylesheet, weil
+// Qt-Stylesheets kein letter-spacing kennen und es kommentarlos
+// verwerfen. 0,18 em bei 9 px = 1,62 px.
+static QLabel* makeGroupHead(const QString& text, QWidget* parent)
+{
+    auto* lbl = new QLabel(text, parent);
+    lbl->setStyleSheet(OverlayColors::kGroupHeadStyle);
+    QFont f = lbl->font();
+    f.setPixelSize(9);
+    f.setBold(true);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.62);
+    lbl->setFont(f);
+    lbl->setFixedHeight(kHeadH);
+    return lbl;
 }
 
 // Helper: create a standard menu button
@@ -359,8 +445,40 @@ void SpectrumOverlayPanel::updateLayout()
                                       : QStringLiteral("\u25b6")); // ▶
     m_collapseBtn->move(kPad, kPad);
 
-    int y = kPad + kBtnH + kGap;
-    for (auto* btn : m_menuBtns) {
+    // Die Beschriftungen entstehen beim ersten Durchlauf und werden
+    // danach nur noch bewegt — sie hängen an keiner Zustandsänderung.
+    if (m_groupHeads.isEmpty()) {
+        for (const GroupHead& g : kGroupHeads) {
+            m_groupHeads.append(
+                makeGroupHead(QString::fromLatin1(g.title), this));
+        }
+    }
+
+    int y = kPad + kBtnH + kGroupGap;
+    int headIdx = 0;
+    for (int i = 0; i < m_menuBtns.size(); ++i) {
+        // Steht vor diesem Knopf eine Versalzeile?
+        const bool startsGroup =
+            headIdx < static_cast<int>(std::size(kGroupHeads))
+            && kGroupHeads[headIdx].beforeIndex == i;
+
+        if (startsGroup) {
+            QLabel* head = m_groupHeads[headIdx];
+            head->setVisible(m_expanded);
+            if (m_expanded) {
+                // Der Gruppenabstand steht ÜBER der Zeile, nicht
+                // zwischen Zeile und erstem Knopf — sonst schwebt die
+                // Überschrift in der Mitte und gehört optisch zu der
+                // Gruppe darüber.
+                if (i > 0) { y += kGroupGap - kGap; }
+                head->move(kPad + 2, y);
+                head->setFixedWidth(kBtnW - 2);
+                y += kHeadH;
+            }
+            ++headIdx;
+        }
+
+        QPushButton* btn = m_menuBtns[i];
         btn->setVisible(m_expanded);
         if (m_expanded) {
             btn->move(kPad, y);
@@ -368,9 +486,8 @@ void SpectrumOverlayPanel::updateLayout()
         }
     }
 
-    int totalH = m_expanded
-        ? (kPad + kBtnH + kGap + static_cast<int>(m_menuBtns.size()) * (kBtnH + kGap))
-        : (kPad + kBtnH + kPad);
+    const int totalH = m_expanded ? (y - kGap + kPad)
+                                  : (kPad + kBtnH + kPad);
     setFixedSize(kPad + kBtnW + kPad, totalH);
 }
 

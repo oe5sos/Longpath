@@ -171,6 +171,12 @@ private:
     // ── Main button strip ────────────────────────────────────────────────
     QPushButton*         m_collapseBtn{nullptr};
     QVector<QPushButton*> m_menuBtns;   // indices 0-6 (buttons 2-8)
+
+    // Die Versalzeilen über den Knopfgruppen (HAUSSTIL Regel 1).
+    // Getrennt von m_menuBtns gehalten, weil dessen Indizes an vier
+    // Stellen fest verdrahtet sind, um die Flyouts zu platzieren —
+    // Beschriftungen dazwischenzumischen würde sie lautlos verschieben.
+    QVector<QLabel*> m_groupHeads;
     bool                 m_expanded{true};
 
     // ── Active flyout tracking (one visible at a time) ───────────────────
