@@ -369,6 +369,21 @@ public:
     /// abzuschreiben.
     static constexpr float kMinSpanDb = 10.0f;
 
+    // ── Die Vorgabe steht an EINER Stelle ────────────────────────────
+    //
+    // Sie stand an dreien: hier als Member-Vorgabe, in loadSettings() als
+    // Rückfallwert, und als abgeschriebene Zahl in
+    // tst_pan_display_settings_inherit. Als der Bereich von −48/−116 auf
+    // −30/−190 ging, fiel der Test — nicht weil etwas kaputt war,
+    // sondern weil er die vierte Kopie der Zahl hielt.
+    //
+    // Öffentlich, damit der Test sie lesen kann statt sie noch einmal
+    // hinzuschreiben. Begründung der Werte selbst: siehe m_refLevel.
+    static constexpr float kDefaultRefLevelDbm = -30.0f;    // oberer Rand
+    static constexpr float kDefaultRangeDb     = 160.0f;    // Spanne
+    static constexpr float kDefaultFloorDbm =
+        kDefaultRefLevelDbm - kDefaultRangeDb;              // −190
+
     /// Setzt den dargestellten Bereich. Vertauschte Grenzen werden
     /// getauscht, eine Spanne unter kMinSpanDb nach unten aufgeweitet —
     /// das Maximum bleibt dabei stehen, weil es der Bezugspegel ist.
@@ -1792,8 +1807,8 @@ private:
     // Bewusst nicht die Thetis-Werte (−40 / −140): mit einem Boden bei
     // −140 faellt derselbe Flur aus dem Bild. Eine Anzeigevorgabe gehoert
     // dem Betreiber, nicht console.cs.
-    float  m_refLevel{-30.0f};        // top of display (dBm)
-    float  m_dynamicRange{160.0f};    // range in dB (bottom = refLevel - dynamicRange)
+    float  m_refLevel{kDefaultRefLevelDbm};     // top of display (dBm)
+    float  m_dynamicRange{kDefaultRangeDb};     // bottom = refLevel - dynamicRange
 
     // ---- Waterfall ----
     QImage m_waterfall;               // ring buffer (Format_RGB32)

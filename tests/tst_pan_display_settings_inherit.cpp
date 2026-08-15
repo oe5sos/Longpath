@@ -86,13 +86,24 @@ private slots:
 
     // ── 1. An untouched pan inherits pan 0 ───────────────────────────────
     //
-    // The finding. Before the fix this returned the hardcoded ship default
-    // (-48.0) rather than pan 0's value, so a new pan opened looking
-    // nothing like the one it was placed beside.
+    // The finding. Before the fix this returned the ship default rather
+    // than pan 0's value, so a new pan opened looking nothing like the one
+    // it was placed beside.
+    //
+    // Pan 0's value here must NOT be the ship default, or the case proves
+    // nothing: both "inherited from pan 0" and "fell through to the
+    // default" would produce the same number and a completely broken
+    // inheritance would still pass. It said -30 until 2026-08-15, which
+    // was harmless until -30 BECAME the default and quietly blinded the
+    // one case written to catch this bug. -55 is chosen for no reason
+    // beyond being neither default nor anything else in this file.
     void an_untouched_pan_reads_pan_zeros_value()
     {
         auto& s = AppSettings::instance();
-        s.setValue(kFloatKey,  u"-30"_s);   // pan 0 says -30
+        static_assert(SpectrumWidget::kDefaultRefLevelDbm != -55.0f,
+                      "pan 0's probe value must differ from the ship "
+                      "default, or this case cannot fail");
+        s.setValue(kFloatKey,  u"-55"_s);   // pan 0 says -55
         s.setValue(kFloatKey1, QString());  // pan 1 has never been set
 
         SpectrumWidget pan1;
@@ -100,8 +111,8 @@ private slots:
         pan1.loadSettings();
 
         // refLevel is m_refLevel, loaded straight from DisplayGridMax.
-        QVERIFY2(qFuzzyCompare(pan1.refLevel() + 1.0F, -30.0F + 1.0F),
-            qPrintable(u"pan 1 should inherit pan 0's grid max of -30, got %1"_s
+        QVERIFY2(qFuzzyCompare(pan1.refLevel() + 1.0F, -55.0F + 1.0F),
+            qPrintable(u"pan 1 should inherit pan 0's grid max of -55, got %1"_s
                            .arg(static_cast<double>(pan1.refLevel()))));
     }
 
@@ -145,8 +156,28 @@ private slots:
     // ── 4. Neither set still lands on the ship default ───────────────────
     //
     // First launch, no settings file. The inheritance must not swallow the
-    // calibrated defaults, which were tuned against a live ANAN-G2 and are
-    // what a new install is judged on.
+    // ship default, which is what a new install is judged on.
+    //
+    // ── Where -30 / -190 comes from ──────────────────────────────────────
+    //
+    // This comment used to say the defaults were "tuned against a live
+    // ANAN-G2". Nobody could produce that measurement, and the numbers it
+    // described (-48 / -116) do not survive the arithmetic: at 16384 bins
+    // across 192 kHz a bin is 11.7 Hz, so the thermal floor sits at
+    // -174 + 10*log10(11.7) = about -163 dBm, and a receiver noise figure
+    // puts the observed floor near -148. A display bottom of -116 leaves
+    // that floor BELOW the bottom edge, with the 68 dB above it filled by
+    // noise — which is exactly what the operator was looking at.
+    //
+    // -30 / -190 is that calculation, not a bench session. It is also
+    // consistent with what the operator's own settings file held for a
+    // second panadapter (DisplayGridMin_1 = -149.74). Corrected
+    // 2026-08-15: a provenance claim nobody can check is worse than none,
+    // because the next person to touch these numbers defers to it.
+    //
+    // The expected value is read from the widget rather than written out
+    // again. Four copies of one number is how this case came to fail in
+    // the first place.
     void with_nothing_set_the_ship_default_still_applies()
     {
         auto& s = AppSettings::instance();
@@ -157,8 +188,11 @@ private slots:
         pan1.setPanIndex(1);
         pan1.loadSettings();
 
-        QVERIFY2(qFuzzyCompare(pan1.refLevel() + 1.0F, -48.0F + 1.0F),
-            qPrintable(u"expected the -48.0 ship default, got %1"_s
+        QVERIFY2(qFuzzyCompare(pan1.refLevel() + 1.0F,
+                               SpectrumWidget::kDefaultRefLevelDbm + 1.0F),
+            qPrintable(u"expected the %1 ship default, got %2"_s
+                           .arg(static_cast<double>(
+                                    SpectrumWidget::kDefaultRefLevelDbm))
                            .arg(static_cast<double>(pan1.refLevel()))));
     }
 };

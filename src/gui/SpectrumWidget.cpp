@@ -822,12 +822,15 @@ void SpectrumWidget::loadSettings()
     // lit up the waterfall floor. Shifting the entire reference plane
     // down 12 dB gives a clean "noise sits low" first impression.
     // Dynamic range (68 dB grid, 60 dB waterfall) is unchanged.
-    // Vorgaben wie in SpectrumWidget.h (m_refLevel / m_dynamicRange) —
-    // die beiden Zahlenpaare muessen uebereinstimmen, sonst haengt der
-    // Startwert davon ab, ob je etwas gespeichert wurde.
-    m_refLevel       = readFloat(QStringLiteral("DisplayGridMax"), -30.0f);
-    m_dynamicRange   = readFloat(QStringLiteral("DisplayGridMax"), -30.0f)
-                     - readFloat(QStringLiteral("DisplayGridMin"), -190.0f);
+    // Aus den Konstanten, nicht als abgeschriebene Zahl: sonst haengt der
+    // Startwert davon ab, ob je etwas gespeichert wurde, und die beiden
+    // Stellen laufen beim naechsten Mal wieder auseinander.
+    m_refLevel       = readFloat(QStringLiteral("DisplayGridMax"),
+                                 kDefaultRefLevelDbm);
+    m_dynamicRange   = readFloat(QStringLiteral("DisplayGridMax"),
+                                 kDefaultRefLevelDbm)
+                     - readFloat(QStringLiteral("DisplayGridMin"),
+                                 kDefaultFloorDbm);
     m_spectrumFrac   = readFloat(QStringLiteral("DisplaySpectrumFrac"), 0.40f);
 
     // Phase 3G-12: persist the spectrum zoom level (visible bandwidth)
