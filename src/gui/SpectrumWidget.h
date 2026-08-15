@@ -558,8 +558,16 @@ public:
     // from transparent at baseline to the fill color at the trace,
     // and the trace uses a vertical color gradient. GPU path keeps
     // its existing per-vertex heatmap coloring (wire-up in commit 5).
+    /// Die Fuellung unter der Kurve verlaeuft (an) oder ist flach (aus).
     void setGradientEnabled(bool on);
     bool gradientEnabled() const { return m_gradientEnabled; }
+
+    /// Die Kurve wird nach Pegel eingefaerbt statt flach gezeichnet.
+    /// Getrennt von gradientEnabled, weil beide bis 2026-08-15 an
+    /// derselben Fahne hingen und auf CPU- und GPU-Pfad Verschiedenes
+    /// taten — siehe die Notiz bei m_heatmapEnabled.
+    void setHeatmapEnabled(bool on);
+    bool heatmapEnabled() const { return m_heatmapEnabled; }
 
     // Display calibration offset added to every bin before it's mapped
     // to screen Y. Ported from Thetis Display.RX1DisplayCalOffset
@@ -1970,9 +1978,36 @@ private:
     QPainterPath m_specPeakPathScratch;
 
     float       m_lineWidth{1.6f};
-    // An: die Fuellung IST der Hausstil, nicht eine Zutat. Aus wirkte die
-    // Kurve als blosser Strich ueber dem Rauschteppich.
+    // ── Warum das zwei Fahnen sind und nicht eine ────────────────────
+    //
+    // Es war eine, und sie bedeutete auf den beiden Malwegen etwas
+    // Verschiedenes:
+    //
+    //   CPU (drawSpectrum) — Verlauf unter der Kurve statt flacher
+    //                        Fuellung
+    //   GPU (render)       — Regenbogen-Einfaerbung der Kurve,
+    //                        blau/cyan/gruen/gelb/rot
+    //
+    // Dieselbe Einstellung, dasselbe gespeicherte Feld, zwei Ergebnisse,
+    // je nachdem ob der Rechner den GPU-Pfad kann. Als am 2026-08-15 die
+    // Vorgabe auf "an" ging, um den Hausstil-Verlauf zu bekommen, haette
+    // das auf jedem GPU-Rechner stattdessen die Kurve bunt gemacht.
+    // Gerettet hat nur, dass beim Betreiber ein gespeichertes "False"
+    // darueber lag — die Fahne war also seit jeher eine Falle, sie hatte
+    // bloss noch niemand ausgeloest.
+    //
+    // Jetzt zwei Begriffe, weil es zwei Sachen sind. Wer hier einen
+    // dritten Malweg ergaenzt, bedient beide oder keinen — aber nicht
+    // einen davon unter dem Namen des anderen.
+    //
+    //   m_gradientEnabled  die Fuellung unter der Kurve verlaeuft
+    //   m_heatmapEnabled   die Kurve wird nach Pegel eingefaerbt
+    //
+    // Die Fuellung ist der Hausstil und steht an. Der Regenbogen kommt
+    // aus AetherSDR, macht Farbe zur groessten Flaeche im Fenster und
+    // steht aus.
     bool        m_gradientEnabled{true};
+    bool        m_heatmapEnabled{false};
 
     // Ported from Thetis Display.RX1DisplayCalOffset (display.cs:1372).
     float       m_dbmCalOffset{0.0f};

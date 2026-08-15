@@ -912,6 +912,13 @@ void SpectrumWidget::loadSettings()
     const bool peakOn = readBool(QStringLiteral("DisplayPeakHoldEnabled"), false);
     const bool gradOn = readBool(QStringLiteral("DisplayGradientEnabled"), true);
     m_gradientEnabled = gradOn;
+    // Eigener Schluessel, eigene Vorgabe (aus) — siehe die Notiz bei
+    // m_heatmapEnabled. Bewusst NICHT aus DisplayGradientEnabled
+    // abgeleitet: wer den alten Schalter auf "an" stehen hat, wollte auf
+    // dem CPU-Pfad eine Fuellung und auf dem GPU-Pfad einen Regenbogen,
+    // und aus einem gespeicherten Wert laesst sich nicht ablesen,
+    // welches von beidem gemeint war.
+    m_heatmapEnabled  = readBool(QStringLiteral("DisplaySpectrumHeatmap"), false);
     // Delay the peak hold enable path until the timer infra is ready.
     if (peakOn) {
         setPeakHoldEnabled(true);
@@ -1225,6 +1232,8 @@ void SpectrumWidget::saveSettings()
               m_peakHoldEnabled ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayGradientEnabled"), m_panIndex),
               m_gradientEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplaySpectrumHeatmap"), m_panIndex),
+              m_heatmapEnabled ? QStringLiteral("True") : QStringLiteral("False"));
 
     // Phase 3G-8 commit 4: waterfall renderer state.
     s.setValue(settingsKey(QStringLiteral("DisplayWfAgc"), m_panIndex),
@@ -1951,7 +1960,17 @@ void SpectrumWidget::setGradientEnabled(bool on)
     }
     m_gradientEnabled = on;
     scheduleSettingsSave();
-    update();  // vertex gen next frame picks flat vs heatmap colours
+    update();  // Fuellung: Verlauf statt flach, beim naechsten Rahmen
+}
+
+void SpectrumWidget::setHeatmapEnabled(bool on)
+{
+    if (m_heatmapEnabled == on) {
+        return;
+    }
+    m_heatmapEnabled = on;
+    scheduleSettingsSave();
+    update();  // Kurvenfarbe: nach Pegel statt flach, beim naechsten Rahmen
 }
 
 void SpectrumWidget::setDbmCalOffset(float db)
@@ -9164,7 +9183,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // (DrawLine over current_display_data[i], i = 0..nDecimatedWidth-1).
     // Honours:
     //   - m_dbmCalOffset (shifts every pixel's dBm before y mapping)
-    //   - m_gradientEnabled (off = flat m_fillColor, on = heatmap)
+    //   - m_heatmapEnabled (aus = flache Kurvenfarbe, an = Regenbogen;
+    //     bis 2026-08-15 haftete das an m_gradientEnabled, das auf dem
+    //     CPU-Pfad etwas anderes bedeutet — siehe Header)
     //   - m_panFill (skips fill VBO update when disabled)
     //   - m_fillColor / m_fillAlpha (used for the flat-fill path)
     //   - m_peakHoldEnabled (generates a second line VBO for peak hold)
@@ -9193,9 +9214,12 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             float y = yBot + t * (yTop - yBot);
 
             float cr, cg, cb2;
-            if (m_gradientEnabled) {
+            if (m_heatmapEnabled) {
                 // Heat map: blue → cyan → green → yellow → red
                 // From AetherSDR SpectrumWidget.cpp:2298-2310
+                // Hing bis 2026-08-15 an m_gradientEnabled, das auf dem
+                // CPU-Pfad die Fuellung schaltet — siehe die Notiz im
+                // Header. Eigene Fahne, Vorgabe aus.
                 if (t < 0.25f) {
                     float s = t / 0.25f;
                     cr = 0.0f; cg = s; cb2 = 1.0f;
@@ -9222,20 +9246,35 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             lineVerts[li + 4] = cb2;
             lineVerts[li + 5] = 0.9f;
 
-            // Fill vertices (top at signal, bottom at base).
+            // ── Fuellung: dicht an der Kurve, weg zur Grundlinie ─────
+            //
+            // Sie war umgekehrt herum, und deshalb sah man sie nicht:
+            // oben, an der Kurve, stand fa * 0.3 — fast durchsichtig —,
+            // unten an der Grundlinie das volle fa, und zwar in einem
+            // fest verdrahteten Dunkelblau (0.0, 0.0, 0.3). Auf fast
+            // schwarzem Grund liest sich das als Hintergrund, nicht als
+            // Fuellung. Es war ausserdem der letzte Blauton, den die
+            // Palettenumstellung nicht erwischt hat, weil er nicht als
+            // Hexwert dasteht, sondern als drei Fliesskommazahlen.
+            //
+            // Jetzt docs/design/HAUSSTIL.md §Weiche Uebergaenge:
+            // "22 % -> 0 zur Grundlinie", in der Kurvenfarbe. Unten ist
+            // die Farbe gleichgueltig, weil dort nichts mehr deckt —
+            // trotzdem dieselbe, damit kein Farbstich entsteht, falls
+            // jemand die Deckkraft spaeter anhebt.
             int fi = j * 2 * kFftVertStride;
             fillVerts[fi]     = x;
             fillVerts[fi + 1] = y;
             fillVerts[fi + 2] = cr;
             fillVerts[fi + 3] = cg;
             fillVerts[fi + 4] = cb2;
-            fillVerts[fi + 5] = fa * 0.3f;
+            fillVerts[fi + 5] = fa;
             fillVerts[fi + 6] = x;
             fillVerts[fi + 7] = yBot;
-            fillVerts[fi + 8]  = 0.0f;
-            fillVerts[fi + 9]  = 0.0f;
-            fillVerts[fi + 10] = 0.3f;
-            fillVerts[fi + 11] = fa;
+            fillVerts[fi + 8]  = cr;
+            fillVerts[fi + 9]  = cg;
+            fillVerts[fi + 10] = cb2;
+            fillVerts[fi + 11] = 0.0f;
         }
 
         batch->updateDynamicBuffer(m_fftLineVbo, 0,
