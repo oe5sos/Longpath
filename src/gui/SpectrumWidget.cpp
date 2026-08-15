@@ -1450,6 +1450,30 @@ void SpectrumWidget::setFilterOffset(int lowHz, int highHz)
 
 void SpectrumWidget::setDbmRange(float minDbm, float maxDbm)
 {
+    // ── Die Spanne darf nicht auf null zulaufen ──────────────────────
+    //
+    // m_dynamicRange ist der Nenner jeder Umrechnung von dBm nach
+    // Bildpunkt (dbmToY, dbmToYf). Wird er null, teilt die Anzeige durch
+    // null; wird er negativ, steht die Skala auf dem Kopf und jede Kurve,
+    // Marke und Gitterlinie sitzt falsch.
+    //
+    // Erreichbar war das über die NF-Gitternachführung
+    // (onNoiseFloorChanged): sie schiebt das Minimum auf den
+    // Rauschflur, lässt das Maximum bei maintainNFAdjustDelta=False aber
+    // stehen. Auf einem lauten Band wandert das Minimum dann nach oben,
+    // bis es das Maximum erreicht — ohne dass irgendetwas es aufhielt.
+    // Ein ruhiges Band oder eine fehlende Antenne sind ungefährlich,
+    // dort sinkt der Flur und die Spanne wird groesser.
+    //
+    // Der Schutz sitzt hier, weil hier alle durchkommen: Ziehen an der
+    // Skala, der Copy-Knopf, Setup und die Nachführung.
+    if (minDbm > maxDbm) {
+        std::swap(minDbm, maxDbm);
+    }
+    if (maxDbm - minDbm < kMinSpanDb) {
+        minDbm = maxDbm - kMinSpanDb;
+    }
+
     m_refLevel = maxDbm;
     m_dynamicRange = maxDbm - minDbm;
     update();

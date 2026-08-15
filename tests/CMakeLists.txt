@@ -1329,6 +1329,14 @@ nereus_add_test(tst_spectrum_overlay_panel)
 # the 20/10/5/2 dB boundaries. Uses QTEST_APPLESS_MAIN (no QApplication).
 nereus_add_test(tst_spectrum_dbm_strip)
 
+# ── Die Spanne, die auf null zulaufen konnte ────────────────────────────────
+# m_dynamicRange ist der Nenner jeder dBm-nach-Bildpunkt-Umrechnung. Die
+# NF-Gitternachfuehrung schiebt das Minimum auf den Rauschflur und laesst das
+# Maximum stehen; auf einem lauten Band wanderte es bis ans Maximum heran, und
+# nichts hielt es auf. Sichert die Untergrenze und, als eigener Fall, dass die
+# harmlose Richtung (ruhiges Band, Flur sinkt) NICHT angefasst wird.
+nereus_add_test(tst_spectrum_dbm_range_clamp)
+
 # ── Phase 3P-A Task 15: RxApplet S-ATT slider range from BoardCapabilities ───
 # HL2 → 0-63 dB; Hermes → 0-31 dB. Verifies the spinbox max is sourced from
 # BoardCapabilities::attenuator.maxDb at construction time, not hardcoded.

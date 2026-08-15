@@ -360,6 +360,18 @@ public:
     double sampleRate() const { return m_sampleRateHz; }
 
     // ---- Display range ----
+
+    /// Kleinste Spanne, die setDbmRange stehen lässt.
+    ///
+    /// m_dynamicRange ist der Nenner jeder dBm→Bildpunkt-Umrechnung.
+    /// Null teilt durch null, negativ stellt die Skala auf den Kopf.
+    /// Öffentlich, damit ein Test die Grenze prüfen kann, ohne sie
+    /// abzuschreiben.
+    static constexpr float kMinSpanDb = 10.0f;
+
+    /// Setzt den dargestellten Bereich. Vertauschte Grenzen werden
+    /// getauscht, eine Spanne unter kMinSpanDb nach unten aufgeweitet —
+    /// das Maximum bleibt dabei stehen, weil es der Bezugspegel ist.
     void setDbmRange(float minDbm, float maxDbm);
     float refLevel() const { return m_refLevel; }
     float dynamicRange() const { return m_dynamicRange; }
