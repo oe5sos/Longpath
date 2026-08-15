@@ -206,6 +206,15 @@ void AntennaWindow::buildUi()
     connect(m_sweepPanel, &SwrSweepPanel::analysisReady,
             this, [this](const Sweep& s) { setSweep(s); });
 
+    // ── The other edge, the one that was missing ─────────────────────
+    //
+    // analysisReady arrives when a sweep FINISHES. For the seventeen to
+    // thirty seconds before that, the panel above already named the new
+    // band while everything below went on describing the old one — two
+    // halves of one page, both current, about different bands.
+    connect(m_sweepPanel, &SwrSweepPanel::sweepStartedFor,
+            this, &AntennaWindow::onSweepStartedFor);
+
     auto* col = new QVBoxLayout(filePage);
     col->setContentsMargins(12, 10, 12, 10);
     col->setSpacing(9);
@@ -973,6 +982,47 @@ void AntennaWindow::setSweep(const Sweep& s)
         }
     }
     if (!m_targetChosen) { m_targetBox->setValue(0.0); }
+
+    // A real measurement is the only way back out of the superseded
+    // state — see onSweepStartedFor(). Recorded before refresh(),
+    // because refresh() is what pushes the state into the curve and the
+    // readouts.
+    m_analysisStale = false;
+    m_analysisLoHz  = m_sweep.isEmpty() ? 0.0 : m_sweep.startHz();
+    m_analysisHiHz  = m_sweep.isEmpty() ? 0.0 : m_sweep.stopHz();
+    m_analysisBandName.clear();
+
+    refresh();
+}
+
+bool AntennaWindow::sameBandSpan(double aLoHz, double aHiHz,
+                                 double bLoHz, double bHiHz)
+{
+    const double aw = aHiHz - aLoHz;
+    const double bw = bHiHz - bLoHz;
+    if (aw <= 0.0 || bw <= 0.0) { return false; }
+    const double overlap = std::min(aHiHz, bHiHz) - std::max(aLoHz, bLoHz);
+    // Half the narrower run. A second sweep of 20 m — perhaps with more
+    // points, perhaps after moving the feedpoint — is the same band and
+    // must not make the picture step back one second before it replaces
+    // it anyway. 80 m after 20 m shares nothing and is not.
+    return overlap > 0.5 * std::min(aw, bw);
+}
+
+void AntennaWindow::onSweepStartedFor(const QString& bandName,
+                                      double loHz, double hiHz)
+{
+    // Nothing on screen to overtake.
+    if (m_sweep.isEmpty() || m_analysisHiHz <= m_analysisLoHz) { return; }
+    if (sameBandSpan(m_analysisLoHz, m_analysisHiHz, loHz, hiHz)) { return; }
+
+    m_analysisStale = true;
+    // Prefer the name the analysis worked out for itself; fall back to
+    // the one that came with the sweep. bandName is the band being
+    // measured NOW and is deliberately not used here — the capsule has
+    // to say which band the numbers under it belong to, and naming the
+    // other one is the whole confusion this is here to end.
+    Q_UNUSED(bandName);
     refresh();
 }
 
@@ -1023,6 +1073,15 @@ void AntennaWindow::refreshBandTable()
     const double limit = m_limitBox->value();
     m_bandTable->setRowCount(bands.size());
 
+    // Ink for everything in the table that is NOT a red over-limit
+    // value: it steps back with the rest of the analysis when that has
+    // been superseded. Red is passed through untouched at the call
+    // sites below, which is the whole distinction.
+    const bool stale = m_analysisStale;
+    auto ink = [stale](const char* c) {
+        return QColor(stale ? Style::kTextInactive : c);
+    };
+
     for (int r = 0; r < bands.size(); ++r) {
         const AmateurBands::Band& b = bands.at(r);
 
@@ -1033,7 +1092,7 @@ void AntennaWindow::refreshBandTable()
             return it;
         };
 
-        put(0, b.name, QColor(Style::kAccent));
+        put(0, b.name, ink(Style::kAccent));
 
         const double at[3] = {b.lowHz, b.centreHz(), b.highHz};
         for (int i = 0; i < 3; ++i) {
@@ -1045,8 +1104,8 @@ void AntennaWindow::refreshBandTable()
                     QColor(Style::kTextInactive));
             } else {
                 put(1 + i, QStringLiteral("%1").arg(v, 0, 'f', 2),
-                    QColor(v > limit ? Style::kRedBorder
-                                     : Style::kTextPrimary));
+                    v > limit ? QColor(Style::kRedBorder)
+                              : ink(Style::kTextPrimary));
             }
         }
 
@@ -1068,8 +1127,8 @@ void AntennaWindow::refreshBandTable()
             put(4, QStringLiteral("%1 bei %2 MHz")
                        .arg(bestSwr, 0, 'f', 2)
                        .arg(bestAt / 1e6, 0, 'f', 3),
-                QColor(bestSwr > limit ? Style::kRedBorder
-                                       : Style::kGreenText));
+                bestSwr > limit ? QColor(Style::kRedBorder)
+                                : ink(Style::kGreenText));
         } else {
             put(4, QStringLiteral("nicht gemessen"),
                 QColor(Style::kTextInactive));
@@ -1086,7 +1145,7 @@ void AntennaWindow::refreshBandTable()
             where = QStringLiteral("%1 MHz · %2 Ω")
                         .arg(c.freqHz / 1e6, 0, 'f', 3)
                         .arg(c.resistanceOhms, 0, 'f', 0);
-            col = QColor(Style::kAmberText);
+            col = ink(Style::kAmberText);
             break;
         }
         put(5, where, col);
@@ -1119,6 +1178,16 @@ void AntennaWindow::refresh()
     m_curve->setBand(custom ? typed : AmateurBands::Band{});
 
     const AmateurBands::Band band = custom ? typed : m_curve->shownBand();
+
+    // Remember what these numbers are about while they are still
+    // current, so the capsule can name it after they stop being. Worked
+    // out from the sweep rather than taken from the sweep's source
+    // string: a .s1p from a VNA has no band in its name and this way
+    // both kinds of measurement carry one.
+    if (!m_analysisStale) {
+        m_analysisBandName = band.isValid() ? band.name : QString{};
+    }
+    m_curve->setSuperseded(m_analysisStale, m_analysisBandName);
 
     // Default the target to the middle of the band. Written through the
     // spin box so the operator can see what it decided, and only while
@@ -1206,13 +1275,23 @@ void AntennaWindow::refresh()
             return;
         }
         val->setText(QStringLiteral("%1").arg(s, 0, 'f', 2));
+        // Over the limit stays red at full strength even when the
+        // analysis has been superseded — the same rule the curve keeps,
+        // for the same reason. Everything else steps back.
         val->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; border: none; }")
-                .arg(QLatin1String(s > limit ? Style::kRedBorder
-                                             : Style::kTextPrimary)));
+                .arg(QLatin1String(s > limit    ? Style::kRedBorder
+                                 : m_analysisStale ? Style::kTextInactive
+                                                   : Style::kTextPrimary)));
     };
-    const QString what = custom ? QStringLiteral("RANGE")
-                                : QStringLiteral("BAND");
+    // The caption carries the band once the numbers stop being about the
+    // one on the radio: "160M START" rather than "BAND START", so the
+    // tiles cannot be read as describing whatever the head names.
+    const QString what =
+        custom ? QStringLiteral("RANGE")
+      : (m_analysisStale && !m_analysisBandName.isEmpty())
+               ? m_analysisBandName.toUpper()
+               : QStringLiteral("BAND");
     setTile(m_startVal, m_startCap, band.isValid() ? band.lowHz : 0.0,
             what + QStringLiteral(" START"));
     setTile(m_midVal, m_midCap, band.isValid() ? band.centreHz() : 0.0,
@@ -1255,8 +1334,10 @@ void AntennaWindow::refresh()
                                 && span.highHz >= band.highHz - 1.0;
             m_spanVal->setStyleSheet(QStringLiteral(
                 "QLabel { color: %1; border: none; }")
-                    .arg(QLatin1String(covers ? Style::kGreenText
-                                              : Style::kTextPrimary)));
+                    .arg(QLatin1String(
+                        m_analysisStale ? Style::kTextInactive
+                      : covers          ? Style::kGreenText
+                                        : Style::kTextPrimary)));
         }
     }
 

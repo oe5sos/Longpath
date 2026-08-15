@@ -4762,6 +4762,16 @@ nereus_add_test(tst_swr_curve_band)
 # Antwort, und eine Zahl laesst sich zusichern.
 nereus_add_test(tst_swr_curve_panels)
 
+# ── Der dritte Zustand: gemessen, echt, und nicht mehr dieses Band ──────────
+# Waehrend eines laufenden Sweeps nannte der Kopf des Antennenfensters das neue
+# Band, waehrend Kurve, Kacheln, Spanne und Tabelle darunter weiter das vorige
+# beschrieben -- beide Haelften aktuell, ueber verschiedene Baender. Ursache war
+# nicht ein vergessener Aufruf, sondern ein fehlender Zustand: die Auswertung
+# kannte nur "Sweep" und "kein Sweep". Sichert die vier Regeln (anderes Band
+# daempft, gleiches nicht, Fehllauf bleibt, echte Messung loest) und die
+# Grenze, die kein Design ueberschreibt: SWR-Rot und Grenzlinie daempfen nie.
+nereus_add_test(tst_swr_analysis_superseded)
+
 # -- Theme substitution. 1733 Hex-Literale in 130 Dateien, 1141 davon in
 #    Qt-Stylesheet-Strings, die keine Konstante aufnehmen koennen. Bis
 #    die alle umgebaut sind, laeuft der Palettenwechsel ueber eine

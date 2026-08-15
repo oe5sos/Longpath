@@ -117,6 +117,39 @@ private:
     AntennaTrim::Kind    currentKind() const;
     AmateurBands::Region currentRegion() const;
 
+    // ── The third state: measured, real, and no longer about this band ─
+    //
+    // The window used to know two things — a sweep, or no sweep — and
+    // could therefore not express the one that is true for the whole
+    // length of a run: these numbers were measured, they are correct,
+    // and they describe a band nobody is looking at any more.
+    //
+    // So the analysis carries the stretch of spectrum it is about, and
+    // a flag for whether that is still the stretch under the needle.
+    // Set when a sweep starts on a different band; cleared ONLY by a
+    // real new measurement arriving through setSweep().
+    //
+    // That asymmetry is what makes a failed run permanent without a
+    // rule saying so: a sweep that measures nothing never calls
+    // setSweep(), so the mark it set on starting simply stays. And a
+    // failed run on the SAME band never set one, which is the operator's
+    // decision of 2026-08-15 — a good measurement of 20 m is not made
+    // wrong by a later 20 m attempt that the coupler slept through.
+    void onSweepStartedFor(const QString& bandName, double loHz,
+                           double hiHz);
+
+    /// True when two frequency ranges are the same band's worth of
+    /// spectrum: they overlap by more than half the narrower one.
+    ///
+    /// Public and static because it is the entire decision, and a
+    /// decision that can be checked with two numbers should not need a
+    /// window, a radio and a rendered picture to check.
+public:
+    static bool sameBandSpan(double aLoHz, double aHiHz,
+                             double bLoHz, double bHiHz);
+
+private:
+
     // As it came out of the file, and as it is after the feedline has
     // been taken back out. Both kept: the operator can compare, and
     // reloading is not needed when the cable length changes.
@@ -229,6 +262,13 @@ private:
     // having it silently become 7.100 on the next measurement is the
     // kind of helpfulness that costs an afternoon.
     bool m_targetChosen{false};
+
+    // What the numbers on screen are about, and whether that is still
+    // the band being measured. See onSweepStartedFor().
+    double  m_analysisLoHz{0.0};
+    double  m_analysisHiHz{0.0};
+    QString m_analysisBandName;
+    bool    m_analysisStale{false};
 
     // The radio-sweep tab (2026-08-13). Owned by the tab widget.
     SwrSweepPanel* m_sweepPanel{nullptr};

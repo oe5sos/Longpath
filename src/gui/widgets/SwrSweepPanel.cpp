@@ -296,6 +296,13 @@ void SwrSweepPanel::setBackend(const Backend& backend)
         m_status->setText(QStringLiteral(
             "Sweep läuft — %1, %2 Punkte …")
                 .arg(bandLabel(plan.band)).arg(plan.points));
+
+        // Tell the analysis half that the band under the needle has
+        // changed, so it can step back rather than go on describing the
+        // previous one in full confidence. See the signal's docstring.
+        emit sweepStartedFor(bandLabel(plan.band),
+                             static_cast<double>(plan.startHz),
+                             static_cast<double>(plan.stopHz));
     });
     connect(ctl, &SwrSweepController::pointReady, this,
             [this](int, quint64 freqHz, double swr, double) {

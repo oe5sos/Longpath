@@ -17,10 +17,12 @@
 #include "gui/styles/Theme.h"      // Theme::generation() — Cache verwerfen
 #include "gui/styles/ThemeQss.h"   // Style::role()
 
+#include <QEasingCurve>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPolygonF>
+#include <QVariantAnimation>
 
 #include <algorithm>
 #include <limits>
@@ -97,7 +99,51 @@ QString mhz(double hz, int digits = 3)
     return QStringLiteral("%1").arg(hz / 1e6, 0, 'f', digits);
 }
 
+/// The same colour with its opacity scaled. Alpha rather than mixing
+/// towards the background: the curve crosses shaded bands and the inset
+/// fill, and a mix against one of them is wrong over the others.
+QColor faded(QColor c, double f)
+{
+    if (f >= 0.999) { return c; }
+    c.setAlpha(std::clamp(static_cast<int>(std::lround(c.alpha() * f)),
+                          0, 255));
+    return c;
+}
+
 } // namespace
+
+bool SwrCurveWidget::fadesWhenSuperseded(const char* role)
+{
+    const QLatin1String r(role);
+    // See the note in the header. Two exceptions, both boundaries.
+    return r != QLatin1String("danger")
+           && r != QLatin1String("measured-border");
+}
+
+void SwrCurveWidget::setSuperseded(bool on, const QString& bandName)
+{
+    if (m_superseded == on && m_supersededBand == bandName) { return; }
+    m_superseded     = on;
+    m_supersededBand = bandName;
+
+    // 150 ms ease — docs/design/HAUSSTIL.md §Weiche Übergänge,
+    // "Zustandswechsel: 150 ms ease. Nichts springt."
+    if (!m_dimAnim) {
+        m_dimAnim = new QVariantAnimation(this);
+        m_dimAnim->setDuration(150);
+        m_dimAnim->setEasingCurve(QEasingCurve::InOutQuad);
+        connect(m_dimAnim, &QVariantAnimation::valueChanged, this,
+                [this](const QVariant& v) {
+                    m_dim = v.toDouble();
+                    update();
+                });
+    }
+    m_dimAnim->stop();
+    m_dimAnim->setStartValue(m_dim);
+    m_dimAnim->setEndValue(targetDim());
+    m_dimAnim->start();
+    update();
+}
 
 SwrCurveWidget::SwrCurveWidget(QWidget* parent)
     : QWidget(parent)
@@ -727,6 +773,47 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
     p.fillRect(rect(), QColor(Style::kPanelBg));
 
+    // ── Stepping back without disappearing ───────────────────────────
+    //
+    // When the analysis is superseded every colour below loses opacity —
+    // except the two that fadesWhenSuperseded() protects. Rather than
+    // touch forty call sites and find out about the one that was missed
+    // by looking at a picture, the palette accessors are shadowed here
+    // by lambdas of the same name. Everything further down goes on
+    // calling kCurve(), kBad() and the rest and gets the right ink.
+    //
+    // The pXxx values are read BEFORE the shadowing names exist, which
+    // is what makes this legal rather than recursive.
+    //
+    // Note that kBad and kLimit are shadowed too, and route through the
+    // same ink(). They come back unchanged — but they come back through
+    // the rule, so the rule is the only place the protection lives.
+    const QColor pCurve    = kCurve();
+    const QColor pBandFill = kBandFill();
+    const QColor pEdge     = kEdge();
+    const QColor pCentre   = kCentre();
+    const QColor pResonant = kResonant();
+    const QColor pGrid     = kGrid();
+    const QColor pText     = kText();
+    const QColor pDimmed   = kDim();
+    const QColor pLimit    = kLimit();
+    const QColor pBad      = kBad();
+
+    const double dim = m_dim;
+    auto ink = [dim](const char* role, const QColor& c) {
+        return fadesWhenSuperseded(role) ? faded(c, dim) : c;
+    };
+    auto kCurve    = [&] { return ink("accent",          pCurve);    };
+    auto kBandFill = [&] { return ink("accent",          pBandFill); };
+    auto kEdge     = [&] { return ink("text-secondary",  pEdge);     };
+    auto kCentre   = [&] { return ink("ok",              pCentre);   };
+    auto kResonant = [&] { return ink("measured",        pResonant); };
+    auto kGrid     = [&] { return ink("border-subtle",   pGrid);     };
+    auto kText     = [&] { return ink("text",            pText);     };
+    auto kDim      = [&] { return ink("text-scale",      pDimmed);   };
+    auto kLimit    = [&] { return ink("measured-border", pLimit);    };
+    auto kBad      = [&] { return ink("danger",          pBad);      };
+
     const double w = width();
     const double h = height();
 
@@ -784,9 +871,13 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
             // What the fill still earns its place for is the margin:
             // the panel carries 6 % of air on each side, so the
             // unfilled strip at each end is the band edge, visible.
-            fill.setAlpha(m_viewSegs.isEmpty()
-                              ? (b.name == m_band.name ? 30 : 14)
-                              : 16);
+            // × dim, because setAlpha REPLACES what ink() put there.
+            // The same applies at the three other places below that
+            // pick an explicit alpha.
+            fill.setAlpha(static_cast<int>(std::lround(
+                (m_viewSegs.isEmpty()
+                     ? (b.name == m_band.name ? 30.0 : 14.0)
+                     : 16.0) * dim)));
             p.fillRect(QRectF(bl, m_plotT, br - bl, plot.height()), fill);
 
             // Name it only where the name fits. A 30 m band on a 3-to-30
@@ -826,7 +917,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // ── The sweep before this one, faint and behind ──────────────────
     if (!m_reference.isEmpty()) {
         QColor faint = kCurve();
-        faint.setAlpha(70);
+        faint.setAlpha(static_cast<int>(std::lround(70.0 * dim)));
         p.setClipRect(plot.adjusted(1, 1, -1, -1));
         p.setPen(QPen(faint, 1.6, Qt::DashLine));
         p.setBrush(Qt::NoBrush);
@@ -851,7 +942,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // the picture names them.
     if (m_all.size() > 1) {
         QColor thin = kResonant();
-        thin.setAlpha(120);
+        thin.setAlpha(static_cast<int>(std::lround(120.0 * dim)));
         p.setPen(QPen(thin, 1.0, Qt::DotLine));
         for (const auto& c : m_all) {
             if (m_resonance.found
@@ -1125,7 +1216,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     // for.
     if (!m_reference.isEmpty()) {
         QColor faint = kCurve();
-        faint.setAlpha(150);
+        faint.setAlpha(static_cast<int>(std::lround(150.0 * dim)));
         p.setPen(faint);
         const QString ref = m_referenceLabel.isEmpty()
             ? QStringLiteral("- - -  previous sweep")
@@ -1186,6 +1277,48 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         p.setBrush(Qt::NoBrush);
         p.setPen(have && swr > m_limit ? kBad() : kText());
         p.drawText(QPointF(bx + 5.0, by + sfm.ascent() + 2.0), txt);
+    }
+
+    // ── Which band these numbers are about ───────────────────────────
+    //
+    // Drawn last and at full strength: it is the one thing on the
+    // picture that explains why everything else is faint, so fading it
+    // with them would be circular.
+    //
+    // Inside the frame rather than above it. The row above carries the
+    // title on the left and the reference-curve label on the right, and
+    // the right is exactly where this belongs — docs/design/HAUSSTIL.md
+    // rule 5, "Zustand steht als umrandete Kapsel rechts oben, immer an
+    // derselben Stelle". Top-right INSIDE the plot keeps that position
+    // without the two colliding.
+    if (m_superseded) {
+        QFont caps = small;
+        caps.setLetterSpacing(QFont::AbsoluteSpacing, 1.4);
+        p.setFont(caps);
+        const QFontMetrics cfm(caps);
+
+        const QString txt = m_supersededBand.isEmpty()
+            ? QStringLiteral("ÜBERHOLT")
+            : QStringLiteral("%1 · ÜBERHOLT").arg(m_supersededBand);
+        const double tw = cfm.horizontalAdvance(txt);
+        const double th = cfm.height();
+        const QRectF cap(m_plotR - tw - 24.0, m_plotT + 8.0,
+                         tw + 16.0, th + 7.0);
+
+        QColor bg(Style::kPanelBg);
+        bg.setAlpha(238);      // legible over whatever curve runs under it
+        p.setBrush(bg);
+        p.setPen(QPen(QColor(Style::role("text-scale", Style::kTextScale)),
+                      1.0));
+        // Radius 6. Never 3 — that is the Qt default and makes
+        // everything look like Qt.
+        p.drawRoundedRect(cap, 6.0, 6.0);
+        p.setBrush(Qt::NoBrush);
+
+        p.setPen(QColor(Style::role("text-secondary",
+                                    Style::kTextSecondary)));
+        p.drawText(QPointF(cap.left() + 8.0,
+                           cap.top() + cfm.ascent() + 3.5), txt);
     }
 }
 

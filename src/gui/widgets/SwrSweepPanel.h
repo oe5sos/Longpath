@@ -153,6 +153,32 @@ signals:
     /// a fabricated curve gets treated as data.
     void analysisReady(const NereusSDR::Sweep& sweep);
 
+    /// A sweep is about to key, for this band and this stretch of
+    /// spectrum. Emitted before the first point arrives.
+    ///
+    /// ── Why the analysis half needs to hear about a START ────────────
+    ///
+    /// The head of the window follows the radio: the band combo tracks
+    /// it on a one-second poll, and the status line names the band the
+    /// moment Start is pressed. The analysis below it changes only on
+    /// `analysisReady`, which arrives when the sweep FINISHES.
+    ///
+    /// So for the length of a run — seventeen seconds at 51 points, half
+    /// a minute at 99 — the head said "80 m" while the curve, the tiles,
+    /// the usable span and the band table all still described 20 m, with
+    /// nothing on screen saying so. Both halves looked current because
+    /// both were: they were current about different bands.
+    ///
+    /// This is the missing edge. The window does not clear anything when
+    /// it arrives — the old measurement is real and worth keeping on
+    /// screen — it marks it as no longer being about the band in hand.
+    ///
+    /// Carried as a frequency range rather than a `Band`: this side
+    /// counts in `Band`, the curve counts in `AmateurBands::Band`, and a
+    /// sweep loaded from a .s1p file has neither. Hertz is the only
+    /// language all three speak.
+    void sweepStartedFor(const QString& bandName, double loHz, double hiHz);
+
 protected:
     // ── The label was lying ──────────────────────────────────────────
     //

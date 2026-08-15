@@ -65,6 +65,7 @@
 #include <QWidget>
 
 class QPainter;
+class QVariantAnimation;
 
 namespace NereusSDR {
 
@@ -86,6 +87,45 @@ public:
     void setReference(const Sweep& s, const QString& label = {});
     void clearReference();
     const Sweep& sweep() const { return m_sweep; }
+
+    // ── Numbers belong to a band, and a band can be left ─────────────
+    //
+    // The measurement stays on screen and stays real. What changes is
+    // that it is no longer about the band being measured, and saying so
+    // is the whole job: the curve steps back in opacity and carries its
+    // own band name in a capsule, so a glance at the head of the window
+    // and a glance here cannot be read as one statement any more.
+    //
+    // Not cleared, deliberately. An operator sweeping 80 m still wants
+    // last hour's 20 m curve to compare against, and blanking it would
+    // throw away a measurement to fix a labelling problem.
+    void setSuperseded(bool on, const QString& bandName = {});
+    bool isSuperseded() const { return m_superseded; }
+    QString supersededBand() const { return m_supersededBand; }
+
+    /// Where the fade is heading. Tests read this instead of waiting out
+    /// the 150 ms the animation takes.
+    double targetDim() const { return m_superseded ? kSupersededDim : 1.0; }
+
+    /// How much opacity ink keeps once the analysis is superseded.
+    static constexpr double kSupersededDim = 0.45;
+
+    // ── The two colours that never step back ─────────────────────────
+    //
+    // Asked by theme role, and the single authority for it: paintEvent
+    // routes EVERY colour through this, so there is no second place
+    // where a colour could quietly be added to the fading set.
+    //
+    // `danger` is an SWR you should not transmit into. `measured-border`
+    // is the limit rule it is judged against. Dimming a warning because
+    // everything around it is dimmed abolishes it exactly as thoroughly
+    // as dimming it because it is loud — which is the thing
+    // docs/design/HAUSSTIL.md §Die Grenze, die kein Design überschreibt
+    // forbids, and which BandPlanGuard exists to back up.
+    //
+    // Static and role-keyed so a test can state the rule without
+    // rendering anything and counting pixels.
+    static bool fadesWhenSuperseded(const char* role);
 
     // Which band plan to draw. Region 1 by default — the operator this
     // was written for is in it, and a wrong default here paints
@@ -298,6 +338,18 @@ private:
     // Cursor position in widget coordinates while it is over the plot,
     // or a negative x when it is not.
     QPointF m_cursor{-1.0, -1.0};
+
+    // ── Superseded ───────────────────────────────────────────────────
+    //
+    // m_dim is the live opacity multiplier, animated between 1.0 and
+    // kSupersededDim. Animated rather than switched because the house
+    // style has one rule about state changes and it is "nothing jumps":
+    // a curve that halves in brightness between two frames reads as a
+    // redraw, not as a step back.
+    bool    m_superseded{false};
+    QString m_supersededBand;
+    double  m_dim{1.0};
+    QVariantAnimation* m_dimAnim{nullptr};
 };
 
 } // namespace NereusSDR
