@@ -359,6 +359,14 @@ public:
     void setSampleRate(double hz);
     double sampleRate() const { return m_sampleRateHz; }
 
+    /// Hoehe des Kurvenbereichs allein — ohne Wasserfall, Bandbalken
+    /// und Frequenzskala. Die Knopfspalte am linken Rand richtet ihre
+    /// Hoehe danach: parentWidget()->height() waere die ganze Flaeche,
+    /// und genau darueber soll sie NICHT liegen.
+    int spectrumAreaHeight() const {
+        return static_cast<int>(static_cast<float>(height()) * m_spectrumFrac);
+    }
+
     // ---- Display range ----
 
     /// Kleinste Spanne, die setDbmRange stehen lässt.

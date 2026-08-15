@@ -177,6 +177,11 @@ private:
     // Stellen fest verdrahtet sind, um die Flyouts zu platzieren —
     // Beschriftungen dazwischenzumischen würde sie lautlos verschieben.
     QVector<QLabel*> m_groupHeads;
+
+    // Das "..." aus HAUSSTIL Regel 2. Entsteht erst, wenn die Spalte
+    // nicht mehr in die Hoehe des Spektrums passt, und traegt die
+    // Gruppen, die dann wegfallen.
+    QPushButton* m_moreBtn{nullptr};
     bool                 m_expanded{true};
 
     // ── Active flyout tracking (one visible at a time) ───────────────────

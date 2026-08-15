@@ -50,7 +50,10 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QSlider>
+#include "gui/SpectrumWidget.h"
 #include <QLabel>
+#include <QMenu>
+#include <QAction>
 #include <QGridLayout>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -156,6 +159,14 @@ namespace OverlayColors {
     // letter-spacing, das wird still verworfen. Sie wird in
     // makeGroupHead() über QFont::setLetterSpacing gesetzt — 0,18 em bei
     // 9 px sind 1,62 px absolut.
+    // Die Flaeche der Spalte selbst. Panel-Ton aus HAUSSTIL, leicht
+    // durchscheinend, damit die Kurve dahinter noch zu ahnen ist —
+    // aber deckend genug, dass sie eine Flaeche IST und nicht ein
+    // Schleier. Radius 6, nie 3.
+    constexpr auto kColumnStyle =
+        "QWidget#spectrumOverlayPanel { background: rgba(12, 12, 14, 232); "
+        "border: 1px solid #1f1f23; border-radius: 6px; }";
+
     constexpr auto kGroupHeadStyle =
         "QLabel { color: #5c5c60; font-size: 9px; font-weight: bold; "
         "background: transparent; }";
@@ -280,7 +291,25 @@ SpectrumOverlayPanel::SpectrumOverlayPanel(QWidget* parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_TransparentForMouseEvents, false);
-    setAttribute(Qt::WA_NoSystemBackground, true);
+
+    // ── Die Spalte braucht eine eigene Flaeche ───────────────────────
+    //
+    // Hier stand WA_NoSystemBackground: das Panel malte nichts, und der
+    // geschlossene Streifen, den man sah, waren in Wahrheit acht zu 94 %
+    // deckende Knoepfe nebeneinander. kPanelStyle lag nur auf den
+    // Flyouts, nie auf der Spalte selbst.
+    //
+    // Solange die Knoepfe deckten, fiel das nicht auf. Als sie nach
+    // HAUSSTIL Regel 2 ("inaktiv fast unsichtbar") duenn wurden, ging
+    // die Flaeche mit ihnen weg und die Knoepfe schwebten ueber der
+    // Kurve. Die Regel setzt ein Panel voraus; das hier hatte keins.
+    //
+    // Objektname + QWidget#-Selektor, damit die Flaeche nicht auf jedes
+    // Kind durchschlaegt — ein blankes background: im Stylesheet eines
+    // Elternwidgets faerbt sonst auch die Knoepfe.
+    setObjectName(QStringLiteral("spectrumOverlayPanel"));
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet(OverlayColors::kColumnStyle);
     setAutoFillBackground(false);
 
     // Button 1: Collapse toggle
@@ -454,9 +483,65 @@ void SpectrumOverlayPanel::updateLayout()
         }
     }
 
+    // ── Wie viele Gruppen passen ueberhaupt hinein ───────────────────
+    //
+    // Die Spalte wuchs mit den Pillen und den Versalzeilen von 194 auf
+    // 383 px. Auf dem Geraet lief sie damit unten aus dem Spektrum
+    // heraus: VAX lag ueber dem Bandbalken, ATT ueber der Frequenzskala.
+    //
+    // Hier bekommt das "..." aus HAUSSTIL Regel 2 seine Aufgabe, und
+    // zwar eine echte: nicht "drei statt dreizehn" als Geschmacksfrage,
+    // sondern weil der Platz endet. Was nicht mehr hineinpasst, wandert
+    // hinter das Auslassungszeichen statt ueber die Skala.
+    //
+    // Gefahrlos, weil die Flyouts am PANEL haengen (x() + width()) und
+    // nicht an ihrem Knopf — ein ausgeblendeter Knopf laesst sein
+    // Flyout weiter an derselben Stelle aufgehen.
+    // Nur der Kurvenbereich, nicht die ganze Flaeche des Widgets: unter
+    // dem Spektrum liegen Wasserfall, Bandbalken und Frequenzskala, und
+    // ueber denen hat die Spalte nichts zu suchen — das war der Befund.
+    const auto* sw = qobject_cast<const SpectrumWidget*>(parentWidget());
+    const int avail = sw ? sw->spectrumAreaHeight() - y() - kPad * 2
+                         : (parentWidget()
+                                ? parentWidget()->height() - y() - kPad * 2
+                                : 100000);
+
+    int visibleBtnCount = m_menuBtns.size();
+    {
+        int probe = kPad + kBtnH + kGroupGap;
+        int g = 0;
+        for (int i = 0; i < m_menuBtns.size(); ++i) {
+            if (g < static_cast<int>(std::size(kGroupHeads))
+                && kGroupHeads[g].beforeIndex == i) {
+                if (i > 0) { probe += kGroupGap - kGap; }
+                probe += kHeadH;
+                ++g;
+            }
+            probe += kBtnH + kGap;
+            // probe steht jetzt unter dem gerade gesetzten Knopf. Passt
+            // darunter noch das "..." selbst? Wenn nicht, ist hier
+            // Schluss. Bewusst mitgerechnet: ein Auslassungszeichen, das
+            // seinerseits nicht mehr hineinpasst, waere die Anzeige, die
+            // ihre eigene Unvollstaendigkeit verschweigt.
+            if (probe + kBtnH + kPad > avail) {
+                // Auf Gruppengrenze zurueckgehen: eine halbe Gruppe
+                // anzuzeigen waere schlimmer als eine ganze zu
+                // verstecken — die Versalzeile stuende dann ueber
+                // nichts.
+                visibleBtnCount = (g > 0) ? kGroupHeads[g - 1].beforeIndex : 0;
+                break;
+            }
+        }
+    }
+    const bool overflow = visibleBtnCount < m_menuBtns.size();
+
     int y = kPad + kBtnH + kGroupGap;
     int headIdx = 0;
     for (int i = 0; i < m_menuBtns.size(); ++i) {
+        if (i >= visibleBtnCount) {
+            m_menuBtns[i]->setVisible(false);
+            continue;
+        }
         // Steht vor diesem Knopf eine Versalzeile?
         const bool startsGroup =
             headIdx < static_cast<int>(std::size(kGroupHeads))
@@ -484,6 +569,52 @@ void SpectrumOverlayPanel::updateLayout()
             btn->move(kPad, y);
             y += kBtnH + kGap;
         }
+    }
+
+    // ── Das Auslassungszeichen ───────────────────────────────────────
+    //
+    // Entsteht erst, wenn es gebraucht wird, und traegt die Gruppen, die
+    // nicht mehr hineinpassten — beschriftet mit ihrem Gruppennamen,
+    // damit man sieht, WAS dahinter liegt und nicht nur DASS etwas
+    // dahinter liegt.
+    if (overflow && m_expanded) {
+        if (!m_moreBtn) {
+            m_moreBtn = new QPushButton(QStringLiteral("…"), this);
+            m_moreBtn->setFixedSize(kBtnW, kBtnH);
+            m_moreBtn->setStyleSheet(OverlayColors::kMenuBtnNormal);
+            m_moreBtn->setToolTip(
+                QStringLiteral("Weitere Gruppen — hier ist der Platz zu Ende"));
+            connect(m_moreBtn, &QPushButton::clicked, this, [this]() {
+                QMenu menu(this);
+                int g = 0;
+                for (int i = 0; i < m_menuBtns.size(); ++i) {
+                    while (g < static_cast<int>(std::size(kGroupHeads))
+                           && kGroupHeads[g].beforeIndex == i) {
+                        if (!m_menuBtns[i]->isVisible()) {
+                            menu.addSection(
+                                QString::fromLatin1(kGroupHeads[g].title));
+                        }
+                        ++g;
+                    }
+                    if (m_menuBtns[i]->isVisible()) { continue; }
+                    QPushButton* btn = m_menuBtns[i];
+                    QAction* a = menu.addAction(btn->text());
+                    a->setEnabled(btn->isEnabled());
+                    // click() statt des Signals direkt: der Knopf traegt
+                    // seine Verdrahtung schon, und ein zweiter Weg
+                    // dorthin waere ein zweiter Ort zum Vergessen.
+                    connect(a, &QAction::triggered, btn, [btn]() {
+                        btn->click();
+                    });
+                }
+                menu.exec(mapToGlobal(m_moreBtn->geometry().bottomLeft()));
+            });
+        }
+        m_moreBtn->setVisible(true);
+        m_moreBtn->move(kPad, y);
+        y += kBtnH + kGap;
+    } else if (m_moreBtn) {
+        m_moreBtn->setVisible(false);
     }
 
     const int totalH = m_expanded ? (y - kGap + kPad)
