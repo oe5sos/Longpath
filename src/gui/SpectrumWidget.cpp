@@ -5064,6 +5064,46 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
         m_wfActiveLowThreshold  = nf + offsetF;
         m_wfActiveHighThreshold = m_wfActiveLowThreshold + 60.0f;
     }
+
+    // ── Letzte Sicherung: das Fenster muss die Daten schneiden ───────
+    //
+    // Der Klemmschutz in waterfallIntensity haelt die SPANNE offen, nicht
+    // die LAGE. Ein Fenster von 30 dB, das vollstaendig unter dem
+    // Rauschflur liegt, ist formal gesund und trotzdem eine einfarbige
+    // Flaeche: jeder Punkt sitzt auf der Palettenspitze. Im Schema
+    // Enhanced ist das ein durchgehend rotes Band, im ClarityBlue ein
+    // magentafarbenes — zweimal derselbe Befund, zweimal von aussen als
+    // Fehler des Wasserfalls gelesen.
+    //
+    // Dies ist bewusst kein Ersatz fuer die Ursache, sondern ein Netz
+    // darunter: ein Fenster, das die gemessenen Werte gar nicht
+    // beruehrt, ist immer ein Fehler weiter oben. Es soll ein
+    // kontrastarmes Bild geben und keine Flaeche — dieselbe Haltung wie
+    // bei der Spannen-Klemme.
+    //
+    // Absichtlich nur der voellig verfehlte Fall. Ein Fenster, das die
+    // Daten teilweise abschneidet, ist genau das, wofuer die Schieber da
+    // sind, und wird nicht angetastet.
+    {
+        float dataMin = wfPixelsDbm[0];
+        float dataMax = dataMin;
+        for (int i = 1; i < n; ++i) {
+            const float v = wfPixelsDbm[i];
+            if (!std::isfinite(v)) { continue; }
+            if (v < dataMin) { dataMin = v; }
+            if (v > dataMax) { dataMax = v; }
+        }
+        if (std::isfinite(dataMin) && std::isfinite(dataMax)
+            && (m_wfActiveHighThreshold <= dataMin
+                || m_wfActiveLowThreshold >= dataMax)) {
+            const float span = std::max(
+                kWfAgcPaletteSpanDb,
+                m_wfActiveHighThreshold - m_wfActiveLowThreshold);
+            const float mid = 0.5f * (dataMin + dataMax);
+            m_wfActiveLowThreshold  = mid - 0.5f * span;
+            m_wfActiveHighThreshold = mid + 0.5f * span;
+        }
+    }
 }
 
 // ---- Waterfall row push ----
