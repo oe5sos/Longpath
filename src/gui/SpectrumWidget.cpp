@@ -139,6 +139,12 @@
 #include <QLabel>
 #include <QPropertyAnimation>
 #include <QScreen>
+// new QThread(this) und &QThread::finished brauchen den vollständigen
+// Typ; der Header führt bei m_waterfallTickerThread nur einen Zeiger.
+// Übersetzt hat es bisher allein der vorkompilierte Header — mit
+// -DNEREUS_USE_PCH=OFF, laut CMakeLists.txt:1590 die Einstellung für
+// genau eine Header-Hygiene-Prüfung, fiel diese Datei um.
+#include <QThread>
 #include <QToolTip>
 #include <QUrl>
 
@@ -170,6 +176,35 @@
 #include <utility>
 
 namespace NereusSDR {
+
+// ── Flächen, Gitter und Rahmen kommen aus dem Theme ──────────────────
+//
+// 2026-08-15, OE5SOS: „der Spektrumbereich im Hauptfenster ist noch
+// blaustichig, während der Wasserfall darunter neutral ist — die Naht
+// ist quer durchs Fenster sichtbar."
+//
+// Sie war es, und zwar an genau neun Stellen. Das GITTER lief längst
+// über Rollen ("grid", "grid-text"); die Werte im Klassenkopf sind tote
+// Vorgaben, die loadSettings() überschreibt. Blau waren nur die
+// FLÄCHEN, und die standen als QColor(0x0f, 0x0f, 0x1a) hart im
+// Malcode — dieselben vier Werte, die docs/design/HAUSSTIL.md unter
+// „Token" als die alte, durchgehend blaustichige Palette aufführt.
+//
+// Der Umweg über eine Rolle statt über eine Konstante ist der Punkt:
+// eine Konstante steht beim Übersetzen fest, eine Rolle liest die
+// Theme-Datei. Siehe die Notiz über pal() in SwrCurveWidget.cpp — es
+// ist derselbe Fehler und dieselbe Abhilfe.
+//
+// Nicht hierdurch geführt: die Kurve, die Rufzeichen, die Marken — und
+// die Bandkante, die {255, 0, 0} bleibt. Eine Sicherheitsmarke gehört
+// nicht in eine Palette, die jemand umstellen kann.
+QColor roleColor(const char* roleName, const char* fallback,
+                 int alpha = 255)
+{
+    QColor c(Style::role(roleName, fallback));
+    if (alpha != 255) { c.setAlpha(alpha); }
+    return c;
+}
 
 // Visual-equality helper for the spot-marker repaint guard.  Drops a
 // redundant overlay repaint whenever a spot-client poll lands on an
@@ -495,7 +530,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // CPU fallback: dark background
     setAutoFillBackground(true);
     QPalette pal = palette();
-    pal.setColor(QPalette::Window, QColor(0x0f, 0x0f, 0x1a));
+    pal.setColor(QPalette::Window, roleColor("app-bg", Style::kAppBg));
     setPalette(pal);
 #endif
 
@@ -620,6 +655,13 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // texture to rebuild so the perf overlay (drawn into m_overlayStatic)
     // refreshes with the current stats.  Started only when the perf
     // overlay is toggled on (setShowPerfOverlay).
+    //
+    // Unter dem Wächter, weil m_perfPollTimer im
+    // NEREUS_GPU_SPECTRUM-Block des Headers steht und die Überlagerung
+    // selbst (paintEvent, im GPU-Zweig) ohne ihn gar nicht gemalt wird.
+    // Ohne GPU-Pfad entsteht der Timer also nicht, statt einmal je
+    // Sekunde für eine Anzeige zu messen, die es nicht gibt.
+#ifdef NEREUS_GPU_SPECTRUM
     m_perfPollTimer = new QTimer(this);
     m_perfPollTimer->setInterval(1000);
     connect(m_perfPollTimer, &QTimer::timeout, this, [this]() {
@@ -668,6 +710,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
             setShowPerfOverlay(true);
         }
     }
+#endif  // NEREUS_GPU_SPECTRUM — Perf-Überlagerung
 
     // Phase 3Q-8: child label for the disconnect overlay. Composites in both
     // CPU and GPU paint paths (QRhi early-returns from paintEvent so a QPainter
@@ -2581,6 +2624,15 @@ void SpectrumWidget::setShowFps(bool on)
 
 void SpectrumWidget::setShowPerfOverlay(bool on)
 {
+#ifndef NEREUS_GPU_SPECTRUM
+    // Ohne GPU-Pfad gibt es nichts einzuschalten: die Überlagerung wird
+    // im GPU-Zweig von paintEvent gemalt, und der ist nicht übersetzt.
+    // Ein stiller Nichtstuer statt eines Wächters an der Aufrufstelle
+    // in MainWindow.cpp:6181 — die Menüfrage „ist das an?" beantwortet
+    // showPerfOverlay() dann mit false, und beides stimmt überein.
+    Q_UNUSED(on);
+    return;
+#else
     if (m_showPerfOverlay == on) { return; }
     m_showPerfOverlay = on;
     // Reset the perf counters when toggled on so stats reflect the
@@ -2599,6 +2651,7 @@ void SpectrumWidget::setShowPerfOverlay(bool on)
         QStringLiteral("ShowPerfOverlay"),
         on ? QStringLiteral("True") : QStringLiteral("False"));
     markOverlayDirty();
+#endif  // NEREUS_GPU_SPECTRUM
 }
 
 void SpectrumWidget::setCursorFreqVisible(bool on)
@@ -3323,7 +3376,7 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
                          m_waterfall.sizeInBytes());
         }
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
-        m_waterfall.fill(QColor(0x0f, 0x0f, 0x1a));
+        m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
         // Pin the new waterfall buffer.  Touched every push (write
         // one row's worth of pixels) and every paint (full incremental
         // texture upload to GPU); compression stalls here cause the
@@ -4136,7 +4189,7 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     const QRect strip = NereusSDR::DbmStrip::stripRect(specRect, kDbmStripW);
 
     // Semi-opaque background
-    p.fillRect(strip, QColor(0x0a, 0x0a, 0x18, 220));
+    p.fillRect(strip, roleColor("panel", Style::kPanelBg, 220));
 
     // Left border line
     p.setPen(QColor(0x30, 0x40, 0x50));
@@ -4251,7 +4304,7 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
         else if (lic.contains(QLatin1Char('T')))      { blend = 0.60f; }
         else if (lic.isEmpty())                       { blend = 0.50f; }
 
-        const QColor bg(0x0a, 0x0a, 0x14);
+        const QColor bg = roleColor("app-bg", Style::kAppBg);
         const QColor fill(
             static_cast<int>(seg.color.red()   * blend + bg.red()   * (1.0f - blend)),
             static_cast<int>(seg.color.green() * blend + bg.green() * (1.0f - blend)),
@@ -4260,7 +4313,7 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
         p.fillRect(x1, bandY, x2 - x1, bandH, fill);
 
         // Separator line at left edge of each segment.
-        p.setPen(QColor(0x0f, 0x0f, 0x1a, 200));
+        p.setPen(roleColor("border-subtle", Style::kBorderSubtle, 200));
         p.drawLine(x1, bandY, x1, bandY + bandH);
 
         // Label: mode + lowest license class allowed (only if there's room).
@@ -4313,7 +4366,7 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
     const int stripX = strip.x();
 
     // Semi-opaque background so spectrum content underneath dims.
-    p.fillRect(strip, QColor(0x0a, 0x0a, 0x18, 220));
+    p.fillRect(strip, roleColor("panel", Style::kPanelBg, 220));
 
     // Left border line — separates the strip from waterfall content.
     p.setPen(QColor(0x30, 0x40, 0x50));
@@ -4584,7 +4637,10 @@ void SpectrumWidget::rebuildWaterfallViewport()
 
     m_wfHistoryOffsetRows = std::clamp(
         m_wfHistoryOffsetRows, 0, maxWaterfallHistoryOffsetRows());
-    m_waterfall.fill(Qt::black);
+    // Derselbe Ton wie die Erstfüllung. Reines Schwarz war nicht
+    // blaustichig und fiel darum bei der Naht nicht auf — aber ein
+    // leerer Wasserfall hätte je nach Weg zwei Gründe gehabt.
+    m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
     m_wfWriteRow = 0;
 
     if (!m_waterfallHistory.isConfigured()) {
@@ -4695,7 +4751,7 @@ void SpectrumWidget::clearWaterfallHistory()
     // disconnect path (MainWindow → connectionStateChanged) had no
     // preceding reset.
     if (!m_waterfall.isNull()) {
-        m_waterfall.fill(Qt::black);
+        m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
     }
     m_wfWriteRow = 0;
     std::fill(m_wfHistoryTimestamps.begin(), m_wfHistoryTimestamps.end(), 0);
@@ -6187,21 +6243,36 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
 void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoint& globalPos)
 {
     auto* menu = new QMenu(this);
-    menu->setStyleSheet(
+    // ── Ein Menü ist Bedienung, kein Messwert ────────────────────────
+    //
+    // OE5SOS, 2026-08-15: alle fünf Werte, auch die zwei Textfarben.
+    // Der Aufklapper trug die alte Palette vollständig: #0f0f1a Fläche,
+    // #205070 Rahmen — der Wert, den StyleConstants.h als „der umrandete
+    // jeden Knopf im Programm" führt —, #204060 Auswahlfüllung und
+    // #00b4d8 Auswahltext. Das Türkis ist abgeschafft; es machte zwei
+    // Jobs gleichzeitig, „ausgewählt" und „gemessen", und genau diese
+    // Trennung ist der Kern des Hausstils: Blau ist anfassbar, Warm ist
+    // gemessen. Ein Menüeintrag ist anfassbar.
+    menu->setStyleSheet(QStringLiteral(
         "QMenu {"
-        "  background: #0f0f1a;"
-        "  border: 1px solid #205070;"
+        "  background: %1;"
+        "  border: 1px solid %2;"
         "  padding: 4px;"
         "}"
         "QMenu::item {"
-        "  color: #c8d8e8;"
+        "  color: %3;"
         "  padding: 4px 12px;"
         "  font-size: 12px;"
         "}"
         "QMenu::item:selected {"
-        "  background: #204060;"
-        "  color: #00b4d8;"
-        "}");
+        "  background: %4;"
+        "  color: %5;"
+        "}")
+        .arg(Style::role("app-bg",   Style::kAppBg),
+             Style::role("border",   Style::kBorder),
+             Style::role("text",     Style::kTextPrimary),
+             Style::role("sel-bg",   Style::kBlueBg),
+             Style::role("sel-text", Style::kBlueText)));
 
     for (const auto& spot : cluster.spots) {
         QString text = QString("%1  %2 kHz")
@@ -8318,7 +8389,8 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
     // fixing two of them made the third look like a regression.
     {
         QImage seed(m_wfGpuTexW, m_wfGpuTexH, QImage::Format_RGBA8888);
-        seed.fill(QColor(0x0f, 0x0f, 0x1a));    // same as m_waterfall's fill
+        // same as m_waterfall's fill — the two must not drift apart
+        seed.fill(roleColor("app-bg", Style::kAppBg));
         if (!m_waterfall.isNull()) {
             QPainter sp(&seed);
             sp.drawImage(0, 0, m_waterfall);
@@ -8540,7 +8612,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             } else {
                 rgba = QImage(m_wfGpuTexW, m_wfGpuTexH,
                               QImage::Format_RGBA8888);
-                rgba.fill(QColor(0x0f, 0x0f, 0x1a));
+                rgba.fill(roleColor("app-bg", Style::kAppBg));
                 QPainter sp(&rgba);
                 sp.drawImage(0, 0, m_waterfall);
             }
@@ -9171,7 +9243,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     cb->resourceUpdate(batch);
 
     // ---- Begin render pass ----
-    const QColor clearColor(0x0a, 0x0a, 0x14);
+    // Die größte Fläche im Fenster. Solange sie blaustichig blieb,
+    // nützte jede andere Korrektur nichts.
+    const QColor clearColor = roleColor("app-bg", Style::kAppBg);
     cb->beginPass(renderTarget(), clearColor, {1.0f, 0});
 
     const QSize outputSize = renderTarget()->pixelSize();

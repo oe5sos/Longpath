@@ -31,11 +31,19 @@ wie gut die einzelnen Farben gewählt sind.
 Grautöne sind **neutral**, nie blaustichig. Die bisherige Palette
 (`#0f0f1a`, `#0a0a18`, `#203040`, `#1a2a3a`) hatte durchgehend Blaustich.
 
+> **App-Grund, korrigiert 2026-08-15.** Hier stand `#050506`. Der Code
+> und [`oe5sos.example.json`](oe5sos.example.json) tragen für dieselbe
+> Rolle `#08080a`, und zwei Zahlen für eine Rolle sind schlimmer als
+> die falschere von beiden — dann streiten Vorlage und Programm, und
+> wer nachschlägt, bekommt je nach Quelle eine andere Antwort. Die
+> Theme-Datei gewinnt: sie ist die Stelle, an der die Palette
+> tatsächlich gewechselt wird.
+
 ### Flächen
 
 | Rolle | Wert |
 |---|---|
-| App-Grund | `#050506` |
+| App-Grund | `#08080a` |
 | Panel | `#0c0c0e` |
 | Panelkopf | `linear-gradient(#16161a, #111113)` |
 | Versenkt (Glas) | `#000000` + `inset 0 2px 8px #000`, `inset 0 1px 0 #ffffff0a` |

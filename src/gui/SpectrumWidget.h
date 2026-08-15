@@ -653,8 +653,25 @@ public:
     // perf overlay (paint/gap/fft/overlay timings + audio underruns
     // + UDP drops + memory pressure).  Persisted via AppSettings
     // "ShowPerfOverlay"; View -> Performance Overlay wires here.
+    //
+    // Die Funktion bleibt in beiden Bauarten stehen, nur ihr Rumpf
+    // hängt am Wächter — dasselbe Muster wie markOverlayDirty() weiter
+    // unten. m_showPerfOverlay lebt im NEREUS_GPU_SPECTRUM-Block; stand
+    // die Zugriffsfunktion davor ausserhalb, übersetzte der CPU-Bau
+    // nicht. Das ist keine ausgedachte Lage: CMakeLists.txt:420 macht
+    // den GPU-Pfad zur Option, Zeile 417 nennt -DNEREUS_GPU_SPECTRUM=OFF
+    // als den Weg dorthin, und ab Zeile 434 schaltet CMake ihn von
+    // selbst ab, wenn Qt älter als 6.7 ist oder ShaderTools bzw.
+    // GuiPrivate fehlen.
     void setShowPerfOverlay(bool on);
-    bool showPerfOverlay() const { return m_showPerfOverlay; }
+    bool showPerfOverlay() const
+    {
+#ifdef NEREUS_GPU_SPECTRUM
+        return m_showPerfOverlay;
+#else
+        return false;   // ohne GPU-Pfad wird die Überlagerung nie gemalt
+#endif
+    }
 
     // B8 Task 21: cursor frequency readout visibility.
     // Default true (matches the previously always-on behavior).

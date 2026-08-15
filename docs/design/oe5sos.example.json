@@ -32,6 +32,7 @@
     "sel-bg": "#254a72",
     "sel-border": "#2f5c86",
     "sel-hover": "#2d5885",
+    "sel-text": "#cfe2f5",
     "measured-bg": "#33280f",
     "measured": "#c2924f",
     "measured-border": "#6b5426",
