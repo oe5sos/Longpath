@@ -134,8 +134,8 @@ void SpectrumStatusOverlay::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
 
     // Background panel: rgba(20, 30, 45, 240) with subtle border.
-    p.setBrush(QColor(20, 30, 45, 240));
-    p.setPen(QColor(Style::kBorderSubtle));
+    p.setBrush(QColor(0x0c, 0x0c, 0x0e, 240));
+    p.setPen(QColor(Style::kBorder));
     p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 3, 3);
 
     int x = kLeftMargin;
@@ -176,9 +176,12 @@ void SpectrumStatusOverlay::paintEvent(QPaintEvent*)
     };
 
     if (m_txBound) {
+        // TX bleibt rot -- HAUSSTIL fuehrt "Sendet / Gefahr" und
+        // erlaubt MOX/TX ausdruecklich kraeftiger als den Rest. Aber die
+        // Toene der Palette statt eines Qt-Rots auf reinem Weiss.
         drawPill(QStringLiteral("TX"),
-                 QColor(0xcc, 0x22, 0x22), QColor(Qt::white),
-                 QColor(0xff, 0x44, 0x44));
+                 QColor(0x7a, 0x2c, 0x2e), QColor(0xf0, 0xdc, 0xdc),
+                 QColor(0xc2, 0x5a, 0x5c));
     }
     if (m_wideBpf) {
         drawPill(QStringLiteral("WIDE"),

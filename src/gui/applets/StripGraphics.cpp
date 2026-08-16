@@ -443,26 +443,26 @@ QString StripDynamicsCurve::explain() const
         const double gr  = double(g.gainReductionDb());
         if (quiet) {
             return QStringLiteral(
-                "<b style='color:#607080'>Silent</b><br>Nothing is arriving "
+                "<b style='color:#5c5c60'>Silent</b><br>Nothing is arriving "
                 "at the gate. Talk, or check the microphone.");
         }
         if (in >= thr) {
             return QStringLiteral(
-                "<b style='color:#00ff88'>▲ Open</b><br>You are "
+                "<b style='color:#6fa384'>▲ Open</b><br>You are "
                 "<b>%1 dB above</b> the threshold. The gate is passing your "
                 "voice and taking nothing off.")
                 .arg(in - thr, 0, 'f', 1);
         }
         if (in >= thr - ret) {
             return QStringLiteral(
-                "<b style='color:#ffb800'>◆ In the sticky zone</b><br>"
+                "<b style='color:#c2924f'>◆ In the sticky zone</b><br>"
                 "%1 dB below the threshold but still inside the deadband, "
                 "so the gate holds whatever it was doing. This is the part "
                 "that stops it chattering on a breath.")
                 .arg(thr - in, 0, 'f', 1);
         }
         return QStringLiteral(
-            "<b style='color:#e05050'>▼ Closing</b><br>%1 dB below the "
+            "<b style='color:#a8853f'>▼ Closing</b><br>%1 dB below the "
             "threshold; the gate is taking off <b>%2 dB</b>. If that is "
             "your voice rather than the room, the threshold is too high.")
             .arg(thr - in, 0, 'f', 1).arg(gr, 0, 'f', 1);
@@ -473,12 +473,12 @@ QString StripDynamicsCurve::explain() const
         const double gr  = double(c.gainReductionDb());
         if (quiet) {
             return QStringLiteral(
-                "<b style='color:#607080'>Silent</b><br>Nothing is reaching "
+                "<b style='color:#5c5c60'>Silent</b><br>Nothing is reaching "
                 "the compressor.");
         }
         if (gr < 0.3) {
             return QStringLiteral(
-                "<b style='color:#8090a0'>Not working</b><br>You are "
+                "<b style='color:#8e8e93'>Not working</b><br>You are "
                 "%1 dB below the threshold, so the compressor is a straight "
                 "wire right now. Lower the threshold if you wanted it to do "
                 "something.")
@@ -486,13 +486,13 @@ QString StripDynamicsCurve::explain() const
         }
         if (gr > 12.0) {
             return QStringLiteral(
-                "<b style='color:#e05050'>Working hard</b><br>Taking off "
+                "<b style='color:#a8853f'>Working hard</b><br>Taking off "
                 "<b>%1 dB</b>. Past about 12 dB a compressor stops evening "
                 "a voice out and starts being the loudest thing about it.")
                 .arg(gr, 0, 'f', 1);
         }
         return QStringLiteral(
-            "<b style='color:#00ff88'>Working</b><br>Taking off "
+            "<b style='color:#6fa384'>Working</b><br>Taking off "
             "<b>%1 dB</b> on the peaks. That is the useful range: audibly "
             "steadier, still recognisably a voice.")
             .arg(gr, 0, 'f', 1);
@@ -502,17 +502,17 @@ QString StripDynamicsCurve::explain() const
         const double gr   = double(m_chain->limiter().gainReductionDb());
         if (quiet) {
             return QStringLiteral(
-                "<b style='color:#607080'>Silent</b><br>Nothing to limit.");
+                "<b style='color:#5c5c60'>Silent</b><br>Nothing to limit.");
         }
         if (gr < 0.2) {
             return QStringLiteral(
-                "<b style='color:#00ff88'>Idle — which is correct</b><br>"
+                "<b style='color:#6fa384'>Idle — which is correct</b><br>"
                 "You are %1 dB under the ceiling. A brickwall that never "
                 "acts is a brickwall doing its job.")
                 .arg(ceil - in, 0, 'f', 1);
         }
         return QStringLiteral(
-            "<b style='color:#ffb800'>Catching peaks</b><br>Holding back "
+            "<b style='color:#c2924f'>Catching peaks</b><br>Holding back "
             "<b>%1 dB</b>. Occasional is fine; if this is constant, the "
             "limiter is doing the compressor's job and doing it worse.")
             .arg(gr, 0, 'f', 1);
@@ -526,15 +526,15 @@ QString StripDynamicsCurve::legend() const
     QString band;
     if (m_stage == Stage::Gate) {
         band = QStringLiteral(
-            "<span style='color:#00b4d8'>▬</span> the sticky zone — inside "
+            "<span style='color:#4a7ba8'>▬</span> the sticky zone — inside "
             "it the gate keeps its current state<br>");
     }
     return QStringLiteral(
-        "<span style='color:#c8d8e8'>●</span> your signal: across is what "
+        "<span style='color:#c4c4c9'>●</span> your signal: across is what "
         "goes in, up is what comes out<br>"
-        "<span style='color:#405060'>╱</span> dashed: where nothing "
+        "<span style='color:#2c2c31'>╱</span> dashed: where nothing "
         "happens<br>%1"
-        "<span style='color:#ffb800'>┊</span> the threshold you set")
+        "<span style='color:#c2924f'>┊</span> the threshold you set")
         .arg(band);
 }
 
@@ -772,7 +772,7 @@ QString StripShaperCurve::explain() const
 
     if (m_livePeak < -55.0) {
         return QStringLiteral(
-            "<b style='color:#607080'>Silent</b><br>Nothing is reaching the "
+            "<b style='color:#5c5c60'>Silent</b><br>Nothing is reaching the "
             "tube.");
     }
     // How far up the curve the signal actually gets. This is the whole
@@ -781,20 +781,20 @@ QString StripShaperCurve::explain() const
                        * std::pow(10.0, drive / 20.0);
     if (reach < 0.25) {
         return QStringLiteral(
-            "<b style='color:#8090a0'>A straight wire</b><br>Your voice is "
+            "<b style='color:#8e8e93'>A straight wire</b><br>Your voice is "
             "only reaching the flat middle of the curve, so this stage is "
             "doing nothing audible whatever the knobs say. More drive, or "
             "more level ahead of it.");
     }
     if (reach > 1.4) {
         return QStringLiteral(
-            "<b style='color:#e05050'>Deep in the bend</b><br>You are well "
+            "<b style='color:#a8853f'>Deep in the bend</b><br>You are well "
             "into the flat top of the curve. That is heavy distortion — it "
             "will be loud, and it will be heard as distortion rather than "
             "as warmth.");
     }
     return QStringLiteral(
-        "<b style='color:#00ff88'>In the bend</b><br>Your voice is reaching "
+        "<b style='color:#6fa384'>In the bend</b><br>Your voice is reaching "
         "the curved part, which is where harmonics come from. The gap "
         "between the orange curve and the dashed line is how much is being "
         "added.");
@@ -803,11 +803,11 @@ QString StripShaperCurve::explain() const
 QString StripShaperCurve::legend() const
 {
     return QStringLiteral(
-        "<span style='color:#c8d8e8'>●</span> how far up the curve your "
+        "<span style='color:#c4c4c9'>●</span> how far up the curve your "
         "voice reaches, either side of zero<br>"
-        "<span style='color:#f09a30'>▬</span> the shaper — the audio "
+        "<span style='color:#c2924f'>▬</span> the shaper — the audio "
         "thread's own function, not a drawing of it<br>"
-        "<span style='color:#405060'>╱</span> dashed: no distortion. The "
+        "<span style='color:#2c2c31'>╱</span> dashed: no distortion. The "
         "distance between the two IS the distortion.");
 }
 
@@ -935,13 +935,13 @@ QString StripBandCurve::explain() const
         const double f0 = double(d.frequencyHz());
         if (m_liveGr > 0.3) {
             return QStringLiteral(
-                "<b style='color:#ffb800'>Working</b><br>Taking off "
+                "<b style='color:#c2924f'>Working</b><br>Taking off "
                 "<b>%1 dB</b> around %2 Hz. It only acts on that band, so "
                 "the rest of your voice is untouched.")
                 .arg(m_liveGr, 0, 'f', 1).arg(f0, 0, 'f', 0);
         }
         return QStringLiteral(
-            "<b style='color:#8090a0'>Listening, not acting</b><br>Nothing "
+            "<b style='color:#8e8e93'>Listening, not acting</b><br>Nothing "
             "loud enough at %1 Hz to trigger it. Either you are not "
             "sibilant, or it is pointed at the wrong band — that is the "
             "commonest way to end up with a de-esser that does nothing.")
@@ -953,11 +953,11 @@ QString StripBandCurve::explain() const
     const double hi = double(p.dooMix());
     if (lo < 0.02 && hi < 0.02) {
         return QStringLiteral(
-            "<b style='color:#8090a0'>Nothing mixed in</b><br>Both "
+            "<b style='color:#8e8e93'>Nothing mixed in</b><br>Both "
             "generators are at zero, so the stage is running and silent.");
     }
     return QStringLiteral(
-        "<b style='color:#00ff88'>Generating</b><br>Low at %1 Hz mixed "
+        "<b style='color:#6fa384'>Generating</b><br>Low at %1 Hz mixed "
         "<b>%2%</b>, high at %3 Hz mixed <b>%4%</b>. This stage invents "
         "content that was not in your voice; past a point it stops "
         "sounding like you.")
@@ -969,15 +969,15 @@ QString StripBandCurve::legend() const
 {
     if (m_stage == Stage::DeEsser) {
         return QStringLiteral(
-            "<span style='color:#f09a30'>▬</span> the band it LISTENS to — "
+            "<span style='color:#c2924f'>▬</span> the band it LISTENS to — "
             "not the cut it makes<br>"
-            "<span style='color:#f09a30'>┊</span> where it is centred<br>"
-            "<span style='color:#ffb800'>▐</span> right-hand bar: how hard "
+            "<span style='color:#c2924f'>┊</span> where it is centred<br>"
+            "<span style='color:#c2924f'>▐</span> right-hand bar: how hard "
             "it is working now");
     }
     return QStringLiteral(
-        "<span style='color:#0090e0'>▬</span> the low generator<br>"
-        "<span style='color:#f09a30'>▬</span> the high generator<br>"
+        "<span style='color:#2f5c86'>▬</span> the low generator<br>"
+        "<span style='color:#c2924f'>▬</span> the high generator<br>"
         "height is how much is mixed in, position is where it is tuned");
 }
 

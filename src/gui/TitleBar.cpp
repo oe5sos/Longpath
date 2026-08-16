@@ -227,35 +227,37 @@ QColor ConnectionSegment::stateDotColor() const
     switch (m_state) {
         case ConnectionState::Connected:
             // m_pulseOn alternates → slow green pulse encoding streaming activity
-            return m_pulseOn ? QColor("#5fff8a") : QColor("#3fcf6a");
+            return m_pulseOn ? QColor("#6fa384") : QColor("#4d7d63");
         case ConnectionState::Probing:
         case ConnectionState::Connecting:
-            return m_pulseOn ? QColor("#4a7ba8") : QColor("#0070c0");
+            return m_pulseOn ? QColor("#4a7ba8") : QColor("#254a72");
         case ConnectionState::LinkLost:
-            return m_pulseOn ? QColor("#ff8c00") : QColor("#cf6c00");
+            return m_pulseOn ? QColor("#c2924f") : QColor("#8a6c3c");
         case ConnectionState::Disconnected:
-            return QColor("#ff4444");
+            // Verbindung verloren ist eine Stoerung, keine Grenze:
+            // es geht nichts kaputt, und es verbindet sich wieder.
+            return QColor("#a8853f");
     }
-    return QColor("#607080");
+    return QColor("#5c5c60");
 }
 
 QColor ConnectionSegment::rttColor(int rttMs) const
 {
-    if (rttMs < 0)    { return QColor("#607080"); }
-    if (rttMs < 50)   { return QColor("#5fff8a"); }
-    if (rttMs < 150)  { return QColor("#ffd700"); }
-    return QColor("#ff6060");
+    if (rttMs < 0)    { return QColor("#5c5c60"); }
+    if (rttMs < 50)   { return QColor("#6fa384"); }
+    if (rttMs < 150)  { return QColor("#c2924f"); }
+    return QColor("#a8853f");
 }
 
 QColor ConnectionSegment::audioPipColor(AudioEngine::FlowState s) const
 {
     switch (s) {
         case AudioEngine::FlowState::Healthy:  return QColor("#4a7ba8");
-        case AudioEngine::FlowState::Underrun: return QColor("#ffd700");
-        case AudioEngine::FlowState::Stalled:  return QColor("#ff6060");
-        case AudioEngine::FlowState::Dead:     return QColor("#3a4a5a");
+        case AudioEngine::FlowState::Underrun: return QColor("#c2924f");
+        case AudioEngine::FlowState::Stalled:  return QColor("#a8853f");
+        case AudioEngine::FlowState::Dead:     return QColor("#2c2c31");
     }
-    return QColor("#3a4a5a");
+    return QColor("#2c2c31");
 }
 
 QRect ConnectionSegment::rttRect() const
@@ -275,7 +277,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
 
     // Background
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor("#0f0f1a"));
+    p.setBrush(QColor("#08080a"));
     p.drawRoundedRect(rect(), 3, 3);
 
     p.setFont(QFont(QStringLiteral("SF Mono"), 10, QFont::DemiBold));
@@ -289,7 +291,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     const int textY = height() / 2 + 4;
 
     if (m_state == ConnectionState::Disconnected) {
-        p.setPen(QColor("#607080"));
+        p.setPen(QColor("#5c5c60"));
         p.drawText(x, textY, tr("Disconnected — click to connect"));
         m_lastRttX1 = m_lastRttX2 = 0;
         m_lastPipX1 = m_lastPipX2 = 0;
@@ -307,7 +309,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     // to the audio pip. asprintf with a leading "\xe2\x96\xb2" prefix
     // gets misinterpreted as Latin-1 codepoints on the macOS compile
     // path, rendering as garbage rather than a triangle.
-    p.setPen(QColor("#a0d8a0"));
+    p.setPen(QColor("#6fa384"));
     const QString tx = QChar(0x25B2) + QString::asprintf(" %.1f Mbps", m_txMbps);
     p.drawText(x, textY, tx);
     x += p.fontMetrics().horizontalAdvance(tx) + 10;
@@ -335,7 +337,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     // = downloading I/Q from the radio.
     //
     // QChar(0x25BC) for the same reason as the up-triangle above.
-    p.setPen(QColor("#a0d8a0"));
+    p.setPen(QColor("#6fa384"));
     const QString rx = QChar(0x25BC) + QString::asprintf(" %.1f Mbps", m_rxMbps);
     p.drawText(x, textY, rx);
     x += p.fontMetrics().horizontalAdvance(rx) + 10;
@@ -458,7 +460,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_utcLabel = new QLabel(this);
     m_utcLabel->setToolTip(tr("UTC time"));
     m_utcLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #8aa8c0; font-size: 11px;"
+        "QLabel { color: #a8a8ae; font-size: 11px;"
         " font-family: 'SF Mono', Menlo, monospace; }")));
     m_hbox->addWidget(m_utcLabel);
     m_hbox->addSpacing(24);
@@ -538,9 +540,9 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     // NereusSDR-original — amber dark for the 💡 feature-request button.
     // One-off; no palette promotion warranted per §A2 design intent.
     m_featureBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #3a2a00; border: 1px solid #806020; "
+        "QPushButton { background: #33280f; border: 1px solid #6b5426; "
         "border-radius: 4px; padding: 0; }"
-        "QPushButton:hover { background: #504000; border-color: #a08030; }"));
+        "QPushButton:hover { background: #33280f; border-color: #6b5426; }"));
     connect(m_featureBtn, &QPushButton::clicked,
             this, &TitleBar::featureRequestClicked);
     m_hbox->addWidget(m_featureBtn);
@@ -556,7 +558,7 @@ void TitleBar::setMenuBar(QMenuBar* mb)
     mb->setStyleSheet(QStringLiteral(
         "QMenuBar { background: transparent; color: %1; font-size: 12px; }"
         "QMenuBar::item { padding: 4px 8px; }"
-        "QMenuBar::item:selected { background: %2; color: #ffffff; }"
+        "QMenuBar::item:selected { background: %2; color: #cfe2f5; }"
         "QMenu { background: %3; color: %5; border: 1px solid %4; }"
         "QMenu::item:selected { background: %6; }")
         .arg(QLatin1String(Style::kTitleText),
