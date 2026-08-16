@@ -484,448 +484,196 @@ float SMeterWidget::currentTxValue() const
 
 void SMeterWidget::paintEvent(QPaintEvent*)
 {
+    // ── Variante 1 aus smeter-beide.html: Balken + Zahlenblock ───────
+    //
+    // Loest das Zifferblatt ab. Aufbau von links nach rechts:
+    // Empfaengerkuerzel, versenkter Kasten mit dem Balken, darunter die
+    // Skalenzahlen; rechts die grosse Zahl in Monospace mit kleiner
+    // Einheit, darunter zwei Zeilen Schluessel-Wert.
+    //
+    // Masse aus dem Entwurf, wo HAUSSTIL nichts anderes sagt.
+    //
+    // ── Zwei Abweichungen vom Entwurf, beide vom Betreiber ──────────
+    //
+    // 1. Die Skalenbeschriftung ist EINFARBIG. Im Entwurf stehen dBm/S0/
+    //    S3/S7 in Grau und +10/+40/+60 in der Messwertfarbe -- wieder
+    //    eine zweifarbige Skala ohne Bedeutung, dieselbe Sache wie das
+    //    rote Skalenende, nur in Bernstein. Die obere Haelfte ist nicht
+    //    mehr Messwert als die untere.
+    //
+    // 2. Grosse Zahl auf measured, Einheit auf text-secondary;
+    //    Schluessel auf Skalenfarbe, Werte auf measured. Das CSS des
+    //    Entwurfs hat es umgekehrt (Zahl auf --t1, Schluessel auf
+    //    --data); die Anweisung des Betreibers geht vor, und sie ist
+    //    stimmiger: der Wert ist die Messung, die Beschriftung ist eine
+    //    Beschriftung.
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+    p.fillRect(rect(), QColor(Style::role("app-bg", Style::kAppBg)));
 
     const int w = width();
     const int h = height();
 
-    // Background
-    p.fillRect(rect(), QColor(Style::kAppBg));
+    const QColor cMeasured(Style::role("measured", Style::kAmberText));
+    const QColor cScale(Style::role("text-scale", Style::kTextScale));
+    const QColor cLabel(Style::role("text-secondary", Style::kTextSecondary));
+    const QColor cBorder(Style::role("border", Style::kBorder));
+    const QColor cInset(Style::role("inset-bg", Style::kInsetBg));
 
-    // -- Arc geometry ---------------------------------------------------------
-    // Large radius with center far below widget -> shallow ~70 deg arc segment
-    const float cx = w * 0.5f;
-    const float radius = w * 0.85f;
-    const float cy = h + radius - h * 0.65f;  // arc center well below widget
-    const float needleCy = h + 6.0f;          // needle origin just below widget bottom
+    // ── Der versenkte Kasten ────────────────────────────────────────
+    constexpr int kPad = 12, kPadX = 14, kGap = 14, kRightW = 132;
+    const QRect box(2, 2, w - 4, h - 4);
+    p.setPen(QPen(cBorder, 1));
+    p.setBrush(cInset);
+    p.drawRoundedRect(box, 6, 6);   // HAUSSTIL: Radius 6, nie 3
+    p.setBrush(Qt::NoBrush);
 
-    // Convert arc degrees to radians
-    const float arcStartRad = qDegreesToRadians(ARC_START_DEG);
-    const float arcEndRad   = qDegreesToRadians(ARC_END_DEG);
-    const float arcSpanRad  = arcEndRad - arcStartRad;
+    const int innerL = box.left() + kPadX;
+    const int innerT = box.top() + kPad;
 
-    // fraction 0.0 -> left end (ARC_END_DEG), fraction 1.0 -> right end (ARC_START_DEG)
-    auto fractionToAngle = [&](float frac) -> float {
-        return arcEndRad - frac * arcSpanRad;  // radians
-    };
+    // ── Empfaengerkuerzel ───────────────────────────────────────────
+    QFont fRx = p.font();
+    fRx.setPixelSize(14);
+    p.setFont(fRx);
+    const QString rxLabel = m_transmitting ? QStringLiteral("TX")
+                                           : QStringLiteral("RX");
+    const QFontMetrics fmRx(fRx);
+    p.setPen(cLabel);
+    p.drawText(innerL, innerT + fmRx.ascent() + 3, rxLabel);
 
-    // ── The glow under the arc ───────────────────────────────────────
-    //
-    // What makes a Zeus gauge read as an instrument rather than as a
-    // diagram: a very faint warm light behind the scale, brightest at
-    // the bottom where the needle is pivoted, gone by the time it
-    // reaches the frame.
-    //
-    // Deliberately not a colour anyone would name. The moment it can be
-    // called olive it is too strong — turn the alpha down, not the hue.
-    {
-        // Der Mittelpunkt gehört INS Fenster. Erst lag er auf needleCy,
-        // also sechs Pixel unter dem unteren Rand — sichtbar war
-        // ausschließlich der ausgeblendete Rand des Verlaufs, und das
-        // Ergebnis war schlicht schwarz. 2026-08-15.
-        QRadialGradient glow(QPointF(cx, h * 0.96f), w * 0.60f);
-        QColor hi(Style::kInstrumentGlowHi);
-        QColor lo(Style::kInstrumentGlowLo);
-        hi.setAlpha(190);
-        lo.setAlpha(80);
-        QColor gone(lo);
-        gone.setAlpha(0);
-        glow.setColorAt(0.0,  hi);
-        glow.setColorAt(0.58, lo);
-        glow.setColorAt(1.0,  gone);
-        p.setPen(Qt::NoPen);
-        p.setBrush(glow);
-        p.drawRect(rect());
-        p.setBrush(Qt::NoBrush);
-    }
+    const int barL = innerL + fmRx.horizontalAdvance(QStringLiteral("RX")) + kGap;
+    const int barR = box.right() - kPadX - kRightW - kGap;
+    const int barW = std::max(40, barR - barL);
+    constexpr int kBarH = 34;
 
-    // ── One arc, one colour ──────────────────────────────────────────
-    //
-    // It used to be half white and half red on the RX scale, and half
-    // blue and half red on the TX scale. Neither split carried
-    // information the ticks did not already carry — it was a scale that
-    // happened to be two-tone, and red is the one colour in this
-    // program that means "attention". Top right of the screen, at all
-    // times, it meant "graduation mark".
-    //
-    // Now the arc is one cream stroke over its whole length and the
-    // limit is marked where limits belong: on the tick. S9 and the
-    // over-scale ticks below take kInstrumentLimit, the rest take the
-    // face colour. Same information, a fraction of the area.
-    const QColor faceColor(Style::kInstrumentFace);
-    const QColor limitColor(Style::kInstrumentLimit);
+    // ── Welcher Wert, welche Skala ──────────────────────────────────
+    const float shown = m_transmitting
+        ? txDisplayValue()
+        : ((m_rxMode == RxMode::SMeterPeak) ? m_peakDbm : m_levelDbm);
+    const bool haveReading =
+        m_transmitting || SignalReading::isMeasurement(shown);
 
-    // ── Zwei Skalen auf einem Bogen ──────────────────────────────────
-    //
-    // Außen S-Stufen für den Empfang, innen Watt fürs Senden. Vorher hat
-    // die FARBE sie getrennt — weiß gegen blau — und als ich beide
-    // cremefarben machte, war die Unterscheidung weg. Beim Ansehen des
-    // laufenden Programms gefunden, 2026-08-15: „3 5 7 9" und
-    // „0 40 80 120" standen gleich hell nebeneinander auf demselben
-    // Bogen.
-    //
-    // Die Antwort ist nicht, Blau zurückzuholen. Von den beiden Skalen
-    // ist immer nur eine gültig: beim Empfang sagt die Wattskala nichts,
-    // beim Senden die S-Skala. Also wird die abgeblendet, die gerade
-    // nichts zu sagen hat. Das ist auch die Zeus-Regel — der Zustand
-    // entscheidet, was hell ist, nicht die Dekoration.
-    //
-    // m_txPower zusätzlich zu m_transmitting, aus demselben Grund wie
-    // weiter oben in diesem File: VOX und hardwaregetastetes CW
-    // erzeugen Leistung, bevor das Flag ankommt.
-    const bool txLive = m_transmitting || m_txPower > 0.5f;
-    auto forScale = [](QColor c, bool live) {
-        if (!live) { c.setAlpha(80); }
-        return c;
-    };
-    const QColor rxFace  = forScale(faceColor,  !txLive);
-    // rxLimit entfaellt: die Empfangsskala hat keine Grenze mehr, die
-    // rot waere. limitColor bleibt fuer die TX-Seite (txLimit).
-    const QColor txFace  = forScale(faceColor,  txLive);
-    const QColor txLimit = forScale(limitColor, txLive);
+    // ── Der Balken ──────────────────────────────────────────────────
+    const QRect bar(barL, innerT, barW, kBarH);
+    p.setPen(QPen(cBorder, 1));
+    p.setBrush(QColor(0, 0, 0));
+    p.drawRoundedRect(bar, 4, 4);
+    p.setBrush(Qt::NoBrush);
 
-    {
-        const QRectF outerArc(cx - radius, cy - radius, radius * 2, radius * 2);
-        p.setPen(QPen(rxFace, 2.4));
-        p.drawArc(outerArc,
-                  static_cast<int>(ARC_START_DEG * 16),
-                  static_cast<int>((ARC_END_DEG - ARC_START_DEG) * 16));
-    }
-
-    // -- Inner arc (TX scale) -- 6px gap --------------------------------------
-    const float arcGap = 6.0f;
-    // Die alten Namen, weil der Zeichencode weiter unten sie liest.
-    const QColor blueColor = txFace;
-    const QColor redColor  = txLimit;
-    {
-        const float innerR = radius - arcGap;
-        const QRectF innerArc(cx - innerR, cy - innerR, innerR * 2, innerR * 2);
-        p.setPen(QPen(txFace, 1.6));
-        p.drawArc(innerArc,
-                  static_cast<int>(ARC_START_DEG * 16),
-                  static_cast<int>((ARC_END_DEG - ARC_START_DEG) * 16));
-    }
-
-    // -- Tick drawing helpers -------------------------------------------------
-    QFont tickFont = font();
-    tickFont.setPixelSize(qMax(10, h / 10));
-    tickFont.setBold(true);
-    p.setFont(tickFont);
-    const QFontMetrics tfm(tickFont);
-
-    // Direction from needle origin through arc point, normalized
-    auto needleDir = [&](float angle) -> std::pair<float, float> {
-        const float arcX = cx + radius * std::cos(angle);
-        const float arcY = cy - radius * std::sin(angle);
-        const float dx = arcX - cx;
-        const float dy = arcY - needleCy;
-        const float len = std::sqrt(dx * dx + dy * dy);
-        return {dx / len, dy / len};
-    };
-
-    // Outside tick (RX): extends outward from the arc, label above
-    auto drawOutsideTick = [&](float frac, const QString& label, const QColor& color,
-                               bool showLabel) {
-        const float angle = fractionToAngle(frac);
-        const float arcX = cx + radius * std::cos(angle);
-        const float arcY = cy - radius * std::sin(angle);
-        auto [ux, uy] = needleDir(angle);
-
-        const QPointF inner(arcX + 2 * ux, arcY + 2 * uy);
-        const QPointF outer(arcX + 14 * ux, arcY + 14 * uy);
-
-        p.setPen(QPen(color, 1.5));
-        p.drawLine(inner, outer);
-
-        if (showLabel) {
-            const QPointF labelPt(arcX + 26 * ux, arcY + 26 * uy);
-            const int tw = tfm.horizontalAdvance(label);
-            p.setPen(color);
-            p.drawText(QPointF(labelPt.x() - tw / 2.0,
-                               labelPt.y() + tfm.ascent() / 2.0), label);
+    if (haveReading) {
+        const float frac = m_transmitting ? txDisplayFraction()
+                                          : dbmToFraction(shown);
+        const int fillW = int(qBound(0.0f, frac, 1.0f) * (barW - 6));
+        if (fillW > 0) {
+            // Senkrechter Verlauf im Messwert-Ton.
+            QLinearGradient g(0, bar.top() + 4, 0, bar.bottom() - 4);
+            QColor lo = cMeasured; lo.setAlpha(150);
+            g.setColorAt(0.0, cMeasured);
+            g.setColorAt(1.0, lo);
+            p.setPen(Qt::NoPen);
+            p.setBrush(g);
+            p.drawRoundedRect(QRect(bar.left() + 3, bar.top() + 4,
+                                    fillW, kBarH - 8), 2, 2);
+            p.setBrush(Qt::NoBrush);
         }
-    };
+    }
 
-    // Inside tick (TX): extends inward from the inner colored arc
-    const float innerArcR = radius - arcGap;
-    auto drawInsideTick = [&](float frac, const QString& label,
-                              const QColor& tickColor, const QColor& labelColor,
-                              bool showLabel) {
-        const float angle = fractionToAngle(frac);
-        // Start from the inner colored arc, not the outer arc
-        const float iArcX = cx + innerArcR * std::cos(angle);
-        const float iArcY = cy - innerArcR * std::sin(angle);
-        auto [ux, uy] = needleDir(angle);
-
-        const QPointF outer(iArcX - 2 * ux, iArcY - 2 * uy);
-        const QPointF inner(iArcX - 14 * ux, iArcY - 14 * uy);
-
-        p.setPen(QPen(tickColor, 1.5));
-        p.drawLine(inner, outer);
-
-        if (showLabel) {
-            const QPointF labelPt(iArcX - 26 * ux, iArcY - 26 * uy);
-            const int tw = tfm.horizontalAdvance(label);
-            p.setPen(labelColor);
-            p.drawText(QPointF(labelPt.x() - tw / 2.0,
-                               labelPt.y() + tfm.ascent() / 2.0), label);
-        }
-    };
-
-    // Die TX-Beschriftungen unten benutzen diesen Namen; er ist die
-    // Schriftfarbe der Wattskala und blendet mit ihr ab.
-    const QColor whiteColor = txFace;
-
-    // -- Outside ticks (RX): S-meter scale -- odd S-units only ----------------
+    // ── Segmentstriche: Aussparungen, keine aufgemalten Linien ──────
     //
-    // S9 in the limit colour: that is where the red half of the arc
-    // used to begin, and a tick says it just as clearly as forty
-    // degrees of red did.
-    // ── Die Empfangsskala kennt keine Grenze ────────────────────────
-    //
-    // S9, +20 und +40 standen in kInstrumentLimit -- demselben Wert wie
-    // danger. Das ist der Fehler, der in diesem Programm schon zweimal
-    // ausgebaut wurde: einmal der halbe rote Bogen des S-Meters, einmal
-    // das rote obere Ende der Wasserfallrampe
-    // (SpectrumWidget.cpp:425-441). Ein starkes Signal auf 20 m ist
-    // keine Gefahr, sondern ein starkes Signal, und wo es keine Schwelle
-    // gibt, kodiert Rot nichts.
-    //
-    // Die Ziffern selbst sind Messwerte -- eine S-Stufe ist eine
-    // abgelesene Groesse wie die Frequenz. Deshalb Bernstein und nicht
-    // das Cremeweiss des Instruments: das gehoert Bogen, Zeiger und
-    // Teilung, nicht der Beschriftung.
-    //
-    // Die TX-Leistungsskala weiter unten bleibt davon unberuehrt. Dort
-    // GIBT es eine Grenze (m_powerRedStart), und dort ist Rot eine
-    // Aussage.
-    const QColor rxDigits(Style::role("measured", Style::kAmberText));
-    for (int s = 1; s <= 9; s += 2) {
-        const float dbm = S0_DBM + s * DB_PER_S;
-        drawOutsideTick(dbmToFraction(dbm), QString::number(s),
-                        forScale(rxDigits, !txLive), true);
-    }
-    for (int over : {20, 40}) {
-        const float dbm = S9_DBM + over;
-        drawOutsideTick(dbmToFraction(dbm), QString("+%1").arg(over),
-                        forScale(rxDigits, !txLive), true);
+    // In der Grundfarbe des Kastens ueber den Balken gezogen. Als
+    // gemalte Linien wuerden sie bei jeder Aenderung des Verlaufs
+    // mitwandern; als Aussparung bleiben sie stehen, wo die Teilung
+    // ist, und der Balken laeuft dahinter durch.
+    p.setPen(QPen(QColor(0x1c, 0x1d, 0x21), 1));
+    for (int i = 1; i < 20; ++i) {
+        const int x = bar.left() + int(double(i) / 20.0 * barW);
+        p.drawLine(x, bar.top() + 5, x, bar.bottom() - 5);
     }
 
-    // -- Inside ticks (TX): scale depends on TX mode --------------------------
-    switch (m_txMode) {
-    case TxMode::Power: {
-        // Dynamic scale based on m_powerScaleMax
-        int maxW = static_cast<int>(m_powerScaleMax);
-        int redW = static_cast<int>(m_powerRedStart);
-        int tickStep, labelStep;
-        if (maxW >= 2000) {         // PGXL: ticks every 100W, labels every 500W
-            tickStep = 100; labelStep = 500;
-        } else if (maxW >= 600) {   // Aurora: ticks every 50W, labels every 100W
-            tickStep = 50; labelStep = 100;
-        } else {                    // Barefoot: ticks every 10W, labels every 40W
-            tickStep = 10; labelStep = 40;
-        }
-        for (int pw = 0; pw <= maxW; pw += tickStep) {
-            const float frac = static_cast<float>(pw) / m_powerScaleMax;
-            const QColor& tc = (pw >= redW) ? redColor : blueColor;
-            const QColor& lc = (pw >= redW) ? redColor : whiteColor;
-            bool isLabeled = (pw % labelStep == 0) || pw == maxW || pw == redW;
-            QString label = (pw >= 1000) ? QString("%1k").arg(pw / 1000.0f, 0, 'f', (pw % 1000) ? 1 : 0)
-                                         : QString::number(pw);
-            drawInsideTick(frac, label, tc, lc, isLabeled);
-        }
-        break;
-    }
-    case TxMode::SWR: {
-        // 1.0-3.0, ticks at 1, 1.5, 2, 2.5, 3.  Red starting at 2.5.
-        for (float s : {1.0f, 1.5f, 2.0f, 2.5f, 3.0f}) {
-            const float frac = (s - 1.0f) / 2.0f;
-            const bool red = (s >= 2.5f);
-            const QColor& tc = red ? redColor : blueColor;
-            const QColor& lc = red ? redColor : whiteColor;
-            QString label = (s == static_cast<int>(s))
-                ? QString::number(static_cast<int>(s))
-                : QString::number(s, 'f', 1);
-            drawInsideTick(frac, label, tc, lc, true);
-        }
-        break;
-    }
-    case TxMode::Level: {
-        // -40 to +5, ticks at -40, -30, -20, -10, 0.  Red at 0.
-        for (int db : {-40, -30, -20, -10, 0}) {
-            const float frac = (db + 40.0f) / 45.0f;
-            const bool red = (db >= 0);
-            const QColor& tc = red ? redColor : blueColor;
-            const QColor& lc = red ? redColor : whiteColor;
-            drawInsideTick(frac, QString::number(db), tc, lc, true);
-        }
-        break;
-    }
-    case TxMode::Compression: {
-        // -25 to 0, ticks at -25, -20, -15, -10, -5, 0.  All default color.
-        for (int db : {-25, -20, -15, -10, -5, 0}) {
-            const float frac = (db + 25.0f) / 25.0f;
-            drawInsideTick(frac, QString::number(db), blueColor, whiteColor, true);
-        }
-        break;
-    }
-    }
-
-    // -- Draw needle ----------------------------------------------------------
-    // Needle originates from needleCy (just below widget) rather than the
-    // arc center, so the pivot is barely out of frame.
-    // When transmitting, needle tracks the selected TX meter instead of RX.
-    // ── Ohne Messung kein Zeiger ────────────────────────────────────
-    //
-    // Ein Zeiger am linken Anschlag ist keine leere Anzeige, sondern die
-    // Behauptung "S0" -- und die ist ohne Verbindung genauso falsch wie
-    // die "-395 dBm" daneben. HAUSSTIL Regel 7 gilt fuer das
-    // Zifferblatt wie fuer die Zahl: unbekannt ist ein Strich, und beim
-    // Instrument heisst das gar kein Ausschlag.
-    //
-    // Nur im Empfangsfall: beim Senden zeigt der Zeiger Leistung, SWR
-    // oder Pegel, und die haben mit dem Empfangspegel nichts zu tun.
-    const bool needleHasReading =
-        m_transmitting || SignalReading::isMeasurement(
-            (m_rxMode == RxMode::SMeterPeak) ? m_peakDbm : m_levelDbm);
-
-    if (needleHasReading) {
-        const float angle = fractionToAngle(m_needleFraction);
-
-        // Needle extends to the end of the outer (RX) ticks: radius + 14
-        const float tipR = radius + 14;
-        const float tipX = cx + tipR * std::cos(angle);
-        const float tipY = cy - tipR * std::sin(angle);
-
-        // Needle shadow
-        p.setPen(QPen(QColor(0, 0, 0, 80), 3));
-        p.drawLine(QPointF(cx + 1, needleCy + 1), QPointF(tipX + 1, tipY + 1));
-
-        // Needle
-        p.setPen(QPen(QColor(0xff, 0xff, 0xff), 2));
-        p.drawLine(QPointF(cx, needleCy), QPointF(tipX, tipY));
-    }
-
-    // Draw peak marker (small triangle) - only in RX S-Meter Peak mode
-    if (!m_transmitting && m_rxMode == RxMode::SMeterPeak
-        && m_peakDbm > m_levelDbm + 1.0f) {
-        const float frac = dbmToFraction(m_peakDbm);
-        const float angle = fractionToAngle(frac);
-        const float markerR = radius - 2;
-
-        const float cosA = std::cos(angle);
-        const float sinA = std::sin(angle);
-
-        const QPointF tip(cx + markerR * cosA, cy - markerR * sinA);
-
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0xff, 0xaa, 0x00));
-        const float perpCos = -sinA;
-        const float perpSin = cosA;
-        const float sz = 3.0f;
-        QPainterPath tri;
-        tri.moveTo(tip);
-        tri.lineTo(tip.x() - 6 * cosA + sz * perpCos,
-                   tip.y() + 6 * sinA + sz * perpSin);
-        tri.lineTo(tip.x() - 6 * cosA - sz * perpCos,
-                   tip.y() + 6 * sinA - sz * perpSin);
-        tri.closeSubpath();
-        p.drawPath(tri);
-    }
-
-    // -- Draw peak hold line (configurable overlay, independent of RX mode) ---
-    if (m_peakHoldEnabled && !m_transmitting
-        && m_peakHoldDbm > S0_DBM + 1.0f) {
-        float frac = dbmToFraction(m_peakHoldDbm);
-        if (m_peakHoldDbm <= m_levelDbm + 0.01f) {
-            frac = m_needleFraction;
+    // ── Skalenzahlen, EINFARBIG ─────────────────────────────────────
+    QFont fSc = p.font();
+    fSc.setPixelSize(10);
+    fSc.setFamily(QStringLiteral("Menlo"));
+    fSc.setStyleHint(QFont::Monospace);
+    p.setFont(fSc);
+    const QFontMetrics fmSc(fSc);
+    p.setPen(cScale);
+    const QStringList scale{QStringLiteral("dBm"), QStringLiteral("S0"),
+                            QStringLiteral("S3"),  QStringLiteral("S7"),
+                            QStringLiteral("+10"), QStringLiteral("+40"),
+                            QStringLiteral("+60")};
+    const int scaleY = bar.bottom() + 5 + fmSc.ascent();
+    for (int i = 0; i < scale.size(); ++i) {
+        const double f = double(i) / (scale.size() - 1);
+        int x = bar.left() + int(f * barW);
+        if (i == 0) { x = bar.left(); }
+        else if (i == scale.size() - 1) {
+            x = bar.right() - fmSc.horizontalAdvance(scale[i]);
         } else {
-            frac = qMax(frac, m_needleFraction);
+            x -= fmSc.horizontalAdvance(scale[i]) / 2;
         }
-        const float angle = fractionToAngle(frac);
-
-        const float cosA = std::cos(angle);
-        const float sinA = std::sin(angle);
-        const QPointF inner(cx + (radius - 4) * cosA,
-                            cy - (radius - 4) * sinA);
-        const QPointF outer(cx + (radius + 10) * cosA,
-                            cy - (radius + 10) * sinA);
-
-        p.setPen(QPen(QColor(0xff, 0x44, 0x44, 0xcc), 2));
-        p.drawLine(inner, outer);
+        p.drawText(x, scaleY, scale[i]);
     }
 
-    // -- Text readout -- all top-aligned on the same baseline -----------------
-    QFont srcFont = font();
-    srcFont.setPixelSize(qMax(9, h / 14));
-    const QFontMetrics sfm(srcFont);
-    const int topY = sfm.height() + 2;
+    // ── Rechte Spalte: grosse Zahl, Einheit, zwei Zeilen ────────────
+    const int rightR = box.right() - kPadX;
 
-    QFont valFont = font();
-    valFont.setPixelSize(qMax(13, h / 8));
-    valFont.setBold(true);
-    const QFontMetrics vfm(valFont);
+    QFont fBig = p.font();
+    fBig.setPixelSize(30);
+    fBig.setFamily(QStringLiteral("Menlo"));
+    fBig.setStyleHint(QFont::Monospace);
+    QFont fUnit = p.font();
+    fUnit.setPixelSize(11);
 
-    if (m_transmitting) {
-        // TX mode: show TX source label (center), mode name (left), value (right)
-        static const char* txLabels[] = {"Power", "SWR", "Level", "Compression"};
-        const QString srcLabel = txLabels[static_cast<int>(m_txMode)];
-        p.setFont(srcFont);
-        p.setPen(QColor(0x80, 0x90, 0xa0));
-        p.drawText((w - sfm.horizontalAdvance(srcLabel)) / 2, topY, srcLabel);
+    const QString bigText = haveReading
+        ? QString::number(double(shown), 'f', 0)
+        : SignalReading::noReadingText();
+    const QString unitText = haveReading ? txUnitLabel() : QString{};
 
-        p.setFont(valFont);
-        // Left: mode name in cyan
-        p.setPen(QColor(0x00, 0xb4, 0xd8));
-        p.drawText(6, topY, "TX");
+    const QFontMetrics fmBig(fBig), fmUnit(fUnit);
+    const int unitW = unitText.isEmpty()
+                        ? 0 : fmUnit.horizontalAdvance(unitText) + 3;
+    p.setFont(fBig);
+    p.setPen(haveReading ? cMeasured : cScale);
+    const int bigY = innerT + fmBig.ascent();
+    p.drawText(rightR - unitW - fmBig.horizontalAdvance(bigText), bigY, bigText);
+    if (!unitText.isEmpty()) {
+        p.setFont(fUnit);
+        p.setPen(cLabel);
+        p.drawText(rightR - fmUnit.horizontalAdvance(unitText), bigY, unitText);
+    }
 
-        // Right: formatted value
-        QString valText;
-        switch (m_txMode) {
-        case TxMode::Power:       valText = QString("%1 W").arg(m_txPower, 0, 'f', 0); break;
-        case TxMode::SWR:         valText = QString("%1").arg(m_txSwr, 0, 'f', 1); break;
-        case TxMode::Level:       valText = QString("%1 dB").arg(m_micLevel, 0, 'f', 0); break;
-        case TxMode::Compression: valText = QString("%1 dB").arg(m_compLevel, 0, 'f', 0); break;
-        }
-        p.setPen(QColor(0xc8, 0xd8, 0xe8));
-        p.drawText(w - vfm.horizontalAdvance(valText) - 6, topY, valText);
-    } else {
-        // RX mode: show source label (center), S-units (left), dBm (right)
-        p.setFont(srcFont);
-        p.setPen(QColor(0x80, 0x90, 0xa0));
-        p.drawText((w - sfm.horizontalAdvance(m_source)) / 2, topY, m_source);
+    // Zwei Zeilen Schluessel-Wert. Der erste Platz nennt die aktive
+    // QUELLE -- das ist ein Modus, kein zweiter Messwert, und er gehoert
+    // deshalb an die Zahl. Der zweite ist ein FESTER Platz, der immer
+    // eine Messung traegt: Rauschflur, in RADE stattdessen SNR. Ein
+    // Platz, zwei Beschriftungen, immer ein Wert -- damit springt das
+    // Panel nicht in der Hoehe, was bei einem festen Kopf ueber einem
+    // scrollbaren Koerper auffiele.
+    QFont fKv = p.font();
+    fKv.setPixelSize(11);
+    fKv.setFamily(QStringLiteral("Menlo"));
+    fKv.setStyleHint(QFont::Monospace);
+    p.setFont(fKv);
+    const QFontMetrics fmKv(fKv);
+    const int kvL = rightR - kRightW;
 
-        const float displayDbm = (m_rxMode == RxMode::SMeterPeak) ? m_peakDbm : m_levelDbm;
-
-        p.setFont(valFont);
-        p.setPen(QColor(0x00, 0xb4, 0xd8));
-        // ── Ohne Messung ein Strich, keine Zahl ─────────────────────
-        //
-        // HAUSSTIL Regel 7. Ohne Verbindung stand hier "-395 dBm" und
-        // "S0" -- beides sah aus wie ein Messergebnis, und "S0" sogar
-        // wie ein plausibles. Siehe widgets/SignalReading.h.
-        const bool haveReading = SignalReading::isMeasurement(displayDbm);
-        QString sText;
-        if (!haveReading) {
-            sText = SignalReading::noReadingText();
-        } else if (displayDbm <= S0_DBM) {
-            sText = "S0";
-        } else if (displayDbm <= S9_DBM) {
-            sText = QString("S%1").arg(qBound(0, qRound((displayDbm - S0_DBM) / DB_PER_S), 9));
-        } else {
-            sText = QString("S9+%1").arg(qRound(displayDbm - S9_DBM));
-        }
-        if (!haveReading) {
-            p.setPen(QColor(Style::role("text-inactive", Style::kTextInactive)));
-        }
-        p.drawText(6, topY, sText);
-
-        const QString dbmText = SignalReading::text(displayDbm);
-        p.setPen(haveReading
-                     ? QColor(0xc8, 0xd8, 0xe8)
-                     : QColor(Style::role("text-inactive", Style::kTextInactive)));
-        p.drawText(w - vfm.horizontalAdvance(dbmText) - 6, topY, dbmText);
+    struct Row { QString k, v; };
+    const Row rows[2] = {
+        { rxSourceAbbrev(), haveReading ? sUnitsText()
+                                        : SignalReading::noReadingText() },
+        { m_snrIsRade ? QStringLiteral("SNR") : QStringLiteral("NF"),
+          SignalReading::isMeasurement(m_secondaryDbm)
+              ? QStringLiteral("%1 dB").arg(double(m_secondaryDbm), 0, 'f', 0)
+              : SignalReading::noReadingText() },
+    };
+    int kvY = bigY + 7 + fmKv.ascent();
+    for (const Row& r : rows) {
+        p.setPen(cScale);
+        p.drawText(kvL, kvY, r.k);
+        p.setPen(SignalReading::noReadingText() == r.v ? cScale : cMeasured);
+        p.drawText(rightR - fmKv.horizontalAdvance(r.v), kvY, r.v);
+        kvY += fmKv.height() + 3;
     }
 }
 
@@ -1145,6 +893,87 @@ QString SMeterWidget::rxModeToLabel(RxMode mode)
     case RxMode::MaxBin:         return "Max Bin";
     }
     return "Signal";
+}
+
+
+// ── Der zweite Platz ────────────────────────────────────────────────
+
+void SMeterWidget::setNoiseFloorDbm(float dbm)
+{
+    m_secondaryDbm = dbm;
+    m_snrIsRade    = false;
+    update();
+}
+
+void SMeterWidget::setRadeSnrDb(float db)
+{
+    // SNR verdraengt den Rauschflur, solange RADE laeuft -- beide
+    // beantworten dieselbe Frage, und zwei Zeilen dafuer waeren eine zu
+    // viel.
+    m_secondaryDbm = db;
+    m_snrIsRade    = true;
+    update();
+}
+
+void SMeterWidget::clearSecondary()
+{
+    m_secondaryDbm = std::numeric_limits<float>::quiet_NaN();
+    m_snrIsRade    = false;
+    update();
+}
+
+QString SMeterWidget::rxSourceAbbrev() const
+{
+    switch (m_rxMode) {
+    case RxMode::SignalAverage: return QStringLiteral("AVG");
+    case RxMode::SMeterPeak:    return QStringLiteral("PK");
+    case RxMode::MaxBin:        return QStringLiteral("MAX");
+    case RxMode::SMeter:
+    default:                    return QStringLiteral("SIG");
+    }
+}
+
+// ── Die Sendeseite im selben Aufbau ─────────────────────────────────
+//
+// Der Entwurf kennt nur den Empfang. Damit das Panel beim Senden nicht
+// leer dasteht, traegt derselbe Balken die gewaehlte TX-Groesse -- so
+// wie es der Zeiger vorher auch tat.
+
+float SMeterWidget::txDisplayValue() const
+{
+    switch (m_txMode) {
+    case TxMode::Power:       return m_txPower;
+    case TxMode::SWR:         return m_txSwr;
+    case TxMode::Level:       return m_micLevel;
+    case TxMode::Compression: return m_compLevel;
+    }
+    return 0.0f;
+}
+
+float SMeterWidget::txDisplayFraction() const
+{
+    switch (m_txMode) {
+    case TxMode::Power:
+        return m_powerScaleMax > 0.0f ? m_txPower / m_powerScaleMax : 0.0f;
+    case TxMode::SWR:
+        return qBound(0.0f, (m_txSwr - 1.0f) / 2.0f, 1.0f);
+    case TxMode::Level:
+    case TxMode::Compression:
+        return qBound(0.0f, m_micLevel / 100.0f, 1.0f);
+    }
+    return 0.0f;
+}
+
+QString SMeterWidget::txUnitLabel() const
+{
+    if (!m_transmitting) { return QStringLiteral("dBm"); }
+    switch (m_txMode) {
+    case TxMode::Power:       return QStringLiteral("W");
+    case TxMode::SWR:         return QString{};
+    case TxMode::Level:
+    case TxMode::Compression: return QStringLiteral("dB");
+    }
+    return QString{};
 }
 
 } // namespace NereusSDR

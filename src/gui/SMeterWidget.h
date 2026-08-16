@@ -43,6 +43,8 @@
 #pragma once
 
 #include <QWidget>
+
+#include <limits>
 #include <QTimer>
 #include <QElapsedTimer>
 
@@ -84,6 +86,30 @@ public:
 
     // Reading as S-units string (e.g. "S7", "S9+20").
     QString sUnitsText() const;
+
+    // ── Der zweite Platz der rechten Spalte ─────────────────────────
+    //
+    // Ein FESTER Platz, der immer eine Messung traegt: der Rauschflur
+    // aus ClarityController::noiseFloorChanged, in RADE stattdessen das
+    // SNR der Betriebsart. Die Beschriftung wechselt mit, der Platz
+    // nicht -- sonst spraenge das Panel in der Hoehe, und es ist der
+    // feste Kopf ueber einem scrollbaren Koerper.
+    void setNoiseFloorDbm(float dbm);   ///< Beschriftung "NF"
+    void setRadeSnrDb(float db);        ///< Beschriftung "SNR"
+    void clearSecondary();              ///< nichts anliegend -> Strich
+
+    /// Kuerzel der aktiven RX-Quelle, neben der grossen Zahl. AVG ist
+    /// ein MODUS, kein zweiter Messwert -- deshalb ein Kuerzel an der
+    /// Zahl und nicht eine eigene Zeile daneben.
+    QString rxSourceAbbrev() const;
+
+private:
+    // Sendeseite im selben Aufbau -- der Entwurf kennt nur den Empfang.
+    float   txDisplayValue() const;
+    float   txDisplayFraction() const;
+    QString txUnitLabel() const;
+
+public:
 
     // From AetherSDR src/gui/SMeterWidget.h:32-34 [@0cd4559]
     enum class TxMode { Power, SWR, Level, Compression };
@@ -212,6 +238,10 @@ private:
 
     // RX state
     // From AetherSDR src/gui/SMeterWidget.h:81-83 [@0cd4559]
+    // Zweiter Platz: Wert + welche Beschriftung er traegt.
+    float   m_secondaryDbm{std::numeric_limits<float>::quiet_NaN()};
+    bool    m_snrIsRade{false};
+
     float   m_levelDbm{-127.0f};    // current RX reading
     float   m_peakDbm{-127.0f};     // RX peak hold
     QString m_source{"S-Meter Peak"};

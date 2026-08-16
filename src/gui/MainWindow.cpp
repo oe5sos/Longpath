@@ -4044,6 +4044,33 @@ void MainWindow::buildUI()
     connect(m_clarityController, &ClarityController::noiseFloorChanged,
             activeSpectrumWidget(), &SpectrumWidget::onNoiseFloorChanged);
 
+    // ── Der zweite Platz im S-Meter-Panel ───────────────────────────
+    //
+    // Derselbe Rauschflur, denselben Weg. Ein FESTER Platz, der immer
+    // eine Messung traegt -- in RADE traegt er stattdessen das SNR, und
+    // nur die Beschriftung wechselt. Eine Zeile, die je nach
+    // Betriebsart erscheint und verschwindet, liesse den festen Kopf in
+    // der Hoehe springen.
+    connect(m_clarityController, &ClarityController::noiseFloorChanged,
+            this, [this](float nfDbm) {
+        if (SMeterWidget* sm = m_appletPanel ? m_appletPanel->smeterWidget()
+                                             : nullptr) {
+            sm->setNoiseFloorDbm(nfDbm);
+        }
+    });
+
+    // RADE verdraengt den Rauschflur, solange es laeuft: beide
+    // beantworten dieselbe Frage -- wie gut komme ich hier durch.
+    if (m_radioModel) {
+        connect(m_radioModel, &RadioModel::radeSnrChanged,
+                this, [this](int, float snrDb) {
+            if (SMeterWidget* sm = m_appletPanel ? m_appletPanel->smeterWidget()
+                                                 : nullptr) {
+                sm->setRadeSnrDb(snrDb);
+            }
+        });
+    }
+
     // Task 2.10: per-band NF priming — settle detector.
     // NereusSDR-original — no Thetis equivalent.
     //
