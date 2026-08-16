@@ -337,9 +337,9 @@ constexpr auto kCheckBoxStyle =
 
 constexpr auto kRadioButtonStyle =
     "QRadioButton { color: #c8d8e8; font-size: 12px; }"
-    "QRadioButton::indicator { width: 14px; height: 14px; background: #1a2a3a;"
-    " border: 1px solid #304050; border-radius: 7px; }"
-    "QRadioButton::indicator:checked { background: #00b4d8; border-color: #00b4d8; }";
+    "QRadioButton::indicator { width: 14px; height: 14px; background: #08080a;"
+    " border: 1px solid #2c2c31; border-radius: 7px; }"
+    "QRadioButton::indicator:checked { background: #4a7ba8; border-color: #2f5c86; }";
 
 // ── Eingabefelder sind Mulden, keine Flaechen ────────────────────────
 //

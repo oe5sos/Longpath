@@ -52,6 +52,8 @@ mw0lge@grange-lane.co.uk
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+#include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 #include "MeterWidget.h"
 #include "MeterItem.h"
 #include "core/LogCategories.h"
@@ -122,7 +124,7 @@ MeterWidget::MeterWidget(QWidget* parent)
     // CPU fallback: dark background
     setAutoFillBackground(true);
     QPalette pal = palette();
-    pal.setColor(QPalette::Window, QColor(0x0f, 0x0f, 0x1a));
+    pal.setColor(QPalette::Window, QColor(Style::role("app-bg", Style::kAppBg)));
     setPalette(pal);
 #endif
 
@@ -354,7 +356,7 @@ void MeterWidget::paintEvent(QPaintEvent* event)
 #else
     Q_UNUSED(event);
     QPainter p(this);
-    p.fillRect(rect(), QColor(0x0f, 0x0f, 0x1a));
+    p.fillRect(rect(), QColor(Style::role("app-bg", Style::kAppBg)));
     drawItems(p);
 #endif
 }
@@ -846,7 +848,7 @@ void MeterWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         if (m_bgDirty) {
-            m_bgImage.fill(QColor(0x0f, 0x0f, 0x1a));
+            m_bgImage.fill(QColor(Style::role("app-bg", Style::kAppBg)));
             QPainter p(&m_bgImage);
             p.setRenderHint(QPainter::Antialiasing, false);
             for (MeterItem* item : m_items) {

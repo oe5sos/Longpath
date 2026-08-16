@@ -69,11 +69,15 @@ namespace {
 
 // NereusSDR-original palette per plan §9.1.  Hex callouts kept in
 // the trailing comment so a designer audit can grep for them.
-constexpr QColor kBg            { 14,  17,  21};   // #0a0a14 — strip background
-constexpr QColor kBorder        { 24,  28,  32};   // #0f0f1a — 1 px frame
-constexpr QColor kGreenPeak     { 76, 208,  72};   // #4cd048 — LimeGreen analogue
-constexpr QColor kRedOverlay    {255,  58,  58};   // #ff4444 — above-threshold
-constexpr QColor kRedThreshLine {255,  58,  58};   // #ff4444 — marker line
+constexpr QColor kBg            {  8,   8,  10};   // kInsetBg — versenkter Grund
+constexpr QColor kBorder        { 44,  44,  49};   // kBorder — 1 px frame
+// Aussteuerung ist gemessen, nicht ein Zustand: Bernstein statt
+// Signalgruen. Siehe die Notiz in VfoStyles.h.
+constexpr QColor kGreenPeak     {194, 146,  79};   // kAmberText — Messwert
+// Ueber der Schwelle ist es keine Messung mehr, sondern eine
+// Warnung: uebersteuert. Bleibt kraeftig und wird nicht gedaempft.
+constexpr QColor kRedOverlay    {168, 107, 109};   // kRedBorder — uebersteuert
+constexpr QColor kRedThreshLine {168, 107, 109};   // kRedBorder — Schwellenmarke
 
 } // namespace
 

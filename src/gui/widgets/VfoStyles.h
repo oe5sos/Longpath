@@ -100,8 +100,18 @@ inline const QColor kHdrRxBlue    { 0x44, 0x88, 0xff }; // RX antenna label text
 inline const QColor kHdrTxRed     { 0xff, 0x44, 0x44 }; // TX antenna label text color
 inline const QColor kFilterCyan   { 0x00, 0xc8, 0xff }; // filter-width label text color
 inline const QColor kSliceBadgeBlue{ 0x00, 0x70, 0xc0 }; // slice letter badge background
-inline const QColor kMeterCyan    { 0x00, 0xb4, 0xd8 }; // S-meter fill below S9
-inline const QColor kMeterGreen   { 0x00, 0xd8, 0x60 }; // S-meter fill at/above S9
+// ── Aussteuerung ist ein Messwert ───────────────────────────────────
+//
+// War Tuerkis unter S9 und Signalgruen darueber. Beides falsch: Gruen
+// (Salbei) ist im Hausstil der Ton fuer einen ZUSTAND -- an oder aus,
+// ein Laempchen. Was ein Pegelbalken zeigt, ist gemessen, und Gemessenes
+// steht in Bernstein, genau wie die Frequenz.
+//
+// Zwei Stufen bleiben, damit S9 als Schwelle ablesbar ist: darunter
+// gedaempft, darueber voll. Derselbe Ton, zwei Helligkeiten -- kein
+// zweiter Farbbegriff fuer dieselbe Groesse.
+inline const QColor kMeterCyan    { 0x8a, 0x6c, 0x3c }; // Messwert, gedaempft (unter S9)
+inline const QColor kMeterGreen   { 0xc2, 0x92, 0x4f }; // Messwert, voll (ab S9)
 inline const QColor kLabelMuted   { 0x68, 0x88, 0xa0 }; // muted label text
 inline const QColor kBodyText     { 0xc8, 0xd8, 0xe8 }; // default body text
 inline const QColor kBgDark       { 0x10, 0x10, 0x1c }; // flag dark bg used by custom paint

@@ -106,8 +106,10 @@ void VfoLevelBar::paintEvent(QPaintEvent*) {
     const QRect barRect(0, barTop, width() - kDbmWidth - 2, height() - barTop);
 
     // ── Bar itself (ported from AetherSDR LevelBar::paintEvent) ────────
-    p.fillRect(barRect, QColor(0x10, 0x10, 0x1c));
-    p.setPen(QColor(0x30, 0x40, 0x50));
+    // Versenkt, wie ein Eingabefeld: Grund dunkler als das Panel, Rand
+    // sichtbar. Ein leerer Balken soll als Balken lesbar bleiben.
+    p.fillRect(barRect, QColor(Style::role("inset-bg", Style::kInsetBg)));
+    p.setPen(QColor(Style::role("border", Style::kBorder)));
     p.drawRect(barRect.adjusted(0, 0, -1, -1));
     const int innerW = barRect.width() - 2;
     const int fillW = static_cast<int>(fillFraction() * innerW);
