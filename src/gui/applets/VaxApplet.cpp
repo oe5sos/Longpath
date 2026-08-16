@@ -21,6 +21,7 @@
 // =================================================================
 
 #include "VaxApplet.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
@@ -136,7 +137,7 @@ void VaxApplet::buildUi()
         row->addWidget(chLabel);
 
         m_tagsLbl[i] = new QLabel(QStringLiteral("\u2014"), body);
-        m_tagsLbl[i]->setStyleSheet(QStringLiteral("QLabel { color: #556070; font-size: 11px; }"));
+        m_tagsLbl[i]->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #556070; font-size: 11px; }")));
         m_tagsLbl[i]->setFixedWidth(56);
         row->addWidget(m_tagsLbl[i]);
 
@@ -201,7 +202,7 @@ void VaxApplet::buildUi()
         devRow->setContentsMargins(48, 0, 0, 0);
         devRow->setSpacing(0);
         m_deviceLbl[i] = new QLabel(deviceLabelFor(channel), body);
-        m_deviceLbl[i]->setStyleSheet(QStringLiteral("QLabel { color: #556070; font-size: 10px; }"));
+        m_deviceLbl[i]->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #556070; font-size: 10px; }")));
         devRow->addWidget(m_deviceLbl[i]);
         devRow->addStretch();
         vbox->addLayout(devRow);
@@ -212,7 +213,7 @@ void VaxApplet::buildUi()
         auto* line = new QFrame(body);
         line->setFrameShape(QFrame::HLine);
         line->setFrameShadow(QFrame::Plain);
-        line->setStyleSheet(QStringLiteral("QFrame { color: #203040; }"));
+        line->setStyleSheet(Style::themed(QStringLiteral("QFrame { color: #203040; }")));
         vbox->addWidget(line);
     }
 
@@ -228,7 +229,7 @@ void VaxApplet::buildUi()
         row->addWidget(txLabel);
 
         m_txTagsLbl = new QLabel(QStringLiteral("\u2014"), body);
-        m_txTagsLbl->setStyleSheet(QStringLiteral("QLabel { color: #556070; font-size: 11px; }"));
+        m_txTagsLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #556070; font-size: 11px; }")));
         m_txTagsLbl->setFixedWidth(56);
         row->addWidget(m_txTagsLbl);
 

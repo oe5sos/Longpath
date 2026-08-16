@@ -61,6 +61,7 @@
 //============================================================================================//
 
 #include "DspSetupPages.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
@@ -419,12 +420,12 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     auto* tabs = new QTabWidget(this);
     m_tabs = tabs;  // remember for selectSubtab()
     tabs->setTabPosition(QTabWidget::North);
-    tabs->setStyleSheet(
+    tabs->setStyleSheet(Style::themed(
         "QTabWidget::pane { border: 1px solid #304050; background: #0f0f1a; }"
         "QTabBar::tab { background: #1a2a3a; color: #8aa8c0; padding: 4px 10px; "
         "               border: 1px solid #304050; border-bottom: none; border-radius: 6px 3px 0 0; }"
         "QTabBar::tab:selected { background: #0f0f1a; color: #c8d8e8; }"
-        "QTabBar::tab:hover { background: #203040; }");
+        "QTabBar::tab:hover { background: #203040; }"));
     contentLayout()->setContentsMargins(0, 0, 0, 0);
     // Remove the trailing stretch that SetupPage adds in its ctor
     // (SetupPage.cpp:90 — m_contentLayout->addStretch(1)). That stretch
@@ -453,8 +454,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* scroll = new QScrollArea;
         scroll->setWidgetResizable(true);
         scroll->setFrameShape(QFrame::NoFrame);
-        scroll->setStyleSheet("QScrollArea { background: #0f0f1a; border: none; }");
-        page->setStyleSheet("QWidget { background: #0f0f1a; }");
+        scroll->setStyleSheet(Style::themed("QScrollArea { background: #0f0f1a; border: none; }"));
+        page->setStyleSheet(Style::themed("QWidget { background: #0f0f1a; }"));
         auto* vlay = new QVBoxLayout(page);
         vlay->setContentsMargins(8, 8, 8, 8);
         vlay->setSpacing(6);
@@ -524,22 +525,22 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         row->setSpacing(8);
 
         auto* label = new QLabel(labelText);
-        label->setStyleSheet("QLabel { color: #8aa8c0; font-size: 12px; }");
+        label->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 12px; }"));
         label->setFixedWidth(80);
         row->addWidget(label);
 
         auto* slider = new QSlider(Qt::Horizontal);
         slider->setRange(minimum, maximum);
         slider->setValue(defaultValue);
-        slider->setStyleSheet(
+        slider->setStyleSheet(Style::themed(
             "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
             "QSlider::handle:horizontal { background: #00b4d8; width: 12px; height: 12px; "
-            "border-radius: 6px; margin: -4px 0; }");
+            "border-radius: 6px; margin: -4px 0; }"));
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, /*stretch=*/1);
 
         auto* value = new QLabel(QString::number(defaultValue) + suffix);
-        value->setStyleSheet("QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }");
+        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }"));
         value->setFixedWidth(48);
         value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(value);
@@ -566,7 +567,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         row->setSpacing(8);
 
         auto* label = new QLabel(labelText);
-        label->setStyleSheet("QLabel { color: #8aa8c0; font-size: 12px; }");
+        label->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 12px; }"));
         label->setFixedWidth(80);
         row->addWidget(label);
 
@@ -574,15 +575,15 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         slider->setRange(static_cast<int>(minimum * scale),
                          static_cast<int>(maximum * scale));
         slider->setValue(static_cast<int>(defaultValue * scale));
-        slider->setStyleSheet(
+        slider->setStyleSheet(Style::themed(
             "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
             "QSlider::handle:horizontal { background: #00b4d8; width: 12px; height: 12px; "
-            "border-radius: 6px; margin: -4px 0; }");
+            "border-radius: 6px; margin: -4px 0; }"));
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, 1);
 
         auto* value = new QLabel;
-        value->setStyleSheet("QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }");
+        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }"));
         value->setFixedWidth(56);
         value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         value->setText(QString::number(defaultValue, 'f', decimals) + suffix);
@@ -603,13 +604,13 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     {
         auto* preRdo  = new QRadioButton("Pre-AGC");
         auto* postRdo = new QRadioButton("Post-AGC");
-        preRdo->setStyleSheet(
+        preRdo->setStyleSheet(Style::themed(
             "QRadioButton { color: #c8d8e8; font-size: 12px; }"
             "QRadioButton::indicator { width: 14px; height: 14px; }"
             "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
             "border-radius: 7px; background: #1a2a3a; }"
             "QRadioButton::indicator:checked { border: 2px solid #00b4d8; "
-            "border-radius: 7px; background: #00b4d8; }");
+            "border-radius: 7px; background: #00b4d8; }"));
         postRdo->setStyleSheet(preRdo->styleSheet());
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
@@ -820,13 +821,13 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         {
             for (int i = 0; i < gmLabels.size(); ++i) {
                 auto* rdo = new QRadioButton(gmLabels[i]);
-                rdo->setStyleSheet(
+                rdo->setStyleSheet(Style::themed(
                     "QRadioButton { color: #c8d8e8; font-size: 12px; }"
                     "QRadioButton::indicator { width: 14px; height: 14px; }"
                     "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
                     "border-radius: 7px; background: #1a2a3a; }"
                     "QRadioButton::indicator:checked { border: 2px solid #00b4d8; "
-                    "border-radius: 7px; background: #00b4d8; }");
+                    "border-radius: 7px; background: #00b4d8; }"));
                 gmGrp->addWidget(rdo);
                 gmRdos.append(rdo);
             }
@@ -1046,11 +1047,11 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 
         auto* btnRow = new QHBoxLayout;
         auto* useModelBtn = new QPushButton("Use Model...");
-        useModelBtn->setStyleSheet(
+        useModelBtn->setStyleSheet(Style::themed(
             "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
             "border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
             "QPushButton:hover { background: #203040; }"
-            "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }");
+            "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }"));
         auto* defBtn = new QPushButton("Default");
         defBtn->setStyleSheet(useModelBtn->styleSheet());
         btnRow->addWidget(useModelBtn);
@@ -1603,7 +1604,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
             tr("Shared by every receiver on the same DDC. Adjusting these "
                "changes the blanker for all of them."));
         nb1Note->setWordWrap(true);
-        nb1Note->setStyleSheet(QStringLiteral("color: #8aa8c0; font-size: 11px;"));
+        nb1Note->setStyleSheet(Style::themed(QStringLiteral("color: #8aa8c0; font-size: 11px;")));
         nb1Lay->addWidget(nb1Note);
     }
 
@@ -1693,7 +1694,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
         auto* snbNote = new QLabel(
             tr("Applies to the selected receiver only."));
         snbNote->setWordWrap(true);
-        snbNote->setStyleSheet(QStringLiteral("color: #8aa8c0; font-size: 11px;"));
+        snbNote->setStyleSheet(Style::themed(QStringLiteral("color: #8aa8c0; font-size: 11px;")));
         snbLay->addWidget(snbNote);
     }
 
@@ -1814,15 +1815,15 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     sidetoneLbl->setFixedWidth(150);
     // Match SetupPage::makeLabeledRow label styling (kLabelStyle in
     // SetupPage.cpp).  Inlined here because the helper is file-scope.
-    sidetoneLbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: #c8d8e8; font-size: 12px; }"));
+    sidetoneLbl->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #c8d8e8; font-size: 12px; }")));
     auto* sidetoneVol = new QSlider(Qt::Horizontal);
     sidetoneVol->setRange(0, 100);
-    sidetoneVol->setStyleSheet(
+    sidetoneVol->setStyleSheet(Style::themed(
         "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; "
         "border-radius: 2px; }"
         "QSlider::handle:horizontal { background: #00b4d8; width: 12px; "
-        "height: 12px; border-radius: 6px; margin: -4px 0; }");
+        "height: 12px; border-radius: 6px; margin: -4px 0; }"));
     sidetoneRowLay->addWidget(sidetoneLbl);
     sidetoneRowLay->addWidget(sidetoneVol, 1);
     timingLay->addWidget(m_sidetoneRow);
@@ -2236,8 +2237,8 @@ CfcSetupPage::CfcSetupPage(RadioModel* model, QWidget* parent)
         "bandpass chain)."));
     cessbNote->setObjectName(QStringLiteral("lblCESSBNote"));
     cessbNote->setWordWrap(true);
-    cessbNote->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8aa8c0; font-size: 11px; font-style: italic; }"));
+    cessbNote->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #8aa8c0; font-size: 11px; font-style: italic; }")));
     cessbLay->addWidget(cessbNote);
 
     // ── Wiring: CESSB widget ↔ TransmitModel ─────────────────────────────────
@@ -2309,13 +2310,13 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
         QStringLiteral("Active"),
         QString()
     });
-    m_notchTable->setStyleSheet(QStringLiteral(
+    m_notchTable->setStyleSheet(Style::themed(QStringLiteral(
         "QTableWidget { background: #1a1a2a; color: #c8d8e8; "
         "  gridline-color: #304050; border: 1px solid #304050; }"
         "QTableWidget::item { padding: 2px 4px; }"
         "QTableWidget::item:selected { background: #204060; }"
         "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
-        "  border: 1px solid #304050; padding: 4px; }"));
+        "  border: 1px solid #304050; padding: 4px; }")));
     m_notchTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_notchTable->setSelectionMode(QAbstractItemView::SingleSelection);
     m_notchTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);

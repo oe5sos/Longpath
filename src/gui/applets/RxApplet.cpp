@@ -117,6 +117,7 @@
 //============================================================================================//
 
 #include "RxApplet.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QGuiApplication>
 
@@ -303,11 +304,11 @@ void RxApplet::buildUi()
             QMenu menu(this);
             // Dark popup palette — without this, Ubuntu's default theme renders
             // items as dark-on-dark (only visible on hover). Issue #98.
-            menu.setStyleSheet(QStringLiteral(
+            menu.setStyleSheet(Style::themed(QStringLiteral(
                 "QMenu { background: #1a2a3a; color: #c8d8e8;"
                 "        border: 1px solid #304050; }"
                 "QMenu::item { padding: 4px 20px; }"
-                "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }"));
+                "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }")));
             const QString cur = m_slice ? m_slice->rxAntenna() : QString{};
             if (m_popupCaps && m_popupSku) {
                 AntennaPopupBuilder::populate(&menu, *m_popupCaps, *m_popupSku,
@@ -338,22 +339,22 @@ void RxApplet::buildUi()
         m_txAntBtn = new QPushButton(QStringLiteral("ANT1"), this);
         m_txAntBtn->setObjectName(QStringLiteral("m_txAntBtn"));
         m_txAntBtn->setFlat(true);
-        m_txAntBtn->setStyleSheet(QStringLiteral(
+        m_txAntBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton {"
             "  color: #ff4444; background: transparent; border: none;"  // §A2 one-off TX color
             "  font-size: 10px; font-weight: bold; padding: 0 2px;"
             "}"
             "QPushButton:hover { color: #ff6666; }"  // §A2 one-off hover derived from #ff4444
-        ));
+        )));
         connect(m_txAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder TX mode — only main ANT1-3 (Phase 3P-I-a T22).
             QMenu menu(this);
             // Dark popup palette — see RX button above. Issue #98.
-            menu.setStyleSheet(QStringLiteral(
+            menu.setStyleSheet(Style::themed(QStringLiteral(
                 "QMenu { background: #1a2a3a; color: #c8d8e8;"
                 "        border: 1px solid #304050; }"
                 "QMenu::item { padding: 4px 20px; }"
-                "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }"));
+                "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }")));
             const QString cur = m_slice ? m_slice->txAntenna() : QString{};
             if (m_popupCaps && m_popupSku) {
                 AntennaPopupBuilder::populate(&menu, *m_popupCaps, *m_popupSku,
@@ -1270,11 +1271,11 @@ void RxApplet::updateSliceButtons(const QVector<SliceModel*>& slices,
         m_sliceGroup->addButton(btn, sliceIdx);
 
         const QColor c = VfoWidget::sliceColor(sliceIdx);
-        btn->setStyleSheet(QStringLiteral(
+        btn->setStyleSheet(Style::themed(QStringLiteral(
             "QToolButton { background: #2a2a2a; color: %1; border: 1px solid %1;"
             " border-radius: 6px; font-weight: bold; font-size: 10px; padding: 0; }"
             "QToolButton:checked { background: %1; color: #0a0a14; }")
-            .arg(c.name()));
+            .arg(c.name())));
         btn->setToolTip(QStringLiteral("Slice %1").arg(s->sliceLetter()));
         btn->setChecked(sliceIdx == activeSliceIndex);
     }

@@ -15,6 +15,7 @@
 // =================================================================
 
 #include "DspParamPopup.h"
+#include "gui/styles/ThemeQss.h"
 #include "GuardedSlider.h"
 
 #include <QVBoxLayout>
@@ -64,7 +65,7 @@ void DspParamPopup::addRadioGroup(const QString& label, const QStringList& optio
                                    int defaultIdx, std::function<void(int)> onChange)
 {
     auto* lbl = new QLabel(label);
-    lbl->setStyleSheet("QLabel { color: #8090a0; font-size: 10px; font-weight: bold; }");
+    lbl->setStyleSheet(Style::themed("QLabel { color: #8090a0; font-size: 10px; font-weight: bold; }"));
     m_layout->addWidget(lbl);
 
     auto* row = new QHBoxLayout;
@@ -109,7 +110,7 @@ void DspParamPopup::addSlider(const QString& label, int min, int max, int defaul
     row->addWidget(slider);
 
     auto* val = new QLabel(format ? format(defaultVal) : QString::number(defaultVal));
-    val->setStyleSheet("QLabel { color: #c8d8e8; min-width: 36px; }");
+    val->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; min-width: 36px; }"));
     val->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     if (!tooltip.isEmpty()) val->setToolTip(tooltip);
     row->addWidget(val);

@@ -38,6 +38,7 @@
 // =================================================================
 
 #include "gui/DiversityDialog.h"
+#include "gui/styles/ThemeQss.h"
 #include "StyleConstants.h"
 #include "core/AppSettings.h"
 #include "core/MoxController.h"
@@ -189,15 +190,15 @@ DiversityDialog::DiversityDialog(RadioModel* radioModel, QWidget* parent)
     // client area; it intercepts mouse events so phase/gain edits go
     // through.
     m_pauseOverlay = new QWidget(this);
-    m_pauseOverlay->setStyleSheet(QStringLiteral(
+    m_pauseOverlay->setStyleSheet(Style::themed(QStringLiteral(
         "background: rgba(20, 30, 45, 220);"
-        "color: #ffb800; font-size: 18px; font-weight: bold;"));
+        "color: #ffb800; font-size: 18px; font-weight: bold;")));
     auto* overlayLayout = new QVBoxLayout(m_pauseOverlay);
     overlayLayout->setContentsMargins(0, 0, 0, 0);
     auto* overlayLbl = new QLabel(
         QStringLiteral("PS HOLD\nPureSignal calibrating"), m_pauseOverlay);
     overlayLbl->setAlignment(Qt::AlignCenter);
-    overlayLbl->setStyleSheet(QStringLiteral("color: #ffb800;"));
+    overlayLbl->setStyleSheet(Style::themed(QStringLiteral("color: #ffb800;")));
     overlayLayout->addWidget(overlayLbl);
     m_pauseOverlay->setGeometry(rect());
     m_pauseOverlay->hide();

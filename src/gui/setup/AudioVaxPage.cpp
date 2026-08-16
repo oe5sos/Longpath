@@ -15,6 +15,7 @@
 // =================================================================
 
 #include "AudioVaxPage.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
@@ -243,8 +244,8 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
         auto* exposedLbl = new QLabel(tr("Exposed to system as:"), this);
-        exposedLbl->setStyleSheet(
-            QStringLiteral("QLabel { color: #607080; font-size: 11px; }"));
+        exposedLbl->setStyleSheet(Style::themed(
+            QStringLiteral("QLabel { color: #607080; font-size: 11px; }")));
 
         m_nodeDescLabel = new QLabel(
             defaultNodeDescription(m_channel), this);
@@ -255,8 +256,8 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
 
         // "Format:" static row.
         auto* formatLbl = new QLabel(tr("Format:"), this);
-        formatLbl->setStyleSheet(
-            QStringLiteral("QLabel { color: #607080; font-size: 11px; }"));
+        formatLbl->setStyleSheet(Style::themed(
+            QStringLiteral("QLabel { color: #607080; font-size: 11px; }")));
         m_formatLabel = new QLabel(
             QStringLiteral("48000 Hz · Stereo · Float32"), this);
         m_formatLabel->setStyleSheet(QLatin1String(kSpecRowValueStyle));
@@ -264,8 +265,8 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
 
         // "Consumers:" placeholder row.
         auto* consumersLbl = new QLabel(tr("Consumers:"), this);
-        consumersLbl->setStyleSheet(
-            QStringLiteral("QLabel { color: #607080; font-size: 11px; }"));
+        consumersLbl->setStyleSheet(Style::themed(
+            QStringLiteral("QLabel { color: #607080; font-size: 11px; }")));
         m_consumerLabel = new QLabel(
             // TODO(later-task): wire live consumer count from engine's
             // owned PipeWireBus collection via Task 24+ accessor.
@@ -277,8 +278,8 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
 
         // "Level:" HGauge row.
         auto* levelLbl = new QLabel(tr("Level:"), this);
-        levelLbl->setStyleSheet(
-            QStringLiteral("QLabel { color: #607080; font-size: 11px; }"));
+        levelLbl->setStyleSheet(Style::themed(
+            QStringLiteral("QLabel { color: #607080; font-size: 11px; }")));
         m_levelGauge = new HGauge(this);
         m_levelGauge->setRange(-60.0, 0.0);
         m_levelGauge->setYellowStart(-12.0);
@@ -697,10 +698,10 @@ void VaxChannelCard::onAutoDetectClicked()
 #endif
 
     QMenu menu(this);
-    menu.setStyleSheet(
+    menu.setStyleSheet(Style::themed(
         "QMenu { background: #0f0f1a; color: #c8d8e8; border: 1px solid #203040; }"
         "QMenu::item:selected { background: #203040; }"
-        "QMenu::item:disabled { color: #556070; }");
+        "QMenu::item:disabled { color: #556070; }"));
 
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     int nativeHalCount = 0;
@@ -855,8 +856,8 @@ void AudioVaxPage::buildPage()
     // Section header.
     auto* headerLabel = new QLabel(
         QStringLiteral("Virtual Audio eXchange — PipeWire sources"), this);
-    headerLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: #8aa8c0; font-size: 12px; }"));
+    headerLabel->setStyleSheet(Style::themed(
+        QStringLiteral("QLabel { color: #8aa8c0; font-size: 12px; }")));
     insertBeforeStretch(headerLabel);
 
     // Sub-header describing the new Phase 3O model.
@@ -866,8 +867,8 @@ void AudioVaxPage::buildPage()
             "source (node). Consumer applications (WSJT-X, FLDIGI, etc.) "
             "select it as an audio input device — no virtual cable needed."),
         this);
-    subHeader->setStyleSheet(
-        QStringLiteral("QLabel { color: #607080; font-size: 11px; }"));
+    subHeader->setStyleSheet(Style::themed(
+        QStringLiteral("QLabel { color: #607080; font-size: 11px; }")));
     subHeader->setWordWrap(true);
     insertBeforeStretch(subHeader);
 
@@ -909,7 +910,7 @@ void AudioVaxPage::buildPage()
                        "Phase 3M (SendIqToVax / TxMonitorToVax) will add "
                        "per-band override here."),
         txGroup);
-    txLabel->setStyleSheet(QStringLiteral("QLabel { color: #607080; font-size: 11px; }"));
+    txLabel->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #607080; font-size: 11px; }")));
     txLabel->setWordWrap(true);
     txLayout->addWidget(txLabel);
     insertBeforeStretch(txGroup);

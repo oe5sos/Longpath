@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "MmioEndpointsDialog.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "../../core/mmio/ExternalVariableEngine.h"
 #include "../../core/mmio/MmioEndpoint.h"
@@ -206,7 +207,7 @@ MmioEndpointsDialog::MmioEndpointsDialog(QWidget* parent)
     auto* centerBtnRow = new QHBoxLayout();
     m_btnApply = new QPushButton(QStringLiteral("Apply changes"), centerWrap);
     m_lblStatus = new QLabel(QStringLiteral("—"), centerWrap);
-    m_lblStatus->setStyleSheet(QStringLiteral("QLabel { color: #8090a0; }"));
+    m_lblStatus->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #8090a0; }")));
     centerBtnRow->addWidget(m_btnApply);
     centerBtnRow->addStretch();
     centerBtnRow->addWidget(m_lblStatus);

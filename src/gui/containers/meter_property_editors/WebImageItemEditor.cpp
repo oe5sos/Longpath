@@ -1,4 +1,5 @@
 #include "WebImageItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/WebImageItem.h"
 
 #include <QLineEdit>
@@ -12,9 +13,9 @@ namespace NereusSDR {
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
 {
-    btn->setStyleSheet(
+    btn->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(c.name(QColor::HexArgb)));
+            .arg(c.name(QColor::HexArgb))));
 }
 } // namespace
 
@@ -48,10 +49,10 @@ void WebImageItemEditor::buildTypeSpecific()
     rowLayout->setSpacing(4);
 
     m_editUrl = new QLineEdit(rowWidget);
-    m_editUrl->setStyleSheet(
+    m_editUrl->setStyleSheet(Style::themed(
         QStringLiteral("QLineEdit { background: #0a0a18; color: #c8d8e8;"
                        " border: 1px solid #1e2e3e; border-radius: 6px;"
-                       " padding: 1px 4px; min-height: 18px; }"));
+                       " padding: 1px 4px; min-height: 18px; }")));
     rowLayout->addWidget(m_editUrl, 1);
 
     auto* btnReload = new QPushButton(QStringLiteral("Reload"), rowWidget);

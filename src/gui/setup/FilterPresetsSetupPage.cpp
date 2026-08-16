@@ -12,6 +12,7 @@
 // =================================================================
 
 #include "FilterPresetsSetupPage.h"
+#include "gui/styles/ThemeQss.h"
 #include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 
@@ -63,14 +64,14 @@ void FilterPresetsSetupPage::buildUi()
     // leaves the widgets pinned to the SetupPage origin and they overlap
     // the title bar. (Qt: only addLayout/addWidget call adoptLayout.)
     auto* modeLbl = new QLabel(QStringLiteral("DSP Mode:"), modeBox);
-    modeLbl->setStyleSheet(QStringLiteral("color: #c8d8e8;"));
+    modeLbl->setStyleSheet(Style::themed(QStringLiteral("color: #c8d8e8;")));
 
     m_modeCombo = new QComboBox(modeBox);
-    m_modeCombo->setStyleSheet(
+    m_modeCombo->setStyleSheet(Style::themed(
         QStringLiteral("QComboBox { background: #1a1a2a; color: #c8d8e8; "
                        "border: 1px solid #304050; border-radius: 6px; padding: 2px 6px; }"
                        "QComboBox::drop-down { background: #1a2a3a; }"
-                       "QComboBox QAbstractItemView { background: #1a1a2a; color: #c8d8e8; }"));
+                       "QComboBox QAbstractItemView { background: #1a1a2a; color: #c8d8e8; }")));
 
     // Populate with all DSPMode values in enum order.
     static const DSPMode kModes[] = {
@@ -108,13 +109,13 @@ void FilterPresetsSetupPage::buildUi()
         QStringLiteral("Width (Hz)"),
         QStringLiteral("Reorder")
     });
-    m_table->setStyleSheet(
+    m_table->setStyleSheet(Style::themed(
         QStringLiteral("QTableWidget { background: #1a1a2a; color: #c8d8e8; "
                        "  gridline-color: #304050; border: 1px solid #304050; }"
                        "QTableWidget::item { padding: 2px 4px; }"
                        "QTableWidget::item:selected { background: #204060; }"
                        "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
-                       "  border: 1px solid #304050; padding: 4px; }"));
+                       "  border: 1px solid #304050; padding: 4px; }")));
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -229,9 +230,9 @@ void FilterPresetsSetupPage::populateTable()
         // Col 1: name (editable QLineEdit)
         auto* nameEdit = new QLineEdit(p.name, m_table);
         nameEdit->setMaxLength(32);
-        nameEdit->setStyleSheet(QStringLiteral(
+        nameEdit->setStyleSheet(Style::themed(QStringLiteral(
             "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
-            "border: 1px solid #304050; border-radius: 2px; padding: 1px 3px; }"));
+            "border: 1px solid #304050; border-radius: 2px; padding: 1px 3px; }")));
         // Connect editing to live persist
         const int row = i;
         connect(nameEdit, &QLineEdit::editingFinished, this, [this, row] {
@@ -244,10 +245,10 @@ void FilterPresetsSetupPage::populateTable()
         lowSpin->setRange(-10000, 10000);
         lowSpin->setValue(p.low);
         lowSpin->setSuffix(QStringLiteral(" Hz"));
-        lowSpin->setStyleSheet(QStringLiteral(
+        lowSpin->setStyleSheet(Style::themed(QStringLiteral(
             "QSpinBox { background: #1a1a2a; color: #c8d8e8; "
             "border: 1px solid #304050; border-radius: 2px; padding: 1px; }"
-            "QSpinBox::up-button, QSpinBox::down-button { background: #1a2a3a; width: 14px; }"));
+            "QSpinBox::up-button, QSpinBox::down-button { background: #1a2a3a; width: 14px; }")));
         connect(lowSpin, &QSpinBox::editingFinished, this, [this, row] {
             commitTableRow(row);
         });

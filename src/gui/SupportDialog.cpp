@@ -1,4 +1,5 @@
 #include "SupportDialog.h"
+#include "gui/styles/ThemeQss.h"
 #include "StyleConstants.h"
 #include "core/LogCategories.h"
 #include "core/SupportBundle.h"
@@ -107,7 +108,7 @@ void SupportDialog::buildUI()
     m_logViewer->setFont(QFont(QStringLiteral("Consolas"), 9));
     // §D: #0a0a14 = Style::kStatusBarBg, #203040 = Style::kBorderSubtle, #00b4d8 = Style::kAccent.
     // §D exception: fg #8aa8c0 (off-palette warm-blue for log text readability).
-    m_logViewer->setStyleSheet(
+    m_logViewer->setStyleSheet(Style::themed(
         QStringLiteral(
             "QPlainTextEdit {"
             "  background: %1;"                  // Style::kStatusBarBg
@@ -115,7 +116,7 @@ void SupportDialog::buildUI()
             "  border: 1px solid %2;"            // Style::kBorderSubtle
             "  selection-background-color: %3;"  // Style::kAccent
             "}")
-        .arg(Style::kStatusBarBg, Style::kBorderSubtle, Style::kAccent));
+        .arg(Style::kStatusBarBg, Style::kBorderSubtle, Style::kAccent)));
     mainLayout->addWidget(m_logViewer, 1);  // stretch factor 1
 
     // --- Action Buttons ---
@@ -168,7 +169,7 @@ void SupportDialog::buildUI()
     // Dialog theme. §D: #0f0f1a = kAppBg, #8090a0 = kTextSecondary,
     // #203040 = kBorderSubtle, #304050 = kOverlayBorder, #c8d8e8 = kTextPrimary.
     // §D exception: #405060 — button border/hover; off-palette (no canonical match).
-    setStyleSheet(
+    setStyleSheet(Style::themed(
         QStringLiteral(
             "QDialog { background: %1; }"
             "QGroupBox {"
@@ -192,7 +193,7 @@ void SupportDialog::buildUI()
             "}"
             "QPushButton:hover { background: #405060; }")  // §D exception
         .arg(Style::kAppBg, Style::kTextSecondary, Style::kBorderSubtle,
-             Style::kOverlayBorder, Style::kTextPrimary));
+             Style::kOverlayBorder, Style::kTextPrimary)));
 }
 
 void SupportDialog::refreshLogViewer()
@@ -316,13 +317,13 @@ void SupportDialog::onCreateBundle()
         "github.com/boydsoftprez/NereusSDR/issues"));
     // §D: #0f0f1a = kAppBg, #c8d8e8 = kTextPrimary, #304050 = kOverlayBorder.
     // §D exception: #405060 — button border; off-palette (matches dialog theme above).
-    msgBox.setStyleSheet(
+    msgBox.setStyleSheet(Style::themed(
         QStringLiteral(
             "QMessageBox { background: %1; color: %2; }"
             "QLabel { color: %2; }"
             "QPushButton { background: %3; color: %2; border: 1px solid #405060;"  // §D exception
             "  border-radius: 6px; padding: 5px 12px; }")
-        .arg(Style::kAppBg, Style::kTextPrimary, Style::kOverlayBorder));
+        .arg(Style::kAppBg, Style::kTextPrimary, Style::kOverlayBorder)));
 
     auto* openBtn = msgBox.addButton(QStringLiteral("Open Folder"), QMessageBox::ActionRole);
     auto* issueBtn = msgBox.addButton(QStringLiteral("File an Issue"), QMessageBox::ActionRole);

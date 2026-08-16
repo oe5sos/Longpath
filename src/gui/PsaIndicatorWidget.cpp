@@ -105,6 +105,7 @@ mw0lge@grange-lane.co.uk
 
 
 #include "gui/PsaIndicatorWidget.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/MoxController.h"
 #include "core/PureSignal.h"
@@ -669,11 +670,11 @@ void PsaIndicatorWidget::applyBackground(QLabel* label, const QColor& bg)
     label->setPalette(p);
     label->setAutoFillBackground(true);
 
-    label->setStyleSheet(QStringLiteral(
+    label->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background-color: %1; color: #0a0a14; "
         "padding: 1px 6px; border-radius: 6px; "
         "font-weight: bold; font-size: 11px; }")
-        .arg(bg.name()));
+        .arg(bg.name())));
 }
 
 } // namespace NereusSDR

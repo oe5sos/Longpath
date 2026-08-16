@@ -1,5 +1,6 @@
 // src/gui/ColorSwatchButton.cpp
 #include "ColorSwatchButton.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QColorDialog>
 #include <QStringLiteral>
@@ -49,12 +50,12 @@ void ColorSwatchButton::updateSwatchStyle()
                                              : QStringLiteral("#1a1a1a");
     const QString border = QStringLiteral("#203040");
 
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: %1; color: %2;"
         " border: 1px solid %3; border-radius: 6px; padding: 2px 8px; }"
         "QPushButton:hover { border-color: #00b4d8; }"
         "QPushButton:pressed { background: %1; }")
-        .arg(m_color.name(QColor::HexArgb), fg, border));
+        .arg(m_color.name(QColor::HexArgb), fg, border)));
 }
 
 QString ColorSwatchButton::colorToHex(const QColor& c)

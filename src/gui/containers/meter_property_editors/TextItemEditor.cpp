@@ -1,4 +1,5 @@
 #include "TextItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 
 #include <QLineEdit>
@@ -25,9 +26,9 @@ void TextItemEditor::setItem(MeterItem* item)
     beginProgrammaticUpdate();
 
     m_editLabel->setText(x->label());
-    m_btnTextColor->setStyleSheet(
+    m_btnTextColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(x->textColor().name(QColor::HexArgb)));
+            .arg(x->textColor().name(QColor::HexArgb))));
     m_spinFontSize->setValue(x->fontSize());
     m_chkBold->setChecked(x->bold());
     m_editSuffix->setText(x->suffix());
@@ -57,9 +58,9 @@ void TextItemEditor::buildTypeSpecific()
     m_btnTextColor = new QPushButton(this);
     m_btnTextColor->setFixedSize(40, 18);
     auto applyTextColor = [this](const QColor& c) {
-        m_btnTextColor->setStyleSheet(
+        m_btnTextColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     connect(m_btnTextColor, &QPushButton::clicked, this, [this, applyTextColor]() {
         TextItem* x = qobject_cast<TextItem*>(m_item);

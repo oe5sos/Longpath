@@ -7,6 +7,7 @@
 // =================================================================
 
 #include "Rf2ksApplet.h"
+#include "gui/styles/ThemeQss.h"
 #include "gui/HGauge.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -38,7 +39,7 @@ Rf2ksApplet::Rf2ksApplet(RadioModel* model, QWidget* parent)
     m_deviceLabel   = new QLabel(QStringLiteral("RF-Kit RF2K-S"), headerWrap);
     m_nicknameLabel = new QLabel(QString(), headerWrap);
     m_deviceLabel->setStyleSheet(QStringLiteral("font-weight:600;"));
-    m_nicknameLabel->setStyleSheet(QStringLiteral("color:#8090a0; font-size:10px;"));
+    m_nicknameLabel->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0; font-size:10px;")));
     leftCol->addWidget(m_deviceLabel);
     leftCol->addWidget(m_nicknameLabel);
     header->addLayout(leftCol);
@@ -115,7 +116,7 @@ Rf2ksApplet::Rf2ksApplet(RadioModel* model, QWidget* parent)
     gaugesLay->addWidget(m_tempGauge);
 
     m_telemetryLabel = new QLabel(gaugesWrap);
-    m_telemetryLabel->setStyleSheet(QStringLiteral("color:#8899aa; font-size:10px;"));
+    m_telemetryLabel->setStyleSheet(Style::themed(QStringLiteral("color:#8899aa; font-size:10px;")));
     gaugesLay->addWidget(m_telemetryLabel);
     root->addWidget(gaugesWrap);
 
@@ -196,17 +197,17 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
     // styling: green pill on OPERATE, neutral blue-grey on STANDBY.
     const bool operating = (mode == QStringLiteral("OPERATE"));
     if (operating) {
-        m_operateBtn->setStyleSheet(
+        m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
                 "QPushButton { background: #1a6030; border: 1px solid #008040; "
                 "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }"
-                "QPushButton:hover { background: #007040; }"));
+                "QPushButton:hover { background: #007040; }")));
     } else {
-        m_operateBtn->setStyleSheet(
+        m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
                 "QPushButton { background: #204060; border: 1px solid #205070; "
                 "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
-                "QPushButton:hover { background: #204060; }"));
+                "QPushButton:hover { background: #204060; }")));
     }
 }
 

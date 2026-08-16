@@ -13,6 +13,7 @@
 // no-port-check: NereusSDR-original
 
 #include "gui/widgets/TxBoundConfirmDialog.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "gui/StyleConstants.h"
 #include "models/SliceModel.h"
@@ -50,7 +51,7 @@ TxBoundConfirmDialog::TxBoundConfirmDialog(const QString& proposedAntenna,
         QStringLiteral("[!] TX-bound slice is on this chain. Re-routing changes the antenna"
                        " your transmit signal goes to."),
         this);
-    warnLbl->setStyleSheet(QStringLiteral("color: #ffb800; font-size: 11px;"));
+    warnLbl->setStyleSheet(Style::themed(QStringLiteral("color: #ffb800; font-size: 11px;")));
     warnLbl->setWordWrap(true);
     main->addWidget(warnLbl);
 

@@ -49,6 +49,7 @@
 // =================================================================
 
 #include "SetupDialog.h"
+#include "gui/styles/ThemeQss.h"
 #include "SetupPage.h"
 #include "core/BoardCapabilities.h"
 #include "core/PureSignal.h"
@@ -155,7 +156,7 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     setWindowTitle("NereusSDR Settings");
     setMinimumSize(820, 600);
     resize(900, 650);
-    setStyleSheet("QDialog { background: #0f0f1a; }");
+    setStyleSheet(Style::themed("QDialog { background: #0f0f1a; }"));
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -164,22 +165,22 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     // ── Splitter: tree navigation | stacked pages ─────────────────────────────
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     splitter->setHandleWidth(1);
-    splitter->setStyleSheet("QSplitter::handle { background: #304050; }");
+    splitter->setStyleSheet(Style::themed("QSplitter::handle { background: #304050; }"));
 
     // Tree navigation
     m_tree = new QTreeWidget;
     m_tree->setHeaderHidden(true);
     m_tree->setIndentation(16);
     m_tree->setFixedWidth(200);
-    m_tree->setStyleSheet(
+    m_tree->setStyleSheet(Style::themed(
         "QTreeWidget { background: #1a1a2a; color: #c8d8e8; border: none; "
         "font-size: 12px; selection-background-color: #00b4d8; }"
         "QTreeWidget::item { padding: 4px 8px; }"
-        "QTreeWidget::item:hover { background: #1a2a3a; }");
+        "QTreeWidget::item:hover { background: #1a2a3a; }"));
 
     // Stacked widget for page content
     m_stack = new QStackedWidget;
-    m_stack->setStyleSheet("QStackedWidget { background: #0f0f1a; }");
+    m_stack->setStyleSheet(Style::themed("QStackedWidget { background: #0f0f1a; }"));
 
     splitter->addWidget(m_tree);
     splitter->addWidget(m_stack);

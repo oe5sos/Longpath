@@ -18,6 +18,7 @@
 // =================================================================
 
 #include "AmpApplet.h"
+#include "gui/styles/ThemeQss.h"
 #include "gui/HGauge.h"
 
 #include <QContextMenuEvent>
@@ -131,11 +132,11 @@ AmpApplet::AmpApplet(RadioModel* model, QWidget* parent)
     // From AetherSDR src/gui/AmpApplet.cpp:62-74 [@0cd4559]
     m_operateBtn = new QPushButton(QStringLiteral("OPERATE"), root);
     m_operateBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
-    m_operateBtn->setStyleSheet(
+    m_operateBtn->setStyleSheet(Style::themed(
         QStringLiteral(
             "QPushButton { background: #204060; border: 1px solid #205070; "
             "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
-            "QPushButton:hover { background: #204060; }"));
+            "QPushButton:hover { background: #204060; }")));
     m_operateBtn->hide();
     connect(m_operateBtn, &QPushButton::clicked, this, [this]() {
         // Toggle: if currently in OPERATE state -> request standby, else -> request operate.
@@ -205,18 +206,18 @@ void AmpApplet::setState(const QString& state)
     m_isTransmitting = state.startsWith(QStringLiteral("TRANSMIT"));
     if (operating) {
         m_operateBtn->setText(QStringLiteral("OPERATE"));
-        m_operateBtn->setStyleSheet(
+        m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
                 "QPushButton { background: #1a6030; border: 1px solid #008040; "
                 "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }"
-                "QPushButton:hover { background: #007040; }"));
+                "QPushButton:hover { background: #007040; }")));
     } else {
         m_operateBtn->setText(QStringLiteral("STANDBY"));
-        m_operateBtn->setStyleSheet(
+        m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
                 "QPushButton { background: #204060; border: 1px solid #205070; "
                 "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
-                "QPushButton:hover { background: #204060; }"));
+                "QPushButton:hover { background: #204060; }")));
     }
     m_operateBtn->show();
 }

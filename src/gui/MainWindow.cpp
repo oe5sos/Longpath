@@ -241,6 +241,7 @@ warren@wpratt.com
 //============================================================================================//
 
 #include "MainWindow.h"
+#include "gui/styles/ThemeQss.h"
 #include "ConnectionPanel.h"
 #include "NetworkDiagnosticsDialog.h"
 #include "SupportDialog.h"
@@ -760,7 +761,7 @@ MainWindow::MainWindow(QWidget* parent)
             m_wisdomDialog->setMinimumWidth(500);
             m_wisdomDialog->setMinimumDuration(0);
             m_wisdomDialog->setWindowModality(Qt::ApplicationModal);
-            m_wisdomDialog->setStyleSheet(QStringLiteral(
+            m_wisdomDialog->setStyleSheet(Style::themed(QStringLiteral(
                 "QProgressDialog { background: #0f0f1a; }"
                 "QLabel { color: #c8d8e8; font-size: 13px; }"
                 "QProgressBar {"
@@ -769,7 +770,7 @@ MainWindow::MainWindow(QWidget* parent)
                 "  background: #1a2a3a; border: 1px solid #205070;"
                 "  border-radius: 6px; min-height: 24px;"
                 "}"
-                "QProgressBar::chunk { background: #00b4d8; }"));
+                "QProgressBar::chunk { background: #00b4d8; }")));
             m_wisdomDialog->show();
         }
 
@@ -2806,8 +2807,8 @@ void MainWindow::buildUI()
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
     m_mainSplitter->setChildrenCollapsible(false);
     m_mainSplitter->setHandleWidth(3);
-    m_mainSplitter->setStyleSheet(QStringLiteral(
-        "QSplitter::handle { background: #203040; }"));
+    m_mainSplitter->setStyleSheet(Style::themed(QStringLiteral(
+        "QSplitter::handle { background: #203040; }")));
 
     // Left side: spectrum + zoom bar
     auto* spectrumPane = new QWidget(m_mainSplitter);
@@ -3121,10 +3122,10 @@ void MainWindow::buildUI()
     zoomBar->setValue(768);
     zoomBar->setFixedHeight(20);
     zoomBar->setToolTip(QStringLiteral("Zoom: drag to adjust spectrum bandwidth"));
-    zoomBar->setStyleSheet(QStringLiteral(
+    zoomBar->setStyleSheet(Style::themed(QStringLiteral(
         "QSlider { background: #0a0a14; }"
         "QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-        "QSlider::handle:horizontal { background: #00b4d8; width: 14px; margin: -4px 0; border-radius: 7px; }"));
+        "QSlider::handle:horizontal { background: #00b4d8; width: 14px; margin: -4px 0; border-radius: 7px; }")));
     layout->addWidget(zoomBar);
     connect(zoomBar, &QSlider::valueChanged, this, [this](int val) {
         double bwHz = val * 1000.0;
@@ -7199,9 +7200,9 @@ void MainWindow::buildStatusBar()
     QStatusBar* sb = statusBar();
     sb->setFixedHeight(46);
     sb->setSizeGripEnabled(false);
-    sb->setStyleSheet(QStringLiteral(
+    sb->setStyleSheet(Style::themed(QStringLiteral(
         "QStatusBar { background: #0a0a14; border-top: 1px solid #203040; }"
-        "QStatusBar::item { border: none; }"));
+        "QStatusBar::item { border: none; }")));
 
     // Wrapper widget for the full-width custom layout. Stored as a
     // member so resizeEvent can read its width for m_chromeBar->relayout().
@@ -7215,7 +7216,7 @@ void MainWindow::buildStatusBar()
     // Helper: styled separator dot
     auto makeSep = [&]() -> QLabel* {
         auto* sep = new QLabel(QStringLiteral(" · "), barWidget);
-        sep->setStyleSheet(QStringLiteral("QLabel { color: #304050; font-size: 18px; }"));
+        sep->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #304050; font-size: 18px; }")));
         return sep;
     };
 
@@ -7324,8 +7325,8 @@ void MainWindow::buildStatusBar()
 
     // Panel toggle (☰) — wired to QSplitter right pane visibility
     auto* panelToggleLabel = new QLabel(QStringLiteral("☰"), barWidget);
-    panelToggleLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8aa8c0; font-weight: bold; font-size: 16px; }"));
+    panelToggleLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #8aa8c0; font-weight: bold; font-size: 16px; }")));
     panelToggleLabel->setToolTip(QStringLiteral("Toggle container panel"));
     panelToggleLabel->setCursor(Qt::PointingHandCursor);
     hbox->addWidget(panelToggleLabel);
@@ -7381,22 +7382,22 @@ void MainWindow::buildStatusBar()
 
     // CWX
     auto* cwxLabel = new QLabel(QStringLiteral("CWX"), barWidget);
-    cwxLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }"));
+    cwxLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }")));
     cwxLabel->setToolTip(QStringLiteral("CW Keyer (NYI)"));
     cwxLabel->setCursor(Qt::PointingHandCursor);
 
     // DVK
     auto* dvkLabel = new QLabel(QStringLiteral("DVK"), barWidget);
-    dvkLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }"));
+    dvkLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }")));
     dvkLabel->setToolTip(QStringLiteral("Digital Voice Keyer (NYI)"));
     dvkLabel->setCursor(Qt::PointingHandCursor);
 
     // FDX
     auto* fdxLabel = new QLabel(QStringLiteral("FDX"), barWidget);
-    fdxLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }"));
+    fdxLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #3a4a5a; font-weight: bold; font-size: 11px; }")));
     fdxLabel->setToolTip(QStringLiteral("Full Duplex (NYI)"));
     fdxLabel->setCursor(Qt::PointingHandCursor);
 
@@ -7560,11 +7561,11 @@ void MainWindow::buildStatusBar()
         vl->setContentsMargins(0, 0, 0, 0);
         vl->setSpacing(0);
         auto* topLbl = new QLabel(top, w);
-        topLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: #607080; font-size: 11px; }"));
+        topLbl->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: #607080; font-size: 11px; }")));
         auto* botLbl = new QLabel(bottom, w);
-        botLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: #3a4a5a; font-size: 11px; }"));
+        botLbl->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: #3a4a5a; font-size: 11px; }")));
         vl->addWidget(topLbl);
         vl->addWidget(botLbl);
         if (outTop) { *outTop = topLbl; }
@@ -7630,9 +7631,9 @@ void MainWindow::buildStatusBar()
     // (available=false) until TunerModel::presenceChanged fires true;
     // text reflects operate/bypass/standby state via stateChanged.
     m_tgxlChip = new QLabel(QStringLiteral("TGXL"), barWidget);
-    m_tgxlChip->setStyleSheet(QStringLiteral(
+    m_tgxlChip->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background:#204060; border:1px solid #205070; "
-        "padding:1px 8px; border-radius:3px; color:#88e0ff; }"));
+        "padding:1px 8px; border-radius:3px; color:#88e0ff; }")));
     m_tgxlChip->setVisible(false);
     hbox->addWidget(m_tgxlChip);
 
@@ -7927,8 +7928,8 @@ void MainWindow::buildStatusBar()
     // now lights up in a pixel the operator has already learned.
     m_safetyGroup = new QWidget(barWidget);
     m_safetyGroup->setObjectName(QStringLiteral("safetyGroup"));
-    m_safetyGroup->setStyleSheet(QStringLiteral(
-        "QWidget#safetyGroup { border-left: 1px solid #203040; }"));
+    m_safetyGroup->setStyleSheet(Style::themed(QStringLiteral(
+        "QWidget#safetyGroup { border-left: 1px solid #203040; }")));
     auto* safetyRow = new QHBoxLayout(m_safetyGroup);
     safetyRow->setContentsMargins(8, 0, 0, 0);
     safetyRow->setSpacing(6);
@@ -9409,8 +9410,8 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                 // Hide: save current sizes, then collapse right to 0
                 m_splitterSizesBeforeHide = m_mainSplitter->sizes();
                 rightPane->hide();
-                label->setStyleSheet(QStringLiteral(
-                    "QLabel { color: #3a4a5a; font-weight: bold; font-size: 16px; }"));
+                label->setStyleSheet(Style::themed(QStringLiteral(
+                    "QLabel { color: #3a4a5a; font-weight: bold; font-size: 16px; }")));
             } else {
                 // Show: restore saved sizes (or default 80/20 if none saved)
                 rightPane->show();
@@ -9419,8 +9420,8 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                 } else {
                     m_mainSplitter->setSizes({1024, 256});
                 }
-                label->setStyleSheet(QStringLiteral(
-                    "QLabel { color: #8aa8c0; font-weight: bold; font-size: 16px; }"));
+                label->setStyleSheet(Style::themed(QStringLiteral(
+                    "QLabel { color: #8aa8c0; font-weight: bold; font-size: 16px; }")));
             }
             return true;  // event consumed
         }
@@ -9464,7 +9465,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 
 void MainWindow::applyDarkTheme()
 {
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QMainWindow { background: #0f0f1a; }"
         "QMenuBar {"
         "  background: #1a2a3a;"
@@ -9483,7 +9484,7 @@ void MainWindow::applyDarkTheme()
         "  background: #1a2a3a;"
         "  color: #8090a0;"
         "  border-top: 1px solid #203040;"
-        "}"));
+        "}")));
 }
 
 void MainWindow::showConnectionPanel()
@@ -11727,7 +11728,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     sDlg = dlg;
     dlg->setWindowTitle(QStringLiteral("AI-Assisted Issue Reporter"));
     dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->setStyleSheet(QStringLiteral("QDialog { background: #0f0f1a; }"));
+    dlg->setStyleSheet(Style::themed(QStringLiteral("QDialog { background: #0f0f1a; }")));
     dlg->setMinimumWidth(620);
 
     auto* vbox = new QVBoxLayout(dlg);
@@ -11794,10 +11795,10 @@ void MainWindow::showFeatureRequestDialogImpl()
 
     auto* submitBtn = new QPushButton(QStringLiteral("Submit Your Idea"), dlg);
     submitBtn->setAutoDefault(false);
-    submitBtn->setStyleSheet(QStringLiteral(
+    submitBtn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
         "border-radius: 4px; padding: 8px 20px; font-size: 13px; }"
-        "QPushButton:hover { background: #00b4d8; }"));
+        "QPushButton:hover { background: #00b4d8; }")));
     connect(submitBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
             "https://github.com/boydsoftprez/NereusSDR/issues/new?template=feature_request.yml")));

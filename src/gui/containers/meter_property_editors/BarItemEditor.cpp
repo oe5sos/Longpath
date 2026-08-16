@@ -1,4 +1,5 @@
 #include "BarItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 
 #include <QComboBox>
@@ -40,26 +41,26 @@ void BarItemEditor::setItem(MeterItem* item)
         m_comboBarStyle->findData(static_cast<int>(bar->barStyle())));
 
     // Filled-mode colors
-    m_btnBarColor->setStyleSheet(
+    m_btnBarColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(bar->barColor().name(QColor::HexArgb)));
-    m_btnBarRedColor->setStyleSheet(
+            .arg(bar->barColor().name(QColor::HexArgb))));
+    m_btnBarRedColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(bar->barRedColor().name(QColor::HexArgb)));
+            .arg(bar->barRedColor().name(QColor::HexArgb))));
 
     // Edge-mode colors
-    m_btnEdgeBg->setStyleSheet(
+    m_btnEdgeBg->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(bar->edgeBackgroundColor().name(QColor::HexArgb)));
-    m_btnEdgeLow->setStyleSheet(
+            .arg(bar->edgeBackgroundColor().name(QColor::HexArgb))));
+    m_btnEdgeLow->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(bar->edgeLowColor().name(QColor::HexArgb)));
-    m_btnEdgeHigh->setStyleSheet(
+            .arg(bar->edgeLowColor().name(QColor::HexArgb))));
+    m_btnEdgeHigh->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(bar->edgeHighColor().name(QColor::HexArgb)));
-    m_btnEdgeAvg->setStyleSheet(
+            .arg(bar->edgeHighColor().name(QColor::HexArgb))));
+    m_btnEdgeAvg->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(bar->edgeAvgColor().name(QColor::HexArgb)));
+            .arg(bar->edgeAvgColor().name(QColor::HexArgb))));
 
     endProgrammaticUpdate();
 }
@@ -168,9 +169,9 @@ void BarItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             bar->setBarColor(chosen);
-            m_btnBarColor->setStyleSheet(
+            m_btnBarColor->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -187,9 +188,9 @@ void BarItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             bar->setBarRedColor(chosen);
-            m_btnBarRedColor->setStyleSheet(
+            m_btnBarRedColor->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -208,9 +209,9 @@ void BarItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             bar->setEdgeBackgroundColor(chosen);
-            m_btnEdgeBg->setStyleSheet(
+            m_btnEdgeBg->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -226,9 +227,9 @@ void BarItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             bar->setEdgeLowColor(chosen);
-            m_btnEdgeLow->setStyleSheet(
+            m_btnEdgeLow->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -244,9 +245,9 @@ void BarItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             bar->setEdgeHighColor(chosen);
-            m_btnEdgeHigh->setStyleSheet(
+            m_btnEdgeHigh->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -262,9 +263,9 @@ void BarItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             bar->setEdgeAvgColor(chosen);
-            m_btnEdgeAvg->setStyleSheet(
+            m_btnEdgeAvg->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

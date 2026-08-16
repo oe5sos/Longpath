@@ -1,14 +1,15 @@
 #include "NyiOverlay.h"
+#include "gui/styles/ThemeQss.h"
 
 namespace NereusSDR {
 
 NyiOverlay::NyiOverlay(const QString& phaseHint, QWidget* parent)
     : QLabel(QStringLiteral("NYI"), parent)
 {
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background: #3a2a00; color: #ffb800;"
         " border: 1px solid #604000; border-radius: 2px;"
-        " padding: 0px 3px; font-size: 8px; font-weight: bold; }"));
+        " padding: 0px 3px; font-size: 8px; font-weight: bold; }")));
     setToolTip(QStringLiteral("Not Yet Implemented — Available in %1").arg(phaseHint));
     setFixedSize(fontMetrics().horizontalAdvance(QStringLiteral("NYI")) + 8, 14);
     raise();

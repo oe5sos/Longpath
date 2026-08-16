@@ -13,6 +13,7 @@
 // =================================================================
 
 #include "DiagnosticsPhaseHPages.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
@@ -114,9 +115,9 @@ void SettingsValidationPage::buildUI()
     auto* layout = qobject_cast<QVBoxLayout*>(group->layout());
 
     m_issueList = new QListWidget;
-    m_issueList->setStyleSheet(
+    m_issueList->setStyleSheet(Style::themed(
         QStringLiteral("QListWidget { background: #0a0a18; color: #c8d8e8; "
-                       "border: 1px solid #304050; }"));
+                       "border: 1px solid #304050; }")));
     m_issueList->setMinimumHeight(220);
     layout->addWidget(m_issueList);
 
@@ -203,7 +204,7 @@ void ExportImportConfigPage::buildUI()
     auto* fileLayout = qobject_cast<QVBoxLayout*>(fileGroup->layout());
     m_settingsPathLabel = new QLabel(
         QStringLiteral("Path: %1").arg(AppSettings::instance().filePath()));
-    m_settingsPathLabel->setStyleSheet(QStringLiteral("color: #c8d8e8;"));
+    m_settingsPathLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c8d8e8;")));
     m_settingsPathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     fileLayout->addWidget(m_settingsPathLabel);
 
@@ -305,9 +306,9 @@ void LogsPage::buildUI()
     auto* layout = qobject_cast<QVBoxLayout*>(group->layout());
     m_logView = new QPlainTextEdit;
     m_logView->setReadOnly(true);
-    m_logView->setStyleSheet(QStringLiteral(
+    m_logView->setStyleSheet(Style::themed(QStringLiteral(
         "QPlainTextEdit { background: #0a0a18; color: #c8d8e8; "
-        "border: 1px solid #304050; font-family: 'Monaco','Menlo',monospace; }"));
+        "border: 1px solid #304050; font-family: 'Monaco','Menlo',monospace; }")));
     m_logView->setPlaceholderText(QStringLiteral(
         "qCWarning / qCDebug capture is wired in a follow-up phase. "
         "For now, run with QT_LOGGING_TO_CONSOLE=1 and read stderr."));

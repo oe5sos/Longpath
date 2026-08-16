@@ -25,6 +25,7 @@
 // `ScrollableLabel` in `~/AetherSDR/src/gui/GuardedSlider.h:81-100`.
 
 #include "ScrollableLabel.h"
+#include "gui/styles/ThemeQss.h"
 #include "VfoStyles.h"
 
 #include <QLabel>
@@ -54,9 +55,9 @@ ScrollableLabel::ScrollableLabel(QWidget* parent)
 
     m_edit->setAlignment(Qt::AlignCenter);
     // Minimal editor styling — inherits palette, override text color to match label
-    m_edit->setStyleSheet(
+    m_edit->setStyleSheet(Style::themed(
         "QLineEdit { background: #1a2a3a; border: 1px solid #0090e0; "
-        "color: #c8d8e8; font-size: 13px; padding: 0 2px; }");
+        "color: #c8d8e8; font-size: 13px; padding: 0 2px; }"));
 
     // Enter/focus-loss commits. returnPressed fires first, then editingFinished;
     // commitEdit is idempotent (guards on currentIndex == kEditPage) so both

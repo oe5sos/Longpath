@@ -1,4 +1,5 @@
 #include "LedItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/LEDItem.h"
 
 #include <QCheckBox>
@@ -22,9 +23,9 @@ void LedItemEditor::setItem(MeterItem* item)
     if (!x) { return; }
 
     auto applyColor = [](QPushButton* btn, const QColor& c) {
-        btn->setStyleSheet(
+        btn->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
 
     beginProgrammaticUpdate();
@@ -93,9 +94,9 @@ void LedItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->trueColour(), this);
         if (chosen.isValid()) {
             x->setTrueColour(chosen);
-            m_btnTrueColour->setStyleSheet(
+            m_btnTrueColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -109,9 +110,9 @@ void LedItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->falseColour(), this);
         if (chosen.isValid()) {
             x->setFalseColour(chosen);
-            m_btnFalseColour->setStyleSheet(
+            m_btnFalseColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -135,9 +136,9 @@ void LedItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->panelBackColour1(), this);
         if (chosen.isValid()) {
             x->setPanelBackColour1(chosen);
-            m_btnPanelBack1->setStyleSheet(
+            m_btnPanelBack1->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -151,9 +152,9 @@ void LedItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->panelBackColour2(), this);
         if (chosen.isValid()) {
             x->setPanelBackColour2(chosen);
-            m_btnPanelBack2->setStyleSheet(
+            m_btnPanelBack2->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

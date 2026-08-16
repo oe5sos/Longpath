@@ -9,6 +9,7 @@
 // =================================================================
 
 #include "gui/setup/PgxlInterlockPage.h"
+#include "gui/styles/ThemeQss.h"
 #include "models/RadioModel.h"
 #include "core/TxInterlockPolicy.h"
 
@@ -122,7 +123,7 @@ void PgxlInterlockPage::buildUi()
         "amplifier is ready. Set to Warn to allow TX with a visible warning.\n\n"
         "Changes take effect immediately for all subsequent TX requests.");
     m_helpText->setWordWrap(true);
-    m_helpText->setStyleSheet("color: #8aa8c0; font-size: 11px;");
+    m_helpText->setStyleSheet(Style::themed("color: #8aa8c0; font-size: 11px;"));
     topLay->addWidget(m_helpText);
 
     topLay->addStretch();

@@ -58,6 +58,7 @@
 //============================================================================================//
 
 #include "RadioInfoTab.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
@@ -160,9 +161,9 @@ RadioInfoTab::RadioInfoTab(RadioModel* model, QWidget* parent)
     // must reconnect for rate changes to take effect.
     m_reconnectBanner = new QFrame(this);
     m_reconnectBanner->setFrameShape(QFrame::StyledPanel);
-    m_reconnectBanner->setStyleSheet(QStringLiteral(
+    m_reconnectBanner->setStyleSheet(Style::themed(QStringLiteral(
         "QFrame { background-color: #3a2a10; border: 1px solid #906000; "
-        "border-radius: 6px; padding: 4px; }"));
+        "border-radius: 6px; padding: 4px; }")));
     auto* bannerLayout = new QHBoxLayout(m_reconnectBanner);
     bannerLayout->setContentsMargins(6, 4, 6, 4);
     m_reconnectBannerLabel = new QLabel(m_reconnectBanner);

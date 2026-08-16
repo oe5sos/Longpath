@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "FourO3APage.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "CatNetworkSetupPages.h"   // PeripheralsPage
 #include "PgxlInterlockPage.h"
@@ -270,8 +271,8 @@ void FourO3APage::refreshFlexApiStatus()
             // (e.g. port in use).  Flag it red so the operator notices.
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8F TCP 4992 bind failed"));
-            m_flexApiStatusLabel->setStyleSheet(
-                QStringLiteral("color: #cc2222;"));  // red
+            m_flexApiStatusLabel->setStyleSheet(Style::themed(
+                QStringLiteral("color: #cc2222;")));  // red
         } else {
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8B Disabled "

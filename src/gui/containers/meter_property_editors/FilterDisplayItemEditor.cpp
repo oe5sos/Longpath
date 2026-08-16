@@ -1,4 +1,5 @@
 #include "FilterDisplayItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/FilterDisplayItem.h"
 
 #include <QComboBox>
@@ -12,9 +13,9 @@ namespace NereusSDR {
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
 {
-    btn->setStyleSheet(
+    btn->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(c.name(QColor::HexArgb)));
+            .arg(c.name(QColor::HexArgb))));
 }
 
 constexpr const char* kComboStyle =

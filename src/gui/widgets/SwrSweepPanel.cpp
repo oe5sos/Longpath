@@ -12,6 +12,7 @@
 // =================================================================
 
 #include "SwrSweepPanel.h"
+#include "gui/styles/ThemeQss.h"
 #include "SwrChartWidget.h"
 
 #include "core/AppSettings.h"
@@ -66,7 +67,7 @@ void SwrSweepPanel::buildUi()
     row->setSpacing(7);
 
     auto* bandCap = new QLabel(QStringLiteral("BAND"), this);
-    bandCap->setStyleSheet(QStringLiteral("color:#8090a0;font-size:10px;"));
+    bandCap->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:10px;")));
     row->addWidget(bandCap);
 
     m_bandBox = new QComboBox(this);
@@ -93,7 +94,7 @@ void SwrSweepPanel::buildUi()
     // kommt über „VNA-Referenz…" ins selbe Diagramm.
 
     auto* ptsCap = new QLabel(QStringLiteral("PUNKTE"), this);
-    ptsCap->setStyleSheet(QStringLiteral("color:#8090a0;font-size:10px;"));
+    ptsCap->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:10px;")));
     row->addWidget(ptsCap);
 
     m_pointsBox = new QSpinBox(this);
@@ -105,7 +106,7 @@ void SwrSweepPanel::buildUi()
     row->addWidget(m_pointsBox);
 
     m_powerLabel = new QLabel(this);
-    m_powerLabel->setStyleSheet(QStringLiteral("color:#c8d8e8;"));
+    m_powerLabel->setStyleSheet(Style::themed(QStringLiteral("color:#c8d8e8;")));
     row->addWidget(m_powerLabel);
 
     // ── The coupler, live ────────────────────────────────────────────
@@ -152,7 +153,7 @@ void SwrSweepPanel::buildUi()
         "Verbindung. Während des Sweeps sendet das Gerät mit "
         "Tune-Leistung; nicht am VFO drehen."), this);
     m_status->setWordWrap(true);
-    m_status->setStyleSheet(QStringLiteral("color:#8090a0;"));
+    m_status->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;")));
     col->addWidget(m_status);
 
     // ── Chart ────────────────────────────────────────────────────────

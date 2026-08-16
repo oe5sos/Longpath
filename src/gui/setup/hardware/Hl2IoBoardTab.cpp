@@ -120,6 +120,7 @@
 // =================================================================
 
 #include "Hl2IoBoardTab.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/BoardCapabilities.h"
 #include "core/HermesLiteBandwidthMonitor.h"
@@ -619,8 +620,8 @@ void Hl2IoBoardTab::updateStatusBar(bool detected)
 
     if (detected) {
         m_statusLabel->setText(tr("mi0bot custom I/O board (0x41): Active"));
-        m_statusFrame->setStyleSheet(QStringLiteral(
-            "QFrame { background: #1a2f1a; border: 1px solid #1a6030; border-radius: 4px; }"));
+        m_statusFrame->setStyleSheet(Style::themed(QStringLiteral(
+            "QFrame { background: #1a2f1a; border: 1px solid #1a6030; border-radius: 4px; }")));
         m_lastProbeLabel->setText(
             QStringLiteral("Last probe: %1")
                 .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"))));
@@ -658,9 +659,9 @@ void Hl2IoBoardTab::updateOcIndicator(quint8 ocByte, int bandIdx, bool mox)
     for (int i = 0; i < 7; ++i) {
         if (!m_ocPinLeds[i]) { continue; }
         const bool on = (ocByte & (1u << i)) != 0;
-        m_ocPinLeds[i]->setStyleSheet(
+        m_ocPinLeds[i]->setStyleSheet(Style::themed(
             on ? QStringLiteral("QFrame { background: #44ff44; border: 1px solid #80ff80; border-radius: 5px; }")
-               : QStringLiteral("QFrame { background: #222; border: 1px solid #555; border-radius: 5px; }"));
+               : QStringLiteral("QFrame { background: #222; border: 1px solid #555; border-radius: 5px; }")));
     }
 }
 
@@ -887,8 +888,8 @@ void Hl2IoBoardTab::onThrottledChanged(bool throttled)
 {
     if (throttled) {
         m_throttleStatusLabel->setText(tr("● throttled"));
-        m_throttleStatusLabel->setStyleSheet(
-            QStringLiteral("font-size: 10px; color: #ff4444;"));
+        m_throttleStatusLabel->setStyleSheet(Style::themed(
+            QStringLiteral("font-size: 10px; color: #ff4444;")));
     } else {
         m_throttleStatusLabel->setText(tr("○ not throttled"));
         m_throttleStatusLabel->setStyleSheet(

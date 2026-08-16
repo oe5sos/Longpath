@@ -65,6 +65,7 @@
 //============================================================================================//
 
 #include "SpectrumPeaksPage.h"
+#include "gui/styles/ThemeQss.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/SpectrumWidget.h"
 #include "core/AppSettings.h"
@@ -85,7 +86,7 @@ namespace {
 
 void applyDarkStyle(QWidget* w)
 {
-    w->setStyleSheet(QStringLiteral(
+    w->setStyleSheet(Style::themed(QStringLiteral(
         "QGroupBox { color: #8090a0; font-size: 11px;"
         "  border: 1px solid #203040; border-radius: 4px;"
         "  margin-top: 8px; padding-top: 4px; }"
@@ -97,7 +98,7 @@ void applyDarkStyle(QWidget* w)
         "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
         "  border: 1px solid #203040; border-radius: 2px; }"
         "QCheckBox::indicator:checked { background: #00b4d8; border-color: #00b4d8; }"
-    ));
+    )));
 }
 
 } // anonymous namespace
@@ -478,10 +479,10 @@ void SpectrumPeaksPage::buildUI()
     m_backBtn = new QPushButton(QStringLiteral("← Spectrum defaults"), this);
     m_backBtn->setToolTip(QStringLiteral(
         "Navigate back to the Spectrum Defaults page."));
-    m_backBtn->setStyleSheet(QStringLiteral(
+    m_backBtn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: #1a2a3a; color: #8aa8c0; border: 1px solid #203040;"
         "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #203040; color: #c8d8e8; }"));
+        "QPushButton:hover { background: #203040; color: #c8d8e8; }")));
     connect(m_backBtn, &QPushButton::clicked,
             this, &SpectrumPeaksPage::backToSpectrumDefaultsRequested);
     contentLayout()->addWidget(m_backBtn, 0, Qt::AlignLeft);

@@ -1,4 +1,5 @@
 #include "MagicEyeItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MagicEyeItem.h"
 
 #include <QPushButton>
@@ -24,9 +25,9 @@ void MagicEyeItemEditor::setItem(MeterItem* item)
 
     beginProgrammaticUpdate();
 
-    m_btnGlowColor->setStyleSheet(
+    m_btnGlowColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(x->glowColor().name(QColor::HexArgb)));
+            .arg(x->glowColor().name(QColor::HexArgb))));
     m_editBezelPath->setText(x->bezelImagePath());
 
     endProgrammaticUpdate();
@@ -40,9 +41,9 @@ void MagicEyeItemEditor::buildTypeSpecific()
     m_btnGlowColor = new QPushButton(this);
     m_btnGlowColor->setFixedSize(40, 18);
     auto applyGlowColor = [this](const QColor& c) {
-        m_btnGlowColor->setStyleSheet(
+        m_btnGlowColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     connect(m_btnGlowColor, &QPushButton::clicked, this, [this, applyGlowColor]() {
         MagicEyeItem* x = qobject_cast<MagicEyeItem*>(m_item);

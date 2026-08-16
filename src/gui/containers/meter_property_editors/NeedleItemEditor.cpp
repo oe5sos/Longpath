@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "NeedleItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 
 #include <QLineEdit>
@@ -154,9 +155,9 @@ void NeedleItemEditor::setItem(MeterItem* item)
 
     // Needle color button
     const QColor nc = needle->needleColor();
-    m_btnNeedleColor->setStyleSheet(
+    m_btnNeedleColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(nc.name(QColor::HexArgb)));
+            .arg(nc.name(QColor::HexArgb))));
 
     m_spinAttack->setValue(static_cast<double>(needle->attackRatio()));
     m_spinDecay->setValue(static_cast<double>(needle->decayRatio()));
@@ -174,9 +175,9 @@ void NeedleItemEditor::setItem(MeterItem* item)
     m_spinHistoryDuration->setValue(needle->historyDuration());
 
     const QColor hc = needle->historyColor();
-    m_btnHistoryColor->setStyleSheet(
+    m_btnHistoryColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(hc.name(QColor::HexArgb)));
+            .arg(hc.name(QColor::HexArgb))));
 
     m_chkNormaliseTo100W->setChecked(needle->normaliseTo100W());
     m_spinMaxPower->setValue(static_cast<double>(needle->maxPower()));
@@ -266,12 +267,12 @@ void NeedleItemEditor::buildTypeSpecific()
     QGroupBox* needleGroup = makeGroup(QStringLiteral("Needle"), needleForm);
 
     m_editSourceLabel = new QLineEdit(needleGroup);
-    m_editSourceLabel->setStyleSheet(
+    m_editSourceLabel->setStyleSheet(Style::themed(
         QStringLiteral("QLineEdit {"
                         "  background: #0a0a18; color: #c8d8e8;"
                         "  border: 1px solid #1e2e3e; border-radius: 6px;"
                         "  padding: 1px 4px; min-height: 18px;"
-                        "}"));
+                        "}")));
     m_editSourceLabel->setMinimumWidth(kFieldWidth);
     connect(m_editSourceLabel, &QLineEdit::editingFinished, this, [this]() {
         if (isProgrammaticUpdate() || !m_item) { return; }
@@ -292,9 +293,9 @@ void NeedleItemEditor::buildTypeSpecific()
             QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             needle->setNeedleColor(chosen);
-            m_btnNeedleColor->setStyleSheet(
+            m_btnNeedleColor->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -459,9 +460,9 @@ void NeedleItemEditor::buildTypeSpecific()
             QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             needle->setHistoryColor(chosen);
-            m_btnHistoryColor->setStyleSheet(
+            m_btnHistoryColor->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

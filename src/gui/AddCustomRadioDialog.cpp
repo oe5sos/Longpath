@@ -66,6 +66,7 @@ mw0lge@grange-lane.co.uk
 // project-level Thetis LICENSE applies.
 
 #include "AddCustomRadioDialog.h"
+#include "gui/styles/ThemeQss.h"
 #include "StyleConstants.h"
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
@@ -385,7 +386,7 @@ void AddCustomRadioDialog::buildUi()
 
     // Dark theme — §D: #8aa8c0 label fg has no canonical match (off-palette
     // label warm-blue used in this dialog only; §D documented exception).
-    setStyleSheet(
+    setStyleSheet(Style::themed(
         QStringLiteral(
             "QDialog { background: %1; }"
             "QGroupBox {"
@@ -401,7 +402,7 @@ void AddCustomRadioDialog::buildUi()
             "  padding: 0 3px;"
             "}"
             "QLabel { color: #8aa8c0; }")          // §D exception: off-palette label warm-blue
-        .arg(Style::kAppBg, Style::kTextSecondary, Style::kBorderSubtle));
+        .arg(Style::kAppBg, Style::kTextSecondary, Style::kBorderSubtle)));
 
     // Wire validation to field changes
     connect(m_nameEdit,     &QLineEdit::textChanged,
@@ -785,10 +786,10 @@ void AddCustomRadioDialog::showInlineInfo(const QString& message)
 {
     // Info band: dark blue border + blue text.
     // Colour: #5985b8 info blue (design §6.4).
-    m_feedbackFrame->setStyleSheet(QStringLiteral(
-        "QFrame { background: #0a1a28; border: 1px solid #5985b8; border-radius: 4px; }"));
-    m_feedbackLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8aa8c0; font-size: 12px; }"));
+    m_feedbackFrame->setStyleSheet(Style::themed(QStringLiteral(
+        "QFrame { background: #0a1a28; border: 1px solid #5985b8; border-radius: 4px; }")));
+    m_feedbackLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #8aa8c0; font-size: 12px; }")));
     m_feedbackLabel->setText(message);
     m_feedbackFrame->show();
 }

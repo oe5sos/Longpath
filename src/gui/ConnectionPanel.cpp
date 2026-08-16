@@ -96,6 +96,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ConnectionPanel.h"
+#include "gui/styles/ThemeQss.h"
 #include "AddCustomRadioDialog.h"
 #include "models/RadioModel.h"
 #include "core/AppSettings.h"
@@ -325,8 +326,8 @@ void ConnectionPanel::buildUI()
     // --- Status label ---
     m_statusLabel = new QLabel(this);
     m_statusLabel->setAlignment(Qt::AlignCenter);
-    m_statusLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8090a0; padding: 4px; }"));
+    m_statusLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #8090a0; padding: 4px; }")));
     mainLayout->addWidget(m_statusLabel);
 
     // --- Radio table (QTableWidget — simpler than QTreeView for this use case) ---
@@ -430,7 +431,7 @@ void ConnectionPanel::buildUI()
     m_detailProtoLabel = new QLabel(m_detailGroup);
     m_detailFwLabel    = new QLabel(m_detailGroup);
     for (auto* lbl : {m_detailBoardLabel, m_detailProtoLabel, m_detailFwLabel}) {
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: #8090a0; font-size: 12px; }"));
+        lbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #8090a0; font-size: 12px; }")));
     }
     infoRow1->addWidget(m_detailBoardLabel);
     infoRow1->addWidget(m_detailProtoLabel);
@@ -443,7 +444,7 @@ void ConnectionPanel::buildUI()
     m_detailIpLabel  = new QLabel(m_detailGroup);
     m_detailMacLabel = new QLabel(m_detailGroup);
     for (auto* lbl : {m_detailIpLabel, m_detailMacLabel}) {
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: #8090a0; font-size: 12px; }"));
+        lbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #8090a0; font-size: 12px; }")));
     }
     infoRow2->addWidget(m_detailIpLabel);
     infoRow2->addWidget(m_detailMacLabel);
@@ -453,15 +454,15 @@ void ConnectionPanel::buildUI()
     // Model selector row
     auto* modelRow = new QHBoxLayout();
     auto* modelLabel = new QLabel(QStringLiteral("Radio Model:"), m_detailGroup);
-    modelLabel->setStyleSheet(QStringLiteral("QLabel { color: #c8d8e8; font-weight: bold; }"));
+    modelLabel->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #c8d8e8; font-weight: bold; }")));
     m_modelCombo = new QComboBox(m_detailGroup);
     m_modelCombo->setMinimumWidth(200);
-    m_modelCombo->setStyleSheet(QStringLiteral(
+    m_modelCombo->setStyleSheet(Style::themed(QStringLiteral(
         "QComboBox { background: #1a2a3a; color: #c8d8e8; border: 1px solid #304050;"
         "  border-radius: 6px; padding: 4px 8px; }"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView { background: #0a1a28; color: #c8d8e8;"
-        "  selection-background-color: #205070; }"));
+        "  selection-background-color: #205070; }")));
     connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ConnectionPanel::onModelComboChanged);
     modelRow->addWidget(modelLabel);
@@ -480,9 +481,9 @@ void ConnectionPanel::buildUI()
     // Reads from AppSettings when a row is selected, writes on toggle.
     m_autoConnectCheck = new QCheckBox(
         QStringLiteral("Auto-connect to this radio on launch"), m_detailGroup);
-    m_autoConnectCheck->setStyleSheet(QStringLiteral(
+    m_autoConnectCheck->setStyleSheet(Style::themed(QStringLiteral(
         "QCheckBox { color: #c8d8e8; font-size: 12px; }"
-        "QCheckBox::indicator { width: 14px; height: 14px; }"));
+        "QCheckBox::indicator { width: 14px; height: 14px; }")));
     connect(m_autoConnectCheck, &QCheckBox::toggled, this, [this](bool checked) {
         RadioInfo info = selectedRadio();
         if (info.macAddress.isEmpty()) {
@@ -626,7 +627,7 @@ void ConnectionPanel::buildUI()
     mainLayout->addLayout(btnLayout);
 
     // Apply dark theme to dialog
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QDialog { background: #0f0f1a; }"
         "QGroupBox {"
         "  color: #8090a0;"
@@ -639,7 +640,7 @@ void ConnectionPanel::buildUI()
         "  subcontrol-origin: margin;"
         "  left: 10px;"
         "  padding: 0 3px;"
-        "}"));
+        "}")));
 
     updateButtonStates();
 }
@@ -655,12 +656,12 @@ QWidget* ConnectionPanel::buildStatusStrip()
     m_statusStrip = new QWidget(this);
     m_statusStrip->setObjectName(QStringLiteral("statusStrip"));
     m_statusStrip->setFixedHeight(40);
-    m_statusStrip->setStyleSheet(QStringLiteral(
+    m_statusStrip->setStyleSheet(Style::themed(QStringLiteral(
         "QWidget#statusStrip {"
         "  background: #0a1a28;"
         "  border: 1px solid #203040;"
         "  border-radius: 4px;"
-        "}"));
+        "}")));
 
     auto* stripLayout = new QHBoxLayout(m_statusStrip);
     stripLayout->setContentsMargins(10, 4, 10, 4);
@@ -676,13 +677,13 @@ QWidget* ConnectionPanel::buildStatusStrip()
 
     // Info text label
     m_stripInfoLabel = new QLabel(QStringLiteral("Disconnected"), m_statusStrip);
-    m_stripInfoLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8090a0; font-size: 12px; }"));
+    m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #8090a0; font-size: 12px; }")));
 
     // Reconnect hint — shown when disconnected and a last-connected radio is known
     m_stripReconnectLabel = new QLabel(m_statusStrip);
-    m_stripReconnectLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #00b4d8; font-size: 11px; }"));
+    m_stripReconnectLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #00b4d8; font-size: 11px; }")));
     m_stripReconnectLabel->setVisible(false);
 
     stripLayout->addWidget(m_stripPillLabel);
@@ -743,8 +744,8 @@ void ConnectionPanel::updateStatusStrip()
             m_stripInfoLabel->setText(QStringLiteral("Connected — %1")
                 .arg(m_radioModel->name()));
         }
-        m_stripInfoLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }"));
+        m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }")));
 
         m_stripDisconnectBtn->setVisible(true);
         m_stripReconnectLabel->setVisible(false);
@@ -754,8 +755,8 @@ void ConnectionPanel::updateStatusStrip()
             "QLabel { color: %1; font-size: 16px; }").arg(QLatin1String(kPillOfflineColor)));
 
         m_stripInfoLabel->setText(QStringLiteral("Disconnected"));
-        m_stripInfoLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: #8090a0; font-size: 12px; }"));
+        m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: #8090a0; font-size: 12px; }")));
 
         m_stripDisconnectBtn->setVisible(false);
 
@@ -1404,10 +1405,10 @@ void ConnectionPanel::onContextMenuRequested(const QPoint& pos)
     bool connected = m_radioModel->isConnected();
 
     QMenu menu(this);
-    menu.setStyleSheet(QStringLiteral(
+    menu.setStyleSheet(Style::themed(QStringLiteral(
         "QMenu { background: #0a1a28; color: #c8d8e8; border: 1px solid #203040; }"
         "QMenu::item:selected { background: #205070; }"
-        "QMenu::item:disabled { color: #3a4a5a; }"));
+        "QMenu::item:disabled { color: #3a4a5a; }")));
 
     QAction* actConnect    = menu.addAction(QStringLiteral("Connect"));
     QAction* actDisconnect = menu.addAction(QStringLiteral("Disconnect"));

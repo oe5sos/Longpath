@@ -1,4 +1,5 @@
 #include "AppearanceSetupPages.h"
+#include "gui/styles/ThemeQss.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/StyleConstants.h"
@@ -313,10 +314,10 @@ void GradientsPage::buildUI()
 
     m_gradientEditorLabel = new QLabel(
         QStringLiteral("(Gradient editor — not yet implemented)"), gradGroup);
-    m_gradientEditorLabel->setStyleSheet(QStringLiteral(
+    m_gradientEditorLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #607080; font-style: italic;"
         " background: #1a2a3a; border: 1px solid #203040;"
-        " border-radius: 6px; padding: 8px; }"));
+        " border-radius: 6px; padding: 8px; }")));
     m_gradientEditorLabel->setMinimumHeight(60);
     m_gradientEditorLabel->setEnabled(false);
     m_gradientEditorLabel->setAlignment(Qt::AlignCenter);
@@ -355,10 +356,10 @@ void SkinsPage::buildUI()
 
     m_skinListLabel = new QLabel(
         QStringLiteral("(Skin list — not yet implemented. Phase 3H.)"), skinGroup);
-    m_skinListLabel->setStyleSheet(QStringLiteral(
+    m_skinListLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #607080; font-style: italic;"
         " background: #1a2a3a; border: 1px solid #203040;"
-        " border-radius: 6px; padding: 8px; }"));
+        " border-radius: 6px; padding: 8px; }")));
     m_skinListLabel->setMinimumHeight(120);
     m_skinListLabel->setEnabled(false);
     m_skinListLabel->setAlignment(Qt::AlignCenter);

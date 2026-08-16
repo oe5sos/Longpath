@@ -22,6 +22,7 @@
 // =================================================================
 
 #include "SetupPage.h"
+#include "gui/styles/ThemeQss.h"
 #include "StyleConstants.h"
 
 #include <QScrollArea>
@@ -70,19 +71,19 @@ void SetupPage::init(const QString& title)
 
     // Page title
     auto* titleLabel = new QLabel(title);
-    titleLabel->setStyleSheet(
+    titleLabel->setStyleSheet(Style::themed(
         "QLabel { color: #c8d8e8; font-size: 16px; font-weight: bold; "
-        "border-bottom: 1px solid #304050; padding-bottom: 4px; }");
+        "border-bottom: 1px solid #304050; padding-bottom: 4px; }"));
     rootLayout->addWidget(titleLabel);
 
     // Scrollable content area
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet("QScrollArea { background: #0f0f1a; border: none; }");
+    scroll->setStyleSheet(Style::themed("QScrollArea { background: #0f0f1a; border: none; }"));
 
     auto* contentWidget = new QWidget;
-    contentWidget->setStyleSheet("QWidget { background: #0f0f1a; }");
+    contentWidget->setStyleSheet(Style::themed("QWidget { background: #0f0f1a; }"));
 
     m_contentLayout = new QVBoxLayout(contentWidget);
     m_contentLayout->setContentsMargins(0, 4, 0, 4);
@@ -258,12 +259,12 @@ QHBoxLayout* SetupPage::addLabeledSlider(QLayout* parent, const QString& label,
 QHBoxLayout* SetupPage::addLabeledToggle(QLayout* parent, const QString& label, QPushButton* toggle)
 {
     toggle->setCheckable(true);
-    toggle->setStyleSheet(
+    toggle->setStyleSheet(Style::themed(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
         "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; "
         "padding: 3px 10px; }"
         "QPushButton:checked { background: #1a5030; color: #00e060; "
-        "border: 1px solid #20a040; }");
+        "border: 1px solid #20a040; }"));
     return makeLabeledRow(parent, label, toggle);
 }
 

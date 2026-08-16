@@ -104,6 +104,7 @@
 //                                    Anthropic Claude Code.
 
 #include "SpotHubDialog.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/DxClusterClient.h"
@@ -285,11 +286,11 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
     root->setContentsMargins(4, 4, 4, 4);
 
     auto* tabs = new QTabWidget;
-    tabs->setStyleSheet(
+    tabs->setStyleSheet(Style::themed(
         "QTabWidget::pane { border: 1px solid #203040; }"
         "QTabBar::tab { background: #1a1a2a; color: #8090a0; border: 1px solid #203040; "
         "  padding: 6px 16px; margin-right: 2px; }"
-        "QTabBar::tab:selected { background: #0f0f1a; color: #00b4d8; border-bottom: none; }");
+        "QTabBar::tab:selected { background: #0f0f1a; color: #00b4d8; border-bottom: none; }"));
 
     // Tab order matches AetherSDR upstream
     // (src/gui/DxClusterDialog.cpp:262-271). NereusSDR adds the PSK
@@ -384,7 +385,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         "PSK Reporter). Change here once; per-source tabs read these "
         "defaults.");
     helpLabel->setWordWrap(true);
-    helpLabel->setStyleSheet("QLabel { color: #8aa8c0; font-size: 11px; }");
+    helpLabel->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 11px; }"));
     idLayout->addWidget(helpLabel);
 
     auto* grid = new QGridLayout;
@@ -442,8 +443,8 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
 
     m_settingsErrorLabel = new QLabel;
     m_settingsErrorLabel->setObjectName("settingsErrorLabel");
-    m_settingsErrorLabel->setStyleSheet(
-        "QLabel { color: #ff4444; font-size: 11px; }");
+    m_settingsErrorLabel->setStyleSheet(Style::themed(
+        "QLabel { color: #ff4444; font-size: 11px; }"));
     btnRow->addWidget(m_settingsErrorLabel, 1);
 
     m_settingsSavedLabel = new QLabel;
@@ -605,8 +606,8 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     }
     m_settingsCurrentLabel = new QLabel(summary);
     m_settingsCurrentLabel->setObjectName("settingsCurrentLabel");
-    m_settingsCurrentLabel->setStyleSheet(
-        "QLabel { color: #8090a0; font-size: 11px; }");
+    m_settingsCurrentLabel->setStyleSheet(Style::themed(
+        "QLabel { color: #8090a0; font-size: 11px; }"));
     m_settingsCurrentLabel->setWordWrap(true);
     layout->addWidget(m_settingsCurrentLabel);
 
@@ -710,7 +711,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
         quint16 port = static_cast<quint16>(m_portSpin->value());
         if (host.isEmpty() || call.isEmpty()) {
             m_statusLabel->setText("Server and callsign are required");
-            m_statusLabel->setStyleSheet("QLabel { color: #ff4444; font-size: 11px; }");
+            m_statusLabel->setStyleSheet(Style::themed("QLabel { color: #ff4444; font-size: 11px; }"));
             return;
         }
         auto& settings = AppSettings::instance();
@@ -758,8 +759,8 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
                 this, [this](const QString& error) {
                     if (m_statusLabel) {
                         m_statusLabel->setText(QString("Error: %1").arg(error));
-                        m_statusLabel->setStyleSheet(
-                            "QLabel { color: #ddbb00; font-size: 11px; }");
+                        m_statusLabel->setStyleSheet(Style::themed(
+                            "QLabel { color: #ddbb00; font-size: 11px; }"));
                     }
                 });
         // Stream raw cluster lines into the console widget so the user
@@ -775,7 +776,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     // Console + spot-color row
     auto* consoleRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("Cluster Console");
-    consoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     consoleRow->addWidget(consoleLabel);
     consoleRow->addStretch();
 
@@ -956,7 +957,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
         quint16 port = static_cast<quint16>(m_rbnPortSpin->value());
         if (host.isEmpty() || call.isEmpty()) {
             m_rbnStatusLabel->setText("Server and callsign are required");
-            m_rbnStatusLabel->setStyleSheet("QLabel { color: #ff4444; font-size: 11px; }");
+            m_rbnStatusLabel->setStyleSheet(Style::themed("QLabel { color: #ff4444; font-size: 11px; }"));
             return;
         }
         auto& settings = AppSettings::instance();
@@ -997,8 +998,8 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
                 this, [this](const QString& error) {
                     if (m_rbnStatusLabel) {
                         m_rbnStatusLabel->setText(QString("Error: %1").arg(error));
-                        m_rbnStatusLabel->setStyleSheet(
-                            "QLabel { color: #ddbb00; font-size: 11px; }");
+                        m_rbnStatusLabel->setStyleSheet(Style::themed(
+                            "QLabel { color: #ddbb00; font-size: 11px; }"));
                     }
                 });
         connect(m_rbnClient, &DxClusterClient::rawLineReceived,
@@ -1012,7 +1013,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     // Console + spot-color row
     auto* rbnConsoleRow = new QHBoxLayout;
     auto* rbnConsoleLabel = new QLabel("RBN Console");
-    rbnConsoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    rbnConsoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     rbnConsoleRow->addWidget(rbnConsoleLabel);
     rbnConsoleRow->addStretch();
 
@@ -1319,7 +1320,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     });
     filterRow->addWidget(m_wsjtxColorDefault);
     auto* defaultLabel = new QLabel("Default");
-    defaultLabel->setStyleSheet("QLabel { color: #8aa8c0; font-size: 14px; }");
+    defaultLabel->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 14px; }"));
     filterRow->addWidget(defaultLabel);
 
     layout->addLayout(filterRow);
@@ -1327,7 +1328,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     // Decodes label + spot-life slider
     auto* decodeRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("WSJT-X Decodes");
-    consoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     decodeRow->addWidget(consoleLabel);
     decodeRow->addStretch();
 
@@ -1346,7 +1347,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     auto* wsjtxLifeValue = new QLabel(QString("%1s").arg(wsjtxLife));
     wsjtxLifeValue->setFixedWidth(35);
     wsjtxLifeValue->setAlignment(Qt::AlignRight);
-    wsjtxLifeValue->setStyleSheet("QLabel { color: #8aa8c0; font-size: 12px; }");
+    wsjtxLifeValue->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 12px; }"));
     decodeRow->addWidget(wsjtxLifeValue);
 
     connect(wsjtxLifeSlider, &QSlider::valueChanged, this, [wsjtxLifeValue](int v) {
@@ -1403,7 +1404,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
         "In SpotCollector, enable UDP broadcast to this port (default 9999).\n"
         "Alternatively, use the DX Cluster tab to connect to SpotCollector's telnet interface.");
     helpLabel->setWordWrap(true);
-    helpLabel->setStyleSheet("QLabel { color: #8aa8c0; font-size: 11px; }");
+    helpLabel->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 11px; }"));
     connLayout->addWidget(helpLabel);
 
     auto* btnRow = new QHBoxLayout;
@@ -1479,7 +1480,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
     layout->addWidget(connGroup);
 
     auto* consoleLabel = new QLabel("SpotCollector Spots");
-    consoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     layout->addWidget(consoleLabel);
 
     m_scConsole = new QPlainTextEdit;
@@ -1491,7 +1492,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
 
     if (m_spotCollectorClient && m_spotCollectorClient->isListening()) {
         m_scStatusLabel->setText(QString("Listening on port %1").arg(m_scPortSpin->value()));
-        m_scStatusLabel->setStyleSheet("QLabel { color: #00b4d8; font-size: 11px; }");
+        m_scStatusLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-size: 11px; }"));
         m_scStartBtn->setText("Stop");
     }
 
@@ -1522,7 +1523,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
 
     grid->addWidget(new QLabel("Server:"), row, 0);
     auto* serverLabel = new QLabel("api.pota.app (HTTP polling)");
-    serverLabel->setStyleSheet("QLabel { color: #8090a0; }");
+    serverLabel->setStyleSheet(Style::themed("QLabel { color: #8090a0; }"));
     grid->addWidget(serverLabel, row, 1);
     row++;
 
@@ -1618,7 +1619,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
 
     auto* consoleRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("POTA Activations");
-    consoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     consoleRow->addWidget(consoleLabel);
     consoleRow->addStretch();
 
@@ -1711,7 +1712,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
 
     grid->addWidget(new QLabel("Server:"), row, 0);
     auto* serverLabel = new QLabel("qso.freedv.org (WebSocket)");
-    serverLabel->setStyleSheet("QLabel { color: #8090a0; }");
+    serverLabel->setStyleSheet(Style::themed("QLabel { color: #8090a0; }"));
     grid->addWidget(serverLabel, row, 1);
     row++;
 
@@ -1778,8 +1779,8 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
             if (m_freedvStatusLabel) {
                 m_freedvStatusLabel->setText(
                     "Identity missing - set callsign and grid in Settings tab.");
-                m_freedvStatusLabel->setStyleSheet(
-                    "QLabel { color: #ddbb00; font-size: 11px; }");
+                m_freedvStatusLabel->setStyleSheet(Style::themed(
+                    "QLabel { color: #ddbb00; font-size: 11px; }"));
             }
             return;
         }
@@ -1817,8 +1818,8 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
                 this, [this](const QString& error) {
                     if (m_freedvStatusLabel) {
                         m_freedvStatusLabel->setText(QString("Error: %1").arg(error));
-                        m_freedvStatusLabel->setStyleSheet(
-                            "QLabel { color: #ddbb00; font-size: 11px; }");
+                        m_freedvStatusLabel->setStyleSheet(Style::themed(
+                            "QLabel { color: #ddbb00; font-size: 11px; }"));
                     }
                 });
     }
@@ -1965,7 +1966,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
 
     auto* consoleRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("FreeDV Spots");
-    consoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     consoleRow->addWidget(consoleLabel);
     consoleRow->addStretch();
 
@@ -2080,7 +2081,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
         "queued and flushed periodically; the console below shows\n"
         "send activity. Callsign and grid are required.");
     helpLabel->setWordWrap(true);
-    helpLabel->setStyleSheet("QLabel { color: #8aa8c0; font-size: 11px; }");
+    helpLabel->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 11px; }"));
     connLayout->addWidget(helpLabel);
 
     auto* btnRow = new QHBoxLayout;
@@ -2120,7 +2121,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
         QString gridSquare = m_pskGridEdit->text().trimmed().toUpper();
         if (call.isEmpty() || gridSquare.isEmpty()) {
             m_pskStatusLabel->setText("Callsign and grid are required");
-            m_pskStatusLabel->setStyleSheet("QLabel { color: #ff4444; font-size: 11px; }");
+            m_pskStatusLabel->setStyleSheet(Style::themed("QLabel { color: #ff4444; font-size: 11px; }"));
             return;
         }
         // 2026-05-12 bench fix (PR #238 review P2): persist under the
@@ -2143,7 +2144,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
     layout->addWidget(connGroup);
 
     auto* consoleLabel = new QLabel("PSK Reporter Activity");
-    consoleLabel->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     layout->addWidget(consoleLabel);
 
     m_pskConsole = new QPlainTextEdit;
@@ -2493,19 +2494,19 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     leftCol->setSpacing(4);
 
     auto* statsTitle = new QLabel("Statistics");
-    statsTitle->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    statsTitle->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     leftCol->addWidget(statsTitle);
 
     auto makeStatRow = [leftCol](const QString& label, const QString& objName) -> QLabel* {
         auto* row = new QHBoxLayout;
         row->setSpacing(6);
         auto* lbl = new QLabel(label + ":");
-        lbl->setStyleSheet("QLabel { color: #8090a0; }");
+        lbl->setStyleSheet(Style::themed("QLabel { color: #8090a0; }"));
         lbl->setMinimumWidth(120);
         row->addWidget(lbl);
         auto* value = new QLabel("0");
         value->setObjectName(objName);
-        value->setStyleSheet("QLabel { color: #c8d8e8; font-weight: bold; }");
+        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-weight: bold; }"));
         row->addWidget(value);
         row->addStretch();
         leftCol->addLayout(row);
@@ -2592,7 +2593,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     rightCol->setSpacing(4);
 
     auto* knobsTitle = new QLabel("Spot Settings");
-    knobsTitle->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; }");
+    knobsTitle->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
     rightCol->addWidget(knobsTitle);
 
     auto* grid = new QGridLayout;
@@ -2868,8 +2869,8 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     // tab's source pills remain a secondary filter for fine-grained
     // control without opening this tab.
     auto* visTitle = new QLabel("Show spots from source");
-    visTitle->setStyleSheet("QLabel { color: #00b4d8; font-weight: bold; "
-                            "margin-top: 8px; }");
+    visTitle->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; "
+                            "margin-top: 8px; }"));
     rightCol->addWidget(visTitle);
 
     static const QVector<QPair<QString, QString>> kSourceChecks = {

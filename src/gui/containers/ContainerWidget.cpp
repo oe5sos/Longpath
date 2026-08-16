@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerWidget.h"
+#include "gui/styles/ThemeQss.h"
 #include "FloatingContainer.h"
 #include "core/BoardCapabilities.h"
 #include "core/LogCategories.h"
@@ -95,8 +96,8 @@ ContainerWidget::ContainerWidget(QWidget* parent)
     // Default placeholder content — replaced by setContent() in later phases
     auto* placeholder = new QLabel(QStringLiteral("Container"), this);
     placeholder->setAlignment(Qt::AlignCenter);
-    placeholder->setStyleSheet(QStringLiteral(
-        "color: #405060; font-size: 14px; background: transparent;"));
+    placeholder->setStyleSheet(Style::themed(QStringLiteral(
+        "color: #405060; font-size: 14px; background: transparent;")));
     setContent(placeholder);
 
     qCDebug(lcContainer) << "Container created:" << m_id;
@@ -117,8 +118,8 @@ void ContainerWidget::buildUI()
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(22);
     m_titleBar->setVisible(false);
-    m_titleBar->setStyleSheet(QStringLiteral(
-        "background: #1a2a3a; border-bottom: 1px solid #203040;"));
+    m_titleBar->setStyleSheet(Style::themed(QStringLiteral(
+        "background: #1a2a3a; border-bottom: 1px solid #203040;")));
 
     auto* barLayout = new QHBoxLayout(m_titleBar);
     barLayout->setContentsMargins(4, 0, 0, 0);
@@ -126,8 +127,8 @@ void ContainerWidget::buildUI()
 
     // Title label — "RX1" + notes (Thetis ucMeter.cs:625-639)
     m_titleLabel = new QLabel(QStringLiteral("RX1"), m_titleBar);
-    m_titleLabel->setStyleSheet(QStringLiteral(
-        "color: #c8d8e8; font-size: 11px; font-weight: bold; background: transparent;"));
+    m_titleLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "color: #c8d8e8; font-size: 11px; font-weight: bold; background: transparent;")));
     m_titleLabel->setCursor(Qt::SizeAllCursor);
     barLayout->addWidget(m_titleLabel, 1);
 
@@ -170,7 +171,7 @@ void ContainerWidget::buildUI()
     // Content holder — layout slot for setContent()
     m_contentHolder = new QWidget(this);
     m_contentHolder->setMouseTracking(true);
-    m_contentHolder->setStyleSheet(QStringLiteral("background: #0f0f1a;"));
+    m_contentHolder->setStyleSheet(Style::themed(QStringLiteral("background: #0f0f1a;")));
     new QVBoxLayout(m_contentHolder);
     m_contentHolder->layout()->setContentsMargins(0, 0, 0, 0);
     mainLayout->addWidget(m_contentHolder, 1);
@@ -179,8 +180,8 @@ void ContainerWidget::buildUI()
     m_resizeGrip = new QWidget(this);
     m_resizeGrip->setFixedSize(12, 12);
     m_resizeGrip->setCursor(Qt::SizeFDiagCursor);
-    m_resizeGrip->setStyleSheet(QStringLiteral(
-        "background: #405060; border-radius: 2px;"));
+    m_resizeGrip->setStyleSheet(Style::themed(QStringLiteral(
+        "background: #405060; border-radius: 2px;")));
     m_resizeGrip->setVisible(false);
 
     // Wire button signals
@@ -280,11 +281,11 @@ void ContainerWidget::setupBorder()
     // normal border regardless of m_border, so the user always sees
     // which container the settings dialog is editing.
     if (m_highlighted) {
-        setStyleSheet(QStringLiteral(
-            "ContainerWidget { border: 2px solid #00b4d8; }"));
+        setStyleSheet(Style::themed(QStringLiteral(
+            "ContainerWidget { border: 2px solid #00b4d8; }")));
     } else if (m_border) {
-        setStyleSheet(QStringLiteral(
-            "ContainerWidget { border: 1px solid #203040; }"));
+        setStyleSheet(Style::themed(QStringLiteral(
+            "ContainerWidget { border: 1px solid #203040; }")));
     } else {
         setStyleSheet(QString());
     }

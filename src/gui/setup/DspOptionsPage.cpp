@@ -85,6 +85,7 @@
 //============================================================================================//
 
 #include "DspOptionsPage.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
 #include "core/RxChannel.h"
@@ -576,8 +577,8 @@ void DspOptionsPage::buildUI()
             [this](qint64 ms) {
                 m_timeToLastChangeLabel->setText(
                     tr("Time to last change: %1 ms").arg(ms));
-                m_timeToLastChangeLabel->setStyleSheet(
-                    QStringLiteral("color: #c8d8e8;"));
+                m_timeToLastChangeLabel->setStyleSheet(Style::themed(
+                    QStringLiteral("color: #c8d8e8;")));
             });
     }
 

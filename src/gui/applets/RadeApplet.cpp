@@ -10,6 +10,7 @@
 //                Code.
 
 #include "RadeApplet.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/MicProfileManager.h"
 #include "core/RadeChannel.h"
@@ -81,8 +82,8 @@ void RadeApplet::buildUI()
     // own here results in a double header. Same fix in PureSignalApplet.
 
     auto* body = new QWidget(this);
-    body->setStyleSheet(
-        QStringLiteral("QWidget { background: #0a0a18; color: #c8d8e8; }"));
+    body->setStyleSheet(Style::themed(
+        QStringLiteral("QWidget { background: #0a0a18; color: #c8d8e8; }")));
     auto* bodyLayout = new QVBoxLayout(body);
     bodyLayout->setContentsMargins(8, 8, 8, 8);
     bodyLayout->setSpacing(6);
@@ -92,13 +93,13 @@ void RadeApplet::buildUI()
         auto* row = new QHBoxLayout();
         row->setSpacing(6);
         auto* lbl = new QLabel(QStringLiteral("Profile"), body);
-        lbl->setStyleSheet(QStringLiteral("color: #8aa8c0; font-size: 11px;"));
+        lbl->setStyleSheet(Style::themed(QStringLiteral("color: #8aa8c0; font-size: 11px;")));
         lbl->setFixedWidth(62);
         m_profileCombo = new QComboBox(body);
-        m_profileCombo->setStyleSheet(QStringLiteral(
+        m_profileCombo->setStyleSheet(Style::themed(QStringLiteral(
             "QComboBox { background: #1a2a3a; color: #c8d8e8; "
             "border: 1px solid #304050; border-radius: 2px; "
-            "padding: 2px 4px; font-size: 11px; }"));
+            "padding: 2px 4px; font-size: 11px; }")));
         row->addWidget(lbl);
         row->addWidget(m_profileCombo, 1);
         bodyLayout->addLayout(row);
@@ -111,17 +112,17 @@ void RadeApplet::buildUI()
 
         m_syncIndicator = new QLabel(body);
         m_syncIndicator->setFixedSize(12, 12);
-        m_syncIndicator->setStyleSheet(QStringLiteral(
-            "QLabel { background: #708090; border-radius: 6px; }"));
+        m_syncIndicator->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { background: #708090; border-radius: 6px; }")));
 
         auto* syncLbl = new QLabel(QStringLiteral("Sync"), body);
-        syncLbl->setStyleSheet(QStringLiteral(
-            "color: #8aa8c0; font-size: 11px;"));
+        syncLbl->setStyleSheet(Style::themed(QStringLiteral(
+            "color: #8aa8c0; font-size: 11px;")));
 
         m_snrLabel = new QLabel(QStringLiteral(" -   - "), body);
-        m_snrLabel->setStyleSheet(QStringLiteral(
+        m_snrLabel->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: #708090; font-size: 11px; "
-            "font-weight: bold; background: transparent; }"));
+            "font-weight: bold; background: transparent; }")));
         m_snrLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
         row->addWidget(m_syncIndicator);
@@ -136,12 +137,12 @@ void RadeApplet::buildUI()
         auto* row = new QHBoxLayout();
         row->setSpacing(6);
         auto* lbl = new QLabel(QStringLiteral("Offset"), body);
-        lbl->setStyleSheet(QStringLiteral("color: #8aa8c0; font-size: 11px;"));
+        lbl->setStyleSheet(Style::themed(QStringLiteral("color: #8aa8c0; font-size: 11px;")));
         lbl->setFixedWidth(62);
         m_freqOffsetLabel = new QLabel(QStringLiteral("0 Hz"), body);
-        m_freqOffsetLabel->setStyleSheet(QStringLiteral(
+        m_freqOffsetLabel->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: #c8d8e8; font-size: 11px; "
-            "font-weight: bold; background: transparent; }"));
+            "font-weight: bold; background: transparent; }")));
         m_freqOffsetLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(lbl);
         row->addStretch(1);
@@ -154,7 +155,7 @@ void RadeApplet::buildUI()
         auto* row = new QHBoxLayout();
         row->setSpacing(6);
         auto* lbl = new QLabel(QStringLiteral("Last RX"), body);
-        lbl->setStyleSheet(QStringLiteral("color: #8aa8c0; font-size: 11px;"));
+        lbl->setStyleSheet(Style::themed(QStringLiteral("color: #8aa8c0; font-size: 11px;")));
         lbl->setFixedWidth(62);
         m_lastDecodedLabel = new QLabel(QStringLiteral("--"), body);
         m_lastDecodedLabel->setStyleSheet(QStringLiteral(
@@ -174,7 +175,7 @@ void RadeApplet::buildUI()
         auto* row = new QHBoxLayout();
         row->setSpacing(6);
         m_resetButton = new QPushButton(QStringLiteral("Reset vocoder"), body);
-        m_resetButton->setStyleSheet(QStringLiteral(
+        m_resetButton->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton { background: #1a2a3a; color: #c8d8e8; "
             "border: 1px solid #304050; border-radius: 2px; "
             "padding: 4px 10px; font-size: 11px; font-weight: bold; }"
@@ -182,7 +183,7 @@ void RadeApplet::buildUI()
             "QPushButton:pressed { background: #2a3a4a; }"
             "QPushButton:disabled { background: #1a1a2a; "
             "color: #556070; border: 1px solid #2a3040; }")
-                .arg(QString::fromLatin1(kRadePurple)));
+                .arg(QString::fromLatin1(kRadePurple))));
         row->addStretch(1);
         row->addWidget(m_resetButton);
         row->addStretch(1);

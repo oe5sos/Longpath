@@ -1,5 +1,6 @@
 // src/gui/widgets/StationBlock.cpp
 #include "StationBlock.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -30,8 +31,8 @@ StationBlock::StationBlock(QWidget* parent) : QWidget(parent)
 
     m_hardwareLabel = new QLabel(this);
     m_hardwareLabel->setAlignment(Qt::AlignCenter);
-    m_hardwareLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #607080; font-size: 10px; background: transparent; }"));
+    m_hardwareLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #607080; font-size: 10px; background: transparent; }")));
     m_hardwareLabel->setVisible(false);
     // Presses must reach StationBlock::mousePressEvent, not stop here.
     m_hardwareLabel->setAttribute(Qt::WA_TransparentForMouseEvents, true);
@@ -100,19 +101,19 @@ void StationBlock::mousePressEvent(QMouseEvent* event)
 void StationBlock::applyStyle()
 {
     if (isConnectedAppearance()) {
-        setStyleSheet(QStringLiteral(
+        setStyleSheet(Style::themed(QStringLiteral(
             "NereusSDR--StationBlock { border: 1px solid rgba(0,180,216,80);"
             " background: #0a0a14; border-radius: 6px; }"
             "QLabel { color: #c8d8e8; font-family: 'SF Mono', Menlo, monospace;"
             " font-size: 12px; font-weight: bold; background: transparent; border: none; }"
-        ));
+        )));
     } else {
-        setStyleSheet(QStringLiteral(
+        setStyleSheet(Style::themed(QStringLiteral(
             "NereusSDR--StationBlock { border: 1px dashed rgba(255,96,96,102);"
             " background: #0a0a14; border-radius: 6px; }"
             "QLabel { color: #607080; font-family: 'SF Mono', Menlo, monospace;"
             " font-size: 12px; font-style: italic; background: transparent; border: none; }"
-        ));
+        )));
     }
 }
 

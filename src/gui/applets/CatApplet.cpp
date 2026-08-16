@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "CatApplet.h"
+#include "gui/styles/ThemeQss.h"
 #include "NyiOverlay.h"
 #include "gui/ComboStyle.h"
 #include "gui/StyleConstants.h"
@@ -42,9 +43,9 @@ static QLabel* makeLed(const QString& name, QWidget* parent)
     auto* led = new QLabel(name, parent);
     led->setFixedSize(24, 14);
     led->setAlignment(Qt::AlignCenter);
-    led->setStyleSheet(QStringLiteral(
+    led->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background: #405060; color: #c8d8e8; border-radius: 2px;"
-        " font-size: 8px; font-weight: bold; }"));
+        " font-size: 8px; font-weight: bold; }")));
     return led;
 }
 

@@ -55,6 +55,7 @@
 // =================================================================
 
 #include "TitleBar.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "core/BuildIdentity.h"
 
@@ -456,9 +457,9 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     // audio level (bench feedback, 2026-08-03).
     m_utcLabel = new QLabel(this);
     m_utcLabel->setToolTip(tr("UTC time"));
-    m_utcLabel->setStyleSheet(QStringLiteral(
+    m_utcLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #8aa8c0; font-size: 11px;"
-        " font-family: 'SF Mono', Menlo, monospace; }"));
+        " font-family: 'SF Mono', Menlo, monospace; }")));
     m_hbox->addWidget(m_utcLabel);
     m_hbox->addSpacing(24);
 

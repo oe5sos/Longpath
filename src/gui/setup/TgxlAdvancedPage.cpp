@@ -14,6 +14,7 @@
 // =================================================================
 
 #include "TgxlAdvancedPage.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QAbstractTableModel>
 #include <QCheckBox>
@@ -460,7 +461,7 @@ void TgxlAdvancedPage::buildNetworkSection(QVBoxLayout* topLay)
         QStringLiteral("TGXL must be unicast-reachable from this host after the change; "
                        "if you lose connection, use Scan LAN to rediscover."));
     warnLabel->setWordWrap(true);
-    warnLabel->setStyleSheet(QStringLiteral("color: #ddbb00;"));
+    warnLabel->setStyleSheet(Style::themed(QStringLiteral("color: #ddbb00;")));
     lay->addWidget(warnLabel);
 
     m_applyIfconfBtn = new QPushButton(QStringLiteral("Apply Network Settings"));

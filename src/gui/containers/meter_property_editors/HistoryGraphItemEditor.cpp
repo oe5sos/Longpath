@@ -1,4 +1,5 @@
 #include "HistoryGraphItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/HistoryGraphItem.h"
 #include "../../meters/MeterPoller.h"
 
@@ -23,9 +24,9 @@ void HistoryGraphItemEditor::setItem(MeterItem* item)
     if (!x) { return; }
 
     auto applyColor = [](QPushButton* btn, const QColor& c) {
-        btn->setStyleSheet(
+        btn->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
 
     beginProgrammaticUpdate();
@@ -67,9 +68,9 @@ void HistoryGraphItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->lineColor0(), this);
         if (chosen.isValid()) {
             x->setLineColor0(chosen);
-            m_btnLineColor0->setStyleSheet(
+            m_btnLineColor0->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -83,9 +84,9 @@ void HistoryGraphItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->lineColor1(), this);
         if (chosen.isValid()) {
             x->setLineColor1(chosen);
-            m_btnLineColor1->setStyleSheet(
+            m_btnLineColor1->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

@@ -26,6 +26,7 @@
 // =================================================================
 
 #include "EqApplet.h"
+#include "gui/styles/ThemeQss.h"
 #include "NyiOverlay.h"
 #include "gui/ComboStyle.h"
 #include "gui/StyleConstants.h"
@@ -53,11 +54,11 @@ public:
         setFixedSize(22, 22);
         setCursor(Qt::PointingHandCursor);
         setToolTip(QStringLiteral("Reset all bands to 0 dB"));
-        setStyleSheet(
+        setStyleSheet(Style::themed(
             "QPushButton { background-color: #1a2a3a; border: 1px solid #205070; "
             "border-radius: 6px; }"
             "QPushButton:hover { background-color: #203040; }"
-            "QPushButton:pressed { background-color: #00b4d8; }");
+            "QPushButton:pressed { background-color: #00b4d8; }"));
     }
 
 protected:
@@ -182,7 +183,7 @@ void EqApplet::buildUI()
         auto* line = new QFrame(this);
         line->setFrameShape(QFrame::HLine);
         line->setFrameShadow(QFrame::Plain);
-        line->setStyleSheet(QStringLiteral("QFrame { color: #203040; }"));
+        line->setStyleSheet(Style::themed(QStringLiteral("QFrame { color: #203040; }")));
         vbox->addWidget(line);
     }
 
@@ -199,7 +200,7 @@ void EqApplet::buildUI()
         for (int i = 0; i < kEqBandCount; ++i) {
             auto* lbl = new QLabel(QString::fromLatin1(kBandLabels[i]), this);
             lbl->setAlignment(Qt::AlignCenter);
-            lbl->setStyleSheet(QStringLiteral("QLabel { color: #8090a0; font-size: 9px; }"));
+            lbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #8090a0; font-size: 9px; }")));
             row->addWidget(lbl, 1);
         }
 
@@ -222,7 +223,7 @@ void EqApplet::buildUI()
             col->setSpacing(0);
 
             auto* topLbl = new QLabel(QStringLiteral("+10"), this);
-            topLbl->setStyleSheet(QStringLiteral("QLabel { color: #607080; font-size: 9px; }"));
+            topLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #607080; font-size: 9px; }")));
             topLbl->setAlignment(Qt::AlignRight | Qt::AlignTop);
             topLbl->setFixedWidth(16);
             col->addWidget(topLbl);
@@ -230,7 +231,7 @@ void EqApplet::buildUI()
             col->addStretch();
 
             auto* midLbl = new QLabel(QStringLiteral("0"), this);
-            midLbl->setStyleSheet(QStringLiteral("QLabel { color: #8090a0; font-size: 9px; }"));
+            midLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #8090a0; font-size: 9px; }")));
             midLbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
             midLbl->setFixedWidth(16);
             col->addWidget(midLbl);
@@ -238,7 +239,7 @@ void EqApplet::buildUI()
             col->addStretch();
 
             auto* botLbl = new QLabel(QStringLiteral("-10"), this);
-            botLbl->setStyleSheet(QStringLiteral("QLabel { color: #607080; font-size: 9px; }"));
+            botLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #607080; font-size: 9px; }")));
             botLbl->setAlignment(Qt::AlignRight | Qt::AlignBottom);
             botLbl->setFixedWidth(16);
             col->addWidget(botLbl);
@@ -268,8 +269,8 @@ void EqApplet::buildUI()
             // Value label under each slider (#c8d8e8, 9px)
             auto* valLbl = new QLabel(QStringLiteral("0"), this);
             valLbl->setAlignment(Qt::AlignCenter);
-            valLbl->setStyleSheet(
-                QStringLiteral("QLabel { color: #c8d8e8; font-size: 9px; }"));
+            valLbl->setStyleSheet(Style::themed(
+                QStringLiteral("QLabel { color: #c8d8e8; font-size: 9px; }")));
             m_valueLabels[i] = valLbl;
             col->addWidget(valLbl);
 
@@ -282,7 +283,7 @@ void EqApplet::buildUI()
             col->setSpacing(0);
 
             auto* topLbl = new QLabel(QStringLiteral("+10"), this);
-            topLbl->setStyleSheet(QStringLiteral("QLabel { color: #607080; font-size: 9px; }"));
+            topLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #607080; font-size: 9px; }")));
             topLbl->setAlignment(Qt::AlignLeft | Qt::AlignTop);
             topLbl->setFixedWidth(16);
             col->addWidget(topLbl);
@@ -290,7 +291,7 @@ void EqApplet::buildUI()
             col->addStretch();
 
             auto* midLbl = new QLabel(QStringLiteral("0"), this);
-            midLbl->setStyleSheet(QStringLiteral("QLabel { color: #8090a0; font-size: 9px; }"));
+            midLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #8090a0; font-size: 9px; }")));
             midLbl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
             midLbl->setFixedWidth(16);
             col->addWidget(midLbl);
@@ -298,7 +299,7 @@ void EqApplet::buildUI()
             col->addStretch();
 
             auto* botLbl = new QLabel(QStringLiteral("-10"), this);
-            botLbl->setStyleSheet(QStringLiteral("QLabel { color: #607080; font-size: 9px; }"));
+            botLbl->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #607080; font-size: 9px; }")));
             botLbl->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
             botLbl->setFixedWidth(16);
             col->addWidget(botLbl);
@@ -314,7 +315,7 @@ void EqApplet::buildUI()
         auto* line = new QFrame(this);
         line->setFrameShape(QFrame::HLine);
         line->setFrameShadow(QFrame::Plain);
-        line->setStyleSheet(QStringLiteral("QFrame { color: #203040; }"));
+        line->setStyleSheet(Style::themed(QStringLiteral("QFrame { color: #203040; }")));
         vbox->addWidget(line);
     }
 
@@ -324,8 +325,8 @@ void EqApplet::buildUI()
         row->setSpacing(4);
 
         auto* presetLbl = new QLabel(QStringLiteral("Preset"), this);
-        presetLbl->setStyleSheet(
-            QStringLiteral("QLabel { color: #8090a0; font-size: 10px; }"));
+        presetLbl->setStyleSheet(Style::themed(
+            QStringLiteral("QLabel { color: #8090a0; font-size: 10px; }")));
         row->addWidget(presetLbl);
 
         // Control 17: Preset combo — Flat / Voice / Music / Custom

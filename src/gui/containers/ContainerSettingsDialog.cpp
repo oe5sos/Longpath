@@ -99,6 +99,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerSettingsDialog.h"
+#include "gui/styles/ThemeQss.h"
 #include "ContainerManager.h"
 #include "MmioEndpointsDialog.h"
 
@@ -313,7 +314,7 @@ void ContainerSettingsDialog::buildLayout()
     root->setSpacing(6);
 
     // Dark dialog background
-    setStyleSheet("QDialog { background: #0f0f1a; color: #c8d8e8; }");
+    setStyleSheet(Style::themed("QDialog { background: #0f0f1a; color: #c8d8e8; }"));
 
     // --- Container-level properties bar (top) ---
     buildContainerPropertiesSection(root);
@@ -321,8 +322,8 @@ void ContainerSettingsDialog::buildLayout()
     // --- Three-panel splitter ---
     m_splitter = new QSplitter(Qt::Horizontal, this);
     m_splitter->setChildrenCollapsible(false);
-    m_splitter->setStyleSheet(
-        "QSplitter::handle { background: #203040; width: 3px; }");
+    m_splitter->setStyleSheet(Style::themed(
+        "QSplitter::handle { background: #203040; width: 3px; }"));
 
     // Phase 3G-6 block 3 commit 12: Thetis 3-column layout.
     // Left = Available (catalog), center = In-use, right = Properties.
@@ -450,8 +451,8 @@ void ContainerSettingsDialog::buildPropertiesPanel(QWidget* parent)
     layout->addWidget(header);
 
     m_propertyStack = new QStackedWidget(parent);
-    m_propertyStack->setStyleSheet(
-        "QStackedWidget { background: #0a0a18; border: 1px solid #203040; }");
+    m_propertyStack->setStyleSheet(Style::themed(
+        "QStackedWidget { background: #0a0a18; border: 1px solid #203040; }"));
 
     // Page 0: empty placeholder
     m_emptyPage = new QWidget(m_propertyStack);
@@ -735,8 +736,8 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
 {
     QFrame* bar = new QFrame(this);
     bar->setFrameShape(QFrame::StyledPanel);
-    bar->setStyleSheet(
-        "QFrame { background: #1a1a2a; border: 1px solid #203040; border-radius: 4px; }");
+    bar->setStyleSheet(Style::themed(
+        "QFrame { background: #1a1a2a; border: 1px solid #203040; border-radius: 4px; }"));
 
     // Phase 3G-6 block 3 commit 17: two-row layout. Row 1 holds the
     // container-switch dropdown, title, bg, rx, and visibility
@@ -759,12 +760,12 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QLabel* contLabel = new QLabel(QStringLiteral("Container:"), bar);
     contLabel->setStyleSheet(kLabelStyle);
     m_containerDropdown = new QComboBox(bar);
-    m_containerDropdown->setStyleSheet(
+    m_containerDropdown->setStyleSheet(Style::themed(
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px;"
         "  min-width: 160px; }"
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #205070; selection-background-color: #00b4d8; }");
+        "  border: 1px solid #205070; selection-background-color: #00b4d8; }"));
     if (m_manager) {
         const QList<ContainerWidget*> all = m_manager->allContainers();
         int activeIdx = -1;
@@ -813,10 +814,10 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QLabel* bgLabel = new QLabel(QStringLiteral("BG:"), bar);
     bgLabel->setStyleSheet(kLabelStyle);
     m_bgColorBtn = new QPushButton(QStringLiteral("  "), bar);
-    m_bgColorBtn->setStyleSheet(
+    m_bgColorBtn->setStyleSheet(Style::themed(
         "QPushButton { background: #0f0f1a; border: 1px solid #205070;"
         "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
-        "QPushButton:hover { border-color: #00b4d8; }");
+        "QPushButton:hover { border-color: #00b4d8; }"));
     m_bgColorBtn->setAutoDefault(false);
     m_bgColorBtn->setDefault(false);
     m_bgColorBtn->setToolTip(QStringLiteral("Choose background color"));
@@ -825,10 +826,10 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
         QColor chosen = QColorDialog::getColor(initial, this,
                                                QStringLiteral("Background Color"));
         if (chosen.isValid()) {
-            m_bgColorBtn->setStyleSheet(
+            m_bgColorBtn->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070;"
                                 "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
-                                "QPushButton:hover { border-color: #00b4d8; }").arg(chosen.name()));
+                                "QPushButton:hover { border-color: #00b4d8; }").arg(chosen.name())));
         }
     });
 
@@ -836,7 +837,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QLabel* borderLabel = new QLabel(QStringLiteral("Border:"), bar);
     borderLabel->setStyleSheet(kLabelStyle);
     m_borderCheck = new QCheckBox(bar);
-    m_borderCheck->setStyleSheet("QCheckBox { color: #c8d8e8; }");
+    m_borderCheck->setStyleSheet(Style::themed("QCheckBox { color: #c8d8e8; }"));
 
     // RX Source
     QLabel* rxLabel = new QLabel(QStringLiteral("RX:"), bar);
@@ -844,23 +845,23 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_rxSourceCombo = new QComboBox(bar);
     m_rxSourceCombo->addItem(QStringLiteral("RX1"), 1);
     m_rxSourceCombo->addItem(QStringLiteral("RX2"), 2);
-    m_rxSourceCombo->setStyleSheet(
+    m_rxSourceCombo->setStyleSheet(Style::themed(
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px; }"
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #205070; selection-background-color: #00b4d8; }");
+        "  border: 1px solid #205070; selection-background-color: #00b4d8; }"));
     m_rxSourceCombo->setFixedWidth(64);
 
     // Show on RX / TX
     QLabel* showRxLabel = new QLabel(QStringLiteral("Show RX:"), bar);
     showRxLabel->setStyleSheet(kLabelStyle);
     m_showOnRxCheck = new QCheckBox(bar);
-    m_showOnRxCheck->setStyleSheet("QCheckBox { color: #c8d8e8; }");
+    m_showOnRxCheck->setStyleSheet(Style::themed("QCheckBox { color: #c8d8e8; }"));
 
     QLabel* showTxLabel = new QLabel(QStringLiteral("Show TX:"), bar);
     showTxLabel->setStyleSheet(kLabelStyle);
     m_showOnTxCheck = new QCheckBox(bar);
-    m_showOnTxCheck->setStyleSheet("QCheckBox { color: #c8d8e8; }");
+    m_showOnTxCheck->setStyleSheet(Style::themed("QCheckBox { color: #c8d8e8; }"));
 
     // Assemble bar
     barLayout->addWidget(titleLabel);
@@ -898,7 +899,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
 
     auto makeCheck = [bar](const QString& label, bool initial) {
         auto* cb = new QCheckBox(label, bar);
-        cb->setStyleSheet("QCheckBox { color: #c8d8e8; }");
+        cb->setStyleSheet(Style::themed("QCheckBox { color: #c8d8e8; }"));
         cb->setChecked(initial);
         return cb;
     };
@@ -1073,7 +1074,7 @@ void ContainerSettingsDialog::onItemSelectionChanged()
     scroll->setWidget(editor);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet(
+    scroll->setStyleSheet(Style::themed(
         "QScrollArea { background: #0a0a18; border: 1px solid #203040; }"
         "QScrollArea > QWidget > QWidget { background: #0a0a18; }"
         "QScrollBar:vertical {"
@@ -1085,7 +1086,7 @@ void ContainerSettingsDialog::onItemSelectionChanged()
         "QScrollBar::handle:vertical:hover { background: #00b4d8; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
         "  height: 0;"
-        "}");
+        "}"));
 
     // Track the scroll area as the "current type editor" so the
     // next selection change removes and deletes the whole wrapper
@@ -1110,7 +1111,7 @@ void ContainerSettingsDialog::onAddItem()
 {
     // Styled popup menu with categorized sub-menus
     auto* menu = new QMenu(this);
-    menu->setStyleSheet(
+    menu->setStyleSheet(Style::themed(
         QStringLiteral("QMenu {"
                        "  background: #1a2a3a;"
                        "  color: #c8d8e8;"
@@ -1123,7 +1124,7 @@ void ContainerSettingsDialog::onAddItem()
                        "QMenu::separator {"
                        "  background: #203040;"
                        "  height: 1px;"
-                       "}"));
+                       "}")));
 
     // --- Meters ---
     QMenu* metersMenu = menu->addMenu(QStringLiteral("Meters"));

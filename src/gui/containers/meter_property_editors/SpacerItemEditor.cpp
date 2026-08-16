@@ -1,4 +1,5 @@
 #include "SpacerItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 #include "../../meters/SpacerItem.h"
 
@@ -21,12 +22,12 @@ void SpacerItemEditor::setItem(MeterItem* item)
     if (!spacer) { return; }
 
     beginProgrammaticUpdate();
-    m_btnColour1->setStyleSheet(
+    m_btnColour1->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(spacer->colour1().name(QColor::HexArgb)));
-    m_btnColour2->setStyleSheet(
+            .arg(spacer->colour1().name(QColor::HexArgb))));
+    m_btnColour2->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(spacer->colour2().name(QColor::HexArgb)));
+            .arg(spacer->colour2().name(QColor::HexArgb))));
     m_spinPadding->setValue(static_cast<double>(spacer->padding()));
     endProgrammaticUpdate();
 }
@@ -46,9 +47,9 @@ void SpacerItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             spacer->setColour1(chosen);
-            m_btnColour1->setStyleSheet(
+            m_btnColour1->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -65,9 +66,9 @@ void SpacerItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             spacer->setColour2(chosen);
-            m_btnColour2->setStyleSheet(
+            m_btnColour2->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

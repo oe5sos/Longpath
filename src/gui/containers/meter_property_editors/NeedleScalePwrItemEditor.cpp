@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "NeedleScalePwrItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 #include "../../meters/NeedleScalePwrItem.h"
 
@@ -123,9 +124,9 @@ void NeedleScalePwrItemEditor::setItem(MeterItem* item)
 
     // Colors
     auto applyColor = [](QPushButton* btn, const QColor& c) {
-        btn->setStyleSheet(
+        btn->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     applyColor(m_btnLowColour,  nspi->lowColour());
     applyColor(m_btnHighColour, nspi->highColour());
@@ -211,9 +212,9 @@ void NeedleScalePwrItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             nspi->setLowColour(chosen);
-            m_btnLowColour->setStyleSheet(
+            m_btnLowColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -229,9 +230,9 @@ void NeedleScalePwrItemEditor::buildTypeSpecific()
                                                      QColorDialog::ShowAlphaChannel);
         if (chosen.isValid()) {
             nspi->setHighColour(chosen);
-            m_btnHighColour->setStyleSheet(
+            m_btnHighColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

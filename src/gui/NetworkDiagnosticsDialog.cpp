@@ -27,6 +27,7 @@
 // =================================================================
 
 #include "gui/NetworkDiagnosticsDialog.h"
+#include "gui/styles/ThemeQss.h"
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
 #include "core/AudioEngine.h"
@@ -192,10 +193,10 @@ void NetworkDiagnosticsDialog::buildUi()
 {
     // §D exception: #0a1a28 — diagnostics dialog bg; darker blue-black than
     // kAppBg (#0f0f1a) to visually separate from the main window.
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QDialog { background: #0a1a28; }"  // §D exception: diagnostics-specific bg
         "QLabel  { background: transparent; }"
-    ));
+    )));
 
     QVBoxLayout* root = new QVBoxLayout(this);
     root->setSpacing(4);
@@ -228,7 +229,7 @@ void NetworkDiagnosticsDialog::buildUi()
     // §D exceptions: bg #1a2a38 / border #304050 / hover #2a3a4a / pressed #1a2a38
     //   — diagnostics button surface; between kButtonBg (#1a2a3a) and kBorderSubtle
     //   (#203040), chosen to contrast with the #0a1a28 dialog bg.
-    resetBtn->setStyleSheet(
+    resetBtn->setStyleSheet(Style::themed(
         QStringLiteral(
             "QPushButton {"
             "  color: %1;"                       // Style::kTitleText
@@ -240,7 +241,7 @@ void NetworkDiagnosticsDialog::buildUi()
             "}"
             "QPushButton:hover { background: #2a3a4a; }"   // §D exception
             "QPushButton:pressed { background: #1a2a38; }" // §D exception
-        ).arg(Style::kTitleText));
+        ).arg(Style::kTitleText)));
     connect(resetBtn, &QPushButton::clicked,
             this, &NetworkDiagnosticsDialog::onResetSessionStats);
     btnRow->addWidget(resetBtn);
@@ -250,7 +251,7 @@ void NetworkDiagnosticsDialog::buildUi()
     // §D exceptions: bg #204060 / border #204060 / hover #204060 / pressed #1a2a48
     //   — diagnostics close button uses a more prominent blue tint to distinguish
     //   it from the reset button; no canonical match.
-    closeBtn->setStyleSheet(
+    closeBtn->setStyleSheet(Style::themed(
         QStringLiteral(
             "QPushButton {"
             "  color: %1;"                       // Style::kTextPrimary
@@ -262,7 +263,7 @@ void NetworkDiagnosticsDialog::buildUi()
             "}"
             "QPushButton:hover { background: #204060; }"   // §D exception
             "QPushButton:pressed { background: #1a2a48; }" // §D exception
-        ).arg(Style::kTextPrimary));
+        ).arg(Style::kTextPrimary)));
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
     btnRow->addWidget(closeBtn);
 

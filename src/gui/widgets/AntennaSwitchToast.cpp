@@ -13,6 +13,7 @@
 // no-port-check: NereusSDR-original
 
 #include "gui/widgets/AntennaSwitchToast.h"
+#include "gui/styles/ThemeQss.h"
 
 #include "gui/StyleConstants.h"
 
@@ -27,16 +28,16 @@ AntennaSwitchToast::AntennaSwitchToast(const QString& message, QWidget* parent)
     : QWidget(parent, Qt::FramelessWindowHint | Qt::Tool)
 {
     setAttribute(Qt::WA_TranslucentBackground);
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QWidget { background: %1; border: 1px solid %2;"
         " border-left: 3px solid #00ff88; border-radius: 6px; }"
-    ).arg(Style::kPanelBg, Style::kBorder));
+    ).arg(Style::kPanelBg, Style::kBorder)));
 
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 8, 12, 8);
 
     auto* checkLbl = new QLabel(QStringLiteral("\xE2\x9C\x93"), this); // UTF-8 checkmark
-    checkLbl->setStyleSheet(QStringLiteral("color: #00ff88; font-size: 14px;"));
+    checkLbl->setStyleSheet(Style::themed(QStringLiteral("color: #00ff88; font-size: 14px;")));
     layout->addWidget(checkLbl);
 
     auto* textWidget = new QWidget(this);

@@ -1,4 +1,5 @@
 #include "MetricLabel.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -40,14 +41,14 @@ void MetricLabel::setValue(const QString& v)
 
 void MetricLabel::applyStyle()
 {
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "QLabel#MetricLabel_Label { color: #607080;"
         " font-family: 'SF Mono', Menlo, monospace;"
         " font-size: 9px; font-weight: 500; letter-spacing: 0.5px; }"
         "QLabel#MetricLabel_Value { color: #8aa8c0;"
         " font-family: 'SF Mono', Menlo, monospace;"
         " font-size: 11px; font-weight: 600; }"
-    ));
+    )));
 }
 
 } // namespace NereusSDR

@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ScaleItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 
 #include <QCheckBox>
@@ -101,23 +102,23 @@ void ScaleItemEditor::setItem(MeterItem* item)
     m_spinFontSize->setValue(scale->fontSize());
 
     auto applyTickColor = [this](const QColor& c) {
-        m_btnTickColor->setStyleSheet(
+        m_btnTickColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     auto applyLabelColor = [this](const QColor& c) {
-        m_btnLabelColor->setStyleSheet(
+        m_btnLabelColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     applyTickColor(scale->tickColor());
     applyLabelColor(scale->labelColor());
 
     // Phase B4 — ShowType + title colour
     m_chkShowType->setChecked(scale->showType());
-    m_btnTitleColor->setStyleSheet(
+    m_btnTitleColor->setStyleSheet(Style::themed(
         QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-            .arg(scale->titleColour().name(QColor::HexArgb)));
+            .arg(scale->titleColour().name(QColor::HexArgb))));
 
     endProgrammaticUpdate();
 }
@@ -190,9 +191,9 @@ void ScaleItemEditor::buildTypeSpecific()
     m_btnTickColor = new QPushButton(this);
     m_btnTickColor->setFixedSize(40, 18);
     auto applyTickBtn = [this](const QColor& c) {
-        m_btnTickColor->setStyleSheet(
+        m_btnTickColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     connect(m_btnTickColor, &QPushButton::clicked, this, [this, applyTickBtn]() {
         ScaleItem* scale = qobject_cast<ScaleItem*>(m_item);
@@ -207,9 +208,9 @@ void ScaleItemEditor::buildTypeSpecific()
     m_btnLabelColor = new QPushButton(this);
     m_btnLabelColor->setFixedSize(40, 18);
     auto applyLabelBtn = [this](const QColor& c) {
-        m_btnLabelColor->setStyleSheet(
+        m_btnLabelColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     connect(m_btnLabelColor, &QPushButton::clicked, this, [this, applyLabelBtn]() {
         ScaleItem* scale = qobject_cast<ScaleItem*>(m_item);
@@ -247,9 +248,9 @@ void ScaleItemEditor::buildTypeSpecific()
     m_btnTitleColor = new QPushButton(this);
     m_btnTitleColor->setFixedSize(40, 18);
     auto applyTitleBtn = [this](const QColor& c) {
-        m_btnTitleColor->setStyleSheet(
+        m_btnTitleColor->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
     connect(m_btnTitleColor, &QPushButton::clicked, this, [this, applyTitleBtn]() {
         ScaleItem* scale = qobject_cast<ScaleItem*>(m_item);

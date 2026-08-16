@@ -59,6 +59,7 @@
 //============================================================================================//
 
 #include "DisplaySetupPages.h"
+#include "gui/styles/ThemeQss.h"
 #include "SetupHelpers.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/StyleConstants.h"
@@ -105,9 +106,9 @@ namespace {
 QLabel* makeColorSwatch(const QString& label, const QString& hexColor, QWidget* parent)
 {
     auto* lbl = new QLabel(QStringLiteral("  %1  ").arg(label), parent);
-    lbl->setStyleSheet(QStringLiteral(
+    lbl->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background: %1; color: #c8d8e8; border: 1px solid #203040;"
-        " border-radius: 6px; padding: 2px 6px; }").arg(hexColor));
+        " border-radius: 6px; padding: 2px 6px; }").arg(hexColor)));
     lbl->setFixedHeight(24);
     lbl->setEnabled(false);  // NYI
     lbl->setToolTip(QStringLiteral("Color picker — not yet implemented"));
@@ -1213,22 +1214,22 @@ void SpectrumDefaultsPage::buildUI()
     // Setup → Appearance → Colors & Theme (consolidated in one place).
     auto* colorHint = new QLabel(QStringLiteral(
         "Spectrum / waterfall colours: Setup → Appearance → Colors & Theme."), this);
-    colorHint->setStyleSheet(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; padding: 6px; }"));
+    colorHint->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #607080; font-style: italic; padding: 6px; }")));
     contentLayout()->addWidget(colorHint);
 
     // ── Cross-links (Task 2.4) ────────────────────────────────────────────────
     // Hint lines for forward-looking moves documented in the design (Task 3.6 / 3.4).
     auto* hintVolts = new QLabel(
         QStringLiteral("ANAN-8000DLE volts/amps moved to Hardware → ANAN-8000DLE."), this);
-    hintVolts->setStyleSheet(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; font-size: 10px; }"));
+    hintVolts->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #607080; font-style: italic; font-size: 10px; }")));
     contentLayout()->addWidget(hintVolts);
 
     auto* hintFilter = new QLabel(
         QStringLiteral("Small filter on VFOs moved to Appearance → VFO Flag."), this);
-    hintFilter->setStyleSheet(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; font-size: 10px; }"));
+    hintFilter->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #607080; font-style: italic; font-size: 10px; }")));
     contentLayout()->addWidget(hintFilter);
 
     const QString crossLinkStyle = QStringLiteral(
@@ -1575,7 +1576,7 @@ void WaterfallDefaultsPage::buildUI()
     // Task 2.8: Calculated Delay readout — live "Delay: NN.N s".
     // Computed from waterfall height × update period; not persisted.
     m_delayLabel = new QLabel(dispGroup);
-    m_delayLabel->setStyleSheet(QStringLiteral("color: #8899aa;"));
+    m_delayLabel->setStyleSheet(Style::themed(QStringLiteral("color: #8899aa;")));
     m_delayLabel->setToolTip(
         QStringLiteral("Approximate time covered by the visible waterfall display "
                        "(rows × update period). Longer periods or larger display heights "
@@ -1779,7 +1780,7 @@ void WaterfallDefaultsPage::buildUI()
     histForm->addRow(QStringLiteral("Depth:"), m_historyDepthCombo);
 
     m_effectiveDepthLabel = new QLabel(histGroup);
-    m_effectiveDepthLabel->setStyleSheet(QStringLiteral("color: #8899aa;"));
+    m_effectiveDepthLabel->setStyleSheet(Style::themed(QStringLiteral("color: #8899aa;")));
     histForm->addRow(QStringLiteral(""), m_effectiveDepthLabel);
 
     contentLayout()->addWidget(histGroup);
@@ -1832,8 +1833,8 @@ void WaterfallDefaultsPage::buildUI()
     // Low Level Color (W10) has moved to Setup → Appearance → Colors & Theme.
     auto* wfColorHint = new QLabel(QStringLiteral(
         "Spectrum / waterfall colours: Setup → Appearance → Colors & Theme."), this);
-    wfColorHint->setStyleSheet(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; padding: 6px; }"));
+    wfColorHint->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #607080; font-style: italic; padding: 6px; }")));
     contentLayout()->addWidget(wfColorHint);
 
     contentLayout()->addStretch();
@@ -1994,8 +1995,8 @@ void GridScalesPage::buildUI()
     auto* bandSeparator = new QFrame(gridGroup);
     bandSeparator->setFrameShape(QFrame::HLine);
     bandSeparator->setFrameShadow(QFrame::Sunken);
-    bandSeparator->setStyleSheet(QStringLiteral(
-        "QFrame { color: #2a3a4a; background: #2a3a4a; max-height: 1px; }"));
+    bandSeparator->setStyleSheet(Style::themed(QStringLiteral(
+        "QFrame { color: #2a3a4a; background: #2a3a4a; max-height: 1px; }")));
     gridForm->addRow(bandSeparator);
 
     m_editingBandLabel = new QLabel(QStringLiteral("◆ Editing per-band grid: — ◆"), gridGroup);
@@ -2131,8 +2132,8 @@ void GridScalesPage::buildUI()
     // Setup → Appearance → Colors & Theme (consolidated colour panel).
     auto* gridColorHint = new QLabel(QStringLiteral(
         "Spectrum / waterfall colours: Setup → Appearance → Colors & Theme."), this);
-    gridColorHint->setStyleSheet(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; padding: 6px; }"));
+    gridColorHint->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #607080; font-style: italic; padding: 6px; }")));
     contentLayout()->addWidget(gridColorHint);
 
     // --- Section: Noise-Floor Tracking (Task 2.9) ---

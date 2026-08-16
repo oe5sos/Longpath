@@ -1,4 +1,5 @@
 #include "SignalTextItemEditor.h"
+#include "gui/styles/ThemeQss.h"
 #include "../../meters/SignalTextItem.h"
 
 #include <QCheckBox>
@@ -23,9 +24,9 @@ void SignalTextItemEditor::setItem(MeterItem* item)
     if (!x) { return; }
 
     auto applyColor = [](QPushButton* btn, const QColor& c) {
-        btn->setStyleSheet(
+        btn->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                .arg(c.name(QColor::HexArgb)));
+                .arg(c.name(QColor::HexArgb))));
     };
 
     beginProgrammaticUpdate();
@@ -115,9 +116,9 @@ void SignalTextItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->colour(), this);
         if (chosen.isValid()) {
             x->setColour(chosen);
-            m_btnColour->setStyleSheet(
+            m_btnColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -131,9 +132,9 @@ void SignalTextItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->peakValueColour(), this);
         if (chosen.isValid()) {
             x->setPeakValueColour(chosen);
-            m_btnPeakColour->setStyleSheet(
+            m_btnPeakColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });
@@ -147,9 +148,9 @@ void SignalTextItemEditor::buildTypeSpecific()
         const QColor chosen = QColorDialog::getColor(x->markerColour(), this);
         if (chosen.isValid()) {
             x->setMarkerColour(chosen);
-            m_btnMarkerColour->setStyleSheet(
+            m_btnMarkerColour->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070; }")
-                    .arg(chosen.name(QColor::HexArgb)));
+                    .arg(chosen.name(QColor::HexArgb))));
             notifyChanged();
         }
     });

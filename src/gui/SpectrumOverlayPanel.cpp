@@ -315,12 +315,12 @@ SpectrumOverlayPanel::SpectrumOverlayPanel(QWidget* parent)
     // Button 1: Collapse toggle
     m_collapseBtn = new QPushButton(this);
     m_collapseBtn->setFixedSize(kBtnW, kBtnH);
-    m_collapseBtn->setStyleSheet(
+    m_collapseBtn->setStyleSheet(Style::themed(
         "QPushButton { background: rgba(20, 30, 45, 240); "
         "border: 1px solid rgba(255, 255, 255, 40); border-radius: 2px; "
         "color: #c8d8e8; font-size: 13px; font-weight: bold; }"
         "QPushButton:hover { background: rgba(0, 112, 192, 180); "
-        "border: 1px solid #0090e0; }");
+        "border: 1px solid #0090e0; }"));
     connect(m_collapseBtn, &QPushButton::clicked, this, &SpectrumOverlayPanel::toggle);
 
     // Button 2: +RX (NYI Phase 3F)
@@ -858,12 +858,12 @@ void SpectrumOverlayPanel::buildAntFlyout()
         m_wnbBtn = new QPushButton("WNB");
         m_wnbBtn->setCheckable(true);
         m_wnbBtn->setFixedSize(48, 22);
-        m_wnbBtn->setStyleSheet(
+        m_wnbBtn->setStyleSheet(Style::themed(
             "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
             "border-radius: 2px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
             "QPushButton:checked { background: #0070c0; color: #ffffff; "
             "border: 1px solid #0090e0; }"
-            "QPushButton:hover { border: 1px solid #0090e0; }");
+            "QPushButton:hover { border: 1px solid #0090e0; }"));
         m_wnbBtn->setToolTip("Wideband noise blanker — suppresses impulse noise across panadapter bandwidth");
         row->addWidget(m_wnbBtn);
         row->addStretch();
@@ -1032,11 +1032,11 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
         m_fillColorBtn->setFixedSize(18, 18);
         // Das Farbfeld zeigt, was tatsächlich gemalt wird — es hing
         // fest auf Zyan und log, sobald das Theme die Kurve änderte.
-        m_fillColorBtn->setStyleSheet(
+        m_fillColorBtn->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton { background: %1;"
                            " border: 1px solid #556070;"
                            " border-radius: 2px; }")
-                .arg(Style::role("trace", Style::kSpectrumTrace)));
+                .arg(Style::role("trace", Style::kSpectrumTrace))));
         m_fillColorBtn->setToolTip("Choose spectrum fill color");
         grid->addWidget(m_fillColorBtn, row, 1);
 
@@ -1044,9 +1044,9 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
             QColor c = QColorDialog::getColor(QColor(Style::role("trace", Style::kSpectrumTrace)), this, "FFT Fill Color",
                                               QColorDialog::DontUseNativeDialog);
             if (c.isValid()) {
-                m_fillColorBtn->setStyleSheet(
+                m_fillColorBtn->setStyleSheet(Style::themed(
                     QString("QPushButton { background: %1; border: 1px solid #556070;"
-                            " border-radius: 2px; }").arg(c.name()));
+                            " border-radius: 2px; }").arg(c.name())));
                 emit fillColorChanged(c);  // B8 Task 22
             }
         });
@@ -1113,11 +1113,11 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
 
         m_clarityRetuneBtn = new QPushButton("Re-tune");
         m_clarityRetuneBtn->setFixedSize(52, 18);
-        m_clarityRetuneBtn->setStyleSheet(
+        m_clarityRetuneBtn->setStyleSheet(Style::themed(
             "QPushButton { background: #204060; color: #c8d8e8; border: 1px solid #304050;"
             "  border-radius: 2px; font-size: 10px; padding: 0; }"
             "QPushButton:hover { background: #204060; }"
-            "QPushButton:pressed { background: #0d2040; }");
+            "QPushButton:pressed { background: #0d2040; }"));
         m_clarityRetuneBtn->setToolTip("Force Clarity to re-estimate the noise floor now");
         grid->addWidget(m_clarityRetuneBtn, row, 2, 1, 2, Qt::AlignRight);
         connect(m_clarityRetuneBtn, &QPushButton::clicked,
@@ -1129,7 +1129,7 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
     {
         auto* sep = new QFrame;
         sep->setFrameShape(QFrame::HLine);
-        sep->setStyleSheet("QFrame { color: #304050; border: none; }");
+        sep->setStyleSheet(Style::themed("QFrame { color: #304050; border: none; }"));
         sep->setFixedHeight(2);
         grid->addWidget(sep, row, 0, 1, 4);
         ++row;
@@ -1572,10 +1572,10 @@ void SpectrumOverlayPanel::setClarityStatus(bool active, bool paused)
     const QString color = paused
         ? QStringLiteral("#d4a017")   // amber
         : QStringLiteral("#20a040");  // green
-    m_clarityBadge->setStyleSheet(
+    m_clarityBadge->setStyleSheet(Style::themed(
         QStringLiteral("QLabel { background: %1; color: #0f0f1a; "
                         "border-radius: 9px; font-size: 11px; "
-                        "font-weight: bold; }").arg(color));
+                        "font-weight: bold; }").arg(color)));
     m_clarityBadge->show();
 }
 

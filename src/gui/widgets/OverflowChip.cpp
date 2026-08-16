@@ -1,5 +1,6 @@
 // src/gui/widgets/OverflowChip.cpp
 #include "OverflowChip.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -21,7 +22,7 @@ OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     setCursor(Qt::WhatsThisCursor);   // hint: hover-for-detail
 
-    setStyleSheet(QStringLiteral(
+    setStyleSheet(Style::themed(QStringLiteral(
         "NereusSDR--OverflowChip {"
         " background: rgba(64,72,88,46);"
         " border-radius: 6px;"
@@ -33,7 +34,7 @@ OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
         " background: transparent; border: none;"
         " padding: 0 2px;"
         "}"
-    ));
+    )));
 
     setVisible(false);
 }

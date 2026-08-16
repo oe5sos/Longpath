@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "FloatingContainer.h"
+#include "gui/styles/ThemeQss.h"
 #include "ContainerWidget.h"
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
@@ -70,7 +71,7 @@ FloatingContainer::FloatingContainer(int rxSource, QWidget* parent)
 {
     setMinimumSize(ContainerWidget::kMinContainerWidth,
                    ContainerWidget::kMinContainerHeight);
-    setStyleSheet(QStringLiteral("background: #0f0f1a;"));
+    setStyleSheet(Style::themed(QStringLiteral("background: #0f0f1a;")));
     updateTitle();
     qCDebug(lcContainer) << "FloatingContainer created for RX" << rxSource;
 }

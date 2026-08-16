@@ -160,6 +160,7 @@
 // 15.  SWR protection LED — QLabel indicator (NYI — 3M-3)
 
 #include "TxApplet.h"
+#include "gui/styles/ThemeQss.h"
 #include "TxEqDialog.h"
 #include "TxCfcDialog.h"
 #include "NyiOverlay.h"
@@ -740,9 +741,9 @@ void TxApplet::buildUI()
         m_psaBtn->setCheckable(true);
         m_psaBtn->setFixedHeight(22);
         m_psaBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_psaBtn->setStyleSheet(Style::buttonBaseStyle()
+        m_psaBtn->setStyleSheet(Style::themed(Style::buttonBaseStyle()
             + QStringLiteral("QPushButton:checked {"
-                             " background: #1a6030; border: 1px solid #008040; color: #fff; }"));
+                             " background: #1a6030; border: 1px solid #008040; color: #fff; }")));
         m_psaBtn->setAccessibleName(QStringLiteral("PS-A PureSignal"));
         m_psaBtn->setToolTip(QStringLiteral(
             "Toggle PureSignal auto-calibration. Right-click to open PureSignal..."));
