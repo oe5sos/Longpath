@@ -717,10 +717,22 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // overlay there would crash; a child QWidget gets stacked by Qt instead).
     m_disconnectLabel = new QLabel(QStringLiteral("DISCONNECTED"), this);
     m_disconnectLabel->setAlignment(Qt::AlignCenter);
+    // ── Nicht verbunden ist ein Zustand, keine Gefahr ───────────────
+    //
+    // Stand in #c14848 quer ueber dem Spektrum, 36 Punkt. Rot bedeutet
+    // in diesem Programm "Achtung" und markiert Grenzen -- die
+    // Bandkante, ein SWR, bei dem man nicht senden sollte. Getrennt zu
+    // sein ist keine davon: es geht nichts kaputt, ein Klick verbindet.
+    //
+    // Dieselbe Ueberlegung wie beim oberen Skalenende und beim
+    // Offline-Punkt der Statuspille. Und die Statuszeile oben links sagt
+    // es ohnehin schon im Klartext -- das hier ist die Wiederholung,
+    // nicht die Meldung.
     m_disconnectLabel->setStyleSheet(QStringLiteral(
         "QLabel { background-color: rgba(10, 12, 20, 200);"
-        " color: #c14848; font-size: 36pt; font-weight: bold;"
-        " letter-spacing: 8px; }"));
+        " color: %1; font-size: 36pt; font-weight: bold;"
+        " letter-spacing: 8px; }")
+        .arg(QLatin1String(Style::kTextScale)));
     m_disconnectLabel->hide();
     m_disconnectLabel->installEventFilter(this);
 

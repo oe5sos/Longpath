@@ -580,7 +580,8 @@ void SMeterWidget::paintEvent(QPaintEvent*)
         return c;
     };
     const QColor rxFace  = forScale(faceColor,  !txLive);
-    const QColor rxLimit = forScale(limitColor, !txLive);
+    // rxLimit entfaellt: die Empfangsskala hat keine Grenze mehr, die
+    // rot waere. limitColor bleibt fuer die TX-Seite (txLimit).
     const QColor txFace  = forScale(faceColor,  txLive);
     const QColor txLimit = forScale(limitColor, txLive);
 
@@ -681,15 +682,34 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     // S9 in the limit colour: that is where the red half of the arc
     // used to begin, and a tick says it just as clearly as forty
     // degrees of red did.
+    // ── Die Empfangsskala kennt keine Grenze ────────────────────────
+    //
+    // S9, +20 und +40 standen in kInstrumentLimit -- demselben Wert wie
+    // danger. Das ist der Fehler, der in diesem Programm schon zweimal
+    // ausgebaut wurde: einmal der halbe rote Bogen des S-Meters, einmal
+    // das rote obere Ende der Wasserfallrampe
+    // (SpectrumWidget.cpp:425-441). Ein starkes Signal auf 20 m ist
+    // keine Gefahr, sondern ein starkes Signal, und wo es keine Schwelle
+    // gibt, kodiert Rot nichts.
+    //
+    // Die Ziffern selbst sind Messwerte -- eine S-Stufe ist eine
+    // abgelesene Groesse wie die Frequenz. Deshalb Bernstein und nicht
+    // das Cremeweiss des Instruments: das gehoert Bogen, Zeiger und
+    // Teilung, nicht der Beschriftung.
+    //
+    // Die TX-Leistungsskala weiter unten bleibt davon unberuehrt. Dort
+    // GIBT es eine Grenze (m_powerRedStart), und dort ist Rot eine
+    // Aussage.
+    const QColor rxDigits(Style::role("measured", Style::kAmberText));
     for (int s = 1; s <= 9; s += 2) {
         const float dbm = S0_DBM + s * DB_PER_S;
         drawOutsideTick(dbmToFraction(dbm), QString::number(s),
-                        (s == 9) ? rxLimit : rxFace, true);
+                        forScale(rxDigits, !txLive), true);
     }
     for (int over : {20, 40}) {
         const float dbm = S9_DBM + over;
         drawOutsideTick(dbmToFraction(dbm), QString("+%1").arg(over),
-                        rxLimit, true);
+                        forScale(rxDigits, !txLive), true);
     }
 
     // -- Inside ticks (TX): scale depends on TX mode --------------------------
