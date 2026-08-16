@@ -35,7 +35,7 @@ inline void applyComboStyle(QComboBox* combo)
         "}"
     ).arg(Style::kButtonBg, Style::kTextPrimary,
           Style::kBorder, Style::kAccent,
-          Style::kInsetBg);
+          Style::kInsetBg));
 }
 
 } // namespace NereusSDR
