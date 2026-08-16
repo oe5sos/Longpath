@@ -74,9 +74,31 @@ private slots:
 
     void theTextIsRoundedAndCarriesTheUnitWhenThereIs()
     {
+        // Absichtlich KEIN exakter Mittelpunkt. Hier geht es darum, dass
+        // gerundet wird und dass die Einheit uebernommen wird -- nicht
+        // darum, wohin genau -72,5 faellt. Das stand hier bis
+        // 2026-08-16 und war eine Annahme, die nie galt: ich hatte
+        // kaufmaennisches Runden zur geraden Zahl vermutet und den
+        // Grenzfall dann auch noch als Prueffall gewaehlt.
         QCOMPARE(SignalReading::text(-73.4f), QStringLiteral("-73 dBm"));
-        QCOMPARE(SignalReading::text(-72.5f, QStringLiteral("dB")),
+        QCOMPARE(SignalReading::text(-72.4f, QStringLiteral("dB")),
                  QStringLiteral("-72 dB"));
+    }
+
+    void halfwayRoundsAwayFromZero()
+    {
+        // Der Mittelpunkt bekommt einen eigenen Fall mit eigenem Namen,
+        // und er haelt fest, was die Funktion TUT -- nicht, was jemand
+        // erwartet haette.
+        //
+        // Das ist keine Pruefung von Qt: text() ist unsere
+        // Anzeigefunktion, und wie sie rundet, ist Teil dessen, was auf
+        // dem Zifferblatt steht. Wer sie spaeter auf qRound umstellt
+        // oder die Nachkommastellen aendert, verschiebt damit angezeigte
+        // Messwerte -- das soll auffallen.
+        QCOMPARE(SignalReading::text(-72.5f), QStringLiteral("-73 dBm"));
+        QCOMPARE(SignalReading::text(-71.5f), QStringLiteral("-72 dBm"));
+        QCOMPARE(SignalReading::text(72.5f),  QStringLiteral("73 dBm"));
     }
 };
 
