@@ -9,8 +9,15 @@ inline void applyComboStyle(QComboBox* combo)
 {
     combo->setFixedHeight(Style::kButtonH);
     combo->setStyleSheet(QStringLiteral(
+        // Das geschlossene Feld ist eine Mulde, keine Flaeche -- siehe
+        // die Notiz bei kLineEditStyle. kButtonBg und kBorder liegen
+        // vier Helligkeitsstufen auseinander; gegen kInsetBg steht der
+        // Rand deutlich, und das Feld ist als Feld erkennbar.
+        //
+        // Die aufgeklappte Liste bleibt auf Knopfgrund: die ist eine
+        // Auswahl und liegt UEBER der Oberflaeche, nicht darin.
         "QComboBox {"
-        "  background: %1; color: %2;"
+        "  background: %5; color: %2;"
         "  border: 1px solid %3; border-radius: 6px;"
         "  padding: 2px 6px; font-size: 10px;"
         "}"
@@ -27,7 +34,8 @@ inline void applyComboStyle(QComboBox* combo)
         "  border: 1px solid %3;"
         "}"
     ).arg(Style::kButtonBg, Style::kTextPrimary,
-          Style::kBorder, Style::kAccent));
+          Style::kBorder, Style::kAccent,
+          Style::kInsetBg);
 }
 
 } // namespace NereusSDR

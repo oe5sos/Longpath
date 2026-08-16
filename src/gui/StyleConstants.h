@@ -341,17 +341,38 @@ constexpr auto kRadioButtonStyle =
     " border: 1px solid #304050; border-radius: 7px; }"
     "QRadioButton::indicator:checked { background: #00b4d8; border-color: #00b4d8; }";
 
+// ── Eingabefelder sind Mulden, keine Flaechen ────────────────────────
+//
+// Gemeldet 2026-08-16 auf Startup & Preferences: Callsign, Grid Square,
+// Process Priority und FFTW Wisdom waren "fast unsichtbar -- man sieht
+// nicht mehr, dass das bedienbare Felder sind".
+//
+// Ursache war nicht zu viel Daempfung, sondern die falsche RICHTUNG.
+// Die Werte #1a2a3a (Grund) und #304050 (Rand) wurden von themed()
+// korrekt auf #1a1a1e und #2c2c31 gezogen -- zwei fast gleiche
+// Grautoene. Vorher trennte der Rand durch ein kraeftiges Blau von
+// selbst; ohne das liegt ein Feld auf dem Panel wie eine Flaeche.
+//
+// HAUSSTIL beschreibt es als VERSENKT: "Versenkt (Glas) #000000 +
+// inset 0 2px 8px #000". Ein Feld gehoert DUNKLER als seine Umgebung,
+// nicht heller -- dann traegt der hellere Rand von selbst.
+//
+// Qt-Stylesheets koennen keinen inneren Schatten. Der Grund liegt
+// deshalb auf kInsetBg (#08080a, dunkler als das Panel #0c0c0e) und der
+// Rand auf kBorder (#2c2c31), der gegen fast Schwarz deutlich steht.
+//
+// Ein leeres Feld ist nicht inaktiv. Es wartet auf eine Eingabe.
 constexpr auto kLineEditStyle =
-    "QLineEdit { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
+    "QLineEdit { background: #08080a; border: 1px solid #2c2c31;"
+    " border-radius: 6px; color: #c4c4c9; font-size: 12px; padding: 2px 4px; }";
 
 constexpr auto kSpinBoxStyle =
-    "QSpinBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
+    "QSpinBox { background: #08080a; border: 1px solid #2c2c31;"
+    " border-radius: 6px; color: #c4c4c9; font-size: 12px; padding: 2px 4px; }";
 
 constexpr auto kDoubleSpinBoxStyle =
-    "QDoubleSpinBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
+    "QDoubleSpinBox { background: #08080a; border: 1px solid #2c2c31;"
+    " border-radius: 6px; color: #c4c4c9; font-size: 12px; padding: 2px 4px; }";
 
 // Backwards-compat wrapper for places that prefer a function form.
 inline QString doubleSpinBoxStyle() { return QString::fromLatin1(kDoubleSpinBoxStyle); }
