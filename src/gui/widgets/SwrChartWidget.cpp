@@ -11,6 +11,7 @@
 //                 (Cowork).
 // =================================================================
 
+#include "gui/styles/ThemeQss.h"
 #include "SwrChartWidget.h"
 
 #include <QPainter>
@@ -24,17 +25,45 @@ namespace NereusSDR {
 
 namespace {
 
-// Trace palette — distinct against the dark chart background; cycles.
-const QColor kTraceColors[] = {
-    QColor(0x00, 0xb4, 0xd8),   // cyan (house accent)
-    QColor(0xf4, 0xa2, 0x61),   // amber
-    QColor(0x90, 0xbe, 0x6d),   // green
-    QColor(0xe0, 0x63, 0xff),   // violet
-    QColor(0xff, 0x6b, 0x6b),   // coral
-    QColor(0xf9, 0xf8, 0x71),   // yellow
+// ── NOTBEHELF, NICHT DIE HAUSFARBEN ─────────────────────────────────
+//
+// Die echten Werte stehen in themes/oe5sos.json unter den Rollen
+// chart-trace-1 bis chart-trace-6. Dieser Block greift NUR, wenn gar
+// keine Theme-Datei vorhanden ist -- also auf einer frischen
+// Installation, bevor der Betreiber seine eigene hinterlegt hat.
+//
+// Er ist ausdruecklich kein Gestaltungsvorrat und wird nicht gepflegt.
+// Wer die Diagrammfarben aendern will, aendert die Theme-Datei.
+//
+// Warum ueberhaupt eine Reihe und nicht ein Ton: das Diagramm legt
+// mehrere Sweeps uebereinander, und die muessen unterscheidbar bleiben.
+// In die Palette gezwungen saehen sie alle gleich aus, und dann ist das
+// Bild huebsch und unlesbar. Gedeckt duerfen sie sein -- auseinander
+// muessen sie liegen.
+//
+// Durchnummeriert, weil die Spuren hier wirklich beliebig sind: eine je
+// Sweep-Durchlauf, in der Reihenfolge des Messens. Was eine Bedeutung
+// haette, bekaeme sie auch als Namen.
+const QColor kTraceFallback[] = {
+    QColor(0xc2, 0x92, 0x4f),   // 1
+    QColor(0x6f, 0xa3, 0x84),   // 2
+    QColor(0x7f, 0x8f, 0xb8),   // 3
+    QColor(0xa0, 0x7f, 0xa8),   // 4
+    QColor(0xb8, 0x84, 0x6f),   // 5
+    QColor(0x8f, 0x9a, 0x5c),   // 6
 };
 constexpr int kTraceColorCount =
-    int(sizeof(kTraceColors) / sizeof(kTraceColors[0]));
+    int(sizeof(kTraceFallback) / sizeof(kTraceFallback[0]));
+
+// Die Rollennamen, an EINER Stelle -- der Test in
+// tst_chart_trace_roles liest sie hier und prueft, dass jede davon in
+// docs/design/oe5sos.example.json steht. Eine frische Installation
+// bekommt die Vorlage ausgeliefert und darf deshalb nicht auf den
+// Notbehelf darueber fallen.
+const char* const kTraceRoles[] = {
+    "chart-trace-1", "chart-trace-2", "chart-trace-3",
+    "chart-trace-4", "chart-trace-5", "chart-trace-6",
+};
 
 constexpr int kMarginL = 44;
 constexpr int kMarginR = 12;
@@ -150,7 +179,10 @@ void SwrChartWidget::setYMax(double yMax)
 
 QColor SwrChartWidget::nextColor()
 {
-    const QColor c = kTraceColors[m_colorCursor % kTraceColorCount];
+    const int i = m_colorCursor % kTraceColorCount;
+    // Rolle zuerst, Notbehelf nur wenn keine Theme-Datei etwas sagt.
+    const QColor c(Style::role(kTraceRoles[i],
+                               kTraceFallback[i].name().toLatin1().constData()));
     ++m_colorCursor;
     return c;
 }

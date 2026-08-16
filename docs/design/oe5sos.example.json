@@ -72,6 +72,12 @@
     "#ff0000": "#a86b6d",
     "#e05050": "#a86b6d",
     "#b87300": "#c2924f",
-    "#00cc44": "#6fa384"
+    "#00cc44": "#6fa384",
+    "chart-trace-1": "#c2924f",
+    "chart-trace-2": "#6fa384",
+    "chart-trace-3": "#7f8fb8",
+    "chart-trace-4": "#a07fa8",
+    "chart-trace-5": "#b8846f",
+    "chart-trace-6": "#8f9a5c"
   }
 }

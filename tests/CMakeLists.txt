@@ -1353,6 +1353,14 @@ nereus_add_test(tst_waterfall_threshold_fit)
 # dass der Ablehnungsgrund die gemessene Groesse nennt.
 nereus_add_test(tst_world_map_catalog)
 
+# ── Der Notbehelf der Spurfarben darf nie zum Einsatz kommen ───────────────
+# Die Spurfarben des SWR-Diagramms kommen aus Theme-Rollen; im Quelltext steht
+# nur eine Rueckfallreihe fuer den Fall ganz ohne Theme-Datei. Eine frische
+# Installation bekommt aber die Vorlage ausgeliefert und darf deshalb nicht auf
+# den Notbehelf fallen. Liest die Rollennamen AUS der Quelle, damit eine
+# siebte Spur den Test nicht gruen laesst.
+nereus_add_test(tst_chart_trace_roles)
+
 # ── "-395 dBm" ohne Verbindung ─────────────────────────────────────────────
 # Zweihundert Dezibel unter dem thermischen Rauschen, an drei Stellen, und es
 # sah aus wie eine sehr genaue Messung. HAUSSTIL Regel 7: unbekannt ist ein
