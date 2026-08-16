@@ -152,7 +152,18 @@ static constexpr QColor kColorOffline     { 30, 30, 40};    // dark grey — off
 // ---------------------------------------------------------------------------
 static const char* kPillOnlineColor    = "#39c167";   // green  — last seen < 60 s
 static const char* kPillStaleColor     = "#d39c2a";   // amber  — last seen 60 s – 5 min
-static const char* kPillOfflineColor   = "#c14848";   // red    — last seen > 5 min / never
+// ── Offline ist ein Zustand, keine Warnung ──────────────────────────
+//
+// War #c14848, kraeftig rot. Aber nichts ist zu verhueten: das Geraet
+// ist eben nicht da, die Zeile daneben sagt es im Klartext, und
+// darunter steht "click to connect". Rot bedeutet in diesem Programm
+// "Achtung" und markiert Grenzen -- die Bandkante, ein SWR, bei dem man
+// nicht senden sollte. Wer es fuer Zustaende ausgibt, verbraucht es.
+//
+// Der ruhende Punkt ist der richtige Ton: sichtbar, dass die Anzeige
+// lebt, und sonst ohne Anspruch. Entscheidung des Betreibers,
+// 2026-08-16.
+static const char* kPillOfflineColor   = Style::kTextInactive;  // war #c14848
 static const char* kPillConnectedColor = "#39c167";   // green  — currently connected
 
 // ---------------------------------------------------------------------------
@@ -657,7 +668,11 @@ QWidget* ConnectionPanel::buildStatusStrip()
 
     // Pill label — coloured circle text
     m_stripPillLabel = new QLabel(QStringLiteral("●"), m_statusStrip);
-    m_stripPillLabel->setStyleSheet(QStringLiteral("QLabel { color: #c14848; font-size: 16px; }"));
+    // Derselbe ruhende Punkt wie in der Tabelle -- die Leiste startet
+    // getrennt, und getrennt ist kein Fehler.
+    m_stripPillLabel->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; font-size: 16px; }")
+            .arg(QLatin1String(kPillOfflineColor)));
 
     // Info text label
     m_stripInfoLabel = new QLabel(QStringLiteral("Disconnected"), m_statusStrip);
