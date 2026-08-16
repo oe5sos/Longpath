@@ -121,6 +121,8 @@ mw0lge@grange-lane.co.uk
 #include <QLoggingCategory>
 #include <QTimer>
 
+#include "gui/StyleConstants.h"
+
 namespace NereusSDR {
 
 // Timing instrumentation, sibling to SetupDialog.cpp's nereus.setup.timing.
@@ -360,32 +362,40 @@ void ConnectionPanel::buildUI()
     // ColInUse stretches
 
     m_radioTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    // Monospace bleibt: die Tabelle traegt Adressen, MACs und Zaehler --
+    // HAUSSTIL Regel 4, "Zahlen sind Monospace". Der Kopf war hell
+    // (#8090a0 auf #0a1a28) und stand damit vor seinem eigenen Inhalt;
+    // eine Ueberschrift ist Beschriftung und gehoert auf Skalenfarbe.
     m_radioTable->setStyleSheet(QStringLiteral(
         "QTableWidget {"
-        "  background: #0a0a14;"
-        "  color: #c8d8e8;"
-        "  border: 1px solid #203040;"
+        "  background: %1;"
+        "  color: %2;"
+        "  border: 1px solid %3;"
         "  font-family: Consolas, 'Courier New', monospace;"
         "  font-size: 12px;"
-        "  gridline-color: #1a2a3a;"
+        "  gridline-color: %4;"
         "}"
         "QTableWidget::item {"
         "  padding: 4px 6px;"
         "  border: none;"
         "}"
         "QTableWidget::item:selected {"
-        "  background: #205070;"
-        "  color: #ffffff;"
+        "  background: %5;"
+        "  color: %6;"
         "}"
         "QHeaderView::section {"
-        "  background: #0a1a28;"
-        "  color: #8090a0;"
+        "  background: %7;"
+        "  color: %8;"
         "  border: none;"
-        "  border-right: 1px solid #203040;"
-        "  border-bottom: 1px solid #203040;"
+        "  border-right: 1px solid %3;"
+        "  border-bottom: 1px solid %3;"
         "  padding: 4px 6px;"
         "  font-size: 11px;"
-        "}"));
+        "}")
+        .arg(QLatin1String(Style::kInsetBg), QLatin1String(Style::kTextPrimary),
+             QLatin1String(Style::kBorder), QLatin1String(Style::kBorderSubtle),
+             QLatin1String(Style::kBlueBg), QLatin1String(Style::kBlueText),
+             QLatin1String(Style::kPanelBg), QLatin1String(Style::kTextScale)));
 
     connect(m_radioTable, &QTableWidget::itemSelectionChanged,
             this, &ConnectionPanel::onRadioSelectionChanged);
@@ -496,29 +506,63 @@ void ConnectionPanel::buildUI()
         return btn;
     };
 
+    // ── Connect: die Auswahl, nicht ein Leuchtsignal ────────────────
+    //
+    // War #00b4d8 auf Weiss -- das abgeschaffte Tuerkis, deckend, mit
+    // fetter Schrift. HAUSSTIL: Blau ist anfassbar, und die Auswahl hat
+    // ihren eigenen Verlauf. Connect ist der hervorgehobene Knopf des
+    // Dialogs, also bekommt er genau den und nicht mehr.
     static const QString kPrimaryStyle = QStringLiteral(
         "QPushButton {"
-        "  background: #00b4d8; color: #fff;"
-        "  border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold;"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "    stop:0 %1, stop:1 #1e3d5f);"
+        "  color: %2; border: 1px solid %3;"
+        "  border-radius: 6px; padding: 6px 12px; font-weight: bold;"
         "}"
-        "QPushButton:hover { background: #0096b7; }"
-        "QPushButton:disabled { background: #2a3040; color: #556070; }");
+        "QPushButton:hover { background: %4; }"
+        "QPushButton:disabled { background: %5; color: %6;"
+        "  border-color: %7; }")
+        .arg(QLatin1String(Style::kBlueBg), QLatin1String(Style::kBlueText),
+             QLatin1String(Style::kBlueBorder), QLatin1String(Style::kBlueHover),
+             QLatin1String(Style::kDisabledBg), QLatin1String(Style::kDisabledText),
+             QLatin1String(Style::kDisabledBorder));
 
     static const QString kSecondaryStyle = QStringLiteral(
         "QPushButton {"
-        "  background: #304050; color: #c8d8e8;"
-        "  border: 1px solid #405060; border-radius: 4px; padding: 6px 12px;"
+        "  background: %1; color: %2;"
+        "  border: 1px solid %3; border-radius: 6px; padding: 6px 12px;"
         "}"
-        "QPushButton:hover { background: #405060; }"
-        "QPushButton:disabled { background: #1a2a3a; color: #3a4a5a; border-color: #203040; }");
+        "QPushButton:hover { background: %4; }"
+        "QPushButton:disabled { background: %5; color: %6; border-color: %7; }")
+        .arg(QLatin1String(Style::kButtonBg), QLatin1String(Style::kTextPrimary),
+             QLatin1String(Style::kBorder), QLatin1String(Style::kButtonHover),
+             QLatin1String(Style::kDisabledBg), QLatin1String(Style::kDisabledText),
+             QLatin1String(Style::kDisabledBorder));
 
+    // ── "Forget" ist keine Grenze ───────────────────────────────────
+    //
+    // War rot (#4a2020 auf #6a3030). Rot bedeutet in diesem Programm
+    // "Achtung" und markiert Grenzen -- die Bandkante, ein SWR, bei dem
+    // man nicht senden sollte. Ein vergessener Radioeintrag ist keine
+    // Grenze: nichts geht kaputt, nichts wird gesendet, der Eintrag
+    // kommt beim naechsten Scan wieder.
+    //
+    // Wer Rot fuer "loeschen" ausgibt, verbraucht es. Dann faellt es
+    // dort nicht mehr auf, wo es zaehlt -- und genau das ist die Regel,
+    // die HAUSSTIL fuer Bandkante und SWR-Rot schuetzt.
+    //
+    // Also derselbe Knopf wie die anderen, nur mit warnender Schrift.
     static const QString kDestructiveStyle = QStringLiteral(
         "QPushButton {"
-        "  background: #4a2020; color: #c8a8a8;"
-        "  border: 1px solid #6a3030; border-radius: 4px; padding: 6px 12px;"
+        "  background: %1; color: %2;"
+        "  border: 1px solid %3; border-radius: 6px; padding: 6px 12px;"
         "}"
-        "QPushButton:hover { background: #602020; }"
-        "QPushButton:disabled { background: #1a2a3a; color: #3a4a5a; border-color: #203040; }");
+        "QPushButton:hover { background: %4; }"
+        "QPushButton:disabled { background: %5; color: %6; border-color: %7; }")
+        .arg(QLatin1String(Style::kButtonBg), QLatin1String(Style::kAmberWarn),
+             QLatin1String(Style::kBorder), QLatin1String(Style::kButtonHover),
+             QLatin1String(Style::kDisabledBg), QLatin1String(Style::kDisabledText),
+             QLatin1String(Style::kDisabledBorder));
 
     // Phase 3Q Task 5 — single ↻ Scan button replaces Start + Stop Discovery.
     // One action, one-shot: triggers the same NIC broadcast scan as before.
@@ -632,12 +676,18 @@ QWidget* ConnectionPanel::buildStatusStrip()
     stripLayout->addStretch();
 
     // Disconnect button — only visible when connected
+    //
+    // Dieselbe Ueberlegung wie bei "Forget": Trennen ist keine Grenze.
+    // Nichts geht kaputt, nichts wird gesendet, ein Klick verbindet
+    // wieder. Rot bleibt der Bandkante und dem SWR.
     static const QString kDisconnectStyle = QStringLiteral(
         "QPushButton {"
-        "  background: #4a2020; color: #c8a8a8;"
-        "  border: 1px solid #6a3030; border-radius: 4px; padding: 4px 10px;"
+        "  background: %1; color: %2;"
+        "  border: 1px solid %3; border-radius: 6px; padding: 4px 10px;"
         "}"
-        "QPushButton:hover { background: #602020; }");
+        "QPushButton:hover { background: %4; }")
+        .arg(QLatin1String(Style::kButtonBg), QLatin1String(Style::kAmberWarn),
+             QLatin1String(Style::kBorder), QLatin1String(Style::kButtonHover));
 
     m_stripDisconnectBtn = new QPushButton(QStringLiteral("Disconnect"), m_statusStrip);
     m_stripDisconnectBtn->setAutoDefault(false);
