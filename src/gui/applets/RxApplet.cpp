@@ -256,7 +256,7 @@ void RxApplet::buildUi()
         m_sliceBadge->setAlignment(Qt::AlignCenter);
         m_sliceBadge->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2;"
-            " border-radius: 3px; font-weight: bold; font-size: 11px; }"
+            " border-radius: 6px; font-weight: bold; font-size: 11px; }"
         ).arg(Style::kBlueBg, Style::kBlueText));
         row->addWidget(m_sliceBadge);
 
@@ -943,7 +943,7 @@ void RxApplet::buildUi()
             "QLabel { background: rgba(255,255,255,0.06);"
             " color: rgba(255,255,255,0.45);"
             " border: 1px solid rgba(255,255,255,0.12);"
-            " border-radius: 3px; font-size: 9px; font-weight: bold;"
+            " border-radius: 6px; font-size: 9px; font-weight: bold;"
             " padding: 1px 4px; }";
 
         // 2026-04-21: OVL badges are retained as backing state for the
@@ -1272,7 +1272,7 @@ void RxApplet::updateSliceButtons(const QVector<SliceModel*>& slices,
         const QColor c = VfoWidget::sliceColor(sliceIdx);
         btn->setStyleSheet(QStringLiteral(
             "QToolButton { background: #2a2a2a; color: %1; border: 1px solid %1;"
-            " border-radius: 3px; font-weight: bold; font-size: 10px; padding: 0; }"
+            " border-radius: 6px; font-weight: bold; font-size: 10px; padding: 0; }"
             "QToolButton:checked { background: %1; color: #0a0a14; }")
             .arg(c.name()));
         btn->setToolTip(QStringLiteral("Slice %1").arg(s->sliceLetter()));
@@ -1676,7 +1676,7 @@ void RxApplet::connectSlice(SliceModel* s)
                     "QLabel { background: rgba(255,255,255,0.06);"
                     " color: rgba(255,255,255,0.45);"
                     " border: 1px solid rgba(255,255,255,0.12);"
-                    " border-radius: 3px; font-size: 9px; font-weight: bold;"
+                    " border-radius: 6px; font-size: 9px; font-weight: bold;"
                     " padding: 1px 4px; }"));
             } else if (level == OverloadLevel::Yellow) {
                 // §A2 one-off: #FFD700 is standard gold/yellow for ADC overload warning badge.
@@ -1685,7 +1685,7 @@ void RxApplet::connectSlice(SliceModel* s)
                     "QLabel { background: rgba(255,200,0,0.20);"
                     " color: #FFD700;"  // §A2 one-off overload warning gold
                     " border: 1px solid rgba(255,200,0,0.40);"
-                    " border-radius: 3px; font-size: 9px; font-weight: bold;"
+                    " border-radius: 6px; font-size: 9px; font-weight: bold;"
                     " padding: 1px 4px; }"));
             } else {  // Red
                 // §A2 one-off: #FF6868 is a soft red for ADC overload critical badge.
@@ -1694,7 +1694,7 @@ void RxApplet::connectSlice(SliceModel* s)
                     "QLabel { background: rgba(255,90,90,0.25);"
                     " color: #FF6868;"  // §A2 one-off overload critical soft-red
                     " border: 1px solid rgba(255,90,90,0.50);"
-                    " border-radius: 3px; font-size: 9px; font-weight: bold;"
+                    " border-radius: 6px; font-size: 9px; font-weight: bold;"
                     " padding: 1px 4px; }"));
             }
         });

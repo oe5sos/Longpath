@@ -92,7 +92,7 @@ QString primaryButtonStyle()
     return QStringLiteral(
         "QPushButton { background: %1; border: 1px solid %2; color: %3;"
         " padding: 5px 14px; font-size: 11px; font-weight: bold;"
-        " border-radius: 3px; }"
+        " border-radius: 6px; }"
         "QPushButton:hover { background: %4; }")
         .arg(Style::kBlueBg, Style::kBlueBorder, Style::kBlueText,
              Style::kBlueHover);
@@ -103,7 +103,7 @@ QString neutralButtonStyle()
     return QStringLiteral(
         "QPushButton { background: %1; border: 1px solid %2; color: %3;"
         " padding: 5px 14px; font-size: 11px; font-weight: bold;"
-        " border-radius: 3px; }"
+        " border-radius: 6px; }"
         "QPushButton:hover { background: %4; }")
         .arg(Style::kButtonBg, Style::kBorder, Style::kTextPrimary,
              Style::kButtonAltHover);
@@ -193,7 +193,7 @@ void VaxLinuxFirstRunDialog::buildUi()
             auto* stateFrame = new QFrame(bodyFrame);
             stateFrame->setStyleSheet(QStringLiteral(
                 "QFrame { background: %1; border: 1px solid %2;"
-                " border-left: 3px solid %3; border-radius: 3px; }")
+                " border-left: 3px solid %3; border-radius: 6px; }")
                 .arg(Style::kInsetBg, Style::kInsetBorder, Style::kAmberWarn));
 
             auto* stateLayout = new QVBoxLayout(stateFrame);
@@ -223,7 +223,7 @@ void VaxLinuxFirstRunDialog::buildUi()
             auto* installFrame = new QFrame(bodyFrame);
             installFrame->setStyleSheet(QStringLiteral(
                 "QFrame { background: %1; border: 1px solid %2;"
-                " border-radius: 3px; }")
+                " border-radius: 6px; }")
                 .arg(Style::kInsetBg, Style::kInsetBorder));
 
             auto* installLayout = new QVBoxLayout(installFrame);

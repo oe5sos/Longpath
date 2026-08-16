@@ -594,7 +594,7 @@ void RotorLogbookPanel::buildUi()
     m_recent->setMaximumHeight(130);
     m_recent->setStyleSheet(QStringLiteral(
         "QTableWidget { background: %1; color: %2; border: 1px solid %3;"
-        "  border-radius: 3px; gridline-color: %3; font-size: 11px; }"
+        "  border-radius: 6px; gridline-color: %3; font-size: 11px; }"
         "QHeaderView::section { background: %4; color: %5; border: none;"
         "  border-bottom: 1px solid %3; padding: 2px 5px; font-size: 9px; }"
     ).arg(QString::fromLatin1(Style::kInsetBg),

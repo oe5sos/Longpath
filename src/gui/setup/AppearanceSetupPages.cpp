@@ -316,7 +316,7 @@ void GradientsPage::buildUI()
     m_gradientEditorLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: #607080; font-style: italic;"
         " background: #1a2a3a; border: 1px solid #203040;"
-        " border-radius: 3px; padding: 8px; }"));
+        " border-radius: 6px; padding: 8px; }"));
     m_gradientEditorLabel->setMinimumHeight(60);
     m_gradientEditorLabel->setEnabled(false);
     m_gradientEditorLabel->setAlignment(Qt::AlignCenter);
@@ -358,7 +358,7 @@ void SkinsPage::buildUI()
     m_skinListLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: #607080; font-style: italic;"
         " background: #1a2a3a; border: 1px solid #203040;"
-        " border-radius: 3px; padding: 8px; }"));
+        " border-radius: 6px; padding: 8px; }"));
     m_skinListLabel->setMinimumHeight(120);
     m_skinListLabel->setEnabled(false);
     m_skinListLabel->setAlignment(Qt::AlignCenter);

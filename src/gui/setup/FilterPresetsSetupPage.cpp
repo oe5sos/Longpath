@@ -68,7 +68,7 @@ void FilterPresetsSetupPage::buildUi()
     m_modeCombo = new QComboBox(modeBox);
     m_modeCombo->setStyleSheet(
         QStringLiteral("QComboBox { background: #1a1a2a; color: #c8d8e8; "
-                       "border: 1px solid #304050; border-radius: 3px; padding: 2px 6px; }"
+                       "border: 1px solid #304050; border-radius: 6px; padding: 2px 6px; }"
                        "QComboBox::drop-down { background: #1a2a3a; }"
                        "QComboBox QAbstractItemView { background: #1a1a2a; color: #c8d8e8; }"));
 
@@ -141,7 +141,7 @@ void FilterPresetsSetupPage::buildUi()
 
     static const QString kBtnStyle = QStringLiteral(
         "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 3px; padding: 4px 10px; }"
+        "  border-radius: 6px; padding: 4px 10px; }"
         "QPushButton:hover { background: #204060; }"
         "QPushButton:pressed { background: #1a2a3a; }");
 

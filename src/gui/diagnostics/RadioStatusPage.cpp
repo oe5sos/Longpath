@@ -86,7 +86,7 @@ static QString progressBarStyle(const char* fill)
         "QProgressBar {"
         "  background: #1a1a2a;"
         "  border: 1px solid %1;"
-        "  border-radius: 3px;"
+        "  border-radius: 6px;"
         "  height: 8px;"
         "  text-align: center;"
         "}"
@@ -611,7 +611,7 @@ void RadioStatusPage::buildHygieneCard(QFrame* card)
 
     m_resetBtn = new QPushButton(QStringLiteral("Reset to defaults"), card);
     m_resetBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: %1; border: 1px solid %2; border-radius: 3px;"
+        "QPushButton { background: %1; border: 1px solid %2; border-radius: 6px;"
         " color: %3; font-size: 9px; padding: 2px 6px; }"
         "QPushButton:hover { background: %4; }"
     ).arg(QLatin1String(Style::kAmberBg),
@@ -622,7 +622,7 @@ void RadioStatusPage::buildHygieneCard(QFrame* card)
 
     m_forgetBtn = new QPushButton(QStringLiteral("Forget this radio"), card);
     m_forgetBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: %1; border: 1px solid %2; border-radius: 3px;"
+        "QPushButton { background: %1; border: 1px solid %2; border-radius: 6px;"
         " color: %3; font-size: 9px; padding: 2px 6px; }"
         "QPushButton:hover { background: %4; }"
     ).arg(QLatin1String(Style::kRedBg),

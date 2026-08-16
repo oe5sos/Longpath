@@ -260,7 +260,7 @@ QHBoxLayout* SetupPage::addLabeledToggle(QLayout* parent, const QString& label, 
     toggle->setCheckable(true);
     toggle->setStyleSheet(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 3px; color: #c8d8e8; font-size: 11px; font-weight: bold; "
+        "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; "
         "padding: 3px 10px; }"
         "QPushButton:checked { background: #1a5030; color: #00e060; "
         "border: 1px solid #20a040; }");

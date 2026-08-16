@@ -75,7 +75,7 @@ void RxDashboard::buildUi()
     // multi-pan operator isn't left guessing.
     m_sliceTag = new QLabel(QString(m_sliceLetter), this);
     m_sliceTag->setStyleSheet(QStringLiteral(
-        "QLabel { color: #0a0a14; background: %1; border-radius: 3px;"
+        "QLabel { color: #0a0a14; background: %1; border-radius: 6px;"
         " padding: 1px 5px; font-weight: bold; font-size: 11px; }")
         .arg(Style::kAccent));
     hbox->addWidget(m_sliceTag);

@@ -17,7 +17,7 @@ TriBtn::TriBtn(Dir dir, QWidget* parent)
     setStyleSheet(QStringLiteral(
         "QPushButton {"
         "  background: %1; border: 1px solid %2;"
-        "  border-radius: 3px; padding: 0; margin: 0;"
+        "  border-radius: 6px; padding: 0; margin: 0;"
         "  min-width: 0; min-height: 0;"
         "}"
         "QPushButton:hover { background: %2; }"

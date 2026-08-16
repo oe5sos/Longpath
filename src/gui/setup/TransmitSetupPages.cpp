@@ -831,7 +831,7 @@ void TxProfilesPage::buildUI()
     info->setStyleSheet(QStringLiteral(
         "QLabel { color: #b0c0d0; font-style: italic; "
         " background: #1a2a3a; border: 1px solid #203040; "
-        " border-radius: 3px; padding: 12px; }"));
+        " border-radius: 6px; padding: 12px; }"));
     contentLayout()->addWidget(info);
 
     contentLayout()->addStretch();
@@ -914,7 +914,7 @@ void SpeechProcessorPage::buildActiveProfileSection()
         "and Save / Save As / Delete buttons live there."));
     m_manageProfileBtn->setStyleSheet(QStringLiteral(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-        "  border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
+        "  border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
         "QPushButton:hover { background: #203040; }"
         "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }"));
 
@@ -1003,7 +1003,7 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
     btn->setToolTip(buttonTooltip);
     btn->setStyleSheet(QStringLiteral(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-        "  border-radius: 3px; color: #c8d8e8; font-size: 11px; padding: 2px 8px; }"
+        "  border-radius: 6px; color: #c8d8e8; font-size: 11px; padding: 2px 8px; }"
         "QPushButton:hover:enabled { background: #203040; }"
         "QPushButton:pressed:enabled { background: #00b4d8; color: #0f0f1a; }"
         "QPushButton:disabled { color: #607080; border: 1px solid #203040; }"));

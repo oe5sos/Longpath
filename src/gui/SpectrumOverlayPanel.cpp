@@ -104,7 +104,7 @@ namespace OverlayColors {
     // Flyout panel backgrounds (verbatim from AetherSDR SpectrumOverlayMenu.cpp)
     constexpr auto kPanelStyle =
         "QWidget { background: rgba(15, 15, 26, 220); "
-        "border: 1px solid #304050; border-radius: 3px; }";
+        "border: 1px solid #304050; border-radius: 6px; }";
 
     // Label style for rows inside translucent flyout panels.
     // Transparent background is required here because the label must not
@@ -679,7 +679,7 @@ void SpectrumOverlayPanel::buildBandFlyout()
 
     const QString bandBtnStyle =
         "QPushButton { background: rgba(30, 40, 55, 220); "
-        "border: 1px solid #304050; border-radius: 3px; "
+        "border: 1px solid #304050; border-radius: 6px; "
         "color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: rgba(0, 112, 192, 180); "
         "border: 1px solid #0090e0; }";

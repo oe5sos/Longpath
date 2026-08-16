@@ -140,7 +140,7 @@ static inline QString fmButtonStyle()
     return QStringLiteral(
         "QPushButton {"
         "  background: %1; color: %2;"
-        "  border: 1px solid %3; border-radius: 3px;"
+        "  border: 1px solid %3; border-radius: 6px;"
         "  padding: 2px 4px; font-size: 10px; font-weight: bold;"
         "}"
         "QPushButton:hover { background: %4; }"

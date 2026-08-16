@@ -422,7 +422,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     tabs->setStyleSheet(
         "QTabWidget::pane { border: 1px solid #304050; background: #0f0f1a; }"
         "QTabBar::tab { background: #1a2a3a; color: #8aa8c0; padding: 4px 10px; "
-        "               border: 1px solid #304050; border-bottom: none; border-radius: 3px 3px 0 0; }"
+        "               border: 1px solid #304050; border-bottom: none; border-radius: 6px 3px 0 0; }"
         "QTabBar::tab:selected { background: #0f0f1a; color: #c8d8e8; }"
         "QTabBar::tab:hover { background: #203040; }");
     contentLayout()->setContentsMargins(0, 0, 0, 0);
@@ -484,7 +484,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     static const QString kLbl = "QLabel { color: #c8d8e8; font-size: 12px; }";
     static const QString kCombo =
         "QComboBox { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }"
+        "border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
         "selection-background-color: #00b4d8; }";
@@ -1048,7 +1048,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* useModelBtn = new QPushButton("Use Model...");
         useModelBtn->setStyleSheet(
             "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-            "border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
+            "border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
             "QPushButton:hover { background: #203040; }"
             "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }");
         auto* defBtn = new QPushButton("Default");
@@ -2332,7 +2332,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     // ── Add ──────────────────────────────────────────────────────────────────
     static const QString kMnfButtonStyle = QStringLiteral(
         "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 3px; padding: 4px 10px; }"
+        "  border-radius: 6px; padding: 4px 10px; }"
         "QPushButton:hover { background: #204060; }"
         "QPushButton:pressed { background: #1a2a3a; }");
 

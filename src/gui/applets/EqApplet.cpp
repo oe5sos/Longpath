@@ -55,7 +55,7 @@ public:
         setToolTip(QStringLiteral("Reset all bands to 0 dB"));
         setStyleSheet(
             "QPushButton { background-color: #1a2a3a; border: 1px solid #205070; "
-            "border-radius: 3px; }"
+            "border-radius: 6px; }"
             "QPushButton:hover { background-color: #203040; }"
             "QPushButton:pressed { background-color: #00b4d8; }");
     }
@@ -91,7 +91,7 @@ protected:
 
 static const QString kBtnBase =
     "QPushButton { background-color: #1a2a3a; color: #c8d8e8; "
-    "border: 1px solid #205070; border-radius: 3px; font-size: 11px; "
+    "border: 1px solid #205070; border-radius: 6px; font-size: 11px; "
     "font-weight: bold; padding: 2px 4px; }"
     "QPushButton:hover { background-color: #203040; }";
 

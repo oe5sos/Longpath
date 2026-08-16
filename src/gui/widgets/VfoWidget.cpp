@@ -634,7 +634,7 @@ void VfoWidget::buildHeaderRow()
     m_txBadge->setCheckable(true);
     m_txBadge->setStyleSheet(
         QStringLiteral("QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-                        "border-radius: 3px; color: #708090; font-size: 10px; font-weight: bold; }"
+                        "border-radius: 6px; color: #708090; font-size: 10px; font-weight: bold; }"
                         "QPushButton:checked { background: #6a3030; border-color: #ff4444; color: #ff8080; }"));
     // NereusSDR native — Thetis has no per-slice TX badge (it uses chkMOX for TX state)
     m_txBadge->setToolTip(QStringLiteral("Indicates this slice is the TX slice"));
@@ -651,7 +651,7 @@ void VfoWidget::buildHeaderRow()
     m_splitBadge->setAlignment(Qt::AlignCenter);
     m_splitBadge->setStyleSheet(
         QStringLiteral("background: #1a2a3a; border: 1px solid #304050;"
-                        "border-radius: 3px; color: #708090; font-size: 10px; font-weight: bold;"));
+                        "border-radius: 6px; color: #708090; font-size: 10px; font-weight: bold;"));
     m_splitBadge->setVisible(false);
     hdr->addWidget(m_splitBadge);
 
@@ -661,7 +661,7 @@ void VfoWidget::buildHeaderRow()
     m_sliceBadge->setAlignment(Qt::AlignCenter);
     m_sliceBadge->setStyleSheet(
         QStringLiteral("background: #0070c0; color: white; font-size: 11px;"
-                        "font-weight: bold; border-radius: 3px;"));
+                        "font-weight: bold; border-radius: 6px;"));
     hdr->addWidget(m_sliceBadge);
 
     static_cast<QVBoxLayout*>(layout())->addLayout(hdr);
@@ -680,7 +680,7 @@ void VfoWidget::buildFrequencyRow()
                         "font-family: 'Consolas', 'Menlo', monospace;"
                         "background: transparent;"
                         "border: 1px solid rgba(255,255,255,50);"
-                        "border-radius: 3px; padding: 0 4px;"));
+                        "border-radius: 6px; padding: 0 4px;"));
     updateFreqLabel();
     m_freqStack->addWidget(m_freqLabel);
 
@@ -691,7 +691,7 @@ void VfoWidget::buildFrequencyRow()
         QStringLiteral("color: #00e5ff; font-size: 20px; font-weight: bold;"
                         "font-family: 'Consolas', 'Menlo', monospace;"
                         "background: #0a0a18; border: 1px solid #00b4d8;"
-                        "border-radius: 3px; padding: 0 4px;"));
+                        "border-radius: 6px; padding: 0 4px;"));
     connect(m_freqEdit, &QLineEdit::returnPressed, this, [this]() {
         const double hz = parseUserFrequency(m_freqEdit->text());
         if (hz > 0.0) {
@@ -1632,7 +1632,7 @@ void VfoWidget::buildModeTab()
         m_modeCmb->setCurrentText(QStringLiteral("USB"));
         m_modeCmb->setStyleSheet(
             QStringLiteral("QComboBox { background: #1a2a3a; color: #c8d8e8;"
-                            "border: 1px solid #304050; border-radius: 3px;"
+                            "border: 1px solid #304050; border-radius: 6px;"
                             "padding: 1px 4px; font-size: 11px; }"
                             "QComboBox::drop-down { border: none; }"
                             "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
@@ -2209,7 +2209,7 @@ void VfoWidget::setSliceIndex(int index)
         QColor c = sliceColor(index);
         m_sliceBadge->setStyleSheet(
             QStringLiteral("background: %1; color: white; font-size: 11px;"
-                            "font-weight: bold; border-radius: 3px;").arg(c.name()));
+                            "font-weight: bold; border-radius: 6px;").arg(c.name()));
     }
 }
 

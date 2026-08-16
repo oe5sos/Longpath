@@ -59,10 +59,10 @@ void FilterPresetEditDialog::buildUi(const FilterPreset& current)
         "QDialog { background: #0f0f1a; color: #c8d8e8; }"
         "QLabel  { color: #c8d8e8; }"
         "QLineEdit, QSpinBox { background: #1a1a2a; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 3px; padding: 2px 4px; }"
+        "  border-radius: 6px; padding: 2px 4px; }"
         "QSpinBox::up-button, QSpinBox::down-button { background: #1a2a3a; width: 16px; }"
         "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 3px; padding: 4px 10px; }"
+        "  border-radius: 6px; padding: 4px 10px; }"
         "QPushButton:hover { background: #204060; }"
         "QPushButton:pressed { background: #1a2a3a; }"
     );

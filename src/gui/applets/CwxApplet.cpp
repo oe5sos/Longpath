@@ -61,7 +61,7 @@ void CwxApplet::buildUI()
     m_textEdit->setStyleSheet(QStringLiteral(
         "QTextEdit {"
         "  background: %1; border: 1px solid %2;"
-        "  border-radius: 3px; color: %3; font-size: 11px;"
+        "  border-radius: 6px; color: %3; font-size: 11px;"
         "}").arg(Style::kInsetBg, Style::kInsetBorder, Style::kTextPrimary));
     vbox->addWidget(m_textEdit);
     NyiOverlay::markNyi(m_textEdit, QStringLiteral("3I-2"));

@@ -408,7 +408,7 @@ void Hl2IoBoardTab::buildConfigAndRegisterRow(QVBoxLayout* outer)
     m_resetButton = new QPushButton(tr("Reset I/O board"), configGroup);
     m_resetButton->setStyleSheet(QStringLiteral(
         "QPushButton { color: #ff6666; border: 1px solid #ff6666; "
-        "border-radius: 3px; padding: 2px 6px; }"));
+        "border-radius: 6px; padding: 2px 6px; }"));
     btnRow->addWidget(m_probeButton);
     btnRow->addWidget(m_resetButton);
     configLayout->addLayout(btnRow);

@@ -23,7 +23,7 @@ inline void applySpinBoxStyle(QAbstractSpinBox* spin)
     spin->setStyleSheet(QStringLiteral(
         "QAbstractSpinBox {"
         "  background: %1; color: %2;"
-        "  border: 1px solid %3; border-radius: 3px;"
+        "  border: 1px solid %3; border-radius: 6px;"
         "  padding: 1px 4px; font-size: 10px;"
         "}"
         // Up / down buttons — explicit subcontrol-position so Fusion's

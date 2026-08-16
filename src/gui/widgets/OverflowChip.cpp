@@ -24,7 +24,7 @@ OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
     setStyleSheet(QStringLiteral(
         "NereusSDR--OverflowChip {"
         " background: rgba(64,72,88,46);"
-        " border-radius: 3px;"
+        " border-radius: 6px;"
         "}"
         "QLabel#OverflowChip_Glyph {"
         " color: #8aa8c0;"

@@ -211,7 +211,7 @@ inline QString buttonBaseStyle()
 {
     return QStringLiteral(
         "QPushButton {"
-        "  background: %1; border: 1px solid %2; border-radius: 3px;"
+        "  background: %1; border: 1px solid %2; border-radius: 6px;"
         "  color: %3; font-size: 10px; font-weight: bold; padding: 2px 4px;"
         "}"
         "QPushButton:hover { background: %4; }"
@@ -293,7 +293,7 @@ inline QString insetValueStyle()
     return QStringLiteral(
         "QLabel {"
         "  font-size: 10px; background: %1; border: 1px solid %2;"
-        "  border-radius: 3px; padding: 1px 2px; color: %3;"
+        "  border-radius: 6px; padding: 1px 2px; color: %3;"
         "}"
     ).arg(kInsetBg, kInsetBorder, kTextPrimary);
 }
@@ -324,7 +324,7 @@ constexpr auto kSecondaryLabelStyle =
 
 constexpr auto kComboStyle =
     "QComboBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }"
+    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }"
     "QComboBox::drop-down { border: none; }"
     "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
     " selection-background-color: #00b4d8; }";
@@ -343,15 +343,15 @@ constexpr auto kRadioButtonStyle =
 
 constexpr auto kLineEditStyle =
     "QLineEdit { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
+    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
 
 constexpr auto kSpinBoxStyle =
     "QSpinBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
+    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
 
 constexpr auto kDoubleSpinBoxStyle =
     "QDoubleSpinBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
+    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }";
 
 // Backwards-compat wrapper for places that prefer a function form.
 inline QString doubleSpinBoxStyle() { return QString::fromLatin1(kDoubleSpinBoxStyle); }
@@ -363,7 +363,7 @@ constexpr auto kSliderStyle =
 
 constexpr auto kButtonStyle =
     "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 3px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
+    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
     "QPushButton:hover { background: #203040; }"
     "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }";
 
@@ -399,7 +399,7 @@ inline void applyDarkPageStyle(QWidget* w)
         "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
         "QLabel { color: %2; }"
         "QComboBox { background: %4; color: %2; border: 1px solid %3;"
-        "  border-radius: 3px; padding: 2px 6px; }"
+        "  border-radius: 6px; padding: 2px 6px; }"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView { background: %4; color: %2;"
         "  selection-background-color: %5; }"
@@ -409,7 +409,7 @@ inline void applyDarkPageStyle(QWidget* w)
         "  margin: -4px 0; border-radius: 6px; }"
         "QSlider::sub-page:horizontal { background: %5; border-radius: 2px; }"
         "QSpinBox, QDoubleSpinBox { background: %4; color: %2;"
-        "  border: 1px solid %3; border-radius: 3px; padding: 1px 4px; }"
+        "  border: 1px solid %3; border-radius: 6px; padding: 1px 4px; }"
         "QCheckBox { color: %2; }"
         "QCheckBox::indicator { width: 14px; height: 14px; background: %4;"
         "  border: 1px solid %3; border-radius: 2px; }"
@@ -419,9 +419,9 @@ inline void applyDarkPageStyle(QWidget* w)
         "  border: 1px solid %3; border-radius: 7px; }"
         "QRadioButton::indicator:checked { background: %5; border-color: %5; }"
         "QLineEdit { background: %4; color: %2; border: 1px solid %3;"
-        "  border-radius: 3px; padding: 2px 6px; }"
+        "  border-radius: 6px; padding: 2px 6px; }"
         "QPushButton { background: %4; color: %2; border: 1px solid %3;"
-        "  border-radius: 3px; padding: 3px 12px; }"
+        "  border-radius: 6px; padding: 3px 12px; }"
         "QPushButton:hover { background: %6; }"
         "QPushButton:pressed { background: %5; color: %1; }"
     ).arg(kAppBg, kTextPrimary, kBorder, kButtonBg, kAccent, kButtonHover, kTextSecondary));

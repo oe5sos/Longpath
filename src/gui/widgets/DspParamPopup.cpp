@@ -38,7 +38,7 @@ static const QString kPopupStyle = QStringLiteral(
     "QRadioButton { color: #c8d8e8; font-size: 11px; }"
     "QCheckBox { color: #c8d8e8; font-size: 11px; }"
     "QPushButton { background: #1a2a3a; color: #c8d8e8; border: 1px solid #304050;"
-    "  border-radius: 3px; padding: 3px 8px; font-size: 11px; }"
+    "  border-radius: 6px; padding: 3px 8px; font-size: 11px; }"
     "QPushButton:hover { background: rgba(0, 112, 192, 180); border: 1px solid #0090e0; }");
 
 static const QString kSliderStyle = QStringLiteral(

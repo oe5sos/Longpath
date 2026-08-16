@@ -97,7 +97,7 @@ void AdcOverloadBadge::applyStyle()
 
     setStyleSheet(QStringLiteral(
         "NereusSDR--AdcOverloadBadge {"
-        " background: %1; border-radius: 3px;"
+        " background: %1; border-radius: 6px;"
         "}"
         // Top row: small caps, semi-bold, tight letter-spacing — reads as
         // a label rather than a value.

@@ -227,7 +227,7 @@ void PgxlAdvancedPage::buildIdentitySection(QVBoxLayout* topLay)
     m_stateBadge->setAutoFillBackground(true);
     m_stateBadge->setAlignment(Qt::AlignCenter);
     m_stateBadge->setStyleSheet(
-        QStringLiteral("background: #555; color: #ccc; border-radius: 3px; padding: 2px 6px;"));
+        QStringLiteral("background: #555; color: #ccc; border-radius: 6px; padding: 2px 6px;"));
     form->addRow(QStringLiteral("State:"), m_stateBadge);
 
     m_meffaLabel = new QLabel(QStringLiteral("--"));
@@ -602,7 +602,7 @@ void PgxlAdvancedPage::onPgxlDisconnected()
     updateConnectionUi(false);
     m_stateBadge->setText(QStringLiteral("Offline"));
     m_stateBadge->setStyleSheet(
-        QStringLiteral("background: #555; color: #ccc; border-radius: 3px; padding: 2px 6px;"));
+        QStringLiteral("background: #555; color: #ccc; border-radius: 6px; padding: 2px 6px;"));
 }
 
 void PgxlAdvancedPage::onPgxlStatusUpdated(const QMap<QString, QString>& kvs)
@@ -626,19 +626,19 @@ void PgxlAdvancedPage::onPgxlStatusUpdated(const QMap<QString, QString>& kvs)
         if (state == QStringLiteral("OPERATE")) {
             m_stateBadge->setStyleSheet(
                 QStringLiteral("background: #2d8a2d; color: #fff;"
-                               " border-radius: 3px; padding: 2px 6px;"));
+                               " border-radius: 6px; padding: 2px 6px;"));
         } else if (state.startsWith(QStringLiteral("FAULT"))) {
             m_stateBadge->setStyleSheet(
                 QStringLiteral("background: #aa2222; color: #fff;"
-                               " border-radius: 3px; padding: 2px 6px;"));
+                               " border-radius: 6px; padding: 2px 6px;"));
         } else if (state == QStringLiteral("STANDBY")) {
             m_stateBadge->setStyleSheet(
                 QStringLiteral("background: #888; color: #fff;"
-                               " border-radius: 3px; padding: 2px 6px;"));
+                               " border-radius: 6px; padding: 2px 6px;"));
         } else {
             m_stateBadge->setStyleSheet(
                 QStringLiteral("background: #c88000; color: #fff;"
-                               " border-radius: 3px; padding: 2px 6px;"));
+                               " border-radius: 6px; padding: 2px 6px;"));
         }
     }
 
@@ -734,7 +734,7 @@ void PgxlAdvancedPage::onSaveAndReboot()
     m_stateBadge->setText(QStringLiteral("Rebooting..."));
     m_stateBadge->setStyleSheet(
         QStringLiteral("background: #c88000; color: #fff;"
-                       " border-radius: 3px; padding: 2px 6px;"));
+                       " border-radius: 6px; padding: 2px 6px;"));
     m_pendingSaveReboot = false;
 }
 
@@ -923,7 +923,7 @@ void PgxlAdvancedPage::updateConnectionUi(bool connected)
             m_stateBadge->setText(QStringLiteral("Offline"));
             m_stateBadge->setStyleSheet(
                 QStringLiteral("background: #555; color: #ccc;"
-                               " border-radius: 3px; padding: 2px 6px;"));
+                               " border-radius: 6px; padding: 2px 6px;"));
         }
     }
 }

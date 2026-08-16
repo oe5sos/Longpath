@@ -767,7 +767,7 @@ MainWindow::MainWindow(QWidget* parent)
                 "  text-align: center; font-size: 13px;"
                 "  font-weight: bold; color: #c8d8e8;"
                 "  background: #1a2a3a; border: 1px solid #205070;"
-                "  border-radius: 3px; min-height: 24px;"
+                "  border-radius: 6px; min-height: 24px;"
                 "}"
                 "QProgressBar::chunk { background: #00b4d8; }"));
             m_wisdomDialog->show();
@@ -11757,7 +11757,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     // AI provider buttons
     const QString btnStyle = QStringLiteral(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 3px; color: #c8d8e8; font-size: 12px; font-weight: bold; "
+        "border-radius: 6px; color: #c8d8e8; font-size: 12px; font-weight: bold; "
         "padding: 6px 12px; }"
         "QPushButton:hover { background: #203040; }");
 

@@ -107,7 +107,7 @@ QLabel* makeColorSwatch(const QString& label, const QString& hexColor, QWidget* 
     auto* lbl = new QLabel(QStringLiteral("  %1  ").arg(label), parent);
     lbl->setStyleSheet(QStringLiteral(
         "QLabel { background: %1; color: #c8d8e8; border: 1px solid #203040;"
-        " border-radius: 3px; padding: 2px 6px; }").arg(hexColor));
+        " border-radius: 6px; padding: 2px 6px; }").arg(hexColor));
     lbl->setFixedHeight(24);
     lbl->setEnabled(false);  // NYI
     lbl->setToolTip(QStringLiteral("Color picker — not yet implemented"));
@@ -1233,7 +1233,7 @@ void SpectrumDefaultsPage::buildUI()
 
     const QString crossLinkStyle = QStringLiteral(
         "QPushButton { background: #1a2a3a; color: #8aa8c0; border: 1px solid #203040;"
-        "  border-radius: 3px; padding: 4px 10px; }"
+        "  border-radius: 6px; padding: 4px 10px; }"
         "QPushButton:hover { background: #203040; color: #c8d8e8; }");
 
     auto* crossLinkRow = new QWidget(this);

@@ -79,7 +79,7 @@ constexpr const char* kPickerStyle =
     "}"
     "QPushButton {"
     "  background: #1a2a3a; color: #c8d8e8;"
-    "  border: 1px solid #205070; border-radius: 3px;"
+    "  border: 1px solid #205070; border-radius: 6px;"
     "  padding: 3px 10px; min-height: 20px;"
     "}"
     "QPushButton:hover { background: #203040; }"

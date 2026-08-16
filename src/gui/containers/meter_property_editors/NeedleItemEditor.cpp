@@ -79,7 +79,7 @@ namespace {
 constexpr const char* kComboStyle =
     "QComboBox {"
     "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 3px;"
+    "  border: 1px solid #1e2e3e; border-radius: 6px;"
     "  padding: 2px 4px; min-height: 18px;"
     "}"
     "QComboBox QAbstractItemView {"
@@ -104,7 +104,7 @@ constexpr const char* kTableStyle =
 constexpr const char* kBtnStyle =
     "QPushButton {"
     "  background: #1a2a38; color: #c8d8e8;"
-    "  border: 1px solid #205070; border-radius: 3px;"
+    "  border: 1px solid #205070; border-radius: 6px;"
     "  padding: 1px 6px; min-height: 18px;"
     "}";
 
@@ -114,7 +114,7 @@ constexpr const char* kBtnStyle =
 constexpr const char* kGroupStyle =
     "QGroupBox {"
     "  color: #8aa8c0; font-weight: bold; font-size: 11px;"
-    "  border: 1px solid #205070; border-radius: 3px;"
+    "  border: 1px solid #205070; border-radius: 6px;"
     "  margin-top: 8px; padding: 6px 4px 4px 4px;"
     "}"
     "QGroupBox::title {"
@@ -125,7 +125,7 @@ constexpr const char* kGroupStyle =
 constexpr const char* kSpinStyle =
     "QDoubleSpinBox, QSpinBox {"
     "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 3px;"
+    "  border: 1px solid #1e2e3e; border-radius: 6px;"
     "  padding: 1px 4px; min-height: 18px;"
     "}";
 
@@ -269,7 +269,7 @@ void NeedleItemEditor::buildTypeSpecific()
     m_editSourceLabel->setStyleSheet(
         QStringLiteral("QLineEdit {"
                         "  background: #0a0a18; color: #c8d8e8;"
-                        "  border: 1px solid #1e2e3e; border-radius: 3px;"
+                        "  border: 1px solid #1e2e3e; border-radius: 6px;"
                         "  padding: 1px 4px; min-height: 18px;"
                         "}"));
     m_editSourceLabel->setMinimumWidth(kFieldWidth);

@@ -211,7 +211,7 @@ void TciApplet::buildHeaderRow(QVBoxLayout* vbox)
         QStringLiteral("Open Setup to configure TCI Server options"));
     m_setupButton->setStyleSheet(QStringLiteral(
         "QPushButton {"
-        "  background: %1; border: 1px solid %2; border-radius: 3px;"
+        "  background: %1; border: 1px solid %2; border-radius: 6px;"
         "  color: %3; font-size: 9px; font-weight: bold; padding: 1px 3px;"
         "}"
         "QPushButton:hover { background: %4; }"
@@ -365,7 +365,7 @@ void TciApplet::buildDisabledState(QVBoxLayout* vbox)
         QStringLiteral("Start the TCI WebSocket server"));
     m_enableBtn->setStyleSheet(QStringLiteral(
         "QPushButton {"
-        "  background: %1; border: 1px solid %2; border-radius: 3px;"
+        "  background: %1; border: 1px solid %2; border-radius: 6px;"
         "  color: %3; font-size: 10px; font-weight: bold; padding: 2px 6px;"
         "}"
         "QPushButton:hover { background: %4; }"

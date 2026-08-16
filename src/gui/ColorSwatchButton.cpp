@@ -51,7 +51,7 @@ void ColorSwatchButton::updateSwatchStyle()
 
     setStyleSheet(QStringLiteral(
         "QPushButton { background: %1; color: %2;"
-        " border: 1px solid %3; border-radius: 3px; padding: 2px 8px; }"
+        " border: 1px solid %3; border-radius: 6px; padding: 2px 8px; }"
         "QPushButton:hover { border-color: #00b4d8; }"
         "QPushButton:pressed { background: %1; }")
         .arg(m_color.name(QColor::HexArgb), fg, border));

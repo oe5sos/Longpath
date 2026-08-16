@@ -45,7 +45,7 @@ static const char* kComboStyle =
     "QComboBox {"
     "  background: #1a2a3a;"
     "  border: 1px solid #203040;"
-    "  border-radius: 3px;"
+    "  border-radius: 6px;"
     "  color: #c8d8e8;"
     "  padding: 2px 6px;"
     "}"

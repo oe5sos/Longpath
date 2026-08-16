@@ -168,7 +168,7 @@ constexpr const char* kAutoToggleStyle =
 
 constexpr const char* kStartBtnStyle =
     "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
-    "border: 1px solid #008ba8; padding: 4px; border-radius: 3px; }"
+    "border: 1px solid #008ba8; padding: 4px; border-radius: 6px; }"
     "QPushButton:hover { background: #00b4d8; }"
     "QPushButton:disabled { background: #404060; color: #808080; }";
 
@@ -237,7 +237,7 @@ constexpr const char* kSpotTableStyle =
 
 QString swatchStyle(const QColor& c) {
     return QString(
-        "QPushButton { background: %1; border: 2px solid #405060; border-radius: 3px; }"
+        "QPushButton { background: %1; border: 2px solid #405060; border-radius: 6px; }"
         "QPushButton:hover { border-color: #c8d8e8; }").arg(c.name());
 }
 
@@ -374,7 +374,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         firstRunBanner->setStyleSheet(
             "QLabel { color: #ffcc66; background: #2a2010; "
             "border: 1px solid #806020; padding: 6px; "
-            "border-radius: 3px; font-weight: bold; }");
+            "border-radius: 6px; font-weight: bold; }");
         idLayout->addWidget(firstRunBanner);
     }
 
@@ -2532,7 +2532,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     clearAllBtn->setFixedHeight(28);
     clearAllBtn->setStyleSheet(
         "QPushButton { background: #b03030; color: white; font-weight: bold; "
-        "border: 1px solid #802020; padding: 4px 10px; border-radius: 3px; }"
+        "border: 1px solid #802020; padding: 4px 10px; border-radius: 6px; }"
         "QPushButton:hover { background: #c84040; }"
         "QPushButton:pressed { background: #902020; }");
     connect(clearAllBtn, &QPushButton::clicked, this, [this] {

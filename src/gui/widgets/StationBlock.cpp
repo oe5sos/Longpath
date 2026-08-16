@@ -102,14 +102,14 @@ void StationBlock::applyStyle()
     if (isConnectedAppearance()) {
         setStyleSheet(QStringLiteral(
             "NereusSDR--StationBlock { border: 1px solid rgba(0,180,216,80);"
-            " background: #0a0a14; border-radius: 3px; }"
+            " background: #0a0a14; border-radius: 6px; }"
             "QLabel { color: #c8d8e8; font-family: 'SF Mono', Menlo, monospace;"
             " font-size: 12px; font-weight: bold; background: transparent; border: none; }"
         ));
     } else {
         setStyleSheet(QStringLiteral(
             "NereusSDR--StationBlock { border: 1px dashed rgba(255,96,96,102);"
-            " background: #0a0a14; border-radius: 3px; }"
+            " background: #0a0a14; border-radius: 6px; }"
             "QLabel { color: #607080; font-family: 'SF Mono', Menlo, monospace;"
             " font-size: 12px; font-style: italic; background: transparent; border: none; }"
         ));

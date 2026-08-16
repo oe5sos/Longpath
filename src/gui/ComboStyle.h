@@ -11,7 +11,7 @@ inline void applyComboStyle(QComboBox* combo)
     combo->setStyleSheet(QStringLiteral(
         "QComboBox {"
         "  background: %1; color: %2;"
-        "  border: 1px solid %3; border-radius: 3px;"
+        "  border: 1px solid %3; border-radius: 6px;"
         "  padding: 2px 6px; font-size: 10px;"
         "}"
         "QComboBox::drop-down { border: none; width: 18px; }"

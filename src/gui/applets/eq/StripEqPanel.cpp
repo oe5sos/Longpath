@@ -147,7 +147,7 @@ QString windowStyle()
 constexpr const char* kRowButtonStyle =
     "QPushButton {"
     "  background: {{color.background.0}}; color: {{color.text.primary}};"
-    "  border: 1px solid {{color.background.1}}; border-radius: 3px;"
+    "  border: 1px solid {{color.background.1}}; border-radius: 6px;"
     "  padding: 2px 12px; font-size: 11px; font-weight: bold;"
     "}"
     "QPushButton:hover { background: {{color.background.1}}; }"
@@ -163,7 +163,7 @@ QString peakHoldStyle()
     return QStringLiteral(
         "QPushButton {"
         "  background: %1; color: %2;"
-        "  border: 1px solid %3; border-radius: 3px;"
+        "  border: 1px solid %3; border-radius: 6px;"
         "  padding: 2px 12px; font-size: 11px; font-weight: bold;"
         "}"
         "QPushButton:hover { background: %3; }"

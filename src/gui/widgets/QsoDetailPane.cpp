@@ -100,7 +100,7 @@ void styleBadge(QLabel* l, const QString& text,
     }
     l->setText(text);
     l->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; background: %2; border-radius: 3px; "
+        "QLabel { color: %1; background: %2; border-radius: 6px; "
         "padding: 1px 6px; font-size: 10px; }")
             .arg(QLatin1String(fg), QLatin1String(bg)));
 }

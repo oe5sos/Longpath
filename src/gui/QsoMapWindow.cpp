@@ -284,7 +284,7 @@ void QsoMapWindow::buildUi()
     m_info->setVisible(false);
     m_info->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; background: %2; "
-        "border: 1px solid %3; border-radius: 3px; padding: 6px; }")
+        "border: 1px solid %3; border-radius: 6px; padding: 6px; }")
         .arg(QString::fromLatin1(Style::kTextPrimary),
              QString::fromLatin1(Style::kInsetBg),
              QString::fromLatin1(Style::kBorderSubtle)));

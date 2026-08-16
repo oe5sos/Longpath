@@ -175,7 +175,7 @@ AntennaAlexAlex2Tab::AntennaAlexAlex2Tab(RadioModel* model, QWidget* parent)
     statusFrame->setFrameShape(QFrame::StyledPanel);
     statusFrame->setStyleSheet(
         QStringLiteral("QFrame { background: palette(window); border: 1px solid palette(mid); "
-                       "border-radius: 3px; }"));
+                       "border-radius: 6px; }"));
 
     auto* statusLayout = new QHBoxLayout(statusFrame);
     statusLayout->setContentsMargins(8, 4, 8, 4);

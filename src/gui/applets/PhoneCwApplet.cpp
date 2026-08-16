@@ -132,7 +132,7 @@ static inline QString phoneButtonStyle()
 {
     return QStringLiteral(
         "QPushButton { background: #204060; border: 1px solid %1;"
-        "  border-radius: 3px; color: %2; font-size: 10px; font-weight: bold; }"
+        "  border-radius: 6px; color: %2; font-size: 10px; font-weight: bold; }"
         "QPushButton:hover { background: %3; }"
     ).arg(NereusSDR::Style::kBorder,
           NereusSDR::Style::kTextPrimary,

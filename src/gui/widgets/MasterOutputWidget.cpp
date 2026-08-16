@@ -54,7 +54,7 @@ static const char* kDbLabelStyle =
     "  font-size: 10px;"
     "  background: #0a0a18;"
     "  border: 1px solid #1e2e3e;"
-    "  border-radius: 3px;"
+    "  border-radius: 6px;"
     "  padding: 1px 2px;"
     "  color: #8aa8c0;"
     "}";

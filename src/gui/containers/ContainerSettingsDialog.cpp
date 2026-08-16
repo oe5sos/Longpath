@@ -207,7 +207,7 @@ constexpr const char* kBtnStyle =
     "  background: #1a2a3a;"
     "  color: #c8d8e8;"
     "  border: 1px solid #205070;"
-    "  border-radius: 3px;"
+    "  border-radius: 6px;"
     "  padding: 4px 8px;"
     "}"
     "QPushButton:hover { background: #203040; }";
@@ -217,7 +217,7 @@ constexpr const char* kOkBtnStyle =
     "  background: #00b4d8;"
     "  color: #0f0f1a;"
     "  border: 1px solid #00d4f8;"
-    "  border-radius: 3px;"
+    "  border-radius: 6px;"
     "  padding: 4px 8px;"
     "  font-weight: bold;"
     "}"
@@ -227,7 +227,7 @@ constexpr const char* kEditStyle =
     "background: #0a0a18;"
     "color: #c8d8e8;"
     "border: 1px solid #1e2e3e;"
-    "border-radius: 3px;"
+    "border-radius: 6px;"
     "padding: 2px 4px;";
 
 constexpr const char* kListStyle =
@@ -251,7 +251,7 @@ constexpr const char* kSpinStyle =
     "background: #0a0a18;"
     "color: #c8d8e8;"
     "border: 1px solid #1e2e3e;"
-    "border-radius: 3px;"
+    "border-radius: 6px;"
     "padding: 2px;";
 
 QPushButton* makeBtn(const QString& text, QWidget* parent)
@@ -761,7 +761,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_containerDropdown = new QComboBox(bar);
     m_containerDropdown->setStyleSheet(
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #1e2e3e; border-radius: 3px; padding: 2px 4px;"
+        "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px;"
         "  min-width: 160px; }"
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #205070; selection-background-color: #00b4d8; }");
@@ -815,7 +815,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_bgColorBtn = new QPushButton(QStringLiteral("  "), bar);
     m_bgColorBtn->setStyleSheet(
         "QPushButton { background: #0f0f1a; border: 1px solid #205070;"
-        "  border-radius: 3px; min-width: 32px; min-height: 18px; }"
+        "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
         "QPushButton:hover { border-color: #00b4d8; }");
     m_bgColorBtn->setAutoDefault(false);
     m_bgColorBtn->setDefault(false);
@@ -827,7 +827,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
         if (chosen.isValid()) {
             m_bgColorBtn->setStyleSheet(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070;"
-                                "  border-radius: 3px; min-width: 32px; min-height: 18px; }"
+                                "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
                                 "QPushButton:hover { border-color: #00b4d8; }").arg(chosen.name()));
         }
     });
@@ -846,7 +846,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_rxSourceCombo->addItem(QStringLiteral("RX2"), 2);
     m_rxSourceCombo->setStyleSheet(
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #1e2e3e; border-radius: 3px; padding: 2px 4px; }"
+        "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px; }"
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #205070; selection-background-color: #00b4d8; }");
     m_rxSourceCombo->setFixedWidth(64);
@@ -928,7 +928,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_btnDelete    = makeBtn(QStringLiteral("Delete"),    bar);
     m_btnDelete->setStyleSheet(
         "QPushButton { background: #401010; color: #ffb0b0; border: 1px solid #802020;"
-        "  border-radius: 3px; padding: 2px 8px; }"
+        "  border-radius: 6px; padding: 2px 8px; }"
         "QPushButton:hover { background: #602020; }");
     row2->addWidget(m_btnDuplicate);
     row2->addWidget(m_btnDelete);

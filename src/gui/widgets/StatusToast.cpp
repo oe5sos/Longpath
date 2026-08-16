@@ -57,7 +57,7 @@ StatusToast::StatusToast(const QString& message,
 
     setStyleSheet(QStringLiteral(
         "QWidget { background: %1; border: 1px solid %2;"
-        " border-left: 3px solid %3; border-radius: 3px; }"
+        " border-left: 3px solid %3; border-radius: 6px; }"
     ).arg(QString::fromLatin1(Style::kPanelBg),
           QString::fromLatin1(Style::kBorder),
           accentFor(severity)));

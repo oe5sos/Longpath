@@ -187,7 +187,7 @@ void SupportDialog::buildUI()
             "  background: %4;"
             "  color: %5;"
             "  border: 1px solid #405060;"    // §D exception: off-palette border
-            "  border-radius: 3px;"
+            "  border-radius: 6px;"
             "  padding: 5px 12px;"
             "}"
             "QPushButton:hover { background: #405060; }")  // §D exception
@@ -321,7 +321,7 @@ void SupportDialog::onCreateBundle()
             "QMessageBox { background: %1; color: %2; }"
             "QLabel { color: %2; }"
             "QPushButton { background: %3; color: %2; border: 1px solid #405060;"  // §D exception
-            "  border-radius: 3px; padding: 5px 12px; }")
+            "  border-radius: 6px; padding: 5px 12px; }")
         .arg(Style::kAppBg, Style::kTextPrimary, Style::kOverlayBorder));
 
     auto* openBtn = msgBox.addButton(QStringLiteral("Open Folder"), QMessageBox::ActionRole);

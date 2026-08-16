@@ -56,7 +56,7 @@ static inline QString vaxSectionStyle()
         "QWidget { background: transparent; }"
         "QLabel { color: %1; font-size: 11px; }"
         "QPushButton { background: %2; border: 1px solid %3;"
-        "  border-radius: 3px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: %4; }"
+        "  border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: %4; }"
         "QPushButton:hover { background: %5; }"
     ).arg(Style::kTextSecondary, Style::kButtonBg, Style::kBorder,
           Style::kTextPrimary, Style::kButtonAltHover);
@@ -70,7 +70,7 @@ static inline QString vaxSectionStyle()
 static inline QString vaxButtonStyle()
 {
     return QStringLiteral(
-        "QPushButton { background: %1; border: 1px solid %2; border-radius: 3px;"
+        "QPushButton { background: %1; border: 1px solid %2; border-radius: 6px;"
         " color: %3; font-size: 11px; font-weight: bold; padding: 2px 8px; }"
         "QPushButton:hover { background: %4; }"
     ).arg(Style::kButtonBg, Style::kBorder, Style::kTextPrimary,

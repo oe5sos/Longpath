@@ -769,7 +769,7 @@ void TxApplet::buildUI()
         inset->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
         inset->setObjectName(QStringLiteral("xpaInset"));
         inset->setStyleSheet(QStringLiteral(
-            "#xpaInset { background: %1; border: 1px solid %2; border-radius: 3px; }"
+            "#xpaInset { background: %1; border: 1px solid %2; border-radius: 6px; }"
             "#xpaInset QLabel { border: none; background: transparent; }"
         ).arg(Style::kInsetBg, Style::kInsetBorder));
 

@@ -107,7 +107,7 @@ inline void applyAppBaselineQss(QApplication& app)
     app.setStyleSheet(QStringLiteral(
         "QToolTip {"
         "  color: %1; background: %2; border: 1px solid %3;"
-        "  padding: 3px; border-radius: 3px;"
+        "  padding: 3px; border-radius: 6px;"
         "}"
         "QGroupBox::title { color: %4; }"
         "QMenu { background: %2; color: %1; border: 1px solid %3; }"

@@ -92,7 +92,7 @@ void applyDarkStyle(QWidget* w)
         "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
         "QLabel { color: #c8d8e8; }"
         "QSpinBox { background: #1a2a3a; color: #c8d8e8;"
-        "  border: 1px solid #203040; border-radius: 3px; padding: 1px 4px; }"
+        "  border: 1px solid #203040; border-radius: 6px; padding: 1px 4px; }"
         "QCheckBox { color: #c8d8e8; }"
         "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
         "  border: 1px solid #203040; border-radius: 2px; }"
@@ -480,7 +480,7 @@ void SpectrumPeaksPage::buildUI()
         "Navigate back to the Spectrum Defaults page."));
     m_backBtn->setStyleSheet(QStringLiteral(
         "QPushButton { background: #1a2a3a; color: #8aa8c0; border: 1px solid #203040;"
-        "  border-radius: 3px; padding: 4px 10px; }"
+        "  border-radius: 6px; padding: 4px 10px; }"
         "QPushButton:hover { background: #203040; color: #c8d8e8; }"));
     connect(m_backBtn, &QPushButton::clicked,
             this, &SpectrumPeaksPage::backToSpectrumDefaultsRequested);

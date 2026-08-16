@@ -234,7 +234,7 @@ void NetworkDiagnosticsDialog::buildUi()
             "  color: %1;"                       // Style::kTitleText
             "  background: #1a2a38;"             // §D exception: diagnostics btn bg
             "  border: 1px solid #304050;"       // §D exception: diagnostics btn border
-            "  border-radius: 3px;"
+            "  border-radius: 6px;"
             "  padding: 4px 10px;"
             "  font-size: 11px;"
             "}"
@@ -256,7 +256,7 @@ void NetworkDiagnosticsDialog::buildUi()
             "  color: %1;"                       // Style::kTextPrimary
             "  background: #204060;"             // §D exception: diagnostics close btn bg
             "  border: 1px solid #204060;"       // §D exception
-            "  border-radius: 3px;"
+            "  border-radius: 6px;"
             "  padding: 4px 16px;"
             "  font-size: 11px;"
             "}"

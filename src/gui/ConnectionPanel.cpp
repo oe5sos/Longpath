@@ -437,7 +437,7 @@ void ConnectionPanel::buildUI()
     m_modelCombo->setMinimumWidth(200);
     m_modelCombo->setStyleSheet(QStringLiteral(
         "QComboBox { background: #1a2a3a; color: #c8d8e8; border: 1px solid #304050;"
-        "  border-radius: 3px; padding: 4px 8px; }"
+        "  border-radius: 6px; padding: 4px 8px; }"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView { background: #0a1a28; color: #c8d8e8;"
         "  selection-background-color: #205070; }"));

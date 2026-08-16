@@ -62,7 +62,7 @@ QLabel* makeBadge(const QString& text, const char* bg, const char* fg,
         "QLabel {"
         "  background: %1; color: %2;"
         "  font-size: 8px; font-weight: bold;"
-        "  border-radius: 3px; padding: 1px 4px;"
+        "  border-radius: 6px; padding: 1px 4px;"
         "}"
     ).arg(QLatin1String(bg), QLatin1String(fg)));
     lbl->setFixedHeight(14);
@@ -359,7 +359,7 @@ QWidget* ClientChainApplet::buildClientRow(
             QStringLiteral("Force-disconnect this TCI client"));
         disconnectBtn->setStyleSheet(QStringLiteral(
             "QPushButton {"
-            "  background: %1; border: 1px solid %2; border-radius: 3px;"
+            "  background: %1; border: 1px solid %2; border-radius: 6px;"
             "  color: %3; font-size: 9px; font-weight: bold; padding: 1px 4px;"
             "}"
             "QPushButton:hover { background: %4; }"

@@ -115,7 +115,7 @@ static const QString kFieldStyle =
     QStringLiteral(
         "QLineEdit, QSpinBox, QComboBox {"
         "  background: %1; color: %2;"
-        "  border: 1px solid %3; border-radius: 3px; padding: 4px 6px;"
+        "  border: 1px solid %3; border-radius: 6px; padding: 4px 6px;"
         "}"
         "QLineEdit:focus, QSpinBox:focus, QComboBox:focus {"
         "  border-color: %4;"
@@ -753,13 +753,13 @@ void AddCustomRadioDialog::validateFields()
         m_macEdit->setStyleSheet(
             QStringLiteral(
                 "QLineEdit { background: %1; color: #e06060;"    // §D exception: error red fg
-                "  border: 1px solid #804040; border-radius: 3px; padding: 4px 6px; }")  // §D exception: error border
+                "  border: 1px solid #804040; border-radius: 6px; padding: 4px 6px; }")  // §D exception: error border
             .arg(kFieldInputBg));
     } else {
         m_macEdit->setStyleSheet(
             QStringLiteral(
                 "QLineEdit { background: %1; color: %2;"
-                "  border: 1px solid %3; border-radius: 3px; padding: 4px 6px; }"
+                "  border: 1px solid %3; border-radius: 6px; padding: 4px 6px; }"
                 "QLineEdit:focus { border-color: %4; }")
             .arg(kFieldInputBg, Style::kTextPrimary, Style::kOverlayBorder, Style::kAccent));
     }

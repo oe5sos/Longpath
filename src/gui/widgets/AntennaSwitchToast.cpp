@@ -29,7 +29,7 @@ AntennaSwitchToast::AntennaSwitchToast(const QString& message, QWidget* parent)
     setAttribute(Qt::WA_TranslucentBackground);
     setStyleSheet(QStringLiteral(
         "QWidget { background: %1; border: 1px solid %2;"
-        " border-left: 3px solid #00ff88; border-radius: 3px; }"
+        " border-left: 3px solid #00ff88; border-radius: 6px; }"
     ).arg(Style::kPanelBg, Style::kBorder));
 
     auto* layout = new QHBoxLayout(this);

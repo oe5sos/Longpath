@@ -137,7 +137,7 @@ Rf2ksApplet::Rf2ksApplet(RadioModel* model, QWidget* parent)
     const QString activeStyle = QStringLiteral(
         "QPushButton[active=\"true\"] {"
         "  background: %1; color: %2; border: 1px solid %3;"
-        "  border-radius: 3px; font-weight: bold;"
+        "  border-radius: 6px; font-weight: bold;"
         "}"
     ).arg(Style::kGreenBg, Style::kGreenText, Style::kGreenBorder);
 
@@ -199,13 +199,13 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
         m_operateBtn->setStyleSheet(
             QStringLiteral(
                 "QPushButton { background: #1a6030; border: 1px solid #008040; "
-                "border-radius: 3px; color: #ffffff; font-size: 10px; font-weight: bold; }"
+                "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }"
                 "QPushButton:hover { background: #007040; }"));
     } else {
         m_operateBtn->setStyleSheet(
             QStringLiteral(
                 "QPushButton { background: #204060; border: 1px solid #205070; "
-                "border-radius: 3px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+                "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
                 "QPushButton:hover { background: #204060; }"));
     }
 }

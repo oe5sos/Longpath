@@ -44,7 +44,7 @@ void SpectrumOverlayMenu::buildUI()
         "}"
         "QComboBox {"
         "  background: #203040; color: #c8d8e8; border: 1px solid #205070;"
-        "  border-radius: 3px; padding: 2px 6px; font-size: 11px;"
+        "  border-radius: 6px; padding: 2px 6px; font-size: 11px;"
         "}"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView {"
@@ -54,7 +54,7 @@ void SpectrumOverlayMenu::buildUI()
         "QCheckBox::indicator { width: 14px; height: 14px; }"
         "QPushButton {"
         "  background: #203040; color: #c8d8e8; border: 1px solid #205070;"
-        "  border-radius: 3px; padding: 3px 10px; font-size: 11px;"
+        "  border-radius: 6px; padding: 3px 10px; font-size: 11px;"
         "}"
         "QPushButton:hover { background: #304050; border-color: #00b4d8; }"
         "QPushButton:pressed { background: #1a2a38; }"));

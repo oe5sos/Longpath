@@ -23,7 +23,7 @@ void applyBtnColor(QPushButton* btn, const QColor& c)
 constexpr const char* kComboStyle =
     "QComboBox {"
     "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 3px;"
+    "  border: 1px solid #1e2e3e; border-radius: 6px;"
     "  padding: 2px 4px; min-height: 18px;"
     "}"
     "QComboBox QAbstractItemView {"
@@ -34,7 +34,7 @@ constexpr const char* kComboStyle =
 
 constexpr const char* kLineStyle =
     "QLineEdit { background: #0a0a18; color: #c8d8e8;"
-    " border: 1px solid #1e2e3e; border-radius: 3px;"
+    " border: 1px solid #1e2e3e; border-radius: 6px;"
     " padding: 1px 4px; min-height: 18px; }";
 } // namespace
 
