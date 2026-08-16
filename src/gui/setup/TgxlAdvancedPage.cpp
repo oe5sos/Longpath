@@ -645,23 +645,23 @@ void TgxlAdvancedPage::onTgxlStatusUpdated(const QMap<QString, QString>& kvs)
         m_stateBadge->setText(state);
         if (state == QStringLiteral("OPERATE")) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #2d8a2d; color: #fff;"
+                QStringLiteral("background: #1c3a2a; color: #6fa384;"
                                " border-radius: 6px; padding: 2px 6px;"));
         } else if (state == QStringLiteral("BYPASS")) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #888; color: #fff;"
+                QStringLiteral("background: #1a1a1e; color: #8e8e93;"
                                " border-radius: 6px; padding: 2px 6px;"));
         } else if (state == QStringLiteral("STANDBY")) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #888; color: #fff;"
+                QStringLiteral("background: #1a1a1e; color: #8e8e93;"
                                " border-radius: 6px; padding: 2px 6px;"));
         } else if (state.startsWith(QStringLiteral("FAULT"))) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #aa2222; color: #fff;"
+                QStringLiteral("background: #7a2c2e; color: #f0dcdc;"
                                " border-radius: 6px; padding: 2px 6px;"));
         } else {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #c88000; color: #fff;"
+                QStringLiteral("background: #33280f; color: #c2924f;"
                                " border-radius: 6px; padding: 2px 6px;"));
         }
     }
@@ -746,7 +746,7 @@ void TgxlAdvancedPage::onSaveAndReboot()
     m_model->tgxlConnection()->save();
     m_stateBadge->setText(QStringLiteral("Rebooting..."));
     m_stateBadge->setStyleSheet(
-        QStringLiteral("background: #c88000; color: #fff;"
+        QStringLiteral("background: #33280f; color: #c2924f;"
                        " border-radius: 6px; padding: 2px 6px;"));
     m_pendingSaveReboot = false;
 }

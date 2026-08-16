@@ -1038,7 +1038,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         QVBoxLayout* mdlGrp = makeGroup(tabLay, "RNNoise Model (Global)");
 
         auto* modelLabel = new QLabel;
-        modelLabel->setStyleSheet("QLabel { color: #00c8ff; font-size: 12px; }");
+        modelLabel->setStyleSheet("QLabel { color: #4a7ba8; font-size: 12px; }");
         {
             const QString saved = AppSettings::instance().value("Nr3ModelPath", "").toString();
             modelLabel->setText(saved.isEmpty() ? "Default (large)" : QFileInfo(saved).baseName());

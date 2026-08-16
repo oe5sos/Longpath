@@ -125,13 +125,13 @@ QColor StatusBadge::variantForegroundColor() const
     // Mirror the colors used by applyStyle() so the SVG tint matches the
     // text color. If applyStyle() colors change, update both.
     switch (m_variant) {
-        case Variant::Info: return QColor(QStringLiteral("#5fa8ff"));
+        case Variant::Info: return QColor(QStringLiteral("#4a7ba8"));
         case Variant::On:   return QColor(QStringLiteral("#5fff8a"));
         case Variant::Off:  return QColor(QStringLiteral("#3a4a5a"));
         case Variant::Warn: return QColor(QStringLiteral("#ffd700"));
         case Variant::Tx:   return QColor(QStringLiteral("#ff6060"));
     }
-    return QColor(QStringLiteral("#5fa8ff"));
+    return QColor(QStringLiteral("#4a7ba8"));
 }
 
 void StatusBadge::renderSvgIcon()
@@ -193,7 +193,7 @@ void StatusBadge::applyStyle()
     QString fg, bg;
     switch (m_variant) {
         case Variant::Info:
-            fg = QStringLiteral("#5fa8ff");
+            fg = QStringLiteral("#4a7ba8");
             bg = QStringLiteral("rgba(95,168,255,26)");   // 0.10 alpha
             break;
         case Variant::On:

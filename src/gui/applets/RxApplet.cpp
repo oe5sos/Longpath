@@ -344,7 +344,7 @@ void RxApplet::buildUi()
             "  color: #ff4444; background: transparent; border: none;"  // §A2 one-off TX color
             "  font-size: 10px; font-weight: bold; padding: 0 2px;"
             "}"
-            "QPushButton:hover { color: #ff6666; }"  // §A2 one-off hover derived from #ff4444
+            "QPushButton:hover { color: #a86b6d; }"  // §A2 one-off hover derived from #ff4444
         )));
         connect(m_txAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder TX mode — only main ANT1-3 (Phase 3P-I-a T22).
@@ -385,7 +385,7 @@ void RxApplet::buildUi()
         m_filterWidthLbl = new QLabel(QStringLiteral("2.9K"), this);
         m_filterWidthLbl->setAlignment(Qt::AlignCenter);
         m_filterWidthLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: #00c8ff; font-size: 11px; font-weight: bold; }"  // §A2 one-off filter highlight
+            "QLabel { color: #4a7ba8; font-size: 11px; font-weight: bold; }"  // §A2 one-off filter highlight
         ));
         row->addWidget(m_filterWidthLbl);
 

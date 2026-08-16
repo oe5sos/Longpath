@@ -118,7 +118,7 @@ QWidget* FourO3APage::buildGeneralTab()
     m_connectionBanner = new QLabel(tab);
     m_connectionBanner->setWordWrap(true);
     m_connectionBanner->setStyleSheet(
-        QStringLiteral("color:#ffcc66; font-size:11px; font-weight:bold;"));
+        QStringLiteral("color:#c2924f; font-size:11px; font-weight:bold;"));
     layout->addWidget(m_connectionBanner);
 
     // ── Master Switch ─────────────────────────────────────────────
@@ -222,12 +222,12 @@ void FourO3APage::refreshConnectionBanner()
         m_connectionBanner->setText(
             tr("Editing peripherals for %1 (%2)").arg(name, mac));
         m_connectionBanner->setStyleSheet(
-            QStringLiteral("color:#7ec850; font-size:11px; font-weight:bold;"));
+            QStringLiteral("color:#6fa384; font-size:11px; font-weight:bold;"));
     } else {
         m_connectionBanner->setText(
             tr("Connect to a radio to edit its peripherals."));
         m_connectionBanner->setStyleSheet(
-            QStringLiteral("color:#ffcc66; font-size:11px; font-weight:bold;"));
+            QStringLiteral("color:#c2924f; font-size:11px; font-weight:bold;"));
     }
     // Master toggle reflects the per-MAC FourO3A_Enabled flag.  Block
     // signals during the refresh so the in-progress assignment doesn't

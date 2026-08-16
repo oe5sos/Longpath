@@ -58,10 +58,10 @@ static const char* kGroupStyle =
 
 static const char* kBadgeStyle =
     "QLabel {"
-    "  background: #2a1a00;"
-    "  border: 1px solid #b87300;"
+    "  background: #33280f;"
+    "  border: 1px solid #6b5426;"
     "  border-radius: 6px;"
-    "  color: #e8a030;"
+    "  color: #c2924f;"
     "  font-size: 10px;"
     "  padding: 2px 6px;"
     "}";
@@ -103,10 +103,10 @@ static const char* kStatusBYOStyle =
 
 static const char* kStatusUnboundStyle =
     "QLabel {"
-    "  background: #2a1a00;"
-    "  border: 1px solid #b87300;"
+    "  background: #33280f;"
+    "  border: 1px solid #6b5426;"
     "  border-radius: 6px;"
-    "  color: #e8a030;"
+    "  color: #c2924f;"
     "  font-size: 11px;"
     "  font-weight: bold;"
     "  padding: 3px 8px;"

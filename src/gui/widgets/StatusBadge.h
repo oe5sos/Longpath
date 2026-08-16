@@ -18,7 +18,7 @@ class StatusBadge : public QWidget {
 
 public:
     enum class Variant {
-        Info,    // blue (#5fa8ff)   — type/mode badges (USB, AGC-S)
+        Info,    // blue (#4a7ba8)   — type/mode badges (USB, AGC-S)
         On,      // green (#5fff8a)  — active toggle (NR2, NB, ANF, SQL)
         Off,     // dim grey (#3a4a5a) — inactive toggle (rendered only when
                  //                       host opts to show the off state)

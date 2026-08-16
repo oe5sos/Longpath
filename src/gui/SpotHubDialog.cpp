@@ -164,8 +164,8 @@ constexpr const char* kSpinBoxStyle =
 
 constexpr const char* kAutoToggleStyle =
     "QPushButton { background: #1a6030; color: white; "
-    "border: 1px solid #305040; padding: 4px 10px; }"
-    "QPushButton:!checked { background: #603020; }";
+    "border: 1px solid #2c5c44; padding: 4px 10px; }"
+    "QPushButton:!checked { background: #33280f; }";
 
 constexpr const char* kStartBtnStyle =
     "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
@@ -373,7 +373,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         firstRunBanner->setObjectName("settingsFirstRunBanner");
         firstRunBanner->setWordWrap(true);
         firstRunBanner->setStyleSheet(
-            "QLabel { color: #ffcc66; background: #2a2010; "
+            "QLabel { color: #c2924f; background: #33280f; "
             "border: 1px solid #806020; padding: 6px; "
             "border-radius: 6px; font-weight: bold; }");
         idLayout->addWidget(firstRunBanner);
@@ -450,7 +450,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     m_settingsSavedLabel = new QLabel;
     m_settingsSavedLabel->setObjectName("settingsSavedLabel");
     m_settingsSavedLabel->setStyleSheet(
-        "QLabel { color: #4caf50; font-weight: bold; }");
+        "QLabel { color: #6fa384; font-weight: bold; }");
     btnRow->addWidget(m_settingsSavedLabel);
 
     applyLayout->addLayout(btnRow);
@@ -577,7 +577,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
                 "Identity: <b>%1</b> / <b>%2</b> (set in Settings tab)")
                 .arg(call, gridSquare));
             m_freedvIdentityLabel->setStyleSheet(
-                "QLabel { color: #4caf50; }");
+                "QLabel { color: #6fa384; }");
         }
     });
 
@@ -1697,7 +1697,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
                 "Identity: <b>%1</b> / <b>%2</b> (set in Settings tab)")
                 .arg(call, gridSquare));
             m_freedvIdentityLabel->setStyleSheet(
-                "QLabel { color: #4caf50; }");
+                "QLabel { color: #6fa384; }");
         }
         layout->addWidget(m_freedvIdentityLabel);
     }
@@ -2612,8 +2612,8 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     // From SpotSettingsDialog.cpp:63-65 [@0cd4559].
     static constexpr const char* kToggleStyle =
         "QPushButton { background: #1a6030; color: white; "
-        "border: 1px solid #305040; padding: 3px; }"
-        "QPushButton:!checked { background: #603020; }";
+        "border: 1px solid #2c5c44; padding: 3px; }"
+        "QPushButton:!checked { background: #33280f; }";
 
     // Spots: Enabled/Disabled. Upstream :57-71 [@0cd4559].
     grid->addWidget(new QLabel("Spots:"), row, 0);

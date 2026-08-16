@@ -131,7 +131,7 @@ static const QString kPrimaryButtonStyle =
         "  background: %1; color: #fff;"
         "  border: none; border-radius: 4px; padding: 6px 16px; font-weight: bold;"
         "}"
-        "QPushButton:hover { background: #0096b7; }"        // §D exception: accent-dark hover
+        "QPushButton:hover { background: #2d5885; }"        // §D exception: accent-dark hover
         "QPushButton:disabled { background: #2a3040; color: #556070; }")  // §D exception: disabled
     .arg(Style::kAccent);
 
@@ -704,7 +704,7 @@ void AddCustomRadioDialog::onSaveOfflineClicked()
                     "we have no way to learn it.\n"
                     "Protocol 1 = HL2 / classic ANAN. Protocol 2 = Saturn / ANAN-G2."));
             m_protocolCombo->setStyleSheet(
-                kFieldStyle + QStringLiteral("QComboBox { border: 1px solid #5985b8; }"));  // §D exception: info-blue highlight
+                kFieldStyle + QStringLiteral("QComboBox { border: 1px solid #4a7ba8; }"));  // §D exception: info-blue highlight
             return;
         }
     }
@@ -787,7 +787,7 @@ void AddCustomRadioDialog::showInlineInfo(const QString& message)
     // Info band: dark blue border + blue text.
     // Colour: #5985b8 info blue (design §6.4).
     m_feedbackFrame->setStyleSheet(Style::themed(QStringLiteral(
-        "QFrame { background: #0a1a28; border: 1px solid #5985b8; border-radius: 4px; }")));
+        "QFrame { background: #0a1a28; border: 1px solid #4a7ba8; border-radius: 4px; }")));
     m_feedbackLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #8aa8c0; font-size: 12px; }")));
     m_feedbackLabel->setText(message);

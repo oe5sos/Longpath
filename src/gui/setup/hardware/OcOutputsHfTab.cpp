@@ -191,14 +191,14 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
 
         auto* rxGroup = new QGroupBox(tr("RX OC Pins per Band"), this);
         rxGroup->setStyleSheet(QStringLiteral(
-            "QGroupBox { color: #6699ff; font-weight: bold; }"
+            "QGroupBox { color: #4a7ba8; font-weight: bold; }"
         ));
         buildMatrixGrid(rxGroup, /*tx=*/false);
         matrixRow->addWidget(rxGroup, 1);
 
         auto* txGroup = new QGroupBox(tr("TX OC Pins per Band"), this);
         txGroup->setStyleSheet(QStringLiteral(
-            "QGroupBox { color: #ff6655; font-weight: bold; }"
+            "QGroupBox { color: #a86b6d; font-weight: bold; }"
         ));
         buildMatrixGrid(txGroup, /*tx=*/true);
         matrixRow->addWidget(txGroup, 1);

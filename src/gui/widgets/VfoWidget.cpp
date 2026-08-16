@@ -623,7 +623,7 @@ void VfoWidget::buildHeaderRow()
     // Filter width label (cyan)
     m_filterWidthLbl = new QLabel(QStringLiteral("2.9K"), this);
     m_filterWidthLbl->setStyleSheet(
-        QStringLiteral("color: #00c8ff; font-size: 11px; font-weight: bold;"));
+        QStringLiteral("color: #4a7ba8; font-size: 11px; font-weight: bold;"));
     m_filterWidthLbl->setFixedHeight(18);
     hdr->addWidget(m_filterWidthLbl);
 

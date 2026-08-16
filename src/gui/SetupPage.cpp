@@ -234,7 +234,7 @@ QHBoxLayout* SetupPage::addLabeledSlider(QLayout* parent, const QString& label,
     slider->setStyleSheet(Style::kSliderStyle);
 
     if (valueLabel != nullptr) {
-        valueLabel->setStyleSheet("QLabel { color: #00c8ff; font-size: 12px; "
+        valueLabel->setStyleSheet("QLabel { color: #4a7ba8; font-size: 12px; "
                                   "font-weight: bold; min-width: 40px; }");
 
         auto* row = new QHBoxLayout;
@@ -285,7 +285,7 @@ QHBoxLayout* SetupPage::addLabeledEdit(QLayout* parent, const QString& label, QL
 
 QHBoxLayout* SetupPage::addLabeledLabel(QLayout* parent, const QString& label, QLabel* value)
 {
-    value->setStyleSheet("QLabel { color: #00c8ff; font-size: 12px; font-weight: bold; }");
+    value->setStyleSheet("QLabel { color: #4a7ba8; font-size: 12px; font-weight: bold; }");
     return makeLabeledRow(parent, label, value);
 }
 

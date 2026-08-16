@@ -70,7 +70,7 @@ static constexpr const char* kFieldStyle =
     "font-size: 11px;";
 
 static constexpr const char* kSectionHeaderStyle =
-    "color: #5fa8ff;"           // §D exception: diagnostics section header blue
+    "color: #4a7ba8;"           // §D exception: diagnostics section header blue
     "font-family: 'SF Mono', Menlo, monospace;"
     "font-size: 11px;"
     "font-weight: bold;"

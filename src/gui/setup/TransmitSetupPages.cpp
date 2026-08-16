@@ -905,7 +905,7 @@ void SpeechProcessorPage::buildActiveProfileSection()
     m_activeProfileLabel = new QLabel(QStringLiteral("Default"));
     m_activeProfileLabel->setObjectName(QStringLiteral("lblActiveProfile"));
     m_activeProfileLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #00c8ff; font-size: 12px; font-weight: bold; }"));
+        "QLabel { color: #4a7ba8; font-size: 12px; font-weight: bold; }"));
 
     m_manageProfileBtn = new QPushButton(QStringLiteral("Manage..."));
     m_manageProfileBtn->setObjectName(QStringLiteral("btnManageProfile"));
@@ -992,7 +992,7 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
     auto* stateLbl = new QLabel(initialState);
     stateLbl->setObjectName(QStringLiteral("state_") + stageName);
     stateLbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: #00c8ff; font-size: 12px; }"));
+        "QLabel { color: #4a7ba8; font-size: 12px; }"));
     stateLbl->setMinimumWidth(90);
     // Stash the dot sibling on the state label so live-update lambdas can
     // reach it without having to re-find it from the page root.

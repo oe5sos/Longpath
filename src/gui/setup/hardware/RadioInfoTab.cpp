@@ -167,7 +167,7 @@ RadioInfoTab::RadioInfoTab(RadioModel* model, QWidget* parent)
     auto* bannerLayout = new QHBoxLayout(m_reconnectBanner);
     bannerLayout->setContentsMargins(6, 4, 6, 4);
     m_reconnectBannerLabel = new QLabel(m_reconnectBanner);
-    m_reconnectBannerLabel->setStyleSheet(QStringLiteral("color: #ffcc66;"));
+    m_reconnectBannerLabel->setStyleSheet(QStringLiteral("color: #c2924f;"));
     m_reconnectBannerLabel->setWordWrap(true);
     bannerLayout->addWidget(m_reconnectBannerLabel);
     m_reconnectBanner->setVisible(false);

@@ -152,7 +152,7 @@ void SupportDialog::buildUI()
             "  padding: 6px 14px;"
             "  font-weight: bold;"
             "}"
-            "QPushButton:hover { background: #0096b7; }")  // §D exception: accent-dark hover
+            "QPushButton:hover { background: #2d5885; }")  // §D exception: accent-dark hover
         .arg(Style::kAccent));
     connect(bundleBtn, &QPushButton::clicked, this, &SupportDialog::onCreateBundle);
     btnLayout->addWidget(bundleBtn);

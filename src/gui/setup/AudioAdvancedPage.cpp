@@ -56,14 +56,14 @@ static const char* kNoteStyle =
 
 static const char* kAmberButtonStyle =
     "QPushButton {"
-    "  background: #2a1a00;"
-    "  border: 1px solid #b87300;"
+    "  background: #33280f;"
+    "  border: 1px solid #6b5426;"
     "  border-radius: 4px;"
-    "  color: #e8a030;"
+    "  color: #c2924f;"
     "  font-weight: bold;"
     "  padding: 6px 16px;"
     "}"
-    "QPushButton:hover { background: #3a2500; border-color: #e8a030; }"
+    "QPushButton:hover { background: #3a2500; border-color: #c2924f; }"
     "QPushButton:pressed { background: #1a1000; }";
 
 static const char* kComboStyle =

@@ -91,7 +91,7 @@ QWidget* RfKitPage::buildGeneralTab()
     m_connectionBanner = new QLabel(tab);
     m_connectionBanner->setWordWrap(true);
     m_connectionBanner->setStyleSheet(
-        QStringLiteral("color:#ffcc66; font-size:11px; font-weight:bold;"));
+        QStringLiteral("color:#c2924f; font-size:11px; font-weight:bold;"));
     lay->addWidget(m_connectionBanner);
 
     m_master = new QCheckBox(tr("Enable RF-Kit Amplifier integration"), tab);
@@ -315,7 +315,7 @@ void RfKitPage::refreshConnectionBanner()
         m_connectionBanner->setText(
             tr("Editing peripherals for %1 (%2)").arg(name, mac));
         m_connectionBanner->setStyleSheet(
-            QStringLiteral("color:#7ec850; font-size:11px; font-weight:bold;"));
+            QStringLiteral("color:#6fa384; font-size:11px; font-weight:bold;"));
         if (m_master) { m_master->setEnabled(true); }
         // Refresh the inputs to reflect the just-connected radio's
         // per-MAC values.  Without this the page would still show the
@@ -325,7 +325,7 @@ void RfKitPage::refreshConnectionBanner()
         m_connectionBanner->setText(
             tr("Connect to a radio to edit its peripherals."));
         m_connectionBanner->setStyleSheet(
-            QStringLiteral("color:#ffcc66; font-size:11px; font-weight:bold;"));
+            QStringLiteral("color:#c2924f; font-size:11px; font-weight:bold;"));
         if (m_master) { m_master->setEnabled(false); }
     }
     // Apply the master gate AFTER the connection-driven enabled state

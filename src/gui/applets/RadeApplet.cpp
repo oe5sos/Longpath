@@ -57,7 +57,7 @@ QString snrColour(double db)
         return QStringLiteral("#708090");
     }
     return (db < kGoodSnrDb) ? QStringLiteral("#ddbb00")
-                             : QStringLiteral("#4caf50");
+                             : QStringLiteral("#6fa384");
 }
 
 }  // namespace
@@ -397,7 +397,7 @@ void RadeApplet::repaintSyncIndicator()
     } else if (qIsNaN(m_lastSnrDb) || m_lastSnrDb < kGoodSnrDb) {
         colour = QStringLiteral("#ddbb00");
     } else {
-        colour = QStringLiteral("#4caf50");
+        colour = QStringLiteral("#6fa384");
     }
     m_syncIndicator->setStyleSheet(QStringLiteral(
         "QLabel { background: %1; border-radius: 6px; }").arg(colour));

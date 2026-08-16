@@ -318,7 +318,7 @@ void Hl2IoBoardTab::buildStatusBar(QVBoxLayout* outer)
     row->addWidget(m_ocByteLabel);
     m_ocMoxLabel = new QLabel(QStringLiteral("RX"), m_statusFrame);
     m_ocMoxLabel->setStyleSheet(QStringLiteral(
-        "color: #6699ff; font-weight: bold;"));
+        "color: #4a7ba8; font-weight: bold;"));
     row->addWidget(m_ocMoxLabel);
     for (int i = 0; i < 7; ++i) {
         auto* led = new QFrame(m_statusFrame);
@@ -408,7 +408,7 @@ void Hl2IoBoardTab::buildConfigAndRegisterRow(QVBoxLayout* outer)
     m_probeButton = new QPushButton(tr("Probe board"), configGroup);
     m_resetButton = new QPushButton(tr("Reset I/O board"), configGroup);
     m_resetButton->setStyleSheet(QStringLiteral(
-        "QPushButton { color: #ff6666; border: 1px solid #ff6666; "
+        "QPushButton { color: #a86b6d; border: 1px solid #a86b6d; "
         "border-radius: 6px; padding: 2px 6px; }"));
     btnRow->addWidget(m_probeButton);
     btnRow->addWidget(m_resetButton);
@@ -653,8 +653,8 @@ void Hl2IoBoardTab::updateOcIndicator(quint8 ocByte, int bandIdx, bool mox)
     if (m_ocMoxLabel) {
         m_ocMoxLabel->setText(mox ? QStringLiteral("TX") : QStringLiteral("RX"));
         m_ocMoxLabel->setStyleSheet(
-            mox ? QStringLiteral("color: #ff6655; font-weight: bold;")
-                : QStringLiteral("color: #6699ff; font-weight: bold;"));
+            mox ? QStringLiteral("color: #a86b6d; font-weight: bold;")
+                : QStringLiteral("color: #4a7ba8; font-weight: bold;"));
     }
     for (int i = 0; i < 7; ++i) {
         if (!m_ocPinLeds[i]) { continue; }

@@ -230,7 +230,7 @@ QColor ConnectionSegment::stateDotColor() const
             return m_pulseOn ? QColor("#5fff8a") : QColor("#3fcf6a");
         case ConnectionState::Probing:
         case ConnectionState::Connecting:
-            return m_pulseOn ? QColor("#5fa8ff") : QColor("#0070c0");
+            return m_pulseOn ? QColor("#4a7ba8") : QColor("#0070c0");
         case ConnectionState::LinkLost:
             return m_pulseOn ? QColor("#ff8c00") : QColor("#cf6c00");
         case ConnectionState::Disconnected:
@@ -250,7 +250,7 @@ QColor ConnectionSegment::rttColor(int rttMs) const
 QColor ConnectionSegment::audioPipColor(AudioEngine::FlowState s) const
 {
     switch (s) {
-        case AudioEngine::FlowState::Healthy:  return QColor("#5fa8ff");
+        case AudioEngine::FlowState::Healthy:  return QColor("#4a7ba8");
         case AudioEngine::FlowState::Underrun: return QColor("#ffd700");
         case AudioEngine::FlowState::Stalled:  return QColor("#ff6060");
         case AudioEngine::FlowState::Dead:     return QColor("#3a4a5a");
