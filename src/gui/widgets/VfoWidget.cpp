@@ -820,9 +820,19 @@ void VfoWidget::buildSnrRow()
 //   "RADE ● <snr>dB"      when synced, SNR known, no callsign yet
 //   "RADE ○ ---"          initial / not-yet-synced fallback
 // Color rules from AetherSDR VfoWidget.cpp:3424-3432 [@0cd4559]:
-//   < 5 dB  -> #e0e040 (yellow, marginal copy)
-//   >= 5 dB -> #00ff88 (green, solid copy)
-//   hollow / no SNR -> #505050 (grey)
+// Farbregeln, 2026-08-16 auf den Hausstil gezogen:
+//   < 5 dB  -> Messwert gedaempft (marginal copy)
+//   >= 5 dB -> Messwert voll      (solid copy)
+//   ohne SNR -> KEINE Farbe, ein Strich auf text-secondary
+//
+// Vorher Gelb / Gruen / Grau -- drei Farbbegriffe fuer eine Groesse.
+// Das SNR ist eine Messung, keine Warnung: dieselbe Regel wie beim
+// Pegelbalken, wo unter S9 und ab S9 zwei Helligkeiten DESSELBEN
+// Bernsteins sind. #e0e040 ist ausserdem genau der Ton, den HAUSSTIL
+// ausschliesst.
+//
+// Und ein unbekanntes SNR ist kein graues SNR, es ist keines: Strich
+// statt Wert, wie ueberall sonst (SignalReading, HAUSSTIL Regel 7).
 static QString radePrefixForCallsign(const QString& callsign)
 {
     return callsign.isEmpty() ? QStringLiteral("RADE") : callsign;
@@ -849,7 +859,7 @@ void VfoWidget::setRadeActive(bool on)
     if (m_snrLabel) {
         const QString prefix = radePrefixForCallsign(m_lastRadeCallsign);
         m_snrLabel->setText(
-            QString("%1 <font color='#505050'>○</font> ---").arg(prefix));
+            QString("%1 <font color='#8e8e93'>——</font>").arg(prefix));
     }
 }
 
@@ -875,12 +885,17 @@ void VfoWidget::setRadeSynced(bool synced)
     // colorized render path.
     if (std::isnan(m_lastRadeSnrDb)) {
         const QString prefix = radePrefixForCallsign(m_lastRadeCallsign);
+        // Der Punkt ist ein ZUSTAND -- eingerastet oder nicht --, also
+        // ok / inaktiv wie ein Laempchen. Der Wert daneben ist eine
+        // MESSUNG, und die gibt es hier nicht: ein Strich, kein "---"
+        // und keine Farbe. Ein unbekanntes SNR ist kein graues SNR.
         const QString color = synced ? QStringLiteral("#6fa384")
-                                     : QStringLiteral("#505050");
+                                     : QStringLiteral("#3d3d41");
         const QString glyph = synced ? QStringLiteral("●")
                                      : QStringLiteral("○");
         m_snrLabel->setText(
-            QString("%1 <font color='%2'>%3</font> ---")
+            QString("%1 <font color='%2'>%3</font> "
+                    "<font color='#8e8e93'>——</font>")
                 .arg(prefix, color, glyph));
     } else {
         // Re-render through the SNR path with the cached value to pick
@@ -912,8 +927,9 @@ void VfoWidget::setRadeSnrLabel(float snrDb)
         return;
     }
     const QString prefix = radePrefixForCallsign(m_lastRadeCallsign);
-    const QString color = (snrDb < 5.0f) ? QStringLiteral("#e0e040")
-                                         : QStringLiteral("#6fa384");
+    const QString color = (snrDb < 5.0f)
+        ? QStringLiteral("#8a6c3c")     // Messwert, gedaempft
+        : QStringLiteral("#c2924f");    // Messwert, voll
     m_snrLabel->setText(
         QString("%1 <font color='%2'>●</font> %3dB")
             .arg(prefix, color)
@@ -998,13 +1014,26 @@ void VfoWidget::updateModeTabAccent()
         m_tabButtons[2]->setStyleSheet(QStringLiteral(
             "QPushButton {"
             "  background: transparent; border: none;"
-            "  color: #a78bfa; font-size: 12px; font-weight: bold;"
+            "  color: %1; font-size: 12px; font-weight: bold;"
             "  padding: 2px 6px;"
             "}"
             "QPushButton:checked {"
-            "  color: #a78bfa;"
-            "  border-bottom: 2px solid #a78bfa;"
-            "}"));
+            "  color: %1;"
+            "  border-bottom: 2px solid %1;"
+            "}")
+            // ── Eine eigene Rolle, kein Wert im Quelltext ───────────
+            //
+            // Das Violett IST Bedeutung: es sagt, dass die Signalkette
+            // von WDSP auf den RADE-Codec umgestellt hat. Deshalb wird
+            // es benannt und nicht umgefaerbt -- aber hart im Quelltext
+            // ist es trotzdem falsch am Platz. Der Wert steht in
+            // themes/oe5sos.json unter "mode-rade".
+            //
+            // Nachgesehen 2026-08-16: KEINE andere Betriebsart traegt
+            // eine eigene Farbe. Es gibt also keine Familie mode-*,
+            // sondern einen Einzelfall aus dem Port -- der bleibt
+            // einzeln stehen und wird trotzdem benannt.
+            .arg(Style::role("mode-rade", "#a78bfa")));
     } else {
         // Restore the default tab style for any non-RADE mode.
         m_tabButtons[2]->setStyleSheet(vfoTabBtnStyle());
@@ -1326,7 +1355,7 @@ void VfoWidget::buildAudioTab()
         m_agcAutoLabel->setStyleSheet(
             QStringLiteral("QPushButton { background: #1a1a1a; border: 1px solid #445;"
                             "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
-                            "QPushButton:hover { border-color: #adff2f; }"));
+                            "QPushButton:hover { border-color: #4a7ba8; }"));
         m_agcAutoLabel->setFixedHeight(14);
         m_agcAutoLabel->setFixedWidth(30);
         m_agcAutoLabel->setCursor(Qt::PointingHandCursor);
@@ -2472,8 +2501,8 @@ void VfoWidget::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double of
         // AUTO badge → bright green (active) — only the button illuminates
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
-                QStringLiteral("QPushButton { background: #1a2a1a; border: 1px solid #adff2f;"
-                                "color: #adff2f; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
+                QStringLiteral("QPushButton { background: #254a72; border: 1px solid #2f5c86;"
+                                "color: #cfe2f5; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
                                 "QPushButton:hover { background: #2a3a2a; }"));
         }
 
@@ -2491,7 +2520,7 @@ void VfoWidget::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double of
             m_agcAutoLabel->setStyleSheet(
                 QStringLiteral("QPushButton { background: #1a1a1a; border: 1px solid #445;"
                                 "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
-                                "QPushButton:hover { border-color: #adff2f; }"));
+                                "QPushButton:hover { border-color: #4a7ba8; }"));
         }
         // Hide info sub-line
         if (m_agcInfoLabel) {
