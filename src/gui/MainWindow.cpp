@@ -11808,10 +11808,25 @@ void MainWindow::showFeatureRequestDialogImpl()
 
     auto* bugBtn = new QPushButton(QStringLiteral("Report a Bug"), dlg);
     bugBtn->setAutoDefault(false);
+    // Ein gewoehnlicher Knopf, kein roter.
+    //
+    // War #cc4040 auf Weiss, dann kurz das Paletten-Rot. Beides falsch:
+    // Rot markiert in diesem Programm, dass etwas NICHT GEHT -- die
+    // Bandkante, ein SWR, bei dem man nicht senden sollte. Diesen Knopf
+    // zu druecken geht, und es geht dabei auch nichts kaputt.
+    //
+    // Anders als "Forget" und "Disconnect" macht er nicht einmal etwas
+    // rueckgaengig, deshalb auch keine warnende Schrift: die Toene von
+    // buttonBaseStyle(), nur mit der groesseren Geometrie dieses
+    // Dialogs (13 px statt 10, Polsterung 8/20 statt 2/4).
     bugBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #7a2c2e; color: #f0dcdc; font-weight: bold; "
-        "border-radius: 4px; padding: 8px 20px; font-size: 13px; }"
-        "QPushButton:hover { background: #a86b6d; }"));
+        "QPushButton { background: %1; border: 1px solid %2;"
+        "  color: %3; font-weight: bold;"
+        "  border-radius: 6px; padding: 8px 20px; font-size: 13px; }"
+        "QPushButton:hover { background: %4; }")
+        .arg(QLatin1String(Style::kButtonBg), QLatin1String(Style::kBorder),
+             QLatin1String(Style::kTextPrimary),
+             QLatin1String(Style::kButtonAltHover)));
     connect(bugBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
             "https://github.com/boydsoftprez/NereusSDR/issues/new?template=bug_report.yml")));
