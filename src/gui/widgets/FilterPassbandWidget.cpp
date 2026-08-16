@@ -24,6 +24,10 @@
 //                 (filter low/high drag + shift-band visualisation).
 // =================================================================
 
+#include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
+
+#include <QPolygonF>
 #include "FilterPassbandWidget.h"
 
 #include <QPainter>
@@ -78,10 +82,12 @@ void FilterPassbandWidget::paintEvent(QPaintEvent*)
     const int h = height();
 
     // Background — from AetherSDR
-    p.fillRect(rect(), QColor(0x0a, 0x0a, 0x18));
+    // Grund als Mulde -- dunkler als das Panel, mit sichtbarem Rand.
+    // Dasselbe wie bei den Eingabefeldern und der HGauge-Rille.
+    p.fillRect(rect(), QColor(Style::role("inset-bg", Style::kInsetBg)));
 
     // Border
-    p.setPen(QColor(0x20, 0x30, 0x40));
+    p.setPen(QColor(Style::role("border", Style::kBorder)));
     p.drawRect(0, 0, w - 1, h - 1);
 
     // ── Static trapezoid shape ──────────────────────────────────────────
@@ -94,15 +100,44 @@ void FilterPassbandWidget::paintEvent(QPaintEvent*)
     const int hiX = w - margin;
     const int kSkirt = (hiX - loX) / 7;
 
-    // Filter shape: left skirt, flat top, right skirt (no bottom, no fill)
-    // From AetherSDR: cyan (#00b4d8), 1.5px
-    p.setPen(QPen(QColor(0x00, 0xb4, 0xd8), 1.5));
+    // ── Die Kurve ist ein Messwert ──────────────────────────────────
+    //
+    // War Zyan (#00b4d8) -- der Ton fuer "anfassbar". Was hier steht,
+    // ist die eingestellte Durchlassbreite, also eine abgelesene Groesse
+    // wie die Frequenz und die Filterkapsel daneben.
+    const QColor curve(Style::role("measured", Style::kAmberText));
+
+    // Leichte Fuellung darunter, 22 % auslaufend zur Grundlinie --
+    // HAUSSTIL §Weiche Uebergaenge, dieselbe Form wie unter der
+    // Spektrumkurve darueber. Damit gehoeren die beiden sichtbar
+    // zusammen, statt dass eine gefuellt und eine ein blosser Strich
+    // ist.
+    {
+        QPolygonF shape;
+        shape << QPointF(loX, botY)
+              << QPointF(loX + kSkirt, topY)
+              << QPointF(hiX - kSkirt, topY)
+              << QPointF(hiX, botY);
+        QLinearGradient g(0, topY, 0, botY);
+        QColor top = curve; top.setAlphaF(0.22);
+        QColor bot = curve; bot.setAlphaF(0.0);
+        g.setColorAt(0.0, top);
+        g.setColorAt(1.0, bot);
+        p.setPen(Qt::NoPen);
+        p.setBrush(g);
+        p.drawPolygon(shape);
+        p.setBrush(Qt::NoBrush);
+    }
+
+    // Filter shape: left skirt, flat top, right skirt
+    p.setPen(QPen(curve, 1.5));
     p.drawLine(loX, botY, loX + kSkirt, topY);          // left skirt
     p.drawLine(loX + kSkirt, topY, hiX - kSkirt, topY);  // flat top
     p.drawLine(hiX - kSkirt, topY, hiX, botY);           // right skirt
 
     // Dashed vertical lines at filter edges (3px inside the skirt tops)
-    p.setPen(QPen(QColor(0x00, 0xb4, 0xd8, 120), 1, Qt::DashLine));
+    QColor edge = curve; edge.setAlpha(120);
+    p.setPen(QPen(edge, 1, Qt::DashLine));
     p.drawLine(loX + kSkirt + 3, 2, loX + kSkirt + 3, h - 2);
     p.drawLine(hiX - kSkirt - 3, 2, hiX - kSkirt - 3, h - 2);
 
@@ -118,7 +153,7 @@ void FilterPassbandWidget::paintEvent(QPaintEvent*)
     const QString bwText = bw >= 1000
         ? QStringLiteral("%1.%2K").arg(bw / 1000).arg((bw % 1000) / 100)
         : QString::number(bw);
-    p.setPen(QColor(0xc8, 0xd8, 0xe8));
+    p.setPen(QColor(Style::role("measured", Style::kAmberText)));
     p.drawText((loX + hiX) / 2 - fm.horizontalAdvance(bwText) / 2, botY + 12, bwText);
 
     // Passband center offset (below top line)
@@ -126,12 +161,12 @@ void FilterPassbandWidget::paintEvent(QPaintEvent*)
     const QString centerText = std::abs(center) >= 1000
         ? QStringLiteral("%1.%2K").arg(std::abs(center) / 1000).arg((std::abs(center) % 1000) / 100)
         : QString::number(std::abs(center));
-    p.setPen(QColor(0x90, 0xa0, 0xb0));
+    p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
     p.drawText((loX + hiX) / 2 - fm.horizontalAdvance(centerText) / 2, topY + 12, centerText);
 
     // Lo label (centered on left slant bottom point)
     const QString loText = QString::number(std::abs(m_lo));
-    p.setPen(QColor(0x80, 0x90, 0xa0));
+    p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
     p.drawText(loX - fm.horizontalAdvance(loText) / 2, botY + 12, loText);
 
     // Hi label (centered on right slant bottom point)

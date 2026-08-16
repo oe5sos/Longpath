@@ -386,7 +386,7 @@ static inline QString vfoDspToggleStyle()
         "  padding: 2px 4px; min-width: 32px;"
         "}"
         "QPushButton:checked {"
-        "  background: %3; color: #ffffff;"
+        "  background: %3; color: #cfe2f5;"   // Auswahltext, war #ffffff
         "  border: 1px solid %4;"
         "}"
         "QPushButton:hover {"
@@ -1353,8 +1353,8 @@ void VfoWidget::buildAudioTab()
 
         m_agcAutoLabel = new QPushButton(QStringLiteral("AUTO"), m_agcTContainer);
         m_agcAutoLabel->setStyleSheet(
-            QStringLiteral("QPushButton { background: #1a1a1a; border: 1px solid #445;"
-                            "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
+            QStringLiteral("QPushButton { background: #1a1a1e; border: 1px solid #2c2c31;"
+                            "color: #5c5c60; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
                             "QPushButton:hover { border-color: #4a7ba8; }"));
         m_agcAutoLabel->setFixedHeight(14);
         m_agcAutoLabel->setFixedWidth(30);
@@ -2518,8 +2518,8 @@ void VfoWidget::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double of
         // AUTO badge → dim gray (inactive)
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
-                QStringLiteral("QPushButton { background: #1a1a1a; border: 1px solid #445;"
-                                "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
+                QStringLiteral("QPushButton { background: #1a1a1e; border: 1px solid #2c2c31;"
+                                "color: #5c5c60; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
                                 "QPushButton:hover { border-color: #4a7ba8; }"));
         }
         // Hide info sub-line
@@ -2624,7 +2624,7 @@ static const char* kFloatingBtnClose =
     "  border-radius: 10px; color: #c4c4c9; font-size: 11px; padding: 0;"
     "}"
     "QPushButton:hover {"
-    "  background: rgba(204,32,32,220); color: #ffffff;"
+    "  background: rgba(122,44,46,220); color: #f0dcdc;"
     "}";
 
 void VfoWidget::buildFloatingButtons()
