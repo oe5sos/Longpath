@@ -911,10 +911,32 @@ void PureSignal::processNewInfo(const int newInfo[16])
     // previous in m_oldInfo, so the comparison is the same.
     const bool changed = hasInfoChanged(newInfo);
 
-    // BENCH DIAGNOSTIC (Phase 3M-4 Task 17): log info[] every ~10 ticks
-    // (~1 sec) so the bench can see whether calcc is progressing.
-    static int diagCounter = 0;
-    if (++diagCounter % 10 == 0) {
+    // BENCH DIAGNOSTIC (Phase 3M-4 Task 17): log info[] so the bench can
+    // see whether calcc is progressing.
+    //
+    // ── Nur bei Aenderung oder waehrend des Sendens ──────────────────
+    //
+    // Gemeldet 2026-08-16: die Zeile stand im Sekundentakt im Protokoll,
+    // auch ohne Verbindung und mit mox=false, und dann durchgehend mit
+    // Nullen. Ein Diagnoseeintrag, der immer kommt, traegt keine
+    // Information und macht das Protokoll unlesbar -- er verdeckt genau
+    // die Meldungen, wegen derer man hineinsieht.
+    //
+    // `changed` steht acht Zeilen weiter oben schon zur Verfuegung
+    // (hasInfoChanged, Thetis PSForm.cs:1086-1095) und ist genau das
+    // richtige Tor. Dazu MOX: waehrend des Sendens aendert sich ohnehin
+    // laufend etwas, und dort ist die Taktung von einer Sekunde das,
+    // wofuer die Zeile gebaut wurde.
+    //
+    // Im Ruhezustand wird der Zaehler zurueckgesetzt, damit der naechste
+    // Vorgang SOFORT meldet und nicht erst, wenn er zufaellig auf einen
+    // Zehnertakt faellt -- das erste Lebenszeichen ist beim Hinsehen das
+    // interessanteste.
+    static int diagTicks = 0;
+    const bool moxNow = m_mox && m_mox->isMox();
+    if (!changed && !moxNow) {
+        diagTicks = 0;
+    } else if (++diagTicks % 10 == 1) {
         // hwPeak + maxTX added 2026-08-01 (J.J. Boyd, KG4VCF). PureSignal
         // parks in LCOLLECT on a live HL2 with both PS streams measurably
         // hot, so the question is no longer whether samples arrive but
@@ -943,7 +965,7 @@ void PureSignal::processNewInfo(const int newInfo[16])
             << " hwPeak=" << hwPeak
             << " maxTX=" << maxTx
             << " binReach=" << (hwPeak > 0.0 ? maxTx / hwPeak : -1.0)
-            << " (mox=" << (m_mox && m_mox->isMox())
+            << " (mox=" << moxNow
             << " autoCal=" << m_autoCalEnabled << ")";
     }
 
