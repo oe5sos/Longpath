@@ -71,6 +71,14 @@ public:
     // credentials holds the objects.
     void setUploaders(const QVector<QsoUploader*>& uploaders);
 
+private slots:
+    /// Eine echte Slot-Methode, damit Qt::UniqueConnection greift --
+    /// bei einem Lambda tut die Fahne schweigend nichts.
+    void onUploadFinished(const QString& call, bool ok, bool duplicate,
+                          const QString& message);
+
+public:
+
     // Lets the detail pane fetch a name and a portrait for the selected
     // contact. Not owned, and optional: the logbook is opened on
     // machines with no QRZ account, where the pane simply says so.

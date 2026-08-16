@@ -156,7 +156,11 @@ if [ -z "$QTINC" ] || [ ! -d "$QTINC/QtCore" ]; then
 fi
 
 compile() {
+    # NEREUSSDR_VERSION setzt sonst CMake. Ohne sie scheitert jede Datei,
+    # die QStringLiteral(NEREUSSDR_VERSION) benutzt, mit "expected ')'" --
+    # ein Fehler, der wie ein Syntaxfehler aussieht und keiner ist.
     g++ -std=c++20 -fsyntax-only -fPIC \
+        -DNEREUSSDR_VERSION='"0.0.0-syntaxcheck"' \
         -I"$QTINC" -I"$QTINC/QtCore" -I"$QTINC/QtGui" -I"$QTINC/QtWidgets" \
         -I"$QTINC/QtNetwork" -I"$QTINC/QtTest" -I"$QTINC/rhi" \
         -I"$ROOT/src" -I"$ROOT" "$1" 2>&1

@@ -116,7 +116,12 @@ inline const QColor kSliceBadgeBlue{ 0x25, 0x4a, 0x72 }; // kBlueBg -- Auswahl
 // Zwei Stufen bleiben, damit S9 als Schwelle ablesbar ist: darunter
 // gedaempft, darueber voll. Derselbe Ton, zwei Helligkeiten -- kein
 // zweiter Farbbegriff fuer dieselbe Groesse.
-inline const QColor kMeterCyan    { 0x8a, 0x6c, 0x3c }; // Messwert, gedaempft (unter S9)
+// Nachgedunkelt 2026-08-16: #8a6c3c lag zwischen den beiden
+// Messwertstufen und war auf einem Balken nicht von warn (#a8853f) zu
+// unterscheiden. warn steht seit HAUSSTIL im Dokument, diese zweite
+// Helligkeit ist erst heute entstanden -- also rueckt sie weg, nicht
+// warn. #6b5630 ist der Verlaufsanfang aus dem S-Meter-Entwurf.
+inline const QColor kMeterCyan    { 0x6b, 0x56, 0x30 }; // Messwert, matt (unter S9)
 inline const QColor kMeterGreen   { 0xc2, 0x92, 0x4f }; // Messwert, voll (ab S9)
 inline const QColor kLabelMuted   { 0x8e, 0x8e, 0x93 }; // kTextSecondary
 inline const QColor kBodyText     { 0xc4, 0xc4, 0xc9 }; // kTextPrimary

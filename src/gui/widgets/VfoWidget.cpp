@@ -928,7 +928,7 @@ void VfoWidget::setRadeSnrLabel(float snrDb)
     }
     const QString prefix = radePrefixForCallsign(m_lastRadeCallsign);
     const QString color = (snrDb < 5.0f)
-        ? QStringLiteral("#8a6c3c")     // Messwert, gedaempft
+        ? QStringLiteral("#6b5630")     // Messwert, gedaempft
         : QStringLiteral("#c2924f");    // Messwert, voll
     m_snrLabel->setText(
         QString("%1 <font color='%2'>●</font> %3dB")

@@ -953,9 +953,23 @@ void LogbookWindow::setUploaders(const QVector<QsoUploader*>& uploaders)
         // Uploads from the panel use the same objects, so filter by
         // whether a batch of ours is outstanding. Without that, logging
         // a contact live would pop a summary box from this window.
-        connect(u, &QsoUploader::uploadFinished, this,
-                [this](const QString& call, bool ok, bool duplicate,
-                       const QString& message) {
+        //
+        // ── Echte Slot-Methode, kein Lambda ─────────────────────────
+        //
+        // Qt::UniqueConnection greift laut Dokumentation NUR bei Zeigern
+        // auf Elementfunktionen und schweigend NICHT bei Lambdas. Hier
+        // stand ein Lambda MIT UniqueConnection -- die Fahne tat also
+        // nichts, und jeder Aufruf von setUploaders haengte eine weitere
+        // Verbindung an. Zwei Aufrufe, zwei Meldungsfenster je Upload.
+        connect(u, &QsoUploader::uploadFinished,
+                this, &LogbookWindow::onUploadFinished,
+                Qt::UniqueConnection);
+    }
+}
+
+void LogbookWindow::onUploadFinished(const QString& call, bool ok,
+                                     bool duplicate, const QString& message)
+{
             if (m_pending <= 0) { return; }
             --m_pending;
             if (ok) {
@@ -1011,8 +1025,6 @@ void LogbookWindow::setUploaders(const QVector<QsoUploader*>& uploaders)
             } else {
                 QMessageBox::information(this, QStringLiteral("Upload"), text);
             }
-        }, Qt::UniqueConnection);
-    }
 }
 
 QList<int> LogbookWindow::outstandingRows() const
