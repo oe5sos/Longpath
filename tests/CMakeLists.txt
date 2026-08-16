@@ -1353,6 +1353,13 @@ nereus_add_test(tst_waterfall_threshold_fit)
 # dass der Ablehnungsgrund die gemessene Groesse nennt.
 nereus_add_test(tst_world_map_catalog)
 
+# ── "-395 dBm" ohne Verbindung ─────────────────────────────────────────────
+# Zweihundert Dezibel unter dem thermischen Rauschen, an drei Stellen, und es
+# sah aus wie eine sehr genaue Messung. HAUSSTIL Regel 7: unbekannt ist ein
+# Strich. Sichert die Bedingung -- ab wann gilt ein Pegel als Messung -- und
+# ausdruecklich nicht, wie der Strich aussieht.
+nereus_add_test(tst_signal_reading)
+
 # ── Phase 3P-A Task 15: RxApplet S-ATT slider range from BoardCapabilities ───
 # HL2 → 0-63 dB; Hermes → 0-31 dB. Verifies the spinbox max is sourced from
 # BoardCapabilities::attenuator.maxDb at construction time, not hardcoded.

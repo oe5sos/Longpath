@@ -49,6 +49,9 @@
 // =================================================================
 #include "SMeterWidget.h"
 
+#include "gui/widgets/SignalReading.h"
+#include "gui/styles/ThemeQss.h"
+
 #include <QActionGroup>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -753,7 +756,21 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     // Needle originates from needleCy (just below widget) rather than the
     // arc center, so the pivot is barely out of frame.
     // When transmitting, needle tracks the selected TX meter instead of RX.
-    {
+    // ── Ohne Messung kein Zeiger ────────────────────────────────────
+    //
+    // Ein Zeiger am linken Anschlag ist keine leere Anzeige, sondern die
+    // Behauptung "S0" -- und die ist ohne Verbindung genauso falsch wie
+    // die "-395 dBm" daneben. HAUSSTIL Regel 7 gilt fuer das
+    // Zifferblatt wie fuer die Zahl: unbekannt ist ein Strich, und beim
+    // Instrument heisst das gar kein Ausschlag.
+    //
+    // Nur im Empfangsfall: beim Senden zeigt der Zeiger Leistung, SWR
+    // oder Pegel, und die haben mit dem Empfangspegel nichts zu tun.
+    const bool needleHasReading =
+        m_transmitting || SignalReading::isMeasurement(
+            (m_rxMode == RxMode::SMeterPeak) ? m_peakDbm : m_levelDbm);
+
+    if (needleHasReading) {
         const float angle = fractionToAngle(m_needleFraction);
 
         // Needle extends to the end of the outer (RX) ticks: radius + 14
@@ -863,19 +880,31 @@ void SMeterWidget::paintEvent(QPaintEvent*)
 
         p.setFont(valFont);
         p.setPen(QColor(0x00, 0xb4, 0xd8));
-        // Show S-units based on the displayed value
+        // ── Ohne Messung ein Strich, keine Zahl ─────────────────────
+        //
+        // HAUSSTIL Regel 7. Ohne Verbindung stand hier "-395 dBm" und
+        // "S0" -- beides sah aus wie ein Messergebnis, und "S0" sogar
+        // wie ein plausibles. Siehe widgets/SignalReading.h.
+        const bool haveReading = SignalReading::isMeasurement(displayDbm);
         QString sText;
-        if (displayDbm <= S0_DBM) {
+        if (!haveReading) {
+            sText = SignalReading::noReadingText();
+        } else if (displayDbm <= S0_DBM) {
             sText = "S0";
         } else if (displayDbm <= S9_DBM) {
             sText = QString("S%1").arg(qBound(0, qRound((displayDbm - S0_DBM) / DB_PER_S), 9));
         } else {
             sText = QString("S9+%1").arg(qRound(displayDbm - S9_DBM));
         }
+        if (!haveReading) {
+            p.setPen(QColor(Style::role("text-inactive", Style::kTextInactive)));
+        }
         p.drawText(6, topY, sText);
 
-        const QString dbmText = QString("%1 dBm").arg(displayDbm, 0, 'f', 0);
-        p.setPen(QColor(0xc8, 0xd8, 0xe8));
+        const QString dbmText = SignalReading::text(displayDbm);
+        p.setPen(haveReading
+                     ? QColor(0xc8, 0xd8, 0xe8)
+                     : QColor(Style::role("text-inactive", Style::kTextInactive)));
         p.drawText(w - vfm.horizontalAdvance(dbmText) - 6, topY, dbmText);
     }
 }

@@ -21,6 +21,9 @@
 //                 `src/gui/VfoWidget.cpp:38-64`.
 // =================================================================
 
+#include "gui/widgets/SignalReading.h"
+#include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 #include "VfoLevelBar.h"
 #include "VfoStyles.h"
 #include <QLinearGradient>
@@ -125,13 +128,17 @@ void VfoLevelBar::paintEvent(QPaintEvent*) {
     // ── dBm text to the right of the bar ──────────────────────────────
     const QRect dbmRect(barRect.right() + 4, barRect.y(),
                         kDbmWidth, barRect.height());
-    p.setPen(isAboveS9() ? kMeterGreen : kMeterCyan);
+    // Ohne Messung ein Strich -- HAUSSTIL Regel 7, siehe
+    // widgets/SignalReading.h. Ohne Verbindung stand hier "-395 dBm".
+    const bool haveReading = SignalReading::isMeasurement(m_value);
+    p.setPen(!haveReading
+                 ? QColor(Style::role("text-inactive", Style::kTextInactive))
+                 : (isAboveS9() ? kMeterGreen : kMeterCyan));
     QFont dbmFont = p.font();
     dbmFont.setPixelSize(10);
     dbmFont.setBold(true);
     p.setFont(dbmFont);
     p.drawText(dbmRect, Qt::AlignVCenter | Qt::AlignLeft,
-               QString::number(static_cast<int>(std::round(m_value)))
-               + QStringLiteral(" dBm"));
+               SignalReading::text(m_value));
 }
 }
