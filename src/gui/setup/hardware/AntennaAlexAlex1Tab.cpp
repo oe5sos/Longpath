@@ -762,10 +762,10 @@ void AntennaAlexAlex1Tab::setLedLit(QFrame* led, bool lit)
     if (!led) { return; }
     if (lit) {
         led->setStyleSheet(
-            QStringLiteral("QFrame { background: #00cc44; border-radius: 5px; }"));
+            QStringLiteral("QFrame { background: #6fa384; border-radius: 5px; }"));
     } else {
         led->setStyleSheet(
-            QStringLiteral("QFrame { background: #444444; border-radius: 5px; }"));
+            QStringLiteral("QFrame { background: #3d3d41; border-radius: 5px; }"));
     }
 }
 

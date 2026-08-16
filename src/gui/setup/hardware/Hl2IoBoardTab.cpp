@@ -171,7 +171,7 @@ static QFrame* makeLed(QWidget* parent)
     led->setFixedSize(12, 12);
     led->setFrameShape(QFrame::NoFrame);
     led->setStyleSheet(QStringLiteral(
-        "QFrame { background: #606060; border-radius: 6px; }"));
+        "QFrame { background: #3d3d41; border-radius: 6px; }"));
     return led;
 }
 
@@ -179,10 +179,10 @@ static void setLedColor(QFrame* led, bool active)
 {
     if (active) {
         led->setStyleSheet(QStringLiteral(
-            "QFrame { background: #22cc44; border-radius: 6px; }"));
+            "QFrame { background: #6fa384; border-radius: 6px; }"));
     } else {
         led->setStyleSheet(QStringLiteral(
-            "QFrame { background: #606060; border-radius: 6px; }"));
+            "QFrame { background: #3d3d41; border-radius: 6px; }"));
     }
 }
 
@@ -284,7 +284,7 @@ void Hl2IoBoardTab::buildStatusBar(QVBoxLayout* outer)
     m_statusFrame = new QFrame(this);
     m_statusFrame->setFrameShape(QFrame::StyledPanel);
     m_statusFrame->setStyleSheet(QStringLiteral(
-        "QFrame { background: #2a2a2a; border: 1px solid #444; border-radius: 4px; }"));
+        "QFrame { background: #1a1a1e; border: 1px solid #2c2c31; border-radius: 4px; }"));
 
     auto* row = new QHBoxLayout(m_statusFrame);
     row->setContentsMargins(8, 4, 8, 4);
@@ -475,7 +475,7 @@ void Hl2IoBoardTab::buildStateMachineRow(QVBoxLayout* outer)
         auto* cell = new QFrame(smGroup);
         cell->setFrameShape(QFrame::StyledPanel);
         cell->setStyleSheet(QStringLiteral(
-            "QFrame { border: 1px solid #444; border-radius: 4px; "
+            "QFrame { border: 1px solid #2c2c31; border-radius: 4px; "
             "background: #222; padding: 2px; }"));
         auto* cellLayout = new QVBoxLayout(cell);
         cellLayout->setSpacing(2);
@@ -485,7 +485,7 @@ void Hl2IoBoardTab::buildStateMachineRow(QVBoxLayout* outer)
         auto* numLabel = new QLabel(QString::number(i), cell);
         numLabel->setAlignment(Qt::AlignCenter);
         numLabel->setStyleSheet(QStringLiteral(
-            "QLabel { background: #444; border-radius: 8px; "
+            "QLabel { background: #2c2c31; border-radius: 8px; "
             "font-weight: bold; font-size: 10px; min-width: 16px; "
             "max-width: 16px; min-height: 16px; max-height: 16px; }"));
         cellLayout->addWidget(numLabel, 0, Qt::AlignHCenter);
@@ -588,7 +588,7 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     throttleLbl->setStyleSheet(QStringLiteral("font-size: 10px;"));
     m_throttleStatusLabel = new QLabel(tr("○ not throttled"), bwGroup);
     m_throttleStatusLabel->setStyleSheet(
-        QStringLiteral("font-size: 10px; color: #22cc44;"));
+        QStringLiteral("font-size: 10px; color: #6fa384;"));
     throttleRow->addWidget(throttleLbl);
     throttleRow->addWidget(m_throttleStatusLabel);
     throttleRow->addStretch();
@@ -621,14 +621,14 @@ void Hl2IoBoardTab::updateStatusBar(bool detected)
     if (detected) {
         m_statusLabel->setText(tr("mi0bot custom I/O board (0x41): Active"));
         m_statusFrame->setStyleSheet(Style::themed(QStringLiteral(
-            "QFrame { background: #1a2f1a; border: 1px solid #1a6030; border-radius: 4px; }")));
+            "QFrame { background: #1c3a2a; border: 1px solid #1a6030; border-radius: 4px; }")));
         m_lastProbeLabel->setText(
             QStringLiteral("Last probe: %1")
                 .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"))));
     } else {
         m_statusLabel->setText(tr("mi0bot custom I/O board (0x41): Not detected"));
         m_statusFrame->setStyleSheet(QStringLiteral(
-            "QFrame { background: #2a2a2a; border: 1px solid #444; border-radius: 4px; }"));
+            "QFrame { background: #1a1a1e; border: 1px solid #2c2c31; border-radius: 4px; }"));
     }
 }
 
@@ -706,10 +706,10 @@ void Hl2IoBoardTab::highlightStep(int step)
     // Clear previous highlight
     if (m_currentHighlightedStep >= 0 && m_currentHighlightedStep < kSteps) {
         m_stepFrames[m_currentHighlightedStep]->setStyleSheet(QStringLiteral(
-            "QFrame { border: 1px solid #444; border-radius: 4px; "
+            "QFrame { border: 1px solid #2c2c31; border-radius: 4px; "
             "background: #222; padding: 2px; }"));
         m_stepNumLabels[m_currentHighlightedStep]->setStyleSheet(QStringLiteral(
-            "QLabel { background: #444; border-radius: 8px; "
+            "QLabel { background: #2c2c31; border-radius: 8px; "
             "font-weight: bold; font-size: 10px; min-width: 16px; "
             "max-width: 16px; min-height: 16px; max-height: 16px; }"));
     }
@@ -718,10 +718,10 @@ void Hl2IoBoardTab::highlightStep(int step)
 
     if (step >= 0 && step < kSteps) {
         m_stepFrames[step]->setStyleSheet(QStringLiteral(
-            "QFrame { border: 2px solid #22cc44; border-radius: 4px; "
-            "background: #1a2f1a; padding: 2px; }"));
+            "QFrame { border: 2px solid #6fa384; border-radius: 4px; "
+            "background: #1c3a2a; padding: 2px; }"));
         m_stepNumLabels[step]->setStyleSheet(QStringLiteral(
-            "QLabel { background: #22cc44; border-radius: 8px; "
+            "QLabel { background: #6fa384; border-radius: 8px; "
             "font-weight: bold; font-size: 10px; color: #000; min-width: 16px; "
             "max-width: 16px; min-height: 16px; max-height: 16px; }"));
     }
@@ -893,7 +893,7 @@ void Hl2IoBoardTab::onThrottledChanged(bool throttled)
     } else {
         m_throttleStatusLabel->setText(tr("○ not throttled"));
         m_throttleStatusLabel->setStyleSheet(
-            QStringLiteral("font-size: 10px; color: #22cc44;"));
+            QStringLiteral("font-size: 10px; color: #6fa384;"));
     }
     m_throttleEventLabel->setText(
         QString::number(m_bwMonitor->throttleEventCount()));

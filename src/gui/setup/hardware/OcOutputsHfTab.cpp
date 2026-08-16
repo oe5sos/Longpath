@@ -622,7 +622,7 @@ void OcOutputsHfTab::repaintLiveLeds()
         const bool lit = (m_currentOcByte >> pin) & 0x01;
         if (lit) {
             m_leds[pin]->setStyleSheet(QStringLiteral(
-                "background: #00cc44;"
+                "background: #6fa384;"
                 "border: 1px solid #33dd55;"
                 "border-radius: 6px;"));
         } else {

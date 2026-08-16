@@ -186,7 +186,7 @@ AntennaAlexAlex2Tab::AntennaAlexAlex2Tab(RadioModel* model, QWidget* parent)
     m_statusLed = new QLabel(statusFrame);
     m_statusLed->setFixedSize(10, 10);
     m_statusLed->setStyleSheet(
-        QStringLiteral("QLabel { background: #666666; border-radius: 5px; }"));
+        QStringLiteral("QLabel { background: #3d3d41; border-radius: 5px; }"));
 
     m_statusLabel = new QLabel(tr("Alex-2 board: Not detected"), statusFrame);
     m_statusLabel->setStyleSheet(
@@ -472,7 +472,7 @@ void AntennaAlexAlex2Tab::updateBoardCapabilities(bool hasAlex2)
             QStringLiteral("QLabel { color: #00aa00; font-weight: bold; }"));
     } else {
         m_statusLed->setStyleSheet(
-            QStringLiteral("QLabel { background: #666666; border-radius: 5px; }"));
+            QStringLiteral("QLabel { background: #3d3d41; border-radius: 5px; }"));
         m_statusLabel->setText(tr("Alex-2 board: Not detected"));
         m_statusLabel->setStyleSheet(
             QStringLiteral("QLabel { color: palette(mid); }"));
@@ -604,10 +604,10 @@ void AntennaAlexAlex2Tab::setLedLit(QFrame* led, bool lit)
     if (!led) { return; }
     if (lit) {
         led->setStyleSheet(
-            QStringLiteral("QFrame { background: #00cc44; border-radius: 5px; }"));
+            QStringLiteral("QFrame { background: #6fa384; border-radius: 5px; }"));
     } else {
         led->setStyleSheet(
-            QStringLiteral("QFrame { background: #444444; border-radius: 5px; }"));
+            QStringLiteral("QFrame { background: #3d3d41; border-radius: 5px; }"));
     }
 }
 
