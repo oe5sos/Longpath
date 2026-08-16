@@ -146,7 +146,7 @@ void SupportDialog::buildUI()
         QStringLiteral(
             "QPushButton {"
             "  background: %1;"          // Style::kAccent
-            "  color: #ffffff;"
+            "  color: #cfe2f5;"   // war #ffffff -- Text auf gefuelltem Knopf
             "  border: none;"
             "  border-radius: 4px;"
             "  padding: 6px 14px;"

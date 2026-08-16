@@ -171,10 +171,10 @@ constexpr const char* kStartBtnStyle =
     "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
     "border: 1px solid #008ba8; padding: 4px; border-radius: 6px; }"
     "QPushButton:hover { background: #00b4d8; }"
-    "QPushButton:disabled { background: #404060; color: #808080; }";
+    "QPushButton:disabled { background: #404060; color: #4e4e53; }";
 
 constexpr const char* kStatusIdleStyle =
-    "QLabel { color: #808080; font-size: 11px; }";
+    "QLabel { color: #8e8e93; font-size: 11px; }";
 
 constexpr const char* kStatusActiveStyle =
     "QLabel { color: #00b4d8; font-size: 11px; font-weight: bold; }";
@@ -781,7 +781,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* dxcColorLabel = new QLabel("Spot Color:");
-    dxcColorLabel->setStyleSheet("QLabel { color: #808080; font-size: 12px; }");
+    dxcColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
     consoleRow->addWidget(dxcColorLabel);
 
     QColor dxcColor(s.value("DxClusterSpotColor", "#D2B48C").toString());
@@ -1018,7 +1018,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     rbnConsoleRow->addStretch();
 
     auto* rbnColorLabel = new QLabel("Spot Color:");
-    rbnColorLabel->setStyleSheet("QLabel { color: #808080; font-size: 12px; }");
+    rbnColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
     rbnConsoleRow->addWidget(rbnColorLabel);
 
     QColor rbnColor(s.value("RbnSpotColor", "#4488FF").toString());
@@ -1202,7 +1202,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     auto* filterRow = new QHBoxLayout;
     filterRow->setSpacing(6);
     auto* filterLabel = new QLabel("Spot Filter:");
-    filterLabel->setStyleSheet("QLabel { color: #808080; font-size: 14px; }");
+    filterLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 14px; }");
     filterRow->addWidget(filterLabel);
 
     const QString cbStyle =
@@ -1333,7 +1333,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     decodeRow->addStretch();
 
     auto* lifeLabel = new QLabel("Spot Life:");
-    lifeLabel->setStyleSheet("QLabel { color: #808080; font-size: 12px; }");
+    lifeLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
     decodeRow->addWidget(lifeLabel);
 
     int wsjtxLife = s.value("WsjtxSpotLifetime", 120).toInt();
@@ -1624,7 +1624,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #808080; font-size: 12px; }");
+    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
     consoleRow->addWidget(spotColorLabel);
 
     QColor potaColor(s.value("PotaSpotColor", "#FFFF00").toString());
@@ -1971,7 +1971,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #808080; font-size: 12px; }");
+    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
     consoleRow->addWidget(spotColorLabel);
 
     QColor freedvColor(s.value("FreeDvSpotColor", "#FF8C00").toString());
@@ -2239,7 +2239,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* bandRow = new QHBoxLayout;
     bandRow->setSpacing(3);
     auto* bandLabel = new QLabel("Bands:");
-    bandLabel->setStyleSheet("QLabel { color: #808080; font-size: 11px; }");
+    bandLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
     bandLabel->setFixedWidth(40);
     bandRow->addWidget(bandLabel);
 
@@ -2290,7 +2290,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* srcRow = new QHBoxLayout;
     srcRow->setSpacing(3);
     auto* srcLabel = new QLabel("Sources:");
-    srcLabel->setStyleSheet("QLabel { color: #808080; font-size: 11px; }");
+    srcLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
     srcLabel->setFixedWidth(40);
     srcRow->addWidget(srcLabel);
     for (const auto& src : sources) {
@@ -2434,7 +2434,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* bottomRow = new QHBoxLayout;
     auto* countLabel = new QLabel("0 spots");
     countLabel->setObjectName("spotListCountLabel");
-    countLabel->setStyleSheet("QLabel { color: #808080; font-size: 11px; }");
+    countLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
     connect(m_spotTableModel, &QAbstractTableModel::rowsInserted,
             this, [this, countLabel] {
         countLabel->setText(QString("%1 spots").arg(m_spotTableModel->rowCount()));

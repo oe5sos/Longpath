@@ -11809,9 +11809,9 @@ void MainWindow::showFeatureRequestDialogImpl()
     auto* bugBtn = new QPushButton(QStringLiteral("Report a Bug"), dlg);
     bugBtn->setAutoDefault(false);
     bugBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #cc4040; color: #ffffff; font-weight: bold; "
+        "QPushButton { background: #7a2c2e; color: #f0dcdc; font-weight: bold; "
         "border-radius: 4px; padding: 8px 20px; font-size: 13px; }"
-        "QPushButton:hover { background: #dd5050; }"));
+        "QPushButton:hover { background: #a86b6d; }"));
     connect(bugBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
             "https://github.com/boydsoftprez/NereusSDR/issues/new?template=bug_report.yml")));
