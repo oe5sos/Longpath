@@ -521,7 +521,7 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     const QColor cInset(Style::role("inset-bg", Style::kInsetBg));
 
     // ── Der versenkte Kasten ────────────────────────────────────────
-    constexpr int kPad = 12, kPadX = 14, kGap = 14, kRightW = 132;
+    constexpr int kPad = 12, kPadX = 14, kGap = 14, kRightW = 112;
     const QRect box(2, 2, w - 4, h - 4);
     p.setPen(QPen(cBorder, 1));
     p.setBrush(cInset);

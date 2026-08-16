@@ -92,6 +92,14 @@ void RxDashboard::buildUi()
 
     // Single dense row, no BadgePair wrappers:
     // [slice tag] [mode] [filter] | [AGC] | [NR] [NB] [APF] [SQL]
+    // LSB ist eine AUSWAHL -- gefuellt auf accent. 2.9k ist ein
+    // MESSWERT -- Bernstein. M und NR1 sind ZUSTAENDE -- Salbei,
+    // ungefuellt (StatusBadge kennt keine Fuellung -- der Modus traegt
+    // stattdessen den Auswahlton). Vorher standen alle vier im selben
+    // Signalgruen und
+    // sahen aus wie dieselbe Sorte Sache.
+    m_modeBadge->setVariant(StatusBadge::Variant::Info);
+    m_filterBadge->setVariant(StatusBadge::Variant::Warn);
     hbox->addWidget(m_modeBadge);
     hbox->addWidget(m_filterBadge);
     hbox->addWidget(m_agcBadge);

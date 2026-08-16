@@ -126,10 +126,14 @@ QColor StatusBadge::variantForegroundColor() const
     // text color. If applyStyle() colors change, update both.
     switch (m_variant) {
         case Variant::Info: return QColor(QStringLiteral("#4a7ba8"));
-        case Variant::On:   return QColor(QStringLiteral("#5fff8a"));
-        case Variant::Off:  return QColor(QStringLiteral("#3a4a5a"));
-        case Variant::Warn: return QColor(QStringLiteral("#ffd700"));
-        case Variant::Tx:   return QColor(QStringLiteral("#ff6060"));
+        // Zustand -> Salbei, nicht Signalgruen. M und NR1 sind an
+        // oder aus, ein Laempchen.
+        case Variant::On:   return QColor(QStringLiteral("#6fa384"));
+        case Variant::Off:  return QColor(QStringLiteral("#3d3d41"));
+        // Kein Gold: das ist ein Messwert (Filterbreite), kein
+        // Alarm. Bernstein wie Frequenz und Skala.
+        case Variant::Warn: return QColor(QStringLiteral("#c2924f"));
+        case Variant::Tx:   return QColor(QStringLiteral("#c25a5c"));
     }
     return QColor(QStringLiteral("#4a7ba8"));
 }
@@ -197,7 +201,7 @@ void StatusBadge::applyStyle()
             bg = QStringLiteral("rgba(95,168,255,26)");   // 0.10 alpha
             break;
         case Variant::On:
-            fg = QStringLiteral("#5fff8a");
+            fg = QStringLiteral("#6fa384");
             bg = QStringLiteral("rgba(95,255,138,26)");
             break;
         case Variant::Off:

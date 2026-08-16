@@ -128,13 +128,25 @@ namespace OverlayColors {
     //
     // Jetzt: inaktiv fast nur Text, aktiv der Auswahl-Verlauf.
     // Radius 6, nie 3.
+    // ── Ein Knopf LIEGT auf der Flaeche ─────────────────────────────
+    //
+    // Hier stand ein fast durchsichtiger Grund (8 % Weiss) mit
+    // Beschriftung auf #8e8e93 -- gedacht als HAUSSTIL Regel 2,
+    // "inaktiv fast unsichtbar". Zusammen mit dem neuen Panelgrund lagen
+    // Knopf und Flaeche dann so nah beieinander, dass die Beschriftungen
+    // verschwanden.
+    //
+    // Die Regel dahinter, gemeldet am 2026-08-16: NUR EINGABEFELDER SIND
+    // MULDEN. Ein Knopf liegt auf der Flaeche und braucht einen eigenen
+    // Grund und einen sichtbaren Rand. "Fast unsichtbar" heisst
+    // zurueckhaltend gegenueber dem AKTIVEN Knopf, nicht unlesbar.
     constexpr auto kMenuBtnNormal =
-        "QPushButton { background: rgba(255, 255, 255, 8); "
-        "border: 1px solid #26262b; border-radius: 6px; "
+        "QPushButton { background: #1a1a1e; "
+        "border: 1px solid #2c2c31; border-radius: 6px; "
         "padding: 0 11px; "
-        "color: #8e8e93; font-size: 11px; font-weight: bold; }"
-        "QPushButton:hover { background: #1e1e22; "
-        "border: 1px solid #2c2c31; color: #c4c4c9; }";
+        "color: #c4c4c9; font-size: 11px; font-weight: bold; }"
+        "QPushButton:hover { background: #2f3138; "
+        "border: 1px solid #2f5c86; }";
 
     // Auswahl: Füllung, Rahmen und Text wörtlich aus HAUSSTIL §Token.
     constexpr auto kMenuBtnActive =

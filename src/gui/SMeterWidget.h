@@ -78,11 +78,13 @@ public:
     // NereusSDR-native; no upstream equivalent. Task 13.
     explicit SMeterWidget(RadioModel* model, QWidget* parent = nullptr);
 
-    // Gestapelt braucht das Panel mehr Hoehe und weniger Breite:
-    // Polsterung 12, Balken 34, Skala 17, Abstand 10, grosse Zahl 30,
-    // zwei Zeilen 28, Polsterung 12 = 143.
-    QSize sizeHint() const override { return {280, 150}; }
-    QSize minimumSizeHint() const override { return {220, 145}; }
+    // Nebeneinander: Polsterung 12, Balken 34, Abstand 5, Skala 12,
+    // Polsterung 12 = 75. Das ist der Normalfall und die Zielhoehe.
+    // Gestapelt braucht es mehr, aber das greift erst unter 200 px --
+    // minimumSizeHint darf deshalb NICHT die gestapelte Hoehe fordern,
+    // sonst ist das Panel immer so hoch wie sein seltenster Fall.
+    QSize sizeHint() const override { return {280, 78}; }
+    QSize minimumSizeHint() const override { return {200, 75}; }
 
     // Current reading in dBm.
     float levelDbm() const { return m_levelDbm; }
@@ -118,9 +120,17 @@ private:
     QStringList scaleLabels() const;
 
     /// Unterhalb dieser Breite steht der Zahlenblock UNTER dem Balken.
-    /// 260 px ist die gemessene Applet-Spalte des Betreibers; darunter
-    /// bliebe nebeneinander zu wenig fuer den Balken.
-    static constexpr int kStackBelowW = 300;
+    ///
+    /// Stand am 2026-08-16 auf 300 -- und die Applet-Spalte ist 260 breit,
+    /// also griff "gestapelt" IMMER. Das Panel war dadurch 145 statt
+    /// 75 px hoch und belegte fast die halbe Spalte fuer einen leeren
+    /// Balken. Die Zahl war als "Vorsichtsgrenze" gedacht und lag ueber
+    /// dem einzigen Fall, den es gibt.
+    ///
+    /// Jetzt 200: nebeneinander bis hinunter zu 200 px, gestapelt nur
+    /// darunter. Die rechte Spalte ist dafuer von 132 auf 112 schmaler,
+    /// damit dem Balken bei 260 px noch rund 80 bleiben.
+    static constexpr int kStackBelowW = 200;
 
 public:
 
