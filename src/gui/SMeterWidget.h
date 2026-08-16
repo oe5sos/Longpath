@@ -78,8 +78,11 @@ public:
     // NereusSDR-native; no upstream equivalent. Task 13.
     explicit SMeterWidget(RadioModel* model, QWidget* parent = nullptr);
 
-    QSize sizeHint() const override { return {280, 140}; }
-    QSize minimumSizeHint() const override { return {200, 100}; }
+    // Gestapelt braucht das Panel mehr Hoehe und weniger Breite:
+    // Polsterung 12, Balken 34, Skala 17, Abstand 10, grosse Zahl 30,
+    // zwei Zeilen 28, Polsterung 12 = 143.
+    QSize sizeHint() const override { return {280, 150}; }
+    QSize minimumSizeHint() const override { return {220, 145}; }
 
     // Current reading in dBm.
     float levelDbm() const { return m_levelDbm; }
@@ -108,6 +111,16 @@ private:
     float   txDisplayValue() const;
     float   txDisplayFraction() const;
     QString txUnitLabel() const;
+
+    /// Die Skalenmarken unter dem Balken -- dieselbe Quelle wie das
+    /// Kuerzel an der Zahl. Empfang: S-Stufen. Senden: die Marken der
+    /// gewaehlten TX-Groesse.
+    QStringList scaleLabels() const;
+
+    /// Unterhalb dieser Breite steht der Zahlenblock UNTER dem Balken.
+    /// 260 px ist die gemessene Applet-Spalte des Betreibers; darunter
+    /// bliebe nebeneinander zu wenig fuer den Balken.
+    static constexpr int kStackBelowW = 300;
 
 public:
 

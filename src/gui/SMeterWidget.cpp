@@ -541,8 +541,20 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     p.setPen(cLabel);
     p.drawText(innerL, innerT + fmRx.ascent() + 3, rxLabel);
 
+    // ── Daneben oder darunter ───────────────────────────────────────
+    //
+    // Gemessen am 2026-08-16: die Applet-Spalte ist beim Betreiber
+    // 260 px breit (MainSplitterSizes 400,260), abzueglich Raender
+    // weniger. Nebeneinander bliebe fuer den Balken zu wenig -- und
+    // dann schoebe sich der Balken zusammen, statt dass die Anzeige den
+    // Platz vernuenftig aufteilt.
+    //
+    // Also: unterhalb kStackBelowW wandert der Zahlenblock UNTER den
+    // Balken, und der bekommt die volle Breite.
+    const bool stacked = (w < kStackBelowW);
     const int barL = innerL + fmRx.horizontalAdvance(QStringLiteral("RX")) + kGap;
-    const int barR = box.right() - kPadX - kRightW - kGap;
+    const int barR = stacked ? (box.right() - kPadX)
+                             : (box.right() - kPadX - kRightW - kGap);
     const int barW = std::max(40, barR - barL);
     constexpr int kBarH = 34;
 
@@ -578,6 +590,21 @@ void SMeterWidget::paintEvent(QPaintEvent*)
         }
     }
 
+    // ── Spitzenmarke ────────────────────────────────────────────────
+    //
+    // Kommt aus dem Zifferblatt zurueck, weil sie etwas zeigt, was der
+    // Balken nicht kann: die Spitze der letzten Sekunden mit Nachlauf
+    // (m_peakDbm, Abklingstufen Fast/Medium/Slow). Ein duenner Strich
+    // statt eines Dreiecks -- im Balken ist dafuer kein Platz.
+    if (!m_transmitting && m_rxMode == RxMode::SMeterPeak
+        && SignalReading::isMeasurement(m_peakDbm)) {
+        const float pf = qBound(0.0f, dbmToFraction(m_peakDbm), 1.0f);
+        const int px = bar.left() + 3 + int(pf * (barW - 6));
+        p.setPen(QPen(QColor(Style::role("instrument-face",
+                                         Style::kInstrumentFace)), 1));
+        p.drawLine(px, bar.top() + 4, px, bar.bottom() - 4);
+    }
+
     // ── Segmentstriche: Aussparungen, keine aufgemalten Linien ──────
     //
     // In der Grundfarbe des Kastens ueber den Balken gezogen. Als
@@ -598,10 +625,11 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     p.setFont(fSc);
     const QFontMetrics fmSc(fSc);
     p.setPen(cScale);
-    const QStringList scale{QStringLiteral("dBm"), QStringLiteral("S0"),
-                            QStringLiteral("S3"),  QStringLiteral("S7"),
-                            QStringLiteral("+10"), QStringLiteral("+40"),
-                            QStringLiteral("+60")};
+    // Die Skala folgt DEM, WAS DER BALKEN ZEIGT -- eine Quelle fuer
+    // beides, wie das Kuerzel an der Zahl. Watt-Marken unter einem
+    // Leistungsbalken, S-Stufen unter dem Empfangspegel. Eine Skala,
+    // die der Groesse widerspricht, waere schlechter als gar keine.
+    const QStringList scale = scaleLabels();
     const int scaleY = bar.bottom() + 5 + fmSc.ascent();
     for (int i = 0; i < scale.size(); ++i) {
         const double f = double(i) / (scale.size() - 1);
@@ -617,6 +645,7 @@ void SMeterWidget::paintEvent(QPaintEvent*)
 
     // ── Rechte Spalte: grosse Zahl, Einheit, zwei Zeilen ────────────
     const int rightR = box.right() - kPadX;
+    const int blockTop = stacked ? (scaleY + 10) : innerT;
 
     QFont fBig = p.font();
     fBig.setPixelSize(30);
@@ -635,7 +664,7 @@ void SMeterWidget::paintEvent(QPaintEvent*)
                         ? 0 : fmUnit.horizontalAdvance(unitText) + 3;
     p.setFont(fBig);
     p.setPen(haveReading ? cMeasured : cScale);
-    const int bigY = innerT + fmBig.ascent();
+    const int bigY = blockTop + fmBig.ascent();
     p.drawText(rightR - unitW - fmBig.horizontalAdvance(bigText), bigY, bigText);
     if (!unitText.isEmpty()) {
         p.setFont(fUnit);
@@ -656,7 +685,7 @@ void SMeterWidget::paintEvent(QPaintEvent*)
     fKv.setStyleHint(QFont::Monospace);
     p.setFont(fKv);
     const QFontMetrics fmKv(fKv);
-    const int kvL = rightR - kRightW;
+    const int kvL = stacked ? innerL : (rightR - kRightW);
 
     struct Row { QString k, v; };
     const Row rows[2] = {
@@ -974,6 +1003,39 @@ QString SMeterWidget::txUnitLabel() const
     case TxMode::Compression: return QStringLiteral("dB");
     }
     return QString{};
+}
+
+
+QStringList SMeterWidget::scaleLabels() const
+{
+    if (!m_transmitting) {
+        return {QStringLiteral("dBm"), QStringLiteral("S0"),
+                QStringLiteral("S3"),  QStringLiteral("S7"),
+                QStringLiteral("+10"), QStringLiteral("+40"),
+                QStringLiteral("+60")};
+    }
+    switch (m_txMode) {
+    case TxMode::Power: {
+        // Marken aus der LEBENDEN Skala, damit die Umskalierung je
+        // angeschlossenem Geraet auch hier greift (Barefoot 100 W,
+        // Aurora 600 W, PGXL 2 kW).
+        QStringList out{QStringLiteral("W")};
+        for (int i = 1; i <= 4; ++i) {
+            out << QString::number(int(m_powerScaleMax * i / 4.0));
+        }
+        return out;
+    }
+    case TxMode::SWR:
+        return {QStringLiteral("SWR"), QStringLiteral("1.0"),
+                QStringLiteral("1.5"), QStringLiteral("2.0"),
+                QStringLiteral("3.0")};
+    case TxMode::Level:
+    case TxMode::Compression:
+        return {QStringLiteral("dB"), QStringLiteral("0"),
+                QStringLiteral("25"), QStringLiteral("50"),
+                QStringLiteral("75"), QStringLiteral("100")};
+    }
+    return {};
 }
 
 } // namespace NereusSDR
