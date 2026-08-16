@@ -676,23 +676,45 @@ void VfoWidget::buildFrequencyRow()
     // Display label
     m_freqLabel = new QLabel(this);
     m_freqLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    // Dieselbe Begruendung wie beim Eingabefeld darunter: die
+    // abgelesene Frequenz ist ein Messwert. Das hier ist die Ausfuehrung,
+    // die man die meiste Zeit sieht.
     m_freqLabel->setStyleSheet(
-        QStringLiteral("color: #00e5ff; font-size: 24px; font-weight: bold;"
+        QStringLiteral("color: %1; font-size: 24px; font-weight: bold;"
                         "font-family: 'Consolas', 'Menlo', monospace;"
                         "background: transparent;"
                         "border: 1px solid rgba(255,255,255,50);"
-                        "border-radius: 6px; padding: 0 4px;"));
+                        "border-radius: 6px; padding: 0 4px;")
+            .arg(QLatin1String(Style::kAmberText)));
     updateFreqLabel();
     m_freqStack->addWidget(m_freqLabel);
 
     // Edit field
     m_freqEdit = new QLineEdit(this);
     m_freqEdit->setAlignment(Qt::AlignRight);
+    // ── Eine Frequenz ist ein Messwert ──────────────────────────────
+    //
+    // War Neonzyan auf Tuerkisrahmen. Nach der Palettenumstellung wurde
+    // der Rahmen zu #4a7ba8 -- also blau, und Blau heisst in diesem
+    // Programm ANFASSBAR. Die Ziffern blieben ueberhaupt stehen: #00e5ff
+    // steht in keiner Zeile der Abbildungstabelle und wurde von themed()
+    // nie erfasst.
+    //
+    // HAUSSTIL: "Blau = anfassbar. Warm = gemessen." Das Feld ist zwar
+    // auch beschreibbar, aber was darin steht, ist zuerst die abgelesene
+    // Frequenz -- also Bernstein.
+    //
+    // Dazu die Form eines Eingabefeldes, nicht die einer Flaeche:
+    // versenkt (Grund DUNKLER als das Panel) mit sichtbarem Rand. Ein
+    // leeres Feld ist nicht inaktiv, es wartet auf eine Eingabe.
     m_freqEdit->setStyleSheet(Style::themed(
-        QStringLiteral("color: #00e5ff; font-size: 20px; font-weight: bold;"
+        QStringLiteral("color: %1; font-size: 20px; font-weight: bold;"
                         "font-family: 'Consolas', 'Menlo', monospace;"
-                        "background: #0a0a18; border: 1px solid #00b4d8;"
-                        "border-radius: 6px; padding: 0 4px;")));
+                        "background: %2; border: 1px solid %3;"
+                        "border-radius: 6px; padding: 0 4px;")
+            .arg(QLatin1String(Style::kAmberText),
+                 QLatin1String(Style::kInsetBg),
+                 QLatin1String(Style::kBorder))));
     connect(m_freqEdit, &QLineEdit::returnPressed, this, [this]() {
         const double hz = parseUserFrequency(m_freqEdit->text());
         if (hz > 0.0) {
