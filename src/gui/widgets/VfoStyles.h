@@ -96,10 +96,16 @@ inline constexpr QStringView kLabelStyle {
 // Drawn from inline QColor calls in AetherSDR src/gui/VfoWidget.cpp.
 // QColor is NOT constexpr in Qt6; use inline const.
 
-inline const QColor kHdrRxBlue    { 0x44, 0x88, 0xff }; // RX antenna label text color
-inline const QColor kHdrTxRed     { 0xff, 0x44, 0x44 }; // TX antenna label text color
-inline const QColor kFilterCyan   { 0x00, 0xc8, 0xff }; // filter-width label text color
-inline const QColor kSliceBadgeBlue{ 0x00, 0x70, 0xc0 }; // slice letter badge background
+// Die Antennenwahl ist anfassbar -- ein Knopf, kein Messwert.
+inline const QColor kHdrRxBlue    { 0x4a, 0x7b, 0xa8 }; // kAccent
+// TX bleibt rot: HAUSSTIL fuehrt "Sendet / Gefahr" ausdruecklich, und
+// nur MOX/TX darf kraeftiger sein. Aber der Ton der Palette, nicht ein
+// Qt-Rot.
+inline const QColor kHdrTxRed     { 0xc2, 0x5a, 0x5c }; // HAUSSTIL: MOX/TX
+// Die Filterbreite ist eine abgelesene Groesse -- Messwert, wie die
+// Frequenz darueber.
+inline const QColor kFilterCyan   { 0xc2, 0x92, 0x4f }; // kAmberText
+inline const QColor kSliceBadgeBlue{ 0x25, 0x4a, 0x72 }; // kBlueBg -- Auswahl
 // ── Aussteuerung ist ein Messwert ───────────────────────────────────
 //
 // War Tuerkis unter S9 und Signalgruen darueber. Beides falsch: Gruen
@@ -112,8 +118,8 @@ inline const QColor kSliceBadgeBlue{ 0x00, 0x70, 0xc0 }; // slice letter badge b
 // zweiter Farbbegriff fuer dieselbe Groesse.
 inline const QColor kMeterCyan    { 0x8a, 0x6c, 0x3c }; // Messwert, gedaempft (unter S9)
 inline const QColor kMeterGreen   { 0xc2, 0x92, 0x4f }; // Messwert, voll (ab S9)
-inline const QColor kLabelMuted   { 0x68, 0x88, 0xa0 }; // muted label text
-inline const QColor kBodyText     { 0xc8, 0xd8, 0xe8 }; // default body text
-inline const QColor kBgDark       { 0x10, 0x10, 0x1c }; // flag dark bg used by custom paint
+inline const QColor kLabelMuted   { 0x8e, 0x8e, 0x93 }; // kTextSecondary
+inline const QColor kBodyText     { 0xc4, 0xc4, 0xc9 }; // kTextPrimary
+inline const QColor kBgDark       { 0x08, 0x08, 0x0a }; // kInsetBg -- versenkt
 
 } // namespace NereusSDR

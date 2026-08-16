@@ -361,7 +361,7 @@ static inline QString vfoTabBtnStyle()
     return QStringLiteral(
         "QPushButton {"
         "  background: transparent; border: none;"
-        "  color: #708090; font-size: 12px; font-weight: bold;"
+        "  color: #76767a; font-size: 12px; font-weight: bold;"
         "  padding: 2px 6px;"
         "}"
         "QPushButton:checked {"
@@ -494,7 +494,7 @@ void VfoWidget::buildUI()
     vaxTabLayout->setContentsMargins(10, 4, 10, 4);
     vaxTabLayout->setSpacing(3);
     auto* vaxTabLbl = new QLabel(QStringLiteral("VAX"), vaxTabWidget);
-    vaxTabLbl->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:10px;")));
+    vaxTabLbl->setStyleSheet(Style::themed(QStringLiteral("color:#8e8e93;font-size:10px;")));
     vaxTabLayout->addWidget(vaxTabLbl);
     m_vaxSelector = new VaxChannelSelector(vaxTabWidget);
     vaxTabLayout->addWidget(m_vaxSelector);
@@ -589,7 +589,7 @@ void VfoWidget::buildHeaderRow()
     m_txAntBtn = new QPushButton(QStringLiteral("ANT1"), this);
     m_txAntBtn->setObjectName(QStringLiteral("m_txAntBtn"));
     m_txAntBtn->setStyleSheet(Style::themed(vfoFlatBtnStyle() +
-        QStringLiteral("QPushButton { color: #ff4444; }")));
+        QStringLiteral("QPushButton { color: #a86b6d; }")));
     m_txAntBtn->setFixedHeight(18);
     // NereusSDR native — no single Thetis TX-antenna tooltip (TX ant is configured
     // via Alex board setup in Setup dialog, not via a main-window toggle)
@@ -634,9 +634,9 @@ void VfoWidget::buildHeaderRow()
     m_txBadge->setFixedSize(28, 18);
     m_txBadge->setCheckable(true);
     m_txBadge->setStyleSheet(Style::themed(
-        QStringLiteral("QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-                        "border-radius: 6px; color: #708090; font-size: 10px; font-weight: bold; }"
-                        "QPushButton:checked { background: #6a3030; border-color: #ff4444; color: #ff8080; }")));
+        QStringLiteral("QPushButton { background: #1a1a1e; border: 1px solid #2c2c31;"
+                        "border-radius: 6px; color: #76767a; font-size: 10px; font-weight: bold; }"
+                        "QPushButton:checked { background: #6a3030; border-color: #a86b6d; color: #ff8080; }")));
     // NereusSDR native — Thetis has no per-slice TX badge (it uses chkMOX for TX state)
     m_txBadge->setToolTip(QStringLiteral("Indicates this slice is the TX slice"));
     hdr->addWidget(m_txBadge);
@@ -651,8 +651,8 @@ void VfoWidget::buildHeaderRow()
     m_splitBadge->setFixedSize(36, 18);
     m_splitBadge->setAlignment(Qt::AlignCenter);
     m_splitBadge->setStyleSheet(Style::themed(
-        QStringLiteral("background: #1a2a3a; border: 1px solid #304050;"
-                        "border-radius: 6px; color: #708090; font-size: 10px; font-weight: bold;")));
+        QStringLiteral("background: #1a1a1e; border: 1px solid #2c2c31;"
+                        "border-radius: 6px; color: #76767a; font-size: 10px; font-weight: bold;")));
     m_splitBadge->setVisible(false);
     hdr->addWidget(m_splitBadge);
 
@@ -661,7 +661,7 @@ void VfoWidget::buildHeaderRow()
     m_sliceBadge->setFixedSize(18, 18);
     m_sliceBadge->setAlignment(Qt::AlignCenter);
     m_sliceBadge->setStyleSheet(Style::themed(
-        QStringLiteral("background: #0070c0; color: white; font-size: 11px;"
+        QStringLiteral("background: #254a72; color: white; font-size: 11px;"
                         "font-weight: bold; border-radius: 6px;")));
     hdr->addWidget(m_sliceBadge);
 
@@ -788,7 +788,7 @@ void VfoWidget::buildSnrRow()
     m_snrLabel->setFixedHeight(16);
     m_snrLabel->setTextFormat(Qt::RichText);
     m_snrLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #00b4d8; font-size: 10px; font-weight: bold;"
+        "QLabel { color: #4a7ba8; font-size: 10px; font-weight: bold;"
         " background: transparent; border: none; padding: 0; margin: 0; }")));
     m_snrLabel->hide();
 
@@ -875,7 +875,7 @@ void VfoWidget::setRadeSynced(bool synced)
     // colorized render path.
     if (std::isnan(m_lastRadeSnrDb)) {
         const QString prefix = radePrefixForCallsign(m_lastRadeCallsign);
-        const QString color = synced ? QStringLiteral("#00ff88")
+        const QString color = synced ? QStringLiteral("#6fa384")
                                      : QStringLiteral("#505050");
         const QString glyph = synced ? QStringLiteral("●")
                                      : QStringLiteral("○");
@@ -913,7 +913,7 @@ void VfoWidget::setRadeSnrLabel(float snrDb)
     }
     const QString prefix = radePrefixForCallsign(m_lastRadeCallsign);
     const QString color = (snrDb < 5.0f) ? QStringLiteral("#e0e040")
-                                         : QStringLiteral("#00ff88");
+                                         : QStringLiteral("#6fa384");
     m_snrLabel->setText(
         QString("%1 <font color='%2'>●</font> %3dB")
             .arg(prefix, color)
@@ -1118,14 +1118,14 @@ void VfoWidget::buildAudioTab()
         m_afGainSlider->setRange(0, 100);
         m_afGainSlider->setValue(50);
         m_afGainSlider->setStyleSheet(Style::themed(
-            QStringLiteral("QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-                            "QSlider::handle:horizontal { background: #00b4d8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
+            QStringLiteral("QSlider::groove:horizontal { background: #1a1a1e; height: 6px; border-radius: 3px; }"
+                            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
         // From Thetis console.resx:8433 — ptbAF.ToolTip
         m_afGainSlider->setToolTip(QStringLiteral("AF Gain - Monitor Volume for RX/TX"));
         row->addWidget(m_afGainSlider);
 
         m_afGainLabel = new QLabel(QStringLiteral("50"), audioWidget);
-        m_afGainLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c8d8e8; font-size: 11px;")));
+        m_afGainLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c4c4c9; font-size: 11px;")));
         m_afGainLabel->setFixedWidth(24);
         m_afGainLabel->setAlignment(Qt::AlignRight);
         row->addWidget(m_afGainLabel);
@@ -1200,13 +1200,13 @@ void VfoWidget::buildAudioTab()
         m_panSlider->setSingleStep(1);
         m_panSlider->setValue(0);
         m_panSlider->setStyleSheet(Style::themed(
-            QStringLiteral("QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-                            "QSlider::handle:horizontal { background: #00b4d8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
+            QStringLiteral("QSlider::groove:horizontal { background: #1a1a1e; height: 6px; border-radius: 3px; }"
+                            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
         m_panSlider->setToolTip(QStringLiteral("Audio pan: left/right stereo balance (−100 = full left, 0 = center, +100 = full right)\nFrom Thetis radio.cs:1386 — WDSP patchpanel.c:159"));
         row->addWidget(m_panSlider);
 
         m_panLabel = new QLabel(QStringLiteral("0"), audioWidget);
-        m_panLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c8d8e8; font-size: 11px;")));
+        m_panLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c4c4c9; font-size: 11px;")));
         m_panLabel->setFixedWidth(24);
         m_panLabel->setAlignment(Qt::AlignRight);
         row->addWidget(m_panLabel);
@@ -1270,8 +1270,8 @@ void VfoWidget::buildAudioTab()
         m_sqlSlider->setSingleStep(1);
         m_sqlSlider->setValue(0);
         m_sqlSlider->setStyleSheet(Style::themed(
-            QStringLiteral("QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-                            "QSlider::handle:horizontal { background: #00b4d8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
+            QStringLiteral("QSlider::groove:horizontal { background: #1a1a1e; height: 6px; border-radius: 3px; }"
+                            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
         // NereusSDR native — Thetis ptbSquelch has no ToolTip entry in console.resx
         m_sqlSlider->setToolTip(QStringLiteral("Squelch threshold. SSB: 0–100 maps to 0.0–1.0 linear. AM: dB scale. FM: linear 0–1."));
         row->addWidget(m_sqlSlider);
@@ -1310,14 +1310,14 @@ void VfoWidget::buildAudioTab()
         m_agcTSlider->setSingleStep(1);
         m_agcTSlider->setValue(-20);
         m_agcTSlider->setStyleSheet(Style::themed(
-            QStringLiteral("QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-                            "QSlider::handle:horizontal { background: #00b4d8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
+            QStringLiteral("QSlider::groove:horizontal { background: #1a1a1e; height: 6px; border-radius: 3px; }"
+                            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; margin: -3px 0; border-radius: 6px; }")));
         // From Thetis console.resx:8397 — ptbRF.ToolTip (ptbRF is the AGC-T slider)
         m_agcTSlider->setToolTip(QStringLiteral("AGC Max Gain - Operates similarly to traditional RF Gain. Right click AUTO based on noise floor."));
         row->addWidget(m_agcTSlider);
 
         m_agcTLabel = new QLabel(QStringLiteral("-20"), m_agcTContainer);
-        m_agcTLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c8d8e8; font-size: 11px;")));
+        m_agcTLabel->setStyleSheet(Style::themed(QStringLiteral("color: #c4c4c9; font-size: 11px;")));
         m_agcTLabel->setFixedWidth(32);
         m_agcTLabel->setAlignment(Qt::AlignRight);
         row->addWidget(m_agcTLabel);
@@ -1654,12 +1654,12 @@ void VfoWidget::buildModeTab()
         });
         m_modeCmb->setCurrentText(QStringLiteral("USB"));
         m_modeCmb->setStyleSheet(Style::themed(
-            QStringLiteral("QComboBox { background: #1a2a3a; color: #c8d8e8;"
-                            "border: 1px solid #304050; border-radius: 6px;"
+            QStringLiteral("QComboBox { background: #1a1a1e; color: #c4c4c9;"
+                            "border: 1px solid #2c2c31; border-radius: 6px;"
                             "padding: 1px 4px; font-size: 11px; }"
                             "QComboBox::drop-down { border: none; }"
-                            "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
-                            "selection-background-color: #0070c0; }")));
+                            "QComboBox QAbstractItemView { background: #1a1a1e; color: #c4c4c9;"
+                            "selection-background-color: #254a72; }")));
         connect(m_modeCmb, &QComboBox::currentTextChanged,
                 this, [this](const QString& text) {
             if (!m_updatingFromModel) {
@@ -1704,10 +1704,10 @@ void VfoWidget::buildXRitTab()
 
     static const char* kZeroBtn =
         "QPushButton {"
-        "  background: #1a2a3a; border: 1px solid #304050; border-radius: 2px;"
-        "  color: #c8d8e8; font-size: 12px; font-weight: bold; padding: 1px;"
+        "  background: #1a1a1e; border: 1px solid #2c2c31; border-radius: 2px;"
+        "  color: #c4c4c9; font-size: 12px; font-weight: bold; padding: 1px;"
         "}"
-        "QPushButton:hover { border: 1px solid #0090e0; }";
+        "QPushButton:hover { border: 1px solid #2f5c86; }";
 
     // --- RIT row ---
     {
@@ -1790,10 +1790,10 @@ void VfoWidget::buildXRitTab()
         m_stepCycleBtn->setFlat(true);
         m_stepCycleBtn->setStyleSheet(Style::themed(
             QStringLiteral("QPushButton {"
-                           "  background: #1a2a3a; border: 1px solid #304050; border-radius: 2px;"
-                           "  color: #c8d8e8; font-size: 11px; font-weight: bold; padding: 2px 4px;"
+                           "  background: #1a1a1e; border: 1px solid #2c2c31; border-radius: 2px;"
+                           "  color: #c4c4c9; font-size: 11px; font-weight: bold; padding: 2px 4px;"
                            "}"
-                           "QPushButton:hover { border: 1px solid #0090e0; }")));
+                           "QPushButton:hover { border: 1px solid #2f5c86; }")));
         m_stepCycleBtn->setFixedHeight(22);
         // NereusSDR native — Thetis has no equivalent step-cycle button
         // (Thetis uses wheel on the VFO display directly; step size is implicit)
@@ -2583,7 +2583,7 @@ void VfoWidget::setSlice(SliceModel* slice)
 static const char* kFloatingBtn =
     "QPushButton {"
     "  background: rgba(20,30,50,230); border: 1px solid rgba(80,100,130,180);"
-    "  border-radius: 10px; color: #c8d8e8; font-size: 11px; padding: 0;"
+    "  border-radius: 10px; color: #c4c4c9; font-size: 11px; padding: 0;"
     "}"
     "QPushButton:hover {"
     "  background: rgba(40,55,80,240);"
@@ -2592,7 +2592,7 @@ static const char* kFloatingBtn =
 static const char* kFloatingBtnClose =
     "QPushButton {"
     "  background: rgba(20,30,50,230); border: 1px solid rgba(80,100,130,180);"
-    "  border-radius: 10px; color: #c8d8e8; font-size: 11px; padding: 0;"
+    "  border-radius: 10px; color: #c4c4c9; font-size: 11px; padding: 0;"
     "}"
     "QPushButton:hover {"
     "  background: rgba(204,32,32,220); color: #ffffff;"
@@ -2690,7 +2690,7 @@ void VfoWidget::applyLockedState(bool on)
         if (on) {
             m_lockBtn->setStyleSheet(Style::themed(QStringLiteral(
                 "QPushButton { background: rgba(255,100,100,80); border: none;"
-                "  border-radius: 10px; color: #c8d8e8; font-size: 11px; padding: 0; }"
+                "  border-radius: 10px; color: #c4c4c9; font-size: 11px; padding: 0; }"
                 "QPushButton:hover { background: rgba(255,100,100,120); }")));
         } else {
             m_lockBtn->setStyleSheet(kFloatingBtn);
