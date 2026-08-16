@@ -1,10 +1,16 @@
 // src/gui/HGauge.cpp
+#include "gui/styles/ThemeQss.h"
 #include "HGauge.h"
 #include "StyleConstants.h"
 #include <QPainter>
 #include <QPaintEvent>
 
 namespace NereusSDR {
+
+// Die gedaempfte Stufe des Messwert-Tons. Dieselbe Zahl wie beim
+// Pegelbalken unter S9 (VfoStyles.h) -- eine Groesse, zwei
+// Helligkeiten, kein zweiter Farbbegriff.
+static constexpr auto kMeasuredDim = "#8a6c3c";
 
 HGauge::HGauge(QWidget* parent) : QWidget(parent)
 {
@@ -49,9 +55,14 @@ void HGauge::paintEvent(QPaintEvent*)
     const int barX = 2;
     const int barW = w - 4;
 
-    // Background
-    p.setPen(QColor(Style::kBorderSubtle));
-    p.setBrush(QColor(Style::kInsetBg));
+    // ── Die Rille ist eine Mulde ────────────────────────────────────
+    //
+    // Wie ein Eingabefeld: Grund dunkler als das Panel, Rand sichtbar.
+    // kBorderSubtle lag zu nah an kInsetBg -- zwei fast gleiche
+    // Grautoene, und der leere Balken verschwand. Derselbe Befund wie auf
+    // Startup & Preferences.
+    p.setPen(QColor(Style::role("border", Style::kBorder)));
+    p.setBrush(QColor(Style::role("inset-bg", Style::kInsetBg)));
     p.drawRoundedRect(barX, barY, barW, barH, 2, 2);
 
     if (m_max <= m_min) { return; }
@@ -62,7 +73,7 @@ void HGauge::paintEvent(QPaintEvent*)
     if (m_reversed) {
         const int fillW = static_cast<int>(normalized * barW);
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(Style::kGaugeDanger));
+        p.setBrush(QColor(Style::role("danger", Style::kGaugeDanger)));
         p.drawRoundedRect(barX + barW - fillW, barY + 1, fillW, barH - 2, 1, 1);
     } else {
         const int fillW = static_cast<int>(normalized * barW);
@@ -75,19 +86,29 @@ void HGauge::paintEvent(QPaintEvent*)
             int normalEnd = qMin(fillW, yellowX);
             if (normalEnd > 0) {
                 p.setPen(Qt::NoPen);
-                p.setBrush(QColor(Style::kGaugeNormal));
+                // Was der Balken zeigt, ist gemessen -- also Bernstein,
+                // nicht Akzentblau. kGaugeNormal war #4a7ba8, der Ton
+                // fuer "anfassbar".
+                p.setBrush(QColor(Style::role("measured-dim", kMeasuredDim)));
                 p.drawRoundedRect(barX + 1, barY + 1, normalEnd, barH - 2, 1, 1);
             }
             if (fillW > yellowX) {
                 int warnEnd = qMin(fillW, redX) - yellowX;
                 if (warnEnd > 0) {
-                    p.setBrush(QColor(Style::kGaugeWarning));
+                    // Zweite Helligkeit DERSELBEN Groesse, kein zweiter
+                    // Farbbegriff -- wie unter und ab S9 beim Pegelbalken.
+                    p.setBrush(QColor(Style::role("measured", Style::kAmberText)));
                     p.drawRect(barX + 1 + yellowX, barY + 1, warnEnd, barH - 2);
                 }
             }
             if (fillW > redX) {
                 int dangerW = fillW - redX;
-                p.setBrush(QColor(Style::kGaugeDanger));
+                // Ab hier ist es keine Messung mehr, sondern eine
+                // Warnung. Die Schwelle setzt das Applet
+                // (setRedStart): SWR ueber 2,5 und Vorlauf ueber 100 W
+                // laut TxApplet.h, beim Verstaerker 1500 W. Bleibt
+                // kraeftig.
+                p.setBrush(QColor(Style::role("danger", Style::kGaugeDanger)));
                 p.drawRect(barX + 1 + redX, barY + 1, dangerW, barH - 2);
             }
         }
@@ -97,13 +118,14 @@ void HGauge::paintEvent(QPaintEvent*)
     if (m_peak > m_min) {
         const double peakNorm = qBound(0.0, (m_peak - m_min) / range, 1.0);
         const int peakX = barX + 1 + static_cast<int>(peakNorm * (barW - 2));
-        p.setPen(QPen(QColor(Style::kGaugePeak), 1));
+        p.setPen(QPen(QColor(Style::role("instrument-face", Style::kInstrumentFace)), 1));
         p.drawLine(peakX, barY + 1, peakX, barY + barH - 2);
     }
 
     // Center title
     if (!m_title.isEmpty()) {
-        p.setPen(QColor(Style::kTextSecondary));
+        // Beschriftung und Teilung gehoeren zum Instrument.
+        p.setPen(QColor(Style::role("instrument-face", Style::kInstrumentFace)));
         p.setFont(QFont(p.font().family(), 8, QFont::Bold));
         p.drawText(QRect(barX, barY, barW, barH), Qt::AlignCenter, m_title);
     }
@@ -115,10 +137,15 @@ void HGauge::paintEvent(QPaintEvent*)
         for (int i = 0; i < n; ++i) {
             double frac = static_cast<double>(i) / (n - 1);
             int x = barX + static_cast<int>(frac * barW);
-            QColor col(Style::kGaugeNormal);
+            // Die Teilung ist Instrument, nicht Messwert -- sie steht
+            // still, waehrend der Balken wandert. Nur jenseits der
+            // Schwelle bekommt sie die Warnfarbe, damit man sieht, WO
+            // die Grenze liegt, bevor der Balken sie erreicht.
+            QColor col(Style::role("instrument-face", Style::kInstrumentFace));
             double val = m_min + frac * range;
-            if (val >= m_redStart) { col = QColor(Style::kGaugeDanger); }
-            else if (val >= m_yellowStart) { col = QColor(Style::kGaugeWarning); }
+            if (val >= m_redStart) {
+                col = QColor(Style::role("danger", Style::kGaugeDanger));
+            }
             p.setPen(col);
             p.drawText(QRect(x - 20, barY + barH + 1, 40, 10),
                        Qt::AlignHCenter | Qt::AlignTop, m_tickLabels[i]);
