@@ -234,8 +234,27 @@ QColor ConnectionSegment::stateDotColor() const
         case ConnectionState::LinkLost:
             return m_pulseOn ? QColor("#c2924f") : QColor("#8a6c3c");
         case ConnectionState::Disconnected:
-            // Verbindung verloren ist eine Stoerung, keine Grenze:
-            // es geht nichts kaputt, und es verbindet sich wieder.
+            // ── Warum hier warn und beim DISCONNECTED-Schild nicht ──
+            //
+            // Beides heisst "keine Verbindung", und beide tragen
+            // absichtlich verschiedene Toene:
+            //
+            //   LinkLost      warn   -- die Verbindung STAND und ist
+            //                          weggebrochen. Etwas ist
+            //                          passiert, der Betreiber hat es
+            //                          nicht veranlasst, und das Geraet
+            //                          versucht gerade wieder.
+            //   DISCONNECTED  Skala  -- gar nicht verbunden. Ein
+            //                          Ruhezustand, kein Vorfall; das
+            //                          grosse Schild im Spektrum sagt
+            //                          nur, dass nichts anliegt.
+            //
+            // Rot ist es in beiden Faellen nicht: es geht nichts kaputt,
+            // und es verbindet sich wieder.
+            //
+            // Steht hier, damit die zwei Antworten nicht in einem
+            // halben Jahr auseinanderlaufen. Wer eine davon aendert,
+            // aendert die andere mit oder streicht diesen Absatz.
             return QColor("#a8853f");
     }
     return QColor("#5c5c60");
