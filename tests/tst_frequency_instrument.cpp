@@ -123,6 +123,56 @@ private slots:
         QCOMPARE(digitsOf(w).size(), 8);
     }
 
+    // ── Drei Bloecke, nicht acht Zeichen ─────────────────────────────
+    //
+    // Befund des Betreibers, 2026-08-18: „Der Trenner steht genauso
+    // weit ab wie die Ziffern untereinander, damit sieht das Auge acht
+    // Einzelzeichen statt drei Bloecke — und die Gruppierung, die wir
+    // gerade repariert haben, wird optisch wieder aufgehoben."
+    //
+    // Ursache: Monospace gibt dem Punkt dieselbe Zelle wie einer
+    // Ziffer. Der Test misst die WIRKLICHEN Abstaende auf dem Schirm,
+    // nicht die Konstanten — waere er gegen kGroupGapOfCell gerechnet,
+    // pruefte er nur, dass eine Zahl gleich sich selbst ist.
+    void theGapBetweenGroupsBeatsTheGapWithin()
+    {
+        FrequencyInstrument w;
+        w.resize(520, 140);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+
+        const QList<QLabel*> d = digitsOf(w);
+        QCOMPARE(d.size(), 8);
+
+        auto gapAfter = [&d](int i) {
+            const QRect a = d.at(i)->geometry();
+            const QRect b = d.at(i + 1)->geometry();
+            return b.left() - a.right() - 1;
+        };
+
+        // Innerhalb einer Gruppe: 2-3, 3-4 und 5-6, 6-7.
+        const int within = qMax(qMax(gapAfter(2), gapAfter(3)),
+                                qMax(gapAfter(5), gapAfter(6)));
+        // Zwischen zwei Gruppen: hinter Stelle 1 und hinter Stelle 4.
+        const int between = qMin(gapAfter(1), gapAfter(4));
+
+        // Beide Enden festnageln, nicht nur ihr Verhaeltnis: „innen
+        // eng" ist eine eigene Zusicherung, sonst waere die Zeile auch
+        // dann gruen, wenn beide Abstaende gross sind und nur der eine
+        // groesser. Bezug ist die Zeichenzelle, damit die Pruefung
+        // ueber die Schriftstufen haelt.
+        const int cell = d.at(0)->width();
+        QVERIFY2(within <= cell / 6,
+                 qPrintable(QStringLiteral(
+                     "innerhalb der Gruppe %1 px bei Zelle %2 — nicht eng")
+                     .arg(within).arg(cell)));
+        QVERIFY2(between >= cell / 2,
+                 qPrintable(QStringLiteral(
+                     "zwischen den Gruppen %1 px bei Zelle %2 — das Auge "
+                     "sieht acht Zeichen statt drei Bloecke")
+                     .arg(between).arg(cell)));
+    }
+
     // Der Kern der Auflage: das Rad ueber der Kilohertz-Stelle dreht
     // Kilohertz, nicht die eingestellte Schrittweite.
     void theWheelTurnsThatDigitsDecade()

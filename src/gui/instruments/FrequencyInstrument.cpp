@@ -40,6 +40,41 @@ constexpr int kDimFromIndex = 6;
 /// Hoehe der Mulde beim Bandstreifen (Entwurf: H = 14 auf 520 Breite).
 constexpr double kStripHeight = 14.0;
 
+// ── Zwei Abstaende, nicht einer ──────────────────────────────────────
+//
+// OE5SOS, 2026-08-18: „Der Trenner steht genauso weit ab wie die
+// Ziffern untereinander, damit sieht das Auge acht Einzelzeichen statt
+// drei Bloecke — und die Gruppierung, die wir gerade repariert haben,
+// wird optisch wieder aufgehoben."
+//
+// Warum es dazu kam: die Zeile ist in Monospace gesetzt, und dort ist
+// der Punkt genau so breit wie eine Ziffer. Das Zeichen ist schmal,
+// seine ZELLE nicht — links und rechts davon steht je eine halbe leere
+// Zelle. Der Trenner brachte damit von sich aus mehr Luft mit als jede
+// Ziffernfuge, und die Zeile zerfiel in acht gleich weit stehende
+// Zeichen.
+//
+// QFont::setLetterSpacing hilft hier nicht: jede Ziffer ist ein eigenes
+// Schild mit eigener Trefferflaeche (Rad ueber der Stelle dreht diese
+// Dekade), also setzt das Layout die Abstaende und nicht die Schrift.
+// Dann sind es zwei Werte, wie der Betreiber gesagt hat — der Abstand
+// INNERHALB einer Gruppe und der ZWISCHEN zweien.
+//
+// Alle drei als Anteil der Zeichenzelle, damit sie ueber die
+// Schriftstufen halten.
+
+/// Luft je Ziffer. Nur so viel, dass die Trefferflaeche nicht auf die
+/// Glyphe schrumpft — innerhalb einer Gruppe soll es eng sein.
+constexpr double kDigitPadOfCell = 0.09;
+
+/// Der Trenner bekommt seine eigene, schmale Breite statt der vollen
+/// Monospace-Zelle.
+constexpr double kSeparatorOfCell = 0.30;
+
+/// Der Gruppenabstand. Steht NUR hinter dem Trenner: „der Trenner darf
+/// schmal bleiben und braucht keine Luft auf beiden Seiten."
+constexpr double kGroupGapOfCell = 0.35;
+
 } // namespace
 
 FrequencyInstrument::FrequencyInstrument(QWidget* parent)
@@ -117,11 +152,22 @@ void FrequencyInstrument::buildDigits()
     // Also Punkte NACH Stelle 1 und NACH Stelle 4.
     static const int kSepAfter[] = {1, 4};
 
+    // Die Zeichenzelle der Ziffernschrift — Bezugsmass fuer alle drei
+    // Abstaende. In Monospace ist sie fuer jedes Zeichen gleich, also
+    // genuegt eine Abfrage.
+    const QFont digitFont = Style::monoFont(m_digitRow->font(),
+                                            Style::kFontDisplay,
+                                            QFont::Light);
+    const int cell = QFontMetrics(digitFont).horizontalAdvance(
+        QStringLiteral("0"));
+    const int digitPad = qMax(1, qRound(cell * kDigitPadOfCell));
+    const int sepWidth = qMax(2, qRound(cell * kSeparatorOfCell));
+    const int groupGap = qMax(2, qRound(cell * kGroupGapOfCell));
+
     for (int i = 0; i < kDigitCount; ++i) {
         auto* d = new QLabel(QStringLiteral("0"), m_digitRow);
         d->setAlignment(Qt::AlignCenter);
-        d->setFont(Style::monoFont(d->font(), Style::kFontDisplay,
-                                   QFont::Light));
+        d->setFont(digitFont);
         // Jede Ziffer ist eine eigene Trefferflaeche. Der Zeiger sagt
         // das an: senkrecht ziehen ist die Geste, die das Rad meint.
         d->setCursor(Qt::SizeVerCursor);
@@ -132,8 +178,10 @@ void FrequencyInstrument::buildDigits()
         // LEER gezeigt, und ein leeres Schild ohne Breite naehme seine
         // eigene Trefferflaeche mit. Man koennte dann 7 MHz nicht mehr
         // auf 17 MHz drehen.
-        d->setMinimumWidth(QFontMetrics(d->font()).horizontalAdvance(
-                               QStringLiteral("0")) + 4);
+        // Feste Breite, nicht nur eine Mindestbreite: sonst bestimmte
+        // der Schilder-sizeHint die Fuge, und der waere je nach Ziffer
+        // verschieden — eine Spalte, die beim Abstimmen atmet.
+        d->setFixedWidth(cell + digitPad);
         m_digits.append(d);
         m_decades.append(kDecades[i]);
         m_digitLayout->addWidget(d);
@@ -141,11 +189,19 @@ void FrequencyInstrument::buildDigits()
         for (int sep : kSepAfter) {
             if (i == sep) {
                 auto* dot = new QLabel(QStringLiteral("."), m_digitRow);
-                dot->setFont(d->font());
+                dot->setFont(digitFont);
+                // Auf die schmale Breite geklemmt. Ohne das brachte der
+                // Punkt die volle Monospace-Zelle mit und riss die
+                // Gruppe auf, die er zusammenhalten soll.
+                dot->setFixedWidth(sepWidth);
+                dot->setAlignment(Qt::AlignCenter);
                 dot->setStyleSheet(Style::themed(
                     QStringLiteral("QLabel { color: %1; }")
                         .arg(Style::kAmberDim)));
                 m_digitLayout->addWidget(dot);
+                // Die Luft steht HINTER dem Trenner, nicht um ihn
+                // herum: er gehoert zur Gruppe links von ihm.
+                m_digitLayout->addSpacing(groupGap);
             }
         }
     }
