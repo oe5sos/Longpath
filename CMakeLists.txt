@@ -699,6 +699,24 @@ set(GUI_SOURCES
     # palette moves through a table rather than through 1733 edits.
     src/gui/LayoutProfiles.cpp
     src/gui/LayoutProfiles.h
+    src/gui/WindowPlacement.cpp
+    src/gui/WindowPlacement.h
+    # Instrumente: eine Quellenliste, ein Zeichenweg. ReadingSource ist
+    # die Beschreibung der Messgroessen (Skala, Schwelle, Teilung),
+    # InstrumentSpine die Geometrie (Bogen / Gerade), InstrumentPainter
+    # die drei Mittel (Mulde, Verlauf, Glut) -- genau einmal.
+    src/gui/instruments/ReadingSource.cpp
+    src/gui/instruments/ReadingSource.h
+    src/gui/instruments/InstrumentSpine.cpp
+    src/gui/instruments/InstrumentSpine.h
+    src/gui/instruments/InstrumentPainter.cpp
+    src/gui/instruments/InstrumentPainter.h
+    src/gui/instruments/InstrumentFooter.cpp
+    src/gui/instruments/InstrumentFooter.h
+    src/gui/instruments/NeedleInstrument.cpp
+    src/gui/instruments/NeedleInstrument.h
+    src/gui/instruments/BarInstrument.cpp
+    src/gui/instruments/BarInstrument.h
     src/gui/widgets/CommandBar.cpp
     src/gui/widgets/WidgetPicker.cpp
     src/gui/widgets/WidgetPicker.h
@@ -952,6 +970,10 @@ set(GUI_SOURCES
     src/gui/applets/AppletWidget.cpp
     src/gui/applets/NyiOverlay.cpp
     src/gui/applets/AppletPanelWidget.cpp
+    src/gui/applets/AppletFloatingWindow.cpp
+    src/gui/applets/AppletFloatingWindow.h
+    src/gui/applets/InstrumentApplet.cpp
+    src/gui/applets/InstrumentApplet.h
     src/gui/applets/AppletVisibilityController.cpp
     src/gui/widgets/RotorDialWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp

@@ -121,10 +121,66 @@ public:
     /// die gespeicherte Liste es noch nicht kennt.
     void setAppletOrder(const QList<AppletWidget*>& order);
 
+    /// Die Stelle eines Applets im Stapel — die Zahl, an die es beim
+    /// Andocken zurückkehren soll. -1, wenn es nicht in dieser Spalte
+    /// steht.
+    int appletPosition(AppletWidget* applet) const;
+
+    /// Testnaht: baut das Kontextmenü der Titelleiste dieses Applets,
+    /// ohne exec() zu rufen. Der Aufrufer besitzt das Menü.
+    /// Gleiches Muster wie AmpApplet::buildContextMenuForTesting().
+    ///
+    /// Es gibt sie, weil das Ablösen jetzt NUR über dieses Menü läuft.
+    /// Ein einziger Pfad, der nicht geprüft wird, ist ein einziger
+    /// Pfad, der eines Tages stillschweigend nichts mehr tut.
+    QMenu* buildTitleBarMenuForTesting(AppletWidget* applet);
+
 signals:
     /// Nach einem abgeschlossenen Zug. Nicht während des Ziehens: wer
     /// darauf hin speichert, soll einmal speichern und nicht vierzigmal.
     void appletsReordered();
+
+    // ── Ablösen — EIN Weg, und der ist der Menüpunkt ─────────────────
+    //
+    // OE5SOS, 2026-08-17. Eine erste Fassung hatte auch ein Ziehen über
+    // eine seitliche Schwelle; sie ist wieder heraus.
+    //
+    // Der Grund ist keine Geschmacksfrage. AetherSDR hat für dieselbe
+    // Sache genau das getan, und ausdrücklich wegen Abstürzen beim
+    // Umhängen über Top-Level-Grenzen:
+    //
+    //   #2495 — QRhiWidget behält beim Reparent einen Aufräum-Rückruf
+    //           auf freigegebenen Zustand; float/dock verdirbt die GPU-
+    //           Darstellung, und beim Beenden stürzt es ab. AetherSDR
+    //           räumt deshalb JEDES QRhiWidget-Kind vor jedem Reparent
+    //           ab (prepareRhiChildrenForReparent, an drei Stellen in
+    //           containers/ContainerManager.cpp).
+    //   #4319 — D3D11 bricht, wenn beim Herauslösen Texturen neu
+    //           angelegt werden.
+    //   #4617 — dieselbe Familie.
+    //
+    // Nachgesehen: AetherSDRs Applet-Ziehen ist ein QDrag mit der
+    // Kennung "application/x-aethersdr-applet", und die einzige Stelle,
+    // die den Wurf annimmt, ist der eigene Rollbereich der Spalte
+    // (AppletPanel.cpp:160-230, AppletDropArea). Ein Zug endet dort
+    // IMMER in einem Umsortieren. Das Ablösen läuft über die
+    // Andockarten des ContainerWidget — ein bewusster, einzelner Pfad.
+    //
+    // NereusSDR macht es genauso: Ziehen bleibt auf das Umsortieren
+    // innerhalb der Spalte beschränkt, wo kein Fensterwechsel
+    // stattfindet. Bequemlichkeit später, wenn der Pfad nachweislich
+    // hält.
+    //
+    // Das Panel löst auch jetzt NICHT selbst ab: es kennt weder die
+    // Fensterliste noch das Profil, und ein Widget, das sich selbst aus
+    // seinem Elternteil herausoperiert, ist der kürzeste Weg zu einem
+    // Zeiger, den zwei Stellen zu halten glauben. MainWindow hört zu
+    // und macht die Arbeit.
+    //
+    /// `dockIndex` ist die Stelle, an der das Applet stand — sie muss
+    /// mit hinaus, weil das Applet nach dem Ausbau nicht mehr sagen
+    /// kann, wo es herkam.
+    void appletDetachRequested(AppletWidget* applet, int dockIndex);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -153,11 +209,16 @@ private:
     int  appletPosForStackIndex(int stackIndex) const;
     void dragTo(int globalY);
 
+    /// Das Kontextmenü einer Titelleiste — der einzige Weg zum Ablösen.
+    void showTitleBarMenu(QWidget* titleBar, const QPoint& globalPos);
+
     QMap<QWidget*, QWidget*> m_titleBars;   // Titelleiste → Hülle
     AppletWidget* m_dragApplet{nullptr};
     int  m_dragStartY{0};
     bool m_dragging{false};
     /// Erst ab hier ist es ein Zug und kein verwackelter Klick.
+    /// Senkrecht gemessen — waagerecht gibt es nichts zu tun, siehe die
+    /// Begründung bei appletDetachRequested.
     static constexpr int kDragThresholdPx = 4;
     QWidget*      m_headerWidget  = nullptr;   // header widget for dynamic resize
     QWidget*      m_headerWrapper = nullptr;   // title-bar wrapper of the header

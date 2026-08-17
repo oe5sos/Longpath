@@ -566,7 +566,12 @@ void ContainerManager::saveState()
         for (const QString& oldId : oldIdList.split(QLatin1Char(','))) {
             s.remove(QStringLiteral("ContainerData_%1").arg(oldId));
             s.remove(QStringLiteral("ContainerItems_%1").arg(oldId));
-            s.remove(QStringLiteral("MeterDisplay_%1_Geometry").arg(oldId));
+            // MeterDisplay_<id>_Geometry wird hier NICHT mehr gelöscht.
+            // Es stand in dieser Schleife, solange dieselbe Funktion den
+            // Schlüssel gleich darauf neu schrieb. Seit sie das nicht
+            // mehr tut (2026-08-16), wäre ein Löschen hier endgültig:
+            // der Rückfall verschwände beim ersten Beenden nach dem
+            // Update, also genau bevor er gebraucht wird.
         }
     }
 
@@ -590,9 +595,17 @@ void ContainerManager::saveState()
                        meter->serializeItems());
         }
         idList << c->id();
-        if (m_floatingForms.contains(c->id())) {
-            m_floatingForms[c->id()]->saveGeometry();
-        }
+        // Hier stand bis 2026-08-16:
+        //     m_floatingForms[c->id()]->saveGeometry();
+        //
+        // Seit der Entscheidung „das Profil besitzt die Geometrie, das
+        // Fenster meldet sie nur" schreibt diese Stelle nicht mehr.
+        // MeterDisplay_<id>_Geometry bleibt als Rückfall LESBAR — der
+        // Schlüssel wird nicht entfernt, damit bestehende Anordnungen
+        // den ersten Start nach dem Update überleben, solange das
+        // Profil zu diesem Container noch nichts sagt. Geschrieben wird
+        // er nicht mehr, sonst gäbe es wieder zwei Besitzer für eine
+        // Zahl, und der eine hinge am Beenden, der andere am Profil.
     }
 
     s.setValue(QStringLiteral("ContainerIdList"), idList.join(QLatin1Char(',')));
@@ -600,6 +613,72 @@ void ContainerManager::saveState()
     saveSplitterState();
 
     qCDebug(lcContainer) << "Saved" << m_containers.size() << "container(s)";
+}
+
+QVariantMap ContainerManager::floatingGeometries() const
+{
+    QVariantMap out;
+    for (auto it = m_containers.constBegin(); it != m_containers.constEnd();
+         ++it) {
+        ContainerWidget* c = it.value();
+        if (!c || !c->isFloating()) { continue; }
+        FloatingContainer* form = m_floatingForms.value(it.key(), nullptr);
+        if (!form) { continue; }
+        const QRect g = form->geometry();
+        QVariantMap one;
+        one.insert(QStringLiteral("x"), g.x());
+        one.insert(QStringLiteral("y"), g.y());
+        one.insert(QStringLiteral("w"), g.width());
+        one.insert(QStringLiteral("h"), g.height());
+        out.insert(it.key(), one);
+    }
+    return out;
+}
+
+void ContainerManager::applyFloatingGeometries(const QVariantMap& geometries)
+{
+    for (auto it = geometries.constBegin(); it != geometries.constEnd(); ++it) {
+        FloatingContainer* form = m_floatingForms.value(it.key(), nullptr);
+        if (!form) { continue; }
+        const QVariantMap one = it.value().toMap();
+        const QRect g(one.value(QStringLiteral("x")).toInt(),
+                      one.value(QStringLiteral("y")).toInt(),
+                      one.value(QStringLiteral("w")).toInt(),
+                      one.value(QStringLiteral("h")).toInt());
+        if (!g.isValid()) { continue; }
+        form->setGeometry(g);
+        // Sofort prüfen statt zu hoffen: das Rechteck kommt aus einem
+        // Profil, das auf einem anderen Schreibtisch angelegt worden
+        // sein kann.
+        form->ensureVisiblePosition(m_dockParent);
+    }
+}
+
+void ContainerManager::clear(bool keepPanelContainer)
+{
+    // Über eine Kopie der Kennungen, nicht über die Karte selbst:
+    // destroyContainer nimmt den Eintrag heraus, während wir liefen.
+    const QList<QString> ids = m_containers.keys();
+    int removed = 0;
+    for (const QString& id : ids) {
+        if (keepPanelContainer && id == m_panelContainerId) {
+            continue;
+        }
+        destroyContainer(id);
+        removed++;
+    }
+    if (!keepPanelContainer) {
+        m_panelContainerId.clear();
+    }
+
+    // destroyContainer arbeitet mit deleteLater(), die alten Widgets
+    // leben also noch bis zum nächsten Durchlauf der Ereignisschleife.
+    // Für den Splitter ist das trotzdem sauber: setParent(nullptr) dort
+    // hängt sie SOFORT aus, und hide() nimmt die freistehenden Fenster
+    // sofort vom Schirm. Ein clear() + restoreState() im selben Zug
+    // zeigt darum nie zwei Sätze gleichzeitig.
+    qCDebug(lcContainer) << "Cleared" << removed << "container(s); panel"
+                          << (keepPanelContainer ? "kept" : "removed");
 }
 
 void ContainerManager::restoreState()
@@ -615,8 +694,19 @@ void ContainerManager::restoreState()
 
     QStringList ids = idList.split(QLatin1Char(','), Qt::SkipEmptyParts);
     int restored = 0;
+    int skipped = 0;
 
     for (const QString& id : ids) {
+        // #99: eine Kennung, die schon lebt, wird nicht ein zweites Mal
+        // angelegt. Ohne diese Zeile überschrieb QMap::insert weiter
+        // unten den Zeiger und liess das alte Widget sichtbar und
+        // herrenlos zurück. Wer ersetzen will, ruft vorher clear().
+        if (m_containers.contains(id)) {
+            qCDebug(lcContainer) << "restoreState: id already live, skipping:" << id;
+            skipped++;
+            continue;
+        }
+
         QString data = s.value(QStringLiteral("ContainerData_%1").arg(id)).toString();
         if (data.isEmpty()) {
             continue;
@@ -695,6 +785,16 @@ void ContainerManager::restoreState()
             }
             break;
         case DockMode::Floating:
+            // Das gespeicherte Rechteck steht hier bereits: setId() oben
+            // ruft restoreGeometry() (FloatingContainer.cpp:88, aus
+            // Thetis frmMeterDisplay.cs:150-156 — "setting ID triggers
+            // geometry restore"). Kein zweiter Aufruf an dieser Stelle,
+            // er läse denselben Schlüssel noch einmal.
+            //
+            // Danach prüft ensureVisiblePosition (in setMeterFloating):
+            // ein Rechteck auf einem Schirm, nicht bei (0,0) und gross
+            // genug, bleibt unangetastet — eingegriffen wird genau dann,
+            // wenn der Monitor beim Start nicht mehr da ist.
             container->resize(floatingForm->size());
             setMeterFloating(container, floatingForm);
             if (container->isContainerEnabled() && !container->isHiddenByMacro()) {
@@ -716,7 +816,8 @@ void ContainerManager::restoreState()
     }
 
     restoreSplitterState();
-    qCDebug(lcContainer) << "Restored" << restored << "container(s)";
+    qCDebug(lcContainer) << "Restored" << restored << "container(s),"
+                          << skipped << "skipped (already live)";
 }
 
 } // namespace NereusSDR

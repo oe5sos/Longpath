@@ -1,6 +1,7 @@
 #include "HistoryGraphItemEditor.h"
 #include "gui/styles/ThemeQss.h"
 #include "../../meters/HistoryGraphItem.h"
+#include "../../instruments/ReadingSource.h"
 #include "../../meters/MeterPoller.h"
 
 #include <QCheckBox>
@@ -142,27 +143,14 @@ void HistoryGraphItemEditor::buildTypeSpecific()
     addHeader(QStringLiteral("Axis 1 Binding"));
 
     m_comboBinding1 = new QComboBox(this);
-    struct B { int id; const char* label; };
-    static const B kBindings[] = {
-        {MeterBinding::SignalPeak,      "RX: Signal Peak"},
-        {MeterBinding::SignalAvg,       "RX: Signal Avg"},
-        {MeterBinding::AdcPeak,         "RX: ADC Peak"},
-        {MeterBinding::AdcAvg,          "RX: ADC Avg"},
-        {MeterBinding::AgcGain,         "RX: AGC Gain"},
-        {MeterBinding::AgcPeak,         "RX: AGC Peak"},
-        {MeterBinding::AgcAvg,          "RX: AGC Avg"},
-        {MeterBinding::TxPower,         "TX: Forward Power"},
-        {MeterBinding::TxReversePower,  "TX: Reverse Power"},
-        {MeterBinding::TxSwr,           "TX: SWR"},
-        {MeterBinding::TxMic,           "TX: Mic"},
-        {MeterBinding::TxAlc,           "TX: ALC"},
-        {MeterBinding::HwVolts,         "HW: Volts"},
-        {MeterBinding::HwAmps,          "HW: Amps"},
-        {MeterBinding::HwTemperature,   "HW: Temperature"},
-    };
+    // Zweite Schreibung derselben Liste, bis 2026-08-17 — und eine
+    // kürzere: sie kannte 15 der 27 Größen, ohne dass irgendwo stand,
+    // warum die anderen zwölf für einen Verlaufsgraphen nicht taugen
+    // sollten. Jetzt aus ReadingSource.h, also vollständig und mit den
+    // beiden anderen Auswahllisten deckungsgleich.
     m_comboBinding1->addItem(QStringLiteral("(none)"), -1);
-    for (const auto& b : kBindings) {
-        m_comboBinding1->addItem(QString::fromLatin1(b.label), b.id);
+    for (const ReadingDescriptor& d : allReadings()) {
+        m_comboBinding1->addItem(d.label, d.bindingId);
     }
     addRow(QStringLiteral("Binding axis 1"), m_comboBinding1);
     connect(m_comboBinding1, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int) {

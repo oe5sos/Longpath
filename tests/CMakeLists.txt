@@ -4863,6 +4863,52 @@ nereus_add_test(tst_layout_profiles)
 #    Anordnung von vor einem Update, die ein neues Widget nicht kennt --
 nereus_add_test(tst_applet_reorder)
 
+# -- Ein Applet aus der Spalte in ein eigenes Fenster und zurueck.
+#    Drei Eigenschaften:
+#      * KEIN Zug loest ab, in keine Richtung. Das ist der Zaun um
+#        einen bekannten Absturz, nicht eine Geschmacksfrage:
+#        AetherSDR hat das Ablosen aus demselben Grund auf einen
+#        einzigen bewussten Pfad gelegt (#2495 QRhiWidget mit
+#        Aufraum-Rueckruf auf freigegebenem Zustand beim Reparent ueber
+#        Top-Level-Grenzen, #4319 D3D11, #4617).
+#      * Der Menuepunkt tut es wirklich -- ein einziger Pfad, den
+#        niemand prueft, tut eines Tages stillschweigend nichts mehr.
+#      * Das Eigentum: releaseApplet gibt das Applet lebend heraus, wer
+#        nicht freigibt nimmt es mit. MainWindow haelt rohe Zeiger auf
+#        jedes Applet -- ein Fenster, das seines mitnimmt, laesst den
+#        naechsten Zugriff aus einer ganz anderen Ecke ins Leere
+#        laufen.
+#    Wo ein gezeigtes Fenster LANDET, wird bewusst nicht geprueft: das
+#    entscheidet der Fensterverwalter --
+nereus_add_test(tst_applet_detach)
+
+# -- Die Quellenliste der Instrumente und die Kennlinie der
+#    Empfangsskala. Der Kern ist die S-Stauchung, und zwar als
+#    STUETZSTELLEN: S0 auf 0, S9 auf 0,66, S9+60 auf 1. Eine
+#    Monotonieprüfung haette jede krumme Kennlinie durchgelassen,
+#    solange sie nur steigt -- und eine Skala, auf der S9 nicht dort
+#    sitzt, wo der Betreiber sie gezeichnet hat, ist eine andere Skala.
+#    Dazu: unter S9 gleichmaessig, darueber gestaucht, und die
+#    Stauchung eine einmalige Aenderung der Teilung statt einer
+#    fortlaufenden Kruemmung --
+nereus_add_test(tst_reading_source)
+
+# -- Die Geometrie der Instrumente: Anteil -> Ort, fuer Bogen und
+#    Gerade. Laufen die beiden auseinander, zeigen zwei Instrumente
+#    denselben Wert an verschiedenen Stellen. Enthaelt die Pruefung,
+#    dass 90 Grad NACH OBEN zeigt -- ein Vorzeichenfehler dort stellt
+#    jedes Zeigerinstrument auf den Kopf, und zwar so, dass es auf den
+#    ersten Blick plausibel aussieht --
+nereus_add_test(tst_instrument_spine)
+
+# -- Ein Instrument ohne Messung darf keine Zahl zeigen. Befund vom
+#    2026-08-17: die Stehwelle stand ohne Verbindung auf 1.00, Spitze
+#    1.00, Zeiger am Anschlag. 1,00 ist ein hervorragendes SWR -- ein
+#    Instrument, das ohne Messung ein hervorragendes Ergebnis anzeigt,
+#    luegt in die beruhigende Richtung, und bei einer Anzeige, an der
+#    man abliest, ob man senden darf, ist das die falsche --
+nereus_add_test(tst_instrument_no_reading)
+
 # -- Schritt 1 des Wasserfall-Umbaus (#100): die Historie haelt
 #    Intensitaet statt fertiger Farbe, blockweise belegt. Geprueft wird
 #    vor allem, dass der Speicher WIRKLICH erst beim Beschreiben

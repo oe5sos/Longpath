@@ -1,0 +1,201 @@
+#pragma once
+
+// =================================================================
+// src/gui/instruments/InstrumentSpine.h  (NereusSDR)
+// =================================================================
+//
+// NereusSDR-original.
+//
+// ── Die Geometrie zweimal, die Mittel einmal ─────────────────────────
+//
+// OE5SOS, 2026-08-17: „sag, welchen gemeinsamen Zeichenweg du für
+// Mulde, Verlauf und Glut vorsiehst — die drei Mittel sollen an einer
+// Stelle stehen, nicht dreimal."
+//
+// Die drei Mittel stehen in InstrumentPainter, genau einmal. Sie
+// müssen aber zwei Formen bedienen: den Bogen (Zeigerinstrument,
+// VFO B) und die Gerade (Balken, VFO A). Der Betreiber hat es selbst
+// so beschrieben: „die Rille der Zeiger, gerade gezogen".
+//
+// Also trennt diese Datei, was verschieden ist, von dem, was gleich
+// ist. Eine Spine beantwortet, WO etwas liegt; der Painter weiss, WIE
+// es aussieht. Fünf Ansichten fallen daraus:
+//
+//   Zeigerinstrument   ArcSpine
+//   Balkeninstrument   LinearSpine
+//   VFO A Bandstreifen LinearSpine, breit und flach
+//   VFO B flacher Bogen ArcSpine, grosser Radius, kleiner Sweep
+//   VFO C nur die Zahl  keine Spine — nur die Glut
+//
+// ── Anteile, keine Werte ─────────────────────────────────────────────
+//
+// Eine Spine kennt keine Messgrössen. Sie rechnet mit Anteilen 0..1;
+// die Umrechnung Wert → Anteil macht ReadingDescriptor::fraction(),
+// weil dort die Kennlinie steht (die Empfangsskala ist nicht linear).
+// Eine Geometrie, die Skalen kennt, wäre die dritte Stelle, an der
+// eine S-Stauchung stehen könnte.
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
+// =================================================================
+
+#include <QBrush>
+#include <QLineF>
+#include <QPainterPath>
+#include <QPointF>
+#include <QRectF>
+
+namespace NereusSDR {
+
+class Spine {
+public:
+    virtual ~Spine() = default;
+
+    // ── Die Mulde ────────────────────────────────────────────────────
+
+    /// Der Pfad der Rille, zu STREICHEN mit troughWidth().
+    virtual QPainterPath troughPath() const = 0;
+    virtual qreal        troughWidth() const = 0;
+
+    /// Die dunkle Kante an der oberen bzw. äusseren Begrenzung der
+    /// Mulde. Ebenfalls zu streichen, mit shadowWidth().
+    virtual QPainterPath shadowPath() const = 0;
+    virtual qreal        shadowWidth() const = 0;
+
+    /// Der Abschnitt der Rille von Anteil a bis b — für den roten
+    /// Bereich oberhalb der Schwelle. Ebenfalls zu streichen.
+    virtual QPainterPath troughSpan(qreal a, qreal b) const = 0;
+
+    // ── Der auslaufende Verlauf ──────────────────────────────────────
+
+    /// Die Fläche, die der Verlauf bis zum Anteil f bedeckt — zu
+    /// FÜLLEN mit fadeBrush().
+    ///
+    /// Was das ist, entscheidet die Geometrie, und die beiden Entwürfe
+    /// meinen Verschiedenes: beim Bogen ist es der Sektor vom
+    /// Drehpunkt bis unter die Rille („er trägt die Fläche, ohne sie
+    /// zu füllen"), bei der Geraden das Innere der Mulde selbst.
+    virtual QPainterPath fillArea(qreal f) const = 0;
+
+    /// Der Pinsel dazu: innen null, aussen etwa ein Viertel.
+    ///
+    /// Die ACHSE ist geometrieabhängig, und das ist keine Nachlässigkeit
+    /// — sie steht in den Entwürfen des Betreibers so. Beim Bogen läuft
+    /// der Verlauf radial vom Drehpunkt nach aussen, bei der Geraden
+    /// längs der Werteachse. „Aussen" heisst in beiden Formen „fern vom
+    /// Anfang", nur liegt der Anfang einmal im Drehpunkt und einmal am
+    /// linken Rand.
+    virtual QBrush fadeBrush(const QColor& c) const = 0;
+
+    // ── Die Glut ─────────────────────────────────────────────────────
+
+    /// Die Fläche, über die die Glut verläuft.
+    virtual QRectF glowBounds() const = 0;
+
+    /// Beschneidung der Glut, oder ein leerer Pfad für „nicht
+    /// beschneiden". Beim Bogen ist das die halbe Scheibe über dem
+    /// Drehpunkt — die Glut soll „über gut die halbe Höhe reichen und
+    /// dort verschwinden", nicht als voller Kreis unter das Instrument
+    /// laufen.
+    virtual QPainterPath glowClip() const = 0;
+
+    // ── Teilung und Marken ───────────────────────────────────────────
+
+    /// Teilstrich bei Anteil f, `len` lang, von der Rille nach innen.
+    virtual QLineF tick(qreal f, qreal len) const = 0;
+
+    /// Ankerpunkt für eine Beschriftung bei Anteil f, `off` von der
+    /// Rille entfernt. Der Text wird darum zentriert.
+    virtual QPointF labelAnchor(qreal f, qreal off) const = 0;
+
+    /// Linie quer durch die Rille bei Anteil f — für die helle Kante
+    /// am Wert, die Bandkanten und die Schwellenmarke. `outward` und
+    /// `inward` verlängern über die Mulde hinaus.
+    virtual QLineF crossAt(qreal f, qreal outward, qreal inward) const = 0;
+};
+
+// ── Bogen ────────────────────────────────────────────────────────────
+
+class ArcSpine : public Spine {
+public:
+    /// `centre` ist der Drehpunkt, `radius` die MITTE der Rille,
+    /// `width` ihre Dicke. `deg0` gehört zu Anteil 0, `deg1` zu 1;
+    /// gemessen wie in der Mathematik (0° = rechts, gegen den
+    /// Uhrzeigersinn), also im Entwurf 168° → 12°.
+    ArcSpine(QPointF centre, qreal radius, qreal width,
+             qreal deg0, qreal deg1);
+
+    /// Innenradius des Sektors. Vorgabe 12 px wie im Entwurf; beim
+    /// sehr flachen VFO-Bogen setzt der Aufrufer ihn dicht unter die
+    /// Rille, sonst liefe der Sektor über das halbe Fenster.
+    void setSectorInnerRadius(qreal r) { m_sectorInner = r; }
+
+    /// Wie weit die Glut vom Drehpunkt reicht, als Anteil des Radius.
+    void setGlowExtent(qreal f) { m_glowExtent = f; }
+
+    QPointF centre() const { return m_c; }
+    qreal   radius() const { return m_r; }
+
+    /// Der Winkel zu einem Anteil — die Zeiger brauchen ihn direkt.
+    qreal degreeAt(qreal f) const;
+    /// Der Punkt bei Radius r und Winkel deg.
+    QPointF pointAt(qreal r, qreal deg) const;
+
+    QPainterPath troughPath() const override;
+    qreal        troughWidth() const override { return m_w; }
+    QPainterPath shadowPath() const override;
+    qreal        shadowWidth() const override;
+    QPainterPath troughSpan(qreal a, qreal b) const override;
+    QPainterPath fillArea(qreal f) const override;
+    QBrush       fadeBrush(const QColor& c) const override;
+    QRectF       glowBounds() const override;
+    QPainterPath glowClip() const override;
+    QLineF       tick(qreal f, qreal len) const override;
+    QPointF      labelAnchor(qreal f, qreal off) const override;
+    QLineF       crossAt(qreal f, qreal outward, qreal inward) const override;
+
+private:
+    QPainterPath arcPath(qreal r, qreal d0, qreal d1) const;
+    QPainterPath sectorPath(qreal rOut, qreal rIn, qreal d0, qreal d1) const;
+
+    QPointF m_c;
+    qreal   m_r{0};
+    qreal   m_w{0};
+    qreal   m_deg0{0};
+    qreal   m_deg1{0};
+    qreal   m_sectorInner{12.0};
+    qreal   m_glowExtent{0.62};
+};
+
+// ── Gerade ───────────────────────────────────────────────────────────
+
+class LinearSpine : public Spine {
+public:
+    /// `trough` ist das Rechteck der Mulde selbst.
+    LinearSpine(QRectF trough, qreal cornerRadius = 3.0);
+
+    QRectF troughRect() const { return m_r; }
+    /// Die x-Stelle zu einem Anteil.
+    qreal xAt(qreal f) const;
+
+    QPainterPath troughPath() const override;
+    qreal        troughWidth() const override { return m_r.height(); }
+    QPainterPath shadowPath() const override;
+    qreal        shadowWidth() const override { return 2.0; }
+    QPainterPath troughSpan(qreal a, qreal b) const override;
+    QPainterPath fillArea(qreal f) const override;
+    QBrush       fadeBrush(const QColor& c) const override;
+    QRectF       glowBounds() const override;
+    QPainterPath glowClip() const override;
+    QLineF       tick(qreal f, qreal len) const override;
+    QPointF      labelAnchor(qreal f, qreal off) const override;
+    QLineF       crossAt(qreal f, qreal outward, qreal inward) const override;
+
+private:
+    QRectF m_r;
+    qreal  m_rad{3.0};
+};
+
+} // namespace NereusSDR

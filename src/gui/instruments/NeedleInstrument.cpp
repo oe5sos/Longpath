@@ -1,0 +1,233 @@
+// =================================================================
+// src/gui/instruments/NeedleInstrument.cpp  (NereusSDR)
+// =================================================================
+// Siehe NeedleInstrument.h. Fast alles Sichtbare kommt aus
+// InstrumentPainter; hier stehen Zeiger, Nachlaufzeiger und die
+// Umrechnung von Fenstergrösse auf Bogenmasse.
+// =================================================================
+
+#include "gui/instruments/NeedleInstrument.h"
+
+#include "gui/instruments/InstrumentFooter.h"
+#include "gui/instruments/InstrumentPainter.h"
+#include "gui/instruments/InstrumentSpine.h"
+#include "gui/instruments/ReadingSource.h"
+
+#include <QPainter>
+#include <QVBoxLayout>
+
+namespace NereusSDR {
+
+namespace {
+
+// ── Bogenmasse ───────────────────────────────────────────────────────
+//
+// Der Entwurf zeichnet in ein 520 × 190 grosses Feld mit Drehpunkt
+// (260, 168), Radius 148 und Rillenbreite 13 — also Drehpunkt knapp
+// über der Unterkante, Radius etwa 0,285 der Breite, Rille 0,088 des
+// Radius. Diese drei Verhältnisse sind das, was mitwächst; die
+// absoluten Zahlen des Entwurfs gelten nur für seine Feldgrösse.
+constexpr double kRadiusOfWidth   = 148.0 / 520.0;
+constexpr double kTroughOfRadius  =  13.0 / 148.0;
+constexpr double kPivotFromBottom =  22.0 / 190.0;   // 190 - 168
+
+/// Der Sweep aus dem Entwurf: 168 Grad links, 12 Grad rechts.
+constexpr double kDeg0 = 168.0;
+constexpr double kDeg1 =  12.0;
+
+} // namespace
+
+NeedleInstrument::NeedleInstrument(QWidget* parent)
+    : QWidget(parent)
+{
+    auto* lay = new QVBoxLayout(this);
+    lay->setContentsMargins(10, 8, 14, 10);
+    lay->setSpacing(0);
+    lay->addStretch(1);                 // die Fläche, in die gemalt wird
+    m_footer = new InstrumentFooter(this);
+    lay->addWidget(m_footer, 0);
+
+    m_peakAge.start();
+}
+
+bool NeedleInstrument::setPrimary(int bindingId)
+{
+    const ReadingDescriptor* d = readingFor(bindingId);
+    // Ohne belegte Skala kein Instrument. Lieber eine abgelehnte
+    // Auswahl als ein Zifferblatt, dessen Bereich niemand verantwortet.
+    if (!d || !d->hasScale) { return false; }
+    m_primary = bindingId;
+    // Kein Startwert. Ein Instrument, dem man die Grösse zuweist, hat
+    // deswegen noch nichts gemessen.
+    clearValue();
+    return true;
+}
+
+bool NeedleInstrument::setSecondary(int bindingId)
+{
+    if (bindingId < 0) { m_secondary = -1; m_hasSecond = false; update(); return true; }
+    const ReadingDescriptor* d = readingFor(bindingId);
+    if (!d || !d->hasScale) { return false; }
+    m_secondary = bindingId;
+    m_hasSecond = false;
+    update();
+    return true;
+}
+
+void NeedleInstrument::clearValue()
+{
+    m_hasValue = false;
+    m_hasSecond = false;
+    refreshFooter();
+    update();
+}
+
+void NeedleInstrument::onReading(int bindingId, double value)
+{
+    if (bindingId == m_primary) {
+        m_value = value;
+        if (!m_hasValue) {
+            // Die erste Messung ist auch die erste Spitze — sonst
+            // stünde als Spitze der Anfang der Skala.
+            m_peak = value;
+            m_peakAge.restart();
+            m_hasValue = true;
+        } else {
+            notePeak(value);
+        }
+        refreshFooter();
+        update();
+    } else if (bindingId == m_secondary) {
+        m_secondValue = value;
+        m_hasSecond = true;
+        update();
+    }
+}
+
+void NeedleInstrument::notePeak(double value)
+{
+    if (value >= m_peak || m_peakAge.elapsed() > kPeakHoldMs) {
+        m_peak = value;
+        m_peakAge.restart();
+    }
+}
+
+void NeedleInstrument::refreshFooter()
+{
+    const ReadingDescriptor* d = readingFor(m_primary);
+    if (!d || !m_footer) { return; }
+    m_footer->setCaption(d->thetisName());
+
+    if (!m_hasValue) {
+        // Gedankenstrich statt Zahl, und in der matten Farbe: ein
+        // Strich ist keine Messung und soll auch nicht wie eine
+        // aussehen. Die GRENZE bleibt stehen — sie ist eine
+        // Eigenschaft der Skala und stimmt auch ohne Messung. Wenn du
+        // sie auch weg willst, ist es eine Zeile.
+        m_footer->setValueText(QStringLiteral("—"));
+        m_footer->setValueColour(Instrument::measuredDim());
+        m_footer->setPeakAndLimit(
+            QStringLiteral("—"),
+            d->threshold.has_value() ? d->text(d->threshold.value()) : QString());
+        return;
+    }
+
+    m_footer->setValueText(d->unit.isEmpty()
+                               ? d->text(m_value)
+                               : QStringLiteral("%1 %2")
+                                     .arg(d->text(m_value), d->unit));
+    m_footer->setValueColour(Instrument::valueColour(*d, m_value));
+    m_footer->setPeakAndLimit(
+        d->text(m_peak),
+        d->threshold.has_value() ? d->text(d->threshold.value()) : QString());
+}
+
+void NeedleInstrument::paintEvent(QPaintEvent*)
+{
+    const ReadingDescriptor* d = readingFor(m_primary);
+    if (!d || !d->hasScale) { return; }
+
+    const int footerH = m_footer ? m_footer->height() : 0;
+    const QRectF face(0, 0, width(), qMax(0, height() - footerH));
+    if (face.width() < 40.0 || face.height() < 30.0) { return; }
+
+    const qreal radius = face.width() * kRadiusOfWidth;
+    const qreal trough = radius * kTroughOfRadius;
+    const QPointF pivot(face.center().x(),
+                        face.bottom() - face.height() * kPivotFromBottom);
+
+    ArcSpine spine(pivot, radius, trough, kDeg0, kDeg1);
+
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const double f = d->fraction(m_value);
+    const QColor col = Instrument::valueColour(*d, m_value);
+    const double thresholdF = d->threshold.has_value()
+                                  ? d->fraction(d->threshold.value())
+                                  : -1.0;
+
+    // ── Ohne Messung nur das Zifferblatt ─────────────────────────────
+    //
+    // Mulde und Teilung ja — sie sagen, WAS hier gemessen würde. Glut,
+    // Sektor, Zeiger, Nachlaufzeiger und Wertkante nein: jedes davon
+    // behauptet eine Zahl.
+    if (!m_hasValue) {
+        Instrument::paintTrough(p, spine, thresholdF);
+        Instrument::paintTicks(p, spine, *d);
+        // Die Nabe bleibt: sie ist der Drehpunkt des Instruments, kein
+        // Messwert. Ein Zifferblatt ohne Nabe sähe unfertig aus statt
+        // ruhig.
+        p.setPen(QPen(Instrument::measuredDim(), 1.0));
+        p.setBrush(QColor(0x15, 0x15, 0x1a));
+        p.drawEllipse(pivot, 5.0, 5.0);
+        return;
+    }
+
+    // Reihenfolge wie im Entwurf: Glut ganz hinten, dann die Mulde,
+    // dann der Sektor, dann Teilung, Zeiger und Kante.
+    Instrument::paintGlow(p, spine, col);
+    Instrument::paintTrough(p, spine, thresholdF);
+    Instrument::paintFade(p, spine, f, col);
+    Instrument::paintTicks(p, spine, *d);
+
+    // Nachlaufzeiger: ein kurzer Strich am äusseren Rand, matt.
+    if (m_peak > m_value) {
+        const qreal deg = spine.degreeAt(d->fraction(m_peak));
+        QColor dim = Instrument::measuredDim();
+        dim.setAlphaF(0.6);
+        p.setPen(QPen(dim, 2.0, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(spine.pointAt(radius - trough / 2.0 - 16.0, deg),
+                   spine.pointAt(radius - trough / 2.0 - 3.0, deg));
+    }
+
+    // Die zweite Anzeige — nur ein Zeiger, kein zweiter Sektor und
+    // keine zweite Glut. Zwei auslaufende Sektoren übereinander werden
+    // matschig, und die Glut hat nur einen Drehpunkt.
+    if (const ReadingDescriptor* d2 = m_hasSecond ? readingFor(m_secondary)
+                                                  : nullptr) {
+        if (d2->hasScale) {
+            const qreal deg = spine.degreeAt(d2->fraction(m_secondValue));
+            p.setPen(QPen(Instrument::measuredDim(), 1.8, Qt::SolidLine,
+                          Qt::RoundCap));
+            p.drawLine(spine.pointAt(10.0, deg),
+                       spine.pointAt(radius - trough / 2.0 - 3.0, deg));
+        }
+    }
+
+    // Die helle Kante VOR dem Zeiger: das Auge soll den Wert finden,
+    // bevor es den Zeiger sucht.
+    Instrument::paintValueEdge(p, spine, f, col);
+
+    const qreal deg = spine.degreeAt(f);
+    p.setPen(QPen(col, 2.2, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(spine.pointAt(10.0, deg),
+               spine.pointAt(radius - trough / 2.0 - 3.0, deg));
+
+    // Die Nabe deckt den Zeigerfuss ab.
+    p.setPen(QPen(Instrument::measuredDim(), 1.0));
+    p.setBrush(QColor(0x15, 0x15, 0x1a));
+    p.drawEllipse(pivot, 5.0, 5.0);
+}
+
+} // namespace NereusSDR

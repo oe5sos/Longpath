@@ -41,6 +41,7 @@
 #include <QPushButton>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QContextMenuEvent>
 
 namespace NereusSDR {
 
@@ -216,6 +217,14 @@ void AppletPanelWidget::removeApplet(AppletWidget* applet)
     QWidget* wrapper = m_wrappers.value(applet, nullptr);
     if (wrapper) {
         m_stackLayout->removeWidget(wrapper);
+        // Die Titelleiste MIT austragen. Sie stirbt gleich als Kind der
+        // Hülle, ihr Eintrag in m_titleBars aber blieb stehen — ein
+        // Zeiger auf Gelöschtes in einer Karte, die der Ereignisfilter
+        // bei JEDEM Mausereignis befragt. Solange removeApplet nirgends
+        // aufgerufen wurde, war das folgenlos; mit dem Ablösen
+        // (2026-08-16) ist es der Normalfall.
+        const QList<QWidget*> bars = m_titleBars.keys(wrapper);
+        for (QWidget* b : bars) { m_titleBars.remove(b); }
         // Reparent applet out of the wrapper before deleting it
         applet->setParent(nullptr);
         applet->hide();
@@ -223,6 +232,14 @@ void AppletPanelWidget::removeApplet(AppletWidget* applet)
         m_wrappers.remove(applet);
     }
     m_applets.removeOne(applet);
+
+    // Ein Applet, das gerade gezogen wird und dabei ausgebaut wird, darf
+    // keinen Zeiger hinterlassen: der nächste Mausbericht griffe sonst
+    // auf etwas zu, das nicht mehr in dieser Spalte steht.
+    if (m_dragApplet == applet) {
+        m_dragApplet = nullptr;
+        m_dragging = false;
+    }
 }
 
 void AppletPanelWidget::setAppletVisible(AppletWidget* applet, bool visible)
@@ -395,6 +412,16 @@ bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
     AppletWidget* applet = appletForWrapper(wrapper);
 
     switch (event->type()) {
+    case QEvent::ContextMenu: {
+        // Der zuverlässige Weg. Auch erreichbar, wenn der Zug misslingt
+        // — auf einem Trackpad, mit einer zittrigen Hand, oder wenn die
+        // Spalte so breit gezogen ist, dass 40 px seitlich nicht
+        // ausreichen, um sie zu verlassen.
+        if (!applet) { break; }
+        auto* ce = static_cast<QContextMenuEvent*>(event);
+        showTitleBarMenu(bar, ce->globalPos());
+        return true;
+    }
     case QEvent::MouseButtonPress: {
         auto* me = static_cast<QMouseEvent*>(event);
         if (me->button() != Qt::LeftButton || !applet) { break; }
@@ -415,6 +442,9 @@ bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
             m_dragging = true;
             bar->setCursor(Qt::ClosedHandCursor);
         }
+        // Nur senkrecht, nur innerhalb dieser Spalte. Warum hier kein
+        // Ablösen stattfindet, steht bei appletDetachRequested im
+        // Header.
         dragTo(y);
         return true;
     }
@@ -434,6 +464,42 @@ bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
         break;
     }
     return QWidget::eventFilter(watched, event);
+}
+
+int AppletPanelWidget::appletPosition(AppletWidget* applet) const
+{
+    return m_applets.indexOf(applet);
+}
+
+QMenu* AppletPanelWidget::buildTitleBarMenuForTesting(AppletWidget* applet)
+{
+    if (!applet || !m_wrappers.contains(applet)) { return nullptr; }
+    auto* menu = new QMenu(this);
+    // Wortlaut vom Betreiber vorgegeben (2026-08-16). Die Auslösung
+    // hängt AN DER AKTION, nicht am Rückgabewert von exec() — nur so
+    // prüft ein Test denselben Weg, den der Bediener nimmt, statt einen
+    // nachgebauten daneben.
+    QAction* detach = menu->addAction(QStringLiteral("Als Fenster ablösen"));
+    connect(detach, &QAction::triggered, this,
+            [this, applet]() {
+        emit appletDetachRequested(applet, appletPosition(applet));
+    });
+    return menu;
+}
+
+void AppletPanelWidget::showTitleBarMenu(QWidget* titleBar,
+                                          const QPoint& globalPos)
+{
+    QWidget* wrapper = m_titleBars.value(titleBar, nullptr);
+    AppletWidget* applet = appletForWrapper(wrapper);
+    if (!applet) { return; }
+
+    QMenu* menu = buildTitleBarMenuForTesting(applet);
+    if (!menu) { return; }
+    // Kein WA_DeleteOnClose dazu: das schlösse mit dem deleteLater()
+    // unten zwei Freigaben für dasselbe Menü ein.
+    menu->exec(globalPos);
+    menu->deleteLater();
 }
 
 void AppletPanelWidget::dragTo(int globalY)

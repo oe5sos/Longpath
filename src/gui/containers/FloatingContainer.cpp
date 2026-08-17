@@ -57,10 +57,9 @@ mw0lge@grange-lane.co.uk
 #include "ContainerWidget.h"
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
+#include "gui/WindowPlacement.h"
 
 #include <QCloseEvent>
-#include <QGuiApplication>
-#include <QScreen>
 #include <QVBoxLayout>
 
 namespace NereusSDR {
@@ -204,55 +203,15 @@ void FloatingContainer::restoreGeometry()
 
 void FloatingContainer::ensureVisiblePosition(QWidget* anchor)
 {
-    // A frameless Qt::Window with no explicit position defaults to (0,0)
-    // on Windows, where it's usually obscured by the main application
-    // window — which is how Container #0 "disappeared" when first
-    // floated. Saved geometry at (0,0) (e.g., after the user closed the
-    // invisible form) perpetuates the trap across restarts.
-    const QRect g = geometry();
-    const int minW = ContainerWidget::kMinContainerWidth;
-    const int minH = ContainerWidget::kMinContainerHeight;
-
-    bool onScreen = false;
-    for (QScreen* s : QGuiApplication::screens()) {
-        if (s && s->availableGeometry().intersects(g)) {
-            onScreen = true;
-            break;
-        }
-    }
-    const bool atOrigin = (g.x() == 0 && g.y() == 0);
-    if (onScreen && !atOrigin && g.width() >= minW && g.height() >= minH) {
-        return;
-    }
-
-    QScreen* screen = nullptr;
-    QRect anchorRect;
-    if (anchor && anchor->window()) {
-        screen = anchor->window()->screen();
-        anchorRect = anchor->window()->geometry();
-    }
-    if (!screen) {
-        screen = QGuiApplication::primaryScreen();
-    }
-    const QRect avail = screen ? screen->availableGeometry()
-                               : QRect(100, 100, 800, 600);
-
-    const int w = qMax(g.width(),  minW > 0 ? minW : 260);
-    const int h = qMax(g.height(), minH > 24 ? minH : 300);
-
-    int x = anchorRect.isValid()
-        ? anchorRect.center().x() - w / 2
-        : avail.x() + (avail.width()  - w) / 2;
-    int y = anchorRect.isValid()
-        ? anchorRect.center().y() - h / 2
-        : avail.y() + (avail.height() - h) / 2;
-
-    x = qBound(avail.x(), x, avail.right()  - w);
-    y = qBound(avail.y(), y, avail.bottom() - h);
-
-    setGeometry(x, y, w, h);
-    qCDebug(lcContainer) << "FloatingContainer: repositioned to visible area"
-                          << QRect(x, y, w, h) << "on screen" << (screen ? screen->name() : QStringLiteral("(null)"));
+    // Der Rumpf steht seit 2026-08-16 als freie Funktion in
+    // gui/WindowPlacement.h — Verhalten unverändert, nur nicht mehr an
+    // dieser Klasse festgewachsen, damit die Applet-Fenster dieselbe
+    // Lösung benutzen statt einer zweiten. Die zwei bekannten Schwächen
+    // ((0,0) als Sonderfall, ein Bildpunkt Überlappung genügt) sind dort
+    // dokumentiert und bewusst stehen geblieben.
+    ensureOnVisibleScreen(this, anchor,
+                          QSize(ContainerWidget::kMinContainerWidth,
+                                ContainerWidget::kMinContainerHeight));
 }
 
 void FloatingContainer::updateTitle()

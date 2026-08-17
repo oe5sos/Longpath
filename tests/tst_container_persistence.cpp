@@ -311,6 +311,116 @@ private slots:
         qDeleteAll(overlaysOnly);
         qDeleteAll(mixed);
     }
+
+    // ── #99: Herstellen darf nicht verdoppeln ────────────────────────
+    //
+    // restoreState() legte für JEDE gespeicherte Kennung ein frisches
+    // ContainerWidget und ein frisches FloatingContainer an und schob
+    // beide in die Karten. Beim zweiten Aufruf überschrieb
+    // QMap::insert nur den Zeiger — das alte Widget wurde nicht
+    // gelöscht, blieb am Splitter hängen und blieb sichtbar. Sobald
+    // Container in die Layout-Profile wandern, ist genau das ein
+    // Profilwechsel, und jeder hätte eine weitere Fensterreihe
+    // erzeugt.
+    //
+    // Nur angedockte Bauarten hier: DockMode::Floating würde echte
+    // Fenster öffnen, und deren Lage bestimmt der Fensterverwalter —
+    // eine Zusicherung darüber wäre je nach Schreibtisch mal wahr und
+    // mal nicht.
+    void restoreStateTwiceDoesNotDuplicate()
+    {
+        QWidget dockParent;
+        QSplitter splitter;
+
+        {
+            ContainerManager mgr(&dockParent, &splitter);
+            mgr.createContainer(1, DockMode::PanelDocked);
+            mgr.createContainer(1, DockMode::OverlayDocked);
+            QCOMPARE(mgr.containerCount(), 2);
+            mgr.saveState();
+        }
+
+        ContainerManager mgr2(&dockParent, &splitter);
+        mgr2.restoreState();
+        QCOMPARE(mgr2.containerCount(), 2);
+
+        // Der zweite Durchgang ist der Fall, der verdoppelte.
+        mgr2.restoreState();
+        QCOMPARE(mgr2.containerCount(), 2);
+    }
+
+    // Der Weg, der beim Profilwechsel zu gehen ist: erst abräumen,
+    // dann herstellen. Das Ergebnis muss ERSETZEN heissen, nicht
+    // ansammeln.
+    void clearThenRestoreReplacesRatherThanAccumulates()
+    {
+        QWidget dockParent;
+        QSplitter splitter;
+
+        {
+            ContainerManager mgr(&dockParent, &splitter);
+            mgr.createContainer(1, DockMode::PanelDocked);
+            mgr.createContainer(1, DockMode::OverlayDocked);
+            mgr.saveState();
+        }
+
+        ContainerManager mgr2(&dockParent, &splitter);
+        mgr2.restoreState();
+        QCOMPARE(mgr2.containerCount(), 2);
+
+        mgr2.clear(/*keepPanelContainer=*/false);
+        QCOMPARE(mgr2.containerCount(), 0);
+        QVERIFY(mgr2.panelContainer() == nullptr);
+
+        mgr2.restoreState();
+        QCOMPARE(mgr2.containerCount(), 2);
+    }
+
+    // Der Panel-Container trägt das AppletPanelWidget mit den zwölf
+    // Applets, und MainWindow hält rohe Zeiger darauf. clear(true)
+    // muss ihn — und genau ihn — stehen lassen.
+    void clearKeepingPanelLeavesExactlyThePanelContainer()
+    {
+        QWidget dockParent;
+        QSplitter splitter;
+        ContainerManager mgr(&dockParent, &splitter);
+
+        ContainerWidget* panel = mgr.createContainer(1, DockMode::PanelDocked);
+        mgr.createContainer(1, DockMode::OverlayDocked);
+        mgr.createContainer(1, DockMode::OverlayDocked);
+        QVERIFY(panel);
+        QCOMPARE(mgr.containerCount(), 3);
+
+        mgr.clear(/*keepPanelContainer=*/true);
+        QCOMPARE(mgr.containerCount(), 1);
+        QCOMPARE(mgr.panelContainer(), panel);
+    }
+
+    // Nach clear(true) darf das Herstellen den behaltenen
+    // Panel-Container nicht ein zweites Mal anlegen — sein Eintrag
+    // steht ja weiterhin in der gespeicherten Liste.
+    void restoreAfterClearKeepingPanelDoesNotReaddThePanel()
+    {
+        QWidget dockParent;
+        QSplitter splitter;
+
+        {
+            ContainerManager mgr(&dockParent, &splitter);
+            mgr.createContainer(1, DockMode::PanelDocked);
+            mgr.createContainer(1, DockMode::OverlayDocked);
+            mgr.saveState();
+        }
+
+        ContainerManager mgr2(&dockParent, &splitter);
+        mgr2.restoreState();
+        QCOMPARE(mgr2.containerCount(), 2);
+
+        mgr2.clear(/*keepPanelContainer=*/true);
+        QCOMPARE(mgr2.containerCount(), 1);
+
+        mgr2.restoreState();
+        QCOMPARE(mgr2.containerCount(), 2);
+    }
 };
 
 QTEST_MAIN(TstContainerPersistence)

@@ -58,6 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QList>
 #include <QMap>
 #include <QSize>
+#include <QVariantMap>
 
 #include <functional>
 
@@ -115,7 +116,60 @@ public:
 
     // --- Persistence ---
     void saveState();
+
+    /// Herstellen aus den Einstellungen.
+    ///
+    /// Container, deren Kennung schon lebt, werden ÜBERSPRUNGEN, nicht
+    /// ein zweites Mal angelegt (#99). Bis 2026-08-16 schob diese
+    /// Funktion für jede gespeicherte Kennung ein frisches
+    /// ContainerWidget und ein frisches FloatingContainer in die Karten
+    /// — beim zweiten Aufruf überschrieb QMap::insert den Zeiger, ohne
+    /// das alte Widget zu löschen: es blieb am Splitter hängen, blieb
+    /// sichtbar, und niemand hielt es mehr. Ein Profilwechsel hätte so
+    /// bei jedem Umschalten eine weitere Fensterreihe erzeugt.
+    ///
+    /// Der Überspringer ist die Absicherung; wer wirklich ERSETZEN will,
+    /// ruft vorher clear().
     void restoreState();
+
+    /// Alle Container abräumen — der Weg, der vor einem ERSETZENDEN
+    /// restoreState() zu gehen ist (Profilwechsel).
+    ///
+    /// keepPanelContainer lässt den Panel-Container stehen. Das ist
+    /// nicht Bequemlichkeit: er trägt das AppletPanelWidget mit den
+    /// zwölf Applets und deren gesamter Modellverdrahtung, und
+    /// MainWindow hält rohe Zeiger darauf (m_appletPanel,
+    /// m_appletsById). Wer ihn mit abräumt, muss die Applets vorher per
+    /// AppletPanelWidget::removeApplet() herauslösen — die Funktion
+    /// hängt ausdrücklich aus, ohne zu löschen — sonst sterben sie mit
+    /// der Hülle und MainWindow bleibt mit baumelnden Zeigern zurück.
+    ///
+    /// Kein Vorgabewert: der Aufrufer soll die Frage beantworten.
+    void clear(bool keepPanelContainer);
+
+    // ── Geometrie für das Profil ─────────────────────────────────────
+    //
+    // Entscheidung des Betreibers (2026-08-16): das PROFIL besitzt die
+    // Geometrie, das Fenster meldet sie nur.
+    //
+    // Der alte Schlüssel MeterDisplay_<id>_Geometry bleibt bestehen und
+    // wird weiter GELESEN (FloatingContainer::setId ruft
+    // restoreGeometry), aber seit diesem Datum nicht mehr GESCHRIEBEN.
+    // Er ist damit der Rückfall für den ersten Start nach dem Update,
+    // solange das Profil zu einem Container noch nichts sagt. Ihn
+    // abzuschaffen verlöre bestehende Anordnungen — dieselbe Rücksicht
+    // wie bei Migration v9.
+
+    /// Rechtecke der freistehenden Container, nach Kennung. Jeder
+    /// Eintrag ist {x, y, w, h}. Angedockte Container kommen nicht vor:
+    /// ihre Lage steht in ContainerData_<id> (Felder 2-5) und gehört
+    /// dem ContainerWidget, nicht dem Fenster.
+    QVariantMap floatingGeometries() const;
+
+    /// Gegenstück. Kennungen ohne lebenden Container werden übergangen
+    /// — eine Aufnahme von vor einem Update kann Container nennen, die
+    /// es nicht mehr gibt.
+    void applyFloatingGeometries(const QVariantMap& geometries);
 
     // Register the content factory used by restoreState() to populate
     // each restored container. Must be set before restoreState().

@@ -310,7 +310,10 @@ warren@wpratt.com
 #include "meters/ItemGroup.h"
 #include "meters/MeterPoller.h"
 #include "meters/VfoDisplayItem.h"  // 3M-1c L.3 — TX badge routing
+#include "applets/AppletFloatingWindow.h"
 #include "applets/AppletPanelWidget.h"
+#include "applets/InstrumentApplet.h"
+#include "gui/WindowPlacement.h"
 #include "SMeterWidget.h"            // Task 41 (Phase 3P-II): SMeterWidget header wiring
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
@@ -962,6 +965,150 @@ SliceModel* MainWindow::sliceForAddedIdForTest(RadioModel* model, int sliceId)
 // will; den Namen erfragt das Fenster. Damit bleibt die Schiene ohne
 // laufende Oberfläche prüfbar, und die Dialoge liegen dort, wo die
 // anderen Dialoge dieses Programms auch liegen.
+QString MainWindow::screenKeyFor(const QWidget* w)
+{
+    const QScreen* s = (w && w->window()) ? w->window()->screen() : nullptr;
+    if (!s) { return QString{}; }
+    const QString serial = s->serialNumber();
+    return serial.isEmpty() ? s->name() : serial;
+}
+
+void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
+                              const QRect& rect, const QString& screenKey)
+{
+    if (!applet || !m_appletPanel) { return; }
+    const QString id = applet->appletId();
+    if (id.isEmpty() || m_floatingApplets.contains(id)) { return; }
+
+    // ── Der Grund, warum es nur EINEN Weg hierher gibt ───────────────
+    //
+    // Dieses setParent() geht über eine Top-Level-Grenze, und genau da
+    // stürzt Qt ab, wenn ein QRhiWidget im Baum hängt: der Aufräum-
+    // Rückruf des alten QRhi feuert später gegen freigegebenen Zustand
+    // (AetherSDR #2495; #4319 dieselbe Familie auf D3D11). AetherSDR
+    // räumt deshalb vor JEDEM Reparent alle QRhiWidget-Kinder ab
+    // (prepareRhiChildrenForReparent), und NereusSDR macht in
+    // ContainerManager mit extractMeterItems/installFreshMeter das
+    // Gleiche für die Meter-Container.
+    //
+    // Die zwölf Applets sind heute reine QWidgets — kein Meter, kein
+    // Spektrum, keine GPU-Fläche. Deshalb reicht hier ein schlichtes
+    // Umhängen. Sobald das nicht mehr stimmt, ist es keine Warnung
+    // mehr wert, sondern ein Absturz beim nächsten Beenden; die Prüfung
+    // unten macht daraus eine Zeile im Protokoll, die die Ursache
+    // benennt, statt eines Sturzes in fremdem Code.
+    //
+    // inherits() statt findChild<QRhiWidget*>(): der Kopf steht hinter
+    // NEREUS_GPU_SPECTRUM, und eine Sicherung, die im falschen Aufbau
+    // wegfällt, ist keine.
+    for (const QWidget* child : applet->findChildren<QWidget*>()) {
+        if (child && child->inherits("QRhiWidget")) {
+            qCWarning(lcContainer)
+                << "Applet" << id << "enthält ein QRhiWidget ("
+                << child->metaObject()->className()
+                << ") und wird über eine Top-Level-Grenze umgehängt."
+                << "Ohne einen Abräumschritt wie ContainerManager::"
+                   "extractMeterItems ist das AetherSDR #2495 — Absturz"
+                   " beim Beenden oder verdorbene Darstellung.";
+            break;
+        }
+    }
+
+    // Erst aus der Spalte, dann ins Fenster. removeApplet hängt aus,
+    // OHNE zu löschen — das ist die Eigenschaft, auf der das hier
+    // beruht. Zwischen den beiden Zeilen hat das Applet keinen
+    // Besitzer; deshalb stehen sie direkt beieinander und nichts
+    // dazwischen, was scheitern könnte.
+    m_appletPanel->removeApplet(applet);
+    auto* win = new AppletFloatingWindow(applet, dockIndex, this);
+    m_floatingApplets.insert(id, win);
+
+    // Kommt eine Geometrie aus dem Profil, gilt sie — und der
+    // Bildschirm, auf dem sie stand, entscheidet mit. Steht das Fenster
+    // laut Profil auf einem Schirm, der nicht mehr da ist, wird das
+    // Rechteck gar nicht erst gesetzt: ensureOnVisibleScreen holt es
+    // dann auf den Schirm des Hauptfensters, statt es erst hinaus- und
+    // dann wieder hereinzuschieben.
+    if (rect.isValid()) {
+        bool screenStillHere = screenKey.isEmpty();
+        if (!screenStillHere) {
+            for (const QScreen* s : QGuiApplication::screens()) {
+                if (!s) { continue; }
+                const QString key = s->serialNumber().isEmpty()
+                                        ? s->name() : s->serialNumber();
+                if (key == screenKey) { screenStillHere = true; break; }
+            }
+        }
+        if (screenStillHere) { win->setGeometry(rect); }
+    }
+    ensureOnVisibleScreen(win, this,
+                          QSize(Style::kAppletPanelW, 120));
+
+    connect(win, &AppletFloatingWindow::dockRequested,
+            this, &MainWindow::dockAppletBack);
+    connect(win, &AppletFloatingWindow::geometrySettled, this,
+            [this](const QString&) {
+        // Ende der Geste in den Speicher, Beenden auf die Platte —
+        // dasselbe Muster wie bei StripEqPanel. captureIntoCurrent()
+        // ist reine Speicherarbeit, save() legt den JSON-Satz in
+        // AppSettings ab; auf die Platte geht das erst beim Beenden.
+        if (m_layoutProfiles) {
+            m_layoutProfiles->captureIntoCurrent();
+            m_layoutProfiles->save();
+        }
+    });
+
+    // Ein Applet, das im Auswähler ausgeschaltet ist, bekommt kein
+    // sichtbares Fenster — sonst hätte das Ablösen das Ausblenden
+    // stillschweigend rückgängig gemacht.
+    if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
+        win->show();
+        win->raise();
+    }
+}
+
+void MainWindow::dockAppletBack(const QString& appletId)
+{
+    AppletFloatingWindow* win = m_floatingApplets.take(appletId);
+    if (!win) { return; }
+
+    const int idx = win->dockIndex();
+    AppletWidget* applet = win->releaseApplet();
+    win->deleteLater();
+
+    if (!applet || !m_appletPanel) { return; }
+    m_appletPanel->addApplet(applet);
+    if (idx >= 0) {
+        // addApplet hängt hinten an; erst das setzt es wieder dorthin,
+        // wo es herkam. Ohne diese Zeile wandert jedes Applet nach
+        // jedem Ausflug ans Ende der Spalte.
+        m_appletPanel->moveApplet(applet, idx);
+    }
+    if (m_appletVis) {
+        m_appletPanel->setAppletVisible(
+            applet, m_appletVis->isEffectivelyVisible(appletId));
+    }
+    if (m_layoutProfiles) {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
+    }
+}
+
+void MainWindow::applyAppletVisibility(const QString& id, bool effective)
+{
+    if (auto* win = m_floatingApplets.value(id, nullptr)) {
+        win->setVisible(effective);
+        return;
+    }
+    if (auto* a = m_appletsById.value(id, nullptr)) {
+        if (m_appletPanel) { m_appletPanel->setAppletVisible(a, effective); }
+        return;
+    }
+    // Kein Applet dahinter — die Knopfleiste und die Statuszeile gehen
+    // ihren eigenen Weg.
+    applyChromeVisibility(id, effective);
+}
+
 QVariantMap MainWindow::blankLayoutState() const
 {
     // ── Was „leer“ heißt ─────────────────────────────────────────────
@@ -979,6 +1126,11 @@ QVariantMap MainWindow::blankLayoutState() const
     // Die Splitterstellung wird MITGENOMMEN, nicht zurückgesetzt. Wer
     // ein neues Profil anlegt, will eine leere Fläche — nicht ein
     // Fenster, dessen Aufteilung ohne Vorwarnung springt.
+    //
+    // Kein "floatingApplets": ein leeres Profil hat keine abgelösten
+    // Fenster. Der fehlende Schlüssel IST die Aussage — beim Anwenden
+    // kehrt jedes abgelöste Applet in die Spalte zurück, statt über
+    // einem Profil stehen zu bleiben, das es nicht kennt.
     QVariantMap s;
 
     QVariantMap vis;
@@ -1927,16 +2079,20 @@ void MainWindow::wirePanNotchHandlers()
         connect(applet, &PanadapterApplet::activeSliceChanged,
                 this, &MainWindow::refreshPanNotchMinWidth,
                 Qt::UniqueConnection);
-        // The pan identity is bound here rather than added to the signal:
-        // SpectrumWidget does not know its own pan id, and the wiring loop
-        // does. Without it the handler would fall back to activeSlice(), which
-        // is not necessarily the slice on the pan that was clicked. Codex
-        // review of PR #313.
-        const QString panId = applet->panId();
-        connect(sw, &SpectrumWidget::notchCreateRequested, this,
-                [this, panId](double freqHz, bool narrow) {
-                    onNotchCreateRequested(panId, freqHz, narrow);
-                },
+        // The pan identity still has to be recovered — SpectrumWidget does
+        // not know its own pan id, and without it the handler would fall
+        // back to activeSlice(), which is not necessarily the slice on the
+        // pan that was clicked (Codex review of PR #313). It used to be
+        // bound into a lambda here. It can't be: Qt6 REJECTS a connect that
+        // pairs Qt::UniqueConnection with a functor target — qWarning
+        // "unique connections require a pointer to member function of a
+        // QObject subclass", and connectImpl returns an invalid Connection.
+        // Not "silently ignored" as the comments on the sibling handlers
+        // say; the connection was never made at all, so notch-create from a
+        // panadapter click did nothing. onNotchCreateFromPan resolves the
+        // pan from sender() instead.
+        connect(sw, &SpectrumWidget::notchCreateRequested,
+                this, &MainWindow::onNotchCreateFromPan,
                 Qt::UniqueConnection);
         connect(sw, &SpectrumWidget::notchMoveRequested,
                 this, &MainWindow::onNotchMoveRequested,
@@ -1957,6 +2113,24 @@ void MainWindow::wirePanNotchHandlers()
                 this, &MainWindow::onNotchRemoveRequested,
                 Qt::UniqueConnection);
     }
+}
+
+void MainWindow::onNotchCreateFromPan(double freqHz, bool narrow)
+{
+    if (!m_panStack) { return; }
+    // Resolve the emitting pan the same way wirePanNotchHandlers() found it,
+    // so the two cannot disagree: whichever applet owns this SpectrumWidget.
+    const QObject* src = sender();
+    for (auto* applet : m_panStack->allApplets()) {
+        if (applet && applet->spectrumWidget() == src) {
+            onNotchCreateRequested(applet->panId(), freqHz, narrow);
+            return;
+        }
+    }
+    // A widget that is wired but no longer in the stack: fall back to the
+    // active pan rather than dropping the operator's click. Reachable only
+    // between a layout change and the re-wire that follows it.
+    onNotchCreateRequested(m_panStack->activePanId(), freqHz, narrow);
 }
 
 void MainWindow::onNotchCreateRequested(const QString& panId, double freqHz,
@@ -3319,6 +3493,24 @@ void MainWindow::buildUI()
     // container's meter sat orphaned and bars never received setValue()
     // calls, the root of the "BarMeter not drawing" symptom.
     m_meterPoller = new MeterPoller(this);
+
+    // ── Die Instrumente an denselben Umlauf ──────────────────────────
+    //
+    // readingUpdated kommt aus MeterPoller::dispatch, also aus
+    // derselben Verteilung, die auch die Meter-Items speist. Kein
+    // zweiter Timer, keine zweite Abfrage — die Instrumente sehen
+    // dieselben Zahlen zum selben Zeitpunkt.
+    //
+    // Die Applets entstehen erst weiter unten; QPointer wäre hier
+    // falsch, weil die Verbindung an EINEN Zeiger gebunden würde, den
+    // es noch nicht gibt. Also über `this` und ein Lambda, das die
+    // Mitglieder zur Laufzeit liest.
+    connect(m_meterPoller, &MeterPoller::readingUpdated, this,
+            [this](int bindingId, double value) {
+        if (m_swrInstrument)    { m_swrInstrument->onReading(bindingId, value); }
+        if (m_signalInstrument) { m_signalInstrument->onReading(bindingId, value); }
+    });
+
     // Task 3.1: expose MeterPoller via RadioModel so MultimeterPage can
     // apply live interval + averaging-window changes without a MainWindow
     // round-trip.  Non-owning; RadioModel stores the pointer only.
@@ -5206,6 +5398,29 @@ void MainWindow::populateDefaultMeter()
     m_pureSignalApplet->setVisible(
         m_radioModel->boardCapabilities().hasPureSignal);
 
+    // ── Die beiden Instrumente (2026-08-17) ──────────────────────────
+    //
+    // Zwei Stück, weil der Betreiber „eine oder zwei Anzeigen" je
+    // Instrument wählen können soll und dafür mehr als eines braucht.
+    // Die Vorbelegung ist die naheliegende Paarung beim Senden
+    // (Stehwelle) und beim Hören (Signal); geändert wird sie später
+    // über den Kopf des Panels.
+    //
+    // Sie hängen an MeterPoller::readingUpdated, also am SELBEN Umlauf
+    // wie die Meter-Items — keine zweite Abfrage, keine zweite Liste.
+    // Die Verdrahtung steht weiter unten bei m_meterPoller.
+    m_swrInstrument = new InstrumentApplet(QStringLiteral("SwrInstrument"),
+                                           QStringLiteral("Stehwelle"),
+                                           m_radioModel, nullptr);
+    m_swrInstrument->setPrimary(MeterBinding::TxSwr);
+    panel->addApplet(m_swrInstrument);
+
+    m_signalInstrument = new InstrumentApplet(QStringLiteral("SignalInstrument"),
+                                              QStringLiteral("S-Meter"),
+                                              m_radioModel, nullptr);
+    m_signalInstrument->setPrimary(MeterBinding::SignalAvg);
+    panel->addApplet(m_signalInstrument);
+
     // Phase 23: TCI applets — live in Container #0 below the existing applets.
     // Visibility is now managed by AppletVisibilityController below
     // (registered as ids "Tci" + "ClientChain", keys AppletTciVisible +
@@ -5434,6 +5649,8 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
+    m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
+    m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletsById[QStringLiteral("Tci")]        = m_tciApplet;
@@ -5476,6 +5693,14 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Tuner Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
                                 QStringLiteral("RF-Kit RF2K-S"), true);
+    // Die beiden Instrumente. defaultVisible=true, damit sie beim
+    // ersten Start dastehen und angesehen werden können — das ist der
+    // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
+    // Plus aus wie jedes andere Widget.
+    m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
+                                QStringLiteral("Stehwelle"),    true);
+    m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
+                                QStringLiteral("S-Meter"),      true);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -5487,6 +5712,23 @@ void MainWindow::populateDefaultMeter()
     //
     // Die Reihenfolge der Kategorien ergibt sich aus der Anmeldung
     // oben, nicht aus dem Alphabet — siehe categories().
+    // Die beiden Instrumente. Ohne describeApplet landen sie im
+    // Auswähler unter „Sonstiges" — sichtbar, aber nicht dort, wo
+    // jemand sie sucht. Die Schlagwörter sind das, wonach man tippt:
+    // wer „swr" oder „zeiger" eingibt, soll sie finden, ohne den
+    // Applet-Namen zu kennen.
+    m_appletVis->describeApplet(QStringLiteral("SwrInstrument"),
+        QStringLiteral("Senden"),
+        {QStringLiteral("swr"), QStringLiteral("stehwelle"),
+         QStringLiteral("anpassung"), QStringLiteral("zeiger"),
+         QStringLiteral("instrument"), QStringLiteral("balken")});
+    m_appletVis->describeApplet(QStringLiteral("SignalInstrument"),
+        QStringLiteral("Empfang"),
+        {QStringLiteral("s-meter"), QStringLiteral("smeter"),
+         QStringLiteral("signal"), QStringLiteral("pegel"),
+         QStringLiteral("zeiger"), QStringLiteral("instrument"),
+         QStringLiteral("balken")});
+
     m_appletVis->describeApplet(QStringLiteral("Rx"),
         QStringLiteral("Empfang"),
         {QStringLiteral("rx"), QStringLiteral("empfang"),
@@ -5646,6 +5888,17 @@ void MainWindow::populateDefaultMeter()
             AppSettings::instance().setValue(
                 QStringLiteral("AppletStackOrder"), ids.join(QLatin1Char(',')));
         });
+
+        // Beide Wege hinaus enden hier: der Zug über die seitliche
+        // Schwelle und der Menüpunkt „Als Fenster ablösen".
+        connect(m_appletPanel, &AppletPanelWidget::appletDetachRequested,
+                this, [this](AppletWidget* a, int dockIndex) {
+            detachApplet(a, dockIndex);
+            if (m_layoutProfiles) {
+                m_layoutProfiles->captureIntoCurrent();
+                m_layoutProfiles->save();
+            }
+        });
     }
 
     // ── Was in einem Profil steht ────────────────────────────────────
@@ -5679,6 +5932,47 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
                 s.insert(QStringLiteral("order"), order);
+
+                // ── Abgelöste Applets ───────────────────────────────
+                //
+                // Das PROFIL besitzt die Geometrie, das Fenster meldet
+                // sie nur (Entscheidung des Betreibers, 2026-08-16).
+                // Eine Kennung, die hier steht, ist abgelöst; eine, die
+                // fehlt, steht in der Spalte. Damit braucht es kein
+                // eigenes „freistehend ja/nein" — das Vorhandensein IST
+                // die Antwort, und zwei Felder, die dasselbe sagen,
+                // können auseinanderlaufen.
+                //
+                // Der Bildschirm kommt mit, sonst stimmt „dorthin
+                // zurück" bei zwei baugleichen Monitoren nicht.
+                QVariantMap floating;
+                for (auto it = m_floatingApplets.constBegin();
+                     it != m_floatingApplets.constEnd(); ++it) {
+                    AppletFloatingWindow* w = it.value();
+                    if (!w) { continue; }
+                    const QRect g = w->geometry();
+                    QVariantMap one;
+                    one.insert(QStringLiteral("x"), g.x());
+                    one.insert(QStringLiteral("y"), g.y());
+                    one.insert(QStringLiteral("w"), g.width());
+                    one.insert(QStringLiteral("h"), g.height());
+                    one.insert(QStringLiteral("screen"), screenKeyFor(w));
+                    one.insert(QStringLiteral("dockIndex"), w->dockIndex());
+                    floating.insert(it.key(), one);
+                }
+                s.insert(QStringLiteral("floatingApplets"), floating);
+
+                // Die freistehenden Meter-Container, nach derselben
+                // Regel. MeterDisplay_<id>_Geometry bleibt bestehen,
+                // wird aber nur noch GELESEN — als Rückfall für den
+                // ersten Start nach diesem Update, wenn noch kein
+                // Profil etwas zu diesem Container sagt. Es abzuschaffen
+                // verlöre bestehende Anordnungen; dieselbe Rücksicht wie
+                // bei Migration v9.
+                if (m_containerManager) {
+                    s.insert(QStringLiteral("containerGeometry"),
+                             m_containerManager->floatingGeometries());
+                }
 
                 if (m_mainSplitter) {
                     QVariantList sizes;
@@ -5731,6 +6025,52 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
+                // ── Abgelöste Applets ───────────────────────────────
+                //
+                // VOR der Reihenfolge: was abgelöst gehört, muss aus
+                // der Spalte heraus sein, bevor die Spalte sortiert
+                // wird — sonst sortiert setAppletOrder Widgets, die
+                // gleich darauf verschwinden, und die Stellen dahinter
+                // rutschen ein zweites Mal.
+                //
+                // Erst alles andocken, was das neue Profil nicht als
+                // abgelöst führt. Das ist die Antwort auf die dritte
+                // offene Frage der Übergabe („was passiert beim
+                // Profilwechsel mit einem Fenster, das im neuen Profil
+                // nicht vorkommt?"): es kehrt in die Spalte zurück,
+                // statt herrenlos stehen zu bleiben. Ein Fenster ohne
+                // Profil, das es kennt, kann niemand mehr wiederfinden.
+                const QVariantMap floating =
+                    s.value(QStringLiteral("floatingApplets")).toMap();
+                for (const QString& id : m_floatingApplets.keys()) {
+                    if (!floating.contains(id)) { dockAppletBack(id); }
+                }
+                for (auto it = floating.constBegin();
+                     it != floating.constEnd(); ++it) {
+                    const QVariantMap one = it.value().toMap();
+                    const QRect rect(one.value(QStringLiteral("x")).toInt(),
+                                     one.value(QStringLiteral("y")).toInt(),
+                                     one.value(QStringLiteral("w")).toInt(),
+                                     one.value(QStringLiteral("h")).toInt());
+                    const QString screen =
+                        one.value(QStringLiteral("screen")).toString();
+                    const int dockIndex =
+                        one.value(QStringLiteral("dockIndex"), -1).toInt();
+                    if (auto* w = m_floatingApplets.value(it.key(), nullptr)) {
+                        // Schon abgelöst — nur nachführen.
+                        w->setDockIndex(dockIndex);
+                        if (rect.isValid()) { w->setGeometry(rect); }
+                        ensureOnVisibleScreen(w, this,
+                                              QSize(Style::kAppletPanelW, 120));
+                    } else if (auto* a = m_appletsById.value(it.key(),
+                                                             nullptr)) {
+                        detachApplet(a, dockIndex, rect, screen);
+                    }
+                    // Eine Kennung ohne Applet dahinter wird
+                    // übergangen: eine Aufnahme von vor einem Update
+                    // kann Widgets nennen, die es nicht mehr gibt.
+                }
+
                 if (m_appletPanel) {
                     QList<AppletWidget*> order;
                     for (const QVariant& v :
@@ -5741,6 +6081,12 @@ void MainWindow::populateDefaultMeter()
                         }
                     }
                     m_appletPanel->setAppletOrder(order);
+                }
+
+                if (m_containerManager
+                    && s.contains(QStringLiteral("containerGeometry"))) {
+                    m_containerManager->applyFloatingGeometries(
+                        s.value(QStringLiteral("containerGeometry")).toMap());
                 }
 
                 const QVariantList sizes =
@@ -5784,13 +6130,7 @@ void MainWindow::populateDefaultMeter()
     // AppSettings already had values from a prior session).
     // Uses effective visibility (user pref AND available).
     for (const QString& id : m_appletVis->registeredIds()) {
-        if (auto* a = m_appletsById.value(id, nullptr)) {
-            panel->setAppletVisible(a, m_appletVis->isEffectivelyVisible(id));
-        } else {
-            // Kein Applet dahinter — die Knopfleiste und die
-            // Statuszeile gehen ihren eigenen Weg.
-            applyChromeVisibility(id, m_appletVis->isEffectivelyVisible(id));
-        }
+        applyAppletVisibility(id, m_appletVis->isEffectivelyVisible(id));
     }
 
     // Pump future EFFECTIVE-visibility changes from the controller into
@@ -5799,13 +6139,7 @@ void MainWindow::populateDefaultMeter()
     // catch both menu clicks and external capability changes (e.g. 4O3A).
     connect(m_appletVis, &AppletVisibilityController::effectiveVisibilityChanged,
             this, [this](const QString& id, bool effective) {
-        if (auto* a = m_appletsById.value(id, nullptr)) {
-            if (m_appletPanel) {
-                m_appletPanel->setAppletVisible(a, effective);
-            }
-        } else {
-            applyChromeVisibility(id, effective);
-        }
+        applyAppletVisibility(id, effective);
     });
 
     // Live-track 4O3A master toggle so Amp/Tuner availability updates

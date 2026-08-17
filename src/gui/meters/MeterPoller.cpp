@@ -72,6 +72,11 @@ mw0lge@grange-lane.co.uk
 #include "core/mmio/MmioEndpoint.h"
 // Task 41 (Phase 3P-II): SMeterWidget + WdspEngine for the pollSMeter() path.
 #include "gui/SMeterWidget.h"
+// Pruefmodus: die Groessen mit belegter Skala kommen aus derselben
+// Tabelle, aus der sich auch die Instrumente bedienen.
+#include "gui/instruments/ReadingSource.h"
+
+#include <cmath>
 #include "core/WdspEngine.h"
 
 // WDSP GetTXAMeter — lock-free TX meter read.
@@ -89,6 +94,7 @@ MeterPoller::MeterPoller(QObject* parent)
 {
     m_timer.setInterval(100);  // 10 fps default (from Thetis UpdateInterval=100ms)
     connect(&m_timer, &QTimer::timeout, this, &MeterPoller::poll);
+    startDemoFeedIfRequested();
 }
 
 MeterPoller::~MeterPoller() = default;
@@ -96,8 +102,56 @@ MeterPoller::~MeterPoller() = default;
 void MeterPoller::setRxChannel(RxChannel* channel)
 {
     m_rxChannel = channel;
+    if (channel && m_demoTimer.isActive()) {
+        // Ein echtes Funkgerät gewinnt immer. Endgültig — der
+        // Prüfmodus wird nicht wieder angeworfen, wenn die Verbindung
+        // abbricht, sonst stünden nach einem Verbindungsverlust
+        // erfundene Zahlen da, wo eben noch gemessene standen.
+        m_demoTimer.stop();
+        m_demoWanted = false;
+        qCInfo(lcMeter) << "MeterPoller: Pruefmodus beendet — RX-Kanal da.";
+    }
     qCDebug(lcMeter) << "MeterPoller: RxChannel set, channelId:"
                       << (channel ? channel->channelId() : -1);
+}
+
+void MeterPoller::startDemoFeedIfRequested()
+{
+    if (qEnvironmentVariableIntValue("NEREUS_METER_DEMO") <= 0) { return; }
+    m_demoWanted = true;
+    m_demoTimer.setInterval(100);          // wie der echte Umlauf
+    connect(&m_demoTimer, &QTimer::timeout, this, &MeterPoller::tickDemo);
+    m_demoTimer.start();
+    // Laut, und auf INF statt DBG: wer das anschaltet, soll es im
+    // Protokoll wiederfinden, wenn er sich später über die Zahlen
+    // wundert.
+    qCInfo(lcMeter) << "MeterPoller: PRUEFMODUS AKTIV (NEREUS_METER_DEMO) —"
+                    << "die Messwerte sind ERFUNDEN und laufen die Skalen ab."
+                    << "Er endet, sobald ein RX-Kanal gesetzt wird.";
+}
+
+void MeterPoller::tickDemo()
+{
+    if (m_rxChannel) { m_demoTimer.stop(); return; }
+
+    // Jede Groesse mit belegter Skala laeuft ihren Bereich ab — eine
+    // volle Fahrt in etwa zwoelf Sekunden, je Groesse phasenversetzt,
+    // damit nicht alle im Gleichschritt gehen. Der Bogen fuehrt durch
+    // die Schwelle hindurch, also auch durch den Farbwechsel: genau
+    // das ist die Stelle, die man ansehen will.
+    constexpr double kTwoPi = 6.283185307179586;
+    constexpr int    kTicksPerSweep = 120;      // 120 x 100 ms
+
+    const auto scaled = readingsWithScale();
+    for (int i = 0; i < scaled.size(); ++i) {
+        const ReadingDescriptor* d = scaled.at(i);
+        const double phase = kTwoPi * (static_cast<double>(m_demoTick)
+                                       / kTicksPerSweep)
+                           + i * (kTwoPi / qMax(1, scaled.size()));
+        const double f = 0.5 - 0.5 * std::cos(phase);
+        dispatch(d->bindingId, d->min + (d->max - d->min) * f);
+    }
+    ++m_demoTick;
 }
 
 // H.2 (Phase 3M-1a): store non-owning pointer to the TX channel.
@@ -258,6 +312,16 @@ void MeterPoller::stop()
     qCDebug(lcMeter) << "MeterPoller: stopped";
 }
 
+void MeterPoller::dispatch(int bindingId, double value)
+{
+    for (auto& guarded : m_targets) {
+        MeterWidget* target = guarded.data();
+        if (!target) { continue; }
+        target->updateMeterValue(bindingId, value);
+    }
+    emit readingUpdated(bindingId, value);
+}
+
 void MeterPoller::poll()
 {
     // Phase 3G-6 block 5: MMIO item polling is independent of the
@@ -317,11 +381,7 @@ void MeterPoller::poll()
         if (bindingId == MeterBinding::SignalAvg) {
             smeterDbm = value;   // post-offset; matches VfoWidget expectation
         }
-        for (auto& guarded : m_targets) {
-            MeterWidget* target = guarded.data();
-            if (!target) { continue; }
-            target->updateMeterValue(bindingId, value);
-        }
+        dispatch(bindingId, value);
     }
 
     // Task 41 (Phase 3P-II): drive the analog SMeterWidget header.
@@ -497,11 +557,7 @@ void MeterPoller::pollTxMeters()
         Q_UNUSED(chanId)
         Q_UNUSED(entry)
 #endif
-        for (auto& guarded : m_targets) {
-            MeterWidget* target = guarded.data();
-            if (!target) { continue; }
-            target->updateMeterValue(entry.bindingId, value);
-        }
+        dispatch(entry.bindingId, value);
     }
 }
 
@@ -511,6 +567,10 @@ void MeterPoller::setRadioStatus(RadioStatus* status)
     if (m_powerConn) {
         QObject::disconnect(m_powerConn);
         m_powerConn = QMetaObject::Connection{};
+    }
+    if (m_tempConn) {
+        QObject::disconnect(m_tempConn);
+        m_tempConn = QMetaObject::Connection{};
     }
     m_radioStatus = status;
     if (m_radioStatus) {
@@ -522,13 +582,26 @@ void MeterPoller::setRadioStatus(RadioStatus* status)
         m_powerConn = connect(
             m_radioStatus, &RadioStatus::powerChanged,
             this, [this](double fwd, double rev, double swr) {
-                for (auto& guarded : m_targets) {
-                    MeterWidget* target = guarded.data();
-                    if (!target) { continue; }
-                    target->updateMeterValue(MeterBinding::TxPower,        fwd);
-                    target->updateMeterValue(MeterBinding::TxReversePower, rev);
-                    target->updateMeterValue(MeterBinding::TxSwr,          swr);
-                }
+                dispatch(MeterBinding::TxPower,        fwd);
+                dispatch(MeterBinding::TxReversePower, rev);
+                dispatch(MeterBinding::TxSwr,          swr);
+            });
+
+        // ── Die Temperatur hatte keinen Erzeuger ─────────────────────
+        //
+        // MeterBinding::HwTemperature gibt es seit Phase 3G-4, es steht
+        // in beiden Auswahllisten — und NICHTS hat je einen Wert
+        // dorthin geschrieben. Wer die Größe an ein Meter-Item band,
+        // sah bis 2026-08-17 den Vorgabewert, für immer.
+        //
+        // RadioStatus::paTemperatureChanged gibt es und wird gesendet
+        // (RadioModel.cpp:9196 für die PA, :9199 für die HL2-FPGA);
+        // es war nur nie hierher geroutet. Ein Abnehmer ohne Erzeuger,
+        // dieselbe Familie wie ein Signal ohne Verbraucher.
+        m_tempConn = connect(
+            m_radioStatus, &RadioStatus::paTemperatureChanged,
+            this, [this](double celsius) {
+                dispatch(MeterBinding::HwTemperature, celsius);
             });
     }
 }

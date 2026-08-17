@@ -245,6 +245,17 @@ signals:
     /// slices given to setSliceChannels().
     void sliceSmeterUpdated(int sliceIndex, double dbm);
 
+    /// Jeder verteilte Messwert, mit seiner MeterBinding-Kennung.
+    ///
+    /// Für Anzeigen, die keine MeterWidget sind — die Zeiger- und
+    /// Balkeninstrumente (2026-08-17). Sie hängen sich hier an, statt
+    /// eine zweite Abfrage aufzumachen: derselbe Umlauf, derselbe
+    /// Zeitpunkt, dieselben Zahlen wie die Meter-Items.
+    ///
+    /// Gesendet aus dispatch(), also aus allen vier Verteilstellen
+    /// (RX-Schleife, TX-Schleife, PA-Telemetrie, MMIO).
+    void readingUpdated(int bindingId, double value);
+
 private slots:
     void poll();
 
@@ -256,6 +267,41 @@ private:
 private slots:
 
 private:
+    /// Einen Messwert an alle Ziele geben UND readingUpdated senden.
+    ///
+    /// Bis 2026-08-17 stand die Zielschleife viermal wörtlich im
+    /// Umlauf (RX, TX, PA-Telemetrie, MMIO). Sie steht jetzt einmal,
+    /// und damit gibt es auch nur EINE Stelle, an der ein neuer
+    /// Abnehmer hinzukommt — statt vier, von denen man eine vergisst.
+    void dispatch(int bindingId, double value);
+
+    // ── Prüfmodus: Messwerte ohne Funkgerät ──────────────────────────
+    //
+    // OE5SOS, 2026-08-17: „sag mir, wie ich beide zu einem Messwert
+    // bekomme, ohne Funkgerät — sonst kann ich Verlauf und Glut nicht
+    // beurteilen."
+    //
+    // Ohne Funkgerät läuft der normale Umlauf gar nicht: start() wird
+    // erst nach der WDSP-Einrichtung beim Verbinden gerufen
+    // (MainWindow.cpp:4696). Der Prüfmodus hat deshalb seinen EIGENEN
+    // Zeitgeber und hängt nicht an m_timer.
+    //
+    // Aus, sofern nicht ausdrücklich verlangt: NEREUS_METER_DEMO=1.
+    // Dasselbe Muster wie NEREUS_WF_DEBUG in SpectrumWidget — „ein
+    // Diagnosemittel, das im Normalbetrieb etwas kostet, ist ein
+    // Diagnosemittel, das gelöscht wird".
+    //
+    // Er läuft NUR, solange kein RX-Kanal gesetzt ist. setRxChannel mit
+    // einem echten Kanal hält ihn an, und zwar endgültig: erfundene
+    // Zahlen über einem laufenden Funkgerät wären genau die Lüge, die
+    // wir gerade beim leeren Instrument abgestellt haben.
+    void startDemoFeedIfRequested();
+    void tickDemo();
+
+    QTimer m_demoTimer;
+    int    m_demoTick{0};
+    bool   m_demoWanted{false};
+
     // ── TX poll helper ────────────────────────────────────────────────────────
     // Reads the 4 WDSP TX meters gated for 3M-1a and pushes them to all
     // registered MeterWidget targets.
@@ -302,6 +348,10 @@ private:
     // disconnected on re-set or when status is nullptr.
     RadioStatus*            m_radioStatus{nullptr};
     QMetaObject::Connection m_powerConn;
+    /// Wie m_powerConn, für RadioStatus::paTemperatureChanged →
+    /// MeterBinding::HwTemperature (2026-08-17). Getrennt gehalten,
+    /// damit setRadioStatus beide sauber löst, statt eine zu vergessen.
+    QMetaObject::Connection m_tempConn;
 
     // SMeterWidget + WdspEngine (Task 41, Phase 3P-II).
     // Both are non-owning raw pointers.  QPointer for SMeterWidget matches

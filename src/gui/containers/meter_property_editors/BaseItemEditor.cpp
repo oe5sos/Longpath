@@ -55,6 +55,7 @@ mw0lge@grange-lane.co.uk
 #include "BaseItemEditor.h"
 
 #include "../../meters/MeterItem.h"
+#include "../../instruments/ReadingSource.h"
 #include "../../meters/MeterPoller.h"
 #include "../MmioVariablePickerPopup.h"
 
@@ -249,41 +250,17 @@ void BaseItemEditor::buildBaseForm()
 
 void BaseItemEditor::populateBindingCombo()
 {
-    struct B { int id; const char* label; };
-    // Order mirrors MeterPoller.h. Block 5 adds MMIO variables at
-    // the tail when ExternalVariableEngine is wired in.
-    static const B kBindings[] = {
-        {MeterBinding::SignalPeak,   "RX: Signal Peak"},
-        {MeterBinding::SignalAvg,    "RX: Signal Avg"},
-        {MeterBinding::AdcPeak,      "RX: ADC Peak"},
-        {MeterBinding::AdcAvg,       "RX: ADC Avg"},
-        {MeterBinding::AgcGain,      "RX: AGC Gain"},
-        {MeterBinding::AgcPeak,      "RX: AGC Peak"},
-        {MeterBinding::AgcAvg,       "RX: AGC Avg"},
-        {MeterBinding::SignalMaxBin, "RX: Signal Max Bin"},
-        {MeterBinding::PbSnr,        "RX: PB SNR"},
-        {MeterBinding::TxPower,      "TX: Forward Power"},
-        {MeterBinding::TxReversePower, "TX: Reverse Power"},
-        {MeterBinding::TxSwr,        "TX: SWR"},
-        {MeterBinding::TxMic,        "TX: Mic"},
-        {MeterBinding::TxComp,       "TX: Compressor"},
-        {MeterBinding::TxAlc,        "TX: ALC"},
-        {MeterBinding::TxEq,         "TX: EQ"},
-        {MeterBinding::TxLeveler,    "TX: Leveler"},
-        {MeterBinding::TxLevelerGain,"TX: Leveler Gain"},
-        {MeterBinding::TxAlcGain,    "TX: ALC Gain"},
-        {MeterBinding::TxAlcGroup,   "TX: ALC Group"},
-        {MeterBinding::TxCfc,        "TX: CFC"},
-        {MeterBinding::TxCfcGain,    "TX: CFC Gain"},
-        {MeterBinding::HwVolts,      "HW: Volts"},
-        {MeterBinding::HwAmps,       "HW: Amps"},
-        {MeterBinding::HwTemperature,"HW: Temperature"},
-        {MeterBinding::RotatorAz,    "Rotator: Azimuth"},
-        {MeterBinding::RotatorEle,   "Rotator: Elevation"},
-    };
+    // Die Liste stand hier bis 2026-08-17 wörtlich — 27 Zeilen, eine
+    // von vier Schreibungen derselben Sache im Baum. Sie kommt jetzt
+    // aus gui/instruments/ReadingSource.h, wo sie EINMAL steht; die
+    // Beschriftungen dort sind von hier übernommen, also ändert sich
+    // kein sichtbarer Text.
+    //
+    // Block 5 hängt MMIO-Variablen hinten an, wenn
+    // ExternalVariableEngine verdrahtet ist.
     m_comboBinding->addItem(QStringLiteral("(none)"), -1);
-    for (const auto& b : kBindings) {
-        m_comboBinding->addItem(QString::fromLatin1(b.label), b.id);
+    for (const ReadingDescriptor& d : allReadings()) {
+        m_comboBinding->addItem(d.label, d.bindingId);
     }
 }
 

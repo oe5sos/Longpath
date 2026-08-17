@@ -360,6 +360,16 @@ private slots:
     /// TNF inbound handlers. Each mutates the single global NotchModel; the
     /// frequencies arrive already resolved in the emitting pan's own
     /// frequency mapping, so nothing here consults an active pan.
+
+    /// SpectrumWidget::notchCreateRequested carries no pan id — the widget
+    /// does not know its own — so this recovers it from sender() and hands
+    /// off to onNotchCreateRequested below.
+    ///
+    /// A slot rather than a pan-id-binding lambda for a harder reason than
+    /// the sibling handlers: Qt6 does not merely ignore Qt::UniqueConnection
+    /// on a functor target, it refuses the connect outright and returns an
+    /// invalid Connection. As a lambda this signal was not connected at all.
+    void onNotchCreateFromPan(double freqHz, bool narrow);
     void onNotchCreateRequested(const QString& panId, double freqHz, bool narrow);
     void onNotchMoveRequested(int id, double newFreqHz);
     void onNotchWidthRequested(int id, double widthHz);
@@ -670,6 +680,40 @@ private:
     /// aus, was im Auswähler steht. Panadapter und Splitterstellung
     /// bleiben.
     QVariantMap blankLayoutState() const;
+
+    // ── Applets als eigene Fenster ───────────────────────────────────
+    //
+    // Entscheidung des Betreibers (2026-08-16): das PROFIL besitzt die
+    // Geometrie, das Fenster meldet sie nur. Beide Wege hinaus — der
+    // Zug über die Schwelle und der Menüpunkt — enden in
+    // detachApplet(); das Schliessen des Fensters führt zurück.
+
+    /// Ein Applet aus der Spalte in ein eigenes Fenster heben.
+    /// `dockIndex` ist die Stelle, an die es beim Andocken zurückkehrt.
+    /// `rect` und `screenKey` kommen aus dem Profil, wenn es dazu etwas
+    /// sagt; sonst leer, und dann platziert ensureOnVisibleScreen().
+    void detachApplet(AppletWidget* applet, int dockIndex,
+                      const QRect& rect = QRect(),
+                      const QString& screenKey = QString());
+
+    /// Zurück in die Spalte, an die gemerkte Stelle. Räumt das Fenster
+    /// ab. Tut nichts, wenn das Applet nicht abgelöst ist.
+    void dockAppletBack(const QString& appletId);
+
+    /// Sichtbarkeit anwenden — auf die Spalte ODER auf das Fenster, je
+    /// nachdem, wo das Applet gerade steht. Ohne diese Weiche liefe ein
+    /// Ausblenden für ein abgelöstes Applet ins Leere: sein Platzhalter
+    /// in der Spalte existiert nicht mehr, und setAppletVisible fände
+    /// keine Hülle.
+    void applyAppletVisibility(const QString& id, bool effective);
+
+    /// Bildschirmkennung für die Geometrie im Profil.
+    /// QScreen::serialNumber() zuerst — nur sie hält zwei baugleiche
+    /// Monitore auseinander; name() tut das nicht. Wo die Plattform
+    /// keine liefert, name() als Rückfall, und wo auch der fehlt, leer:
+    /// dann entscheidet allein das Rechteck, und ensureOnVisibleScreen
+    /// fängt den Fall „Monitor weg" ohnehin ab.
+    static QString screenKeyFor(const QWidget* w);
 
     void wireSliceStatusOverlayTriggers(SliceModel* slice);
 
@@ -1208,8 +1252,20 @@ private:
     class ProfileRail* m_profileRail{nullptr};
     class LayoutProfiles* m_layoutProfiles{nullptr};
 
+    /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
+    /// MeterPoller::readingUpdated, also am selben Umlauf wie die
+    /// Meter-Items.
+    class InstrumentApplet* m_swrInstrument{nullptr};
+    class InstrumentApplet* m_signalInstrument{nullptr};
+
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;
+
+    /// Die abgelösten Applets, nach Kennung. Ein Eintrag hier heisst:
+    /// dieses Applet steht NICHT in der Spalte. Die Fenster gehören
+    /// diesem Fenster (Qt-Elternschaft), damit sie beim Beenden
+    /// mitgehen.
+    QHash<QString, class AppletFloatingWindow*> m_floatingApplets;
     QHash<QString, QAction*> m_topMenuAppletActions;
     QMenu* m_bannerAppletsMenu{nullptr};
     QHash<QString, QAction*> m_bannerAppletActions;
