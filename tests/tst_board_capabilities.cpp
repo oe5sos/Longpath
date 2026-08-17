@@ -333,6 +333,60 @@ private slots:
         QVERIFY(!BoardCapsTable::forBoard(HPSDRHW::Orion).hasPaVoltsTelemetry);
         QVERIFY(!BoardCapsTable::forBoard(HPSDRHW::HermesLite).hasPaVoltsTelemetry);
     }
+
+    // ── Ein Familienname ist kein Geraetename ────────────────────────
+    //
+    // Befund des Betreibers, 2026-08-17: seine Anvelina Pro 3 meldete
+    // sich als "ANAN-7000DLE/8000DLE (OrionMkII)". Die Erkennung kennt
+    // nur das Board-Byte, und vier SKUs teilen sich diese Platine —
+    // welches Geraet es ist, kann sie gar nicht wissen.
+    //
+    // Geprueft wird deshalb die KLASSE, nicht der Einzelfall: traegt
+    // ein Board mehr als ein Modell, darf sein Anzeigename nicht der
+    // Name eines dieser Modelle sein. Ein Board mit genau einem Modell
+    // (ANAN-G2E, Hermes Lite 2) darf so heissen wie sein Geraet — dort
+    // ist der Name keine Behauptung, sondern eine Tatsache.
+    void aSharedBoardIsNotLabelledWithOneOfItsModels()
+    {
+        // Board -> die Modelle, die darauf laufen.
+        QMap<HPSDRHW, QStringList> members;
+        for (int i = static_cast<int>(HPSDRModel::FIRST) + 1;
+             i < static_cast<int>(HPSDRModel::LAST); ++i) {
+            const auto m = static_cast<HPSDRModel>(i);
+            members[boardForModel(m)]
+                << QString::fromLatin1(displayName(m));
+        }
+
+        for (auto it = members.constBegin(); it != members.constEnd(); ++it) {
+            if (it.value().size() < 2) { continue; }   // 1:1 — erlaubt
+            const QString label = QString::fromLatin1(
+                BoardCapsTable::forBoard(it.key()).displayName);
+
+            // Faellt der Familienname mit einem Geraetenamen zusammen,
+            // ist der Anzeigename in Ordnung: die Hermes-Platine HEISST
+            // Hermes, und dass eines ihrer drei Geraete auch so heisst,
+            // macht "Hermes (ANAN-10/100)" nicht zu einer Behauptung.
+            // Ohne diese Ausnahme meldet die Pruefung genau diesen Fall
+            // als Fehler — der erste Lauf tat es.
+            const QString family = QString::fromLatin1(boardCodeName(it.key()));
+
+            for (const QString& sku : it.value()) {
+                if (sku.compare(family, Qt::CaseInsensitive) == 0) { continue; }
+                // Der Modellname darf als ERLAEUTERUNG in Klammern
+                // stehen ("Hermes (ANAN-10/100)") — was nicht geht, ist
+                // ein Anzeigename, der MIT einem Geraetenamen anfaengt
+                // und damit behauptet, dieses Geraet zu sein.
+                QVERIFY2(!label.startsWith(sku),
+                         qPrintable(QStringLiteral(
+                             "Board %1 traegt %2 Modelle, heisst aber "
+                             "\"%3\" — das ist der Name von %4 und "
+                             "nicht der der Familie")
+                                 .arg(static_cast<int>(it.key()))
+                                 .arg(it.value().size())
+                                 .arg(label, sku)));
+            }
+        }
+    }
 };
 
 QTEST_APPLESS_MAIN(TestBoardCapabilities)

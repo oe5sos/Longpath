@@ -669,7 +669,28 @@ const BoardCapabilities kOrionMKII = {
     // Empty means "use the shipped Thetis defaults", which now live in
     // codec::alex::computeBpf1 rather than being absent entirely.
     .p2PreampPerAdc   = true,
-    .displayName      = "ANAN-7000DLE/8000DLE (OrionMkII)",
+    // Der Name der FAMILIE, nicht der eines Geraets (2026-08-17).
+    //
+    // Hier stand "ANAN-7000DLE/8000DLE (OrionMkII)". Das benannte zwei
+    // von fuenf Mitgliedern dieser Zeile: ORIONMKII, ANAN7000D,
+    // ANAN8000D, ANVELINAPRO3 und REDPITAYA loesen alle hierher auf
+    // (siehe den Kommentar am Kopf der Zeile). Eine Anvelina Pro 3
+    // meldete sich damit als ein Geraet, das sie nicht ist.
+    //
+    // Genauer geht es nicht, und zwar grundsaetzlich: die Erkennung
+    // kennt nur das Board-Byte (5 = OrionMKII), und die vier SKUs
+    // teilen sich dieselbe Platine. Thetis fuehrt "ORIONMKII" aus
+    // genau diesem Grund gar nicht erst in comboRadioModel
+    // (setup.Designer.cs:8515-8528 [v2.10.3.13]) — welches der vier
+    // Geraete es ist, ist eine ANGABE DES BEDIENERS und keine Messung.
+    // defaultModelForBoard() waehlt ANAN7000D nur als Platzhalter, und
+    // auch das aus einem anderen Grund (PA-Verstaerkung, siehe dort).
+    //
+    // Also die Familie zuerst, die Mitglieder als Erlaeuterung — die
+    // Form, die die HermesII-Zeile oben schon hat
+    // ("Hermes II (ANAN-10E/100B)"). Wer beide Geraete benutzt, sieht
+    // sie dann nebeneinander gleich beschriftet.
+    .displayName      = "OrionMkII (7000DLE/8000DLE/Anvelina Pro 3/Red Pitaya)",
     .sourceCitation   = "network.h:453, enums.cs:395, clsHardwareSpecific.cs:143-190",
 };
 
@@ -1058,7 +1079,12 @@ const BoardCapabilities kSaturn = {
     .hasPaAmpsTelemetry  = true,  // HasAmps  (clsHardwareSpecific.cs:261 [v2.10.3.15])
     .minFirmwareVersion = 0,   // floor check removed; see file header
     .knownGoodFirmware  = 0,
-    .displayName      = "ANAN-G2 (Saturn)",
+    // Dieselbe Korrektur wie bei OrionMkII, gefunden von der Pruefung
+    // aSharedBoardIsNotLabelledWithOneOfItsModels (2026-08-17): die
+    // Saturn-Platine traegt ANAN-G2 UND ANAN-G2 1K. "ANAN-G2 (Saturn)"
+    // ist der Name des einen von beiden — ein G2-1K meldete sich damit
+    // als ein Geraet, das es nicht ist.
+    .displayName      = "Saturn (ANAN-G2/G2 1K)",
     .sourceCitation   = "network.h:455, enums.cs:397, clsHardwareSpecific.cs:164-176",
 };
 
