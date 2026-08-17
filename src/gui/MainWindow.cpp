@@ -312,6 +312,7 @@ warren@wpratt.com
 #include "meters/VfoDisplayItem.h"  // 3M-1c L.3 — TX badge routing
 #include "applets/AppletFloatingWindow.h"
 #include "applets/AppletPanelWidget.h"
+#include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
 #include "gui/WindowPlacement.h"
 #include "SMeterWidget.h"            // Task 41 (Phase 3P-II): SMeterWidget header wiring
@@ -3620,6 +3621,10 @@ void MainWindow::buildUI()
         SliceModel* s = m_radioModel->activeSlice();
         if (!s) { return; }
         m_rxDashboard->bindSlice(s);
+        // Dieselbe Scheibe an die Frequenzanzeige. Sie haengt an
+        // derselben Stelle, damit die untere Leiste und das Widget
+        // niemals verschiedene Scheiben beschreiben.
+        if (m_frequencyApplet) { m_frequencyApplet->bindSlice(s); }
         // Use SliceModel::sliceLetter(), do NOT derive the letter here.
         // It is already derived from sliceIndex() upstream. It previously
         // returned a stored member defaulting to 'A', so every slice
@@ -5411,6 +5416,13 @@ void MainWindow::populateDefaultMeter()
     // Sie hängen an MeterPoller::readingUpdated, also am SELBEN Umlauf
     // wie die Meter-Items — keine zweite Abfrage, keine zweite Liste.
     // Die Verdrahtung steht weiter unten bei m_meterPoller.
+    // Die Frequenz im Zeigerstil (2026-08-17). Sie steht VOR den
+    // Messanzeigen in der Spalte: sie ist der Zustand, nach dem man am
+    // haeufigsten sieht, und sie muss dastehen, bevor die VFO-Flagge
+    // ausgeblendet werden darf.
+    m_frequencyApplet = new FrequencyApplet(m_radioModel, nullptr);
+    panel->addApplet(m_frequencyApplet);
+
     m_swrInstrument = new InstrumentApplet(QStringLiteral("SwrInstrument"),
                                            QStringLiteral("Stehwelle"),
                                            m_radioModel, nullptr);
@@ -5651,6 +5663,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
+    m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
 #ifdef HAVE_WEBSOCKETS
@@ -5699,6 +5712,8 @@ void MainWindow::populateDefaultMeter()
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
     // Plus aus wie jedes andere Widget.
+    m_appletVis->registerApplet(QStringLiteral("Frequency"),
+                                QStringLiteral("Frequenz"),     true);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
                                 QStringLiteral("Stehwelle"),    true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
@@ -5719,6 +5734,12 @@ void MainWindow::populateDefaultMeter()
     // jemand sie sucht. Die Schlagwörter sind das, wonach man tippt:
     // wer „swr" oder „zeiger" eingibt, soll sie finden, ohne den
     // Applet-Namen zu kennen.
+    m_appletVis->describeApplet(QStringLiteral("Frequency"),
+        QStringLiteral("Empfang"),
+        {QStringLiteral("frequenz"), QStringLiteral("vfo"),
+         QStringLiteral("qrg"), QStringLiteral("band"),
+         QStringLiteral("abstimmen"), QStringLiteral("split"),
+         QStringLiteral("mhz")});
     m_appletVis->describeApplet(QStringLiteral("SwrInstrument"),
         QStringLiteral("Senden"),
         {QStringLiteral("swr"), QStringLiteral("stehwelle"),

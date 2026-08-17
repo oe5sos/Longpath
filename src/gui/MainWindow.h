@@ -1260,6 +1260,7 @@ private:
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
     /// MeterPoller::readingUpdated, also am selben Umlauf wie die
     /// Meter-Items.
+    class FrequencyApplet*  m_frequencyApplet{nullptr};
     class InstrumentApplet* m_swrInstrument{nullptr};
     class InstrumentApplet* m_signalInstrument{nullptr};
 

@@ -4909,6 +4909,15 @@ nereus_add_test(tst_instrument_spine)
 #    man abliest, ob man senden darf, ist das die falsche --
 nereus_add_test(tst_instrument_no_reading)
 
+# -- Das Frequenz-Widget BEDIENT, es zeigt nicht nur. Auflage des
+#    Betreibers: ohne Rad und Klick-Eingabe naehme das Ausblenden der
+#    VFO-Flagge das Abstimmen mit der Maus weg. Geprueft wird, dass das
+#    Rad ueber einer Ziffer GENAU DEREN Dekade dreht (alle acht
+#    einzeln) und dass das Widget sich nicht selbst verstellt, sondern
+#    den Wunsch meldet -- so laeuft die Aenderung ueber denselben Weg
+#    wie jede andere Abstimmung --
+nereus_add_test(tst_frequency_instrument)
+
 # -- Schritt 1 des Wasserfall-Umbaus (#100): die Historie haelt
 #    Intensitaet statt fertiger Farbe, blockweise belegt. Geprueft wird
 #    vor allem, dass der Speicher WIRKLICH erst beim Beschreiben

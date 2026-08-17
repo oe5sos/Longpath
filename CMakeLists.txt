@@ -717,6 +717,8 @@ set(GUI_SOURCES
     src/gui/instruments/NeedleInstrument.h
     src/gui/instruments/BarInstrument.cpp
     src/gui/instruments/BarInstrument.h
+    src/gui/instruments/FrequencyInstrument.cpp
+    src/gui/instruments/FrequencyInstrument.h
     src/gui/widgets/CommandBar.cpp
     src/gui/widgets/WidgetPicker.cpp
     src/gui/widgets/WidgetPicker.h
@@ -974,6 +976,8 @@ set(GUI_SOURCES
     src/gui/applets/AppletFloatingWindow.h
     src/gui/applets/InstrumentApplet.cpp
     src/gui/applets/InstrumentApplet.h
+    src/gui/applets/FrequencyApplet.cpp
+    src/gui/applets/FrequencyApplet.h
     src/gui/applets/AppletVisibilityController.cpp
     src/gui/widgets/RotorDialWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp
