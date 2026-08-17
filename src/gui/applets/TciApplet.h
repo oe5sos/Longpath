@@ -60,7 +60,7 @@ public:
     explicit TciApplet(TciServer* server, QWidget* parent = nullptr);
     ~TciApplet() override = default;
 
-    QString appletId()    const override { return QStringLiteral("tci"); }
+    QString appletId()    const override { return QStringLiteral("Tci"); }
     QString appletTitle() const override { return QStringLiteral("TCI Server"); }
     void    syncFromModel() override;
 

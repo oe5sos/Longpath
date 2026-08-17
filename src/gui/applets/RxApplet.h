@@ -181,7 +181,7 @@ public:
     explicit RxApplet(SliceModel* slice, RadioModel* model,
                       QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("rx"); }
+    QString appletId()    const override { return QStringLiteral("Rx"); }
     QString appletTitle() const override { return QStringLiteral("RX"); }
     void    syncFromModel() override;
 

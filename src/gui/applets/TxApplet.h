@@ -213,7 +213,7 @@ class TxApplet : public AppletWidget {
 public:
     explicit TxApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId() const override { return QStringLiteral("TX"); }
+    QString appletId() const override { return QStringLiteral("Tx"); }
     QString appletTitle() const override { return QStringLiteral("TX"); }
     void syncFromModel() override;
 

@@ -57,7 +57,7 @@ public:
     explicit RadeApplet(RadioModel* model, QWidget* parent = nullptr);
     ~RadeApplet() override = default;
 
-    QString appletId()    const override { return QStringLiteral("RADE"); }
+    QString appletId()    const override { return QStringLiteral("Rade"); }
     QString appletTitle() const override { return QStringLiteral("RADE"); }
     void syncFromModel() override;
 

@@ -76,7 +76,7 @@ public:
     explicit VaxApplet(RadioModel* model, AudioEngine* audio,
                        QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("vax"); }
+    QString appletId()    const override { return QStringLiteral("Vax"); }
     QString appletTitle() const override { return QStringLiteral("VAX"); }
     void    syncFromModel() override;
 

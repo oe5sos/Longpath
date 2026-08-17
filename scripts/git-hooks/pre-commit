@@ -81,6 +81,19 @@ if ! python3 scripts/verify-thetis-headers.py --all-kinds >/dev/null; then
     exit 1
 fi
 
+# Nicht Attribution, sondern dieselbe Sorte Fehler: zwei Namen fuer
+# dieselbe Sache, die still auseinanderlaufen. Siehe den Kopf von
+# scripts/check-applet-ids.py — 2026-08-18, „Als Fenster abloesen"
+# verlor das RX-Panel.
+echo "[pre-commit] check-applet-ids.py (Namensdrift bei Applets)"
+if ! python3 scripts/check-applet-ids.py >/dev/null; then
+    python3 scripts/check-applet-ids.py || true
+    echo
+    echo "[pre-commit] BLOCKED: eine Applet-Kennung ist zweigeteilt oder"
+    echo "             loest nicht auf. Siehe src/gui/applets/AppletKeys.h."
+    exit 1
+fi
+
 echo "[pre-commit] verify-inline-cites.py (baseline regression gate)"
 if ! python3 scripts/verify-inline-cites.py >/dev/null 2>&1; then
     python3 scripts/verify-inline-cites.py || true

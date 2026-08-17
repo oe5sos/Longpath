@@ -68,7 +68,7 @@ public:
     explicit ClientChainApplet(TciServer* server, QWidget* parent = nullptr);
     ~ClientChainApplet() override = default;
 
-    QString appletId()    const override { return QStringLiteral("tci_clients"); }
+    QString appletId()    const override { return QStringLiteral("ClientChain"); }
     QString appletTitle() const override { return QStringLiteral("TCI Clients"); }
     void    syncFromModel() override;
 

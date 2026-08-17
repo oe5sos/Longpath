@@ -108,7 +108,7 @@ class PureSignalApplet : public AppletWidget {
 public:
     explicit PureSignalApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("pure_signal"); }
+    QString appletId()    const override { return QStringLiteral("PureSignal"); }
     QString appletTitle() const override { return QStringLiteral("PureSignal"); }
     void    syncFromModel() override;
 

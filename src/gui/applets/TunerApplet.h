@@ -80,7 +80,7 @@ public:
                          QWidget* parent = nullptr,
                          TuneMemoryStore* tuneStore = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("tuner"); }
+    QString appletId()    const override { return QStringLiteral("Tuner"); }
     QString appletTitle() const override { return QStringLiteral("Tuner Genius"); }
     void    syncFromModel() override;
 

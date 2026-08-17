@@ -68,6 +68,18 @@ jobs:
         # GPL permission block on re-import.
         run: python3 scripts/verify-thetis-headers.py --all-kinds
 
+      - name: Verify applet ids have not drifted apart
+        # Nicht Attribution, sondern dieselbe Sorte Fehler: zwei Namen
+        # fuer dieselbe Sache, die still auseinanderlaufen.
+        #
+        # Am 2026-08-18 verlor „Als Fenster abloesen" das RX-Panel, weil
+        # jedes Applet eine Panelkennung („Rx") UND eine Eigenkennung
+        # („rx") trug. Jede Nachschlagung ueber die Grenze hinweg gab
+        # nullptr zurueck — kein Absturz, keine Warnung. Der Unit-Test
+        # nagelt den Fehler fest, diese Pruefung die Ursache: sie faellt,
+        # sobald irgendwo eine zweite Schreibweise entsteht.
+        run: python3 scripts/check-applet-ids.py
+
       - name: Verify provenance tables match the source tree
         # Already enforced in pre-commit Ring 2. Re-run in CI Ring 3
         # because squashed merges and rebases can introduce drift the

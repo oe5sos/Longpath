@@ -54,7 +54,7 @@ class AmpApplet : public AppletWidget {
 public:
     explicit AmpApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("amp"); }
+    QString appletId()    const override { return QStringLiteral("Amp"); }
     QString appletTitle() const override { return QStringLiteral("Power Genius"); }
     void    syncFromModel() override {}
 

@@ -119,7 +119,7 @@ public:
     explicit PhoneCwApplet(RadioModel* model, QWidget* parent = nullptr);
     ~PhoneCwApplet() override;
 
-    QString appletId()    const override { return QStringLiteral("PHCW"); }
+    QString appletId()    const override { return QStringLiteral("PhoneCw"); }
     QString appletTitle() const override { return QStringLiteral("Phone / CW"); }
     void syncFromModel() override;
 

@@ -90,7 +90,10 @@ private slots:
     void constructsWithoutCrash() {
         Harness h = makeHarness();
         QVERIFY(h.applet != nullptr);
-        QCOMPARE(h.applet->appletId(), QStringLiteral("vax"));
+        // „Vax", nicht „vax": seit 2026-08-18 traegt jedes Applet nur
+        // noch EINE Kennung, die Panelkennung. scripts/check-applet-ids.py
+        // haelt das fest; siehe src/gui/applets/AppletKeys.h.
+        QCOMPARE(h.applet->appletId(), QStringLiteral("Vax"));
         QCOMPARE(h.applet->appletTitle(), QStringLiteral("VAX"));
 
         h.applet->show();
