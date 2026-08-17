@@ -105,6 +105,9 @@ protected:
     void hideEvent(QHideEvent* ev) override;
 
 private:
+    /// Das Rechteck in die Einstellungen schreiben. Wird NICHT direkt
+    /// aus moveEvent/resizeEvent gerufen — dazu siehe
+    /// m_geometrySaveTimer.
     void saveGeometryToSettings();
     void restoreGeometryFromSettings();
 
@@ -155,6 +158,21 @@ private:
     ClientEqParamRow*          m_paramRow{nullptr};
     ClientEqOutputFader*       m_outFader{nullptr};
     QTimer*                    m_fftTimer{nullptr};
+
+    // Zusammenfassung für das Schreiben der Fenstergeometrie
+    // (2026-08-16). moveEvent und resizeEvent riefen bis dahin direkt
+    // saveGeometryToSettings(), und dessen letzte Zeile ist
+    // AppSettings::save() — also: Sicherungskopie der Datei anlegen,
+    // umbenennen, die VOLLSTÄNDIGE XML-Datei neu schreiben, fsync. Bei
+    // rund 6200 Einstellungen. Je Bildpunkt eines Fensterzuges.
+    //
+    // Jetzt: Ende der Geste in den Speicher, Beenden auf die Platte —
+    // dasselbe Muster wie ContainerWidget::endDrag() und
+    // AppletPanelWidget::appletsReordered. closeEvent/hideEvent
+    // schreiben sofort durch, damit ein Zug, dem gleich das Schliessen
+    // folgt, nicht in der Wartezeit verlorengeht.
+    QTimer*                    m_geometrySaveTimer{nullptr};
+    static constexpr int       kGeometrySaveDelayMs = 400;
     std::unique_ptr<ClientEqFftAnalyzer> m_fftAnalyzer;
     bool                       m_restoring{false};
 };

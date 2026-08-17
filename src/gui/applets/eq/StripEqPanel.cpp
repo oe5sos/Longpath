@@ -537,6 +537,14 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     connect(m_fftTimer, &QTimer::timeout,
             this, &StripEqPanel::tickFftAnalyzer);
 
+    // Zusammenfassung für das Geometrie-Schreiben — Begründung am
+    // Bauteil im Header.
+    m_geometrySaveTimer = new QTimer(this);
+    m_geometrySaveTimer->setSingleShot(true);
+    m_geometrySaveTimer->setInterval(kGeometrySaveDelayMs);
+    connect(m_geometrySaveTimer, &QTimer::timeout,
+            this, &StripEqPanel::saveGeometryToSettings);
+
     restoreGeometryFromSettings();
 }
 
@@ -729,6 +737,11 @@ void StripEqPanel::refreshFromEngine()
 
 void StripEqPanel::closeEvent(QCloseEvent* ev)
 {
+    // Durchschreiben statt warten: der Zug, dem sofort das Schliessen
+    // folgt, darf nicht in der Wartezeit des Sammeltimers hängen
+    // bleiben. Der stop() verhindert, dass er gleich danach noch ein
+    // zweites Mal dasselbe schreibt.
+    if (m_geometrySaveTimer) { m_geometrySaveTimer->stop(); }
     saveGeometryToSettings();
     QWidget::closeEvent(ev);
 }
@@ -743,6 +756,14 @@ void StripEqPanel::showEvent(QShowEvent* ev)
 void StripEqPanel::hideEvent(QHideEvent* ev)
 {
     QWidget::hideEvent(ev);
+    // Verstecken ist der andere Weg hinaus (Werkzeugfenster werden
+    // versteckt, nicht geschlossen). Steht noch etwas an, jetzt
+    // schreiben: moveEvent prüft isVisible(), nach dem Verstecken
+    // käme also nichts mehr nach.
+    if (m_geometrySaveTimer && m_geometrySaveTimer->isActive()) {
+        m_geometrySaveTimer->stop();
+        saveGeometryToSettings();
+    }
     if (m_fftTimer) m_fftTimer->stop();
     // Clear the canvas's last FFT snapshot so it doesn't paint stale
     // energy next time the window opens.
@@ -752,13 +773,17 @@ void StripEqPanel::hideEvent(QHideEvent* ev)
 void StripEqPanel::moveEvent(QMoveEvent* ev)
 {
     QWidget::moveEvent(ev);
-    if (!m_restoring && isVisible()) saveGeometryToSettings();
+    if (!m_restoring && isVisible() && m_geometrySaveTimer) {
+        m_geometrySaveTimer->start();
+    }
 }
 
 void StripEqPanel::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
-    if (!m_restoring && isVisible()) saveGeometryToSettings();
+    if (!m_restoring && isVisible() && m_geometrySaveTimer) {
+        m_geometrySaveTimer->start();
+    }
 }
 
 void StripEqPanel::saveGeometryToSettings()
