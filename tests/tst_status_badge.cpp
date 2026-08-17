@@ -57,6 +57,51 @@ private slots:
         }
     }
 
+    // Der Grund kommt aus einem BENANNTEN Paar, nicht aus einer
+    // Deckkraft. Geprueft wird das an der Eigenschaft, die eine
+    // Deckkraft nicht haben kann: der Grund steht als fester Wert im
+    // Stylesheet und nicht als rgba(...) mit Alphaanteil.
+    void backgroundIsANamedColourNotAnAlphaWash()
+    {
+        StatusBadge b;
+        for (auto v : {StatusBadge::Variant::Info, StatusBadge::Variant::On,
+                       StatusBadge::Variant::Off, StatusBadge::Variant::Warn,
+                       StatusBadge::Variant::Tx}) {
+            b.setVariant(v);
+            const QString qss = b.styleSheet();
+            QVERIFY2(!qss.contains(QStringLiteral("rgba(")),
+                     qPrintable(QStringLiteral(
+                         "Variante %1 traegt wieder eine Deckkraft: %2")
+                             .arg(static_cast<int>(v)).arg(qss)));
+            QVERIFY2(qss.contains(QStringLiteral("background: #")),
+                     qPrintable(QStringLiteral(
+                         "Variante %1 hat keinen benannten Grund: %2")
+                             .arg(static_cast<int>(v)).arg(qss)));
+        }
+    }
+
+    // Und jede Variante bekommt ihren EIGENEN Grund. Ein Paar, das
+    // sich den Grund mit einer anderen Variante teilt, unterscheidet
+    // nur noch an der Schrift — und dafuer braucht es keinen Grund.
+    void everyVariantHasItsOwnBackground()
+    {
+        StatusBadge b;
+        QSet<QString> seen;
+        for (auto v : {StatusBadge::Variant::Info, StatusBadge::Variant::On,
+                       StatusBadge::Variant::Off, StatusBadge::Variant::Warn,
+                       StatusBadge::Variant::Tx}) {
+            b.setVariant(v);
+            const QString qss = b.styleSheet();
+            const int at = qss.indexOf(QStringLiteral("background: #"));
+            QVERIFY(at >= 0);
+            const QString bg = qss.mid(at + 12, 7);
+            QVERIFY2(!seen.contains(bg),
+                     qPrintable(QStringLiteral("Grund %1 wird von zwei "
+                                               "Varianten benutzt").arg(bg)));
+            seen.insert(bg);
+        }
+    }
+
     // Die Varianten muessen unterscheidbar bleiben. Das ist der Rest
     // dessen, was "txVariantUsesRed" eigentlich meinte: nicht "genau
     // dieses Rot", sondern "nicht dieselbe Farbe wie die anderen".

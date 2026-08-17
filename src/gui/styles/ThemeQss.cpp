@@ -89,6 +89,17 @@ const QVector<ThemeEntry>& table()
         { "measured-border",   "#906000", Style::kAmberBorder },
         { "warn",              "#ddbb00", Style::kAmberWarn },
         { "danger-bg",         "#cc2222", Style::kRedBg },
+
+        // Abzeichen — eigene Abstufung, siehe StyleConstants.h.
+        // Der mittlere Wert ist hier derselbe wie der Zielwert: diese
+        // Rollen sind neu (2026-08-17) und haben keine Nereus-Vorgeschichte,
+        // aus der etwas zu ersetzen waere.
+        { "badge-info-bg",     "#161e27", Style::kBadgeInfoBg },
+        { "badge-ok-bg",       "#212b27", Style::kBadgeOkBg },
+        { "badge-off-bg",      "#18181a", Style::kBadgeOffBg },
+        { "badge-warn-bg",     "#372c1d", Style::kBadgeWarnBg },
+        { "badge-tx-bg",       "#3f2224", Style::kBadgeTxBg },
+        { "tx",                "#c25a5c", Style::kTxRed },
         { "danger",            "#ff4444", Style::kRedBorder },
 
         // DSP-Umschalter

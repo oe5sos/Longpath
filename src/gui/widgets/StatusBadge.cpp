@@ -1,6 +1,9 @@
 // src/gui/widgets/StatusBadge.cpp
 #include "StatusBadge.h"
 
+#include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
+
 #include <QColor>
 #include <QHBoxLayout>
 #include <QImage>
@@ -120,25 +123,52 @@ void StatusBadge::recomputeMinimumWidth()
     setMinimumWidth(textWidth + iconWidth + 14);
 }
 
-QColor StatusBadge::variantForegroundColor() const
+namespace {
+
+// ── Ein Paar je Variante ─────────────────────────────────────────────
+//
+// Grund UND Text stehen in derselben Zeile. Das ist der Kern der
+// Aenderung vom 2026-08-17: vorher gab es zwei Tabellen, eine fuer die
+// Schrift und eine fuer den Grund, und sie sind auseinandergelaufen.
+// Eine Zeile kann das nicht.
+//
+// Beide Seiten gehen ueber Style::role(), damit eine Theme-Datei sie
+// erreicht. StatusBadge rief bisher gar kein themed() -- es war
+// ueberhaupt nicht themefaehig, und das ist beim Umbau mit aufgefallen.
+struct BadgePair {
+    const char* bgRole;
+    const char* bgFallback;
+    const char* fgRole;
+    const char* fgFallback;
+};
+
+BadgePair pairFor(StatusBadge::Variant v)
 {
-    // Die EINE Quelle fuer die Schriftfarbe eines Abzeichens: das
-    // SVG-Symbol wird damit getoent, und applyStyle() liest sie seit
-    // 2026-08-17 ebenfalls von hier. Vorher war es eine zweite
-    // Tabelle "die man mit nachziehen muss" -- und genau das ging beim
-    // Hausstil-Umbau schief.
-    switch (m_variant) {
-        case Variant::Info: return QColor(QStringLiteral("#4a7ba8"));
+    switch (v) {
+        case StatusBadge::Variant::Info:
+            return {"badge-info-bg", Style::kBadgeInfoBg, "accent",   Style::kAccent};
         // Zustand -> Salbei, nicht Signalgruen. M und NR1 sind an
         // oder aus, ein Laempchen.
-        case Variant::On:   return QColor(QStringLiteral("#6fa384"));
-        case Variant::Off:  return QColor(QStringLiteral("#3d3d41"));
+        case StatusBadge::Variant::On:
+            return {"badge-ok-bg",   Style::kBadgeOkBg,   "ok",       Style::kGreenText};
+        case StatusBadge::Variant::Off:
+            return {"badge-off-bg",  Style::kBadgeOffBg,  "text-inactive", Style::kTextInactive};
         // Kein Gold: das ist ein Messwert (Filterbreite), kein
         // Alarm. Bernstein wie Frequenz und Skala.
-        case Variant::Warn: return QColor(QStringLiteral("#c2924f"));
-        case Variant::Tx:   return QColor(QStringLiteral("#c25a5c"));
+        case StatusBadge::Variant::Warn:
+            return {"badge-warn-bg", Style::kBadgeWarnBg, "measured", Style::kAmberText};
+        case StatusBadge::Variant::Tx:
+            return {"badge-tx-bg",   Style::kBadgeTxBg,   "tx",       Style::kTxRed};
     }
-    return QColor(QStringLiteral("#4a7ba8"));
+    return {"badge-info-bg", Style::kBadgeInfoBg, "accent", Style::kAccent};
+}
+
+} // namespace
+
+QColor StatusBadge::variantForegroundColor() const
+{
+    const BadgePair p = pairFor(m_variant);
+    return QColor(Style::role(p.fgRole, p.fgFallback));
 }
 
 void StatusBadge::renderSvgIcon()
@@ -197,36 +227,23 @@ void StatusBadge::mousePressEvent(QMouseEvent* event)
 
 void StatusBadge::applyStyle()
 {
-    // ── Eine Quelle fuer die Schriftfarbe ────────────────────────────
+    // Grund und Schrift aus DERSELBEN Zeile. Hier stand bis 2026-08-17
+    // eine zweite Farbtabelle plus errechnete Deckkraftwerte
+    // (rgba(255,96,96,51) und Geschwister). Beides ist weg:
     //
-    // Hier stand eine zweite Farbtabelle, und der Kommentar bei
-    // variantForegroundColor() sagte, was passieren wuerde: "If
-    // applyStyle() colors change, update both." Genau das ist beim
-    // Hausstil-Umbau halb passiert -- On wurde nachgezogen (#5fff8a ->
-    // #6fa384), Warn, Tx und Off nicht. Die beiden Tabellen sagten
-    // seither Verschiedenes:
+    //   Die zweite Tabelle, weil der Kommentar bei
+    //   variantForegroundColor() ihre Zukunft schon beschrieb -- "If
+    //   applyStyle() colors change, update both" -- und beim
+    //   Hausstil-Umbau genau das halb passierte: On wurde nachgezogen,
+    //   Warn, Tx und Off nicht. Sichtbar als Abzeichen, dessen
+    //   SVG-Symbol eine andere Farbe trug als seine Beschriftung.
     //
-    //   Warn   #ffd700 Gold      vs  #c2924f Messwert-Bernstein
-    //   Tx     #ff6060 Signalrot vs  #c25a5c Sende-Rot
-    //   Off    #3a4a5a Blaugrau  vs  #3d3d41 neutral
-    //
-    // Sichtbar war das als Abzeichen, dessen SVG-Symbol (getoent aus
-    // variantForegroundColor) eine andere Farbe hatte als seine
-    // Beschriftung. Zwei Tabellen fuer eine Farbe koennen nur
-    // auseinanderlaufen; jetzt ist es eine.
-    const QString fg = variantForegroundColor().name();
-
-    QString bg;
-    switch (m_variant) {
-        case Variant::Info: bg = QStringLiteral("rgba(95,168,255,26)"); break;  // 0.10 alpha
-        case Variant::On:   bg = QStringLiteral("rgba(95,255,138,26)"); break;
-        case Variant::Off:  bg = QStringLiteral("rgba(64,72,88,46)");   break;  // 0.18 alpha
-        case Variant::Warn: bg = QStringLiteral("rgba(255,215,0,30)");  break;
-        case Variant::Tx:   bg = QStringLiteral("rgba(255,96,96,51)");  break;  // 0.20 alpha
-    }
-    // Die Hintergruende sind ABSICHTLICH nicht mitgezogen: sie liegen
-    // bei 10-20 % Deckung und sind eine eigene gestalterische Frage.
-    // Wer sie angeht, tut es als eigenen Schritt.
+    //   Die Deckkraftwerte, weil eine Deckkraft ueber einem unbekannten
+    //   Grund je nach Untergrund etwas anderes ergibt. Woher die
+    //   benannten Gruende kommen, steht bei kBadge*Bg.
+    const BadgePair p = pairFor(m_variant);
+    const QString bg = Style::role(p.bgRole, p.bgFallback);
+    const QString fg = Style::role(p.fgRole, p.fgFallback);
 
     // Font-size bumped 10 → 12 px (2026-04-30) so the badge text reads
     // cleanly when stacked into a vertical pair by RxDashboard's medium-

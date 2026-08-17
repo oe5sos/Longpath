@@ -99,6 +99,56 @@ constexpr auto kAmberText       = "#c2924f";
 constexpr auto kAmberDim        = "#6b5630";
 constexpr auto kAmberBorder     = "#6b5426";
 constexpr auto kAmberWarn       = "#a8853f";
+// ── Abzeichen: Paare aus Grund und Text ─────────────────────────────
+//
+// OE5SOS, 2026-08-17: „keine errechneten Deckkraftwerte, sondern
+// benannte Paare aus Grund und Text — wie danger-bg mit Rot-Text."
+//
+// StatusBadge legte bis dahin eine Deckkraft von 10-20 % ueber den
+// Untergrund: rgba(255,96,96,51) und Geschwister. Zwei Gruende, warum
+// das weg ist:
+//
+//   Eine Deckkraft ueber einem UNBEKANNTEN Grund ergibt je nach
+//   Untergrund etwas anderes. Dasselbe Abzeichen sah in der
+//   Statuszeile anders aus als im RxDashboard, ohne dass irgendwo
+//   stand, welcher Ton herauskommen sollte.
+//
+//   Ein Paar haelt Grund und Text zusammen. Genau das war beim
+//   Abzeichen auseinandergelaufen (siehe StatusBadge::applyStyle).
+//
+// ── Woher die Werte kommen ──────────────────────────────────────────
+//
+// Ausgerechnet, nicht geschaetzt: fuer jede Variante der sichtbare
+// Abstand ihrer bisherigen Wasche vom Panelgrund (#0c0c0e), gemessen
+// in CIE-Lab wie in tools/colour_audit.py, und dann die Deckkraft
+// gesucht, die mit der HEUTIGEN Schriftfarbe denselben Abstand ergibt.
+//
+// Der Unterschied ist noetig, weil die alten Waschen aus den alten
+// HELLEN Farben gerechnet waren -- Gold #ffd700 unter einer Schrift,
+// die seit dem Hausstil Bernstein #c2924f ist, und Signalrot #ff6060
+// unter #c25a5c. Dieselbe Deckkraft mit einer gedaempften Farbe
+// verschwindet; derselbe ABSTAND bleibt sichtbar.
+//
+//   Info  #141c27 -> #161e27   (dE 10,0)
+//   On    #14251b -> #212b27   (dE 14,9)
+//   Off   #15171b -> #18181a   (dE  5,0)
+//   Warn  #29240c -> #372c1d   (dE 19,7)
+//   Tx    #3d1d1e -> #3f2224   (dE 20,5)
+//
+// Eigene Abstufung neben kGreenBg/kAmberBg/kRedBg: die sind die
+// Fuellung eines Knopfes (TgxlAdvancedPage:648-664), ein Abzeichen ist
+// eine Andeutung. Zwei Staerken, zwei Namensfamilien.
+constexpr auto kBadgeInfoBg     = "#161e27";
+constexpr auto kBadgeOkBg       = "#212b27";
+constexpr auto kBadgeOffBg      = "#18181a";
+constexpr auto kBadgeWarnBg     = "#372c1d";
+constexpr auto kBadgeTxBg       = "#3f2224";
+
+// Das kraeftigere Sende-Rot. HAUSSTIL.md §Bedeutung: „Sendet / Gefahr
+// #a86b6d — nur MOX/TX darf kraeftiger, #c25a5c". Stand als Literal in
+// StatusBadge und hatte keinen Namen.
+constexpr auto kTxRed           = "#c25a5c";
+
 constexpr auto kRedBg           = "#7a2c2e";
 constexpr auto kRedText         = "#f0dcdc";
 constexpr auto kRedBorder       = "#a86b6d";
