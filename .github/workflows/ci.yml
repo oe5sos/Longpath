@@ -698,3 +698,144 @@ jobs:
       - name: ccache stats
         if: runner.os != 'Windows'
         run: ccache --show-stats
+
+  # ====================================================================
+  # Die App so bauen, wie sie ausgeliefert wird
+  # ====================================================================
+  #
+  # OE5SOS, 2026-08-17: „Ein Bau ohne NEREUS_BUILD_TESTS gehört in die
+  # regelmäßige Prüfung. Sonst kann derselbe Fall jederzeit
+  # wiederkommen, und wieder merkt es niemand, bis jemand zufällig von
+  # Grund auf baut."
+  #
+  # ── Der Fall ─────────────────────────────────────────────────────────
+  #
+  # RadioModel::txWorker() stand innerhalb von
+  # `#ifdef NEREUS_BUILD_TESTS`, und TxVoiceCheckDialog.cpp — reiner
+  # Produktionscode — rief es an fünf Stellen. Die App war damit seit
+  # 49d10dc8 nicht mehr von Grund auf baubar.
+  #
+  # Gemeldet hat es niemand, weil JEDER bestehende Job dieser Datei mit
+  # -DNEREUS_BUILD_TESTS=ON konfiguriert (ci.yml:537, :563, und der
+  # Windows-Zweig). CMakeLists.txt:1691 reicht das Makro an
+  # NereusSDRObjs weiter, also übersetzte die CI immer eine
+  # Objektbibliothek, in der die Funktion existiert. 678 grüne Tests,
+  # jedes Mal, über Wochen.
+  #
+  # Lokal dasselbe von der anderen Seite: ./build.sh baut inkrementell,
+  # und die alte Objektdatei lag im Verzeichnis. Erst ein `rm -rf build`
+  # hat es gezeigt.
+  #
+  # ── Warum ein eigener Job und kein Schritt im bestehenden ────────────
+  #
+  # Der build-Job hat sein Verzeichnis bereits mit ON konfiguriert. Ein
+  # zweiter Aufruf im selben Verzeichnis würde den Zwischenstand erben —
+  # und genau das Erben eines Zwischenstands ist der Fehler, den dieser
+  # Job fangen soll.
+  #
+  # Nur Linux: der Fehlertyp ist ein Präprozessorschalter und hat mit
+  # der Plattform nichts zu tun. Der billigste Läufer genügt.
+  ship-build:
+    name: Ship build (no tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config g++ mold \
+            libgl1-mesa-dev libfftw3-dev \
+            libasound2-dev libjack-jackd2-dev \
+            libpipewire-0.3-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: 'qtmultimedia qtshadertools qtwebsockets'
+          cache: true
+
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          # Eigener Schlüssel: dieser Job übersetzt ANDERE Objekte als
+          # die Test-Läufer (das Makro geht in den Hash ein). Auf deren
+          # Schlüssel zu greifen brächte keine Treffer und würde ihre
+          # Einträge verdrängen.
+          key: ccache-ship-${{ github.sha }}
+          restore-keys: |
+            ccache-ship-
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime
+          ccache --set-config=hash_dir=false
+          ccache --set-config=max_size=2G
+          ccache --zero-stats
+
+      # NEREUS_BUILD_TESTS wird hier NICHT gesetzt. Die Vorgabe in
+      # CMakeLists.txt:1686 ist OFF, und genau diese Vorgabe soll
+      # geprüft werden — sie explizit auf OFF zu setzen würde den Fall
+      # verdecken, dass jemand die Vorgabe auf ON dreht.
+      - name: Configure (ship defaults)
+        run: |
+          cmake -B build-ship -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=mold \
+            -DCMAKE_SHARED_LINKER_FLAGS_INIT=-fuse-ld=mold \
+            -DCMAKE_MODULE_LINKER_FLAGS_INIT=-fuse-ld=mold
+
+      # ── Die Prüfung, die prüft, dass hier geprüft wird ──────────────
+      #
+      # Dieselbe Lehre wie beim Versionsstring und bei den Qt-Modulen:
+      # eine Prüfung, die nicht fehlschlagen kann, prüft nichts.
+      #
+      # Dreht jemand die Vorgabe in CMakeLists.txt auf ON, wäre dieser
+      # Job ab dann eine teure Wiederholung der anderen — er liefe
+      # weiter grün und finge den Fehlertyp nie wieder. Also erst
+      # nachsehen, dass das Makro wirklich aus ist, und sonst abbrechen.
+      - name: Verify the guard is actually off
+        run: |
+          echo "── NEREUS_BUILD_TESTS im Cache ──"
+          grep -E "^NEREUS_BUILD_TESTS" build-ship/CMakeCache.txt || true
+          if ! grep -qE "^NEREUS_BUILD_TESTS:BOOL=OFF$" build-ship/CMakeCache.txt; then
+            echo "::error::NEREUS_BUILD_TESTS ist in diesem Bau nicht OFF."
+            echo "Dieser Job soll die App so bauen, wie sie ausgeliefert wird."
+            echo "Steht das Makro auf ON, wiederholt er nur die Test-Jobs und"
+            echo "faengt den Fall nicht mehr, fuer den es ihn gibt:"
+            echo "Produktionscode, der einen Test-Zugriff benutzt."
+            exit 1
+          fi
+          # Und der Gegenbeweis: der Schalter schliesst wirklich etwas
+          # aus. Findet sich im Baum kein einziger davon abhaengiger
+          # Block mehr, ist dieser Job gegenstandslos geworden und soll
+          # es sagen, statt still weiterzulaufen.
+          if ! grep -rq "ifdef NEREUS_BUILD_TESTS" src/; then
+            echo "::error::Kein einziger #ifdef NEREUS_BUILD_TESTS mehr in src/."
+            echo "Dann trennt dieser Bau nichts mehr von den Test-Jobs."
+            exit 1
+          fi
+
+      - name: Build the application
+        run: cmake --build build-ship -j$(nproc)
+
+      # Ein Bau ohne Programm ist kein Bau. Ninja meldet Erfolg auch
+      # dann, wenn das Ziel gar nicht Teil von `all` war.
+      - name: Verify the binary exists
+        run: |
+          test -x build-ship/NereusSDR
+          ls -la build-ship/NereusSDR
+
+      - name: ccache stats
+        run: ccache --show-stats

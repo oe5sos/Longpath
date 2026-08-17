@@ -84,6 +84,45 @@ Then run `ctest`. **Skipping the build step is the one real footgun here**:
 which after a source change means testing your previous code and getting a
 green that means nothing.
 
+## Two build directories, and what each one hides
+
+`./build.sh` builds into `build/`. `./tools/run_tests.sh` builds into
+`build-tests/`. **They are configured differently, and each one can pass
+while the other is broken.**
+
+| | `build/` | `build-tests/` |
+|---|---|---|
+| configured by | `./build.sh` | `./tools/run_tests.sh` |
+| `NEREUS_BUILD_TESTS` | OFF (the shipping default) | ON |
+| what it proves | the app compiles as shipped | the tests compile and pass |
+
+`CMakeLists.txt:1691` propagates `NEREUS_BUILD_TESTS` to the
+`NereusSDRObjs` object library, so the two directories hold **different
+object code for the same sources**. Anything inside an
+`#ifdef NEREUS_BUILD_TESTS` block exists in one and not in the other.
+
+Two consequences, both of which have already bitten:
+
+**A green suite does not mean the app builds.** On 2026-08-17 the app had
+not been buildable from scratch since `49d10dc8`: `RadioModel::txWorker()`
+sat inside the test-only guard while `TxVoiceCheckDialog.cpp` — production
+code — called it five times. Every CI job configures with
+`NEREUS_BUILD_TESTS=ON`, so the suite compiled it every time and reported
+678 green. The `ship-build` job in `ci.yml` exists to close exactly this
+gap; run it locally as a clean `rm -rf build && ./build.sh`.
+
+**Running a test binary by hand from the wrong directory tests nothing.**
+`build/tests/tst_foo` is whatever `build.sh` last happened to link there —
+usually stale, sometimes ancient. The same afternoon, five tests "passed"
+from `build/tests/` while failing in `build-tests/`, and chasing that
+phantom cost hours. If you invoke a test binary directly, take it from
+`build-tests/tests/`, and only after `run_tests.sh` has rebuilt it.
+
+Related footgun, same shape: piping `./build.sh` into another command
+throws its exit status away. `./build.sh | tail -6` reports the status of
+`tail`, which is always 0. Use `./build.sh --quiet` when a script needs
+the status.
+
 ## macOS: the first-run scan
 
 macOS malware-scans every freshly linked binary the first time it runs.
