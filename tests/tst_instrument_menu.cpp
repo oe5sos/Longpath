@@ -1,3 +1,10 @@
+// no-port-check: nennt console.cs nur als Herkunft einer Begruendung —
+// dass Max Bin denselben Kalibrieroffset bekommt wie Signal Peak und
+// Signal Avg. Der Port dieser Zeile lebt in MeterPoller.cpp und ist
+// dort mit Zeilenangabe und Version zitiert. Hier steht kein
+// uebernommener Code, nur die Erklaerung, warum die drei auf einer
+// Skala stehen.
+
 // =================================================================
 // tests/tst_instrument_menu.cpp  (NereusSDR)
 // =================================================================
