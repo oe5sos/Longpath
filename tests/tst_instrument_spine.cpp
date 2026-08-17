@@ -188,6 +188,61 @@ private slots:
             lastArc = d;
         }
     }
+
+    // ── Der Massstab ─────────────────────────────────────────────────
+    //
+    // Der Fehler vom 2026-08-18: Radius und Drehpunkt wuchsen mit der
+    // Flaeche, Strichstaerken und Nabe nicht. Auf dem Schirm sah der
+    // Zeiger dann aus wie „ein duenner gerader Strich", weil er bei
+    // halber Instrumentengroesse noch immer 2,2 Pixel breit war.
+    //
+    // Der Test nagelt fest, WORAN die Strichstaerken haengen: an der
+    // Rille, nicht am Radius. Ohne das bekaeme der sehr flache
+    // VFO-Bogen (R gross, Rille schmal) fingerdicke Striche.
+
+    void theUnitFollowsTheTroughNotTheRadius()
+    {
+        // Der Entwurf selbst: Radius 148, Rille 13 → unit == Radius.
+        ArcSpine design(QPointF(260.0, 168.0), 148.0, 13.0, 168.0, 12.0);
+        QVERIFY(qAbs(design.unit() - 148.0) < 1e-3);
+
+        // Dasselbe Instrument halb so gross: alles halbiert sich mit.
+        ArcSpine half(QPointF(130.0, 84.0), 74.0, 6.5, 168.0, 12.0);
+        QVERIFY(qAbs(half.unit() - 74.0) < 1e-3);
+
+        // Der flache VFO-Bogen: sehr grosser Radius, schmale Rille. Der
+        // Massstab bleibt in der Groessenordnung des Entwurfs — haetten
+        // wir den Radius genommen, waere er hier fuenfmal so gross.
+        ArcSpine flat(QPointF(260.0, 800.0), 700.0, 12.0, 100.6, 79.4);
+        QVERIFY2(flat.unit() < 200.0,
+                 "der flache Bogen bekaeme Striche nach Radiusmass");
+    }
+
+    void everyMeasureScalesWithTheInstrument()
+    {
+        ArcSpine big(QPointF(260.0, 168.0), 148.0, 13.0, 168.0, 12.0);
+        ArcSpine small(QPointF(130.0, 84.0), 74.0, 6.5, 168.0, 12.0);
+
+        // Halbe Groesse, halbe Masse — ausnahmslos.
+        QVERIFY(near(big.shadowWidth(), 2.0 * small.shadowWidth()));
+        QVERIFY(near(big.unit(),        2.0 * small.unit()));
+
+        // Und der Teilstrich sitzt in beiden am selben relativen Ort.
+        const QLineF lb = big.tick(0.5,   big.unit() * 4.0 / 148.0);
+        const QLineF ls = small.tick(0.5, small.unit() * 4.0 / 148.0);
+        QVERIFY(near(lb.length(), 2.0 * ls.length()));
+    }
+
+    void theShadowSitsFlushWithTheOuterEdge()
+    {
+        // Die dunkle Kante liegt buendig auf der Aussenkante der Rille,
+        // nicht darueber hinaus — sonst franst die Mulde aus.
+        ArcSpine s(QPointF(0.0, 0.0), 100.0, 10.0, 180.0, 0.0);
+        const double outer = 100.0 + 10.0 / 2.0;
+        const QRectF sh = s.shadowPath().boundingRect();
+        QVERIFY(sh.width() / 2.0 <= outer + kEps);
+        QVERIFY(sh.width() / 2.0 >= outer - s.shadowWidth() - kEps);
+    }
 };
 
 QTEST_MAIN(TestInstrumentSpine)

@@ -43,10 +43,14 @@ class QRectF;
 
 namespace NereusSDR {
 
+class ArcSpine;
 class Spine;
 struct ReadingDescriptor;
 
 namespace Instrument {
+
+/// Erster oder zweiter Zeiger — nur die Strichstärke unterscheidet sie.
+enum class NeedleWeight { Primary, Secondary };
 
 /// Die Mulde: Grund in inset-bg, darüber die dunkle Kante.
 ///
@@ -71,8 +75,30 @@ void paintGlow(QPainter& p, const Spine& s, const QColor& c,
 void paintGlow(QPainter& p, const QRectF& bounds, const QPainterPath& clip,
                const QColor& c, double intensity = 0.16);
 
-/// Die schmale hellere Kante am aktuellen Wert.
+/// Die schmale hellere Kante am aktuellen Wert — auf der GERADEN.
+///
+/// Auf dem Bogen ist der Wert der Zeiger selbst; dort liegt die Kante
+/// auf seiner Flanke und kommt aus paintNeedle(). Ein Querstrich über
+/// der Rille zeigte dort auf dieselbe Stelle ein zweites Mal.
 void paintValueEdge(QPainter& p, const Spine& s, double f, const QColor& c);
+
+/// Der Zeiger, samt der hellen Kante auf seiner vorderen Flanke.
+///
+/// Form, Breite, Kappe und Länge stehen so im Entwurf: gleichmässiger
+/// Strich, keine Verjüngung, kein Schatten. Wer das ändern will, ändert
+/// den Entwurf — bis dahin ist hier nichts hinzuerfunden.
+void paintNeedle(QPainter& p, const ArcSpine& s, double f, const QColor& c,
+                 NeedleWeight weight = NeedleWeight::Primary,
+                 bool withEdge = true);
+
+/// Der Nachlaufzeiger: kurzer matter Strich am äusseren Rand.
+void paintPeakNeedle(QPainter& p, const ArcSpine& s, double f,
+                     const QColor& c);
+
+/// Die Nabe. Sie deckt den Zeigerfuss ab und bleibt auch dann stehen,
+/// wenn keine Messung vorliegt — sie ist der Drehpunkt des Instruments
+/// und behauptet keine Zahl.
+void paintHub(QPainter& p, const ArcSpine& s);
 
 /// Beschriftete und feine Teilstriche einer Messgrösse.
 ///

@@ -49,9 +49,38 @@
 
 namespace NereusSDR {
 
+// ── Der Massstab, in dem die Entwürfe notiert sind ───────────────────
+//
+// ~/Downloads/zeiger-verfeinert.html zeichnet in ein festes Feld von
+// 520 × 190 mit Radius 148 und Rillenbreite 13. Der Browser skaliert
+// dieses Feld als GANZES: Strichstärken, Nabe und Teilstriche wachsen
+// dort selbstverständlich mit dem Bogen mit.
+//
+// Der erste Port hat nur Radius und Drehpunkt als Verhältnis gerechnet
+// und Zeigerbreite, Nabenradius, Tick-Längen und Beschriftungsabstand
+// in absoluten Pixeln stehen lassen. Bei genau 520 Pixeln Breite stimmt
+// das; bei jeder anderen nicht — und weil die Instrumente in der
+// Applet-Spalte schmaler stehen, war der Zeiger relativ zu dünn. Der
+// Betreiber hat es als „dünne gerade Striche" gesehen, 2026-08-18:
+// „Das ist keine Gestaltung, das ist ein Proportionsfehler."
+//
+// Darum: alle Masse der Entwürfe stehen im Code als Verhältnis zu
+// dieser Zahl und werden mit Spine::unit() wieder in Pixel gerechnet.
+inline constexpr qreal kDesignUnit = 148.0;
+
+/// Die Rillenbreite des Entwurfs, als Anteil von kDesignUnit. Die Rille
+/// ist in beiden Entwürfen das Mass, an dem die Strichstärken hängen —
+/// nicht der Radius, denn der flache VFO-Bogen hat einen sehr grossen
+/// Radius bei schmaler Rille und bekäme sonst fingerdicke Striche.
+inline constexpr qreal kTroughOfUnit = 13.0 / kDesignUnit;
+
 class Spine {
 public:
     virtual ~Spine() = default;
+
+    /// Die Bezugslänge dieser Geometrie in Pixeln. Ein Mass aus dem
+    /// Entwurf wird zu `x / kDesignUnit * s.unit()`.
+    virtual qreal unit() const = 0;
 
     // ── Die Mulde ────────────────────────────────────────────────────
 
@@ -127,9 +156,10 @@ public:
     ArcSpine(QPointF centre, qreal radius, qreal width,
              qreal deg0, qreal deg1);
 
-    /// Innenradius des Sektors. Vorgabe 12 px wie im Entwurf; beim
-    /// sehr flachen VFO-Bogen setzt der Aufrufer ihn dicht unter die
-    /// Rille, sonst liefe der Sektor über das halbe Fenster.
+    /// Innenradius des Sektors. Vorgabe wie im Entwurf (12 von 148),
+    /// mitwachsend; beim sehr flachen VFO-Bogen setzt der Aufrufer ihn
+    /// dicht unter die Rille, sonst liefe der Sektor über das halbe
+    /// Fenster.
     void setSectorInnerRadius(qreal r) { m_sectorInner = r; }
 
     /// Wie weit die Glut vom Drehpunkt reicht, als Anteil des Radius.
@@ -143,6 +173,7 @@ public:
     /// Der Punkt bei Radius r und Winkel deg.
     QPointF pointAt(qreal r, qreal deg) const;
 
+    qreal        unit() const override { return m_w / kTroughOfUnit; }
     QPainterPath troughPath() const override;
     qreal        troughWidth() const override { return m_w; }
     QPainterPath shadowPath() const override;
@@ -180,6 +211,13 @@ public:
     /// Die x-Stelle zu einem Anteil.
     qreal xAt(qreal f) const;
 
+    /// Fest, nicht mitwachsend — und das ist Absicht. Der Entwurf der
+    /// Geraden (~/Downloads/frequenz-im-zeigerstil.html) ist gegen den
+    /// Code noch nicht gegengeprüft; ihn hier mitwachsen zu lassen wäre
+    /// eine sichtbare Änderung an Balken und Frequenzstreifen, die
+    /// niemand angesehen hat. Wenn die Gerade drankommt, steht die
+    /// Stelle schon.
+    qreal        unit() const override { return kDesignUnit; }
     QPainterPath troughPath() const override;
     qreal        troughWidth() const override { return m_r.height(); }
     QPainterPath shadowPath() const override;

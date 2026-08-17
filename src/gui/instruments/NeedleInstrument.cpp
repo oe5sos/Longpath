@@ -25,8 +25,12 @@ namespace {
 // Der Entwurf zeichnet in ein 520 × 190 grosses Feld mit Drehpunkt
 // (260, 168), Radius 148 und Rillenbreite 13 — also Drehpunkt knapp
 // über der Unterkante, Radius etwa 0,285 der Breite, Rille 0,088 des
-// Radius. Diese drei Verhältnisse sind das, was mitwächst; die
-// absoluten Zahlen des Entwurfs gelten nur für seine Feldgrösse.
+// Radius.
+//
+// Hier stehen nur noch die drei Masse des ZIFFERBLATTS. Alles, was
+// darauf gezeichnet wird — Zeigerbreite, Nabe, Teilstriche, Abstände —
+// hängt an Spine::unit() und wächst dort mit; siehe InstrumentSpine.h,
+// Abschnitt „Der Massstab, in dem die Entwürfe notiert sind".
 constexpr double kRadiusOfWidth   = 148.0 / 520.0;
 constexpr double kTroughOfRadius  =  13.0 / 148.0;
 constexpr double kPivotFromBottom =  22.0 / 190.0;   // 190 - 168
@@ -178,9 +182,7 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
         // Die Nabe bleibt: sie ist der Drehpunkt des Instruments, kein
         // Messwert. Ein Zifferblatt ohne Nabe sähe unfertig aus statt
         // ruhig.
-        p.setPen(QPen(Instrument::measuredDim(), 1.0));
-        p.setBrush(QColor(0x15, 0x15, 0x1a));
-        p.drawEllipse(pivot, 5.0, 5.0);
+        Instrument::paintHub(p, spine);
         return;
     }
 
@@ -193,41 +195,29 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
 
     // Nachlaufzeiger: ein kurzer Strich am äusseren Rand, matt.
     if (m_peak > m_value) {
-        const qreal deg = spine.degreeAt(d->fraction(m_peak));
-        QColor dim = Instrument::measuredDim();
-        dim.setAlphaF(0.6);
-        p.setPen(QPen(dim, 2.0, Qt::SolidLine, Qt::RoundCap));
-        p.drawLine(spine.pointAt(radius - trough / 2.0 - 16.0, deg),
-                   spine.pointAt(radius - trough / 2.0 - 3.0, deg));
+        Instrument::paintPeakNeedle(p, spine, d->fraction(m_peak),
+                                    Instrument::measuredDim());
     }
 
     // Die zweite Anzeige — nur ein Zeiger, kein zweiter Sektor und
     // keine zweite Glut. Zwei auslaufende Sektoren übereinander werden
-    // matschig, und die Glut hat nur einen Drehpunkt.
+    // matschig, und die Glut hat nur einen Drehpunkt. Auch keine helle
+    // Kante: sie sagt „HIER ist der Wert", und das gilt für einen.
     if (const ReadingDescriptor* d2 = m_hasSecond ? readingFor(m_secondary)
                                                   : nullptr) {
         if (d2->hasScale) {
-            const qreal deg = spine.degreeAt(d2->fraction(m_secondValue));
-            p.setPen(QPen(Instrument::measuredDim(), 1.8, Qt::SolidLine,
-                          Qt::RoundCap));
-            p.drawLine(spine.pointAt(10.0, deg),
-                       spine.pointAt(radius - trough / 2.0 - 3.0, deg));
+            Instrument::paintNeedle(p, spine, d2->fraction(m_secondValue),
+                                    Instrument::measuredDim(),
+                                    Instrument::NeedleWeight::Secondary,
+                                    /*withEdge=*/false);
         }
     }
 
-    // Die helle Kante VOR dem Zeiger: das Auge soll den Wert finden,
-    // bevor es den Zeiger sucht.
-    Instrument::paintValueEdge(p, spine, f, col);
-
-    const qreal deg = spine.degreeAt(f);
-    p.setPen(QPen(col, 2.2, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(spine.pointAt(10.0, deg),
-               spine.pointAt(radius - trough / 2.0 - 3.0, deg));
+    // Der Zeiger, und die helle Kante auf seiner vorderen Flanke.
+    Instrument::paintNeedle(p, spine, f, col);
 
     // Die Nabe deckt den Zeigerfuss ab.
-    p.setPen(QPen(Instrument::measuredDim(), 1.0));
-    p.setBrush(QColor(0x15, 0x15, 0x1a));
-    p.drawEllipse(pivot, 5.0, 5.0);
+    Instrument::paintHub(p, spine);
 }
 
 } // namespace NereusSDR

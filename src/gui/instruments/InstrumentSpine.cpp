@@ -21,12 +21,32 @@ namespace NereusSDR {
 // Winkel gegen den Uhrzeigersinn — dieselbe Zählung wie die Entwürfe.
 // Die 1/16-Grad-Zählung von QPainter::drawArc kommt hier nicht vor.
 
+namespace {
+
+// Masse aus ~/Downloads/zeiger-verfeinert.html, als Anteil von
+// kDesignUnit — siehe die Begründung dort im Header.
+
+/// Die dunkle Kante über der Rille. Entwurf: stroke-width 2.2 bei
+/// Rillenbreite 13, bündig mit der äusseren Begrenzung.
+constexpr qreal kShadowOfTrough  = 2.2 / 13.0;
+
+/// Innenradius des Sektors: Entwurf 12.
+constexpr qreal kSectorInnerOfUnit = 12.0 / kDesignUnit;
+
+/// Luft zwischen Sektor und Rille (Entwurf 2) bzw. zwischen Teilstrich
+/// und Rille (Entwurf 1).
+constexpr qreal kSectorGapOfUnit = 2.0 / kDesignUnit;
+constexpr qreal kTickGapOfUnit   = 1.0 / kDesignUnit;
+
+} // namespace
+
 // ── ArcSpine ─────────────────────────────────────────────────────────
 
 ArcSpine::ArcSpine(QPointF centre, qreal radius, qreal width,
                    qreal deg0, qreal deg1)
     : m_c(centre), m_r(radius), m_w(width), m_deg0(deg0), m_deg1(deg1)
 {
+    m_sectorInner = unit() * kSectorInnerOfUnit;
 }
 
 qreal ArcSpine::degreeAt(qreal f) const
@@ -72,11 +92,13 @@ QPainterPath ArcSpine::troughPath() const
 QPainterPath ArcSpine::shadowPath() const
 {
     // Die dunkle Kante sitzt an der ÄUSSEREN Begrenzung der Mulde,
-    // knapp innerhalb, damit sie nicht über den Rand hinausragt.
-    return arcPath(m_r + m_w / 2.0 - 1.1, m_deg0, m_deg1);
+    // knapp innerhalb, damit sie nicht über den Rand hinausragt: der
+    // Pfad läuft eine halbe Kantenbreite innerhalb, dann liegt der
+    // Strich bündig auf der Aussenkante.
+    return arcPath(m_r + m_w / 2.0 - shadowWidth() / 2.0, m_deg0, m_deg1);
 }
 
-qreal ArcSpine::shadowWidth() const { return 2.2; }
+qreal ArcSpine::shadowWidth() const { return m_w * kShadowOfTrough; }
 
 QPainterPath ArcSpine::troughSpan(qreal a, qreal b) const
 {
@@ -87,13 +109,13 @@ QPainterPath ArcSpine::fillArea(qreal f) const
 {
     // Vom Drehpunkt bis knapp unter die Rille — der Sektor trägt die
     // Fläche des Zifferblatts, nicht die Mulde.
-    return sectorPath(m_r - m_w / 2.0 - 2.0, m_sectorInner,
-                      m_deg0, degreeAt(f));
+    return sectorPath(m_r - m_w / 2.0 - unit() * kSectorGapOfUnit,
+                      m_sectorInner, m_deg0, degreeAt(f));
 }
 
 QBrush ArcSpine::fadeBrush(const QColor& c) const
 {
-    QRadialGradient g(m_c, m_r - m_w / 2.0 - 2.0);
+    QRadialGradient g(m_c, m_r - m_w / 2.0 - unit() * kSectorGapOfUnit);
     QColor c0 = c; c0.setAlphaF(0.0);
     QColor c1 = c; c1.setAlphaF(0.10);
     QColor c2 = c; c2.setAlphaF(0.26);
@@ -119,7 +141,7 @@ QPainterPath ArcSpine::glowClip() const
 QLineF ArcSpine::tick(qreal f, qreal len) const
 {
     const qreal d = degreeAt(f);
-    const qreal r0 = m_r - m_w / 2.0 - 1.0;
+    const qreal r0 = m_r - m_w / 2.0 - unit() * kTickGapOfUnit;
     return QLineF(pointAt(r0, d), pointAt(r0 - len, d));
 }
 
