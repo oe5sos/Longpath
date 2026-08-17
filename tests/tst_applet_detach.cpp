@@ -49,7 +49,9 @@
 #include <QSignalSpy>
 
 #include "gui/applets/AppletFloatingWindow.h"
+#include "gui/applets/AppletKeys.h"
 #include "gui/applets/AppletPanelWidget.h"
+#include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
 
 using namespace NereusSDR;
@@ -211,9 +213,13 @@ private slots:
         auto* rx = new StubApplet(QStringLiteral("rx"));
         QPointer<AppletWidget> guard(rx);
 
-        auto* win = new AppletFloatingWindow(rx, 3);
+        auto* win = new AppletFloatingWindow(rx, QStringLiteral("Rx"), 3);
         QCOMPARE(win->applet(), static_cast<AppletWidget*>(rx));
-        QCOMPARE(win->appletId(), QStringLiteral("rx"));
+        // „Rx", nicht „rx": das Fenster meldet den Schluessel, unter
+        // dem es gefuehrt wird. Hier stand appletId() des Applets, und
+        // damit kam dockRequested unter einem Namen an, den
+        // m_floatingApplets nicht kannte.
+        QCOMPARE(win->appletId(), QStringLiteral("Rx"));
         QCOMPARE(win->dockIndex(), 3);
         QCOMPARE(rx->parentWidget(), static_cast<QWidget*>(win));
 
@@ -233,7 +239,7 @@ private slots:
     void releaseTwiceIsHarmless()
     {
         auto* rx = new StubApplet(QStringLiteral("rx"));
-        auto* win = new AppletFloatingWindow(rx, 0);
+        auto* win = new AppletFloatingWindow(rx, QStringLiteral("Rx"), 0);
         AppletWidget* first = win->releaseApplet();
         QVERIFY(first);
         QVERIFY(win->releaseApplet() == nullptr);
@@ -249,21 +255,157 @@ private slots:
     {
         auto* rx = new StubApplet(QStringLiteral("rx"));
         QPointer<AppletWidget> guard(rx);
-        auto* win = new AppletFloatingWindow(rx, 0);
+        auto* win = new AppletFloatingWindow(rx, QStringLiteral("Rx"), 0);
         delete win;
         QVERIFY(guard.isNull());
+    }
+
+
+    // ── Der Fehler vom 2026-08-18: zwei Kennungen ────────────────────
+    //
+    // „Als Fenster abloesen verliert das Panel. Das Panel verschwindet
+    // aus der Spalte, kein Fenster erscheint, und der Zustand wird
+    // gespeichert." — OE5SOS.
+    //
+    // Ursache: jedes Applet trug zwei Namen. Die Panelkennung („Rx")
+    // fuehrte den Auswaehler, die Sichtbarkeit und das Profil; die
+    // Eigenkennung („rx") stand in appletId(). detachApplet fragte die
+    // Sichtbarkeit unter der Eigenkennung ab, fand keinen Eintrag und
+    // liess das fertig gebaute Fenster ungezeigt.
+    //
+    // Die drei Faelle unten pruefen die Aufloesung selbst. Sie steht
+    // deshalb als freie Funktion in AppletKeys und nicht als Methode
+    // auf MainWindow: MainWindow laesst sich hier nicht bauen (ein
+    // blosses `MainWindow w;` startet echte UDP-Suche im Netz).
+
+    void thePanelIdWinsOverTheAppletsOwnId()
+    {
+        auto* rx = new StubApplet(QStringLiteral("rx"));
+        auto* tx = new StubApplet(QStringLiteral("TX"));
+        const AppletMap map{{QStringLiteral("Rx"), rx},
+                            {QStringLiteral("Tx"), tx}};
+
+        QCOMPARE(AppletKeys::panelIdFor(map, rx), QStringLiteral("Rx"));
+        QCOMPARE(AppletKeys::panelIdFor(map, tx), QStringLiteral("Tx"));
+        delete rx;
+        delete tx;
+    }
+
+    // Aufnahmen von vor dem Update nennen Eigenkennungen. Wuerden sie
+    // hier nicht mehr aufgeloest, verloere jeder beim ersten Start nach
+    // diesem Update seine Anordnung — von vierzehn Eintraegen loesten
+    // sich vier auf, der Rest fiel still weg.
+    void bothKindsOfKeyStillFindTheApplet()
+    {
+        auto* rx = new StubApplet(QStringLiteral("rx"));
+        const AppletMap map{{QStringLiteral("Rx"), rx}};
+
+        QCOMPARE(AppletKeys::appletFor(map, QStringLiteral("Rx")),
+                 static_cast<AppletWidget*>(rx));
+        QCOMPARE(AppletKeys::appletFor(map, QStringLiteral("rx")),
+                 static_cast<AppletWidget*>(rx));
+        QCOMPARE(AppletKeys::canonical(map, QStringLiteral("rx")),
+                 QStringLiteral("Rx"));
+
+        // Eine Kennung ohne Applet bleibt, wie sie ist: eine Aufnahme
+        // kann Widgets nennen, die es nicht mehr gibt, und die sollen
+        // nicht stillschweigend zu etwas anderem werden.
+        QCOMPARE(AppletKeys::canonical(map, QStringLiteral("weg")),
+                 QStringLiteral("weg"));
+        QVERIFY(AppletKeys::appletFor(map, QStringLiteral("weg")) == nullptr);
+        delete rx;
+    }
+
+    // Der Fehler in einer Zeile: unter welcher Kennung die Sichtbarkeit
+    // steht, und unter welcher gefragt wurde.
+    void visibilityIsKeptUnderThePanelId()
+    {
+        auto* rx = new StubApplet(QStringLiteral("rx"));
+        const AppletMap map{{QStringLiteral("Rx"), rx}};
+
+        AppletVisibilityController vis;
+        vis.registerApplet(QStringLiteral("Rx"), QStringLiteral("RX"),
+                           /*defaultVisible=*/true);
+
+        QVERIFY2(vis.isEffectivelyVisible(
+                     AppletKeys::panelIdFor(map, rx)),
+                 "die Panelkennung muss die Sichtbarkeit finden");
+        QVERIFY2(!vis.isEffectivelyVisible(rx->appletId()),
+                 "die Eigenkennung darf NICHT als sichtbar gelten — sonst "
+                 "sagt dieser Test nichts ueber den Fehler aus");
+        delete rx;
+    }
+
+    // ── Hin UND zurueck ──────────────────────────────────────────────
+    //
+    // „Der Weg muss in beide Richtungen laufen, sonst ist er eine
+    // Falle." — OE5SOS. Geprueft wird die Eigentumsuebergabe an den
+    // echten Klassen; MainWindow steuert nur die Kennung bei, und die
+    // hat oben ihre eigenen Faelle.
+
+    void detachThenDockPutsTheAppletBackInTheColumn()
+    {
+        AppletPanelWidget panel;
+        auto* rx = new StubApplet(QStringLiteral("rx"));
+        auto* tx = new StubApplet(QStringLiteral("TX"));
+        panel.addApplet(rx);
+        panel.addApplet(tx);
+        panel.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+
+        const AppletMap map{{QStringLiteral("Rx"), rx},
+                            {QStringLiteral("Tx"), tx}};
+        const int idx = panel.appletPosition(rx);
+        QCOMPARE(idx, 0);
+
+        // ── hinaus ───────────────────────────────────────────────────
+        panel.removeApplet(rx);
+        auto* win = new AppletFloatingWindow(
+            rx, AppletKeys::panelIdFor(map, rx), idx);
+        win->resize(260, 120);
+        win->show();
+        // isVisible(), nicht qWaitForWindowExposed: ob der
+        // Fensterverwalter das Fenster tatsaechlich auf den Schirm
+        // bringt, entscheidet er, und im Pruefstand oft gar nicht. Der
+        // FEHLER war ein nie gerufenes show() — und genau das sagt
+        // isVisible().
+        QVERIFY(QTest::qWaitFor([win]() { return win->isVisible(); }, 2000));
+
+        QVERIFY2(!panel.applets().contains(rx),
+                 "das Applet steht noch in der Spalte");
+        QCOMPARE(win->appletId(), QStringLiteral("Rx"));
+        QVERIFY2(win->isVisible(), "das Fenster ist nicht sichtbar");
+        QVERIFY2(rx->isVisible(),
+                 "das Applet im Fenster ist unsichtbar — removeApplet "
+                 "versteckt es, und das Fenster muss es wieder zeigen");
+        QCOMPARE(rx->parentWidget(), static_cast<QWidget*>(win));
+
+        // ── und zurueck ──────────────────────────────────────────────
+        const int back = win->dockIndex();
+        AppletWidget* a = win->releaseApplet();
+        QCOMPARE(a, static_cast<AppletWidget*>(rx));
+        delete win;
+
+        panel.addApplet(a);
+        panel.moveApplet(a, back);
+
+        QVERIFY2(panel.applets().contains(rx),
+                 "das Applet ist nicht in die Spalte zurueckgekehrt");
+        QCOMPARE(panel.appletPosition(rx), idx);
+        QVERIFY2(QTest::qWaitFor([rx]() { return rx->isVisible(); }, 2000),
+                 "zurueck in der Spalte, aber unsichtbar");
     }
 
     void closingTheWindowAsksToDock()
     {
         auto* rx = new StubApplet(QStringLiteral("rx"));
-        auto* win = new AppletFloatingWindow(rx, 1);
+        auto* win = new AppletFloatingWindow(rx, QStringLiteral("Rx"), 1);
         QSignalSpy spy(win, &AppletFloatingWindow::dockRequested);
 
         win->close();
 
         QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("rx"));
+        QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("Rx"));
 
         AppletWidget* back = win->releaseApplet();
         delete win;

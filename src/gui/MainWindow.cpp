@@ -311,6 +311,7 @@ warren@wpratt.com
 #include "meters/MeterPoller.h"
 #include "meters/VfoDisplayItem.h"  // 3M-1c L.3 — TX badge routing
 #include "applets/AppletFloatingWindow.h"
+#include "applets/AppletKeys.h"
 #include "applets/AppletPanelWidget.h"
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
@@ -974,11 +975,38 @@ QString MainWindow::screenKeyFor(const QWidget* w)
     return serial.isEmpty() ? s->name() : serial;
 }
 
+// Die Aufloesung selbst steht in AppletKeys — als freie Funktion ueber
+// einer uebergebenen Karte, weil MainWindow sich im Pruefstand nicht
+// bauen laesst (ein blosses `MainWindow w;` startet echte UDP-Suche).
+// Eine Aufloesung, die niemand pruefen kann, ist genau die Art Code, in
+// der dieser Fehler entstanden ist.
+QString MainWindow::panelIdFor(const AppletWidget* applet) const
+{
+    return AppletKeys::panelIdFor(m_appletsById, applet);
+}
+
+AppletWidget* MainWindow::appletForKey(const QString& key) const
+{
+    return AppletKeys::appletFor(m_appletsById, key);
+}
+
+QString MainWindow::canonicalAppletKey(const QString& key) const
+{
+    return AppletKeys::canonical(m_appletsById, key);
+}
+
 void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                               const QRect& rect, const QString& screenKey)
 {
     if (!applet || !m_appletPanel) { return; }
-    const QString id = applet->appletId();
+    // Die PANELKENNUNG, nicht die Eigenkennung. Unter ihr steht die
+    // Sichtbarkeit, unter ihr wird das Profil geschrieben — siehe den
+    // Abschnitt „EINE Kennung, nicht zwei" in MainWindow.h. Hier stand
+    // applet->appletId(), und weil das „rx" statt „Rx" ist, gab
+    // isEffectivelyVisible() unten falsch zurueck: das Fenster wurde
+    // gebaut und nie gezeigt, das Applet war aus der Spalte heraus und
+    // nirgends zu sehen.
+    const QString id = panelIdFor(applet);
     if (id.isEmpty() || m_floatingApplets.contains(id)) { return; }
 
     // ── Der Grund, warum es nur EINEN Weg hierher gibt ───────────────
@@ -1021,7 +1049,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // Besitzer; deshalb stehen sie direkt beieinander und nichts
     // dazwischen, was scheitern könnte.
     m_appletPanel->removeApplet(applet);
-    auto* win = new AppletFloatingWindow(applet, dockIndex, this);
+    auto* win = new AppletFloatingWindow(applet, id, dockIndex, this);
     m_floatingApplets.insert(id, win);
 
     // Kommt eine Geometrie aus dem Profil, gilt sie — und der
@@ -1102,7 +1130,28 @@ void MainWindow::applyAppletVisibility(const QString& id, bool effective)
         return;
     }
     if (auto* a = m_appletsById.value(id, nullptr)) {
-        if (m_appletPanel) { m_appletPanel->setAppletVisible(a, effective); }
+        if (m_appletPanel) {
+            // ── Einschalten heisst notfalls EINBAUEN ─────────────────
+            //
+            // setAppletVisible sucht die Huelle des Applets in dieser
+            // Spalte und tut nichts, wenn es keine gibt. Fuer ein
+            // Applet, das nur ausgeblendet ist, stimmt das. Fuer eines,
+            // das gar nicht mehr in der Spalte steht, ist es eine
+            // stille Sackgasse — und genau die hat der Betreiber am
+            // 2026-08-18 gefunden: „der Eintrag steht in der Liste,
+            // aber Klick und Doppelklick bewirken nichts."
+            //
+            // Der Auswaehler setzt eine Absicht („zeig das"), keinen
+            // Widget-Zustand. Wenn das Applet nirgends steht, ist die
+            // Absicht nur zu erfuellen, indem es zurueck in die Spalte
+            // kommt. Ohne das braeuchte der Auswaehler Wissen darueber,
+            // WO ein Applet gerade ist — und das ist genau die Frage,
+            // die er nicht stellen koennen soll.
+            if (effective && !m_appletPanel->applets().contains(a)) {
+                m_appletPanel->addApplet(a);
+            }
+            m_appletPanel->setAppletVisible(a, effective);
+        }
         return;
     }
     // Kein Applet dahinter — die Knopfleiste und die Statuszeile gehen
@@ -5895,9 +5944,13 @@ void MainWindow::populateDefaultMeter()
         if (!saved.isEmpty()) {
             QList<AppletWidget*> order;
             for (const QString& id : saved) {
-                if (auto* a = m_appletsById.value(id, nullptr)) {
-                    order.append(a);
-                }
+                // appletForKey statt m_appletsById: eine Aufnahme von
+                // vor dem 2026-08-18 nennt hier Eigenkennungen („rx"),
+                // und die fanden in der Panelkarte nichts. Von
+                // vierzehn Eintraegen loesten sich vier auf, der Rest
+                // fiel still weg — die Spalte stand danach in
+                // Anmeldereihenfolge da.
+                if (auto* a = appletForKey(id)) { order.append(a); }
             }
             m_appletPanel->setAppletOrder(order);
         }
@@ -5906,7 +5959,7 @@ void MainWindow::populateDefaultMeter()
                 this, [this]() {
             QStringList ids;
             for (AppletWidget* a : m_appletPanel->applets()) {
-                if (a) { ids << a->appletId(); }
+                if (a) { ids << panelIdFor(a); }
             }
             AppSettings::instance().setValue(
                 QStringLiteral("AppletStackOrder"), ids.join(QLatin1Char(',')));
@@ -5951,7 +6004,7 @@ void MainWindow::populateDefaultMeter()
                 QStringList order;
                 if (m_appletPanel) {
                     for (AppletWidget* a : m_appletPanel->applets()) {
-                        if (a) { order << a->appletId(); }
+                        if (a) { order << panelIdFor(a); }
                     }
                 }
                 s.insert(QStringLiteral("order"), order);
@@ -6063,8 +6116,21 @@ void MainWindow::populateDefaultMeter()
                 // nicht vorkommt?"): es kehrt in die Spalte zurück,
                 // statt herrenlos stehen zu bleiben. Ein Fenster ohne
                 // Profil, das es kennt, kann niemand mehr wiederfinden.
-                const QVariantMap floating =
-                    s.value(QStringLiteral("floatingApplets")).toMap();
+                // Auf die Panelkennung bringen, bevor irgendetwas damit
+                // verglichen wird: bis zum 2026-08-18 standen hier
+                // Eigenkennungen („rx"), und die stimmten mit keinem
+                // Schluessel in m_floatingApplets oder m_appletsById
+                // ueberein.
+                QVariantMap floating;
+                {
+                    const QVariantMap raw =
+                        s.value(QStringLiteral("floatingApplets")).toMap();
+                    for (auto it = raw.constBegin(); it != raw.constEnd();
+                         ++it) {
+                        floating.insert(canonicalAppletKey(it.key()),
+                                        it.value());
+                    }
+                }
                 for (const QString& id : m_floatingApplets.keys()) {
                     if (!floating.contains(id)) { dockAppletBack(id); }
                 }
@@ -6085,8 +6151,7 @@ void MainWindow::populateDefaultMeter()
                         if (rect.isValid()) { w->setGeometry(rect); }
                         ensureOnVisibleScreen(w, this,
                                               QSize(Style::kAppletPanelW, 120));
-                    } else if (auto* a = m_appletsById.value(it.key(),
-                                                             nullptr)) {
+                    } else if (auto* a = appletForKey(it.key())) {
                         detachApplet(a, dockIndex, rect, screen);
                     }
                     // Eine Kennung ohne Applet dahinter wird
@@ -6098,8 +6163,7 @@ void MainWindow::populateDefaultMeter()
                     QList<AppletWidget*> order;
                     for (const QVariant& v :
                          s.value(QStringLiteral("order")).toList()) {
-                        if (auto* a = m_appletsById.value(v.toString(),
-                                                          nullptr)) {
+                        if (auto* a = appletForKey(v.toString())) {
                             order.append(a);
                         }
                     }

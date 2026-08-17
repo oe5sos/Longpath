@@ -66,12 +66,19 @@ public:
     /// im Stapel, an die es beim Andocken zurückkehrt — ohne sie landet
     /// jedes zurückgedockte Applet unten, und der Betreiber sortiert
     /// nach jedem Ausflug neu.
-    AppletFloatingWindow(AppletWidget* applet, int dockIndex,
-                         QWidget* parent = nullptr);
+    /// `panelId` ist der Schluessel, unter dem dieses Fenster gefuehrt
+    /// wird — die Panelkennung, nicht AppletWidget::appletId(). Er wird
+    /// hereingereicht statt abgeleitet: das Fenster soll sich unter
+    /// demselben Namen melden, unter dem es abgelegt wurde. Frueher las
+    /// appletId() die Eigenkennung des Applets, und dockRequested kam
+    /// damit unter einem Namen an, den m_floatingApplets nicht kannte.
+    AppletFloatingWindow(AppletWidget* applet, const QString& panelId,
+                         int dockIndex, QWidget* parent = nullptr);
     ~AppletFloatingWindow() override;
 
     AppletWidget* applet() const { return m_applet.data(); }
-    QString appletId() const;
+    /// Der Schluessel, unter dem dieses Fenster gefuehrt wird.
+    QString appletId() const { return m_panelId; }
 
     int  dockIndex() const { return m_dockIndex; }
     void setDockIndex(int idx) { m_dockIndex = idx; }
@@ -99,6 +106,7 @@ private:
     void scheduleGeometryReport();
 
     QPointer<AppletWidget> m_applet;
+    QString m_panelId;
     int      m_dockIndex{-1};
     QTimer*  m_settleTimer{nullptr};
 

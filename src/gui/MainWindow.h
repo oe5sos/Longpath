@@ -693,6 +693,41 @@ private:
     // Zug über die Schwelle und der Menüpunkt — enden in
     // detachApplet(); das Schliessen des Fensters führt zurück.
 
+    // ── EINE Kennung, nicht zwei ─────────────────────────────────────
+    //
+    // Bis 2026-08-18 gab es im Baum zwei Namen für dasselbe Applet:
+    //
+    //   Panelkennung   „Rx" — m_appletsById, AppletVisibilityController,
+    //                  der Auswähler, das Profilfeld „visible"
+    //   Eigenkennung   „rx" — AppletWidget::appletId(), das Profilfeld
+    //                  „order", „floatingApplets", AppletStackOrder
+    //
+    // Sie stimmen bei vier von neunzehn Applets überein und laufen sonst
+    // auseinander: rx/Rx, TX/Tx, PHCW/PhoneCw, vax/Vax, amp/Amp,
+    // tuner/Tuner, tci/Tci, pure_signal/PureSignal, RADE/Rade,
+    // tci_clients/ClientChain. Jede Stelle, an der ein Schlüssel der
+    // einen Sorte in einer Karte der anderen nachgeschlagen wurde, gab
+    // still nullptr zurück — und damit den Fehler vom 2026-08-18: „Als
+    // Fenster ablösen" nahm das RX-Panel aus der Spalte, fand die
+    // Sichtbarkeit unter „rx" nicht und zeigte das Fenster nie.
+    //
+    // Ab jetzt ist die PANELKENNUNG der Schlüssel — überall. Sie steht
+    // im Auswähler, im Menü und im Profil und ist die einzige, die ein
+    // Mensch je zu Gesicht bekommt. appletId() bleibt, wo es hingehört:
+    // als Eigenname des Widgets.
+
+    /// Die Panelkennung eines Applets — der Schlüssel, unter dem es im
+    /// Auswähler, im Profil und in m_floatingApplets steht.
+    QString panelIdFor(const AppletWidget* applet) const;
+
+    /// Das Applet zu einer Kennung, gleich welcher Sorte. Nimmt auch
+    /// die Eigenkennung an, damit ein Profil von vor dem 2026-08-18
+    /// weiter gelesen wird.
+    AppletWidget* appletForKey(const QString& key) const;
+
+    /// Eine Kennung beliebiger Sorte auf die Panelkennung bringen.
+    QString canonicalAppletKey(const QString& key) const;
+
     /// Ein Applet aus der Spalte in ein eigenes Fenster heben.
     /// `dockIndex` ist die Stelle, an die es beim Andocken zurückkehrt.
     /// `rect` und `screenKey` kommen aus dem Profil, wenn es dazu etwas

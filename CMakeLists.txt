@@ -973,6 +973,8 @@ set(GUI_SOURCES
     src/gui/applets/AppletWidget.cpp
     src/gui/applets/NyiOverlay.cpp
     src/gui/applets/AppletPanelWidget.cpp
+    src/gui/applets/AppletKeys.cpp
+    src/gui/applets/AppletKeys.h
     src/gui/applets/AppletFloatingWindow.cpp
     src/gui/applets/AppletFloatingWindow.h
     src/gui/applets/InstrumentApplet.cpp

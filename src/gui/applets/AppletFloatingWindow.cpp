@@ -17,10 +17,12 @@
 
 namespace NereusSDR {
 
-AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet, int dockIndex,
-                                           QWidget* parent)
+AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
+                                           const QString& panelId,
+                                           int dockIndex, QWidget* parent)
     : QWidget(parent, Qt::Window)
     , m_applet(applet)
+    , m_panelId(panelId)
     , m_dockIndex(dockIndex)
 {
     setWindowTitle(applet ? applet->appletTitle()
@@ -49,11 +51,6 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet, int dockIndex,
 }
 
 AppletFloatingWindow::~AppletFloatingWindow() = default;
-
-QString AppletFloatingWindow::appletId() const
-{
-    return m_applet ? m_applet->appletId() : QString{};
-}
 
 AppletWidget* AppletFloatingWindow::releaseApplet()
 {
