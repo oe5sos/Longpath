@@ -25,6 +25,15 @@ public:
     // PureSignalApplet wiring tests).
     double value() const noexcept { return m_value; }
 
+    // Skala und Rotbeginn, ebenfalls nur lesend. Dazugekommen
+    // 2026-08-18: die Leistungsanzeige der TxApplet springt jetzt auf
+    // 2 kW, wenn ein aeusserer Verstaerker arbeitet, und ohne diese
+    // beiden koennte kein Test unterscheiden, ob sie es wirklich tut
+    // oder nur nicht abstuerzt.
+    double maximum() const noexcept { return m_max; }
+    double minimum() const noexcept { return m_min; }
+    double redStart() const noexcept { return m_redStart; }
+
     QSize sizeHint() const override { return {200, 30}; }
     QSize minimumSizeHint() const override { return {100, 26}; }
 

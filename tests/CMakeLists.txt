@@ -4653,6 +4653,16 @@ nereus_add_test(tst_tx_applet_vox_relocated)
 # bare-integer label, Thetis-faithful tooltip wording.
 nereus_add_test(tst_tx_applet_hl2_slider)
 
+# -- Die Leistungsanzeige, wenn ein aeusserer Verstaerker arbeitet. Die
+#    2-kW-Skala fuer PGXL und RF-Kit stand bis 2026-08-18 NUR an der
+#    analogen Anzeige im Panelkopf; die Anzeige in der TxApplet blieb
+#    auf der Barfussdecke des Geraets und klebte bei 800 W am Anschlag.
+#    Zwei Faelle, die man leicht uebersieht: das Zurueck geht auf die
+#    Skala des GERAETS (ein HL2 mit 5 W darf nicht auf 0..200 W landen),
+#    und ein Bandwechsel darf die Skala bei laufendem Verstaerker nicht
+#    zurueckziehen --
+nereus_add_test(tst_tx_applet_power_scale)
+
 # -- UI Polish Foundation A1: AppletPanelWidget scrollbar gutter --
 nereus_add_test(tst_applet_panel_gutter)
 

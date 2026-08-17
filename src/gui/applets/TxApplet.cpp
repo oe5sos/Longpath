@@ -831,12 +831,48 @@ void TxApplet::wireControls()
     //       characters update too fast to read.
     connect(&m_model->radioStatus(), &RadioStatus::powerChanged,
             this, [this](double fwdW, double /*revW*/, double swr) {
+        // Solange ein aeusserer Verstaerker arbeitet, meldet ER die
+        // Leistung. Die Barfusszahl des Geraets ist dann seine
+        // Ansteuerung, nicht die Ausgangsleistung — sie hier
+        // durchzulassen ueberschriebe den Verstaerkerwert im Takt der
+        // Geraetetelemetrie (~20 Hz gegen 1 Hz beim RF-Kit) und die
+        // Anzeige spraenge zwischen 40 W und 800 W.
+        //
+        // Dieselbe Torschaltung wie bei der analogen Anzeige
+        // (MainWindow Connect 2, KG4VCF-Befund 2026-05-25).
+        if (m_model && m_model->isAnyExternalAmpInOperate()) { return; }
         constexpr double kAlpha = 0.30;
         m_fwdPowerSmoothedW = kAlpha * fwdW + (1.0 - kAlpha) * m_fwdPowerSmoothedW;
         if (m_swrGauge) {
             m_swrGauge->setValue(swr);
         }
     });
+
+    // ── Die Leistung des Verstaerkers ────────────────────────────────
+    //
+    // Zwei Quellen, je Hersteller eine, mit derselben Torschaltung wie
+    // die analoge Anzeige. PGXL meldet ueber ampMetersChanged, RF-Kit
+    // ueber externalAmpFwdSwrUpdated.
+    //
+    // Die RF-Kit-Torschaltung fragt AUSDRUECKLICH nur nach RF-Kit und
+    // nicht nach „irgendein Verstaerker": dieses Signal traegt
+    // ausschliesslich RF-Kit-Telemetrie, und in der uebergreifenden
+    // Form liess ein PGXL in OPERATE die 0 W eines RF2K-S im Standby
+    // durch (Codex-Durchsicht, PR #291).
+    if (m_model) {
+        connect(m_model, &RadioModel::ampMetersChanged, this,
+                [this](float fwd, float swr) {
+            if (!m_model->hasAmplifier() || !m_model->ampOperate()) { return; }
+            m_fwdPowerSmoothedW = fwd;
+            if (m_swrGauge) { m_swrGauge->setValue(swr); }
+        });
+        connect(m_model, &RadioModel::externalAmpFwdSwrUpdated, this,
+                [this](int fwd, float swr) {
+            if (!m_model->isRfKitInOperate()) { return; }
+            m_fwdPowerSmoothedW = static_cast<double>(fwd);
+            if (m_swrGauge) { m_swrGauge->setValue(swr); }
+        });
+    }
     auto* fwdGaugeRefreshTimer = new QTimer(this);
     fwdGaugeRefreshTimer->setInterval(50);   // 20 Hz UI refresh
     connect(fwdGaugeRefreshTimer, &QTimer::timeout, this, [this]() {
@@ -1581,9 +1617,46 @@ void TxApplet::syncFromModel()
 //  the wired VOX surface lives on PhoneCwApplet now, and the per-parameter
 //  popup gave way to right-click → Setup → Transmit → DEXP/VOX.)
 
+void TxApplet::setPowerScale(int maxWatts, bool hasAmplifier)
+{
+    if (!m_fwdPowerGauge) { return; }
+    m_ampScaleActive = hasAmplifier;
+
+    if (!hasAmplifier) {
+        // Zurueck auf die Skala des Geraets — und zwar auf die
+        // PER-SKU-Skala, nicht auf eine feste Barfusszahl. Ein HL2 mit
+        // 5 W darf nach dem Abschalten des Verstaerkers nicht auf
+        // 0-200 W stehen; er stuende dann in der ersten Vierzigstel
+        // der Anzeige.
+        rescaleFwdGaugeForModel(m_fwdGaugeModel);
+        return;
+    }
+
+    // Wortgleich mit TunerApplet::setPowerScale — dieselben Zahlen fuer
+    // dieselbe Sache, damit die Anzeigen nicht auseinanderlaufen.
+    // Ursprung: AetherSDR src/gui/TunerApplet.cpp:setPowerScale [@0cd4559].
+    Q_UNUSED(maxWatts);
+    m_fwdPowerGauge->setRange(0.0, 2000.0);
+    m_fwdPowerGauge->setYellowStart(1500.0);
+    m_fwdPowerGauge->setRedStart(1500.0);
+    m_fwdPowerGauge->setTickLabels({
+        QStringLiteral("0"),    QStringLiteral("500"),
+        QStringLiteral("1000"), QStringLiteral("1500"),
+        QStringLiteral("2000"),
+    });
+}
+
 void TxApplet::rescaleFwdGaugeForModel(HPSDRModel model)
 {
     if (!m_fwdPowerGauge) { return; }
+    // Die Verstaerkerskala hat Vorrang. Ohne diese Zeile setzte ein
+    // Bandwechsel bei laufendem PGXL die Anzeige zurueck auf die
+    // Barfussdecke des Geraets — und 800 W stuenden dann weit jenseits
+    // des Anschlags.
+    // Das Geraet merken, auch wenn die Skala gerade nicht gesetzt
+    // wird: setPowerScale(false) stellt danach GENAU dieses wieder her.
+    m_fwdGaugeModel = model;
+    if (m_ampScaleActive) { return; }
 
     // Per-SKU PA ceiling from HpsdrModel.h paMaxWattsFor().  Bench-reported
     // #167 follow-up: 0-120 W default scale made HL2 (5 W max) and

@@ -5133,9 +5133,17 @@ void MainWindow::populateDefaultMeter()
         });
 
         // Connect 3: PGXL connect event snaps scale to 2 kW.
+        //
+        // 2026-08-18: die TxApplet bekommt dieselbe Skala. Bis dahin
+        // sprang nur die analoge Anzeige im Panelkopf auf 2 kW,
+        // waehrend die Leistungsanzeige in der TxApplet weiter auf der
+        // Barfussdecke des Geraets stand und bei jedem Sendevorgang am
+        // Anschlag klebte. „Die 2-kW-Skala geht mit ihnen — sie gehoert
+        // zur Leistungsanzeige, nicht zum Empfangszeiger." (OE5SOS)
         connect(m_radioModel, &RadioModel::amplifierChanged, this,
-                [sm](bool present) {
+                [this, sm](bool present) {
             sm->setPowerScale(/*maxWatts=*/0, present);
+            if (m_txApplet) { m_txApplet->setPowerScale(0, present); }
         });
 
         // Connect 4: OPERATE/STANDBY state change re-evaluates scale.
@@ -5147,8 +5155,9 @@ void MainWindow::populateDefaultMeter()
         // barefoot scale if RF-Kit is still amplifying (and vice versa).
         connect(m_radioModel, &RadioModel::ampStateChanged, this,
                 [this, sm]() {
-            sm->setPowerScale(/*maxWatts=*/0,
-                              m_radioModel->isAnyExternalAmpInOperate());
+            const bool amplifying = m_radioModel->isAnyExternalAmpInOperate();
+            sm->setPowerScale(/*maxWatts=*/0, amplifying);
+            if (m_txApplet) { m_txApplet->setPowerScale(0, amplifying); }
         });
 
         // Connect 5: 2026-05-20 bench fix -- SMeterWidget::setTransmitting
@@ -5189,8 +5198,10 @@ void MainWindow::populateDefaultMeter()
         // PGXL is still amplifying.
         connect(m_radioModel, &RadioModel::externalAmpOperateChanged, this,
                 [this, sm](bool /*inOp*/) {
-            sm->setPowerScale(/*maxWatts=*/0,
-                              m_radioModel->isAnyExternalAmpInOperate());
+            const bool amplifying = m_radioModel->isAnyExternalAmpInOperate();
+            sm->setPowerScale(/*maxWatts=*/0, amplifying);
+            // Dieselbe Skala fuer die TxApplet — siehe Connect 3 oben.
+            if (m_txApplet) { m_txApplet->setPowerScale(0, amplifying); }
         });
 
         // RF-Kit Connect B: feed RF-Kit forward power + SWR to the TX needle.

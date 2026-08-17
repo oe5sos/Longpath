@@ -228,6 +228,25 @@ public:
     // (yields 100 W ceiling).  Bench-reported #167 follow-up.
     void rescaleFwdGaugeForModel(HPSDRModel model);
 
+    // ── Der Verstaerker verschiebt die Skala ─────────────────────────
+    //
+    // Bis 2026-08-18 stand das nur an der analogen S-Meter-Anzeige im
+    // Panelkopf (SMeterWidget::setPowerScale): mit PGXL oder RF-Kit in
+    // OPERATE sprang sie auf 2 kW, waehrend die Leistungsanzeige HIER
+    // weiter auf der Barfussskala des Geraets stand und bei jedem
+    // Sendevorgang am Anschlag klebte.
+    //
+    // OE5SOS, 2026-08-18: „Die 2-kW-Skala fuer PGXL und RF-Kit geht mit
+    // ihnen — sie gehoert zur Leistungsanzeige, nicht zum
+    // Empfangszeiger."
+    //
+    // `hasAmplifier` heisst „verstaerkt gerade", nicht „ist
+    // angeschlossen": ein PGXL in STANDBY reicht die Leistung des
+    // Geraets durch, und dann ist die Barfussskala die richtige.
+    // Wortgleich mit TunerApplet::setPowerScale, damit die drei
+    // Anzeigen nicht auseinanderlaufen koennen.
+    void setPowerScale(int maxWatts, bool hasAmplifier);
+
     // K.2: MOX button tooltip override based on current DSP mode.
     // Public static so tests can call it directly without constructing a full
     // TxApplet instance. Returns the rejection reason for deferred modes
@@ -490,6 +509,23 @@ private:
     // the radio profile).  Default HPSDRModel::FIRST is the same sentinel
     // used by rescaleFwdGaugeForModel(HPSDRModel::FIRST) at construction.
     HPSDRModel m_powerSliderModel{HPSDRModel::FIRST};
+    HPSDRModel m_fwdGaugeModel{HPSDRModel::FIRST};
+
+    /// Steht die Leistungsanzeige gerade auf der Verstaerkerskala?
+    /// rescaleFwdGaugeForModel muss das wissen: es rechnet die Skala
+    /// aus der PA-Decke des GERAETS, und waehrend ein Verstaerker
+    /// arbeitet, waere das die falsche Antwort. Ein Bandwechsel bei
+    /// laufendem PGXL haette die Anzeige sonst zurueck auf Barfuss
+    /// gesetzt.
+    bool m_ampScaleActive{false};
+
+    /// Das Geraet, fuer das die Leistungsanzeige zuletzt skaliert
+    /// wurde. Eigenes Feld, NICHT m_powerSliderModel: das gehoert den
+    /// Reglern und wird von rescalePowerSlidersForModel gesetzt. Beide
+    /// werden heute zusammen gerufen, aber „setPowerScale(false) stellt
+    /// wieder her, was eine ANDERE Funktion sich gemerkt hat" ist die
+    /// Sorte Kopplung, die genau so lange haelt, bis jemand eine der
+    /// beiden einzeln ruft.
 
     // Flag preventing echo loops between the model and the UI.
     bool m_updatingFromModel{false};
