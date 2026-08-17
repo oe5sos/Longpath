@@ -63,6 +63,59 @@ class TestFrequencyInstrument : public QObject
 
 private slots:
 
+    // ── Die Gruppierung, nicht nur der Wert ──────────────────────────
+    //
+    // Befund des Betreibers, 2026-08-18: oben stand 0.713.9700 MHz,
+    // in der VFO-Zeile darunter richtig 7.139.700. Der WERT stimmte
+    // die ganze Zeit — nur die Trennpunkte sassen an festen Stellen
+    // von links, waehrend die Gruppierung vom kleinsten Hertz her
+    // zaehlt. Ein Test auf den Wert allein waere gruen geblieben.
+    void groupingCountsFromTheRight()
+    {
+        FrequencyInstrument w;
+        w.resize(400, 120);
+
+        w.setFrequency(7'139'700.0);
+        QCOMPARE(w.groupedText(), QStringLiteral("7.139.700"));
+
+        w.setFrequency(14'225'000.0);
+        QCOMPARE(w.groupedText(), QStringLiteral("14.225.000"));
+    }
+
+    // Unter 10 MHz bleibt die vorderste Stelle leer. Eine fuehrende
+    // Null liest sich als Teil der Zahl — genau so ist der Fehler oben
+    // ueberhaupt entstanden.
+    void belowTenMegahertzThereIsNoLeadingZero()
+    {
+        FrequencyInstrument w;
+        w.resize(400, 120);
+
+        w.setFrequency(7'139'700.0);
+        QVERIFY2(!w.groupedText().startsWith(QLatin1Char('0')),
+                 qPrintable(QStringLiteral("fuehrende Null: %1")
+                                .arg(w.groupedText())));
+
+        w.setFrequency(3'650'000.0);
+        QCOMPARE(w.groupedText(), QStringLiteral("3.650.000"));
+
+        // Ab 10 MHz steht die Stelle wieder da.
+        w.setFrequency(14'225'000.0);
+        QVERIFY(w.groupedText().startsWith(QStringLiteral("14")));
+    }
+
+    // Die leere Stelle behaelt ihre Trefferflaeche: 7 MHz muss sich auf
+    // 17 MHz drehen lassen, auch wenn dort nichts steht.
+    void theBlankLeadingDigitStillTunes()
+    {
+        FrequencyInstrument w;
+        w.resize(400, 120);
+        w.setFrequency(7'139'700.0);
+        QSignalSpy spy(&w, &FrequencyInstrument::frequencyEdited);
+        wheelOn(digitsOf(w).at(0), +1);
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(qAbs(spy.at(0).at(0).toDouble() - 17'139'700.0) < 1e-6);
+    }
+
     void everyDigitIsItsOwnTarget()
     {
         FrequencyInstrument w;

@@ -27,39 +27,27 @@ InstrumentFooter::InstrumentFooter(QWidget* parent)
     // es kommentarlos; die Laufweite muss über QFont gesetzt werden
     // (Vorlage: makeGroupHead() in SpectrumOverlayPanel.cpp).
     m_caption = new QLabel(this);
-    {
-        QFont f = m_caption->font();
-        f.setPixelSize(8);
-        f.setWeight(QFont::DemiBold);
-        f.setCapitalization(QFont::AllUppercase);
-        f.setLetterSpacing(QFont::AbsoluteSpacing, 8.0 * 0.18);
-        m_caption->setFont(f);
-    }
+    // Versalzeile ueber Style::capsFont — Groesse, Halbfett,
+    // Grossbuchstaben und Laufweite an einer Stelle. Sie stand hier als
+    // 8 px mit von Hand gerechneter Laufweite; 9 ist die benannte
+    // Stufe und liegt weiterhin im Bereich, den HAUSSTIL.md nennt.
+    m_caption->setFont(Style::capsFont(m_caption->font()));
     m_caption->setStyleSheet(Style::themed(
         QStringLiteral("QLabel { color: %1; background: transparent; }")
             .arg(Style::kTextScale)));
     lay->addWidget(m_caption, 0, Qt::AlignBaseline);
 
     m_middle = new QLabel(this);
-    {
-        QFont f = m_middle->font();
-        f.setPixelSize(11);
-        f.setFamily(QStringLiteral("Menlo"));   // Zahlen, die sich ändern
-        m_middle->setFont(f);
-    }
+    // Zahlen, die sich aendern -> Monospace (HAUSSTIL Regel 2).
+    m_middle->setFont(Style::monoFont(m_middle->font(), Style::kFontSmall));
     m_middle->setStyleSheet(Style::themed(
         QStringLiteral("QLabel { color: %1; background: transparent; }")
             .arg(Instrument::measuredDim().name())));
     lay->addWidget(m_middle, 1, Qt::AlignBaseline);
 
     m_value = new QLabel(this);
-    {
-        QFont f = m_value->font();
-        f.setPixelSize(22);
-        f.setWeight(QFont::DemiBold);
-        f.setFamily(QStringLiteral("Menlo"));
-        m_value->setFont(f);
-    }
+    m_value->setFont(Style::monoFont(m_value->font(), Style::kFontReading,
+                                     QFont::DemiBold));
     setValueColour(QColor(Style::role("measured", Style::kAmberText)));
     lay->addWidget(m_value, 0, Qt::AlignBaseline);
 }

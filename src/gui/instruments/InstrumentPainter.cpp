@@ -179,6 +179,10 @@ void paintTicks(QPainter& p, const Spine& s, const ReadingDescriptor& d)
         p.drawLine(s.tick(d.fraction(t.value), kMajorTickLen));
     }
 
+    // Die Teilung traegt Zahlen, also Monospace auf der Versalstufe.
+    // Sie erbte bisher die Schrift des Aufrufers — damit sah dieselbe
+    // Skala je nach Widget anders aus.
+    p.setFont(Style::monoFont(p.font(), Style::kFontCaption));
     const QFontMetricsF fm(p.font());
     p.setPen(scale);
     for (const ReadingTick& t : d.ticks) {

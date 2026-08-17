@@ -28,6 +28,8 @@
 #include <QString>
 #include <QWidget>
 
+#include <QFont>
+
 namespace NereusSDR::Style {
 
 // ── Entblaut, 2026-08-15 ──────────────────────────────────────────────
@@ -52,6 +54,46 @@ constexpr auto kPanelBg         = "#0c0c0e";   // war #0a0a18
 constexpr auto kTextPrimary     = "#c4c4c9";   // war #c8d8e8
 constexpr auto kTextSecondary   = "#8e8e93";
 constexpr auto kTextTertiary    = "#76767a";
+// ── Sechs Schriftstufen ─────────────────────────────────────────────
+//
+// OE5SOS, 2026-08-18: „sechs Stufen, QFont::setLetterSpacing, benannte
+// Konstanten, vorher zaehlen was es schon gibt."
+//
+// GEZAEHLT am 2026-08-18: 641 Vorkommen in 18 verschiedenen Groessen
+// (60 x setPixelSize, 581 x font-size im Stylesheet). Die haeufigsten
+// sind 11 (232), 10 (186), 9 (69), 12 (72) — vier Stufen, die kaum
+// auseinanderliegen und offensichtlich nicht entschieden, sondern
+// gewachsen sind.
+//
+// Die Leiter unten deckt die drei Instrumente ab. Sie ist NICHT auf
+// den ganzen Baum angewandt: 641 Stellen blind zu ersetzen waere
+// derselbe Fehler wie die Palettenumstellung ohne Abbildungstabelle.
+// Wer sie ausweitet, tut es Datei fuer Datei.
+//
+// Die Zahlen sind ein Vorschlag mit einer Stelle, an der man ihn
+// aendert. Herkunft:
+//   Caption  9  — HAUSSTIL.md §Die acht Regeln, Regel 1: 8-9 px
+//   Small   11  — die haeufigste Groesse im Baum
+//   Body    13  — die VFO-Zeile des Frequenz-Widgets
+//   Sub     16  — bisher duenn belegt (8 Vorkommen), fuellt die Luecke
+//   Reading 22  — der abgelesene Wert in der Instrumenten-Fusszeile
+//   Display 38  — die Frequenz selbst
+constexpr int kFontCaption = 9;
+constexpr int kFontSmall   = 11;
+constexpr int kFontBody    = 13;
+constexpr int kFontSub     = 16;
+constexpr int kFontReading = 22;
+constexpr int kFontDisplay = 38;
+
+/// Laufweite der Versalzeile, als Anteil der Schriftgroesse.
+/// HAUSSTIL.md §Die acht Regeln: „.18em".
+///
+/// Sie MUSS ueber QFont::setLetterSpacing gesetzt werden.
+/// Qt-Stylesheets kennen kein letter-spacing und verwerfen es
+/// kommentarlos — das steht so in der Uebergabe vom 2026-08-15 und hat
+/// dort schon einmal eine Stunde gekostet.
+constexpr double kCapsTracking = 0.18;
+
 constexpr auto kTextScale       = "#5c5c60";
 constexpr auto kTextInactive    = "#3d3d41";
 // NereusSDR-original — used in 5+ places for AGC-T / pan / similar labels;
@@ -521,5 +563,30 @@ constexpr auto kTxFilterOverlayLabel  = "#c2924f";
 // Border reuses kAccent (#00b4d8); only the fill variant is new.
 // Customisable on Setup → Display → Spectrum Defaults.
 constexpr auto kRxFilterOverlayFill   = "rgba(0, 180, 216, 80)";
+
+
+/// Eine Versalzeile: Groesse, Halbfett, Grossbuchstaben und die
+/// Laufweite aus kCapsTracking — an einer Stelle, damit sie nicht je
+/// Aufrufstelle neu gerechnet wird und dabei auseinanderlaeuft.
+inline QFont capsFont(const QFont& base, int px = kFontCaption)
+{
+    QFont f = base;
+    f.setPixelSize(px);
+    f.setWeight(QFont::DemiBold);
+    f.setCapitalization(QFont::AllUppercase);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, px * kCapsTracking);
+    return f;
+}
+
+/// Eine Zahl, die sich aendert: Monospace, damit Stellen untereinander
+/// stehen. HAUSSTIL.md §Die acht Regeln, Regel 2.
+inline QFont monoFont(const QFont& base, int px, QFont::Weight w = QFont::Normal)
+{
+    QFont f = base;
+    f.setPixelSize(px);
+    f.setWeight(w);
+    f.setFamily(QStringLiteral("Menlo"));
+    return f;
+}
 
 } // namespace NereusSDR::Style

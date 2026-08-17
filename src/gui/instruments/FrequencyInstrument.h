@@ -85,6 +85,12 @@ public:
     void setForm(Form f);
     Form form() const { return m_form; }
 
+    /// Die Ziffernzeile als Text, aus den echten Schildern in
+    /// Layoutfolge gelesen. Fuer den Test, der die GRUPPIERUNG
+    /// festnagelt und nicht nur den Wert — die beiden liefen am
+    /// 2026-08-18 auseinander.
+    QString groupedText() const;
+
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override { return {240, 74}; }
 

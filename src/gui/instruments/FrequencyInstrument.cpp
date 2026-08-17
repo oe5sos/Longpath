@@ -64,8 +64,9 @@ FrequencyInstrument::FrequencyInstrument(QWidget* parent)
     m_edit->setPlaceholderText(QStringLiteral("MHz"));
     m_edit->setStyleSheet(Style::themed(QStringLiteral(
         "QLineEdit { background: %1; color: %2; border: 1px solid %3;"
-        " border-radius: 6px; font-family: Menlo; font-size: 26px; }")
-        .arg(Style::kInsetBg, Style::kAmberText, Style::kBorder)));
+        " border-radius: 6px; font-family: Menlo; font-size: %4px; }")
+        .arg(Style::kInsetBg, Style::kAmberText, Style::kBorder)
+        .arg(Style::kFontReading)));
     connect(m_edit, &QLineEdit::editingFinished,
             this, &FrequencyInstrument::commitEdit);
 
@@ -77,12 +78,7 @@ FrequencyInstrument::FrequencyInstrument(QWidget* parent)
 
     m_vfoRow = new QLabel(this);
     m_vfoRow->setTextFormat(Qt::RichText);
-    {
-        QFont f = m_vfoRow->font();
-        f.setPixelSize(13);
-        f.setFamily(QStringLiteral("Menlo"));
-        m_vfoRow->setFont(f);
-    }
+    m_vfoRow->setFont(Style::monoFont(m_vfoRow->font(), Style::kFontBody));
     root->addWidget(m_vfoRow, 0);
 
     refreshDigits();
@@ -105,25 +101,39 @@ QSize FrequencyInstrument::sizeHint() const
 
 void FrequencyInstrument::buildDigits()
 {
-    // Trennzeichen nach der ersten und der vierten Ziffer: 7.139.700.
-    static const int kSepAfter[] = {0, 3};
+    // ── Gruppen zu drei, von RECHTS gezaehlt ─────────────────────────
+    //
+    // Hier stand {0, 3}, und das war um eine Stelle verschoben: die
+    // Trennpunkte sassen an festen Stellen von links, waehrend die
+    // Gruppierung vom kleinsten Hertz her zaehlt. 7.139.700 Hz kam als
+    // „0.713.9700" heraus — die fuehrende Null wurde mitgezaehlt.
+    // Befund des Betreibers, 2026-08-18, gegen die VFO-Zeile darunter,
+    // die es richtig zeigte.
+    //
+    // Die Stellen sind 10 MHz .. 1 Hz. Gruppen von rechts:
+    //   (1 Hz, 10 Hz, 100 Hz) = 5,6,7
+    //   (1 k, 10 k, 100 k)    = 2,3,4
+    //   (1 M, 10 M)           = 0,1
+    // Also Punkte NACH Stelle 1 und NACH Stelle 4.
+    static const int kSepAfter[] = {1, 4};
 
     for (int i = 0; i < kDigitCount; ++i) {
         auto* d = new QLabel(QStringLiteral("0"), m_digitRow);
         d->setAlignment(Qt::AlignCenter);
-        {
-            QFont f = d->font();
-            f.setPixelSize(38);
-            f.setWeight(QFont::Light);
-            f.setFamily(QStringLiteral("Menlo"));
-            d->setFont(f);
-        }
+        d->setFont(Style::monoFont(d->font(), Style::kFontDisplay,
+                                   QFont::Light));
         // Jede Ziffer ist eine eigene Trefferflaeche. Der Zeiger sagt
         // das an: senkrecht ziehen ist die Geste, die das Rad meint.
         d->setCursor(Qt::SizeVerCursor);
         d->setAttribute(Qt::WA_Hover, true);
         d->installEventFilter(this);
         d->setToolTip(tr("Scroll to tune this digit"));
+        // Feste Mindestbreite: die fuehrende Stelle wird unter 10 MHz
+        // LEER gezeigt, und ein leeres Schild ohne Breite naehme seine
+        // eigene Trefferflaeche mit. Man koennte dann 7 MHz nicht mehr
+        // auf 17 MHz drehen.
+        d->setMinimumWidth(QFontMetrics(d->font()).horizontalAdvance(
+                               QStringLiteral("0")) + 4);
         m_digits.append(d);
         m_decades.append(kDecades[i]);
         m_digitLayout->addWidget(d);
@@ -141,12 +151,9 @@ void FrequencyInstrument::buildDigits()
     }
 
     auto* unit = new QLabel(QStringLiteral("MHz"), m_digitRow);
-    {
-        QFont f = unit->font();
-        f.setPixelSize(11);
-        f.setLetterSpacing(QFont::AbsoluteSpacing, 11.0 * 0.14);
-        unit->setFont(f);
-    }
+    // „MHz" ist eine Beschriftung, keine Zahl: Versalzeile auf der
+    // kleinen Stufe, mit derselben Laufweite wie jede andere.
+    unit->setFont(Style::capsFont(unit->font(), Style::kFontSmall));
     unit->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: %1; }").arg(Style::kTextSecondary)));
     m_digitLayout->addSpacing(10);
@@ -159,7 +166,12 @@ void FrequencyInstrument::refreshDigits()
     for (int i = 0; i < m_digits.size(); ++i) {
         const qint64 dec = static_cast<qint64>(m_decades.at(i));
         const int digit = static_cast<int>((hz / dec) % 10);
-        m_digits[i]->setText(QString::number(digit));
+        // Unter 10 MHz bleibt die vorderste Stelle leer statt „0". Die
+        // Zeile darunter macht es genauso (0 wird dort nicht gepolstert),
+        // und eine fuehrende Null liest sich als Teil der Zahl.
+        const bool blank = (i == 0 && hz < 10000000);
+        m_digits[i]->setText(blank ? QString()
+                                   : QString::number(digit));
         const bool dim = (i >= kDimFromIndex);
         m_digits[i]->setStyleSheet(Style::themed(
             QStringLiteral("QLabel { color: %1; padding: 2px 1px;"
@@ -168,6 +180,25 @@ void FrequencyInstrument::refreshDigits()
                 .arg(dim ? Style::kAmberDim : Style::kAmberText,
                      Style::kBadgeWarnBg)));
     }
+}
+
+QString FrequencyInstrument::groupedText() const
+{
+    // Liest die WIRKLICHEN Schilder in der WIRKLICHEN Reihenfolge des
+    // Layouts — keine zweite Fassung der Formatierung, die gruen bleiben
+    // koennte, waehrend auf dem Schirm etwas anderes steht.
+    QString out;
+    QLayout* lay = m_digitRow ? m_digitRow->layout() : nullptr;
+    if (!lay) { return out; }
+    for (int i = 0; i < lay->count(); ++i) {
+        QLayoutItem* it = lay->itemAt(i);
+        auto* l = it ? qobject_cast<QLabel*>(it->widget()) : nullptr;
+        if (!l) { continue; }
+        // Die Einheit gehoert nicht zur Zahl.
+        if (l->text() == QStringLiteral("MHz")) { continue; }
+        out += l->text();
+    }
+    return out;
 }
 
 void FrequencyInstrument::refreshVfoRow()
