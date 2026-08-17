@@ -34,6 +34,7 @@ Aufruf
     python3 tools/colour_audit.py                # Übersicht
     python3 tools/colour_audit.py --collapse     # die ersetzbaren, mit Fundort
     python3 tools/colour_audit.py --orphans      # die eigenständigen
+    python3 tools/colour_audit.py --unmapped     # die, die kein Theme erreicht
     python3 tools/colour_audit.py --apply        # Schritt 1 ausführen
 
 Bis auf ``--apply`` liest das Skript nur.
@@ -53,6 +54,46 @@ Nur der Eimer ΔE < 8 wird angefasst. Diese Farben sind von ihrem Ziel
 nicht zu unterscheiden — ``#404858`` steht 18-mal in der App und liegt
 2,9 ΔE neben ``kTitleGradTop``. Es geht keine Information verloren,
 weil da keine war.
+
+Was ``--unmapped`` meldet — der Fehlertyp hinter #00e5ff
+-------------------------------------------------------
+
+Ergänzt am 2026-08-17 auf Bitte des Betreibers.
+
+Die bisherigen Eimer messen den Abstand zur nächsten BENANNTEN Farbe.
+Sie beantworten „hat diese Farbe einen Namen?" — aber nicht die Frage,
+die #00e5ff monatelang überstehen liess: **erreicht das Theme sie
+überhaupt?**
+
+``Style::themed()`` ersetzt Werte, die in der Abbildungstabelle in
+``src/gui/styles/ThemeQss.cpp`` als Schlüssel stehen. Ein Literal, das
+dort NICHT vorkommt, ist für jeden Palettenwechsel unsichtbar. Es
+überlebt jede Umstellung, ohne dass irgendwo etwas rot wird — und genau
+das ist an einer Farbe das Tückische: sie funktioniert weiter, sie
+stimmt nur nicht mehr.
+
+Die drei ΔE-Eimer sagten dazu nichts. Eine Farbe kann einen Namen
+haben, dicht an der Palette liegen, und trotzdem eingefroren sein,
+weil ihr Wert in der Tabelle fehlt.
+
+Gemeldet werden deshalb zwei Gruppen, nach Vorkommen sortiert:
+
+* **eingefroren** — Wert nicht in der Tabelle. Entweder eine Zeile
+  dort ergänzen oder das Literal auf einen Wert ziehen, den die Tabelle
+  kennt.
+* **eingefroren UND namenlos (ΔE > 18)** — die schlimmste Sorte: keine
+  Konstante, kein Theme-Zugriff, keine Ähnlichkeit zu irgendetwas
+  Benanntem. Da hat jemand eine Farbe erfunden und niemand hat sie
+  wieder eingesammelt.
+
+Zwei Gruppen bleiben absichtlich draussen, weil sie sonst das Bild
+zudecken:
+
+* Dateien in ``EXEMPT`` — dieselbe Befreiung wie in der übrigen
+  Inventur.
+* Farben, die nur in Kommentaren stehen, kann das Skript nicht von
+  Code unterscheiden; es liest zeilenweise. Das war vorher schon so
+  und wird hier nicht schlimmer.
 
 Ausgeschlossen als Ziel sind die ``kEqBand*``-Töne. Die existieren, um
 acht überlagerte Entzerrerkurven auseinanderzuhalten, und ein Knopf im
@@ -283,6 +324,48 @@ def main() -> int:
         print("Schritt 1: ununterscheidbare Farben auf ihr Ziel setzen.\n")
         return apply_collapse(buckets, dry=(mode == "--apply-dry"))
 
+    if mode == "--unmapped":
+        mapped = theme_legacy_keys()
+        if not mapped:
+            print("Die Abbildungstabelle ist leer oder nicht lesbar "
+                  "(src/gui/styles/ThemeQss.cpp).", file=sys.stderr)
+            print("Ohne sie ist die Frage 'erreicht das Theme diese "
+                  "Farbe?' nicht zu beantworten — kein Ergebnis ist "
+                  "besser als ein leeres.", file=sys.stderr)
+            return 2
+
+        # Namenlos UND weit weg: die Farben aus Eimer 2.
+        far = {r[0] for r in buckets[2]}
+        frozen = {c: hits for c, hits in found.items() if c not in mapped}
+
+        worst = {c: h for c, h in frozen.items() if c in far}
+        rest  = {c: h for c, h in frozen.items() if c not in far}
+
+        print("Farben, die kein Theme erreicht — der Wert steht nicht in")
+        print("der Abbildungstabelle (src/gui/styles/ThemeQss.cpp).")
+        print("Sie ueberleben jeden Palettenwechsel, ohne dass etwas "
+              "rot wird.\n")
+
+        def dump(title, group, limit):
+            if not group:
+                return
+            n = sum(len(h) for h in group.values())
+            print(f"── {title}: {len(group)} Farben, {n} Vorkommen ───")
+            for colour, hits in sorted(group.items(),
+                                       key=lambda kv: -len(kv[1])):
+                name, value, d = classify(colour, palette)
+                print(f"{colour}  {len(hits):>3}×   naechste benannte: "
+                      f"{name} {value}  ΔE {d:.0f}")
+                for rel, line in hits[:limit]:
+                    print(f"        {rel}:{line}")
+                if len(hits) > limit:
+                    print(f"        … und {len(hits) - limit} weitere")
+            print()
+
+        dump("eingefroren UND namenlos (ΔE > 18)", worst, 4)
+        dump("eingefroren", rest, 2)
+        return 0
+
     if mode == "--orphans":
         print("Eigenständige Farben (ΔE > 18). Jede braucht einen Namen "
               "in StyleConstants.h,")
@@ -314,8 +397,23 @@ def main() -> int:
         print(f"  {head}  {len(buckets[i]):>4} Farben  {n:>4} Vorkommen"
               f"   — {note}")
     print()
+    mapped = theme_legacy_keys()
+    if mapped:
+        frozen = {c: h for c, h in found.items() if c not in mapped}
+        frozen_hits = sum(len(h) for h in frozen.values())
+        far = {r[0] for r in buckets[2]}
+        worst = len([c for c in frozen if c in far])
+        print("── Was kein Theme erreicht ─────────────────────────────────")
+        print(f"  nicht in der Abbildungstabelle  {len(frozen):>4} Farben"
+              f"  {frozen_hits:>4} Vorkommen")
+        print(f"  davon auch namenlos (ΔE > 18)   {worst:>4} Farben")
+        print("  — diese folgen keinem Palettenwechsel. Der Fehlertyp,")
+        print("    der #00e5ff monatelang ueberstehen liess.")
+        print()
+
     print("  python3 tools/colour_audit.py --collapse   die ersetzbaren")
     print("  python3 tools/colour_audit.py --orphans    die eigenständigen")
+    print("  python3 tools/colour_audit.py --unmapped   die eingefrorenen")
     print("  python3 tools/colour_audit.py --apply-dry  Schritt 1 vorführen")
     print("  python3 tools/colour_audit.py --apply      Schritt 1 ausführen")
     return 0

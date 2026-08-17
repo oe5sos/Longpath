@@ -2233,9 +2233,11 @@ void MainWindow::refreshTnfIndicator()
 //
 // The connects name member slots rather than lambdas on purpose. This runs
 // again on every countChanged, so it has to be idempotent, and
-// Qt::UniqueConnection is silently ignored for lambda targets in Qt6 -- a
-// lambda here would stack one extra connection per layout switch and open
-// that many FilterPolicyDialogs on a single click.
+// Qt::UniqueConnection only works on a pointer-to-member target. Qt6 does
+// not quietly drop the flag on a lambda -- it warns ("unique connections
+// require a pointer to member function of a QObject subclass") and refuses
+// the connect, so a lambda here would not stack duplicates but simply
+// never fire. A named slot is the only shape that gets the dedup asked for.
 // ---------------------------------------------------------------------------
 // ensureOverlayPanels — one control strip per panadapter.
 //
@@ -7724,9 +7726,10 @@ void MainWindow::buildStatusBar()
     hbox->addWidget(m_tnfLabel);
 
     if (NotchModel* notches = m_radioModel->notchModel()) {
-        // Named slot, not a lambda: Qt::UniqueConnection is silently ignored
-        // for lambda targets in Qt6, and every one of these five signals can
-        // fire while the bar is being rebuilt.
+        // Named slot, not a lambda: Qt::UniqueConnection only works on a
+        // pointer-to-member target -- on a lambda Qt6 warns and refuses the
+        // connect entirely. Every one of these five signals can fire while
+        // the bar is being rebuilt, so the dedup has to actually hold.
         connect(notches, &NotchModel::globalEnabledChanged, this,
                 &MainWindow::refreshTnfIndicator, Qt::UniqueConnection);
         connect(notches, &NotchModel::notchAdded, this,
@@ -8042,8 +8045,10 @@ void MainWindow::buildStatusBar()
             refreshChromeBarForSystemTile();
         }
         if (auto* conn = m_radioModel->connection()) {
-            // conn is a new object on each reconnect — no deduplication needed.
-            // Qt::UniqueConnection is not supported for lambda connects anyway.
+            // conn is a new object on each reconnect — no deduplication
+            // needed. Qt::UniqueConnection would be no help here in any
+            // case: on a lambda target Qt6 warns and refuses the connect,
+            // rather than making it once-only.
             //
             // 2026-05-25 KG4VCF G2E bench finding: ANAN-G2E (HermesC10)
             // firmware leaves user_adc0 (AIN3 / status bytes 53-54) dark.
@@ -8316,8 +8321,9 @@ void MainWindow::buildStatusBar()
     // Wire TX badge to MoxController. MoxController lives on m_radioModel;
     // both are created before buildStatusBar() runs.
     if (MoxController* mox = m_radioModel->moxController()) {
-        // Qt::UniqueConnection is not supported for lambda connects — this
-        // connect runs once at construction so no deduplication is needed.
+        // Qt::UniqueConnection is not usable on a lambda target — Qt6 warns
+        // and refuses such a connect outright. Not needed here either: this
+        // runs once at construction, so there is nothing to deduplicate.
         connect(mox, &MoxController::moxStateChanged, this, [this](bool tx) {
             // While inhibited the badge is showing the prohibition symbol and
             // must keep showing it; a MOX transition underneath must not
@@ -11481,10 +11487,11 @@ void MainWindow::onConnectionStateChanged()
 
         // Phase 3P-II Phase 4 Task 89: wire TunerApplet context menu signals to
         // TgxlConnection. buildUI() runs once at startup, so no deduplication
-        // guard is needed. Qt::UniqueConnection is intentionally NOT used here:
-        // Qt6 silently no-ops UniqueConnection when the slot is a lambda (it
-        // requires a pointer-to-member-function of a QObject subclass), so
-        // all four connects below would have been dead on arrival.
+        // guard is needed. Qt::UniqueConnection is intentionally NOT used
+        // here: it requires a pointer-to-member-function of a QObject
+        // subclass, and on a lambda Qt6 warns and returns an invalid
+        // Connection — all four connects below would have been dead on
+        // arrival, not merely un-deduplicated.
         if (m_tunerApplet) {
             // Track TGXL connected state for Disconnect/Reconnect label.
             connect(m_radioModel->tgxlConnection(), &TgxlConnection::connected,

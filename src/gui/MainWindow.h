@@ -289,9 +289,14 @@ private slots:
     /// Idempotent, because re-arming on every countChanged would otherwise
     /// stack duplicate connections and open one dialog per layout switch the
     /// operator had ever made. The handlers below are SLOTS, not lambdas,
-    /// specifically so Qt::UniqueConnection actually dedups: Qt6 silently
-    /// no-ops UniqueConnection when the target is a lambda (see the notes at
-    /// the SpotModel and applet-visibility connect sites).
+    /// specifically so Qt::UniqueConnection actually dedups.
+    ///
+    /// Qt6 does NOT quietly drop the flag on a functor target — it warns
+    /// ("unique connections require a pointer to member function of a
+    /// QObject subclass") and returns an invalid Connection, so the
+    /// connect never happens at all. A lambda here would therefore not
+    /// stack duplicates; it would be dead. Both outcomes are wrong, and
+    /// the second is the one that hides.
     void wirePanBadgeHandlers();
 
     /// Give every panadapter its own control strip (+RX / BAND / ANT /
@@ -381,11 +386,11 @@ private slots:
     /// frequency from a panadapter click; this one has to compose the centre
     /// itself from the pan's own slice (design section 7.5).
     ///
-    /// A slot, not a lambda, for the same reason the five handlers above are:
-    /// ensureOverlayPanels re-runs on every PanadapterStack::countChanged and
-    /// Qt6 silently ignores Qt::UniqueConnection on a lambda target, so a
-    /// lambda would add one extra notch per layout switch the operator had
-    /// ever made.
+    /// A slot, not a lambda, for the same reason the five handlers above
+    /// are: ensureOverlayPanels re-runs on every
+    /// PanadapterStack::countChanged, and Qt::UniqueConnection only works
+    /// on a pointer-to-member target. On a lambda Qt6 warns and refuses
+    /// the connect outright — the handler would never fire.
     void onAddTnfClicked(const QString& panId);
 
     /// TNF: surface a rejected add. Without this a +TNF press inside the
@@ -452,10 +457,10 @@ private slots:
     /// activePanId() lookup -- the same "acts on the pan that was clicked"
     /// shape as the three handlers above. Named slots rather than lambdas:
     /// wirePanBadgeHandlers() re-runs on every countChanged, and
-    /// Qt::UniqueConnection is silently dropped for lambda targets (see the
-    /// comment on the `activated` connect in wirePanBadgeHandlers()), so a
-    /// lambda here would re-add itself on every layout change and fire the
-    /// add-slice/float once per accumulated connection.
+    /// Qt::UniqueConnection only works on a pointer-to-member target: on a
+    /// lambda Qt6 warns and refuses the connect (see the comment on the
+    /// `activated` connect in wirePanBadgeHandlers()). Either the dedup
+    /// fails or the handler never runs — a named slot avoids the question.
     void onPanAddSliceRequested(const QString& panId);
     void onPanFloatRequested(const QString& panId);
 
