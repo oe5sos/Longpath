@@ -1436,6 +1436,28 @@ public:
     void applyPeripheralsForTest() { applyPeripheralsForCurrentMac(); }
     void teardownPeripheralsForTest() { teardownPeripherals(); }
 
+    // ── Kein Testzugriff: TxVoiceCheckDialog benutzt das ─────────────
+    //
+    // Stand bis 2026-08-17 INNERHALB des #ifdef NEREUS_BUILD_TESTS
+    // weiter unten — direkt unter txWorkerForTest(), dessen Kommentar
+    // ausdruecklich sagt "Test-only accessor — do not use in production
+    // code". Der Nachbar hat den Platz geerbt, aber nicht die
+    // Eigenschaft.
+    //
+    // Folge: die App war seit 49d10dc8 NICHT MEHR VON GRUND AUF BAUBAR.
+    // TxVoiceCheckDialog.cpp ruft txWorker() an fuenf Stellen, und ohne
+    // das Makro gibt es die Funktion nicht. Gesehen hat es niemand,
+    // weil ./build.sh inkrementell baut und die alte Objektdatei liegen
+    // blieb, waehrend ./tools/run_tests.sh mit
+    // NEREUS_BUILD_TESTS=ON konfiguriert und deshalb immer durchlief.
+    // Erst ein rm -rf build hat es gezeigt.
+    //
+    // Voice-check access to the worker's pre/post-strip taps
+    // (2026-08-11). Null until a connection constructs the worker — the
+    // dialog re-arms on its level-watch tick exactly as it does for
+    // txChannel().
+    TxWorkerThread* txWorker() { return m_txWorker.get(); }
+
 #ifdef NEREUS_BUILD_TESTS
 public:
     // Test-only: inject board caps without a live radio connection.
@@ -1670,11 +1692,6 @@ public:
     // Test-only accessor — do not use in production code.
     const TxWorkerThread* txWorkerForTest() const { return m_txWorker.get(); }
 
-    // Voice-check access to the worker's pre/post-strip taps
-    // (2026-08-11). Null until a connection constructs the worker — the
-    // dialog re-arms on its level-watch tick exactly as it does for
-    // txChannel().
-    TxWorkerThread* txWorker() { return m_txWorker.get(); }
     // Phase 3M-1c TX pump v3 — TxMicSource is constructed alongside
     // TxWorkerThread; allow tests to verify the pre/post-connect ownership.
     const class TxMicSource* txMicSourceForTest() const { return m_txMicSource.get(); }
