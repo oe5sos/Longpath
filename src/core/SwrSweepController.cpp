@@ -1,4 +1,12 @@
 // =================================================================
+//
+// Independently implemented from the Thetis console — diese Datei
+// traegt KEINEN uebernommenen Inhalt. Die einzige geborgte Zahl der
+// Klasse (kTuneSettleMs = 300, console.cs:44743 [@852bf0e]) steht im
+// Kopf SwrSweepController.h, und der traegt dafuer den woertlichen
+// Lizenzblock und eine PROVENANCE-Zeile. Die zwei Thetis-Erwaehnungen
+// weiter unten sind Prosa UEBER die Bandtabelle des BandPlanGuard,
+// keine Uebernahme.
 // src/core/SwrSweepController.cpp  (NereusSDR)
 // =================================================================
 //

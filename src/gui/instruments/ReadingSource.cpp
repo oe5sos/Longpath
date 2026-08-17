@@ -1,3 +1,11 @@
+// no-port-check: die einzige Thetis-Erwaehnung hier ist ein
+// NEGATIVBEFUND. enums.cs:498 wird genannt, um festzuhalten, dass
+// Thetis die Kuehlkoerpertemperatur als Fehlerbit fuehrt und eben
+// KEINE Skala hat, die man portieren koennte. Uebernommen wird aus
+// Thetis in dieser Datei nichts; die Skalen stammen aus dem eigenen
+// Baum, die Teilung aus den Entwuerfen des Betreibers. Die Erwaehnung
+// steht da, damit die Suche nicht ein zweites Mal gemacht wird.
+
 // =================================================================
 // src/gui/instruments/ReadingSource.cpp  (NereusSDR)
 // =================================================================
@@ -168,15 +176,31 @@ QList<ReadingDescriptor> buildTable()
     // ── HW: Temperatur — ohne Skala, und das mit Absicht ─────────────
     //
     // Der Betreiber hat sie als eine der vier Quellen für die
-    // Instrumente genannt. Sie bekommt hier trotzdem keine: im ganzen
-    // Baum steht weder ein Bereich noch eine Grenze für die
-    // PA-Temperatur (SystemTile zeigt die Zahl ohne Zone, RadioStatus
-    // reicht sie nur durch), und die Thetis-Quelle ist auf diesem
-    // Rechner nicht geklont — ../Thetis fehlt.
+    // Instrumente genannt. Sie bekommt trotzdem keine Skala, und das
+    // ist nachgesehen und nicht dahingestellt:
     //
-    // Eine erfundene Skala sähe aus wie eine Messung. Sobald ein
-    // Bereich und eine Grenze belegt sind, sind es drei Zeilen hier,
-    // und die Größe steht sofort in der Auswahl der Instrumente.
+    //   Im eigenen Baum steht weder Bereich noch Grenze. RadioStatus
+    //   reicht die Zahl durch (setPaTemperature), SystemTile zeigt sie
+    //   ohne Zone.
+    //
+    //   In Thetis auch nicht — nachgesehen am 2026-08-17 gegen
+    //   ../Thetis [@852bf0e]. Thetis kennt die Kühlkörpertemperatur
+    //   NICHT als Messwert mit Bereich, sondern als FEHLERBIT:
+    //   PAstatusIndicatorState.HeatsinkTemperature (enums.cs:498),
+    //   ein Flag im PA-Statuswort, das der Verstärker meldet. Es gibt
+    //   dort keine Skala zu portieren, weil dort keine gezeichnet
+    //   wird.
+    //
+    // Damit ist die Frage keine Portierungsfrage mehr, sondern eine
+    // Angabe: ab welcher Temperatur soll das Instrument warnen. Das
+    // steht in keinem Quelltext, sondern im Datenblatt des jeweiligen
+    // Geräts — und die Antwort gehört dem Betreiber.
+    //
+    // Eine erfundene Skala sähe aus wie eine Messung. Sobald Bereich
+    // und Grenze belegt sind, sind es drei Zeilen hier, und die Größe
+    // steht sofort in der Auswahl der Instrumente. Die Prüfung in
+    // tst_reading_source fällt dann um und erinnert daran, die
+    // Herkunft dazuzuschreiben.
     plain(MeterBinding::HwTemperature,  "HW: Temperature");
 
     plain(MeterBinding::RotatorAz,      "Rotator: Azimuth");

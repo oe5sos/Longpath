@@ -2,6 +2,79 @@
 // src/core/SwrSweepController.h  (NereusSDR)
 // =================================================================
 //
+// Ported from Thetis source:
+//   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
+//
+// Umfang der Uebernahme: EINE Konstante. kTuneSettleMs = 300 spiegelt
+// das Task.Delay(300) um die TUNE-Umschaltung (console.cs:44743
+// [@852bf0e]). Alles Weitere in dieser Datei ist NereusSDR-original --
+// Thetis kennt keinen Bandwobbler. Dass eine geborgte Konstante
+// trotzdem den vollen Kopf traegt, ist der Hausstand: FFTEngine.cpp
+// steht mit derselben Begruendung in der PROVENANCE-Tabelle
+// („constant reference only").
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-13 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-08-17 — Verbatim console.cs header + PROVENANCE row added; the
+//                 borrowed constant had a cite but no attribution, which
+//                 scripts/check-new-ports.py had been failing on.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
+// =================================================================
+
+//=================================================================
+// console.cs
+//=================================================================
+// Thetis is a C# implementation of a Software Defined Radio.
+// Copyright (C) 2004-2009  FlexRadio Systems 
+// Copyright (C) 2010-2020  Doug Wigley
+// Credit is given to Sizenko Alexander of Style-7 (http://www.styleseven.com/) for the Digital-7 font.
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact us via email at: sales@flex-radio.com.
+// Paper mail may be sent to: 
+//    FlexRadio Systems
+//    8900 Marybank Dr.
+//    Austin, TX 78750
+//    USA
+//
+//=================================================================
+// Modifications to support the Behringer Midi controllers
+// by Chris Codella, W2PA, May 2017.  Indicated by //-W2PA comment lines. 
+// Modifications for using the new database import function.  W2PA, 29 May 2017
+// Support QSK, possible with Protocol-2 firmware v1.7 (Orion-MkI and Orion-MkII), and later.  W2PA, 5 April 2019 
+// Modfied heavily - Copyright (C) 2019-2026 Richard Samphire (MW0LGE)
+// ApacheLabs G2E support added throughout Thetis in various files, all changes marked  //N1GP G2E added
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
+
+// =================================================================
+//
 // NereusSDR-original feature (no Thetis equivalent — Thetis has no
 // band-sweep SWR analyzer). Built entirely on ported, bench-proven
 // primitives: MoxController::setTune (BandPlanGuard-gated),
@@ -351,8 +424,13 @@ public:
 
     // ── Tuning constants ─────────────────────────────────────────────
     /// Mirrors TwoToneController::kTuneReleaseSettleMs (Thetis
-    /// console.cs:44740 [v2.10.3.13] Task.Delay(300) around TUNE
-    /// transitions).
+    /// console.cs:44743 [@852bf0e] — `await Task.Delay(300);` nach dem
+    /// Abschalten von TUN, bevor der Zweiton startet).
+    ///
+    /// Die Zeile stand als 44740 [v2.10.3.13] hier; gegen die
+    /// vorliegende Arbeitskopie nachgesehen und auf 44743 [@852bf0e]
+    /// gestellt. Der WERT ist unveraendert 300 — nur die Zeilennummer
+    /// war zwischen den Fassungen verrutscht.
     static constexpr int kTuneSettleMs = 300;
     /// Fallback floor in watts, used only when no raw ADC count is
     /// available (the tests feed watts alone).
