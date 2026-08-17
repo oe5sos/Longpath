@@ -41,7 +41,8 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
-#include <QElapsedTimer>
+#include "gui/instruments/PeakHold.h"
+
 #include <QWidget>
 
 namespace NereusSDR {
@@ -73,6 +74,13 @@ public:
 
     bool hasValue() const { return m_hasValue; }
 
+    /// Die Spitzenhaltung — dieselbe Klasse wie beim Zeigerinstrument,
+    /// damit eine Einstellung aus dem Rechtsklickmenue beide Ansichten
+    /// erreicht und nicht nur die gerade sichtbare.
+    PeakHold&       peakHold()       { return m_peak; }
+    const PeakHold& peakHold() const { return m_peak; }
+    void resetPeak() { m_peak.reset(m_value); update(); }
+
     QSize sizeHint() const override { return {320, 74}; }
     QSize minimumSizeHint() const override { return {180, 56}; }
 
@@ -80,7 +88,6 @@ protected:
     void paintEvent(QPaintEvent*) override;
 
 private:
-    void notePeak(double value);
     void refreshFooter();
     void paintOne(class QPainter& p, const QRectF& area,
                   const ReadingDescriptor& d, double value,
@@ -92,18 +99,13 @@ private:
     int    m_secondary{-1};
     double m_value{0.0};
     double m_secondValue{0.0};
-    double m_peak{0.0};
-    QElapsedTimer m_peakAge;
+    PeakHold m_peak;
 
     /// Ohne gültige Messung: kein Verlauf, keine Glut, keine Wertkante,
     /// Wert als Gedankenstrich. Mulde und Teilung bleiben. Begründung
     /// bei NeedleInstrument.
     bool m_hasValue{false};
     bool m_hasSecond{false};
-
-    /// Wie beim Zeigerinstrument — dieselbe Zahl, damit die Spitze in
-    /// beiden Ansichten gleich lange steht.
-    static constexpr qint64 kPeakHoldMs = 3000;
 };
 
 } // namespace NereusSDR

@@ -59,14 +59,23 @@ QList<ReadingDescriptor> buildTable()
 
     // ── RX ───────────────────────────────────────────────────────────
     //
-    // Signal Peak und Signal Avg sind die beiden, die auf einer
-    // S-Skala stehen. Bereich und Kennlinie aus SMeterWidget.h:62-66
-    // + :318-319 (S0 = -127 dBm, 6 dB je Stufe, S9+60 = -13 dBm).
-    // KEINE Schwelle: „Wo es keine Schwelle gibt — Empfangsskala —,
-    // gibt es keinen roten Abschnitt" (OE5SOS, 2026-08-17).
+    // Die drei Grössen, die auf einer S-Skala stehen. Bereich und
+    // Kennlinie aus SMeterWidget.h:62-66 + :318-319 (S0 = -127 dBm,
+    // 6 dB je Stufe, S9+60 = -13 dBm). KEINE Schwelle: „Wo es keine
+    // Schwelle gibt — Empfangsskala —, gibt es keinen roten Abschnitt"
+    // (OE5SOS, 2026-08-17).
+    //
+    // Max Bin gehört dazu, weil es dieselbe Grösse ist: Thetis rechnet
+    // ihm denselben Kalibrieroffset an wie den beiden anderen
+    // (console.cs:46881 [v2.10.3.13] gegen :46824 und :46828). Es stand
+    // vorher als `plain` ohne Skala hier und war damit für die
+    // Instrumente unsichtbar — wählbar war es nur über den
+    // Rechtsklick der analogen S-Meter-Anzeige, also über eine zweite
+    // Auswahlmechanik neben dieser Liste.
     for (const auto& sig : {
-             std::pair<int, const char*>{MeterBinding::SignalPeak, "RX: Signal Peak"},
-             std::pair<int, const char*>{MeterBinding::SignalAvg,  "RX: Signal Avg"}}) {
+             std::pair<int, const char*>{MeterBinding::SignalPeak,   "RX: Signal Peak"},
+             std::pair<int, const char*>{MeterBinding::SignalAvg,    "RX: Signal Avg"},
+             std::pair<int, const char*>{MeterBinding::SignalMaxBin, "RX: Signal Max Bin"}}) {
         ReadingDescriptor d;
         d.bindingId  = sig.first;
         d.label      = QString::fromLatin1(sig.second);
@@ -102,7 +111,6 @@ QList<ReadingDescriptor> buildTable()
     plain(MeterBinding::AgcGain,      "RX: AGC Gain");
     plain(MeterBinding::AgcPeak,      "RX: AGC Peak");
     plain(MeterBinding::AgcAvg,       "RX: AGC Avg");
-    plain(MeterBinding::SignalMaxBin, "RX: Signal Max Bin");
     plain(MeterBinding::PbSnr,        "RX: PB SNR");
 
     // ── TX: Vorlaufleistung ──────────────────────────────────────────

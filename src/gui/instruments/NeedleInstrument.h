@@ -43,7 +43,8 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
-#include <QElapsedTimer>
+#include "gui/instruments/PeakHold.h"
+
 #include <QWidget>
 
 namespace NereusSDR {
@@ -81,6 +82,12 @@ public:
     /// Zifferblatt und sonst nichts.
     bool hasValue() const { return m_hasValue; }
 
+    /// Die Spitzenhaltung. Sie wird aus dem Rechtsklickmenü des Applets
+    /// eingestellt; das Instrument besitzt sie, das Applet bedient sie.
+    PeakHold&       peakHold()       { return m_peak; }
+    const PeakHold& peakHold() const { return m_peak; }
+    void resetPeak() { m_peak.reset(m_value); update(); }
+
     QSize sizeHint() const override { return {320, 210}; }
     QSize minimumSizeHint() const override { return {200, 140}; }
 
@@ -88,10 +95,6 @@ protected:
     void paintEvent(QPaintEvent*) override;
 
 private:
-    /// Die Spitze der letzten Sekunden. Vergisst, was älter ist —
-    /// ein Nachlaufzeiger, der alles behält, ist eine Grenzmarke und
-    /// kein Nachlaufzeiger.
-    void notePeak(double value);
     void refreshFooter();
 
     InstrumentFooter* m_footer{nullptr};
@@ -100,8 +103,12 @@ private:
     int    m_secondary{-1};
     double m_value{0.0};
     double m_secondValue{0.0};
-    double m_peak{0.0};
-    QElapsedTimer m_peakAge;
+
+    /// Die Spitze der letzten Sekunden. Vergisst, was älter ist — ein
+    /// Nachlaufzeiger, der alles behält, ist eine Grenzmarke und kein
+    /// Nachlaufzeiger. Steht in PeakHold, weil das Balkeninstrument
+    /// dasselbe braucht.
+    PeakHold m_peak;
 
     // ── Ohne Messung wird nicht gemessen ─────────────────────────────
     //
@@ -117,11 +124,6 @@ private:
     // sieht, WAS nicht gemessen wird.
     bool m_hasValue{false};
     bool m_hasSecond{false};
-
-    /// Wie lange die Spitze stehen bleibt. „Der Spitze der letzten
-    /// Sekunden" — drei ist die kleinste Zahl, die im Plural stimmt und
-    /// lang genug für ein Sprachsignal.
-    static constexpr qint64 kPeakHoldMs = 3000;
 };
 
 } // namespace NereusSDR

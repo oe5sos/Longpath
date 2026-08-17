@@ -707,6 +707,7 @@ set(GUI_SOURCES
     # die drei Mittel (Mulde, Verlauf, Glut) -- genau einmal.
     src/gui/instruments/ReadingSource.cpp
     src/gui/instruments/ReadingSource.h
+    src/gui/instruments/PeakHold.h
     src/gui/instruments/InstrumentSpine.cpp
     src/gui/instruments/InstrumentSpine.h
     src/gui/instruments/InstrumentPainter.cpp

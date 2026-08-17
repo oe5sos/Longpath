@@ -110,7 +110,11 @@ struct ReadingDescriptor {
     QString thetisName() const;
 };
 
-/// Alle beschriebenen Größen, in der Reihenfolge von MeterPoller.h.
+/// Alle beschriebenen Größen. Weitgehend in der Reihenfolge von
+/// MeterPoller.h — Ausnahme: Signal Max Bin steht bei den beiden
+/// anderen S-Skalen, weil diese Liste auch die Auswahl im
+/// Rechtsklickmenü ist und dort die drei Empfangsquellen
+/// zusammengehören.
 const QList<ReadingDescriptor>& allReadings();
 
 /// Die Beschreibung zu einer Kennung, oder nullptr.

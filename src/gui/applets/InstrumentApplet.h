@@ -20,11 +20,18 @@
 // Ansichten desselben Applets tauscht nur die Seite und behält Quelle,
 // Spitze und Platz in der Spalte.
 //
-// ── Noch OHNE Umschalter ─────────────────────────────────────────────
+// ── Bedient wird über den Rechtsklick ────────────────────────────────
 //
-// Der Knopf im Panelkopf gehört zu Punkt 5 der abgesprochenen
-// Reihenfolge und ist hier bewusst nicht gebaut. setForm() ist die
-// Stelle, an der er andocken wird. Bis dahin steht der Zeiger.
+// OE5SOS, 2026-08-18: „RX-Quellen und Spitzenhaltung ins
+// Rechtsklickmenü." Der Umschalter Zeiger/Balken war für den Panelkopf
+// vorgesehen; der Kopf fällt weg, also steht er hier mit.
+//
+// Das Menü ist damit die EINE Stelle, an der ein Instrument eingestellt
+// wird: Quelle, zweite Anzeige, Form, Spitzenhaltung. Die analoge
+// S-Meter-Anzeige hatte dafür ihr eigenes Rechtsklickmenü mit einer
+// eigenen Quellenauswahl (RxMode) — zwei Wege zu einer Entscheidung.
+// Hier steht nur einer, und er bedient sich aus derselben Liste wie
+// jedes andere Messwerkzeug (ReadingSource → MeterBinding).
 //
 // =================================================================
 // Modification history (NereusSDR):
@@ -34,12 +41,16 @@
 
 #include "gui/applets/AppletWidget.h"
 
+#include <functional>
+
+class QMenu;
 class QStackedWidget;
 
 namespace NereusSDR {
 
 class BarInstrument;
 class NeedleInstrument;
+class PeakHold;
 
 class InstrumentApplet : public AppletWidget {
     Q_OBJECT
@@ -64,11 +75,25 @@ public:
     void setForm(Form f);
     Form form() const { return m_form; }
 
+    /// Die Spitzenhaltung einer Ansicht. Beide sollen immer gleich
+    /// stehen — wer sie einzeln abfragt, prüft genau das.
+    const PeakHold& peakHold(Form f) const;
+
+    /// Das Rechtsklickmenü, ohne es zu zeigen — für den Test, damit er
+    /// die Einträge lesen kann, ohne ein Menü aufzuklappen.
+    QMenu* buildContextMenu(QWidget* parent);
+
 public slots:
     /// Direkt an MeterPoller::readingUpdated zu hängen.
     void onReading(int bindingId, double value);
 
+protected:
+    void contextMenuEvent(QContextMenuEvent* ev) override;
+
 private:
+    /// Auf beide Ansichten anwenden. Eine Einstellung, die nur die
+    /// sichtbare Form erreicht, springt beim Umschalten zurück.
+    void forEachInstrument(const std::function<void(PeakHold&)>& fn);
     QString m_id;
     QString m_title;
     Form    m_form{Form::Needle};

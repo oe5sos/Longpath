@@ -384,6 +384,27 @@ void MeterPoller::poll()
         dispatch(bindingId, value);
     }
 
+    // Signal Max Bin, als eigene Kennung.
+    //
+    // Sie stand bisher NUR in pollSMeter() und ging nur an die analoge
+    // Anzeige -- wer sie sehen wollte, musste dort rechtsklicken. Damit
+    // gab es zwei Wege, eine Empfangsquelle zu waehlen: die Kennung
+    // (jedes Messwerkzeug) und der Rechtsklick (nur diese eine
+    // Anzeige). Als Kennung ausgesendet, kann jedes Instrument sie
+    // waehlen wie jede andere Groesse.
+    //
+    // Offset wie bei den beiden anderen S-Groessen, samt Sentinel-Gate:
+    // Thetis console.cs:46881 [v2.10.3.13]
+    //   if (max_bin > -400f)
+    //       _RX1MeterValues[Reading.SIGNAL_MAX_BIN] = max_bin + offset;
+    // Quelle: WdspEngine::getMaxBinDbm(disp=0) -- Einzelpanadapter,
+    // wdsp/analyzer.c:830 [@501e3f5] GetDetectMaxBin.
+    if (m_wdspEngine) {
+        const double maxBinRaw = m_wdspEngine->getMaxBinDbm(/*disp=*/0);
+        dispatch(MeterBinding::SignalMaxBin,
+                 maxBinRaw > -400.0 ? maxBinRaw + rxOffsetDb : maxBinRaw);
+    }
+
     // Task 41 (Phase 3P-II): drive the analog SMeterWidget header.
     // pollSMeter() also emits smeterUpdated with the SAME dBm value it
     // pushes to the analog needle, so the VFO flag mini-bar and the

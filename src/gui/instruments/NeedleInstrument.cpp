@@ -50,8 +50,6 @@ NeedleInstrument::NeedleInstrument(QWidget* parent)
     lay->addStretch(1);                 // die Fläche, in die gemalt wird
     m_footer = new InstrumentFooter(this);
     lay->addWidget(m_footer, 0);
-
-    m_peakAge.start();
 }
 
 bool NeedleInstrument::setPrimary(int bindingId)
@@ -82,6 +80,7 @@ void NeedleInstrument::clearValue()
 {
     m_hasValue = false;
     m_hasSecond = false;
+    m_peak.forget();
     refreshFooter();
     update();
 }
@@ -90,29 +89,14 @@ void NeedleInstrument::onReading(int bindingId, double value)
 {
     if (bindingId == m_primary) {
         m_value = value;
-        if (!m_hasValue) {
-            // Die erste Messung ist auch die erste Spitze — sonst
-            // stünde als Spitze der Anfang der Skala.
-            m_peak = value;
-            m_peakAge.restart();
-            m_hasValue = true;
-        } else {
-            notePeak(value);
-        }
+        m_hasValue = true;
+        m_peak.note(value);
         refreshFooter();
         update();
     } else if (bindingId == m_secondary) {
         m_secondValue = value;
         m_hasSecond = true;
         update();
-    }
-}
-
-void NeedleInstrument::notePeak(double value)
-{
-    if (value >= m_peak || m_peakAge.elapsed() > kPeakHoldMs) {
-        m_peak = value;
-        m_peakAge.restart();
     }
 }
 
@@ -142,7 +126,7 @@ void NeedleInstrument::refreshFooter()
                                      .arg(d->text(m_value), d->unit));
     m_footer->setValueColour(Instrument::valueColour(*d, m_value));
     m_footer->setPeakAndLimit(
-        d->text(m_peak),
+        m_peak.enabled() ? d->text(m_peak.value()) : QStringLiteral("—"),
         d->threshold.has_value() ? d->text(d->threshold.value()) : QString());
 }
 
@@ -194,8 +178,8 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     Instrument::paintTicks(p, spine, *d);
 
     // Nachlaufzeiger: ein kurzer Strich am äusseren Rand, matt.
-    if (m_peak > m_value) {
-        Instrument::paintPeakNeedle(p, spine, d->fraction(m_peak),
+    if (m_peak.enabled() && m_peak.value() > m_value) {
+        Instrument::paintPeakNeedle(p, spine, d->fraction(m_peak.value()),
                                     Instrument::measuredDim());
     }
 

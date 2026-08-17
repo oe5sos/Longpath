@@ -4909,6 +4909,15 @@ nereus_add_test(tst_instrument_spine)
 #    man abliest, ob man senden darf, ist das die falsche --
 nereus_add_test(tst_instrument_no_reading)
 
+# -- Das Rechtsklickmenue der Instrumente. Bis zum 2026-08-18 gab es
+#    ZWEI Wege, eine Empfangsquelle zu waehlen: die Kennung aus
+#    ReadingSource (jedes Messwerkzeug) und die eigene RxMode-Liste im
+#    Rechtsklick der analogen S-Meter-Anzeige. Zwei Listen fuer dieselbe
+#    Entscheidung laufen auseinander, und sie hatten es schon getan --
+#    "Max Bin" stand nur in der zweiten. Der Test haelt fest, dass das
+#    Menue AUS der einen Liste kommt und nicht daneben --
+nereus_add_test(tst_instrument_menu)
+
 # -- Das Frequenz-Widget BEDIENT, es zeigt nicht nur. Auflage des
 #    Betreibers: ohne Rad und Klick-Eingabe naehme das Ausblenden der
 #    VFO-Flagge das Abstimmen mit der Maus weg. Geprueft wird, dass das
