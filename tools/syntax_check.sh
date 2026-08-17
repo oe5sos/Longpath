@@ -159,10 +159,18 @@ compile() {
     # NEREUSSDR_VERSION setzt sonst CMake. Ohne sie scheitert jede Datei,
     # die QStringLiteral(NEREUSSDR_VERSION) benutzt, mit "expected ')'" --
     # ein Fehler, der wie ein Syntaxfehler aussieht und keiner ist.
+    #
+    # Die Modulliste unten muss die REQUIRED-Komponenten aus CMakeLists.txt
+    # abdecken. Multimedia, Svg und WebSockets fehlten bis 2026-08-16, und
+    # weil der flache Baum je Framework nur EIN Verzeichnis verlinkt, fand
+    # <QAudio> sich nicht -- jede Datei, die core/ClientPuduMonitor.h
+    # erreicht (also auch MainWindow.cpp), scheiterte mit einem
+    # "file not found", das wie ein Fehler im Code aussah und keiner war.
     g++ -std=c++20 -fsyntax-only -fPIC \
         -DNEREUSSDR_VERSION='"0.0.0-syntaxcheck"' \
         -I"$QTINC" -I"$QTINC/QtCore" -I"$QTINC/QtGui" -I"$QTINC/QtWidgets" \
         -I"$QTINC/QtNetwork" -I"$QTINC/QtTest" -I"$QTINC/rhi" \
+        -I"$QTINC/QtMultimedia" -I"$QTINC/QtSvg" -I"$QTINC/QtWebSockets" \
         -I"$ROOT/src" -I"$ROOT" "$1" 2>&1
 }
 
