@@ -52,7 +52,7 @@ constexpr double kLabelOffset      = 22.0;
 
 /// Rückfallwert für „measured-dim". StyleConstants.h führt ihn nicht;
 /// HGauge.cpp:13 hält denselben Wert dateilokal.
-constexpr auto kMeasuredDimFallback = "#6b5630";
+constexpr auto kMeasuredDimFallback = Style::kAmberDim;
 
 } // namespace
 

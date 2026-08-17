@@ -91,6 +91,12 @@ constexpr auto kBlueBorder      = "#2f5c86";
 constexpr auto kBlueHover       = "#2d5885";
 constexpr auto kAmberBg         = "#33280f";
 constexpr auto kAmberText       = "#c2924f";
+// Die gedaempfte Messwertstufe. Sie stand bis 2026-08-17 dreimal als
+// nacktes #6b5630 im Baum -- dateilokal in HGauge.cpp:13, noch einmal
+// in InstrumentPainter.cpp und als Literal in VfoWidget. Eine Farbe mit
+// drei Wohnorten und keinem Namen ist genau die, die beim naechsten
+// Feinschliff an zwei Stellen mitgezogen wird und an einer nicht.
+constexpr auto kAmberDim        = "#6b5630";
 constexpr auto kAmberBorder     = "#6b5426";
 constexpr auto kAmberWarn       = "#a8853f";
 constexpr auto kRedBg           = "#7a2c2e";

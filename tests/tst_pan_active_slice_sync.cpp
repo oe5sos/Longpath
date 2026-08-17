@@ -181,10 +181,22 @@ private slots:
         MainWindow::wireRadeFlagForTest(&model, &flagA, 0);
         MainWindow::wireRadeFlagForTest(&model, &flagC, 2);
 
+        // Worum es in DIESEM Test geht, sagt sein Name: die Meldung fuer
+        // Scheibe 0 erreicht Fahne A und laesst Fahne C in Ruhe.
+        //
+        // Hier standen bis 2026-08-17 zwei Farbpruefungen (#505050 und
+        // "---"). Sie nagelten die Darstellung des ungerasteten
+        // Zustands fest und fielen um, als der Hausstil sie auf
+        // Geviertstrich und Beschriftungsfarbe zog -- ohne dass an der
+        // Zustellung der Meldung irgendetwas falsch gewesen waere.
+        // Geprueft wird jetzt die Zustellung: A verliert seinen
+        // Messwert, C behaelt seinen.
         emit model.radeSyncChanged(0, false);
         QVERIFY(flagA.snrLabelForTest()->text().contains(QStringLiteral("RADE")));
-        QVERIFY(flagA.snrLabelForTest()->text().contains(QStringLiteral("#505050")));
-        QVERIFY(flagA.snrLabelForTest()->text().contains(QStringLiteral("---")));
+        QVERIFY2(!flagA.snrLabelForTest()->text().contains(QStringLiteral("dB")),
+                 qPrintable(QStringLiteral("Fahne A ist nicht gerastet und "
+                                           "zeigt trotzdem einen Wert: %1")
+                                .arg(flagA.snrLabelForTest()->text())));
         QVERIFY(flagC.snrLabelForTest()->text().contains(QStringLiteral("-7")));
 
         emit model.radeFreqOffsetChanged(2, 125.0f);

@@ -10,7 +10,9 @@ namespace NereusSDR {
 // Die gedaempfte Stufe des Messwert-Tons. Dieselbe Zahl wie beim
 // Pegelbalken unter S9 (VfoStyles.h) -- eine Groesse, zwei
 // Helligkeiten, kein zweiter Farbbegriff.
-static constexpr auto kMeasuredDim = "#6b5630";
+// Siehe Style::kAmberDim — dieser dateilokale Zwilling bleibt nur als
+// Rueckfallwert fuer role() stehen.
+static constexpr auto kMeasuredDim = Style::kAmberDim;
 
 HGauge::HGauge(QWidget* parent) : QWidget(parent)
 {

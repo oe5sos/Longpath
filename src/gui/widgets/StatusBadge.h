@@ -50,6 +50,16 @@ public:
     QString label() const noexcept { return m_label; }
     Variant variant() const noexcept { return m_variant; }
 
+    /// Die eine Farbe eines Abzeichens: das SVG-Symbol wird damit
+    /// getoent, und applyStyle() setzt damit die Schriftfarbe.
+    ///
+    /// Oeffentlich seit 2026-08-17, damit ein Test die Zusicherung
+    /// pruefen kann, dass beide dieselbe Farbe tragen. Bis dahin gab es
+    /// zwei Tabellen mit dem Hinweis "update both" — und beim
+    /// Hausstil-Umbau wurde nur eine nachgezogen. Eine Zusicherung, die
+    /// nur im Kommentar steht, ist keine.
+    QColor variantForegroundColor() const;
+
 signals:
     void clicked();
     void rightClicked(const QPoint& globalPos);
@@ -61,7 +71,6 @@ private:
     void applyStyle();
     void renderSvgIcon();
     void recomputeMinimumWidth();
-    QColor variantForegroundColor() const;
 
     QString  m_icon;
     QString  m_svgIcon;

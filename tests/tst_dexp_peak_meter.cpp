@@ -23,6 +23,7 @@
 //
 // =================================================================
 
+#include "gui/StyleConstants.h"
 #include "gui/widgets/DexpPeakMeter.h"
 
 #include <QImage>
@@ -30,6 +31,42 @@
 #include <QtTest/QtTest>
 
 using namespace NereusSDR;
+
+namespace {
+
+// ── Rollen statt Werte ───────────────────────────────────────────────
+//
+// Dieser Test verglich bis 2026-08-17 gemalte Pixel gegen "gruen"
+// (qGreen > 200) und "rot" (qRed > 200). Das waren die Farben, die der
+// Streifen VOR dem Hausstil malte; seit 505da981 sind es Bernstein
+// (Messwert) und das gedaempfte Rot (Warnung). Die Pruefungen fielen
+// seither um, ohne dass am Streifen etwas falsch gewesen waere.
+//
+// Ein Pixelvergleich auf einen Hexwert waere derselbe Fehler noch
+// einmal. Verglichen wird deshalb gegen die PALETTENKONSTANTEN, die
+// der Streifen laut seiner eigenen Kommentare benutzt (kAmberText fuer
+// den Messwert, kGaugeDanger fuer die Warnung): zieht jemand die
+// Palette nach, ziehen Widget und Test gemeinsam mit.
+bool isColour(QRgb px, const char* paletteHex)
+{
+    const QColor want(QString::fromLatin1(paletteHex));
+    // Toleranz, weil der Streifen kantenglaettet malt und die Sonde
+    // dicht an einer Kante sitzen kann.
+    return qAbs(qRed(px)   - want.red())   <= 12
+        && qAbs(qGreen(px) - want.green()) <= 12
+        && qAbs(qBlue(px)  - want.blue())  <= 12;
+}
+
+QString describe(QRgb px)
+{
+    return QStringLiteral("#%1%2%3")
+        .arg(qRed(px),   2, 16, QLatin1Char('0'))
+        .arg(qGreen(px), 2, 16, QLatin1Char('0'))
+        .arg(qBlue(px),  2, 16, QLatin1Char('0'));
+}
+
+} // namespace
+
 
 class TstDexpPeakMeter : public QObject {
     Q_OBJECT
@@ -68,8 +105,10 @@ private slots:
             meter.render(&p);
         }
         const QRgb pxLow = low.pixel(10, 2);
-        QVERIFY2(qGreen(pxLow) < 100,
-                 "negative signal must clamp to 0 -> column should not be green");
+        QVERIFY2(!isColour(pxLow, Style::kAmberText),
+                 qPrintable(QStringLiteral(
+                     "negativ muss auf 0 klemmen — die Spalte darf nicht "
+                     "gefuellt sein, ist aber %1").arg(describe(pxLow))));
 
         // Above-1 input: should clamp to 1.0 -> column at x=90 is
         // green (well inside the full-width green fill).
@@ -81,8 +120,10 @@ private slots:
             meter.render(&p);
         }
         const QRgb pxHigh = high.pixel(90, 2);
-        QVERIFY2(qGreen(pxHigh) > 200 && qRed(pxHigh) < 100,
-                 ">1.0 signal must clamp to 1.0 -> column should be green");
+        QVERIFY2(isColour(pxHigh, Style::kAmberText),
+                 qPrintable(QStringLiteral(
+                     ">1.0 muss auf 1.0 klemmen — die Spalte muss den "
+                     "Messwert tragen, ist aber %1").arg(describe(pxHigh))));
     }
 
     // Green fill — signal=0.5, threshold=0.8 -> threshold sits past
@@ -98,10 +139,15 @@ private slots:
         QPainter p(&img);
         meter.render(&p);
         const QRgb px = img.pixel(10, 2);
-        QVERIFY2(qGreen(px) > 200,
-                 "x=10 should be in the green peak fill (signal=0.5)");
-        QVERIFY2(qRed(px)   < 100,
-                 "x=10 should NOT be red (threshold sits past signal)");
+        QVERIFY2(isColour(px, Style::kAmberText),
+                 qPrintable(QStringLiteral(
+                     "x=10 liegt in der Messwertfuellung (signal=0.5), "
+                     "ist aber %1").arg(describe(px))));
+        QVERIFY2(!isColour(px, Style::kGaugeDanger),
+                 qPrintable(QStringLiteral(
+                     "x=10 darf nicht die Warnfarbe tragen — die Schwelle "
+                     "liegt hinter dem Signal, ist aber %1")
+                         .arg(describe(px))));
     }
 
     // Red threshold marker — even with signal=0, the 1 px red
@@ -117,8 +163,10 @@ private slots:
         QPainter p(&img);
         meter.render(&p);
         const QRgb px = img.pixel(50, 1);
-        QVERIFY2(qRed(px) > 200,
-                 "x=50 should be the red threshold marker line");
+        QVERIFY2(isColour(px, Style::kGaugeDanger),
+                 qPrintable(QStringLiteral(
+                     "x=50 muss die Schwellenmarke sein (Warnfarbe), "
+                     "ist aber %1").arg(describe(px))));
     }
 
     // Red above-threshold overlay — when signal>threshold, the
@@ -138,10 +186,15 @@ private slots:
         meter.render(&p);
         // x=60 sits between threshold(40) and signal(80) -> red.
         const QRgb px = img.pixel(60, 1);
-        QVERIFY2(qRed(px) > 200,
-                 "x=60 should be in the red above-threshold overlay");
-        QVERIFY2(qGreen(px) < 100,
-                 "x=60 should NOT be green (above the threshold)");
+        QVERIFY2(isColour(px, Style::kGaugeDanger),
+                 qPrintable(QStringLiteral(
+                     "x=60 liegt zwischen Schwelle und Signal und muss die "
+                     "Warnfarbe tragen, ist aber %1").arg(describe(px))));
+        QVERIFY2(!isColour(px, Style::kAmberText),
+                 qPrintable(QStringLiteral(
+                     "x=60 liegt ueber der Schwelle und darf nicht mehr "
+                     "als blosser Messwert dastehen, ist aber %1")
+                         .arg(describe(px))));
     }
 };
 

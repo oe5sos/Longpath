@@ -122,8 +122,11 @@ void StatusBadge::recomputeMinimumWidth()
 
 QColor StatusBadge::variantForegroundColor() const
 {
-    // Mirror the colors used by applyStyle() so the SVG tint matches the
-    // text color. If applyStyle() colors change, update both.
+    // Die EINE Quelle fuer die Schriftfarbe eines Abzeichens: das
+    // SVG-Symbol wird damit getoent, und applyStyle() liest sie seit
+    // 2026-08-17 ebenfalls von hier. Vorher war es eine zweite
+    // Tabelle "die man mit nachziehen muss" -- und genau das ging beim
+    // Hausstil-Umbau schief.
     switch (m_variant) {
         case Variant::Info: return QColor(QStringLiteral("#4a7ba8"));
         // Zustand -> Salbei, nicht Signalgruen. M und NR1 sind an
@@ -194,29 +197,36 @@ void StatusBadge::mousePressEvent(QMouseEvent* event)
 
 void StatusBadge::applyStyle()
 {
-    QString fg, bg;
+    // ── Eine Quelle fuer die Schriftfarbe ────────────────────────────
+    //
+    // Hier stand eine zweite Farbtabelle, und der Kommentar bei
+    // variantForegroundColor() sagte, was passieren wuerde: "If
+    // applyStyle() colors change, update both." Genau das ist beim
+    // Hausstil-Umbau halb passiert -- On wurde nachgezogen (#5fff8a ->
+    // #6fa384), Warn, Tx und Off nicht. Die beiden Tabellen sagten
+    // seither Verschiedenes:
+    //
+    //   Warn   #ffd700 Gold      vs  #c2924f Messwert-Bernstein
+    //   Tx     #ff6060 Signalrot vs  #c25a5c Sende-Rot
+    //   Off    #3a4a5a Blaugrau  vs  #3d3d41 neutral
+    //
+    // Sichtbar war das als Abzeichen, dessen SVG-Symbol (getoent aus
+    // variantForegroundColor) eine andere Farbe hatte als seine
+    // Beschriftung. Zwei Tabellen fuer eine Farbe koennen nur
+    // auseinanderlaufen; jetzt ist es eine.
+    const QString fg = variantForegroundColor().name();
+
+    QString bg;
     switch (m_variant) {
-        case Variant::Info:
-            fg = QStringLiteral("#4a7ba8");
-            bg = QStringLiteral("rgba(95,168,255,26)");   // 0.10 alpha
-            break;
-        case Variant::On:
-            fg = QStringLiteral("#6fa384");
-            bg = QStringLiteral("rgba(95,255,138,26)");
-            break;
-        case Variant::Off:
-            fg = QStringLiteral("#3a4a5a");
-            bg = QStringLiteral("rgba(64,72,88,46)");      // 0.18 alpha
-            break;
-        case Variant::Warn:
-            fg = QStringLiteral("#ffd700");
-            bg = QStringLiteral("rgba(255,215,0,30)");
-            break;
-        case Variant::Tx:
-            fg = QStringLiteral("#ff6060");
-            bg = QStringLiteral("rgba(255,96,96,51)");     // 0.20 alpha
-            break;
+        case Variant::Info: bg = QStringLiteral("rgba(95,168,255,26)"); break;  // 0.10 alpha
+        case Variant::On:   bg = QStringLiteral("rgba(95,255,138,26)"); break;
+        case Variant::Off:  bg = QStringLiteral("rgba(64,72,88,46)");   break;  // 0.18 alpha
+        case Variant::Warn: bg = QStringLiteral("rgba(255,215,0,30)");  break;
+        case Variant::Tx:   bg = QStringLiteral("rgba(255,96,96,51)");  break;  // 0.20 alpha
     }
+    // Die Hintergruende sind ABSICHTLICH nicht mitgezogen: sie liegen
+    // bei 10-20 % Deckung und sind eine eigene gestalterische Frage.
+    // Wer sie angeht, tut es als eigenen Schritt.
 
     // Font-size bumped 10 → 12 px (2026-04-30) so the badge text reads
     // cleanly when stacked into a vertical pair by RxDashboard's medium-

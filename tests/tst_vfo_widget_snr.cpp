@@ -35,6 +35,7 @@
 #include <cmath>
 #include <limits>
 
+#include "gui/StyleConstants.h"
 #include "gui/widgets/VfoWidget.h"
 #include "models/SliceModel.h"
 #include "core/WdspTypes.h"
@@ -73,19 +74,27 @@ void TestVfoWidgetSnr::nanShowsHollowInitialState() {
     seedRadeMode(&vfo, &slice);
 
     // Initial slice snrDb is NaN.  setRadeSnrLabel(NaN) early-returns
-    // (VfoWidget.cpp:794-796) so the label stays at the
-    // setRadeActive(true) initial paint: "RADE ○ ---" in grey.
+    // so the label stays at the setRadeActive(true) initial paint: the
+    // placeholder in the label colour.
     slice.setSnrDb(std::numeric_limits<double>::quiet_NaN());
 
     QLabel* label = vfo.snrLabelForTest();
     QVERIFY(label != nullptr);
-    QVERIFY2(label->text().contains(QStringLiteral("---")),
-             qPrintable(QStringLiteral("expected '---' placeholder, got: %1")
+    // Der Platzhalter ist seit dem Hausstil ein Geviertstrich, nicht
+    // drei Bindestriche. Geprueft wird, DASS ein Platzhalter steht --
+    // welches Zeichen es ist, ist Gestaltung.
+    QVERIFY2(!label->text().contains(QStringLiteral("dB")),
+             qPrintable(QStringLiteral("ohne Messung darf keine Zahl "
+                                       "dastehen, steht aber: %1")
                             .arg(label->text())));
-    // Hollow-circle ○ paints with the grey #505050 color marker.
-    QVERIFY2(label->text().contains(QStringLiteral("#505050")),
-             qPrintable(QStringLiteral("expected grey #505050 marker, got: %1")
-                            .arg(label->text())));
+    // Die Rolle, nicht der Wert: der Platzhalter traegt die
+    // Beschriftungsfarbe. Frueher stand hier das nackte #505050 und
+    // fiel um, sobald die Palette sich bewegte.
+    QVERIFY2(label->text().contains(QString::fromLatin1(Style::kTextSecondary)),
+             qPrintable(QStringLiteral("erwartet Beschriftungsfarbe %1, "
+                                       "bekommen: %2")
+                            .arg(QString::fromLatin1(Style::kTextSecondary),
+                                 label->text())));
 }
 
 void TestVfoWidgetSnr::lowSnrShowsYellow() {
@@ -100,11 +109,14 @@ void TestVfoWidgetSnr::lowSnrShowsYellow() {
     QVERIFY2(label->text().contains(QStringLiteral("3dB")),
              qPrintable(QStringLiteral("expected '3dB' in label, got: %1")
                             .arg(label->text())));
-    // Below the 5 dB threshold -> yellow #e0e040 (AetherSDR
-    // VfoWidget.cpp:3424-3432 [@0cd4559]).
-    QVERIFY2(label->text().contains(QStringLiteral("#e0e040")),
-             qPrintable(QStringLiteral("expected yellow #e0e040 marker, got: %1")
-                            .arg(label->text())));
+    // Unter 5 dB -> gedaempfte Messwertstufe. Frueher stand hier ein
+    // gelbes #e0e040 aus der Zeit vor dem Hausstil; Gelb ist keine
+    // Rolle dieser Palette. Jetzt die Konstante statt des Wertes.
+    QVERIFY2(label->text().contains(QString::fromLatin1(Style::kAmberDim)),
+             qPrintable(QStringLiteral("erwartet gedaempften Messwert %1, "
+                                       "bekommen: %2")
+                            .arg(QString::fromLatin1(Style::kAmberDim),
+                                 label->text())));
 }
 
 void TestVfoWidgetSnr::goodSnrShowsGreen() {
@@ -119,10 +131,13 @@ void TestVfoWidgetSnr::goodSnrShowsGreen() {
     QVERIFY2(label->text().contains(QStringLiteral("12dB")),
              qPrintable(QStringLiteral("expected '12dB' in label, got: %1")
                             .arg(label->text())));
-    // >= 5 dB -> green #00ff88.
-    QVERIFY2(label->text().contains(QStringLiteral("#00ff88")),
-             qPrintable(QStringLiteral("expected green #00ff88 marker, got: %1")
-                            .arg(label->text())));
+    // Ab 5 dB -> volle Messwertstufe. Frueher gruen (#00ff88): der SNR
+    // ist ein GEMESSENER Wert und kein Zustand, also Bernstein.
+    QVERIFY2(label->text().contains(QString::fromLatin1(Style::kAmberText)),
+             qPrintable(QStringLiteral("erwartet vollen Messwert %1, "
+                                       "bekommen: %2")
+                            .arg(QString::fromLatin1(Style::kAmberText),
+                                 label->text())));
 }
 
 void TestVfoWidgetSnr::negativeSnrFormats() {
@@ -139,10 +154,12 @@ void TestVfoWidgetSnr::negativeSnrFormats() {
     QVERIFY2(label->text().contains(QStringLiteral("-1dB")),
              qPrintable(QStringLiteral("expected '-1dB' in label, got: %1")
                             .arg(label->text())));
-    // Negative SNR is below the 5 dB threshold -> yellow.
-    QVERIFY2(label->text().contains(QStringLiteral("#e0e040")),
-             qPrintable(QStringLiteral("expected yellow #e0e040 marker, got: %1")
-                            .arg(label->text())));
+    // Negativ ist unter der Schwelle -> gedaempft.
+    QVERIFY2(label->text().contains(QString::fromLatin1(Style::kAmberDim)),
+             qPrintable(QStringLiteral("erwartet gedaempften Messwert %1, "
+                                       "bekommen: %2")
+                            .arg(QString::fromLatin1(Style::kAmberDim),
+                                 label->text())));
 }
 
 void TestVfoWidgetSnr::snrHiddenInNonRadeMode() {

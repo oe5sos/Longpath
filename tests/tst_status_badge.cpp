@@ -29,18 +29,50 @@ private slots:
         QCOMPARE(b.label(), QStringLiteral("USB"));
     }
 
-    void setVariantUpdatesStyle() {
+    // Frueher standen hier zwei Hexwerte (#5fff8a, #ff6060) aus der
+    // Zeit vor dem Hausstil. Ein Test, der eine Farbe festnagelt, faellt
+    // bei jedem Feinschliff um und sagt nichts darueber, ob das Widget
+    // stimmt.
+    //
+    // Geprueft wird jetzt die Zusicherung, die die Datei selbst
+    // aufstellt: Beschriftung und SVG-Symbol tragen DIESELBE Farbe.
+    // variantForegroundColor() ist die eine Quelle; steht ihr Wert
+    // nicht im Stylesheet, sind die beiden auseinander -- und genau das
+    // war zwischen dem Hausstil-Umbau und dem 2026-08-17 der Fall.
+    void styleFollowsTheVariantForegroundColour() {
         StatusBadge b;
-        b.setVariant(StatusBadge::Variant::On);
-        QCOMPARE(b.variant(), StatusBadge::Variant::On);
-        // Stylesheet must contain the green-on accent
-        QVERIFY(b.styleSheet().contains(QStringLiteral("#5fff8a")));
+        for (auto v : {StatusBadge::Variant::Info, StatusBadge::Variant::On,
+                       StatusBadge::Variant::Off, StatusBadge::Variant::Warn,
+                       StatusBadge::Variant::Tx}) {
+            b.setVariant(v);
+            QCOMPARE(b.variant(), v);
+            const QString want = b.variantForegroundColor().name();
+            QVERIFY2(b.styleSheet().contains(want),
+                     qPrintable(QStringLiteral(
+                         "Variante %1: Symbolfarbe %2 steht nicht im "
+                         "Stylesheet — die beiden Tabellen sind wieder "
+                         "auseinander. Stylesheet: %3")
+                             .arg(static_cast<int>(v)).arg(want,
+                                  b.styleSheet())));
+        }
     }
 
-    void txVariantUsesRed() {
+    // Die Varianten muessen unterscheidbar bleiben. Das ist der Rest
+    // dessen, was "txVariantUsesRed" eigentlich meinte: nicht "genau
+    // dieses Rot", sondern "nicht dieselbe Farbe wie die anderen".
+    void everyVariantHasItsOwnColour() {
         StatusBadge b;
-        b.setVariant(StatusBadge::Variant::Tx);
-        QVERIFY(b.styleSheet().contains(QStringLiteral("#ff6060")));
+        QSet<QString> seen;
+        for (auto v : {StatusBadge::Variant::Info, StatusBadge::Variant::On,
+                       StatusBadge::Variant::Off, StatusBadge::Variant::Warn,
+                       StatusBadge::Variant::Tx}) {
+            b.setVariant(v);
+            const QString c = b.variantForegroundColor().name();
+            QVERIFY2(!seen.contains(c),
+                     qPrintable(QStringLiteral("Farbe %1 wird von zwei "
+                                               "Varianten benutzt").arg(c)));
+            seen.insert(c);
+        }
     }
 
     void leftClickEmitsClicked() {

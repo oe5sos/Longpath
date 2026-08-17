@@ -14,6 +14,8 @@
 //   is clicked.
 
 #include <QtTest>
+
+#include "gui/StyleConstants.h"
 #include <QApplication>
 #include <QComboBox>
 #include <QLabel>
@@ -163,8 +165,17 @@ void TestRadeApplet::onSyncChangedUpdatesIndicatorColor()
     emit fx.radio.radeSyncChanged(0, true);
     emit fx.radio.radeSnrChanged(0, 10.0f);
     const QString synced = indicator->styleSheet();
-    QVERIFY2(synced.contains(QStringLiteral("#4caf50")),
-             "Sync indicator must turn green when synced and SNR >= 5");
+    // Frueher #4caf50 — ein Gruen aus der Zeit vor dem Hausstil, das
+    // der Code laengst nicht mehr malt. Jetzt die Rolle: der gerastete
+    // Zustand traegt die Bestaetigt-Farbe.
+    QVERIFY2(synced.contains(QString::fromLatin1(Style::kGreenText)),
+             qPrintable(QStringLiteral(
+                 "gerastet und SNR >= 5 muss %1 tragen, Stylesheet: %2")
+                     .arg(QString::fromLatin1(Style::kGreenText), synced)));
+    // Und die drei Zustaende muessen unterscheidbar bleiben — das ist
+    // der Sinn einer Anzeige, die nur aus einem Punkt besteht.
+    QVERIFY2(synced != notSynced,
+             "gerastet und nicht gerastet sehen gleich aus");
 }
 
 void TestRadeApplet::onTextDecodedShowsCallsign()

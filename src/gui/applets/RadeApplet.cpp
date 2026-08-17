@@ -10,6 +10,7 @@
 //                Code.
 
 #include "RadeApplet.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/MicProfileManager.h"
@@ -387,17 +388,23 @@ void RadeApplet::repaintSyncIndicator()
         return;
     }
     // Decision matrix:
-    //   not synced              -> dim grey (#708090)
-    //   synced + snr < 5 dB    -> yellow   (#ddbb00)
-    //   synced + snr >= 5 dB   -> green    (#4caf50)
-    //   synced + snr NaN        -> yellow (treated as marginal)
+    //   not synced             -> gedaempft
+    //   synced + snr < 5 dB    -> Warnstufe
+    //   synced + snr >= 5 dB   -> bestaetigt
+    //   synced + snr NaN       -> Warnstufe (als grenzwertig behandelt)
+    //
+    // Die Klammerwerte in dieser Liste nannten bis 2026-08-17 noch
+    // #708090 / #ddbb00 / #4caf50 — die Farben von vor dem Hausstil.
+    // Der Code darunter war laengst umgestellt, der Kommentar nicht.
+    // Ein Kommentar, der eine andere Farbe nennt als die Zeile drei
+    // Zeilen weiter, ist schlimmer als keiner.
     QString colour;
     if (!m_synced) {
         colour = QStringLiteral("#708090");
     } else if (qIsNaN(m_lastSnrDb) || m_lastSnrDb < kGoodSnrDb) {
         colour = QStringLiteral("#ddbb00");
     } else {
-        colour = QStringLiteral("#6fa384");
+        colour = QString::fromLatin1(Style::kGreenText);
     }
     m_syncIndicator->setStyleSheet(QStringLiteral(
         "QLabel { background: %1; border-radius: 6px; }").arg(colour));
