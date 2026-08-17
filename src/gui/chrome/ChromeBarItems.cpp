@@ -89,9 +89,20 @@ void registerChromeBarItems(ChromeBarController& c, const ChromeBarWidgets& w)
         QCoreApplication::translate("ChromeBar", "CH"));
     add(c, w.chain1, nullptr, 4, QString());
 
-    // Rungs 5..9, one pill each, right to left.
-    static const char* const kPillNames[] = {"SQL", "APF", "NB", "NR", "AGC"};
-    for (int rung = 5; rung <= 9; ++rung) {
+    // Rungs 5..12, one pill each, right to left.
+    //
+    // 10..12 kamen am 2026-08-17 dazu (OE5SOS): was die VFO-Flagge
+    // allein trug und unten keine Entsprechung hatte. Sie liegen ueber
+    // den DSP-Pillen, weil niedrige Rungs zuerst falten und diese drei
+    // Zustaende sind, die man beim Wegfallen der Flagge sonst nirgends
+    // mehr saehe. Begruendung je Rung im Header von
+    // RxDashboard::badgeForRung.
+    //
+    // TX fehlt hier mit Absicht: es sagt, welche Scheibe sendet, faltet
+    // deshalb nie und zaehlt in RxDashboard::residualWidth mit.
+    static const char* const kPillNames[] = {"SQL", "APF", "NB", "NR", "AGC",
+                                             "VAX", "ANT", "RIT"};
+    for (int rung = 5; rung <= 12; ++rung) {
         add(c, w.pillByRung.value(rung), nullptr, rung,
             QCoreApplication::translate("ChromeBar", kPillNames[rung - 5]));
     }

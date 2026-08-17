@@ -8420,7 +8420,10 @@ void MainWindow::buildStatusBar()
     bar.placeholderSep   = m_placeholderSep;
     bar.bandStackLabel   = m_bandStackLabel;
     bar.tnfLabel         = m_tnfLabel;
-    for (int rung = 5; rung <= 9; ++rung) {
+    // 5..12: die fuenf DSP-Pillen plus die drei Zugaenge vom 2026-08-17
+    // (VAX 10, ANT 11, RIT 12). TX ist absichtlich nicht dabei — es
+    // faltet nie und zaehlt in residualWidth mit.
+    for (int rung = 5; rung <= 12; ++rung) {
         bar.pillByRung[rung] = m_rxDashboard->badgeForRung(rung);
     }
 
@@ -8452,6 +8455,12 @@ void MainWindow::buildStatusBar()
     m_chromeBar->setItemAvailable(m_chain1IndicatorWidget, false);
     m_chromeBar->setItemAvailable(m_overflowChip, false);
     for (int rung = 5; rung <= 8; ++rung) {  // SQL, APF, NB, NR
+        m_chromeBar->setItemAvailable(m_rxDashboard->badgeForRung(rung), false);
+    }
+    // Die drei Zugaenge starten ebenfalls aus: eine Antenne, ein
+    // RIT-Versatz und ein VAX-Kanal gibt es erst, wenn eine Scheibe
+    // etwas davon sagt.
+    for (int rung = 10; rung <= 12; ++rung) {
         m_chromeBar->setItemAvailable(m_rxDashboard->badgeForRung(rung), false);
     }
     // AGC (rung 9) has no off state and keeps the default available=true.

@@ -67,7 +67,24 @@ public:
     QString modeText() const;
 
     /// Badge that folds at this rung, or nullptr if the rung is not ours.
-    /// 5 SQL, 6 APF, 7 NB, 8 NR, 9 AGC. Mode and filter never fold.
+    /// 5 SQL, 6 APF, 7 NB, 8 NR, 9 AGC, 10 VAX, 11 ANT, 12 RIT.
+    /// Mode, filter und TX falten nie.
+    ///
+    /// ── Warum die drei neuen so hoch liegen ──────────────────────────
+    ///
+    /// Niedrige Rungs falten zuerst (ChromeBarController.cpp:131). Die
+    /// Leiter geht heute bis 11 (TNF); die drei Zugaenge vom 2026-08-17
+    /// setzen darueber an, weil sie Zustaende sind, die man beim
+    /// Wegfallen der Flagge sonst nirgends mehr saehe:
+    ///
+    ///   10 VAX  — ein Laempchen; darf als erstes der drei gehen.
+    ///   11 ANT  — beim Bandwechsel staendig gebraucht.
+    ///   12 RIT  — verschiebt still die Frequenz. Faltet zuletzt.
+    ///
+    /// TX ist NICHT dabei: es sagt, welche Scheibe sendet, und das ist
+    /// eine Sicherheitsangabe. Sie steht bei Kennung, Betriebsart und
+    /// Bandbreite in der nie faltenden Gruppe und zaehlt in
+    /// residualWidth() mit.
     StatusBadge* badgeForRung(int rung) const;
 
     /// Width NOT covered by the five individually-registered pills
@@ -110,6 +127,10 @@ private slots:
     void onNbChanged(int nbMode);
     void onApfChanged(bool active);
     void onSsqlChanged(bool active);
+    void onAntennaChanged(const QString& ant);
+    void onTxSliceChanged(bool isTx);
+    void onRitXitChanged();
+    void onVaxChanged(int channel);
 
 private:
     void buildUi();
@@ -124,6 +145,15 @@ private:
     StatusBadge* m_nbBadge{nullptr};
     StatusBadge* m_apfBadge{nullptr};
     StatusBadge* m_sqlBadge{nullptr};
+
+    // Die vier Zugaenge vom 2026-08-17 (OE5SOS): was die VFO-Flagge
+    // allein trug und unten keine Entsprechung hatte. Alle vier sind
+    // Scheiben-Zustand, also gehoeren sie in diese Reihe und nicht in
+    // eine zweite daneben.
+    StatusBadge* m_txBadge{nullptr};    ///< sendet diese Scheibe — faltet nie
+    StatusBadge* m_antBadge{nullptr};   ///< Antenne, Rung 11
+    StatusBadge* m_ritBadge{nullptr};   ///< RIT/XIT, Rung 12
+    StatusBadge* m_vaxBadge{nullptr};   ///< VAX-Kanal, Rung 10
 };
 
 } // namespace NereusSDR

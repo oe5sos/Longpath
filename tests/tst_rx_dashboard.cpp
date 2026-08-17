@@ -94,8 +94,42 @@ private slots:
         for (int rung = 0; rung <= 4; ++rung) {
             QCOMPARE(d.badgeForRung(rung), nullptr);
         }
-        for (int rung = 10; rung <= 12; ++rung) {
+        // 10..12 hat diese Pruefung bis 2026-08-17 ebenfalls als „nicht
+        // unsere" gefuehrt. Sie sind es seither: VAX, ANT und RIT sind
+        // dazugekommen, weil sie beim Wegfallen der VFO-Flagge sonst
+        // nirgends mehr staenden (OE5SOS). Die Zusicherung wandert
+        // deshalb eine Sprosse hoeher — ueber 12 gehoert dem Dashboard
+        // weiterhin nichts.
+        for (int rung = 13; rung <= 20; ++rung) {
             QCOMPARE(d.badgeForRung(rung), nullptr);
+        }
+    }
+
+    // Die drei Zugaenge sind auf der Leiter, und zwar in dieser
+    // Reihenfolge. Niedrige Rungs falten zuerst: VAX (ein Laempchen)
+    // vor ANT (beim Bandwechsel gebraucht) vor RIT (verschiebt still
+    // die Frequenz). Vertauscht sie jemand, faellt das hier auf.
+    void theFourNewPillsSitWhereTheyWereDecided() {
+        RxDashboard d;
+        QVERIFY(d.badgeForRung(10) != nullptr);   // VAX
+        QVERIFY(d.badgeForRung(11) != nullptr);   // ANT
+        QVERIFY(d.badgeForRung(12) != nullptr);   // RIT
+        QVERIFY(d.badgeForRung(10) != d.badgeForRung(11));
+        QVERIFY(d.badgeForRung(11) != d.badgeForRung(12));
+    }
+
+    // TX faltet NIE — es sagt, welche Scheibe sendet, und das ist eine
+    // Sicherheitsangabe. Es darf deshalb auf keiner Sprosse stehen und
+    // muss stattdessen in residualWidth mitzaehlen.
+    void txNeverFolds() {
+        RxDashboard d;
+        for (int rung = 0; rung <= 20; ++rung) {
+            StatusBadge* b = d.badgeForRung(rung);
+            if (!b) { continue; }
+            QVERIFY2(b->label() != QStringLiteral("TX"),
+                     qPrintable(QStringLiteral(
+                         "TX steht auf Sprosse %1 und wuerde falten")
+                             .arg(rung)));
         }
     }
 

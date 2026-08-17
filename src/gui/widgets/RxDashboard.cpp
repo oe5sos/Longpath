@@ -90,6 +90,11 @@ void RxDashboard::buildUi()
     m_apfBadge    = new StatusBadge(this);
     m_sqlBadge    = new StatusBadge(this);
 
+    m_txBadge     = new StatusBadge(this);
+    m_antBadge    = new StatusBadge(this);
+    m_ritBadge    = new StatusBadge(this);
+    m_vaxBadge    = new StatusBadge(this);
+
     // Single dense row, no BadgePair wrappers:
     // [slice tag] [mode] [filter] | [AGC] | [NR] [NB] [APF] [SQL]
     // LSB ist eine AUSWAHL -- gefuellt auf accent. 2.9k ist ein
@@ -100,6 +105,9 @@ void RxDashboard::buildUi()
     // sahen aus wie dieselbe Sorte Sache.
     m_modeBadge->setVariant(StatusBadge::Variant::Info);
     m_filterBadge->setVariant(StatusBadge::Variant::Warn);
+    // TX direkt hinter die Kennung: die beiden zusammen beantworten
+    // „welche Scheibe, und sendet sie".
+    hbox->addWidget(m_txBadge);
     hbox->addWidget(m_modeBadge);
     hbox->addWidget(m_filterBadge);
     hbox->addWidget(m_agcBadge);
@@ -107,8 +115,21 @@ void RxDashboard::buildUi()
     hbox->addWidget(m_nbBadge);
     hbox->addWidget(m_apfBadge);
     hbox->addWidget(m_sqlBadge);
+    hbox->addWidget(m_antBadge);
+    hbox->addWidget(m_ritBadge);
+    hbox->addWidget(m_vaxBadge);
 
     // Active-only badges hidden by default — "no NYI" rule.
+    // Aus, bis eine Scheibe etwas anderes sagt. TX bleibt sichtbar:
+    // „sendet nicht" ist auch eine Aussage, und eine, die man beim
+    // Hinsehen bestaetigt haben will.
+    m_txBadge->setVariant(StatusBadge::Variant::Off);
+    m_txBadge->setLabel(QStringLiteral("TX"));
+    m_txBadge->setToolTip(tr("This slice is not the transmitter"));
+    m_antBadge->setVisible(false);
+    m_ritBadge->setVisible(false);
+    m_vaxBadge->setVisible(false);
+
     m_nrBadge->setVisible(false);
     m_nbBadge->setVisible(false);
     m_apfBadge->setVisible(false);
@@ -175,6 +196,11 @@ StatusBadge* RxDashboard::badgeForRung(int rung) const
     case 7:  return m_nbBadge;
     case 8:  return m_nrBadge;
     case 9:  return m_agcBadge;
+    // 2026-08-17: die drei faltenden Zugaenge. Begruendung der
+    // Rung-Wahl im Header bei badgeForRung.
+    case 10: return m_vaxBadge;
+    case 11: return m_antBadge;
+    case 12: return m_ritBadge;
     default: return nullptr;
     }
 }
@@ -186,10 +212,13 @@ int RxDashboard::residualWidth() const
     // never-folding widgets (tag-mode, mode-filter). AGC is deliberately
     // excluded even though it is also always visible: it is one of the
     // five pills and is already counted at its own rung-9 registration.
+    // Drei Luecken statt zwei, seit TX (2026-08-17) zur nie faltenden
+    // Gruppe gehoert: Kennung-TX, TX-Modus, Modus-Filter.
     constexpr int kMargins = 20;
-    constexpr int kGaps    = 2 * 4;
+    constexpr int kGaps    = 3 * 4;
     int w = kMargins + kGaps;
     if (m_sliceTag)    { w += m_sliceTag->sizeHint().width(); }
+    if (m_txBadge)     { w += m_txBadge->sizeHint().width(); }
     if (m_modeBadge)   { w += m_modeBadge->sizeHint().width(); }
     if (m_filterBadge) { w += m_filterBadge->sizeHint().width(); }
     return w;
@@ -219,6 +248,16 @@ void RxDashboard::bindSlice(SliceModel* slice)
             &RxDashboard::onApfChanged);
     connect(slice, &SliceModel::ssqlEnabledChanged, this,
             &RxDashboard::onSsqlChanged);
+    connect(slice, &SliceModel::rxAntennaChanged, this,
+            &RxDashboard::onAntennaChanged);
+    connect(slice, &SliceModel::txSliceChanged, this,
+            &RxDashboard::onTxSliceChanged);
+    connect(slice, &SliceModel::ritEnabledChanged, this,
+            [this](bool) { onRitXitChanged(); });
+    connect(slice, &SliceModel::xitEnabledChanged, this,
+            [this](bool) { onRitXitChanged(); });
+    connect(slice, &SliceModel::vaxChannelChanged, this,
+            &RxDashboard::onVaxChanged);
 
     // Seed every badge from the new slice so the row is correct before the
     // first signal arrives (slice may already have state before binding).
@@ -229,6 +268,71 @@ void RxDashboard::bindSlice(SliceModel* slice)
     onNbChanged(static_cast<int>(slice->nbMode()));
     onApfChanged(slice->apfEnabled());
     onSsqlChanged(slice->ssqlEnabled());
+    onAntennaChanged(slice->rxAntenna());
+    onTxSliceChanged(slice->isTxSlice());
+    onRitXitChanged();
+    onVaxChanged(slice->vaxChannel());
+}
+
+// ── Die vier Zugaenge ────────────────────────────────────────────────
+//
+// Jeder meldet seine Breite und seine Sichtbarkeit weiter, wie die
+// bestehenden Pillen: badgeAvailabilityChanged fuer die drei
+// faltenden, residualWidthChanged fuer TX (das faltet nie und zaehlt
+// deshalb in residualWidth mit).
+
+void RxDashboard::onAntennaChanged(const QString& ant)
+{
+    const bool show = !ant.isEmpty();
+    m_antBadge->setLabel(ant);
+    m_antBadge->setVariant(StatusBadge::Variant::Info);
+    m_antBadge->setToolTip(tr("Receive antenna: %1").arg(ant));
+    m_antBadge->setVisible(show);
+    emit badgeAvailabilityChanged(11, show);
+}
+
+void RxDashboard::onTxSliceChanged(bool isTx)
+{
+    // Sendet: kraeftig. Sendet nicht: matt, aber da. Ein Abzeichen, das
+    // im Ruhezustand verschwindet, laesst offen, ob es die Frage
+    // beantwortet hat oder nur nicht gefragt wurde.
+    m_txBadge->setLabel(QStringLiteral("TX"));
+    m_txBadge->setVariant(isTx ? StatusBadge::Variant::Tx
+                               : StatusBadge::Variant::Off);
+    m_txBadge->setToolTip(isTx ? tr("This slice is the transmitter")
+                               : tr("This slice is not the transmitter"));
+    emit residualWidthChanged();
+}
+
+void RxDashboard::onRitXitChanged()
+{
+    if (!m_slice) { return; }
+    const bool rit = m_slice->ritEnabled();
+    const bool xit = m_slice->xitEnabled();
+    const bool show = rit || xit;
+    // Beide zugleich ist moeglich und muss unterscheidbar bleiben —
+    // sonst sieht „nur RIT" aus wie „RIT und XIT".
+    QString label;
+    if (rit && xit) { label = QStringLiteral("R+X"); }
+    else if (rit)   { label = QStringLiteral("RIT"); }
+    else if (xit)   { label = QStringLiteral("XIT"); }
+    m_ritBadge->setLabel(label);
+    m_ritBadge->setVariant(StatusBadge::Variant::Warn);
+    m_ritBadge->setToolTip(tr("Receive/transmit incremental tuning is "
+                              "offsetting this slice"));
+    m_ritBadge->setVisible(show);
+    emit badgeAvailabilityChanged(12, show);
+}
+
+void RxDashboard::onVaxChanged(int channel)
+{
+    const bool show = channel > 0;
+    m_vaxBadge->setLabel(QStringLiteral("VAX%1").arg(channel));
+    m_vaxBadge->setVariant(StatusBadge::Variant::On);
+    m_vaxBadge->setToolTip(tr("Digital-mode audio bus %1 is routed to "
+                              "this slice").arg(channel));
+    m_vaxBadge->setVisible(show);
+    emit badgeAvailabilityChanged(10, show);
 }
 
 void RxDashboard::onModeChanged(int mode)
