@@ -1875,6 +1875,24 @@ private:
     // From AetherSDR SpectrumWidget.h:559 [@2bb3b5c]
     // (debounce timer added by unmerged AetherSDR PR #1478 — see plan §authoring-time #2)
     QTimer*         m_historyResizeTimer{nullptr};
+
+    // Coalesces buffer re-allocation during a resize drag (2026-08-16).
+    // A drag delivers a resizeEvent every ~30-40 ms, and each intermediate
+    // size used to re-allocate the waterfall image and both overlay images
+    // — 45 re-allocations observed for one drag to one final size, 44 of
+    // them for a size the operator never stopped at.
+    //
+    // While this timer is running the three buffers keep their previous
+    // dimensions and the GPU stretches the last good overlay over the new
+    // widget rect.  The re-allocation happens once, when the size has held
+    // still for kResizeSettleMs.
+    //
+    // Deliberately NOT applied to the first allocation: m_waterfall starts
+    // null, and deferring that would leave nothing to draw.  resizeEvent
+    // calls applyResizeSettled() straight through in that case.
+    QTimer*         m_resizeSettleTimer{nullptr};
+    static constexpr int kResizeSettleMs = 80;
+
     QTimer          m_displayTimer;
     bool            m_hasNewSpectrum{false};
 
@@ -2637,6 +2655,24 @@ private:
 #endif
         update();
     }
+
+    /// True while a resize drag is still in flight — the size has changed
+    /// within the last kResizeSettleMs and is expected to change again.
+    /// Callers that would re-allocate a size-dependent buffer skip while
+    /// this holds; applyResizeSettled() does the work once at the end.
+    ///
+    /// The first allocation is exempt, but that exemption lives in
+    /// resizeEvent (which never starts the timer when m_waterfall is
+    /// still null) rather than here — this only reports the timer.
+    bool resizeSettling() const {
+        return m_resizeSettleTimer && m_resizeSettleTimer->isActive();
+    }
+
+    /// Re-allocate the waterfall image for the current widget size and
+    /// let the render path re-allocate the overlays.  Called from the
+    /// settle timer, and directly from resizeEvent for the first
+    /// allocation.
+    void applyResizeSettled();
 };
 
 } // namespace NereusSDR

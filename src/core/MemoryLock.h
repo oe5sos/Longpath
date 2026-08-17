@@ -4,10 +4,16 @@
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //
 // Pin memory regions so the OS can not compress or page them out.
-// Used on hot buffers (waterfall texture, overlay texture, FFT
-// scratch, audio ring) that get touched at high frequency and whose
-// stalls show up as jitter / underrun under build-load memory
-// pressure.
+//
+// Scope, narrowed 2026-08-16: page locks belong on the real-time audio
+// path (audio ring, FFT scratch), where a fault on a hot buffer is an
+// audible dropout.  They do NOT belong on display buffers.  The
+// waterfall and both overlay images were pinned here until that date;
+// the failure a pin prevents there is one stuttered frame, and the
+// price was an mlock + munlock of ~12 MB per intermediate window size
+// during a resize drag.  Wrong trade, removed.  If a future buffer
+// wants a lock, the question to answer first is what a page fault on
+// it actually costs the operator.
 //
 // Backed by mlock(2) on macOS / Linux and VirtualLock on Windows.
 // All three OSes enforce a per-process / per-user lockable byte

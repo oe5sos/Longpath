@@ -79,8 +79,9 @@ AlignedRange alignRange(const void* addr, std::size_t bytes)
 // move in matched pairs.  Guarded by a plain mutex: every call site is
 // a setup / teardown / realloc path on the GUI, FFT or connection
 // thread.  Nothing calls this from the audio callback, and the vector
-// holds a handful of entries (FFT scratch x3, waterfall, two overlay
-// textures, audio ring).
+// holds a handful of entries (FFT scratch x3, audio ring — the
+// waterfall and the two overlay textures stopped taking locks on
+// 2026-08-16, see the scope note in MemoryLock.h).
 std::mutex               s_registryMutex;
 std::vector<AlignedRange> s_lockedRanges;
 

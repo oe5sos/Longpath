@@ -152,6 +152,9 @@
 #include <QElapsedTimer>
 #include <QTimeZone>
 
+// Still needed for memoryLockStats() in the perf overlay + the 1 Hz perf
+// log line: the display buffers no longer take page locks, but the audio
+// ring and FFT scratch still do, and that is what the readout reports.
 #include "core/MemoryLock.h"
 #include "core/MemoryPressure.h"
 #include "core/PerfMonitor.h"
@@ -649,6 +652,17 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
             rebuildWaterfallViewport();
         }
     });
+
+    // Coalescing timer for the waterfall + overlay re-allocation itself
+    // (2026-08-16).  Sibling of the history debounce above and for the
+    // same reason one step earlier in the chain: a resize drag delivers a
+    // new size every ~30-40 ms and only the last one is a size the
+    // operator asked for.  See m_resizeSettleTimer in the header.
+    m_resizeSettleTimer = new QTimer(this);
+    m_resizeSettleTimer->setSingleShot(true);
+    m_resizeSettleTimer->setInterval(kResizeSettleMs);
+    connect(m_resizeSettleTimer, &QTimer::timeout,
+            this, &SpectrumWidget::applyResizeSettled);
 
     // 2026-05-26 KG4VCF perf instrumentation: 1 Hz poll that updates
     // PerfMonitor's memory-pressure sample and forces the overlay
@@ -3417,6 +3431,23 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
         }
     }
 
+    // Re-allocate the size-dependent buffers — but not on every
+    // intermediate size of a drag.  The first allocation runs straight
+    // away (nothing to draw otherwise); after that the work is deferred
+    // until the size has held still for kResizeSettleMs.  See
+    // m_resizeSettleTimer for what that costs and saves.
+    if (m_waterfall.isNull() || !m_resizeSettleTimer) {
+        applyResizeSettled();
+    } else {
+        m_resizeSettleTimer->start();
+    }
+
+    // Reposition VFO flags after resize
+    updateVfoPositions();
+}
+
+void SpectrumWidget::applyResizeSettled()
+{
     // Recreate waterfall image at new size
     int w = width();
     int h = height();
@@ -3429,26 +3460,11 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
     int wfH = static_cast<int>(h * (1.0f - m_spectrumFrac)) - kFreqScaleH - kDividerH;
     if (wfW > 0 && wfH > 0 && (m_waterfall.isNull() ||
         m_waterfall.width() != wfW || m_waterfall.height() != wfH)) {
-        // 2026-05-26 KG4VCF: unlock the previous waterfall before
-        // QImage replacement frees it.  Aligned no-op when m_waterfall
-        // was null.
-        if (!m_waterfall.isNull()) {
-            unlockMemory(m_waterfall.constBits(),
-                         m_waterfall.sizeInBytes());
-        }
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
         m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
-        // Pin the new waterfall buffer.  Touched every push (write
-        // one row's worth of pixels) and every paint (full incremental
-        // texture upload to GPU); compression stalls here cause the
-        // visible waterfall stutter under build load.
-        lockMemory(m_waterfall.constBits(),
-                   m_waterfall.sizeInBytes(),
-                   "SpectrumWidget::m_waterfall");
         m_wfWriteRow = 0;
 #ifdef NEREUS_GPU_SPECTRUM
         m_wfTexFullUpload = true;
-        markOverlayDirty();
 #endif
         // Sub-epic E: schedule history-image rebuild so the ring buffer's
         // QImage tracks m_waterfall's new dimensions. Debounced 250 ms so
@@ -3458,9 +3474,15 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
             m_historyResizeTimer->start();
         }
     }
-
-    // Reposition VFO flags after resize
-    updateVfoPositions();
+    // Unconditional, unlike the waterfall block above: the overlays follow
+    // the FULL widget rect while the waterfall follows only its own pane,
+    // so a drag that changes the widget without changing wfW/wfH still
+    // leaves the overlays a size behind.  markOverlayDirty() also calls
+    // update(), which is what runs the deferred overlay re-allocation in
+    // renderGpuFrame now that resizeSettling() has gone false — and is the
+    // repaint the CPU path needs here too, which is why it is not under
+    // the GPU guard.
+    markOverlayDirty();
 }
 
 void SpectrumWidget::paintEvent(QPaintEvent* event)
@@ -8335,15 +8357,14 @@ void SpectrumWidget::initOverlayPipeline()
 
     m_overlayStatic = QImage(pw, ph, QImage::Format_RGBA8888_Premultiplied);
     m_overlayStatic.setDevicePixelRatio(dpr);
-    // 2026-05-26 KG4VCF: pin the overlay texture so the per-paint
-    // QImage::fill + 16 paint ops + GPU upload don't touch a
-    // compressed page when the system is under memory pressure.
-    // This is the biggest single buffer in the render path (~1.6 MB
-    // at default window size) and is hit on every overlay-rebuild
-    // tick (10 Hz when blob / peak-hold / NF are enabled).
-    lockMemory(m_overlayStatic.constBits(),
-               m_overlayStatic.sizeInBytes(),
-               "SpectrumWidget::m_overlayStatic (init)");
+    // NOT page-locked, deliberately.  Until 2026-08-16 this buffer (and
+    // m_overlayDynamic and m_waterfall) went through lockMemory() to keep
+    // the per-paint fill + GPU upload off a compressed page under memory
+    // pressure.  The reasoning was sound for the audio ring and wrong here:
+    // a page fault on a display buffer costs one stuttered frame, while the
+    // pin cost a full mlock/munlock of ~12 MB on every intermediate window
+    // size during a resize drag.  Page locks stay on the real-time audio
+    // path, where a fault is an audible dropout.  See MemoryLock.h.
 
     // 2026-05-26 KG4VCF dual-layer split: dynamic overlay texture.
     // Same dimensions, format, sampler, pipeline as the static
@@ -8368,9 +8389,6 @@ void SpectrumWidget::initOverlayPipeline()
     // garbage, most visibly right after init or a resize.  Codex review,
     // PR #291.
     m_overlayDynamic.fill(Qt::transparent);
-    lockMemory(m_overlayDynamic.constBits(),
-               m_overlayDynamic.sizeInBytes(),
-               "SpectrumWidget::m_overlayDynamic (init)");
 }
 
 void SpectrumWidget::initSpectrumPipeline()
@@ -8802,20 +8820,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         const qreal dpr = devicePixelRatioF();
         const int pw = static_cast<int>(w * dpr);
         const int ph = static_cast<int>(h * dpr);
-        if (m_overlayStatic.size() != QSize(pw, ph)) {
-            // 2026-05-26 KG4VCF: unlock the previous overlay before
-            // replacement frees it.  Aligned no-op when null.
-            if (!m_overlayStatic.isNull()) {
-                unlockMemory(m_overlayStatic.constBits(),
-                             m_overlayStatic.sizeInBytes());
-            }
+        if (m_overlayStatic.size() != QSize(pw, ph) && !resizeSettling()) {
             m_overlayStatic = QImage(pw, ph, QImage::Format_RGBA8888_Premultiplied);
             m_overlayStatic.setDevicePixelRatio(dpr);
-            // Pin the resized overlay (resize trigger fires on
-            // window-size change; tag for log clarity).
-            lockMemory(m_overlayStatic.constBits(),
-                       m_overlayStatic.sizeInBytes(),
-                       "SpectrumWidget::m_overlayStatic (resize)");
             m_ovGpuTex->setPixelSize(QSize(pw, ph));
             m_ovGpuTex->create();
             m_ovSrb->setBindings({
@@ -8840,11 +8847,18 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // upload) so the perf overlay can show avg/max cost and
         // confirm whether this is the dominant per-paint expense.
         QElapsedTimer ovlyTimer;
-        const bool needsOverlayRebuild = m_overlayStaticDirty;
+        // Suppressed while a resize drag is in flight.  Every draw call
+        // below takes its geometry from the CURRENT widget size, while the
+        // image still carries the pre-drag dimensions until the size
+        // settles — so rebuilding here would paint new-size chrome into an
+        // old-size buffer and clip it.  The dirty flag is left set, and the
+        // GPU stretches the last complete overlay until applyResizeSettled()
+        // re-allocates and this runs once.
+        const bool needsOverlayRebuild = m_overlayStaticDirty && !resizeSettling();
         if (needsOverlayRebuild) {
             ovlyTimer.start();
         }
-        if (m_overlayStaticDirty) {
+        if (needsOverlayRebuild) {
             m_overlayStatic.fill(Qt::transparent);
             QPainter p(&m_overlayStatic);
             p.setRenderHint(QPainter::Antialiasing, false);
@@ -9123,20 +9137,13 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // pressure.  The per-frame paint ops themselves (3 ellipses
         // + 3 small text labels + 1 polyline + 1 dashed line) are
         // < 1 ms even under contention.
-        if (m_overlayDynamic.size() != QSize(pw, ph)) {
-            if (!m_overlayDynamic.isNull()) {
-                unlockMemory(m_overlayDynamic.constBits(),
-                             m_overlayDynamic.sizeInBytes());
-            }
+        if (m_overlayDynamic.size() != QSize(pw, ph) && !resizeSettling()) {
             m_overlayDynamic = QImage(pw, ph, QImage::Format_RGBA8888_Premultiplied);
             m_overlayDynamic.setDevicePixelRatio(dpr);
             // Same uninitialized-buffer hazard as the init path above: the
             // rebuild below only touches the spectrum-height band, while the
             // quad samples the full texture.  Codex review, PR #291.
             m_overlayDynamic.fill(Qt::transparent);
-            lockMemory(m_overlayDynamic.constBits(),
-                       m_overlayDynamic.sizeInBytes(),
-                       "SpectrumWidget::m_overlayDynamic (resize)");
             m_ovDynGpuTex->setPixelSize(QSize(pw, ph));
             m_ovDynGpuTex->create();
             m_ovDynSrb->setBindings({
@@ -9162,7 +9169,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             m_ovDynNeedsFullUpload = true;
         }
 
-        if (m_overlayDynamicDirty) {
+        // Same resize suppression as the static layer above, and for the
+        // same reason: the partial-region rebuild below clears and uploads
+        // a spectrum-height band computed from the current widget size.
+        if (m_overlayDynamicDirty && !resizeSettling()) {
             QElapsedTimer dynTimer;
             dynTimer.start();
 
@@ -9489,31 +9499,17 @@ void SpectrumWidget::releaseResources()
     delete m_ovVbo;           m_ovVbo = nullptr;
     delete m_ovGpuTex;        m_ovGpuTex = nullptr;
     delete m_ovSampler;       m_ovSampler = nullptr;
-    // Release the static overlay's lock too.  initOverlayPipeline() locks
-    // it and, on device/surface recreation, runs again and replaces the
-    // QImage with a freshly locked one -- so skipping it here leaked one
-    // MemoryLock registration per recreate, inflating the locked-byte
-    // count and potentially pinning allocator pages for buffers that no
-    // longer exist.  Codex review, PR #291.
+    // No overlay unlock pass here any more: the display buffers stopped
+    // being page-locked on 2026-08-16 (rationale in initOverlayPipeline).
+    // The lock/unlock bookkeeping this used to need — one registration
+    // leaked per device recreate, Codex review PR #291 — went with it.
     //
-    // Deliberately NOT m_waterfall: that buffer is locked where it is
-    // reallocated on a size change, not in initOverlayPipeline(), so it
-    // survives this call still locked and still in use.  Unlocking it here
-    // would drop a live pin that nothing re-establishes.
-    if (!m_overlayStatic.isNull()) {
-        unlockMemory(m_overlayStatic.constBits(),
-                     m_overlayStatic.sizeInBytes());
-    }
     // 2026-05-26 KG4VCF dual-layer overlay split: tear down the
     // dynamic-overlay resources.  Pipeline + VBO + sampler are
     // shared with the static layer; only SRB + texture are
     // separate.
     delete m_ovDynSrb;        m_ovDynSrb = nullptr;
     delete m_ovDynGpuTex;     m_ovDynGpuTex = nullptr;
-    if (!m_overlayDynamic.isNull()) {
-        unlockMemory(m_overlayDynamic.constBits(),
-                     m_overlayDynamic.sizeInBytes());
-    }
 
     delete m_fftLinePipeline;  m_fftLinePipeline = nullptr;
     delete m_fftFillPipeline;  m_fftFillPipeline = nullptr;
