@@ -113,6 +113,8 @@ constexpr auto kButtonHover     = "#26262b";   // war #203040
 constexpr auto kButtonAltHover  = "#2f3138";   // war #204060
 constexpr auto kBorder          = "#2c2c31";   // war #205070
 constexpr auto kBorderSubtle    = "#1f1f23";   // war #203040
+constexpr auto kPanadapterBg    = "#0a0a12";   // Grundflaeche des Panadapters,
+                                               // unter Bild und Raster
 constexpr auto kInsetBg         = "#08080a";   // war #0a0a18
 constexpr auto kInsetBorder     = "#232329";   // war #1e2e3e
 constexpr auto kGroove          = "#1f1f23";   // war #203040

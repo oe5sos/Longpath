@@ -687,6 +687,15 @@ public:
 
     // Right-edge dBm scale strip visibility. When false, the strip is
     // hidden and the spectrum fills the full widget width.
+    void setBackgroundImage(const QString& path);
+    QString backgroundImagePath() const { return m_bgImagePath; }
+    void setBackgroundOpacity(int pct);
+    int  backgroundOpacity() const { return m_bgOpacity; }
+    void setBackgroundFillColor(const QColor& c);
+    QColor backgroundFillColor() const { return m_bgFillColor; }
+    void loadBackgroundSettings();
+    void paintBackgroundLayer(QPainter& p, const QRect& specRect);
+
     void setDbmScaleVisible(bool on);
     bool dbmScaleVisible() const { return m_dbmScaleVisible; }
 
@@ -2570,6 +2579,27 @@ private:
     QRhiBuffer*                 m_ovVbo{nullptr};
     QRhiTexture*                m_ovGpuTex{nullptr};
     QRhiSampler*                m_ovSampler{nullptr};
+    // ── Frei waehlbarer Hintergrund ──────────────────────────────────
+    //
+    // Port aus AetherSDR SpectrumWidget: setBackgroundImage /
+    // setBackgroundOpacity / setBackgroundFillColor
+    // (SpectrumWidget.cpp:11161-11187 [@0cd4559]) samt der Komposition
+    // bei :13730. Die Reihenfolge ist AetherSDRs, nicht neu erfunden:
+    //
+    //     Fuellfarbe   volle Deckkraft
+    //     Bild         Deckkraft 1 - opacity/100
+    //
+    // m_bgOpacity sagt also, wie stark die FUELLFARBE durchkommt, nicht
+    // wie stark das Bild deckt. Der Name stammt aus AetherSDR und
+    // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
+    // Umbenennung scheitert.
+    QImage  m_bgImage;
+    QImage  m_bgScaled;
+    QSize   m_bgScaledSize;
+    QString m_bgImagePath;
+    int     m_bgOpacity{80};
+    QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
+
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};
     bool   m_overlayNeedsUpload{true};

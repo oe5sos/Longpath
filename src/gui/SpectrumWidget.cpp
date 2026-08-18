@@ -536,6 +536,10 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     setPalette(pal);
 #endif
 
+    // Hintergrund aus den Einstellungen holen, bevor der erste Rahmen
+    // gemalt wird — sonst blitzt beim Start einmal die Vorgabefarbe auf.
+    loadBackgroundSettings();
+
     setCursor(Qt::CrossCursor);
     setMouseTracking(true);
 
@@ -3514,6 +3518,10 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
     p.fillRect(0, specH, w, kDividerH, QColor(0x30, 0x40, 0x50));
 
     // Draw components
+    // Derselbe Hintergrund wie im GPU-Zweig. Ein Hintergrund, der
+    // nur in einem der beiden Malwege erscheint, ist schlimmer als
+    // keiner: dann haengt das Bild an der Grafikkarte.
+    paintBackgroundLayer(p, specRect);
     drawGrid(p, specRect);
     drawSpectrum(p, specRect);
     drawWaterfall(p, wfRect);
@@ -4189,6 +4197,102 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
                 : (wfRect.right() - textW - pad);
         p.drawText(x, wfRect.top() + 12, stamp);
     }
+}
+
+
+// ── Frei waehlbarer Hintergrund ──────────────────────────────────────
+//
+// Port aus AetherSDR SpectrumWidget.cpp:11161-11187 [@0cd4559].
+// Uebernommen sind Zuschnitt (KeepAspectRatioByExpanding + mittiger
+// Ausschnitt), die Zwischenhaltung nach Groesse und die
+// Deckkraft-Rechnung 1 - opacity/100.
+//
+// NereusSDR-Abweichung: die Einstellungen laufen ueber AppSettings mit
+// PascalCase-Schluesseln statt AetherSDRs settingsKey()-Praefix, weil
+// unser Panadapter nicht je Empfaenger persistiert.
+
+void SpectrumWidget::setBackgroundImage(const QString& path)
+{
+    if (path == m_bgImagePath) { return; }
+    m_bgImagePath = path;
+    m_bgScaled = {};
+    m_bgScaledSize = {};
+    if (path.isEmpty()) {
+        m_bgImage = {};
+    } else {
+        m_bgImage = QImage(path);
+        if (m_bgImage.isNull()) {
+            qCWarning(lcSpectrum) << "Hintergrundbild nicht ladbar:" << path;
+        }
+    }
+    auto& st = AppSettings::instance();
+    st.setValue("PanadapterBackgroundImage", m_bgImagePath);
+    st.save();
+    m_overlayStaticDirty = true;
+    update();
+}
+
+void SpectrumWidget::setBackgroundOpacity(int pct)
+{
+    const int use = qBound(0, pct, 100);
+    if (use == m_bgOpacity) { return; }
+    m_bgOpacity = use;
+    auto& st = AppSettings::instance();
+    st.setValue("PanadapterBackgroundOpacity", QString::number(m_bgOpacity));
+    st.save();
+    m_overlayStaticDirty = true;
+    update();
+}
+
+void SpectrumWidget::setBackgroundFillColor(const QColor& c)
+{
+    if (!c.isValid() || c == m_bgFillColor) { return; }
+    m_bgFillColor = c;
+    auto& st = AppSettings::instance();
+    st.setValue("PanadapterBackgroundFill", m_bgFillColor.name(QColor::HexArgb));
+    st.save();
+    m_overlayStaticDirty = true;
+    update();
+}
+
+void SpectrumWidget::loadBackgroundSettings()
+{
+    auto& st = AppSettings::instance();
+    const QString path = st.value("PanadapterBackgroundImage", QString()).toString();
+    m_bgOpacity = qBound(0, st.value("PanadapterBackgroundOpacity", "80").toInt(), 100);
+    const QColor fill(st.value("PanadapterBackgroundFill",
+                               QString::fromLatin1(Style::kPanadapterBg)).toString());
+    if (fill.isValid()) { m_bgFillColor = fill; }
+    if (!path.isEmpty()) {
+        m_bgImagePath = path;
+        m_bgImage = QImage(path);
+        m_bgScaled = {};
+        m_bgScaledSize = {};
+    }
+    m_overlayStaticDirty = true;
+}
+
+// Malt Fuellfarbe und Bild in DIESER Reihenfolge in den uebergebenen
+// Bereich. Beide Malwege rufen sie, damit GPU und CPU dasselbe zeigen —
+// ein Hintergrund, der nur in einem der beiden erscheint, ist schlimmer
+// als keiner.
+void SpectrumWidget::paintBackgroundLayer(QPainter& p, const QRect& specRect)
+{
+    p.fillRect(specRect, m_bgFillColor);
+    if (m_bgImage.isNull() || specRect.isEmpty()) { return; }
+    if (m_bgScaledSize != specRect.size()) {
+        const QImage expanded = m_bgImage.scaled(
+            specRect.size(), Qt::KeepAspectRatioByExpanding,
+            Qt::SmoothTransformation);
+        const int cx = (expanded.width()  - specRect.width())  / 2;
+        const int cy = (expanded.height() - specRect.height()) / 2;
+        m_bgScaled = expanded.copy(cx, cy, specRect.width(), specRect.height());
+        m_bgScaledSize = specRect.size();
+    }
+    const qreal keep = p.opacity();
+    p.setOpacity(1.0 - m_bgOpacity / 100.0);
+    p.drawImage(specRect.topLeft(), m_bgScaled);
+    p.setOpacity(keep);
 }
 
 // ---- Frequency scale bar ----
@@ -8858,6 +8962,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             QPainter p(&m_overlayStatic);
             p.setRenderHint(QPainter::Antialiasing, false);
 
+            // Ganz unten, unter dem Raster: AetherSDR begruendet das bei
+            // SpectrumWidget.cpp:13748 [@0cd4559] — die Rasterzellen
+            // muessen HINTER den Signalspitzen liegen, nicht darueber.
+            paintBackgroundLayer(p, specRect);
             drawGrid(p, specRect);
             if (m_dbmScaleVisible) {
                 // drawDbmScale needs the FULL-WIDTH rect so the strip
