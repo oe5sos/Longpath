@@ -880,6 +880,24 @@ def main() -> int:
                     # FAIL daraus zu machen hiesse, eine erfundene
                     # Attributionsverletzung neben den echten Mangel zu
                     # stellen.
+                    # „Hinter dem Dateiende" schlaegt „ohne Stempel":
+                    # der fehlende Stempel heisst nur, dass nicht
+                    # geprueft werden kann; die ueberschrittene
+                    # Dateilaenge heisst, dass das Zitat in KEINER
+                    # Fassung stimmen kann. Der staerkere Befund
+                    # gewinnt, sonst versteckt er sich unter 387
+                    # gleichlautenden Zeilen.
+                    eof_hit = None
+                    for ver in UNSTAMPED_PROBE_VERSIONS:
+                        probe = git_lines_at(THETIS_DIR if which == "ramdor"
+                                             else MI0BOT_DIR, ver,
+                                             m.group("file"))
+                        if probe is None:
+                            continue
+                        if spans[0][0] <= len(probe):
+                            eof_hit = None
+                            break
+                        eof_hit = len(probe)
                     findings.append({
                         "severity": "warn",
                         "file": str(port.relative_to(REPO)),
@@ -887,7 +905,11 @@ def main() -> int:
                         "which": which,
                         "source_file": m.group("file"),
                         "source_lines": line_nums,
-                        "issue": "cite-unstamped",
+                        "issue": ("cite-unstamped" if eof_hit is None else
+                                  "cite-line-beyond-eof"),
+                        "detail": (None if eof_hit is None else
+                                   f"Zeile {spans[0][0]}, Datei hat "
+                                   f"{eof_hit}"),
                         "tag": None,
                     })
                     break
@@ -905,6 +927,46 @@ def main() -> int:
                         "tag": None,
                     })
                     break
+                # BEWEISBAR FALSCH: die zitierte Zeile liegt hinter dem
+                # Dateiende. Anders als „Klon fehlt" ist das kein
+                # Nicht-pruefen-koennen, sondern ein Befund -- das Zitat
+                # KANN so nicht stimmen, in keiner Fassung.
+                #
+                # Bis 2026-08-18 fiel es lautlos durch: die Spanne lag
+                # ausserhalb, extract_tags_from_region fand darum keine
+                # Tags, und „keine Tags gefordert" sieht aus wie „alle
+                # Tags erhalten".
+                #
+                # Die acht heutigen Faelle zitieren alle
+                # networkproto1.c:762..878, waehrend die Datei bei ramdor
+                # 749 Zeilen hat. Sie meinen mit hoher
+                # Wahrscheinlichkeit mi0bots laengere HL2-Fassung und
+                # tragen die falsche Herkunftsgrammatik -- genau der
+                # Fork-Verwechsler, vor dem resolve_upstream oben warnt.
+                # Welche es ist, entscheidet ein Mensch; das Werkzeug
+                # sagt nur, dass es so nicht stimmt.
+                probe = src_lines
+                if probe is None and upstream is not None:
+                    try:
+                        probe = upstream.read_text(
+                            encoding="utf-8", errors="replace").splitlines()
+                    except Exception:
+                        probe = None
+                if probe is not None and spans and spans[0][0] > len(probe):
+                    findings.append({
+                        "severity": "warn",
+                        "file": str(port.relative_to(REPO)),
+                        "cite_line": cite_line,
+                        "which": which,
+                        "source_file": m.group("file"),
+                        "source_lines": line_nums,
+                        "issue": "cite-line-beyond-eof",
+                        "detail": (f"Zeile {spans[0][0]}, Datei hat "
+                                   f"{len(probe)}"),
+                        "tag": None,
+                    })
+                    break
+
                 source_tags = extract_tags_from_region(upstream, spans,
                                                        lines=src_lines)
                 for src_line, tag in sorted(source_tags):
@@ -947,11 +1009,14 @@ def main() -> int:
             groups.setdefault((f["which"], f["issue"]), []).append(f)
         for (which, issue), items in sorted(groups.items(),
                                             key=lambda kv: -len(kv[1])):
-            print(f"  WARN  {len(items):4d} cite(s) nicht pruefbar  "
-                  f"[{which}: {issue}]")
+            wording = ("BEFUND — Zitat kann nicht stimmen"
+                       if issue == "cite-line-beyond-eof"
+                       else "cite(s) nicht pruefbar")
+            print(f"  WARN  {len(items):4d} {wording}  [{which}: {issue}]")
             for f in items[:3]:
+                extra = f"  ({f['detail']})" if f.get("detail") else ""
                 print(f"          z.B. {f['file']}:{f['cite_line']} "
-                      f"-> {f['source_file']}")
+                      f"-> {f['source_file']}{extra}")
             if len(items) > 3:
                 print(f"          ... und {len(items) - 3} weitere "
                       f"(vollstaendig in --json)")
