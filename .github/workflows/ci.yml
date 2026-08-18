@@ -224,6 +224,21 @@ jobs:
           NEREUS_FREEDV_DIR: ${{ github.workspace }}/../freedv-gui
         run: python3 scripts/verify-inline-tag-preservation.py
 
+      - name: Style drift has not grown
+        # Die Ratsche gegen die Stil-Drift. Sie prueft KEIN Ideal,
+        # sondern nur die Richtung: waechst die Zahl der namenlosen
+        # Farben oder der Schriftgroessen ausserhalb der Leiter, faellt
+        # der Bau.
+        #
+        # Warum das noetig ist: die Palette wurde am 2026-08-15 von 276
+        # auf 202 Farben gebracht und stand am 2026-08-18 bei 297. Ohne
+        # Bremse ist jedes Aufraeumen eine wiederkehrende Ausgabe statt
+        # einer Verbesserung.
+        #
+        # Nach einem Aufraeumen die Decke nachziehen:
+        #   python3 scripts/verify-style-drift.py --update-baseline
+        run: python3 scripts/verify-style-drift.py
+
       - name: Contributor indexes are up to date with corpus
         # Regenerates docs/attribution/thetis-{contributor,inline-mods}-
         # index.md from the corpus JSON and fails the PR if the
