@@ -2346,7 +2346,7 @@ private:
     // Fast-attack swap colour — From Thetis display.cs:5431-5432 [v2.10.3.13]:
     //   nf_colour      = bFast ? m_bDX2_Gray : m_bDX2_noisefloor;
     //   nf_colour_text = bFast ? m_bDX2_Gray : m_bDX2_noisefloor_text;
-    // Lightened from Qt::gray (160,160,164) to #C8C8C8 so the swatch and
+    // Lightened from Qt::gray (160,160,164) to #c4c4c9 so the swatch and
     // the rendered overlay both stand out against NereusSDR's dark UI
     // background; Thetis renders against a lighter-grey grid backdrop where
     // medium-grey reads fine.

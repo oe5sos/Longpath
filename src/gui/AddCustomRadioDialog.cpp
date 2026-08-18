@@ -336,7 +336,7 @@ void AddCustomRadioDialog::buildUi()
 
     // --- Inline feedback band (hidden by default) ---
     // Used by showInlineError / showInlineInfo to surface probe results.
-    // Error = #c14848 red; Info = #5985b8 blue (design §6.3-6.5).
+    // Error = #c14848 red; Info = #4a7ba8 blue (design §6.3-6.5).
     m_feedbackFrame = new QFrame(this);
     m_feedbackFrame->setFrameShape(QFrame::StyledPanel);
     m_feedbackFrame->setContentsMargins(0, 0, 0, 0);
@@ -785,7 +785,7 @@ void AddCustomRadioDialog::showInlineError(const QString& message)
 void AddCustomRadioDialog::showInlineInfo(const QString& message)
 {
     // Info band: dark blue border + blue text.
-    // Colour: #5985b8 info blue (design §6.4).
+    // Colour: #4a7ba8 info blue (design §6.4).
     m_feedbackFrame->setStyleSheet(Style::themed(QStringLiteral(
         "QFrame { background: #0a1a28; border: 1px solid #4a7ba8; border-radius: 4px; }")));
     m_feedbackLabel->setStyleSheet(Style::themed(QStringLiteral(

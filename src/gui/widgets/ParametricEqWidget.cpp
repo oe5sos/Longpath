@@ -848,7 +848,7 @@ void ParametricEqWidget::paintEvent(QPaintEvent* /*event*/) {
     QRect client = rect();
     if (client.width() < 2 || client.height() < 2) return;
 
-    g.fillRect(client, eqInk("eq-bg", "#191919"));   // BackColor (ucParametricEq.cs:443)
+    g.fillRect(client, eqInk("eq-bg", "#18181a"));   // BackColor (ucParametricEq.cs:443)
 
     QRect plot = computePlotRect();
     if (plot.width() < 2 || plot.height() < 2) return;
@@ -873,11 +873,11 @@ void ParametricEqWidget::paintEvent(QPaintEvent* /*event*/) {
 
 // From Thetis ucParametricEq.cs:2061-2117 [v2.10.3.13].
 void ParametricEqWidget::drawGrid(QPainter& g, const QRect& plot) {
-    g.fillRect(plot, eqInk("eq-plot", "#121212"));
+    g.fillRect(plot, eqInk("eq-plot", "#0d0d0f"));
 
     drawBarChart(g, plot);
 
-    QPen gridPen(eqInk("eq-grid", "#2d2d2d"), 1.0);
+    QPen gridPen(eqInk("eq-grid", "#2c2c31"), 1.0);
     g.setPen(gridPen);
 
     if (m_logScale) {
@@ -903,7 +903,7 @@ void ParametricEqWidget::drawGrid(QPainter& g, const QRect& plot) {
     }
 
     // Zero-dB grid line: 1.5px width, brighter grey (75,75,75).
-    QPen zeroPen(eqInk("eq-zero", "#4b4b4b"), 1.5);
+    QPen zeroPen(eqInk("eq-zero", "#4e4e53"), 1.5);
     g.setPen(zeroPen);
     float y0 = yFromDb(plot, 0.0);
     g.drawLine(QPointF(plot.left(), y0), QPointF(plot.right(), y0));
@@ -1186,7 +1186,7 @@ void ParametricEqWidget::drawGlobalGainHandle(QPainter& g, const QRect& plot) {
     g.setPen(Qt::NoPen);
     g.drawPolygon(tri);
 
-    QPen outline(eqInk("eq-outline", "#282828"), 1.0);
+    QPen outline(eqInk("eq-outline", "#26262b"), 1.0);
     g.setPen(outline);
     g.setBrush(Qt::NoBrush);
     g.drawPolygon(tri);
@@ -1211,7 +1211,7 @@ void ParametricEqWidget::drawPoints(QPainter& g, const QRect& plot) {
         g.setPen(Qt::NoPen);
         g.drawEllipse(QPointF(x, y), r, r);
 
-        QPen outline(eqInk("eq-outline", "#232323"), 1.0);
+        QPen outline(eqInk("eq-outline", "#232327"), 1.0);
         g.setPen(outline);
         g.setBrush(Qt::NoBrush);
         g.drawEllipse(QPointF(x, y), r, r);
@@ -1285,7 +1285,7 @@ void ParametricEqWidget::drawDotReading(QPainter& g, const QRect& plot,
         }
     }
 
-    QBrush panelBrush(eqInk("eq-plot", "#121212", 150));
+    QBrush panelBrush(eqInk("eq-plot", "#0d0d0f", 150));
     QPen   panelPen  (eqInk("eq-callout-border", "#ffdc78", 90), 1.0);
     QBrush textBrush (eqInk("eq-callout-text", "#ffeb5a"));
 
@@ -1375,7 +1375,7 @@ void ParametricEqWidget::drawAxisScales(QPainter& g, const QRect& plot) {
 
 // From Thetis ucParametricEq.cs:2645-2651 [v2.10.3.13].
 void ParametricEqWidget::drawBorder(QPainter& g, const QRect& plot) {
-    QPen border(eqInk("eq-outline", "#464646"), 1.0);
+    QPen border(eqInk("eq-outline", "#3d3d41"), 1.0);
     g.setPen(border);
     g.setBrush(Qt::NoBrush);
     g.drawRect(plot);

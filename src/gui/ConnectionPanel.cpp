@@ -527,7 +527,7 @@ void ConnectionPanel::buildUI()
     static const QString kPrimaryStyle = QStringLiteral(
         "QPushButton {"
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
-        "    stop:0 %1, stop:1 #1e3d5f);"
+        "    stop:0 %1, stop:1 #254a72);"
         "  color: %2; border: 1px solid %3;"
         "  border-radius: 6px; padding: 6px 12px; font-weight: bold;"
         "}"
@@ -553,7 +553,7 @@ void ConnectionPanel::buildUI()
 
     // ── "Forget" ist keine Grenze ───────────────────────────────────
     //
-    // War rot (#4a2020 auf #6a3030). Rot bedeutet in diesem Programm
+    // War rot (#3f2224 auf #6a3030). Rot bedeutet in diesem Programm
     // "Achtung" und markiert Grenzen -- die Bandkante, ein SWR, bei dem
     // man nicht senden sollte. Ein vergessener Radioeintrag ist keine
     // Grenze: nichts geht kaputt, nichts wird gesendet, der Eintrag

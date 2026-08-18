@@ -46,8 +46,8 @@ void ColorSwatchButton::updateSwatchStyle()
     // Pick a readable border/text color based on the swatch luminance so the
     // button stays visible against any chosen fill.
     const int luminance = qGray(m_color.red(), m_color.green(), m_color.blue());
-    const QString fg    = (luminance < 128) ? QStringLiteral("#e8e8e8")
-                                             : QStringLiteral("#1a1a1a");
+    const QString fg    = (luminance < 128) ? QStringLiteral("#f0dcdc")
+                                             : QStringLiteral("#18181a");
     const QString border = QStringLiteral("#203040");
 
     setStyleSheet(Style::themed(QStringLiteral(

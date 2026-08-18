@@ -51,14 +51,14 @@ constexpr double kValueEdgeStartOfUnit = 24.0 / kDesignUnit;
 //
 // Entwurf: line von r = 10 bis R − W/2 − 3, stroke-width 2.2, runde
 // Kappe, keine Verjüngung und kein Schatten. Nabe: Kreis r = 5, Füllung
-// #15151a, 1 px Rand in measured-dim.
+// #141417, 1 px Rand in measured-dim.
 constexpr double kNeedleWidthOfUnit    =  2.2 / kDesignUnit;
 constexpr double kNeedleInnerOfUnit    = 10.0 / kDesignUnit;
 constexpr double kNeedleTipGapOfUnit   =  3.0 / kDesignUnit;
 constexpr double kHubRadiusOfUnit      =  5.0 / kDesignUnit;
 constexpr double kHubStrokeOfUnit      =  1.0 / kDesignUnit;
 
-/// Füllung der Nabe. Entwurf: #15151a. Kein Rollenname: das ist kein
+/// Füllung der Nabe. Entwurf: #141417. Kein Rollenname: das ist kein
 /// Flächengrund, sondern das Loch, das der Zeigerfuss abdeckt.
 inline QColor hubFill() { return QColor(0x15, 0x15, 0x1a); }
 

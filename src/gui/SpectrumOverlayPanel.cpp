@@ -151,7 +151,7 @@ namespace OverlayColors {
     // Auswahl: Füllung, Rahmen und Text wörtlich aus HAUSSTIL §Token.
     constexpr auto kMenuBtnActive =
         "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #254a72, stop:1 #1e3d5f); "
+        "stop:0 #254a72, stop:1 #254a72); "
         "border: 1px solid #2f5c86; border-radius: 6px; "
         "padding: 0 11px; "
         "color: #cfe2f5; font-size: 11px; font-weight: bold; }";

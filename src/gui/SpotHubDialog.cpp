@@ -225,7 +225,7 @@ constexpr const char* kSpotTableStyle =
     "}"
     "QTableView::item:selected {"
     "  background: #204060;"
-    "  color: #e0f0ff;"
+    "  color: #cfe2f5;"
     "}"
     "QHeaderView::section {"
     "  background: #1a1a2a;"

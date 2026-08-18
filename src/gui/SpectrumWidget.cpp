@@ -5930,7 +5930,7 @@ std::pair<int,int> SpectrumWidget::txAudioToIq(int audioLow, int audioHigh,
 // From Thetis display.cs:389 [v2.10.3.15]: notch_active_colour = Color.Yellow.
 static constexpr QRgb kNotchActiveColour = qRgb(0xFF, 0xFF, 0x00);
 // From Thetis display.cs:390 [v2.10.3.15]: notch_inactive_colour = Color.Gray.
-// System.Drawing.Color.Gray is #808080 while Qt::gray is #A0A0A4, so the
+// System.Drawing.Color.Gray is #828288 while Qt::gray is #9aa0a8, so the
 // literal is spelled out rather than reaching for the Qt global colour.
 static constexpr QRgb kNotchInactiveColour = qRgb(0x80, 0x80, 0x80);
 // From Thetis display.cs:387 [v2.10.3.15]: notch_tnf_off_colour = Color.Olive.

@@ -112,7 +112,7 @@ inline void applyAppBaselineQss(QApplication& app)
         "QGroupBox::title { color: %4; }"
         "QMenu { background: %2; color: %1; border: 1px solid %3; }"
         "QMenu::item { padding: 4px 20px; }"
-        "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }"
+        "QMenu::item:selected { background: #2d5885; color: #ffffff; }"
         "QMenu::item:disabled { color: %5; }"
         // Spinbox arrows: Fusion paints these with palette.foreground()
         // darkened, which is unreadable against our dark surfaces. Point

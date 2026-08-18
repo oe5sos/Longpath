@@ -330,7 +330,7 @@ void RxApplet::buildUi()
                 "QMenu { background: #1a2a3a; color: #c8d8e8;"
                 "        border: 1px solid #304050; }"
                 "QMenu::item { padding: 4px 20px; }"
-                "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }")));
+                "QMenu::item:selected { background: #2d5885; color: #ffffff; }")));
             const QString cur = m_slice ? m_slice->rxAntenna() : QString{};
             if (m_popupCaps && m_popupSku) {
                 AntennaPopupBuilder::populate(&menu, *m_popupCaps, *m_popupSku,
@@ -376,7 +376,7 @@ void RxApplet::buildUi()
                 "QMenu { background: #1a2a3a; color: #c8d8e8;"
                 "        border: 1px solid #304050; }"
                 "QMenu::item { padding: 4px 20px; }"
-                "QMenu::item:selected { background: #2a5a8a; color: #ffffff; }")));
+                "QMenu::item:selected { background: #2d5885; color: #ffffff; }")));
             const QString cur = m_slice ? m_slice->txAntenna() : QString{};
             if (m_popupCaps && m_popupSku) {
                 AntennaPopupBuilder::populate(&menu, *m_popupCaps, *m_popupSku,
@@ -773,13 +773,13 @@ void RxApplet::buildUi()
         headerRow->addWidget(m_agcTLabel);
 
         // §A2 one-offs for AUTO badge (inactive state):
-        // #1a1a1a = near-black bg (darker than kDisabledBg #1a1a2a — no blue tint).
+        // #18181a = near-black bg (darker than kDisabledBg #1a1a2a — no blue tint).
         // #445 / #556 = very dim purple-gray border/text (3-digit shorthands, off-palette).
         // #adff2f = lime-green hover accent (active-AUTO color, NereusSDR-original).
         // None of these map cleanly to a canonical constant; all kept as one-offs.
         m_agcAutoLabel = new QPushButton(QStringLiteral("AUTO"), m_agcTContainer);
         m_agcAutoLabel->setStyleSheet(
-            QStringLiteral("QPushButton { background: #1a1a1a; border: 1px solid #445;"  // §A2 one-off
+            QStringLiteral("QPushButton { background: #18181a; border: 1px solid #445;"  // §A2 one-off
                             "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
                             "QPushButton:hover { border-color: #adff2f; }"));
         m_agcAutoLabel->setFixedHeight(14);
@@ -1381,7 +1381,7 @@ void RxApplet::updateSliceButtons(const QVector<SliceModel*>& slices,
 
         const QColor c = sliceColor(sliceIdx);
         btn->setStyleSheet(Style::themed(QStringLiteral(
-            "QToolButton { background: #2a2a2a; color: %1; border: 1px solid %1;"
+            "QToolButton { background: #2c2c31; color: %1; border: 1px solid %1;"
             " border-radius: 6px; font-weight: bold; font-size: 10px; padding: 0; }"
             "QToolButton:checked { background: %1; color: #0a0a14; }")
             .arg(c.name())));
@@ -1863,13 +1863,13 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
 
     if (autoOn) {
         // AUTO badge → bright green (active) — only the button illuminates
-        // §A2 one-offs: #1a2a1a (dark green bg), #adff2f (lime border+text), #2a3a2a (hover).
+        // §A2 one-offs: #1b3527 (dark green bg), #adff2f (lime border+text), #1b3527 (hover).
         // NereusSDR-original active-AUTO palette; not in StyleConstants.
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
-                QStringLiteral("QPushButton { background: #1a2a1a; border: 1px solid #adff2f;"  // §A2 one-off
+                QStringLiteral("QPushButton { background: #1b3527; border: 1px solid #adff2f;"  // §A2 one-off
                                 "color: #adff2f; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
-                                "QPushButton:hover { background: #2a3a2a; }"));
+                                "QPushButton:hover { background: #1b3527; }"));
         }
 
         // Show info sub-line
@@ -1882,10 +1882,10 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
         }
     } else {
         // AUTO badge → dim gray (inactive)
-        // §A2 one-offs: same #1a1a1a/#445/#556/#adff2f as construction-time style; see above.
+        // §A2 one-offs: same #18181a/#445/#556/#adff2f as construction-time style; see above.
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
-                QStringLiteral("QPushButton { background: #1a1a1a; border: 1px solid #445;"  // §A2 one-off
+                QStringLiteral("QPushButton { background: #18181a; border: 1px solid #445;"  // §A2 one-off
                                 "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
                                 "QPushButton:hover { border-color: #adff2f; }"));
         }

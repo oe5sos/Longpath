@@ -81,7 +81,7 @@ static const char* kAutoDetectStyle =
 // queried by test probes (findStatusBanner) via Qt widget hierarchy.
 [[maybe_unused]] static const char* kStatusNativeStyle =
     "QLabel {"
-    "  background: #0f2a1a;"
+    "  background: #1b3527;"
     "  border: 1px solid #1a6030;"
     "  border-radius: 6px;"
     "  color: #00ff88;"
@@ -93,7 +93,7 @@ static const char* kAutoDetectStyle =
 static const char* kStatusBYOStyle =
     "QLabel {"
     "  background: #0a1a28;"
-    "  border: 1px solid #2a5a8a;"
+    "  border: 1px solid #2d5885;"
     "  border-radius: 6px;"
     "  color: #00b4d8;"
     "  font-size: 11px;"

@@ -28,7 +28,7 @@ inline constexpr const char* kPopupMenu =
     "  padding: 4px 20px;"
     "}"
     "QMenu::item:selected {"
-    "  background: #2a5a8a;"
+    "  background: #2d5885;"
     "  color: #ffffff;"
     "}"
     "QMenu::item:disabled {"

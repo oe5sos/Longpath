@@ -162,7 +162,7 @@ RadioInfoTab::RadioInfoTab(RadioModel* model, QWidget* parent)
     m_reconnectBanner = new QFrame(this);
     m_reconnectBanner->setFrameShape(QFrame::StyledPanel);
     m_reconnectBanner->setStyleSheet(Style::themed(QStringLiteral(
-        "QFrame { background-color: #3a2a10; border: 1px solid #906000; "
+        "QFrame { background-color: #33280f; border: 1px solid #906000; "
         "border-radius: 6px; padding: 4px; }")));
     auto* bannerLayout = new QHBoxLayout(m_reconnectBanner);
     bannerLayout->setContentsMargins(6, 4, 6, 4);

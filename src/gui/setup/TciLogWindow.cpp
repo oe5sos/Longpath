@@ -124,9 +124,9 @@ void TciLogWindow::buildUI()
     // Dark-theme styling to match the rest of NereusSDR's setup dialogs.
     m_logView->setStyleSheet(QStringLiteral(
         "QPlainTextEdit {"
-        "  background-color: #1a1a1a;"
-        "  color: #d0d0d0;"
-        "  border: 1px solid #3a3a3a;"
+        "  background-color: #18181a;"
+        "  color: #c4c4c9;"
+        "  border: 1px solid #3d3d41;"
         "  selection-background-color: #4a6f8f;"
         "}"));
     root->addWidget(m_logView, /*stretch=*/1);
