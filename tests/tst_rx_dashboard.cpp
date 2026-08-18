@@ -9,6 +9,7 @@
 
 #include "gui/widgets/RxDashboard.h"
 #include "gui/widgets/StatusBadge.h"
+#include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
 using namespace NereusSDR;
@@ -116,6 +117,82 @@ private slots:
         QVERIFY(d.badgeForRung(12) != nullptr);   // RIT
         QVERIFY(d.badgeForRung(10) != d.badgeForRung(11));
         QVERIFY(d.badgeForRung(11) != d.badgeForRung(12));
+    }
+
+    // ── Und sie zeigen auch etwas ───────────────────────────────────
+    //
+    // Die Faelle oben pruefen die STELLE auf der Faltleiter. Seit die
+    // VFO-Flagge am 2026-08-18 geloescht ist, sind diese Pillen die
+    // EINZIGE Stelle, an der X/RIT und die VAX-Zuordnung ueberhaupt zu
+    // sehen sind — vorher standen sie auch auf der Flagge. Eine Pille
+    // an der richtigen Sprosse, die nichts anzeigt, faellt niemandem
+    // auf; deshalb hier der Inhalt.
+
+    // Die Pille sagt den ZUSTAND, nicht den Wert. Der Versatz in Hertz
+    // steht in der RxApplet (m_ritLabel, „+250 Hz") — dort, wo man ihn
+    // auch verstellt. Auf der Leiste, die faltet, waere eine Zahl
+    // schlechter als ein Wort: „RIT" heisst „dein Empfang sitzt nicht,
+    // wo du denkst", und das ist der Teil, der auf einen Blick gehoert.
+    //
+    // Beide zugleich muss unterscheidbar bleiben, sonst sieht „nur
+    // RIT" aus wie „RIT und XIT".
+    void ritAndXitShowTheirState() {
+        RadioModel m;
+        SliceModel* s = m.sliceById(0);
+        if (!s) { s = m.sliceById(m.addSlice()); }
+        QVERIFY(s);
+        RxDashboard d;
+        d.bindSlice(s);
+
+        StatusBadge* rit = d.badgeForRung(12);
+        QVERIFY(rit);
+        QVERIFY2(!rit->isVisible() || rit->label().isEmpty(),
+                 "ohne RIT und XIT darf die Pille nichts behaupten");
+
+        s->setRitEnabled(true);
+        s->setRitHz(250);
+        QCOMPARE(rit->label(), QStringLiteral("RIT"));
+
+        s->setXitEnabled(true);
+        QCOMPARE(rit->label(), QStringLiteral("R+X"));
+
+        s->setRitEnabled(false);
+        QCOMPARE(rit->label(), QStringLiteral("XIT"));
+    }
+
+    void theVaxPillNamesItsChannel() {
+        RadioModel m;
+        SliceModel* s = m.sliceById(0);
+        if (!s) { s = m.sliceById(m.addSlice()); }
+        QVERIFY(s);
+        RxDashboard d;
+        d.bindSlice(s);
+
+        StatusBadge* vax = d.badgeForRung(10);
+        QVERIFY(vax);
+
+        s->setVaxChannel(2);
+        QVERIFY2(vax->label().contains(QStringLiteral("2")),
+                 qPrintable(QStringLiteral("VAX-Pille sagt %1")
+                                .arg(vax->label())));
+
+        s->setVaxChannel(0);
+        QVERIFY2(vax->label().isEmpty() || !vax->isVisible(),
+                 "ohne VAX-Kanal darf die Pille keinen behaupten");
+    }
+
+    void theAntennaPillNamesTheAntenna() {
+        RadioModel m;
+        SliceModel* s = m.sliceById(0);
+        if (!s) { s = m.sliceById(m.addSlice()); }
+        QVERIFY(s);
+        RxDashboard d;
+        d.bindSlice(s);
+
+        s->setRxAntenna(QStringLiteral("ANT2"));
+        StatusBadge* ant = d.badgeForRung(11);
+        QVERIFY(ant);
+        QCOMPARE(ant->label(), QStringLiteral("ANT2"));
     }
 
     // TX faltet NIE — es sagt, welche Scheibe sendet, und das ist eine

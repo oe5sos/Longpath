@@ -768,11 +768,22 @@ nereus_add_test(tst_rx_dsp_worker_buffer_sizing)
 # chunk, and an unbound stream processes nothing.
 nereus_add_test(tst_rx_dsp_worker_multi_slice)
 
-# ── Phase 3G-10 VFO DSP parity + AetherSDR flag port ─────────────────────
-nereus_add_test(tst_vfo_level_bar)
+
+# -- tst_vfo_level_bar ist am 2026-08-18 mit VfoLevelBar geloescht:
+#    der S-Meter-Balken der VFO-Flagge. Das Zeigerinstrument hat
+#    ihn abgeloest und holt seinen Wert ueber die Kennung
+#    MeterBinding::SignalAvg wie jede andere Groesse --
 nereus_add_test(tst_scrollable_label)
 nereus_add_test(tst_vfo_mode_containers)
-nereus_add_test(tst_vfo_tooltip_coverage)
+
+# -- Vier Faelle sind am 2026-08-18 mit der VFO-Flagge geloescht:
+#    tst_vfo_widget_snr, tst_vfo_widget_tx_badge_click,
+#    tst_vfo_tooltip_coverage, tst_pan_flag_positions. Sie prueften
+#    Anzeigen und Gesten der Flagge selbst. Was UEBERLEBEN musste,
+#    ist umgezogen statt geloescht: der Frequenz-Eingabeparser
+#    (tst_vfo_frequency_parser, 29 Faelle, jetzt gegen
+#    FrequencyInstrument) und die Faehigkeits-Gatterung der
+#    Antennenknoepfe (tst_ui_capability_gating, RxApplet-Haelfte) --
 
 # Regression test for issue #73 — VfoWidget frequency-entry parser
 nereus_add_test(tst_vfo_frequency_parser)
@@ -5604,20 +5615,6 @@ nereus_add_test(tst_slice_model_snr)
 # variants with mirrored 1700 Hz passbands.
 nereus_add_test(tst_dspmode_rade)
 
-# ── Phase 3R Task L1: VfoWidget SNR row ─────────────────────────────────────
-# Pins the contract that VfoWidget surfaces the active slice's snrDb
-# Q_PROPERTY (set by RadeChannel via I5 routing) as a dim-grey /
-# yellow / green text row, visible only when the slice's mode is
-# either RADE sideband (DSPMode::RADE_U or DSPMode::RADE_L).
-# NereusSDR-native UI extension; no upstream equivalent.
-# Cases:
-#   nanShowsDashesInGrey      - NaN -> " -   - " in #7a8088
-#   lowSnrShowsYellow         - 3.0 dB -> "+3 dB" in #e6c200
-#   goodSnrShowsGreen         - 12.0 dB -> "+12 dB" in #4caf50
-#   negativeSnrFormats        - -1.0 dB -> "-1 dB" (no double-sign)
-#   snrHiddenInNonRadeMode    - USB hides row; RADE_U shows it.
-#   snrVisibleInRadeLower     - RADE_L also shows the row.
-nereus_add_test(tst_vfo_widget_snr)
 
 # ── Phase 3R Task L2: RadeApplet ────────────────────────────────────────────
 # Pins the RadeApplet UI contract:
@@ -6330,13 +6327,6 @@ nereus_add_test(tst_status_toast_preserves_bottom_bar)
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-c-tx-arbiter-lifecycle-plan.md Task 7.
 nereus_add_test(tst_radio_model_slice_lifecycle)
 
-# Phase 3F Sub-Epic C Task 9: VfoWidget TX badge click emits
-# txHandoffRequested(sliceIndex). MainWindow forwards this signal to
-# RadioModel::txSliceArbiter()->requestHandoff() which performs the
-# MOX-safe TX-slice flip.
-# Source: NereusSDR-original (VfoWidget itself is NereusSDR-original).
-# Design: docs/architecture/2026-05-26-phase3f-sub-epic-c-tx-arbiter-lifecycle-plan.md Task 9.
-nereus_add_test(tst_vfo_widget_tx_badge_click)
 
 # Phase 3F Sub-Epic F Task 1: P2 composeCmdGeneral writes packetbuf[23]
 # wideband per-ADC enable mask per Thetis network.c:879 [v2.10.3.15].
@@ -6535,11 +6525,6 @@ nereus_add_test(tst_perf_monitor_ring)
 # active slice. The DSP menu used to write rxChannel(0) unconditionally.
 nereus_add_test(tst_dsp_menu_active_slice)
 
-# Phase 3F: a pan hosting several slices places each flag at its OWN slice
-# frequency. updateVfoPositions() derived one x from the pan's single m_vfoHz
-# and moved every flag to it, so co-hosted flags stacked on top of each other
-# and tracked whichever slice moved last. Bench-reported 2026-07-28.
-nereus_add_test(tst_pan_flag_positions)
 
 # Phase 3F: Qt does not constrain a plain Qt::Popup to the screen the way it
 # constrains QMenu, so the right-click waterfall panel opened below the bottom

@@ -85,6 +85,26 @@ public:
     void setForm(Form f);
     Form form() const { return m_form; }
 
+    // ── Eingetippte Frequenz deuten ──────────────────────────────────
+    //
+    // Am 2026-08-18 aus VfoWidget herausgeloest, wo der Parser als
+    // statische Methode stand und mit 24 Faellen geprueft war. Er MUSS
+    // die Flagge ueberleben: commitEdit() rief bis dahin ein blosses
+    // toDouble() und nahm MHz an — damit waere „7.230.000" still
+    // verworfen worden (zwei Punkte) und „7230" als 7230 MHz gelandet.
+    // Das ist wortwoertlich Fehlerbericht #73, den dieser Parser
+    // seinerzeit geschlossen hat.
+    //
+    // Deutet europaeische und amerikanische Tausendertrennung,
+    // Dezimalkomma und -punkt, ausgeschriebene und kurze Einheiten
+    // (MHz/kHz/Hz, M/k), gross wie klein. Liefert Hz, oder -1 wenn
+    // sich nichts Sinnvolles lesen laesst.
+    //
+    // KLEMMT NICHT: der Aufrufer entscheidet, was ausserhalb des
+    // Bereichs geschieht. Ein Parser, der klemmt, kann nicht mehr
+    // sagen, ob die Eingabe unsinnig oder nur ausserhalb war.
+    static double parseUserFrequency(const QString& raw);
+
     /// Die Ziffernzeile als Text, aus den echten Schildern in
     /// Layoutfolge gelesen. Fuer den Test, der die GRUPPIERUNG
     /// festnagelt und nicht nur den Wert — die beiden liefen am

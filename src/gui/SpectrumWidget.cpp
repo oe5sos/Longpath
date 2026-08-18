@@ -120,7 +120,6 @@
 #include "SpectrumOverlayMenu.h"
 #include "ImdOverlay.h"
 #include "spectrum/WaterfallTicker.h"
-#include "widgets/VfoWidget.h"
 #include "ColorSwatchButton.h"
 #include "core/AppSettings.h"
 #include "core/audio/RealtimeAudioPriority.h"
@@ -5349,7 +5348,7 @@ QRgb SpectrumWidget::waterfallColor(float dbm, float lowDbm, float highDbm,
 //
 // Filter edges come from the flag, not the pan, because filter width is per
 // slice: reusing the pan's pair would draw a 2.7 kHz SSB band around a 500 Hz
-// CW slice. VfoWidget already receives both values from its SliceModel
+// CW slice. Die Werte kommen aus SliceModel
 // (MainWindow::createSliceFlag seeds setFilter and re-pushes it on
 // filterChanged); it just discarded them before.
 //
@@ -5369,24 +5368,19 @@ SpectrumWidget::sliceMarkerGeometry() const
 {
     QVector<SliceMarkerGeometry> out;
 
-    if (m_vfoWidgets.isEmpty()) {
-        if (m_vfoHz > 0.0) {
-            out.append(SliceMarkerGeometry{m_vfoHz, m_filterLowHz,
-                                           m_filterHighHz, nullptr});
-        }
-        return out;
-    }
-
-    // QMap, so this walks slices in index order and the paint order is stable
-    // frame to frame rather than hash-dependent.
-    out.reserve(m_vfoWidgets.size());
-    for (auto it = m_vfoWidgets.constBegin(); it != m_vfoWidgets.constEnd(); ++it) {
-        const VfoWidget* flag = it.value();
-        if (!flag || flag->frequency() <= 0.0) {
-            continue;
-        }
-        out.append(SliceMarkerGeometry{flag->frequency(), flag->filterLow(),
-                                       flag->filterHigh(), flag});
+    // Bis 2026-08-18 kam eine Marke JE FLAGGE, mit Frequenz und
+    // Filterkanten aus der Flagge. Die Flaggen sind geloescht; es
+    // bleibt die Marke dieses Panadapters aus seinen eigenen Werten —
+    // genau der Zweig, der vorher fuer „noch keine Flagge angelegt"
+    // dastand.
+    //
+    // Fuer Phase 3F gehoert hier eine Marke je zugeordneter Scheibe
+    // her, aus SliceModel statt aus einem Widget. Das ist die bessere
+    // Quelle: eine Marke, die aus der Anzeige liest, kann nicht
+    // stimmen, wenn die Anzeige gerade nicht da ist.
+    if (m_vfoHz > 0.0) {
+        out.append(SliceMarkerGeometry{m_vfoHz, m_filterLowHz,
+                                       m_filterHighHz, nullptr});
     }
     return out;
 }
@@ -5466,8 +5460,9 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
 
     // VFO triangle marker — from AetherSDR line 3285-3293
     // Drawn below any VFO flag widget that may be positioned at the top.
-    // If a VfoWidget exists for this slice, draw triangle at the flag's bottom edge.
-    // Otherwise draw at spectrum top.
+    // Ohne Flagge sitzt es am oberen Spektrumsrand. Der Zweig fuer
+    // „haengt an der Unterkante einer Flagge" steht weiter unten und
+    // wartet auf das, was im Zielbild an ihre Stelle tritt.
     if (vfoX >= specRect.left() && vfoX <= specRect.right()) {
         static constexpr int kTriHalf = 6;
         static constexpr int kTriH = 10;
@@ -5475,10 +5470,10 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
         int triTop = specRect.top();
         // If VFO flag is present, position triangle below it.
         //
-        // THIS marker's flag, not m_vfoWidgets[0]. The slice-0 lookup was
-        // harmless while one marker was drawn per pan; with one per slice it
-        // would hang every triangle off slice A's flag height, which is only
-        // ever right by coincidence.
+        // DIESER Marke ihre Flagge, nicht die der Scheibe 0 — solange
+        // eine Marke je Panadapter gezeichnet wurde, war der Unterschied
+        // folgenlos; je Scheibe haengte er sonst jedes Dreieck an die
+        // Hoehe von Scheibe A.
         if (g.flag && g.flag->isVisible()) {
             triTop = g.flag->y() + g.flag->height();
         }
@@ -9604,61 +9599,24 @@ void SpectrumWidget::setCtunEnabled(bool enabled)
     scheduleSettingsSave();
 }
 
-VfoWidget* SpectrumWidget::addVfoWidget(int sliceIndex)
-{
-    if (m_vfoWidgets.contains(sliceIndex)) {
-        return m_vfoWidgets[sliceIndex];
-    }
+// Die Flaggenverwaltung (addVfoWidget / removeVfoWidget / vfoWidget /
+// raiseFrontVfoWidget) ist am 2026-08-18 mit der VFO-Flagge
+// weggefallen. Sie legte je Scheibe eine Flagge auf diesem
+// Panadapter an, hielt sie in m_vfoWidgets und hob die vorderste bei
+// jedem Bild nach oben.
 
-    auto* w = new VfoWidget(this);
-    w->setSliceIndex(sliceIndex);
-    m_vfoWidgets[sliceIndex] = w;
-    w->show();
-    w->raise();
-    return w;
-}
 
-void SpectrumWidget::removeVfoWidget(int sliceIndex)
-{
-    if (auto* w = m_vfoWidgets.take(sliceIndex)) {
-        // The flag's close / lock / record / play buttons are parented to THIS
-        // widget, not to the flag, so deleting the flag alone orphans them and
-        // they stay painted on the pan. Bench-caught 2026-07-26: creating and
-        // removing slices left a stack of dead button columns behind. Cleared
-        // here rather than in ~VfoWidget because doing it while both objects
-        // are alive keeps the destruction order ours (issue #113).
-        w->destroyFloatingButtons();
-        delete w;
-        update();
-    }
-}
 
-VfoWidget* SpectrumWidget::vfoWidget(int sliceIndex) const
-{
-    return m_vfoWidgets.value(sliceIndex, nullptr);
-}
-
-// See the header for the bench defect this closes (Sub-Epic J,
-// 2026-07-28). Immediate effect here is only half the fix -- see
-// raiseFrontVfoWidget(), which updateVfoPositions() also calls every frame
-// so the pin survives past the next position pass.
+// Die zweite Haelfte dieses Befunds (Sub-Epic J, 2026-07-28) war
+// raiseFrontVfoWidget: die vorderste Flagge musste bei jedem Bild
+// wieder nach oben, sonst ueberdeckte die naechste Positionsrunde sie.
+// Die Flaggen sind am 2026-08-18 geloescht; die vorderste Scheibe wird
+// weiter gefuehrt, weil das Malen sie braucht.
 void SpectrumWidget::setFrontSliceIndex(int sliceIndex)
 {
     m_frontSliceIndex = sliceIndex;
-    raiseFrontVfoWidget();
 }
 
-void SpectrumWidget::raiseFrontVfoWidget()
-{
-    VfoWidget* w = m_vfoWidgets.value(m_frontSliceIndex, nullptr);
-    if (!w) {
-        // No pin, or the pinned slice has no flag on THIS pan (a different
-        // pan hosts it, or this pan's flag has not been built yet) -- leave
-        // this pan's own order alone.
-        return;
-    }
-    w->raiseAboveSiblings();
-}
 
 void SpectrumWidget::updateVfoPositions()
 {
@@ -9694,41 +9652,16 @@ void SpectrumWidget::updateVfoPositions()
     //
     // A single-slice pan is unchanged: its one flag carries the same frequency
     // the pan does, so the x it lands on is identical to the pre-fix one.
-    for (auto it = m_vfoWidgets.begin(); it != m_vfoWidgets.end(); ++it) {
-        VfoWidget* vfo = it.value();
-        if (vfo->width() <= 0) {
-            vfo->adjustSize();
-        }
-        // Hide VFO flag when off-screen (SmartSDR pattern).
-        //
-        // Per flag, for the same reason as the placement above: the pan-level
-        // m_vfoOffScreen answers "is the PAN's VFO outside the window", which
-        // hid a perfectly on-window flag whenever some other slice on the same
-        // pan was tuned away. m_vfoOffScreen still drives the pan's own
-        // off-screen chevron (drawOffScreenIndicator) and is left alone.
-        const double flagHz = vfo->frequency();
-        if (flagHz < leftEdge || flagHz > rightEdge) {
-            vfo->hide();
-        } else {
-            // isHidden(), not isVisible(): a flag on a pan that has not been
-            // shown yet reads !isVisible() forever, which turned this into an
-            // unconditional show() on every pass.
-            if (vfo->isHidden()) {
-                vfo->show();
-            }
-            vfo->updatePosition(hzToX(flagHz, specRect), 0);
-            vfo->raise();
-        }
-    }
-
-    // The loop above just raised every visible flag once, in m_vfoWidgets'
-    // ascending slice-index order -- so without this, whichever slice has
-    // the HIGHEST index would land on top after every single frame,
-    // regardless of which one is active. Bench-reported 2026-07-28
-    // (Sub-Epic J): "slice A selected, slice B's flag covered A's, clipping
-    // A's frequency readout." Re-asserting the pin here, after the loop, is
-    // what makes it survive this pass instead of only the one it was set on.
-    raiseFrontVfoWidget();
+    // Hier stand die Positionsrunde ueber alle Flaggen: Breite
+    // nachziehen, ausblenden wenn ausserhalb des Fensters, sonst
+    // zeigen, an die Frequenz setzen und nach oben heben — und danach
+    // die vorderste noch einmal, damit nicht die hoechste Scheibenzahl
+    // jedes Bild gewinnt (Befund Sub-Epic J, 2026-07-28).
+    //
+    // Die Flaggen sind am 2026-08-18 geloescht. Was von der Funktion
+    // bleibt, ist die Rechnung darueber: sie fuehrt m_vfoOffScreen
+    // nach, und das treibt weiterhin den Auslaufpfeil am Rand
+    // (drawOffScreenIndicator).
 }
 
 // ---- Phase 3Q-8: disconnect overlay ----------------------------------------

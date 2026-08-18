@@ -791,13 +791,12 @@ set(GUI_SOURCES
     src/gui/widgets/StationPhoto.cpp
     src/gui/widgets/TriBtn.h
     src/gui/widgets/TriBtn.cpp
-    src/gui/widgets/VfoLevelBar.cpp
-    src/gui/widgets/VfoModeContainers.cpp
-    src/gui/widgets/VfoModeContainers.h
     src/gui/widgets/VaxChannelSelector.cpp
     src/gui/widgets/MasterOutputWidget.cpp
+    src/gui/widgets/VfoModeContainers.cpp
+    src/gui/widgets/VfoModeContainers.h
+    src/gui/widgets/SliceColors.h
     src/gui/widgets/VfoStyles.h
-    src/gui/widgets/VfoWidget.cpp
     src/gui/widgets/MetricLabel.cpp
     src/gui/widgets/MetricLabel.h
     src/gui/widgets/SystemTile.cpp

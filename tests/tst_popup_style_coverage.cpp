@@ -27,7 +27,9 @@ class TestPopupStyleCoverage : public QObject {
 private slots:
     void every_antenna_menu_uses_kPopupMenu() {
         const QStringList knownAntennaMenuSites = {
-            QStringLiteral("src/gui/widgets/VfoWidget.cpp"),
+            // VfoWidget.cpp stand hier, bis die VFO-Flagge am
+            // 2026-08-18 geloescht wurde. Die RxApplet ist jetzt die
+            // einzige Flaeche mit einem Antennenmenue.
             QStringLiteral("src/gui/applets/RxApplet.cpp"),
             // Add more when new antenna QMenu sites land.
         };

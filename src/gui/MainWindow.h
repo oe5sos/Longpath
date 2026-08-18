@@ -100,7 +100,6 @@ class WdspEngine;
 class FFTEngine;
 class SpectrumWidget;
 class SliceModel;
-class VfoWidget;
 // Phase 3F Sub-Epic D: forward declarations for the multi-pan layout
 // manager. Member m_panStack is introduced (nullptr) in Task 10/11 so the
 // +PAN affordance (a dropdown at the time; a drawn icon opening
@@ -195,8 +194,6 @@ public:
     static SliceModel* sliceForAddedIdForTest(RadioModel* model, int sliceId);
     static void applyAntennaChangeForTest(RadioModel* model, int sliceId,
                                           const QString& antennaName);
-    static void wireRadeFlagForTest(RadioModel* model, VfoWidget* flag,
-                                    int sliceId);
     static void configureSpectrumForPanForTest(SpectrumWidget* spectrum,
                                                 const QString& panId);
     static void wireWidebandExtensionForTest(SpectrumWidget* spectrum,
@@ -757,15 +754,6 @@ private:
 
     void wireSliceStatusOverlayTriggers(SliceModel* slice);
 
-    /// Phase 3F: create the VfoWidget for a secondary slice (B+) on the
-    /// given SpectrumWidget, push initial state, wire all intent + bidi
-    /// signals, and register it in m_vfoWidgetsBySlice. Returns the new
-    /// flag (or nullptr). Used both at sliceAdded and on panKeyChanged
-    /// migration so the wiring lives in one place. Slice A keeps its own
-    /// dedicated path in wireSliceToSpectrum(). Mirrors AetherSDR's
-    /// addVfoWidget()+wireVfoWidget() pair (MainWindow.cpp:11583 +
-    /// 13968 [@6a142807]).
-    class VfoWidget* createSliceFlag(SliceModel* slice, SpectrumWidget* sw);
 
     /// Phase 3F Sub-Epic D Task 16: clean disconnect-before-removal for pans
     /// (AetherSDR issue #242 pattern - avoids lambda crashes during teardown).
@@ -1159,18 +1147,10 @@ private:
     // controller from inside the widget (auto-wired via RadioModel).
     PsaIndicatorWidget* m_psaIndicator{nullptr};
 
-    // VFO flag widget (Phase 3E)
-    class VfoWidget* m_vfoWidget{nullptr};
-
-    // Phase 3F hotfix 2026-05-27: per-slice VfoWidget tracking. Slice 0
-    // (Slice A) maps to the existing m_vfoWidget for backward compat;
-    // additional slices created via +PAN / Ctrl+R get their own VfoWidget
-    // via SpectrumWidget::addVfoWidget(N) wired in the sliceAdded handler.
-    // Without this hash, multi-slice was invisible: the slice landed in
-    // the model and the codec recomputed the DDC assignment, but no flag
-    // appeared for the new slice and operators had no way to interact
-    // with it.
-    QHash<int, class VfoWidget*> m_vfoWidgetsBySlice;
+    // Die VFO-Flagge ist am 2026-08-18 geloescht (Zielbild Punkt 1).
+    // Hier standen m_vfoWidget und m_vfoWidgetsBySlice; die Notiz in
+    // MainWindow.cpp an der Stelle von createSliceFlag nennt, was
+    // wohin umgezogen ist.
 
     // Applets (Phase 3-UI)
     class AmpApplet*   m_ampApplet{nullptr};

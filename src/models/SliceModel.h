@@ -175,7 +175,7 @@ class SliceModel : public QObject {
     Q_PROPERTY(bool       txSlice      READ isTxSlice    NOTIFY txSliceChanged)
 
     // ── Phase 3F Sub-Epic A: multi-panadapter / multi-slice identity ────────────
-    // Phase 3F: per-slice letter identifier A-E. Drives badge color via VfoWidget::sliceColor().
+    // Phase 3F: per-slice letter identifier A-E. Drives badge color via sliceColor() (gui/widgets/SliceColors.h).
     // Read-only: derived from sliceIndex, so there is nothing to write and
     // nothing that can change independently of the slice's identity.
     Q_PROPERTY(QChar sliceLetter READ sliceLetter CONSTANT)

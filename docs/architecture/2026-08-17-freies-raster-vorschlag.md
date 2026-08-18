@@ -24,7 +24,9 @@
 
 1. Der **Panadapter ist selbst ein Feld**, mit seinen Werkzeugen in der
    eigenen Kopfleiste (Zoom, Geschwindigkeit, Mute, TX, Schloss,
-   Schließen). Die VFO-Flagge darüber fällt ersatzlos weg.
+   Schließen). Die VFO-Flagge darüber fällt ersatzlos weg —
+   **erledigt am 2026-08-18**, siehe §8. Das Feld selbst steht noch aus:
+   der Panadapter hängt weiter im `QSplitter` neben der Spalte.
 2. Der **Inhalt passt sich der Feldgröße an**, nicht nur der Rahmen.
 3. Das **+** legt neue Felder an.
 
@@ -323,3 +325,67 @@ nicht in denselben Schritt:
   *sichtbar*, nicht Felder *an*. `AppletGrid::addCell()` steht bereit;
   die Frage, was in ein frisch angelegtes leeres Feld hineinkommt,
   gehört zum Auswähler und nicht zum Raster.
+
+
+---
+
+## 8 · Die VFO-Flagge ist weg (2026-08-18)
+
+Punkt 1 des Zielbilds, erste Hälfte. Der Panadapter ist noch kein Feld,
+aber der schwebende Kasten darüber ist es nicht mehr.
+
+**Was umgezogen ist, mit eigenen Tests:**
+
+| von der Flagge | wohin |
+| --- | --- |
+| Frequenz mit Rad und Klick | `FrequencyInstrument` |
+| `parseUserFrequency` (29 Testfälle) | ebendort — **Fund**, siehe unten |
+| Lautstärke, Stumm, Binaural | `RxApplet` |
+| die sieben Rauschminderungen | `RxApplet` |
+| NB/NB2, SNB, ANF, APF + Hz | `RxApplet` |
+| die sieben NR-Schnellregler | `DspQuickPopups` — **Fund** |
+| S-Meter-Balken | Zeigerinstrument als Applet |
+| RADE-SNR | Kennung `MeterBinding::RadeSnr` |
+| Scheibenfarben A–D | `SliceColors.h` — **Fund** |
+| Antennen inkl. BYPS | `AntennaPopupBuilder` (war schon dort) |
+| X/RIT, VAX, TX, Antenne als Anzeige | Pillen in der unteren Leiste |
+
+**Drei Funde**, alle beim zeilenweisen Abgleich statt beim Bauen:
+
+1. **Der Schnellregler.** Rechtsklick auf eine Rauschminderung öffnete
+   auf der Flagge drei bis fünf Regler für *diese* Minderung; die
+   Setup-Seite war darin nur der Verweis ganz unten. Der erste Umzug
+   hatte den Verweis für das Ganze genommen. 28 der 30
+   `SliceModel`-Setzer, die die Flagge bediente, sind diese Regler.
+2. **`parseUserFrequency`.** 98 Zeilen, 29 Testfälle, schließt
+   Fehlerbericht #73 (europäische Tausendertrennung, Dezimalpunkt ohne
+   Einheit). `FrequencyInstrument::commitEdit` rief bis dahin ein
+   blosses `toDouble()` mit der Annahme MHz — „7.230.000" wäre still
+   verworfen worden, „7230" als 7230 MHz gelandet.
+3. **`sliceColor`.** Die vier Scheibenfarben standen als statische
+   Methode auf der Flagge und werden von der RxApplet geteilt.
+
+**Was ersatzlos fällt, benannt statt verschwiegen:** die Schnellwahl
+USB/CW/DIG (der volle Wähler bleibt), `recordToggled`/`playToggled`
+(waren an nichts verdrahtet), und sechs Signale des
+Mehrfach-Panadapters — Scheibe schließen, TX-Übergabe, Abtastrate,
+Filterpolitik, Scheibe entfernen, Antennenwahl je Scheibe.
+
+**Die offene Frage für Phase 3F**, hier vermerkt statt still gelassen:
+*die Flagge war die Bedienfläche einer zweiten Scheibe.* Ohne sie
+bedient die RxApplet immer die **aktive** Scheibe. Scheibe B braucht
+eine eigene Fläche — im Zielbild ein eigenes Feld im Raster, und damit
+genau das, wofür Schritt 3 die Spannweiten bringt.
+
+Ebenfalls für 3F: `SpectrumWidget::sliceMarkerGeometry` lieferte eine
+Marke **je Flagge**, mit Frequenz und Filterkanten aus dem Widget. Jetzt
+liefert es die eine Marke des Panadapters. Die richtige Quelle ist
+ohnehin `SliceModel`, nicht ein Widget — eine Marke, die aus der
+Anzeige liest, kann nicht stimmen, wenn die Anzeige gerade nicht da ist.
+
+**Rückgezogene Provenance mit Fundstelle:** vier Zeilen in
+`THETIS-PROVENANCE.md` (VfoWidget ×2, VfoModeContainers ×2) und eine im
+AetherSDR-Index. `verify-provenance-sync.py` kannte „zurückgezogen"
+nicht und hätte sie als verwaiste Zeilen gemeldet; es kennt den Fall
+jetzt — **und verlangt dabei einen Commit**: eine Rücknahme ohne
+Fundstelle ist keine Rücknahme, sondern ein Verlust mit Fußnote.

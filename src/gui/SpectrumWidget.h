@@ -195,7 +195,6 @@ namespace NereusSDR {
 
 class BandPlanManager;
 class SpectrumOverlayMenu;
-class VfoWidget;
 class ImdOverlay;  // Phase 3M-4 Task 12 — two-tone IMD overlay analytical core
 class WaterfallTicker;  // src/gui/spectrum/WaterfallTicker.h
 
@@ -1040,9 +1039,6 @@ public slots:
     int  stepSize() const { return m_stepHz; }
 
     // ---- VFO flag widgets (AetherSDR pattern) ----
-    VfoWidget* addVfoWidget(int sliceIndex);
-    void removeVfoWidget(int sliceIndex);
-    VfoWidget* vfoWidget(int sliceIndex) const;
     void updateVfoPositions();
 
     /// Pin sliceIndex's flag to the front of this pan's stacking order.
@@ -1081,7 +1077,12 @@ public:
         double centreHz{0.0};
         int    filterLowHz{0};
         int    filterHighHz{0};
-        const VfoWidget* flag{nullptr};
+        /// Frueher die VFO-Flagge, an deren Unterkante das Dreieck
+        /// haengt. Die Flaggen sind am 2026-08-18 geloescht; das Feld
+        /// bleibt als Anker fuer das, was im Zielbild an ihre Stelle
+        /// tritt — heute immer nullptr, dann sitzt das Dreieck am
+        /// oberen Spektrumsrand (der Rueckfall stand schon da).
+        const QWidget* flag{nullptr};
     };
 
     /// Every RX marker this pan must paint, one per hosted slice, in slice
@@ -2141,7 +2142,6 @@ private:
     int    m_panIndex{0};            // for per-pan settings keys
 
     // ---- VFO flag widgets ----
-    QMap<int, VfoWidget*> m_vfoWidgets;
 
     // Which slice's flag stays on top -- see setFrontSliceIndex(). -1 = no
     // pin; updateVfoPositions() falls back to its own ascending-index order.
@@ -2152,7 +2152,6 @@ private:
     // updateVfoPositions() pass, because that loop unconditionally raises
     // every visible flag once per frame and would otherwise undo the pin on
     // the very next frame.
-    void raiseFrontVfoWidget();
 
     // ---- CTUN mode ----
     bool   m_ctunEnabled{true};  // true = SmartSDR-style (pan independent of VFO)

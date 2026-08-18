@@ -134,7 +134,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/styles/PopupMenuStyle.h"
 #include "gui/widgets/FilterPassbandWidget.h"
-#include "gui/widgets/VfoWidget.h"  // VfoWidget::sliceColor — shared slice palette
+#include "gui/widgets/SliceColors.h"  // sliceColor — die eine Tabelle
 #include "models/PanadapterModel.h"
 #include "models/FilterPresetStore.h"
 #include "models/RadioModel.h"
@@ -1301,7 +1301,7 @@ void RxApplet::updateSliceButtons(const QVector<SliceModel*>& slices,
         m_sliceGroup->removeButton(btn);
         m_sliceGroup->addButton(btn, sliceIdx);
 
-        const QColor c = VfoWidget::sliceColor(sliceIdx);
+        const QColor c = sliceColor(sliceIdx);
         btn->setStyleSheet(Style::themed(QStringLiteral(
             "QToolButton { background: #2a2a2a; color: %1; border: 1px solid %1;"
             " border-radius: 6px; font-weight: bold; font-size: 10px; padding: 0; }"

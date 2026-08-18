@@ -13,7 +13,7 @@
 // them in step:
 //
 //   1. RadioModel::activeSlice() -- global, one per application. Every
-//      route the operator has for selecting a slice (a VfoWidget flag
+//      route the operator has for selecting a slice (bis 2026-08-18 eine VFO-Flagge
 //      press, an RxApplet slice tab, a band button) lands here.
 //
 //   2. PanadapterApplet::activeSliceIndex() -- per pan. This is what
@@ -48,7 +48,6 @@
 #include "gui/PanadapterStack.h"
 #include "gui/MainWindow.h"
 #include "gui/SpectrumWidget.h"
-#include "gui/widgets/VfoWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -86,7 +85,7 @@ private slots:
 
     // A(0) B(1) C(2), close B, and the list is [A(0), C(2)]: C sits at
     // position 1 while its id stays 2. Every per-slice UI surface carries the
-    // stable id -- VfoWidget::sliceActivationRequested emits the value
+    // stable id -- die Auswahl emittiert den Wert
     // createSliceFlag stamped from SliceModel::sliceIndex(), and
     // RxApplet::updateSliceButtons keys its button group the same way -- so
     // handing that id to the positional setter asked for position 2 of a
@@ -166,43 +165,6 @@ private slots:
         QCOMPARE(MainWindow::sliceForAddedIdForTest(&model, c->sliceIndex()), c);
     }
 
-    void rade_updates_are_scoped_to_the_matching_flag_id()
-    {
-        RadioModel model;
-        VfoWidget flagA;
-        VfoWidget flagC;
-        flagA.setSliceIndex(0);
-        flagC.setSliceIndex(2);
-        flagA.setRadeActive(true);
-        flagA.setRadeSnrLabel(-1.0f);
-        flagC.setRadeActive(true);
-        flagC.setRadeSnrLabel(-7.0f);
-
-        MainWindow::wireRadeFlagForTest(&model, &flagA, 0);
-        MainWindow::wireRadeFlagForTest(&model, &flagC, 2);
-
-        // Worum es in DIESEM Test geht, sagt sein Name: die Meldung fuer
-        // Scheibe 0 erreicht Fahne A und laesst Fahne C in Ruhe.
-        //
-        // Hier standen bis 2026-08-17 zwei Farbpruefungen (#505050 und
-        // "---"). Sie nagelten die Darstellung des ungerasteten
-        // Zustands fest und fielen um, als der Hausstil sie auf
-        // Geviertstrich und Beschriftungsfarbe zog -- ohne dass an der
-        // Zustellung der Meldung irgendetwas falsch gewesen waere.
-        // Geprueft wird jetzt die Zustellung: A verliert seinen
-        // Messwert, C behaelt seinen.
-        emit model.radeSyncChanged(0, false);
-        QVERIFY(flagA.snrLabelForTest()->text().contains(QStringLiteral("RADE")));
-        QVERIFY2(!flagA.snrLabelForTest()->text().contains(QStringLiteral("dB")),
-                 qPrintable(QStringLiteral("Fahne A ist nicht gerastet und "
-                                           "zeigt trotzdem einen Wert: %1")
-                                .arg(flagA.snrLabelForTest()->text())));
-        QVERIFY(flagC.snrLabelForTest()->text().contains(QStringLiteral("-7")));
-
-        emit model.radeFreqOffsetChanged(2, 125.0f);
-        QVERIFY(flagC.snrLabelForTest()->text().contains(QStringLiteral("+125Hz")));
-        QVERIFY(!flagA.snrLabelForTest()->text().contains(QStringLiteral("+125Hz")));
-    }
 
     void wideband_bins_are_fanned_to_every_pan()
     {
@@ -241,61 +203,6 @@ private slots:
         QCOMPARE(pan0->activeSliceIndex(), 1);
     }
 
-    // Fourth bench report on this same wiring, Sub-Epic J: "with Slice A
-    // selected, Slice B's flag covered A's, clipping A's frequency readout."
-    // hostingPanFollowsTheSelectedSlice above proves setActiveSliceOnHostingPan
-    // retargets the right pan's activeSliceIndex; this proves the SAME call,
-    // through the SAME production path (PanadapterStack::
-    // setActiveSliceOnHostingPan -> PanadapterApplet::setActiveSliceIndex ->
-    // SpectrumWidget::setFrontSliceIndex), also reorders that slice's REAL
-    // flag on the pan's REAL, owned SpectrumWidget -- the exact object
-    // MainWindow's activeSliceChanged lambda drives, nothing mirrored or
-    // stood in for it.
-    //
-    // Two earlier fixes on this branch shipped with passing tests and did
-    // not work on the bench because the real behaviour lived in an
-    // untestable MainWindow lambda. This pins the chain one layer below that
-    // lambda; the lambda itself is one line
-    // (m_panStack->setActiveSliceOnHostingPan(...)), covered by
-    // mirrorMainWindowSyncWire below.
-    void selectingASliceRaisesItsRealFlagOnTheHostingPan()
-    {
-        PanadapterStack stack;
-        PanadapterApplet* pan0 = stack.panadapter(QStringLiteral("pan-0"));
-        QVERIFY(pan0);
-
-        pan0->addSlice(0);
-        pan0->addSlice(1);
-
-        SpectrumWidget* spectrum = pan0->spectrumWidget();
-        QVERIFY(spectrum);
-        VfoWidget* flagA = spectrum->addVfoWidget(0);
-        VfoWidget* flagB = spectrum->addVfoWidget(1);
-        QVERIFY(flagA);
-        QVERIFY(flagB);
-        flagA->setFrequency(14'150'000.0);
-        flagB->setFrequency(14'250'000.0);
-
-        QWidget* parent = flagA->parentWidget();
-        QVERIFY(parent);
-
-        // Select B through the real production call.
-        stack.setActiveSliceOnHostingPan(1);
-        spectrum->updateVfoPositions();  // the render-frame pass that follows
-        QVERIFY2(parent->children().indexOf(flagB) > parent->children().indexOf(flagA),
-                 "selecting B must bring its real flag to the front");
-
-        // The operator's reported repro, one step further: select A back.
-        // A one-shot raise that does not survive updateVfoPositions() (which
-        // ran once already above, and runs again here) would leave B on top
-        // -- B has the higher slice index, which is what the loop falls back
-        // to on every pass with no pin held.
-        stack.setActiveSliceOnHostingPan(0);
-        spectrum->updateVfoPositions();
-        QVERIFY2(parent->children().indexOf(flagA) > parent->children().indexOf(flagB),
-                 "selecting A afterward must bring ITS real flag back to the "
-                 "front, even though B has the higher slice index");
-    }
 
     // The standing project rule is that a control drawn on a pan acts on that
     // pan. Selecting a slice must therefore retarget the pan that hosts it and
@@ -334,32 +241,6 @@ private slots:
 
     // ── Composition: selecting a flag retargets that pan's click-to-tune ───
 
-    // End to end from the signal the operator's click raises, with the
-    // MainWindow connect mirrored (see mirrorMainWindowSyncWire above).
-    // pan0->activeSliceIndex() is exactly what MainWindow::sliceForPan
-    // resolves before calling SliceModel::setFrequency, so asserting on it is
-    // asserting on which slice a click on the spectrum retunes.
-    void flagSelectionRetargetsClickToTuneOnThatPan()
-    {
-        RadioModel model;
-        model.configureStreamPool(5, 5, 192000);
-        PanadapterStack stack;
-        mirrorMainWindowSyncWire(model, stack);
-
-        PanadapterApplet* pan0 = stack.panadapter(QStringLiteral("pan-0"));
-        QVERIFY(pan0);
-
-        const int a = model.addSlice(QStringLiteral("pan-0"));
-        const int b = model.addSlice(QStringLiteral("pan-0"));
-        pan0->addSlice(a);
-        pan0->addSlice(b);
-        QCOMPARE(pan0->activeSliceIndex(), a);
-
-        // The operator presses flag B. VfoWidget emits its slice ID.
-        QVERIFY(model.setActiveSliceById(b));
-
-        QCOMPARE(pan0->activeSliceIndex(), b);
-    }
 
     // ── Migration: a pan must never point at a slice it no longer hosts ────
 

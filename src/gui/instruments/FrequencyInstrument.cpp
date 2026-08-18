@@ -311,16 +311,118 @@ void FrequencyInstrument::beginEdit()
     m_edit->setFocus();
 }
 
+double FrequencyInstrument::parseUserFrequency(const QString& raw)
+{
+    QString s = raw.trimmed();
+    if (s.isEmpty()) { return -1.0; }
+
+    // Detect and strip unit suffix (longest match first so "MHz" wins over "Hz").
+    double mult = 0.0;
+    bool hasUnit = false;
+    const auto tryStripSuffix = [&](const char* suffix, double m) {
+        if (s.endsWith(QLatin1String(suffix), Qt::CaseInsensitive)) {
+            s.chop(qstrlen(suffix));
+            mult = m;
+            hasUnit = true;
+            return true;
+        }
+        return false;
+    };
+    tryStripSuffix("MHz", 1e6)
+        || tryStripSuffix("kHz", 1e3)
+        || tryStripSuffix("Hz",  1.0)
+        || tryStripSuffix("M",   1e6)
+        || tryStripSuffix("K",   1e3);
+    s = s.trimmed();
+    if (s.isEmpty()) { return -1.0; }
+
+    const int nDots   = s.count(QLatin1Char('.'));
+    const int nCommas = s.count(QLatin1Char(','));
+
+    // Normalize separators. The goal: end up with at most one '.' as the
+    // decimal separator, with any grouping separators removed.
+    if (nDots >= 2 && nCommas == 0) {
+        // "7.230.000" (or with unit: "7.230.000 Hz") — dots are thousand
+        // separators. When no unit was given, default to Hz since that's
+        // the only sensible interpretation of a multi-dot number.
+        s.remove(QLatin1Char('.'));
+        if (!hasUnit) { mult = 1.0; }
+    } else if (nCommas >= 2 && nDots == 0) {
+        // "7,230,000" — US thousand-separated Hz value.
+        s.remove(QLatin1Char(','));
+        if (!hasUnit) { mult = 1.0; }
+    } else if (nDots > 0 && nCommas > 0) {
+        // Mixed: the last occurrence is the decimal, the rest are thousands.
+        // The presence of thousand separators means the user is writing a
+        // Hz value (e.g. "7,230,000.50"); no unit makes no other sense.
+        if (s.lastIndexOf(QLatin1Char('.')) > s.lastIndexOf(QLatin1Char(','))) {
+            s.remove(QLatin1Char(','));
+        } else {
+            s.remove(QLatin1Char('.'));
+            s.replace(QLatin1Char(','), QLatin1Char('.'));
+        }
+        if (!hasUnit) { mult = 1.0; }
+    } else if (nCommas == 1 && nDots == 0) {
+        // Single comma — ambiguous. If a unit suffix was already parsed, a
+        // three-digit tail is a US-style thousands separator
+        // (e.g. "7,230 kHz" → 7,230 kHz), anything else is EU decimal
+        // ("7,23 MHz" → 7.23 MHz). Without a unit, fall through to EU
+        // decimal — the historical behavior — because a bare "7,23" with
+        // no grouping context reads as a decimal in every locale that
+        // writes it that way.
+        const int commaIdx  = s.indexOf(QLatin1Char(','));
+        const int tailCount = s.size() - commaIdx - 1;
+        if (hasUnit && tailCount == 3) {
+            s.remove(QLatin1Char(','));
+        } else {
+            s.replace(QLatin1Char(','), QLatin1Char('.'));
+        }
+    }
+    // else: at most a single '.' (C-locale ready) or a plain integer.
+
+    bool ok = false;
+    const double v = s.toDouble(&ok);
+    if (!ok || v < 0.0) { return -1.0; }
+
+    if (mult != 0.0) {
+        return v * mult;
+    }
+
+    // Plain number, no unit, no grouping separators. Matches the Thetis
+    // MHz-decimal convention when a decimal point is present. For bare
+    // integers, pick the first unit (MHz → kHz → Hz) whose interpretation
+    // lies in the Red Pitaya tuning range — this rescues users who typed
+    // "7230" (intending kHz) or "7230000" (intending Hz) without guessing
+    // wrong like the prior heuristic did (issue #73).
+    constexpr double kMinHz = 100000.0;     // 100 kHz floor
+    constexpr double kMaxHz = 61440000.0;   // 61.44 MHz ceiling
+    const bool isDecimal = (nDots == 1);
+    if (isDecimal) {
+        return v * 1e6;  // Thetis convention: decimal number is MHz
+    }
+    const double asMHz = v * 1e6;
+    const double asKHz = v * 1e3;
+    const double asHz  = v;
+    if (asMHz >= kMinHz && asMHz <= kMaxHz) { return asMHz; }
+    if (asKHz >= kMinHz && asKHz <= kMaxHz) { return asKHz; }
+    if (asHz  >= kMinHz && asHz  <= kMaxHz) { return asHz;  }
+    // No interpretation in range: fall back to MHz; caller will clamp.
+    return asMHz;
+}
+
 void FrequencyInstrument::commitEdit()
 {
     m_stack->setCurrentWidget(m_digitRow);
-    bool ok = false;
-    const double mhz = m_edit->text().toDouble(&ok);
     // Unlesbares verwerfen und die alte Zahl stehen lassen. Eine
     // Frequenz, die aus einem Tippfehler entsteht, ist schlimmer als
     // eine, die sich nicht geaendert hat.
-    if (ok && mhz > 0.0) {
-        emit frequencyEdited(mhz * 1e6);
+    //
+    // Hier stand bis 2026-08-18 ein blosses toDouble() mit der Annahme
+    // MHz. Das haette „7.230.000" still verworfen und „7230" als
+    // 7230 MHz gelesen — Fehlerbericht #73 noch einmal.
+    const double hz = parseUserFrequency(m_edit->text());
+    if (hz > 0.0) {
+        emit frequencyEdited(hz);
     }
 }
 

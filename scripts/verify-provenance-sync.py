@@ -12,6 +12,7 @@ This script catches two classes of drift:
 Exit 0 on clean, 1 on any discrepancy.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -90,6 +91,8 @@ def parse_provenance_paths():
     declared = set()
     independent = set()
     path_linenos: dict[str, int] = {}
+    withdrawn: set[str] = set()
+    withdrawn_without_commit: list[tuple[str, int]] = []
 
     if not PROVENANCE.is_file():
         return declared, independent, path_linenos
@@ -135,11 +138,34 @@ def parse_provenance_paths():
         else:
             # For derivative section, extract from column 0 (index 0)
             candidate = first_cell.replace("`", "").strip()
-            if candidate:
-                declared.add(candidate)
-                path_linenos.setdefault(candidate, lineno)
+            if not candidate:
+                continue
 
-    return declared, independent, path_linenos
+            # ── Zurueckgezogene Zeilen ───────────────────────────────
+            #
+            # Eine geloeschte Datei laesst sich nicht einfach aus der
+            # Tabelle streichen: dann waere der Port nicht mehr
+            # auffindbar. Anweisung des Betreibers, 2026-08-18: „Die
+            # PROVENANCE-Zeile zurueckziehen, mit einer Notiz, unter
+            # welchem Commit die Datei zuletzt stand — damit der Port
+            # auffindbar bleibt."
+            #
+            # Eine Zeile, die ZURUECKGEZOGEN sagt, wird von der
+            # Auf-der-Platte-Pruefung ausgenommen — aber NUR, wenn sie
+            # auch einen Commit nennt. Eine Ruecknahme ohne Fundstelle
+            # ist keine Ruecknahme, sondern ein Verlust mit Fussnote,
+            # und faellt darum durch.
+            row = " ".join(cells)
+            if "ZURUECKGEZOGEN" in row:
+                if not re.search(r"`[0-9a-f]{7,40}`", row):
+                    withdrawn_without_commit.append((candidate, lineno))
+                withdrawn.add(candidate)
+                continue
+
+            declared.add(candidate)
+            path_linenos.setdefault(candidate, lineno)
+
+    return declared, independent, path_linenos, withdrawn, withdrawn_without_commit
 
 
 def main():
@@ -147,7 +173,8 @@ def main():
     ported_files = find_ported_files()
 
     # Find all declared files (both derivative and independent sections)
-    declared_files, independent_files, path_linenos = parse_provenance_paths()
+    (declared_files, independent_files, path_linenos,
+     withdrawn, withdrawn_without_commit) = parse_provenance_paths()
 
     # Files that are expected to be in PROVENANCE (either derived or independent)
     all_expected = declared_files | independent_files
@@ -155,7 +182,7 @@ def main():
     failures = 0
 
     # Check 1: ported files not in PROVENANCE
-    missing_from_provenance = ported_files - all_expected
+    missing_from_provenance = ported_files - all_expected - withdrawn
     for path in sorted(missing_from_provenance):
         failures += 1
         print(f"FAIL {path} — has 'Ported from' marker but not in PROVENANCE.md")
@@ -167,6 +194,25 @@ def main():
         failures += 1
         lineno = path_linenos.get(path, "?")
         print(f"FAIL THETIS-PROVENANCE.md:{lineno}  orphan row: {path!r} not on disk")
+
+    # Check 3: eine Ruecknahme ohne Fundstelle ist keine Ruecknahme
+    for path, lineno in withdrawn_without_commit:
+        failures += 1
+        print(f"FAIL THETIS-PROVENANCE.md:{lineno}  zurueckgezogene Zeile "
+              f"{path!r} nennt keinen Commit — ohne `<sha>` ist der Port "
+              f"nicht mehr auffindbar")
+
+    # Check 4: eine zurueckgezogene Datei, die es doch noch gibt
+    for path in sorted(withdrawn):
+        if (REPO / path).is_file():
+            failures += 1
+            lineno = path_linenos.get(path, "?")
+            print(f"FAIL THETIS-PROVENANCE.md:{lineno}  {path!r} ist als "
+                  f"ZURUECKGEZOGEN gefuehrt, liegt aber auf der Platte")
+
+    if withdrawn:
+        print(f"  hinweis: {len(withdrawn)} zurueckgezogene Zeile(n), "
+              f"je mit Commit-Fundstelle")
 
     # Summary
     total = len(ported_files)
