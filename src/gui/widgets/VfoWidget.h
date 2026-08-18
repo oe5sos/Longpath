@@ -626,13 +626,9 @@ private:
 
     // --- NR bank helpers (Sub-epic C-1, Tasks 14-15) ---
     void onActiveNrChanged(NereusSDR::NrSlot slot);
-    void showNr1Popup(const QPoint& globalPos);
-    void showNr2Popup(const QPoint& globalPos);
-    void showNr3Popup(const QPoint& globalPos);
-    void showNr4Popup(const QPoint& globalPos);
-    void showDfnrPopup(const QPoint& globalPos);
-    void showBnrPopup(const QPoint& globalPos);
-    void showMnrPopup(const QPoint& globalPos);
+    // Die sieben Schnellregler-Bauer stehen seit 2026-08-18 in
+    // gui/widgets/DspQuickPopups.{h,cpp} — sie muessen die Loeschung
+    // dieser Klasse ueberleben.
 
     // Guard to prevent signal re-emission during model updates
     bool m_updatingFromModel{false};

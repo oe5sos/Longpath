@@ -37,10 +37,12 @@
 
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QApplication>
 #include <QSlider>
 
 #include "core/WdspTypes.h"
 #include "gui/applets/RxApplet.h"
+#include "gui/widgets/DspParamPopup.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -212,14 +214,64 @@ private slots:
     // Rechtsklick fuehrt zu den Einstellungen. Ohne ihn waeren die
     // Regler nur noch ueber das Setup-Menue erreichbar.
 
-    void rightClickOnANoiseReductionAsksForItsSetupPage()
+    // ── DER FUND vom zeilenweisen Abgleich ───────────────────────────
+    //
+    // Der erste Umzug legte den Rechtsklick direkt auf die
+    // Einstellungsseite. Auf der Flagge oeffnet er aber die drei bis
+    // fuenf Regler DIESER Rauschminderung (DspParamPopup); die
+    // Einstellungsseite ist darin nur der Verweis „More Settings…"
+    // ganz unten. 28 der 30 SliceModel-Setzer, die die Flagge
+    // ueberhaupt bediente, sind genau diese Regler — mit der Flagge
+    // waeren sie unbedienbar geworden.
+    void rightClickOnANoiseReductionOpensItsQuickControls()
     {
         Harness h = make();
+        QPushButton* nr1 = button(*h.applet, QStringLiteral("NR1"));
+        QVERIFY(nr1);
+
+        emit nr1->customContextMenuRequested(QPoint(2, 2));
+
+        // Der Schnellregler ist ein eigenes Fenster mit Schiebern.
+        // Gesucht wird das Vorhandensein, nicht das Aussehen.
+        DspParamPopup* popup = nullptr;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (auto* p = qobject_cast<DspParamPopup*>(w)) { popup = p; }
+        }
+        if (!popup) {
+            popup = h.applet->findChild<DspParamPopup*>();
+        }
+        QVERIFY2(popup,
+                 "Rechtsklick oeffnet keinen Schnellregler — dann sind "
+                 "die NR-Parameter nach dem Loeschen der Flagge nur noch "
+                 "ueber das Setup-Menue erreichbar");
+        QVERIFY2(!popup->findChildren<QSlider*>().isEmpty(),
+                 "der Schnellregler hat keine Regler");
+        popup->hide();
+        popup->deleteLater();
+    }
+
+    // Und der Verweis darin fuehrt weiter auf die volle Seite — das
+    // war der Teil, den der erste Umzug als das Ganze genommen hatte.
+    void theQuickControlsStillLinkToTheFullSetupPage()
+    {
+        Harness h = make();
+        QSignalSpy spy(h.applet.get(), &RxApplet::openNrSetupRequested);
+
         QPushButton* nr3 = button(*h.applet, QStringLiteral("NR3"));
         QVERIFY(nr3);
-
-        QSignalSpy spy(h.applet.get(), &RxApplet::openNrSetupRequested);
         emit nr3->customContextMenuRequested(QPoint(2, 2));
+
+        DspParamPopup* popup = h.applet->findChild<DspParamPopup*>();
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (auto* p = qobject_cast<DspParamPopup*>(w)) { popup = p; }
+        }
+        QVERIFY(popup);
+        QPushButton* more = nullptr;
+        for (QPushButton* b : popup->findChildren<QPushButton*>()) {
+            if (b && b->text().contains(QStringLiteral("More"))) { more = b; }
+        }
+        QVERIFY2(more, "kein Verweis auf die volle Einstellungsseite");
+        more->click();
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).value<NrSlot>(), NrSlot::NR3);
     }

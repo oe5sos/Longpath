@@ -765,6 +765,8 @@ set(GUI_SOURCES
     src/gui/widgets/DexpPeakMeter.h
     src/gui/widgets/DexpPeakMeter.cpp
     src/gui/widgets/DspParamPopup.cpp
+    src/gui/widgets/DspQuickPopups.cpp
+    src/gui/widgets/DspQuickPopups.h
     src/gui/widgets/FilterPassbandWidget.cpp
     src/gui/widgets/FilterPresetEditDialog.cpp
     src/gui/widgets/GuardedComboBox.h

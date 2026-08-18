@@ -126,6 +126,7 @@
 #include "core/SkuUiProfile.h"
 #include "core/P2RadioConnection.h"
 #include "gui/AntennaPopupBuilder.h"
+#include "gui/widgets/DspQuickPopups.h"
 #include "core/RadioConnection.h"
 #include "core/StepAttenuatorController.h"
 #include "core/accessories/AlexController.h"
@@ -2115,8 +2116,21 @@ void RxApplet::wireInheritedRows()
             m_slice->setActiveNr(on ? slot : NrSlot::Off);
         });
         connect(b, &QWidget::customContextMenuRequested, this,
-                [this, slot](const QPoint&) {
-            emit openNrSetupRequested(slot);
+                [this, slot, b](const QPoint& pos) {
+            // ── Der Schnellregler, nicht die Einstellungsseite ──────
+            //
+            // Der erste Umzug (2026-08-18 vormittags) hatte den
+            // Rechtsklick direkt auf die Setup-Seite gelegt. Beim
+            // zeilenweisen Abgleich Flagge gegen RxApplet fiel auf:
+            // auf der Flagge oeffnet er die drei bis fuenf Regler
+            // DIESER Rauschminderung, und die Setup-Seite ist darin
+            // nur der Verweis ganz unten. 28 der 30 SliceModel-Setzer,
+            // die die Flagge bediente, sind genau diese Regler.
+            DspQuickPopup::showFor(this, m_slice, slot,
+                                   b->mapToGlobal(pos),
+                                   [this, slot]() {
+                                       emit openNrSetupRequested(slot);
+                                   });
         });
     }
     connect(m_anfBtn, &QPushButton::toggled, this, [this](bool on) {
