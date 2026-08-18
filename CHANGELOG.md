@@ -20,6 +20,45 @@
 - **TX self-monitor path hardening (2026-08-11).** MasterMixer opportunistic slots get an adaptive jitter cushion (doubles on starvation, bounded, never probed down) + seam fades; validated by an offline cadence simulation now in-tree as `tst_master_mixer_cadence` (six jitter/drift profiles, zero steady-state discontinuities asserted). Full narrative: `docs/architecture/2026-08-11-tx-monitor-audio-path.md`.
 - **Network path instrumentation + repair (2026-08-11, remote bench).** Socket-level sequence audits for the P2 mic stream (port 1026) and the DDC I/Q direction (5 s windows at qCInfo, clean heartbeat 1/min). New `MicReorderBuffer` between the mic decoder and the TX pump: speculative zero-latency reordering — late frames are slotted back into position (the dominant defect on routed/WLAN paths, ~0.2-0.5% of frames), true losses concealed by repeating the last 1.33 ms block. Measured live: every late frame rescued, zero out-of-order splices reach TX audio.
 
+### Removed (2026-08-18 — Entdoppelung der Bedienflächen)
+
+Zwei Flächen fallen ersatzlos weg, weil sie dieselbe Bedienung ein
+zweites Mal anboten. Beide Löschungen sind **absichtlich** und machen
+Einträge unter *Added* weiter oben teilweise ungültig — sie bleiben dort
+stehen, weil sie beschreiben, was in Phase 3F gebaut wurde, aber der
+Stand von heute ist dieser:
+
+- **Die VFO-Flagge (`VfoWidget`, `VfoLevelBar`) ist gelöscht.** Sie war
+  die letzte Fläche für sieben Bediengruppen, die damit fast still
+  mitgegangen wären — Lautstärke und Stumm eingeschlossen, weil ein
+  Kommentar in `RxApplet.cpp` eine „TitleBar master volume" als zweite
+  Fläche nannte, die es in NereusSDR nie gab. Alle sieben sind vorher in
+  die `RxApplet` gezogen und dort mit `tst_rx_applet_inherited`
+  festgenagelt.
+  - Damit hinfällig: **„VFO flag per-slice auto-creation"** (oben unter
+    *Added*) — es gibt keine Flagge mehr, die je Scheibe entstehen
+    könnte. Scheibe B braucht eine eigene Fläche; das ist Schritt 3 des
+    freien Rasters (Spannweiten).
+  - Ebenfalls betroffen: der **TX-Abzeichen-Klick** aus Sub-Epic C und
+    das **Rechtsklickmenü der Flagge** aus Sub-Epic E. Welche Scheibe
+    sendet, sagt jetzt die TX-Pille in der unteren Leiste.
+  - `parseUserFrequency` wandert mit nach `FrequencyInstrument` und
+    schließt dabei Fehlerbericht #73 an einer zweiten Stelle: die
+    Eingabe lief vorher durch ein blosses `toDouble()` mit der Annahme
+    MHz, womit `7.230.000` still verworfen und `7230` als 7230 MHz
+    gelandet wäre.
+- **`SMeterWidget` ist gelöscht.** Die analoge Anzeige stand doppelt: als
+  fester Kopf der Applet-Spalte und als Instrument im Raster. Die
+  2-kW-Skala für PGXL / RF-Kit gehört zur Leistungsanzeige und sitzt
+  jetzt in der `TxApplet`; die Empfangsskalen hängen an der
+  `InstrumentApplet`.
+- **Die drei modusabhängigen Gruppen** (FM-CTCSS, DIG-Versatz, RTTY
+  Mark/Shift) haben den Umzug überstanden, waren dabei aber für einen
+  Zwischenstand **unerreichbar**: `VfoModeContainers` baute weiter und
+  hatte eigene Tests, wurde aber von keiner Fläche mehr konstruiert. Sie
+  hängen jetzt in der `RxApplet`, und ein Test prüft die
+  *Erreichbarkeit*, nicht nur die Sichtbarkeitsregel.
+
 ### Changed
 
 - **MainWindow refactor**: m_spectrumWidget single-widget pointer replaced with m_panStack (PanadapterStack containing N PanadapterApplet instances). 125 call sites migrated to activeSpectrumWidget() helper for backward compatibility.
