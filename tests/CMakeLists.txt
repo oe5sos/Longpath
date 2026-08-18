@@ -4903,6 +4903,16 @@ nereus_add_test(tst_applet_detach)
 #    Widget -- sonst muesste die gespeicherte Anordnung zweimal wandern.
 nereus_add_test(tst_applet_grid)
 
+# -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
+#    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still
+#    mit, faende es niemand: es gibt keine Fehlermeldung fuer eine
+#    Bedienung, die es nicht mehr gibt, und die Pillen unten sind
+#    ANZEIGEN, keine Schalter. Besonders Lautstaerke und Stumm -- ohne
+#    sie haette das Programm weder das eine noch das andere, weil die
+#    „TitleBar master volume", auf die der alte Kommentar verwies, in
+#    NereusSDR nie gebaut wurde --
+nereus_add_test(tst_rx_applet_inherited)
+
 # -- Die Quellenliste der Instrumente und die Kennlinie der
 #    Empfangsskala. Der Kern ist die S-Stauchung, und zwar als
 #    STUETZSTELLEN: S0 auf 0, S9 auf 0,66, S9+60 auf 1. Eine

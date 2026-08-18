@@ -93,6 +93,22 @@ namespace MeterBinding {
     constexpr int SignalMaxBin = 7;    // Spectral peak bin
     constexpr int PbSnr        = 8;    // Peak-to-baseline SNR
 
+    // ── Zwei Groessen, die NICHT aus WDSP kommen (2026-08-18) ────────
+    //
+    // Sie standen bis dahin nur als Beschriftung an der analogen
+    // S-Meter-Anzeige im Panelkopf. Mit deren Wegfall brauchen sie eine
+    // Kennung wie jede andere Messgroesse — dann kann jedes Instrument
+    // sie waehlen, statt dass eine Anzeige sie als Sonderfall traegt.
+    // OE5SOS, 2026-08-18: „ebenfalls ein Messwert mit Skala — als
+    // Quelle ins Instrument, nicht als eigene Zeile irgendwo."
+    //
+    // Beide werden nicht gepollt, sondern EINGESPEIST: der Rauschflur
+    // von ClarityController::noiseFloorChanged, das RADE-SNR von
+    // RadioModel::radeSnrChanged. MeterPoller::feedReading nimmt sie
+    // entgegen und schickt sie denselben Weg wie einen Pollwert.
+    constexpr int NoiseFloor   = 9;    // ClarityController, dBm
+    constexpr int RadeSnr      = 10;   // RADE-Decoder, dB in 3 kHz
+
     // TX meters (100+). From Thetis MeterManager.cs Reading enum.
     // Stub values until TxChannel exists (Phase 3I-1).
     // PWR/SWR are hardware PA measurements, not WDSP meters.
@@ -255,6 +271,22 @@ signals:
     /// Gesendet aus dispatch(), also aus allen vier Verteilstellen
     /// (RX-Schleife, TX-Schleife, PA-Telemetrie, MMIO).
     void readingUpdated(int bindingId, double value);
+
+public slots:
+    /// Einen Messwert von aussen einspeisen.
+    ///
+    /// Fuer Groessen, die nicht aus WDSP gepollt werden koennen, weil
+    /// sie irgendwo im Baum ENTSTEHEN: der Rauschflur im
+    /// ClarityController, das RADE-SNR im Decoder. Sie gehen von hier
+    /// denselben Weg wie ein Pollwert — dispatch() an alle Ziele UND
+    /// readingUpdated.
+    ///
+    /// Warum ueber den Poller und nicht direkt ans Instrument: sonst
+    /// gaebe es zwei Wege, an einen Messwert zu kommen, und das
+    /// Instrument muesste wissen, welcher fuer welche Groesse gilt.
+    /// Genau diese Doppelung war am 2026-08-18 der Grund, warum „Max
+    /// Bin" nur ueber ein zweites Menue erreichbar war.
+    void feedReading(int bindingId, double value);
 
 private slots:
     void poll();

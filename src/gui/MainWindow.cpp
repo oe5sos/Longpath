@@ -4305,6 +4305,20 @@ void MainWindow::buildUI()
                                              : nullptr) {
             sm->setNoiseFloorDbm(nfDbm);
         }
+        // ── Zweitens als MESSGROESSE, nicht nur als Beschriftung ─────
+        //
+        // OE5SOS, 2026-08-18: „die Rauschflur-Beschriftung gehört zum
+        // Empfang, also ins Instrument als Quelle."
+        //
+        // Ueber den Poller, nicht direkt ans Instrument: sonst gaebe es
+        // zwei Wege, an einen Messwert zu kommen, und das Instrument
+        // muesste wissen, welcher fuer welche Groesse gilt. Genau diese
+        // Doppelung war der Grund, warum „Max Bin" nur ueber ein
+        // zweites Menue erreichbar war.
+        if (m_meterPoller) {
+            m_meterPoller->feedReading(MeterBinding::NoiseFloor,
+                                       static_cast<double>(nfDbm));
+        }
     });
 
     // RADE verdraengt den Rauschflur, solange es laeuft: beide
@@ -4315,6 +4329,16 @@ void MainWindow::buildUI()
             if (SMeterWidget* sm = m_appletPanel ? m_appletPanel->smeterWidget()
                                                  : nullptr) {
                 sm->setRadeSnrDb(snrDb);
+            }
+            // Auch das RADE-SNR ist ein Messwert mit Skala und gehoert
+            // als Quelle ins Instrument — der Bereich steht in
+            // ReadingSource, aus dem RADE-Quelltext gerechnet.
+            // PB SNR (MeterBinding::PbSnr) bleibt davon getrennt: das
+            // ist Spitze-zu-Grundlinie aus dem Spektrum, nicht die
+            // Schaetzung des RADE-Decoders.
+            if (m_meterPoller) {
+                m_meterPoller->feedReading(MeterBinding::RadeSnr,
+                                           static_cast<double>(snrDb));
             }
         });
     }
@@ -9495,9 +9519,39 @@ void MainWindow::wireSliceToSpectrum()
             dialog->show();
         });
 
-        // RxApplet openNbSetupRequested wiring removed 2026-04-22 —
-        // RxApplet no longer hosts any NB controls (strict Thetis parity).
-        // VfoWidget::openNbSetupRequested above handles the NB→Setup hop.
+        // ── Der Schnellregler-Rechtsklick (2026-08-18) ──────────────
+        //
+        // Hier stand seit dem 2026-04-22: „RxApplet openNbSetupRequested
+        // wiring removed — RxApplet no longer hosts any NB controls
+        // (strict Thetis parity). VfoWidget::openNbSetupRequested above
+        // handles the NB→Setup hop."
+        //
+        // Die Begruendung von damals setzt die Flagge voraus. Sie faellt
+        // ersatzlos weg (Zielbild Punkt 1), und von den drei Thetis-
+        // Flaechen blieben sonst zwei uebrig, die beide Einstellungen
+        // sind und keine Bedienung. Entscheidung des Betreibers am
+        // 2026-08-18: die Rauschminderung zieht mit.
+        //
+        // Wortgleich mit der Verdrahtung der Flagge weiter oben — es ist
+        // dieselbe Handlung, nur von einer anderen Flaeche aus.
+        connect(m_rxApplet, &RxApplet::openNbSetupRequested, this, [this]() {
+            auto* dialog = new SetupDialog(m_radioModel, this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            wireSetupDialog(dialog);
+            dialog->selectPage(QStringLiteral("NB/SNB"));
+            dialog->show();
+        });
+        connect(m_rxApplet, &RxApplet::openNrSetupRequested, this,
+                [this](NereusSDR::NrSlot slot) {
+            auto* dialog = new SetupDialog(m_radioModel, this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            wireSetupDialog(dialog);
+            dialog->selectPage(QStringLiteral("NR/ANF"));
+            if (auto* nrPage = dialog->findChild<NrAnfSetupPage*>()) {
+                nrPage->selectSubtab(slot);
+            }
+            dialog->show();
+        });
     }
 
     // --- PhoneCwApplet → Setup → Transmit → DEXP/VOX page (Phase 3M-3a-iii Task 15).

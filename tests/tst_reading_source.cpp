@@ -38,6 +38,8 @@
 
 #include <QtTest>
 
+#include <cmath>
+
 #include "gui/instruments/ReadingSource.h"
 #include "gui/meters/MeterPoller.h"
 
@@ -153,10 +155,13 @@ private slots:
                      qPrintable(QStringLiteral("Kennung %1 ohne Beschriftung")
                                     .arg(d.bindingId)));
         }
-        // 27 Größen — so viele standen in der längeren der beiden
-        // Auswahllisten, aus denen diese Tabelle hervorging
-        // (BaseItemEditor.cpp vor dem 2026-08-17).
-        QCOMPARE(allReadings().size(), 27);
+        // 27 Größen aus der längeren der beiden Auswahllisten, aus
+        // denen diese Tabelle hervorging (BaseItemEditor.cpp vor dem
+        // 2026-08-17), plus zwei, die dort nie standen: Rauschflur und
+        // RADE-SNR. Beide kommen nicht aus WDSP und lebten nur als
+        // Beschriftung an der analogen S-Meter-Anzeige; sie sind am
+        // 2026-08-18 Messgrössen mit eigener Kennung geworden.
+        QCOMPARE(allReadings().size(), 29);
     }
 
     void lookupFindsWhatIsThereAndNothingElse()
@@ -239,6 +244,101 @@ private slots:
         const ReadingDescriptor* d = readingFor(MeterBinding::SignalAvg);
         QVERIFY(d);
         QCOMPARE(d->thetisName(), QStringLiteral("Signal Average"));
+    }
+
+    // ── Die zwei Quellen, die nicht aus WDSP kommen ──────────────────
+    //
+    // OE5SOS, 2026-08-18: Rauschflur und RADE-SNR „als Quelle ins
+    // Instrument, nicht als eigene Zeile irgendwo". Beide standen
+    // vorher nur als Beschriftung an der analogen S-Meter-Anzeige.
+
+    void theNoiseFloorUsesThePanadaptersOwnRange()
+    {
+        const ReadingDescriptor* d = readingFor(MeterBinding::NoiseFloor);
+        QVERIFY(d);
+        QVERIFY2(d->hasScale, "ohne Skala bietet kein Instrument sie an");
+        // PanadapterModel.h:186-187 — dieselben Grenzen, in denen der
+        // Wert entsteht. Eine eigene Zahl hier waere eine zweite
+        // Behauptung ueber denselben Bereich.
+        QCOMPARE(d->min, -140.0);
+        QCOMPARE(d->max,  -40.0);
+        QVERIFY2(!d->threshold.has_value(),
+                 "ein hoher Rauschflur ist ein schlechter Standort, "
+                 "keine Gefahr");
+    }
+
+    // Auf der dBm-ACHSE, nicht auf der S-Skala. Ein Rauschflur ist kein
+    // Signal; die Stauchung ueber S9 saehe hier aus wie eine
+    // Eigenschaft des Rauschens.
+    void theNoiseFloorIsLinearNotSCompressed()
+    {
+        const ReadingDescriptor* d = readingFor(MeterBinding::NoiseFloor);
+        QVERIFY(d);
+        // Die Mitte des Bereichs liegt bei der Haelfte der Skala —
+        // das tut sie bei der S-Kennlinie gerade NICHT.
+        const double mid = (d->min + d->max) / 2.0;
+        QVERIFY(qAbs(d->fraction(mid) - 0.5) < 1e-9);
+
+        const ReadingDescriptor* sig = readingFor(MeterBinding::SignalAvg);
+        QVERIFY(sig);
+        const double sigMid = (sig->min + sig->max) / 2.0;
+        QVERIFY2(qAbs(sig->fraction(sigMid) - 0.5) > 0.01,
+                 "die Empfangsskala ist nicht mehr gestaucht — dann sagt "
+                 "der Vergleich oben nichts mehr aus");
+    }
+
+    // Der Bereich ist AUS DEM RADE-QUELLTEXT GERECHNET, nicht geraten:
+    // rade_ofdm.c:412-424 [@b289102] mit den Konstanten aus
+    // rade_dsp.h:59-65. Die Klemme snr_est <= 0 -> 0.1 in Zeile 413 ist
+    // der kleinste Wert, den der Schaetzer melden kann.
+    void theRadeSnrFloorComesFromTheEstimatorsOwnClamp()
+    {
+        const ReadingDescriptor* d = readingFor(MeterBinding::RadeSnr);
+        QVERIFY(d);
+        QVERIFY(d->hasScale);
+
+        // Die Rechnung nachvollzogen, damit der Test faellt, wenn
+        // jemand die Zahl ohne die Quelle aendert.
+        constexpr double kFs = 8000.0, kNc = 30.0, kM = 160.0, kNcp = 32.0;
+        const double snrEstFloor = 0.1;                     // Zeile 413
+        double dB = 10.0 * std::log10(snrEstFloor);
+        dB = (dB - 4.1343) / 0.7650;                        // Zeile 417-419
+        const double Rs = kFs / kM;
+        dB += 10.0 * std::log10(Rs * kNc / 3000.0)
+            + 10.0 * std::log10((kM + kNcp) / kM);          // Zeile 422-424
+
+        QVERIFY2(qAbs(dB - (-20.69)) < 0.02,
+                 qPrintable(QStringLiteral("die RADE-Rechnung ergibt %1 dB, "
+                                           "nicht -20.69").arg(dB)));
+        // Abgerundet, damit die Skala nicht bei einer krummen Zahl
+        // beginnt — aber NICHT darunter: ein Instrument, das mehr
+        // Skala zeigt, als die Quelle je erreicht, zeigt Bereich, den
+        // es nicht gibt.
+        QCOMPARE(d->min, -21.0);
+        QVERIFY(d->min <= dB);
+    }
+
+    // Die Grenze bei 5 dB (VfoWidget.cpp:930) ist UMGEKEHRT — klein ist
+    // schlecht —, und `threshold` heisst „darueber ist es eine
+    // Warnung". Sie hier einzutragen waere ein zweiter Begriff mit
+    // demselben Namen.
+    void theRadeSnrCarriesNoInvertedThreshold()
+    {
+        const ReadingDescriptor* d = readingFor(MeterBinding::RadeSnr);
+        QVERIFY(d);
+        QVERIFY(!d->threshold.has_value());
+    }
+
+    // PB SNR ist etwas anderes: Spitze-zu-Grundlinie aus dem Spektrum,
+    // nicht die Schaetzung des RADE-Decoders. Es bleibt getrennt.
+    void peakToBaselineSnrStaysSeparateFromRadeSnr()
+    {
+        const ReadingDescriptor* pb = readingFor(MeterBinding::PbSnr);
+        const ReadingDescriptor* rade = readingFor(MeterBinding::RadeSnr);
+        QVERIFY(pb);
+        QVERIFY(rade);
+        QVERIFY(pb->bindingId != rade->bindingId);
+        QVERIFY(pb->label != rade->label);
     }
 };
 

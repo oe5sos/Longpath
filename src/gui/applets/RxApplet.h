@@ -249,6 +249,14 @@ signals:
     // RxApplet::sliceActivationRequested (RxApplet.h:96 [@6a142807]).
     void sliceActivationRequested(int sliceIndex);
 
+    // ── Vom Erbe der Flagge (2026-08-18) ─────────────────────────────
+    //
+    // Der Schnellregler-Rechtsklick. MainWindow leitet ihn auf dieselbe
+    // Setup-Seite wie bisher — die Signale heissen darum wie die der
+    // Flagge, damit die Verdrahtung dort eine Zeile bleibt.
+    void openNrSetupRequested(NereusSDR::NrSlot slot);
+    void openNbSetupRequested();
+
 private:
     void buildUi();
     void connectSlice(SliceModel* s);
@@ -312,7 +320,53 @@ private:
     FilterPassbandWidget* m_filterPassband = nullptr;
 
     // ── Right column ──────────────────────────────────────────────────────
-    // Mute button removed §B4 bench review — VfoWidget + TitleBar are the 2 surfaces.
+
+    // ── Erbe der VFO-Flagge (2026-08-18) ─────────────────────────────
+    //
+    // Die Flagge faellt ersatzlos weg (Zielbild Punkt 1). Fuenf Gruppen
+    // lebten NUR dort und ziehen hierher; die Zaehlung davor steht im
+    // Sitzungsprotokoll und ergab: Filtervorwahlen, Panorama und
+    // Squelch NICHT (die stehen hier schon), diese fuenf schon.
+    //
+    // Lautstaerke und Stumm sind der siebte Verwaiste, den die erste
+    // Zaehlung uebersehen hatte. In RxApplet.cpp stand dazu:
+    //   „AF gain slider removed: TitleBar master volume + VfoWidget
+    //    per-slice AF control are the canonical 2 surfaces."
+    // Diese Kopfleiste mit Hauptlautstaerke GIBT ES IN NereusSDR NICHT
+    // — ein aus AetherSDR mitgewanderter Satz. Ohne die Flagge haette
+    // das Programm keine Lautstaerke und keine Stummschaltung gehabt.
+    QSlider*     m_afSlider    = nullptr;
+    QLabel*      m_afLabel     = nullptr;
+    QPushButton* m_muteBtn     = nullptr;
+    QPushButton* m_binBtn      = nullptr;
+
+    // Die sieben Rauschminderungen. Gegenseitig ausschliessend ueber
+    // SliceModel::setActiveNr — genau EINE laeuft, oder keine.
+    QPushButton* m_nr1Btn      = nullptr;
+    QPushButton* m_nr2Btn      = nullptr;
+    QPushButton* m_nr3Btn      = nullptr;
+    QPushButton* m_nr4Btn      = nullptr;
+    QPushButton* m_dfnrBtn     = nullptr;
+    QPushButton* m_bnrBtn      = nullptr;
+    QPushButton* m_mnrBtn      = nullptr;
+
+    // NB (dreistufig: Aus / NB / NB2), SNB, ANF, APF samt Abstimmung.
+    QPushButton* m_nbBtn       = nullptr;
+    QPushButton* m_snbBtn      = nullptr;
+    QPushButton* m_anfBtn      = nullptr;
+    QPushButton* m_apfBtn      = nullptr;
+    QSlider*     m_apfSlider   = nullptr;
+    QLabel*      m_apfLabel    = nullptr;
+
+    /// Alle NR-Knoepfe in Reihenfolge, fuer das Nachfuehren aus dem
+    /// Modell. Eine Liste statt sieben Zeilen: sieben Zeilen laufen
+    /// auseinander, sobald eine achte dazukommt.
+    QList<QPushButton*> nrButtons() const;
+
+    void buildInheritedRows(class QVBoxLayout* col);
+    void wireInheritedRows();
+    void syncInheritedFromSlice();
+
     // Control 13: Audio pan
     QSlider*     m_panSlider   = nullptr;
 

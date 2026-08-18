@@ -201,6 +201,25 @@ RxApplet::RxApplet(SliceModel* slice, RadioModel* model, QWidget* parent)
         });
     }
 
+    // ── Die Scheibe aus dem Konstruktor anschliessen ─────────────────
+    //
+    // Sie wurde bis 2026-08-18 nur ZUGEWIESEN (m_slice(slice) oben),
+    // nie verbunden: connectSlice lief allein ueber setSlice(), und das
+    // kehrt bei gleicher Scheibe frueh zurueck. Eine RxApplet, die ihre
+    // Scheibe im Konstruktor bekommt, hat ihr also nie zugehoert — jede
+    // Aenderung von aussen ging an der Anzeige vorbei.
+    //
+    // Gefunden vom Test zum Erbe der Flagge: NR1 an, dann NR2, und auf
+    // dem Schirm leuchteten beide. Bis dahin fiel es nicht auf, weil in
+    // MainWindow ohnehin setSlice() folgte; sobald die RxApplet aber
+    // die einzige Flaeche fuer die Rauschminderung ist, ist es der
+    // Unterschied zwischen „schaltet" und „schaltet und zeigt es".
+    //
+    // Doppelt verbunden wird dabei nichts: setSlice() kehrt bei
+    // derselben Scheibe frueh zurueck, und bei einer anderen laeuft
+    // disconnectSlice() zuerst.
+    connectSlice(m_slice);
+
     syncFromModel();
 }
 
@@ -548,11 +567,19 @@ void RxApplet::buildUi()
     auto* rightCol = new QVBoxLayout;
     rightCol->setSpacing(2);
 
-    // Mute button removed: VfoWidget + TitleBar are the 2 canonical surfaces.
     // AGC-T container placed here after AGC combo is constructed below.
     // (§B4 ui-polish-cross-surface — bench feedback Plan 3 review)
-    // AF gain slider removed: TitleBar master volume + VfoWidget per-slice
-    // AF control are the canonical 2 surfaces (§B4 ui-polish-cross-surface).
+    //
+    // Die zwei Saetze darueber standen hier bis 2026-08-18 und lauteten
+    // „Mute button removed: VfoWidget + TitleBar are the 2 canonical
+    // surfaces" und „AF gain slider removed: TitleBar master volume +
+    // VfoWidget per-slice AF control are the canonical 2 surfaces".
+    // Beide nannten eine KOPFLEISTE MIT HAUPTLAUTSTAERKE, die es in
+    // NereusSDR nie gegeben hat — ein aus AetherSDR mitgewanderter
+    // Satz. Faktisch war die Flagge die einzige Flaeche; mit ihrem
+    // Wegfall haette das Programm weder Lautstaerke noch Stumm gehabt.
+    // Beide stehen jetzt hier, siehe buildInheritedRows().
+    buildInheritedRows(rightCol);
 
     // Control 13: Audio pan slider — L ←→ R, center = 50
     // Wired to SliceModel::setAudioPan() — §B4 ui-polish-cross-surface.
@@ -1004,8 +1031,11 @@ void RxApplet::buildUi()
     m_filterWidthLbl->setToolTip(QStringLiteral("Current filter passband width"));
     // NereusSDR native — Thetis uses discrete radio buttons per mode
     m_modeCombo->setToolTip(QStringLiteral("Select operating mode"));
-    // m_muteBtn removed §B4 bench review — VfoWidget + TitleBar are the 2 surfaces.
-    // m_afSlider removed in §B4 — TitleBar master + VfoWidget AF are the 2 surfaces.
+    // m_muteBtn und m_afSlider sind 2026-08-18 zurueckgekommen — die
+    // Kopfleiste mit Hauptlautstaerke, auf die die alten Kommentare
+    // hier verwiesen, hat es in NereusSDR nie gegeben. Ihre Hinweise
+    // stehen bei ihrem Aufbau in buildInheritedRows().
+    wireInheritedRows();
     // From Thetis console.resx:4554 — comboAGC.ToolTip
     m_agcCombo->setToolTip(QStringLiteral("Automatic Gain Control Mode Setting"));
     // From Thetis console.resx:8397 — ptbRF.ToolTip (ptbRF is the AGC-T slider)
@@ -1336,6 +1366,10 @@ void RxApplet::syncFromModel()
 
     m_updatingFromModel = true;
 
+    // Das Erbe der Flagge zuerst — es haengt an nichts, was darunter
+    // steht, und faellt so beim Lesen nicht zwischen die Zeilen.
+    syncInheritedFromSlice();
+
     // Mode combo
     {
         const QString name = SliceModel::modeName(m_slice->dspMode());
@@ -1431,6 +1465,33 @@ void RxApplet::syncFromModel()
 void RxApplet::connectSlice(SliceModel* s)
 {
     if (!s) { return; }
+
+    // ── Das Erbe der Flagge folgt dem Modell ─────────────────────────
+    //
+    // Ohne diese Zeilen setzt ein Klick zwar das Modell, aber die
+    // uebrigen Knoepfe bleiben stehen, wie sie standen. Bei der
+    // Rauschminderung faellt das sofort auf: NR1 an, dann NR2 — das
+    // Modell fuehrt NR2, auf dem Schirm leuchten beide. Die Auswahl ist
+    // gegenseitig ausschliessend, also muss das Ausschliessen auch zu
+    // sehen sein.
+    //
+    // Ein Sammelanschluss statt sieben einzelner: die Aenderung EINER
+    // Groesse zieht ohnehin alle Knoepfe des Erbes nach, und sieben
+    // Verbindungen, die dasselbe tun, laufen irgendwann auseinander.
+    const auto refresh = [this]() {
+        m_updatingFromModel = true;
+        syncInheritedFromSlice();
+        m_updatingFromModel = false;
+    };
+    connect(s, &SliceModel::activeNrChanged,        this, refresh);
+    connect(s, &SliceModel::anfEnabledChanged,      this, refresh);
+    connect(s, &SliceModel::nbModeChanged,          this, refresh);
+    connect(s, &SliceModel::snbEnabledChanged,      this, refresh);
+    connect(s, &SliceModel::apfEnabledChanged,      this, refresh);
+    connect(s, &SliceModel::apfTuneHzChanged,       this, refresh);
+    connect(s, &SliceModel::afGainChanged,          this, refresh);
+    connect(s, &SliceModel::mutedChanged,           this, refresh);
+    connect(s, &SliceModel::binauralEnabledChanged, this, refresh);
 
     // Mode change → update combo + filter grid + passband widget
     connect(s, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
@@ -1837,5 +1898,300 @@ QString RxApplet::attLabelTextForTest() const
     return m_attLabel ? m_attLabel->text() : QString();
 }
 #endif
+
+// ═══════════════════════════════════════════════════════════════════════
+// Erbe der VFO-Flagge (2026-08-18)
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Die Flagge faellt ersatzlos weg. Gezaehlt wurde vorher, wie es der
+// Betreiber verlangt hat („Wenn eine der sechs nach dem Umzug in der
+// RxApplet doppelt dasteht, sag es vorher"). Ergebnis:
+//
+//   schon hier, zieht NICHT um   Filtervorwahlen samt Shift→TX,
+//                                Panorama, Squelch
+//   zieht um                     Lautstaerke + Stumm, Binaural,
+//                                die sieben Rauschminderungen,
+//                                NB/SNB/ANF/APF, der Schnellregler
+//
+// EINE UMKEHR, ausdruecklich benannt: bis zum 2026-04-22 stand hier
+//
+//   „NB controls intentionally absent from RxApplet per strict Thetis
+//    parity: Thetis never puts NB controls on a per-slice applet. The
+//    valid Thetis surfaces are (1) chkNB tri-state on the VFO flag,
+//    (2) Setup → DSP → NB/SNB, (3) the DSP menu bar."
+//
+// Die Begruendung von damals setzt die Flagge voraus. Ohne sie bleiben
+// von den drei genannten Flaechen zwei uebrig, und beide sind
+// Einstellungen, keine Bedienung. Der Betreiber hat die Umkehr am
+// 2026-08-18 entschieden: „Die Rauschminderung verlieren wäre ein
+// Rückschritt, den ich nie bestellt habe."
+
+QList<QPushButton*> RxApplet::nrButtons() const
+{
+    return {m_nr1Btn, m_nr2Btn, m_nr3Btn, m_nr4Btn,
+            m_dfnrBtn, m_bnrBtn, m_mnrBtn};
+}
+
+void RxApplet::buildInheritedRows(QVBoxLayout* col)
+{
+    // ── Lautstaerke · Stumm · Binaural ───────────────────────────────
+    {
+        auto* cap = new QLabel(QStringLiteral("LAUTSTÄRKE"), this);
+        cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
+        cap->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; }").arg(Style::kTextScale)));
+        col->addWidget(cap);
+
+        auto* row = new QHBoxLayout;
+        row->setSpacing(4);
+
+        auto* lbl = new QLabel(QStringLiteral("AF"), this);
+        lbl->setFixedWidth(24);
+        lbl->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary)));
+        row->addWidget(lbl);
+
+        m_afSlider = new QSlider(Qt::Horizontal, this);
+        m_afSlider->setRange(0, 100);
+        m_afSlider->setValue(50);
+        m_afSlider->setFixedHeight(18);
+        m_afSlider->setStyleSheet(Style::sliderHStyle());
+        m_afSlider->setToolTip(QStringLiteral(
+            "Receiver audio level for this slice"));
+        row->addWidget(m_afSlider, 1);
+
+        m_afLabel = new QLabel(QStringLiteral("50"), this);
+        m_afLabel->setFixedWidth(24);
+        m_afLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_afLabel->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextPrimary)));
+        row->addWidget(m_afLabel);
+
+        m_muteBtn = greenToggle(QStringLiteral("MUTE"), 46, 20);
+        m_muteBtn->setToolTip(QStringLiteral("Silence this slice"));
+        row->addWidget(m_muteBtn);
+
+        m_binBtn = greenToggle(QStringLiteral("BIN"), 40, 20);
+        m_binBtn->setToolTip(QStringLiteral(
+            "Binaural audio — spreads the passband across the stereo image"));
+        row->addWidget(m_binBtn);
+
+        col->addLayout(row);
+    }
+
+    // ── Rauschminderung ──────────────────────────────────────────────
+    //
+    // Zwei Reihen zu vier, wie im Zielbild. Die sieben schliessen sich
+    // gegenseitig aus: setActiveNr(slot) oder setActiveNr(Off).
+    {
+        auto* cap = new QLabel(QStringLiteral("RAUSCHMINDERUNG"), this);
+        cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
+        cap->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; }").arg(Style::kTextScale)));
+        col->addWidget(cap);
+
+        auto make = [this](const QString& text, const QString& tip) {
+            QPushButton* b = greenToggle(text, -1, 20);
+            b->setToolTip(tip);
+            b->setContextMenuPolicy(Qt::CustomContextMenu);
+            return b;
+        };
+
+        m_nr1Btn  = make(QStringLiteral("NR1"),
+                         QStringLiteral("Adaptive noise reduction (ANR)"));
+        m_nr2Btn  = make(QStringLiteral("NR2"),
+                         QStringLiteral("Spectral noise reduction (EMNR)"));
+        m_nr3Btn  = make(QStringLiteral("NR3"),
+                         QStringLiteral("Neural noise reduction (RNNoise)"));
+        m_nr4Btn  = make(QStringLiteral("NR4"),
+                         QStringLiteral("Spectral-bleach noise reduction"));
+        m_dfnrBtn = make(QStringLiteral("DFNR"),
+                         QStringLiteral("DeepFilterNet3 noise reduction"));
+        m_bnrBtn  = make(QStringLiteral("BNR"),
+                         QStringLiteral("Bandpass noise reduction"));
+        m_mnrBtn  = make(QStringLiteral("MNR"),
+                         QStringLiteral("MMSE-Wiener noise reduction"));
+
+        auto* r1 = new QHBoxLayout; r1->setSpacing(4);
+        for (QPushButton* b : {m_nr1Btn, m_nr2Btn, m_nr3Btn, m_nr4Btn}) {
+            r1->addWidget(b);
+        }
+        col->addLayout(r1);
+
+        auto* r2 = new QHBoxLayout; r2->setSpacing(4);
+        for (QPushButton* b : {m_dfnrBtn, m_bnrBtn, m_mnrBtn}) {
+            r2->addWidget(b);
+        }
+        m_anfBtn = greenToggle(QStringLiteral("ANF"), -1, 20);
+        m_anfBtn->setToolTip(QStringLiteral(
+            "Automatic notch filter — removes steady carriers"));
+        m_anfBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        r2->addWidget(m_anfBtn);
+        col->addLayout(r2);
+    }
+
+    // ── NB · SNB · APF ───────────────────────────────────────────────
+    {
+        auto* cap = new QLabel(QStringLiteral("NB / SNB / APF"), this);
+        cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
+        cap->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; }").arg(Style::kTextScale)));
+        col->addWidget(cap);
+
+        auto* row = new QHBoxLayout; row->setSpacing(4);
+
+        // Dreistufig, nicht an/aus: Aus → NB → NB2 → Aus. Die
+        // Beschriftung sagt, was LAEUFT, nicht was ein Klick tut.
+        m_nbBtn = greenToggle(QStringLiteral("NB"), 46, 20);
+        m_nbBtn->setCheckable(false);   // der Zustand steht im Text
+        m_nbBtn->setToolTip(QStringLiteral(
+            "Noise blanker — click cycles Off / NB / NB2. "
+            "Right-click opens the NB/SNB setup page."));
+        m_nbBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        row->addWidget(m_nbBtn);
+
+        m_snbBtn = greenToggle(QStringLiteral("SNB"), 46, 20);
+        m_snbBtn->setToolTip(QStringLiteral("Spectral noise blanker"));
+        m_snbBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        row->addWidget(m_snbBtn);
+
+        m_apfBtn = greenToggle(QStringLiteral("APF"), 46, 20);
+        m_apfBtn->setToolTip(QStringLiteral(
+            "Audio peaking filter — narrow peak for CW"));
+        m_apfBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        row->addWidget(m_apfBtn);
+
+        m_apfSlider = new QSlider(Qt::Horizontal, this);
+        m_apfSlider->setRange(-500, 500);
+        m_apfSlider->setValue(0);
+        m_apfSlider->setFixedHeight(18);
+        m_apfSlider->setStyleSheet(Style::sliderHStyle());
+        m_apfSlider->setToolTip(QStringLiteral("APF centre offset (Hz)"));
+        row->addWidget(m_apfSlider, 1);
+
+        m_apfLabel = new QLabel(QStringLiteral("0 Hz"), this);
+        m_apfLabel->setFixedWidth(44);
+        m_apfLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_apfLabel->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary)));
+        row->addWidget(m_apfLabel);
+
+        col->addLayout(row);
+    }
+}
+
+void RxApplet::wireInheritedRows()
+{
+    // Lautstaerke
+    connect(m_afSlider, &QSlider::valueChanged, this, [this](int v) {
+        if (m_afLabel) { m_afLabel->setText(QString::number(v)); }
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setAfGain(v);
+    });
+    connect(m_muteBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setMuted(on);
+    });
+    connect(m_binBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setBinauralEnabled(on);
+    });
+
+    // Rauschminderung — gegenseitig ausschliessend. Ein zweiter Klick
+    // auf den laufenden schaltet ihn ab; das ist der einzige Weg zu
+    // „keine", ohne einen achten Knopf „AUS" zu bauen.
+    // NICHT `slots` nennen: das ist Qts Makro-Schluesselwort, und der
+    // Uebersetzer meldet dann „expected unqualified-id" an einer Stelle,
+    // an der nichts falsch aussieht.
+    const QList<NrSlot> nrSlots = {NrSlot::NR1, NrSlot::NR2, NrSlot::NR3,
+                                   NrSlot::NR4, NrSlot::DFNR, NrSlot::BNR,
+                                   NrSlot::MNR};
+    const QList<QPushButton*> btns = nrButtons();
+    for (int i = 0; i < btns.size(); ++i) {
+        QPushButton* b = btns.at(i);
+        const NrSlot slot = nrSlots.at(i);
+        connect(b, &QPushButton::toggled, this, [this, slot](bool on) {
+            if (m_updatingFromModel || !m_slice) { return; }
+            m_slice->setActiveNr(on ? slot : NrSlot::Off);
+        });
+        connect(b, &QWidget::customContextMenuRequested, this,
+                [this, slot](const QPoint&) {
+            emit openNrSetupRequested(slot);
+        });
+    }
+    connect(m_anfBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setAnfEnabled(on);
+    });
+
+    // NB dreistufig
+    connect(m_nbBtn, &QPushButton::clicked, this, [this]() {
+        if (!m_slice) { return; }
+        switch (m_slice->nbMode()) {
+        case NbMode::Off: m_slice->setNbMode(NbMode::NB);  break;
+        case NbMode::NB:  m_slice->setNbMode(NbMode::NB2); break;
+        default:          m_slice->setNbMode(NbMode::Off); break;
+        }
+    });
+    connect(m_nbBtn, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint&) { emit openNbSetupRequested(); });
+    connect(m_snbBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setSnbEnabled(on);
+    });
+    connect(m_snbBtn, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint&) { emit openNbSetupRequested(); });
+    connect(m_apfBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setApfEnabled(on);
+    });
+    connect(m_apfSlider, &QSlider::valueChanged, this, [this](int hz) {
+        if (m_apfLabel) {
+            m_apfLabel->setText(QStringLiteral("%1 Hz").arg(hz));
+        }
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setApfTuneHz(hz);
+    });
+}
+
+void RxApplet::syncInheritedFromSlice()
+{
+    if (!m_slice) { return; }
+    // m_updatingFromModel setzt der Aufrufer — syncFromModel() haelt
+    // die Sperre ueber den ganzen Durchlauf, damit kein Setzer ein
+    // Signal ausloest, das denselben Wert zurueckschreibt.
+    if (m_afSlider) { m_afSlider->setValue(m_slice->afGain()); }
+    if (m_afLabel)  { m_afLabel->setText(QString::number(m_slice->afGain())); }
+    if (m_muteBtn)  { m_muteBtn->setChecked(m_slice->muted()); }
+    if (m_binBtn)   { m_binBtn->setChecked(m_slice->binauralEnabled()); }
+
+    const NrSlot active = m_slice->activeNr();
+    // NICHT `slots` nennen: das ist Qts Makro-Schluesselwort, und der
+    // Uebersetzer meldet dann „expected unqualified-id" an einer Stelle,
+    // an der nichts falsch aussieht.
+    const QList<NrSlot> nrSlots = {NrSlot::NR1, NrSlot::NR2, NrSlot::NR3,
+                                   NrSlot::NR4, NrSlot::DFNR, NrSlot::BNR,
+                                   NrSlot::MNR};
+    const QList<QPushButton*> btns = nrButtons();
+    for (int i = 0; i < btns.size() && i < nrSlots.size(); ++i) {
+        if (btns.at(i)) { btns.at(i)->setChecked(active == nrSlots.at(i)); }
+    }
+    if (m_anfBtn) { m_anfBtn->setChecked(m_slice->anfEnabled()); }
+
+    if (m_nbBtn) {
+        switch (m_slice->nbMode()) {
+        case NbMode::NB:  m_nbBtn->setText(QStringLiteral("NB"));  break;
+        case NbMode::NB2: m_nbBtn->setText(QStringLiteral("NB2")); break;
+        default:          m_nbBtn->setText(QStringLiteral("NB"));  break;
+        }
+        // Der Rahmen sagt „laeuft", der Text sagt „welches".
+        m_nbBtn->setProperty("active", m_slice->nbMode() != NbMode::Off);
+        m_nbBtn->style()->unpolish(m_nbBtn);
+        m_nbBtn->style()->polish(m_nbBtn);
+    }
+    if (m_snbBtn)    { m_snbBtn->setChecked(m_slice->snbEnabled()); }
+    if (m_apfBtn)    { m_apfBtn->setChecked(m_slice->apfEnabled()); }
+    if (m_apfSlider) { m_apfSlider->setValue(m_slice->apfTuneHz()); }
+}
 
 } // namespace NereusSDR

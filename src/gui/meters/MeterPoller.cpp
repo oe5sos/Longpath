@@ -322,6 +322,11 @@ void MeterPoller::dispatch(int bindingId, double value)
     emit readingUpdated(bindingId, value);
 }
 
+void MeterPoller::feedReading(int bindingId, double value)
+{
+    dispatch(bindingId, value);
+}
+
 void MeterPoller::poll()
 {
     // Phase 3G-6 block 5: MMIO item polling is independent of the
