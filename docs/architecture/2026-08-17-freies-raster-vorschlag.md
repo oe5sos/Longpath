@@ -371,6 +371,26 @@ USB/CW/DIG (der volle Wähler bleibt), `recordToggled`/`playToggled`
 Mehrfach-Panadapters — Scheibe schließen, TX-Übergabe, Abtastrate,
 Filterpolitik, Scheibe entfernen, Antennenwahl je Scheibe.
 
+**Nachtrag 2026-08-18, drei Gruppen wären fast liegengeblieben.** Der
+Ausbau der Flagge hinterließ `VfoModeContainers.{h,cpp}` im Baum:
+FM-CTCSS, DIG-Versatz und RTTY-Mark/Shift. Die Datei übersetzte weiter
+und hatte zwei eigene Tests — nur konstruierte sie niemand mehr. Für
+den Bediener fehlten drei Bedienfelder, für jedes Werkzeug war alles
+grün.
+
+Das ist die Lücke, die diese Art Umzug systematisch hat: **Code, der
+baut und geprüft wird, aber an keiner Fläche hängt, sieht von innen
+gesund aus.** Ein Test, der nur die Sichtbarkeitsregel prüft, hätte sie
+nicht gefunden — er hätte die Behälter selbst instanziiert und wäre
+zufrieden gewesen. Der Test, der sie fand, fragt zuerst
+`findChild<FmOptContainer*>()` auf der RxApplet: *hängt das Ding
+überhaupt irgendwo?*
+
+Die Sichtbarkeitsregel ist wörtlich aus `VfoWidget::applyModeVisibility`
+übernommen — FM bei FM, DIG bei DIGL oder DIGU, RTTY **nur** bei DIGL
+(RTTY ist eine DIGL-Untermenge, darum sind DIG und RTTY zugleich
+sichtbar und nicht abwechselnd).
+
 **Die offene Frage für Phase 3F**, hier vermerkt statt still gelassen:
 *die Flagge war die Bedienfläche einer zweiten Scheibe.* Ohne sie
 bedient die RxApplet immer die **aktive** Scheibe. Scheibe B braucht
