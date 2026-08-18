@@ -36,18 +36,36 @@ genau diese Namen (`discover_sibling()` in
 
 ```bash
 cd ..   # neben das NereusSDR-Verzeichnis
-git clone --filter=blob:none https://github.com/ramdor/Thetis
-git clone --filter=blob:none https://github.com/mi0bot/OpenHPSDR-Thetis mi0bot-Thetis
-git clone --filter=blob:none https://github.com/dl1bz/deskhpsdr
-git clone --filter=blob:none https://github.com/drowe67/freedv-gui
+git clone https://github.com/ramdor/Thetis
+git clone https://github.com/mi0bot/OpenHPSDR-Thetis mi0bot-Thetis
+git clone https://github.com/dl1bz/deskhpsdr
+git clone https://github.com/drowe67/freedv-gui
 ```
 
-**`--filter=blob:none`, nicht `--depth`.** Ein Partial Clone hat die
-**volle Historie** — nötig, weil jedes Zitat seine Fassung nennt
-(`[v2.10.3.13]`, `[@501e3f5]`) und der Prüfer sie über
-`git show <rev>:<pfad>` aufschlägt. Ein flacher Klon kennt die alten
-Commits nicht und meldet `stamp-not-in-clone`. Dateiinhalte holt git bei
-Bedarf nach: mi0bot liegt so bei rund 21 MB statt einigen hundert.
+### Nicht `--filter=blob:none`, und nicht `--depth`
+
+Beide sehen nach der sparsamen Wahl aus. Beide sind hier falsch, aus
+zwei verschiedenen Gründen:
+
+**`--depth` (flacher Klon) fällt am Stempel.** Jedes Zitat nennt seine
+Fassung (`[v2.10.3.13]`, `[@501e3f5]`), und der Prüfer schlägt sie über
+`git show <rev>:<pfad>` auf. Ein flacher Klon kennt die alten Commits
+nicht und meldet `stamp-not-in-clone` — die Prüfung fällt aus, und zwar
+still.
+
+**`--filter=blob:none` fällt am Auschecken.** Die Historie ist
+vollständig, der Klon lädt zunächst fast nichts — aber beim Anlegen der
+Arbeitskopie holt git **jede Datei einzeln** über HTTP nach. Bei
+mi0bot-Thetis lief das am 2026-08-18 über elf Minuten und war noch nicht
+fertig, während ein gewöhnlicher Klon dieselben Daten als einen
+komprimierten Pack in einem Bruchteil zieht. Diese Seite hat es zuerst
+empfohlen; der Rat war falsch und ist hiermit zurückgenommen.
+
+Der Objektspeicher eines Partial Clone ist dabei sofort brauchbar —
+`git show HEAD:<pfad>` funktioniert, lange bevor das Auschecken durch
+ist. Für den Tag-Prüfer allein würde er also genügen. Die anderen Prüfer
+und jedes `grep` über die Quelle brauchen aber Dateien auf der Platte,
+und dafür ist der gewöhnliche Klon schlicht der schnellere Weg.
 
 ## Keine zweite Arbeitskopie je Fassung
 
