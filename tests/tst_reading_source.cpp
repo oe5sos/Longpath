@@ -189,7 +189,13 @@ private slots:
         for (const ReadingDescriptor* d : scaled) { ids.insert(d->bindingId); }
 
         // Belegt: SWR (TxApplet.h:175), Vorlaufleistung
-        // (ItemGroup.cpp:680 + TxApplet.h:174), Signal (SMeterWidget).
+        // (ItemGroup.cpp:680 + TxApplet.h:174), Signal
+        // (InstrumentApplet „SignalInstrument", MainWindow.cpp:5001).
+        //
+        // Hier stand „Signal (SMeterWidget)". Das war seit 300e8d48 falsch:
+        // die Klasse ist geloescht, und wer ihr nachging, um zu sehen, WER
+        // die Kennung belegt, fand nichts. Die Skalen haengen jetzt an der
+        // InstrumentApplet, die setPrimary(MeterBinding::SignalAvg) setzt.
         QVERIFY(ids.contains(MeterBinding::TxSwr));
         QVERIFY(ids.contains(MeterBinding::TxPower));
         QVERIFY(ids.contains(MeterBinding::SignalAvg));
