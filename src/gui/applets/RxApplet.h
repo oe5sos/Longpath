@@ -364,6 +364,14 @@ private:
     QList<QPushButton*> nrButtons() const;
 
     void buildInheritedRows(class QVBoxLayout* col);
+
+    /// Die drei modusabhaengigen Gruppen, aus der VFO-Flagge uebernommen
+    /// (75cc2c35). Sichtbarkeitsregel in applyModeVisibility(); sie
+    /// binden ihre Scheibe selbst und werden in setSlice() nachgezogen.
+    class FmOptContainer*         m_fmContainer{nullptr};
+    class DigOffsetContainer*     m_digContainer{nullptr};
+    class RttyMarkShiftContainer* m_rttyContainer{nullptr};
+    void applyModeVisibility(DSPMode mode);
     void wireInheritedRows();
     void syncInheritedFromSlice();
 

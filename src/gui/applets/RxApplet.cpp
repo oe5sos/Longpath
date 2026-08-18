@@ -135,6 +135,8 @@
 #include "gui/styles/PopupMenuStyle.h"
 #include "gui/widgets/FilterPassbandWidget.h"
 #include "gui/widgets/SliceColors.h"  // sliceColor — die eine Tabelle
+#include "gui/widgets/VfoModeContainers.h"  // FM/DIG/RTTY — die drei
+                                            // modusabhaengigen Gruppen
 #include "models/PanadapterModel.h"
 #include "models/FilterPresetStore.h"
 #include "models/RadioModel.h"
@@ -949,6 +951,46 @@ void RxApplet::buildUi()
         });
     }
 
+    // ── Die drei modusabhaengigen Gruppen ─────────────────────────────────
+    //
+    // Sie hingen bis 2026-08-18 in der VFO-Flagge. Mit ihrem Ausbau war
+    // VfoModeContainers.{h,cpp} zwar noch im Baum und baute auch, wurde
+    // aber von KEINER Flaeche mehr konstruiert: FM-CTCSS, DIG-Versatz und
+    // RTTY-Mark/Shift waren fuer den Bediener unerreichbar. Nur zwei
+    // Tests erreichten den Code noch -- also genau der Fall, in dem eine
+    // gruene Suite nichts ueber Benutzbarkeit sagt.
+    //
+    // Sie stehen am Ende der rechten Spalte, hinter RIT/XIT: die Flagge
+    // hatte sie ebenso am Ende ihres DSP-Bereichs, und sie sind selten
+    // sichtbar (je einer von acht Modi), gehoeren also nicht zwischen die
+    // Regler, die immer da sind.
+    m_fmContainer = new FmOptContainer(this);
+    m_fmContainer->setVisible(false);
+    rightCol->addWidget(m_fmContainer);
+
+    m_digContainer = new DigOffsetContainer(this);
+    m_digContainer->setVisible(false);
+    rightCol->addWidget(m_digContainer);
+
+    m_rttyContainer = new RttyMarkShiftContainer(this);
+    m_rttyContainer->setVisible(false);
+    rightCol->addWidget(m_rttyContainer);
+
+    // Stand die Scheibe schon VOR buildUi() fest, bekommen die drei sie
+    // hier -- der Konstruktor setzt m_slice direkt und ruft niemals
+    // setSlice(), wo die Weitergabe sonst passiert. Die Flagge hatte
+    // dieselbe Zeile aus demselben Grund (VfoWidget.cpp:1581 vor 75cc2c35);
+    // ich hatte sie beim Umzug weggelassen, und
+    // tst_rx_applet_inherited::modeContainersReadTheSlice hat es gemeldet:
+    // die Behaelter standen da, zeigten aber ihre Vorgabewerte statt der
+    // Scheibe.
+    if (m_slice) {
+        m_fmContainer->setSlice(m_slice);
+        m_digContainer->setSlice(m_slice);
+        m_rttyContainer->setSlice(m_slice);
+        applyModeVisibility(m_slice->dspMode());
+    }
+
     columns->addLayout(rightCol, 3);
     root->addLayout(columns);
 
@@ -1228,7 +1270,43 @@ void RxApplet::setSlice(SliceModel* slice)
     disconnectSlice(m_slice);
     m_slice = slice;
     connectSlice(m_slice);
+    // Die drei Gruppen halten ihre eigene Scheibenbindung; sie muessen
+    // sie beim Wechsel mitbekommen, sonst bedienen sie weiter die alte.
+    if (m_fmContainer)   { m_fmContainer->setSlice(m_slice); }
+    if (m_digContainer)  { m_digContainer->setSlice(m_slice); }
+    if (m_rttyContainer) { m_rttyContainer->setSlice(m_slice); }
     syncFromModel();
+    // Sichtbarkeit NACH syncFromModel: der Modus steht erst danach fest.
+    applyModeVisibility(m_slice ? m_slice->dspMode() : DSPMode::LSB);
+}
+
+// ── Sichtbarkeit der drei modusabhaengigen Gruppen ────────────────────────
+//
+// Regel woertlich uebernommen aus VfoWidget::applyModeVisibility
+// (src/gui/widgets/VfoWidget.cpp, geloescht in 75cc2c35). Sie ist nicht
+// hergeleitet, sondern die Regel, die die Flagge hatte:
+//
+//   FM   -> mode == FM
+//   DIG  -> DIGL oder DIGU        (Thetis fuehrt getrennte Versaetze je
+//                                  Seitenband, der Behaelter routet selbst)
+//   RTTY -> NUR DIGL              (RTTY ist eine DIGL-Untermenge; das ist
+//                                  der Grund, warum RTTY und DIG zugleich
+//                                  sichtbar sind und nicht abwechselnd)
+void RxApplet::applyModeVisibility(DSPMode mode)
+{
+    if (m_fmContainer) {
+        m_fmContainer->setVisible(mode == DSPMode::FM);
+        if (mode == DSPMode::FM) { m_fmContainer->syncFromSlice(); }
+    }
+    if (m_digContainer) {
+        const bool dig = (mode == DSPMode::DIGL || mode == DSPMode::DIGU);
+        m_digContainer->setVisible(dig);
+        if (dig) { m_digContainer->syncFromSlice(); }
+    }
+    if (m_rttyContainer) {
+        m_rttyContainer->setVisible(mode == DSPMode::DIGL);
+        if (mode == DSPMode::DIGL) { m_rttyContainer->syncFromSlice(); }
+    }
 }
 
 void RxApplet::setSliceIndex(int idx)
@@ -1506,6 +1584,9 @@ void RxApplet::connectSlice(SliceModel* s)
         updateFilterLabel();
         updateFilterButtons();
         m_filterPassband->setMode(name);
+        // Die drei modusabhaengigen Gruppen mitziehen -- ohne das bliebe
+        // die Gruppe des VORIGEN Modus stehen.
+        applyModeVisibility(mode);
     });
 
     // AGC change → update combo

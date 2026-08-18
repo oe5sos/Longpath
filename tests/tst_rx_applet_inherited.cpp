@@ -39,10 +39,12 @@
 #include <QSignalSpy>
 #include <QApplication>
 #include <QSlider>
+#include <QLabel>
 
 #include "core/WdspTypes.h"
 #include "gui/applets/RxApplet.h"
 #include "gui/widgets/DspParamPopup.h"
+#include "gui/widgets/VfoModeContainers.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -302,6 +304,84 @@ private slots:
         QVERIFY2(dfnr->isChecked(),
                  "das Modell sagt DFNR, der Knopf steht auf aus");
         QVERIFY(mute->isChecked());
+    }
+
+    // ── Die drei modusabhaengigen Gruppen ────────────────────────────
+    //
+    // Der sechste, siebte und achte Verwaiste, und sie waren schlimmer
+    // dran als die anderen: VfoModeContainers.{h,cpp} blieb nach dem
+    // Ausbau der Flagge im Baum, BAUTE weiter und hatte sogar zwei
+    // eigene Tests — nur konstruierte es niemand mehr. FM-CTCSS,
+    // DIG-Versatz und RTTY-Mark/Shift waren fuer den Bediener
+    // unerreichbar, und keine Suite haette das gemeldet: Code, der
+    // uebersetzt und geprueft wird, aber an keiner Flaeche haengt, ist
+    // fuer jeden Pruefer in Ordnung.
+    //
+    // Darum prueft der erste Fall nicht die Regel, sondern die
+    // ERREICHBARKEIT.
+
+    void modeContainersAreReachableAtAll()
+    {
+        Harness h = make();
+        QVERIFY2(h.applet->findChild<FmOptContainer*>(),
+                 "FM-CTCSS haengt an keiner Flaeche");
+        QVERIFY2(h.applet->findChild<DigOffsetContainer*>(),
+                 "DIG-Versatz haengt an keiner Flaeche");
+        QVERIFY2(h.applet->findChild<RttyMarkShiftContainer*>(),
+                 "RTTY Mark/Shift haengt an keiner Flaeche");
+    }
+
+    // Sichtbarkeitsregel, woertlich aus VfoWidget::applyModeVisibility
+    // uebernommen (geloescht in 75cc2c35):
+    //   FM -> FM, DIG -> DIGL|DIGU, RTTY -> NUR DIGL.
+    //
+    // isVisibleTo(), nicht isVisible(): die RxApplet ist hier ein nie
+    // gezeigtes Fenster, und dann meldet isVisible() fuer JEDES Kind
+    // false, ganz gleich was gewollt war. Genau diese Falle steht
+    // schon in tst_rx_dashboard.cpp vermerkt.
+    void modeContainerVisibilityFollowsMode()
+    {
+        Harness h = make();
+        auto* fm   = h.applet->findChild<FmOptContainer*>();
+        auto* dig  = h.applet->findChild<DigOffsetContainer*>();
+        auto* rtty = h.applet->findChild<RttyMarkShiftContainer*>();
+        QVERIFY(fm && dig && rtty);
+
+        struct Case { DSPMode mode; bool fm; bool dig; bool rtty; const char* name; };
+        const Case cases[] = {
+            {DSPMode::LSB,  false, false, false, "LSB"},
+            {DSPMode::FM,   true,  false, false, "FM"},
+            {DSPMode::DIGL, false, true,  true,  "DIGL"},
+            {DSPMode::DIGU, false, true,  false, "DIGU"},
+            {DSPMode::CWU,  false, false, false, "CWU"},
+        };
+        for (const Case& c : cases) {
+            h.slice->setDspMode(c.mode);
+            QCOMPARE(fm->isVisibleTo(h.applet.get()),   c.fm);
+            QCOMPARE(dig->isVisibleTo(h.applet.get()),  c.dig);
+            QVERIFY2(rtty->isVisibleTo(h.applet.get()) == c.rtty,
+                     qPrintable(QStringLiteral("RTTY falsch bei %1")
+                                    .arg(QLatin1String(c.name))));
+        }
+    }
+
+    // Und dass sie am Modell haengen, nicht nur da sind. Der
+    // RTTY-Behaelter zeigt rttyMarkHz; steht die Bindung nicht, bleibt
+    // der Text auf dem Vorgabewert stehen.
+    void modeContainersReadTheSlice()
+    {
+        Harness h = make();
+        auto* rtty = h.applet->findChild<RttyMarkShiftContainer*>();
+        QVERIFY(rtty);
+        h.slice->setRttyMarkHz(1615);
+        h.slice->setDspMode(DSPMode::DIGL);  // macht sichtbar + synchronisiert
+
+        bool found = false;
+        for (QLabel* l : rtty->findChildren<QLabel*>()) {
+            if (l && l->text().contains(QStringLiteral("1615"))) { found = true; }
+        }
+        QVERIFY2(found, "der RTTY-Behaelter zeigt die Mark-Frequenz der "
+                        "Scheibe nicht — die Bindung fehlt");
     }
 };
 
