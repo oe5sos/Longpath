@@ -68,6 +68,14 @@ signals:
     void dynRangeChanged(float dB);
     void ctunChanged(bool enabled);
 
+    /// Der Weg zu den Reglern, die nicht hierher gehoeren.
+    ///
+    /// Betreiber-Entscheidung 2026-08-18: „Rechtsklick fuehrt zur
+    /// Setup-Seite" — kurzer Weg zum Aufrufen, EIN Ort fuer die Regler.
+    /// Dasselbe Muster wie bei den DSP-Schnellreglern. Das Menue traegt
+    /// die haeufigen Handgriffe, nicht jede Einstellung.
+    void openSetupPageRequested(const QString& page);
+
     // Tunable notch filter: "Add notch here" pressed.  freqHz is absolute
     // RF in Hz, the value last handed to setNotchAddFrequency.  Every
     // frequency crossing the TNF signal boundary is Hz; the only MHz

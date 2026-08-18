@@ -93,6 +93,8 @@
 #include <QTimer>
 #include <algorithm>
 #include <cmath>
+#include <QFileDialog>
+#include <QFileInfo>
 
 namespace NereusSDR {
 
@@ -1176,6 +1178,88 @@ void SpectrumDefaultsPage::buildUI()
     overlayForm->addRow(QString(), monitorHzBtn);
 
     contentLayout()->addWidget(overlayGroup);
+
+    // ── Hintergrund ───────────────────────────────────────────────────
+    //
+    // Port aus AetherSDR (setBackgroundImage / -Opacity / -FillColor,
+    // SpectrumWidget.cpp:11161-11187 [@0cd4559]). Der Betreiber hat am
+    // 2026-08-18 entschieden: Regler hier, und der Rechtsklick auf den
+    // Panadapter fuehrt hierher — dasselbe Muster wie die
+    // DSP-Schnellregler.
+    //
+    // „Fuellfarbe sichtbar" statt „Bilddeckkraft": AetherSDRs
+    // m_bgOpacity sagt, wie stark die FUELLFARBE durchkommt. Der Name
+    // bleibt im Code (Vergleichbarkeit der Baeume), aber die
+    // Beschriftung sagt, was der Regler tut — sonst dreht ihn jeder
+    // falsch herum.
+    auto* bgGroup = new QGroupBox(QStringLiteral("Hintergrund"), this);
+    auto* bgForm  = new QFormLayout(bgGroup);
+    bgForm->setSpacing(6);
+
+    auto* bgRow   = new QWidget(bgGroup);
+    auto* bgRowL  = new QHBoxLayout(bgRow);
+    bgRowL->setContentsMargins(0, 0, 0, 0);
+    bgRowL->setSpacing(6);
+    m_bgPathLabel = new QLabel(QStringLiteral("— kein Bild —"), bgRow);
+    m_bgPathLabel->setToolTip(QStringLiteral(
+        "Bild hinter Raster und Spur. Wird auf die Flaeche vergroessert "
+        "und mittig beschnitten, das Seitenverhaeltnis bleibt."));
+    auto* bgPick  = new QPushButton(QStringLiteral("Waehlen…"), bgRow);
+    auto* bgClear = new QPushButton(QStringLiteral("Entfernen"), bgRow);
+    bgRowL->addWidget(m_bgPathLabel, 1);
+    bgRowL->addWidget(bgPick);
+    bgRowL->addWidget(bgClear);
+    bgForm->addRow(QStringLiteral("Bild"), bgRow);
+
+    m_bgOpacitySlider = new QSlider(Qt::Horizontal, bgGroup);
+    m_bgOpacitySlider->setRange(0, 100);
+    m_bgOpacitySlider->setToolTip(QStringLiteral(
+        "Wie stark die Fuellfarbe durch das Bild kommt. 100 = nur "
+        "Fuellfarbe, 0 = nur Bild."));
+    bgForm->addRow(QStringLiteral("Fuellfarbe sichtbar (%)"), m_bgOpacitySlider);
+
+    m_bgFillButton = new ColorSwatchButton(
+        QColor(Style::kPanadapterBg), bgGroup);
+    m_bgFillButton->setToolTip(QStringLiteral(
+        "Die Flaeche unter dem Bild. Ohne Bild ist sie der Hintergrund."));
+    bgForm->addRow(QStringLiteral("Fuellfarbe"), m_bgFillButton);
+
+    auto spectrum = [this]() -> SpectrumWidget* {
+        return model() ? model()->spectrumWidget() : nullptr;
+    };
+    auto refreshBgLabel = [this, spectrum] {
+        auto* w = spectrum();
+        const QString p = w ? w->backgroundImagePath() : QString();
+        m_bgPathLabel->setText(p.isEmpty() ? QStringLiteral("— kein Bild —")
+                                           : QFileInfo(p).fileName());
+    };
+    connect(bgPick, &QPushButton::clicked, this, [this, spectrum, refreshBgLabel] {
+        const QString p = QFileDialog::getOpenFileName(
+            this, QStringLiteral("Hintergrundbild waehlen"), QString(),
+            QStringLiteral("Bilder (*.png *.jpg *.jpeg *.bmp *.webp)"));
+        if (p.isEmpty()) { return; }
+        if (auto* w = spectrum()) { w->setBackgroundImage(p); }
+        refreshBgLabel();
+    });
+    connect(bgClear, &QPushButton::clicked, this, [spectrum, refreshBgLabel] {
+        if (auto* w = spectrum()) { w->setBackgroundImage(QString()); }
+        refreshBgLabel();
+    });
+    connect(m_bgOpacitySlider, &QSlider::valueChanged, this, [spectrum](int v) {
+        if (auto* w = spectrum()) { w->setBackgroundOpacity(v); }
+    });
+    connect(m_bgFillButton, &ColorSwatchButton::colorChanged, this,
+            [spectrum](const QColor& c) {
+        if (auto* w = spectrum()) { w->setBackgroundFillColor(c); }
+    });
+    if (auto* w = spectrum()) {
+        QSignalBlocker b1(m_bgOpacitySlider);
+        m_bgOpacitySlider->setValue(w->backgroundOpacity());
+        m_bgFillButton->setColor(w->backgroundFillColor());
+    }
+    refreshBgLabel();
+
+    contentLayout()->addWidget(bgGroup);
 
     // --- Section: Thread ---
     auto* threadGroup = new QGroupBox(QStringLiteral("Thread"), this);

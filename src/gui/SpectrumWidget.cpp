@@ -7384,6 +7384,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // Show overlay menu on right-click (default — not on a spot).
         if (!m_overlayMenu) {
             m_overlayMenu = new SpectrumOverlayMenu(this);
+            connect(m_overlayMenu, &SpectrumOverlayMenu::openSetupPageRequested,
+                    this, &SpectrumWidget::openSetupPageRequested);
             connect(m_overlayMenu, &SpectrumOverlayMenu::wfColorGainChanged,
                     this, [this](int v) { m_wfColorGain = v; update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::wfBlackLevelChanged,

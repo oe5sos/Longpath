@@ -98,6 +98,11 @@ private:
     void loadFromRenderer();
     void pushFps(int fps);
 
+    // Section: Hintergrund (Port aus AetherSDR, 2026-08-18)
+    class QLabel*             m_bgPathLabel{nullptr};
+    class QSlider*            m_bgOpacitySlider{nullptr};
+    class ColorSwatchButton*  m_bgFillButton{nullptr};
+
     // Section: FFT
     // Phase 2: FFT size is a 0..6 slider (Thetis tbDisplayFFTSize per
     // setup.designer.cs:35043 [v2.10.3.13]).  Slider value maps to

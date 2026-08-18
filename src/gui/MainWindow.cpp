@@ -4163,6 +4163,19 @@ void MainWindow::buildUI()
                 activeSpectrumWidget(), &SpectrumWidget::setFillAlpha);
 
         // B8 Task 24: wire "More Display Options →" link to Setup → Display.
+        // Rechtsklick auf den Panadapter -> Setup-Seite. Derselbe Weg,
+        // den die Overlay-Leiste schon nimmt (2026-08-18).
+        if (auto* sw = activeSpectrumWidget()) {
+            connect(sw, &SpectrumWidget::openSetupPageRequested,
+                    this, [this](const QString& page) {
+                auto* dialog = new SetupDialog(m_radioModel, this);
+                dialog->setAttribute(Qt::WA_DeleteOnClose);
+                wireSetupDialog(dialog);
+                dialog->selectPage(page);
+                dialog->show();
+            });
+        }
+
         connect(m_overlayPanel, &SpectrumOverlayPanel::openSetupRequested,
                 this, [this](const QString& page) {
             auto* dialog = new SetupDialog(m_radioModel, this);

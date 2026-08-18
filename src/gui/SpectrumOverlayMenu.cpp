@@ -218,6 +218,19 @@ void SpectrumOverlayMenu::buildUI()
     });
     updateNotchAddLabel();
 
+    // ── Hintergrund ───────────────────────────────────────────────────
+    // Nur der Weg dorthin, nicht die Regler selbst: ein Datei-Auswaehler
+    // und drei Regler in einem Menue, das ueber dem Wasserfall
+    // aufklappt, waere die falsche Flaeche.
+    auto* bgButton = new QPushButton(QStringLiteral("Hintergrund…"), this);
+    bgButton->setToolTip(QStringLiteral(
+        "Bild, Fuellfarbe und Deckkraft des Panadapters — oeffnet "
+        "Setup → Display → Spectrum Defaults"));
+    connect(bgButton, &QPushButton::clicked, this, [this]() {
+        emit openSetupPageRequested(QStringLiteral("Spectrum Defaults"));
+    });
+    layout->addWidget(bgButton);
+
     setFixedWidth(280);
 }
 

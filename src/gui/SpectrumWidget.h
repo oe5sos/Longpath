@@ -1388,6 +1388,8 @@ public:
     }
 
 signals:
+    /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
+    void openSetupPageRequested(const QString& page);
     // 2026-05-22 bench fix: emitted after each updateSpectrumLinear
     // completes (m_renderedPixels populated). MainWindow consumes this
     // to push peakDbmInSlicePassband() into WdspEngine's MaxBin detector
