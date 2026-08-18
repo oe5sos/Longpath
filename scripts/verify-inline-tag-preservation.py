@@ -398,6 +398,133 @@ def resolve_upstream(cite_file: str, which: str,
     return None
 
 
+# ── Die zitierte Fassung lesen, nicht die ausgecheckte ──────────────────
+#
+# Ein Zitat nennt seine Fassung (`[v2.10.3.13]`, `[@501e3f5]`). Bis
+# 2026-08-18 wurde es trotzdem gegen den Arbeitsbaum von ../Thetis
+# geprueft — also gegen das, was dort gerade ausgecheckt ist. Steht der
+# Klon auf @852bf0e, liest der Pruefer bei jedem [v2.10.3.13]-Zitat eine
+# um Dutzende Zeilen verschobene Stelle, erntet die Autorenkuerzel, die
+# dort zufaellig stehen, und verlangt sie bei uns.
+#
+# Nachgewiesen an MoxController.h: zitiert console.cs:19687
+# [v2.10.3.13], `private int rf_delay = 30`. In @852bf0e steht die
+# Deklaration bei 19648, 39 Zeilen frueher; der Pruefer landete auf einer
+# fremden Stelle mit //MW0LGE und verlangte den Tag. Von 53 gemeldeten
+# fehlenden Tags war so keiner belastbar — und ein Werkzeug, das
+# GPL-Attributionsverstoesse ERFINDET, ist schlimmer als eines, das sagt,
+# es koenne nicht pruefen.
+#
+# Die Abhilfe braucht keine zweite Arbeitskopie je Fassung: der Klon hat
+# die Objekte schon. `git show <rev>:<pfad>` liefert die Datei genau in
+# der zitierten Fassung, kostet keinen Plattenplatz und deckt auch
+# Stempel ab, die niemand vorher als Verzeichnis angelegt hat.
+#
+# Die Verzeichnis-Pins (THETIS_VERSION_DIRS) bleiben als Vorrang stehen:
+# CI reicht sie per Umgebungsvariable herein, und ein ausgecheckter Baum
+# schlaegt den Objektspeicher, wenn beides da ist.
+
+_GIT_TREE_CACHE: dict[tuple[str, str], dict[str, str]] = {}
+_GIT_BLOB_CACHE: dict[tuple[str, str, str], list[str] | None] = {}
+_GIT_REV_CACHE: dict[tuple[str, str], str | None] = {}
+
+
+def _git(repo: Path, *argv: str) -> str | None:
+    """Run git in `repo`, returning stdout or None on any failure."""
+    import subprocess
+    try:
+        res = subprocess.run(("git", "-C", str(repo)) + argv,
+                             capture_output=True, text=True, timeout=60)
+    except Exception:
+        return None
+    return res.stdout if res.returncode == 0 else None
+
+
+def _git_rev(repo: Path, stamp: str) -> str | None:
+    """Resolve a cite stamp to a commit in `repo`.
+
+    Accepts both grammars: `2.10.3.13` is tried as the tag `v2.10.3.13`
+    (and bare), `501e3f5` as a short SHA. Returns None when the clone
+    does not carry that object -- a shallow clone legitimately may not,
+    and the caller must then say "not checkable" rather than guess.
+    """
+    key = (str(repo), stamp)
+    if key in _GIT_REV_CACHE:
+        return _GIT_REV_CACHE[key]
+    rev = None
+    for cand in (f"v{stamp}", stamp) if "." in stamp else (stamp,):
+        out = _git(repo, "rev-parse", "--quiet", "--verify", f"{cand}^{{commit}}")
+        if out and out.strip():
+            rev = out.strip()
+            break
+    _GIT_REV_CACHE[key] = rev
+    return rev
+
+
+def _git_tree_index(repo: Path, rev: str) -> dict[str, str]:
+    """Map basename -> full repo path for every file at `rev`.
+
+    Cites name upstream files inconsistently: sometimes the full
+    `Project Files/Source/Console/console.cs`, sometimes the bare
+    `console.cs`. The directory resolver handled that with rglob; here
+    the index does the same job against the tree listing.
+
+    A basename that occurs more than once maps to the SHORTEST path.
+    That is a guess, and it is the same guess the rglob resolver already
+    made -- but it is confined to files whose basename is ambiguous, and
+    Thetis's Console sources are not.
+    """
+    key = (str(repo), rev)
+    cached = _GIT_TREE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    # Schluessel KLEINGESCHRIEBEN. Die Zitate im Baum schreiben
+    # Thetis-Dateinamen mal so, mal so -- `Display.cs` neben `display.cs`,
+    # `setup.Designer.cs` neben `setup.designer.cs`. Der alte
+    # Verzeichnis-Resolver hat das nie gemerkt, weil er per rglob auf
+    # einem case-insensitiven Dateisystem (macOS) suchte; der
+    # Objektspeicher ist case-sensitiv und haette 80 Zitate als
+    # "nicht auffindbar" gemeldet, die es sehr wohl gibt.
+    index: dict[str, str] = {}
+    out = _git(repo, "ls-tree", "-r", "--name-only", rev)
+    if out:
+        for path in out.splitlines():
+            base = path.rsplit("/", 1)[-1].lower()
+            prev = index.get(base)
+            if prev is None or len(path) < len(prev):
+                index[base] = path
+    _GIT_TREE_CACHE[key] = index
+    return index
+
+
+def git_lines_at(repo: Path, stamp: str, cite_file: str) -> list[str] | None:
+    """Return the cited file's lines as of `stamp`, or None.
+
+    None means "cannot check", never "empty file": every failure path
+    here -- clone absent, object absent from a shallow clone, filename
+    not in that tree -- has to reach the caller as a warning, not as an
+    absence of tags that would silently pass.
+    """
+    if not repo.is_dir():
+        return None
+    rev = _git_rev(repo, stamp)
+    if rev is None:
+        return None
+    key = (str(repo), rev, cite_file)
+    if key in _GIT_BLOB_CACHE:
+        return _GIT_BLOB_CACHE[key]
+    index = _git_tree_index(repo, rev)
+    path = (cite_file if cite_file in index.values()
+            else index.get(cite_file.rsplit("/", 1)[-1].lower()))
+    lines = None
+    if path:
+        blob = _git(repo, "show", f"{rev}:{path}")
+        if blob is not None:
+            lines = blob.splitlines()
+    _GIT_BLOB_CACHE[key] = lines
+    return lines
+
+
 def _sibling_search_bases(primary: Path, name: str) -> list[Path]:
     """Candidate base directories for an upstream, env override first."""
     candidates = [primary]
@@ -439,8 +566,11 @@ def find_header_end(text: list[str]) -> int:
     return 1  # no body found; treat whole file as body to be safe
 
 
-def extract_tags_from_region(src_path: Path, spans: list[tuple[int, int]],
-                             window: int = 5) -> set[tuple[int, str]]:
+def extract_tags_from_region(src_path: Path | None,
+                             spans: list[tuple[int, int]],
+                             window: int = 5,
+                             lines: list[str] | None = None
+                             ) -> set[tuple[int, str]]:
     """Pull every inline tag (callsign/named/version/dash) found within
     ±window lines of each cited SPAN, EXCLUDING tags that fall inside
     the file's copyright/license header block (detected by
@@ -452,10 +582,14 @@ def extract_tags_from_region(src_path: Path, spans: list[tuple[int, int]],
     and manufacture requirements from untouched upstream code — see
     parse_lines_spans() for the cite that exposed this.
     """
-    try:
-        text = src_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except Exception:
-        return set()
+    if lines is not None:
+        text = lines
+    else:
+        try:
+            text = src_path.read_text(encoding="utf-8",
+                                      errors="replace").splitlines()
+        except Exception:
+            return set()
     header_end = find_header_end(text)
     tags: set[tuple[int, str]] = set()
     rows: set[int] = set()
@@ -580,8 +714,84 @@ def main() -> int:
                 # than whatever sits at that line in the default pin.
                 sm = RE_STAMP.search(line)
                 stamp = (sm.group("ver") or sm.group("sha")) if sm else None
-                upstream = resolve_upstream(m.group("file"), which, stamp)
-                if upstream is None:
+                # REIHENFOLGE, und sie ist der ganze Punkt:
+                #
+                #   1. ein ausgecheckter Pin fuer genau diesen Stempel
+                #      (THETIS_VERSION_DIRS; CI reicht ihn per
+                #      Umgebungsvariable herein)
+                #   2. sonst der Objektspeicher des Klons an diesem
+                #      Stempel -- `git show <rev>:<pfad>`
+                #   3. sonst gar nichts.
+                #
+                # Der Arbeitsbaum des Klons ist KEIN Rueckfall mehr,
+                # sobald das Zitat eine Fassung nennt. Genau dieser
+                # Rueckfall hat die 53 unbelastbaren Meldungen erzeugt:
+                # er sieht aus wie eine Pruefung, ist aber eine gegen
+                # eine andere Fassung. Ohne Stempel bleibt der
+                # Arbeitsbaum das Beste, was es gibt.
+                repo_for = {"ramdor": THETIS_DIR,
+                            "mi0bot": MI0BOT_DIR}.get(which)
+                pinned = (THETIS_VERSION_DIRS.get(stamp)
+                          if (which == "ramdor" and stamp) else None)
+                src_lines = None
+                upstream = None
+                if pinned is not None and pinned.is_dir():
+                    upstream = resolve_upstream(m.group("file"), which, stamp)
+                elif stamp and repo_for is not None:
+                    src_lines = git_lines_at(repo_for, stamp, m.group("file"))
+                    if src_lines is None and pinned is None:
+                        # Der Klon kennt den Stempel nicht (flacher Klon,
+                        # fremdes Repo). Der Arbeitsbaum ist dann die
+                        # einzige Auskunft -- schlechter als nichts waere
+                        # sie nur, wenn wir so taeten, als sei sie die
+                        # zitierte Fassung. Sie wird als solche gemeldet.
+                        upstream = resolve_upstream(m.group("file"), which,
+                                                    stamp)
+                        if upstream is not None:
+                            findings.append({
+                                "severity": "warn",
+                                "file": str(port.relative_to(REPO)),
+                                "cite_line": cite_line,
+                                "which": which,
+                                "source_file": m.group("file"),
+                                "source_lines": line_nums,
+                                "issue": f"stamp-not-in-clone[{stamp}]",
+                                "tag": None,
+                            })
+                            # Eine Meldung je Zitat, nicht zwei: der
+                            # Fall ist benannt, der generische
+                            # upstream-not-found darunter wuerde ihn nur
+                            # verdoppeln.
+                            continue
+                elif which in ("ramdor", "mi0bot"):
+                    # OHNE STEMPEL ist nichts zu pruefen, und das ist
+                    # keine Formalie. Genau so entstanden die beiden
+                    # letzten unbelastbaren Meldungen: ein Zitat ohne
+                    # Fassungsangabe wurde gegen den ausgecheckten Stand
+                    # gelesen (@852bf0e), fand dort ein //N1GP bzw.
+                    # //MW0LGE an der zitierten Zeilennummer und
+                    # verlangte es bei uns.
+                    #
+                    # Der Mangel ist der FEHLENDE STEMPEL, nicht ein
+                    # fehlender Tag. Er wird als solcher gemeldet und
+                    # von verify-inline-cites.py durchgesetzt; hier ein
+                    # FAIL daraus zu machen hiesse, eine erfundene
+                    # Attributionsverletzung neben den echten Mangel zu
+                    # stellen.
+                    findings.append({
+                        "severity": "warn",
+                        "file": str(port.relative_to(REPO)),
+                        "cite_line": cite_line,
+                        "which": which,
+                        "source_file": m.group("file"),
+                        "source_lines": line_nums,
+                        "issue": "cite-unstamped",
+                        "tag": None,
+                    })
+                    continue
+                else:
+                    upstream = resolve_upstream(m.group("file"), which, stamp)
+                if upstream is None and src_lines is None:
                     findings.append({
                         "severity": "warn",
                         "file": str(port.relative_to(REPO)),
@@ -593,7 +803,8 @@ def main() -> int:
                         "tag": None,
                     })
                     continue
-                source_tags = extract_tags_from_region(upstream, spans)
+                source_tags = extract_tags_from_region(upstream, spans,
+                                                       lines=src_lines)
                 for src_line, tag in sorted(source_tags):
                     if not port_contains_tag(port, cite_line, tag):
                         findings.append({
@@ -616,14 +827,32 @@ def main() -> int:
     else:
         print(f"[tag-preservation] scanned {cite_count} cites across "
               f"{sum(1 for _ in iter_source_files())} files")
+        # FAILs einzeln -- jeder ist zu handeln. WARNs GRUPPIERT: sie
+        # sagen "konnte nicht geprueft werden", und davon gibt es
+        # hunderte aus je EINEM Grund (ein Klon fehlt). Vorher stand
+        # jede als eigene Zeile, 780 Stueck; wer 780 Zeilen sieht, liest
+        # keine davon, und dann faellt auch der eine echte Fund nicht
+        # auf. Die vollstaendige Liste bleibt in --json.
         for f in findings:
             if f["issue"] == "missing-inline-tag":
                 print(f"  FAIL  {f['file']}:{f['cite_line']}  "
                       f"cites {f['source_file']}:{f['source_line']}  "
                       f"— missing `//{f['tag']}` tag within ±10 lines")
-            else:
-                print(f"  WARN  {f['file']}:{f['cite_line']}  "
-                      f"{f['source_file']} — {f['issue']}")
+        groups: dict[tuple[str, str], list[dict]] = {}
+        for f in findings:
+            if f["issue"] == "missing-inline-tag":
+                continue
+            groups.setdefault((f["which"], f["issue"]), []).append(f)
+        for (which, issue), items in sorted(groups.items(),
+                                            key=lambda kv: -len(kv[1])):
+            print(f"  WARN  {len(items):4d} cite(s) nicht pruefbar  "
+                  f"[{which}: {issue}]")
+            for f in items[:3]:
+                print(f"          z.B. {f['file']}:{f['cite_line']} "
+                      f"-> {f['source_file']}")
+            if len(items) > 3:
+                print(f"          ... und {len(items) - 3} weitere "
+                      f"(vollstaendig in --json)")
         fails = [f for f in findings if f["severity"] == "fail"]
         if not fails:
             print("[tag-preservation] OK — no missing tags detected")
