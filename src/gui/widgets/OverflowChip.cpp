@@ -30,7 +30,7 @@ OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
         "QLabel#OverflowChip_Glyph {"
         " color: #8aa8c0;"
         " font-family: 'SF Mono', Menlo, monospace;"
-        " font-size: 14px; font-weight: 700;"
+        " font-size: 16px; font-weight: 700;"
         " background: transparent; border: none;"
         " padding: 0 2px;"
         "}"

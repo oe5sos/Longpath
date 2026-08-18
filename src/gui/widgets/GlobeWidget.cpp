@@ -765,7 +765,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     if (untextured) {
         // Say why it looks plain, and what fixes it.
         QFont f = p.font();
-        f.setPixelSize(10);
+        f.setPixelSize(11);
         p.setFont(f);
         p.setPen(QColor(Style::kTextScale));
         const QString hint = QStringLiteral("no world image loaded");

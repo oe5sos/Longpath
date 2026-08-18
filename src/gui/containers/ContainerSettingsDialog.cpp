@@ -243,10 +243,10 @@ constexpr const char* kListStyle =
     "}";
 
 constexpr const char* kLabelStyle =
-    "color: #8090a0; font-size: 12px;";
+    "color: #8090a0; font-size: 13px;";
 
 constexpr const char* kSectionHeaderStyle =
-    "color: #8aa8c0; font-weight: bold; font-size: 12px;";
+    "color: #8aa8c0; font-weight: bold; font-size: 13px;";
 
 constexpr const char* kSpinStyle =
     "background: #0a0a18;"

@@ -162,7 +162,7 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
             tr("N2ADR Filter (HL2): Hardware → HL2 I/O Board"),
             this);
         n2adrHint->setStyleSheet(QStringLiteral(
-            "QLabel { color: #888; font-style: italic; font-size: 10px; }"));
+            "QLabel { color: #888; font-style: italic; font-size: 11px; }"));
         n2adrHint->setToolTip(tr(
             "On Hermes Lite 2, N2ADR filter board control is configured "
             "on the HL2 I/O Board tab."));

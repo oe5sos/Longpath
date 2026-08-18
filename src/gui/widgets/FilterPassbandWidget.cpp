@@ -144,7 +144,7 @@ void FilterPassbandWidget::paintEvent(QPaintEvent*)
     // ── Labels ──────────────────────────────────────────────────────────
     // From AetherSDR FilterPassbandWidget.cpp lines 72-99
     QFont font = p.font();
-    font.setPixelSize(10);
+    font.setPixelSize(11);
     p.setFont(font);
     const QFontMetrics fm(font);
 

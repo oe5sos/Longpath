@@ -310,7 +310,7 @@ inline QString buttonBaseStyle()
     return QStringLiteral(
         "QPushButton {"
         "  background: %1; border: 1px solid %2; border-radius: 6px;"
-        "  color: %3; font-size: 10px; font-weight: bold; padding: 2px 4px;"
+        "  color: %3; font-size: 11px; font-weight: bold; padding: 2px 4px;"
         "}"
         "QPushButton:hover { background: %4; }"
     ).arg(kButtonBg, kBorder, kTextPrimary, kButtonAltHover);
@@ -390,7 +390,7 @@ inline QString insetValueStyle()
 {
     return QStringLiteral(
         "QLabel {"
-        "  font-size: 10px; background: %1; border: 1px solid %2;"
+        "  font-size: 11px; background: %1; border: 1px solid %2;"
         "  border-radius: 6px; padding: 1px 2px; color: %3;"
         "}"
     ).arg(kInsetBg, kInsetBorder, kTextPrimary);
@@ -422,19 +422,19 @@ constexpr auto kSecondaryLabelStyle =
 
 constexpr auto kComboStyle =
     "QComboBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }"
+    " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
     "QComboBox::drop-down { border: none; }"
     "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
     " selection-background-color: #00b4d8; }";
 
 constexpr auto kCheckBoxStyle =
-    "QCheckBox { color: #c8d8e8; font-size: 12px; }"
+    "QCheckBox { color: #c8d8e8; font-size: 13px; }"
     "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
     " border: 1px solid #304050; border-radius: 2px; }"
     "QCheckBox::indicator:checked { background: #00b4d8; border-color: #00b4d8; }";
 
 constexpr auto kRadioButtonStyle =
-    "QRadioButton { color: #c8d8e8; font-size: 12px; }"
+    "QRadioButton { color: #c8d8e8; font-size: 13px; }"
     "QRadioButton::indicator { width: 14px; height: 14px; background: #08080a;"
     " border: 1px solid #2c2c31; border-radius: 7px; }"
     "QRadioButton::indicator:checked { background: #4a7ba8; border-color: #2f5c86; }";
@@ -462,15 +462,15 @@ constexpr auto kRadioButtonStyle =
 // Ein leeres Feld ist nicht inaktiv. Es wartet auf eine Eingabe.
 constexpr auto kLineEditStyle =
     "QLineEdit { background: #08080a; border: 1px solid #2c2c31;"
-    " border-radius: 6px; color: #c4c4c9; font-size: 12px; padding: 2px 4px; }";
+    " border-radius: 6px; color: #c4c4c9; font-size: 13px; padding: 2px 4px; }";
 
 constexpr auto kSpinBoxStyle =
     "QSpinBox { background: #08080a; border: 1px solid #2c2c31;"
-    " border-radius: 6px; color: #c4c4c9; font-size: 12px; padding: 2px 4px; }";
+    " border-radius: 6px; color: #c4c4c9; font-size: 13px; padding: 2px 4px; }";
 
 constexpr auto kDoubleSpinBoxStyle =
     "QDoubleSpinBox { background: #08080a; border: 1px solid #2c2c31;"
-    " border-radius: 6px; color: #c4c4c9; font-size: 12px; padding: 2px 4px; }";
+    " border-radius: 6px; color: #c4c4c9; font-size: 13px; padding: 2px 4px; }";
 
 // Backwards-compat wrapper for places that prefer a function form.
 inline QString doubleSpinBoxStyle() { return QString::fromLatin1(kDoubleSpinBoxStyle); }
@@ -482,7 +482,7 @@ constexpr auto kSliderStyle =
 
 constexpr auto kButtonStyle =
     "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
+    " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
     "QPushButton:hover { background: #203040; }"
     "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }";
 

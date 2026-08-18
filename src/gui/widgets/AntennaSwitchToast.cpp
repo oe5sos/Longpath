@@ -37,7 +37,7 @@ AntennaSwitchToast::AntennaSwitchToast(const QString& message, QWidget* parent)
     layout->setContentsMargins(12, 8, 12, 8);
 
     auto* checkLbl = new QLabel(QStringLiteral("\xE2\x9C\x93"), this); // UTF-8 checkmark
-    checkLbl->setStyleSheet(Style::themed(QStringLiteral("color: #00ff88; font-size: 14px;")));
+    checkLbl->setStyleSheet(Style::themed(QStringLiteral("color: #00ff88; font-size: 16px;")));
     layout->addWidget(checkLbl);
 
     auto* textWidget = new QWidget(this);
@@ -52,7 +52,7 @@ AntennaSwitchToast::AntennaSwitchToast(const QString& message, QWidget* parent)
 
     auto* msgLbl = new QLabel(message, textWidget);
     msgLbl->setStyleSheet(
-        QStringLiteral("color: %1; font-size: 10px;").arg(Style::kTextTertiary));
+        QStringLiteral("color: %1; font-size: 11px;").arg(Style::kTextTertiary));
     textLayout->addWidget(msgLbl);
 
     layout->addWidget(textWidget);

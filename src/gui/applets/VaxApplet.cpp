@@ -202,7 +202,7 @@ void VaxApplet::buildUi()
         devRow->setContentsMargins(48, 0, 0, 0);
         devRow->setSpacing(0);
         m_deviceLbl[i] = new QLabel(deviceLabelFor(channel), body);
-        m_deviceLbl[i]->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #556070; font-size: 10px; }")));
+        m_deviceLbl[i]->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #556070; font-size: 11px; }")));
         devRow->addWidget(m_deviceLbl[i]);
         devRow->addStretch();
         vbox->addLayout(devRow);

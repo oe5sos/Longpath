@@ -843,7 +843,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     }
 
     QFont small = p.font();
-    small.setPixelSize(10);
+    small.setPixelSize(11);
 
     // ── The bands ────────────────────────────────────────────────────
     //

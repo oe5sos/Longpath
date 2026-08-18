@@ -317,7 +317,7 @@ void RxApplet::buildUi()
         m_rxAntBtn->setStyleSheet(QStringLiteral(
             "QPushButton {"
             "  color: #4488ff; background: transparent; border: none;"  // §A2 one-off "live blue"
-            "  font-size: 10px; font-weight: bold; padding: 0 2px;"
+            "  font-size: 11px; font-weight: bold; padding: 0 2px;"
             "}"
             "QPushButton:hover { color: #66aaff; }"  // §A2 one-off hover derived from #4488ff
         ));
@@ -364,7 +364,7 @@ void RxApplet::buildUi()
         m_txAntBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton {"
             "  color: #ff4444; background: transparent; border: none;"  // §A2 one-off TX color
-            "  font-size: 10px; font-weight: bold; padding: 0 2px;"
+            "  font-size: 11px; font-weight: bold; padding: 0 2px;"
             "}"
             "QPushButton:hover { color: #a86b6d; }"  // §A2 one-off hover derived from #ff4444
         )));
@@ -1040,7 +1040,7 @@ void RxApplet::buildUi()
         if (dualAdc) {
             m_rx1PreampToggle = new QCheckBox(QStringLiteral("RX1 preamp"), this);
             m_rx1PreampToggle->setStyleSheet(QStringLiteral(
-                "QCheckBox { color: %1; font-size: 10px; }"
+                "QCheckBox { color: %1; font-size: 11px; }"
                 "QCheckBox::indicator { width: 12px; height: 12px; }").arg(Style::kTitleText));
             // Phase 3P-B Task 10: RX1 preamp wires to P2RadioConnection::setRx1Preamp
             // which routes to CodecContext.p2Rx1Preamp → byte 1403 bit 1.
@@ -1382,7 +1382,7 @@ void RxApplet::updateSliceButtons(const QVector<SliceModel*>& slices,
         const QColor c = sliceColor(sliceIdx);
         btn->setStyleSheet(Style::themed(QStringLiteral(
             "QToolButton { background: #2c2c31; color: %1; border: 1px solid %1;"
-            " border-radius: 6px; font-weight: bold; font-size: 10px; padding: 0; }"
+            " border-radius: 6px; font-weight: bold; font-size: 11px; padding: 0; }"
             "QToolButton:checked { background: %1; color: #0a0a14; }")
             .arg(c.name())));
         btn->setToolTip(QStringLiteral("Slice %1").arg(s->sliceLetter()));
@@ -2046,7 +2046,7 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
         m_afLabel->setFixedWidth(24);
         m_afLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_afLabel->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextPrimary)));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary)));
         row->addWidget(m_afLabel);
 
         m_muteBtn = greenToggle(QStringLiteral("MUTE"), 46, 20);
@@ -2155,7 +2155,7 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
         m_apfLabel->setFixedWidth(44);
         m_apfLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_apfLabel->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary)));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary)));
         row->addWidget(m_apfLabel);
 
         col->addLayout(row);

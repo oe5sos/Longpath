@@ -78,7 +78,7 @@ QLabel* makeSecondaryLabel(const QString& text, QWidget* parent)
 {
     auto* lbl = new QLabel(text, parent);
     lbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }"
+        "QLabel { color: %1; font-size: 11px; }"
     ).arg(Style::kTextSecondary));
     return lbl;
 }
@@ -193,7 +193,7 @@ void TciApplet::buildHeaderRow(QVBoxLayout* vbox)
 
     auto* titleLbl = new QLabel(QStringLiteral("TCI Server"), this);
     titleLbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; font-weight: bold; }"
+        "QLabel { color: %1; font-size: 11px; font-weight: bold; }"
     ).arg(Style::kTextPrimary));
     row->addWidget(titleLbl);
 
@@ -351,7 +351,7 @@ void TciApplet::buildDisabledState(QVBoxLayout* vbox)
     auto* hintLbl = new QLabel(
         QStringLiteral("TCI server is not running."), this);
     hintLbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }"
+        "QLabel { color: %1; font-size: 11px; }"
     ).arg(Style::kTextSecondary));
     hintLbl->setWordWrap(true);
     vbox->addWidget(hintLbl);
@@ -366,7 +366,7 @@ void TciApplet::buildDisabledState(QVBoxLayout* vbox)
     m_enableBtn->setStyleSheet(QStringLiteral(
         "QPushButton {"
         "  background: %1; border: 1px solid %2; border-radius: 6px;"
-        "  color: %3; font-size: 10px; font-weight: bold; padding: 2px 6px;"
+        "  color: %3; font-size: 11px; font-weight: bold; padding: 2px 6px;"
         "}"
         "QPushButton:hover { background: %4; }"
     ).arg(Style::kButtonBg, Style::kBorder, Style::kTextPrimary,

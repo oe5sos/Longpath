@@ -118,7 +118,7 @@ WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
     m_search->setStyleSheet(QStringLiteral(
         "QLineEdit { background: %1; border: 1px solid %2;"
         "  border-radius: 6px; color: %3; padding: 7px 11px;"
-        "  font-size: 12px; }")
+        "  font-size: 13px; }")
         .arg(QString::fromLatin1(Style::kInsetBg),
              QString::fromLatin1(Style::kBorder),
              QString::fromLatin1(Style::kTextPrimary)));

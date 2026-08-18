@@ -340,7 +340,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
 
     // Cardinal letters
     QFont cf = p.font();
-    cf.setPixelSize(10);
+    cf.setPixelSize(11);
     p.setFont(cf);
     p.setPen(kCardinal);
     const QFontMetrics cfm(cf);
@@ -435,7 +435,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // collide on an az/el rotator.
     if (m_simulated) {
         QFont sf = p.font();
-        sf.setPixelSize(10);
+        sf.setPixelSize(11);
         sf.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
         p.setFont(sf);
         p.setPen(QColor(Style::kAmberWarn));
@@ -449,7 +449,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
 
     if (m_hasElevation) {
         QFont ef = p.font();
-        ef.setPixelSize(10);
+        ef.setPixelSize(11);
         p.setFont(ef);
         p.setPen(kMuted);
         const QString etext =
@@ -498,7 +498,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
                line1);
 
     QFont small = p.font();
-    small.setPixelSize(10);
+    small.setPixelSize(11);
     small.setBold(false);
     p.setFont(small);
     const QFontMetrics sfm(small);

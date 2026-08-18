@@ -1223,13 +1223,13 @@ void SpectrumDefaultsPage::buildUI()
     auto* hintVolts = new QLabel(
         QStringLiteral("ANAN-8000DLE volts/amps moved to Hardware → ANAN-8000DLE."), this);
     hintVolts->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; font-size: 10px; }")));
+        "QLabel { color: #607080; font-style: italic; font-size: 11px; }")));
     contentLayout()->addWidget(hintVolts);
 
     auto* hintFilter = new QLabel(
         QStringLiteral("Small filter on VFOs moved to Appearance → VFO Flag."), this);
     hintFilter->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #607080; font-style: italic; font-size: 10px; }")));
+        "QLabel { color: #607080; font-style: italic; font-size: 11px; }")));
     contentLayout()->addWidget(hintFilter);
 
     const QString crossLinkStyle = QStringLiteral(

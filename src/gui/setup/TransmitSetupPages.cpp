@@ -860,7 +860,7 @@ constexpr QChar kHollowCircle = QChar(0x25CB);  // ○
 QString dotStyleFor(bool on)
 {
     const QString colour = on ? QStringLiteral("#20e070") : QStringLiteral("#607080");
-    return QStringLiteral("QLabel { color: %1; font-size: 14px; font-weight: bold; }").arg(colour);
+    return QStringLiteral("QLabel { color: %1; font-size: 16px; font-weight: bold; }").arg(colour);
 }
 
 }  // namespace
@@ -899,13 +899,13 @@ void SpeechProcessorPage::buildActiveProfileSection()
 
     auto* nameLabel = new QLabel(QStringLiteral("Profile:"));
     nameLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #c8d8e8; font-size: 12px; }")));
+        "QLabel { color: #c8d8e8; font-size: 13px; }")));
     nameLabel->setFixedWidth(150);
 
     m_activeProfileLabel = new QLabel(QStringLiteral("Default"));
     m_activeProfileLabel->setObjectName(QStringLiteral("lblActiveProfile"));
     m_activeProfileLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #4a7ba8; font-size: 12px; font-weight: bold; }"));
+        "QLabel { color: #4a7ba8; font-size: 13px; font-weight: bold; }"));
 
     m_manageProfileBtn = new QPushButton(QStringLiteral("Manage..."));
     m_manageProfileBtn->setObjectName(QStringLiteral("btnManageProfile"));
@@ -915,7 +915,7 @@ void SpeechProcessorPage::buildActiveProfileSection()
         "and Save / Save As / Delete buttons live there."));
     m_manageProfileBtn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-        "  border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
+        "  border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
         "QPushButton:hover { background: #203040; }"
         "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }")));
 
@@ -979,7 +979,7 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
 {
     auto* nameLbl = new QLabel(stageName);
     nameLbl->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }")));
+        "QLabel { color: #c8d8e8; font-size: 13px; font-weight: bold; }")));
     nameLbl->setMinimumWidth(110);
 
     auto* dotLbl = new QLabel(initiallyOn ? QString(kFilledCircle)
@@ -992,7 +992,7 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
     auto* stateLbl = new QLabel(initialState);
     stateLbl->setObjectName(QStringLiteral("state_") + stageName);
     stateLbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: #4a7ba8; font-size: 12px; }"));
+        "QLabel { color: #4a7ba8; font-size: 13px; }"));
     stateLbl->setMinimumWidth(90);
     // Stash the dot sibling on the state label so live-update lambdas can
     // reach it without having to re-find it from the page root.
@@ -1026,7 +1026,7 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
     if (!futurePhaseTag.isEmpty()) {
         auto* tagLbl = new QLabel(QStringLiteral("(") + futurePhaseTag + QStringLiteral(")"));
         tagLbl->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: #607080; font-size: 10px; font-style: italic; }")));
+            "QLabel { color: #607080; font-size: 11px; font-style: italic; }")));
         grid->addWidget(tagLbl, row, 4);
     }
 
@@ -1156,7 +1156,7 @@ void SpeechProcessorPage::buildStageStatusSection()
     // green-for-on) so users can tell at a glance that ALC isn't a toggle.
     if (auto* dot = group->findChild<QLabel*>(QStringLiteral("dot_ALC"))) {
         dot->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: #00b4d8; font-size: 14px; font-weight: bold; }")));
+            "QLabel { color: #00b4d8; font-size: 16px; font-weight: bold; }")));
     }
 
     // Phase Rotator — wired live (3M-3a-ii Batch 5).  Cross-links to CFC

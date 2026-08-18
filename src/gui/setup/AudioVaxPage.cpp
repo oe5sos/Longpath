@@ -62,7 +62,7 @@ static const char* kBadgeStyle =
     "  border: 1px solid #6b5426;"
     "  border-radius: 6px;"
     "  color: #c2924f;"
-    "  font-size: 10px;"
+    "  font-size: 11px;"
     "  padding: 2px 6px;"
     "}";
 
@@ -857,7 +857,7 @@ void AudioVaxPage::buildPage()
     auto* headerLabel = new QLabel(
         QStringLiteral("Virtual Audio eXchange — PipeWire sources"), this);
     headerLabel->setStyleSheet(Style::themed(
-        QStringLiteral("QLabel { color: #8aa8c0; font-size: 12px; }")));
+        QStringLiteral("QLabel { color: #8aa8c0; font-size: 13px; }")));
     insertBeforeStretch(headerLabel);
 
     // Sub-header describing the new Phase 3O model.

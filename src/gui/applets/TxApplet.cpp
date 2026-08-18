@@ -288,7 +288,7 @@ void TxApplet::buildUI()
         rfValue->setFixedWidth(22);
         rfValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         rfValue->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextPrimary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
 
         m_rfPowerSlider = rfSlider;
         m_rfPowerValue  = rfValue;
@@ -299,7 +299,7 @@ void TxApplet::buildUI()
         auto* lbl = new QLabel(QStringLiteral("RF Power:"), this);
         lbl->setFixedWidth(62);
         lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTitleText));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTitleText));
         row->addWidget(lbl);
 
         rfSlider->setFixedHeight(18);
@@ -325,7 +325,7 @@ void TxApplet::buildUI()
         tunValue->setFixedWidth(22);
         tunValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         tunValue->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextPrimary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
 
         m_tunePwrSlider = tunSlider;
         m_tunePwrValue  = tunValue;
@@ -336,7 +336,7 @@ void TxApplet::buildUI()
         auto* lbl = new QLabel(QStringLiteral("Tune Pwr:"), this);
         lbl->setFixedWidth(62);
         lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTitleText));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTitleText));
         row->addWidget(lbl);
 
         tunSlider->setFixedHeight(18);
@@ -520,7 +520,7 @@ void TxApplet::buildUI()
         auto* volLbl = new QLabel(QStringLiteral("Mon Vol:"), this);
         volLbl->setFixedWidth(62);
         volLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTitleText));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTitleText));
         volRow->addWidget(volLbl);
 
         // Range 0..100 integer; default 50 (model default 0.5f).
@@ -537,7 +537,7 @@ void TxApplet::buildUI()
         m_monitorVolumeValue->setFixedWidth(26);
         m_monitorVolumeValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_monitorVolumeValue->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextPrimary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
         volRow->addWidget(m_monitorVolumeValue);
 
         vbox->addLayout(volRow);
@@ -651,7 +651,7 @@ void TxApplet::buildUI()
         auto* bwLbl = new QLabel(QStringLiteral("TX BW"), this);
         bwLbl->setFixedWidth(56);
         bwLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; font-weight: bold; }"
+            "QLabel { color: %1; font-size: 11px; font-weight: bold; }"
         ).arg(Style::kTitleText));
         bwRow->addWidget(bwLbl);
 

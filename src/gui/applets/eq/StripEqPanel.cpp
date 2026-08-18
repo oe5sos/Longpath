@@ -218,7 +218,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             "drag HP/LP = freq + Q · Shift + drag for Q · "
             "double-click a point to change its filter type · "
             "right-click for the full menu");
-        applyThemed(hint, "QLabel { color: {{color.background.3}}; font-size: 10px; }");
+        applyThemed(hint, "QLabel { color: {{color.background.3}}; font-size: 11px; }");
         row->addWidget(hint, 1);
 
         // Reference curve overlay — paints one of several target curves

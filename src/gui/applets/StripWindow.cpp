@@ -682,7 +682,7 @@ QWidget* StripWindow::buildTxSpectrumPanel()
         "problem is downstream of this point."), page);
     note->setWordWrap(true);
     note->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
             .arg(QString::fromLatin1(Style::kTextScale)));
     col->addWidget(note);
 
@@ -1473,7 +1473,7 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
     st.live->setTextFormat(Qt::RichText);
     st.live->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     st.live->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-size: 12px; }")
+        QStringLiteral("QLabel { color: %1; font-size: 13px; }")
             .arg(QString::fromLatin1(Style::kTextPrimary)));
     col->addWidget(st.live);
 
@@ -1538,7 +1538,7 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
         // entry called "Voodoo — edited" that cannot be chosen.
         st.charMark = new QLabel(QStringLiteral("edited"), words);
         st.charMark->setStyleSheet(
-            QStringLiteral("QLabel { color: %1; font-size: 10px; "
+            QStringLiteral("QLabel { color: %1; font-size: 11px; "
                            "font-style: italic; }")
                 .arg(QString::fromLatin1(Style::kAmberText)));
         st.charMark->setToolTip(QStringLiteral(

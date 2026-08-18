@@ -59,7 +59,7 @@ static const char* kCheckStyle =
     "  border-radius: 2px; background: #0f0f1a; }"
     "QCheckBox::indicator:checked { background: #00b4d8; }";
 
-static const char* kLabelStyle = "QLabel { color: #c8d8e8; font-size: 12px; }";
+static const char* kLabelStyle = "QLabel { color: #c8d8e8; font-size: 13px; }";
 
 static const char* kDimLabelStyle = "QLabel { color: #607080; font-size: 11px; }";
 
@@ -70,7 +70,7 @@ static const char* kPillStyleOk =
     "  border: 1px solid #203040;"
     "  border-radius: 8px;"
     "  color: #80c8a0;"
-    "  font-size: 10px;"
+    "  font-size: 11px;"
     "  padding: 2px 8px;"
     "}";
 
@@ -80,7 +80,7 @@ static const char* kPillStyleError =
     "  border: 1px solid #603040;"
     "  border-radius: 8px;"
     "  color: #e05060;"
-    "  font-size: 10px;"
+    "  font-size: 11px;"
     "  padding: 2px 8px;"
     "}";
 
@@ -90,7 +90,7 @@ static const char* kPillStyleApplying =
     "  border: 1px solid #304050;"
     "  border-radius: 8px;"
     "  color: #c8d8e8;"
-    "  font-size: 10px;"
+    "  font-size: 11px;"
     "  padding: 2px 8px;"
     "}";
 

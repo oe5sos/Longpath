@@ -781,7 +781,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* dxcColorLabel = new QLabel("Spot Color:");
-    dxcColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
+    dxcColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     consoleRow->addWidget(dxcColorLabel);
 
     QColor dxcColor(s.value("DxClusterSpotColor", "#D2B48C").toString());
@@ -1018,7 +1018,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     rbnConsoleRow->addStretch();
 
     auto* rbnColorLabel = new QLabel("Spot Color:");
-    rbnColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
+    rbnColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     rbnConsoleRow->addWidget(rbnColorLabel);
 
     QColor rbnColor(s.value("RbnSpotColor", "#4488FF").toString());
@@ -1202,11 +1202,11 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     auto* filterRow = new QHBoxLayout;
     filterRow->setSpacing(6);
     auto* filterLabel = new QLabel("Spot Filter:");
-    filterLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 14px; }");
+    filterLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 16px; }");
     filterRow->addWidget(filterLabel);
 
     const QString cbStyle =
-        "QCheckBox { color: #8aa8c0; font-size: 14px; spacing: 3px; }"
+        "QCheckBox { color: #8aa8c0; font-size: 16px; spacing: 3px; }"
         "QCheckBox::indicator { width: 14px; height: 14px; }";
 
     // CQ color + checkbox
@@ -1320,7 +1320,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     });
     filterRow->addWidget(m_wsjtxColorDefault);
     auto* defaultLabel = new QLabel("Default");
-    defaultLabel->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 14px; }"));
+    defaultLabel->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 16px; }"));
     filterRow->addWidget(defaultLabel);
 
     layout->addLayout(filterRow);
@@ -1333,7 +1333,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     decodeRow->addStretch();
 
     auto* lifeLabel = new QLabel("Spot Life:");
-    lifeLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
+    lifeLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     decodeRow->addWidget(lifeLabel);
 
     int wsjtxLife = s.value("WsjtxSpotLifetime", 120).toInt();
@@ -1347,7 +1347,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     auto* wsjtxLifeValue = new QLabel(QString("%1s").arg(wsjtxLife));
     wsjtxLifeValue->setFixedWidth(35);
     wsjtxLifeValue->setAlignment(Qt::AlignRight);
-    wsjtxLifeValue->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 12px; }"));
+    wsjtxLifeValue->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 13px; }"));
     decodeRow->addWidget(wsjtxLifeValue);
 
     connect(wsjtxLifeSlider, &QSlider::valueChanged, this, [wsjtxLifeValue](int v) {
@@ -1624,7 +1624,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
+    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     consoleRow->addWidget(spotColorLabel);
 
     QColor potaColor(s.value("PotaSpotColor", "#FFFF00").toString());
@@ -1971,7 +1971,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 12px; }");
+    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     consoleRow->addWidget(spotColorLabel);
 
     QColor freedvColor(s.value("FreeDvSpotColor", "#FF8C00").toString());

@@ -101,7 +101,7 @@ void styleBadge(QLabel* l, const QString& text,
     l->setText(text);
     l->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; background: %2; border-radius: 6px; "
-        "padding: 1px 6px; font-size: 10px; }")
+        "padding: 1px 6px; font-size: 11px; }")
             .arg(QLatin1String(fg), QLatin1String(bg)));
 }
 
@@ -176,7 +176,7 @@ void QsoDetailPane::buildUi()
     col->addWidget(m_call);
 
     m_name = new QLabel(this);
-    m_name->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 12px; }")
+    m_name->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }")
                               .arg(QLatin1String(Style::kTextPrimary)));
     m_name->setWordWrap(true);
     col->addWidget(m_name);
@@ -188,7 +188,7 @@ void QsoDetailPane::buildUi()
     col->addWidget(m_where);
 
     m_stale = new QLabel(this);
-    m_stale->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+    m_stale->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                                .arg(QLatin1String(Style::kAmberWarn)));
     m_stale->setWordWrap(true);
     m_stale->setVisible(false);
@@ -259,7 +259,7 @@ void QsoDetailPane::buildUi()
     col->addLayout(turnRow);
 
     m_travel = new QLabel(this);
-    m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+    m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                                 .arg(QLatin1String(Style::kAmberWarn)));
     m_travel->setWordWrap(true);
     col->addWidget(m_travel);
@@ -292,7 +292,7 @@ void QsoDetailPane::buildUi()
 
     m_extrasEmpty = new QLabel(this);
     m_extrasEmpty->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+        QStringLiteral("QLabel { color: %1; font-size: 11px; }")
             .arg(QLatin1String(Style::kTextInactive)));
     m_extrasEmpty->setWordWrap(true);
     col->addWidget(m_extrasEmpty);
@@ -631,12 +631,12 @@ void QsoDetailPane::refreshExtras()
         if (kv.second.trimmed().isEmpty()) { continue; }
 
         auto* k = new QLabel(kv.first, m_extrasBox);
-        k->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+        k->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                              .arg(QLatin1String(Style::kTextScale)));
         auto* v = new QLabel(kv.second, m_extrasBox);
         QFont f = v->font();
         f.setFamily(QStringLiteral("Menlo"));
-        f.setPixelSize(10);
+        f.setPixelSize(11);
         v->setFont(f);
         v->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                              .arg(QLatin1String(Style::kTextPrimary)));

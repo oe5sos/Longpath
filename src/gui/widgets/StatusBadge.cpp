@@ -251,7 +251,7 @@ void StatusBadge::applyStyle()
     setStyleSheet(QStringLiteral(
         "NereusSDR--StatusBadge { background: %1; border-radius: 6px; }"
         "QLabel { color: %2; font-family: 'SF Mono', Menlo, monospace;"
-        " font-size: 12px; font-weight: 600; line-height: 1.4; }"
+        " font-size: 13px; font-weight: 600; line-height: 1.4; }"
     ).arg(bg, fg));
 }
 

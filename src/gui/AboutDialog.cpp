@@ -180,7 +180,7 @@ void AboutDialog::buildUI()
     auto* author = new QLabel(QStringLiteral("Created by JJ Boyd · KG4VCF"), this);
     author->setAlignment(Qt::AlignCenter);
     // §D exception: #aabbcc — author byline; lighter blue-gray than kTitleText (#8aa8c0).
-    author->setStyleSheet(QStringLiteral("color: #8e8e93; font-size: 12px;"));
+    author->setStyleSheet(QStringLiteral("color: #8e8e93; font-size: 13px;"));
     mainLayout->addWidget(author);
 
     // ── Divider ─────────────────────────────────────────────────────────

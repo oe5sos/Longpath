@@ -95,7 +95,7 @@ void RelayBar::paintEvent(QPaintEvent*)
 
     // Label
     QFont f = font();
-    f.setPixelSize(10);
+    f.setPixelSize(11);
     f.setBold(true);
     p.setFont(f);
     p.setPen(QColor(Style::kTextPrimary));

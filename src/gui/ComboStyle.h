@@ -19,7 +19,7 @@ inline void applyComboStyle(QComboBox* combo)
         "QComboBox {"
         "  background: %5; color: %2;"
         "  border: 1px solid %3; border-radius: 6px;"
-        "  padding: 2px 6px; font-size: 10px;"
+        "  padding: 2px 6px; font-size: 11px;"
         "}"
         "QComboBox::drop-down { border: none; width: 18px; }"
         // Reuse the spin-down arrow asset (shared with QSpinBox styling)

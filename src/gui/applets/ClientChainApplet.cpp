@@ -61,7 +61,7 @@ QLabel* makeBadge(const QString& text, const char* bg, const char* fg,
     lbl->setStyleSheet(QStringLiteral(
         "QLabel {"
         "  background: %1; color: %2;"
-        "  font-size: 8px; font-weight: bold;"
+        "  font-size: 9px; font-weight: bold;"
         "  border-radius: 6px; padding: 1px 4px;"
         "}"
     ).arg(QLatin1String(bg), QLatin1String(fg)));
@@ -74,7 +74,7 @@ QLabel* makeSecondaryLabel(const QString& text, QWidget* parent)
 {
     auto* lbl = new QLabel(text, parent);
     lbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }"
+        "QLabel { color: %1; font-size: 11px; }"
     ).arg(Style::kTextSecondary));
     return lbl;
 }
@@ -130,7 +130,7 @@ ClientChainApplet::ClientChainApplet(TciServer* server, QWidget* parent)
         m_autoRefreshCheck->setToolTip(
             QStringLiteral("Refresh the client list automatically every second"));
         m_autoRefreshCheck->setStyleSheet(QStringLiteral(
-            "QCheckBox { color: %1; font-size: 10px; }"
+            "QCheckBox { color: %1; font-size: 11px; }"
             "QCheckBox::indicator { width: 12px; height: 12px; }"
         ).arg(Style::kTextSecondary));
         connect(m_autoRefreshCheck, &QCheckBox::toggled,
@@ -244,7 +244,7 @@ QWidget* ClientChainApplet::buildClientRow(
                                        : session->peer,
                                    row);
         peerLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; font-weight: bold; }"
+            "QLabel { color: %1; font-size: 11px; font-weight: bold; }"
         ).arg(Style::kTextPrimary));
         peerLbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
         hbox->addWidget(peerLbl);

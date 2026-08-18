@@ -42,8 +42,32 @@ AppletWidget::AppletWidget(RadioModel* model, QWidget* parent)
     : QWidget(parent)
     , m_model(model)
 {
+    // ── Die Schriftgroesse gehoert NICHT in dieses Stylesheet ────────
+    //
+    // Hier stand `QLabel { color: %1; font-size: 11px; }`. Ein
+    // Qt-Stylesheet kaskadiert auf JEDES untergeordnete Label und
+    // GEWINNT gegen setFont(). Damit war die gesamte Schriftleiter
+    // innerhalb der Applets ausser Kraft: jedes Instrument, das seine
+    // Groesse per setFont() setzt, wurde auf 11 px gezogen.
+    //
+    // Sichtbar geworden an der Frequenzanzeige (Betreiber, 2026-08-18).
+    // FrequencyInstrument berechnet die feste Breite jeder Ziffer aus
+    // der Zelle der 38-px-Ziffernschrift und zeichnete die Glyphe dann
+    // mit 11 px — jedes Schild dreieinhalbmal so breit wie sein
+    // Zeichen. Die Zeile zerfiel in gleich weit stehende Zeichen
+    // („7 . 1 3 1 . 3 0 0"), obwohl die drei Abstandskonstanten in
+    // FrequencyInstrument.cpp genau das verhindern sollen.
+    //
+    // Die Farbe bleibt im Stylesheet — sie soll kaskadieren. Die
+    // Groesse kommt per setFont(): die erbt genauso an alle Kinder,
+    // aber ein Kind mit eigenem setFont() behaelt seines.
+    setFont([this] {
+        QFont f = font();
+        f.setPixelSize(Style::kFontSmall);
+        return f;
+    }());
     setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 11px; }"
+        "QLabel { color: %1; }"
     ).arg(Style::kTextPrimary)
     + Style::buttonBaseStyle()
     + Style::sliderHStyle());
@@ -63,13 +87,13 @@ QWidget* AppletWidget::appletTitleBar(const QString& text)
 
     auto* grip = new QLabel(QStringLiteral("\u22EE\u22EE"), bar);
     grip->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; background: transparent; }"
+        "QLabel { color: %1; font-size: 11px; background: transparent; }"
     ).arg(Style::kTextScale));
     hbox->addWidget(grip);
 
     auto* label = new QLabel(text, bar);
     label->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; font-weight: bold;"
+        "QLabel { color: %1; font-size: 11px; font-weight: bold;"
         " background: transparent; }"
     ).arg(Style::kTitleText));
     hbox->addWidget(label);
@@ -88,7 +112,7 @@ QHBoxLayout* AppletWidget::sliderRow(const QString& labelText,
     auto* lbl = new QLabel(labelText, this);
     lbl->setFixedWidth(labelWidth);
     lbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+        "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
     row->addWidget(lbl);
 
     slider->setFixedHeight(18);

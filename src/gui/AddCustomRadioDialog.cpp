@@ -240,7 +240,7 @@ void AddCustomRadioDialog::buildUi()
             "Discovery will not find it automatically — it is saved\n"
             "to your settings and shown in the list at launch."));
     infoLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-size: 12px; padding: 4px; }")
+        QStringLiteral("QLabel { color: %1; font-size: 13px; padding: 4px; }")
         .arg(Style::kTextSecondary));
     outerLayout->addWidget(infoLabel);
 
@@ -777,7 +777,7 @@ void AddCustomRadioDialog::showInlineError(const QString& message)
     m_feedbackFrame->setStyleSheet(QStringLiteral(
         "QFrame { background: #2a1010; border: 1px solid #c14848; border-radius: 4px; }"));
     m_feedbackLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #e07070; font-size: 12px; }"));
+        "QLabel { color: #e07070; font-size: 13px; }"));
     m_feedbackLabel->setText(message);
     m_feedbackFrame->show();
 }
@@ -789,7 +789,7 @@ void AddCustomRadioDialog::showInlineInfo(const QString& message)
     m_feedbackFrame->setStyleSheet(Style::themed(QStringLiteral(
         "QFrame { background: #0a1a28; border: 1px solid #4a7ba8; border-radius: 4px; }")));
     m_feedbackLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #8aa8c0; font-size: 12px; }")));
+        "QLabel { color: #8aa8c0; font-size: 13px; }")));
     m_feedbackLabel->setText(message);
     m_feedbackFrame->show();
 }

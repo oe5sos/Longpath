@@ -99,7 +99,7 @@ constexpr const char* kCheckStyle =
     "QCheckBox { color: #c8d8e8; }";
 
 constexpr const char* kLabelStyle =
-    "QLabel { color: #8090a0; font-size: 10px; }";
+    "QLabel { color: #8090a0; font-size: 11px; }";
 
 constexpr const char* kHeaderStyle =
     "QLabel { color: #8aa8c0; font-weight: bold; font-size: 11px;"

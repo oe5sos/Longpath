@@ -38,7 +38,7 @@ namespace NereusSDR {
 //   transparent background, no border, 14 px glyph font, flattens
 //   the checked state by dimming opacity (mute visual cue).
 static const char* kSpeakerBtnStyle =
-    "QPushButton { background: transparent; border: none; font-size: 14px; padding: 0; }"
+    "QPushButton { background: transparent; border: none; font-size: 16px; padding: 0; }"
     "QPushButton:checked { opacity: 0.4; }";
 
 // Horizontal volume slider — copies AetherSDR TitleBar.cpp:195-198
@@ -51,7 +51,7 @@ static const char* kSliderStyle =
 // Inset value readout — STYLEGUIDE.md line 137 "Inset Value Display".
 static const char* kDbLabelStyle =
     "QLabel {"
-    "  font-size: 10px;"
+    "  font-size: 11px;"
     "  background: #0a0a18;"
     "  border: 1px solid #1e2e3e;"
     "  border-radius: 6px;"

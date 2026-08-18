@@ -4179,7 +4179,7 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
                               : QDateTime::currentDateTime();
         const QString stamp = now.toString(QStringLiteral("hh:mm:ss"));
         QFont f = p.font();
-        f.setPixelSize(10);
+        f.setPixelSize(11);
         p.setFont(f);
         p.setPen(QColor(200, 220, 255));
         const int pad = 4;
@@ -4202,7 +4202,7 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
     }
 
     QFont font = p.font();
-    font.setPixelSize(10);
+    font.setPixelSize(11);
     p.setFont(font);
     // From Thetis display.cs:2003 — grid_text_color (now configurable).
     p.setPen(m_gridTextColor);
@@ -6391,7 +6391,7 @@ void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoi
         "QMenu::item {"
         "  color: %3;"
         "  padding: 4px 12px;"
-        "  font-size: 12px;"
+        "  font-size: 13px;"
         "}"
         "QMenu::item:selected {"
         "  background: %4;"

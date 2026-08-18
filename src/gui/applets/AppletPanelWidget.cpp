@@ -289,14 +289,14 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     // Grip dots (⋮⋮) — from AetherSDR: #607080, 10px
     auto* grip = new QLabel(QStringLiteral("\u22EE\u22EE"), titleBar);
     grip->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; background: transparent; }"
+        "QLabel { color: %1; font-size: 11px; background: transparent; }"
     ).arg(Style::kTextScale));
     titleLayout->addWidget(grip);
 
     // Title label — from AetherSDR: #8aa8c0, 10px bold
     auto* label = new QLabel(title, titleBar);
     label->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; font-weight: bold;"
+        "QLabel { color: %1; font-size: 11px; font-weight: bold;"
         " background: transparent; }"
     ).arg(Style::kTitleText));
     titleLayout->addWidget(label);

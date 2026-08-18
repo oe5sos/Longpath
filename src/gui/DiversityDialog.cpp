@@ -192,7 +192,7 @@ DiversityDialog::DiversityDialog(RadioModel* radioModel, QWidget* parent)
     m_pauseOverlay = new QWidget(this);
     m_pauseOverlay->setStyleSheet(Style::themed(QStringLiteral(
         "background: rgba(20, 30, 45, 220);"
-        "color: #ffb800; font-size: 18px; font-weight: bold;")));
+        "color: #ffb800; font-size: 22px; font-weight: bold;")));
     auto* overlayLayout = new QVBoxLayout(m_pauseOverlay);
     overlayLayout->setContentsMargins(0, 0, 0, 0);
     auto* overlayLbl = new QLabel(

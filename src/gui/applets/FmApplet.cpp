@@ -141,7 +141,7 @@ static inline QString fmButtonStyle()
         "QPushButton {"
         "  background: %1; color: %2;"
         "  border: 1px solid %3; border-radius: 6px;"
-        "  padding: 2px 4px; font-size: 10px; font-weight: bold;"
+        "  padding: 2px 4px; font-size: 11px; font-weight: bold;"
         "}"
         "QPushButton:hover { background: %4; }"
     ).arg(Style::kButtonBg,
@@ -175,7 +175,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("FM Mic"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -202,7 +202,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Dev"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -284,7 +284,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Offset"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -311,7 +311,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Dir"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -345,7 +345,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Profile"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 

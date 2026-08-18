@@ -83,7 +83,7 @@ QString monoLabelStyle()
 QString sectionLabelStyle()
 {
     return QStringLiteral(
-        "QLabel { color: %1; font-size: 12px; }")
+        "QLabel { color: %1; font-size: 13px; }")
         .arg(Style::kTextPrimary);
 }
 
@@ -166,7 +166,7 @@ void VaxLinuxFirstRunDialog::buildUi()
         badge->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; background: %2; border: 1px solid %1;"
             " padding: 1px 6px; border-radius: 2px;"
-            " font-size: 10px; font-weight: bold; letter-spacing: 0.5px; }")
+            " font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }")
             .arg(Style::kAmberWarn, Style::kInsetBg));
         headerLayout->addWidget(badge);
 
@@ -272,7 +272,7 @@ void VaxLinuxFirstRunDialog::buildUi()
                 auto* distroLabel = new QLabel(
                     QString::fromUtf8(row.label), installFrame);
                 distroLabel->setStyleSheet(QStringLiteral(
-                    "QLabel { color: %1; font-size: 10px; font-weight: bold; }")
+                    "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
                     .arg(Style::kAmberText));
                 installLayout->addWidget(distroLabel);
 

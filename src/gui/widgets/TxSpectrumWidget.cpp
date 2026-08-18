@@ -201,7 +201,7 @@ void TxSpectrumWidget::paintEvent(QPaintEvent*)
     p.drawRect(plot);
 
     QFont small = p.font();
-    small.setPixelSize(10);
+    small.setPixelSize(11);
     p.setFont(small);
     const QFontMetrics sfm(small);
 

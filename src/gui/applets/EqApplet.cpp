@@ -326,7 +326,7 @@ void EqApplet::buildUI()
 
         auto* presetLbl = new QLabel(QStringLiteral("Preset"), this);
         presetLbl->setStyleSheet(Style::themed(
-            QStringLiteral("QLabel { color: #8090a0; font-size: 10px; }")));
+            QStringLiteral("QLabel { color: #8090a0; font-size: 11px; }")));
         row->addWidget(presetLbl);
 
         // Control 17: Preset combo — Flat / Voice / Music / Custom

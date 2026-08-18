@@ -87,7 +87,7 @@ namespace {
 constexpr const char* kLedActiveStyle =
     "QLabel {"
     "  background: #20c060; border-radius: 4px;"
-    "  color: #0a0a14; font-size: 8px; font-weight: bold;"
+    "  color: #0a0a14; font-size: 9px; font-weight: bold;"
     "  padding: 0px 2px;"
     "}";
 
@@ -96,7 +96,7 @@ constexpr const char* kLedActiveStyle =
 constexpr const char* kLedInactiveStyle =
     "QLabel {"
     "  background: #405060; border-radius: 4px;"
-    "  color: #6080a0; font-size: 8px; font-weight: bold;"
+    "  color: #6080a0; font-size: 9px; font-weight: bold;"
     "  padding: 0px 2px;"
     "}";
 
@@ -284,7 +284,7 @@ void PureSignalApplet::buildUI()
     m_correctionDb->setObjectName(QStringLiteral("PsAppletCorrectionDbLabel"));
 
     const QString infoStyle = QStringLiteral(
-        "QLabel { font-size: 10px; color: %1; }").arg(Style::kTextSecondary);
+        "QLabel { font-size: 11px; color: %1; }").arg(Style::kTextSecondary);
     for (QLabel* lbl : {m_iterations, m_feedbackDb, m_correctionDb}) {
         lbl->setStyleSheet(infoStyle);
         vbox->addWidget(lbl);

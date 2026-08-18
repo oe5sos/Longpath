@@ -98,7 +98,7 @@ constexpr const char* kTableStyle =
     "  background: #00b4d8; color: #0a0a18;"
     "}"
     "QHeaderView::section {"
-    "  background: #1a2a38; color: #8aa8c0; font-size: 10px;"
+    "  background: #1a2a38; color: #8aa8c0; font-size: 11px;"
     "  border: 1px solid #1e2e3e; padding: 2px;"
     "}";
 
@@ -131,7 +131,7 @@ constexpr const char* kSpinStyle =
     "}";
 
 constexpr const char* kCheckStyle = "QCheckBox { color: #c8d8e8; }";
-constexpr const char* kLabelStyle = "QLabel { color: #8090a0; font-size: 10px; }";
+constexpr const char* kLabelStyle = "QLabel { color: #8090a0; font-size: 11px; }";
 
 constexpr int kFieldWidth = 140;
 

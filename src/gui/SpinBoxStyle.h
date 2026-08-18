@@ -24,7 +24,7 @@ inline void applySpinBoxStyle(QAbstractSpinBox* spin)
         "QAbstractSpinBox {"
         "  background: %1; color: %2;"
         "  border: 1px solid %3; border-radius: 6px;"
-        "  padding: 1px 4px; font-size: 10px;"
+        "  padding: 1px 4px; font-size: 11px;"
         "}"
         // Up / down buttons — explicit subcontrol-position so Fusion's
         // native rendering doesn't get a chance to clip them.  Width 16

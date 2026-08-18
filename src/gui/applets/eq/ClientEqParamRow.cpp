@@ -339,14 +339,14 @@ private:
         // QLabels until focused; subtle dark inset + cyan border on
         // focus to indicate edit mode (matches ClientCompKnob).
         const QString freqStyle = QString(
-            "QLineEdit { color: %1; font-size: 10px; font-weight: bold;"
+            "QLineEdit { color: %1; font-size: 11px; font-weight: bold;"
             " background: transparent; border: 1px solid transparent;"
             " border-radius: 2px; padding: 0;"
             " selection-background-color: %2; }"
             "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
             ).arg(accentName, selBg);
         const QString gainStyle = QString(
-            "QLineEdit { color: %1; font-size: 12px; font-weight: bold;"
+            "QLineEdit { color: %1; font-size: 13px; font-weight: bold;"
             " background: transparent; border: 1px solid transparent;"
             " border-radius: 2px; padding: 1px 0;"
             " selection-background-color: %3; }"
@@ -354,7 +354,7 @@ private:
             "QLineEdit:read-only { color: %2; }"
             ).arg(accentName, accentName, selBg);
         const QString qStyle = QString(
-            "QLineEdit { color: %1; font-size: 10px;"
+            "QLineEdit { color: %1; font-size: 11px;"
             " background: transparent; border: 1px solid transparent;"
             " border-radius: 2px; padding: 0;"
             " selection-background-color: %2; }"

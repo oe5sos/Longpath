@@ -76,7 +76,34 @@ def measure() -> tuple[dict, dict]:
     # Bremse, die zu hoch zaehlt, laesst echtes Wachstum durch, solange
     # es unter ihrer falschen Decke bleibt.
     palette_values = {v.lower() for v in palette.values()}
-    unnamed = {c for c in lits if c.lower() not in palette_values}
+
+    # Ein Vorgabewert hinter einem Themenschlüssel ist BENANNT, auch wenn
+    # er als Hexwert dasteht: `eqInk("eq-bg", "#191919")` heisst eq-bg,
+    # und #191919 ist der portierte Thetis-Wert dahinter.
+    #
+    # Ohne diese Ausnahme zaehlt die Bremse solche Werte als Drift — und
+    # verlangt damit genau das, was CLAUDE.md verbietet: eine portierte
+    # Konstante an die Hauspalette anzugleichen. Am 2026-08-18 ist das
+    # einmal passiert (acht Werte in ParametricEqWidget.cpp, gefangen von
+    # tst_parametric_eq_widget_paint); nach der Ruecknahme meldete die
+    # Bremse 243 -> 249 und forderte den Fehler ein zweites Mal.
+    keyed: set[str] = set()
+    for colour, hits in lits.items():
+        for rel, lineno in hits:
+            path = REPO / rel
+            try:
+                line = path.read_text(encoding="utf-8",
+                                      errors="replace").split("\n")[lineno - 1]
+            except Exception:
+                continue
+            if colour.lower() in [g.lower() for g in
+                                  audit.RE_KEYED_DEFAULT.findall(line)]:
+                keyed.add(colour.lower())
+                break
+
+    unnamed = {c for c in lits
+               if c.lower() not in palette_values
+               and c.lower() not in keyed}
 
     font_hits: list[str] = []
     for path in sorted(REPO.glob("src/**/*")):
@@ -98,6 +125,7 @@ def measure() -> tuple[dict, dict]:
         "unnamed_colours": len(unnamed),
         "colour_literals": sum(len(v) for v in lits.values()),
         "off_ladder_font_sizes": len(font_hits),
+        "keyed_port_defaults": len(keyed),
     }
     return counts, {"off_ladder": font_hits}
 
@@ -122,17 +150,24 @@ def main() -> int:
         return 0
 
     base = json.loads(BASELINE.read_text(encoding="utf-8"))
-    grown, shrunk = [], []
+    grown, shrunk, fresh = [], [], []
     for key, now in counts.items():
         was = base.get(key)
         if was is None:
-            grown.append((key, "neu", now))
+            # Eine NEUE Kennzahl ist kein Wachstum, sondern eine neue
+            # Messung. Sie als Fehler zu melden hiesse, dass das
+            # Hinzufuegen einer Messung den Bau bricht — dann fuegt
+            # niemand eine hinzu. Sie wird aufgenommen und ab dem
+            # naechsten Lauf ueberwacht.
+            fresh.append((key, now))
         elif now > was:
             grown.append((key, was, now))
         elif now < was:
             shrunk.append((key, was, now))
 
     if args.update_baseline:
+        for key, now in fresh:
+            print(f"[style-drift] neue Kennzahl aufgenommen: {key} = {now}")
         if grown:
             print("[style-drift] Decke NICHT nachgezogen — es ist "
                   "gewachsen, nicht gefallen:", file=sys.stderr)
@@ -162,6 +197,10 @@ def main() -> int:
             print(f"    {line}")
         if len(detail["off_ladder"]) > 40:
             print(f"    ... und {len(detail['off_ladder']) - 40} weitere")
+
+    for key, now in fresh:
+        print(f"  ++ {key:26s} {now:5d}   neu — mit --update-baseline "
+              f"aufnehmen")
 
     if grown:
         print("\n[style-drift] FEHLER — die Drift ist gewachsen:",

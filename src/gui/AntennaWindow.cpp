@@ -542,7 +542,7 @@ void AntennaWindow::buildUi()
 
     m_actionSub = new QLabel(QString{}, actionFrame);
     m_actionSub->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 12px; border: none; }")
+        "QLabel { color: %1; font-size: 13px; border: none; }")
             .arg(QLatin1String(Style::kTextPrimary)));
     m_actionSub->setWordWrap(true);
 
@@ -656,7 +656,7 @@ void AntennaWindow::buildUi()
 
     m_source = new QLabel(QString{}, this);
     m_source->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
             .arg(QLatin1String(Style::kTextScale)));
     col->addWidget(m_source);
 
@@ -1314,7 +1314,7 @@ void AntennaWindow::refresh()
             m_spanVal->setText(m_sweep.isEmpty() ? QStringLiteral("—")
                                                  : QStringLiteral("none"));
             m_spanVal->setStyleSheet(QStringLiteral(
-                "QLabel { color: %1; font-size: 15px; border: none; }")
+                "QLabel { color: %1; font-size: 16px; border: none; }")
                     .arg(QLatin1String(m_sweep.isEmpty()
                                            ? Style::kTextInactive
                                            : Style::kRedBorder)));

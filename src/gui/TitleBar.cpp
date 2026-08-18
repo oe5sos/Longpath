@@ -438,7 +438,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     // From AetherSDR TitleBar.cpp:101-104 — text swapped to "NereusSDR".
     auto* appName = new QLabel(QStringLiteral("NereusSDR"), this);
     // App-name label. From AetherSDR TitleBar.cpp:102.
-    appName->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 14px; font-weight: bold; }")
+    appName->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 16px; font-weight: bold; }")
                            .arg(QLatin1String(Style::kAccent)));
     appName->setAlignment(Qt::AlignCenter);
     m_hbox->addWidget(appName);
@@ -454,7 +454,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     if (!tag.isEmpty()) {
         auto* build = new QLabel(tag, this);
         build->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }")
+            "QLabel { color: %1; font-size: 11px; }")
             .arg(QLatin1String(Style::kTextScale)));
         build->setToolTip(QStringLiteral(
             "Branch and commit this binary was built from"));
@@ -575,7 +575,7 @@ void TitleBar::setMenuBar(QMenuBar* mb)
     }
     // Menu-bar restyle. From AetherSDR TitleBar.cpp:285-290.
     mb->setStyleSheet(QStringLiteral(
-        "QMenuBar { background: transparent; color: %1; font-size: 12px; }"
+        "QMenuBar { background: transparent; color: %1; font-size: 13px; }"
         "QMenuBar::item { padding: 4px 8px; }"
         "QMenuBar::item:selected { background: %2; color: #cfe2f5; }"
         "QMenu { background: %3; color: %5; border: 1px solid %4; }"

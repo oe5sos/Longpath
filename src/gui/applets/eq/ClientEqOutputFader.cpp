@@ -108,7 +108,7 @@ ClientEqOutputFader::ClientEqOutputFader(QWidget* parent) : QWidget(parent)
 
     auto* top = new QLabel("OUT");
     top->setAlignment(Qt::AlignCenter);
-    applyThemed(top, "QLabel { color: {{color.text.secondary}}; font-size: 10px; font-weight: bold;"
+    applyThemed(top, "QLabel { color: {{color.text.secondary}}; font-size: 11px; font-weight: bold;"
         " background: transparent; border: none; }");
     root->addWidget(top);
 
@@ -121,7 +121,7 @@ ClientEqOutputFader::ClientEqOutputFader(QWidget* parent) : QWidget(parent)
     m_valueEdit = new QLineEdit;
     m_valueEdit->setAlignment(Qt::AlignCenter);
     m_valueEdit->setFrame(false);
-    applyThemed(m_valueEdit, "QLineEdit { color: {{color.text.primary}}; font-size: 10px; font-weight: bold;"
+    applyThemed(m_valueEdit, "QLineEdit { color: {{color.text.primary}}; font-size: 11px; font-weight: bold;"
         " background: transparent; border: 1px solid transparent;"
         " border-radius: 2px; padding: 0;"
         " selection-background-color: {{color.background.2}}; }"
@@ -286,7 +286,7 @@ void ClientEqOutputFader::paintEvent(QPaintEvent*)
 
     // dB scale labels + tick marks on the left side.
     QFont f = p.font();
-    f.setPixelSize(8);
+    f.setPixelSize(9);
     p.setFont(f);
     const QFontMetrics fm(f);
     const int textRight = kLabelColW - 2;

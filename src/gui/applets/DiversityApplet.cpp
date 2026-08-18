@@ -129,7 +129,7 @@ DiversityApplet::DiversityApplet(RadioModel* model, QWidget* parent)
 
         auto* lbl = new QLabel(QStringLiteral("ESC"), this);
         lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
         lbl->setFixedWidth(62);
         row->addWidget(lbl);
 

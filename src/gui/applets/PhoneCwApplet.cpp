@@ -132,7 +132,7 @@ static inline QString phoneButtonStyle()
 {
     return QStringLiteral(
         "QPushButton { background: #204060; border: 1px solid %1;"
-        "  border-radius: 6px; color: %2; font-size: 10px; font-weight: bold; }"
+        "  border-radius: 6px; color: %2; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: %3; }"
     ).arg(NereusSDR::Style::kBorder,
           NereusSDR::Style::kTextPrimary,
@@ -321,7 +321,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         // Control 5b: Value label — widened to 35px for "-40 dB" / "+10 dB" strings.
         // Phase 3M-1b: shows dB value e.g. "-6 dB".
         m_micLevelLabel = new QLabel(QStringLiteral("-6 dB"), page);
-        m_micLevelLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextPrimary));
+        m_micLevelLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextPrimary));
         m_micLevelLabel->setFixedWidth(35);
         m_micLevelLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(m_micLevelLabel);
@@ -370,7 +370,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         // Numeric value label, right-aligned: 8px kTextPrimary — compact
         // value readout matching adjacent slider tick labels.
         m_procValueLabel = new QLabel(QStringLiteral("0 dB"), procGroup);
-        m_procValueLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 8px; }").arg(NereusSDR::Style::kTextPrimary));
+        m_procValueLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 9px; }").arg(NereusSDR::Style::kTextPrimary));
         m_procValueLabel->setAlignment(Qt::AlignRight | Qt::AlignBottom);
         procVbox->addWidget(m_procValueLabel);
 
@@ -425,7 +425,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         row->addWidget(m_monSlider, 1);
 
         auto* monLabel = new QLabel(QStringLiteral("50"), page);
-        monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextPrimary));
+        monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextPrimary));
         monLabel->setFixedWidth(22);
         monLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(monLabel);
@@ -506,7 +506,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("AM Car:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(40);
         row->addWidget(lbl);
 
@@ -584,7 +584,7 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("FM MIC:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(kLeftColW);
         row->addWidget(lbl);
 
@@ -610,7 +610,7 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Dev:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(28);
         row->addWidget(lbl);
 
@@ -681,7 +681,7 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Offset:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(kLeftColW);
         row->addWidget(lbl);
 
@@ -707,7 +707,7 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Dir:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(24);
         row->addWidget(lbl);
 
@@ -746,7 +746,7 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Profile:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(kLeftColW);
         row->addWidget(lbl);
 
@@ -767,7 +767,7 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Memory:"), page);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
         lbl->setFixedWidth(kLeftColW);
         row->addWidget(lbl);
 

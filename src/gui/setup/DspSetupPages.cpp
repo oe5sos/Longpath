@@ -482,10 +482,10 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     };
 
     // Shared label/control style constants (mirror SetupPage::makeLabeledRow).
-    static const QString kLbl = "QLabel { color: #c8d8e8; font-size: 12px; }";
+    static const QString kLbl = "QLabel { color: #c8d8e8; font-size: 13px; }";
     static const QString kCombo =
         "QComboBox { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 2px 4px; }"
+        "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
         "selection-background-color: #00b4d8; }";
@@ -494,7 +494,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         "QSlider::handle:horizontal { background: #00b4d8; width: 12px; height: 12px; "
         "border-radius: 6px; margin: -4px 0; }";
     static const QString kInfoLbl =
-        "QLabel { color: #5a8aaa; font-size: 12px; font-style: italic; }";
+        "QLabel { color: #5a8aaa; font-size: 13px; font-style: italic; }";
 
     // Label style used inside lambdas (non-static copy so it can be captured).
     const QString lblStyle = kLbl;
@@ -525,7 +525,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         row->setSpacing(8);
 
         auto* label = new QLabel(labelText);
-        label->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 12px; }"));
+        label->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 13px; }"));
         label->setFixedWidth(80);
         row->addWidget(label);
 
@@ -540,7 +540,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         row->addWidget(slider, /*stretch=*/1);
 
         auto* value = new QLabel(QString::number(defaultValue) + suffix);
-        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }"));
+        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-size: 13px; font-weight: bold; }"));
         value->setFixedWidth(48);
         value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(value);
@@ -567,7 +567,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         row->setSpacing(8);
 
         auto* label = new QLabel(labelText);
-        label->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 12px; }"));
+        label->setStyleSheet(Style::themed("QLabel { color: #8aa8c0; font-size: 13px; }"));
         label->setFixedWidth(80);
         row->addWidget(label);
 
@@ -583,7 +583,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         row->addWidget(slider, 1);
 
         auto* value = new QLabel;
-        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-size: 12px; font-weight: bold; }"));
+        value->setStyleSheet(Style::themed("QLabel { color: #c8d8e8; font-size: 13px; font-weight: bold; }"));
         value->setFixedWidth(56);
         value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         value->setText(QString::number(defaultValue, 'f', decimals) + suffix);
@@ -605,7 +605,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* preRdo  = new QRadioButton("Pre-AGC");
         auto* postRdo = new QRadioButton("Post-AGC");
         preRdo->setStyleSheet(Style::themed(
-            "QRadioButton { color: #c8d8e8; font-size: 12px; }"
+            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
             "QRadioButton::indicator { width: 14px; height: 14px; }"
             "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
             "border-radius: 7px; background: #1a2a3a; }"
@@ -822,7 +822,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             for (int i = 0; i < gmLabels.size(); ++i) {
                 auto* rdo = new QRadioButton(gmLabels[i]);
                 rdo->setStyleSheet(Style::themed(
-                    "QRadioButton { color: #c8d8e8; font-size: 12px; }"
+                    "QRadioButton { color: #c8d8e8; font-size: 13px; }"
                     "QRadioButton::indicator { width: 14px; height: 14px; }"
                     "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
                     "border-radius: 7px; background: #1a2a3a; }"
@@ -1038,7 +1038,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         QVBoxLayout* mdlGrp = makeGroup(tabLay, "RNNoise Model (Global)");
 
         auto* modelLabel = new QLabel;
-        modelLabel->setStyleSheet("QLabel { color: #4a7ba8; font-size: 12px; }");
+        modelLabel->setStyleSheet("QLabel { color: #4a7ba8; font-size: 13px; }");
         {
             const QString saved = AppSettings::instance().value("Nr3ModelPath", "").toString();
             modelLabel->setText(saved.isEmpty() ? "Default (large)" : QFileInfo(saved).baseName());
@@ -1049,7 +1049,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* useModelBtn = new QPushButton("Use Model...");
         useModelBtn->setStyleSheet(Style::themed(
             "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-            "border-radius: 6px; color: #c8d8e8; font-size: 12px; padding: 3px 10px; }"
+            "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
             "QPushButton:hover { background: #203040; }"
             "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }"));
         auto* defBtn = new QPushButton("Default");
@@ -1175,7 +1175,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 
         // Algorithm radio — rdoSBNR1/2/3 [v2.10.3.13]
         const QString rdoStyle =
-            "QRadioButton { color: #c8d8e8; font-size: 12px; }"
+            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
             "QRadioButton::indicator { width: 14px; height: 14px; }"
             "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
             "border-radius: 7px; background: #1a2a3a; }"
@@ -1816,7 +1816,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     // Match SetupPage::makeLabeledRow label styling (kLabelStyle in
     // SetupPage.cpp).  Inlined here because the helper is file-scope.
     sidetoneLbl->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #c8d8e8; font-size: 12px; }")));
+        "QLabel { color: #c8d8e8; font-size: 13px; }")));
     auto* sidetoneVol = new QSlider(Qt::Horizontal);
     sidetoneVol->setRange(0, 100);
     sidetoneVol->setStyleSheet(Style::themed(

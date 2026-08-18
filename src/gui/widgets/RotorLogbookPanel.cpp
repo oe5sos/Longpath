@@ -1159,7 +1159,7 @@ void RotorLogbookPanel::openRotorSetupDialog()
     installLog->setVisible(false);
     installLog->setStyleSheet(
         QStringLiteral("QPlainTextEdit { background: %1; color: %2; "
-                       "font-family: Menlo, monospace; font-size: 10px; "
+                       "font-family: Menlo, monospace; font-size: 11px; "
                        "border: 1px solid %3; }")
             .arg(QString::fromLatin1(Style::kInsetBg),
                  QString::fromLatin1(Style::kTextSecondary),
@@ -1457,7 +1457,7 @@ void RotorLogbookPanel::updateSolarLine()
 
     m_solarLine->setText(text);
     m_solarLine->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(QString::fromLatin1(s.greyline ? Style::kAmberText
                                             : Style::kTextSecondary)));
 }
@@ -1686,7 +1686,7 @@ void RotorLogbookPanel::updateWorkedLine(const QString& call)
 
     m_workedLine->setText(bits.join(QStringLiteral(" · ")));
     m_workedLine->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }").arg(colour));
+        "QLabel { color: %1; font-size: 11px; }").arg(colour));
 }
 
 void RotorLogbookPanel::updateFlagFor(const QString& call)

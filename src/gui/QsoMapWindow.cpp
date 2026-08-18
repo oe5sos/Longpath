@@ -129,7 +129,7 @@ void QsoMapWindow::buildUi()
 
     auto caption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
-        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                              .arg(QString::fromLatin1(Style::kTextScale)));
         return l;
     };
@@ -478,7 +478,7 @@ void QsoMapWindow::rebuildFilterPills()
     auto addCaption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
         l->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }")
+            "QLabel { color: %1; font-size: 11px; }")
             .arg(QString::fromLatin1(Style::kTextScale)));
         m_pillRow->addWidget(l);
     };

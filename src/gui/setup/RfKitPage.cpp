@@ -198,7 +198,7 @@ QWidget* RfKitPage::buildRf2ksTab()
         "RF2K-S firmware does not expose antenna names via REST. "
         "Labels are stored locally in NereusSDR."), labelsBox);
     note->setWordWrap(true);
-    note->setStyleSheet(Style::themed(QStringLiteral("color:#8899aa; font-size:10px;")));
+    note->setStyleSheet(Style::themed(QStringLiteral("color:#8899aa; font-size:11px;")));
     labelsFm->addRow(note);
     for (int i = 0; i < 4; ++i) {
         m_antLabelEdits[i] = new QLineEdit(labelsBox);

@@ -179,7 +179,7 @@ void StationPhoto::paintEvent(QPaintEvent*)
 
     p.setPen(QColor(Style::kTextScale));
     QFont f = p.font();
-    f.setPixelSize(10);
+    f.setPixelSize(11);
     p.setFont(f);
     p.drawText(rect().adjusted(8, 8, -8, -8),
                Qt::AlignCenter | Qt::TextWordWrap, m_placeholder);

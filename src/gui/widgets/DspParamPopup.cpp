@@ -65,7 +65,7 @@ void DspParamPopup::addRadioGroup(const QString& label, const QStringList& optio
                                    int defaultIdx, std::function<void(int)> onChange)
 {
     auto* lbl = new QLabel(label);
-    lbl->setStyleSheet(Style::themed("QLabel { color: #8090a0; font-size: 10px; font-weight: bold; }"));
+    lbl->setStyleSheet(Style::themed("QLabel { color: #8090a0; font-size: 11px; font-weight: bold; }"));
     m_layout->addWidget(lbl);
 
     auto* row = new QHBoxLayout;

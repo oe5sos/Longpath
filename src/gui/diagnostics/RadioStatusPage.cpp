@@ -225,7 +225,7 @@ void RadioStatusPage::buildStatusBar(QFrame* bar)
 
     auto makeCol = [&](const QString& label) -> QLabel* {
         auto* lbl = new QLabel(label, bar);
-        lbl->setStyleSheet(QStringLiteral("font-size: 10px; color: %1;")
+        lbl->setStyleSheet(QStringLiteral("font-size: 11px; color: %1;")
                                .arg(QLatin1String(Style::kGreenText)));
         return lbl;
     };
@@ -307,7 +307,7 @@ void RadioStatusPage::buildPaStatusCard(QFrame* card)
 
     auto* title = new QLabel(QStringLiteral("PA Status"), card);
     title->setStyleSheet(QStringLiteral(
-        "font-size: 10px; font-weight: bold; color: %1; border: none;"
+        "font-size: 11px; font-weight: bold; color: %1; border: none;"
     ).arg(QLatin1String(Style::kAccent)));
     v->addWidget(title);
 
@@ -321,7 +321,7 @@ void RadioStatusPage::buildPaStatusCard(QFrame* card)
         row->addStretch();
         m_paTemperatureLabel = new QLabel(QStringLiteral("0.0 °C"), card);
         m_paTemperatureLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_paTemperatureLabel);
         v->addLayout(row);
@@ -345,7 +345,7 @@ void RadioStatusPage::buildPaStatusCard(QFrame* card)
         row->addStretch();
         m_paCurrentLabel = new QLabel(QStringLiteral("0.0 A"), card);
         m_paCurrentLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_paCurrentLabel);
         v->addLayout(row);
@@ -371,7 +371,7 @@ void RadioStatusPage::buildPaStatusCard(QFrame* card)
         // (see RadioStatus.h header comment re: source-first deviation).
         m_paVoltageLabel = new QLabel(QStringLiteral("—"), card);
         m_paVoltageLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextInactive)));
         row->addWidget(m_paVoltageLabel);
         v->addLayout(row);
@@ -390,7 +390,7 @@ void RadioStatusPage::buildPowerCard(QFrame* card)
 
     auto* title = new QLabel(QStringLiteral("Forward / Reflected / SWR"), card);
     title->setStyleSheet(QStringLiteral(
-        "font-size: 10px; font-weight: bold; color: %1; border: none;"
+        "font-size: 11px; font-weight: bold; color: %1; border: none;"
     ).arg(QLatin1String(Style::kAccent)));
     v->addWidget(title);
 
@@ -404,7 +404,7 @@ void RadioStatusPage::buildPowerCard(QFrame* card)
         row->addStretch();
         m_forwardLabel = new QLabel(QStringLiteral("— W"), card);
         m_forwardLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_forwardLabel);
         v->addLayout(row);
@@ -428,7 +428,7 @@ void RadioStatusPage::buildPowerCard(QFrame* card)
         row->addStretch();
         m_reflectedLabel = new QLabel(QStringLiteral("— W"), card);
         m_reflectedLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_reflectedLabel);
         v->addLayout(row);
@@ -444,7 +444,7 @@ void RadioStatusPage::buildPowerCard(QFrame* card)
         row->addStretch();
         m_swrLabel = new QLabel(QStringLiteral("1.0:1"), card);
         m_swrLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_swrLabel);
         v->addLayout(row);
@@ -471,7 +471,7 @@ void RadioStatusPage::buildPttCard(QFrame* card)
 
     auto* title = new QLabel(QStringLiteral("PTT Source"), card);
     title->setStyleSheet(QStringLiteral(
-        "font-size: 10px; font-weight: bold; color: %1; border: none;"
+        "font-size: 11px; font-weight: bold; color: %1; border: none;"
     ).arg(QLatin1String(Style::kAccent)));
     v->addWidget(title);
 
@@ -495,7 +495,7 @@ void RadioStatusPage::buildPttCard(QFrame* card)
             "QPushButton {"
             "  background: %1; border: 1px solid %2;"
             "  border-radius: 9px; color: %3;"
-            "  font-size: 8px; font-weight: bold; padding: 1px 4px;"
+            "  font-size: 9px; font-weight: bold; padding: 1px 4px;"
             "}"
         ).arg(QLatin1String(Style::kButtonBg),
               QLatin1String(Style::kBorderSubtle),
@@ -539,7 +539,7 @@ void RadioStatusPage::buildConnectionCard(QFrame* card)
 
     auto* title = new QLabel(QStringLiteral("Connection Quality"), card);
     title->setStyleSheet(QStringLiteral(
-        "font-size: 10px; font-weight: bold; color: %1; border: none;"
+        "font-size: 11px; font-weight: bold; color: %1; border: none;"
     ).arg(QLatin1String(Style::kAccent)));
     v->addWidget(title);
 
@@ -552,7 +552,7 @@ void RadioStatusPage::buildConnectionCard(QFrame* card)
         row->addStretch();
         out = new QLabel(QStringLiteral("—"), card);
         out->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(out);
         v->addLayout(row);
@@ -565,7 +565,7 @@ void RadioStatusPage::buildConnectionCard(QFrame* card)
 
     auto* hint = new QLabel(
         QStringLiteral("(Full 60s graph in Connection Quality tab)"), card);
-    hint->setStyleSheet(QStringLiteral("font-size: 8px; color: %1; border: none;")
+    hint->setStyleSheet(QStringLiteral("font-size: 9px; color: %1; border: none;")
                             .arg(QLatin1String(Style::kTextTertiary)));
     v->addWidget(hint);
 
@@ -587,7 +587,7 @@ void RadioStatusPage::buildHygieneCard(QFrame* card)
 
     auto* title = new QLabel(QStringLiteral("Settings Hygiene"), card);
     title->setStyleSheet(QStringLiteral(
-        "font-size: 10px; font-weight: bold; color: %1; border: none;"
+        "font-size: 11px; font-weight: bold; color: %1; border: none;"
     ).arg(QLatin1String(Style::kAccent)));
     v->addWidget(title);
 
@@ -773,11 +773,11 @@ void RadioStatusPage::onBwPollTick()
 
     if (throttled) {
         m_bwThrottleLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kAmberText)));
     } else {
         m_bwThrottleLabel->setStyleSheet(QStringLiteral(
-            "font-size: 10px; font-weight: bold; color: %1; border: none;"
+            "font-size: 11px; font-weight: bold; color: %1; border: none;"
         ).arg(QLatin1String(Style::kTextPrimary)));
     }
 
@@ -802,7 +802,7 @@ void RadioStatusPage::refreshPttPills()
             "QPushButton {"
             "  background: %1; border: 1px solid %2;"
             "  border-radius: 9px; color: %3;"
-            "  font-size: 8px; font-weight: bold; padding: 1px 4px;"
+            "  font-size: 9px; font-weight: bold; padding: 1px 4px;"
             "}"
         ).arg(isActive ? QLatin1String(Style::kGreenBg)     : QLatin1String(Style::kButtonBg),
               isActive ? QLatin1String(Style::kGreenBorder)  : QLatin1String(Style::kBorderSubtle),

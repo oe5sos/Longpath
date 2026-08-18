@@ -113,7 +113,7 @@ namespace OverlayColors {
     // 10 px bold) does not — keeping it co-located with the other overlay rules.
     constexpr auto kLabelStyle =
         "QLabel { background: transparent; border: none; "
-        "color: #8aa8c0; font-size: 10px; font-weight: bold; }";
+        "color: #8aa8c0; font-size: 11px; font-weight: bold; }";
 
     // Menu strip buttons — fully transparent/semi-transparent fills that
     // blend with the spectrum below.
@@ -922,9 +922,9 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
     grid->setColumnStretch(2, 1);
 
     const QString labelStyle =
-        "QLabel { color: #8090a0; font-size: 10px; border: none; }";
+        "QLabel { color: #8090a0; font-size: 11px; border: none; }";
     const QString valStyle =
-        "QLabel { color: #c8d8e8; font-size: 10px; border: none; min-width: 24px; }";
+        "QLabel { color: #c8d8e8; font-size: 11px; border: none; min-width: 24px; }";
     const QString sliderStyle =
         "QSlider { border: none; }"
         "QSlider::groove:horizontal { height: 4px; background: #203040; border-radius: 2px; }"
@@ -1127,7 +1127,7 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
         m_clarityRetuneBtn->setFixedSize(52, 18);
         m_clarityRetuneBtn->setStyleSheet(Style::themed(
             "QPushButton { background: #204060; color: #c8d8e8; border: 1px solid #304050;"
-            "  border-radius: 2px; font-size: 10px; padding: 0; }"
+            "  border-radius: 2px; font-size: 11px; padding: 0; }"
             "QPushButton:hover { background: #204060; }"
             "QPushButton:pressed { background: #0d2040; }"));
         m_clarityRetuneBtn->setToolTip("Force Clarity to re-estimate the noise floor now");
@@ -1150,7 +1150,7 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
     // "More Display Options →" footer link — B8 Task 24: wired to Setup → Display.
     {
         auto* moreLbl = new QLabel("<a href=\"#more\" style=\"color: #00b4d8; "
-                                   "text-decoration: none; font-size: 10px;\">"
+                                   "text-decoration: none; font-size: 11px;\">"
                                    "More Display Options &#x2192;</a>");
         moreLbl->setTextFormat(Qt::RichText);
         moreLbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -1517,7 +1517,7 @@ void SpectrumOverlayPanel::buildZoomButtons()
     const QString zBtnStyle =
         "QPushButton { background: rgba(20, 30, 45, 200); "
         "border: 1px solid rgba(255, 255, 255, 40); border-radius: 2px; "
-        "color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+        "color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: rgba(0, 112, 192, 180); "
         "border: 1px solid #0090e0; }"
         "QPushButton:pressed { background: rgba(0, 144, 224, 200); }";

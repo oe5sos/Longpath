@@ -35,7 +35,7 @@ QString badgeStyle(bool active)
                                   : QString::fromLatin1(Style::kTextSecondary);
     return QStringLiteral(
         "QPushButton { background: %1; border: 1px solid %2; color: %3;"
-        "  border-radius: %4px; font-size: 12px; font-weight: bold; }"
+        "  border-radius: %4px; font-size: 13px; font-weight: bold; }"
         "QPushButton:hover { border: 1px solid %5; }")
         .arg(bg, border, text)
         .arg(ProfileRail::kBadgeSide / 2)
@@ -77,7 +77,7 @@ ProfileRail::ProfileRail(LayoutProfiles* profiles, QWidget* parent)
         "Das bisherige behält seinen Aufbau — wie „Speichern unter“."));
     m_plus->setStyleSheet(QStringLiteral(
         "QPushButton { background: transparent; color: %1;"
-        "  border: 1px dashed %2; border-radius: %3px; font-size: 15px; }"
+        "  border: 1px dashed %2; border-radius: %3px; font-size: 16px; }"
         "QPushButton:hover { color: %4; border: 1px dashed %4; }")
         .arg(QString::fromLatin1(Style::kTextScale),
              QString::fromLatin1(Style::kBorder))

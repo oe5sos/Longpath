@@ -7154,7 +7154,7 @@ void MainWindow::buildStatusBar()
     // Helper: styled separator dot
     auto makeSep = [&]() -> QLabel* {
         auto* sep = new QLabel(QStringLiteral(" · "), barWidget);
-        sep->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #304050; font-size: 18px; }")));
+        sep->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #304050; font-size: 22px; }")));
         return sep;
     };
 
@@ -7239,7 +7239,7 @@ void MainWindow::buildStatusBar()
 
         auto* topLbl = new QLabel(QStringLiteral("CH %1").arg(adc), w);
         topLbl->setStyleSheet(
-            QStringLiteral("color: %1; font-size: 10px; font-weight: bold;")
+            QStringLiteral("color: %1; font-size: 11px; font-weight: bold;")
                 .arg(Style::kTextScale));
         vl->addWidget(topLbl);
 
@@ -11637,7 +11637,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     // AI provider buttons
     const QString btnStyle = QStringLiteral(
         "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 12px; font-weight: bold; "
+        "border-radius: 6px; color: #c8d8e8; font-size: 13px; font-weight: bold; "
         "padding: 6px 12px; }"
         "QPushButton:hover { background: #203040; }");
 

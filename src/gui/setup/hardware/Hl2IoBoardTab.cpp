@@ -310,7 +310,7 @@ void Hl2IoBoardTab::buildStatusBar(QVBoxLayout* outer)
     row->addSpacing(16);
     row->addWidget(new QLabel(tr("OC bank 0:"), m_statusFrame));
     m_ocBandLabel = new QLabel(QStringLiteral("—"), m_statusFrame);
-    m_ocBandLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 10px;"));
+    m_ocBandLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 11px;"));
     row->addWidget(m_ocBandLabel);
     m_ocByteLabel = new QLabel(QStringLiteral("0x00"), m_statusFrame);
     m_ocByteLabel->setStyleSheet(QStringLiteral(
@@ -338,11 +338,11 @@ void Hl2IoBoardTab::buildStatusBar(QVBoxLayout* outer)
         QStringLiteral("I2C addr: 0x%1")
             .arg(IoBoardHl2::kI2cAddrGeneral, 2, 16, QLatin1Char('0')).toUpper(),
         m_statusFrame);
-    m_i2cAddrLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 10px;"));
+    m_i2cAddrLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 11px;"));
     row->addWidget(m_i2cAddrLabel);
 
     m_lastProbeLabel = new QLabel(tr("Last probe: —"), m_statusFrame);
-    m_lastProbeLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 10px;"));
+    m_lastProbeLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 11px;"));
     row->addWidget(m_lastProbeLabel);
 
     outer->addWidget(m_statusFrame);
@@ -370,7 +370,7 @@ void Hl2IoBoardTab::buildConfigAndRegisterRow(QVBoxLayout* outer)
            "Disable for manual OC pin control.</i>"),
         configGroup);
     noteLabel->setWordWrap(true);
-    noteLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 10px;"));
+    noteLabel->setStyleSheet(QStringLiteral("color: #aaa; font-size: 11px;"));
     configLayout->addWidget(noteLabel);
 
     // Decoded register quick-view (read-only form rows)
@@ -385,10 +385,10 @@ void Hl2IoBoardTab::buildConfigAndRegisterRow(QVBoxLayout* outer)
         rowL->setContentsMargins(0, 0, 0, 0);
         rowL->setSpacing(4);
         auto* lbl = new QLabel(label, rowW);
-        lbl->setStyleSheet(QStringLiteral("color: #aaa; font-size: 10px;"));
+        lbl->setStyleSheet(QStringLiteral("color: #aaa; font-size: 11px;"));
         lbl->setFixedWidth(160);
         valueLabel = new QLabel(QStringLiteral("—"), rowW);
-        valueLabel->setStyleSheet(QStringLiteral("font-size: 10px; font-family: monospace;"));
+        valueLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: monospace;"));
         rowL->addWidget(lbl);
         rowL->addWidget(valueLabel);
         rowL->addStretch();
@@ -486,7 +486,7 @@ void Hl2IoBoardTab::buildStateMachineRow(QVBoxLayout* outer)
         numLabel->setAlignment(Qt::AlignCenter);
         numLabel->setStyleSheet(QStringLiteral(
             "QLabel { background: #2c2c31; border-radius: 8px; "
-            "font-weight: bold; font-size: 10px; min-width: 16px; "
+            "font-weight: bold; font-size: 11px; min-width: 16px; "
             "max-width: 16px; min-height: 16px; max-height: 16px; }"));
         cellLayout->addWidget(numLabel, 0, Qt::AlignHCenter);
 
@@ -548,14 +548,14 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     auto* ep6Row = new QHBoxLayout;
     auto* ep6Lbl = new QLabel(tr("EP6 ingress (RX I/Q):"), bwGroup);
     ep6Lbl->setFixedWidth(180);
-    ep6Lbl->setStyleSheet(QStringLiteral("font-size: 10px;"));
+    ep6Lbl->setStyleSheet(QStringLiteral("font-size: 11px;"));
     m_ep6Bar = new QProgressBar(bwGroup);
     m_ep6Bar->setRange(0, 100);
     m_ep6Bar->setValue(0);
     m_ep6Bar->setTextVisible(false);
     m_ep6Bar->setFixedHeight(14);
     m_ep6RateLabel = new QLabel(QStringLiteral("0.0 Mbps"), bwGroup);
-    m_ep6RateLabel->setStyleSheet(QStringLiteral("font-size: 10px; font-family: monospace;"));
+    m_ep6RateLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: monospace;"));
     m_ep6RateLabel->setFixedWidth(70);
     ep6Row->addWidget(ep6Lbl);
     ep6Row->addWidget(m_ep6Bar, 1);
@@ -566,14 +566,14 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     auto* ep2Row = new QHBoxLayout;
     auto* ep2Lbl = new QLabel(tr("EP2 egress (audio + C&C):"), bwGroup);
     ep2Lbl->setFixedWidth(180);
-    ep2Lbl->setStyleSheet(QStringLiteral("font-size: 10px;"));
+    ep2Lbl->setStyleSheet(QStringLiteral("font-size: 11px;"));
     m_ep2Bar = new QProgressBar(bwGroup);
     m_ep2Bar->setRange(0, 100);
     m_ep2Bar->setValue(0);
     m_ep2Bar->setTextVisible(false);
     m_ep2Bar->setFixedHeight(14);
     m_ep2RateLabel = new QLabel(QStringLiteral("0.0 Mbps"), bwGroup);
-    m_ep2RateLabel->setStyleSheet(QStringLiteral("font-size: 10px; font-family: monospace;"));
+    m_ep2RateLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: monospace;"));
     m_ep2RateLabel->setFixedWidth(70);
     ep2Row->addWidget(ep2Lbl);
     ep2Row->addWidget(m_ep2Bar, 1);
@@ -585,10 +585,10 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     // Throttle status
     auto* throttleRow = new QHBoxLayout;
     auto* throttleLbl = new QLabel(tr("LAN PHY throttle:"), bwGroup);
-    throttleLbl->setStyleSheet(QStringLiteral("font-size: 10px;"));
+    throttleLbl->setStyleSheet(QStringLiteral("font-size: 11px;"));
     m_throttleStatusLabel = new QLabel(tr("○ not throttled"), bwGroup);
     m_throttleStatusLabel->setStyleSheet(
-        QStringLiteral("font-size: 10px; color: #6fa384;"));
+        QStringLiteral("font-size: 11px; color: #6fa384;"));
     throttleRow->addWidget(throttleLbl);
     throttleRow->addWidget(m_throttleStatusLabel);
     throttleRow->addStretch();
@@ -597,10 +597,10 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     // Dropped frames (throttle event count proxy)
     auto* droppedRow = new QHBoxLayout;
     auto* droppedLbl = new QLabel(tr("Dropped frames:"), bwGroup);
-    droppedLbl->setStyleSheet(QStringLiteral("font-size: 10px;"));
+    droppedLbl->setStyleSheet(QStringLiteral("font-size: 11px;"));
     m_throttleEventLabel = new QLabel(QStringLiteral("0"), bwGroup);
     m_throttleEventLabel->setStyleSheet(
-        QStringLiteral("font-size: 10px; font-family: monospace;"));
+        QStringLiteral("font-size: 11px; font-family: monospace;"));
     droppedRow->addWidget(droppedLbl);
     droppedRow->addWidget(m_throttleEventLabel);
     droppedRow->addStretch();
@@ -710,7 +710,7 @@ void Hl2IoBoardTab::highlightStep(int step)
             "background: #222; padding: 2px; }"));
         m_stepNumLabels[m_currentHighlightedStep]->setStyleSheet(QStringLiteral(
             "QLabel { background: #2c2c31; border-radius: 8px; "
-            "font-weight: bold; font-size: 10px; min-width: 16px; "
+            "font-weight: bold; font-size: 11px; min-width: 16px; "
             "max-width: 16px; min-height: 16px; max-height: 16px; }"));
     }
 
@@ -722,7 +722,7 @@ void Hl2IoBoardTab::highlightStep(int step)
             "background: #1c3a2a; padding: 2px; }"));
         m_stepNumLabels[step]->setStyleSheet(QStringLiteral(
             "QLabel { background: #6fa384; border-radius: 8px; "
-            "font-weight: bold; font-size: 10px; color: #000; min-width: 16px; "
+            "font-weight: bold; font-size: 11px; color: #000; min-width: 16px; "
             "max-width: 16px; min-height: 16px; max-height: 16px; }"));
     }
 }
@@ -889,11 +889,11 @@ void Hl2IoBoardTab::onThrottledChanged(bool throttled)
     if (throttled) {
         m_throttleStatusLabel->setText(tr("● throttled"));
         m_throttleStatusLabel->setStyleSheet(Style::themed(
-            QStringLiteral("font-size: 10px; color: #ff4444;")));
+            QStringLiteral("font-size: 11px; color: #ff4444;")));
     } else {
         m_throttleStatusLabel->setText(tr("○ not throttled"));
         m_throttleStatusLabel->setStyleSheet(
-            QStringLiteral("font-size: 10px; color: #6fa384;"));
+            QStringLiteral("font-size: 11px; color: #6fa384;"));
     }
     m_throttleEventLabel->setText(
         QString::number(m_bwMonitor->throttleEventCount()));

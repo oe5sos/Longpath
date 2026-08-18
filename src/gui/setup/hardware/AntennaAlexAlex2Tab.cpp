@@ -203,7 +203,7 @@ AntennaAlexAlex2Tab::AntennaAlexAlex2Tab(RadioModel* model, QWidget* parent)
             .arg(QChar(0x2014), QChar(0x00B7), QChar(0x2014)),
         statusFrame);
     m_selectedLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: palette(mid); font-size: 10px; }"));
+        QStringLiteral("QLabel { color: palette(mid); font-size: 11px; }"));
     m_selectedLabel->setToolTip(
         tr("Live filter selection — derived from PanadapterModel centre frequency."));
 
@@ -249,7 +249,7 @@ AntennaAlexAlex2Tab::AntennaAlexAlex2Tab(RadioModel* model, QWidget* parent)
             led->setToolTip(tr("Lit when the RX frequency falls in this HPF band"));
             auto* ledLabel = new QLabel(QString::fromLatin1(lbl), ledContainer);
             ledLabel->setAlignment(Qt::AlignHCenter);
-            ledLabel->setStyleSheet(QStringLiteral("QLabel { font-size: 8px; }"));
+            ledLabel->setStyleSheet(QStringLiteral("QLabel { font-size: 9px; }"));
             ledContainerLayout->addWidget(led, 0, Qt::AlignHCenter);
             ledContainerLayout->addWidget(ledLabel, 0, Qt::AlignHCenter);
             ledLayout->addWidget(ledContainer);
@@ -343,7 +343,7 @@ AntennaAlexAlex2Tab::AntennaAlexAlex2Tab(RadioModel* model, QWidget* parent)
             led->setToolTip(tr("Lit when the RX frequency falls in this LPF band"));
             auto* ledLabel = new QLabel(QString::fromLatin1(lbl), ledContainer);
             ledLabel->setAlignment(Qt::AlignHCenter);
-            ledLabel->setStyleSheet(QStringLiteral("QLabel { font-size: 8px; }"));
+            ledLabel->setStyleSheet(QStringLiteral("QLabel { font-size: 9px; }"));
             ledContainerLayout->addWidget(led, 0, Qt::AlignHCenter);
             ledContainerLayout->addWidget(ledLabel, 0, Qt::AlignHCenter);
             ledLayout->addWidget(ledContainer);

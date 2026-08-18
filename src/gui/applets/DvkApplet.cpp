@@ -68,7 +68,7 @@ void DvkApplet::buildUI()
         m_slotLabel[i] = new QLabel(slotNames[i], this);
         m_slotLabel[i]->setFixedWidth(44);
         m_slotLabel[i]->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
         row->addWidget(m_slotLabel[i]);
 
         m_recBtn[i]  = styledButton(QStringLiteral("\u25CF Rec"));

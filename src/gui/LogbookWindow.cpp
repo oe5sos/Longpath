@@ -257,7 +257,7 @@ void LogbookWindow::buildUi()
         "  font-size: 11px; }"
         "QTableWidget::item:selected { background: %6; color: %2; }"
         "QHeaderView::section { background: %4; color: %5; border: none;"
-        "  border-bottom: 1px solid %3; padding: 3px 6px; font-size: 10px; }"
+        "  border-bottom: 1px solid %3; padding: 3px 6px; font-size: 11px; }"
     ).arg(QString::fromLatin1(Style::kInsetBg),
           QString::fromLatin1(Style::kTextPrimary),
           QString::fromLatin1(Style::kBorderSubtle),
@@ -425,7 +425,7 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 
     auto caption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
-        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 10px; }")
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                              .arg(QString::fromLatin1(Style::kTextScale)));
         return l;
     };
@@ -1587,7 +1587,7 @@ void LogbookWindow::showStatistics()
     view->setPlainText(text);
     QFont mono(QStringLiteral("Menlo"));
     mono.setStyleHint(QFont::Monospace);
-    mono.setPixelSize(12);
+    mono.setPixelSize(13);
     view->setFont(mono);
     view->setStyleSheet(QStringLiteral(
         "QPlainTextEdit { background: %1; color: %2; border: 1px solid "

@@ -78,7 +78,7 @@ QString pillSuggestedStyle()
 QString introLabelStyle()
 {
     return QStringLiteral(
-        "QLabel { color: %1; font-size: 12px; }")
+        "QLabel { color: %1; font-size: 13px; }")
         .arg(Style::kTextPrimary);
 }
 
@@ -87,8 +87,8 @@ QString explainBlockStyle()
     return QStringLiteral(
         "QFrame { background: %1; border: 1px solid %2;"
         " border-left: 3px solid %3; border-radius: 6px; }"
-        "QLabel { color: %4; font-size: 10px; }"
-        "QLabel#explainStrong { color: %5; font-size: 10px; font-weight: bold; }")
+        "QLabel { color: %4; font-size: 11px; }"
+        "QLabel#explainStrong { color: %5; font-size: 11px; font-weight: bold; }")
         .arg(Style::kInsetBg, Style::kInsetBorder, Style::kAccent,
              Style::kTextSecondary, Style::kTextPrimary);
 }
@@ -195,7 +195,7 @@ QWidget* makeDetRow(int vaxSlot,
     } else {
         rightSide->setText(rightGreyText);
         rightSide->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }")
+            "QLabel { color: %1; font-size: 11px; }")
             .arg(Style::kTextInactive));
     }
     layout->addWidget(rightSide, 0, Qt::AlignTop);
@@ -382,7 +382,7 @@ QWidget* VaxFirstRunDialog::buildHeaderBar()
     badge->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; background: %2; border: 1px solid %1;"
         " padding: 1px 6px; border-radius: 2px;"
-        " font-size: 10px; font-weight: bold; letter-spacing: 0.5px; }")
+        " font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }")
         .arg(badgeColor, Style::kInsetBg));
     layout->addWidget(badge);
 
@@ -476,7 +476,7 @@ void VaxFirstRunDialog::buildBodyWindowsCablesFound(QVBoxLayout* bodyLayout)
         " VAX 2/3.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(Style::kTextSecondary));
     explainLayout->addWidget(explainLabel);
     bodyLayout->addWidget(explain);
@@ -555,7 +555,7 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
 
         auto* title = new QLabel(QString::fromUtf8(v.title), titleRow);
         title->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 12px; font-weight: bold; }")
+            "QLabel { color: %1; font-size: 13px; font-weight: bold; }")
             .arg(Style::kTextPrimary));
         titleLayout->addWidget(title);
         titleLayout->addStretch();
@@ -571,7 +571,7 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
         auto* subtitle = new QLabel(QString::fromUtf8(v.subtitle), card);
         subtitle->setWordWrap(true);
         subtitle->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }")
+            "QLabel { color: %1; font-size: 11px; }")
             .arg(Style::kTextSecondary));
         cardLayout->addWidget(subtitle);
 
@@ -626,7 +626,7 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
     auto* dashedTitle = new QLabel(
         QStringLiteral("Already have one?"), dashedCard);
     dashedTitle->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 12px; font-weight: bold; }")
+        "QLabel { color: %1; font-size: 13px; font-weight: bold; }")
         .arg(Style::kTextSecondary));
     dashedLayout->addWidget(dashedTitle);
 
@@ -637,7 +637,7 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
         dashedCard);
     dashedSub->setWordWrap(true);
     dashedSub->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(Style::kTextSecondary));
     dashedLayout->addWidget(dashedSub);
 
@@ -674,7 +674,7 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
         " is needed.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(Style::kTextSecondary));
     explainLayout->addWidget(explainLabel);
     bodyLayout->addWidget(explain);
@@ -800,7 +800,7 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
         " Done.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(Style::kTextSecondary));
     explainLayout->addWidget(explainLabel);
     bodyLayout->addWidget(explain);
@@ -854,7 +854,7 @@ void VaxFirstRunDialog::buildBodyLinuxNative(QVBoxLayout* bodyLayout)
         " from the audio device list.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(Style::kTextSecondary));
     explainLayout->addWidget(explainLabel);
     bodyLayout->addWidget(explain);
@@ -957,7 +957,7 @@ QWidget* VaxFirstRunDialog::buildFooter()
     auto* hint = new QLabel(hintText, footer);
     hint->setWordWrap(true);
     hint->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(Style::kTextSecondary));
     layout->addWidget(hint, 1);
 

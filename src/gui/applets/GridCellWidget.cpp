@@ -39,13 +39,13 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
 
     auto* grip = new QLabel(QStringLiteral("⋮⋮"), m_titleBar);
     grip->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; background: transparent; }"
+        "QLabel { color: %1; font-size: 11px; background: transparent; }"
     ).arg(Style::kTextScale));
     m_titleLayout->addWidget(grip);
 
     m_titleLabel = new QLabel(m_titleBar);
     m_titleLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; font-weight: bold;"
+        "QLabel { color: %1; font-size: 11px; font-weight: bold;"
         " background: transparent; }"
     ).arg(Style::kTitleText));
     m_titleLayout->addWidget(m_titleLabel);

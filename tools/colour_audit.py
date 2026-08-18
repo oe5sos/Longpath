@@ -172,6 +172,32 @@ def named_palette() -> dict[str, str]:
     return {m.group(1): m.group(2).lower() for m in NAMED.finditer(text)}
 
 
+# ── Der Vorgabewert hinter einem Themenschlüssel ist keine Drift ──────
+#
+# `eqInk("eq-bg", "#191919")` sieht wie ein namenloses Literal aus und
+# ist das Gegenteil: der Ton HAT einen Namen (`eq-bg`), und der Hexwert
+# dahinter ist der portierte Vorgabewert — hier BackColor aus Thetis'
+# ucParametricEq.cs:443.
+#
+# Am 2026-08-18 hat --apply acht solche Werte in ParametricEqWidget.cpp
+# angeglichen, darunter #191919 -> #18181a. tst_parametric_eq_widget_paint
+# hat es gefangen, weil es den Thetis-Wert punktgenau prueft — und es hat
+# recht damit: CLAUDE.md verlangt, portierte Konstanten unveraendert zu
+# lassen. Eine „unsichtbare" Angleichung an die Hauspalette ist bei einem
+# portierten Wert kein Stilgewinn, sondern ein Portierungsfehler.
+#
+# Erkennungsmerkmal ist der Schluessel VOR dem Literal in derselben
+# Klammer. Ein Zitat auf derselben Zeile genuegt nicht: von den acht
+# Stellen trug nur eine eines.
+RE_KEYED_DEFAULT = re.compile(
+    r'\w+\s*\(\s*"[A-Za-z0-9_.-]+"\s*,\s*"(#[0-9a-fA-F]{6})"')
+
+
+def keyed_default_spans(line: str) -> list[tuple[int, int]]:
+    """Bereiche der Literale, die als Vorgabewert hinter einem Schluessel stehen."""
+    return [m.span(1) for m in RE_KEYED_DEFAULT.finditer(line)]
+
+
 def literals() -> dict[str, list[tuple[str, int]]]:
     """Farbe -> [(Datei, Zeile), …], ohne die befreiten Dateien."""
     found: dict[str, list[tuple[str, int]]] = collections.defaultdict(list)
@@ -266,7 +292,23 @@ def apply_collapse(buckets, dry: bool = False) -> int:
         if path.suffix not in {".cpp", ".h"} or path.name in EXEMPT:
             continue
         text = path.read_text(encoding="utf-8")
-        out, n = pat.subn(lambda m: plan[m.group(0).lower()], text)
+        # Zeilenweise, damit die geschuetzten Bereiche je Zeile bekannt
+        # sind. Vorher lief die Ersetzung ueber die ganze Datei und
+        # konnte einen portierten Vorgabewert nicht von einem freien
+        # Literal unterscheiden.
+        lines = text.split("\n")
+        n = 0
+        for i, line in enumerate(lines):
+            spans = keyed_default_spans(line)
+            def repl(m):
+                nonlocal n
+                for a, b in spans:
+                    if m.start() >= a and m.end() <= b:
+                        return m.group(0)      # portierter Vorgabewert
+                n += 1
+                return plan[m.group(0).lower()]
+            lines[i] = pat.sub(repl, line)
+        out = "\n".join(lines)
         if n:
             touched += 1
             edits += n

@@ -67,7 +67,7 @@ void SwrSweepPanel::buildUi()
     row->setSpacing(7);
 
     auto* bandCap = new QLabel(QStringLiteral("BAND"), this);
-    bandCap->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:10px;")));
+    bandCap->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:11px;")));
     row->addWidget(bandCap);
 
     m_bandBox = new QComboBox(this);
@@ -94,7 +94,7 @@ void SwrSweepPanel::buildUi()
     // kommt über „VNA-Referenz…" ins selbe Diagramm.
 
     auto* ptsCap = new QLabel(QStringLiteral("PUNKTE"), this);
-    ptsCap->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:10px;")));
+    ptsCap->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;font-size:11px;")));
     row->addWidget(ptsCap);
 
     m_pointsBox = new QSpinBox(this);

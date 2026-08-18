@@ -97,7 +97,7 @@ ContainerWidget::ContainerWidget(QWidget* parent)
     auto* placeholder = new QLabel(QStringLiteral("Container"), this);
     placeholder->setAlignment(Qt::AlignCenter);
     placeholder->setStyleSheet(Style::themed(QStringLiteral(
-        "color: #405060; font-size: 14px; background: transparent;")));
+        "color: #405060; font-size: 16px; background: transparent;")));
     setContent(placeholder);
 
     qCDebug(lcContainer) << "Container created:" << m_id;

@@ -144,7 +144,7 @@ void DigitalApplet::buildSliderRow(QVBoxLayout* root, const QString& label,
 
     auto* lbl = new QLabel(label, this);
     lbl->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+        "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
     lbl->setFixedWidth(50);
     row->addWidget(lbl);
 
@@ -225,7 +225,7 @@ void DigitalApplet::buildUI()
 
         auto* lbl = new QLabel(QStringLiteral("Rate"), this);
         lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
         lbl->setFixedWidth(50);
         row->addWidget(lbl);
 
@@ -265,7 +265,7 @@ void DigitalApplet::buildUI()
 
         auto* lbl = new QLabel(QStringLiteral("Buffer"), this);
         lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
         lbl->setFixedWidth(50);
         row->addWidget(lbl);
 
@@ -299,7 +299,7 @@ void DigitalApplet::buildUI()
 
         auto* lbl = new QLabel(QStringLiteral("rigctld"), this);
         lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextSecondary));
+            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
         lbl->setFixedWidth(50);
         row->addWidget(lbl);
 

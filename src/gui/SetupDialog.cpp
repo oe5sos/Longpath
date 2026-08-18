@@ -174,7 +174,7 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     m_tree->setFixedWidth(200);
     m_tree->setStyleSheet(Style::themed(
         "QTreeWidget { background: #1a1a2a; color: #c8d8e8; border: none; "
-        "font-size: 12px; selection-background-color: #00b4d8; }"
+        "font-size: 13px; selection-background-color: #00b4d8; }"
         "QTreeWidget::item { padding: 4px 8px; }"
         "QTreeWidget::item:hover { background: #1a2a3a; }"));
 

@@ -151,7 +151,7 @@ void TunerApplet::buildUI()
     m_tuneBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     m_tuneBtn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: #204060; border: 1px solid #205070; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+        "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: #204060; }")));
     btnCol->addWidget(m_tuneBtn);
 
@@ -240,7 +240,7 @@ void TunerApplet::buildUI()
     m_operateBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: #204060; border: 1px solid #205070; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+        "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: #204060; }")));
     btnCol->addWidget(m_operateBtn);
 
@@ -274,7 +274,7 @@ void TunerApplet::buildUI()
             btn->setFixedHeight(22);
             btn->setStyleSheet(Style::themed(QStringLiteral(
                 "QPushButton { background: #1a2a3a; border: 1px solid #205070; "
-                "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+                "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
                 "QPushButton:hover { background: #204060; }")));
             return btn;
         };
@@ -397,7 +397,7 @@ void TunerApplet::setTunerModel(TunerModel* model)
             m_tuneSwr = 999.0f;  // reset high so capture tracking works
             m_tuneBtn->setStyleSheet(Style::themed(QStringLiteral(
                 "QPushButton { background: #cc2222; border: 1px solid #ff4444; "
-                "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }")));
+                "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }")));
             m_tuneBtn->setText(QStringLiteral("TUNING..."));
 
             // Engage local CW tune carrier + standby PGXL for a hardware-
@@ -434,7 +434,7 @@ void TunerApplet::setTunerModel(TunerModel* model)
             // Restore normal style.
             m_tuneBtn->setStyleSheet(Style::themed(QStringLiteral(
                 "QPushButton { background: #204060; border: 1px solid #205070; "
-                "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+                "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
                 "QPushButton:hover { background: #204060; }")));
 
             // Drop our orchestrated carrier (and ONLY ours) when TGXL
@@ -556,19 +556,19 @@ void TunerApplet::syncFromModel()
         m_operateBtn->setText(QStringLiteral("OPERATE"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton { background: #1a6030; border: 1px solid #008040; "
-            "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }"
+            "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
             "QPushButton:hover { background: #007040; }")));
     } else if (m_tunerModel->isOperate() && m_tunerModel->isBypass()) {
         m_operateBtn->setText(QStringLiteral("BYPASS"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton { background: #906000; border: 1px solid #a07000; "
-            "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }"
+            "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
             "QPushButton:hover { background: #9a7000; }")));
     } else {
         m_operateBtn->setText(QStringLiteral("STANDBY"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton { background: #204060; border: 1px solid #205070; "
-            "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+            "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
             "QPushButton:hover { background: #204060; }")));
     }
 }
@@ -617,11 +617,11 @@ void TunerApplet::updateAntennaButtons(int antA)
     // From AetherSDR src/gui/TunerApplet.cpp:updateAntennaButtons [@0cd4559]
     static constexpr const char* kDefault =
         "QPushButton { background: #1a2a3a; border: 1px solid #205070; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 10px; font-weight: bold; }"
+        "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: #204060; }";
     static constexpr const char* kActive =
         "QPushButton { background: #1a6030; border: 1px solid #008040; "
-        "border-radius: 6px; color: #ffffff; font-size: 10px; font-weight: bold; }";
+        "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }";
 
     m_ant1Btn->setStyleSheet(antA == 0 ? kActive : kDefault);
     m_ant2Btn->setStyleSheet(antA == 1 ? kActive : kDefault);
