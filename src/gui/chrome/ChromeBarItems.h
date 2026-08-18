@@ -64,6 +64,16 @@ struct ChromeBarWidgets {
     /// stubs, because its amber state warns that notches are bypassed.
     QWidget* tnfLabel{nullptr};
 
+    /// Die vier Sendeschalter (Betreiber-Entscheidung 2026-08-18,
+    /// Fussleisten-Entwurf Zuschnitt A). Je Schalter ein Eintrag, weil
+    /// sie verschieden wichtig sind: PS faellt zuerst (Sprosse 13), MOX
+    /// zuletzt (16). Ein Sender, den man nicht abschalten kann, ist das
+    /// schlechteste Ende einer Faltung.
+    QWidget* txMox{nullptr};
+    QWidget* txVox{nullptr};
+    QWidget* txTune{nullptr};
+    QWidget* txPs{nullptr};
+
     /// Rung to pill widget, rungs 5..9 only (SQL, APF, NB, NR, AGC).
     /// Mode and filter never fold and are deliberately absent.
     QHash<int, QWidget*> pillByRung;

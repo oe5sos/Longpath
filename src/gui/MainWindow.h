@@ -864,6 +864,11 @@ private:
     // from onConnectionStateChanged().
     StationBlock* m_stationBlock{nullptr};    // Sub-PR-7 G.1: radio-name anchor
     QLabel* m_tnfLabel{nullptr};
+    /// Die vier Sendeschalter der unteren Leiste (2026-08-18).
+    class TxSwitch* m_txMoxSwitch{nullptr};
+    class TxSwitch* m_txVoxSwitch{nullptr};
+    class TxSwitch* m_txTuneSwitch{nullptr};
+    class TxSwitch* m_txPsSwitch{nullptr};
 
     // Wisdom generation dialog (shown on first run)
     QProgressDialog* m_wisdomDialog{nullptr};

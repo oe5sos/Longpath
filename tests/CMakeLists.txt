@@ -4913,6 +4913,7 @@ nereus_add_test(tst_applet_detach)
 #    Betreibers vom 2026-08-18: ein Feld ist ein Behaelter, kein
 #    Widget -- sonst muesste die gespeicherte Anordnung zweimal wandern.
 nereus_add_test(tst_applet_grid)
+nereus_add_test(tst_tx_switch_bar)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still

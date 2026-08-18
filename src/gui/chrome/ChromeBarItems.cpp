@@ -124,6 +124,15 @@ void registerChromeBarItems(ChromeBarController& c, const ChromeBarWidgets& w)
     // that turns amber when notches exist and are being bypassed. That
     // warning outranks a row of stubs, so TNF is the last foldable item
     // on the bar.
+    // Die vier Sendeschalter. Hohe Sprossen: sie ueberleben die Faltung
+    // laenger als die DSP-Pillen, weil sie HANDLUNGEN sind und keine
+    // Anzeigen — eine Anzeige, die faellt, kostet Wissen; ein Schalter,
+    // der faellt, kostet die Bedienung.
+    add(c, w.txPs,   nullptr, 13, QStringLiteral("PS"));
+    add(c, w.txTune, nullptr, 14, QStringLiteral("TUNE"));
+    add(c, w.txVox,  nullptr, 15, QStringLiteral("VOX"));
+    add(c, w.txMox,  nullptr, 16, QStringLiteral("MOX"));
+
     add(c, w.tnfLabel, nullptr, 11,
         QCoreApplication::translate("ChromeBar", "TNF"));
 }

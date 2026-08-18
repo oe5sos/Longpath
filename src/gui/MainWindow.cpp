@@ -379,6 +379,7 @@ warren@wpratt.com
 #include "widgets/SystemTile.h"
 #include "gui/chrome/ChromeBarController.h"
 #include "gui/chrome/ChromeBarItems.h"
+#include "gui/chrome/TxSwitchBar.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/AudioEngine.h"
 #include "core/ClientPuduMonitor.h"
@@ -7300,6 +7301,25 @@ void MainWindow::buildStatusBar()
     // its own item and folds with live state, not with the stubs.
     hbox->addWidget(m_tnfLabel);
 
+    // ── Die vier Sendeschalter ────────────────────────────────────────
+    //
+    // Betreiber-Entscheidung 2026-08-18 (Fussleisten-Entwurf, Zuschnitt
+    // A): MOX, VOX, TUNE und PS kommen nach unten und BLEIBEN ZUGLEICH
+    // in der TxApplet. Beide Flaechen haengen am selben Modell und
+    // kennen einander nicht — wer eine umlegt, sieht die andere
+    // mitgehen, weil beide auf dasselbe Signal hoeren.
+    m_txMoxSwitch  = new TxSwitch(TxSwitch::Kind::Mox,  m_radioModel, barWidget);
+    m_txVoxSwitch  = new TxSwitch(TxSwitch::Kind::Vox,  m_radioModel, barWidget);
+    m_txTuneSwitch = new TxSwitch(TxSwitch::Kind::Tune, m_radioModel, barWidget);
+    m_txPsSwitch   = new TxSwitch(TxSwitch::Kind::Ps,   m_radioModel, barWidget);
+    // Reihenfolge im Bild wie bei Zeus: MOX VOX TUNE PS. Die Faltung
+    // laeuft andersherum (PS zuerst), das ist Absicht — die Stelle im
+    // Bild und die Wichtigkeit sind zwei verschiedene Ordnungen.
+    hbox->addWidget(m_txMoxSwitch);
+    hbox->addWidget(m_txVoxSwitch);
+    hbox->addWidget(m_txTuneSwitch);
+    hbox->addWidget(m_txPsSwitch);
+
     if (NotchModel* notches = m_radioModel->notchModel()) {
         // Named slot, not a lambda: Qt::UniqueConnection only works on a
         // pointer-to-member target -- on a lambda Qt6 warns and refuses the
@@ -7995,6 +8015,10 @@ void MainWindow::buildStatusBar()
     bar.placeholderSep   = m_placeholderSep;
     bar.bandStackLabel   = m_bandStackLabel;
     bar.tnfLabel         = m_tnfLabel;
+    bar.txMox            = m_txMoxSwitch;
+    bar.txVox            = m_txVoxSwitch;
+    bar.txTune           = m_txTuneSwitch;
+    bar.txPs             = m_txPsSwitch;
     // 5..12: die fuenf DSP-Pillen plus die drei Zugaenge vom 2026-08-17
     // (VAX 10, ANT 11, RIT 12). TX ist absichtlich nicht dabei — es
     // faltet nie und zaehlt in residualWidth mit.
