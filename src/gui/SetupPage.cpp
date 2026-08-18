@@ -32,7 +32,7 @@ namespace NereusSDR {
 
 // Shared style strings — mirror AetherSDR RadioSetupDialog constants
 static const QString kGroupStyle =
-    "QGroupBox { border: 1px solid #304050; border-radius: 4px; "
+    "QGroupBox { border: 1px solid #304050; border-radius: 6px; "
     "margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
     "QGroupBox::title { subcontrol-origin: margin; left: 10px; "
     "padding: 0 4px; }";

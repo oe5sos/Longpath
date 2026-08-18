@@ -83,7 +83,7 @@ constexpr const char* kPickerStyle =
     "  padding: 3px 10px; min-height: 20px;"
     "}"
     "QPushButton:hover { background: #203040; }"
-    "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }";
+    "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }";
 
 } // namespace
 

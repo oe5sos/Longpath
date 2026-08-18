@@ -421,8 +421,8 @@ ItemGroup* ItemGroup::createHBarPreset(int bindingId, double minVal, double maxV
     bar->setOrientation(BarItem::Orientation::Horizontal);
     bar->setRange(minVal, maxVal);
     bar->setBindingId(bindingId);
-    bar->setBarColor(QColor(QStringLiteral("#00b4d8")));
-    bar->setBarRedColor(QColor(QStringLiteral("#ff4444")));
+    bar->setBarColor(QColor(QStringLiteral("#4a7ba8")));
+    bar->setBarRedColor(QColor(QStringLiteral("#c25a5c")));
     bar->setRedThreshold(minVal + (maxVal - minVal) * 0.9);
     bar->setZOrder(5);
     group->addItem(bar);
@@ -478,8 +478,8 @@ ItemGroup* ItemGroup::createCompactHBarPreset(int bindingId, double minVal, doub
     bar->setOrientation(BarItem::Orientation::Horizontal);
     bar->setRange(minVal, maxVal);
     bar->setBindingId(bindingId);
-    bar->setBarColor(QColor(QStringLiteral("#00b4d8")));
-    bar->setBarRedColor(QColor(QStringLiteral("#ff4444")));
+    bar->setBarColor(QColor(QStringLiteral("#4a7ba8")));
+    bar->setBarRedColor(QColor(QStringLiteral("#c25a5c")));
     bar->setRedThreshold(minVal + (maxVal - minVal) * 0.9);
     bar->setZOrder(5);
     group->addItem(bar);

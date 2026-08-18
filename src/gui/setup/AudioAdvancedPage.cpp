@@ -43,7 +43,7 @@ namespace {
 static const char* kGroupStyle =
     "QGroupBox {"
     "  border: 1px solid #203040;"
-    "  border-radius: 4px;"
+    "  border-radius: 6px;"
     "  margin-top: 8px;"
     "  padding-top: 12px;"
     "  font-weight: bold;"
@@ -58,7 +58,7 @@ static const char* kAmberButtonStyle =
     "QPushButton {"
     "  background: #33280f;"
     "  border: 1px solid #6b5426;"
-    "  border-radius: 4px;"
+    "  border-radius: 6px;"
     "  color: #c2924f;"
     "  font-weight: bold;"
     "  padding: 6px 16px;"

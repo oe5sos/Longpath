@@ -294,7 +294,7 @@ void RxApplet::buildUi()
         m_lockBtn->setFlat(true);
         m_lockBtn->setStyleSheet(QStringLiteral(
             "QPushButton { font-size: 13px; padding: 0; background: transparent; border: none; }"
-            "QPushButton:checked { color: #4488ff; }"  // §A2 one-off "live blue"
+            "QPushButton:checked { color: #4a7ba8; }"  // §A2 one-off "live blue"
         ));
         connect(m_lockBtn, &QPushButton::toggled, this, [this](bool locked) {
             m_lockBtn->setText(locked
@@ -316,7 +316,7 @@ void RxApplet::buildUi()
         m_rxAntBtn->setFlat(true);
         m_rxAntBtn->setStyleSheet(QStringLiteral(
             "QPushButton {"
-            "  color: #4488ff; background: transparent; border: none;"  // §A2 one-off "live blue"
+            "  color: #4a7ba8; background: transparent; border: none;"  // §A2 one-off "live blue"
             "  font-size: 11px; font-weight: bold; padding: 0 2px;"
             "}"
             "QPushButton:hover { color: #66aaff; }"  // §A2 one-off hover derived from #4488ff
@@ -363,7 +363,7 @@ void RxApplet::buildUi()
         m_txAntBtn->setFlat(true);
         m_txAntBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton {"
-            "  color: #ff4444; background: transparent; border: none;"  // §A2 one-off TX color
+            "  color: #c25a5c; background: transparent; border: none;"  // §A2 one-off TX color
             "  font-size: 11px; font-weight: bold; padding: 0 2px;"
             "}"
             "QPushButton:hover { color: #a86b6d; }"  // §A2 one-off hover derived from #ff4444
@@ -780,8 +780,8 @@ void RxApplet::buildUi()
         m_agcAutoLabel = new QPushButton(QStringLiteral("AUTO"), m_agcTContainer);
         m_agcAutoLabel->setStyleSheet(
             QStringLiteral("QPushButton { background: #18181a; border: 1px solid #445;"  // §A2 one-off
-                            "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
-                            "QPushButton:hover { border-color: #adff2f; }"));
+                            "color: #556; font-size: 7px; padding: 0 3px; border-radius: 6px; }"
+                            "QPushButton:hover { border-color: #c2924f; }"));
         m_agcAutoLabel->setFixedHeight(14);
         m_agcAutoLabel->setFixedWidth(30);
         m_agcAutoLabel->setCursor(Qt::PointingHandCursor);
@@ -1867,8 +1867,8 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
         // NereusSDR-original active-AUTO palette; not in StyleConstants.
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
-                QStringLiteral("QPushButton { background: #1b3527; border: 1px solid #adff2f;"  // §A2 one-off
-                                "color: #adff2f; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
+                QStringLiteral("QPushButton { background: #1b3527; border: 1px solid #c2924f;"  // §A2 one-off
+                                "color: #c2924f; font-size: 7px; padding: 0 3px; border-radius: 6px; }"
                                 "QPushButton:hover { background: #1b3527; }"));
         }
 
@@ -1886,8 +1886,8 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
                 QStringLiteral("QPushButton { background: #18181a; border: 1px solid #445;"  // §A2 one-off
-                                "color: #556; font-size: 7px; padding: 0 3px; border-radius: 2px; }"
-                                "QPushButton:hover { border-color: #adff2f; }"));
+                                "color: #556; font-size: 7px; padding: 0 3px; border-radius: 6px; }"
+                                "QPushButton:hover { border-color: #c2924f; }"));
         }
         if (m_agcInfoLabel) {
             m_agcInfoLabel->hide();

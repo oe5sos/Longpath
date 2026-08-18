@@ -78,7 +78,7 @@ QFrame* tile(QWidget* parent, QLabel** cap, QLabel** val,
 {
     auto* f = new QFrame(parent);
     f->setStyleSheet(QStringLiteral(
-        "QFrame { background: %1; border: 1px solid %2; border-radius: 4px; }")
+        "QFrame { background: %1; border: 1px solid %2; border-radius: 6px; }")
             .arg(QLatin1String(Style::kPanelBg),
                  QLatin1String(Style::kBorderSubtle)));
     auto* col = new QVBoxLayout(f);
@@ -92,7 +92,7 @@ QFrame* tile(QWidget* parent, QLabel** cap, QLabel** val,
 
     *val = new QLabel(QStringLiteral("—"), f);
     QFont vf = (*val)->font();
-    vf.setPixelSize(19);
+    vf.setPixelSize(22);
     vf.setFamily(QStringLiteral("Menlo"));
     (*val)->setFont(vf);
     (*val)->setStyleSheet(QStringLiteral(
@@ -531,7 +531,7 @@ void AntennaWindow::buildUi()
     m_action = new QLabel(QStringLiteral("—"), actionFrame);
     {
         QFont f = m_action->font();
-        f.setPixelSize(30);
+        f.setPixelSize(38);
         f.setFamily(QStringLiteral("Menlo"));
         m_action->setFont(f);
     }
@@ -574,7 +574,7 @@ void AntennaWindow::buildUi()
     m_caution = new QLabel(QString{}, this);
     m_caution->setWordWrap(true);
     m_caution->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; background: %2; border-radius: 4px; "
+        "QLabel { color: %1; background: %2; border-radius: 6px; "
         "padding: 6px 9px; font-size: 11px; }")
             .arg(QLatin1String(Style::kAmberText),
                  QLatin1String(Style::kAmberBg)));

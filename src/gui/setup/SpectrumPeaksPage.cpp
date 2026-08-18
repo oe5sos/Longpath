@@ -88,7 +88,7 @@ void applyDarkStyle(QWidget* w)
 {
     w->setStyleSheet(Style::themed(QStringLiteral(
         "QGroupBox { color: #8090a0; font-size: 11px;"
-        "  border: 1px solid #203040; border-radius: 4px;"
+        "  border: 1px solid #203040; border-radius: 6px;"
         "  margin-top: 8px; padding-top: 4px; }"
         "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
         "QLabel { color: #c8d8e8; }"
@@ -97,7 +97,7 @@ void applyDarkStyle(QWidget* w)
         "QCheckBox { color: #c8d8e8; }"
         "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
         "  border: 1px solid #203040; border-radius: 2px; }"
-        "QCheckBox::indicator:checked { background: #00b4d8; border-color: #00b4d8; }"
+        "QCheckBox::indicator:checked { background: #4a7ba8; border-color: #4a7ba8; }"
     )));
 }
 
@@ -130,7 +130,7 @@ SpectrumPeaksPage::SpectrumPeaksPage(RadioModel* model, QWidget* parent)
     // Smooth-Defaults data line. Persisted format is "#RRGGBBAA".
     m_aphColor->setColor(ColorSwatchButton::colorFromHex(
         s.value(QStringLiteral("DisplayActivePeakHoldColor"),
-                QStringLiteral("#FFD700FF")).toString()));
+                QStringLiteral("#c2924fFF")).toString()));
 
     // Peak Blobs
     // Thetis Display.cs:4395 [v2.10.3.13] ships m_bPeakBlobMaximums = true.

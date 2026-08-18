@@ -57,7 +57,7 @@ QString snrColour(double db)
     if (qIsNaN(db)) {
         return QStringLiteral("#708090");
     }
-    return (db < kGoodSnrDb) ? QStringLiteral("#ddbb00")
+    return (db < kGoodSnrDb) ? QStringLiteral("#c2924f")
                              : QStringLiteral("#6fa384");
 }
 
@@ -99,7 +99,7 @@ void RadeApplet::buildUI()
         m_profileCombo = new QComboBox(body);
         m_profileCombo->setStyleSheet(Style::themed(QStringLiteral(
             "QComboBox { background: #1a2a3a; color: #c8d8e8; "
-            "border: 1px solid #304050; border-radius: 2px; "
+            "border: 1px solid #304050; border-radius: 6px; "
             "padding: 2px 4px; font-size: 11px; }")));
         row->addWidget(lbl);
         row->addWidget(m_profileCombo, 1);
@@ -178,7 +178,7 @@ void RadeApplet::buildUI()
         m_resetButton = new QPushButton(QStringLiteral("Reset vocoder"), body);
         m_resetButton->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton { background: #1a2a3a; color: #c8d8e8; "
-            "border: 1px solid #304050; border-radius: 2px; "
+            "border: 1px solid #304050; border-radius: 6px; "
             "padding: 4px 10px; font-size: 11px; font-weight: bold; }"
             "QPushButton:hover { border: 1px solid %1; }"
             "QPushButton:pressed { background: #2a3a4a; }"
@@ -402,7 +402,7 @@ void RadeApplet::repaintSyncIndicator()
     if (!m_synced) {
         colour = QStringLiteral("#708090");
     } else if (qIsNaN(m_lastSnrDb) || m_lastSnrDb < kGoodSnrDb) {
-        colour = QStringLiteral("#ddbb00");
+        colour = QStringLiteral("#c2924f");
     } else {
         colour = QString::fromLatin1(Style::kGreenText);
     }

@@ -1074,12 +1074,12 @@ void PsForm::refreshCoBadge()
     if (m_pureSignal->correctionsBeingApplied()) {
         if (m_pureSignal->isCorrecting()) {
             css = QStringLiteral(
-                "QLabel { background-color: #00FF00; border: 1px inset; "
+                "QLabel { background-color: #6fa384; border: 1px inset; "
                 "min-width: 12px; min-height: 12px; }");
         } else {
             // Yellow — corrections applied but feedback level not yet > 90.
             css = QStringLiteral(
-                "QLabel { background-color: #FFFF00; border: 1px inset; "
+                "QLabel { background-color: #c2924f; border: 1px inset; "
                 "min-width: 12px; min-height: 12px; }");
         }
     } else {

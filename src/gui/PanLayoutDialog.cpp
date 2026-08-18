@@ -111,7 +111,7 @@ void PanLayoutDialog::buildUi(int maxPanCount, const QString& currentLayoutId,
         btn->setStyleSheet(QStringLiteral(
             "QPushButton { background: transparent; border: none; }"
             "QPushButton:hover { background: rgba(0, 180, 216, 30);"
-            " border: 1px solid %1; border-radius: 4px; }")
+            " border: 1px solid %1; border-radius: 6px; }")
             .arg(Style::kAccent));
 
         auto* btnLayout = new QVBoxLayout(btn);

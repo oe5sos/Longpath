@@ -129,7 +129,7 @@ static const QString kPrimaryButtonStyle =
     QStringLiteral(
         "QPushButton {"
         "  background: %1; color: #fff;"
-        "  border: none; border-radius: 4px; padding: 6px 16px; font-weight: bold;"
+        "  border: none; border-radius: 6px; padding: 6px 16px; font-weight: bold;"
         "}"
         "QPushButton:hover { background: #2d5885; }"        // §D exception: accent-dark hover
         "QPushButton:disabled { background: #2a3040; color: #556070; }")  // §D exception: disabled
@@ -141,7 +141,7 @@ static const QString kSecondaryButtonStyle =
     QStringLiteral(
         "QPushButton {"
         "  background: %1; color: %2;"
-        "  border: 1px solid #405060; border-radius: 4px; padding: 6px 16px;"  // §D: #405060 exception
+        "  border: 1px solid #405060; border-radius: 6px; padding: 6px 16px;"  // §D: #405060 exception
         "}"
         "QPushButton:hover { background: #405060; }")       // §D exception: secondary hover
     .arg(Style::kOverlayBorder, Style::kTextPrimary);
@@ -392,7 +392,7 @@ void AddCustomRadioDialog::buildUi()
             "QGroupBox {"
             "  color: %2;"
             "  border: 1px solid %3;"
-            "  border-radius: 4px;"
+            "  border-radius: 6px;"
             "  margin-top: 8px;"
             "  padding-top: 12px;"
             "}"
@@ -775,7 +775,7 @@ void AddCustomRadioDialog::showInlineError(const QString& message)
     // Error band: dark red border + lighter red background, white text.
     // Colour: #c14848 error red (design §6.3).
     m_feedbackFrame->setStyleSheet(QStringLiteral(
-        "QFrame { background: #2a1010; border: 1px solid #c14848; border-radius: 4px; }"));
+        "QFrame { background: #2a1010; border: 1px solid #c14848; border-radius: 6px; }"));
     m_feedbackLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: #e07070; font-size: 13px; }"));
     m_feedbackLabel->setText(message);
@@ -787,7 +787,7 @@ void AddCustomRadioDialog::showInlineInfo(const QString& message)
     // Info band: dark blue border + blue text.
     // Colour: #4a7ba8 info blue (design §6.4).
     m_feedbackFrame->setStyleSheet(Style::themed(QStringLiteral(
-        "QFrame { background: #0a1a28; border: 1px solid #4a7ba8; border-radius: 4px; }")));
+        "QFrame { background: #0a1a28; border: 1px solid #4a7ba8; border-radius: 6px; }")));
     m_feedbackLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #8aa8c0; font-size: 13px; }")));
     m_feedbackLabel->setText(message);

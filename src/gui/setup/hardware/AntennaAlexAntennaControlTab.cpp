@@ -172,7 +172,7 @@ void AntennaAlexAntennaControlTab::buildBlockTxStrip(QVBoxLayout* outerLayout)
     auto* frame = new QFrame(this);
     frame->setFrameShape(QFrame::StyledPanel);
     frame->setStyleSheet(QStringLiteral(
-        "QFrame { background-color: rgba(200,50,50,0.08); border: 1px solid rgba(200,50,50,0.4); border-radius: 4px; }"));
+        "QFrame { background-color: rgba(200,50,50,0.08); border: 1px solid rgba(200,50,50,0.4); border-radius: 6px; }"));
 
     auto* row = new QHBoxLayout(frame);
     row->setContentsMargins(8, 4, 8, 4);

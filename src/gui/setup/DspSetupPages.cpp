@@ -469,7 +469,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     auto makeGroup = [](QVBoxLayout* parent, const QString& title) -> QVBoxLayout*
     {
         static const QString kGrpStyle =
-            "QGroupBox { border: 1px solid #304050; border-radius: 4px; "
+            "QGroupBox { border: 1px solid #304050; border-radius: 6px; "
             "margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
             "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
         auto* grp = new QGroupBox(title);
@@ -488,10 +488,10 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-        "selection-background-color: #00b4d8; }";
+        "selection-background-color: #4a7ba8; }";
     static const QString kSlider =
         "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: #00b4d8; width: 12px; height: 12px; "
+        "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
         "border-radius: 6px; margin: -4px 0; }";
     static const QString kInfoLbl =
         "QLabel { color: #5a8aaa; font-size: 13px; font-style: italic; }";
@@ -534,7 +534,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         slider->setValue(defaultValue);
         slider->setStyleSheet(Style::themed(
             "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-            "QSlider::handle:horizontal { background: #00b4d8; width: 12px; height: 12px; "
+            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
             "border-radius: 6px; margin: -4px 0; }"));
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, /*stretch=*/1);
@@ -577,7 +577,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         slider->setValue(static_cast<int>(defaultValue * scale));
         slider->setStyleSheet(Style::themed(
             "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-            "QSlider::handle:horizontal { background: #00b4d8; width: 12px; height: 12px; "
+            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
             "border-radius: 6px; margin: -4px 0; }"));
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, 1);
@@ -609,8 +609,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             "QRadioButton::indicator { width: 14px; height: 14px; }"
             "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
             "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #00b4d8; "
-            "border-radius: 7px; background: #00b4d8; }"));
+            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
+            "border-radius: 7px; background: #4a7ba8; }"));
         postRdo->setStyleSheet(preRdo->styleSheet());
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
@@ -826,8 +826,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
                     "QRadioButton::indicator { width: 14px; height: 14px; }"
                     "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
                     "border-radius: 7px; background: #1a2a3a; }"
-                    "QRadioButton::indicator:checked { border: 2px solid #00b4d8; "
-                    "border-radius: 7px; background: #00b4d8; }"));
+                    "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
+                    "border-radius: 7px; background: #4a7ba8; }"));
                 gmGrp->addWidget(rdo);
                 gmRdos.append(rdo);
             }
@@ -1051,7 +1051,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
             "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
             "QPushButton:hover { background: #203040; }"
-            "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }"));
+            "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }"));
         auto* defBtn = new QPushButton("Default");
         defBtn->setStyleSheet(useModelBtn->styleSheet());
         btnRow->addWidget(useModelBtn);
@@ -1179,8 +1179,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
             "QRadioButton::indicator { width: 14px; height: 14px; }"
             "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
             "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #00b4d8; "
-            "border-radius: 7px; background: #00b4d8; }";
+            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
+            "border-radius: 7px; background: #4a7ba8; }";
 
         auto* algo1 = new QRadioButton("Algo 1");
         auto* algo2 = new QRadioButton("Algo 2");
@@ -1822,7 +1822,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     sidetoneVol->setStyleSheet(Style::themed(
         "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; "
         "border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: #00b4d8; width: 12px; "
+        "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; "
         "height: 12px; border-radius: 6px; margin: -4px 0; }"));
     sidetoneRowLay->addWidget(sidetoneLbl);
     sidetoneRowLay->addWidget(sidetoneVol, 1);

@@ -74,7 +74,7 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(QStringLiteral(
         "CommandBar { background: %1; border: 1px solid %2;"
-        "             border-radius: 8px; }")
+        "             border-radius: 6px; }")
         .arg(QString::fromLatin1(Style::kPanelBg),
              QString::fromLatin1(Style::kBorderSubtle)));
 

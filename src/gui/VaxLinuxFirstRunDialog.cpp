@@ -165,7 +165,7 @@ void VaxLinuxFirstRunDialog::buildUi()
         auto* badge = new QLabel(QStringLiteral("LINUX"), header);
         badge->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; background: %2; border: 1px solid %1;"
-            " padding: 1px 6px; border-radius: 2px;"
+            " padding: 1px 6px; border-radius: 6px;"
             " font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }")
             .arg(Style::kAmberWarn, Style::kInsetBg));
         headerLayout->addWidget(badge);

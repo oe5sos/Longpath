@@ -917,7 +917,7 @@ void SpeechProcessorPage::buildActiveProfileSection()
         "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
         "  border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
         "QPushButton:hover { background: #203040; }"
-        "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }")));
+        "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }")));
 
     row->addWidget(nameLabel);
     row->addWidget(m_activeProfileLabel, 1);
@@ -1006,7 +1006,7 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
         "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
         "  border-radius: 6px; color: #c8d8e8; font-size: 11px; padding: 2px 8px; }"
         "QPushButton:hover:enabled { background: #203040; }"
-        "QPushButton:pressed:enabled { background: #00b4d8; color: #0f0f1a; }"
+        "QPushButton:pressed:enabled { background: #4a7ba8; color: #0f0f1a; }"
         "QPushButton:disabled { color: #607080; border: 1px solid #203040; }")));
 
     if (linkPage.isEmpty()) {
@@ -1156,7 +1156,7 @@ void SpeechProcessorPage::buildStageStatusSection()
     // green-for-on) so users can tell at a glance that ALC isn't a toggle.
     if (auto* dot = group->findChild<QLabel*>(QStringLiteral("dot_ALC"))) {
         dot->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: #00b4d8; font-size: 16px; font-weight: bold; }")));
+            "QLabel { color: #4a7ba8; font-size: 16px; font-weight: bold; }")));
     }
 
     // Phase Rotator — wired live (3M-3a-ii Batch 5).  Cross-links to CFC

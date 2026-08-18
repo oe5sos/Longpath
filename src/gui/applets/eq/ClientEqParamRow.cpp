@@ -341,24 +341,24 @@ private:
         const QString freqStyle = QString(
             "QLineEdit { color: %1; font-size: 11px; font-weight: bold;"
             " background: transparent; border: 1px solid transparent;"
-            " border-radius: 2px; padding: 0;"
+            " border-radius: 6px; padding: 0;"
             " selection-background-color: %2; }"
-            "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
+            "QLineEdit:focus { background: #0a0a18; border: 1px solid #4a7ba8; }"
             ).arg(accentName, selBg);
         const QString gainStyle = QString(
             "QLineEdit { color: %1; font-size: 13px; font-weight: bold;"
             " background: transparent; border: 1px solid transparent;"
-            " border-radius: 2px; padding: 1px 0;"
+            " border-radius: 6px; padding: 1px 0;"
             " selection-background-color: %3; }"
-            "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
+            "QLineEdit:focus { background: #0a0a18; border: 1px solid #4a7ba8; }"
             "QLineEdit:read-only { color: %2; }"
             ).arg(accentName, accentName, selBg);
         const QString qStyle = QString(
             "QLineEdit { color: %1; font-size: 11px;"
             " background: transparent; border: 1px solid transparent;"
-            " border-radius: 2px; padding: 0;"
+            " border-radius: 6px; padding: 0;"
             " selection-background-color: %2; }"
-            "QLineEdit:focus { background: #0a0a18; border: 1px solid #00b4d8; }"
+            "QLineEdit:focus { background: #0a0a18; border: 1px solid #4a7ba8; }"
             ).arg(qColName, selBg);
         m_freqEdit->setStyleSheet(freqStyle);
         m_gainEdit->setStyleSheet(gainStyle);

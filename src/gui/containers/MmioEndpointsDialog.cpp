@@ -88,7 +88,7 @@ constexpr const char* kDialogStyle =
     "QComboBox QAbstractItemView {"
     "  background: #0a0a18; color: #c8d8e8;"
     "  border: 1px solid #205070;"
-    "  selection-background-color: #00b4d8;"
+    "  selection-background-color: #4a7ba8;"
     "}"
     "QListWidget, QTreeWidget {"
     "  background: #0a0a18; color: #c8d8e8;"
@@ -101,7 +101,7 @@ constexpr const char* kDialogStyle =
     "  padding: 3px 10px; min-height: 20px;"
     "}"
     "QPushButton:hover { background: #203040; }"
-    "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }";
+    "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }";
 
 constexpr const char* kSectionHeaderStyle =
     "QLabel { color: #8aa8c0; font-weight: bold; font-size: 11px;"

@@ -83,7 +83,7 @@ constexpr const char* kComboStyle =
     "QComboBox QAbstractItemView {"
     "  background: #0a0a18; color: #c8d8e8;"
     "  border: 1px solid #205070;"
-    "  selection-background-color: #00b4d8;"
+    "  selection-background-color: #4a7ba8;"
     "}";
 
 constexpr const char* kTableStyle =
@@ -92,7 +92,7 @@ constexpr const char* kTableStyle =
     "  border: 1px solid #1e2e3e; gridline-color: #1e2e3e;"
     "}"
     "QTableWidget::item:selected {"
-    "  background: #00b4d8; color: #0a0a18;"
+    "  background: #4a7ba8; color: #0a0a18;"
     "}"
     "QHeaderView::section {"
     "  background: #1a2a38; color: #8aa8c0; font-size: 11px;"

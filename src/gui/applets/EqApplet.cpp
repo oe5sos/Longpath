@@ -58,7 +58,7 @@ public:
             "QPushButton { background-color: #1a2a3a; border: 1px solid #205070; "
             "border-radius: 6px; }"
             "QPushButton:hover { background-color: #203040; }"
-            "QPushButton:pressed { background-color: #00b4d8; }"));
+            "QPushButton:pressed { background-color: #4a7ba8; }"));
     }
 
 protected:
@@ -101,8 +101,8 @@ static const QString kGreenActive =
     "border: 1px solid #00a060; }";
 
 static const QString kBlueActive =
-    "QPushButton:checked { background-color: #0070c0; color: #ffffff; "
-    "border: 1px solid #0090e0; }";
+    "QPushButton:checked { background-color: #4a7ba8; color: #ffffff; "
+    "border: 1px solid #4a7ba8; }";
 
 // 10-band frequency labels: 32/63/125/250/500/1k/2k/4k/8k/16k Hz.
 static constexpr int kEqBandCount = 10;

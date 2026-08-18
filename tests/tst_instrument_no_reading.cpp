@@ -136,6 +136,57 @@ private slots:
         b.clearValue();
         QCOMPARE(n.hasValue(), b.hasValue());
     }
+
+    // ── Zwei Arten von „kein Messwert" ───────────────────────────────
+    //
+    // Der Betreiber hat gemeldet, die Stehwelle habe keinen Zeiger. Sie
+    // hatte auch keinen Messwert — die Regel griff also richtig, und
+    // trotzdem sah es kaputt aus. Die Entscheidung vom 2026-08-18
+    // trennt darum die beiden Faelle:
+    //
+    //   ohne Radio          -> Zeiger ruht am Anschlag, matt
+    //   mit Radio, kein Wert -> kein Zeiger (er behauptete eine Messung)
+    //
+    // Geprueft wird der ZUSTAND, nicht das Bild: ein Farbvergleich auf
+    // dem gemalten Bogen haenge an Deckkraft und Rundung und braeche
+    // beim naechsten Feinschliff, ohne dass die Regel verletzt waere.
+    void offlineIsNotTheSameAsNoReading()
+    {
+        NeedleInstrument n;
+        QVERIFY(n.setPrimary(MeterBinding::TxSwr));
+
+        // Vorgabe: verbunden gedacht, also kein Zeiger ohne Wert.
+        QVERIFY(!n.isOffline());
+        QVERIFY(!n.hasValue());
+
+        n.setOffline(true);
+        QVERIFY(n.isOffline());
+        QVERIFY2(!n.hasValue(),
+                 "Ruhelage ist kein Messwert — sie darf hasValue() nicht setzen");
+
+        // Kommt ein Wert herein, gewinnt er: dann ist der Zeiger echt.
+        n.onReading(MeterBinding::TxSwr, 2.1);
+        QVERIFY(n.hasValue());
+        QVERIFY(n.isOffline());   // die Verbindung sagt das Applet, nicht der Wert
+
+        n.setOffline(false);
+        QVERIFY(!n.isOffline());
+    }
+
+    // Zweimal derselbe Zustand darf nicht zweimal neu zeichnen. Bei
+    // einem Instrument, das an einem 1-Hz-Takt haengt, ist das der
+    // Unterschied zwischen ruhig und flackernd.
+    void settingTheSameOfflineStateTwiceIsIdempotent()
+    {
+        NeedleInstrument n;
+        QVERIFY(n.setPrimary(MeterBinding::TxSwr));
+        n.setOffline(true);
+        n.setOffline(true);
+        QVERIFY(n.isOffline());
+        n.setOffline(false);
+        n.setOffline(false);
+        QVERIFY(!n.isOffline());
+    }
 };
 
 QTEST_MAIN(TestInstrumentNoReading)

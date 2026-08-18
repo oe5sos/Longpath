@@ -632,7 +632,7 @@ void ConnectionPanel::buildUI()
         "QGroupBox {"
         "  color: #8090a0;"
         "  border: 1px solid #203040;"
-        "  border-radius: 4px;"
+        "  border-radius: 6px;"
         "  margin-top: 8px;"
         "  padding-top: 12px;"
         "}"
@@ -660,7 +660,7 @@ QWidget* ConnectionPanel::buildStatusStrip()
         "QWidget#statusStrip {"
         "  background: #0a1a28;"
         "  border: 1px solid #203040;"
-        "  border-radius: 4px;"
+        "  border-radius: 6px;"
         "}")));
 
     auto* stripLayout = new QHBoxLayout(m_statusStrip);
@@ -683,7 +683,7 @@ QWidget* ConnectionPanel::buildStatusStrip()
     // Reconnect hint — shown when disconnected and a last-connected radio is known
     m_stripReconnectLabel = new QLabel(m_statusStrip);
     m_stripReconnectLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #00b4d8; font-size: 11px; }")));
+        "QLabel { color: #4a7ba8; font-size: 11px; }")));
     m_stripReconnectLabel->setVisible(false);
 
     stripLayout->addWidget(m_stripPillLabel);

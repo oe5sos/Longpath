@@ -338,7 +338,7 @@ void NetworkDiagnosticsDialog::refresh()
         m_statusLabel->setText(
             connected
                 ? QStringLiteral("<span style='color:#5fff8a;'>&#x25cf; Connected</span>")
-                : QStringLiteral("<span style='color:#ff6060;'>&#x25cf; Disconnected</span>"));
+                : QStringLiteral("<span style='color:#c25a5c;'>&#x25cf; Disconnected</span>"));
         m_statusLabel->setTextFormat(Qt::RichText);
     }
 

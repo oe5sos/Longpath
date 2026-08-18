@@ -208,7 +208,7 @@ void AmpApplet::setState(const QString& state)
         m_operateBtn->setText(QStringLiteral("OPERATE"));
         m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
-                "QPushButton { background: #1a6030; border: 1px solid #008040; "
+                "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
                 "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
                 "QPushButton:hover { background: #007040; }")));
     } else {

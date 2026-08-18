@@ -181,7 +181,7 @@ void ContainerWidget::buildUI()
     m_resizeGrip->setFixedSize(12, 12);
     m_resizeGrip->setCursor(Qt::SizeFDiagCursor);
     m_resizeGrip->setStyleSheet(Style::themed(QStringLiteral(
-        "background: #405060; border-radius: 2px;")));
+        "background: #405060; border-radius: 6px;")));
     m_resizeGrip->setVisible(false);
 
     // Wire button signals
@@ -282,7 +282,7 @@ void ContainerWidget::setupBorder()
     // which container the settings dialog is editing.
     if (m_highlighted) {
         setStyleSheet(Style::themed(QStringLiteral(
-            "ContainerWidget { border: 2px solid #00b4d8; }")));
+            "ContainerWidget { border: 2px solid #4a7ba8; }")));
     } else if (m_border) {
         setStyleSheet(Style::themed(QStringLiteral(
             "ContainerWidget { border: 1px solid #203040; }")));

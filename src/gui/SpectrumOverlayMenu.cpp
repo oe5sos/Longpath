@@ -33,7 +33,7 @@ void SpectrumOverlayMenu::buildUI()
         "NereusSDR--SpectrumOverlayMenu {"
         "  background: #1a2a3a;"
         "  border: 1px solid #205070;"
-        "  border-radius: 4px;"
+        "  border-radius: 6px;"
         "}"
         "QLabel { color: #c8d8e8; font-size: 11px; }"
         "QSlider::groove:horizontal {"
@@ -41,7 +41,7 @@ void SpectrumOverlayMenu::buildUI()
         "}"
         "QSlider::handle:horizontal {"
         "  width: 12px; height: 12px; margin: -4px 0;"
-        "  background: #00b4d8; border-radius: 6px;"
+        "  background: #4a7ba8; border-radius: 6px;"
         "}"
         "QComboBox {"
         "  background: #203040; color: #c8d8e8; border: 1px solid #205070;"
@@ -49,7 +49,7 @@ void SpectrumOverlayMenu::buildUI()
         "}"
         "QComboBox::drop-down { border: none; }"
         "QComboBox QAbstractItemView {"
-        "  background: #1a2a3a; color: #c8d8e8; selection-background-color: #00b4d8;"
+        "  background: #1a2a3a; color: #c8d8e8; selection-background-color: #4a7ba8;"
         "}"
         "QCheckBox { color: #c8d8e8; font-size: 11px; }"
         "QCheckBox::indicator { width: 14px; height: 14px; }"
@@ -57,12 +57,12 @@ void SpectrumOverlayMenu::buildUI()
         "  background: #203040; color: #c8d8e8; border: 1px solid #205070;"
         "  border-radius: 6px; padding: 3px 10px; font-size: 11px;"
         "}"
-        "QPushButton:hover { background: #304050; border-color: #00b4d8; }"
+        "QPushButton:hover { background: #304050; border-color: #4a7ba8; }"
         "QPushButton:pressed { background: #1a2a38; }")));
 
     // --- Waterfall section ---
     auto* wfLabel = new QLabel(QStringLiteral("Waterfall"), this);
-    wfLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #00b4d8;")));
+    wfLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8;")));
     layout->addWidget(wfLabel);
 
     // Color scheme
@@ -115,7 +115,7 @@ void SpectrumOverlayMenu::buildUI()
 
     // --- Spectrum section ---
     auto* specLabel = new QLabel(QStringLiteral("Spectrum"), this);
-    specLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #00b4d8; margin-top: 6px;")));
+    specLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
     layout->addWidget(specLabel);
 
     // Pan fill
@@ -143,7 +143,7 @@ void SpectrumOverlayMenu::buildUI()
 
     // --- Display Range section ---
     auto* rangeLabel = new QLabel(QStringLiteral("Display Range"), this);
-    rangeLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #00b4d8; margin-top: 6px;")));
+    rangeLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
     layout->addWidget(rangeLabel);
 
     // Ref level
@@ -180,7 +180,7 @@ void SpectrumOverlayMenu::buildUI()
 
     // --- Tuning Mode section ---
     auto* tuneLabel = new QLabel(QStringLiteral("Tuning"), this);
-    tuneLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #00b4d8; margin-top: 6px;")));
+    tuneLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
     layout->addWidget(tuneLabel);
 
     m_ctunCheck = new QCheckBox(QStringLiteral("CTUN (independent pan)"), this);
@@ -198,7 +198,7 @@ void SpectrumOverlayMenu::buildUI()
     // Ctrl + right-click stays the primary add gesture; this row is the
     // discoverable one for an operator who does not know the chord.
     auto* notchLabel = new QLabel(QStringLiteral("Notch"), this);
-    notchLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #00b4d8; margin-top: 6px;")));
+    notchLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
     layout->addWidget(notchLabel);
 
     auto* notchRow = new QHBoxLayout;

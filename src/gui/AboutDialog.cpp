@@ -237,7 +237,7 @@ void AboutDialog::buildUI()
     contribList->setStyleSheet(
         QStringLiteral(
             "QListWidget { background: %1; color: %2; border: 1px solid %3;"
-            " border-radius: 4px; font-size: 11px; padding: 4px; }"
+            " border-radius: 6px; font-size: 11px; padding: 4px; }"
             "QListWidget::item { padding: 1px 4px; }")
             .arg(Style::kInsetBg, Style::kTextPrimary, Style::kBorderSubtle));
 
@@ -490,9 +490,9 @@ void AboutDialog::buildUI()
     okBtn->setFixedWidth(80);
     // §D exception: hover #00b4d8 — brightened accent variant; no canonical match.
     okBtn->setStyleSheet(Style::themed(
-        QStringLiteral("QPushButton { background: %1; color: %2; border-radius: 4px;"
+        QStringLiteral("QPushButton { background: %1; color: %2; border-radius: 6px;"
                        " padding: 6px 16px; font-weight: bold; }"
-                       "QPushButton:hover { background: #00b4d8; }")  // §D exception: accent-light hover
+                       "QPushButton:hover { background: #4a7ba8; }")  // §D exception: accent-light hover
             .arg(Style::kAccent, Style::kAppBg)));
     connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
 

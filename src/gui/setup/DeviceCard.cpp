@@ -33,7 +33,7 @@ namespace {
 static const char* kGroupStyle =
     "QGroupBox {"
     "  border: 1px solid #203040;"
-    "  border-radius: 4px;"
+    "  border-radius: 6px;"
     "  margin-top: 8px;"
     "  padding-top: 12px;"
     "  font-weight: bold;"
@@ -51,13 +51,13 @@ static const char* kComboStyle =
     "}"
     "QComboBox::drop-down { border: none; }"
     "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-    "  selection-background-color: #00b4d8; }";
+    "  selection-background-color: #4a7ba8; }";
 
 static const char* kCheckStyle =
     "QCheckBox { color: #c8d8e8; spacing: 4px; }"
     "QCheckBox::indicator { width: 12px; height: 12px; border: 1px solid #203040;"
     "  border-radius: 2px; background: #0f0f1a; }"
-    "QCheckBox::indicator:checked { background: #00b4d8; }";
+    "QCheckBox::indicator:checked { background: #4a7ba8; }";
 
 static const char* kLabelStyle = "QLabel { color: #c8d8e8; font-size: 13px; }";
 
@@ -68,7 +68,7 @@ static const char* kPillStyleOk =
     "QLabel {"
     "  background: #1a2a38;"
     "  border: 1px solid #203040;"
-    "  border-radius: 8px;"
+    "  border-radius: 6px;"
     "  color: #80c8a0;"
     "  font-size: 11px;"
     "  padding: 2px 8px;"
@@ -78,7 +78,7 @@ static const char* kPillStyleError =
     "QLabel {"
     "  background: #301520;"
     "  border: 1px solid #603040;"
-    "  border-radius: 8px;"
+    "  border-radius: 6px;"
     "  color: #e05060;"
     "  font-size: 11px;"
     "  padding: 2px 8px;"
@@ -88,7 +88,7 @@ static const char* kPillStyleApplying =
     "QLabel {"
     "  background: #203040;"
     "  border: 1px solid #304050;"
-    "  border-radius: 8px;"
+    "  border-radius: 6px;"
     "  color: #c8d8e8;"
     "  font-size: 11px;"
     "  padding: 2px 8px;"

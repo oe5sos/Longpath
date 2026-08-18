@@ -773,7 +773,7 @@ MainWindow::MainWindow(QWidget* parent)
                 "  background: #1a2a3a; border: 1px solid #205070;"
                 "  border-radius: 6px; min-height: 24px;"
                 "}"
-                "QProgressBar::chunk { background: #00b4d8; }")));
+                "QProgressBar::chunk { background: #4a7ba8; }")));
             m_wisdomDialog->show();
         }
 
@@ -2937,7 +2937,7 @@ void MainWindow::buildUI()
     zoomBar->setStyleSheet(Style::themed(QStringLiteral(
         "QSlider { background: #0a0a14; }"
         "QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-        "QSlider::handle:horizontal { background: #00b4d8; width: 14px; margin: -4px 0; border-radius: 7px; }")));
+        "QSlider::handle:horizontal { background: #4a7ba8; width: 14px; margin: -4px 0; border-radius: 7px; }")));
     layout->addWidget(zoomBar);
     connect(zoomBar, &QSlider::valueChanged, this, [this](int val) {
         double bwHz = val * 1000.0;
@@ -7572,7 +7572,7 @@ void MainWindow::buildStatusBar()
     m_tgxlChip = new QLabel(QStringLiteral("TGXL"), barWidget);
     m_tgxlChip->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background:#204060; border:1px solid #205070; "
-        "padding:1px 8px; border-radius:3px; color:#88e0ff; }")));
+        "padding:1px 8px; border-radius:6px; color:#88e0ff; }")));
     m_tgxlChip->setVisible(false);
     hbox->addWidget(m_tgxlChip);
 
@@ -9350,13 +9350,13 @@ void MainWindow::applyDarkTheme()
         "  color: #c8d8e8;"
         "  border-bottom: 1px solid #203040;"
         "}"
-        "QMenuBar::item:selected { background: #00b4d8; }"
+        "QMenuBar::item:selected { background: #4a7ba8; }"
         "QMenu {"
         "  background: #1a2a3a;"
         "  color: #c8d8e8;"
         "  border: 1px solid #203040;"
         "}"
-        "QMenu::item:selected { background: #00b4d8; }"
+        "QMenu::item:selected { background: #4a7ba8; }"
         "QLabel { color: #c8d8e8; }"
         "QStatusBar {"
         "  background: #1a2a3a;"
@@ -11675,9 +11675,9 @@ void MainWindow::showFeatureRequestDialogImpl()
     auto* submitBtn = new QPushButton(QStringLiteral("Submit Your Idea"), dlg);
     submitBtn->setAutoDefault(false);
     submitBtn->setStyleSheet(Style::themed(QStringLiteral(
-        "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
-        "border-radius: 4px; padding: 8px 20px; font-size: 13px; }"
-        "QPushButton:hover { background: #00b4d8; }")));
+        "QPushButton { background: #4a7ba8; color: #0f0f1a; font-weight: bold; "
+        "border-radius: 6px; padding: 8px 20px; font-size: 13px; }"
+        "QPushButton:hover { background: #4a7ba8; }")));
     connect(submitBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
             "https://github.com/boydsoftprez/NereusSDR/issues/new?template=feature_request.yml")));

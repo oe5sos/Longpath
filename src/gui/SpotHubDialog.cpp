@@ -168,16 +168,16 @@ constexpr const char* kAutoToggleStyle =
     "QPushButton:!checked { background: #33280f; }";
 
 constexpr const char* kStartBtnStyle =
-    "QPushButton { background: #00b4d8; color: #0f0f1a; font-weight: bold; "
+    "QPushButton { background: #4a7ba8; color: #0f0f1a; font-weight: bold; "
     "border: 1px solid #008ba8; padding: 4px; border-radius: 6px; }"
-    "QPushButton:hover { background: #00b4d8; }"
+    "QPushButton:hover { background: #4a7ba8; }"
     "QPushButton:disabled { background: #404060; color: #4e4e53; }";
 
 constexpr const char* kStatusIdleStyle =
     "QLabel { color: #8e8e93; font-size: 11px; }";
 
 constexpr const char* kStatusActiveStyle =
-    "QLabel { color: #00b4d8; font-size: 11px; font-weight: bold; }";
+    "QLabel { color: #4a7ba8; font-size: 11px; font-weight: bold; }";
 
 constexpr const char* kConsoleStyle =
     "QPlainTextEdit {"
@@ -201,14 +201,14 @@ constexpr const char* kFilterPillStyle =
     "  background: #1a1a2a;"
     "  color: #8090a0;"
     "  border: 1px solid #203040;"
-    "  border-radius: 9px;"
+    "  border-radius: 6px;"
     "  padding: 2px 8px;"
     "  font-size: 11px;"
     "  font-weight: bold;"
     "  min-width: 24px;"
     "}"
     "QPushButton:checked {"
-    "  background: #00b4d8;"
+    "  background: #4a7ba8;"
     "  color: #0f0f1a;"
     "  border-color: #008ba8;"
     "}"
@@ -229,7 +229,7 @@ constexpr const char* kSpotTableStyle =
     "}"
     "QHeaderView::section {"
     "  background: #1a1a2a;"
-    "  color: #00b4d8;"
+    "  color: #4a7ba8;"
     "  border: 1px solid #203040;"
     "  padding: 3px 6px;"
     "  font-weight: bold;"
@@ -290,7 +290,7 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
         "QTabWidget::pane { border: 1px solid #203040; }"
         "QTabBar::tab { background: #1a1a2a; color: #8090a0; border: 1px solid #203040; "
         "  padding: 6px 16px; margin-right: 2px; }"
-        "QTabBar::tab:selected { background: #0f0f1a; color: #00b4d8; border-bottom: none; }"));
+        "QTabBar::tab:selected { background: #0f0f1a; color: #4a7ba8; border-bottom: none; }"));
 
     // Tab order matches AetherSDR upstream
     // (src/gui/DxClusterDialog.cpp:262-271). NereusSDR adds the PSK
@@ -444,7 +444,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     m_settingsErrorLabel = new QLabel;
     m_settingsErrorLabel->setObjectName("settingsErrorLabel");
     m_settingsErrorLabel->setStyleSheet(Style::themed(
-        "QLabel { color: #ff4444; font-size: 11px; }"));
+        "QLabel { color: #c25a5c; font-size: 11px; }"));
     btnRow->addWidget(m_settingsErrorLabel, 1);
 
     m_settingsSavedLabel = new QLabel;
@@ -711,7 +711,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
         quint16 port = static_cast<quint16>(m_portSpin->value());
         if (host.isEmpty() || call.isEmpty()) {
             m_statusLabel->setText("Server and callsign are required");
-            m_statusLabel->setStyleSheet(Style::themed("QLabel { color: #ff4444; font-size: 11px; }"));
+            m_statusLabel->setStyleSheet(Style::themed("QLabel { color: #c25a5c; font-size: 11px; }"));
             return;
         }
         auto& settings = AppSettings::instance();
@@ -760,7 +760,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
                     if (m_statusLabel) {
                         m_statusLabel->setText(QString("Error: %1").arg(error));
                         m_statusLabel->setStyleSheet(Style::themed(
-                            "QLabel { color: #ddbb00; font-size: 11px; }"));
+                            "QLabel { color: #c2924f; font-size: 11px; }"));
                     }
                 });
         // Stream raw cluster lines into the console widget so the user
@@ -776,7 +776,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     // Console + spot-color row
     auto* consoleRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("Cluster Console");
-    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     consoleRow->addWidget(consoleLabel);
     consoleRow->addStretch();
 
@@ -957,7 +957,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
         quint16 port = static_cast<quint16>(m_rbnPortSpin->value());
         if (host.isEmpty() || call.isEmpty()) {
             m_rbnStatusLabel->setText("Server and callsign are required");
-            m_rbnStatusLabel->setStyleSheet(Style::themed("QLabel { color: #ff4444; font-size: 11px; }"));
+            m_rbnStatusLabel->setStyleSheet(Style::themed("QLabel { color: #c25a5c; font-size: 11px; }"));
             return;
         }
         auto& settings = AppSettings::instance();
@@ -999,7 +999,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
                     if (m_rbnStatusLabel) {
                         m_rbnStatusLabel->setText(QString("Error: %1").arg(error));
                         m_rbnStatusLabel->setStyleSheet(Style::themed(
-                            "QLabel { color: #ddbb00; font-size: 11px; }"));
+                            "QLabel { color: #c2924f; font-size: 11px; }"));
                     }
                 });
         connect(m_rbnClient, &DxClusterClient::rawLineReceived,
@@ -1013,7 +1013,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     // Console + spot-color row
     auto* rbnConsoleRow = new QHBoxLayout;
     auto* rbnConsoleLabel = new QLabel("RBN Console");
-    rbnConsoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    rbnConsoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     rbnConsoleRow->addWidget(rbnConsoleLabel);
     rbnConsoleRow->addStretch();
 
@@ -1021,14 +1021,14 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     rbnColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     rbnConsoleRow->addWidget(rbnColorLabel);
 
-    QColor rbnColor(s.value("RbnSpotColor", "#4488FF").toString());
+    QColor rbnColor(s.value("RbnSpotColor", "#4a7ba8").toString());
     auto* rbnColorBtn = new QPushButton;
     rbnColorBtn->setObjectName("rbnColorBtn");
     rbnColorBtn->setFixedSize(18, 18);
     rbnColorBtn->setStyleSheet(swatchStyle(rbnColor));
     connect(rbnColorBtn, &QPushButton::clicked, this, [this, rbnColorBtn] {
         QColor c = QColorDialog::getColor(
-            QColor(AppSettings::instance().value("RbnSpotColor", "#4488FF").toString()),
+            QColor(AppSettings::instance().value("RbnSpotColor", "#4a7ba8").toString()),
             this, "RBN Spot Color");
         if (c.isValid()) {
             rbnColorBtn->setStyleSheet(swatchStyle(c));
@@ -1210,14 +1210,14 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
         "QCheckBox::indicator { width: 14px; height: 14px; }";
 
     // CQ color + checkbox
-    QColor cqColor(s.value("WsjtxColorCQ", "#00FF00").toString());
+    QColor cqColor(s.value("WsjtxColorCQ", "#6fa384").toString());
     m_wsjtxColorCQ = new QPushButton;
     m_wsjtxColorCQ->setObjectName("wsjtxColorCQ");
     m_wsjtxColorCQ->setFixedSize(18, 18);
     m_wsjtxColorCQ->setStyleSheet(swatchStyle(cqColor));
     connect(m_wsjtxColorCQ, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
-            QColor(AppSettings::instance().value("WsjtxColorCQ", "#00FF00").toString()),
+            QColor(AppSettings::instance().value("WsjtxColorCQ", "#6fa384").toString()),
             this, "CQ Spot Color");
         if (c.isValid()) {
             m_wsjtxColorCQ->setStyleSheet(swatchStyle(c));
@@ -1274,14 +1274,14 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     filterRow->addWidget(m_wsjtxFilterPOTA, 1);
 
     // Calling Me color + checkbox
-    QColor callingMeColor(s.value("WsjtxColorCallingMe", "#FF0000").toString());
+    QColor callingMeColor(s.value("WsjtxColorCallingMe", "#c25a5c").toString());
     m_wsjtxColorCallingMe = new QPushButton;
     m_wsjtxColorCallingMe->setObjectName("wsjtxColorCallingMe");
     m_wsjtxColorCallingMe->setFixedSize(18, 18);
     m_wsjtxColorCallingMe->setStyleSheet(swatchStyle(callingMeColor));
     connect(m_wsjtxColorCallingMe, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
-            QColor(AppSettings::instance().value("WsjtxColorCallingMe", "#FF0000").toString()),
+            QColor(AppSettings::instance().value("WsjtxColorCallingMe", "#c25a5c").toString()),
             this, "Calling Me Spot Color");
         if (c.isValid()) {
             m_wsjtxColorCallingMe->setStyleSheet(swatchStyle(c));
@@ -1328,7 +1328,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     // Decodes label + spot-life slider
     auto* decodeRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("WSJT-X Decodes");
-    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     decodeRow->addWidget(consoleLabel);
     decodeRow->addStretch();
 
@@ -1480,7 +1480,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
     layout->addWidget(connGroup);
 
     auto* consoleLabel = new QLabel("SpotCollector Spots");
-    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     layout->addWidget(consoleLabel);
 
     m_scConsole = new QPlainTextEdit;
@@ -1492,7 +1492,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
 
     if (m_spotCollectorClient && m_spotCollectorClient->isListening()) {
         m_scStatusLabel->setText(QString("Listening on port %1").arg(m_scPortSpin->value()));
-        m_scStatusLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-size: 11px; }"));
+        m_scStatusLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-size: 11px; }"));
         m_scStartBtn->setText("Stop");
     }
 
@@ -1619,7 +1619,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
 
     auto* consoleRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("POTA Activations");
-    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     consoleRow->addWidget(consoleLabel);
     consoleRow->addStretch();
 
@@ -1627,14 +1627,14 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     consoleRow->addWidget(spotColorLabel);
 
-    QColor potaColor(s.value("PotaSpotColor", "#FFFF00").toString());
+    QColor potaColor(s.value("PotaSpotColor", "#c2924f").toString());
     auto* potaColorBtn = new QPushButton;
     potaColorBtn->setObjectName("potaColorBtn");
     potaColorBtn->setFixedSize(18, 18);
     potaColorBtn->setStyleSheet(swatchStyle(potaColor));
     connect(potaColorBtn, &QPushButton::clicked, this, [this, potaColorBtn] {
         QColor c = QColorDialog::getColor(
-            QColor(AppSettings::instance().value("PotaSpotColor", "#FFFF00").toString()),
+            QColor(AppSettings::instance().value("PotaSpotColor", "#c2924f").toString()),
             this, "POTA Spot Color");
         if (c.isValid()) {
             potaColorBtn->setStyleSheet(swatchStyle(c));
@@ -1689,7 +1689,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
         m_freedvIdentityLabel->setWordWrap(true);
         if (call.isEmpty() || gridSquare.isEmpty()) {
             m_freedvIdentityLabel->setText(
-                "<b style='color:#ddbb00;'>No identity set.</b> "
+                "<b style='color:#c2924f;'>No identity set.</b> "
                 "Go to the <b>Settings</b> tab and fill in your callsign "
                 "and grid square before starting FreeDV Reporter.");
         } else {
@@ -1780,7 +1780,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
                 m_freedvStatusLabel->setText(
                     "Identity missing - set callsign and grid in Settings tab.");
                 m_freedvStatusLabel->setStyleSheet(Style::themed(
-                    "QLabel { color: #ddbb00; font-size: 11px; }"));
+                    "QLabel { color: #c2924f; font-size: 11px; }"));
             }
             return;
         }
@@ -1819,7 +1819,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
                     if (m_freedvStatusLabel) {
                         m_freedvStatusLabel->setText(QString("Error: %1").arg(error));
                         m_freedvStatusLabel->setStyleSheet(Style::themed(
-                            "QLabel { color: #ddbb00; font-size: 11px; }"));
+                            "QLabel { color: #c2924f; font-size: 11px; }"));
                     }
                 });
     }
@@ -1966,7 +1966,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
 
     auto* consoleRow = new QHBoxLayout;
     auto* consoleLabel = new QLabel("FreeDV Spots");
-    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     consoleRow->addWidget(consoleLabel);
     consoleRow->addStretch();
 
@@ -1974,14 +1974,14 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
     spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
     consoleRow->addWidget(spotColorLabel);
 
-    QColor freedvColor(s.value("FreeDvSpotColor", "#FF8C00").toString());
+    QColor freedvColor(s.value("FreeDvSpotColor", "#c2924f").toString());
     auto* freedvColorBtn = new QPushButton;
     freedvColorBtn->setObjectName("freedvColorBtn");
     freedvColorBtn->setFixedSize(18, 18);
     freedvColorBtn->setStyleSheet(swatchStyle(freedvColor));
     connect(freedvColorBtn, &QPushButton::clicked, this, [this, freedvColorBtn] {
         QColor c = QColorDialog::getColor(
-            QColor(AppSettings::instance().value("FreeDvSpotColor", "#FF8C00").toString()),
+            QColor(AppSettings::instance().value("FreeDvSpotColor", "#c2924f").toString()),
             this, "FreeDV Spot Color");
         if (c.isValid()) {
             freedvColorBtn->setStyleSheet(swatchStyle(c));
@@ -2121,7 +2121,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
         QString gridSquare = m_pskGridEdit->text().trimmed().toUpper();
         if (call.isEmpty() || gridSquare.isEmpty()) {
             m_pskStatusLabel->setText("Callsign and grid are required");
-            m_pskStatusLabel->setStyleSheet(Style::themed("QLabel { color: #ff4444; font-size: 11px; }"));
+            m_pskStatusLabel->setStyleSheet(Style::themed("QLabel { color: #c25a5c; font-size: 11px; }"));
             return;
         }
         // 2026-05-12 bench fix (PR #238 review P2): persist under the
@@ -2144,7 +2144,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
     layout->addWidget(connGroup);
 
     auto* consoleLabel = new QLabel("PSK Reporter Activity");
-    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     layout->addWidget(consoleLabel);
 
     m_pskConsole = new QPlainTextEdit;
@@ -2494,7 +2494,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     leftCol->setSpacing(4);
 
     auto* statsTitle = new QLabel("Statistics");
-    statsTitle->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    statsTitle->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     leftCol->addWidget(statsTitle);
 
     auto makeStatRow = [leftCol](const QString& label, const QString& objName) -> QLabel* {
@@ -2579,7 +2579,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     int  levelsVal   = s.value("SpotsMaxLevel", 3).toInt();
     int  positionVal = s.value("SpotsStartingHeightPercentage", 50).toInt();
     int  fontSizeVal = s.value("SpotFontSize", 16).toInt();
-    QColor spotColor(s.value("SpotsOverrideColor", "#FFFF00").toString());
+    QColor spotColor(s.value("SpotsOverrideColor", "#c2924f").toString());
     QColor bgColor  (s.value("SpotsOverrideBgColor", "#0a0a14").toString());
     int  bgOpacityVal = s.value("SpotsBackgroundOpacity", 48).toInt();
     // Migrate from old minutes key to new seconds key. Preserved
@@ -2593,7 +2593,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     rightCol->setSpacing(4);
 
     auto* knobsTitle = new QLabel("Spot Settings");
-    knobsTitle->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; }"));
+    knobsTitle->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
     rightCol->addWidget(knobsTitle);
 
     auto* grid = new QGridLayout;
@@ -2782,7 +2782,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     colorSwatch->setStyleSheet(swatchStyle(spotColor));
     connect(colorSwatch, &QPushButton::clicked, this,
             [this, colorSwatch, save] {
-        QColor current(AppSettings::instance().value("SpotsOverrideColor", "#FFFF00").toString());
+        QColor current(AppSettings::instance().value("SpotsOverrideColor", "#c2924f").toString());
         QColor c = QColorDialog::getColor(current, this, "Spot Text Color");
         if (c.isValid()) {
             colorSwatch->setStyleSheet(swatchStyle(c));
@@ -2869,7 +2869,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     // tab's source pills remain a secondary filter for fine-grained
     // control without opening this tab.
     auto* visTitle = new QLabel("Show spots from source");
-    visTitle->setStyleSheet(Style::themed("QLabel { color: #00b4d8; font-weight: bold; "
+    visTitle->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; "
                             "margin-top: 8px; }"));
     rightCol->addWidget(visTitle);
 

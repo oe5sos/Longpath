@@ -82,6 +82,19 @@ public:
     /// Zifferblatt und sonst nichts.
     bool hasValue() const { return m_hasValue; }
 
+    /// Kein Radio verbunden.
+    ///
+    /// Betreiber-Entscheidung 2026-08-18: OHNE VERBINDUNG ruht der
+    /// Zeiger am Anschlag, matt. MIT Verbindung, aber ohne Messwert
+    /// (SWR vor dem ersten Senden) bleibt er weg wie bisher.
+    ///
+    /// Der Unterschied ist nicht kosmetisch: „nichts angeschlossen" und
+    /// „noch nicht gemessen" sind zwei Zustaende, und nur beim zweiten
+    /// waere ein Zeiger eine Behauptung ueber eine Messung. Beim ersten
+    /// ist er das, was jedes Analoginstrument im Schrank tut.
+    void setOffline(bool offline);
+    bool isOffline() const { return m_offline; }
+
     /// Die Spitzenhaltung. Sie wird aus dem Rechtsklickmenü des Applets
     /// eingestellt; das Instrument besitzt sie, das Applet bedient sie.
     PeakHold&       peakHold()       { return m_peak; }
@@ -123,6 +136,7 @@ private:
     // als Gedankenstrich. Das Zifferblatt bleibt stehen, damit man
     // sieht, WAS nicht gemessen wird.
     bool m_hasValue{false};
+    bool m_offline{false};
     bool m_hasSecond{false};
 };
 

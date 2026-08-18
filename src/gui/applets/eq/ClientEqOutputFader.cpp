@@ -123,7 +123,7 @@ ClientEqOutputFader::ClientEqOutputFader(QWidget* parent) : QWidget(parent)
     m_valueEdit->setFrame(false);
     applyThemed(m_valueEdit, "QLineEdit { color: {{color.text.primary}}; font-size: 11px; font-weight: bold;"
         " background: transparent; border: 1px solid transparent;"
-        " border-radius: 2px; padding: 0;"
+        " border-radius: 6px; padding: 0;"
         " selection-background-color: {{color.background.2}}; }"
         "QLineEdit:focus { background: {{color.background.0}}; border: 1px solid {{color.accent}}; }");
     m_valueEdit->installEventFilter(this);

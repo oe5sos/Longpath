@@ -75,7 +75,7 @@ constexpr const char* kComboStyle =
     "QComboBox QAbstractItemView {"
     "  background: #0a0a18; color: #c8d8e8;"
     "  border: 1px solid #205070;"
-    "  selection-background-color: #00b4d8;"
+    "  selection-background-color: #4a7ba8;"
     "}";
 } // namespace
 

@@ -978,7 +978,7 @@ void SpectrumWidget::loadSettings()
         // the live trace pure white). Default gold (#FFD700FF).
         m_activePeakHoldColor = ColorSwatchButton::colorFromHex(
             s.value(QStringLiteral("DisplayActivePeakHoldColor"),
-                    QStringLiteral("#FFD700FF")).toString());
+                    QStringLiteral("#c2924fFF")).toString());
 
         // Peak Blobs — NereusSDR ships disabled by default (deviation from
         // Thetis Display.cs:4395 [v2.10.3.13] m_bPeakBlobMaximums = true).
@@ -6139,7 +6139,7 @@ void SpectrumWidget::loadSpotDisplaySettings()
             == QStringLiteral("True"));
     setSpotColor(QColor(
         s.value(QStringLiteral("SpotsOverrideColor"),
-                QStringLiteral("#FFFF00")).toString()));
+                QStringLiteral("#c2924f")).toString()));
     setSpotBgColor(QColor(
         s.value(QStringLiteral("SpotsOverrideBgColor"),
                 QStringLiteral("#0a0a14")).toString()));

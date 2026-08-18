@@ -86,11 +86,11 @@ void AdcOverloadBadge::applyStyle()
     QString fg, bg;
     switch (m_variant) {
         case Variant::Warn:
-            fg = QStringLiteral("#ffd700");
+            fg = QStringLiteral("#c2924f");
             bg = QStringLiteral("rgba(255,215,0,30)");
             break;
         case Variant::Tx:
-            fg = QStringLiteral("#ff6060");
+            fg = QStringLiteral("#c25a5c");
             bg = QStringLiteral("rgba(255,96,96,51)");
             break;
     }

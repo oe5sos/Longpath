@@ -199,7 +199,7 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
     if (operating) {
         m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
-                "QPushButton { background: #1a6030; border: 1px solid #008040; "
+                "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
                 "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
                 "QPushButton:hover { background: #007040; }")));
     } else {
@@ -218,7 +218,7 @@ void Rf2ksApplet::setConnectedState(bool connected)
         ? QStringLiteral("#34c759")
         : QStringLiteral("#e64949");
     m_statusDot->setStyleSheet(
-        QStringLiteral("background:%1; border-radius:5px;").arg(color));
+        QStringLiteral("background:%1; border-radius:6px;").arg(color));
 }
 
 // ---------- Section B slots ----------

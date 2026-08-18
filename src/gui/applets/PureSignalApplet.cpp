@@ -86,7 +86,7 @@ namespace {
 // LED active style — green-on-dark (mirrors PsaIndicatorWidget palette).
 constexpr const char* kLedActiveStyle =
     "QLabel {"
-    "  background: #20c060; border-radius: 4px;"
+    "  background: #20c060; border-radius: 6px;"
     "  color: #0a0a14; font-size: 9px; font-weight: bold;"
     "  padding: 0px 2px;"
     "}";
@@ -95,7 +95,7 @@ constexpr const char* kLedActiveStyle =
 // styling baked into PureSignalApplet's buildUI).
 constexpr const char* kLedInactiveStyle =
     "QLabel {"
-    "  background: #405060; border-radius: 4px;"
+    "  background: #405060; border-radius: 6px;"
     "  color: #6080a0; font-size: 9px; font-weight: bold;"
     "  padding: 0px 2px;"
     "}";

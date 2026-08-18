@@ -15,6 +15,7 @@
 #include <QMenu>
 #include <QStackedWidget>
 #include <QVBoxLayout>
+#include "models/RadioModel.h"
 
 namespace NereusSDR {
 
@@ -36,6 +37,21 @@ InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
     lay->addWidget(m_stack);
 
     setForm(Form::Needle);
+
+    // Ruhelage ohne Radio (Betreiber-Entscheidung 2026-08-18). Das
+    // Instrument selbst kennt kein Radio — es kennt Messwerte. Die
+    // Verbindung ist Wissen der Applet, also wird sie hier
+    // durchgereicht und nicht im Instrument abgefragt.
+    if (m_model) {
+        auto push = [this] {
+            const bool offline =
+                m_model->connectionState() != ConnectionState::Connected;
+            m_needle->setOffline(offline);
+        };
+        connect(m_model, &RadioModel::connectionStateChanged,
+                this, [push](NereusSDR::ConnectionState) { push(); });
+        push();
+    }
 }
 
 bool InstrumentApplet::setPrimary(int bindingId)

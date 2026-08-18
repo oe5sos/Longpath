@@ -215,7 +215,7 @@ constexpr const char* kBtnStyle =
 
 constexpr const char* kOkBtnStyle =
     "QPushButton {"
-    "  background: #00b4d8;"
+    "  background: #4a7ba8;"
     "  color: #0f0f1a;"
     "  border: 1px solid #00d4f8;"
     "  border-radius: 6px;"
@@ -238,7 +238,7 @@ constexpr const char* kListStyle =
     "  border: 1px solid #203040;"
     "}"
     "QListWidget::item:selected {"
-    "  background: #00b4d8;"
+    "  background: #4a7ba8;"
     "  color: #0f0f1a;"
     "}";
 
@@ -737,7 +737,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QFrame* bar = new QFrame(this);
     bar->setFrameShape(QFrame::StyledPanel);
     bar->setStyleSheet(Style::themed(
-        "QFrame { background: #1a1a2a; border: 1px solid #203040; border-radius: 4px; }"));
+        "QFrame { background: #1a1a2a; border: 1px solid #203040; border-radius: 6px; }"));
 
     // Phase 3G-6 block 3 commit 17: two-row layout. Row 1 holds the
     // container-switch dropdown, title, bg, rx, and visibility
@@ -765,7 +765,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
         "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px;"
         "  min-width: 160px; }"
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #205070; selection-background-color: #00b4d8; }"));
+        "  border: 1px solid #205070; selection-background-color: #4a7ba8; }"));
     if (m_manager) {
         const QList<ContainerWidget*> all = m_manager->allContainers();
         int activeIdx = -1;
@@ -817,7 +817,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_bgColorBtn->setStyleSheet(Style::themed(
         "QPushButton { background: #0f0f1a; border: 1px solid #205070;"
         "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
-        "QPushButton:hover { border-color: #00b4d8; }"));
+        "QPushButton:hover { border-color: #4a7ba8; }"));
     m_bgColorBtn->setAutoDefault(false);
     m_bgColorBtn->setDefault(false);
     m_bgColorBtn->setToolTip(QStringLiteral("Choose background color"));
@@ -829,7 +829,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
             m_bgColorBtn->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070;"
                                 "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
-                                "QPushButton:hover { border-color: #00b4d8; }").arg(chosen.name())));
+                                "QPushButton:hover { border-color: #4a7ba8; }").arg(chosen.name())));
         }
     });
 
@@ -849,7 +849,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px; }"
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #205070; selection-background-color: #00b4d8; }"));
+        "  border: 1px solid #205070; selection-background-color: #4a7ba8; }"));
     m_rxSourceCombo->setFixedWidth(64);
 
     // Show on RX / TX
@@ -1081,9 +1081,9 @@ void ContainerSettingsDialog::onItemSelectionChanged()
         "  background: #0f0f1a; width: 10px; margin: 0;"
         "}"
         "QScrollBar::handle:vertical {"
-        "  background: #205070; border-radius: 4px; min-height: 24px;"
+        "  background: #205070; border-radius: 2px; min-height: 24px;"
         "}"
-        "QScrollBar::handle:vertical:hover { background: #00b4d8; }"
+        "QScrollBar::handle:vertical:hover { background: #4a7ba8; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
         "  height: 0;"
         "}"));
@@ -1118,7 +1118,7 @@ void ContainerSettingsDialog::onAddItem()
                        "  border: 1px solid #205070;"
                        "}"
                        "QMenu::item:selected {"
-                       "  background: #00b4d8;"
+                       "  background: #4a7ba8;"
                        "  color: #0f0f1a;"
                        "}"
                        "QMenu::separator {"
@@ -1987,7 +1987,7 @@ void ContainerSettingsDialog::onLoadPreset()
 {
     constexpr const char* kMenuStyle =
         "QMenu { background: #1a2a3a; color: #c8d8e8; border: 1px solid #205070; }"
-        "QMenu::item:selected { background: #00b4d8; color: #0f0f1a; }"
+        "QMenu::item:selected { background: #4a7ba8; color: #0f0f1a; }"
         "QMenu::separator { background: #203040; height: 1px; }";
 
     QMenu menu(this);

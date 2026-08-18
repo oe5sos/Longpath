@@ -45,8 +45,8 @@ static const char* kSpeakerBtnStyle =
 // palette verbatim: #1a2a3a groove, #00b4d8 handle + sub-page fill.
 static const char* kSliderStyle =
     "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-    "QSlider::handle:horizontal { background: #00b4d8; width: 10px; margin: -3px 0; border-radius: 5px; }"
-    "QSlider::sub-page:horizontal { background: #00b4d8; border-radius: 2px; }";
+    "QSlider::handle:horizontal { background: #4a7ba8; width: 10px; margin: -3px 0; border-radius: 5px; }"
+    "QSlider::sub-page:horizontal { background: #4a7ba8; border-radius: 2px; }";
 
 // Inset value readout — STYLEGUIDE.md line 137 "Inset Value Display".
 static const char* kDbLabelStyle =

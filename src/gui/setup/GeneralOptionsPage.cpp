@@ -517,7 +517,7 @@ void GeneralOptionsPage::buildStepAttGroup()
 
     // --- ADC linked label ---
     m_lblAdcLinked = new QLabel(QStringLiteral("ADC linked — both RX share the same ADC"), group);
-    m_lblAdcLinked->setStyleSheet(Style::themed(QStringLiteral("color: #ff4444; font-weight: bold;")));
+    m_lblAdcLinked->setStyleSheet(Style::themed(QStringLiteral("color: #c25a5c; font-weight: bold;")));
     m_lblAdcLinked->setVisible(false);
     vbox->addWidget(m_lblAdcLinked);
 

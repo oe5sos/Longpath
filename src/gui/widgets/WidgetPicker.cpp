@@ -61,7 +61,7 @@ WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
     setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(QStringLiteral(
         "WidgetPicker { background: %1; border: 1px solid %2;"
-        "               border-radius: 8px; }")
+        "               border-radius: 6px; }")
         .arg(QString::fromLatin1(Style::kPanelBg),
              QString::fromLatin1(Style::kBorder)));
     // ── Wie groß ─────────────────────────────────────────────────────
@@ -246,7 +246,7 @@ void WidgetPicker::refresh()
         // Eigenschaft, zwei Zustände, kein Haken nötig.
         c.frame->setStyleSheet(QStringLiteral(
             "CardFrame { background: %1; border: 1px solid %2;"
-            "            border-radius: 8px; }")
+            "            border-radius: 6px; }")
             .arg(QString::fromLatin1(c.checked ? Style::kBlueBg
                                                : Style::kInsetBg),
                  QString::fromLatin1(c.checked ? Style::kBlueBorder
@@ -358,8 +358,8 @@ AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
     // wie ein Knopf, der schon etwas ist.
     plus->setStyleSheet(QStringLiteral(
         "QPushButton { background: transparent; color: %1;"
-        "  border: 1px dashed %2; border-radius: 8px;"
-        "  font-size: 17px; }"
+        "  border: 1px dashed %2; border-radius: 6px;"
+        "  font-size: 16px; }"
         "QPushButton:hover { color: %3; border-color: %4; background: %5; }")
         .arg(QString::fromLatin1(Style::kTextScale),
              QString::fromLatin1(Style::kBorder),

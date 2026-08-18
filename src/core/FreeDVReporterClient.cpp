@@ -975,7 +975,7 @@ void FreeDVReporterClient::emitSpotFromFreqChange(const QString& sid)
     spot.lifetimeSec = 0;
 
     QString freedvColor = AppSettings::instance()
-        .value(QStringLiteral("FreeDvSpotColor"), QStringLiteral("#FF8C00")).toString();
+        .value(QStringLiteral("FreeDvSpotColor"), QStringLiteral("#c2924f")).toString();
     if (freedvColor.length() == 7) {
         freedvColor = QStringLiteral("#FF") + freedvColor.mid(1);
     }
@@ -1052,7 +1052,7 @@ void FreeDVReporterClient::emitSpotFromRxReport(const QJsonObject& data)
     spot.lifetimeSec = 0;  // use source default from AppSettings
 
     QString freedvColor = AppSettings::instance()
-        .value(QStringLiteral("FreeDvSpotColor"), QStringLiteral("#FF8C00")).toString();
+        .value(QStringLiteral("FreeDvSpotColor"), QStringLiteral("#c2924f")).toString();
     if (freedvColor.length() == 7) {
         freedvColor = QStringLiteral("#FF") + freedvColor.mid(1);
     }

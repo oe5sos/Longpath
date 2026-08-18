@@ -232,7 +232,7 @@ void TxApplet::buildUI()
             " color: %1;"
             " font-size: 9px;"
             " border: 1px solid %2;"
-            " border-radius: 2px;"
+            " border-radius: 6px;"
             " padding: 0px 4px;"
             " background: %3;"
             "}"
@@ -743,7 +743,7 @@ void TxApplet::buildUI()
         m_psaBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
         m_psaBtn->setStyleSheet(Style::themed(Style::buttonBaseStyle()
             + QStringLiteral("QPushButton:checked {"
-                             " background: #1a6030; border: 1px solid #008040; color: #fff; }")));
+                             " background: #1a6030; border: 1px solid #6fa384; color: #fff; }")));
         m_psaBtn->setAccessibleName(QStringLiteral("PS-A PureSignal"));
         m_psaBtn->setToolTip(QStringLiteral(
             "Toggle PureSignal auto-calibration. Right-click to open PureSignal..."));
@@ -933,7 +933,7 @@ void TxApplet::wireControls()
     {
         auto updateSwrProtLed = [this](bool isHigh) {
             if (!m_swrProtLed) { return; }
-            const QString color = isHigh ? QStringLiteral("#ffaa00")
+            const QString color = isHigh ? QStringLiteral("#c2924f")
                                          : Style::kTextInactive;
             m_swrProtLed->setStyleSheet(QStringLiteral(
                 "QLabel { color: %1; font-size: 9px; font-weight: bold; }"

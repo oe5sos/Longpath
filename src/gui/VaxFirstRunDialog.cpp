@@ -62,7 +62,7 @@ QString pillNewStyle()
     return QStringLiteral(
         "QLabel { background: %1; border: 1px solid %2; color: %3;"
         " padding: 1px 6px; font-size: 9px; font-weight: bold;"
-        " border-radius: 2px; }")
+        " border-radius: 6px; }")
         .arg(Style::kGreenBg, Style::kGreenBorder, Style::kGreenText);
 }
 
@@ -71,7 +71,7 @@ QString pillSuggestedStyle()
     return QStringLiteral(
         "QLabel { background: %1; border: 1px solid %2; color: %3;"
         " padding: 1px 6px; font-size: 9px; font-weight: bold;"
-        " border-radius: 2px; }")
+        " border-radius: 6px; }")
         .arg(Style::kAmberBg, Style::kAmberBorder, Style::kAmberText);
 }
 
@@ -381,7 +381,7 @@ QWidget* VaxFirstRunDialog::buildHeaderBar()
     const QString badgeColor = platformBadgeColor();
     badge->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; background: %2; border: 1px solid %1;"
-        " padding: 1px 6px; border-radius: 2px;"
+        " padding: 1px 6px; border-radius: 6px;"
         " font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }")
         .arg(badgeColor, Style::kInsetBg));
     layout->addWidget(badge);

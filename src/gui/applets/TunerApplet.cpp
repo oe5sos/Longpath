@@ -396,7 +396,7 @@ void TunerApplet::setTunerModel(TunerModel* model)
             m_postTuneTimer->stop();
             m_tuneSwr = 999.0f;  // reset high so capture tracking works
             m_tuneBtn->setStyleSheet(Style::themed(QStringLiteral(
-                "QPushButton { background: #cc2222; border: 1px solid #ff4444; "
+                "QPushButton { background: #cc2222; border: 1px solid #c25a5c; "
                 "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }")));
             m_tuneBtn->setText(QStringLiteral("TUNING..."));
 
@@ -555,7 +555,7 @@ void TunerApplet::syncFromModel()
     if (m_tunerModel->isOperate() && !m_tunerModel->isBypass()) {
         m_operateBtn->setText(QStringLiteral("OPERATE"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
-            "QPushButton { background: #1a6030; border: 1px solid #008040; "
+            "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
             "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
             "QPushButton:hover { background: #007040; }")));
     } else if (m_tunerModel->isOperate() && m_tunerModel->isBypass()) {
@@ -620,7 +620,7 @@ void TunerApplet::updateAntennaButtons(int antA)
         "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: #204060; }";
     static constexpr const char* kActive =
-        "QPushButton { background: #1a6030; border: 1px solid #008040; "
+        "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
         "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }";
 
     m_ant1Btn->setStyleSheet(antA == 0 ? kActive : kDefault);

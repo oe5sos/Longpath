@@ -53,8 +53,8 @@ inline constexpr QStringView kTabLblNormal {
 // From AetherSDR src/gui/VfoWidget.cpp:149 — verbatim port
 inline constexpr QStringView kTabLblActive {
     u"QLabel { background: transparent; border: none; "
-    u"border-bottom: 2px solid #00b4d8; "
-    u"color: #00b4d8; font-size: 13px; font-weight: bold; padding: 3px 0; }"
+    u"border-bottom: 2px solid #4a7ba8; "
+    u"color: #4a7ba8; font-size: 13px; font-weight: bold; padding: 3px 0; }"
 };
 
 // From AetherSDR src/gui/VfoWidget.cpp:154 — verbatim port
@@ -65,18 +65,18 @@ inline constexpr QStringView kDisabledBtn {
 
 // From AetherSDR src/gui/VfoWidget.cpp:158 — verbatim port
 inline constexpr QStringView kDspToggle {
-    u"QPushButton { background: #1a2a3a; border: 1px solid #304050; border-radius: 2px; "
+    u"QPushButton { background: #1a2a3a; border: 1px solid #304050; border-radius: 6px; "
     u"color: #c8d8e8; font-size: 13px; font-weight: bold; padding: 2px 4px; }"
     u"QPushButton:checked { background: #1a6030; color: #ffffff; border: 1px solid #20a040; }"
-    u"QPushButton:hover { border: 1px solid #0090e0; }"
+    u"QPushButton:hover { border: 1px solid #4a7ba8; }"
 };
 
 // From AetherSDR src/gui/VfoWidget.cpp:164 — verbatim port
 inline constexpr QStringView kModeBtn {
-    u"QPushButton { background: #1a2a3a; border: 1px solid #304050; border-radius: 2px; "
+    u"QPushButton { background: #1a2a3a; border: 1px solid #304050; border-radius: 6px; "
     u"color: #c8d8e8; font-size: 13px; font-weight: bold; padding: 3px; }"
-    u"QPushButton:checked { background: #0070c0; color: #ffffff; border: 1px solid #0090e0; }"
-    u"QPushButton:hover { border: 1px solid #0090e0; }"
+    u"QPushButton:checked { background: #4a7ba8; color: #ffffff; border: 1px solid #4a7ba8; }"
+    u"QPushButton:hover { border: 1px solid #4a7ba8; }"
 };
 
 // From AetherSDR src/gui/VfoWidget.cpp:170 — verbatim port

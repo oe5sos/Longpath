@@ -68,7 +68,7 @@ QLabel* makeStatusDot(QWidget* parent)
     auto* dot = new QLabel(parent);
     dot->setFixedSize(10, 10);
     dot->setStyleSheet(QStringLiteral(
-        "QLabel { background: %1; border-radius: 5px; }"
+        "QLabel { background: %1; border-radius: 6px; }"
     ).arg(kDotOff));
     return dot;
 }
@@ -413,7 +413,7 @@ void TciApplet::updateStatusWidgets()
         const char* color = !running ? kDotOff
                           : (count > 0 ? kDotClients : kDotRunning);
         m_statusDot->setStyleSheet(QStringLiteral(
-            "QLabel { background: %1; border-radius: 5px; }"
+            "QLabel { background: %1; border-radius: 6px; }"
         ).arg(QLatin1String(color)));
     }
 

@@ -48,7 +48,7 @@ namespace {
 static const char* kGroupStyle =
     "QGroupBox {"
     "  border: 1px solid #203040;"
-    "  border-radius: 4px;"
+    "  border-radius: 6px;"
     "  margin-top: 8px;"
     "  padding-top: 12px;"
     "  font-weight: bold;"
@@ -71,7 +71,7 @@ static const char* kAutoDetectStyle =
     "  background: #1a2a3a;"
     "  border: 1px solid #203040;"
     "  border-radius: 6px;"
-    "  color: #00b4d8;"
+    "  color: #4a7ba8;"
     "  font-size: 11px;"
     "  padding: 3px 8px;"
     "}"
@@ -95,7 +95,7 @@ static const char* kStatusBYOStyle =
     "  background: #0a1a28;"
     "  border: 1px solid #2d5885;"
     "  border-radius: 6px;"
-    "  color: #00b4d8;"
+    "  color: #4a7ba8;"
     "  font-size: 11px;"
     "  font-weight: bold;"
     "  padding: 3px 8px;"
@@ -132,7 +132,7 @@ static const char* kActionBtnStyle =
 static const char* kEnableChkStyle =
     "QCheckBox { color: #8aa8c0; font-size: 11px; font-weight: bold; }"
     "QCheckBox::indicator { width: 14px; height: 14px; }"
-    "QCheckBox::indicator:checked { background: #00b4d8; border: 1px solid #00b4d8; border-radius: 2px; }";
+    "QCheckBox::indicator:checked { background: #4a7ba8; border: 1px solid #4a7ba8; border-radius: 2px; }";
 
 // Label builder for the disabled "native (bound automatically)" info
 // row shown at the top of the Auto-detect menu on Mac/Linux when the

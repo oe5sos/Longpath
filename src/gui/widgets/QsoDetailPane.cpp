@@ -165,7 +165,7 @@ void QsoDetailPane::buildUi()
     m_call = new QLabel(this);
     {
         QFont f = m_call->font();
-        f.setPixelSize(19);
+        f.setPixelSize(22);
         f.setFamily(QStringLiteral("Menlo"));
         f.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
         m_call->setFont(f);

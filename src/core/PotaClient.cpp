@@ -148,7 +148,7 @@ QVector<DxSpot> PotaClient::parseAndCollect(const QByteArray& data)
         spot.lifetimeSec = (expire > 0) ? expire : 600;
 
         // Apply POTA spot color (#RRGGBB -> #FFRRGGBB for radio)
-        QString potaColor = AppSettings::instance().value("PotaSpotColor", "#FFFF00").toString();
+        QString potaColor = AppSettings::instance().value("PotaSpotColor", "#c2924f").toString();
         if (potaColor.length() == 7) {
             potaColor = "#FF" + potaColor.mid(1);
         }

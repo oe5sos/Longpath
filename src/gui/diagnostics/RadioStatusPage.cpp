@@ -74,7 +74,7 @@ static QString cardStyle()
         "QFrame {"
         "  background: #0a0a18;"
         "  border: 1px solid %1;"
-        "  border-radius: 4px;"
+        "  border-radius: 6px;"
         "  padding: 2px;"
         "}"
     ).arg(QLatin1String(Style::kBorder));
@@ -92,7 +92,7 @@ static QString progressBarStyle(const char* fill)
         "}"
         "QProgressBar::chunk {"
         "  background: %2;"
-        "  border-radius: 2px;"
+        "  border-radius: 6px;"
         "}"
     ).arg(QLatin1String(Style::kBorderSubtle), QLatin1String(fill));
 }
@@ -114,7 +114,7 @@ RadioStatusPage::RadioStatusPage(RadioModel* model, QWidget* parent)
         "QFrame {"
         "  background: #0a1a10;"
         "  border: 1px solid %1;"
-        "  border-radius: 4px;"
+        "  border-radius: 6px;"
         "}"
     ).arg(QLatin1String(Style::kGreenBorder)));
     statusBar->setFixedHeight(Style::kStatusBarH);
@@ -494,7 +494,7 @@ void RadioStatusPage::buildPttCard(QFrame* card)
         btn->setStyleSheet(QStringLiteral(
             "QPushButton {"
             "  background: %1; border: 1px solid %2;"
-            "  border-radius: 9px; color: %3;"
+            "  border-radius: 6px; color: %3;"
             "  font-size: 9px; font-weight: bold; padding: 1px 4px;"
             "}"
         ).arg(QLatin1String(Style::kButtonBg),
@@ -801,7 +801,7 @@ void RadioStatusPage::refreshPttPills()
         m_pttPills[i]->setStyleSheet(QStringLiteral(
             "QPushButton {"
             "  background: %1; border: 1px solid %2;"
-            "  border-radius: 9px; color: %3;"
+            "  border-radius: 6px; color: %3;"
             "  font-size: 9px; font-weight: bold; padding: 1px 4px;"
             "}"
         ).arg(isActive ? QLatin1String(Style::kGreenBg)     : QLatin1String(Style::kButtonBg),

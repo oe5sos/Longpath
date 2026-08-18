@@ -2354,7 +2354,7 @@ void RadioModel::onRbnSpotReceived(const DxSpot& spot)
     const int lifetime = s.value(QStringLiteral("RbnSpotLifetimeSec"),
                                  1800).toInt();
     const QString color = s.value(QStringLiteral("RbnSpotColor"),
-                                  QStringLiteral("#4488FF")).toString();
+                                  QStringLiteral("#4a7ba8")).toString();
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 }
@@ -2369,7 +2369,7 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
     const int lifetime = s.value(QStringLiteral("WsjtxSpotLifetimeSec"),
                                  120).toInt();
     const QString color = s.value(QStringLiteral("WsjtxSpotColor"),
-                                  QStringLiteral("#00FF00")).toString();
+                                  QStringLiteral("#6fa384")).toString();
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 
@@ -2429,7 +2429,7 @@ void RadioModel::onPotaSpotReceived(const DxSpot& spot)
     const int lifetime = s.value(QStringLiteral("PotaSpotLifetimeSec"),
                                  3600).toInt();
     const QString color = s.value(QStringLiteral("PotaSpotColor"),
-                                  QStringLiteral("#FFFF00")).toString();
+                                  QStringLiteral("#c2924f")).toString();
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 }
@@ -2441,7 +2441,7 @@ void RadioModel::onFreeDvReporterSpotReceived(const DxSpot& spot)
     const int lifetime = s.value(QStringLiteral("FreeDvSpotLifetimeSec"),
                                  1800).toInt();
     const QString color = s.value(QStringLiteral("FreeDvSpotColor"),
-                                  QStringLiteral("#FF8C00")).toString();
+                                  QStringLiteral("#c2924f")).toString();
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 }

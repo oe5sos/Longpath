@@ -416,7 +416,7 @@ void SpectrumDefaultsPage::buildUI()
     //   kInsetBorder = #1e2e3e  (StyleConstants.h:54)
     //   kAccent      = #00b4d8  (StyleConstants.h:44)  -- cyan readout text
     const QString readoutStyle = QStringLiteral(
-        "QLabel { background-color: #0a0a18; color: #00b4d8; "
+        "QLabel { background-color: #0a0a18; color: #4a7ba8; "
         "border: 1px solid #1e2e3e; padding: 1px 6px; "
         "font-family: Menlo, Consolas, monospace; }");
 

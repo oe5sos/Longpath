@@ -44,7 +44,7 @@ static QLabel* makeLed(const QString& name, QWidget* parent)
     led->setFixedSize(24, 14);
     led->setAlignment(Qt::AlignCenter);
     led->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { background: #405060; color: #c8d8e8; border-radius: 2px;"
+        "QLabel { background: #405060; color: #c8d8e8; border-radius: 6px;"
         " font-size: 9px; font-weight: bold; }")));
     return led;
 }

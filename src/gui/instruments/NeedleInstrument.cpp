@@ -15,6 +15,7 @@
 
 #include <QPainter>
 #include <QVBoxLayout>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -82,6 +83,13 @@ void NeedleInstrument::clearValue()
     m_hasSecond = false;
     m_peak.forget();
     refreshFooter();
+    update();
+}
+
+void NeedleInstrument::setOffline(bool offline)
+{
+    if (m_offline == offline) { return; }
+    m_offline = offline;
     update();
 }
 
@@ -163,6 +171,17 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     if (!m_hasValue) {
         Instrument::paintTrough(p, spine, thresholdF);
         Instrument::paintTicks(p, spine, *d);
+        // Ohne Verbindung ruht der Zeiger am Anschlag — matt, damit die
+        // Ruhelage nicht wie ein gemessener Kleinstwert aussieht. Mit
+        // Verbindung, aber ohne Messwert bleibt er weg: dort WAERE eine
+        // Messung moeglich, und ein Zeiger behauptete sie.
+        if (m_offline) {
+            p.save();
+            p.setOpacity(0.30);
+            Instrument::paintNeedle(p, spine, 0.0,
+                                    QColor(Style::kTextScale));
+            p.restore();
+        }
         // Die Nabe bleibt: sie ist der Drehpunkt des Instruments, kein
         // Messwert. Ein Zifferblatt ohne Nabe sähe unfertig aus statt
         // ruhig.

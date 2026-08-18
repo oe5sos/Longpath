@@ -232,7 +232,7 @@ void FilterPresetsSetupPage::populateTable()
         nameEdit->setMaxLength(32);
         nameEdit->setStyleSheet(Style::themed(QStringLiteral(
             "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
-            "border: 1px solid #304050; border-radius: 2px; padding: 1px 3px; }")));
+            "border: 1px solid #304050; border-radius: 6px; padding: 1px 3px; }")));
         // Connect editing to live persist
         const int row = i;
         connect(nameEdit, &QLineEdit::editingFinished, this, [this, row] {
@@ -279,7 +279,7 @@ void FilterPresetsSetupPage::populateTable()
 
         static const QString kArrowStyle = QStringLiteral(
             "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-            "  border-radius: 2px; padding: 0px 4px; font-size: 11px; }"
+            "  border-radius: 6px; padding: 0px 4px; font-size: 11px; }"
             "QPushButton:hover { background: #204060; }"
             "QPushButton:disabled { color: #405060; border-color: #1a1a2a; }");
 

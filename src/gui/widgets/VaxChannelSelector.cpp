@@ -22,14 +22,14 @@ namespace NereusSDR {
 // Active-blue style: matches kModeBtn in VfoStyles.h — #0070c0 / #0090e0 / #ffffff
 static const char* kVaxBtnStyle =
     "QPushButton {"
-    "  background: #1a2a3a; border: 1px solid #304050; border-radius: 2px;"
+    "  background: #1a2a3a; border: 1px solid #304050; border-radius: 6px;"
     "  color: #c8d8e8; font-size: 11px; font-weight: bold; padding: 2px 5px;"
     "}"
     "QPushButton:checked {"
-    "  background: #0070c0; color: #ffffff; border: 1px solid #0090e0;"
+    "  background: #4a7ba8; color: #ffffff; border: 1px solid #4a7ba8;"
     "}"
     "QPushButton:hover {"
-    "  border: 1px solid #0090e0;"
+    "  border: 1px solid #4a7ba8;"
     "}";
 
 VaxChannelSelector::VaxChannelSelector(QWidget* parent)

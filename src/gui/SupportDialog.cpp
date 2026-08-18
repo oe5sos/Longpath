@@ -148,7 +148,7 @@ void SupportDialog::buildUI()
             "  background: %1;"          // Style::kAccent
             "  color: #cfe2f5;"   // war #ffffff -- Text auf gefuelltem Knopf
             "  border: none;"
-            "  border-radius: 4px;"
+            "  border-radius: 6px;"
             "  padding: 6px 14px;"
             "  font-weight: bold;"
             "}"
@@ -175,7 +175,7 @@ void SupportDialog::buildUI()
             "QGroupBox {"
             "  color: %2;"
             "  border: 1px solid %3;"
-            "  border-radius: 4px;"
+            "  border-radius: 6px;"
             "  margin-top: 8px;"
             "  padding-top: 14px;"
             "}"

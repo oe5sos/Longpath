@@ -274,7 +274,7 @@ QWidget* ClientChainApplet::buildClientRow(
         for (const int rx : std::as_const(session->iqStreamEnabled)) {
             hbox->addWidget(makeBadge(
                 QStringLiteral("IQ %1").arg(rx),
-                "#204060", "#00b4d8", row));
+                "#204060", "#4a7ba8", row));
         }
 
         // Audio subscription badges (one per subscribed slice).

@@ -267,7 +267,7 @@ constexpr auto kEqBand0 = "#8090a0";   // grey — kTextSecondary, HP slot
 constexpr auto kEqBand1 = "#ff8850";   // coral, new
 constexpr auto kEqBand2 = "#ffb800";   // amber — kAmberText
 constexpr auto kEqBand3 = "#00ff88";   // green — kGreenText
-constexpr auto kEqBand4 = "#00b4d8";   // teal  — kAccent
+constexpr auto kEqBand4 = "#4a7ba8";   // teal  — kAccent
 constexpr auto kEqBand5 = "#4a80ff";   // blue, new
 constexpr auto kEqBand6 = "#a070e0";   // violet, new
 constexpr auto kEqBand7 = "#8090a0";   // grey — kTextSecondary, LP slot
@@ -413,7 +413,7 @@ constexpr auto kPageStyle =
     "QWidget { background: #0f0f1a; color: #c8d8e8; }";
 
 constexpr auto kGroupBoxStyle =
-    "QGroupBox { border: 1px solid #304050; border-radius: 4px;"
+    "QGroupBox { border: 1px solid #304050; border-radius: 6px;"
     " margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
     "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
 
@@ -425,13 +425,13 @@ constexpr auto kComboStyle =
     " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
     "QComboBox::drop-down { border: none; }"
     "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
-    " selection-background-color: #00b4d8; }";
+    " selection-background-color: #4a7ba8; }";
 
 constexpr auto kCheckBoxStyle =
     "QCheckBox { color: #c8d8e8; font-size: 13px; }"
     "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
     " border: 1px solid #304050; border-radius: 2px; }"
-    "QCheckBox::indicator:checked { background: #00b4d8; border-color: #00b4d8; }";
+    "QCheckBox::indicator:checked { background: #4a7ba8; border-color: #4a7ba8; }";
 
 constexpr auto kRadioButtonStyle =
     "QRadioButton { color: #c8d8e8; font-size: 13px; }"
@@ -477,14 +477,14 @@ inline QString doubleSpinBoxStyle() { return QString::fromLatin1(kDoubleSpinBoxS
 
 constexpr auto kSliderStyle =
     "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-    "QSlider::handle:horizontal { background: #00b4d8; width: 12px;"
+    "QSlider::handle:horizontal { background: #4a7ba8; width: 12px;"
     " height: 12px; border-radius: 6px; margin: -4px 0; }";
 
 constexpr auto kButtonStyle =
     "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
     " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
     "QPushButton:hover { background: #203040; }"
-    "QPushButton:pressed { background: #00b4d8; color: #0f0f1a; }";
+    "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }";
 
 // Apply the canonical "dark page" stylesheet to a Setup page that lays
 // itself out manually (i.e. doesn't inherit the SetupPage::addLabeledX
@@ -513,7 +513,7 @@ inline void applyDarkPageStyle(QWidget* w)
     w->setStyleSheet(QStringLiteral(
         "QWidget { background: %1; color: %2; }"
         "QGroupBox { color: %7; font-size: 11px;"
-        "  border: 1px solid %3; border-radius: 4px;"
+        "  border: 1px solid %3; border-radius: 6px;"
         "  margin-top: 8px; padding-top: 12px; }"
         "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
         "QLabel { color: %2; }"

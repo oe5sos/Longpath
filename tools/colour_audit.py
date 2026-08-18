@@ -208,6 +208,18 @@ def literals() -> dict[str, list[tuple[str, int]]]:
         for n, line in enumerate(
                 path.read_text(encoding="utf-8", errors="replace").splitlines(),
                 start=1):
+            # Kommentartext zaehlt NICHT. Ein Satz wie „war #00b4d8"
+            # dokumentiert eine Ersetzung; ihn als Farbliteral zu zaehlen
+            # heisst, dass jede aufgeraeumte Farbe im Bestand bleibt,
+            # solange jemand erklaert hat, warum sie weg ist.
+            #
+            # Am 2026-08-18 sichtbar geworden: nach dem Abbilden von 182
+            # Vorkommen auf die vier Rollen blieb die Zahl der Farben
+            # stehen. Von 28 verbliebenen #00b4d8 standen 26 in
+            # Kommentaren.
+            cut = line.find("//")
+            if cut >= 0:
+                line = line[:cut]
             for m in HEX.finditer(line):
                 found[m.group(0).lower()].append((rel, n))
             for m in QCOLOR_HEX.finditer(line):
@@ -257,6 +269,28 @@ def theme_legacy_keys() -> set[str]:
         r'\{\s*"[a-z0-9-]+"\s*,\s*"(#[0-9a-fA-F]{6})"', src.read_text())}
 
 
+# Dateien, in denen ALTE Hexwerte kein Vorkommen sind, sondern
+# SCHLUESSEL. ThemeQss.cpp bildet „frueher stand hier #00b4d8" auf die
+# heutige Marke ab; wird der linke Wert ersetzt, erkennt die Tabelle die
+# alte Farbe nicht mehr und ein Palettenwechsel geht daran vorbei.
+#
+# Am 2026-08-18 ist das passiert — nicht durch --apply (das fragt
+# theme_legacy_keys() und haette es verweigert), sondern durch ein
+# Einmal-Skript, das die vier Rollen abgebildet hat und diesen Schutz
+# nicht kannte. Zwei Zeilen bekamen sogar denselben Schluessel
+# (sel-bg und sel-border beide #4a7ba8). tst_theme_qss und
+# tst_theme_filter haben es gefangen.
+#
+# Der Schutz steht jetzt hier, wo ihn jedes Skript sieht, das die
+# Inventur benutzt — und nicht nur in apply_collapse.
+THEME_TABLE_FILES = {"ThemeQss.cpp"}
+
+
+def is_theme_table(path) -> bool:
+    """Datei, in der Hexwerte Schluessel sind und nicht Vorkommen."""
+    return getattr(path, "name", str(path)).rsplit("/", 1)[-1] in THEME_TABLE_FILES
+
+
 def apply_collapse(buckets, dry: bool = False) -> int:
     """Schritt 1: die ununterscheidbaren Farben auf ihr Ziel setzen."""
     protected = theme_legacy_keys()
@@ -290,6 +324,8 @@ def apply_collapse(buckets, dry: bool = False) -> int:
     touched, edits = 0, 0
     for path in sorted(SRC.rglob("*")):
         if path.suffix not in {".cpp", ".h"} or path.name in EXEMPT:
+            continue
+        if is_theme_table(path):
             continue
         text = path.read_text(encoding="utf-8")
         # Zeilenweise, damit die geschuetzten Bereiche je Zeile bekannt

@@ -560,7 +560,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     // One-off; no palette promotion warranted per §A2 design intent.
     m_featureBtn->setStyleSheet(QStringLiteral(
         "QPushButton { background: #33280f; border: 1px solid #6b5426; "
-        "border-radius: 4px; padding: 0; }"
+        "border-radius: 6px; padding: 0; }"
         "QPushButton:hover { background: #33280f; border-color: #6b5426; }"));
     connect(m_featureBtn, &QPushButton::clicked,
             this, &TitleBar::featureRequestClicked);
