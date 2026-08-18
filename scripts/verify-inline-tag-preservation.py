@@ -629,12 +629,94 @@ def port_contains_tag(port_path: Path, cite_line: int, tag: str,
     return False
 
 
+
+# Fassungen, gegen die ein stempelloses Zitat geprueft wird. Die ersten
+# beiden sind die, die im Baum ueberhaupt vorkommen (6615 x v2.10.3.13,
+# 1263 x v2.10.3.15); die dritte ist der ausgecheckte Stand, gegen den
+# bis 2026-08-18 faelschlich geprueft wurde.
+UNSTAMPED_PROBE_VERSIONS = ["2.10.3.13", "2.10.3.15", "852bf0e"]
+
+
+def report_unstamped() -> int:
+    """Die stempellosen Zitate in zwei Haeufen teilen.
+
+    Ein Stempel ist eine BEHAUPTUNG darueber, welche Fassung gelesen
+    wurde. Ihn zu raten ist schlimmer, als ihn wegzulassen: ein falscher
+    Stempel laesst den Pruefer eine fremde Stelle oeffnen und dort
+    Autorenkuerzel ernten, die niemanden hier betreffen -- genau der
+    Mechanismus, der die 53 unbelastbaren Meldungen erzeugt hat.
+
+    Darum wird hier NICHT gestempelt, sondern sortiert:
+
+      EINDEUTIG   -- die zitierte Zeile sagt in ALLEN geprueften
+                     Fassungen dasselbe. Welche gemeint war, ist dann
+                     gleichgueltig; ein Stempel ist mechanisch
+                     nachtragbar.
+      MEHRDEUTIG  -- die Fassungen weichen ab. Hier muss ein Mensch
+                     entscheiden, und die Entscheidung ist eine
+                     inhaltliche: welche Fassung hat der Portierende
+                     tatsaechlich vor sich gehabt.
+    """
+    eindeutig: list[str] = []
+    mehrdeutig: list[tuple[str, str, int]] = []
+    ungefunden = 0
+
+    for port in iter_source_files():
+        try:
+            lines = port.read_text(encoding="utf-8",
+                                   errors="replace").splitlines()
+        except Exception:
+            continue
+        for i, line in enumerate(lines):
+            mm = RE_CITE_RAMDOR.search(line)
+            if not mm or RE_STAMP.search(line):
+                continue
+            spans = parse_lines_spans(mm.group("lines"))
+            if not spans:
+                continue
+            lo = spans[0][0]
+            texts = []
+            for ver in UNSTAMPED_PROBE_VERSIONS:
+                src = git_lines_at(THETIS_DIR, ver, mm.group("file"))
+                texts.append(src[lo - 1].strip()
+                             if (src and lo <= len(src)) else None)
+            present = [t for t in texts if t is not None]
+            where = f"{port.relative_to(REPO)}:{i + 1}"
+            if not present:
+                ungefunden += 1
+            elif (len(present) == len(UNSTAMPED_PROBE_VERSIONS)
+                  and len(set(present)) == 1):
+                eindeutig.append(where)
+            else:
+                mehrdeutig.append((where, mm.group("file"), lo))
+
+    total = len(eindeutig) + len(mehrdeutig) + ungefunden
+    print(f"[unstamped] {total} ramdor-Zitate ohne Fassungsangabe\n")
+    print(f"  {len(eindeutig):4d}  EINDEUTIG  -- Stempel mechanisch "
+          f"nachtragbar (alle Fassungen sagen dasselbe)")
+    print(f"  {len(mehrdeutig):4d}  MEHRDEUTIG -- braucht eine inhaltliche "
+          f"Entscheidung")
+    if ungefunden:
+        print(f"  {ungefunden:4d}  Datei in keiner geprueften Fassung "
+              f"gefunden")
+    print("\n-- MEHRDEUTIG, nach Datei --")
+    by_file: dict[str, int] = {}
+    for where, _, _ in mehrdeutig:
+        by_file[where.split(":")[0]] = by_file.get(where.split(":")[0], 0) + 1
+    for f, n in sorted(by_file.items(), key=lambda kv: -kv[1])[:15]:
+        print(f"  {n:4d}  {f}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--audit", action="store_true",
                     help="Report findings but exit 0 (for historical sweeps)")
     ap.add_argument("--json", action="store_true",
                     help="Emit findings as JSON")
+    ap.add_argument("--unstamped", action="store_true",
+                    help="Zitate OHNE Fassungsangabe auflisten und je Fall "
+                         "sagen, ob ein Stempel mechanisch nachtragbar ist")
     args = ap.parse_args()
 
     if not THETIS_DIR.is_dir():
@@ -680,6 +762,9 @@ def main() -> int:
               f"emit upstream-not-found warnings rather than hard-failing. "
               f"Set NEREUS_FREEDV_DIR or clone to a sibling directory.",
               file=sys.stderr)
+
+    if args.unstamped:
+        return report_unstamped()
 
     findings = []
     cite_count = 0
