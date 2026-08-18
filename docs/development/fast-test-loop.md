@@ -1,12 +1,25 @@
 # Fast Test Loop
 
-The suite has **513 registered tests** (517 `tst_*.cpp` files; four are
+The suite has **674 registered tests** (678 `tst_*.cpp` files; four are
 Linux/PipeWire-only and register only on Linux).
 
 Every test executable statically links the entire application, so each one
 costs about **38 CPU-seconds to link** and lands at roughly 35 MB. Building
-all of them costs about **32 minutes**, and running them cold adds about
-5 more. Almost nothing you do day to day needs that.
+all of them costs about **40 minutes**, and running them cold adds about
+7 more. Almost nothing you do day to day needs that.
+
+> **Die Zahlen hier veralten still.** Sie standen bis 2026-08-18 auf 513
+> registrierten Tests bei tatsaechlich 674 — 31 % zu niedrig, und die
+> Bauzeit im selben Verhaeltnis. Wer nach dieser Seite plant, plant dann
+> zu knapp. Die Anzahlen unten sind am 2026-08-18 gemessen
+> (`ctest -N`, `ctest -L <label> -N`); die **Bauzeit ist hochgerechnet**,
+> nicht neu gestoppt — die 38 CPU-Sekunden je Bindevorgang stammen aus
+> der urspruenglichen Messung und gelten unveraendert je Test.
+>
+> Nachzaehlen kostet einen Befehl:
+> ```bash
+> ctest --test-dir build -N | grep -cE 'Test +#'
+> ```
 
 ## Everyday commands
 
@@ -36,12 +49,12 @@ Current distribution:
 
 | Label | Tests |
 | --- | --- |
-| `core` | 423 |
-| `models` | 191 |
-| `gui` | 152 |
+| `core` | 542 |
+| `models` | 254 |
+| `gui` | 208 |
 | `unclassified` | 5 |
 
-Tests commonly touch more than one subsystem, so these do not sum to 513.
+Tests commonly touch more than one subsystem, so these do not sum to 674.
 `unclassified` means the test includes no `core/`, `models/`, or `gui/`
 header at all; the five current members are all legitimately in that
 category (a smoke test, a WDSP `extern "C"` test, a build-hygiene grep
@@ -53,7 +66,7 @@ blocking forever.
 ### Labels narrow the run, not the dependency
 
 Labels are derived from each test's **direct** includes, so they are a
-triage aid, not a blast-radius calculation. **85 of the 513 tests carry no
+triage aid, not a blast-radius calculation. **132 of the 674 tests carry no
 `core` label but still statically link all of `NereusSDRObjs`**, so a
 `src/core` edit genuinely affects them even though `ctest -L core` will not
 run them.
