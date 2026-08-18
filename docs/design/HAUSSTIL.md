@@ -273,3 +273,68 @@ Der SWR-Durchlauf tastet den Sender. Nichts an der Oberfläche darf dazu
 verleiten, außerhalb der Amateurbänder zu messen — auch nicht mit 1 W.
 `BandPlanGuard` bleibt die Autorität. Wer den ganzen Bereich sehen will,
 lädt eine `.s1p` vom VNA.
+
+---
+
+## Die Falle, die einen Monat Typografie unsichtbar gemacht hat
+
+*Gefunden am 2026-08-18, gemeldet vom Betreiber an der Frequenzanzeige.*
+
+Ein Qt-Stylesheet **kaskadiert auf jedes untergeordnete Widget** und
+**gewinnt gegen `setFont()`**. In `AppletWidget`s Konstruktor stand:
+
+```cpp
+setStyleSheet("QLabel { color: …; font-size: 11px; }");
+```
+
+Damit war die gesamte Schriftleiter *innerhalb aller Applets* außer
+Kraft. Sechs benannte Stufen, reduziert auf eine — und zwar lautlos:
+kein Fehler, kein Test, nichts. Die Instrumente setzten ihre Größen
+weiter korrekt per `setFont()`, und keine davon kam an.
+
+Sichtbar wurde es erst dort, wo zwei Größen voneinander abhängen: die
+Frequenzanzeige berechnet die feste Breite jeder Ziffer aus der Zelle
+der 38-px-Schrift und zeichnete die Glyphe mit 11 px. Jedes
+Ziffernschild dreieinhalbmal so breit wie sein Zeichen — die Zeile
+zerfiel zu `7 . 1 3 1 . 3 0 0`. Überall sonst sah es lediglich
+*etwas klein* aus, und daran gewöhnt sich das Auge.
+
+### Die Regel, die daraus folgt
+
+> **Farbe darf ins Stylesheet, Größe nicht.**
+
+Farbe *soll* kaskadieren — ein Applet gibt seinen Kindern seinen
+Textton. Größe soll erben, aber überschreibbar bleiben, und das kann
+nur `setFont()`:
+
+```cpp
+// richtig — erbt an alle Kinder, ein Kind mit eigenem setFont() gewinnt
+setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+setStyleSheet("QLabel { color: …; }");
+```
+
+### Woran man es erkennt
+
+Ein `font-size` in einem Stylesheet, das auf einem **Behälter** gesetzt
+wird (`this`, ein Panel, ein Applet) statt auf einem einzelnen Widget.
+Auf einem einzelnen Label ist es harmlos — dort ist es die Aussage über
+genau dieses Label.
+
+```sh
+grep -rn "setStyleSheet" src | grep -v "->" | grep "font-size"
+```
+
+Am 2026-08-18 war `AppletWidget` die einzige Stelle. `InstrumentApplet`,
+`GridCellWidget`, `ContainerWidget` und `InstrumentSpine` setzen ihre
+Stylesheets auf einzelne Labels und sind in Ordnung.
+
+### Was daran verallgemeinerbar ist
+
+Die drei Abstandskonstanten in `FrequencyInstrument.cpp` waren nie
+schuld — sie standen richtig da und rechneten mit der richtigen Zelle.
+Der Fehler lag zwei Ebenen darüber, in einer Datei, die mit Frequenzen
+nichts zu tun hat.
+
+**Wenn eine Maßangabe nicht wirkt, ist die Ursache selten dort, wo sie
+steht.** Bei Qt-Stylesheets ist die erste Frage nicht „stimmt der
+Wert?", sondern „wer überschreibt ihn von oben?".
