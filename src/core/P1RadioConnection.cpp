@@ -338,8 +338,8 @@ void P1RadioConnection::composeEp2Frame(quint8 out[1032], quint32 seq,
 
     // Bytes 16..519: TX I/Q + mic data — zeros (RX-only; TX producer added in TX phase)
 
-    // Source: networkproto1.c:878-883 — WriteMainLoop_HL2() USB subframe 1 sync
-    // (same layout in WriteMainLoop at :880-883)
+    // Source: mi0bot networkproto1.c:886-888 [@0cef1c9] — WriteMainLoop_HL2()
+    // USB subframe sync bytes (same layout in WriteMainLoop at :605-607)
     out[520] = 0x7F;
     out[521] = 0x7F;
     out[522] = 0x7F;
@@ -481,14 +481,15 @@ void P1RadioConnection::composeCcBankTxFreq(quint8 out[5], quint64 freqHz) noexc
 // ---------------------------------------------------------------------------
 // composeCcBankAtten
 //
-// Source: networkproto1.c:762-771 — case 11 (Preamp control / step attenuator)
-//   C0 |= 0x14 → address 0x0A (networkproto1.c:763)
+// Source: mi0bot networkproto1.c:767-776 [@0cef1c9] — case 11 (Preamp control /
+// step attenuator)
+//   C0 |= 0x14 → address 0x0A (mi0bot networkproto1.c:768 [@0cef1c9])
 //   C4 = (adc[0].rx_step_attn & 0b00011111) | 0b00100000
 //        Low 5 bits = dB value; bit 5 = "enable step attenuator" flag
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcBankAtten(quint8 out[5], int dB) noexcept
 {
-    // Source: networkproto1.c:763 — C0 |= 0x14 → address 0x0A
+    // Source: mi0bot networkproto1.c:768 [@0cef1c9] — C0 |= 0x14 → address 0x0A
     out[0] = 0x14;  // MOX=0; address bits = 0x14
 
     // C1..C3: preamp/mic/dig-out flags — zero for Task 7 scope
@@ -496,14 +497,16 @@ void P1RadioConnection::composeCcBankAtten(quint8 out[5], int dB) noexcept
     out[2] = 0;
     out[3] = 0;
 
-    // Source: networkproto1.c:770 — C4 = (rx_step_attn & 0b00011111) | 0b00100000
+    // Source: mi0bot networkproto1.c:775 [@0cef1c9] — C4 = (rx_step_attn &
+    // 0b00011111) | 0b00100000
     out[4] = static_cast<quint8>((dB & 0x1F) | 0x20);
 }
 
 // ---------------------------------------------------------------------------
 // composeCcBankAlexRx
 //
-// Source: networkproto1.c:826-835 — case 16 (BPF2 / ALEX RX filter mask)
+// Source: mi0bot networkproto1.c:831-840 [@0cef1c9] — case 16 (BPF2 / ALEX RX
+// filter mask)
 //   C0 |= 0x24 → address 0x12
 //   C1 = BPF HPF filter bits (low 7 bits of alexRxMask)
 //   C2 = xvtr_enable + puresignal flags (bits 0 + 6 of upper byte)
@@ -516,7 +519,7 @@ void P1RadioConnection::composeCcBankAtten(quint8 out[5], int dB) noexcept
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcBankAlexRx(quint8 out[5], quint32 alexRxMask) noexcept
 {
-    // Source: networkproto1.c:827 — C0 |= 0x24
+    // Source: mi0bot networkproto1.c:832 [@0cef1c9] — C0 |= 0x24
     out[0] = 0x24;
     out[1] = static_cast<quint8>(alexRxMask & 0x7F);  // HPF filter bits
     out[2] = static_cast<quint8>((alexRxMask >> 8) & 0x41); // xvtr + puresignal flags

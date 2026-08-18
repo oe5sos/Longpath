@@ -188,7 +188,8 @@ private slots:
     void attenuatorEncodedInBank() {
         quint8 out[5] = {};
         P1RadioConnection::composeCcBankAtten(out, /*dB=*/20);
-        // Source: networkproto1.c:770 — case 11 (C0 |= 0x14): C4 = adc[0].rx_step_attn & 0b00011111 | 0b00100000
+        // Source: mi0bot networkproto1.c:775 [@0cef1c9] — case 11 (C0 |= 0x14):
+        // C4 = adc[0].rx_step_attn & 0b00011111 | 0b00100000
         // Low 5 bits of C4 hold the dB value; bit 5 is the "enable attenuation" flag
         QCOMPARE(int(out[4] & 0x1F), 20);
     }
@@ -196,7 +197,8 @@ private slots:
     void attenuatorC0AddressIs0x0A() {
         quint8 out[5] = {};
         P1RadioConnection::composeCcBankAtten(out, 0);
-        // Source: networkproto1.c:763 — case 11: C0 |= 0x14 → address = 0x14>>1 = 0x0A
+        // Source: mi0bot networkproto1.c:768 [@0cef1c9] — case 11: C0 |= 0x14 →
+        // address = 0x14>>1 = 0x0A
         QCOMPARE(int((out[0] >> 1) & 0x7F), 0x0A);
     }
 
