@@ -777,6 +777,23 @@ def main() -> int:
             continue
         for ln_idx, line in enumerate(lines):
             # IMPORTANT: check most-specific upstreams first.
+            #
+            # UND: jeder Ausstieg NACH einem Treffer muss `break` sein.
+            # Die Schleife laeuft ueber die ZITAT-SORTEN, nicht ueber
+            # Zeilen -- ein `continue` darin heisst "probier dieselbe
+            # Zeile mit dem naechsten Muster". Genau das geschah: die
+            # Zeile
+            #   // Source: deskhpsdr/src/old_protocol.c:460 [@120188f]
+            # traf zuerst RE_CITE_DESKHPSDR, meldete upstream-not-found,
+            # lief per continue weiter, traf dann RE_CITE_RAMDOR (dessen
+            # blankes "Source:" ebenfalls passt), das dieselbe Datei
+            # unter dem Thetis-Klon suchte und ein ZWEITES Mal meldete.
+            # 63 Zitate doppelt gezaehlt, davon 63 unter einer Herkunft,
+            # die nicht ihre ist; cite_count um dieselbe Zahl zu hoch.
+            #
+            # Das `continue` unter `if not m:` bleibt eines -- dort
+            # heisst es "dieses Muster passt nicht", und das ist der
+            # einzige Fall, in dem weitergesucht werden soll.
             # RE_CITE_DESKHPSDR must precede RE_CITE_RAMDOR because the
             # ramdor regex has a bare "Source:" prefix that also matches
             # "Source: deskhpsdr/src/..." cite lines. First match wins
@@ -792,7 +809,7 @@ def main() -> int:
                 cite_line = ln_idx + 1
                 spans = parse_lines_spans(m.group("lines"))
                 if not spans:
-                    continue
+                    break
                 line_nums = parse_lines_token(m.group("lines"))
                 # Route by the cite's own version stamp, so a
                 # `[v2.10.3.15]` cite is checked against v2.10.3.15 rather
@@ -847,7 +864,7 @@ def main() -> int:
                             # Fall ist benannt, der generische
                             # upstream-not-found darunter wuerde ihn nur
                             # verdoppeln.
-                            continue
+                            break
                 elif which in ("ramdor", "mi0bot"):
                     # OHNE STEMPEL ist nichts zu pruefen, und das ist
                     # keine Formalie. Genau so entstanden die beiden
@@ -873,7 +890,7 @@ def main() -> int:
                         "issue": "cite-unstamped",
                         "tag": None,
                     })
-                    continue
+                    break
                 else:
                     upstream = resolve_upstream(m.group("file"), which, stamp)
                 if upstream is None and src_lines is None:
@@ -887,7 +904,7 @@ def main() -> int:
                         "issue": "upstream-not-found",
                         "tag": None,
                     })
-                    continue
+                    break
                 source_tags = extract_tags_from_region(upstream, spans,
                                                        lines=src_lines)
                 for src_line, tag in sorted(source_tags):
