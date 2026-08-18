@@ -21,15 +21,22 @@ private slots:
 
 void TstAppletPanelGutter::stackLayoutReservesEightPxRightMargin()
 {
+    // Die Rinne wird am WIDGET im Rollbereich gemessen, nicht an einem
+    // bestimmten Layouttyp. Sie hing frueher an einem QVBoxLayout, seit
+    // 2026-08-18 an einem AppletGrid (Schritt 1 des freien Rasters) —
+    // die Zusicherung ist dieselbe geblieben: acht Pixel rechts fuer
+    // die Rollleiste, sonst nichts.
+    //
+    // Auf den Layouttyp zu pruefen hiesse pruefen, WIE es gebaut ist,
+    // statt WAS es zusichert. Der Test waere beim Rasterumbau rot
+    // geworden, ohne dass sich am Bild etwas geaendert haette.
     AppletPanelWidget panel;
     auto* scroll = panel.findChild<QScrollArea*>();
     QVERIFY(scroll != nullptr);
     auto* stackWidget = scroll->widget();
     QVERIFY(stackWidget != nullptr);
-    auto* stackLayout = qobject_cast<QVBoxLayout*>(stackWidget->layout());
-    QVERIFY(stackLayout != nullptr);
 
-    QMargins m = stackLayout->contentsMargins();
+    QMargins m = stackWidget->contentsMargins();
     QCOMPARE(m.right(), 8);  // 8 px reserved for the scrollbar
     QCOMPARE(m.left(), 0);
     QCOMPARE(m.top(), 0);

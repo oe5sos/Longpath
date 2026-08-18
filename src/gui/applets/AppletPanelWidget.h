@@ -38,6 +38,8 @@ namespace NereusSDR {
 
 class AppletWidget;
 class SMeterWidget;
+class AppletGrid;
+class GridCellWidget;
 
 // Scrollable vertical stack of applets with AetherSDR AppletPanel styling.
 // This is a SINGLE widget that goes into ContainerWidget::setContent().
@@ -199,20 +201,32 @@ private:
     QVBoxLayout* m_rootLayout = nullptr;     // top-level: header + scroll
     QVBoxLayout* m_headerLayout = nullptr;   // fixed header above scroll area
     QScrollArea* m_scrollArea = nullptr;
-    QVBoxLayout* m_stackLayout = nullptr;    // inside scroll area
+
+    // ── Schritt 1 des freien Rasters (2026-08-18) ────────────────────
+    //
+    // Der Stapel aus Huellen in einem QVBoxLayout ist ein Raster mit
+    // EINER Spalte geworden. Sichtbar aendert sich nichts — die Zeile
+    // IST der Index, solange es eine Spalte gibt. Genau deshalb laesst
+    // sich der Umbau von „Reihenfolge" auf „Ort" allein und pruefbar
+    // machen, bevor Spalten, Spannweiten und Density darauf aufbauen.
+    //
+    // Aus der Huelle ist ein FELD geworden: ein Behaelter mit
+    // Kopfleiste und einer LISTE von Inhalten (Festlegung des
+    // Betreibers, siehe GridCell.h). Schritt 1 legt eines je Feld
+    // hinein; das Datenmodell traegt schon mehrere.
+    AppletGrid* m_grid = nullptr;
     QList<AppletWidget*> m_applets;
-    QMap<AppletWidget*, QWidget*> m_wrappers;  // applet → wrapper widget
+    QMap<AppletWidget*, GridCellWidget*> m_wrappers;  // Applet → Feld
 
     // ── Ziehen ───────────────────────────────────────────────────────
     int  stackIndexOf(QWidget* wrapper) const;
     AppletWidget* appletForWrapper(QWidget* wrapper) const;
-    int  appletPosForStackIndex(int stackIndex) const;
     void dragTo(int globalY);
 
     /// Das Kontextmenü einer Titelleiste — der einzige Weg zum Ablösen.
     void showTitleBarMenu(QWidget* titleBar, const QPoint& globalPos);
 
-    QMap<QWidget*, QWidget*> m_titleBars;   // Titelleiste → Hülle
+    QMap<QWidget*, QWidget*> m_titleBars;   // Titelleiste → Feld
     AppletWidget* m_dragApplet{nullptr};
     int  m_dragStartY{0};
     bool m_dragging{false};

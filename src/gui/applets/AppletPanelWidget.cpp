@@ -24,7 +24,9 @@
 // =================================================================
 
 #include "AppletPanelWidget.h"
+#include "AppletGrid.h"
 #include "AppletWidget.h"
+#include "GridCellWidget.h"
 #include "gui/StyleConstants.h"
 // Task 40 (Phase 3P-II): analog S-Meter replaces the composite MeterWidget
 // header.  The right-click context menu (Tasks 38/39) is the only entry
@@ -103,18 +105,17 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
         "}"
     ).arg(Style::kPanelBg, Style::kGroove));
 
-    // Inner widget for the scroll area
-    auto* stackWidget = new QWidget(m_scrollArea);
-    stackWidget->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
-    m_stackLayout = new QVBoxLayout(stackWidget);
+    // Das Raster im Rollbereich. Schritt 1: eine Spalte, ein Applet je
+    // Feld — dasselbe Bild wie der Stapel davor, aber Ort statt
+    // Reihenfolge. Siehe AppletGrid.h.
+    m_grid = new AppletGrid(m_scrollArea);
+    m_grid->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
     // 8 px matches the QScrollBar:vertical width in the stylesheet above;
     // Qt::ScrollBarAsNeeded means the gutter is wasted when the bar hides,
     // but 8 px is negligible and avoids a layout reflow on bar show/hide.
-    m_stackLayout->setContentsMargins(0, 0, 8, 0);
-    m_stackLayout->setSpacing(0);
-    m_stackLayout->addStretch();
+    m_grid->setContentsMargins(0, 0, 8, 0);
 
-    m_scrollArea->setWidget(stackWidget);
+    m_scrollArea->setWidget(m_grid);
     m_rootLayout->addWidget(m_scrollArea);
 
     // Task 40 (Phase 3P-II): install the analog SMeterWidget as the fixed header.
@@ -199,14 +200,13 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
     if (m_applets.contains(applet)) { return; }  // already present
     m_applets.append(applet);
 
-    applet->setParent(this);
-    applet->show();
-    QWidget* wrapped = wrapWithTitleBar(applet, applet->appletTitle());
-    m_wrappers[applet] = wrapped;
-
-    // Insert before the trailing stretch
-    int idx = m_stackLayout->count() - 1;
-    m_stackLayout->insertWidget(idx, wrapped);
+    GridCellWidget* cell = m_grid->appendInOwnCell(applet);
+    if (!cell) { m_applets.removeOne(applet); return; }
+    m_wrappers[applet] = cell;
+    // Die Kopfleiste ist der Griff — nur sie, nicht das Applet
+    // darunter, sonst zöge jeder Regler das ganze Feld mit.
+    cell->titleBar()->installEventFilter(this);
+    m_titleBars.insert(cell->titleBar(), cell);
 }
 
 void AppletPanelWidget::removeApplet(AppletWidget* applet)
@@ -214,9 +214,8 @@ void AppletPanelWidget::removeApplet(AppletWidget* applet)
     if (!applet) { return; }
     if (!m_applets.contains(applet)) { return; }
 
-    QWidget* wrapper = m_wrappers.value(applet, nullptr);
+    GridCellWidget* wrapper = m_wrappers.value(applet, nullptr);
     if (wrapper) {
-        m_stackLayout->removeWidget(wrapper);
         // Die Titelleiste MIT austragen. Sie stirbt gleich als Kind der
         // Hülle, ihr Eintrag in m_titleBars aber blieb stehen — ein
         // Zeiger auf Gelöschtes in einer Karte, die der Ereignisfilter
@@ -225,10 +224,10 @@ void AppletPanelWidget::removeApplet(AppletWidget* applet)
         // (2026-08-16) ist es der Normalfall.
         const QList<QWidget*> bars = m_titleBars.keys(wrapper);
         for (QWidget* b : bars) { m_titleBars.remove(b); }
-        // Reparent applet out of the wrapper before deleting it
-        applet->setParent(nullptr);
-        applet->hide();
-        wrapper->deleteLater();
+        // takeWidget haengt aus, OHNE zu loeschen, und raeumt das Feld
+        // ab, wenn es dabei leer wird. Der Aufrufer bekommt ein
+        // lebendes Applet zurueck — darauf beruht das Abloesen.
+        m_grid->takeWidget(applet);
         m_wrappers.remove(applet);
     }
     m_applets.removeOne(applet);
@@ -259,13 +258,15 @@ void AppletPanelWidget::setBannerMenu(QMenu* menu)
 
 void AppletPanelWidget::addWidget(QWidget* widget, const QString& title)
 {
+    // Ein rohes Widget bekommt genauso ein Feld wie ein Applet — der
+    // Behaelter haelt Widgets, nicht Applets (Festlegung des
+    // Betreibers, siehe GridCell.h). Nur traegt es keine Panelkennung
+    // und steht darum nicht in m_applets: es laesst sich nicht
+    // ausblenden und nicht abloesen.
     if (!widget) { return; }
-
-    QWidget* wrapped = wrapWithTitleBar(widget, title);
-
-    // Insert before the trailing stretch
-    int idx = m_stackLayout->count() - 1;
-    m_stackLayout->insertWidget(idx, wrapped);
+    GridCellWidget* cell = m_grid->appendInOwnCell(widget);
+    if (!cell) { return; }
+    cell->setTitle(title);
 }
 
 QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& title,
@@ -330,8 +331,9 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
 
 int AppletPanelWidget::stackIndexOf(QWidget* wrapper) const
 {
-    if (!wrapper || !m_stackLayout) { return -1; }
-    return m_stackLayout->indexOf(wrapper);
+    auto* cell = qobject_cast<GridCellWidget*>(wrapper);
+    if (!cell || !m_grid) { return -1; }
+    return m_grid->positionOf(cell->cellId());
 }
 
 AppletWidget* AppletPanelWidget::appletForWrapper(QWidget* wrapper) const
@@ -344,48 +346,41 @@ AppletWidget* AppletPanelWidget::appletForWrapper(QWidget* wrapper) const
 
 bool AppletPanelWidget::moveApplet(AppletWidget* applet, int toIndex)
 {
-    if (!applet || !m_stackLayout) { return false; }
-    QWidget* wrapper = m_wrappers.value(applet, nullptr);
+    if (!applet || !m_grid) { return false; }
+    GridCellWidget* wrapper = m_wrappers.value(applet, nullptr);
     if (!wrapper) { return false; }
 
     const int from = stackIndexOf(wrapper);
     if (from < 0) { return false; }
 
-    // Die Dehnung am Ende ist keine gültige Stelle. Ohne diese Grenze
-    // landet ein zu weit gezogenes Widget HINTER ihr und klebt danach
-    // unten fest, während alle anderen oben zusammenrücken.
-    const int last = m_stackLayout->count() - 2;
-    const int to = qBound(0, toIndex, qMax(0, last));
+    // Die Grenze ist jetzt die Zahl der FELDER. Vorher war es die Zahl
+    // der Stapeleintraege minus der Dehnung am Ende — dieselbe Sache,
+    // nur dass das Raster keine Dehnung als Eintrag fuehrt.
+    const int to = qBound(0, toIndex, qMax(0, m_grid->cells().size() - 1));
     if (to == from) { return false; }
 
-    m_stackLayout->removeWidget(wrapper);
-    m_stackLayout->insertWidget(to, wrapper);
+    m_grid->moveCell(wrapper->cellId(), to);
 
     // m_applets führt dieselbe Reihenfolge nach. Sie ist das, was
     // applets() herausgibt und was gespeichert wird — liefe sie
     // auseinander, käme nach dem Neustart eine andere Anordnung heraus
     // als die, die man hinterlassen hat.
-    const int oldPos = m_applets.indexOf(applet);
-    if (oldPos >= 0) {
-        m_applets.removeAt(oldPos);
-        const int newPos = qBound(0, appletPosForStackIndex(to), m_applets.size());
-        m_applets.insert(newPos, applet);
+    //
+    // Die Stelle kommt jetzt DIREKT aus dem Raster: es ist die einzige
+    // Quelle fuer die Anzeigefolge. appletPosForStackIndex() hat sie
+    // frueher nachgerechnet, weil im Stapel auch Nicht-Applets lagen;
+    // im Raster ist die Zuordnung Feld → Inhalt eindeutig, und eine
+    // Nachrechnung waere eine zweite Quelle fuer dieselbe Aussage.
+    const QList<AppletWidget*> inGrid = m_grid->applets();
+    QList<AppletWidget*> reordered;
+    for (AppletWidget* a : inGrid) {
+        if (m_applets.contains(a)) { reordered.append(a); }
     }
+    for (AppletWidget* a : m_applets) {
+        if (!reordered.contains(a)) { reordered.append(a); }
+    }
+    m_applets = reordered;
     return true;
-}
-
-int AppletPanelWidget::appletPosForStackIndex(int stackIndex) const
-{
-    // Im Stapel liegen auch Widgets, die keine Applets sind. Die Stelle
-    // in m_applets ist deshalb die Anzahl der Applets, die im Stapel
-    // VOR dieser Stelle liegen — nicht der Stapelindex selbst.
-    int pos = 0;
-    for (int i = 0; i < stackIndex && i < m_stackLayout->count(); ++i) {
-        QLayoutItem* it = m_stackLayout->itemAt(i);
-        QWidget* w = it ? it->widget() : nullptr;
-        if (w && appletForWrapper(w)) { ++pos; }
-    }
-    return pos;
 }
 
 void AppletPanelWidget::setAppletOrder(const QList<AppletWidget*>& order)
@@ -504,8 +499,8 @@ void AppletPanelWidget::showTitleBarMenu(QWidget* titleBar,
 
 void AppletPanelWidget::dragTo(int globalY)
 {
-    QWidget* wrapper = m_wrappers.value(m_dragApplet, nullptr);
-    if (!wrapper || !m_stackLayout) { return; }
+    GridCellWidget* wrapper = m_wrappers.value(m_dragApplet, nullptr);
+    if (!wrapper || !m_grid) { return; }
     const int here = stackIndexOf(wrapper);
     if (here < 0) { return; }
 
@@ -513,10 +508,10 @@ void AppletPanelWidget::dragTo(int globalY)
     // Zeiger die Mitte eines Nachbarn überschreitet, tauschen die
     // beiden die Plätze. Das Bild zeigt dann immer, was beim Loslassen
     // herauskommt — bei einem Einfügestrich muss man es sich denken.
-    for (int i = 0; i < m_stackLayout->count() - 1; ++i) {
+    const QList<GridCellWidget*> fields = m_grid->cells();
+    for (int i = 0; i < fields.size(); ++i) {
         if (i == here) { continue; }
-        QLayoutItem* it = m_stackLayout->itemAt(i);
-        QWidget* other = it ? it->widget() : nullptr;
+        QWidget* other = fields.at(i);
         if (!other || !other->isVisible()) { continue; }
         // Nur mit Applets tauschen. Die Kopfleiste des S-Meters ist
         // fest verbaut; sie unter ein Applet zu schieben, wäre ein Zug,

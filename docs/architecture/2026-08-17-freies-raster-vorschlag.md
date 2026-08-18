@@ -1,6 +1,46 @@
 # Freies Raster: was trägt, was fehlt, in welchen Schritten
 
-**Stand 2026-08-17. Vorschlag zum Lesen, nicht zum Ausführen.**
+**Stand 2026-08-17, angenommen und begonnen am 2026-08-18.**
+
+> **Festlegung des Betreibers, 2026-08-18, vor dem ersten Strich Code:**
+>
+> „Ein Feld im Raster ist ein **Behälter**, kein Widget. Es hat Ort und
+> Größe — und eine **Liste** von Widgets, nicht eines. Das ist die
+> Voraussetzung dafür, Stehwelle und S-Meter nebeneinander in ein
+> Fenster zu legen, und es ist genau das Modell, das ContainerWidget +
+> MeterWidget + ItemGroup schon abbilden: ein Behälter, viele Inhalte,
+> in einem Zeichendurchgang.
+>
+> Baust du das Feld erst als Einzel-Widget und rüstest die Liste später
+> nach, muss die gespeicherte Anordnung **zweimal wandern** — und der
+> Kennungs-Fehler von heute Abend hat gezeigt, was eine
+> Anordnungswanderung still verlieren kann."
+>
+> Damit beantwortet: Frage 1 aus §4 (Gitter oder freie Rechtecke) →
+> **Gitter mit Zellen**, und die Zelle ist ein Behälter.
+
+**Drei Anforderungen aus dem Zielbild**
+(`~/Downloads/nereus-zielbild-gesamt.html`, 2026-08-17):
+
+1. Der **Panadapter ist selbst ein Feld**, mit seinen Werkzeugen in der
+   eigenen Kopfleiste (Zoom, Geschwindigkeit, Mute, TX, Schloss,
+   Schließen). Die VFO-Flagge darüber fällt ersatzlos weg.
+2. Der **Inhalt passt sich der Feldgröße an**, nicht nur der Rahmen.
+3. Das **+** legt neue Felder an.
+
+**Stand der Umsetzung**
+
+| Schritt | Stand |
+| --- | --- |
+| 1 · Behälter, einspaltig | **fertig, 2026-08-18** — `GridCell`, `GridCellWidget`, `AppletGrid`; `AppletPanelWidget` benutzt sie. Sichtbar unverändert. |
+| 2 · Spalten nach Breite | offen — erst nach dem Flaggen-Umzug |
+| 3 · Spannweiten + Profil | offen |
+| 4 · `Density` | offen |
+| 5 · übrige Applets | offen |
+
+---
+
+**Ursprünglicher Vorschlag zum Lesen, nicht zum Ausführen.**
 Auftrag des Betreibers: „Punkt 4 (freies Raster, Inhalt passt sich der
 Größe an) heute nicht anfangen — stattdessen zum Abschluss einen
 Vorschlag dazu ausarbeiten und ablegen, den ich morgen lese."
@@ -82,6 +122,11 @@ Zwei gangbare Formen:
 Zusicherung „nichts überlappt, nichts fällt heraus" ohne dass der
 Bediener sie einhalten muss.
 
+> **Entschieden 2026-08-18: Gitter.** Und die Zelle ist ein Behälter mit
+> einer Liste, nicht ein Platz für ein Widget — siehe die Festlegung
+> ganz oben. `GridCell` trägt `row/col/rowSpan/colSpan` und eine
+> `QStringList applets`; `GridCellWidget` hält `QList<QWidget*>`.
+
 ### b) Größenstufen statt Skalierung
 
 Heute skaliert Inhalt (Kopfhöhe, Bogenradius). Was fehlt, ist die
@@ -142,7 +187,7 @@ darf keine Ablösegeste tragen.**
 
 Jeder Schritt ist für sich lauffähig und für sich zu beurteilen.
 
-**Schritt 1 — Der Behälter, einspaltig.**
+**Schritt 1 — Der Behälter, einspaltig.**  ✅ *fertig 2026-08-18*
 `AppletGrid` neben `AppletPanelWidget`, zunächst mit einer Spalte und
 ohne Spannweiten. Sichtbar ändert sich nichts; die Applets liegen nur
 in Zellen statt in einer Box. Damit ist die Umstellung von Reihenfolge
@@ -192,3 +237,56 @@ VFO-Flagge und den Umschalter im Panelkopf. Ein Rasterumbau darüber
 hinweg würde alle drei mit anfassen. Die Reihenfolge, die du für heute
 gesetzt hast, hält sie auseinander — und Schritt 1 oben ist bewusst so
 geschnitten, dass er erst danach kommt, ohne dass etwas davon abhängt.
+
+
+---
+
+## 6 · Was Schritt 1 tatsächlich geworden ist (2026-08-18)
+
+Drei neue Dateien unter `src/gui/applets/`:
+
+| Datei | Rolle |
+| --- | --- |
+| `GridCell.{h,cpp}` | reine Anordnung: Id, Ort, Spannweite, **Liste** von Panelkennungen, Titel, Schloss. Kein Qt-Elternteil, prüfbar ohne Fenster, direkt ins Profil schreibbar. |
+| `GridCellWidget.{h,cpp}` | das Feld auf dem Schirm: Kopfleiste (Griff · Titel · nachgestellt) plus **N** Inhalte. |
+| `AppletGrid.{h,cpp}` | `QGridLayout` über den Feldern; `columns()`, `moveCell()`, `arrangement()` / `applyArrangement()`. |
+
+`AppletPanelWidget` benutzt sie: aus `m_stackLayout` (ein `QVBoxLayout`
+voller anonymer Hüllen) ist `m_grid` geworden, aus der Hülle ein Feld.
+Sichtbar ändert sich nichts — solange es **eine** Spalte gibt, *ist* die
+Zeile der Index.
+
+**Entfernt, weil das Raster die Frage nicht mehr stellt:**
+`appletPosForStackIndex()`. Es rechnete die Stelle in `m_applets` aus
+dem Stapelindex nach, weil im Stapel auch Nicht-Applets lagen. Im Raster
+ist die Zuordnung Feld → Inhalt eindeutig; die Folge kommt jetzt direkt
+aus dem Raster, statt aus zwei Quellen zusammengerechnet zu werden.
+
+**Umbenannt:** die Anordnung heißt `arrangement()`, nicht `layout()` —
+letzteres gehört `QWidget` und meint etwas anderes. Zwei Bedeutungen für
+denselben Namen an derselben Klasse sind genau die Sorte Verwechslung,
+die in dieser Woche zweimal Zeit gekostet hat.
+
+**Drei Tests mussten mit**, und alle drei aus demselben Grund: sie
+prüften die **Bauart** statt der **Zusicherung** — sie suchten das
+`QVBoxLayout` im Rollbereich und lasen dort einen Index ab. Sie prüfen
+jetzt dieselbe Aussage über die öffentliche Antwort
+(`appletPosition()`, `contentsMargins()` am Widget). Ein Test, der beim
+Umbau rot wird, ohne dass sich am Bild etwas ändert, misst die falsche
+Sache.
+
+## 7 · Was Schritt 2 noch braucht
+
+Die drei Anforderungen aus dem Zielbild sind noch offen und gehören
+nicht in denselben Schritt:
+
+* **Panadapter als Feld** — er hängt heute im `QSplitter` neben der
+  Spalte, nicht im Raster. `GridCellWidget` nimmt ihn bereits an (es
+  hält `QWidget*`, nicht `AppletWidget*`); was fehlt, ist die Auflösung
+  des Splitters und die Werkzeugzeile in seiner Kopfleiste.
+* **Inhalt nach Feldgröße** — das ist Schritt 4 (`Density`), und die
+  Regel „eine ausdrückliche Wahl gewinnt" steht in §2b.
+* **Das + legt Felder an** — heute legt `AddWidgetButton` Applets
+  *sichtbar*, nicht Felder *an*. `AppletGrid::addCell()` steht bereit;
+  die Frage, was in ein frisch angelegtes leeres Feld hineinkommt,
+  gehört zum Auswähler und nicht zum Raster.

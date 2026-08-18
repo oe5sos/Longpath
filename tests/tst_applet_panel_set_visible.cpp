@@ -6,6 +6,7 @@
 #include <QVBoxLayout>
 #include <QScrollArea>
 #include "gui/applets/AppletPanelWidget.h"
+#include "gui/applets/GridCellWidget.h"
 #include "gui/applets/AppletWidget.h"
 
 using namespace NereusSDR;
@@ -32,27 +33,25 @@ private slots:
     void unknown_applet_is_noop();
 };
 
-static QWidget* wrapperFor(AppletPanelWidget& panel, AppletWidget* applet)
+// ── Zugriff ueber die Zusicherung, nicht ueber die Bauart ───────────
+//
+// Diese beiden Helfer griffen bis 2026-08-18 auf das QVBoxLayout im
+// Rollbereich zu und lasen dort den Index ab. Mit Schritt 1 des freien
+// Rasters ist daraus ein AppletGrid geworden (dieselbe Reihenfolge,
+// dasselbe Bild) — und der Test wurde rot, ohne dass sich an dem, was
+// er zusichert, etwas geaendert haette.
+//
+// Er prueft jetzt, was er immer meinte: das Feld eines Applets ist
+// versteckt, und seine STELLE hat sich dabei nicht geaendert. Die
+// Stelle kommt aus AppletPanelWidget::appletPosition — der oeffentlichen
+// Antwort auf genau diese Frage.
+
+static QWidget* wrapperFor(AppletPanelWidget& panel, QWidget* applet)
 {
-    auto* scroll = panel.findChild<QScrollArea*>();
-    if (!scroll) { return nullptr; }
-    auto* stackWidget = scroll->widget();
-    if (!stackWidget) { return nullptr; }
-    auto* layout = qobject_cast<QVBoxLayout*>(stackWidget->layout());
-    if (!layout) { return nullptr; }
-    for (int i = 0; i < layout->count(); ++i) {
-        auto* w = layout->itemAt(i)->widget();
-        if (w && w->isAncestorOf(applet)) { return w; }
+    for (auto* cell : panel.findChildren<NereusSDR::GridCellWidget*>()) {
+        if (cell && cell->isAncestorOf(applet)) { return cell; }
     }
     return nullptr;
-}
-
-static int indexOf(AppletPanelWidget& panel, QWidget* wrapper)
-{
-    auto* scroll = panel.findChild<QScrollArea*>();
-    auto* stackWidget = scroll->widget();
-    auto* layout = qobject_cast<QVBoxLayout*>(stackWidget->layout());
-    return layout->indexOf(wrapper);
 }
 
 void TstAppletPanelSetVisible::hides_wrapper_without_changing_layout_index()
@@ -65,12 +64,12 @@ void TstAppletPanelSetVisible::hides_wrapper_without_changing_layout_index()
 
     QWidget* wrapperB = wrapperFor(panel, b);
     QVERIFY(wrapperB);
-    int idxBefore = indexOf(panel, wrapperB);
+    const int idxBefore = panel.appletPosition(b);
 
     panel.setAppletVisible(b, false);
 
     QVERIFY(!wrapperB->isVisible());
-    QCOMPARE(indexOf(panel, wrapperB), idxBefore);
+    QCOMPARE(panel.appletPosition(b), idxBefore);
 }
 
 void TstAppletPanelSetVisible::shows_wrapper_again_at_same_index()
@@ -83,13 +82,14 @@ void TstAppletPanelSetVisible::shows_wrapper_again_at_same_index()
     panel.addApplet(b);
 
     QWidget* wrapperB = wrapperFor(panel, b);
-    int idxBefore = indexOf(panel, wrapperB);
+    QVERIFY(wrapperB);
+    const int idxBefore = panel.appletPosition(b);
 
     panel.setAppletVisible(b, false);
     panel.setAppletVisible(b, true);
 
     QVERIFY(wrapperB->isVisible());
-    QCOMPARE(indexOf(panel, wrapperB), idxBefore);
+    QCOMPARE(panel.appletPosition(b), idxBefore);
 }
 
 void TstAppletPanelSetVisible::null_applet_is_noop()

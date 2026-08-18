@@ -973,6 +973,12 @@ set(GUI_SOURCES
     src/gui/applets/AppletWidget.cpp
     src/gui/applets/NyiOverlay.cpp
     src/gui/applets/AppletPanelWidget.cpp
+    src/gui/applets/GridCell.cpp
+    src/gui/applets/GridCell.h
+    src/gui/applets/GridCellWidget.cpp
+    src/gui/applets/GridCellWidget.h
+    src/gui/applets/AppletGrid.cpp
+    src/gui/applets/AppletGrid.h
     src/gui/applets/AppletKeys.cpp
     src/gui/applets/AppletKeys.h
     src/gui/applets/AppletFloatingWindow.cpp

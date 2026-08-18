@@ -4892,6 +4892,17 @@ nereus_add_test(tst_applet_reorder)
 #    entscheidet der Fensterverwalter --
 nereus_add_test(tst_applet_detach)
 
+# -- Schritt 1 des freien Rasters (Entwurf 2026-08-17): aus dem Stapel
+#    aus Huellen wird ein Raster mit EINER Spalte. Der Schritt ist mit
+#    Absicht der, an dem sich sichtbar nichts aendert -- solange es eine
+#    Spalte gibt, IST die Zeile der Index. Geprueft wird darum nicht
+#    „das Raster funktioniert", sondern: dieselbe Reihenfolge wie
+#    vorher, Aushaengen loescht nicht, und das Datenmodell traegt
+#    bereits MEHRERE Inhalte je Feld. Letzteres ist die Festlegung des
+#    Betreibers vom 2026-08-18: ein Feld ist ein Behaelter, kein
+#    Widget -- sonst muesste die gespeicherte Anordnung zweimal wandern.
+nereus_add_test(tst_applet_grid)
+
 # -- Die Quellenliste der Instrumente und die Kennlinie der
 #    Empfangsskala. Der Kern ist die S-Stauchung, und zwar als
 #    STUETZSTELLEN: S0 auf 0, S9 auf 0,66, S9+60 auf 1. Eine
