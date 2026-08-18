@@ -6,6 +6,8 @@
 
 #include "gui/applets/AppletGrid.h"
 
+#include <QResizeEvent>
+
 #include "gui/applets/AppletWidget.h"
 #include "gui/applets/GridCellWidget.h"
 
@@ -121,7 +123,38 @@ QList<AppletWidget*> AppletGrid::applets() const
 
 void AppletGrid::setColumns(int n)
 {
+    m_columnsExplicit = true;
     const int use = qMax(1, n);
+    if (use == m_columns) { return; }
+    m_columns = use;
+    relayout();
+}
+
+void AppletGrid::clearExplicitColumns()
+{
+    if (!m_columnsExplicit) { return; }
+    m_columnsExplicit = false;
+    const int use = columnsForWidth(width());
+    if (use == m_columns) { return; }
+    m_columns = use;
+    relayout();
+}
+
+// Schritt 2 des freien Rasters: Spalten nach Breite.
+//
+// Die Umbrueche liegen bei 1100 und 1600 (Betreiber, 2026-08-18). Sie
+// wirken NUR, solange niemand die Spaltenzahl ausdruecklich gesetzt hat
+// — siehe setColumns().
+//
+// Kein eigenes Umbau-Konto: relayout() setzt die Felder ohnehin aus
+// Anzeigefolge und Spaltenzahl, und setColumns kehrt bei gleicher Zahl
+// frueh zurueck. Eine Fenstergroessenaenderung, die keine Schwelle
+// ueberschreitet, kostet damit einen Vergleich.
+void AppletGrid::resizeEvent(QResizeEvent* e)
+{
+    QWidget::resizeEvent(e);
+    if (m_columnsExplicit) { return; }
+    const int use = columnsForWidth(width());
     if (use == m_columns) { return; }
     m_columns = use;
     relayout();

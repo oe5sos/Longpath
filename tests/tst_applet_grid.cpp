@@ -31,6 +31,10 @@
 // =================================================================
 
 #include <QtTest>
+#include <QCoreApplication>
+#include <QResizeEvent>
+#include <QSet>
+#include <QGridLayout>
 
 #include <QLabel>
 
@@ -62,6 +66,24 @@ QStringList idsOf(const QList<AppletWidget*>& list)
     return out;
 }
 
+} // namespace
+
+
+namespace {
+/// Groesse setzen UND das Ereignis zustellen.
+///
+/// `resize()` allein genuegt nicht: bei einem nicht gezeigten
+/// Fenster haelt Qt6 das QResizeEvent bis zum Anzeigen zurueck. Der
+/// Test lief dadurch gegen einen Handler, der nie gerufen wurde —
+/// und meldete „1 statt 2", was wie ein Fehler in der
+/// Schwellenrechnung aussah und keiner war.
+void resizeAndDeliver(QWidget& w, int width, int height)
+{
+    const QSize before = w.size();
+    w.resize(width, height);
+    QResizeEvent ev(w.size(), before);
+    QCoreApplication::sendEvent(&w, &ev);
+}
 } // namespace
 
 class TestAppletGrid : public QObject
@@ -282,6 +304,81 @@ private slots:
                  "removeApplet muss aushaengen, nicht loeschen — darauf "
                  "beruht das Abloesen in ein eigenes Fenster");
         delete rx;
+    }
+
+    // ── Schritt 2: Spalten nach Breite ───────────────────────────────
+    //
+    // Die Schwellen sind eine Festlegung des Betreibers (1100 / 1600),
+    // keine Herleitung. Der Test NENNT sie darum als Zahlen und rechnet
+    // sie nicht nach — sonst prueft er nur, dass zwei Formeln
+    // uebereinstimmen, und nicht, dass die Festlegung eingehalten ist.
+    void columnsFollowWidthAtTheAgreedThresholds()
+    {
+        QCOMPARE(AppletGrid::columnsForWidth(0),    1);
+        QCOMPARE(AppletGrid::columnsForWidth(1099), 1);
+        QCOMPARE(AppletGrid::columnsForWidth(1100), 2);   // Schwelle
+        QCOMPARE(AppletGrid::columnsForWidth(1599), 2);
+        QCOMPARE(AppletGrid::columnsForWidth(1600), 3);   // Schwelle
+        QCOMPARE(AppletGrid::columnsForWidth(4000), 3);
+    }
+
+    void resizingChangesTheColumnCount()
+    {
+        AppletGrid g;
+        resizeAndDeliver(g, 900, 600);
+        QCOMPARE(g.columns(), 1);
+        resizeAndDeliver(g, 1200, 600);
+        QCOMPARE(g.columns(), 2);
+        resizeAndDeliver(g, 1700, 600);
+        QCOMPARE(g.columns(), 3);
+        resizeAndDeliver(g, 1000, 600);
+        QCOMPARE(g.columns(), 1);
+    }
+
+    // Die Antwort des Betreibers auf Entwurf §4 Frage 3: nein, die
+    // Automatik ueberschreibt keine ausdrueckliche Wahl. Ohne diese
+    // Sperre waere eine Wahl bis zur naechsten
+    // Fenstergroessenaenderung gueltig, also praktisch nie.
+    void anExplicitChoiceSurvivesResizing()
+    {
+        AppletGrid g;
+        resizeAndDeliver(g, 1700, 600);
+        QCOMPARE(g.columns(), 3);
+        g.setColumns(1);
+        QVERIFY(g.columnsAreExplicit());
+        resizeAndDeliver(g, 1200, 600);
+        QCOMPARE(g.columns(), 1);      // NICHT 2
+        resizeAndDeliver(g, 1800, 600);
+        QCOMPARE(g.columns(), 1);      // auch nicht 3
+        g.clearExplicitColumns();      // zurueck an die Automatik
+        QVERIFY(!g.columnsAreExplicit());
+        QCOMPARE(g.columns(), 3);
+    }
+
+    // Nichts faellt heraus und nichts ueberlappt: bei fuenf Feldern und
+    // drei Spalten muessen genau fuenf Plaetze belegt sein, jeder
+    // einmal. Das ist die Pruefbarkeit, die der Entwurf fuer Schritt 2
+    // verlangt.
+    void nothingOverlapsAndNothingFallsOut()
+    {
+        AppletGrid g;
+        for (int i = 0; i < 5; ++i) { g.addCell(); }
+        resizeAndDeliver(g, 1700, 600);
+        QCOMPARE(g.columns(), 3);
+
+        auto* lay = qobject_cast<QGridLayout*>(g.layout());
+        QVERIFY(lay);
+        QSet<QPair<int,int>> seen;
+        int found = 0;
+        for (int i = 0; i < lay->count(); ++i) {
+            int r = 0, c = 0, rs = 0, cs = 0;
+            lay->getItemPosition(i, &r, &c, &rs, &cs);
+            QVERIFY2(!seen.contains(qMakePair(r, c)),
+                     "zwei Felder auf demselben Platz");
+            seen.insert(qMakePair(r, c));
+            ++found;
+        }
+        QCOMPARE(found, 5);
     }
 };
 

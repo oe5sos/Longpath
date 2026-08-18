@@ -100,7 +100,35 @@ public:
     // ── Anordnung ────────────────────────────────────────────────────
 
     int  columns() const { return m_columns; }
+
+    /// Ausdrueckliche Wahl. Sie GEWINNT dauerhaft: ab hier richtet sich
+    /// die Spaltenzahl nicht mehr nach der Breite.
+    ///
+    /// So beantwortet vom Betreiber am 2026-08-18 (Entwurf §4 Frage 3,
+    /// „Darf die Automatik eine ausdrueckliche Wahl ueberschreiben?" —
+    /// nein). Ohne diese Sperre waere jede Wahl bis zur naechsten
+    /// Fenstergroessenaenderung gueltig, also praktisch nie.
     void setColumns(int n);
+
+    /// Spaltenzahl aus der Breite. Rein und statisch, damit die
+    /// Schwellen pruefbar sind, ohne ein Fenster zu bauen.
+    ///
+    /// Schwellen vom Betreiber am 2026-08-18: zwei Spalten ab 1100,
+    /// drei ab 1600. Sie stehen hier und nicht in einer .cpp, weil der
+    /// Test sie nennt und nicht nachrechnet.
+    static constexpr int kTwoColumnWidth   = 1100;
+    static constexpr int kThreeColumnWidth = 1600;
+    static int columnsForWidth(int w) {
+        if (w >= kThreeColumnWidth) { return 3; }
+        if (w >= kTwoColumnWidth)   { return 2; }
+        return 1;
+    }
+
+    /// Hat jemand die Spaltenzahl ausdruecklich gesetzt?
+    bool columnsAreExplicit() const { return m_columnsExplicit; }
+
+    /// Gibt die Automatik zurueck (fuer ein „nach Breite"-Menue).
+    void clearExplicitColumns();
 
     /// Die Stelle eines Feldes in der Anzeigefolge (0-basiert), oder -1.
     int  positionOf(const QString& id) const;
@@ -122,6 +150,13 @@ signals:
     /// nicht bei jedem Bildpunkt.
     void layoutChanged();
 
+protected:
+    /// Hier, unmittelbar vor private: — und nicht mitten im oeffentlichen
+    /// Teil. Ein `protected:` in der Mitte nimmt alles Folgende mit; beim
+    /// ersten Versuch waren dadurch positionOf() und moveCell()
+    /// geschuetzt, was AppletPanelWidget.cpp sofort gemeldet hat.
+    void resizeEvent(class QResizeEvent* e) override;
+
 private:
     void relayout();
     QString nextId();
@@ -134,6 +169,7 @@ private:
     QHash<QString, GridCell> m_meta;
     int m_columns{1};
     int m_nextId{1};
+    bool m_columnsExplicit{false};
 };
 
 } // namespace NereusSDR
