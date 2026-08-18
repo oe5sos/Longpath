@@ -831,15 +831,30 @@ def main() -> int:
                 # er sieht aus wie eine Pruefung, ist aber eine gegen
                 # eine andere Fassung. Ohne Stempel bleibt der
                 # Arbeitsbaum das Beste, was es gibt.
+                # ALLE VIER Upstreams, nicht nur die zwei Thetis-Zweige.
+                # Die Fassungsauflösung ueber den Objektspeicher galt bis
+                # 2026-08-18 nur fuer ramdor und mi0bot; deskhpsdr und
+                # freedv-gui liefen weiter ueber den Arbeitsbaum -- also
+                # gegen das, was der Klon gerade ausgecheckt hat, statt
+                # gegen die zitierte Fassung.
+                #
+                # Aufgefallen, als der deskhpsdr-Klon ankam: zehn Zitate
+                # auf old_protocol.c:3595..3814 galten sofort als
+                # „hinter dem Dateiende" (die Datei hat bei HEAD 3470
+                # Zeilen). Alle zehn tragen [@120188f] -- eine Fassung,
+                # in der die Datei laenger war. Es waren keine Fehler in
+                # den Zitaten, sondern einer in diesem Werkzeug.
                 repo_for = {"ramdor": THETIS_DIR,
-                            "mi0bot": MI0BOT_DIR}.get(which)
+                            "mi0bot": MI0BOT_DIR,
+                            "deskhpsdr": DESKHPSDR_DIR,
+                            "freedv-gui": FREEDV_DIR}.get(which)
                 pinned = (THETIS_VERSION_DIRS.get(stamp)
                           if (which == "ramdor" and stamp) else None)
                 src_lines = None
                 upstream = None
                 if pinned is not None and pinned.is_dir():
                     upstream = resolve_upstream(m.group("file"), which, stamp)
-                elif stamp and repo_for is not None:
+                elif stamp and repo_for is not None and repo_for.is_dir():
                     src_lines = git_lines_at(repo_for, stamp, m.group("file"))
                     if src_lines is None and pinned is None:
                         # Der Klon kennt den Stempel nicht (flacher Klon,
@@ -865,7 +880,16 @@ def main() -> int:
                             # upstream-not-found darunter wuerde ihn nur
                             # verdoppeln.
                             break
-                elif which in ("ramdor", "mi0bot"):
+                elif not stamp:
+                    # `not stamp` und nicht bloss „sonst": ein Zitat MIT
+                    # Stempel, dessen Klon fehlt, ist nicht stempellos --
+                    # es ist ungeprueft. Beides in denselben Topf zu
+                    # werfen liest sich als „387 Leute haben den Stempel
+                    # vergessen", wo in Wahrheit ein Verzeichnis fehlt.
+                    # Genau das passierte, als MI0BOT_DIR kurz weg war:
+                    # 161 gestempelte Zitate rutschten in den
+                    # Stempel-Topf und blaehten ihn von 23 auf 184.
+                    #
                     # OHNE STEMPEL ist nichts zu pruefen, und das ist
                     # keine Formalie. Genau so entstanden die beiden
                     # letzten unbelastbaren Meldungen: ein Zitat ohne
