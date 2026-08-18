@@ -206,7 +206,7 @@ double HermesLiteBandwidthMonitor::computeBps(std::atomic<int64_t>& totalBytes,
     if (dt <= 0) { return lastBps; }
 
     const int64_t db = total - prevBytes;
-    // Source: bandwidth_monitor.c:106 — bps = (double)db * 1000.0 / (double)dt
+    // Source: bandwidth_monitor.c:106 [v2.10.3.13] — bps = (double)db * 1000.0 / (double)dt
     const double bps = static_cast<double>(db) * 1000.0 / static_cast<double>(dt);
 
     lastBytes.store(total, std::memory_order_relaxed);

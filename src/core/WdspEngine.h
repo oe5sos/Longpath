@@ -242,7 +242,7 @@ public:
     //   inputBufferSize=238 (one P2 packet), dspBufferSize=4096,
     //   all rates=48000 (no resampling needed)
     //
-    // From Thetis cmaster.c:72-86 (OpenChannel call in create_rcvr)
+    // From Thetis cmaster.c:72-86 [v2.10.3.13] (OpenChannel call in create_rcvr)
     RxChannel* createRxChannel(int channelId,
                                int inputBufferSize = 238,
                                int dspBufferSize = 4096,

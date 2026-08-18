@@ -400,7 +400,7 @@ public:
     // routes feedback streams to the panadapter.  UI-only here; the
     // panadapter wire-through is Task 13.
     void setLoopback(bool on);
-    // From Thetis PSForm.cs:968-971 chkShow2ToneMeasurements_CheckedChanged
+    // From Thetis PSForm.cs:968-971 [v2.10.3.13] chkShow2ToneMeasurements_CheckedChanged
     // [v2.10.3.13] → Display.ShowIMDMeasurments = checked.  UI-only here;
     // the IMD-overlay wire-through is Task 12.
     void setShow2ToneMeasurements(bool on);

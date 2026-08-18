@@ -333,7 +333,7 @@ void ContainerWidget::setAxisLock(AxisLock lock)
 
 void ContainerWidget::cycleAxisLock(bool reverse)
 {
-    // From Thetis ucMeter.cs:912-935
+    // From Thetis ucMeter.cs:912-935 [v2.10.3.13]
     int n = static_cast<int>(m_axisLock);
     if (reverse) {
         n--;
@@ -352,7 +352,7 @@ void ContainerWidget::cycleAxisLock(bool reverse)
 
 void ContainerWidget::setPinOnTop(bool pin)
 {
-    // From Thetis ucMeter.cs:974-978
+    // From Thetis ucMeter.cs:974-978 [v2.10.3.13]
     m_pinOnTop = pin;
     m_btnPin->setText(pin ? QStringLiteral("\U0001F4CD") : QStringLiteral("\U0001F4CC"));
     setTopMost();
@@ -360,7 +360,7 @@ void ContainerWidget::setPinOnTop(bool pin)
 
 void ContainerWidget::setTopMost()
 {
-    // From Thetis ucMeter.cs:980-993
+    // From Thetis ucMeter.cs:980-993 [v2.10.3.13]
     if (isFloating() && parentWidget()) {
         FloatingContainer* fc = qobject_cast<FloatingContainer*>(parentWidget());
         if (fc) {
@@ -443,14 +443,14 @@ void ContainerWidget::setDelta(const QPoint& delta) { m_delta = delta; }
 
 void ContainerWidget::storeLocation()
 {
-    // From Thetis ucMeter.cs:567-572
+    // From Thetis ucMeter.cs:567-572 [v2.10.3.13]
     m_dockedLocation = pos();
     m_dockedSize = size();
 }
 
 void ContainerWidget::restoreLocation()
 {
-    // From Thetis ucMeter.cs:574-593
+    // From Thetis ucMeter.cs:574-593 [v2.10.3.13]
     bool moved = false;
     if (m_dockedLocation != pos()) {
         move(m_dockedLocation);
@@ -474,7 +474,7 @@ int ContainerWidget::roundToNearestTen(int value)
 
 void ContainerWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    // From Thetis ucMeter.cs:1198-1229
+    // From Thetis ucMeter.cs:1198-1229 [v2.10.3.13]
     // Upstream inline attribution preserved verbatim (ucMeter.cs:1200):
     //   bool no_controls = _no_controls && !Common.ShiftKeyDown; //[2.10.3.6]MW0LGE no title or resize grabber, override by holding shift
     bool noControls = m_noControls && !(QApplication::keyboardModifiers() & Qt::ShiftModifier);
@@ -592,7 +592,7 @@ bool ContainerWidget::eventFilter(QObject* watched, QEvent* event)
 
 void ContainerWidget::beginDrag(const QPoint& globalPos)
 {
-    // From Thetis ucMeter.cs:281-294
+    // From Thetis ucMeter.cs:281-294 [v2.10.3.13]
     m_dragging = true;
     if (isFloating()) {
         m_dragStartPos = globalPos - parentWidget()->pos();
@@ -609,7 +609,7 @@ void ContainerWidget::updateDrag(const QPoint& globalPos)
     }
 
     if (isFloating()) {
-        // From Thetis ucMeter.cs:319-345
+        // From Thetis ucMeter.cs:319-345 [v2.10.3.13]
         QPoint newPos = globalPos - m_dragStartPos;
         if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
             newPos.setX(roundToNearestTen(newPos.x()));
@@ -619,7 +619,7 @@ void ContainerWidget::updateDrag(const QPoint& globalPos)
             parentWidget()->move(newPos);
         }
     } else {
-        // From Thetis ucMeter.cs:346-374 — overlay-docked, clamped
+        // From Thetis ucMeter.cs:346-374 [v2.10.3.13] — overlay-docked, clamped
         QPoint newPos = globalPos - m_dragStartPos;
         if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
             newPos.setX(roundToNearestTen(newPos.x()));
@@ -652,7 +652,7 @@ void ContainerWidget::endDrag()
 
 void ContainerWidget::beginResize(const QPoint& globalPos)
 {
-    // From Thetis ucMeter.cs:400-407
+    // From Thetis ucMeter.cs:400-407 [v2.10.3.13]
     m_resizeStartGlobal = globalPos;
     m_resizeStartSize = isFloating() && parentWidget() ? parentWidget()->size() : size();
     m_resizing = true;
@@ -665,7 +665,7 @@ void ContainerWidget::updateResize(const QPoint& globalPos)
         return;
     }
 
-    // From Thetis ucMeter.cs:489-518
+    // From Thetis ucMeter.cs:489-518 [v2.10.3.13]
     int dX = globalPos.x() - m_resizeStartGlobal.x();
     int dY = globalPos.y() - m_resizeStartGlobal.y();
 
@@ -691,7 +691,7 @@ void ContainerWidget::endResize()
 
 void ContainerWidget::doResize(int w, int h)
 {
-    // From Thetis ucMeter.cs:520-549
+    // From Thetis ucMeter.cs:520-549 [v2.10.3.13]
     w = std::max(w, kMinContainerWidth);
     h = std::max(h, kMinContainerHeight);
 

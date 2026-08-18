@@ -97,7 +97,7 @@ enum class WindowFunction : int {
 // Thread-safe parameter updates via std::atomic for values set from
 // the main thread (FFT size changes require replan on next frame).
 //
-// From Thetis display.cs:215 — BUFFER_SIZE = 16384 (max FFT size)
+// From Thetis display.cs:215 [v2.10.3.13] — BUFFER_SIZE = 16384 (max FFT size)
 /// Die Vorgabe-FFT-Größe an EINER Stelle. Sie stand vorher als 4096 an
 /// drei Orten — im Feld, im Rückfallwert von SpectrumWidget::binWidthHz()
 /// und in zwei Tests — und beim Anheben blieben zwei davon zurück.

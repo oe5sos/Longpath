@@ -80,7 +80,7 @@ struct HardwareProfile {
 };
 
 // Compute a HardwareProfile for the given model.
-// From Thetis clsHardwareSpecific.cs:85-184
+// From Thetis clsHardwareSpecific.cs:85-184 [v2.10.3.13]
 // Upstream inline attribution preserved verbatim:
 //   :129  case HPSDRModel.ANAN_G1: //N1GP G1 added
 //   :164  case HPSDRModel.ANAN_G2_1K:             // G8NJJ: likely to need further changes for PA
@@ -92,7 +92,7 @@ HardwareProfile profileForModel(HPSDRModel model);
 HPSDRModel defaultModelForBoard(HPSDRHW board);
 
 // Return the list of HPSDRModel values compatible with a discovered board byte.
-// From Thetis NetworkIO.cs:164-171
+// From Thetis NetworkIO.cs:164-171 [v2.10.3.13]
 // Upstream inline attribution preserved verbatim:
 //   :160  //[2.10.3.9]MW0LGE added board check, issue icon shown in setup
 QList<HPSDRModel> compatibleModels(HPSDRHW board);

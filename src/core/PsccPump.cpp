@@ -161,7 +161,7 @@ void PsccPump::onIqData(int /*ddcIndex*/, const QVector<float>& /*samples*/)
 void PsccPump::onPsPairedIqData(int psFbDdc, const QVector<float>& psFbSamples,
                                 int txMonDdc, const QVector<float>& txMonSamples)
 {
-    // From Thetis ChannelMaster/sync.c:53-58 InboundBlock(id=1)
+    // From Thetis ChannelMaster/sync.c:53-58 [v2.10.3.13] InboundBlock(id=1)
     // [v2.10.3.15]:
     //   pscc (chid (inid (1, 0), 0),
     //         nsamples,
@@ -236,7 +236,7 @@ void PsccPump::onPsPairedIqData(int psFbDdc, const QVector<float>& psFbSamples,
 
 void PsccPump::tryPump()
 {
-    // From Thetis ChannelMaster/sync.c:53-58 InboundBlock(id=1)
+    // From Thetis ChannelMaster/sync.c:53-58 [v2.10.3.13] InboundBlock(id=1)
     // [v2.10.3.13]:
     //   pscc(chid(inid(1, 0), 0),
     //        nsamples,

@@ -156,7 +156,7 @@ namespace NereusSDR {
 struct BoardCapabilities;
 class MeterItem;
 
-// From Thetis ucMeter.cs:49-59 — axis lock positions for docked containers.
+// From Thetis ucMeter.cs:49-59 [v2.10.3.13] — axis lock positions for docked containers.
 enum class AxisLock {
     Left = 0, TopLeft, Top, TopRight,
     Right, BottomRight, Bottom, BottomLeft

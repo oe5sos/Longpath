@@ -87,11 +87,11 @@ public:
     static void composeCcBankAlexTx(quint8 out[5], quint32 alexTxMask) noexcept;
     static void composeCcBankOcOutputs(quint8 out[5], quint8 ocMask) noexcept;
 
-    // Source: networkproto1.c:367-374 — sign-extend 24-bit big-endian sample
+    // Source: networkproto1.c:367-374 [v2.10.3.13] — sign-extend 24-bit big-endian sample
     // and scale to float [-1, 1] using 2^23 full scale.
     static float scaleSample24(const quint8 be24[3]) noexcept;
 
-    // Source: networkproto1.c:361-376 MetisReadThreadMainLoop — parse a
+    // Source: networkproto1.c:361-376 [v2.10.3.13] MetisReadThreadMainLoop — parse a
     // 1032-byte metis ep6 datagram into per-receiver interleaved I/Q float pairs.
     // perRx[i] is interleaved (I0, Q0, I1, Q1, ...) for receiver i.
     // Returns false on malformed input (wrong magic, missing sync, bad numRx).

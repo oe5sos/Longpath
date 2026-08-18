@@ -83,14 +83,14 @@ FloatingContainer::~FloatingContainer()
 void FloatingContainer::setId(const QString& id)
 {
     m_id = id;
-    // From Thetis frmMeterDisplay.cs:150-156 — setting ID triggers geometry restore
+    // From Thetis frmMeterDisplay.cs:150-156 [v2.10.3.13] — setting ID triggers geometry restore
     restoreGeometry();
     updateTitle();
 }
 
 void FloatingContainer::takeOwner(ContainerWidget* container)
 {
-    // From Thetis frmMeterDisplay.cs:168-179
+    // From Thetis frmMeterDisplay.cs:168-179 [v2.10.3.13]
     m_containerMinimises = container->containerMinimises();
     m_formEnabled = container->isContainerEnabled();
 
@@ -140,7 +140,7 @@ void FloatingContainer::onOwnerMinimisedChanged(bool minimised)
 
 void FloatingContainer::onConsoleWindowStateChanged(Qt::WindowStates state, bool rx2Enabled)
 {
-    // From Thetis frmMeterDisplay.cs:114-139
+    // From Thetis frmMeterDisplay.cs:114-139 [v2.10.3.13]
     if (m_formEnabled && m_floating && m_containerMinimises) {
         if (state & Qt::WindowMinimized) {
             hide();
@@ -162,7 +162,7 @@ void FloatingContainer::onConsoleWindowStateChanged(Qt::WindowStates state, bool
 
 void FloatingContainer::closeEvent(QCloseEvent* event)
 {
-    // From Thetis frmMeterDisplay.cs:158-166 — hide instead of close
+    // From Thetis frmMeterDisplay.cs:158-166 [v2.10.3.13] — hide instead of close
     if (event->spontaneous()) {
         hide();
         event->ignore();
@@ -216,7 +216,7 @@ void FloatingContainer::ensureVisiblePosition(QWidget* anchor)
 
 void FloatingContainer::updateTitle()
 {
-    // From Thetis frmMeterDisplay.cs:140-144 — unique title for OBS/streaming
+    // From Thetis frmMeterDisplay.cs:140-144 [v2.10.3.13] — unique title for OBS/streaming
     uint hash = qHash(m_id) % 100000;
     setWindowTitle(QStringLiteral("NereusSDR Meter [%1]").arg(hash, 5, 10, QLatin1Char('0')));
 }

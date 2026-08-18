@@ -7791,7 +7791,7 @@ void MainWindow::buildStatusBar()
     // Auto-hide timer mirrors Thetis ucInfoBar._warningTimer — single-shot
     // 2000 ms, restarts on each overload event so a single hit keeps the
     // alarm visible for the full 2 s even after the per-ADC level decays.
-    // Source: ucInfoBar.cs:927-932 + console.cs:21388 show_duration=2000
+    // Source: ucInfoBar.cs:927-932 [v2.10.3.13] + console.cs:21388 show_duration=2000
     // [@501e3f5].
     m_adcOvlHideTimer = new QTimer(this);
     m_adcOvlHideTimer->setSingleShot(true);

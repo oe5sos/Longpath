@@ -200,7 +200,7 @@ class WaterfallTicker;  // src/gui/spectrum/WaterfallTicker.h
 
 // Waterfall color scheme presets.
 // Default matches AetherSDR/SmartSDR style.
-// From Thetis enums.cs:68-79 (ColorScheme enum). Expanded 4 → 7 in
+// From Thetis enums.cs:68-79 [v2.10.3.13] (ColorScheme enum). Expanded 4 → 7 in
 // Phase 3G-8 commit 5 (plan §7 W17 waterfall colour schemes expansion).
 enum class WfColorScheme : int {
     Default = 0,    // AetherSDR: black → blue → cyan → green → yellow → red

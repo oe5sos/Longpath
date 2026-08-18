@@ -114,7 +114,7 @@ public:
 
     int rxSource() const { return m_rxSource; }
 
-    // From Thetis frmMeterDisplay.cs:168-179
+    // From Thetis frmMeterDisplay.cs:168-179 [v2.10.3.13]
     void takeOwner(ContainerWidget* container);
 
     bool containerMinimises() const { return m_containerMinimises; }
@@ -131,7 +131,7 @@ public:
     bool isContainerFloating() const { return m_floating; }
     void setContainerFloating(bool floating);
 
-    // From Thetis frmMeterDisplay.cs:114-139
+    // From Thetis frmMeterDisplay.cs:114-139 [v2.10.3.13]
     void onConsoleWindowStateChanged(Qt::WindowStates state, bool rx2Enabled);
 
     void saveGeometry();

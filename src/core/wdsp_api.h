@@ -700,32 +700,32 @@ void xnobEXTF(int id, float* I, float* Q);
 // WDSP: third_party/wdsp/src/nobII.c:658,686,697,707,727
 
 // mode: 0=zero, 1=sample-hold, 2=mean-hold, 3=hold-sample, 4=interpolate
-// From Thetis specHPSDR.cs:937 — SetEXTNOBMode(int id, int mode)
+// From Thetis specHPSDR.cs:937 [v2.10.3.13] — SetEXTNOBMode(int id, int mode)
 // WDSP: third_party/wdsp/src/nobII.c:658
 void SetEXTNOBMode(int id, int mode);
 
 // tau: slew time constant in seconds (sets both advslewtime and hangslewtime)
-// From Thetis specHPSDR.cs:922 — SetEXTNOBTau(int id, double tau)
+// From Thetis specHPSDR.cs:922 [v2.10.3.13] — SetEXTNOBTau(int id, double tau)
 // WDSP: third_party/wdsp/src/nobII.c:686
 void SetEXTNOBTau(int id, double tau);
 
 // hangtime: hang time in seconds after blanked impulse
-// From Thetis specHPSDR.cs:925 — SetEXTNOBHangtime(int id, double time)
+// From Thetis specHPSDR.cs:925 [v2.10.3.13] — SetEXTNOBHangtime(int id, double time)
 // WDSP: third_party/wdsp/src/nobII.c:697
 void SetEXTNOBHangtime(int id, double time);
 
 // advtime: advance/lead time in seconds before detected impulse
-// From Thetis specHPSDR.cs:928 — SetEXTNOBAdvtime(int id, double time)
+// From Thetis specHPSDR.cs:928 [v2.10.3.13] — SetEXTNOBAdvtime(int id, double time)
 // WDSP: third_party/wdsp/src/nobII.c:707
 void SetEXTNOBAdvtime(int id, double time);
 
 // threshold: detection threshold (dimensionless ratio; create default 30.0)
-// From Thetis specHPSDR.cs:934 — SetEXTNOBThreshold(int id, double thresh)
+// From Thetis specHPSDR.cs:934 [v2.10.3.13] — SetEXTNOBThreshold(int id, double thresh)
 // WDSP: third_party/wdsp/src/nobII.c:727
 void SetEXTNOBThreshold(int id, double thresh);
 
 // backtau: averaging time constant for signal magnitude (seconds)
-// From Thetis specHPSDR.cs:931 — SetEXTNOBBacktau(int id, double tau)
+// From Thetis specHPSDR.cs:931 [v2.10.3.13] — SetEXTNOBBacktau(int id, double tau)
 // WDSP: third_party/wdsp/src/nobII.c
 void SetEXTNOBBacktau(int id, double tau);
 

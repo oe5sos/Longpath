@@ -514,7 +514,7 @@ void PureSignal::setRelaxTolerance(bool on)
     if (on == m_relaxTolerance) { return; }
     m_relaxTolerance = on;
     if (m_tx) {
-        // From Thetis PSForm.cs:805-810 chkPSRelaxPtol_CheckedChanged
+        // From Thetis PSForm.cs:805-810 [v2.10.3.13] chkPSRelaxPtol_CheckedChanged
         // [v2.10.3.13]:
         //   if (chkPSRelaxPtol.Checked)
         //       puresignal.SetPSPtol(_txachannel, 0.400);
@@ -969,7 +969,7 @@ void PureSignal::processNewInfo(const int newInfo[16])
             << " autoCal=" << m_autoCalEnabled << ")";
     }
 
-    // From Thetis PSForm.cs:1097-1098 CalibrationAttemptsChanged
+    // From Thetis PSForm.cs:1097-1098 [v2.10.3.13] CalibrationAttemptsChanged
     // [v2.10.3.13]:
     //   public static bool CalibrationAttemptsChanged
     //     { get { return _info[5] != _oldInfo[5]; } }

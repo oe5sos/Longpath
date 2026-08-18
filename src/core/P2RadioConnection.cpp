@@ -1154,7 +1154,7 @@ void P2RadioConnection::setAntennaRouting(AntennaRouting r)
     m_alex.txAnt = clamp(r.txAnt);
 
     // RX-only antenna mux + RX-Bypass-Out relay — Phase 3P-I-b T5.
-    // From Thetis ChannelMaster/netInterface.c:479-481 + network.h:279-282
+    // From Thetis ChannelMaster/netInterface.c:479-481 [v2.10.3.13] + network.h:279-282
     // [v2.10.3.13 @501e3f5]. rxOnlyAnt 0=none, 1=Rx1In, 2=Rx2In, 3=XVTRRxIn.
     m_alex.rxOnlyAnt = (r.rxOnlyAnt < 0 || r.rxOnlyAnt > 3) ? 0 : r.rxOnlyAnt;
     m_alex.rxOut     = r.rxOut;
@@ -2118,7 +2118,7 @@ void P2RadioConnection::onReadyRead()
 // Fires every 500ms, sends CmdGeneral when running
 void P2RadioConnection::onKeepAliveTick()
 {
-    // From Thetis network.c:1436
+    // From Thetis network.c:1436 [v2.10.3.13]
     // if (prn->run && prn->wdt) CmdGeneral();
     // Note: we send CmdGeneral unconditionally when running (wdt=0 means no watchdog,
     // but keepalive still runs per Thetis behavior)
@@ -2247,7 +2247,7 @@ void P2RadioConnection::setOcMatrix(const OcMatrix* matrix)
 // by effectiveFreqCorrectionFactor(). When null, factor defaults to 1.0
 // and output is byte-identical to pre-calibration.
 //
-// Source: HPSDR/NetworkIO.cs:227-249 FreqCorrectionFactor property,
+// Source: HPSDR/NetworkIO.cs:227-249 [v2.10.3.13] FreqCorrectionFactor property,
 //   Freq2PhaseWord(): long pw = (long)Math.Pow(2, 32) * freq / 122880000
 //   (correction factor applied before Freq2PhaseWord in Thetis via the
 //   VFOfreq → SetVFOfreq → Freq2PhaseWord chain) [@501e3f5]
@@ -2556,7 +2556,7 @@ CodecContext P2RadioConnection::buildCodecContext() const
     ctx.p2AlexTxAnt = m_alex.txAnt;
 
     // RX-only antenna mux + RX-Bypass-Out relay — Phase 3P-I-b T5.
-    // From Thetis ChannelMaster/network.h:279-282 + netInterface.c:479-481
+    // From Thetis ChannelMaster/network.h:279-282 [v2.10.3.13] + netInterface.c:479-481
     // [v2.10.3.13 @501e3f5]. Consumed by P2CodecOrionMkII::buildAlex0().
     ctx.rxOnlyAnt = m_alex.rxOnlyAnt;
     ctx.rxOut     = m_alex.rxOut;
@@ -2721,14 +2721,14 @@ void P2RadioConnection::composeCmdTx(char buf[60]) const
 // Porting from Thetis CmdGeneral() network.c:821-911
 void P2RadioConnection::composeCmdGeneralLegacy(char buf[60]) const
 {
-    // From Thetis network.c:826
+    // From Thetis network.c:826 [v2.10.3.13]
     buf[4] = 0x00;  // Command
 
-    // From Thetis network.c:831-876 — PORT assignments
+    // From Thetis network.c:831-876 [v2.10.3.13] — PORT assignments
     int tmp;
 
     // PC outbound source ports (radio receives FROM these)
-    // From Thetis network.c:839-857
+    // From Thetis network.c:839-857 [v2.10.3.13]
     tmp = m_p2CustomPortBase + 0;  // Rx Specific #1025
     buf[5] = tmp >> 8; buf[6] = tmp & 0xff;
     tmp = m_p2CustomPortBase + 1;  // Tx Specific #1026
@@ -2741,7 +2741,7 @@ void P2RadioConnection::composeCmdGeneralLegacy(char buf[60]) const
     buf[15] = tmp >> 8; buf[16] = tmp & 0xff;
 
     // Radio outbound source ports (radio sends FROM these)
-    // From Thetis network.c:860-875
+    // From Thetis network.c:860-875 [v2.10.3.13]
     tmp = m_p2CustomPortBase + 0;  // High Priority to PC #1025
     buf[11] = tmp >> 8; buf[12] = tmp & 0xff;
     tmp = m_p2CustomPortBase + 10; // Rx0 DDC IQ #1035
@@ -2751,7 +2751,7 @@ void P2RadioConnection::composeCmdGeneralLegacy(char buf[60]) const
     tmp = m_p2CustomPortBase + 2;  // Wideband ADC0 #1027
     buf[21] = tmp >> 8; buf[22] = tmp & 0xff;
 
-    // From Thetis network.c:878-888 — Wideband settings
+    // From Thetis network.c:878-888 [v2.10.3.13] — Wideband settings
     // From Thetis network.c:879 [v2.10.3.15] - wb_enable mask, bit N = ADCN.
     // Phase 3F Sub-Epic F Task 1 wired this from a hardcoded 0 placeholder to
     // m_wbEnableMask. Driven by setWidebandEnabled().
@@ -2762,18 +2762,18 @@ void P2RadioConnection::composeCmdGeneralLegacy(char buf[60]) const
     buf[27] = m_wbUpdateRate;      // 70ms
     buf[28] = m_wbPacketsPerFrame; // 32
 
-    // From Thetis network.c:896 — 0x08 = bit[3] "freq or phase word"
+    // From Thetis network.c:896 [v2.10.3.13] — 0x08 = bit[3] "freq or phase word"
     // Thetis sends 0x08 but stores frequencies as Hz in prn->rx[].frequency
     // Keep this matching Thetis exactly
     buf[37] = 0x08;
 
-    // From Thetis network.c:898
+    // From Thetis network.c:898 [v2.10.3.13]
     buf[38] = m_wdt;  // Watchdog timer (0 = disabled)
 
-    // From Thetis network.c:904
+    // From Thetis network.c:904 [v2.10.3.13]
     buf[58] = (!m_tx[0].pa) & 0x01;  // PA enable
 
-    // From Thetis network.c:906 — Alex enable (BPF board)
+    // From Thetis network.c:906 [v2.10.3.13] — Alex enable (BPF board)
     // prbpfilter->enable | prbpfilter2->enable
     buf[59] = 0x03;  // Enable both Alex0 and Alex1
 
@@ -2795,10 +2795,10 @@ void P2RadioConnection::composeCmdHighPriorityLegacy(char buf[kBufLen]) const
     // future 3M-3 rear-panel-PTT-out wiring but must NOT drive the MOX wire bit.
     buf[4] = static_cast<char>((m_mox ? 0x02 : 0x00) | (m_running ? 0x01 : 0x00));
 
-    // From Thetis network.c:931-933
+    // From Thetis network.c:931-933 [v2.10.3.13]
     buf[5] = (m_tx[0].dash << 2 | m_tx[0].dot << 1 | m_tx[0].cwx) & 0x7;
 
-    // From Thetis network.c:936-1005
+    // From Thetis network.c:936-1005 [v2.10.3.13]
     // RX frequencies — 4 bytes each, big-endian phase words.
     // General cmd byte 37 = 0x08 (bit 3) means frequencies are NCO phase words.
     // From pcap analysis: phase_word = freq_hz * 2^32 / 122880000
@@ -2811,7 +2811,7 @@ void P2RadioConnection::composeCmdHighPriorityLegacy(char buf[kBufLen]) const
         }
     }
 
-    // From Thetis network.c:1008-1011 — TX0 frequency (also phase word)
+    // From Thetis network.c:1008-1011 [v2.10.3.13] — TX0 frequency (also phase word)
     writeBE32(buf, 329, hzToPhaseWord(m_tx[0].frequency));
 
     // From deskhpsdr/src/new_protocol.c:864-876 [@120188f]:
@@ -2836,15 +2836,15 @@ void P2RadioConnection::composeCmdHighPriorityLegacy(char buf[kBufLen]) const
         buf[345] = static_cast<char>(txInBand ? m_tx[0].driveLevel : 0);
     }
 
-    // From Thetis network.c:1037-1038 — Mercury Attenuator
+    // From Thetis network.c:1037-1038 [v2.10.3.13] — Mercury Attenuator
     buf[1403] = m_rx[1].preamp << 1 | m_rx[0].preamp;
 
-    // From Thetis network.c:1055-1057 — Step Attenuators
+    // From Thetis network.c:1055-1057 [v2.10.3.13] — Step Attenuators
     buf[1442] = m_adc[1].rxStepAttn;
     buf[1443] = m_adc[0].rxStepAttn;
 
     // Alex filter/antenna registers (bytes 1428-1435)
-    // From Thetis ChannelMaster/network.c:1040-1050
+    // From Thetis ChannelMaster/network.c:1040-1050 [v2.10.3.13]
     // Alex0 (bytes 1432-1435): RX antenna + HPF + LPF
     // Alex1 (bytes 1428-1431): TX antenna + HPF + LPF
     writeBE32(buf, 1432, buildAlex0());
@@ -2854,22 +2854,22 @@ void P2RadioConnection::composeCmdHighPriorityLegacy(char buf[kBufLen]) const
 // Porting from Thetis CmdRx() network.c:1066-1179
 void P2RadioConnection::composeCmdRxLegacy(char buf[kBufLen]) const
 {
-    // From Thetis network.c:1074
+    // From Thetis network.c:1074 [v2.10.3.13]
     buf[4] = m_numAdc;
 
-    // From Thetis network.c:1080-1082 — Dither
+    // From Thetis network.c:1080-1082 [v2.10.3.13] — Dither
     buf[5] = (m_adc[2].dither << 2 | m_adc[1].dither << 1 | m_adc[0].dither) & 0x7;
 
-    // From Thetis network.c:1088-1090 — Random
+    // From Thetis network.c:1088-1090 [v2.10.3.13] — Random
     buf[6] = (m_adc[2].random << 2 | m_adc[1].random << 1 | m_adc[0].random) & 0x7;
 
-    // From Thetis network.c:1097-1103 — Enable bitmask
+    // From Thetis network.c:1097-1103 [v2.10.3.13] — Enable bitmask
     buf[7] = (m_rx[6].enable << 6 | m_rx[5].enable << 5 |
               m_rx[4].enable << 4 | m_rx[3].enable << 3 |
               m_rx[2].enable << 2 | m_rx[1].enable << 1 |
               m_rx[0].enable) & 0xff;
 
-    // From Thetis network.c:1106-1169 — Per-RX config
+    // From Thetis network.c:1106-1169 [v2.10.3.13] — Per-RX config
     // Layout: each RX is 6 bytes apart, starting at byte 17
     // byte+0: ADC, byte+1-2: sampling rate, byte+5: bit depth
     for (int i = 0; i < 7; ++i) {
@@ -2880,20 +2880,20 @@ void P2RadioConnection::composeCmdRxLegacy(char buf[kBufLen]) const
         buf[base + 5] = m_rx[i].bitDepth;
     }
 
-    // From Thetis network.c:1172
+    // From Thetis network.c:1172 [v2.10.3.13]
     buf[1363] = m_rx[0].sync;
 }
 
 // Porting from Thetis CmdTx() network.c:1181-1248
 void P2RadioConnection::composeCmdTxLegacy(char buf[60]) const
 {
-    // From Thetis network.c:1188
+    // From Thetis network.c:1188 [v2.10.3.13]
     buf[4] = m_numDac;
 
-    // From Thetis network.c:1199 — CW mode control
+    // From Thetis network.c:1199 [v2.10.3.13] — CW mode control
     buf[5] = m_cw.modeControl;
 
-    // From Thetis network.c:1202-1216
+    // From Thetis network.c:1202-1216 [v2.10.3.13]
     buf[6] = m_cw.sidetoneLevel;
     buf[7] = (m_cw.sidetoneFreq >> 8) & 0xff;
     buf[8] = m_cw.sidetoneFreq & 0xff;
@@ -2903,24 +2903,24 @@ void P2RadioConnection::composeCmdTxLegacy(char buf[60]) const
     buf[12] = m_cw.hangDelay & 0xff;
     buf[13] = m_cw.rfDelay;
 
-    // From Thetis network.c:1218-1220 — TX0 sampling rate
+    // From Thetis network.c:1218-1220 [v2.10.3.13] — TX0 sampling rate
     buf[14] = (m_tx[0].samplingRate >> 8) & 0xff;
     buf[15] = m_tx[0].samplingRate & 0xff;
 
-    // From Thetis network.c:1222
+    // From Thetis network.c:1222 [v2.10.3.13]
     buf[17] = m_cw.edgeLength & 0xff;
 
-    // From Thetis network.c:1224-1226 — TX0 phase shift
+    // From Thetis network.c:1224-1226 [v2.10.3.13] — TX0 phase shift
     buf[26] = (m_tx[0].phaseShift >> 8) & 0xff;
     buf[27] = m_tx[0].phaseShift & 0xff;
 
-    // From Thetis network.c:1234 — Mic control
+    // From Thetis network.c:1234 [v2.10.3.13] — Mic control
     buf[50] = m_mic.micControl;
 
-    // From Thetis network.c:1236
+    // From Thetis network.c:1236 [v2.10.3.13]
     buf[51] = m_mic.lineInGain;
 
-    // From Thetis network.c:1238-1242 — Step attenuators on TX
+    // From Thetis network.c:1238-1242 [v2.10.3.13] — Step attenuators on TX
     buf[57] = m_adc[2].txStepAttn;
     buf[58] = m_adc[1].txStepAttn;
     buf[59] = m_adc[0].txStepAttn;
@@ -2935,7 +2935,7 @@ void P2RadioConnection::sendCmdGeneral()
     // Stamp sequence number before compose so wire bytes include it.
     writeBE32(buf, 0, m_seqGeneral++);
     composeCmdGeneral(buf);
-    // From Thetis network.c:910
+    // From Thetis network.c:910 [v2.10.3.13]
     // sendPacket(listenSock, packetbuf, sizeof(packetbuf), prn->base_outbound_port);
     QByteArray pkt(buf, sizeof(buf));
     m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort);
@@ -2947,7 +2947,7 @@ void P2RadioConnection::sendCmdHighPriority()
     memset(buf, 0, sizeof(buf));
     writeBE32(buf, 0, m_seqHighPri++);
     composeCmdHighPriority(buf);
-    // From Thetis network.c:1062
+    // From Thetis network.c:1062 [v2.10.3.13]
     // sendPacket(listenSock, packetbuf, BUFLEN, prn->base_outbound_port + 3);
     QByteArray pkt(buf, sizeof(buf));
     // 2026-07-27: check the send result.  Previously the return was discarded,
@@ -2975,7 +2975,7 @@ void P2RadioConnection::sendCmdRx()
     memset(buf, 0, sizeof(buf));
     writeBE32(buf, 0, m_seqRx++);
     composeCmdRx(buf);
-    // From Thetis network.c:1178
+    // From Thetis network.c:1178 [v2.10.3.13]
     QByteArray pkt(buf, sizeof(buf));
     m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 1);
 }
@@ -2986,7 +2986,7 @@ void P2RadioConnection::sendCmdTx()
     memset(buf, 0, sizeof(buf));
     writeBE32(buf, 0, m_seqTx++);
     composeCmdTx(buf);
-    // From Thetis network.c:1247
+    // From Thetis network.c:1247 [v2.10.3.13]
     QByteArray pkt(buf, sizeof(buf));
     m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 2);
 }
@@ -3418,7 +3418,7 @@ void P2RadioConnection::writeBE32(char* buf, int offset, quint32 value)
 // Phase 3P-G: multiplied by CalibrationController::effectiveFreqCorrectionFactor()
 // when a controller is wired.  Default factor 1.0 → byte-identical to pre-cal.
 //
-// Source: HPSDR/NetworkIO.cs:251-254 Freq2PhaseWord():
+// Source: HPSDR/NetworkIO.cs:251-254 [v2.10.3.13] Freq2PhaseWord():
 //   long pw = (long)Math.Pow(2, 32) * freq / 122880000;
 //   (Thetis applies FreqCorrectionFactor to the freq argument via VFOfreq()
 //   before calling Freq2PhaseWord — we fold the factor into this helper.)
@@ -3443,7 +3443,7 @@ quint32 P2RadioConnection::hzToPhaseWord(quint64 freqHz) const
 // Build Alex0 32-bit register (bytes 1432-1435 in CmdHighPriority).
 // Contains: RX antenna (bits 24-26), LPF (bits 20-31), HPF (bits 0-6),
 //           RX relay bits (bits 8-15).
-// From Thetis ChannelMaster/network.h:263-358 bpfilter struct.
+// From Thetis ChannelMaster/network.h:263-358 [v2.10.3.13] bpfilter struct.
 quint32 P2RadioConnection::buildAlex0() const
 {
     quint32 reg = 0;

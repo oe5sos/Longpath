@@ -139,7 +139,7 @@ void P2CodecOrionMkII::composeCmdGeneral(const CodecContext& ctx, quint8 buf[60]
     // From Thetis network.c:826 [@501e3f5]
     buf[4] = 0x00;  // Command
 
-    // From Thetis network.c:831-876 — PORT assignments
+    // From Thetis network.c:831-876 [v2.10.3.13] — PORT assignments
     int tmp;
 
     // PC outbound source ports (radio receives FROM these)

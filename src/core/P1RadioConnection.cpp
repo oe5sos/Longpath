@@ -310,7 +310,7 @@ void P1RadioConnection::composeEp2Frame(quint8 out[1032], quint32 seq,
                                          quint64 rx1FreqHz,
                                          int activeRxCount) noexcept
 {
-    // Source: networkproto1.c:223-230 — MetisWriteFrame() header + sequence
+    // Source: networkproto1.c:223-230 [v2.10.3.13] — MetisWriteFrame() header + sequence
     out[0] = 0xEF;
     out[1] = 0xFE;
     out[2] = 0x01;
@@ -322,7 +322,7 @@ void P1RadioConnection::composeEp2Frame(quint8 out[1032], quint32 seq,
     out[6] = static_cast<quint8>((seq >>  8) & 0xFF);
     out[7] = static_cast<quint8>( seq        & 0xFF);
 
-    // Source: networkproto1.c:597-602 — WriteMainLoop() USB subframe 0 sync
+    // Source: networkproto1.c:597-602 [v2.10.3.13] — WriteMainLoop() USB subframe 0 sync
     out[8]  = 0x7F;
     out[9]  = 0x7F;
     out[10] = 0x7F;
@@ -363,7 +363,7 @@ void P1RadioConnection::composeEp2Frame(quint8 out[1032], quint32 seq,
 // ---------------------------------------------------------------------------
 // composeCcBank0
 //
-// Source: networkproto1.c:619-641 — WriteMainLoop() case 0 (general settings)
+// Source: networkproto1.c:619-641 [v2.10.3.13] — WriteMainLoop() case 0 (general settings)
 //   C0 = XmitBit (MOX, bit 0); address bits 7..1 = 0x00 (no C0 |= address)
 //   C1 = SampleRateIn2Bits & 3  (48k=0, 96k=1, 192k=2, 384k=3)
 //   C2 = OC output mask (bits 7..1) | EER bit (bit 0) — zero for stub
@@ -373,13 +373,13 @@ void P1RadioConnection::composeEp2Frame(quint8 out[1032], quint32 seq,
 void P1RadioConnection::composeCcBank0(quint8 out[5], int sampleRate, bool mox,
                                         int activeRxCount) noexcept
 {
-    // Source: networkproto1.c:615 -- C0 = (unsigned char)XmitBit
+    // Source: networkproto1.c:615 [v2.10.3.13] -- C0 = (unsigned char)XmitBit
     // (Nearby upstream context — case 12 Step ATT control — carries the
     //  RedPitaya guard: `//[2.10.3.9]DH1KLM  //model needed as board type
     //  (prn->discovery.BoardType) is an OrionII` on networkproto1.c:612.)
     out[0] = mox ? 0x01 : 0x00;
 
-    // Source: networkproto1.c:620 -- C1 = (SampleRateIn2Bits & 3)
+    // Source: networkproto1.c:620 [v2.10.3.13] -- C1 = (SampleRateIn2Bits & 3)
     // 48000->0, 96000->1, 192000->2, 384000->3
     quint8 srBits = 0;
     if      (sampleRate >= 384000) { srBits = 3; }
@@ -393,7 +393,7 @@ void P1RadioConnection::composeCcBank0(quint8 out[5], int sampleRate, bool mox,
     out[3] = 0;
 
     // C4: number of DDCs to run, encoded as (nddc - 1) << 3
-    // Source: networkproto1.c:470. Thetis sends 0x08 for nddc=2 even on
+    // Source: networkproto1.c:470 [v2.10.3.13]. Thetis sends 0x08 for nddc=2 even on
     // single-RX setups (diversity pre-allocation). We send the actual
     // count so 1-RX configurations write 0x00. The Hermes firmware
     // accepts both.
@@ -404,7 +404,7 @@ void P1RadioConnection::composeCcBank0(quint8 out[5], int sampleRate, bool mox,
 // ---------------------------------------------------------------------------
 // composeCcBankRxFreq
 //
-// Source: networkproto1.c:484-494 — case 2 (RX1/DDC0 frequency)
+// Source: networkproto1.c:484-494 [v2.10.3.13] — case 2 (RX1/DDC0 frequency)
 //   rxIndex 0 → C0 |= 4 (address 0x02)
 //   rxIndex 1 → C0 |= 6 (address 0x03)  [case 3]
 //   rxIndex 2 → C0 |= 8 (address 0x04)  [case 5]
@@ -459,7 +459,7 @@ void P1RadioConnection::composeCcBankRxFreq(quint8 out[5], int rxIndex, quint64 
 // ---------------------------------------------------------------------------
 // composeCcBankTxFreq
 //
-// Source: networkproto1.c:476-482 — case 1 (TX VFO frequency)
+// Source: networkproto1.c:476-482 [v2.10.3.13] — case 1 (TX VFO frequency)
 //   C0 |= 2 → address 0x01
 //   C1..C4 = (prn->tx[0].frequency >> {24,16,8,0}) & 0xff — raw Hz, big-endian
 //
@@ -468,7 +468,7 @@ void P1RadioConnection::composeCcBankRxFreq(quint8 out[5], int rxIndex, quint64 
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcBankTxFreq(quint8 out[5], quint64 freqHz) noexcept
 {
-    // Source: networkproto1.c:477 — C0 |= 2  (case 1 = TX VFO)
+    // Source: networkproto1.c:477 [v2.10.3.13] — C0 |= 2  (case 1 = TX VFO)
     out[0] = 0x02;  // address 0x01, MOX=0
 
     const quint32 hz = static_cast<quint32>(freqHz);
@@ -530,7 +530,7 @@ void P1RadioConnection::composeCcBankAlexRx(quint8 out[5], quint32 alexRxMask) n
 // ---------------------------------------------------------------------------
 // composeCcBankAlexTx
 //
-// Source: networkproto1.c:747-760 — case 10 (TX drive level / ALEX TX LPF)
+// Source: networkproto1.c:747-760 [v2.10.3.13] — case 10 (TX drive level / ALEX TX LPF)
 //   C0 |= 0x12 → address 0x09
 //   C3 = HPF filter bits (bits from alexTxMask low byte)
 //   C4 = LPF filter bits (bits from alexTxMask high byte)
@@ -542,7 +542,7 @@ void P1RadioConnection::composeCcBankAlexRx(quint8 out[5], quint32 alexRxMask) n
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcBankAlexTx(quint8 out[5], quint32 alexTxMask) noexcept
 {
-    // Source: networkproto1.c:748 — C0 |= 0x12
+    // Source: networkproto1.c:748 [v2.10.3.13] — C0 |= 0x12
     out[0] = 0x12;
     out[1] = 0;  // drive level — TODO(3I-T7): wire from state
     out[2] = 0;  // mic/apollo flags — TODO(3I-T7): wire from state
@@ -553,7 +553,7 @@ void P1RadioConnection::composeCcBankAlexTx(quint8 out[5], quint32 alexTxMask) n
 // ---------------------------------------------------------------------------
 // composeCcBankOcOutputs
 //
-// Source: networkproto1.c:621 — case 0: C2 = (cw.eer & 1) | ((oc_output << 1) & 0xFE)
+// Source: networkproto1.c:621 [v2.10.3.13] — case 0: C2 = (cw.eer & 1) | ((oc_output << 1) & 0xFE)
 //   OC output bits live in bank 0 C2, bits 7..1. Not a separate bank.
 //   For Task 7 scope this helper encodes only the OC mask into C2 of a
 //   bank-0-shaped output buffer (C0 address = 0x00, C1 = default 48k).
@@ -564,7 +564,7 @@ void P1RadioConnection::composeCcBankAlexTx(quint8 out[5], quint32 alexTxMask) n
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcBankOcOutputs(quint8 out[5], quint8 ocMask) noexcept
 {
-    // Source: networkproto1.c:621 — C2 = (cw.eer & 1) | ((oc_output << 1) & 0xFE)
+    // Source: networkproto1.c:621 [v2.10.3.13] — C2 = (cw.eer & 1) | ((oc_output << 1) & 0xFE)
     out[0] = 0;  // address 0x00, MOX=0
     out[1] = 0;
     out[2] = static_cast<quint8>((ocMask << 1) & 0xFE);  // OC bits in C2 bits 7..1
@@ -596,7 +596,7 @@ P1RadioConnection::~P1RadioConnection()
 // ---------------------------------------------------------------------------
 void P1RadioConnection::init()
 {
-    // Source: networkproto1.c:203 equivalent — bind to any available port
+    // Source: networkproto1.c:203 [v2.10.3.13] equivalent — bind to any available port
     m_socket = new QUdpSocket(this);
 
     if (!m_socket->bind(QHostAddress::Any, 0)) {
@@ -652,7 +652,7 @@ void P1RadioConnection::init()
 // connectToRadio
 //
 // Binds the socket, sends metis-start, transitions to Connected.
-// Source: networkproto1.c:33 SendStartToMetis — sends EF FE 04 01 then
+// Source: networkproto1.c:33 [v2.10.3.13] SendStartToMetis — sends EF FE 04 01 then
 // waits for the first ep6 frame. For Phase 3I Task 9 we transition to
 // Connected immediately after sending start, matching P2 behavior.
 // ---------------------------------------------------------------------------
@@ -751,7 +751,7 @@ void P1RadioConnection::connectToRadio(const RadioInfo& info)
     sendPrimingBurst(3);
 
     // Send metis-start to begin ep6 stream.
-    // Source: networkproto1.c:33-68 SendStartToMetis -- cmd byte 0x01 = IQ only
+    // Source: networkproto1.c:33-68 [v2.10.3.13] SendStartToMetis -- cmd byte 0x01 = IQ only
     sendMetisStart(false);
 
     // Second priming burst after start, matching Thetis's ForceCandCFrame(3)
@@ -782,7 +782,7 @@ void P1RadioConnection::connectToRadio(const RadioInfo& info)
 // disconnect
 //
 // Sends metis-stop and closes the socket.
-// Source: networkproto1.c:72-110 SendStopToMetis — EF FE 04 00
+// Source: networkproto1.c:72-110 [v2.10.3.13] SendStopToMetis — EF FE 04 00
 // ---------------------------------------------------------------------------
 void P1RadioConnection::disconnect()
 {
@@ -2544,7 +2544,7 @@ CodecContext P1RadioConnection::buildCodecContext() const
 //
 // Drains incoming datagrams. For each 1032-byte ep6 frame, calls the static
 // parseEp6Frame helper and emits iqDataReceived for each receiver.
-// Source: networkproto1.c:319-415 MetisReadThreadMainLoop
+// Source: networkproto1.c:319-415 [v2.10.3.13] MetisReadThreadMainLoop
 //
 // Upstream inline attribution in that range — preserved verbatim per
 // CLAUDE.md §"Inline comment preservation — SHIP-BLOCKING":
@@ -2589,7 +2589,7 @@ void P1RadioConnection::onReadyRead()
         if (data.isEmpty()) { continue; }
 
         // ep6 frames are exactly 1032 bytes
-        // Source: networkproto1.c:319 — MetisReadThreadMainLoop receives 1032-byte frames
+        // Source: networkproto1.c:319 [v2.10.3.13] — MetisReadThreadMainLoop receives 1032-byte frames
         if (data.size() == 1032) {
             // Update watchdog timestamp on every good ep6 arrival.
             // Source: NereusSDR design doc §3.6 — successful data resets the retry counter.
@@ -2800,7 +2800,7 @@ void P1RadioConnection::onReconnectTimeout()
     // Send stop then prime then start so the radio re-arms its ep6 sender
     // with the current RX1 frequency latched. Without the primed C&C burst,
     // the radio comes back up in ADC-idle state (I=DC, Q=0).
-    // Source: networkproto1.c:49-110 SendStopToMetis / SendStartToMetis plus
+    // Source: networkproto1.c:49-110 [v2.10.3.13] SendStopToMetis / SendStartToMetis plus
     // the ForceCandCFrame bracket pattern from MetisReadThreadMainLoop:281.
     sendMetisStop();
     sendPrimingBurst(3);
@@ -2871,7 +2871,7 @@ void P1RadioConnection::onConnectTimeout()
 // ---------------------------------------------------------------------------
 // sendMetisStart
 //
-// Source: networkproto1.c:33-68 SendStartToMetis
+// Source: networkproto1.c:33-68 [v2.10.3.13] SendStartToMetis
 //   outpacket.packetbuf[0] = 0xef  (line 43)
 //   outpacket.packetbuf[1] = 0xfe  (line 44)
 //   outpacket.packetbuf[2] = 0x04  (line 49)
@@ -2883,7 +2883,7 @@ void P1RadioConnection::sendMetisStart(bool iqAndMic)
 {
     if (!m_socket) { return; }
 
-    // Source: networkproto1.c:33-68 SendStartToMetis — 64-byte packet
+    // Source: networkproto1.c:33-68 [v2.10.3.13] SendStartToMetis — 64-byte packet
     QByteArray pkt(64, '\0');
     pkt[0] = static_cast<char>(0xEF);
     pkt[1] = static_cast<char>(0xFE);
@@ -2923,7 +2923,7 @@ void P1RadioConnection::sendMetisStart(bool iqAndMic)
 // ---------------------------------------------------------------------------
 // sendMetisStop
 //
-// Source: networkproto1.c:72-110 SendStopToMetis
+// Source: networkproto1.c:72-110 [v2.10.3.13] SendStopToMetis
 //   outpacket.packetbuf[2] = 0x04  (line 84)
 //   outpacket.packetbuf[3] = 0x00  (stop command)
 //   Packet is 64 bytes, padded with zeros.
@@ -2932,7 +2932,7 @@ void P1RadioConnection::sendMetisStop()
 {
     if (!m_socket) { return; }
 
-    // Source: networkproto1.c:72-110 SendStopToMetis — 64-byte packet
+    // Source: networkproto1.c:72-110 [v2.10.3.13] SendStopToMetis — 64-byte packet
     QByteArray pkt(64, '\0');
     pkt[0] = static_cast<char>(0xEF);
     pkt[1] = static_cast<char>(0xFE);
@@ -2961,7 +2961,7 @@ void P1RadioConnection::sendMetisStop()
 //
 // Builds a 1032-byte ep2 frame with two C&C subframes drawn from the full
 // 17-bank round-robin sequence. Each call advances m_ccRoundRobinIdx by 2.
-// Source: networkproto1.c:216-236 MetisWriteFrame + :597-884 WriteMainLoop
+// Source: networkproto1.c:216-236 [v2.10.3.13] MetisWriteFrame + :597-884 WriteMainLoop
 // ---------------------------------------------------------------------------
 void P1RadioConnection::sendCommandFrame()
 {
@@ -3096,7 +3096,7 @@ void P1RadioConnection::sendPrimingBurst(int countPerBank)
 //
 // Calls the static parseEp6Frame helper and emits iqDataReceived for each
 // receiver's interleaved I/Q samples.
-// Source: networkproto1.c:319-415 MetisReadThreadMainLoop
+// Source: networkproto1.c:319-415 [v2.10.3.13] MetisReadThreadMainLoop
 // Upstream inline attribution preserved verbatim (networkproto1.c:335/353/354/355):
 //   `// only cleared by getAndResetADC_Overload(), or'ed with existing state //[2.10.3.13]MW0LGE`
 // ---------------------------------------------------------------------------
@@ -3206,7 +3206,7 @@ void P1RadioConnection::parseEp6Frame(const QByteArray& pkt)
             // I2C response — already handled above; not a telemetry frame.
             continue;
         }
-        // Source: networkproto1.c:332 — switch (ControlBytesIn[0] & 0xf8)
+        // Source: networkproto1.c:332 [v2.10.3.13] — switch (ControlBytesIn[0] & 0xf8)
         // Cases 0x00/0x20 carry ADC-overload bits (one per ADC); the
         // `//[2.10.3.13]MW0LGE only cleared by getAndResetADC_Overload(),
         // or'ed with existing state` inline attributions are preserved
@@ -4066,7 +4066,7 @@ void P1RadioConnection::hl2CheckBandwidthMonitor()
 // ---------------------------------------------------------------------------
 // scaleSample24
 //
-// Source: networkproto1.c:367-374 MetisReadThreadMainLoop — sample extraction
+// Source: networkproto1.c:367-374 [v2.10.3.13] MetisReadThreadMainLoop — sample extraction
 // uses (bptr[k+0] << 24 | bptr[k+1] << 16 | bptr[k+2] << 8) to sign-extend
 // the 24-bit big-endian value into a 32-bit int, then multiplies by
 // const_1_div_2147483648_ (= 1/2^31). The << 8 fill + divide by 2^31 is
@@ -4075,12 +4075,12 @@ void P1RadioConnection::hl2CheckBandwidthMonitor()
 float P1RadioConnection::scaleSample24(const quint8 be24[3]) noexcept
 {
     // Sign-extend 24-bit big-endian to qint32 via left-shift trick.
-    // Source: networkproto1.c:368-370 — (bptr[k+0] << 24 | bptr[k+1] << 16 | bptr[k+2] << 8)
+    // Source: networkproto1.c:368-370 [v2.10.3.13] — (bptr[k+0] << 24 | bptr[k+1] << 16 | bptr[k+2] << 8)
     qint32 v = (qint32(be24[0]) << 24)
              | (qint32(be24[1]) << 16)
              | (qint32(be24[2]) << 8);
     v >>= 8;  // arithmetic right-shift to sign-extend from 24 bits
-    // Source: networkproto1.c:367 — const_1_div_2147483648_ * (shifted value >> 8)
+    // Source: networkproto1.c:367 [v2.10.3.13] — const_1_div_2147483648_ * (shifted value >> 8)
     // Equivalent: v / 2^23 = v / 8388608
     return float(v) / 8388608.0f;
 }
@@ -4088,7 +4088,7 @@ float P1RadioConnection::scaleSample24(const quint8 be24[3]) noexcept
 // ---------------------------------------------------------------------------
 // parseEp6Frame
 //
-// Source: networkproto1.c:319-415 MetisReadThreadMainLoop — iterates 2 subframes,
+// Source: networkproto1.c:319-415 [v2.10.3.13] MetisReadThreadMainLoop — iterates 2 subframes,
 // each 512 bytes.
 // Upstream inline attribution (networkproto1.c:335/353/354/355, preserved
 // verbatim): `// only cleared by getAndResetADC_Overload(), or'ed with existing state //[2.10.3.13]MW0LGE`
@@ -4123,7 +4123,7 @@ bool P1RadioConnection::parseEp6Frame(const quint8 frame[1032],
     if (numRx < 1 || numRx > 7) { return false; }
 
     // Validate Metis ep6 header: EF FE 01 06 + 4-byte sequence
-    // Source: networkproto1.c:326-327 — check first four bytes (after MetisReadDirect strips header)
+    // Source: networkproto1.c:326-327 [v2.10.3.13] — check first four bytes (after MetisReadDirect strips header)
     // In our full datagram the magic lives at [0..3]
     if (frame[0] != 0xEF || frame[1] != 0xFE ||
         frame[2] != 0x01 || frame[3] != 0x06) {
@@ -4131,11 +4131,11 @@ bool P1RadioConnection::parseEp6Frame(const quint8 frame[1032],
     }
 
     // Validate sync bytes for both USB subframes
-    // Source: networkproto1.c:327 — (bptr[0]==0x7f && bptr[1]==0x7f && bptr[2]==0x7f)
+    // Source: networkproto1.c:327 [v2.10.3.13] — (bptr[0]==0x7f && bptr[1]==0x7f && bptr[2]==0x7f)
     if (frame[8]   != 0x7F || frame[9]   != 0x7F || frame[10]  != 0x7F) { return false; }
     if (frame[520] != 0x7F || frame[521] != 0x7F || frame[522] != 0x7F) { return false; }
 
-    // Source: networkproto1.c:361 — spr = 504 / (6 * nddc + 2)
+    // Source: networkproto1.c:361 [v2.10.3.13] — spr = 504 / (6 * nddc + 2)
     const int slotBytes        = 6 * numRx + 2;  // (I24+Q24)*numRx + Mic16
     const int samplesPerSubframe = 504 / slotBytes;
 
@@ -4151,13 +4151,13 @@ bool P1RadioConnection::parseEp6Frame(const quint8 frame[1032],
 
     // Parse one 512-byte subframe; sampleStart is the offset of the first sample
     // slot within the full 1032-byte datagram.
-    // Source: networkproto1.c:366 — k = 8 + isample*(6*nddc+2) + iddc*6
+    // Source: networkproto1.c:366 [v2.10.3.13] — k = 8 + isample*(6*nddc+2) + iddc*6
     //   (where k is relative to bptr which starts at sync bytes)
     //   In our frame: sampleStart = subframeBase + 8 (sync3 + C&C5)
     auto parseSubframe = [&](int sampleStart) {
         for (int s = 0; s < samplesPerSubframe; ++s) {
             for (int r = 0; r < numRx; ++r) {
-                // Source: networkproto1.c:366 — k = 8 + isample*slotBytes + iddc*6
+                // Source: networkproto1.c:366 [v2.10.3.13] — k = 8 + isample*slotBytes + iddc*6
                 const int off = sampleStart + s * slotBytes + r * 6;
                 const float i = scaleSample24(&frame[off]);
                 const float q = scaleSample24(&frame[off + 3]);

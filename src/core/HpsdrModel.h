@@ -90,7 +90,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 namespace NereusSDR {
 
 // Logical radio model — what the user says they have in Setup.
-// Source: enums.cs:109
+// Source: enums.cs:109 [v2.10.3.13]
 enum class HPSDRModel : int {
     FIRST        = -1,
     HPSDR        =  0,  // Atlas/Metis kit

@@ -763,7 +763,7 @@ void PsForm::onSingleCalibrate()
 
 void PsForm::onAdvancedClicked()
 {
-    // From Thetis PSForm.cs:888-902 btnPSAdvanced_Click + setAdvancedView
+    // From Thetis PSForm.cs:888-902 [v2.10.3.13] btnPSAdvanced_Click + setAdvancedView
     // [v2.10.3.13]:
     //   private bool _advancedON = false; //MW0LGE_[2.9.0.7]
     //   _advancedON = !_advancedON;

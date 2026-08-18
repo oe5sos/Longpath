@@ -390,7 +390,7 @@ RxChannel* WdspEngine::createRxChannel(int channelId,
     }
 
 #ifdef HAVE_WDSP
-    // From Thetis cmaster.c:72-86 (create_rcvr OpenChannel call)
+    // From Thetis cmaster.c:72-86 [v2.10.3.13] (create_rcvr OpenChannel call)
     OpenChannel(
         channelId,
         inputBufferSize,        // in_size

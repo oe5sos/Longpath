@@ -78,7 +78,7 @@ SerialEndpointWorker::~SerialEndpointWorker()
     stop();
 }
 
-// From Thetis MeterManager.cs:40630-40660 — SerialPortHandler.Open():
+// From Thetis MeterManager.cs:40630-40660 [v2.10.3.13] — SerialPortHandler.Open():
 // sets port name, baud rate, then opens with default 8N1 / no flow
 // control before subscribing to DataReceived.
 void SerialEndpointWorker::start()

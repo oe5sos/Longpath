@@ -84,7 +84,7 @@ private slots:
 
     // ── 4. C0 address bits (7..1) must be 0x00 for bank 0 ──────────────────
     // Bank 0 has no address bits — C0 bits 7..1 = 0.
-    // Source: networkproto1.c:619 — case 0: no C0 |= address; bits 7..1 are clear.
+    // Source: networkproto1.c:619 [v2.10.3.13] — case 0: no C0 |= address; bits 7..1 are clear.
     // After setMox(true), only bit 0 is set; the address field stays zero.
     void setMoxTrue_addressBitsAreZero() {
         P1RadioConnection conn;
@@ -150,7 +150,7 @@ private slots:
     // The EP2 frame layout places sub-frame 0 C0 at absolute byte 11.
     // This test verifies that composeCcForBankForTest(0, ...) matches the
     // same bit position that sendCommandFrame() writes to frame[11].
-    // Source: networkproto1.c:223-236 MetisWriteFrame — sync at [8..10],
+    // Source: networkproto1.c:223-236 [v2.10.3.13] MetisWriteFrame — sync at [8..10],
     //         C0 at [11].
     // Source: deskhpsdr/src/old_protocol.c:3597 [@120188f] — C0 |= 0x01
     void subframe0_byte11_hasMoxBit() {
@@ -177,7 +177,7 @@ private slots:
     // This test verifies that bank-0 and bank-1 C0 bytes are distinct, and
     // that sub-frame 1's C0 (frame[523]) would carry the MOX OR into the
     // address bits (not 0x01 alone).
-    // Source: networkproto1.c:476-482 — case 1: C0 = 0x02 (TX freq address)
+    // Source: networkproto1.c:476-482 [v2.10.3.13] — case 1: C0 = 0x02 (TX freq address)
     // Source: composeCcBankTxFreq(): out[0] = 0x02
     void subframe1_bank1_c0IsNotBit0Only() {
         P1RadioConnection conn;

@@ -209,7 +209,7 @@ private slots:
 
     void agcAttackDefaultIsTwo() {
         // From WDSP wcpAGC.c create_wcpagc — tau_attack default 2 ms
-        // From Thetis dsp.cs:116-117 — P/Invoke declared, UI disabled/hidden
+        // From Thetis dsp.cs:116-117 [v2.10.3.13] — P/Invoke declared, UI disabled/hidden
         RxChannel ch(kTestChannel, kTestBufSize, kTestRate);
         QCOMPARE(ch.agcAttack(), 2);
     }

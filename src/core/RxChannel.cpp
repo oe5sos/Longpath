@@ -432,7 +432,7 @@ void RxChannel::setFilterFreqs(double lowHz, double highHz)
     m_filterHighInt = static_cast<int>(std::round(highHz));
 
 #ifdef HAVE_WDSP
-    // From Thetis rxa.cs:110-111, radio.cs:603-604 — both bp1 and nbp0
+    // From Thetis rxa.cs:110-111 [v2.10.3.13], radio.cs:603-604 — both bp1 and nbp0
     // filters must be updated together. SetRXABandpassFreqs only touches
     // bp1, which runs only when AMD/SNBA/EMNR/ANF/ANR is enabled.
     // RXANBPSetFreqs touches nbp0, the filter that runs unconditionally

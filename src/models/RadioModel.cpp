@@ -6754,7 +6754,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
 
             // ── Task 17 chunk A — wire PSEnabled fan-out into ReceiverManager ──
             //
-            // From Thetis PSForm.cs:235-269 PSEnabled property setter
+            // From Thetis PSForm.cs:235-269 [v2.10.3.13] PSEnabled property setter
             // [v2.10.3.13]:
             //   if (_psenabled) { console.UpdateDDCs(...); NetworkIO.SetPureSignal(1);
             //                     NetworkIO.SendHighPriority(1); ... }

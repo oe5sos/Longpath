@@ -331,7 +331,7 @@ void ConnectionPanel::buildUI()
     mainLayout->addWidget(m_statusLabel);
 
     // --- Radio table (QTableWidget — simpler than QTreeView for this use case) ---
-    // Source: clsDiscoveredRadioPicker.cs:81 — DataGridView with SelectionMode FullRowSelect
+    // Source: clsDiscoveredRadioPicker.cs:81 [v2.10.3.13] — DataGridView with SelectionMode FullRowSelect
     auto* radioGroup = new QGroupBox(QStringLiteral("Discovered Radios"), this);
     auto* radioLayout = new QVBoxLayout(radioGroup);
 
@@ -353,7 +353,7 @@ void ConnectionPanel::buildUI()
             << QStringLiteral("In-Use");     // Col 7 — ucRadioList.cs:101 RadioIsBusy
     m_radioTable->setHorizontalHeaderLabels(headers);
 
-    // Source: clsDiscoveredRadioPicker.cs:87 — FullRowSelect
+    // Source: clsDiscoveredRadioPicker.cs:87 [v2.10.3.13] — FullRowSelect
     m_radioTable->setSelectionMode(QAbstractItemView::SingleSelection);
     m_radioTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_radioTable->setEditTriggers(QAbstractItemView::NoEditTriggers);

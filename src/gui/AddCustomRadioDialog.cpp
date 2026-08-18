@@ -534,7 +534,7 @@ void AddCustomRadioDialog::populateModelCombo()
 
 void AddCustomRadioDialog::populateProtocolCombo()
 {
-    // From Thetis frmAddCustomRadio.Designer.cs:81-82 — items "Protocol 1" / "Protocol 2"
+    // From Thetis frmAddCustomRadio.Designer.cs:81-82 [v2.10.3.13] — items "Protocol 1" / "Protocol 2"
     // From frmAddCustomRadio.cs:60 — SelectedIndex = 0 (Protocol 1 default)
     // Phase 3Q Task 4: add "Auto-detect" sentinel (-1) for Save-offline guard.
     m_protocolCombo->addItem(QStringLiteral("Auto-detect"),
