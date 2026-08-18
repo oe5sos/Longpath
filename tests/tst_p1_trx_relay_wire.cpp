@@ -91,7 +91,13 @@ private slots:
     // ── 4. Bank 10 C0 address bits must be 0x12 ─────────────────────────────
     // Bank 10's C0 byte carries address 0x12 (bits 7..1).  After setTrxRelay,
     // only bit 7 of C3 changes — C0 (out[0]) must still have address 0x12.
-    // Source: networkproto1.c:578-591 / deskhpsdr old_protocol.c:2895 [@120188f]
+    // ZWEI Quellen, zwei Zeilen, zwei Stempel. Vorher standen sie in
+    // einer Zeile mit EINEM Stempel — und der galt dann fuer beide, was
+    // fuer keine von beiden stimmte: [@120188f] ist ein deskhpsdr-Commit
+    // und in Thetis nicht auffindbar, also blieb die Thetis-Seite
+    // ungeprueft.
+    // Source: networkproto1.c:578-579 [v2.10.3.13] — case 10: C0 |= 0x12
+    // Source: deskhpsdr old_protocol.c:2895 [@120188f]
     //   output_buffer[C0] = 0x12;
     void setTrxRelayTrue_c0AddressIs0x12() {
         P1RadioConnection conn;

@@ -433,8 +433,23 @@ def _git(repo: Path, *argv: str) -> str | None:
     """Run git in `repo`, returning stdout or None on any failure."""
     import subprocess
     try:
+        # errors="replace", NICHT die Vorgabe. Thetis-Quellen sind
+        # teils Windows-1252 (Umlaute in Autorenzeilen, Gradzeichen in
+        # DSP-Kommentaren). Mit der Vorgabe wirft die Dekodierung, der
+        # Fehler landet im except unten, und die Datei gilt als NICHT
+        # GEFUNDEN — obwohl `git show` sie von Hand anstandslos
+        # ausgibt.
+        #
+        # Aufgefallen an DiversityForm.cs: drei Zitate in
+        # DiversityRadarWidget.cpp galten als upstream-not-found,
+        # waehrend die Datei im Baumindex stand und sich im Terminal
+        # oeffnen liess. Ein Dekodierfehler, der als fehlende Datei
+        # gemeldet wird, schickt die Suche in die voellig falsche
+        # Richtung.
         res = subprocess.run(("git", "-C", str(repo)) + argv,
-                             capture_output=True, text=True, timeout=60)
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace",
+                             timeout=60)
     except Exception:
         return None
     return res.stdout if res.returncode == 0 else None
