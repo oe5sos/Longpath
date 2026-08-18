@@ -537,8 +537,9 @@ public:
 
     // Returns the peak S-meter reading (dBm) from the RXA pipeline.
     // Reads WDSP RXA_S_PK via GetRXAMeter (enum value 0).
-    // Used by SMeterWidget RxMode::SMeter and RxMode::SMeterPeak paths
-    // in MeterPoller::pollSMeter() (Task 41, Phase 3P-II).
+    // Geht als eigene Kennung MeterBinding::SignalPeak aus
+    // MeterPoller::poll() heraus; bis 2026-08-18 stattdessen ueber die
+    // RxMode-Auswahl der analogen Anzeige (Task 41, Phase 3P-II).
     // Returns -140.0 sentinel when the engine is not yet initialized.
     //
     // From Thetis Console/dsp.cs:387-388 [@501e3f5] (P/Invoke)

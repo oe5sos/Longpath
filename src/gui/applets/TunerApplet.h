@@ -93,7 +93,7 @@ public:
 
     // Test seam: returns a heap-allocated QMenu* without exec()-ing it.
     // Caller owns the returned menu; delete or deleteLater() as needed.
-    // Same pattern as AmpApplet/SMeterWidget buildContextMenuForTesting().
+    // Same pattern as AmpApplet::buildContextMenuForTesting().
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
 
     // Phase 3P-II Phase 4 Task 89: test seams for context menu tests.

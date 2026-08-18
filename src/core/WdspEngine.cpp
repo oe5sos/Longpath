@@ -1501,7 +1501,9 @@ double WdspEngine::getRxaSignalAverage(int channel) const
 //
 // RXA_S_PK == 0 (first entry in Thetis dsp.cs:889 rxaMeterType enum
 // [@501e3f5]; also matches WdspTypes.h RxMeterType::SignalPeak = 0).
-// Used by SMeterWidget RxMode::SMeter and RxMode::SMeterPeak paths in
+// Geht als eigene Kennung MeterBinding::SignalPeak aus
+// MeterPoller::poll() heraus. Bis 2026-08-18 las die analoge Anzeige
+// den Wert stattdessen ueber ihre RxMode-Auswahl in
 // MeterPoller::pollSMeter() (Task 41, Phase 3P-II).
 double WdspEngine::getRxaSignalPeak(int channel) const
 {

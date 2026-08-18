@@ -1698,7 +1698,7 @@ RadioModel::RadioModel(QObject* parent)
     // Phase 3P-III Task 13: aggregate PGXL state into the cross-vendor signal.
     // onPgxlStatus() already updates m_ampOperate on every statusUpdated frame;
     // we re-emit the same operate decision through the brand-neutral signal so
-    // SMeterWidget (and any future consumer) does not need to know about PGXL.
+    // consumers (TxApplet, TunerApplet) do not need to know about PGXL.
     connect(m_pgxlConnection, &PgxlConnection::statusUpdated,
             this, [this](const QMap<QString, QString>& kvs) {
         if (kvs.contains(QStringLiteral("state"))) {
@@ -2720,7 +2720,7 @@ void RadioModel::setFourO3AEnabled(bool enabled)
 
         // Reset amp-presence cache. m_hasAmplifier is sticky-true after
         // any PGXL statusUpdated (see onPgxlStatus); resetting it here
-        // lets the SMeterWidget / TunerApplet revert their power scales
+        // lets the TxApplet / TunerApplet revert their power scales
         // to barefoot via the amplifierChanged(false) + ampStateChanged
         // emissions below. m_ampOperate also clears so STANDBY/OPERATE
         // consumers see the amp gone.
@@ -14347,8 +14347,8 @@ QString RadioModel::buildConnectionTooltip() const
 //
 //      2026-05-20 bench fix: prior formula was `10^(-rl_db/20)` which
 //      inverts the math -- for swr=-24.5 (well-matched antenna) it
-//      produced ratio = 16.78 instead of 1.13, so the SMeterWidget TX
-//      display showed a wildly wrong high-SWR readout the whole time
+//      produced ratio = 16.78 instead of 1.13, so the TX display
+//      showed a wildly wrong high-SWR readout the whole time
 //      PGXL was actually amplifying into a low-SWR load. User report:
 //      "always high SWR readout on PGXL".
 void RadioModel::onPgxlStatus(const QMap<QString, QString>& kvs)

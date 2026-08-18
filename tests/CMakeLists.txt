@@ -5961,33 +5961,8 @@ nereus_add_test(tst_tuner_model_apply_status)
 #          Console/console.cs:957+51150 [@501e3f5] (Thetis call sites)
 nereus_add_test(tst_wdsp_engine_max_bin)
 
-# Pins SMeterWidget::setPowerScale snap-logic across three brackets:
-# barefoot (<= 100W -> 120/100), Aurora (> 100W -> 600/500), and
-# PGXL amplifier (hasAmplifier=true -> 2000/1500).
-# Ported from AetherSDR src/gui/SMeterWidget.cpp:642-656 [@0cd4559].
-# Phase 3P-II Phase 2, Tasks 34/35/36.
-nereus_add_test(tst_smeter_widget_scale)
 
-# Verifies SMeterWidget peak hold decay rate logic across DecayRate::Fast,
-# Medium, and Slow.  Uses testAdvanceTime() + testPeakLevel() test seams to
-# inject synthetic time without real QTimer ticks.
-# Decay constants from AetherSDR src/gui/SMeterWidget.cpp:675-681 [@0cd4559]:
-#   Fast 20 dB/s -> 1 s of decay from -50 dBm yields -70 +/-1 dBm
-#   Medium 10 dB/s -> -60 +/-1 dBm
-#   Slow 5 dB/s -> -55 +/-1 dBm
-# Phase 3P-II Phase 2, Task 37.
-nereus_add_test(tst_smeter_widget_peak_hold)
 
-# Verifies SMeterWidget right-click context menu structure and AppSettings
-# persistence via the buildContextMenuForTesting() test seam (Task 38 refactor).
-# Tests:
-#   menuHasFourRxModes: RX Mode submenu contains Signal / Sig Avg /
-#     Signal Peak / Max Bin per design doc ss5.4.2.
-#   settingTxModePersistsToAppSettings: setTxMode("SWR") writes
-#     SMeter_TxSelect == 1 to AppSettings (Power=0, SWR=1, Level=2, Compression=3).
-# NereusSDR-native test; AetherSDR has no contextMenuEvent on SMeterWidget.
-# Phase 3P-II Phase 2, Task 39.
-nereus_add_test(tst_smeter_widget_context_menu)
 
 # ── Phase 3P-II Phase 3 (Connection robustness) ──────────────────────────
 # Tasks 55+56: amplifierCreate frame format + flexradioPair accept/reject.
@@ -6193,11 +6168,6 @@ nereus_add_test(tst_rf2ks_applet_layout)
 nereus_add_test(tst_rf2ks_applet_context_menu)
 nereus_add_test(tst_rfkit_page_master_gate)
 
-# Task 13: SMeterWidget subscribes to RadioModel::externalAmpOperateChanged
-# (cross-vendor aggregator) instead of the PGXL-specific statusUpdated signal.
-# Both PGXL and RF-Kit OPERATE states flip the meter to 2 kW scale; all-STANDBY
-# reverts to barefoot.  Test seam: txScaleIs2kWForTesting() reads m_powerScaleMax.
-nereus_add_test(tst_smeter_widget_external_amp)
 
 # Phase 3F Sub-Epic A Tasks 4-6: SliceModel new Q_PROPERTYs
 # Verifies three new Q_PROPERTYs added for multi-panadapter/multi-slice support:

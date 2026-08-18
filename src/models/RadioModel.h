@@ -1196,9 +1196,10 @@ public:
 
     // Cross-vendor "is any external amp currently amplifying?" predicate.
     // True if PGXL is connected + in OPERATE OR if the RF-Kit RF2K-S is in
-    // OPERATE.  Used by MainWindow's SMeterWidget wiring to decide whether
-    // to feed the TX needle from the radio's barefoot meters or from an
-    // external amp's telemetry.  Phase 3P-III bench fix 2026-05-25 KG4VCF:
+    // OPERATE.  Used by MainWindow's power-scale wiring to decide whether
+    // to feed the TX power/SWR display from the radio's barefoot meters or
+    // from an external amp's telemetry.  Phase 3P-III bench fix 2026-05-25
+    // KG4VCF:
     // without this gate, PGXL Connect 2 (radio TX power) was overwriting
     // RF-Kit Connect B (amp forward power) at the radio's higher emit rate.
     bool isAnyExternalAmpInOperate() const;
@@ -2504,7 +2505,7 @@ signals:
 
     // Phase 3P-III Task 13: cross-vendor external-amp aggregator signals.
     // Both PgxlConnection state transitions and Rf2ksConnection::operateModeUpdated
-    // feed externalAmpOperateChanged so SMeterWidget and any other consumer can
+    // feed externalAmpOperateChanged so TxApplet and any other consumer can
     // subscribe once rather than per-brand.
     //
     // externalAmpOperateChanged(bool inOperate):

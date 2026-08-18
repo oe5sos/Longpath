@@ -736,7 +736,6 @@ set(GUI_SOURCES
     src/gui/PsForm.cpp
     src/gui/TitleBar.cpp
     src/gui/RelayBar.cpp
-    src/gui/SMeterWidget.cpp
     src/gui/WaterfallHistoryBuffer.cpp
     src/gui/WaterfallHistoryBuffer.h
     src/gui/widgets/ProfileRail.cpp

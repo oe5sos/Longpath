@@ -170,8 +170,8 @@ private slots:
     // wiring bug. Uses buildContextMenuForTesting() rather than exec()-ing
     // a real popup (which would need a QTimer::singleShot to escape a
     // nested event loop and risks flaking in CI) -- the same approach
-    // SMeterWidget::buildContextMenuForTesting() already uses
-    // (tst_smeter_widget_context_menu.cpp). Final-fix-wave finding 7: this
+    // AmpApplet::buildContextMenuForTesting() already uses.
+    // Final-fix-wave finding 7: this
     // used to be the "stronger than" case sitting below two weaker,
     // shim-based seam tests (emitAddSliceForTest() / emitFloatForTest());
     // since this test alone already proves both "own id carried" and "no

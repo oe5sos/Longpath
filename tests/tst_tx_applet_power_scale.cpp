@@ -109,6 +109,34 @@ private slots:
         QCOMPARE(g->maximum(), hl2Max);
     }
 
+    // ── EINE ZUSICHERUNG OHNE TEST, und das ist hier vermerkt ────────
+    //
+    // „Irgendein Verstaerker in OPERATE heisst 2 kW; alle im Standby
+    // heisst zurueck auf die Geraeteskala." Diese herstelleruebergreifende
+    // Regel lebt in RadioModel::isAnyExternalAmpInOperate() und wird in
+    // MainWindow an setPowerScale weitergereicht.
+    //
+    // Sie ist HIER NICHT GEPRUEFT, und zwar aus zwei Gruenden, die beide
+    // benannt gehoeren:
+    //
+    //   1. m_hasAmplifier und m_ampOperate haben keine Setter — sie
+    //      entstehen aus PgxlConnection-Statusmeldungen. Ein Test kann
+    //      sie nicht stellen, ohne dem Modell Pruefzugaenge zu geben.
+    //   2. MainWindow, wo die Verdrahtung sitzt, laesst sich im
+    //      Pruefstand nicht bauen (ein blosses `MainWindow w;` startet
+    //      echte UDP-Suche im Netz).
+    //
+    // Bis 2026-08-18 stand dafuer tst_smeter_widget_external_amp. Es
+    // haengte an SMeterWidget::connectToRadioModel — und MainWindow.cpp
+    // vermerkte selbst: „the SMeterWidget(RadioModel*, QWidget*)
+    // overload + connectToRadioModel() added in Task 13 are dead code in
+    // production". Der Test pruefte also einen Weg, den die Anwendung
+    // nie ging; die Deckung war scheinbar, nicht wirklich.
+    //
+    // Sie hier nachzubauen waere dasselbe noch einmal. Der ehrliche
+    // Stand ist: ungeprueft, sichtbar vermerkt, und zu schliessen, sobald
+    // es einen Pruefzugang gibt, der den echten Weg geht.
+
     // Ein Bandwechsel ruft rescaleFwdGaugeForModel. Ohne Vorrang der
     // Verstaerkerskala saesse die Anzeige danach wieder auf der
     // Barfussdecke, und 800 W stuenden weit jenseits des Anschlags.

@@ -301,8 +301,7 @@ void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
 // Split out of contextMenuEvent so a test can build the menu, find +
 // trigger() these two actions by their operator-facing text, and assert the
 // resulting signal without exec()-ing a real nested event loop -- mirrors
-// SMeterWidget::buildContextMenu() / buildContextMenuForTesting()
-// (tst_smeter_widget_context_menu.cpp).
+// AmpApplet::buildContextMenu() / buildContextMenuForTesting().
 QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
 {
     auto* menu = new QMenu(qobject_cast<QWidget*>(parent));

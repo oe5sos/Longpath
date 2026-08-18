@@ -138,7 +138,7 @@ public:
     /// Test-only: build and return the right-click context menu without
     /// exec()-ing it, so a test can find + trigger() its actions without a
     /// live nested event loop. Mirrors
-    /// SMeterWidget::buildContextMenuForTesting() (tst_smeter_widget_context_menu.cpp).
+    /// AmpApplet::buildContextMenuForTesting().
     /// NereusSDR-native test seam.
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
 
@@ -193,7 +193,7 @@ private:
     /// pre-existing Extended-view toggle. Returns a heap-allocated QMenu*
     /// parented to `parent`; contextMenuEvent() exec()s it and
     /// deleteLater()s it, buildContextMenuForTesting() hands it to a test
-    /// untouched. Mirrors SMeterWidget::buildContextMenu().
+    /// untouched. Mirrors AmpApplet::buildContextMenu().
     QMenu* buildContextMenu(QObject* parent);
 
     QString                 m_panId;

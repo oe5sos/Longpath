@@ -4784,9 +4784,9 @@ void MainWindow::buildUI()
     // Phase 3F Sub-Epic J Task 4: the container S-meter is attached to no
     // flag, so it must show the active slice, not always slice A. The
     // WDSP-init binding above is only the seed for the first slice --
-    // MeterPoller::pollSMeter() (which drives the analog SMeterWidget
-    // installed as AppletPanelWidget's fixed header, i.e. the widget this
-    // wiring targets) reads m_rxChannel exclusively and that pointer never
+    // MeterPoller::pollSMeter() (bis 2026-08-18 die analoge Anzeige im
+    // festen Kopf der AppletPanelWidget, heute der Sammelanschluss
+    // smeterUpdated) reads m_rxChannel exclusively and that pointer never
     // moved after the seed, so the container meter showed RxChannel 0
     // whatever the operator was working. The per-flag mini S-meters do not
     // have this bug: they already resolve their own channel per slice via
@@ -5024,10 +5024,11 @@ void MainWindow::populateDefaultMeter()
         delete alc;
     }
 
-    // Build an AppletPanelWidget: SMeterWidget header + scrollable applets.
-    // Task 40 (Phase 3P-II): AppletPanelWidget constructor now installs the
-    // analog SMeterWidget as the fixed header automatically.  The old
-    // setHeaderWidget(m_meterWidget, ...) call is removed; the composite
+    // Build an AppletPanelWidget: scrollable applets.
+    // Task 40 (Phase 3P-II) installierte hier die analoge Anzeige als
+    // festen Kopf; sie ist am 2026-08-18 weggefallen, der Kopf mit ihr.
+    // Der noch aeltere setHeaderWidget(m_meterWidget, ...) fiel schon
+    // damals weg; the composite
     // MeterWidget (m_meterWidget) remains the Container #0 content for the
     // traditional GroupBox-based meters and is not affected.
     m_appletPanel = new AppletPanelWidget();
@@ -5106,7 +5107,7 @@ void MainWindow::populateDefaultMeter()
     // Four permanent connects (RadioModel persists across radio connects):
     //
     // 1. ampMetersChanged: when PGXL is OPERATE, forward the amp's
-    //    forward-power/SWR readings to the SMeterWidget TX display.
+    //    forward-power/SWR readings to the TxApplet power display.
     //    RadioModel::ampMetersChanged is fired by PgxlConnection on each
     //    statusUpdated containing "peakfwd" and "swr" keys.
     //
@@ -5119,13 +5120,6 @@ void MainWindow::populateDefaultMeter()
     // 4. ampStateChanged: re-evaluate scale whenever OPERATE/STANDBY toggles.
     //    When returning to STANDBY (amp present but not OPERATE), the scale
     //    reverts to barefoot by passing hasAmplifier()=false to setPowerScale.
-    // ── Ohne die analoge Anzeige (2026-08-18) ────────────────────
-    //
-    // Hier stand `if (SMeterWidget* sm = ...->smeterWidget())` um
-    // den ganzen Block. Die Anzeige ist mit dem festen Kopf
-    // weggefallen; was sie bediente, hat vorher eine Heimat
-    // bekommen — Leistung und SWR samt 2-kW-Skala in der TxApplet,
-    // die Empfangsquellen als Kennungen im Instrument.
     {
         // Connect 1: PGXL amp meters (OPERATE path).
         // Connect 2: radio barefoot/Aurora TX meters (STANDBY or no amp).
@@ -5163,42 +5157,30 @@ void MainWindow::populateDefaultMeter()
         // so pass false (treat as absent) until OPERATE resumes.
         //
         // 2026-05-25 KG4VCF bench fix: use the cross-vendor predicate so
-        // PGXL going STANDBY does not flip the SMeterWidget back to
-        // barefoot scale if RF-Kit is still amplifying (and vice versa).
+        // PGXL going STANDBY does not flip the power scale back to
+        // barefoot if RF-Kit is still amplifying (and vice versa).
         connect(m_radioModel, &RadioModel::ampStateChanged, this,
                 [this]() {
             const bool amplifying = m_radioModel->isAnyExternalAmpInOperate();
             if (m_txApplet) { m_txApplet->setPowerScale(0, amplifying); }
         });
 
-        // Connect 5 (2026-05-20) verband MoxController mit
-        // SMeterWidget::setTransmitting, damit die analoge Nadel beim
-        // Senden auf die Leistungsskala wechselte. Sie faellt mit dem
-        // festen Kopf weg; das Zeigerinstrument braucht den Wechsel
+        // Eine fuenfte Verbindung (2026-05-20) liess die analoge Nadel
+        // beim Senden auf die Leistungsskala wechseln. Sie faellt mit
+        // dem festen Kopf weg; das Zeigerinstrument braucht den Wechsel
         // nicht, weil es die Groesse selbst waehlt statt sie aus dem
         // Sendezustand abzuleiten.
     }
 
-    // Phase 3P-III review fix C1: wire the production SMeterWidget to the
-    // cross-vendor RF-Kit aggregate signals.
+    // Phase 3P-III review fix C1 verband die cross-vendor RF-Kit-Signale
+    // mit der analogen Anzeige, die sie bis dahin als einzige nicht
+    // abonniert hatte: die 2-kW-Umschaltung blieb bei RF-Kit OPERATE
+    // stumm und die Sendenadel stand.
     //
-    // The displayed SMeterWidget is constructed via the QWidget-only ctor in
-    // AppletPanelWidget, so the SMeterWidget(RadioModel*, QWidget*) overload +
-    // connectToRadioModel() added in Task 13 are dead code in production.
-    // externalAmpOperateChanged and externalAmpFwdSwrUpdated fire correctly
-    // from RadioModel but the displayed widget never subscribed, leaving the
-    // 2 kW scale switch silent on RF-Kit OPERATE and the TX needle frozen.
-    //
-    // Wire here, immediately after the analogous PGXL SMeterWidget block,
-    // so all SMeterWidget signal connections live in one place. PGXL paths
-    // (Connect 1..5 above) remain unchanged; these two add RF-Kit on top.
-    // ── Ohne die analoge Anzeige (2026-08-18) ────────────────────
-    //
-    // Hier stand `if (SMeterWidget* sm = ...->smeterWidget())` um
-    // den ganzen Block. Die Anzeige ist mit dem festen Kopf
-    // weggefallen; was sie bediente, hat vorher eine Heimat
-    // bekommen — Leistung und SWR samt 2-kW-Skala in der TxApplet,
-    // die Empfangsquellen als Kennungen im Instrument.
+    // Die Anzeige ist weg; die zwei Verbindungen bleiben und speisen
+    // dieselbe Skala wie die PGXL-Wege (Connect 1..5 oben) in der
+    // TxApplet. Sie stehen weiter hier, damit alle Verstaerkerwege an
+    // einer Stelle liegen.
     {
         // RF-Kit Connect A: snap 2 kW scale on RF-Kit OPERATE.
         // externalAmpOperateChanged is now transition-gated (fix I2) so this
@@ -5553,7 +5535,7 @@ void MainWindow::populateDefaultMeter()
     // PGXL comes into the chain. TunerApplet defaults to 0-200 W
     // (barefoot) which pegs out the moment PGXL pushes its amplified
     // ~450-2000 W through the tuner. Mirror the same amplifierChanged
-    // + ampStateChanged wires we use for the SMeterWidget above.
+    // + ampStateChanged wires we use for the TxApplet above.
     if (m_tunerApplet) {
         // Initial scale: match current PGXL state at construction time.
         const bool amplifyingNow =
@@ -11510,7 +11492,7 @@ void MainWindow::onConnectionStateChanged()
                 // 2026-05-20 bench fix: peakfwd is dBm (not watts) and swr
                 // is signed dB return loss (not an SWR ratio). Convert
                 // here so the AmpApplet gauges read the same numbers
-                // the SMeterWidget already gets via
+                // die TxApplet already gets via
                 // RadioModel::ampMetersChanged.
                 // 2026-05-22 bench fix: only forward the converted
                 // peakfwd / swr when the amp is actually transmitting;

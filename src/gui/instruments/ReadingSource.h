@@ -126,19 +126,41 @@ QList<const ReadingDescriptor*> readingsWithScale();
 
 // ── Die Empfangsskala ────────────────────────────────────────────────
 //
-// Dieselbe Kennlinie steht auch in SMeterWidget.h:317-320 (S0_DBM,
-// S9_DBM, MAX_DBM, DB_PER_S). SMeterWidget wurde NICHT umgestellt —
-// das wäre eine sichtbare Änderung an etwas Bestehendem und gehört dem
-// Betreiber.
+// Die drei Stuetzstellen kommen aus THETIS, nicht aus einer eigenen
+// Rechnung. Thetis MeterManager.cs:22870-22872 [v2.10.3.15-5-g852bf0e]
+// legt die Kalibrierpunkte des S-Meter-Balkens fest:
 //
-// Damit stehen die Zahlen an zwei Stellen, und ein Test kann das nicht
-// heilen: die Konstanten dort sind private. tst_reading_source nagelt
-// DIESE Seite fest (mit den Zeilen aus SMeterWidget.h als Herkunft);
-// wer die andere ändert, muss hierher sehen. Bis SMeterWidget von hier
-// liest, ist das eine Handreichung und keine Sicherung.
-constexpr double kS0Dbm  = -127.0;   ///< SMeterWidget.h:62
-constexpr double kS9Dbm  =  -73.0;   ///< 6 dB je S-Stufe ab S0
-constexpr double kSMaxDbm = -13.0;   ///< S9+60, SMeterWidget.h:319
+//     cb.ScaleCalibration.Add(-133, new PointF(0, 0));      // position for S0 or below
+//                                    // -133 is the edge, as S0 (-127) is the first small tick
+//     cb.ScaleCalibration.Add(-73, new PointF(0.5f, 0));    // position for S9
+//     cb.ScaleCalibration.Add(-13, new PointF(0.99f, 0));   // position for S9+60dB or above
+//
+// Also S0 = -127 dBm, S9 = -73 dBm, S9+60 = -13 dBm; daraus 6 dB je
+// S-Stufe bis S9 und 10 dB darueber.
+//
+// Bis 2026-08-18 stand hier stattdessen ein Verweis auf
+// SMeterWidget.h:62-66 + :318-319 — unsere eigene Zwischenstation, die
+// die Zahlen ihrerseits aus AetherSDR hatte. Mit deren Loeschung waere
+// der Verweis ins Leere gelaufen; die Quelle ist ohnehin diese hier.
+//
+// ── Zwei Abweichungen von Thetis, beide gewollt ──────────────────────
+//
+// 1. Die STELLE von S9 auf der Skala. Thetis setzt sie auf 0,5 der
+//    Balkenlaenge, wir auf 0,66 — aus dem Entwurf des Betreibers
+//    (~/Downloads/zeiger-verfeinert.html, sigFrac). Das ist eine
+//    Gestaltungsentscheidung ueber dieselben dBm-Werte, kein
+//    Portierungsfehler. Wer sie „berichtigt", macht ein anderes
+//    Instrument daraus.
+//
+// 2. Thetis verschiebt die Skala oberhalb einer Grenzfrequenz um 20 dB
+//    (MeterManager.cs:22874, `if (IsAboveS9Frequency(_rx)) cb.Value -= 20;`
+//    mit _s9Frequency = 30.0 MHz aus :358) — auf UKW ist S9 nach IARU
+//    -93 dBm statt -73 dBm. Diese Umschaltung haben WIR NICHT, und die
+//    geloeschte analoge Anzeige hatte sie auch nicht. Bekannte Luecke,
+//    hier vermerkt, damit sie nicht ein drittes Mal gesucht wird.
+constexpr double kS0Dbm   = -127.0;   ///< MeterManager.cs:22870 (Kommentar)
+constexpr double kS9Dbm   =  -73.0;   ///< MeterManager.cs:22871
+constexpr double kSMaxDbm =  -13.0;   ///< MeterManager.cs:22872
 
 /// Wo S9 auf der Skala sitzt. Aus dem Entwurf des Betreibers
 /// (~/Downloads/zeiger-verfeinert.html, sigFrac): 0.66, nicht 2/3.

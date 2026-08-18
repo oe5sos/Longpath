@@ -60,7 +60,7 @@ public:
 
     // Test seam: returns a heap-allocated QMenu* without exec()-ing it.
     // Caller owns the returned menu; delete or deleteLater() as needed.
-    // Same pattern as SMeterWidget::buildContextMenuForTesting() (Task 38,
+    // Same pattern as the other applets' buildContextMenuForTesting() (Task 38,
     // commit 067d2d5b).
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
 

@@ -20,8 +20,9 @@
 //
 // ── Was sie NICHT tut ────────────────────────────────────────────────
 //
-// Sie klingt nicht ab. Die analoge Anzeige (SMeterWidget) hat ein
-// Abklingen in dB je Sekunde, weil ihr Zeiger stetig läuft; hier fällt
+// Sie klingt nicht ab. Die analoge Anzeige, die bis 2026-08-18 im
+// Panelkopf stand, hatte ein Abklingen in dB je Sekunde, weil ihr
+// Zeiger stetig lief; hier fällt
 // die Spitze auf den Messwert zurück, sobald die Haltezeit um ist.
 // Ein Abklingen hier wäre eine Erfindung — es steht in keinem Entwurf
 // des Betreibers, und die beiden Verhalten nebeneinander wären

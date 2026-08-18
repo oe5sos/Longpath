@@ -1,3 +1,9 @@
+// no-port-check: nennt MeterManager.cs nur als HERKUNFT der drei
+// dBm-Stuetzstellen der S-Skala (S0/S9/S9+60). Der Port dieser Zahlen
+// lebt in gui/instruments/ReadingSource.h und ist dort mit Zeile und
+// Version zitiert; hier steht kein uebernommener Code, sondern die
+// Pruefung, dass die Zahlen mit der Quelle uebereinstimmen.
+
 // =================================================================
 // tests/tst_reading_source.cpp  (NereusSDR)
 // =================================================================
@@ -71,9 +77,11 @@ private slots:
                                 .arg(signalFraction(kSMaxDbm), 0, 'f', 6)));
     }
 
-    // Herkunft der dBm-Zahlen: SMeterWidget.h:62-63 und :317-320.
-    // Dort sind sie private, also kann dieser Test sie nicht dagegen
-    // halten — er nagelt diese Seite fest. Siehe ReadingSource.h.
+    // Herkunft der dBm-Zahlen: Thetis MeterManager.cs:22870-22872
+    // [v2.10.3.15-5-g852bf0e], die Kalibrierpunkte des S-Meter-Balkens.
+    // Bis 2026-08-18 nannte dieser Kommentar SMeterWidget.h — unsere
+    // eigene Zwischenstation, die die Zahlen ihrerseits aus AetherSDR
+    // hatte und am selben Tag geloescht wurde.
     void dbmAnchorsMatchTheSMeterScale()
     {
         QCOMPARE(kS0Dbm,   -127.0);

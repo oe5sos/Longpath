@@ -416,8 +416,9 @@ void MeterPoller::poll()
 // frueh zurueck, und die Pegelbalken je Scheibe haengen daran nicht.
 // Scheiben ab B hatten vorher gar kein S-Meter.
 //
-// SignalAvg only: the analog SMeter's peak / MaxBin modes are a property of
-// that one widget, while every flag bar wants the same averaged reading.
+// SignalAvg only: peak / MaxBin waren eine Eigenschaft der einen analogen
+// Anzeige (bis 2026-08-18); jeder Pegelbalken an der Flagge will denselben
+// gemittelten Wert.
 void MeterPoller::pollSliceSMeters()
 {
     if (!m_wdspEngine || m_sliceChannels.isEmpty()) { return; }
