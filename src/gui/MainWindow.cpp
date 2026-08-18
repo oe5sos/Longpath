@@ -4074,13 +4074,8 @@ void MainWindow::buildUI()
     });
 
     // Phase 3F Sub-Epic C Task 10: TxSliceArbiter state → UI updates.
-    // When the TX-bound slice flips (via VfoWidget badge click in T9, or
-    // any future programmatic path), update the matching VfoWidget badge
-    // and post a 2-second "TX > Slice X" status toast.
-    //
-    // Sub-Epic D expands this single-VfoWidget update to iterate the full
-    // per-pan flag collection (one VfoWidget per slice on multi-pan
-    // layouts).
+    // Wechselt die sendende Scheibe, wird die Anzeige nachgefuehrt und ein
+    // Hinweis „TX > Slice X" fuer zwei Sekunden gezeigt.
     //
     // Bis 2026-08-18 fuehrte diese Schleife das TX-Abzeichen jeder
     // VFO-Flagge nach. Die Flaggen sind geloescht; welche Scheibe
@@ -8755,62 +8750,18 @@ void MainWindow::wireSliceToSpectrum()
 
 
 
-    // --- SliceModel → VfoWidget: RIT/XIT inbound (S1.8a stubs) ---
-
-
-
-
-    // --- SliceModel → VfoWidget: DSP tab inbound (S1.8b) ---
-
-    // Sub-epic C-1: NR bank sync — VfoWidget::setSlice also connects activeNrChanged
-    // via onActiveNrChanged for the full 7-button bank; this redundant connection is
-    // removed to avoid double-firing. setSlice handles both initial sync and updates.
-    // (Legacy setNr2Enabled call removed here — onActiveNrChanged covers NR2.)
-
-
-
-
-    // --- VFO flag → slice ---
-
-
-
-
-    // Shift+click on a filter preset on the flag — snap TX passband to
-    // match the RX preset's audio Hz range (Thetis-style alignment shortcut).
-
-
-
-
-
-
-    // NB cycling — nbModeCycled fires on user click; cycle the mode through
-    // Off → NB → NB2 → Off via SliceModel. SliceModel's nbModeChanged feeds
-    // back to setNbMode() (wired in the inbound block above).
-    // From Thetis console.cs:43513 [v2.10.3.13].
-
-    // NR/ANF → RxChannel directly (not SliceModel properties)
-
-    // --- VfoWidget → SliceModel: DSP tab outbound (S1.8b) ---
-
-    // --- SliceModel → VfoWidget: Audio tab inbound (S1.8c stubs) ---
-
-    // --- VfoWidget → SliceModel: Audio tab outbound (S1.8c stubs) ---
-
-    // --- VfoWidget → MainWindow: open Setup dialog to AGC/ALC page ---
-
-    // --- VfoWidget → Setup → DSP → NB/SNB page (right-click on NB or SNB).
-    // Mirrors Thetis chkNB_MouseDown / chkDSPNB2_MouseDown (console.cs:44447
-    // [v2.10.3.13]) which call ShowSetupTab(NB_Tab).
-
-    // --- VfoWidget → Setup → DSP → NR/ANF page (Task 18, Sub-epic C-1).
-    // Emitted from DspParamPopup "More Settings…" on any NR bank button.
-    // Mirrors Thetis chkNR_MouseDown (console.cs [v2.10.3.13]) which calls
-    // ShowSetupTab(NR_Tab). Sub-tab selection per NrSlot is deferred to Task 17.
-
-    // --- VfoWidget AUTO button → SliceModel auto-AGC toggle ---
-
-    // --- SliceModel auto-AGC state → update visuals on both widgets ---
-
+    // ── Hier standen zwoelf Abschnittskoepfe der VFO-Flagge ──────────────
+    //
+    // `SliceModel -> VfoWidget: RIT/XIT inbound`, `... DSP tab inbound`,
+    // `VfoWidget -> Setup -> DSP -> NR/ANF page` und neun weitere. Die
+    // Verbindungen darunter gingen mit der Flagge (75cc2c35), die Koepfe
+    // blieben stehen — Wegweiser auf Wege, die es nicht mehr gibt.
+    //
+    // Ein Grabstein statt zwoelf: die Routen fuehren jetzt ueber die
+    // RxApplet, die ihre Scheibe selbst bindet (RxApplet::connectSlice)
+    // und dafuer keine Verdrahtung in MainWindow braucht. Wer die alten
+    // Kanten sehen will:
+    //   git show 75cc2c35^:src/gui/MainWindow.cpp
     // --- Noise floor fast-attack triggers (slice is guaranteed non-null here) ---
     {
         auto* nfTracker = m_radioModel->noiseFloorTracker();
@@ -8828,24 +8779,12 @@ void MainWindow::wireSliceToSpectrum()
         }
     }
 
-    // --- VfoWidget → SliceModel: RIT/XIT outbound (S1.8a stubs) ---
-
-
-
-
-    // --- VfoWidget → SliceModel: STEP cycle (S1.8a — wires to live setStepHz) ---
-
-    // --- VfoWidget → SliceModel: lock state (S1.8a — verifying edge exists) ---
-
-    // --- SliceModel → VfoWidget: lock state inbound (S1.8a review — I3) ---
-    // Without this edge, programmatic changes to SliceModel::locked (e.g. from
-    // a future CAT/TCI command) would not be reflected in either lock button.
-
-    // Phase 3F (Bug 2): wire Slice A's floating ✕ close button to removeSlice.
-    // Slice A's close button is hidden by VfoWidget (last-slice invariant), so
-    // this can only fire if a future change un-hides it; removeSlice refuses
-    // to remove the final slice regardless, so this is safe and consistent
-    // with the secondary-flag wiring in createSliceFlag().
+    // Hier stand die Verdrahtung des schwebenden ✕ von Scheibe A auf
+    // removeSlice (Phase 3F, Fehler 2). Sie ist mit der Flagge gegangen
+    // (75cc2c35), und zwar ersatzlos MIT ABSICHT: das ✕ war ein Knopf AUF
+    // der Flagge. Es gibt keine schwebende Flagge mehr, also auch kein ✕
+    // zu verdrahten — keine Luecke, sondern ein entfallener Knopf.
+    // Scheiben schliesst man jetzt ueber die RxApplet.
 
 
     // The four spectrum controls that act on a slice (click-to-tune, filter-
@@ -11641,7 +11580,7 @@ void MainWindow::showFeatureRequestDialogImpl()
         "3. ## Why — what problem it solves\n"
         "4. ## How Other Clients Do It — how Thetis, PowerSDR, SparkSDR, etc. handle this\n"
         "5. ## Suggested Behavior — specific UX: what the user clicks, sees, what happens.\n"
-        "   Reference NereusSDR UI elements (AppletPanel, VfoWidget, RxApplet, SetupDialog, etc.)\n"
+        "   Reference NereusSDR UI elements (AppletPanel, RxApplet, TxApplet, SetupDialog, etc.)\n"
         "6. ## Protocol Hints — relevant OpenHPSDR commands, or \"Unknown — needs research\"\n"
         "7. ## Acceptance Criteria — 3-5 bullet points defining done vs not-done\n\n"
         "FOR BUG REPORTS include:\n"
