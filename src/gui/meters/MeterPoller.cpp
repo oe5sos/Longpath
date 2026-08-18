@@ -70,8 +70,6 @@ mw0lge@grange-lane.co.uk
 #include "core/LogCategories.h"
 #include "core/mmio/ExternalVariableEngine.h"
 #include "core/mmio/MmioEndpoint.h"
-// Task 41 (Phase 3P-II): SMeterWidget + WdspEngine for the pollSMeter() path.
-#include "gui/SMeterWidget.h"
 // Pruefmodus: die Groessen mit belegter Skala kommen aus derselben
 // Tabelle, aus der sich auch die Instrumente bedienen.
 #include "gui/instruments/ReadingSource.h"
@@ -161,14 +159,6 @@ void MeterPoller::setTxChannel(TxChannel* channel)
     m_txChannel = channel;
     qCDebug(lcMeter) << "MeterPoller: TxChannel set, channelId:"
                       << (channel ? channel->channelId() : -1);
-}
-
-// Task 41 (Phase 3P-II): store non-owning pointer to the analog SMeterWidget.
-// Call with nullptr on panel destruction (QPointer auto-clears on widget delete).
-void MeterPoller::setSMeter(SMeterWidget* widget)
-{
-    m_sMeter = widget;
-    qCDebug(lcMeter) << "MeterPoller: SMeterWidget set:" << (widget ? "yes" : "nullptr");
 }
 
 // Task 41 (Phase 3P-II): store non-owning pointer to WdspEngine for getMaxBinDbm.
@@ -410,38 +400,21 @@ void MeterPoller::poll()
                  maxBinRaw > -400.0 ? maxBinRaw + rxOffsetDb : maxBinRaw);
     }
 
-    // Task 41 (Phase 3P-II): drive the analog SMeterWidget header.
-    // pollSMeter() also emits smeterUpdated with the SAME dBm value it
-    // pushes to the analog needle, so the VFO flag mini-bar and the
-    // analog SMeter always agree on source (both follow the analog
-    // widget's rxMode() selection).  Previously poll() emitted
-    // smeterUpdated with the SignalAvg value (line removed here)
-    // while pollSMeter set the analog widget from SignalPeak when in
-    // SMeter mode -- a 3-15 dB divergence depending on signal/noise.
+    // pollSMeter() sendet nur noch smeterUpdated mit dem gemittelten
+    // Wert. Der Zweig auf SMeterWidget::rxMode(), der bis 2026-08-18
+    // hier eine zweite Quellenauswahl fuehrte, ist mit der analogen
+    // Anzeige weggefallen; alle drei Empfangsgroessen gehen oben als
+    // eigene Kennung heraus.
     Q_UNUSED(smeterDbm);
     pollSMeter();
     pollSliceSMeters();
 }
 
-// Drive the analog SMeterWidget with the WDSP source selected by its current
-// rxMode().
-//
-// Branches on SMeterWidget::rxMode() (Task 41, Phase 3P-II).
-//
-// Source mapping (Thetis Console/dsp.cs:952-957 [@501e3f5] inside
-// CalculateRXMeter; neighbouring ADC_REAL case at dsp.cs:959 carries a
-// //MW0LGE [2.9.0.7] inline tag that we preserve per GPL attribution):
-//   case MeterType.SIGNAL_STRENGTH:     RXA_S_PK  (peak S-unit reading)
-//   case MeterType.AVG_SIGNAL_STRENGTH: RXA_S_AV  (averaged S-unit reading)
-// MaxBin uses GetDetectMaxBin (wdsp/analyzer.c:830 [@501e3f5]) -- no direct
-// Thetis dsp.cs call site; the detector is always display-channel 0 in
-// single-panadapter builds.
 // Per-slice S-meter, one emit per slice per tick.
 //
-// Deliberately NOT part of pollSMeter(): that returns early without an analog
-// SMeterWidget or without m_rxChannel, and the flag level bars depend on
-// neither. Slices B+ had no S-meter at all before this -- the poller owns a
-// single m_rxChannel and emitted one unqualified smeterUpdated.
+// Deliberately NOT part of pollSMeter(): das kehrt ohne m_rxChannel
+// frueh zurueck, und die Pegelbalken je Scheibe haengen daran nicht.
+// Scheiben ab B hatten vorher gar kein S-Meter.
 //
 // SignalAvg only: the analog SMeter's peak / MaxBin modes are a property of
 // that one widget, while every flag bar wants the same averaged reading.
@@ -459,79 +432,26 @@ void MeterPoller::pollSliceSMeters()
 
 void MeterPoller::pollSMeter()
 {
-    SMeterWidget* sm = m_sMeter.data();
-    if (!sm) { return; }
+    // ── Die analoge Anzeige ist weg (2026-08-18) ─────────────────────
+    //
+    // Hier stand ein Zweig auf SMeterWidget::rxMode(), der je nach
+    // Auswahl RXA_S_PK, RXA_S_AV oder GetDetectMaxBin las und den Wert
+    // an die eine analoge Nadel gab. Das war der ZWEITE Weg, eine
+    // Empfangsquelle zu waehlen — der erste ist die Kennung, und die
+    // gilt fuer jedes Messwerkzeug. Zwei Wege zu einer Entscheidung
+    // waren bereits auseinandergelaufen: Max Bin stand nur im zweiten.
+    //
+    // Alle drei Groessen werden jetzt in poll() als eigene Kennung
+    // ausgesendet; wer sie sehen will, waehlt sie im Rechtsklick seines
+    // Instruments.
+    //
+    // Was BLEIBT ist smeterUpdated mit dem gemittelten Wert. Es ist der
+    // unqualifizierte Sammelanschluss fuer alles, was „irgendein
+    // S-Meter-Wert" braucht, und haengt an keiner Anzeige.
     if (!m_rxChannel) { return; }
-
-    const int ch = m_rxChannel->channelId();
-
-    // Thetis-faithful RX meter cal offset (Thetis-faithful port).
-    // Applied to ALL three RxMode branches (SIGNAL_STRENGTH,
-    // AVG_SIGNAL_STRENGTH, SIGNAL_MAX_BIN) to match Thetis console.cs:
-    //   :46824 (SIGNAL_STRENGTH)      ... + offset
-    //   :46828 (AVG_SIGNAL_STRENGTH)  ... + offset
-    //   :46881 (SIGNAL_MAX_BIN)       ... + offset
-    // RXOffset = RXPreampOffset + RXCalibrationOffset (console.cs:21040).
-    const float rxOffsetDb = m_rxOffsetSource
-        ? static_cast<float>(m_rxOffsetSource())
-        : 0.0f;
-
-    float dbm = -127.0f;
-    switch (sm->rxMode()) {
-    case SMeterWidget::RxMode::SMeter:
-    case SMeterWidget::RxMode::SMeterPeak:
-        // From Thetis Console/dsp.cs:954 [@501e3f5] (CalculateRXMeter):
-        //   case MeterType.SIGNAL_STRENGTH: val = GetRXAMeter(channel, RXA_S_PK);
-        // The adjacent ADC_REAL case at dsp.cs:959 carries //MW0LGE [2.9.0.7]
-        // attribution that we preserve verbatim per GPL inline-tag rule.
-        // Display-side offset add per console.cs:46824 [v2.10.3.13]:
-        //   _RX1MeterValues[Reading.SIGNAL_STRENGTH] = ... + offset;
-        if (m_wdspEngine) {
-            dbm = static_cast<float>(m_wdspEngine->getRxaSignalPeak(ch)) + rxOffsetDb;
-        } else {
-            // Fallback via RxChannel wrapper (RXA_S_PK = RxMeterType::SignalPeak = 0).
-            dbm = static_cast<float>(m_rxChannel->getMeter(RxMeterType::SignalPeak)) + rxOffsetDb;
-        }
-        break;
-    case SMeterWidget::RxMode::SignalAverage:
-        // From Thetis Console/dsp.cs:957 [@501e3f5] (CalculateRXMeter):
-        //   case MeterType.AVG_SIGNAL_STRENGTH: val = GetRXAMeter(channel, RXA_S_AV);
-        // The adjacent ADC_REAL case at dsp.cs:959 carries //MW0LGE [2.9.0.7]
-        // attribution that we preserve verbatim per GPL inline-tag rule.
-        // Display-side offset add per console.cs:46828 [v2.10.3.13]:
-        //   _RX1MeterValues[Reading.AVG_SIGNAL_STRENGTH] = ... + offset;
-        dbm = static_cast<float>(m_rxChannel->getMeter(RxMeterType::SignalAvg)) + rxOffsetDb;
-        break;
-    case SMeterWidget::RxMode::MaxBin:
-        // GetDetectMaxBin(disp=0) -- single-pan display channel 0.
-        // From Thetis Console/dsp.cs:849-850 [@501e3f5] (P/Invoke GetDetectMaxBin).
-        // Display-side offset add per console.cs:46881 [v2.10.3.13]:
-        //   if (max_bin > -400f)
-        //       _RX1MeterValues[Reading.SIGNAL_MAX_BIN] = max_bin + offset;
-        // NereusSDR sources MaxBin from FFTEngine via WdspEngine::getMaxBinDbm
-        // (single-panadapter assumption; see WdspEngine.cpp:1327).  Same
-        // logical reading as Thetis GetDetectMaxBin so the same +offset
-        // applies (gates on the -400 sentinel matching Thetis).
-        if (m_wdspEngine) {
-            const float maxBinRaw = static_cast<float>(m_wdspEngine->getMaxBinDbm(/*disp=*/0));
-            if (maxBinRaw > -400.0f) {
-                dbm = maxBinRaw + rxOffsetDb;
-            } else {
-                dbm = maxBinRaw;  // pass through sentinel unchanged
-            }
-        }
-        break;
-    }
-    sm->setLevel(dbm);
-
-    // Emit the SAME dBm value to the VFO flag mini-bar so it always
-    // tracks the analog meter's current source (peak / avg / MaxBin).
-    // Without this, the flag bar was hard-wired to SignalAvg in poll()
-    // and could disagree with the analog SMeter by 3-15 dB.  Done last
-    // so the analog widget sees the value first (matches the order
-    // VfoWidget::setSmeter listeners expect for cross-meter alignment).
-    emit smeterUpdated(static_cast<double>(dbm));
-
+    const double rxOffsetDb = m_rxOffsetSource ? m_rxOffsetSource() : 0.0;
+    emit smeterUpdated(m_rxChannel->getMeter(RxMeterType::SignalAvg)
+                       + rxOffsetDb);
 }
 
 // Poll the four WDSP TX meters active in 3M-1a and push to meter widget targets.

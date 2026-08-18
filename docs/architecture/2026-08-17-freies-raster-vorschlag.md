@@ -33,7 +33,7 @@
 | Schritt | Stand |
 | --- | --- |
 | 1 · Behälter, einspaltig | **fertig, 2026-08-18** — `GridCell`, `GridCellWidget`, `AppletGrid`; `AppletPanelWidget` benutzt sie. Sichtbar unverändert. |
-| 2 · Spalten nach Breite | offen — erst nach dem Flaggen-Umzug |
+| 2 · Spalten nach Breite + freies Setzen | offen — erst nach dem Flaggen-Umzug. Bringt die zweite der beiden Bewegungen, siehe §6a. |
 | 3 · Spannweiten + Profil | offen |
 | 4 · `Density` | offen |
 | 5 · übrige Applets | offen |
@@ -274,6 +274,39 @@ jetzt dieselbe Aussage über die öffentliche Antwort
 (`appletPosition()`, `contentsMargins()` am Widget). Ein Test, der beim
 Umbau rot wird, ohne dass sich am Bild etwas ändert, misst die falsche
 Sache.
+
+## 6a · Zwei Bewegungen, die nicht dasselbe sind
+
+**Beobachtung des Betreibers, 2026-08-18:** ein abgelöstes Feld landet
+auf dem Schreibtisch, nicht auf der Nereus-Fläche. Das ist richtig so —
+und es ist der Anlass, den Unterschied hier festzuhalten, bevor ihn
+jemand für einen Fehler hält.
+
+| | **Ablösen** | **Freies Setzen** |
+| --- | --- | --- |
+| Wohin | eigenes Fenster des Fensterverwalters | innerhalb der Nereus-Fläche |
+| Wofür | zweiter Bildschirm, danebenlegen | Anordnung im Hauptfenster |
+| Träger | `AppletFloatingWindow` (`Qt::Window`) | `AppletGrid` / `GridCellWidget` |
+| Geometrie | Bildschirmkennung + Rechteck, Profilfeld `floatingApplets` | Zelle + Spannweite, Profilfeld `cells` (Schritt 3) |
+| Geste | **nur** über den Menüpunkt | Ziehen am Griff |
+| Stand | gebaut | Schritt 2 |
+
+Warum das Ablösen ausdrücklich **nicht** per Zug geht, steht in §2e: das
+Umhängen über eine Top-Level-Grenze ist die AetherSDR-Absturzfamilie
+(#2495, #4319, #4617). Ein Zug **innerhalb** des Rasters wechselt kein
+Fenster und ist unbedenklich — er ist genau die Bewegung, die Schritt 2
+bringt.
+
+Sie zu verwechseln hätte zwei Folgen, die beide unangenehm sind: wer
+„frei setzen" meint und „ablösen" bekommt, verliert sein Feld auf einem
+Bildschirm, den er vielleicht gar nicht sieht; wer „ablösen" meint und
+„frei setzen" bekommt, findet sein Feld nicht auf dem zweiten Monitor.
+
+**Der Auswähler soll später beides anbieten**, benannt und getrennt —
+etwa „Als Fenster ablösen" gegen „Auf der Fläche frei setzen". Heute
+kennt er nur die erste Bewegung, weil es die zweite noch nicht gibt.
+
+---
 
 ## 7 · Was Schritt 2 noch braucht
 

@@ -32,7 +32,6 @@
 // header.  The right-click context menu (Tasks 38/39) is the only entry
 // point for RX/TX mode selection and peak-hold settings; the inline settings
 // strip that AetherSDR renders inside the AppletPanel is intentionally absent.
-#include "gui/SMeterWidget.h"
 
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -65,20 +64,16 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     // S-Meter title bar (right end, after the title label). This avoids
     // a dedicated banner row that would compete for clicks with the
     // master-volume strip above the panel.
-    m_bannerMenuButton = new QPushButton(QStringLiteral("☰"), this);
-    m_bannerMenuButton->setObjectName(QStringLiteral("appletPanelBannerButton"));
-    m_bannerMenuButton->setFixedSize(22, 18);
-    // User-visible tooltip — plain English, no source cites.
-    m_bannerMenuButton->setToolTip(QStringLiteral("Show or hide applets"));
-    m_bannerMenuButton->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        "  background: transparent; color: %1;"
-        "  border: none; font-size: 12px;"
-        "}"
-        "QPushButton:hover { color: %2; }"
-        "QPushButton::menu-indicator { image: none; width: 0; }"
-    ).arg(Style::kTitleText, Style::kAccent));
-    m_bannerMenuButton->hide();   // hidden until setBannerMenu called
+    // ── Das ☰ ist am 2026-08-18 weggefallen ──────────────────────
+    //
+    // Es sass in der Titelleiste des festen S-Meter-Kopfes und oeffnete
+    // die Applet-Liste. Mit dem Kopf faellt es mit — und das ist kein
+    // Verlust: das + in der Kopfleiste und Ansicht > Container >
+    // Applets machen dieselbe Arbeit, und der Auswaehler hinter dem +
+    // kann mehr (Kategorien, Suche, Schlagwoerter).
+    //
+    // Vom Betreiber am 2026-08-18 bestaetigt: „Das ≡ fällt weg, ja.
+    // Deine Begründung trägt."
 
     // Fixed header area (above scroll) — for MeterWidget / S-Meter
     m_headerLayout = new QVBoxLayout;
@@ -118,22 +113,29 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     m_scrollArea->setWidget(m_grid);
     m_rootLayout->addWidget(m_scrollArea);
 
-    // Task 40 (Phase 3P-II): install the analog SMeterWidget as the fixed header.
-    // The composite ItemGroup-based S-Meter previously set here via the
-    // m_meterWidget path in MainWindow::buildUI() is no longer used for the
-    // header; the underlying MeterWidget (Container #0) stays alive for
-    // Container #1 and other targets -- this call only replaces the fixed top
-    // header of the applet panel.
+    // ── Kein fester Kopf mehr (2026-08-18) ───────────────────────
     //
-    // Right-click context menu (Tasks 38/39) is the only entry point for
-    // mode selection and peak-hold settings per design doc ss5.4.2.
-    // The inline settings strip (TX/RX combos + peak-hold checkbox + decay
-    // combo + reset button) that AetherSDR renders in AppletPanel is not
-    // present in NereusSDR.
-    m_sMeter = new SMeterWidget(this);
-    // aspectRatio 2.0f: width/height = 2.0 gives the needle arc comfortable
-    // vertical room (same ratio as AetherSDR's 280:140 default).
-    setHeaderWidget(m_sMeter, QStringLiteral("S-Meter"), 2.0f);
+    // Hier stand die analoge SMeterWidget-Anzeige als feste Kopfzeile
+    // ueber der Spalte. Sie war das zweite S-Meter — das erste ist das
+    // Zeigerinstrument, das als Applet in der Spalte steht.
+    //
+    // Entdoppelt auf Weisung des Betreibers, 2026-08-18: „fester Kopf
+    // weg, Zeiger-Instrument bleibt, RX-Quellen und Spitzenhaltung ins
+    // Rechtsklickmenü."
+    //
+    // Alles, was der Kopf konnte, hat vorher eine Heimat bekommen:
+    //   vier RX-Quellen      Kennungen in ReadingSource, waehlbar im
+    //                        Rechtsklick jedes Instruments
+    //   Spitzenhaltung       ebendort (an/aus, Haltezeit, Zuruecksetzen)
+    //   Leistung und SWR     TxApplet, samt 2-kW-Skala bei PGXL/RF-Kit
+    //   Rauschflur, RADE-SNR eigene Kennungen, ebenfalls waehlbar
+    //   Pegel, Kompression   waren tot — setMicMeters hatte im ganzen
+    //                        Baum keinen Aufrufer
+    //
+    // Die Kopfzeilen-Mechanik (setHeaderWidget/clearHeaderWidget) bleibt
+    // stehen: sie ist allgemein und kostet nichts, solange sie niemand
+    // ruft. Der Panadapter soll im Zielbild selbst ein Feld werden, und
+    // dann ist sie womoeglich wieder die richtige Stelle.
 }
 
 void AppletPanelWidget::setHeaderWidget(QWidget* widget, const QString& title,
@@ -151,7 +153,7 @@ void AppletPanelWidget::setHeaderWidget(QWidget* widget, const QString& title,
     // Pass the ☰ menu button as the trailing widget so it lives in the
     // S-Meter title bar (right end). See AppletPanelWidget.h comment for
     // why we don't use a dedicated banner row.
-    QWidget* wrapped = wrapWithTitleBar(widget, title, m_bannerMenuButton);
+    QWidget* wrapped = wrapWithTitleBar(widget, title);
     wrapped->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_headerWrapper = wrapped;
     m_headerLayout->addWidget(wrapped);
@@ -247,13 +249,6 @@ void AppletPanelWidget::setAppletVisible(AppletWidget* applet, bool visible)
     QWidget* wrapper = m_wrappers.value(applet, nullptr);
     if (!wrapper) { return; }  // applet not in this panel
     wrapper->setVisible(visible);
-}
-
-void AppletPanelWidget::setBannerMenu(QMenu* menu)
-{
-    if (!m_bannerMenuButton) { return; }
-    m_bannerMenuButton->setMenu(menu);
-    m_bannerMenuButton->setVisible(menu != nullptr);
 }
 
 void AppletPanelWidget::addWidget(QWidget* widget, const QString& title)

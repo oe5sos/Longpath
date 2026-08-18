@@ -1308,8 +1308,6 @@ private:
     /// mitgehen.
     QHash<QString, class AppletFloatingWindow*> m_floatingApplets;
     QHash<QString, QAction*> m_topMenuAppletActions;
-    QMenu* m_bannerAppletsMenu{nullptr};
-    QHash<QString, QAction*> m_bannerAppletActions;
 
     // Phase 3O Sub-Phase 10 Task 10c: host strip for the menu bar +
     // MasterOutputWidget. Owned by QMainWindow via setMenuWidget().

@@ -1,5 +1,13 @@
 // Verify A1: AppletPanelWidget reserves an 8 px scrollbar gutter on the right.
 // Per docs/architecture/ui-audit-polish-plan.md §A1.
+//
+// 2026-08-18: zwei Faelle zum ☰-Knopf standen hier
+// (bannerButtonHiddenUntilMenuSet, bannerButtonShownAndOpensMenuOnceSet).
+// Sie sind GELOESCHT, nicht angepasst: der Knopf sass in der Titelleiste
+// des festen S-Meter-Kopfes, und beide sind mit ihm weggefallen. Ein
+// Test, der ein abgeschafftes Bedienelement prueft, hat seinen Sinn
+// verloren — ihn auf „ist nicht da" umzuschreiben pruefte die Abwesenheit
+// von etwas, das niemand vermisst.
 
 #include <QApplication>
 #include <QtTest/QtTest>
@@ -15,8 +23,6 @@ class TstAppletPanelGutter : public QObject {
     Q_OBJECT
 private slots:
     void stackLayoutReservesEightPxRightMargin();
-    void bannerButtonHiddenUntilMenuSet();
-    void bannerButtonShownAndOpensMenuOnceSet();
 };
 
 void TstAppletPanelGutter::stackLayoutReservesEightPxRightMargin()
@@ -43,29 +49,7 @@ void TstAppletPanelGutter::stackLayoutReservesEightPxRightMargin()
     QCOMPARE(m.bottom(), 0);
 }
 
-void TstAppletPanelGutter::bannerButtonHiddenUntilMenuSet()
-{
-    AppletPanelWidget panel;
-    auto* btn = panel.findChild<QPushButton*>(
-        QStringLiteral("appletPanelBannerButton"));
-    QVERIFY(btn != nullptr);
-    QVERIFY(!btn->isVisible());
-}
 
-void TstAppletPanelGutter::bannerButtonShownAndOpensMenuOnceSet()
-{
-    AppletPanelWidget panel;
-    panel.show();
-    auto* menu = new QMenu(&panel);
-    menu->addAction(QStringLiteral("dummy"));
-    panel.setBannerMenu(menu);
-
-    auto* btn = panel.findChild<QPushButton*>(
-        QStringLiteral("appletPanelBannerButton"));
-    QVERIFY(btn != nullptr);
-    QVERIFY(btn->isVisible());
-    QCOMPARE(btn->menu(), menu);
-}
 
 QTEST_MAIN(TstAppletPanelGutter)
 #include "tst_applet_panel_gutter.moc"

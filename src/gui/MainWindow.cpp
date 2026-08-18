@@ -316,7 +316,6 @@ warren@wpratt.com
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
 #include "gui/WindowPlacement.h"
-#include "SMeterWidget.h"            // Task 41 (Phase 3P-II): SMeterWidget header wiring
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
 #include "applets/AppletVisibilityController.h"
@@ -4301,11 +4300,7 @@ void MainWindow::buildUI()
     // der Hoehe springen.
     connect(m_clarityController, &ClarityController::noiseFloorChanged,
             this, [this](float nfDbm) {
-        if (SMeterWidget* sm = m_appletPanel ? m_appletPanel->smeterWidget()
-                                             : nullptr) {
-            sm->setNoiseFloorDbm(nfDbm);
-        }
-        // ── Zweitens als MESSGROESSE, nicht nur als Beschriftung ─────
+        // ── Als MESSGROESSE (2026-08-18) ─────────────────────────────
         //
         // OE5SOS, 2026-08-18: „die Rauschflur-Beschriftung gehört zum
         // Empfang, also ins Instrument als Quelle."
@@ -4326,10 +4321,6 @@ void MainWindow::buildUI()
     if (m_radioModel) {
         connect(m_radioModel, &RadioModel::radeSnrChanged,
                 this, [this](int, float snrDb) {
-            if (SMeterWidget* sm = m_appletPanel ? m_appletPanel->smeterWidget()
-                                                 : nullptr) {
-                sm->setRadeSnrDb(snrDb);
-            }
             // Auch das RADE-SNR ist ein Messwert mit Skala und gehoert
             // als Quelle ins Instrument — der Bereich steht in
             // ReadingSource, aus dem RADE-Quelltext gerechnet.
@@ -5042,13 +5033,11 @@ void MainWindow::populateDefaultMeter()
     m_appletPanel = new AppletPanelWidget();
     auto* panel = m_appletPanel;
 
-    // Task 41 (Phase 3P-II): wire the SMeterWidget (installed by the
-    // AppletPanelWidget constructor) into MeterPoller.  WdspEngine is
-    // needed for getRxaSignalPeak() and getMaxBinDbm() (MaxBin mode).
+    // WdspEngine an den Poller: getMaxBinDbm() braucht sie, und Max Bin
+    // ist seit 2026-08-18 eine Kennung wie jede andere. Der setSMeter-
+    // Aufruf, der hier stand, ist mit dem festen S-Meter-Kopf
+    // weggefallen.
     if (m_meterPoller) {
-        if (SMeterWidget* sm = m_appletPanel->smeterWidget()) {
-            m_meterPoller->setSMeter(sm);
-        }
         m_meterPoller->setWdspEngine(m_radioModel->wdspEngine());
 
         // RX meter cal offset source (Thetis-faithful port).
@@ -5130,15 +5119,15 @@ void MainWindow::populateDefaultMeter()
     // 4. ampStateChanged: re-evaluate scale whenever OPERATE/STANDBY toggles.
     //    When returning to STANDBY (amp present but not OPERATE), the scale
     //    reverts to barefoot by passing hasAmplifier()=false to setPowerScale.
-    if (SMeterWidget* sm = m_appletPanel->smeterWidget()) {
+    // ── Ohne die analoge Anzeige (2026-08-18) ────────────────────
+    //
+    // Hier stand `if (SMeterWidget* sm = ...->smeterWidget())` um
+    // den ganzen Block. Die Anzeige ist mit dem festen Kopf
+    // weggefallen; was sie bediente, hat vorher eine Heimat
+    // bekommen — Leistung und SWR samt 2-kW-Skala in der TxApplet,
+    // die Empfangsquellen als Kennungen im Instrument.
+    {
         // Connect 1: PGXL amp meters (OPERATE path).
-        connect(m_radioModel, &RadioModel::ampMetersChanged, this,
-                [this, sm](float fwd, float swr) {
-            if (m_radioModel->hasAmplifier() && m_radioModel->ampOperate()) {
-                sm->setTxMeters(fwd, swr);
-            }
-        });
-
         // Connect 2: radio barefoot/Aurora TX meters (STANDBY or no amp).
         // RadioStatus::powerChanged carries (fwdWatts, revWatts, swr); we
         // take fwdWatts (arg 1) and swr (arg 3) to match setTxMeters() signature.
@@ -5149,12 +5138,12 @@ void MainWindow::populateDefaultMeter()
         // (without PGXL) is in OPERATE, the radio's barefoot reading was
         // overwriting the RF-Kit amp reading at ~20 Hz.  Now barefoot only
         // feeds when no external amp is amplifying.
-        connect(&m_radioModel->radioStatus(), &RadioStatus::powerChanged,
-                this, [this, sm](double fwd, double /*rev*/, double swr) {
-            if (!m_radioModel->isAnyExternalAmpInOperate()) {
-                sm->setTxMeters(static_cast<float>(fwd), static_cast<float>(swr));
-            }
-        });
+        // Connect 1 und 2 speisten die analoge Nadel: PGXL ueber
+        // ampMetersChanged, das Geraet selbst ueber powerChanged, mit
+        // einer Torschaltung dazwischen (KG4VCF-Befund 2026-05-25:
+        // 20 Hz Geraetetelemetrie ueberschrieb sonst den 1-Hz-Wert des
+        // Verstaerkers). Beide Wege samt Torschaltung stehen jetzt in
+        // TxApplet::wireControls — dort, wo die Anzeige ist.
 
         // Connect 3: PGXL connect event snaps scale to 2 kW.
         //
@@ -5165,8 +5154,7 @@ void MainWindow::populateDefaultMeter()
         // Anschlag klebte. „Die 2-kW-Skala geht mit ihnen — sie gehoert
         // zur Leistungsanzeige, nicht zum Empfangszeiger." (OE5SOS)
         connect(m_radioModel, &RadioModel::amplifierChanged, this,
-                [this, sm](bool present) {
-            sm->setPowerScale(/*maxWatts=*/0, present);
+                [this](bool present) {
             if (m_txApplet) { m_txApplet->setPowerScale(0, present); }
         });
 
@@ -5178,25 +5166,17 @@ void MainWindow::populateDefaultMeter()
         // PGXL going STANDBY does not flip the SMeterWidget back to
         // barefoot scale if RF-Kit is still amplifying (and vice versa).
         connect(m_radioModel, &RadioModel::ampStateChanged, this,
-                [this, sm]() {
+                [this]() {
             const bool amplifying = m_radioModel->isAnyExternalAmpInOperate();
-            sm->setPowerScale(/*maxWatts=*/0, amplifying);
             if (m_txApplet) { m_txApplet->setPowerScale(0, amplifying); }
         });
 
-        // Connect 5: 2026-05-20 bench fix -- SMeterWidget::setTransmitting
-        // was implemented but never wired. m_transmitting stayed false so
-        // updateNeedleTarget() always fell through to the RX dBm path,
-        // even when ampMetersChanged was feeding watts via setTxMeters.
-        // The needle therefore showed an RX S-meter reading during TX
-        // even though PGXL was clearly delivering power. Wire MoxController
-        // so the needle switches to the TX-power scale on key, returns to
-        // RX scale on unkey. moxStateChanged fires at end of walk so the
-        // switch lines up with carrier-on-air.
-        if (MoxController* mox = m_radioModel->moxController()) {
-            connect(mox, &MoxController::moxStateChanged,
-                    sm, &SMeterWidget::setTransmitting);
-        }
+        // Connect 5 (2026-05-20) verband MoxController mit
+        // SMeterWidget::setTransmitting, damit die analoge Nadel beim
+        // Senden auf die Leistungsskala wechselte. Sie faellt mit dem
+        // festen Kopf weg; das Zeigerinstrument braucht den Wechsel
+        // nicht, weil es die Groesse selbst waehlt statt sie aus dem
+        // Sendezustand abzuleiten.
     }
 
     // Phase 3P-III review fix C1: wire the production SMeterWidget to the
@@ -5212,7 +5192,14 @@ void MainWindow::populateDefaultMeter()
     // Wire here, immediately after the analogous PGXL SMeterWidget block,
     // so all SMeterWidget signal connections live in one place. PGXL paths
     // (Connect 1..5 above) remain unchanged; these two add RF-Kit on top.
-    if (SMeterWidget* sm = m_appletPanel->smeterWidget()) {
+    // ── Ohne die analoge Anzeige (2026-08-18) ────────────────────
+    //
+    // Hier stand `if (SMeterWidget* sm = ...->smeterWidget())` um
+    // den ganzen Block. Die Anzeige ist mit dem festen Kopf
+    // weggefallen; was sie bediente, hat vorher eine Heimat
+    // bekommen — Leistung und SWR samt 2-kW-Skala in der TxApplet,
+    // die Empfangsquellen als Kennungen im Instrument.
+    {
         // RF-Kit Connect A: snap 2 kW scale on RF-Kit OPERATE.
         // externalAmpOperateChanged is now transition-gated (fix I2) so this
         // fires only when the amp enters or leaves OPERATE, not every poll.
@@ -5221,9 +5208,8 @@ void MainWindow::populateDefaultMeter()
         // RF-Kit going STANDBY does not flip back to barefoot scale if
         // PGXL is still amplifying.
         connect(m_radioModel, &RadioModel::externalAmpOperateChanged, this,
-                [this, sm](bool /*inOp*/) {
+                [this](bool /*inOp*/) {
             const bool amplifying = m_radioModel->isAnyExternalAmpInOperate();
-            sm->setPowerScale(/*maxWatts=*/0, amplifying);
             // Dieselbe Skala fuer die TxApplet — siehe Connect 3 oben.
             if (m_txApplet) { m_txApplet->setPowerScale(0, amplifying); }
         });
@@ -5242,12 +5228,8 @@ void MainWindow::populateDefaultMeter()
         // RF-Kit /power polls through from an RF2K-S sitting in STANDBY,
         // clobbering the live PGXL reading with RF-Kit's 0 W once per poll.
         // Codex review, PR #291.
-        connect(m_radioModel, &RadioModel::externalAmpFwdSwrUpdated, this,
-                [this, sm](int fwd, float swr) {
-            if (m_radioModel->isRfKitInOperate()) {
-                sm->setTxMeters(static_cast<float>(fwd), swr);
-            }
-        });
+        // Der RF-Kit-Zufluss ebenso — er steht mit derselben
+        // Torschaltung in der TxApplet.
     }
 
     // Connect 5: Phase 3P-II Phase 4 Task 97 -- PGXL power cap soft-alert.
@@ -6284,49 +6266,21 @@ void MainWindow::populateDefaultMeter()
         });
     }
 
-    // ── Banner ☰ menu on AppletPanelWidget ──────────────────────────────
-    if (m_appletVis && m_appletPanel) {
-        m_bannerAppletsMenu = new QMenu(this);
-
-        for (const QString& id : m_appletVis->registeredIds()) {
-            QAction* act = m_bannerAppletsMenu->addAction(
-                m_appletVis->displayName(id));
-            act->setCheckable(true);
-            act->setChecked(m_appletVis->isVisible(id));
-            // Grey out the entry when the applet is currently unavailable
-            // (e.g. Amp/Tuner when 4O3A is disabled). The check state still
-            // reflects the user preference so re-enabling restores it.
-            act->setEnabled(m_appletVis->isAvailable(id));
-            // User-visible tooltip — plain English.
-            act->setToolTip(QStringLiteral("Show or hide the %1 applet")
-                            .arg(m_appletVis->displayName(id)));
-
-            connect(act, &QAction::toggled, this, [this, id](bool checked) {
-                if (m_appletVis) { m_appletVis->setVisible(id, checked); }
-            });
-            m_bannerAppletActions.insert(id, act);
-        }
-
-        // Sync banner checkmarks when state changes elsewhere (top menu).
-        connect(m_appletVis, &AppletVisibilityController::visibilityChanged,
-                this, [this](const QString& id, bool visible) {
-            if (auto* act = m_bannerAppletActions.value(id, nullptr)) {
-                QSignalBlocker block(act);
-                act->setChecked(visible);
-            }
-        });
-
-        // Grey/un-grey banner entries when an applet's availability
-        // changes (e.g. 4O3A master toggle flipped).
-        connect(m_appletVis, &AppletVisibilityController::availabilityChanged,
-                this, [this](const QString& id, bool available) {
-            if (auto* act = m_bannerAppletActions.value(id, nullptr)) {
-                act->setEnabled(available);
-            }
-        });
-
-        m_appletPanel->setBannerMenu(m_bannerAppletsMenu);
-    }
+    // ── Das ☰-Menue am Panel ist weggefallen (2026-08-18) ───────────
+    //
+    // Hier stand ein zweites Applet-Menue mit Haekchen je Eintrag, das
+    // am ☰ in der Titelleiste des festen S-Meter-Kopfes hing. Mit dem
+    // Kopf faellt beides weg.
+    //
+    // Kein Verlust: das + in der Kopfleiste oeffnet den Auswaehler (mit
+    // Kategorien, Suche und Schlagwoertern), und Ansicht > Container >
+    // Applets fuehrt dieselbe Liste mit Haekchen. Zwei Menues fuer
+    // dieselbe Entscheidung waren ohnehin eine Doppelung — und die
+    // Woche hat gezeigt, was aus Doppelungen wird.
+    //
+    // Vom Betreiber am 2026-08-18 bestaetigt: „Das ≡ fällt weg, ja.
+    // Deine Begründung trägt — + in der Kopfleiste und Ansicht →
+    // Container → Applets machen dieselbe Arbeit."
 
     // Ghost applets: constructed but not added to the panel or the Containers menu
     // until their feature phases ship. Uncomment the construction + addContainerToggle

@@ -37,7 +37,6 @@ class QMenu;
 namespace NereusSDR {
 
 class AppletWidget;
-class SMeterWidget;
 class AppletGrid;
 class GridCellWidget;
 
@@ -70,10 +69,6 @@ public:
 
     QWidget* headerWidget() const { return m_headerWidget; }
 
-    // Access the SMeterWidget installed as the fixed header.
-    // Returns nullptr before the panel is built (should never happen after
-    // buildUI is called from the constructor chain, but callers must guard).
-    SMeterWidget* smeterWidget() const { return m_sMeter; }
 
     // Add an applet — wraps it with a title bar and adds to the scroll stack
     void addApplet(AppletWidget* applet);
@@ -88,9 +83,6 @@ public:
     void setAppletVisible(AppletWidget* applet, bool visible);
 
     // Install a menu on the panel's top-right ☰ button. Until this is
-    // called, the button is hidden. Pass nullptr to remove the menu and
-    // re-hide the button.
-    void setBannerMenu(QMenu* menu);
 
     // Add a raw widget (e.g., MeterWidget) with a custom title to the scroll area
     void addWidget(QWidget* widget, const QString& title);
@@ -237,15 +229,10 @@ private:
     QWidget*      m_headerWidget  = nullptr;   // header widget for dynamic resize
     QWidget*      m_headerWrapper = nullptr;   // title-bar wrapper of the header
     float         m_headerAspect  = 0.0f;      // width/height ratio for header
-    // SMeterWidget installed as the fixed header (Task 40, Phase 3P-II).
-    // Non-owning after setHeaderWidget(); the title-bar wrapper owns the tree.
-    // Accessed by MainWindow via smeterWidget() for Task 41/43 wiring.
-    SMeterWidget* m_sMeter        = nullptr;
 
     // ☰ menu button. Created in the constructor (hidden, parented to
     // `this` for memory management). When setHeaderWidget runs it gets
     // re-parented into the S-Meter title bar via wrapWithTitleBar.
-    QPushButton*  m_bannerMenuButton{nullptr};
 };
 
 } // namespace NereusSDR

@@ -75,7 +75,6 @@ class RxChannel;
 class TxChannel;
 class MeterWidget;
 class RadioStatus;
-class SMeterWidget;
 class WdspEngine;
 
 // Binding IDs map to WDSP meter types (RxMeterType enum values)
@@ -147,14 +146,6 @@ public:
 
     void setRxChannel(RxChannel* channel);
 
-    // ── SMeterWidget feed (Task 41, Phase 3P-II) ──────────────────────────
-    //
-    // setSMeter: register the analog SMeterWidget (AppletPanelWidget header).
-    // pollSMeter() reads the WDSP source selected by m_sMeter->rxMode() and
-    // calls m_sMeter->setLevel(dbm) on each poll tick.
-    // setWdspEngine: provides getMaxBinDbm() for RxMode::MaxBin.
-    // Both are non-owning; call with nullptr to detach.
-    void setSMeter(SMeterWidget* widget);
     void setWdspEngine(WdspEngine* engine);
 
     // ── TX meter bindings (H.2, Phase 3M-1a) ─────────────────────────────
@@ -340,13 +331,11 @@ private:
     // Porting from Thetis dsp.cs:999-1050 [v2.10.3.13] CalculateTXMeter.
     void pollTxMeters();
 
-    // ── SMeterWidget poll helper (Task 41, Phase 3P-II) ──────────────────────
-    // Branches on m_sMeter->rxMode() to read the correct WDSP source and
-    // calls m_sMeter->setLevel(dbm).  Called from poll() when m_inTx=false.
-    // Selector mapping (from Thetis Console/console.cs:954-957 [@501e3f5]):
-    //   SMeter / SMeterPeak  -> GetRXAMeter(ch, RXA_S_PK)  (enum 0)
-    //   SignalAverage        -> GetRXAMeter(ch, RXA_S_AV)  (enum 1)
-    //   MaxBin               -> GetDetectMaxBin(disp=0)
+    /// Sendet smeterUpdated mit dem gemittelten Empfangswert.
+    ///
+    /// Hiess einmal so, weil es die analoge S-Meter-Anzeige bediente.
+    /// Die ist am 2026-08-18 weggefallen; der Name bleibt, weil das
+    /// Signal so heisst.
     void pollSMeter();
 
     // m_avgWindow: averaging window size set by MultimeterPage (Task 3.1).
@@ -385,10 +374,6 @@ private:
     /// damit setRadioStatus beide sauber löst, statt eine zu vergessen.
     QMetaObject::Connection m_tempConn;
 
-    // SMeterWidget + WdspEngine (Task 41, Phase 3P-II).
-    // Both are non-owning raw pointers.  QPointer for SMeterWidget matches
-    // the m_rxChannel / m_txChannel safety pattern above.
-    QPointer<SMeterWidget>  m_sMeter;
     WdspEngine*             m_wdspEngine{nullptr};
 
     // RX meter cal offset (Thetis-faithful port).  Set via
