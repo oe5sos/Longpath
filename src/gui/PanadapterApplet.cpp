@@ -32,6 +32,7 @@
 #include "gui/styles/ThemeQss.h"
 #include "gui/StyleConstants.h"
 #include <QLabel>
+#include <QPushButton>
 #include <QHBoxLayout>
 
 namespace NereusSDR {
@@ -57,27 +58,71 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // eine, und sie traegt beide Regler bereits. Sie hier zu
     // wiederholen waere genau die Doppelung, die an diesem Tag zweimal
     // aufgeraeumt wurde.
+    // Entwurf 4 vom 2026-08-19, auf Ansage des Betreibers („padapter
+    // noch immer nicht in einem window"): DIESELBE Handschrift wie der
+    // Kopf jedes Containers — gelber Griffstrich links, Name in
+    // Versalien, rechts der Schalter. Vorher trug der Panadapter einen
+    // eigenen Kopf mit eigenen Abstaenden und keinem Schalter; er sah
+    // aus wie ein Fremdkoerper zwischen den Kacheln.
     auto* head = new QWidget(this);
+    head->setFixedHeight(22);
     auto* headLay = new QHBoxLayout(head);
-    headLay->setContentsMargins(8, 3, 8, 3);
+    headLay->setContentsMargins(5, 0, 3, 0);
     headLay->setSpacing(6);
 
+    // Der gelbe Strich wie bei Zeus Link und wie im Container-Kopf.
+    m_grip = new QLabel(head);
+    m_grip->setFixedWidth(3);
+    m_grip->setStyleSheet(QStringLiteral(
+        "background: %1; border-radius: 1px; margin: 4px 0;")
+        .arg(QLatin1String(Style::kAmberText)));
+    headLay->addWidget(m_grip);
+
+    // Der gruene Punkt bleibt: er sagt, dass Daten fliessen. Ein leeres
+    // Bild ohne ihn ist ein Fehler, mit ihm eine stille Frequenz.
     auto* dot = new QLabel(QString::fromUtf8("\xe2\x97\x8f"), head);
     dot->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: %1; }").arg(Style::kGreenText)));
+        "QLabel { color: %1; background: transparent; }")
+        .arg(Style::kGreenText)));
     headLay->addWidget(dot);
 
     m_titleLabel = new QLabel(QStringLiteral("PANADAPTER"), head);
     m_titleLabel->setFont(Style::capsFont(m_titleLabel->font(),
                                           Style::kFontCaption));
-    m_titleLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: %1; }").arg(Style::kTitleText)));
+    // Ziffernbreite: die Mittenfrequenz laeuft beim Wischen mit, und
+    // eine Zahl, die dabei die Breite wechselt, zappelt.
+    QFont headFont = m_titleLabel->font();
+    headFont.setStyleHint(QFont::Monospace);
+    m_titleLabel->setFont(headFont);
+    m_titleLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: transparent; letter-spacing: 1px; }")
+        .arg(QLatin1String(Style::kTextPrimary)));
     headLay->addWidget(m_titleLabel);
     headLay->addStretch(1);
 
-    head->setStyleSheet(Style::themed(QStringLiteral(
+    // Ablösen und zurueck, EIN Schalter. Bisher lag „Float this pan" nur
+    // im Rechtsklick-Menue und der Rueckweg gar nirgends — man musste
+    // das Fenster schliessen und wissen, dass genau das zurueckdockt.
+    m_btnFloat = new QPushButton(QStringLiteral("\u2197"), head);
+    m_btnFloat->setFixedSize(20, 20);
+    m_btnFloat->setStyleSheet(QStringLiteral(
+        "QPushButton { background: transparent; border: none; color: %1;"
+        "  font-size: 11px; padding: 0; }"
+        "QPushButton:hover { background: %2; color: %3; }")
+        .arg(QLatin1String(Style::kTextSecondary),
+             QLatin1String(Style::kButtonHover),
+             QLatin1String(Style::kTextPrimary)));
+    headLay->addWidget(m_btnFloat);
+    connect(m_btnFloat, &QPushButton::clicked, this, [this]() {
+        if (m_floating) { emit dockRequested(m_panId); }
+        else            { emit floatRequested(m_panId); }
+    });
+    setFloatingIndicator(false);
+
+    head->setStyleSheet(QStringLiteral(
         "QWidget { background: %1; border-bottom: 1px solid %2; }")
-        .arg(Style::kPanelBg, Style::kBorder)));
+        .arg(QLatin1String(Style::kTitleGradBot),
+             QLatin1String(Style::kBorderSubtle)));
     layout->addWidget(head, 0);
 
     layout->addWidget(m_spectrum, 1);
@@ -368,6 +413,18 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
     connect(extAct, &QAction::toggled, this, &PanadapterApplet::setExtendedViewEnabled);
 
     return menu;
+}
+
+// ↗ heisst „ablösen", ↙ heisst „zurueck in die Anordnung".
+void PanadapterApplet::setFloatingIndicator(bool floating)
+{
+    m_floating = floating;
+    if (!m_btnFloat) { return; }
+    m_btnFloat->setText(floating ? QStringLiteral("\u2199")
+                                 : QStringLiteral("\u2197"));
+    m_btnFloat->setToolTip(floating
+        ? QStringLiteral("Back into the layout")
+        : QStringLiteral("Detach into its own window"));
 }
 
 } // namespace NereusSDR

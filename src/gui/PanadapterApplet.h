@@ -51,6 +51,8 @@ class QMenu;
 // Typ, obwohl <QLabel> eingebunden ist.
 class QLabel;
 
+class QPushButton;
+
 namespace NereusSDR {
 
 class SpectrumWidget;
@@ -126,6 +128,13 @@ public:
     QString statusMode() const;
     int     statusChainIndex() const;
 
+    /// Der Kopf sagt, wo diese Kachel liegt: ↗ heisst „ablösen", ↙
+    /// heisst „zurueck in die Anordnung". Von aussen gesetzt, weil der
+    /// Umzug auch woanders ausgeloest werden kann (Rechtsklick, Fenster
+    /// schliessen, Anordnung wechseln) — ein Zeichen, das nur beim
+    /// eigenen Klick nachzieht, luegt beim naechsten Weg.
+    void setFloatingIndicator(bool floating);
+
     /// Phase 3F: light (or clear) this pan's WIDE pill.
     /// A pan shows WIDE when the RX preselector chain feeding it is bypassed
     /// on the wire. The decision is per chain and is made by
@@ -179,6 +188,12 @@ signals:
     void addSliceRequested(const QString& panId);
     void floatRequested(const QString& panId);
 
+    /// Zurueck in die Anordnung. Der Kopf traegt EINEN Schalter fuer
+    /// beide Richtungen — „Ablösen" ohne Rueckweg ist eine
+    /// Einbahnstrasse, und der Weg zurueck lag bisher nur im Schliessen
+    /// des Fensters.
+    void dockRequested(const QString& panId);
+
 protected:
     /// Right-align the status strip clear of the dBm scale strip. Re-run
     /// whenever a pill lights or goes dark: the strip's minimum width grows to
@@ -208,6 +223,9 @@ private:
     QString                 m_panId;
     SpectrumWidget*         m_spectrum {nullptr};
     QLabel*                 m_titleLabel {nullptr};
+    QLabel*                 m_grip {nullptr};
+    QPushButton*            m_btnFloat {nullptr};
+    bool                    m_floating {false};
     SpectrumStatusOverlay*  m_statusOverlay {nullptr};
     int                     m_activeSliceIndex {-1};
     QSet<int>               m_associatedSlices;

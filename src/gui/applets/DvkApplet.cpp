@@ -37,6 +37,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QSlider>
+#include <QFrame>
 
 namespace NereusSDR {
 
@@ -93,6 +94,7 @@ void DvkApplet::startRecording(int index)
     worker->setVoiceTapEnabled(true);
 
     m_recordingSlot = index;
+    applyRowStyle(index);
     if (m_recBtn[index])  { m_recBtn[index]->setText(QStringLiteral("\u25A0")); }
     for (int i = 0; i < kSlots; ++i) {
         if (i != index && m_recBtn[i]) { m_recBtn[i]->setEnabled(false); }
@@ -105,6 +107,7 @@ void DvkApplet::finishRecording()
     if (m_recordingSlot < 0 || !m_recorder) { return; }
     const int index = m_recordingSlot;
     m_recordingSlot = -1;
+    applyRowStyle(index);
 
     // Reihenfolge wie im Sprach-Selbsttest: erst das Tor zu, dann die
     // Verbindung loesen. Andersherum liefe der Abgriff noch, waehrend
@@ -147,14 +150,44 @@ void DvkApplet::refreshSlot(int index)
         m_slotKey[index]->setText(s.shortcut);
     }
     if (m_slotLabel[index]) {
-        // Leerer Platz sagt das auch. „Slot 3" allein laesst offen, ob
-        // da etwas liegt.
+        // Ein leerer Platz sagt „empty" und sagt es kursiv und blass.
+        // „Slot 3" allein laesst offen, ob da etwas liegt.
         const QString name = s.label.isEmpty()
             ? QStringLiteral("Slot %1").arg(index + 1) : s.label;
         m_slotLabel[index]->setText(s.isEmpty()
-            ? QStringLiteral("%1 — empty").arg(name)
-            : QStringLiteral("%1 · %2 s").arg(name)
-                  .arg(s.seconds, 0, 'f', 1));
+            ? QStringLiteral("%1 — empty").arg(name) : name);
+        m_slotLabel[index]->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; background: transparent;%2 }")
+            .arg(QLatin1String(s.isEmpty() ? Style::kTextScale
+                                           : Style::kTextPrimary),
+                 QLatin1String(s.isEmpty() ? " font-style: italic;" : "")));
+    }
+    if (m_slotLen[index]) {
+        m_slotLen[index]->setText(s.isEmpty()
+            ? QStringLiteral("\u2014")
+            : QStringLiteral("%1 s").arg(s.seconds, 0, 'f', 1));
+    }
+}
+
+// Zebra macht zehn Zeilen abzaehlbar; rot sagt, welche gerade aufnimmt.
+// Der linke Balken traegt den Zustand noch einmal ohne Farbe.
+void DvkApplet::applyRowStyle(int index)
+{
+    if (index < 0 || index >= kSlots || !m_slotRow[index]) { return; }
+
+    if (index == m_recordingSlot) {
+        m_slotRow[index]->setStyleSheet(QStringLiteral(
+            "QWidget { background: %1; border-left: 2px solid %2; }")
+            .arg(QLatin1String(Style::kInsetBg),
+                 QLatin1String(Style::kRedBg)));
+    } else if (index % 2 == 1) {
+        m_slotRow[index]->setStyleSheet(QStringLiteral(
+            "QWidget { background: %1; border-left: 2px solid transparent; }")
+            .arg(QLatin1String(Style::kPanelBg)));
+    } else {
+        m_slotRow[index]->setStyleSheet(QStringLiteral(
+            "QWidget { background: transparent;"
+            " border-left: 2px solid transparent; }"));
     }
 }
 
@@ -185,23 +218,47 @@ void DvkApplet::buildUI()
     // Ein gesperrter Knopf ohne Erklaerung ist ein Versprechen, das die
     // Anwendung nicht haelt — davon haben wir 72 im Setup, das reicht.
     for (int i = 0; i < kSlots; ++i) {
-        auto* row = new QHBoxLayout;
+        // Die Zeile ist ein eigenes Widget, nicht bloss eine Anordnung:
+        // nur so kann sie einen Grund tragen. Zebra macht zehn Zeilen
+        // abzaehlbar, und die laufende Aufnahme faerbt die GANZE Zeile —
+        // ein roter Punkt allein wird fuer „auf Sendung" gehalten.
+        m_slotRow[i] = new QWidget(this);
+        auto* row = new QHBoxLayout(m_slotRow[i]);
+        row->setContentsMargins(4, 1, 3, 1);
         row->setSpacing(3);
 
-        m_slotKey[i] = new QLabel(this);
+        // Die TASTE steht links. Im Betrieb greift man nach der Taste,
+        // nicht nach dem Namen.
+        m_slotKey[i] = new QLabel(m_slotRow[i]);
         m_slotKey[i]->setFixedWidth(26);
+        m_slotKey[i]->setAlignment(Qt::AlignCenter);
         m_slotKey[i]->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; font-weight: bold; }")
-                .arg(Style::kAmberText));
+            "QLabel { color: %1; font-size: 10px; font-weight: bold;"
+            " background: %2; border: 1px solid %3; border-radius: 3px; }")
+                .arg(QLatin1String(Style::kAmberText),
+                     QLatin1String(Style::kInsetBg),
+                     QLatin1String(Style::kAmberBorder)));
         row->addWidget(m_slotKey[i]);
 
-        m_slotLabel[i] = new QLabel(this);
+        m_slotLabel[i] = new QLabel(m_slotRow[i]);
         m_slotLabel[i]->setMinimumWidth(70);
-        m_slotLabel[i]->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
         m_slotLabel[i]->setToolTip(QStringLiteral(
             "Double-click to name this announcement (CQ, 73, callsign …)."));
         row->addWidget(m_slotLabel[i], 1);
+
+        // Die Dauer in eigener Spalte, rechtsbuendig und in
+        // Ziffernbreite: sie ist die einzige Zahl, die vor dem Senden
+        // zaehlt, und sie soll beim Auffrischen nicht springen.
+        m_slotLen[i] = new QLabel(m_slotRow[i]);
+        m_slotLen[i]->setFixedWidth(42);
+        m_slotLen[i]->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        QFont lenFont = m_slotLen[i]->font();
+        lenFont.setStyleHint(QFont::Monospace);
+        lenFont.setPointSizeF(lenFont.pointSizeF() - 1.0);
+        m_slotLen[i]->setFont(lenFont);
+        m_slotLen[i]->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                        .arg(QLatin1String(Style::kTextScale)));
+        row->addWidget(m_slotLen[i]);
 
         m_recBtn[i]  = styledButton(QStringLiteral("\u25CF"));
         m_playBtn[i] = styledButton(QStringLiteral("\u25BA"));
@@ -224,7 +281,8 @@ void DvkApplet::buildUI()
         row->addWidget(m_stopBtn[i]);
         row->addWidget(m_loadBtn[i]);
 
-        vbox->addLayout(row);
+        vbox->addWidget(m_slotRow[i]);
+        applyRowStyle(i);
 
         // Aufnahme geht, sobald der Sendeweg steht — sie TASTET NICHT,
         // sie liest nur mit. Wiedergabe bleibt gesperrt, bis die Tastung
@@ -259,6 +317,20 @@ void DvkApplet::buildUI()
     if (m_model) {
         connect(&m_model->voiceKeyer(), &VoiceKeyerStore::slotChanged,
                 this, &DvkApplet::refreshSlot);
+    }
+
+    // Was ab hier kommt, gilt fuer den GANZEN Speicher, nicht fuer eine
+    // Zeile. Eine Trennlinie sagt das, bevor jemand „Rpt" fuer den
+    // zuletzt angeklickten Platz haelt.
+    {
+        auto* rule = new QFrame(this);
+        rule->setFrameShape(QFrame::HLine);
+        rule->setFixedHeight(1);
+        rule->setStyleSheet(QStringLiteral("background: %1; border: none;")
+                                .arg(QLatin1String(Style::kBorderSubtle)));
+        vbox->addSpacing(4);
+        vbox->addWidget(rule);
+        vbox->addSpacing(2);
     }
 
     // --- Control 2: Record level gauge (0-100) ---
@@ -300,10 +372,10 @@ void DvkApplet::buildUI()
     vbox->addWidget(m_semiBkBtn);
     NyiOverlay::markNyi(m_semiBkBtn, QStringLiteral("3I-1"));
 
-    // --- Control 5: WAV file import button ---
-    m_importBtn = styledButton(QStringLiteral("Import WAV\u2026"));
-    vbox->addWidget(m_importBtn);
-    NyiOverlay::markNyi(m_importBtn, QStringLiteral("3I-1"));
+    // Ein globaler „Import WAV…"-Knopf stand hier bis 2026-08-19. Er
+    // ist entfallen: jede der zehn Zeilen hat ihren eigenen WAV-Knopf,
+    // und ein Import ohne Ziel-Platz muesste erst fragen, in welche
+    // Zeile — derselbe Weg mit einem Zwischenschritt mehr.
 
     vbox->addStretch();
     root->addWidget(body);

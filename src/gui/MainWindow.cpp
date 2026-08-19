@@ -2288,6 +2288,12 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::floatRequested,
                 this, &MainWindow::onPanFloatRequested,
                 Qt::UniqueConnection);
+        // Der Rueckweg. Ohne ihn ist der Schalter im Kopf der Kachel
+        // eine Einbahnstrasse — genau der Zustand, ueber den sich der
+        // Betreiber am 2026-08-19 beschwert hat.
+        connect(applet, &PanadapterApplet::dockRequested,
+                this, &MainWindow::onPanDockRequested,
+                Qt::UniqueConnection);
         // Phase 3F: clicking a pan makes it the active pan. Straight to the
         // stack's setter, exactly as AetherSDR MainWindow.cpp:12964 [@6a142807]
         // does it:
@@ -2374,6 +2380,11 @@ void MainWindow::onPanAddSliceRequested(const QString& panId)
 void MainWindow::onPanFloatRequested(const QString& panId)
 {
     if (m_panStack) { m_panStack->floatPanadapter(panId); }
+}
+
+void MainWindow::onPanDockRequested(const QString& panId)
+{
+    if (m_panStack) { m_panStack->dockPanadapter(panId); }
 }
 
 void MainWindow::wireSliceStatusOverlayTriggers(SliceModel* slice)

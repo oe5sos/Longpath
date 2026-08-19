@@ -460,6 +460,7 @@ private slots:
     /// fails or the handler never runs — a named slot avoids the question.
     void onPanAddSliceRequested(const QString& panId);
     void onPanFloatRequested(const QString& panId);
+    void onPanDockRequested(const QString& panId);
 
     void onConnectionStateChanged();
     void showConnectionPanel();

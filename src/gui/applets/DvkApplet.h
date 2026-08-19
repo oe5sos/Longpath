@@ -60,14 +60,22 @@ private:
     // drei Knoepfe.
     static constexpr int kSlots = 10;
 
+    // Die Zeile selbst, damit sie einen Grund tragen kann: Zebra, und
+    // waehrend der Aufnahme die ganze Zeile rot. Ein roter Punkt allein
+    // wird fuer „auf Sendung" gehalten.
+    QWidget*     m_slotRow[kSlots]   = {};
     QLabel*      m_slotKey[kSlots]   = {};
     QLabel*      m_slotLabel[kSlots] = {};
+    QLabel*      m_slotLen[kSlots]   = {};
     QPushButton* m_recBtn[kSlots]    = {};
     QPushButton* m_playBtn[kSlots]   = {};
     QPushButton* m_stopBtn[kSlots]   = {};
     QPushButton* m_loadBtn[kSlots]   = {};
 
     void refreshSlot(int index);
+
+    // Zebra, oder rot wenn diese Zeile gerade aufnimmt.
+    void applyRowStyle(int index);
 
     // Aufnahme vom Mikrofon in einen Platz. Nimmt denselben Weg wie der
     // Sprach-Selbsttest: TxWorkerThread::preStripAudioReady in einen

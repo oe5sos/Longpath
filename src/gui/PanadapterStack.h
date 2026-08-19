@@ -131,6 +131,21 @@ public:
 
     /// Detach a pan into a top-level PanFloatingWindow.
     void floatPanadapter(const QString& panId);
+
+    /// Zurueck in die Anordnung, den umgekehrten Weg zu floatPanadapter.
+    ///
+    /// Es gab bisher nur dockAllFloatingPans() (privat, raeumt alles auf
+    /// einmal ab) und den Weg ueber das Schliessen des Fensters. Der
+    /// Kopf des Panadapters braucht aber EINEN Schalter, der hin und
+    /// zuruecklegt — genau wie der Kopf jedes Containers. Ohne das ist
+    /// „Ablösen" eine Einbahnstrasse.
+    void dockPanadapter(const QString& panId);
+
+    /// Liegt dieser Panadapter gerade in einem eigenen Fenster? Der Kopf
+    /// fragt danach, um sein Zeichen zwischen ↗ und ↙ zu wechseln.
+    bool isPanFloating(const QString& panId) const {
+        return m_floating.contains(panId);
+    }
     PanFloatingWindow* floatingWindowForTest(const QString& panId) const
     {
         return m_floating.value(panId, nullptr);
@@ -153,6 +168,12 @@ public:
 signals:
     void activePanChanged(const QString& panId);
     void countChanged(int count);
+
+    /// Ein Panadapter ist in ein eigenes Fenster gegangen oder wieder
+    /// zurueck. Der Kopf der Kachel hoert mit, damit sein Zeichen nicht
+    /// luegt, wenn der Umzug woanders ausgeloest wurde (Rechtsklick,
+    /// Fenster schliessen, Anordnung wechseln).
+    void panFloatStateChanged(const QString& panId, bool floating);
 
 private:
     void rebuildSplitters(const QString& layoutId, const QStringList& panIds);

@@ -302,6 +302,10 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     connect(floater, &PanFloatingWindow::dockRequested, this, [this, panId]() {
         auto* taken = m_floating.take(panId);
         if (!taken) { return; }
+        emit panFloatStateChanged(panId, false);
+        if (PanadapterApplet* a = m_pans.value(panId, nullptr)) {
+            a->setFloatingIndicator(false);
+        }
         // Re-attach all currently-known applets to the current layout. The
         // applyLayout path detaches every applet from its parent first
         // (clearSplitters reparents back to `this` and hides) and then
@@ -315,6 +319,8 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // Now that the floating window exists and is mapped, bring the pan back up
     // so its QRhiWidget initializes against that window's surface.
     applet->show();
+    applet->setFloatingIndicator(true);
+    emit panFloatStateChanged(panId, true);
 
     // Re-establish the pans that stayed behind.
     //
@@ -337,6 +343,23 @@ void PanadapterStack::floatPanadapter(const QString& panId)
         }
     }
 }
+// Der umgekehrte Weg zu floatPanadapter. Er tut genau das, was der
+// dockRequested-Empfaenger dort tut — nur von aussen aufrufbar, damit
+// der Kopf der Kachel EINEN Schalter fuer beide Richtungen haben kann.
+//
+// Ueber das Fenster und nicht ueber die Anordnung: PanFloatingWindow
+// meldet dockRequested, wenn es geschlossen wird, und dort haengt die
+// ganze Wiederherstellung (applyLayout, Aufraeumen des Fensters, die
+// Hide/Show-Runde fuer die QRhi-Kontexte der Nachbarn). Das hier zu
+// wiederholen waere ein zweiter Weg, der beim naechsten Umbau
+// auseinanderlaeuft.
+void PanadapterStack::dockPanadapter(const QString& panId)
+{
+    PanFloatingWindow* floater = m_floating.value(panId, nullptr);
+    if (!floater) { return; }
+    floater->requestDock();
+}
+
 void PanadapterStack::rebuildSplitters(const QString&, const QStringList&) {}
 
 void PanadapterStack::dockAllFloatingPans()

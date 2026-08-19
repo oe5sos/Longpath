@@ -22,6 +22,8 @@
 // no-port-check: NereusSDR-original test file.
 
 #include <QtTest>
+#include <QPushButton>
+#include <QSignalSpy>
 #include <QLabel>
 
 #include "gui/PanadapterApplet.h"
@@ -32,6 +34,22 @@ using namespace NereusSDR;
 class TestPanadapterHeader : public QObject
 {
     Q_OBJECT
+
+private:
+
+    // Der Ablöse-Schalter ist der einzige Knopf im Kopf; ueber den
+    // Hinweistext gefunden, damit die Suche haelt, wenn spaeter ein
+    // zweiter dazukommt.
+    static QPushButton* floatButtonOf(PanadapterApplet& pan)
+    {
+        for (QPushButton* b : pan.findChildren<QPushButton*>()) {
+            if (b->toolTip().contains(QStringLiteral("window"))
+                || b->toolTip().contains(QStringLiteral("layout"))) {
+                return b;
+            }
+        }
+        return nullptr;
+    }
 
 private slots:
 
@@ -66,6 +84,72 @@ private slots:
         pan.spectrumWidget()->setFrequencyRange(14.225000e6, 192000.0);
         QVERIFY2(pan.titleLabel()->text().contains(QStringLiteral("14.225000")),
                  "die Kopfzeile ist beim ersten Wert stehengeblieben");
+    }
+
+    // ── Der Schalter im Kopf ─────────────────────────────────────────
+    //
+    // Entwurf 4 (2026-08-19): der Kopf traegt EINEN Schalter fuer beide
+    // Richtungen. Bisher lag „Float this pan" nur im Rechtsklick-Menue
+    // und der Rueckweg nirgends — man musste das Fenster schliessen und
+    // wissen, dass genau das zurueckdockt.
+    void theHeaderHasAFloatSwitch()
+    {
+        PanadapterApplet pan(QStringLiteral("pan-0"));
+        QVERIFY2(floatButtonOf(pan) != nullptr,
+                 "ohne Schalter bleibt das Ablösen im Rechtsklick-Menue "
+                 "vergraben");
+    }
+
+    void theSwitchAsksToDetach()
+    {
+        PanadapterApplet pan(QStringLiteral("pan-0"));
+        QSignalSpy spy(&pan, &PanadapterApplet::floatRequested);
+
+        QPushButton* b = floatButtonOf(pan);
+        QVERIFY(b);
+        b->click();
+
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.takeFirst().at(0).toString(), QStringLiteral("pan-0"));
+    }
+
+    // DER FALL, DER VORHER FEHLTE: derselbe Schalter muss zurueckfuehren.
+    void andTheSameSwitchAsksToComeBack()
+    {
+        PanadapterApplet pan(QStringLiteral("pan-0"));
+        pan.setFloatingIndicator(true);
+
+        QSignalSpy back(&pan, &PanadapterApplet::dockRequested);
+        QSignalSpy away(&pan, &PanadapterApplet::floatRequested);
+
+        QPushButton* b = floatButtonOf(pan);
+        QVERIFY(b);
+        b->click();
+
+        QCOMPARE(back.count(), 1);
+        QVERIFY2(away.count() == 0,
+                 "ein abgeloester Panadapter darf nicht noch einmal "
+                 "ablösen wollen");
+    }
+
+    // Das Zeichen muss dem Zustand folgen, auch wenn der Umzug woanders
+    // ausgeloest wurde — Rechtsklick, Fenster schliessen, Anordnung
+    // wechseln. Ein Zeichen, das nur beim eigenen Klick nachzieht,
+    // luegt beim naechsten Weg.
+    void theSwitchSaysWhichWayItPoints()
+    {
+        PanadapterApplet pan(QStringLiteral("pan-0"));
+        QPushButton* b = floatButtonOf(pan);
+        QVERIFY(b);
+
+        const QString docked = b->text();
+        pan.setFloatingIndicator(true);
+        QVERIFY2(b->text() != docked,
+                 "abgeloest und eingefuegt muessen sich am Zeichen "
+                 "unterscheiden");
+
+        pan.setFloatingIndicator(false);
+        QCOMPARE(b->text(), docked);
     }
 };
 
