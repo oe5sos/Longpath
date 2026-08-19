@@ -69,6 +69,21 @@ private:
 
     void refreshSlot(int index);
 
+    // Aufnahme vom Mikrofon in einen Platz. Nimmt denselben Weg wie der
+    // Sprach-Selbsttest: TxWorkerThread::preStripAudioReady in einen
+    // TxAudioRecorder, also VOR der Sprachbearbeitung. Eine Ansage soll
+    // klingen wie die Stimme, nicht wie die Stimme durch den heutigen
+    // Kompressor — die Bearbeitung kommt beim Senden ohnehin darueber.
+    //
+    // SENDET NICHT. Der Abgriff liest mit, was das Mikrofon liefert;
+    // getastet wird nichts.
+    void startRecording(int index);
+    void finishRecording();
+
+    class TxAudioRecorder* m_recorder = nullptr;
+    QMetaObject::Connection m_micTap;
+    int   m_recordingSlot = -1;
+
     // Control 2 — record level gauge (0-100)
     HGauge*      m_recLevel      = nullptr;
 

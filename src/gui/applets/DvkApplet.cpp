@@ -24,6 +24,8 @@
 
 #include "DvkApplet.h"
 #include "models/RadioModel.h"
+#include "core/TxWorkerThread.h"
+#include "core/TxAudioRecorder.h"
 #include <QMessageBox>
 #include <QFileDialog>
 #include "NyiOverlay.h"
@@ -38,10 +40,101 @@
 
 namespace NereusSDR {
 
+namespace {
+// Mikrofonrate des Sendewegs — dieselbe Zahl, die der Sprach-Selbsttest
+// nimmt; beide lesen denselben Abgriff.
+constexpr int kMicRateHz = 48000;
+}
+
+
 DvkApplet::DvkApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
 {
     buildUI();
+}
+
+// ── Aufnahme ─────────────────────────────────────────────────────────
+//
+// Derselbe Weg wie der Sprach-Selbsttest (TxVoiceCheckDialog): der
+// Abgriff preStripAudioReady laeuft auf dem Sendefaden und reicht die
+// Mikrofonwerte direkt in einen TxAudioRecorder. VOR der
+// Sprachbearbeitung — eine Ansage soll klingen wie die Stimme, nicht
+// wie die Stimme durch den heutigen Kompressor; beim Senden laeuft die
+// Bearbeitung ohnehin darueber.
+//
+// ES WIRD NICHTS GETASTET. Der Abgriff liest mit, was das Mikrofon
+// liefert; der Sender bleibt aus.
+void DvkApplet::startRecording(int index)
+{
+    if (!m_model || index < 0 || index >= kSlots) { return; }
+
+    TxWorkerThread* worker = m_model->txWorker();
+    if (!worker) {
+        QMessageBox::information(this, QStringLiteral("Voice Keyer"),
+            QStringLiteral("The transmit path is not up yet — connect to "
+                           "the radio first, then record."));
+        return;
+    }
+
+    if (!m_recorder) {
+        m_recorder = new TxAudioRecorder(this);
+        m_recorder->setSampleRate(kMicRateHz);
+        connect(m_recorder, &TxAudioRecorder::recordingFull, this,
+                [this]() { finishRecording(); });
+    }
+    m_recorder->clear();
+    m_recorder->start();
+
+    QObject::disconnect(m_micTap);
+    m_micTap = connect(worker, &TxWorkerThread::preStripAudioReady, m_recorder,
+                       [this](const float* samples, int frames) {
+        m_recorder->feed(samples, frames);
+    }, Qt::DirectConnection);
+    worker->setVoiceTapEnabled(true);
+
+    m_recordingSlot = index;
+    if (m_recBtn[index])  { m_recBtn[index]->setText(QStringLiteral("\u25A0")); }
+    for (int i = 0; i < kSlots; ++i) {
+        if (i != index && m_recBtn[i]) { m_recBtn[i]->setEnabled(false); }
+        if (m_loadBtn[i]) { m_loadBtn[i]->setEnabled(false); }
+    }
+}
+
+void DvkApplet::finishRecording()
+{
+    if (m_recordingSlot < 0 || !m_recorder) { return; }
+    const int index = m_recordingSlot;
+    m_recordingSlot = -1;
+
+    // Reihenfolge wie im Sprach-Selbsttest: erst das Tor zu, dann die
+    // Verbindung loesen. Andersherum liefe der Abgriff noch, waehrend
+    // niemand mehr zuhoert.
+    if (m_model && m_model->txWorker()) {
+        m_model->txWorker()->setVoiceTapEnabled(false);
+    }
+    QObject::disconnect(m_micTap);
+    m_recorder->stop();
+
+    if (m_recBtn[index]) { m_recBtn[index]->setText(QStringLiteral("\u25CF")); }
+    for (int i = 0; i < kSlots; ++i) {
+        if (m_recBtn[i])  { m_recBtn[i]->setEnabled(m_model && m_model->txWorker()); }
+        if (m_loadBtn[i]) { m_loadBtn[i]->setEnabled(true); }
+    }
+
+    if (!m_model) { return; }
+
+    QVector<float> samples(m_recorder->recordedFrames());
+    if (!samples.isEmpty()) {
+        std::copy_n(m_recorder->samples(), samples.size(), samples.begin());
+    }
+
+    QString err;
+    if (!m_model->voiceKeyer().setRecording(index, samples, kMicRateHz, &err)) {
+        QMessageBox::warning(this, QStringLiteral("Voice Keyer"),
+            QStringLiteral("Nothing was stored: %1").arg(err));
+        return;
+    }
+    refreshSlot(index);
 }
 
 // Eine Zeile auffrischen: Taste, Beschriftung, Dauer.
@@ -116,8 +209,9 @@ void DvkApplet::buildUI()
         m_loadBtn[i] = styledButton(QStringLiteral("WAV"));
 
         m_recBtn[i]->setToolTip(QStringLiteral(
-            "Record from the microphone — needs the transmit path, which "
-            "is the next step. Load a WAV in the meantime."));
+            "Record from the microphone into this slot (up to 30 s). "
+            "Press again to stop. This does NOT transmit — it listens to "
+            "what the microphone delivers. Needs a connected radio."));
         m_playBtn[i]->setToolTip(QStringLiteral(
             "Send this announcement — needs the transmit path, which is "
             "the next step."));
@@ -132,10 +226,17 @@ void DvkApplet::buildUI()
 
         vbox->addLayout(row);
 
-        // Bis der Sendeweg haengt: gesperrt, aber mit Grund im Tooltip.
-        m_recBtn[i]->setEnabled(false);
+        // Aufnahme geht, sobald der Sendeweg steht — sie TASTET NICHT,
+        // sie liest nur mit. Wiedergabe bleibt gesperrt, bis die Tastung
+        // im MoxController haengt; der Tooltip sagt es.
+        m_recBtn[i]->setEnabled(m_model && m_model->txWorker() != nullptr);
         m_playBtn[i]->setEnabled(false);
         m_stopBtn[i]->setEnabled(false);
+
+        connect(m_recBtn[i], &QPushButton::clicked, this, [this, i]() {
+            if (m_recordingSlot == i) { finishRecording(); }
+            else if (m_recordingSlot < 0) { startRecording(i); }
+        });
 
         const int slot = i;
         connect(m_loadBtn[i], &QPushButton::clicked, this, [this, slot]() {
