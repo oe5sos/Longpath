@@ -613,6 +613,8 @@ set(CORE_SOURCES
     src/core/CtyDatParser.cpp
     src/core/VoiceSignalDetector.cpp
     src/core/SignalHistoryStore.cpp
+    src/core/audio/WavFile.cpp
+    src/core/audio/VoiceKeyer.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp
