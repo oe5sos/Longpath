@@ -17,7 +17,12 @@ Verbinden die MAC-Adresse und laden ihren Zustand
 (`RadioModel.cpp:6022-6028`). Danach passiert **nichts**:
 
 * keine Bedienfläche — kein Setup, kein Menü, kein Applet
-* kein Testfall
+* **aber sehr wohl Tests**: `tst_apollo_controller.cpp` und
+  `tst_penny_lane_controller.cpp`, zusammen 35 Fundstellen. *(Korrektur
+  vom selben Tag: hier stand zuerst „kein Testfall". Falsch — ich hatte
+  nach dem Zugriffsnamen `apolloController` gesucht statt nach der
+  Klasse. Der Befund wird dadurch besser: die Logik ist geprüft, es
+  fehlt wirklich nur der Anschluss.)*
 * auf der Leitung stehen Nullen:
   `P1RadioConnection.cpp:548` → `out[2] = 0; // mic/apollo flags —
   TODO(3I-T7): wire from state`
@@ -28,7 +33,8 @@ und vollständiger: Zustand wird gepflegt, gespeichert, wieder gelöscht —
 und wirkt nie.
 
 **Vorschlag.** Entweder anschließen (Setup-Seite unter Hardware plus die
-zwei Bits in `out[2]`) oder ausbauen. Beides ist besser als der
+zwei Bits in `out[2]`) oder ausbauen. Weil die Controller getestet sind,
+ist der Anschluss die kleinere Arbeit von beiden. Beides ist besser als der
 Ist-Zustand, in dem ein Betreiber mit Apollo-Zusatz nicht erkennen kann,
 dass die Anwendung ihn ignoriert. *Aufwand: klein bis mittel. Braucht
 eine Entscheidung, keine Analyse.*
@@ -91,7 +97,8 @@ aufgeflogen und **drei** Merkmale als „gebaut, an keiner Fläche"
 (Modusgruppen, Bandplan, jetzt Apollo/PennyLane). Beides fand ich von
 Hand. Das ist Glück, kein Verfahren.
 
-**Vorschlag.** Ein Skript, das mechanisch meldet:
+**Gebaut am selben Tag:** `scripts/find-unsurfaced-features.py`. Es
+meldet mechanisch:
 
 1. Klassen in `src/core` und `src/models`, die in `src/gui` **nicht
    einmal** vorkommen (bei mir heute: 45 Treffer, davon die meisten
@@ -101,7 +108,14 @@ Hand. Das ist Glück, kein Verfahren.
 
 Als Bericht, nicht als Sperre: die Regel „jedes Merkmal braucht eine
 Fläche" hat berechtigte Ausnahmen, und ein Tor, das ständig zu Unrecht
-rot wird, wird abgeschaltet. *Aufwand: klein. Wirkung: dauerhaft.*
+rot wird, wird abgeschaltet. Die Ausnahmeliste im Skript führt jede
+Klasse mit Begründung — eine Liste ohne Gründe wächst, bis sie alles
+enthält.
+
+Erster Lauf: **2 Treffer**, nämlich genau Apollo und PennyLane aus
+Punkt 1. Die 43 anderen Klassen ohne GUI-Vorkommen stehen begründet in
+der Ausnahmeliste (Codecs, Audio-Quellen, Transport-Arbeiter,
+TCI-Innereien).
 
 ## 6. Kleinkram, belegt
 

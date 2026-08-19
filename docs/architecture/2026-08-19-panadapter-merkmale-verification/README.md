@@ -130,6 +130,26 @@ die laufende Anwendung.
 | 6.11 | Häkchen ein, App neu starten | Die Häkchen stehen noch auf ein, Marken bauen sich neu auf | |
 | 6.12 | Bandplan mit Fonie-Bereichen aktiv, ein sprachbreites Signal außerhalb der Fonie-Bereiche (z. B. im CW-Teil) | Es bekommt **keine** Sprachmarke. Ein Schmalband-Störträger dort bekommt bei eingeschaltetem QRM-Häkchen sehr wohl eine | |
 
+## §7 Doppelklick auf ein gespottetes Rufzeichen — braucht Spots
+
+Voraussetzung: eine Spot-Quelle liefert (DX-Cluster, RBN, POTA …), damit
+Etiketten im Panadapter stehen. Für die Zeilen mit Peilung zusätzlich der
+**eigene Locator** unter Rotor-Einstellungen; QRZ-Zugangsdaten sind
+nützlich, aber nicht nötig — die Richtung kommt notfalls aus `cty.dat`.
+
+| # | Schritt | Erwartet | Ergebnis |
+|---|---------|----------|----------|
+| 7.1 | Doppelklick auf ein Spot-Etikett | Rotor/Log-Fläche kommt nach vorn, das Rufzeichen steht im Feld, Land und Flagge erscheinen | |
+| 7.2 | Dasselbe, auf die Rose schauen | Der **Zeiger geht auf die Zielposition** des Rufzeichens; die Statuszeile nennt Entfernung, Grad und Himmelsrichtung. Der Mast bewegt sich **nicht** | |
+| 7.3 | Ohne Netzverbindung wiederholen | Die Richtung erscheint trotzdem — sie kommt aus den Koordinaten der DXCC-Einheit in `cty.dat`, die Statuszeile sagt „(from prefix)" | |
+| 7.4 | Mit QRZ-Zugang, kurz warten | Die Schätzung aus dem Prefix wird durch den genauen Locator ersetzt; Peilung und Entfernung springen auf den genauen Wert | |
+| 7.5 | Der erste Klick des Doppelklicks | Das Gerät ist auf die Spot-Frequenz abgestimmt — der Log-Eintrag nimmt Frequenz, Band und Betriebsart von dort | |
+| 7.6 | Danach „Log QSO" drücken | Der Eintrag enthält Rufzeichen, Frequenz, Band, Betriebsart, Locator, **Entfernung und Peilung** | |
+| 7.7 | Doppelklick auf freie Fläche im Spektrum | Nichts wird ins Log übernommen; das bisherige Verhalten des zweiten Klicks bleibt | |
+| 7.8 | Doppelklick auf eine **S-Verlauf-Marke** (`S7`) | Nichts passiert — eine S-Stufe ist kein Rufzeichen | |
+| 7.9 | Rechtsklick → „Turn rotor to <call>" zum Vergleich | Dieser Weg **dreht** den Mast. Der Unterschied zum Doppelklick ist beabsichtigt | |
+| 7.10 | Doppelklick auf ein Etikett, während der Rotor gerade dreht | Kein Durcheinander: der laufende Lauf wird nicht abgebrochen, nur das Ziel angezeigt | |
+
 ---
 
 ## Bekannte Auslassungen
