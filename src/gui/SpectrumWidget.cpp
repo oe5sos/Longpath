@@ -6713,16 +6713,21 @@ void SpectrumWidget::loadSpotDisplaySettings()
 }
 
 // From AetherSDR src/gui/SpectrumWidget.cpp:4497-4633 [@0cd4559]
-void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
+// Merge DX spots, Signal History markers, and QRM History markers.
+// Each category is gated by its own flag.  S-History markers within 3 kHz of
+// an active DX spot are suppressed — the spot carries richer callsign/DXCC info.
+//
+// From AetherSDR SpectrumWidget.cpp:15719-15741 [@0cd4559]. Der gemeinsame
+// Weg ist der Punkt: Kollisionsstapelung, Buendelabzeichen und Klickfelder
+// gelten dann fuer beide Sorten zusammen. Zwei getrennte Zeichnungen
+// wuerden uebereinander malen.
+//
+// Als eigene Funktion und nicht inmitten der Zeichnung, damit die
+// 3-kHz-Regel pruefbar ist: sie ist die Regel, die am ehesten unbemerkt
+// kaputtgeht — ein falsches Vorzeichen oder eine vertauschte Einheit
+// faellt im Bild erst auf, wenn zwei Etiketten uebereinander stehen.
+QVector<SpectrumWidget::SpotMarker> SpectrumWidget::mergedMarkers() const
 {
-    // Merge DX spots, Signal History markers, and QRM History markers.
-    // Each category is gated by its own flag.  S-History markers within 3 kHz of
-    // an active DX spot are suppressed — the spot carries richer callsign/DXCC info.
-    //
-    // From AetherSDR SpectrumWidget.cpp:15719-15741 [@0cd4559]. Der gemeinsame
-    // Weg ist der Punkt: Kollisionsstapelung, Buendelabzeichen und Klickfelder
-    // gelten dann fuer beide Sorten zusammen. Zwei getrennte Zeichnungen
-    // wuerden uebereinander malen.
     QVector<SpotMarker> allMarkers;
     if (m_showSpots) { allMarkers = m_spotMarkers; }
     if (m_showSignalHistory || m_showSignalHistoryQrm) {
@@ -6741,6 +6746,12 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
             if (!masked) { allMarkers.append(sh); }
         }
     }
+    return allMarkers;
+}
+
+void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
+{
+    const QVector<SpotMarker> allMarkers = mergedMarkers();
 
     if (allMarkers.isEmpty()) {
         m_spotClickRects.clear();

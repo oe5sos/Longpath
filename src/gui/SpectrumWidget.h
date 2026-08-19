@@ -1336,6 +1336,10 @@ public:
         return m_signalHistoryMarkers;
     }
 
+    // Was tatsaechlich gezeichnet wuerde: Spots plus Verlaufsmarken nach
+    // Schaltern und 3-kHz-Regel.
+    QVector<SpotMarker> mergedMarkersForTest() const { return mergedMarkers(); }
+
     void setShowSignalHistory(bool on);
     bool showSignalHistory() const { return m_showSignalHistory; }
     void setShowSignalHistoryQrm(bool on);
@@ -1799,6 +1803,7 @@ private:
     //    AetherSDR emits MHz, the call site multiplies by 1e6).
     //  - Cluster badge popup menu with formatted spot lines.
     void drawSpotMarkers(QPainter& p, const QRect& specRect);
+    QVector<SpotMarker> mergedMarkers() const;
     void showSpotClusterPopup(const SpotCluster& cluster, const QPoint& globalPos);
 
     // ---- TNF / notch overlay (design section 8.2) ----

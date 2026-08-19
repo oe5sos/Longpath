@@ -124,6 +124,103 @@ private slots:
         w.setShowSignalHistory(false);
         QCOMPARE(w.signalHistoryMarkersForTest().size(), 1);
     }
+
+    // ── Die 3-kHz-Regel ──────────────────────────────────────────────
+    //
+    // Liegt binnen 3 kHz ein echter DX-Spot, weicht die Verlaufsmarke:
+    // der Spot traegt ein Rufzeichen, die Marke nur eine S-Stufe. Ohne
+    // diese Regel staenden zwei Etiketten uebereinander, und das
+    // wertvollere waere verdeckt.
+
+    void aSpotSuppressesAMarkerWithinThreeKilohertz()
+    {
+        SpectrumWidget w;
+        w.setShowSpots(true);
+        w.setShowSignalHistory(true);
+        w.setSpotMarkers({mark(14.205000, QStringLiteral("DXCluster"),
+                               QStringLiteral("DL1ABC"))});
+        w.setSignalHistoryMarkers({mark(14.207000, QStringLiteral("SHistory"),
+                                        QStringLiteral("S7"))});  // 2 kHz daneben
+
+        const auto merged = w.mergedMarkersForTest();
+        QCOMPARE(merged.size(), 1);
+        QCOMPARE(merged.first().callsign, QStringLiteral("DL1ABC"));
+    }
+
+    void aMarkerFurtherAwayThanThreeKilohertzSurvives()
+    {
+        SpectrumWidget w;
+        w.setShowSpots(true);
+        w.setShowSignalHistory(true);
+        w.setSpotMarkers({mark(14.205000, QStringLiteral("DXCluster"),
+                               QStringLiteral("DL1ABC"))});
+        w.setSignalHistoryMarkers({mark(14.209000, QStringLiteral("SHistory"),
+                                        QStringLiteral("S7"))});  // 4 kHz daneben
+
+        QCOMPARE(w.mergedMarkersForTest().size(), 2);
+    }
+
+    // Die Regel gilt in beide Richtungen der Frequenzachse — ein
+    // vertauschtes Vorzeichen faellt sonst nur auf einer Seite auf.
+    void theRuleWorksBelowTheSpotToo()
+    {
+        SpectrumWidget w;
+        w.setShowSpots(true);
+        w.setShowSignalHistory(true);
+        w.setSpotMarkers({mark(14.205000, QStringLiteral("DXCluster"),
+                               QStringLiteral("DL1ABC"))});
+        w.setSignalHistoryMarkers({mark(14.203000, QStringLiteral("SHistory"),
+                                        QStringLiteral("S7"))});
+        QCOMPARE(w.mergedMarkersForTest().size(), 1);
+    }
+
+    // Ausgeschaltete Sorten kommen gar nicht erst in die Zeichnung.
+    void gatingDecidesWhatIsDrawn()
+    {
+        SpectrumWidget w;
+        w.setShowSpots(false);
+        w.setSignalHistoryMarkers({
+            mark(14.205, QStringLiteral("SHistory"), QStringLiteral("S7")),
+            mark(14.220, QStringLiteral("QRM"),      QStringLiteral("S9")),
+        });
+
+        QVERIFY2(w.mergedMarkersForTest().isEmpty(),
+                 "beide Schalter aus: nichts wird gezeichnet");
+
+        w.setShowSignalHistory(true);
+        QCOMPARE(w.mergedMarkersForTest().size(), 1);
+        QCOMPARE(w.mergedMarkersForTest().first().source,
+                 QStringLiteral("SHistory"));
+
+        w.setShowSignalHistoryQrm(true);
+        QCOMPARE(w.mergedMarkersForTest().size(), 2);
+
+        w.setShowSignalHistory(false);
+        QCOMPARE(w.mergedMarkersForTest().size(), 1);
+        QCOMPARE(w.mergedMarkersForTest().first().source,
+                 QStringLiteral("QRM"));
+    }
+
+    // Ein unterdrueckter Spot verschwindet nicht aus dem Speicher — nur
+    // aus dem Bild. Sonst waere die Marke nach dem Ablaufen des Spots
+    // fuer immer weg.
+    void suppressionDoesNotDeleteTheMarker()
+    {
+        SpectrumWidget w;
+        w.setShowSpots(true);
+        w.setShowSignalHistory(true);
+        w.setSpotMarkers({mark(14.205, QStringLiteral("DXCluster"),
+                               QStringLiteral("DL1ABC"))});
+        w.setSignalHistoryMarkers({mark(14.206, QStringLiteral("SHistory"),
+                                        QStringLiteral("S7"))});
+        QCOMPARE(w.mergedMarkersForTest().size(), 1);
+        QCOMPARE(w.signalHistoryMarkersForTest().size(), 1);
+
+        w.setSpotMarkers({});   // Spot laeuft ab
+        QCOMPARE(w.mergedMarkersForTest().size(), 1);
+        QCOMPARE(w.mergedMarkersForTest().first().callsign,
+                 QStringLiteral("S7"));
+    }
 };
 
 QTEST_MAIN(TestSignalHistoryMarkers)
