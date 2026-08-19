@@ -611,6 +611,8 @@ set(CORE_SOURCES
     src/core/FreeDVRadeReporterBridge.cpp
     src/core/PskReporterClient.cpp
     src/core/CtyDatParser.cpp
+    src/core/VoiceSignalDetector.cpp
+    src/core/SignalHistoryStore.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp
