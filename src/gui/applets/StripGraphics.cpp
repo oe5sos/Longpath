@@ -239,7 +239,7 @@ void StripLevelBars::paintEvent(QPaintEvent*)
         }
         // -6 dBFS mark: the level above which an SSB transmitter has
         // nothing left to give and the ALC starts making the decisions.
-        p.setPen(QPen(QColor(0xd0, 0x60, 0x40), 1, Qt::DotLine));
+        p.setPen(QPen(QColor(Style::kTxRed), 1, Qt::DotLine));
         const int wx = int(xOf(-6.0));
         p.drawLine(wx, y, wx, y + barH);
 
@@ -269,7 +269,7 @@ void StripLevelBars::paintEvent(QPaintEvent*)
     // separate settings.
     if (m_in > kFloorDb && m_out > kFloorDb) {
         const double delta = m_out - m_in;
-        p.setPen(delta > 6.0 ? QColor(0xd0, 0x60, 0x40)
+        p.setPen(delta > 6.0 ? QColor(Style::kTxRed)
                              : c(Style::kTextSecondary));
         p.drawText(rect().adjusted(0, 0, -4, -2),
                    Qt::AlignRight | Qt::AlignBottom,
@@ -342,8 +342,8 @@ namespace {
 // stylesheet, because these widgets paint themselves.
 void drawInset(QPainter& p, const QRect& r)
 {
-    p.fillRect(r, QColor(0x08, 0x08, 0x10));
-    p.setPen(QPen(QColor(0x16, 0x20, 0x2e), 1));
+    p.fillRect(r, QColor(Style::kPanadapterBg));
+    p.setPen(QPen(QColor(Style::kBadgeInfoBg), 1));
     p.drawRect(r);
     p.setPen(QPen(QColor(0, 0, 0, 190), 1));
     p.drawLine(r.left() + 1, r.top() + 1, r.right() - 1, r.top() + 1);
@@ -675,7 +675,7 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     // and it works: the colour says which kind of stage you are looking
     // at before you have read the title.
     const QColor curveCol = (m_stage == Stage::Gate)
-        ? QColor(0xf0, 0x9a, 0x30) : QColor(0x00, 0xe5, 0xff);
+        ? QColor(Style::kAmberText) : QColor(Style::kBlueText);
     QPen curvePen(curveCol, 2.1);
     curvePen.setJoinStyle(Qt::RoundJoin);
     curvePen.setCapStyle(Qt::RoundCap);
@@ -868,7 +868,7 @@ void StripShaperCurve::paintEvent(QPaintEvent*)
         if (px == r.left()) { path.moveTo(pt); } else { path.lineTo(pt); }
     }
     p.setClipRect(r);
-    p.setPen(QPen(QColor(0xf0, 0x9a, 0x30), 2.0));
+    p.setPen(QPen(QColor(Style::kAmberText), 2.0));
     p.drawPath(path);
 
     // How far up the curve the signal is actually reaching. A shaper
@@ -1041,7 +1041,7 @@ void StripBandCurve::paintEvent(QPaintEvent*)
         g.setColorAt(0.0, QColor(0xf0, 0x9a, 0x30, 90));
         g.setColorAt(1.0, QColor(0xf0, 0x9a, 0x30, 10));
         p.fillPath(fill, g);
-        p.setPen(QPen(QColor(0xf0, 0x9a, 0x30), 1.8));
+        p.setPen(QPen(QColor(Style::kAmberText), 1.8));
         p.drawPath(band);
 
         const int fx = int(xForHz(f0, r));
@@ -1071,9 +1071,9 @@ void StripBandCurve::paintEvent(QPaintEvent*)
         struct Mark { double hz; double mix; QColor col; QString name; };
         const Mark marks[2] = {
             {double(pu.pooTuneHz()), double(pu.pooMix()),
-             QColor(0x50, 0xa0, 0xf0), QStringLiteral("low")},
+             QColor(Style::kAccent), QStringLiteral("low")},
             {double(pu.dooTuneHz()), double(pu.dooMix()),
-             QColor(0xf0, 0x9a, 0x30), QStringLiteral("high")},
+             QColor(Style::kAmberText), QStringLiteral("high")},
         };
         for (const Mark& m : marks) {
             if (m.hz <= 0.0) { continue; }

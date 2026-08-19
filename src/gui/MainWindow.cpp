@@ -5381,10 +5381,24 @@ void MainWindow::populateDefaultMeter()
     if (m_tciApplet) {
         m_appletVis->registerApplet(QStringLiteral("Tci"),
                                     QStringLiteral("TCI Server"),  true);
+        // Ohne describeApplet landen sie in „Sonstiges" und sind nur
+        // ueber ihren Anzeigenamen zu finden — die Suche im Auswaehler
+        // greift dann nicht auf „netzwerk" oder „fernsteuerung".
+        // 15 der 17 Applets waren beschrieben, diese zwei nicht.
+        m_appletVis->describeApplet(QStringLiteral("Tci"),
+            QStringLiteral("Netzwerk"),
+            {QStringLiteral("tci"), QStringLiteral("server"),
+             QStringLiteral("netzwerk"), QStringLiteral("fernsteuerung"),
+             QStringLiteral("websocket"), QStringLiteral("expert")});
     }
     if (m_clientChainApplet) {
         m_appletVis->registerApplet(QStringLiteral("ClientChain"),
                                     QStringLiteral("TCI Clients"), true);
+        m_appletVis->describeApplet(QStringLiteral("ClientChain"),
+            QStringLiteral("Netzwerk"),
+            {QStringLiteral("tci"), QStringLiteral("clients"),
+             QStringLiteral("netzwerk"), QStringLiteral("verbindungen"),
+             QStringLiteral("kette")});
     }
 #endif
 
@@ -7605,7 +7619,7 @@ void MainWindow::buildStatusBar()
     m_tgxlChip = new QLabel(QStringLiteral("TGXL"), barWidget);
     m_tgxlChip->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background:#204060; border:1px solid #205070; "
-        "padding:1px 8px; border-radius:6px; color:#88e0ff; }")));
+        "padding:1px 8px; border-radius:6px; color:#cfe2f5; }")));
     m_tgxlChip->setVisible(false);
     hbox->addWidget(m_tgxlChip);
 
@@ -11666,7 +11680,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     // Status label — shows after provider selected
     auto* statusLabel = new QLabel;
     statusLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #20c060; font-size: 11px; font-weight: bold; }"));
+        "QLabel { color: #6fa384; font-size: 11px; font-weight: bold; }"));
     statusLabel->setAlignment(Qt::AlignCenter);
     statusLabel->hide();
     vbox->addWidget(statusLabel);

@@ -60,7 +60,7 @@ constexpr double kHubStrokeOfUnit      =  1.0 / kDesignUnit;
 
 /// Füllung der Nabe. Entwurf: #141417. Kein Rollenname: das ist kein
 /// Flächengrund, sondern das Loch, das der Zeigerfuss abdeckt.
-inline QColor hubFill() { return QColor(0x15, 0x15, 0x1a); }
+inline QColor hubFill() { return QColor(Style::kTitleGradBot); }
 
 /// Der Nachlaufzeiger: kurzer Strich am äusseren Rand, matt.
 constexpr double kPeakLengthOfUnit = 13.0 / kDesignUnit;   // 16 − 3

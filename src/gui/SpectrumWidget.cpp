@@ -4190,7 +4190,7 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
         QFont f = p.font();
         f.setPixelSize(11);
         p.setFont(f);
-        p.setPen(QColor(200, 220, 255));
+        p.setPen(QColor(Style::kBlueText));
         const int pad = 4;
         const int textW = p.fontMetrics().horizontalAdvance(stamp);
         int x = (m_wfTimestampPos == TimestampPosition::Left)
@@ -4299,7 +4299,7 @@ void SpectrumWidget::paintBackgroundLayer(QPainter& p, const QRect& specRect)
 // ---- Frequency scale bar ----
 void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
 {
-    p.fillRect(r, QColor(0x10, 0x15, 0x20));
+    p.fillRect(r, QColor(Style::kBadgeInfoBg));
 
     // Phase 3G-8 commit 5: Off alignment suppresses labels entirely.
     if (m_freqLabelAlign == FreqLabelAlign::Off) {
@@ -4390,7 +4390,7 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     const int arrowBot = specRect.top() + kDbmArrowH - 2;
 
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0x60, 0x80, 0xa0));
+    p.setBrush(QColor(Style::kAccent));
 
     // Up arrow (▲) — left side
     QPolygon upTri;
@@ -4432,7 +4432,7 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
         if (y < labelTop || y > specRect.bottom() - 5) continue;
 
         // Tick mark
-        p.setPen(QColor(0x50, 0x70, 0x80));
+        p.setPen(QColor(Style::kTextTertiary));
         p.drawLine(strip.left(), y, strip.left() + 4, y);
 
         // Label — QStaticText cache: HarfBuzz shapes each unique string
@@ -4449,7 +4449,7 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
         // first-paint rebuild on HiDPI displays.
         cit.value().prepare(p.transform(), f);
 
-        p.setPen(QColor(0x80, 0xa0, 0xb0));
+        p.setPen(QColor(Style::kSpectrumGridText));
         p.drawStaticText(
             QPointF(strip.left() + 6, y - staticAscent / 2.0),
             cit.value());
@@ -4562,15 +4562,15 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
     // LIVE button — grey when live, bright red when paused.
     const QRect liveRect = waterfallLiveButtonRect(wfRect);
     p.setPen(QColor(0x40, 0x50, 0x60));
-    p.setBrush(m_wfLive ? QColor(0x45, 0x45, 0x45)
-                        : QColor(0xc0, 0x20, 0x20));  // bright red when paused
+    p.setBrush(m_wfLive ? QColor(Style::kTextInactive)
+                        : QColor(Style::kTxRed));  // bright red when paused
     p.drawRoundedRect(liveRect, 3, 3);
 
     QFont liveFont = p.font();
     liveFont.setPointSize(7);
     liveFont.setBold(true);
     p.setFont(liveFont);
-    p.setPen(m_wfLive ? QColor(0xb0, 0xb0, 0xb0) : Qt::white);
+    p.setPen(m_wfLive ? QColor(Style::kTitleText) : Qt::white);
     p.drawText(liveRect, Qt::AlignCenter, QStringLiteral("LIVE"));
 
     // Tick labels along the strip.
@@ -4597,7 +4597,7 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
         }
 
         // Tick mark
-        p.setPen(QColor(0x50, 0x70, 0x80));
+        p.setPen(QColor(Style::kTextTertiary));
         p.drawLine(stripX, yy, stripX + 4, yy);
 
         // Label: elapsed seconds when live, absolute UTC when paused.
@@ -4607,7 +4607,7 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
                 m_wfHistoryOffsetRows
                 + static_cast<int>(std::round(sec * 1000.0f / msPerRow)));
 
-        p.setPen(QColor(0x80, 0xa0, 0xb0));
+        p.setPen(QColor(Style::kSpectrumGridText));
         if (m_wfLive) {
             p.drawText(stripX + 6, yy + fm.ascent() / 2, label);
         } else {
@@ -6457,7 +6457,7 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
             p.setBrush(QColor(0x30, 0x50, 0x70, 200));
             p.drawRoundedRect(badgeRect, 3, 3);
 
-            p.setPen(QColor(0xff, 0xc0, 0x40));  // amber text
+            p.setPen(QColor(Style::kAmberText));  // amber text
             p.drawText(badgeRect, Qt::AlignCenter, badgeText);
 
             // Store for click detection
@@ -6707,12 +6707,12 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(pt, radius, radius);
     };
-    drawMarker(f0L,   QColor("#ffd24a"), 6.0f);
-    drawMarker(f0U,   QColor("#ffd24a"), 6.0f);
-    drawMarker(imd3L, QColor("#ff8a8a"), 5.0f);
-    drawMarker(imd3U, QColor("#ff8a8a"), 5.0f);
-    drawMarker(imd5L, QColor("#cc6680"), 4.0f);
-    drawMarker(imd5U, QColor("#cc6680"), 4.0f);
+    drawMarker(f0L,   QColor("#c2924f"), 6.0f);
+    drawMarker(f0U,   QColor("#c2924f"), 6.0f);
+    drawMarker(imd3L, QColor("#c25a5c"), 5.0f);
+    drawMarker(imd3U, QColor("#c25a5c"), 5.0f);
+    drawMarker(imd5L, QColor("#c25a5c"), 4.0f);
+    drawMarker(imd5U, QColor("#c25a5c"), 4.0f);
 
     // From Thetis display.cs:5520 [v2.10.3.13]:
     //   RoundedRectangle rr = new RoundedRectangle();
@@ -6729,7 +6729,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     const QRectF box(specRect.left() + kBoxX, specRect.top() + kBoxY,
                      kBoxW, kBoxH);
     p.setBrush(QColor(20, 28, 40, 240));
-    p.setPen(QPen(QColor("#5fb0d8"), 1.5));
+    p.setPen(QPen(QColor("#4a7ba8"), 1.5));
     p.drawRoundedRect(box, kBoxR, kBoxR);
 
     // From Thetis display.cs:5683-5687 [v2.10.3.13] DrawText calls.
@@ -8728,7 +8728,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // magenta convicts the chain. One run with NEREUS_WF_DEBUG=2
     // answers what four theories could not.
     if (kWfDebugLevel >= 2 && !m_waterfall.isNull()) {
-        m_waterfall.fill(QColor(0, 170, 0));
+        m_waterfall.fill(QColor(Style::kGreenText));
         m_wfTexFullUpload = true;
     }
     if (kWfDebug) {
@@ -9197,13 +9197,13 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 const QColor bg = red   ? QColor(80, 20, 20, 220)
                                 : amber ? QColor(80, 60, 20, 220)
                                         : QColor(20, 40, 20, 220);
-                const QColor border = red   ? QColor(200, 80, 80)
-                                    : amber ? QColor(200, 160, 60)
-                                            : QColor(80, 200, 80);
+                const QColor border = red   ? QColor(Style::kTxRed)
+                                    : amber ? QColor(Style::kAmberText)
+                                            : QColor(Style::kGreenText);
                 p.setPen(QPen(border, 1));
                 p.setBrush(bg);
                 p.drawRect(boxX, boxY, boxW, boxH);
-                p.setPen(QColor(220, 220, 220));
+                p.setPen(QColor(Style::kRedText));
                 for (int i = 0; i < lines.size(); ++i) {
                     p.drawText(boxX + padX,
                                boxY + padY + fm.ascent() + i * lineH,

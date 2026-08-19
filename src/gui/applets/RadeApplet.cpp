@@ -36,7 +36,7 @@ namespace {
 
 // RADE accent purple. Matches the L3 mode-menu / VFO chip colour for
 // visual consistency across the RADE surface.
-constexpr const char* kRadePurple = "#a78bfa";
+constexpr const char* kRadePurple = "#4a7ba8";
 
 // Threshold above which the codec is considered "good copy" (green).
 // Below this, marginal (yellow). Same threshold as VfoWidget L1.

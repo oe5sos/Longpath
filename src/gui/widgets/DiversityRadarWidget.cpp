@@ -75,6 +75,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -178,10 +179,10 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
 
     // Backdrop radial gradient (NereusSDR-original chrome).
     QRadialGradient bg(c, r);
-    bg.setColorAt(0.0, QColor(0, 60, 100));
-    bg.setColorAt(1.0, QColor(0, 20, 40));
+    bg.setColorAt(0.0, QColor(Style::kBlueBg));
+    bg.setColorAt(1.0, QColor(Style::kBadgeInfoBg));
     p.setBrush(bg);
-    p.setPen(QPen(QColor(0, 255, 255), 1.0));
+    p.setPen(QPen(QColor(Style::kDspToggleText), 1.0));
     p.drawEllipse(c, r, r);
 
     // Range rings at 30 percent and 50 percent (dashed).
@@ -202,7 +203,7 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     QFont labelFont = p.font();
     labelFont.setPointSizeF(labelFont.pointSizeF() * 0.85);
     p.setFont(labelFont);
-    p.setPen(QColor(200, 220, 230));
+    p.setPen(QColor(Style::kBlueText));
     const QString labels[4] = {QStringLiteral("N"), QStringLiteral("E"),
                                QStringLiteral("S"), QStringLiteral("W")};
     const QPointF offsets[4] = {
@@ -242,7 +243,7 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
         lobe << QPointF(sx, sy);
     }
 
-    QPen lobePen(QColor(0, 220, 255), 1.6);
+    QPen lobePen(QColor(Style::kBlueText), 1.6);
     p.setPen(lobePen);
     p.setBrush(QColor(0, 220, 255, 60));
     p.drawPolygon(lobe);
@@ -261,7 +262,7 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     const double hy = c.y() - handleR * std::cos(m_phase);
     p.setPen(QPen(QColor(255, 255, 255, 200), 1.0, Qt::DashLine));
     p.drawLine(c, QPointF(hx, hy));
-    p.setBrush(QColor(255, 220, 80));
+    p.setBrush(QColor(Style::kAmberText));
     p.setPen(QPen(QColor(255, 255, 255), 1.0));
     p.drawEllipse(QPointF(hx, hy), 5.0, 5.0);
 }

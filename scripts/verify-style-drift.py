@@ -114,6 +114,12 @@ def measure() -> tuple[dict, dict]:
         except Exception:
             continue
         rel = path.relative_to(REPO)
+        # Kommentartext zaehlt NICHT. Dieselbe Korrektur wie in
+        # colour_audit.py: ein Satz wie „kCheckBoxStyle adds
+        # font-size:12px" beschreibt eine ANDERE Konstante und ist keine
+        # Schriftgroesse dieser Zeile. Ohne diese Zeile blieb der Zaehler
+        # bei 5 stehen, obwohl nur vier echte Stellen uebrig waren.
+        text = "\n".join(l.split("//")[0] for l in text.split("\n"))
         for rx in (RE_FONT_PX, RE_SET_PIXEL):
             for m in rx.finditer(text):
                 px = int(m.group(1))

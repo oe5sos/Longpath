@@ -115,6 +115,7 @@ mw0lge@grange-lane.co.uk
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -321,7 +322,7 @@ void SignalTextItem::paint(QPainter& p, int widgetW, int widgetH)
 
             case BarStyle::GradientFilled: {
                 QLinearGradient grad(barRect.left(), 0, barRect.right(), 0);
-                grad.setColorAt(0.0, QColor(0x00, 0xff, 0xff));  // cyan
+                grad.setColorAt(0.0, QColor(Style::kDspToggleText));  // cyan
                 grad.setColorAt(1.0, QColor(0xff, 0x00, 0x00));  // red
                 p.setBrush(grad);
                 const QRect fillRect(barRect.left(), barRect.top(), fillW, barRect.height());
@@ -344,7 +345,7 @@ void SignalTextItem::paint(QPainter& p, int widgetW, int widgetH)
                         const int g = static_cast<int>(0xff * (1.0f - t));
                         p.fillRect(segRect, QColor(r, g, 0xff - r));
                     } else {
-                        p.fillRect(segRect, QColor(0x20, 0x20, 0x30));
+                        p.fillRect(segRect, QColor(Style::kBadgeInfoBg));
                     }
                 }
                 break;

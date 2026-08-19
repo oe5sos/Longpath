@@ -117,6 +117,7 @@ mw0lge@grange-lane.co.uk
 #include <cmath>
 #include <algorithm>
 #include <QtMath>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -1547,7 +1548,7 @@ void NeedleItem::paintBackground(QPainter& p, int widgetW, int widgetH)
     // Blue arc 6px inside the outer arc (always drawn)
     const float innerR = radius - 6.0f;
     const QRectF innerArc(cx - innerR, cy - innerR, innerR * 2.0f, innerR * 2.0f);
-    arcPen.setColor(QColor(0x00, 0x80, 0xd0));  // From AetherSDR blueColor
+    arcPen.setColor(QColor(Style::kAccent));  // From AetherSDR blueColor
     p.setPen(arcPen);
     const int fullStart = static_cast<int>(kArcStartDeg * 16.0f);
     const int fullSpan  = static_cast<int>((kArcEndDeg - kArcStartDeg) * 16.0f);

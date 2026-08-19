@@ -62,6 +62,7 @@ mw0lge@grange-lane.co.uk
 
 #include <algorithm>
 #include <cmath>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -115,7 +116,7 @@ void MagicEyeItem::paint(QPainter& p, int widgetW, int widgetH)
     p.setRenderHint(QPainter::Antialiasing, true);
 
     // Step 3: dark background circle
-    p.setBrush(QColor(0x0a, 0x0a, 0x0a));
+    p.setBrush(QColor(Style::kStatusBarBg));
     p.setPen(Qt::NoPen);
     p.drawEllipse(eyeRect);
 
@@ -145,7 +146,7 @@ void MagicEyeItem::paint(QPainter& p, int widgetW, int widgetH)
 
     // Step 6: center dot (anode)
     int dotR = side / 12;
-    p.setBrush(QColor(0x20, 0x20, 0x20));
+    p.setBrush(QColor(Style::kBorderSubtle));
     p.drawEllipse(eyeRect.center(), dotR, dotR);
 
     // Step 7: optional bezel overlay image

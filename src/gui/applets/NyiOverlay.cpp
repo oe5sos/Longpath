@@ -7,7 +7,7 @@ NyiOverlay::NyiOverlay(const QString& phaseHint, QWidget* parent)
     : QLabel(QStringLiteral("NYI"), parent)
 {
     setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { background: #3a2a00; color: #ffb800;"
+        "QLabel { background: #33280f; color: #ffb800;"
         " border: 1px solid #604000; border-radius: 6px;"
         " padding: 0px 3px; font-size: 9px; font-weight: bold; }")));
     setToolTip(QStringLiteral("Not Yet Implemented — Available in %1").arg(phaseHint));

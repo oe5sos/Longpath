@@ -69,17 +69,17 @@ static const char* kPillStyleOk =
     "  background: #1a2a38;"
     "  border: 1px solid #203040;"
     "  border-radius: 6px;"
-    "  color: #80c8a0;"
+    "  color: #7fae91;"
     "  font-size: 11px;"
     "  padding: 2px 8px;"
     "}";
 
 static const char* kPillStyleError =
     "QLabel {"
-    "  background: #301520;"
-    "  border: 1px solid #603040;"
+    "  background: #3f2224;"
+    "  border: 1px solid #3f2224;"
     "  border-radius: 6px;"
-    "  color: #e05060;"
+    "  color: #c25a5c;"
     "  font-size: 11px;"
     "  padding: 2px 8px;"
     "}";

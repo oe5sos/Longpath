@@ -830,7 +830,7 @@ void TxProfilesPage::buildUI()
     info->setAlignment(Qt::AlignCenter);
     info->setWordWrap(true);
     info->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { color: #b0c0d0; font-style: italic; "
+        "QLabel { color: #c4c4c9; font-style: italic; "
         " background: #1a2a3a; border: 1px solid #203040; "
         " border-radius: 6px; padding: 12px; }")));
     contentLayout()->addWidget(info);
@@ -859,7 +859,7 @@ constexpr QChar kHollowCircle = QChar(0x25CB);  // ○
 //   alc  → cyan         (#00b4d8)  for the "always-on" callout
 QString dotStyleFor(bool on)
 {
-    const QString colour = on ? QStringLiteral("#20e070") : QStringLiteral("#607080");
+    const QString colour = on ? QStringLiteral("#6fa384") : QStringLiteral("#607080");
     return QStringLiteral("QLabel { color: %1; font-size: 16px; font-weight: bold; }").arg(colour);
 }
 

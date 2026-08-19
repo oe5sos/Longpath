@@ -230,7 +230,7 @@ QWidget* ClientChainApplet::buildClientRow(
         // TX badge — orange when this socket holds the TX audio mutex.
         const bool isTxActive = (m_server && socket == m_server->activeTxAudioClient());
         if (isTxActive) {
-            hbox->addWidget(makeBadge(QStringLiteral("TX"), "#804000", "#ffb800", row));
+            hbox->addWidget(makeBadge(QStringLiteral("TX"), "#a8724a", "#ffb800", row));
         } else {
             // Transparent spacer to keep peer label aligned.
             auto* spacer = new QLabel(row);
@@ -287,7 +287,7 @@ QWidget* ClientChainApplet::buildClientRow(
         // TX direction badge (orange when active TX client).
         if (m_server && socket == m_server->activeTxAudioClient()) {
             hbox->addWidget(makeBadge(
-                QStringLiteral("TX audio"), "#804000", "#ffb800", row));
+                QStringLiteral("TX audio"), "#a8724a", "#ffb800", row));
         }
 
         if (session->iqStreamEnabled.isEmpty()
@@ -302,12 +302,12 @@ QWidget* ClientChainApplet::buildClientRow(
         // RX sensors badge
         if (session->rxSensorsEnabled) {
             hbox->addWidget(makeBadge(
-                QStringLiteral("RX sens"), "#003060", "#60b8e0", row));
+                QStringLiteral("RX sens"), "#254a72", "#4a7ba8", row));
         }
         // TX sensors badge
         if (session->txSensorsEnabled) {
             hbox->addWidget(makeBadge(
-                QStringLiteral("TX sens"), "#402000", "#c08040", row));
+                QStringLiteral("TX sens"), "#33280f", "#c2924f", row));
         }
 
         vbox->addLayout(hbox);
@@ -364,7 +364,7 @@ QWidget* ClientChainApplet::buildClientRow(
             "}"
             "QPushButton:hover { background: %4; }"
         ).arg(Style::kButtonBg, Style::kRedBorder, Style::kRedBorder,
-              "#3a0a0a"));
+              "#3f2224"));
         disconnectBtn->setProperty("ws", QVariant::fromValue(socket));
         connect(disconnectBtn, &QPushButton::clicked,
                 this, &ClientChainApplet::onDisconnectClicked);

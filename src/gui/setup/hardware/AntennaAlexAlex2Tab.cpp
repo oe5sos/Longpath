@@ -466,10 +466,10 @@ void AntennaAlexAlex2Tab::updateBoardCapabilities(bool hasAlex2)
 
     if (hasAlex2) {
         m_statusLed->setStyleSheet(
-            QStringLiteral("QLabel { background: #00cc00; border-radius: 6px; }"));
+            QStringLiteral("QLabel { background: #6fa384; border-radius: 6px; }"));
         m_statusLabel->setText(tr("Alex-2 board: Active"));
         m_statusLabel->setStyleSheet(
-            QStringLiteral("QLabel { color: #00aa00; font-weight: bold; }"));
+            QStringLiteral("QLabel { color: #6fa384; font-weight: bold; }"));
     } else {
         m_statusLed->setStyleSheet(
             QStringLiteral("QLabel { background: #3d3d41; border-radius: 6px; }"));

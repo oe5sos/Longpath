@@ -201,7 +201,7 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
             QStringLiteral(
                 "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
                 "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
-                "QPushButton:hover { background: #007040; }")));
+                "QPushButton:hover { background: #33684c; }")));
     } else {
         m_operateBtn->setStyleSheet(Style::themed(
             QStringLiteral(
@@ -215,8 +215,8 @@ void Rf2ksApplet::setConnectedState(bool connected)
 {
     m_connected = connected;
     const QString color = connected
-        ? QStringLiteral("#34c759")
-        : QStringLiteral("#e64949");
+        ? QStringLiteral("#6fa384")
+        : QStringLiteral("#c25a5c");
     m_statusDot->setStyleSheet(
         QStringLiteral("background:%1; border-radius:6px;").arg(color));
 }

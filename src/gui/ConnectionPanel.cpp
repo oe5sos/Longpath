@@ -151,8 +151,8 @@ static constexpr QColor kColorOffline     { 30, 30, 40};    // dark grey — off
 // ---------------------------------------------------------------------------
 // State pill colors — design §7.3 (Phase 3Q Task 5)
 // ---------------------------------------------------------------------------
-static const char* kPillOnlineColor    = "#39c167";   // green  — last seen < 60 s
-static const char* kPillStaleColor     = "#d39c2a";   // amber  — last seen 60 s – 5 min
+static const char* kPillOnlineColor    = "#6fa384";   // green  — last seen < 60 s
+static const char* kPillStaleColor     = "#c2924f";   // amber  — last seen 60 s – 5 min
 // ── Offline ist ein Zustand, keine Warnung ──────────────────────────
 //
 // War #c14848, kraeftig rot. Aber nichts ist zu verhueten: das Geraet
@@ -165,7 +165,7 @@ static const char* kPillStaleColor     = "#d39c2a";   // amber  — last seen 60
 // lebt, und sonst ohne Anspruch. Entscheidung des Betreibers,
 // 2026-08-16.
 static const char* kPillOfflineColor   = Style::kTextInactive;  // war #c14848
-static const char* kPillConnectedColor = "#39c167";   // green  — currently connected
+static const char* kPillConnectedColor = "#6fa384";   // green  — currently connected
 
 // ---------------------------------------------------------------------------
 // StatePill — pure static threshold function (Phase 3Q Task 5 Step 3)
@@ -473,7 +473,7 @@ void ConnectionPanel::buildUI()
     // Hint label
     m_modelHintLabel = new QLabel(m_detailGroup);
     m_modelHintLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #b08020; font-size: 11px; font-style: italic; }"));
+        "QLabel { color: #a8853f; font-size: 11px; font-style: italic; }"));
     m_modelHintLabel->setVisible(false);
     detailLayout->addWidget(m_modelHintLabel);
 

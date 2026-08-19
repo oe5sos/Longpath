@@ -319,7 +319,7 @@ void RxApplet::buildUi()
             "  color: #4a7ba8; background: transparent; border: none;"  // §A2 one-off "live blue"
             "  font-size: 11px; font-weight: bold; padding: 0 2px;"
             "}"
-            "QPushButton:hover { color: #66aaff; }"  // §A2 one-off hover derived from #4488ff
+            "QPushButton:hover { color: #4a7ba8; }"  // §A2 one-off hover derived from #4488ff
         ));
         connect(m_rxAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder — capability-gated popup (Phase 3P-I-a T22).
@@ -780,7 +780,7 @@ void RxApplet::buildUi()
         m_agcAutoLabel = new QPushButton(QStringLiteral("AUTO"), m_agcTContainer);
         m_agcAutoLabel->setStyleSheet(
             QStringLiteral("QPushButton { background: #18181a; border: 1px solid #445;"  // §A2 one-off
-                            "color: #556; font-size: 7px; padding: 0 3px; border-radius: 6px; }"
+                            "color: #556; font-size: 9px; padding: 0 3px; border-radius: 6px; }"
                             "QPushButton:hover { border-color: #c2924f; }"));
         m_agcAutoLabel->setFixedHeight(14);
         m_agcAutoLabel->setFixedWidth(30);
@@ -812,7 +812,7 @@ void RxApplet::buildUi()
         m_agcInfoLabel = new QLabel(m_agcTContainer);
         // §A2 one-off: #33aa33 is NereusSDR-original AGC-info green (one location).
         // Not in StyleConstants; distinct from kGreenBg/kGreenText. Kept as one-off.
-        m_agcInfoLabel->setStyleSheet(QStringLiteral("color: #33aa33; font-size: 7px; padding: 0 2px;"));
+        m_agcInfoLabel->setStyleSheet(QStringLiteral("color: #6fa384; font-size: 9px; padding: 0 2px;"));
         m_agcInfoLabel->hide();
         containerLayout->addWidget(m_agcInfoLabel);
 
@@ -1868,7 +1868,7 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
                 QStringLiteral("QPushButton { background: #1b3527; border: 1px solid #c2924f;"  // §A2 one-off
-                                "color: #c2924f; font-size: 7px; padding: 0 3px; border-radius: 6px; }"
+                                "color: #c2924f; font-size: 9px; padding: 0 3px; border-radius: 6px; }"
                                 "QPushButton:hover { background: #1b3527; }"));
         }
 
@@ -1886,7 +1886,7 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
                 QStringLiteral("QPushButton { background: #18181a; border: 1px solid #445;"  // §A2 one-off
-                                "color: #556; font-size: 7px; padding: 0 3px; border-radius: 6px; }"
+                                "color: #556; font-size: 9px; padding: 0 3px; border-radius: 6px; }"
                                 "QPushButton:hover { border-color: #c2924f; }"));
         }
         if (m_agcInfoLabel) {

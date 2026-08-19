@@ -796,18 +796,18 @@ void LogbookWindow::refreshTable()
         // this column, and colour reads faster than text.
         if (QTableWidgetItem* bi = m_table->item(row, ColBand)) {
             static const QHash<QString, QColor> kBandCol = {
-                {QStringLiteral("160m"), QColor(0xc0, 0x40, 0x40)},
-                {QStringLiteral("80m"),  QColor(0xff, 0x70, 0x40)},
-                {QStringLiteral("60m"),  QColor(0xff, 0xa0, 0x40)},
-                {QStringLiteral("40m"),  QColor(0xff, 0xd0, 0x40)},
-                {QStringLiteral("30m"),  QColor(0xff, 0xff, 0x40)},
-                {QStringLiteral("20m"),  QColor(0x40, 0xff, 0x40)},
-                {QStringLiteral("17m"),  QColor(0x40, 0xff, 0xb0)},
-                {QStringLiteral("15m"),  QColor(0x40, 0xd0, 0xff)},
-                {QStringLiteral("12m"),  QColor(0x40, 0x80, 0xff)},
-                {QStringLiteral("10m"),  QColor(0xa0, 0x40, 0xff)},
-                {QStringLiteral("6m"),   QColor(0xff, 0x40, 0xff)},
-                {QStringLiteral("2m"),   QColor(0xff, 0x40, 0xc0)},
+                {QStringLiteral("160m"), QColor(Style::kTxRed)},
+                {QStringLiteral("80m"),  QColor(Style::kTxRed)},
+                {QStringLiteral("60m"),  QColor(Style::kAmberText)},
+                {QStringLiteral("40m"),  QColor(Style::kAmberText)},
+                {QStringLiteral("30m"),  QColor(Style::kAmberText)},
+                {QStringLiteral("20m"),  QColor(Style::kGreenText)},
+                {QStringLiteral("17m"),  QColor(Style::kDspToggleText)},
+                {QStringLiteral("15m"),  QColor(Style::kBlueText)},
+                {QStringLiteral("12m"),  QColor(Style::kAccent)},
+                {QStringLiteral("10m"),  QColor(Style::kBlueHover)},
+                {QStringLiteral("6m"),   QColor(Style::kTxRed)},
+                {QStringLiteral("2m"),   QColor(Style::kTxRed)},
             };
             const QColor c = kBandCol.value(e.band.trimmed().toLower());
             if (c.isValid()) {

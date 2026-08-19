@@ -127,7 +127,7 @@ void TciLogWindow::buildUI()
         "  background-color: #18181a;"
         "  color: #c4c4c9;"
         "  border: 1px solid #3d3d41;"
-        "  selection-background-color: #4a6f8f;"
+        "  selection-background-color: #4a7ba8;"
         "}"));
     root->addWidget(m_logView, /*stretch=*/1);
 }

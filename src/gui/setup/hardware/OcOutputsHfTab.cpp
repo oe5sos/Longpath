@@ -623,7 +623,7 @@ void OcOutputsHfTab::repaintLiveLeds()
         if (lit) {
             m_leds[pin]->setStyleSheet(QStringLiteral(
                 "background: #6fa384;"
-                "border: 1px solid #33dd55;"
+                "border: 1px solid #6fa384;"
                 "border-radius: 6px;"));
         } else {
             m_leds[pin]->setStyleSheet(QStringLiteral(

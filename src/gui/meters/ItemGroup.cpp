@@ -84,6 +84,7 @@ mw0lge@grange-lane.co.uk
 
 #include <QStringList>
 #include <QtAlgorithms>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -1059,7 +1060,7 @@ ItemGroup* ItemGroup::createAnanMMPreset(QObject* parent)
     signal->setRect(0.0f, 0.0f, 1.0f, 1.0f);
     signal->setBindingId(MeterBinding::SignalAvg);
     signal->setZOrder(10);
-    signal->setNeedleColor(QColor(233, 51, 50));
+    signal->setNeedleColor(QColor(Style::kTxRed));
     signal->setAttackRatio(0.8f);
     signal->setDecayRatio(0.2f);
     signal->setLengthFactor(1.65f);
@@ -1131,7 +1132,7 @@ ItemGroup* ItemGroup::createAnanMMPreset(QObject* parent)
     power->setRect(0.0f, 0.0f, 1.0f, 1.0f);
     power->setBindingId(MeterBinding::TxPower);
     power->setZOrder(10);
-    power->setNeedleColor(QColor(233, 51, 50));
+    power->setNeedleColor(QColor(Style::kTxRed));
     power->setAttackRatio(0.2f);
     power->setDecayRatio(0.1f);
     power->setLengthFactor(1.55f);

@@ -29,6 +29,7 @@
 
 #include <QFont>
 #include <QPainter>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -95,19 +96,19 @@ void LayoutThumbnail::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    QColor bg = m_current ? QColor(0x00, 0x60, 0x7a) : QColor(0x1a, 0x2a, 0x3a);
-    if (!m_enabled) { bg = QColor(0x10, 0x10, 0x18); }
+    QColor bg = m_current ? QColor(Style::kBlueBorder) : QColor(0x1a, 0x2a, 0x3a);
+    if (!m_enabled) { bg = QColor(Style::kPanadapterBg); }
     p.fillRect(rect(), bg);
 
     QColor border = m_current ? QColor(0x00, 0xb4, 0xd8) : QColor(0x30, 0x40, 0x50);
-    if (!m_enabled) { border = QColor(0x20, 0x20, 0x30); }
+    if (!m_enabled) { border = QColor(Style::kBadgeInfoBg); }
     p.setPen(QPen(border, m_current ? 2 : 1));
     p.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 4, 4);
 
-    const QColor cellColor = m_enabled ? QColor(0x2a, 0x5a, 0x8a)
+    const QColor cellColor = m_enabled ? QColor(Style::kBlueHover)
                                        : QColor(0x1a, 0x1a, 0x2a);
     const QColor textColor = m_enabled ? QColor(0xc8, 0xd8, 0xe8)
-                                       : QColor(0x40, 0x40, 0x50);
+                                       : QColor(Style::kTextInactive);
 
     const QVector<QRect> cells = cellRects();
     for (int i = 0; i < cells.size(); ++i) {

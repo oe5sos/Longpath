@@ -1129,7 +1129,7 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
             "QPushButton { background: #204060; color: #c8d8e8; border: 1px solid #304050;"
             "  border-radius: 6px; font-size: 11px; padding: 0; }"
             "QPushButton:hover { background: #204060; }"
-            "QPushButton:pressed { background: #0d2040; }"));
+            "QPushButton:pressed { background: #161e27; }"));
         m_clarityRetuneBtn->setToolTip("Force Clarity to re-estimate the noise floor now");
         grid->addWidget(m_clarityRetuneBtn, row, 2, 1, 2, Qt::AlignRight);
         connect(m_clarityRetuneBtn, &QPushButton::clicked,
@@ -1582,7 +1582,7 @@ void SpectrumOverlayPanel::setClarityStatus(bool active, bool paused)
         return;
     }
     const QString color = paused
-        ? QStringLiteral("#d4a017")   // amber
+        ? QStringLiteral("#c2924f")   // amber
         : QStringLiteral("#20a040");  // green
     m_clarityBadge->setStyleSheet(Style::themed(
         QStringLiteral("QLabel { background: %1; color: #0f0f1a; "

@@ -60,7 +60,7 @@ void ColorsThemePage::buildUI()
 
     // Trace & Fill Color — moved from Display → Spectrum Defaults "Trace Colors" group.
     m_traceFillColorBtn = makeBtn(specGroup,
-        QColor(0x00, 0xe5, 0xff),
+        QColor(Style::kBlueText),
         [](SpectrumWidget* w){ return w->fillColor(); },
         &SpectrumWidget::setFillColor);
     // Thetis: setup.designer.cs:3234 (clrbtnDataLine) / :3217 (clrbtnDataFill) — collapsed into

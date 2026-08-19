@@ -102,7 +102,7 @@ static const char* const kGeometrySettingsKey =
 static QString bisqueLabelStyle()
 {
     return QStringLiteral(
-        "QLabel { background-color: #FFE4C4; color: black; "
+        "QLabel { background-color: #f0dcdc; color: black; "
         "border: 1px inset; padding: 1px 4px; min-width: 56px; }");
 }
 

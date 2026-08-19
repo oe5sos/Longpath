@@ -227,12 +227,12 @@ QColor ConnectionSegment::stateDotColor() const
     switch (m_state) {
         case ConnectionState::Connected:
             // m_pulseOn alternates → slow green pulse encoding streaming activity
-            return m_pulseOn ? QColor("#6fa384") : QColor("#4d7d63");
+            return m_pulseOn ? QColor("#6fa384") : QColor("#33684c");
         case ConnectionState::Probing:
         case ConnectionState::Connecting:
             return m_pulseOn ? QColor("#4a7ba8") : QColor("#254a72");
         case ConnectionState::LinkLost:
-            return m_pulseOn ? QColor("#c2924f") : QColor("#8a6c3c");
+            return m_pulseOn ? QColor("#c2924f") : QColor("#6b5426");
         case ConnectionState::Disconnected:
             // ── Warum hier warn und beim DISCONNECTED-Schild nicht ──
             //
@@ -547,7 +547,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
         return QIcon(pm);
     };
 
-    QIcon bulbIcon = makeBulbIcon(QColor(0xFF, 0xD0, 0x60), QColor(0x80, 0x60, 0x20));
+    QIcon bulbIcon = makeBulbIcon(QColor(Style::kAmberText), QColor(Style::kAmberBorder));
 
     m_featureBtn = new QPushButton(this);
     m_featureBtn->setObjectName(QStringLiteral("featureButton"));

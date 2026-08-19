@@ -91,6 +91,7 @@ mw0lge@grange-lane.co.uk
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -128,17 +129,17 @@ const QVector<QColor>& ParametricEqWidget::defaultBandPalette() {
         QColor(  0, 220, 130),
         QColor(255, 210,   0),
         QColor(255, 140,   0),
-        QColor(255,  80,  80),
-        QColor(255,   0, 180),
-        QColor(170,  90, 255),
-        QColor( 70, 120, 255),
-        QColor(  0, 200, 200),
-        QColor(180, 255,  90),
-        QColor(255, 105, 180),
-        QColor(255, 215, 120),
-        QColor(120, 255, 255),
-        QColor(140, 200, 255),
-        QColor(220, 160, 255),
+        QColor(Style::kTxRed),
+        QColor(Style::kTxRed),
+        QColor(Style::kBlueHover),
+        QColor(Style::kAccent),
+        QColor(Style::kDspToggleText),
+        QColor(Style::kAmberWarn),
+        QColor(Style::kTxRed),
+        QColor(Style::kAmberText),
+        QColor(Style::kBlueText),
+        QColor(Style::kBlueText),
+        QColor(Style::kAccent),
         QColor(255, 120,  40),
         QColor(120, 255, 160),
         QColor(255,  60, 120),
@@ -162,7 +163,7 @@ QColor ParametricEqWidget::defaultBandPaletteAt(int index) {
 QColor ParametricEqWidget::getBandBaseColor(int index) {
     const auto& palette = defaultBandPalette();
     int n = palette.size();
-    if (n <= 0) return QColor(200, 200, 200);
+    if (n <= 0) return QColor(Style::kTextPrimary);
     int idx = index % n;
     if (idx < 0) idx = 0;
     return palette.at(idx);

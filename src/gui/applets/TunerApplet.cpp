@@ -557,13 +557,13 @@ void TunerApplet::syncFromModel()
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
             "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
             "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
-            "QPushButton:hover { background: #007040; }")));
+            "QPushButton:hover { background: #33684c; }")));
     } else if (m_tunerModel->isOperate() && m_tunerModel->isBypass()) {
         m_operateBtn->setText(QStringLiteral("BYPASS"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
-            "QPushButton { background: #906000; border: 1px solid #a07000; "
+            "QPushButton { background: #906000; border: 1px solid #a8853f; "
             "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
-            "QPushButton:hover { background: #9a7000; }")));
+            "QPushButton:hover { background: #a8853f; }")));
     } else {
         m_operateBtn->setText(QStringLiteral("STANDBY"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(

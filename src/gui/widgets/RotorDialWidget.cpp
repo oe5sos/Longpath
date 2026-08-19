@@ -409,15 +409,15 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // the other turns the wrong way at three in the morning — or,
     // worse, believes the antenna moved when it did not. (2026-08-10)
     const QColor actualCol = m_simulated                  ? kMuted
-                           : (m_state == State::Turning)  ? QColor(0xff, 0xfb, 0xe8)
-                           : (m_state == State::OnTarget) ? QColor(0xea, 0xff, 0xf4)
+                           : (m_state == State::Turning)  ? QColor(Style::kRedText)
+                           : (m_state == State::OnTarget) ? QColor(Style::kRedText)
                                                           : kActual;
     drawNeedle(m_actual, actualCol, 0.90, m_simulated, m_simulated ? 2.0 : 2.6);
 
     // Hub
     const QColor hubCol = (m_state == State::Turning)  ? kTurning
                         : (m_state == State::OnTarget) ? kArrived
-                                                       : QColor(0xc9, 0xcc, 0xd4);
+                                                       : QColor(Style::kTextPrimary);
     QRadialGradient hub(c, 9);
     hub.setColorAt(0.0, hubCol);
     QColor hubEdge = hubCol;

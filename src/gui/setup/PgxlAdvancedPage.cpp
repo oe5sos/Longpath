@@ -260,7 +260,7 @@ void PgxlAdvancedPage::buildHardwareSection(QVBoxLayout* topLay)
     m_hwPendingLabel = new QLabel(
         QStringLiteral("Changes pending -- Save & Reboot required to apply."));
     m_hwPendingLabel->setStyleSheet(
-        QStringLiteral("color: #e87c1e; font-style: italic;"));
+        QStringLiteral("color: #c2924f; font-style: italic;"));
     m_hwPendingLabel->setVisible(false);
     lay->addWidget(m_hwPendingLabel);
 
@@ -626,11 +626,11 @@ void PgxlAdvancedPage::onPgxlStatusUpdated(const QMap<QString, QString>& kvs)
         m_stateBadge->setText(state);
         if (state == QStringLiteral("OPERATE")) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #2d8a2d; color: #fff;"
+                QStringLiteral("background: #33684c; color: #fff;"
                                " border-radius: 6px; padding: 2px 6px;"));
         } else if (state.startsWith(QStringLiteral("FAULT"))) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #aa2222; color: #fff;"
+                QStringLiteral("background: #c25a5c; color: #fff;"
                                " border-radius: 6px; padding: 2px 6px;"));
         } else if (state == QStringLiteral("STANDBY")) {
             m_stateBadge->setStyleSheet(
@@ -638,7 +638,7 @@ void PgxlAdvancedPage::onPgxlStatusUpdated(const QMap<QString, QString>& kvs)
                                " border-radius: 6px; padding: 2px 6px;"));
         } else {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #c88000; color: #fff;"
+                QStringLiteral("background: #c2924f; color: #fff;"
                                " border-radius: 6px; padding: 2px 6px;"));
         }
     }
@@ -734,7 +734,7 @@ void PgxlAdvancedPage::onSaveAndReboot()
     m_model->pgxlConnection()->save();
     m_stateBadge->setText(QStringLiteral("Rebooting..."));
     m_stateBadge->setStyleSheet(
-        QStringLiteral("background: #c88000; color: #fff;"
+        QStringLiteral("background: #c2924f; color: #fff;"
                        " border-radius: 6px; padding: 2px 6px;"));
     m_pendingSaveReboot = false;
 }

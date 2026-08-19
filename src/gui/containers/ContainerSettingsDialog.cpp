@@ -217,12 +217,12 @@ constexpr const char* kOkBtnStyle =
     "QPushButton {"
     "  background: #4a7ba8;"
     "  color: #0f0f1a;"
-    "  border: 1px solid #00d4f8;"
+    "  border: 1px solid #cfe2f5;"
     "  border-radius: 6px;"
     "  padding: 4px 8px;"
     "  font-weight: bold;"
     "}"
-    "QPushButton:hover { background: #00c8e8; }";
+    "QPushButton:hover { background: #cfe2f5; }";
 
 constexpr const char* kEditStyle =
     "background: #0a0a18;"
@@ -928,9 +928,9 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_btnDuplicate = makeBtn(QStringLiteral("Duplicate"), bar);
     m_btnDelete    = makeBtn(QStringLiteral("Delete"),    bar);
     m_btnDelete->setStyleSheet(
-        "QPushButton { background: #401010; color: #ffb0b0; border: 1px solid #802020;"
+        "QPushButton { background: #3f2224; color: #f0dcdc; border: 1px solid #7a2c2e;"
         "  border-radius: 6px; padding: 2px 8px; }"
-        "QPushButton:hover { background: #602020; }");
+        "QPushButton:hover { background: #7a2c2e; }");
     row2->addWidget(m_btnDuplicate);
     row2->addWidget(m_btnDelete);
 

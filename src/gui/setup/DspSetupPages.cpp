@@ -494,7 +494,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
         "border-radius: 6px; margin: -4px 0; }";
     static const QString kInfoLbl =
-        "QLabel { color: #5a8aaa; font-size: 13px; font-style: italic; }";
+        "QLabel { color: #4a7ba8; font-size: 13px; font-style: italic; }";
 
     // Label style used inside lambdas (non-static copy so it can be captured).
     const QString lblStyle = kLbl;

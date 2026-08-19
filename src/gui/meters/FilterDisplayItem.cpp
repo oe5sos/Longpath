@@ -63,6 +63,7 @@ mw0lge@grange-lane.co.uk
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -371,7 +372,7 @@ void FilterDisplayItem::paintHighResolutionFilterCurve(QPainter& p, const QRect&
     p.setRenderHint(QPainter::Antialiasing, true);
     // Distinct cyan colour — contrasts with the yellow/red edge markers and the
     // lime-green spectrum trace.
-    p.setPen(QPen(QColor(0x78, 0xc8, 0xff), 1));  // #78C8FF light-blue
+    p.setPen(QPen(QColor(Style::kBlueText), 1));  // #78C8FF light-blue
     p.setBrush(Qt::NoBrush);
     p.drawPolyline(curve);
 }

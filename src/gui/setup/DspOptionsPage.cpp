@@ -143,7 +143,7 @@ QLabel* makeWarningIcon(QWidget* parent)
 {
     auto* lbl = new QLabel(parent);
     lbl->setText(QStringLiteral("⚠"));  // U+26A0 WARNING SIGN
-    lbl->setStyleSheet(QStringLiteral("color: #FFC800; font-weight: bold;"));
+    lbl->setStyleSheet(QStringLiteral("color: #c2924f; font-weight: bold;"));
     lbl->setVisible(false);
     return lbl;
 }

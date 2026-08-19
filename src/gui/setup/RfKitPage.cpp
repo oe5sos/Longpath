@@ -395,8 +395,8 @@ void RfKitPage::refreshLiveStatus()
     Rf2ksConnection* conn = m_model->rfKitConnection();
     if (!conn) { return; }
     const QString status = conn->isConnected()
-        ? QStringLiteral("<span style='color:#34c759;'>CONNECTED</span>")
-        : QStringLiteral("<span style='color:#e64949;'>DISCONNECTED</span>");
+        ? QStringLiteral("<span style='color:#6fa384;'>CONNECTED</span>")
+        : QStringLiteral("<span style='color:#c25a5c;'>DISCONNECTED</span>");
     m_liveStatusLabel->setText(
         QStringLiteral("RF2K-S: %1 &nbsp; %2:%3 &nbsp; %4")
             .arg(status, conn->peerAddress())

@@ -63,8 +63,8 @@ static const char* kAmberButtonStyle =
     "  font-weight: bold;"
     "  padding: 6px 16px;"
     "}"
-    "QPushButton:hover { background: #3a2500; border-color: #c2924f; }"
-    "QPushButton:pressed { background: #1a1000; }";
+    "QPushButton:hover { background: #33280f; border-color: #c2924f; }"
+    "QPushButton:pressed { background: #0d0d0f; }";
 
 static const char* kComboStyle =
     "QComboBox {"

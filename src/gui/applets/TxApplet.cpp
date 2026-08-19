@@ -500,8 +500,8 @@ void TxApplet::buildUI()
         // NereusSDR-original one-off — do NOT snap to Style::kBlueBg / kBlueBorder.
         m_monBtn->setStyleSheet(Style::buttonBaseStyle()
             + QStringLiteral("QPushButton:checked {"
-                             " background: #001a33;"
-                             " border: 1px solid #3399ff;"
+                             " background: #161e27;"
+                             " border: 1px solid #4a7ba8;"
                              " color: #ffffff;"
                              "}"));
         m_monBtn->setAccessibleName(QStringLiteral("Monitor enable"));

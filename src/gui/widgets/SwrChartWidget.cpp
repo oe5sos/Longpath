@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "gui/StyleConstants.h"
 
 namespace NereusSDR {
 
@@ -47,10 +48,10 @@ namespace {
 const QColor kTraceFallback[] = {
     QColor(0xc2, 0x92, 0x4f),   // 1
     QColor(0x6f, 0xa3, 0x84),   // 2
-    QColor(0x7f, 0x8f, 0xb8),   // 3
-    QColor(0xa0, 0x7f, 0xa8),   // 4
-    QColor(0xb8, 0x84, 0x6f),   // 5
-    QColor(0x8f, 0x9a, 0x5c),   // 6
+    QColor(Style::kAccent),   // 3
+    QColor(Style::kLabelMid),   // 4
+    QColor(Style::kTxFilterOverlayBorder),   // 5
+    QColor(Style::kAmberWarn),   // 6
 };
 constexpr int kTraceColorCount =
     int(sizeof(kTraceFallback) / sizeof(kTraceFallback[0]));
@@ -230,7 +231,7 @@ void SwrChartWidget::paintEvent(QPaintEvent* /*ev*/)
 
     // Background.
     p.fillRect(rect(), QColor(0x0f, 0x0f, 0x1a));
-    p.fillRect(plot, QColor(0x14, 0x18, 0x24));
+    p.fillRect(plot, QColor(Style::kBadgeInfoBg));
 
     const double yMin = 1.0;
     auto yFor = [&](double swr) -> int {
@@ -242,16 +243,16 @@ void SwrChartWidget::paintEvent(QPaintEvent* /*ev*/)
     // Quality zones (bottom-up: green, yellow, red).
     p.fillRect(QRect(plot.left(), yFor(kZoneGood), plot.width(),
                      plot.bottom() - yFor(kZoneGood)),
-               QColor(0x1d, 0x3a, 0x24));
+               QColor(Style::kGreenBg));
     p.fillRect(QRect(plot.left(), yFor(kZoneOk), plot.width(),
                      yFor(kZoneGood) - yFor(kZoneOk)),
-               QColor(0x3a, 0x36, 0x1d));
+               QColor(Style::kAmberBg));
     p.fillRect(QRect(plot.left(), plot.top(), plot.width(),
                      yFor(kZoneOk) - plot.top()),
-               QColor(0x3a, 0x1d, 0x1d));
+               QColor(Style::kBadgeTxBg));
 
     // Y grid + labels at 1.5 / 2 / 3 / 5.
-    p.setPen(QColor(0x30, 0x50, 0x70));
+    p.setPen(QColor(Style::kBlueBg));
     p.setFont(QFont(font().family(), 9));
     for (double g : {1.0, kZoneGood, kZoneOk, 3.0, 5.0}) {
         if (g > m_yMax) {
@@ -263,7 +264,7 @@ void SwrChartWidget::paintEvent(QPaintEvent* /*ev*/)
         p.drawText(QRect(0, y - 8, kMarginL - 6, 16),
                    Qt::AlignRight | Qt::AlignVCenter,
                    QString::number(g, 'g', 2));
-        p.setPen(QColor(0x30, 0x50, 0x70));
+        p.setPen(QColor(Style::kBlueBg));
     }
 
     quint64 lo = 0;

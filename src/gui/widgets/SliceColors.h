@@ -41,11 +41,11 @@ inline QColor sliceColor(int index)
 {
     // From AetherSDR SliceColors.h
     switch (index) {
-    case 0: return QColor(0x00, 0xd4, 0xff);  // cyan
-    case 1: return QColor(0xff, 0x40, 0xff);  // magenta
-    case 2: return QColor(0x40, 0xff, 0x40);  // green
+    case 0: return QColor(Style::kBlueText);  // cyan
+    case 1: return QColor(Style::kTxRed);  // magenta
+    case 2: return QColor(Style::kGreenText);  // green
     case 3: return QColor(0xff, 0xff, 0x00);  // yellow
-    default: return QColor(0x00, 0xd4, 0xff);
+    default: return QColor(Style::kBlueText);
     }
 }
 

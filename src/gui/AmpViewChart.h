@@ -53,6 +53,7 @@
 #include <QWidget>
 
 #include <vector>
+#include "gui/StyleConstants.h"
 
 class QPaintEvent;
 
@@ -125,10 +126,10 @@ private:
                            // AmpView.Designer.cs:182-183 [v2.10.3.13]
 
     // Series colours (matching AmpView.Designer.cs:79-130 [v2.10.3.13]).
-    static QColor colourRef()     { return QColor(0x69, 0x69, 0x69); } // DimGray
+    static QColor colourRef()     { return QColor(Style::kTextScale); } // DimGray
     static QColor colourMagAmp()  { return QColor(0x1E, 0x90, 0xFF); } // DodgerBlue
-    static QColor colourPhsAmp()  { return QColor(0xFF, 0xD7, 0x00); } // Gold
-    static QColor colourMagCorr() { return QColor(0xDC, 0x14, 0x3C); } // Crimson
+    static QColor colourPhsAmp()  { return QColor(Style::kAmberText); } // Gold
+    static QColor colourMagCorr() { return QColor(Style::kTxRed); } // Crimson
     static QColor colourPhsCorr() { return QColor(0x00, 0xFF, 0x00); } // Lime
 };
 

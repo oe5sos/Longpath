@@ -262,7 +262,7 @@ void NetworkDiagnosticsDialog::buildUi()
             "  font-size: 11px;"
             "}"
             "QPushButton:hover { background: #204060; }"   // §D exception
-            "QPushButton:pressed { background: #1a2a48; }" // §D exception
+            "QPushButton:pressed { background: #254a72; }" // §D exception
         ).arg(Style::kTextPrimary)));
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
     btnRow->addWidget(closeBtn);

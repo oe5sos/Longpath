@@ -51,8 +51,8 @@ namespace {
 
 // Status dot color tokens.
 constexpr auto kDotOff      = "#cc2222";   // red  — server stopped
-constexpr auto kDotRunning  = "#00cc66";   // green — running, no clients
-constexpr auto kDotClients  = "#00e0e0";   // cyan  — running with clients
+constexpr auto kDotRunning  = "#6fa384";   // green — running, no clients
+constexpr auto kDotClients  = "#7fae91";   // cyan  — running with clients
 
 // Gain slider range in dB (post-DSP TCI stream volume).
 constexpr int kGainMin = -60;

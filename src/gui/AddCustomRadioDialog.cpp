@@ -753,8 +753,8 @@ void AddCustomRadioDialog::validateFields()
     if (!macOk) {
         m_macEdit->setStyleSheet(
             QStringLiteral(
-                "QLineEdit { background: %1; color: #e06060;"    // §D exception: error red fg
-                "  border: 1px solid #804040; border-radius: 6px; padding: 4px 6px; }")  // §D exception: error border
+                "QLineEdit { background: %1; color: #c25a5c;"    // §D exception: error red fg
+                "  border: 1px solid #7a2c2e; border-radius: 6px; padding: 4px 6px; }")  // §D exception: error border
             .arg(kFieldInputBg));
     } else {
         m_macEdit->setStyleSheet(
@@ -777,7 +777,7 @@ void AddCustomRadioDialog::showInlineError(const QString& message)
     m_feedbackFrame->setStyleSheet(QStringLiteral(
         "QFrame { background: #2a1010; border: 1px solid #c14848; border-radius: 6px; }"));
     m_feedbackLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #e07070; font-size: 13px; }"));
+        "QLabel { color: #c25a5c; font-size: 13px; }"));
     m_feedbackLabel->setText(message);
     m_feedbackFrame->show();
 }

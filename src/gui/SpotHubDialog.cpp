@@ -169,9 +169,9 @@ constexpr const char* kAutoToggleStyle =
 
 constexpr const char* kStartBtnStyle =
     "QPushButton { background: #4a7ba8; color: #0f0f1a; font-weight: bold; "
-    "border: 1px solid #008ba8; padding: 4px; border-radius: 6px; }"
+    "border: 1px solid #4a7ba8; padding: 4px; border-radius: 6px; }"
     "QPushButton:hover { background: #4a7ba8; }"
-    "QPushButton:disabled { background: #404060; color: #4e4e53; }";
+    "QPushButton:disabled { background: #254a72; color: #4e4e53; }";
 
 constexpr const char* kStatusIdleStyle =
     "QLabel { color: #8e8e93; font-size: 11px; }";
@@ -210,7 +210,7 @@ constexpr const char* kFilterPillStyle =
     "QPushButton:checked {"
     "  background: #4a7ba8;"
     "  color: #0f0f1a;"
-    "  border-color: #008ba8;"
+    "  border-color: #4a7ba8;"
     "}"
     "QPushButton:hover { border-color: #c8d8e8; }";
 
@@ -374,7 +374,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         firstRunBanner->setWordWrap(true);
         firstRunBanner->setStyleSheet(
             "QLabel { color: #c2924f; background: #33280f; "
-            "border: 1px solid #806020; padding: 6px; "
+            "border: 1px solid #6b5426; padding: 6px; "
             "border-radius: 6px; font-weight: bold; }");
         idLayout->addWidget(firstRunBanner);
     }
@@ -2532,10 +2532,10 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     clearAllBtn->setObjectName("displayClearAllSpotsBtn");
     clearAllBtn->setFixedHeight(28);
     clearAllBtn->setStyleSheet(
-        "QPushButton { background: #b03030; color: white; font-weight: bold; "
-        "border: 1px solid #802020; padding: 4px 10px; border-radius: 6px; }"
-        "QPushButton:hover { background: #c84040; }"
-        "QPushButton:pressed { background: #902020; }");
+        "QPushButton { background: #c25a5c; color: white; font-weight: bold; "
+        "border: 1px solid #7a2c2e; padding: 4px 10px; border-radius: 6px; }"
+        "QPushButton:hover { background: #c25a5c; }"
+        "QPushButton:pressed { background: #7a2c2e; }");
     connect(clearAllBtn, &QPushButton::clicked, this, [this] {
         if (m_spotModel) {
             m_spotModel->clear();

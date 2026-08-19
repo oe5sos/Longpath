@@ -112,7 +112,7 @@ RadioStatusPage::RadioStatusPage(RadioModel* model, QWidget* parent)
     statusBar->setFrameShape(QFrame::StyledPanel);
     statusBar->setStyleSheet(QStringLiteral(
         "QFrame {"
-        "  background: #0a1a10;"
+        "  background: #212b27;"
         "  border: 1px solid %1;"
         "  border-radius: 6px;"
         "}"
