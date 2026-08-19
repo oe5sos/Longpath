@@ -308,6 +308,25 @@ void ContainerWidget::setDockMode(DockMode mode)
     // Enforce minimum width in all dock modes so the applets are always usable.
     setMinimumWidth(260);
 
+    // ── Der Griff ────────────────────────────────────────────────────
+    //
+    // AUSSERHALB der Aenderungsbedingung, und das ist der Kern: beim
+    // Wiederherstellen aus den Einstellungen steht der Modus schon auf
+    // OVERLAY, `changed` ist also false — und der Container laege ohne
+    // Griff da. Genau so war es im laufenden Programm am 2026-08-19.
+    //
+    // Zwei Dinge, die sich leicht verwechseln lassen:
+    //   m_titleBarVisible       — DARF die Leiste erscheinen (Vorgabe true)
+    //   m_titleBar->isVisible() — ZEIGT sie gerade
+    // Im Splitter blendet die Ueberfahr-Automatik sie ein und aus.
+    // Geloest muss sie STEHEN: die Applets darunter schlucken jede
+    // Mausbewegung, das Ueberfahren kommt also nie an, und ohne Leiste
+    // ist „frei bewegen" ein leeres Versprechen.
+    if (m_titleBar && m_titleBarVisible) {
+        m_titleBar->setVisible(mode != DockMode::PanelDocked);
+        if (mode != DockMode::PanelDocked) { m_titleBar->raise(); }
+    }
+
     if (changed) {
         updateTitleBar();
         emit dockModeChanged(mode);
@@ -548,7 +567,12 @@ void ContainerWidget::mouseMoveEvent(QMouseEvent* event)
         if (y < kTitleHoverZone && !m_titleBar->isVisible()) {
             m_titleBar->setVisible(true);
             m_titleBar->raise();
-        } else if (y >= kTitleBarHeight && m_titleBar->isVisible() && !m_dragging) {
+        } else if (y >= kTitleBarHeight && m_titleBar->isVisible() && !m_dragging
+                   && isPanelDocked()) {
+            // Nur im Splitter wieder ausblenden. Geloest ist die Leiste
+            // der EINZIGE Griff — sie wegzublenden, sobald der Zeiger
+            // zwei Zentimeter tiefer steht, macht das Bewegen unmoeglich.
+            // Genau daran ist der Selbsttest am 2026-08-19 gescheitert.
             m_titleBar->setVisible(false);
         }
     }
@@ -579,7 +603,13 @@ void ContainerWidget::mouseMoveEvent(QMouseEvent* event)
 void ContainerWidget::leaveEvent(QEvent* event)
 {
     if (!m_dragging && !m_resizing) {
-        m_titleBar->setVisible(false);
+        // Siehe mouseMoveEvent: das Ausblenden gehoert in den Splitter.
+        // Ein geloester Container behaelt seinen Griff, auch wenn die
+        // Maus ihn verlaesst — sonst ist er beim naechsten Hinfahren
+        // wieder unfassbar.
+        if (isPanelDocked()) {
+            m_titleBar->setVisible(false);
+        }
         m_resizeGrip->setVisible(false);
     }
     QWidget::leaveEvent(event);
@@ -625,7 +655,12 @@ bool ContainerWidget::eventFilter(QObject* watched, QEvent* event)
             if (y < kTitleHoverZone && !m_titleBar->isVisible()) {
                 m_titleBar->setVisible(true);
                 m_titleBar->raise();
-            } else if (y >= kTitleBarHeight && m_titleBar->isVisible() && !m_dragging) {
+            } else if (y >= kTitleBarHeight && m_titleBar->isVisible() && !m_dragging
+                       && isPanelDocked()) {
+                // Dieselbe Regel wie in mouseMoveEvent — hier fuer
+                // Mausbewegungen, die in einem KIND ankommen. Der
+                // Applet-Inhalt deckt den Container vollstaendig ab,
+                // also laeuft praktisch jede Bewegung durch diesen Zweig.
                 m_titleBar->setVisible(false);
             }
         }
