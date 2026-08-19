@@ -124,10 +124,28 @@ Google-Earth-Weg.
 * **Zoom auf die Gegenstation** mit einem Knopf, wenn ein Ziel gesetzt
   ist — der häufigste Wunsch im Betrieb.
 
+## Nachtrag: D ist gebaut
+
+Am selben Tag umgesetzt, mit 23 Testfällen:
+
+* **Doppelklick auf die Kugel → dorthin fliegen** (Kamera und Zoom
+  animiert). Der Doppelklick *neben* die Kugel setzt weiter zurück.
+* **Tastatur**: `+` / `−` zoomen, Pfeiltasten drehen, `0` setzt zurück,
+  `T` fliegt zur Gegenstation (ohne gesetztes Ziel absichtlich still).
+* **Rechtsklick-Menü**: Zoom in / Zoom out / Fly to station / Reset view.
+* Die Animation zieht jetzt **Breite und Zoom** mit, nicht nur die Länge —
+  vorher sprang beides, was beim Hinfliegen wie ein Bildfehler aussieht.
+
+**Und ein Fund, der aus einem falschen Test von mir kam:** ab etwa 1,15×
+füllt die Scheibe das ganze Fenster — „neben der Kugel" gibt es dann
+nicht mehr. Der Rückweg hing genau an dieser Stelle und wäre unerreichbar
+gewesen, sobald man hineingezoomt hat. Deshalb liegt er jetzt zusätzlich
+auf der Taste `0` und im Rechtsklick-Menü. Ein Testfall hält den Grund
+fest, damit niemand die Doppelklick-Geste später „aufräumt".
+
 ## Was ich empfehle
 
-1. **D zuerst** — ein Nachmittag, und der Zoom wird überhaupt erst
-   auffindbar.
+1. ~~**D zuerst**~~ — **erledigt**, siehe Nachtrag.
 2. **B danach** — nutzt, was schon gebaut ist, und bringt den
    Google-Earth-Eindruck ohne neue Abhängigkeit.
 3. **A nur mit Kacheln**, sonst ist der Speicherbedarf nicht vertretbar.

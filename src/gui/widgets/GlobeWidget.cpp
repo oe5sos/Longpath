@@ -17,8 +17,12 @@
 #include "GlobeWidget.h"
 #include "WorldTexture.h"
 #include "gui/StyleConstants.h"
+#include "gui/styles/PopupMenuStyle.h"
 
 #include <QDateTime>
+#include <QContextMenuEvent>
+#include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -51,6 +55,8 @@ double angleDelta(double a, double b) { return norm180(b - a); }
 GlobeWidget::GlobeWidget(QWidget* parent)
     : QWidget(parent)
 {
+    // Tasten kommen nur an einem Widget an, das Fokus annehmen darf.
+    setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_OpaquePaintEvent);
     // Siehe FlatMapWidget: derselbe Geber erreicht beide Ansichten.
     // Ein Bildwechsel erreicht jede Ansicht ueber den Geber in
@@ -83,6 +89,22 @@ GlobeWidget::GlobeWidget(QWidget* parent)
         } else if (m_autoRotate) {
             m_viewLon = norm180(m_viewLon + 0.15);
             m_targetViewLon = m_viewLon;
+            moving = true;
+        }
+
+        // Breite mit derselben Daempfung (2026-08-19). Vorher sprang sie,
+        // was beim Hinfliegen auf einen Ort wie ein Bildfehler aussieht.
+        const double dLat = m_targetViewLat - m_viewLat;
+        if (std::abs(dLat) > 0.2) {
+            m_viewLat = std::clamp(m_viewLat + dLat * 0.12, -85.0, 85.0);
+            moving = true;
+        }
+
+        // Zoom multiplikativ, nicht additiv: von 1x auf 2x ist derselbe
+        // Weg wie von 2x auf 4x, und nur so fuehlt sich das Naeherkommen
+        // gleichmaessig an.
+        if (std::abs(m_targetZoom - m_zoom) > 0.01) {
+            m_zoom += (m_targetZoom - m_zoom) * 0.18;
             moving = true;
         }
 
@@ -168,6 +190,15 @@ void GlobeWidget::lookAlongBearing(double deg)
     if (!m_anim->isActive()) { m_anim->start(); }
 }
 
+void GlobeWidget::flyTo(double lat, double lon, double zoomFactor)
+{
+    m_targetViewLat = std::clamp(lat, -85.0, 85.0);
+    m_targetViewLon = norm180(lon);
+    m_targetZoom    = std::clamp(m_zoom * zoomFactor, 0.6, maxZoom());
+    m_frameDirty    = true;
+    if (!m_anim->isActive()) { m_anim->start(); }
+}
+
 void GlobeWidget::setAutoRotate(bool on)
 {
     m_autoRotate = on;
@@ -190,6 +221,7 @@ void GlobeWidget::zoomBy(double factor)
 {
     const double before = m_zoom;
     m_zoom = std::clamp(m_zoom * factor, 0.6, maxZoom());
+    m_targetZoom = m_zoom;   // Handbetrieb schlaegt die Animation
     if (qFuzzyCompare(before, m_zoom)) { return; }
     m_frameDirty = true;
     update();
@@ -206,8 +238,89 @@ void GlobeWidget::resetView()
         m_viewLon = m_homeLon;
     }
     m_targetViewLon = m_viewLon;
+    m_targetViewLat = m_viewLat;   // sonst zieht die Animation zurueck
+    m_targetZoom    = m_zoom;
     m_frameDirty = true;
     update();
+}
+
+// ── Kontextmenue ────────────────────────────────────────────────────
+//
+// Warum es das ueberhaupt gibt: der Weg zurueck lag auf dem Doppelklick
+// NEBEN die Kugel — und ab etwa 1,15x fuellt die Scheibe das ganze
+// Fenster, es gibt also kein „neben" mehr. Der Rueckweg waere genau dann
+// unerreichbar, wenn man ihn braucht. Aufgefallen ist das an einem Test,
+// dessen Annahme falsch war, nicht im Betrieb (2026-08-19).
+//
+// Ein Rechtsklick ist bei jedem Zoom da. Zugleich beantwortet das den
+// Satz, der schon bei zoomBy() steht: ein Mausrad ist keine
+// Bedienflaeche — hier steht jetzt, dass die Kugel zoomt.
+void GlobeWidget::contextMenuEvent(QContextMenuEvent* e)
+{
+    QMenu menu(this);
+    // Dieselbe Menue-Optik wie ueberall sonst (RxApplet, VFO-Flagge,
+    // Panadapter): sonst sieht ein Menue nach einem anderen Programm aus.
+    menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
+
+    QAction* in   = menu.addAction(QStringLiteral("Zoom in"));
+    QAction* out  = menu.addAction(QStringLiteral("Zoom out"));
+    menu.addSeparator();
+    QAction* toTx = menu.addAction(QStringLiteral("Fly to station"));
+    toTx->setEnabled(m_hasTarget);
+    toTx->setToolTip(m_hasTarget
+        ? QStringLiteral("Centre on the station being worked")
+        : QStringLiteral("No station set — enter a callsign first"));
+    QAction* home = menu.addAction(QStringLiteral("Reset view"));
+
+    const QAction* chosen = menu.exec(e->globalPos());
+    if (chosen == in)        { zoomBy(1.3); }
+    else if (chosen == out)  { zoomBy(1.0 / 1.3); }
+    else if (chosen == toTx && m_hasTarget) { flyTo(m_targetLat, m_targetLon); }
+    else if (chosen == home) { resetView(); }
+    e->accept();
+}
+
+// ── Tastatur ────────────────────────────────────────────────────────
+//
+// Weil ein Mausrad keine Bedienflaeche ist — derselbe Grund, aus dem
+// zoomBy() ueberhaupt oeffentlich ist. Wer die Kugel angeklickt hat, kann
+// sie ab 2026-08-19 auch mit den Tasten bewegen.
+void GlobeWidget::keyPressEvent(QKeyEvent* e)
+{
+    constexpr double kStepDeg = 8.0;
+
+    switch (e->key()) {
+    case Qt::Key_Plus:
+    case Qt::Key_Equal:      zoomBy(1.3);            break;
+    case Qt::Key_Minus:      zoomBy(1.0 / 1.3);      break;
+    case Qt::Key_0:          resetView();            break;
+    case Qt::Key_Left:
+        m_targetViewLon = norm180(m_viewLon - kStepDeg);
+        if (!m_anim->isActive()) { m_anim->start(); }
+        break;
+    case Qt::Key_Right:
+        m_targetViewLon = norm180(m_viewLon + kStepDeg);
+        if (!m_anim->isActive()) { m_anim->start(); }
+        break;
+    case Qt::Key_Up:
+        m_targetViewLat = std::clamp(m_viewLat + kStepDeg, -85.0, 85.0);
+        if (!m_anim->isActive()) { m_anim->start(); }
+        break;
+    case Qt::Key_Down:
+        m_targetViewLat = std::clamp(m_viewLat - kStepDeg, -85.0, 85.0);
+        if (!m_anim->isActive()) { m_anim->start(); }
+        break;
+    case Qt::Key_T:
+        // Zur Gegenstation fliegen — der haeufigste Wunsch im Betrieb.
+        // Ohne gesetztes Ziel absichtlich nichts: eine Taste, die
+        // irgendwohin fliegt, ist schlimmer als eine, die schweigt.
+        if (m_hasTarget) { flyTo(m_targetLat, m_targetLon); }
+        break;
+    default:
+        QWidget::keyPressEvent(e);
+        return;
+    }
+    e->accept();
 }
 
 // ── Mouse ───────────────────────────────────────────────────────────
@@ -216,6 +329,7 @@ void GlobeWidget::mousePressEvent(QMouseEvent* e)
 {
     if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
 
+    setFocus(Qt::MouseFocusReason);   // sonst erreichen Tasten die Kugel nie
     m_dragging = true;
     m_dragFrom = e->position().toPoint();
     m_dragStartLat = m_viewLat;
@@ -243,6 +357,7 @@ void GlobeWidget::mouseMoveEvent(QMouseEvent* e)
     // Clamped short of the poles: at exactly 90 the projection loses its
     // sense of which way is east and the globe appears to jump.
     m_viewLat = std::clamp(m_dragStartLat + d.y() * perPx, -85.0, 85.0);
+    m_targetViewLat = m_viewLat;   // Ziehen beendet einen laufenden Flug
     m_targetViewLon = m_viewLon;
 
     m_frameDirty = true;
@@ -262,8 +377,19 @@ void GlobeWidget::mouseReleaseEvent(QMouseEvent* e)
 void GlobeWidget::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (e->button() == Qt::LeftButton) {
-        // A way back. Having turned the globe to somewhere unhelpful,
-        // hunting for a reset button is worse than a double click.
+        // Auf der Kugel: dorthin fliegen (2026-08-19, auf Ansage des
+        // Betreibers „wie bei Google Earth"). Das ist dort die Geste, mit
+        // der man sich naeher holt.
+        double lat = 0.0, lon = 0.0;
+        if (unproject(e->position(), lat, lon)) {
+            flyTo(lat, lon);
+            return;
+        }
+
+        // NEBEN der Kugel: der Weg zurueck, wie bisher. Having turned the
+        // globe to somewhere unhelpful, hunting for a reset button is
+        // worse than a double click — der Satz stimmt weiter, nur die
+        // Flaeche ist jetzt die leere Ecke statt der Kugel selbst.
         resetView();
         return;
     }
@@ -277,6 +403,7 @@ void GlobeWidget::wheelEvent(QWheelEvent* e)
 
     const double before = m_zoom;
     m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 0.6, maxZoom());
+    m_targetZoom = m_zoom;
     if (!qFuzzyCompare(before, m_zoom)) {
         // Zum Zeiger hin, nicht zur Mitte (2026-08-19). Beim Hineinzoomen
         // wandert die Kamera einen Teil des Weges zu dem Ort, auf den der

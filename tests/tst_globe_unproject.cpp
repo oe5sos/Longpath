@@ -23,6 +23,8 @@
 // no-port-check: NereusSDR-original test file.
 
 #include <QtTest>
+#include <QKeyEvent>
+#include <QMouseEvent>
 
 #include "gui/widgets/GlobeWidget.h"
 
@@ -143,6 +145,144 @@ private slots:
         QVERIFY(g.zoom() > 1.0);
         g.resetView();
         QCOMPARE(g.zoom(), 1.0);
+    }
+
+    // ── Hinfliegen ───────────────────────────────────────────────────
+    //
+    // Doppelklick AUF die Kugel fliegt dorthin, NEBEN die Kugel setzt
+    // zurueck. Beides ist gewollt: „naeher heran" ist die haeufige
+    // Geste, „zurueck" die wichtige, und sie brauchen nicht dieselbe
+    // Flaeche.
+
+    void flyToAimsAtThePlaceAndZoomsIn()
+    {
+        GlobeWidget g;
+        prepare(g);
+        const double before = g.targetZoomForTest();
+
+        g.flyTo(48.0, 16.0);
+        QVERIFY2(g.targetZoomForTest() > before,
+                 "hinfliegen heisst auch naeher kommen");
+    }
+
+    void flyToRespectsTheCeiling()
+    {
+        GlobeWidget g;
+        prepare(g);
+        for (int i = 0; i < 30; ++i) { g.flyTo(0.0, 0.0, 1.8); }
+        QVERIFY2(g.targetZoomForTest() <= g.maxZoom() + 1e-9,
+                 "auch der Flug bricht die Decke nicht");
+    }
+
+    void doubleClickOnTheGlobeFliesThere()
+    {
+        GlobeWidget g;
+        prepare(g);
+        const double before = g.targetZoomForTest();
+
+        QMouseEvent ev(QEvent::MouseButtonDblClick, QPointF(230, 180),
+                       g.mapToGlobal(QPointF(230, 180)),
+                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &ev);
+
+        QVERIFY2(g.targetZoomForTest() > before,
+                 "ein Doppelklick auf der Kugel holt naeher heran");
+    }
+
+    // Bei Zoom 1 liegt die Ecke NEBEN der Scheibe (Radius 0,44 der
+    // kleineren Kante), dort setzt der Doppelklick zurueck.
+    void doubleClickBesideTheGlobeResets()
+    {
+        GlobeWidget g;
+        prepare(g);
+        g.flyTo(48.0, 16.0);          // Kamera und Zoomziel verstellen
+        QVERIFY(g.targetZoomForTest() > 1.0);
+
+        QMouseEvent ev(QEvent::MouseButtonDblClick, QPointF(3, 3),
+                       g.mapToGlobal(QPointF(3, 3)),
+                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &ev);
+
+        QCOMPARE(g.zoom(), 1.0);
+        QCOMPARE(g.targetZoomForTest(), 1.0);
+    }
+
+    // WICHTIGER FUND, und er kam aus einem falschen Test von mir: ab
+    // etwa 1,15x fuellt die Scheibe das ganze Fenster. „Neben der Kugel"
+    // gibt es dann NICHT MEHR — der Doppelklick landet ueberall auf der
+    // Kugel und fliegt, statt zurueckzusetzen.
+    //
+    // Der Rueckweg darf also nicht allein an dieser Geste haengen. Er
+    // liegt zusaetzlich auf der Taste 0 und im Rechtsklick-Menue, und
+    // dieser Fall haelt fest, WARUM.
+    void whenZoomedInThereIsNoBesideAnyMore()
+    {
+        GlobeWidget g;
+        prepare(g);
+        g.zoomBy(3.0);
+
+        double lat = 0.0, lon = 0.0;
+        QVERIFY2(g.unproject(QPointF(3, 3), lat, lon),
+                 "bei Zoom 3 ist selbst die Ecke noch auf der Kugel");
+
+        // Also bleibt der Rueckweg ueber die Taste.
+        QKeyEvent zero(QEvent::KeyPress, Qt::Key_0, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &zero);
+        QCOMPARE(g.zoom(), 1.0);
+    }
+
+    // ── Tastatur ─────────────────────────────────────────────────────
+
+    void plusAndMinusZoom()
+    {
+        GlobeWidget g;
+        prepare(g);
+
+        QKeyEvent plus(QEvent::KeyPress, Qt::Key_Plus, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &plus);
+        QVERIFY2(g.zoom() > 1.0, "Plus holt naeher");
+
+        QKeyEvent minus(QEvent::KeyPress, Qt::Key_Minus, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &minus);
+        QCoreApplication::sendEvent(&g, &minus);
+        QVERIFY2(g.zoom() < 1.0, "Minus holt weiter weg");
+    }
+
+    void zeroGoesBack()
+    {
+        GlobeWidget g;
+        prepare(g);
+        g.zoomBy(4.0);
+        QKeyEvent zero(QEvent::KeyPress, Qt::Key_0, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &zero);
+        QCOMPARE(g.zoom(), 1.0);
+    }
+
+    // Ohne gesetztes Ziel tut die Taste absichtlich nichts: eine Taste,
+    // die irgendwohin fliegt, ist schlimmer als eine, die schweigt.
+    void theTargetKeyIsSilentWithoutATarget()
+    {
+        GlobeWidget g;
+        prepare(g);
+        const double before = g.targetZoomForTest();
+
+        QKeyEvent t(QEvent::KeyPress, Qt::Key_T, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &t);
+        QCOMPARE(g.targetZoomForTest(), before);
+    }
+
+    void theTargetKeyFliesToTheStation()
+    {
+        GlobeWidget g;
+        prepare(g);
+        g.setHome(48.2, 16.4);
+        g.setTarget(-33.9, 151.2);           // Sydney
+        const double before = g.targetZoomForTest();
+
+        QKeyEvent t(QEvent::KeyPress, Qt::Key_T, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &t);
+        QVERIFY2(g.targetZoomForTest() > before,
+                 "mit gesetztem Ziel fliegt T dorthin");
     }
 };
 

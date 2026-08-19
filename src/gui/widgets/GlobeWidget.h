@@ -26,6 +26,7 @@
 #include <QVector>
 #include <QWidget>
 
+class QContextMenuEvent;
 class QDateTime;
 class QPainter;
 class QTimer;
@@ -103,6 +104,15 @@ public:
     // der Unterschied, den man zu Google Earth am deutlichsten spuert.
     bool unproject(const QPointF& pos, double& lat, double& lon) const;
 
+    // Dorthin fliegen: Kamera auf den Ort, Zoom eine Stufe naeher,
+    // animiert. Der Doppelklick auf die Kugel tut das (2026-08-19) —
+    // bei Google Earth ist das die Geste, mit der man sich naeher holt.
+    //
+    // Der Doppelklick NEBEN die Kugel setzt weiter zurueck. Beides ist
+    // gewuenscht: „naeher heran" ist die haeufige Geste, „zurueck" die
+    // wichtige, und sie brauchen nicht dieselbe Flaeche.
+    void flyTo(double lat, double lon, double zoomFactor = 1.8);
+
     // Testnaht fuer den Rundgang Ort -> Bildpunkt -> Ort. project() ist
     // privat, weil niemand von aussen zeichnet; der Rundgang ist aber
     // die einzige Pruefung, die einen vertauschten Sinus in der
@@ -111,6 +121,14 @@ public:
     {
         return project(lat, lon, out);
     }
+
+    // Kameralage und Zoomziel, fuer Tests der Flug-Geste.
+    void viewForTest(double& lat, double& lon) const
+    {
+        lat = m_viewLat;
+        lon = m_viewLon;
+    }
+    double targetZoomForTest() const { return m_targetZoom; }
 
     // Spin slowly when idle. Off by default: motion in the corner of
     // the eye is a distraction while operating.
@@ -158,6 +176,8 @@ protected:
     void mouseMoveEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
+    void keyPressEvent(QKeyEvent*) override;
+    void contextMenuEvent(QContextMenuEvent*) override;
     void wheelEvent(QWheelEvent*) override;
 
 private:
@@ -188,6 +208,11 @@ private:
     double m_viewLat{20.0};   // camera centre
     double m_viewLon{0.0};
     double m_targetViewLon{0.0};
+    // Ziele der Animation. Bis 2026-08-19 wurde nur die Laenge geglättet;
+    // Breite und Zoom sprangen. Beim Hinfliegen auf einen Ort sieht das
+    // aus wie ein Bildfehler, nicht wie eine Bewegung.
+    double m_targetViewLat{20.0};
+    double m_targetZoom{1.0};
 
     double m_homeLat{0.0},   m_homeLon{0.0};
     double m_targetLat{0.0}, m_targetLon{0.0};
