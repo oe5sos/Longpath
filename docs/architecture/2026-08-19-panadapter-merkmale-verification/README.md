@@ -32,6 +32,17 @@ Zeile Notiz.
 Schalter: Setup → Display → Spectrum Defaults → Spectrum Overlays →
 „Show tune guide".
 
+**Automatisch abgedeckt seit 2026-08-19** (`tst_tune_guide_behaviour`,
+8 Fälle mit echten Mausereignissen im Offscreen-Malweg): dass die Linie
+beim Bewegen **erscheint**, beim Verlassen des Panadapters **sofort**
+verschwindet, dass eine zweite Bewegung sie am Leben hält, dass der
+Schalter im Aus nichts tut und dass Wiedereinschalten auf die nächste
+Bewegung wartet.
+
+Die Zeilen bleiben trotzdem in der Matrix: der Test weiß, dass der
+Zustand stimmt, aber nicht, ob man die Linie **sieht** — Farbe,
+Lesbarkeit der Beschriftung, Flackern. Das kann nur ein Auge.
+
 | # | Schritt | Erwartet | Ergebnis |
 |---|---------|----------|----------|
 | 1.1 | Frischer Start, Häkchen anschauen | Aus. Im Panadapter keine Linie am Zeiger | |
