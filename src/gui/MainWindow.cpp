@@ -4511,14 +4511,70 @@ void MainWindow::rebuildEditContainerSubmenu()
         const QString label = c->notes().isEmpty()
             ? (QStringLiteral("(unnamed) ") + c->id().left(8))
             : c->notes();
-        QAction* act = m_editContainerMenu->addAction(label);
         const QString id = c->id();
-        connect(act, &QAction::triggered, this, [this, id]() {
+
+        // Ein Untermenue je Container statt einer einzelnen Aktion
+        // (2026-08-19). Grund: der Rechtsklick AUF dem Container kommt
+        // nicht ueberall an — im Applet-Container deckt die Applet-Saeule
+        // die Flaeche vollstaendig ab und fuehrt ihr eigenes Menue. Beim
+        // Selbsttest im laufenden Programm war mein neues Container-Menue
+        // deshalb NICHT erreichbar. Ueber die Menueleiste ist es das
+        // immer.
+        QMenu* sub = m_editContainerMenu->addMenu(label);
+
+        QAction* settings = sub->addAction(QStringLiteral("Settings…"));
+        connect(settings, &QAction::triggered, this, [this, id]() {
             if (!m_containerManager) { return; }
             ContainerWidget* target = m_containerManager->container(id);
             if (!target) { return; }
             ContainerSettingsDialog dialog(target, this, m_containerManager);
             dialog.exec();
+        });
+
+        sub->addSeparator();
+
+        // Die drei Andock-Arten in den Worten des Betreibers: „jeder
+        // Container muss sich ueberall hinbewegen koennen … anschliessend
+        // mit einem Schloss um es zu fixieren."
+        QAction* move = sub->addAction(QStringLiteral("Move freely"));
+        move->setCheckable(true);
+        move->setChecked(c->isOverlayDocked());
+        move->setToolTip(QStringLiteral(
+            "Place this container anywhere over the main area — drag its "
+            "title bar to move, the corner to resize."));
+        connect(move, &QAction::triggered, this, [this, id]() {
+            if (m_containerManager) { m_containerManager->overlayDockContainer(id); }
+        });
+
+        QAction* window = sub->addAction(QStringLiteral("Own window"));
+        window->setCheckable(true);
+        window->setChecked(c->isFloating());
+        connect(window, &QAction::triggered, this, [this, id]() {
+            if (m_containerManager) { m_containerManager->floatContainer(id); }
+        });
+
+        QAction* edge = sub->addAction(QStringLiteral("Dock at the edge"));
+        edge->setCheckable(true);
+        edge->setChecked(c->isPanelDocked());
+        edge->setToolTip(QStringLiteral(
+            "Back into the side panel, where it shares one axis with the "
+            "panadapter."));
+        connect(edge, &QAction::triggered, this, [this, id]() {
+            if (m_containerManager) { m_containerManager->panelDockContainer(id); }
+        });
+
+        sub->addSeparator();
+
+        QAction* lock = sub->addAction(QStringLiteral("Lock in place"));
+        lock->setCheckable(true);
+        lock->setChecked(c->isLocked());
+        lock->setToolTip(QStringLiteral(
+            "Freeze position and size until the lock comes off."));
+        connect(lock, &QAction::triggered, this, [this, id](bool on) {
+            if (!m_containerManager) { return; }
+            if (ContainerWidget* target = m_containerManager->container(id)) {
+                target->setLocked(on);
+            }
         });
     }
 }
