@@ -72,6 +72,8 @@ private slots:
     void overflowSpotsBecomeClusterBadge();
     void clickRectAtSpotXTuneable();
     void rejectsBeyondVisibleRange();
+    void historyOnlyMarkersCarryNoSpotIndex();
+    void mixedMarkersKeepSpotIndicesStraight();
 };
 
 void TestSpotOverlayRender::emptyOverlayDrawsNothing()
@@ -210,6 +212,89 @@ void TestSpotOverlayRender::rejectsBeyondVisibleRange()
     // Only the in-range spot should produce a click rect.
     QCOMPARE(sw.spotClickRectsForTest().size(), 1);
     QCOMPARE(sw.spotClickRectsForTest().first().freqMhz, 14.250);
+}
+
+// ── Rueckfalltest: der Index der Klickfelder ─────────────────────────
+//
+// markerIndex zeigt in m_spotMarkers und nur dorthin — daran haengen
+// spotTriggered, der Hinweis beim Ueberfahren und „Remove Spot".
+//
+// Am 2026-08-19 lief die Zeichnung auf die ZUSAMMENGEFUEHRTE Liste um
+// (DX-Spots plus S-Verlauf), und der Index entstand weiter aus der
+// Zeigerdifferenz gegen m_spotMarkers. Das ist undefiniert, sobald die
+// Marke aus der anderen Liste stammt, und greift bei reinen
+// Verlaufsmarken auf m_spotMarkers[0] einer LEEREN Liste zu.
+//
+// Diese zwei Faelle halten die Regel fest. Der erste faellt ohne die
+// Korrektur ins Ungewisse — genau darum steht er hier.
+
+void TestSpotOverlayRender::historyOnlyMarkersCarryNoSpotIndex()
+{
+    SpectrumWidget sw;
+    sw.resize(800, 400);
+    sw.setFrequencyRange(14'250'000.0, 96'000.0);
+
+    // Keine DX-Spots, nur Verlaufsmarken: die gefaehrliche Lage.
+    sw.setSpotMarkers({});
+    sw.setShowSpots(false);
+    sw.setShowSignalHistory(true);
+
+    SpectrumWidget::SpotMarker sh;
+    sh.callsign = QStringLiteral("S7");
+    sh.freqMhz  = 14.250;
+    sh.source   = QStringLiteral("SHistory");
+    sw.setSignalHistoryMarkers({sh});
+
+    const QRect specRect(0, 0, 800, 200);
+    renderSpots(sw, specRect);
+
+    QCOMPARE(sw.spotClickRectsForTest().size(), 1);
+    QCOMPARE(sw.spotClickRectsForTest().first().markerIndex, -1);
+    QCOMPARE(sw.spotClickRectsForTest().first().freqMhz, 14.250);
+}
+
+void TestSpotOverlayRender::mixedMarkersKeepSpotIndicesStraight()
+{
+    SpectrumWidget sw;
+    sw.resize(800, 400);
+    sw.setFrequencyRange(14'250'000.0, 96'000.0);
+
+    QVector<SpectrumWidget::SpotMarker> spots;
+    spots.append(makeSpot(1, QStringLiteral("DL1ABC"), 14.240));
+    spots.append(makeSpot(2, QStringLiteral("G0XYZ"),  14.260));
+    sw.setSpotMarkers(spots);
+    sw.setShowSpots(true);
+    sw.setShowSignalHistory(true);
+
+    // Weit genug weg von beiden Spots, damit die 3-kHz-Regel nicht
+    // zuschlaegt und die Marke wirklich gezeichnet wird.
+    SpectrumWidget::SpotMarker sh;
+    sh.callsign = QStringLiteral("S9");
+    sh.freqMhz  = 14.280;
+    sh.source   = QStringLiteral("SHistory");
+    sw.setSignalHistoryMarkers({sh});
+
+    const QRect specRect(0, 0, 800, 200);
+    renderSpots(sw, specRect);
+
+    const auto rects = sw.spotClickRectsForTest();
+    QCOMPARE(rects.size(), 3);
+
+    // Die DX-Spots behalten ihren Platz in m_spotMarkers ...
+    int seenSpotIndices = 0;
+    int seenHistory     = 0;
+    for (const auto& hr : rects) {
+        if (hr.markerIndex >= 0) {
+            QVERIFY2(hr.markerIndex < sw.spotMarkersForTest().size(),
+                     "ein Index muss in m_spotMarkers zeigen");
+            ++seenSpotIndices;
+        } else {
+            ++seenHistory;
+        }
+    }
+    QCOMPARE(seenSpotIndices, 2);
+    // ... und die Verlaufsmarke bekommt keinen.
+    QCOMPARE(seenHistory, 1);
 }
 
 QTEST_MAIN(TestSpotOverlayRender)

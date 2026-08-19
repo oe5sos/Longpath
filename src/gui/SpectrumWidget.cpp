@@ -6868,7 +6868,23 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
         p.drawLine(x, specRect.bottom(), x, labelRect.bottom());
 
         placed.append(labelRect);
-        int mIdx = static_cast<int>(&spot - &m_spotMarkers[0]);
+        // markerIndex zeigt in m_spotMarkers und nur dorthin: an ihm haengen
+        // spotTriggered, der Kerben-Hinweis beim Ueberfahren und „Remove
+        // Spot" — alles Dinge, die es nur fuer echte DX-Spots gibt.
+        //
+        // Seit die Schleife ueber die ZUSAMMENGEFUEHRTE Liste laeuft
+        // (S-Verlauf, 2026-08-19), darf der Index nicht mehr aus der
+        // Zeigerdifferenz gegen m_spotMarkers entstehen: die Marke liegt in
+        // einer anderen Liste, die Rechnung ist undefiniert, und bei reinen
+        // Verlaufsmarken greift &m_spotMarkers[0] auf eine leere Liste zu.
+        //
+        // allMarkers beginnt mit den DX-Spots (falls gezeigt), danach folgen
+        // die Verlaufsmarken. Die vorderen Plaetze bilden also 1:1 auf
+        // m_spotMarkers ab, die hinteren bekommen -1 — „keine DX-Marke",
+        // womit die Waechter an den drei Stellen oben von selbst greifen.
+        const int listPos  = static_cast<int>(&spot - &allMarkers[0]);
+        const int spotCount = m_showSpots ? static_cast<int>(m_spotMarkers.size()) : 0;
+        const int mIdx = (listPos < spotCount) ? listPos : -1;
         m_spotClickRects.append({labelRect, spot.freqMhz, mIdx});
 
         // Background pill — only draw when override background is enabled (#768)
