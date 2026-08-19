@@ -129,6 +129,69 @@ abschalten will, ist das eine Betriebsfrage und kein Port.
 nach der Prüfung drei anders als notiert, plus der Bandplan davor. Vier
 Fehlalarme in zwei Tagen, jeder einzelne wäre als Klon mitgebaut worden.
 
+## Vierte Korrektur: der S-Verlauf ist kein Streifen, und TX im Wasserfall haben wir
+
+Beide Punkte gesucht, bevor gebaut wurde. Beide sind anders als notiert.
+
+### S-Verlauf — kein eigener Streifen, sondern ein Erkenner
+
+Die Liste sagte „Signalstärke über Zeit als eigener Streifen", und daraus
+folgte die Schätzung „Tagesstück wegen der Höhenaufteilung". **Falsch.**
+Die S-Verlauf-Marken laufen bei AetherSDR durch `drawSpotMarkers` —
+dieselbe Kollisionsstapelung wie die DX-Spots, mit `sLabel(peakDbm)` als
+Etikett (also „S7" statt eines Rufzeichens) und einer Unterdrückung, wenn
+ein echter Spot binnen 3 kHz liegt. Kein Streifen, keine
+Höhenaufteilung.
+
+Der Aufwand liegt woanders, nämlich in der **Quelle**:
+
+* `src/core/VoiceSignalDetector.cpp`, 314 Zeilen
+* `src/core/SignalClassifier.cpp`, 88 Zeilen — **lädt ein Modell von der
+  Platte** (`loadModel(path)`), unterscheidet QRM von Sprache
+* dazu in `MainWindow` eine Einträgeverwaltung mit `lastSeenMs`,
+  `peakDbm`, `widthHz`, Alterung, und dem Sonderfall „Sprache über einem
+  als QRM eingeordneten Eintrag" (zwei Marken gleichzeitig)
+
+**Was das für uns heißt:** die Zeichenhälfte haben wir bereits — die
+Spot-Marken samt Kollisionsstapelung sind seit 3J-2 portiert. Und der
+Kern des Betriebsnutzens („welche Frequenzen waren zuletzt belegt, wie
+stark") steckt bei uns im `PeakBlobDetector` mit
+`ActivePeakHoldTrace`: N Spitzen, `max_dBm` je Spitze,
+Zeitstempel der letzten Anhebung, Haltezeit, Abfallrate, wahlweise nur
+innerhalb des Filters. Genau die 11 Setter, die im Abschnitt „Was wir
+haben und AetherSDR nicht" stehen.
+
+Die echte Lücke ist damit **nicht ein Anzeigemerkmal, sondern die
+Einordnung** (QRM gegen Sprache) — und die hängt an einem
+Modelldatei-Erkenner. Das ist eine **Architekturentscheidung**, keine
+Portierung: eine neue Abhängigkeit, eine mitzuliefernde Modelldatei, ein
+Erkenner im FFT-Strom. Gehört dem Betreiber vorgelegt, nicht nebenbei
+gebaut. Aus der Reihenfolge „Nummer 3 von sieben" ist damit ein eigener
+Vorschlag geworden.
+
+### TX im Wasserfall — vorhanden, mit Schalter, den AetherSDR nicht hat
+
+`setShowTxInWaterfall` heißt bei AetherSDR: während des Sendens weiter
+Wasserfallzeilen aus den FFT-Werten schieben, damit das eigene Signal im
+Verlauf erscheint. Bei uns läuft das **von sich aus** — `pushWaterfallRow`
+schiebt durch, und es gibt sogar den umgekehrten Schalter dazu:
+`WaterfallStopOnTx` (Task 2.8, Vorgabe aus) hält den Wasserfall beim
+Senden an, wenn jemand das ausdrücklich will. Dazu kommen
+`m_showTxFilterOnRxWaterfall` und `m_showTxZeroLineOnWaterfall` als
+TX-Überlagerungen im Wasserfall.
+
+Einschränkung, damit die Notiz nicht mehr behauptet als geprüft ist: der
+*Mechanismus* ist da und der Schalter auch. Ob der Inhalt beim Senden
+tatsächlich das TX-Signal zeigt, ist eine Frage an die Bank, nicht an den
+Quelltext — sie steht auf der TX-Prüfliste.
+
+**Fehlalarm-Bilanz nach zwei Tagen: fünf.** Bandplan, Einfachklick,
+Zeigerform, erweiterter Durchlass, TX im Wasserfall — plus der S-Verlauf,
+der keiner ist, sondern etwas anderes und Größeres. Von sieben
+„Merkmalen" der Liste bleiben nach der Prüfung **zwei** übrig, die
+wirklich Panadapter-Arbeit sind: die SWR-Kurve (Darstellung, Controller
+vorhanden) und die Ausbreitungsvorhersage (fremde Daten).
+
 ---
 
 ## Was AetherSDR hat und wir nicht
