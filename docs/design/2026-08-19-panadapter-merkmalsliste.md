@@ -260,6 +260,66 @@ Alles Nötige ist im Baum vorhanden; es ist Verdrahtung, keine Erfindung.
   gibt es hier keinen Istzustand zu erhalten: das Merkmal ist neu, also
   ist die Vorgabe aus.
 
+## Fünfte Korrektur: die SWR-Kurve haben wir reicher, nur woanders
+
+Gesucht am 2026-08-19, bevor gebaut wurde. Die Liste sagte: „Wir haben
+den `SwrSweepController`, aber keine Darstellung im Panadapter."
+Richtig ist der zweite Halbsatz — und er ist trotzdem irreführend.
+
+**Was AetherSDR hat:** `drawSwrSweep`, rund 385 Zeilen, zeichnet ein
+kleines eigenes Diagramm **in** den Panadapter, unterhalb der
+VFO-Flaggen, mit eigener Achse, Laufanzeige und Quellenetikett.
+
+**Was wir haben:**
+
+* `SwrCurveWidget` — **1325 Zeilen, NereusSDR-eigen.** Kurve gegen die
+  Bänder, drei Senkrechte (untere Kante, Mitte, obere Kante) mit
+  abgelesenen Zahlen, bernsteinfarbene **Resonanzmarke** dort, wo die
+  Reaktanz durch null geht, Mehrband-Darstellung für Endgespeiste, und
+  ein Hinweis, welche IARU-Region schattiert wurde
+* `SwrSweepPanel`, `SwrChartWidget`, `SwrSweepController`
+* eine ganze **`AntennaWindow`** mit Reiter „Sweep (Radio)", erreichbar
+  über **Tools → Antenna…**, samt Bandplan-Wächter und Tune-Drive je
+  Band
+
+Der Unterschied ist also **die Platzierung, nicht die Fähigkeit** — und
+in der Sache sind wir voraus: AetherSDRs Einsatz beantwortet „wie steht
+das SWR gerade", unsere Ansicht beantwortet „wo ist die Antenne resonant
+und wie viel Draht fehlt".
+
+**Nicht gebaut.** 385 Zeilen Einsatz-Diagramm zu portieren, um eine
+schlechtere Fassung dessen zu bekommen, was in einem eigenen Fenster
+schon steht, ist kein Fortschritt. Sollte sich beim Wobbeln zeigen, dass
+der Blick auf den Panadapter fehlt, ist das ein Wunsch des Betreibers
+und keine Portierung — und dann ist die billige Antwort, das vorhandene
+Widget in einen andockbaren Container zu setzen, den der
+`ContainerManager` ohnehin kann.
+
+---
+
+## Endstand der Liste
+
+Von den sieben „Merkmalen" der ursprünglichen Empfehlung:
+
+| Merkmal | Ausgang |
+| --- | --- |
+| Squelch-Linie | **gebaut** (`bd287daf`), plus Automatik (`6b183799`) |
+| Abstimmhilfen | **ein Drittel gebaut** (`92c2acf5`); Einfachklick abgelehnt, Zeigerform war kein Merkmal |
+| S-Verlauf | **gebaut**, in drei Teilen (`f4540db5`, `2212805e`, `72734dd3`) — und es war kein Streifen, sondern ein Erkenner |
+| TX im Wasserfall | **hatten wir schon**, samt umgekehrtem Schalter |
+| SWR-Kurve | **haben wir reicher**, nur in einem eigenen Fenster |
+| Erweiterter Durchlass | **taten wir schon**; nachgezogen wurde nur der Schalter zum Abschalten (`dc103721`) |
+| Ausbreitungsvorhersage | **offen** — braucht fremde Daten, also eine Entscheidung des Betreibers, keine Portierung |
+
+**Sechs Fehlalarme, ein echtes neues Merkmal, zwei nachgezogene
+Schalter.** Der Bandplan davor macht sieben. Als Klon wären alle sechs
+mitgebaut worden — teils doppelt zu dem, was schon lief, teils
+schlechter.
+
+Was übrig bleibt, ist eine einzige offene Frage, und sie ist keine
+Portierungsfrage: **wollen wir eine Ausbreitungsvorhersage, die Daten
+aus dem Netz holt?**
+
 ---
 
 ## Was AetherSDR hat und wir nicht
