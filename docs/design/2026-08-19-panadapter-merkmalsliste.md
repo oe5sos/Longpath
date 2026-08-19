@@ -73,11 +73,34 @@ notiert** (Squelch-Automatik offen, SWR-Kurve vorhanden, Abstimmhilfen
 gedrittelt). Die Regel „erst im Baum suchen" hat sich zweimal an zwei
 Tagen bezahlt.
 
-Noch offen aus Merkmal 1: `setAutoSquelchEnable` und
-`setAutoSqlMarginDb` — die **Automatik mit Abstand zum Rauschboden**.
-Die Linie ist da, die Automatik nicht. Sie braucht den
-`NoiseFloorEstimator` aus 3G-9c als Eingang und ist deshalb ein eigener
-Schritt, kein Nachtrag.
+## Merkmal 1 ist geschlossen: die Automatik nimmt den *sichtbaren* Boden
+
+`setAutoSquelchEnable` + `setAutoSqlMarginDb` sind am selben Tag
+nachgezogen. Der interessante Teil war nicht die Rechnung — Boden plus
+Abstand — sondern **welcher** Boden.
+
+Wir führen drei Kandidaten:
+
+1. `m_nfLerpAverage` aus `processNoiseFloor` — Thetis-treu, und der Wert,
+   den die **NF-Linie malt**.
+2. Die Perzentil-plus-EWMA-Schätzung des `ClarityController`
+   (`NoiseFloorEstimator`) — treibt nur das mitlaufende Gitterminimum.
+3. AetherSDRs eigener Zweipass-Mittelwert in
+   `updateAutoSquelchFromBins`, der beim Port mitgekommen wäre.
+
+Genommen ist (1), und der Grund steht schon als Kommentar in
+`onNoiseFloorChanged`: die Clarity-Schätzung ergibt einen anderen Wert
+als Thetis' Verfahren, weshalb die NF-Anzeige sie ausdrücklich *nicht*
+nimmt — sonst schwebte die Linie über dem sichtbaren Rauschen. Dieselbe
+Überlegung gilt für die Schwelle: **wer die Linie sieht, muss die
+Schwelle daran ablesen können.** Ein dritter Schätzer hätte eine
+Schwelle ergeben, die neben der gezeichneten Linie liegt, und niemand
+hätte gewusst, welche der beiden lügt.
+
+Weiter nicht übernommen: AetherSDRs `drawAutoSqlFloor` (gestrichelte
+Bodenlinie plus „Floor -120 dBm"). Unsere NF-Anzeige malt genau diesen
+Wert bereits, mit einstellbaren Farben und Linienbreite. Zwei Striche auf
+derselben Höhe sind kein Merkmal.
 
 ---
 

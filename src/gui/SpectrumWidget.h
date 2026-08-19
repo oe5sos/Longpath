@@ -170,6 +170,7 @@ mw0lge@grange-lane.co.uk
 #include "spectrum/PeakBlobDetector.h"
 #include "spectrum/SpectrumAvenger.h"
 
+#include <limits>   // quiet_NaN — Sperre der Squelch-Automatik
 #include <utility>
 
 #include "core/ConnectionState.h"
@@ -749,6 +750,45 @@ public:
     void setTuneGuideEnabled(bool on);
     bool tuneGuideEnabled() const { return m_tuneGuideEnabled; }
     bool tuneGuideShowing() const { return m_tuneGuideShowing; }
+
+    // ── Squelch-Automatik ────────────────────────────────────────────
+    //
+    // Port aus AetherSDR: setAutoSquelchEnable + setAutoSqlMarginDb +
+    // updateAutoSquelchFromBins (SpectrumWidget.cpp:4508-4587
+    // [@0cd4559]). Die Schwelle folgt dem Rauschboden mit festem
+    // Abstand, statt bei jedem Bandwechsel nachgestellt zu werden.
+    //
+    // DREI NereusSDR-Abweichungen, alle aus dem hiesigen Baum begruendet:
+    //
+    // 1. KEIN eigener Schaetzer. AetherSDR rechnet in
+    //    updateAutoSquelchFromBins einen zweiten Rauschboden aus den
+    //    Bins (Zweipass-Mittel ueber jeden vierten Bin, danach EWMA
+    //    0.1/0.9). Wir haben den Wert schon zweimal: processNoiseFloor
+    //    haelt den Thetis-treuen m_nfLerpAverage, und das ist der Wert,
+    //    den der Betreiber als NF-Linie SIEHT. Ein dritter Schaetzer
+    //    ergaebe eine Schwelle, die neben der sichtbaren Linie liegt —
+    //    siehe die Notiz in onNoiseFloorChanged darueber, warum die
+    //    ClarityController-Schaetzung fuer die Anzeige gerade NICHT
+    //    genommen wird. Wer die Linie sieht, muss die Schwelle daran
+    //    ablesen koennen.
+    //
+    // 2. In dBm, nicht in einer 0..160-Stufe. Dieselbe Entscheidung wie
+    //    bei der Squelch-Linie: FlexRadio meldet Stufen, unser
+    //    SliceModel haelt dBm (amsqThresh).
+    //
+    // 3. Keine eigene Bodenlinie (AetherSDRs drawAutoSqlFloor, dort
+    //    gestrichelt plus „Floor -120 dBm"). Unsere NF-Anzeige malt
+    //    genau diesen Wert bereits, mit einstellbaren Farben und
+    //    Linienbreite. Zwei Striche auf derselben Hoehe sind kein
+    //    Merkmal, sondern ein Zeichenfehler.
+    void setAutoSquelchEnabled(bool on);
+    bool autoSquelchEnabled() const { return m_autoSquelchEnabled; }
+    void setAutoSqlMarginDb(int db);           // 5..20, wie AetherSDR
+    int  autoSqlMarginDb() const { return m_autoSqlMarginDb; }
+    // Zuletzt vorgeschlagene Schwelle, oder NaN, solange keine steht.
+    double lastAutoSqlThresholdDbm() const { return m_lastAutoSqlDbm; }
+    // Fuer den Test: einen Rauschboden einspeisen, ohne FFT-Rahmen.
+    void testApplyAutoSquelch(float nfDbm) { updateAutoSquelch(nfDbm); }
 
     void setBandPlanFontSize(int pt);             // 0 = off
     int  bandPlanFontSize() const { return m_bandPlanFontSize; }
@@ -1461,6 +1501,13 @@ signals:
 
     // Emitted when user clicks on spectrum/waterfall to tune
     void frequencyClicked(double hz);
+
+    // Squelch-Automatik: vorgeschlagene Schwelle in dBm. MainWindow legt
+    // sie auf SliceModel::setAmsqThresh, was ueber amsqThreshChanged die
+    // Squelch-Linie nachzieht — der Betreiber SIEHT die Automatik damit
+    // arbeiten. AetherSDR heisst das Signal autoSquelchLevelSuggested und
+    // fuehrt eine 0..160-Stufe; wir fuehren dBm.
+    void autoSquelchThresholdSuggested(double dbm);
     // Phase 3J-2 Task E1: emitted when the user clicks a spot label
     // (or selects a spot from a cluster badge popup). spotIndex is the
     // SpotMarker::index that was bound to the clicked label so spot
@@ -1642,6 +1689,9 @@ private:
     void drawBandPlan(QPainter& p, const QRect& specRect);
     void drawSquelchLine(QPainter& p, const QRect& specRect);
     void drawTuneGuide(QPainter& p, const QRect& specRect);
+    // Rauschboden -> Schwellenvorschlag. Ruft am Ende von
+    // processNoiseFloor, mit dem sichtbaren m_nfLerpAverage.
+    void updateAutoSquelch(float nfDbm);
     // Zeigerbewegung: Hilfe zeigen und die vier Sekunden neu starten.
     void noteTuneGuideActivity();
 
@@ -2188,6 +2238,17 @@ private:
     bool                         m_squelchLineVisible{false};
     double                       m_squelchDbm{-150.0};
     class QTimer*                m_squelchHideTimer{nullptr};
+
+    bool                         m_autoSquelchEnabled{false};
+    // 10 dB wie AetherSDR (SpectrumWidget.h:1414 m_autoSqlMarginDb{10}).
+    int                          m_autoSqlMarginDb{10};
+    // Sperre gegen Wiederholung: nur senden, wenn sich der Vorschlag um
+    // mindestens 1 dB bewegt hat. AetherSDR vergleicht dafuer die
+    // ganzzahlige Stufe (m_lastAutoSquelchLevel); in dBm braucht es eine
+    // ausdrueckliche Schwelle, sonst faehrt der Wert bei jedem Rahmen
+    // ueber die Verdrahtung.
+    double                       m_lastAutoSqlDbm{
+        std::numeric_limits<double>::quiet_NaN()};
 
     bool                         m_tuneGuideEnabled{false};
     bool                         m_tuneGuideShowing{false};

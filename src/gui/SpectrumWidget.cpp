@@ -1076,6 +1076,11 @@ void SpectrumWidget::loadSettings()
     // (SpectrumWidget.h:1760 [@0cd4559] m_showTuneGuides{false}). Eine
     // Linie, die am Zeiger klebt, gehoert nicht ungefragt ins Bild.
     m_tuneGuideEnabled = readBool(QStringLiteral("DisplayShowTuneGuide"), false);
+    // Squelch-Automatik: aus als Vorgabe. Sie schreibt eine Schwelle in
+    // das Modell, und das tut nichts ungefragt.
+    m_autoSquelchEnabled = readBool(QStringLiteral("DisplayAutoSquelch"), false);
+    m_autoSqlMarginDb = qBound(5,
+        readInt(QStringLiteral("DisplayAutoSqlMarginDb"), 10), 20);
     m_dbmScaleVisible = readBool(QStringLiteral("DisplayDbmScaleVisible"), true);
     m_bandPlanFontSize = s.value(QStringLiteral("BandPlanFontSize"),
                                  QStringLiteral("6")).toInt();
@@ -1311,6 +1316,9 @@ void SpectrumWidget::saveSettings()
               m_showCursorFreq ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayShowTuneGuide"), m_panIndex),
               m_tuneGuideEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayAutoSquelch"), m_panIndex),
+              m_autoSquelchEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    writeInt(QStringLiteral("DisplayAutoSqlMarginDb"), m_autoSqlMarginDb);
     s.setValue(settingsKey(QStringLiteral("DisplayDbmScaleVisible"), m_panIndex),
               m_dbmScaleVisible ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("BandPlanFontSize"),
@@ -2238,6 +2246,12 @@ void SpectrumWidget::processNoiseFloor()
             if (m_showNoiseFloor) { markOverlayDirty(); }
         }
     }
+
+    // Squelch-Automatik am geglaetteten Wert, nicht am Rahmenwert: die
+    // Schwelle soll dem folgen, was als NF-Linie steht, und nicht bei
+    // jedem Rahmen zappeln. m_nfLerpAverage ist derselbe Wert, den die
+    // Anzeige nimmt (siehe die Notiz in onNoiseFloorChanged).
+    updateAutoSquelch(m_nfLerpAverage);
 }
 
 // ---- NF-aware grid (Task 2.9) ----
@@ -4427,6 +4441,72 @@ void SpectrumWidget::noteTuneGuideActivity()
         m_tuneGuideHideTimer->stop();
     }
     m_overlayStaticDirty = true;
+}
+
+// ── Squelch-Automatik ────────────────────────────────────────────────
+//
+// Port aus AetherSDR SpectrumWidget.cpp:4508-4587 [@0cd4559]. Uebernommen
+// sind die Idee (Schwelle = Rauschboden + Abstand), der Abstandsbereich
+// 5..20 dB und der Vorgabewert 10 dB.
+//
+// Nicht uebernommen ist AetherSDRs eigener Schaetzer in
+// updateAutoSquelchFromBins: wir haben den Rauschboden bereits, und zwar
+// den Thetis-treuen aus processNoiseFloor, der auch die NF-Linie malt.
+// Begruendung steht im Header; kurz: die Schwelle muss an der sichtbaren
+// Linie ablesbar sein.
+
+void SpectrumWidget::setAutoSquelchEnabled(bool on)
+{
+    if (m_autoSquelchEnabled == on) { return; }
+    m_autoSquelchEnabled = on;
+    if (on) {
+        // Kaltstart wie bei AetherSDR (:4515 m_lastAutoSquelchLevel = -1):
+        // der erste Rauschboden nach dem Einschalten soll senden, auch
+        // wenn er dem letzten von vorhin gleicht.
+        m_lastAutoSqlDbm = std::numeric_limits<double>::quiet_NaN();
+    }
+    scheduleSettingsSave();
+}
+
+void SpectrumWidget::setAutoSqlMarginDb(int db)
+{
+    // 5..20 dB wie AetherSDR (:4527 std::clamp(dBm, 5, 20)).
+    db = qBound(5, db, 20);
+    if (m_autoSqlMarginDb == db) { return; }
+    m_autoSqlMarginDb = db;
+    // Neu senden, auch wenn der Rauschboden steht: der Abstand hat sich
+    // geaendert, also die Schwelle. AetherSDR macht es genauso (:4528).
+    m_lastAutoSqlDbm = std::numeric_limits<double>::quiet_NaN();
+    scheduleSettingsSave();
+}
+
+void SpectrumWidget::updateAutoSquelch(float nfDbm)
+{
+    if (!m_autoSquelchEnabled) { return; }
+
+    // Beim Senden nicht nachstellen: das eigene Signal hebt den
+    // gemessenen Boden, und die Automatik wuerde die Schwelle hochziehen
+    // und nach dem Loslassen alles zumachen. AetherSDR prueft dafuer
+    // m_transmitting (:4533), unser Aequivalent ist m_moxOverlay.
+    if (m_moxOverlay) { return; }
+
+    // -200 dBm ist der Anfangswert von m_nfFftBinAverage / m_nfLerpAverage:
+    // solange processNoiseFloor keinen Rahmen gesehen hat, steht dort kein
+    // gemessener Boden, sondern die Vorbelegung.
+    if (!std::isfinite(nfDbm) || nfDbm <= -199.0f) { return; }
+
+    const double target = static_cast<double>(nfDbm)
+                        + static_cast<double>(m_autoSqlMarginDb);
+
+    // Nur bei Bewegung senden. Ohne diese Sperre laeuft bei jedem
+    // FFT-Rahmen ein Modell-Setter samt Signalkette und Neuzeichnen der
+    // Squelch-Linie — bei 10 bis 30 Rahmen je Sekunde.
+    if (std::isfinite(m_lastAutoSqlDbm)
+        && std::abs(target - m_lastAutoSqlDbm) < 1.0) {
+        return;
+    }
+    m_lastAutoSqlDbm = target;
+    emit autoSquelchThresholdSuggested(target);
 }
 
 void SpectrumWidget::drawTuneGuide(QPainter& p, const QRect& specRect)

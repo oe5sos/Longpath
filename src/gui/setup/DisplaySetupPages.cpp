@@ -253,6 +253,15 @@ void SpectrumDefaultsPage::loadFromRenderer()
         QSignalBlocker b(m_showTuneGuideToggle);
         m_showTuneGuideToggle->setChecked(sw->tuneGuideEnabled());
     }
+    if (m_autoSquelchToggle) {
+        QSignalBlocker b(m_autoSquelchToggle);
+        m_autoSquelchToggle->setChecked(sw->autoSquelchEnabled());
+    }
+    if (m_autoSqlMarginSpin) {
+        QSignalBlocker b(m_autoSqlMarginSpin);
+        m_autoSqlMarginSpin->setValue(sw->autoSqlMarginDb());
+        m_autoSqlMarginSpin->setEnabled(sw->autoSquelchEnabled());
+    }
     if (m_showBinWidthToggle) {
         QSignalBlocker b(m_showBinWidthToggle);
         m_showBinWidthToggle->setChecked(sw->showBinWidth());
@@ -996,6 +1005,54 @@ void SpectrumDefaultsPage::buildUI()
         hl->addStretch();
         overlayForm->addRow(QString(), row);
     }
+
+    // Squelch-Automatik — steht HIER, bei der NF-Anzeige, und nicht bei
+    // den Squelch-Reglern im RxApplet: sie rechnet aus dem Rauschboden,
+    // und wer den Abstand einstellt, will die Linie dabei sehen.
+    // Port aus AetherSDR setAutoSquelchEnable + setAutoSqlMarginDb
+    // (SpectrumWidget.cpp:4508-4530 [@0cd4559]).
+    m_autoSquelchToggle = new QCheckBox(
+        QStringLiteral("Auto squelch follows noise floor"), overlayGroup);
+    m_autoSquelchToggle->setToolTip(QStringLiteral(
+        "Continuously set the squelch threshold to the measured noise floor "
+        "plus the margin below. Only writes the threshold while squelch is "
+        "switched on for the slice, and pauses during transmit."));
+    m_autoSqlMarginSpin = new QSpinBox(overlayGroup);
+    m_autoSqlMarginSpin->setRange(5, 20);
+    m_autoSqlMarginSpin->setValue(10);
+    m_autoSqlMarginSpin->setSuffix(QStringLiteral(" dB"));
+    m_autoSqlMarginSpin->setToolTip(QStringLiteral(
+        "How far above the noise floor the automatic threshold sits. "
+        "Smaller opens on weaker signals; larger keeps the noise out."));
+    connect(m_autoSquelchToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setAutoSquelchEnabled(on);
+        }
+        if (m_autoSqlMarginSpin) { m_autoSqlMarginSpin->setEnabled(on); }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayAutoSquelch"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    connect(m_autoSqlMarginSpin, qOverload<int>(&QSpinBox::valueChanged),
+            this, [this](int v) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setAutoSqlMarginDb(v);
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayAutoSqlMarginDb"), QString::number(v));
+    });
+    {
+        auto* row = new QWidget(overlayGroup);
+        auto* hl  = new QHBoxLayout(row);
+        hl->setContentsMargins(0, 0, 0, 0);
+        hl->addWidget(m_autoSquelchToggle);
+        hl->addSpacing(8);
+        hl->addWidget(new QLabel(QStringLiteral("Margin:"), row));
+        hl->addWidget(m_autoSqlMarginSpin);
+        hl->addStretch();
+        overlayForm->addRow(QString(), row);
+    }
+    m_autoSqlMarginSpin->setEnabled(m_autoSquelchToggle->isChecked());
 
     // NF Shift + Line Width — Thetis display.cs:5400 + 2310.
     {

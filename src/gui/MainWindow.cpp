@@ -8691,6 +8691,25 @@ void MainWindow::wireSliceToSpectrum()
                 [pushSquelch](double) { pushSquelch(); });
     }
 
+    // ── Squelch-Automatik ─────────────────────────────────────────────
+    //
+    // Der Rueckweg der Linie darueber: das Panadapter meldet aus dem
+    // Rauschboden eine Schwelle, sie geht ins Modell, und das Modell
+    // zieht ueber amsqThreshChanged die Linie nach. Der Betreiber sieht
+    // die Automatik damit arbeiten, statt ihr glauben zu muessen.
+    //
+    // Nur wenn der Squelch auch eingeschaltet ist: eine Automatik, die
+    // eine Schwelle stellt, die niemand benutzt, verstellt dem Betreiber
+    // nur seinen gemerkten Wert.
+    if (auto* sw = activeSpectrumWidget()) {
+        connect(sw, &SpectrumWidget::autoSquelchThresholdSuggested, this,
+                [slice](double dbm) {
+            if (slice->ssqlEnabled()) {
+                slice->setAmsqThresh(dbm);
+            }
+        });
+    }
+
     connect(slice, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
         // Phase 3R L2: RADE applet shows for either RADE sideband, IN ADDITION
         // to PhoneCwApplet -- bench feedback showed PhoneCw hosts the mic gain
