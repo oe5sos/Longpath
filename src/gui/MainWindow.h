@@ -588,6 +588,11 @@ private:
     // Persistiert unter „AppletPanelBelow". Begruendung und Zielbild
     // stehen in MainWindow.cpp beim Menueeintrag.
     void setAppletPanelBelow(bool below);
+
+    // Rotor/Log unter den Panadapter legen statt an den Rand andocken.
+    // Gibt der unteren Flaeche des aeusseren Splitters Inhalt — ohne
+    // Inhalt waere der senkrechte Griff da, aber sinnlos.
+    void setRotorPanelBelow(bool below);
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
     void ensureQrzClient();
@@ -1027,6 +1032,14 @@ private:
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
     QSplitter* m_mainSplitter{nullptr};
+    // Aeusserer, SENKRECHTER Splitter um m_mainSplitter herum: erst
+    // dadurch laesst sich der Panadapter auch in der Hoehe ziehen.
+    // Begruendung der Schachtelung in MainWindow.cpp bei der Anlage.
+    QSplitter* m_outerSplitter{nullptr};
+    QWidget*   m_belowPane{nullptr};   // Flaeche unter dem Panadapter
+    // Das Panel selbst, unabhaengig davon, WO es gerade haengt (Dock
+    // oder untere Flaeche). ensureRotorPanel() liest diesen Zeiger.
+    class RotorLogbookPanel* m_rotorPanel{nullptr};
     int m_hDelta{0};
     int m_vDelta{0};
 

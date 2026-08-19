@@ -404,6 +404,19 @@ void GlobeWidget::wheelEvent(QWheelEvent* e)
     const double before = m_zoom;
     m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 0.6, maxZoom());
     m_targetZoom = m_zoom;
+
+    // Am oberen Anschlag weiter hineindrehen: die Kugel kann nicht
+    // naeher, die flache Karte schon. Den Ort mitgeben, damit dort
+    // dieselbe Stelle in der Mitte liegt (2026-08-19).
+    if (steps > 0.0 && qFuzzyCompare(before, maxZoom())
+            && qFuzzyCompare(m_zoom, maxZoom())) {
+        double lat = m_viewLat, lon = m_viewLon;
+        unproject(e->position(), lat, lon);   // scheitert am Rand: Mitte bleibt
+        emit zoomedInPastCeiling(lat, lon);
+        e->accept();
+        return;
+    }
+
     if (!qFuzzyCompare(before, m_zoom)) {
         // Zum Zeiger hin, nicht zur Mitte (2026-08-19). Beim Hineinzoomen
         // wandert die Kamera einen Teil des Weges zu dem Ort, auf den der

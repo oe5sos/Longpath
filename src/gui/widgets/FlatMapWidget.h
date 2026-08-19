@@ -98,6 +98,12 @@ public:
     // Back to the whole world, centred.
     void resetView();
 
+    // Auf einen Ort schwenken, ohne den Zoom anzufassen. Gebraucht fuer
+    // den Uebergang von der Kugel: wer dort bis zum Anschlag
+    // hineingezoomt hat, will hier denselben Ort sehen und nicht
+    // Nullmeridian und Aequator.
+    void centreOn(double lat, double lon);
+
     QSize sizeHint() const override { return {900, 460}; }
 
     // ── Pure geometry, exposed for tests ─────────────────────────────
@@ -120,6 +126,12 @@ public:
     static QString gridSquare4(double lat, double lon);
 
 signals:
+    // Der Betreiber zoomt am unteren Anschlag weiter heraus (2026-08-19).
+    // Fuer die flache Karte ist bei 1x die ganze Welt zu sehen — weiter
+    // heraus gibt es hier nichts, wohl aber auf der KUGEL. Das Fenster
+    // schaltet daraufhin um.
+    void zoomedOutPastFloor();
+
     // A contact marker was clicked. label is the MapPoint's label —
     // the callsign, prefixed with '~' when the position was a country
     // guess rather than a locator.

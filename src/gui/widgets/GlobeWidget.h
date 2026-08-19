@@ -169,6 +169,10 @@ public:
     static double angularDistance(double latA, double lonA,
                                   double latB, double lonB);
 
+signals:
+    // Siehe oben.
+    void zoomedInPastCeiling(double lat, double lon);
+
 protected:
     void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent*) override;

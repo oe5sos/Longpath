@@ -309,6 +309,36 @@ void QsoMapWindow::buildUi()
         m_viewBtn->setText(toFlat ? QStringLiteral("Globe")
                                   : QStringLiteral("Flat map"));
     });
+
+    // ── Durchzoomen zwischen den beiden Ansichten (2026-08-19) ───────
+    //
+    // Auf Ansage des Betreibers („die Weltkugel wuerde ich mit Zoom
+    // machen, wie bei Google Earth", danach: Weg B). Der Uebergang
+    // passiert genau dort, wo eine Ansicht an ihr Ende kommt:
+    //
+    //   * Kugel am oberen Anschlag, weiter hinein  -> flache Karte,
+    //     zentriert auf denselben Ort
+    //   * flache Karte bei 1x, weiter heraus       -> Kugel
+    //
+    // Kein neuer Schalter: der Knopf bleibt, was er war. Wer nichts von
+    // Ansichten wissen will, dreht einfach weiter und bekommt jedes Mal
+    // die, die mehr zeigen kann.
+    connect(m_globe, &GlobeWidget::zoomedInPastCeiling, this,
+            [this](double lat, double lon) {
+        m_stack->setCurrentIndex(1);
+        m_viewBtn->setText(QStringLiteral("Globe"));
+        // Erst der Zoom, dann das Zentrieren: centreOn rechnet mit dem
+        // AKTUELLEN Zoom, und andersherum saesse der Ort daneben.
+        m_flat->resetView();
+        m_flat->zoomBy(3.0);
+        m_flat->centreOn(lat, lon);
+    });
+
+    connect(m_flat, &FlatMapWidget::zoomedOutPastFloor, this, [this]() {
+        m_stack->setCurrentIndex(0);
+        m_viewBtn->setText(QStringLiteral("Flat map"));
+        m_globe->resetView();
+    });
     connect(m_paths, &QCheckBox::toggled, this, [this](bool on) {
         m_globe->setShowPointPaths(on);
         m_flat->setShowPaths(on);

@@ -3002,7 +3002,46 @@ void MainWindow::buildUI()
     centreCol->setContentsMargins(6, 6, 6, 0);
     centreCol->setSpacing(6);
     centreCol->addWidget(m_commandBar, 0);
-    centreCol->addWidget(m_mainSplitter, 1);
+
+    // ── Panadapter in BEIDE Richtungen veraenderbar (2026-08-19) ──────
+    //
+    // Auf Ansage des Betreibers: „der Panadapter soll auf der x- und
+    // y-Achse verschoben werden koennen, sprich in alle Groessen und
+    // Richtungen veraenderbar."
+    //
+    // Ein einzelner Splitter hat einen Griff, also EINE Achse. Also wird
+    // der vorhandene GESCHACHTELT: aussen senkrecht, innen der bisherige
+    // waagerechte.
+    //
+    //   aussen (senkrecht)
+    //     +-- innen (waagerecht):  [ Panadapter | Applet-Leiste ]
+    //     +-- untere Flaeche       (fuer Rotor/Log und spaeter Kacheln)
+    //
+    // Der innere Splitter behaelt seine IDENTITAET: ContainerManager
+    // haelt einen Zeiger darauf und dockt die Applet-Leiste dort ein.
+    // Haette ich ihn ersetzt statt umschlossen, waere die ganze
+    // Container-Verwaltung mitzuziehen gewesen.
+    m_outerSplitter = new QSplitter(Qt::Vertical, this);
+    m_outerSplitter->setObjectName(QStringLiteral("outerSplitter"));
+    m_outerSplitter->setChildrenCollapsible(false);
+    m_outerSplitter->setHandleWidth(3);
+    m_outerSplitter->setStyleSheet(Style::themed(QStringLiteral(
+        "QSplitter::handle { background: #203040; }")));
+    m_outerSplitter->addWidget(m_mainSplitter);
+
+    // Die untere Flaeche bleibt leer und verborgen, bis jemand etwas
+    // hineinlegt. Ein sichtbarer leerer Streifen waere ein Versprechen,
+    // das niemand eingeloest hat.
+    m_belowPane = new QWidget(m_outerSplitter);
+    m_belowPane->setObjectName(QStringLiteral("belowPane"));
+    auto* belowCol = new QVBoxLayout(m_belowPane);
+    belowCol->setContentsMargins(0, 0, 0, 0);
+    belowCol->setSpacing(0);
+    m_belowPane->setMinimumHeight(120);
+    m_belowPane->hide();
+    m_outerSplitter->addWidget(m_belowPane);
+
+    centreCol->addWidget(m_outerSplitter, 1);
     centreRow->addLayout(centreCol, 1);
 
     setCentralWidget(centre);
@@ -3232,6 +3271,14 @@ void MainWindow::buildUI()
                                       QStringLiteral("False")).toString()
             == QStringLiteral("True")) {
         setAppletPanelBelow(true);
+    }
+
+    // Rotor/Log unter dem Panadapter, falls zuletzt so gewaehlt. Nach
+    // dem Fensteraufbau, weil ensureRotorPanel() das Dock erst anlegt.
+    if (AppSettings::instance().value(QStringLiteral("RotorPanelBelow"),
+                                      QStringLiteral("False")).toString()
+            == QStringLiteral("True")) {
+        setRotorPanelBelow(true);
     }
 
     // Wire spectrum display to SliceModel (values come from persisted state,
@@ -6120,6 +6167,25 @@ void MainWindow::buildMenuBar()
                              && m_mainSplitter->orientation() == Qt::Vertical);
         connect(belowAct, &QAction::toggled, this, [this](bool below) {
             setAppletPanelBelow(below);
+        });
+
+        // Rotor/Log unter den Panadapter: gibt der unteren Flaeche des
+        // aeusseren Splitters Inhalt, und damit ist der Panadapter in
+        // BEIDEN Achsen ziehbar — Breite am inneren Griff, Hoehe am
+        // aeusseren (2026-08-19, auf Ansage des Betreibers).
+        QAction* rotorBelowAct = viewMenu->addAction(
+            QStringLiteral("&Rotor / Log below panadapter"));
+        rotorBelowAct->setCheckable(true);
+        rotorBelowAct->setToolTip(QStringLiteral(
+            "Move the Rotor / Log panel out of its dock and under the "
+            "panadapter. The handle between them then resizes the "
+            "panadapter's height."));
+        rotorBelowAct->setChecked(
+            AppSettings::instance().value(QStringLiteral("RotorPanelBelow"),
+                                          QStringLiteral("False")).toString()
+            == QStringLiteral("True"));
+        connect(rotorBelowAct, &QAction::toggled, this, [this](bool below) {
+            setRotorPanelBelow(below);
         });
     }
 
@@ -10041,10 +10107,59 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         // are for sending contacts on afterwards from the logbook
         // window, where the operator can see what is being sent where.
         panel->setUploadTargets(qsoUploaders());
+        m_rotorPanel = panel;
         m_rotorDock->setWidget(panel);
         addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);
     }
-    return qobject_cast<RotorLogbookPanel*>(m_rotorDock->widget());
+    // NICHT ueber m_rotorDock->widget(): das Panel kann unter dem
+    // Panadapter liegen (setRotorPanelBelow), und dann ist das Dock leer.
+    // Frueher stand hier genau das — und der naechste Aufruf haette ein
+    // ZWEITES Panel gebaut, mit eigener QRZ-Abfrage und eigenem Logbuch.
+    return m_rotorPanel;
+}
+
+// ── Rotor/Log unter den Panadapter ───────────────────────────────────
+//
+// Die untere Flaeche des aeusseren Splitters bekommt Inhalt. Ohne
+// Inhalt waere der senkrechte Griff da, aber sinnlos: man zieht einen
+// leeren Streifen groesser.
+//
+// Das Panel wandert dabei aus dem Dock heraus und wieder hinein. Es
+// wird nicht kopiert — ein zweites Logbuch mit eigenem Zustand waere
+// genau die Art Fehler, die niemand bemerkt, bis zwei Eintraege
+// auseinanderlaufen.
+void MainWindow::setRotorPanelBelow(bool below)
+{
+    RotorLogbookPanel* panel = ensureRotorPanel();
+    if (!panel || !m_belowPane || !m_rotorDock) { return; }
+
+    auto* col = qobject_cast<QVBoxLayout*>(m_belowPane->layout());
+    if (!col) { return; }
+
+    if (below) {
+        m_rotorDock->setWidget(nullptr);
+        col->addWidget(panel);
+        panel->show();
+        m_belowPane->show();
+        m_rotorDock->hide();
+
+        // Zwei Drittel Panadapter, ein Drittel darunter — dieselbe
+        // Aufteilung wie beim waagerechten Splitter.
+        const int h = m_outerSplitter ? m_outerSplitter->height() : 0;
+        if (h > 0 && m_outerSplitter) {
+            m_outerSplitter->setSizes({h * 2 / 3, h / 3});
+        }
+    } else {
+        col->removeWidget(panel);
+        m_rotorDock->setWidget(panel);
+        m_belowPane->hide();
+        m_rotorDock->show();
+        m_rotorDock->raise();
+    }
+
+    AppSettings::instance().setValue(
+        QStringLiteral("RotorPanelBelow"),
+        below ? QStringLiteral("True") : QStringLiteral("False"));
 }
 
 // ── Applet-Leiste neben oder unter den Panadapter ────────────────────

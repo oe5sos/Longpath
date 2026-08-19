@@ -803,6 +803,28 @@ void FlatMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
     QWidget::mouseDoubleClickEvent(e);
 }
 
+void FlatMapWidget::centreOn(double lat, double lon)
+{
+    // mapRect() ist die Grundlage plus m_pan. Also erst ausrechnen, wo
+    // der Ort OHNE Schwenk laege, dann den Schwenk so setzen, dass er in
+    // der Fenstermitte sitzt.
+    const double w = width();
+    const double h = height();
+    double mw = w;
+    double mh = mw / 2.0;
+    if (mh > h) { mh = h; mw = mh * 2.0; }
+    mw *= m_zoom;
+    mh *= m_zoom;
+
+    const double baseLeft = (w - mw) / 2.0;
+    const double baseTop  = (h - mh) / 2.0;
+    const double x = baseLeft + (norm180(lon) + 180.0) / 360.0 * mw;
+    const double y = baseTop  + (90.0 - std::clamp(lat, -90.0, 90.0)) / 180.0 * mh;
+
+    m_pan = QPointF(w / 2.0 - x, h / 2.0 - y);
+    update();
+}
+
 void FlatMapWidget::wheelEvent(QWheelEvent* e)
 {
     const double steps = e->angleDelta().y() / 120.0;
@@ -810,6 +832,16 @@ void FlatMapWidget::wheelEvent(QWheelEvent* e)
 
     const double before = m_zoom;
     m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 1.0, 12.0);
+
+    // Am unteren Anschlag weiter herausdrehen heisst: der Betreiber will
+    // MEHR sehen, als eine flache Weltkarte zeigen kann. Das kann nur die
+    // Kugel; das Fenster schaltet um (2026-08-19).
+    if (steps < 0.0 && qFuzzyCompare(before, 1.0) && qFuzzyCompare(m_zoom, 1.0)) {
+        emit zoomedOutPastFloor();
+        e->accept();
+        return;
+    }
+
     if (!qFuzzyCompare(before, m_zoom)) {
         // Keep whatever is under the pointer under the pointer, so
         // zooming into a region does not throw it off screen.
