@@ -53,6 +53,8 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerWidget.h"
+
+#include "gui/styles/PopupMenuStyle.h"
 #include "gui/styles/ThemeQss.h"
 #include "FloatingContainer.h"
 #include "core/BoardCapabilities.h"
@@ -73,6 +75,8 @@ mw0lge@grange-lane.co.uk
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QContextMenuEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QApplication>
 #include <QMap>
@@ -379,6 +383,66 @@ void ContainerWidget::setTopMost()
 
 void ContainerWidget::setBorder(bool border) { m_border = border; setupBorder(); }
 void ContainerWidget::setLocked(bool locked) { m_locked = locked; }
+
+// ── Kontextmenue: bewegen und feststellen ────────────────────────────
+//
+// Auf Ansage des Betreibers (2026-08-19): „jeder Container muss sich
+// ueberall hinbewegen koennen … es sollte ein click and drop verwendet
+// werden, anschliessend mit einem Schloss um es zu fixieren."
+//
+// Beides GAB es schon — drei Andock-Arten, freies Ziehen im
+// ueberlagernden und schwebenden Zustand (updateDrag), und ein
+// m_locked, das Ziehen UND Groessenaendern sperrt. Was fehlte, war der
+// Weg dorthin: kein Menue, kein Knopf, nichts. Der Modus liess sich nur
+// im Quelltext setzen.
+//
+// Darum hier ein Rechtsklick-Menue statt neuer Mechanik. Die
+// Andock-Arten in ihren eigenen Worten:
+//
+//   Frei bewegen   — ueberlagernd: absolute Lage ueber dem Hauptbereich,
+//                    Titelleiste ziehen, Ecke groessenaendern
+//   Eigenes Fenster— schwebend, auch ausserhalb des Hauptfensters
+//   Am Rand        — im Splitter, also EINE Achse; das ist der Zustand,
+//                    ueber den sich der Betreiber beschwert hat
+void ContainerWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    QMenu menu(this);
+    menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
+
+    QAction* move  = menu.addAction(QStringLiteral("Move freely"));
+    move->setCheckable(true);
+    move->setChecked(isOverlayDocked());
+    move->setToolTip(QStringLiteral(
+        "Place this container anywhere over the main area — drag its "
+        "title bar to move, the corner to resize."));
+
+    QAction* window = menu.addAction(QStringLiteral("Own window"));
+    window->setCheckable(true);
+    window->setChecked(isFloating());
+
+    QAction* edge = menu.addAction(QStringLiteral("Dock at the edge"));
+    edge->setCheckable(true);
+    edge->setChecked(isPanelDocked());
+    edge->setToolTip(QStringLiteral(
+        "Back into the side panel. There it shares one axis with the "
+        "panadapter and moves only with the splitter handle."));
+
+    menu.addSeparator();
+
+    QAction* lock = menu.addAction(QStringLiteral("Lock in place"));
+    lock->setCheckable(true);
+    lock->setChecked(m_locked);
+    lock->setToolTip(QStringLiteral(
+        "Freeze position and size. Nothing moves this container until "
+        "the lock comes off — the way to keep a layout you like."));
+
+    const QAction* chosen = menu.exec(event->globalPos());
+    if (chosen == move && !isOverlayDocked())        { emit overlayRequested(); }
+    else if (chosen == window && !isFloating())      { emit floatRequested(); }
+    else if (chosen == edge && !isPanelDocked())     { emit dockRequested(); }
+    else if (chosen == lock)                         { setLocked(!m_locked); }
+    event->accept();
+}
 void ContainerWidget::setContainerEnabled(bool enabled) { m_enabled = enabled; }
 void ContainerWidget::setShowOnRx(bool show) { m_showOnRx = show; }
 void ContainerWidget::setShowOnTx(bool show) { m_showOnTx = show; }

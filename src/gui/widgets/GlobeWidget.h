@@ -23,6 +23,7 @@
 
 #include <QImage>
 #include <QPoint>
+#include <QRectF>
 #include <QVector>
 #include <QWidget>
 
@@ -198,6 +199,9 @@ private:
     bool projectAlt(double lat, double lon, double alt, QPointF& out) const;
     // Radius of the disc in pixels, magnification included.
     double radiusPx() const;
+    // Lage der gemalten Zoomknoepfe. Zeichnung und Trefferpruefung
+    // teilen sie sich (2026-08-19).
+    QRectF zoomButtonRect(bool plus) const;
     // One raised great-circle arc from home to the given end point.
     //
     // `steps` is the caller's, not the arc's: drawing five hundred of

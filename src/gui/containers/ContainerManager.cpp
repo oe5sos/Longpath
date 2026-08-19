@@ -108,6 +108,11 @@ void ContainerManager::wireContainer(ContainerWidget* container)
     connect(container, &ContainerWidget::dockRequested, this, [this, container]() {
         dockContainer(container->id());
     });
+    // „Frei bewegen" aus dem Kontextmenue des Containers (2026-08-19).
+    // Die Umschaltung gab es laengst, nur rief sie niemand.
+    connect(container, &ContainerWidget::overlayRequested, this, [this, container]() {
+        overlayDockContainer(container->id());
+    });
     connect(container, &ContainerWidget::settingsRequested, this,
             [this, container]() {
         ContainerSettingsDialog dialog(container, container->window(), this);

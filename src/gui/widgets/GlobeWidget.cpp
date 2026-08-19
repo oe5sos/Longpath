@@ -330,6 +330,20 @@ void GlobeWidget::mousePressEvent(QMouseEvent* e)
     if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
 
     setFocus(Qt::MouseFocusReason);   // sonst erreichen Tasten die Kugel nie
+
+    // Erst die Knoepfe, dann das Ziehen: sonst dreht sich die Kugel,
+    // waehrend man auf Plus drueckt.
+    if (zoomButtonRect(true).contains(e->position())) {
+        zoomBy(1.3);
+        e->accept();
+        return;
+    }
+    if (zoomButtonRect(false).contains(e->position())) {
+        zoomBy(1.0 / 1.3);
+        e->accept();
+        return;
+    }
+
     m_dragging = true;
     m_dragFrom = e->position().toPoint();
     m_dragStartLat = m_viewLat;
@@ -509,6 +523,19 @@ void GlobeWidget::interpolateGreatCircle(double latA, double lonA,
 
     lat = std::atan2(z, std::sqrt(x * x + y * y)) / kDeg;
     lon = std::atan2(y, x) / kDeg;
+}
+
+// Lage der beiden Zoomknoepfe, unten rechts uebereinander. Eine
+// Funktion, weil Zeichnung UND Trefferpruefung dieselbe Stelle brauchen
+// — zwei Rechnungen waeren zwei Gelegenheiten, sie auseinanderlaufen zu
+// lassen.
+QRectF GlobeWidget::zoomButtonRect(bool plus) const
+{
+    constexpr double kSize = 22.0;
+    constexpr double kPad  = 8.0;
+    const double x = width() - kPad - kSize;
+    const double y = height() - kPad - kSize - (plus ? kSize + 4.0 : 0.0);
+    return QRectF(x, y, kSize, kSize);
 }
 
 double GlobeWidget::radiusPx() const
@@ -968,6 +995,46 @@ void GlobeWidget::paintEvent(QPaintEvent*)
         const QString hint = QStringLiteral("no world image loaded");
         p.drawText(QPointF((width() - QFontMetrics(f).horizontalAdvance(hint)) / 2.0,
                            height() - 6.0), hint);
+    }
+
+    // ── Plus und Minus (2026-08-19) ─────────────────────────────────
+    //
+    // Auf Ansage des Betreibers: „es sollte in der Grafik auch ein Plus
+    // und Minus zum Vergroessern sein." Damit beantwortet die Kugel
+    // endlich den Satz, der seit je bei zoomBy() steht: ein Mausrad ist
+    // keine Bedienflaeche.
+    //
+    // Gemalt statt als Kind-Widget: die Kugel rendert sich ohnehin
+    // selbst, und zwei QPushButtons darueber wuerden beim Ziehen die
+    // Mausereignisse abfangen und die Drehung zerreissen.
+    {
+        const QRectF plus  = zoomButtonRect(true);
+        const QRectF minus = zoomButtonRect(false);
+        const QColor face(Style::kPanelBg);
+        const QColor edge(Style::kBorderSubtle);
+        const QColor text(Style::kTextSecondary);
+
+        QFont f = p.font();
+        f.setPixelSize(15);
+        f.setBold(true);
+        p.setFont(f);
+
+        for (int i = 0; i < 2; ++i) {
+            const QRectF r = (i == 0) ? plus : minus;
+            const bool atLimit = (i == 0) ? (m_zoom >= maxZoom() - 1e-6)
+                                          : (m_zoom <= 0.6 + 1e-6);
+            p.setBrush(QColor(face.red(), face.green(), face.blue(), 210));
+            p.setPen(QPen(edge, 1));
+            p.drawRoundedRect(r, 4, 4);
+
+            // Am Anschlag blass: ein Knopf, der nichts tut, soll das auch
+            // zeigen, statt den Betreiber raten zu lassen.
+            QColor t = text;
+            t.setAlpha(atLimit ? 90 : 235);
+            p.setPen(t);
+            p.drawText(r, Qt::AlignCenter,
+                       (i == 0) ? QStringLiteral("+") : QStringLiteral("\u2212"));
+        }
     }
 }
 

@@ -284,6 +284,68 @@ private slots:
         QVERIFY2(g.targetZoomForTest() > before,
                  "mit gesetztem Ziel fliegt T dorthin");
     }
+
+    // ── Die gemalten Knoepfe ─────────────────────────────────────────
+    //
+    // „es sollte in der Grafik auch ein Plus und Minus zum Vergroessern
+    // sein" (Betreiber, 2026-08-19). Gemalt statt als Kind-Widget, damit
+    // sie beim Ziehen nicht die Mausereignisse abfangen — also gehoert
+    // die Trefferpruefung geprueft.
+
+    void theDrawnPlusButtonZooms()
+    {
+        GlobeWidget g;
+        prepare(g);
+        const double before = g.zoom();
+
+        // Unten rechts, oberer der beiden Knoepfe.
+        const QPointF plus(400 - 8 - 11, 400 - 8 - 22 - 4 - 11);
+        QMouseEvent ev(QEvent::MouseButtonPress, plus, g.mapToGlobal(plus),
+                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &ev);
+
+        QVERIFY2(g.zoom() > before, "Plus muss vergroessern");
+    }
+
+    void theDrawnMinusButtonZoomsOut()
+    {
+        GlobeWidget g;
+        prepare(g);
+        g.zoomBy(2.0);
+        const double before = g.zoom();
+
+        const QPointF minus(400 - 8 - 11, 400 - 8 - 11);
+        QMouseEvent ev(QEvent::MouseButtonPress, minus, g.mapToGlobal(minus),
+                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &ev);
+
+        QVERIFY2(g.zoom() < before, "Minus muss verkleinern");
+    }
+
+    // Ein Druck auf einen Knopf darf die Kugel NICHT mitdrehen — sonst
+    // rutscht die Ansicht bei jedem Zoomklick weg.
+    void pressingAButtonDoesNotStartADrag()
+    {
+        GlobeWidget g;
+        prepare(g);
+        double lat0 = 0.0, lon0 = 0.0;
+        g.viewForTest(lat0, lon0);
+
+        const QPointF plus(400 - 8 - 11, 400 - 8 - 22 - 4 - 11);
+        QMouseEvent press(QEvent::MouseButtonPress, plus, g.mapToGlobal(plus),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &press);
+
+        const QPointF away(200, 120);
+        QMouseEvent move(QEvent::MouseMove, away, g.mapToGlobal(away),
+                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&g, &move);
+
+        double lat1 = 0.0, lon1 = 0.0;
+        g.viewForTest(lat1, lon1);
+        QCOMPARE(lat1, lat0);
+        QCOMPARE(lon1, lon0);
+    }
 };
 
 QTEST_MAIN(TestGlobeUnproject)

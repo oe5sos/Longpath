@@ -148,6 +148,7 @@ mw0lge@grange-lane.co.uk
 #include <QString>
 #include <cstdint>
 
+class QContextMenuEvent;
 class QLabel;
 class QPushButton;
 
@@ -284,6 +285,18 @@ public slots:
 signals:
     void floatRequested();
     void dockRequested();
+
+    // „Frei bewegen": ueberlagernd andocken, also absolute Lage ueber
+    // dem Hauptbereich. In diesem Zustand laesst sich der Container mit
+    // der Titelleiste ueberall hinziehen (updateDrag, auf das
+    // Elternfenster geklemmt) — genau das, was der Betreiber am
+    // 2026-08-19 verlangt hat: „jeder Container muss sich ueberall
+    // hinbewegen koennen."
+    //
+    // Es gab die drei Andock-Arten schon, aber KEINEN Weg dorthin: der
+    // Modus liess sich nur im Quelltext oder aus den Einstellungen
+    // setzen. Vierter Fall von „gebaut, an keiner Flaeche" an einem Tag.
+    void overlayRequested();
     void settingsRequested();
     void dockedMoved();
     void dockModeChanged(DockMode mode);
@@ -315,6 +328,7 @@ public:
 
 protected:
     void mouseMoveEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void leaveEvent(QEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
 
