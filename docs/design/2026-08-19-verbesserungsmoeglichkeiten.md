@@ -68,11 +68,14 @@ ohne Erklärung ist ein Versprechen, das die Anwendung nicht hält.
 **Befund, und es ist meiner von heute.** `SignalHistoryStore` kennt
 `setQrmGateSeconds` (3–30 s, wie lange ein Träger stehen muss, bis er als
 Störung gilt) und `setLifetimeSeconds` (15–300 s, wann ein Eintrag
-vergeht). Beide sind begrenzt, getestet — und **niemand ruft sie**. Beim
+vergeht). Beide sind begrenzt, getestet — und **niemand rief sie**. Beim
 Vorbild sind es zwei Schieber im Spot-Hub.
 
-**Vorschlag.** Zwei Zahlenfelder neben die beiden Häkchen unter
-Setup → Display → Spectrum Overlays. *Aufwand: klein.*
+**Erledigt am selben Tag:** zwei Zahlenfelder unter Setup → Display →
+Spectrum Overlays („Interference after" und „Remember stations for"),
+durchgereicht bis `SignalHistoryStore`, mit Persistenz und Rückweg beim
+Öffnen der Seite. Die **Grenzen bleiben in der Klasse** — eine zweite
+Bedienfläche würde sie sonst umgehen; drei Testfälle halten das fest.
 
 ## 4. Der Rechtsklick dreht, der Doppelklick nicht
 
