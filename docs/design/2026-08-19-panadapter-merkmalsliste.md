@@ -192,6 +192,59 @@ der keiner ist, sondern etwas anderes und Größeres. Von sieben
 wirklich Panadapter-Arbeit sind: die SWR-Kurve (Darstellung, Controller
 vorhanden) und die Ausbreitungsvorhersage (fremde Daten).
 
+## S-Verlauf: was steht, was fehlt (Stand 2026-08-19 abends)
+
+Zwei von drei Teilen sind gebaut und geprüft, der dritte ist die
+Bedienfläche. Wichtig für den nächsten Griff: **die Rechenhälfte hängt
+an nichts** — sie ist absichtlich noch nicht verdrahtet, weil der
+Schalter zusammen mit der Zeichnung kommt.
+
+| Teil | Stand | Wo |
+| --- | --- | --- |
+| Erkenner (ein FFT-Bild → Signale) | **fertig**, 21 Fälle | `src/core/VoiceSignalDetector.{h,cpp}` |
+| Verwaltung (Signale über Zeit) | **fertig**, 21 Fälle | `src/core/SignalHistoryStore.{h,cpp}` |
+| Marken im Panadapter + Schalter | **offen** | siehe unten |
+
+### Was der dritte Teil braucht
+
+Alles Nötige ist im Baum vorhanden; es ist Verdrahtung, keine Erfindung.
+
+1. **Zweiter Markenkanal in `SpectrumWidget`.** `setSpotMarkers` ist von
+   den DX-Spots belegt; ein `setSignalHistoryMarkers` daneben, und in
+   `drawSpotMarkers` beide Listen zusammenführen. Das Vorbild
+   unterdrückt eine Verlaufsmarke, wenn binnen **3 kHz** ein echter Spot
+   liegt (`kSpotOverrideMhz`, AetherSDR `SpectrumWidget.cpp:15727`) —
+   der Spot trägt das Rufzeichen, die Verlaufsmarke nur eine S-Stufe.
+   Die Kollisionsstapelung gilt dann für beide zusammen, das ist der
+   Grund für den gemeinsamen Weg.
+2. **Speisung.** `primaryFftEngine()` → `FFTEngine::fftReady` liefert
+   dBm-Werte; das Muster steht dreimal in `MainWindow.cpp:3709-3737`
+   (Clarity, `NoiseFloorTracker`, MaxBin). Der Rauschboden kommt aus
+   demselben `NoiseFloorTracker`, die Fonie-Bereiche aus
+   `BandPlanManager` über `isVoiceSegmentLabel`, die Betriebsart aus
+   `SliceModel`.
+3. **Takt.** Ein Zeitgeber im Sekundentakt für
+   `expire()` + `rebuild()` + Marken neu setzen. Das Vorbild tut genau
+   das (`expireSHistoryMarkers`), und zwar **auch ohne neue Treffer** —
+   sonst bleiben Marken stehen, deren Zeitstempel weggealtert sind.
+   `rebuild()` braucht die gemessene Bildrate; ein EWMA über die
+   Abstände von `fftReady` genügt (Vorbild: `fpsEwma`, α = 0.05).
+4. **Bedienfläche.** Zwei Häkchen (Sprache / Störungen) plus die zwei
+   Regler, deren Grenzen schon in der Klasse liegen (QRM-Tor 3–30 s,
+   Lebensdauer 15–300 s). Dazu die zwei Farben, die das Vorbild
+   persistiert: `#FFC800` für Sprache, `#FF0000` für Störung.
+
+### Was dabei zu beachten ist
+
+* **Rechenlast.** Der Erkenner läuft über jedes Bild; das Vorbild
+  bremst über eine Sperre nach Bandwechseln und rechnet die
+  Belegungsschwelle aus der gemessenen Bildrate. Beides ist portiert.
+  Ungeprüft ist, was der Erkenner bei 4096 Werten und 60 Bildern je
+  Sekunde kostet — das gehört gemessen, bevor er dauerhaft mitläuft.
+* **Vorgabe aus.** Anders als bei der Verlängerung in den Wasserfall
+  gibt es hier keinen Istzustand zu erhalten: das Merkmal ist neu, also
+  ist die Vorgabe aus.
+
 ---
 
 ## Was AetherSDR hat und wir nicht
