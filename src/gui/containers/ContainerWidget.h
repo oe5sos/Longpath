@@ -301,6 +301,7 @@ signals:
     void dockedMoved();
     void dockModeChanged(DockMode mode);
     void titleBarVisibilityChanged(bool visible);
+    void lockedChanged(bool locked);
     void minimisedChanged(bool minimised);
     void notesChanged(const QString& notes);
     // Emitted from setContent() after the new content widget is
@@ -335,6 +336,7 @@ protected:
 private:
     void buildUI();
     void updateTitleBar();
+    void updateLockButton();
     void updateTitle();
     void setupBorder();
 
@@ -397,7 +399,9 @@ private:
     QWidget* m_contentHolder{nullptr};
     QWidget* m_content{nullptr};
     QWidget* m_resizeGrip{nullptr};
+    QLabel* m_grip{nullptr};
     QLabel* m_titleLabel{nullptr};
+    QPushButton* m_btnLock{nullptr};
     QPushButton* m_btnFloat{nullptr};
     QPushButton* m_btnAxis{nullptr};
     QPushButton* m_btnPin{nullptr};

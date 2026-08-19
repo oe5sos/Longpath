@@ -54,6 +54,7 @@ mw0lge@grange-lane.co.uk
 
 #include "ContainerWidget.h"
 
+#include "gui/StyleConstants.h"
 #include "gui/styles/PopupMenuStyle.h"
 #include "gui/styles/ThemeQss.h"
 #include "FloatingContainer.h"
@@ -92,6 +93,7 @@ ContainerWidget::ContainerWidget(QWidget* parent)
     setMinimumSize(kMinContainerWidth, kMinContainerHeight);
     setMouseTracking(true);
     buildUI();
+    updateLockButton();
     updateTitleBar();
     updateTitle();
     setupBorder();
@@ -118,28 +120,68 @@ void ContainerWidget::buildUI()
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    // Title bar — hidden by default, shown on hover (Thetis ucMeter.cs:156)
+    // ── Ein Kopf fuer alle Fenster ───────────────────────────────────
+    //
+    // Entwurf 1 vom 2026-08-19, vom Betreiber freigegeben: Greifpunkt
+    // links, Name in Versalien, rechts die Schalter — Schloss, Ablösen,
+    // Einstellungen. Wer ein Fenster bewegen will, soll nie zweimal
+    // suchen muessen.
+    //
+    // Die Farben kommen aus Style:: statt als Hexwerte im Quelltext zu
+    // stehen. themed() hat die alten Werte zwar richtig uebersetzt, aber
+    // nur, weil jeder einzelne in der Theme-Tabelle steht; ein neu
+    // hingeschriebener Hexwert faellt still durch. Die Konstante kann
+    // das nicht.
+    //
+    // Hoehe aus kTitleBarHeight (22): genug zum Greifen, wenig genug,
+    // dass zehn Fenster nicht nur aus Koepfen bestehen.
     m_titleBar = new QWidget(this);
-    m_titleBar->setFixedHeight(22);
+    m_titleBar->setFixedHeight(kTitleBarHeight);
     m_titleBar->setVisible(false);
-    m_titleBar->setStyleSheet(Style::themed(QStringLiteral(
-        "background: #1a2a3a; border-bottom: 1px solid #203040;")));
+    m_titleBar->setStyleSheet(QStringLiteral(
+        "background: %1; border-bottom: 1px solid %2;")
+        .arg(QLatin1String(Style::kTitleGradBot),
+             QLatin1String(Style::kBorderSubtle)));
 
     auto* barLayout = new QHBoxLayout(m_titleBar);
-    barLayout->setContentsMargins(4, 0, 0, 0);
-    barLayout->setSpacing(2);
+    barLayout->setContentsMargins(5, 0, 0, 0);
+    barLayout->setSpacing(3);
+
+    // Greifpunkt. Er bewegt nichts, was die Titelleiste nicht auch
+    // bewegt — er SAGT nur, dass sich hier etwas ziehen laesst. Genau
+    // das fehlte: das Ziehen gab es, den Hinweis darauf nicht.
+    //
+    // Als GELBER STRICH, nicht als sechs graue Punkte: der Betreiber am
+    // 2026-08-19 zum ersten Entwurf — „die 6 punkte vor dem titel
+    // koennten farbe benoetigen oder wie bei zeus der gelbe strich".
+    // Zeus Link setzt denselben Strich, und ein Grauton auf grauem
+    // Grund war ohnehin genau die Zurueckhaltung, die den Hinweis
+    // unsichtbar gemacht hat.
+    //
+    // Ein QLabel ohne Text, das nur seinen Grund zeigt — ein Zeichen
+    // waere in jeder Schrift anders breit, ein Grund ist ueberall
+    // gleich.
+    m_grip = new QLabel(m_titleBar);
+    m_grip->setFixedWidth(3);
+    m_grip->setCursor(Qt::SizeAllCursor);
+    m_grip->setToolTip(QStringLiteral("Drag to move this container"));
+    barLayout->addWidget(m_grip);
 
     // Title label — "RX1" + notes (Thetis ucMeter.cs:625-639)
     m_titleLabel = new QLabel(QStringLiteral("RX1"), m_titleBar);
-    m_titleLabel->setStyleSheet(Style::themed(QStringLiteral(
-        "color: #c8d8e8; font-size: 11px; font-weight: bold; background: transparent;")));
+    m_titleLabel->setStyleSheet(QStringLiteral(
+        "color: %1; font-size: 11px; font-weight: bold; background: transparent;"
+        " letter-spacing: 1px;").arg(QLatin1String(Style::kTextPrimary)));
     m_titleLabel->setCursor(Qt::SizeAllCursor);
     barLayout->addWidget(m_titleLabel, 1);
 
     const QString btnStyle = QStringLiteral(
-        "QPushButton { background: transparent; border: none; color: #8090a0;"
+        "QPushButton { background: transparent; border: none; color: %1;"
         "  font-size: 11px; padding: 2px 4px; }"
-        "QPushButton:hover { background: #2a3a4a; color: #c8d8e8; }");
+        "QPushButton:hover { background: %2; color: %3; }")
+        .arg(QLatin1String(Style::kTextSecondary),
+             QLatin1String(Style::kButtonHover),
+             QLatin1String(Style::kTextPrimary));
 
     // Axis lock button (overlay-docked only)
     m_btnAxis = new QPushButton(QStringLiteral("\u2196"), m_titleBar);
@@ -155,6 +197,15 @@ void ContainerWidget::buildUI()
     m_btnPin->setStyleSheet(btnStyle);
     m_btnPin->setVisible(false);
     barLayout->addWidget(m_btnPin);
+
+    // Schloss. Es stand bisher nur im Rechtsklick-Menue — ein
+    // festgestelltes Fenster sah aus wie ein loses, und man ruettelt
+    // daran, bis man merkt, warum nichts geht. Sichtbarer Zustand ist
+    // der halbe Zweck eines Schlosses.
+    m_btnLock = new QPushButton(m_titleBar);
+    m_btnLock->setFixedSize(22, 22);
+    m_btnLock->setStyleSheet(btnStyle);
+    barLayout->addWidget(m_btnLock);
 
     // Float/Dock toggle
     m_btnFloat = new QPushButton(QStringLiteral("\u2197"), m_titleBar);
@@ -175,7 +226,8 @@ void ContainerWidget::buildUI()
     // Content holder — layout slot for setContent()
     m_contentHolder = new QWidget(this);
     m_contentHolder->setMouseTracking(true);
-    m_contentHolder->setStyleSheet(Style::themed(QStringLiteral("background: #0f0f1a;")));
+    m_contentHolder->setStyleSheet(QStringLiteral("background: %1;")
+                                       .arg(QLatin1String(Style::kAppBg)));
     new QVBoxLayout(m_contentHolder);
     m_contentHolder->layout()->setContentsMargins(0, 0, 0, 0);
     mainLayout->addWidget(m_contentHolder, 1);
@@ -184,8 +236,9 @@ void ContainerWidget::buildUI()
     m_resizeGrip = new QWidget(this);
     m_resizeGrip->setFixedSize(12, 12);
     m_resizeGrip->setCursor(Qt::SizeFDiagCursor);
-    m_resizeGrip->setStyleSheet(Style::themed(QStringLiteral(
-        "background: #405060; border-radius: 6px;")));
+    m_resizeGrip->setStyleSheet(QStringLiteral(
+        "background: %1; border-radius: 6px;")
+        .arg(QLatin1String(Style::kTextInactive)));
     m_resizeGrip->setVisible(false);
 
     // Wire button signals
@@ -209,9 +262,14 @@ void ContainerWidget::buildUI()
         emit settingsRequested();
     });
 
+    connect(m_btnLock, &QPushButton::clicked, this, [this]() {
+        setLocked(!m_locked);
+    });
+
     // Event filters for title bar drag + resize grip + hover detection
     m_titleBar->installEventFilter(this);
     m_titleLabel->installEventFilter(this);
+    m_grip->installEventFilter(this);
     m_resizeGrip->installEventFilter(this);
     m_contentHolder->installEventFilter(this);
 }
@@ -285,11 +343,11 @@ void ContainerWidget::setupBorder()
     // normal border regardless of m_border, so the user always sees
     // which container the settings dialog is editing.
     if (m_highlighted) {
-        setStyleSheet(Style::themed(QStringLiteral(
-            "ContainerWidget { border: 2px solid #4a7ba8; }")));
+        setStyleSheet(QStringLiteral("ContainerWidget { border: 2px solid %1; }")
+                          .arg(QLatin1String(Style::kAccent)));
     } else if (m_border) {
-        setStyleSheet(Style::themed(QStringLiteral(
-            "ContainerWidget { border: 1px solid #203040; }")));
+        setStyleSheet(QStringLiteral("ContainerWidget { border: 1px solid %1; }")
+                          .arg(QLatin1String(Style::kBorderSubtle)));
     } else {
         setStyleSheet(QString());
     }
@@ -401,7 +459,55 @@ void ContainerWidget::setTopMost()
 }
 
 void ContainerWidget::setBorder(bool border) { m_border = border; setupBorder(); }
-void ContainerWidget::setLocked(bool locked) { m_locked = locked; }
+void ContainerWidget::setLocked(bool locked)
+{
+    if (m_locked == locked) { return; }
+    m_locked = locked;
+    updateLockButton();
+    emit lockedChanged(m_locked);
+}
+
+// Zu heisst bernstein und geschlossenes Schloss, offen heisst grau.
+// Beides zugleich — Farbe UND Zeichen — damit der Zustand auch dann
+// traegt, wenn jemand die Farben umstellt.
+void ContainerWidget::updateLockButton()
+{
+    if (!m_btnLock) { return; }
+
+    m_btnLock->setText(m_locked ? QString::fromUtf8("\U0001F512")
+                                : QString::fromUtf8("\U0001F513"));
+    m_btnLock->setToolTip(m_locked
+        ? QStringLiteral("Locked — click to release position and size")
+        : QStringLiteral("Lock position and size"));
+
+    if (m_locked) {
+        m_btnLock->setStyleSheet(QStringLiteral(
+            "QPushButton { background: transparent; border: none; color: %1;"
+            "  font-size: 11px; padding: 2px 4px; }"
+            "QPushButton:hover { background: %2; }")
+            .arg(QLatin1String(Style::kAmberText),
+                 QLatin1String(Style::kButtonHover)));
+    } else {
+        m_btnLock->setStyleSheet(QStringLiteral(
+            "QPushButton { background: transparent; border: none; color: %1;"
+            "  font-size: 11px; padding: 2px 4px; }"
+            "QPushButton:hover { background: %2; color: %3; }")
+            .arg(QLatin1String(Style::kTextSecondary),
+                 QLatin1String(Style::kButtonHover),
+                 QLatin1String(Style::kTextPrimary)));
+    }
+
+    // Der Greifpunkt sagt mit, ob sich etwas ziehen laesst: ein Pfeil,
+    // der einen Umzug verspricht, den das Schloss verbietet, ist eine
+    // Luege.
+    if (m_grip) {
+        m_grip->setStyleSheet(QStringLiteral(
+            "background: %1; border-radius: 1px; margin: 4px 0;")
+            .arg(QLatin1String(m_locked ? Style::kTextInactive
+                                        : Style::kAmberText)));
+        m_grip->setCursor(m_locked ? Qt::ArrowCursor : Qt::SizeAllCursor);
+    }
+}
 
 // ── Kontextmenue: bewegen und feststellen ────────────────────────────
 //
@@ -620,7 +726,8 @@ void ContainerWidget::leaveEvent(QEvent* event)
 bool ContainerWidget::eventFilter(QObject* watched, QEvent* event)
 {
     // Title bar drag
-    if ((watched == m_titleBar || watched == m_titleLabel) && !m_locked) {
+    if ((watched == m_titleBar || watched == m_titleLabel
+         || watched == m_grip) && !m_locked) {
         if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent* me = static_cast<QMouseEvent*>(event);
             if (me->button() == Qt::LeftButton && !isPanelDocked()) {
