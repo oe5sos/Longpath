@@ -269,6 +269,14 @@ void SpectrumDefaultsPage::loadFromRenderer()
         QSignalBlocker b(m_signalHistoryQrmToggle);
         m_signalHistoryQrmToggle->setChecked(sw->showSignalHistoryQrm());
     }
+    if (m_signalHistoryQrmGateSpin) {
+        QSignalBlocker b(m_signalHistoryQrmGateSpin);
+        m_signalHistoryQrmGateSpin->setValue(sw->signalHistoryQrmGateSeconds());
+    }
+    if (m_signalHistoryLifetimeSpin) {
+        QSignalBlocker b(m_signalHistoryLifetimeSpin);
+        m_signalHistoryLifetimeSpin->setValue(sw->signalHistoryLifetimeSeconds());
+    }
     if (m_autoSquelchToggle) {
         QSignalBlocker b(m_autoSquelchToggle);
         m_autoSquelchToggle->setChecked(sw->autoSquelchEnabled());
@@ -1015,6 +1023,43 @@ void SpectrumDefaultsPage::buildUI()
             on ? QStringLiteral("True") : QStringLiteral("False"));
     });
     overlayForm->addRow(QString(), m_signalHistoryQrmToggle);
+
+    // Die zwei Schwellen dazu. Ihre Grenzen liegen in
+    // SignalHistoryStore, nicht hier — eine zweite Bedienflaeche wuerde
+    // sie sonst umgehen. Die Felder zeigen dieselben Zahlen.
+    m_signalHistoryQrmGateSpin = new QSpinBox(overlayGroup);
+    m_signalHistoryQrmGateSpin->setRange(3, 30);
+    m_signalHistoryQrmGateSpin->setSuffix(QStringLiteral(" s"));
+    m_signalHistoryQrmGateSpin->setValue(6);
+    m_signalHistoryQrmGateSpin->setToolTip(QStringLiteral(
+        "How long a carrier or wideband signal must sit on one frequency "
+        "without a gap before it counts as interference. Voice-width "
+        "signals always need two unbroken minutes — speech has gaps."));
+    connect(m_signalHistoryQrmGateSpin, qOverload<int>(&QSpinBox::valueChanged),
+            this, [this](int v) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setSignalHistoryQrmGateSeconds(v);
+        }
+    });
+    overlayForm->addRow(QStringLiteral("Interference after:"),
+                        m_signalHistoryQrmGateSpin);
+
+    m_signalHistoryLifetimeSpin = new QSpinBox(overlayGroup);
+    m_signalHistoryLifetimeSpin->setRange(15, 300);
+    m_signalHistoryLifetimeSpin->setSuffix(QStringLiteral(" s"));
+    m_signalHistoryLifetimeSpin->setValue(60);
+    m_signalHistoryLifetimeSpin->setToolTip(QStringLiteral(
+        "How long a station stays remembered after it was last heard. The "
+        "marker itself disappears after 30 s; the entry survives longer so "
+        "a station that comes back does not have to qualify again."));
+    connect(m_signalHistoryLifetimeSpin, qOverload<int>(&QSpinBox::valueChanged),
+            this, [this](int v) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setSignalHistoryLifetimeSeconds(v);
+        }
+    });
+    overlayForm->addRow(QStringLiteral("Remember stations for:"),
+                        m_signalHistoryLifetimeSpin);
 
     // ShowBinWidth — live bin-width readout.
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth.

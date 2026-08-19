@@ -1345,6 +1345,18 @@ public:
     void setShowSignalHistoryQrm(bool on);
     bool showSignalHistoryQrm() const { return m_showSignalHistoryQrm; }
 
+    // Die zwei Schwellen des S-Verlaufs. Sie lagen bis 2026-08-19 nur in
+    // SignalHistoryStore und wurden von niemandem gesetzt — gebaut, an
+    // keiner Flaeche, derselbe Fehler, den ich am selben Tag zweimal an
+    // anderer Stelle gefunden habe.
+    //
+    // Die Grenzen (3..30 s und 15..300 s) stehen in der Klasse, nicht
+    // hier: eine zweite Bedienflaeche wuerde sie sonst umgehen.
+    void setSignalHistoryQrmGateSeconds(int s);
+    int  signalHistoryQrmGateSeconds() const;
+    void setSignalHistoryLifetimeSeconds(int s);
+    int  signalHistoryLifetimeSeconds() const;
+
     // Die Speisung des S-Verlaufs, gerufen aus processNoiseFloor().
     //
     // DORT und nicht in MainWindow, aus demselben Grund wie bei der

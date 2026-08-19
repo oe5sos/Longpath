@@ -221,6 +221,45 @@ private slots:
         QCOMPARE(w.mergedMarkersForTest().first().callsign,
                  QStringLiteral("S7"));
     }
+
+    // ── Die zwei Schwellen ───────────────────────────────────────────
+    //
+    // Sie lagen bis 2026-08-19 nur im Speicher und wurden von niemandem
+    // gesetzt — gebaut, an keiner Flaeche. Jetzt gibt es zwei Felder im
+    // Setup, und diese Faelle halten fest, dass der Weg durchgeht und die
+    // Grenzen dabei greifen.
+
+    void thresholdsStartAtTheirDefaults()
+    {
+        SpectrumWidget w;
+        QCOMPARE(w.signalHistoryQrmGateSeconds(), 6);
+        QCOMPARE(w.signalHistoryLifetimeSeconds(), 60);
+    }
+
+    void thresholdsGoThroughToTheStore()
+    {
+        SpectrumWidget w;
+        w.setSignalHistoryQrmGateSeconds(12);
+        w.setSignalHistoryLifetimeSeconds(180);
+        QCOMPARE(w.signalHistoryQrmGateSeconds(), 12);
+        QCOMPARE(w.signalHistoryLifetimeSeconds(), 180);
+    }
+
+    // Die Grenzen liegen in SignalHistoryStore, nicht in der
+    // Bedienflaeche — sonst umgeht sie ein zweiter Weg.
+    void thresholdsStayInsideTheirLimits()
+    {
+        SpectrumWidget w;
+        w.setSignalHistoryQrmGateSeconds(1);
+        QCOMPARE(w.signalHistoryQrmGateSeconds(), 3);
+        w.setSignalHistoryQrmGateSeconds(999);
+        QCOMPARE(w.signalHistoryQrmGateSeconds(), 30);
+
+        w.setSignalHistoryLifetimeSeconds(2);
+        QCOMPARE(w.signalHistoryLifetimeSeconds(), 15);
+        w.setSignalHistoryLifetimeSeconds(9999);
+        QCOMPARE(w.signalHistoryLifetimeSeconds(), 300);
+    }
 };
 
 QTEST_MAIN(TestSignalHistoryMarkers)

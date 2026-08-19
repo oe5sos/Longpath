@@ -1086,6 +1086,10 @@ void SpectrumWidget::loadSettings()
         readBool(QStringLiteral("DisplayShowSignalHistory"), false);
     m_showSignalHistoryQrm =
         readBool(QStringLiteral("DisplayShowSignalHistoryQrm"), false);
+    m_signalHistory.setQrmGateSeconds(
+        readInt(QStringLiteral("DisplaySignalHistoryQrmGateS"), 6));
+    m_signalHistory.setLifetimeSeconds(
+        readInt(QStringLiteral("DisplaySignalHistoryLifetimeS"), 60));
     m_extendedPassband =
         readBool(QStringLiteral("DisplayExtendedPassband"), true);
     m_autoSqlMarginDb = qBound(5,
@@ -1336,6 +1340,10 @@ void SpectrumWidget::saveSettings()
               m_showSignalHistory ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayShowSignalHistoryQrm"), m_panIndex),
               m_showSignalHistoryQrm ? QStringLiteral("True") : QStringLiteral("False"));
+    writeInt(QStringLiteral("DisplaySignalHistoryQrmGateS"),
+             m_signalHistory.qrmGateSeconds());
+    writeInt(QStringLiteral("DisplaySignalHistoryLifetimeS"),
+             m_signalHistory.lifetimeSeconds());
     s.setValue(settingsKey(QStringLiteral("DisplayDbmScaleVisible"), m_panIndex),
               m_dbmScaleVisible ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("BandPlanFontSize"),
@@ -6660,6 +6668,30 @@ void SpectrumWidget::setShowSignalHistoryQrm(bool on)
     m_showSignalHistoryQrm = on;
     scheduleSettingsSave();
     update();
+}
+
+void SpectrumWidget::setSignalHistoryQrmGateSeconds(int sec)
+{
+    if (m_signalHistory.qrmGateSeconds() == sec) { return; }
+    m_signalHistory.setQrmGateSeconds(sec);   // begrenzt selbst auf 3..30
+    scheduleSettingsSave();
+}
+
+int SpectrumWidget::signalHistoryQrmGateSeconds() const
+{
+    return m_signalHistory.qrmGateSeconds();
+}
+
+void SpectrumWidget::setSignalHistoryLifetimeSeconds(int sec)
+{
+    if (m_signalHistory.lifetimeSeconds() == sec) { return; }
+    m_signalHistory.setLifetimeSeconds(sec);  // begrenzt selbst auf 15..300
+    scheduleSettingsSave();
+}
+
+int SpectrumWidget::signalHistoryLifetimeSeconds() const
+{
+    return m_signalHistory.lifetimeSeconds();
 }
 
 // Phase 3J-2 + 3R M2: refresh every Spot Display knob from AppSettings.

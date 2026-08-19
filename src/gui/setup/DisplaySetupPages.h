@@ -178,6 +178,8 @@ private:
     QCheckBox* m_extendedPassbandToggle{nullptr};
     QCheckBox* m_signalHistoryToggle{nullptr};
     QCheckBox* m_signalHistoryQrmToggle{nullptr};
+    QSpinBox*  m_signalHistoryQrmGateSpin{nullptr};
+    QSpinBox*  m_signalHistoryLifetimeSpin{nullptr};
     QCheckBox* m_autoSquelchToggle{nullptr};
     QSpinBox*  m_autoSqlMarginSpin{nullptr};
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth
