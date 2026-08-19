@@ -1020,6 +1020,27 @@ void RotorLogbookPanel::workSpot(const QString& call)
     if (m_dial->hasTarget()) { beginTurn(); }
 }
 
+void RotorLogbookPanel::takeSpot(const QString& call)
+{
+    const QString c = call.trimmed().toUpper();
+    if (c.isEmpty()) { return; }
+
+    // Das Setzen des Feldes zieht alles nach: onCallsignEdited holt Land
+    // und Flagge aus cty.dat, stellt den Zeiger auf die Zielpeilung der
+    // DXCC-Einheit und schreibt die Entfernung in die Statuszeile — ohne
+    // Netz. Kommt die QRZ-Antwort, ersetzt der genaue Locator die
+    // Schaetzung aus dem Prefix.
+    m_callEdit->setText(c);
+    m_callEdit->setFocus();
+
+    // Kein beginTurn(): siehe Begruendung am Kopf der Deklaration. Wer
+    // drehen will, hat den Rotate-Knopf daneben und sieht vorher, wohin.
+    if (!m_dial->hasTarget()) {
+        setStatus(QStringLiteral("%1 — no bearing yet, waiting for a locator")
+                      .arg(c));
+    }
+}
+
 void RotorLogbookPanel::openRotorSetupDialog()
 {
     ensureRotor();

@@ -6602,7 +6602,18 @@ void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
     m_signalHistory.expire(nowMs);
     m_signalHistory.rebuild(nowMs, m_shRunRateEwma);
 
-    // Farben wie beim Vorbild: Bernstein fuer Sprache, Rot fuer Stoerung.
+    // Bernstein fuer Sprache, Rot fuer Stoerung — die Unterscheidung wie
+    // beim Vorbild (AetherSDR: #FFC800 und #FF0000), die WERTE aber aus
+    // unserer Palette. Ein Panadapter mit zwei Rot- und zwei
+    // Bernsteintoenen sieht nach zwei Programmen aus, und wer das Theme
+    // umstellt, erwartet, dass alles mitgeht.
+    //
+    // roleColor() liest die Theme-Datei mit der Konstante als Rueckfall —
+    // dieselben Rollen wie die Squelch-Linie („warn") und die
+    // Stehwellen-Warnung.
+    const QString voiceHex = roleColor("warn", Style::kAmberWarn).name();
+    const QString qrmHex   = roleColor("danger", Style::kRedBorder).name();
+
     QVector<SpotMarker> markers;
     for (const auto& e : m_signalHistory.visibleEntries()) {
         SpotMarker m;
@@ -6611,8 +6622,7 @@ void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
         m.mode        = e.mode;
         m.source      = e.suspectQrm ? QStringLiteral("QRM")
                                      : QStringLiteral("SHistory");
-        m.color       = e.suspectQrm ? QStringLiteral("#FF0000")
-                                     : QStringLiteral("#FFC800");
+        m.color       = e.suspectQrm ? qrmHex : voiceHex;
         m.timestampMs = e.lastSeenMs;
         markers.append(m);
     }
@@ -7398,7 +7408,12 @@ bool SpectrumWidget::eventFilter(QObject* obj, QEvent* ev)
             mouseReleaseEvent(static_cast<QMouseEvent*>(ev));
             return true;
         case QEvent::MouseButtonDblClick:
-            mousePressEvent(static_cast<QMouseEvent*>(ev));
+            // Bis 2026-08-19 ging der Doppelklick hier als DRUCK weiter, ein
+            // echter mouseDoubleClickEvent haette auf dem GPU-Weg also nie
+            // gefeuert. Jetzt bekommt er ihn — und der faellt von sich aus
+            // auf mousePressEvent zurueck, wenn er nichts zu tun findet.
+            // Damit bleibt alles wie vorher, ausser auf einem Spot-Etikett.
+            mouseDoubleClickEvent(static_cast<QMouseEvent*>(ev));
             return true;
         case QEvent::Wheel:
             wheelEvent(static_cast<QWheelEvent*>(ev));
@@ -8557,6 +8572,45 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
     update();
 #endif
     QWidget::mouseMoveEvent(event);
+}
+
+// ── Doppelklick auf ein Spot-Etikett: ins Logbuch ────────────────────
+//
+// Auf Ansage des Betreibers (2026-08-19): „wenn ein Call gespottet ist
+// und ich sehe es am Panadapter, soll es mit Doppelklick sofort ins
+// Logbuch übernommen werden, Frequenz usw."
+//
+// WAS HIER NICHT PASSIERT, und das ist Absicht: die Frequenz wird nicht
+// mitgeschickt. Der ERSTE Klick des Doppelklicks stimmt schon auf den
+// Spot ab (mousePressEvent, Spot-Trefferflaeche), und
+// RotorLogbookPanel::buildEntry liest Frequenz, Band und Betriebsart aus
+// der aktiven Scheibe. Die Frequenz zweimal zu fuehren waere eine zweite
+// Wahrheit, die irgendwann von der ersten abweicht.
+//
+// Verlaufsmarken des S-Verlaufs sind ausgenommen: ihr Etikett ist eine
+// S-Stufe („S7"), kein Rufzeichen. Sie tragen markerIndex -1, und genau
+// daran erkennt man sie.
+void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && m_showSpots) {
+        const QPoint pos = event->position().toPoint();
+        for (const auto& hr : m_spotClickRects) {
+            if (!hr.rect.contains(pos)) { continue; }
+            if (hr.markerIndex < 0 || hr.markerIndex >= m_spotMarkers.size()) {
+                continue;
+            }
+            const QString call = m_spotMarkers[hr.markerIndex].callsign.trimmed();
+            if (call.isEmpty()) { continue; }
+            emit spotLogRequested(call);
+            event->accept();
+            return;
+        }
+    }
+
+    // Nichts getroffen: weiter wie vor 2026-08-19, als der Filter den
+    // Doppelklick unbesehen als Druck weitergab. Ohne diesen Rueckfall
+    // verlore der zweite Klick auf freier Flaeche seine Wirkung.
+    mousePressEvent(event);
 }
 
 void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)

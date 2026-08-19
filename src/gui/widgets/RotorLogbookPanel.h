@@ -96,6 +96,24 @@ public:
     // so this is one line of behaviour, not a second code path.
     void workSpot(const QString& call);
 
+    /// Ein gespottetes Rufzeichen uebernehmen, OHNE den Mast zu drehen.
+    ///
+    /// Auf Ansage des Betreibers (2026-08-19): Doppelklick auf das
+    /// Rufzeichen im Panadapter soll das Log oeffnen, die
+    /// Rotor-Einstellungen zeigen und den ZEIGER auf die Zielposition
+    /// stellen — „so sehe ich sofort, ob der Rotor in diese Richtung
+    /// steht". Genau darum wird hier nicht gedreht: der Vergleich
+    /// zwischen Ist und Ziel ist der Zweck.
+    ///
+    /// Unterschied zu workSpot(): das ist der Rechtsklick-Weg „Turn
+    /// rotor to <call>", der ausdruecklich dreht.
+    ///
+    /// Alles Weitere haengt schon am Rufzeichenfeld: Land und Flagge aus
+    /// cty.dat, Zielpeilung aus den Koordinaten der DXCC-Einheit (ohne
+    /// Netz), Entfernung in der Statuszeile, und die QRZ-Abfrage
+    /// verfeinert es, sobald sie antwortet.
+    void takeSpot(const QString& call);
+
     // 2026-08-10: a contact logged by another program (WSJT-X's
     // Logged-ADIF message). Written to the same file through the same
     // duplicate check and upload path as a hand-logged QSO — one log,

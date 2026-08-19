@@ -1959,6 +1959,24 @@ void MainWindow::wireSpectrumForPan(SpectrumWidget* sw, const QString& panId)
         }
     });
 
+    // 2026-08-19: Doppelklick auf ein Spot-Etikett — Log auf, Rotor-Lage
+    // sichtbar, Zeiger auf die Zielposition des Rufzeichens. takeSpot
+    // dreht NICHT: der Sinn ist der Vergleich zwischen Ist und Ziel
+    // („so sehe ich sofort, ob der Rotor in diese Richtung steht").
+    // Gedreht wird ueber Rotate daneben oder den Rechtsklick-Weg oben.
+    //
+    // Frequenz, Band und Betriebsart kommen nicht mit: der erste Klick
+    // des Doppelklicks hat schon abgestimmt, und buildEntry liest sie
+    // aus der aktiven Scheibe.
+    connect(sw, &SpectrumWidget::spotLogRequested,
+            this, [this](const QString& dxCall) {
+        if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+            m_rotorDock->show();
+            m_rotorDock->raise();
+            panel->takeSpot(dxCall);
+        }
+    });
+
     // Hovering a spot on any pan drives the Spot Hub highlight.
     if (m_spotHubDialog) {
         connect(sw, &SpectrumWidget::spotHoverIndexChanged,
@@ -2925,6 +2943,17 @@ void MainWindow::buildUI()
                 m_rotorDock->show();
                 m_rotorDock->raise();
                 panel->workSpot(dxCall);
+            }
+        });
+
+        // Derselbe Weg fuer den Doppelklick, siehe Begruendung bei der
+        // per-pan-Verdrahtung.
+        connect(activeSpectrumWidget(), &SpectrumWidget::spotLogRequested,
+                this, [this](const QString& dxCall) {
+            if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+                m_rotorDock->show();
+                m_rotorDock->raise();
+                panel->takeSpot(dxCall);
             }
         });
     }

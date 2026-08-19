@@ -1596,6 +1596,16 @@ signals:
     // rotor path wants the station, not the marker.
     void spotRotorRequested(const QString& dxCall);
 
+    // 2026-08-19: Doppelklick auf ein Spot-Etikett — das Rufzeichen ins
+    // Logbuch uebernehmen und die Peilung dazu zeigen. MainWindow holt
+    // die Rotor/Log-Flaeche nach vorn und reicht das Rufzeichen an
+    // RotorLogbookPanel::takeSpot.
+    //
+    // Ohne Frequenz: der erste Klick des Doppelklicks hat schon
+    // abgestimmt, und der Logbuch-Eintrag liest Frequenz, Band und
+    // Betriebsart aus der aktiven Scheibe.
+    void spotLogRequested(const QString& dxCall);
+
     // 2026-05-12 bench fix (Gap #6).  Fires when the mouse enters or
     // leaves a spot label hit-rect.  -1 indicates "no spot under
     // cursor" (use to clear the Spot List highlight).  Drives the
@@ -1678,6 +1688,7 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void leaveEvent(QEvent* event) override;
 
