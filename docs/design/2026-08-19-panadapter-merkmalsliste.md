@@ -102,6 +102,33 @@ Bodenlinie plus „Floor -120 dBm"). Unsere NF-Anzeige malt genau diesen
 Wert bereits, mit einstellbaren Farben und Linienbreite. Zwei Striche auf
 derselben Höhe sind kein Merkmal.
 
+## Dritte Korrektur: „Erweiterter Durchlass" tun wir schon, ohne Schalter
+
+Gesucht am 2026-08-19, bevor gebaut wurde. Die beiden Setter machen
+zusammen **eine** Sache: Mittellinie und Durchlassfläche nicht nur im
+Spektrum zeichnen, sondern **hinunter in den Wasserfall** verlängern.
+`m_extendedFrequencyLine` verlängert die Linie, `m_extendedPassband` die
+Fläche; beide stehen bei AetherSDR auf `aus`.
+
+Bei uns läuft genau das, unbedingt und ohne Schalter:
+
+* Durchlassfläche im Wasserfall — `SpectrumWidget.cpp`, direkt nach der
+  Spektrumsfläche, dieselbe `m_rxFilterColor`
+* Filterkanten — vier Linien, zwei davon über `wfRect.top()` bis
+  `wfRect.bottom()`
+* Mittellinie — `drawLine(vfoX, specRect.top(), vfoX, wfRect.bottom())`,
+  also über beide Bereiche in einem Zug
+
+Damit ist es **derselbe Fall wie `setSingleClickTune`**: nicht eine
+Lücke, sondern ein Schalter, um unser Verhalten *abzuschalten*. Portiert
+würde er zwei Optionen hinzufügen, deren Vorgabestellung schlechter ist
+als der Istzustand. Nicht gebaut — und wenn jemand die Verlängerung
+abschalten will, ist das eine Betriebsfrage und kein Port.
+
+**Bilanz der Regel „erst im Baum suchen":** von sieben Merkmalen waren
+nach der Prüfung drei anders als notiert, plus der Bandplan davor. Vier
+Fehlalarme in zwei Tagen, jeder einzelne wäre als Klon mitgebaut worden.
+
 ---
 
 ## Was AetherSDR hat und wir nicht
