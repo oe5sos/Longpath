@@ -95,6 +95,7 @@
 #include <cmath>
 #include <QFileDialog>
 #include <QFileInfo>
+#include "models/BandPlanManager.h"
 
 namespace NereusSDR {
 
@@ -1260,6 +1261,81 @@ void SpectrumDefaultsPage::buildUI()
     refreshBgLabel();
 
     contentLayout()->addWidget(bgGroup);
+
+    // ── Bandplan ──────────────────────────────────────────────────────
+    //
+    // Der Bandplan war seit dem Port vollstaendig da — Manager, fuenf
+    // Plaene als JSON, drawBandPlan() in BEIDEN Malwegen, Schriftgroesse
+    // unter BandPlanFontSize persistiert — und hatte KEINE
+    // Bedienflaeche. Kein Schalter, keine Planauswahl, nirgends.
+    //
+    // Derselbe Fall wie die Modusgruppen am 2026-08-18: gebaut,
+    // geprueft, an keiner Flaeche. Aufgefallen erst beim
+    // Merkmalsvergleich mit AetherSDR — und dort zunaechst als
+    // FEHLENDES Merkmal einsortiert, weil AetherSDR den Schalter
+    // setShowBandPlan(bool) nennt und wir setBandPlanFontSize(int) mit
+    // 0 = aus. Zwei Namen, ein Merkmal.
+    auto* bpGroup = new QGroupBox(QStringLiteral("Bandplan"), this);
+    auto* bpForm  = new QFormLayout(bpGroup);
+    bpForm->setSpacing(6);
+
+    m_bandPlanShow = new QCheckBox(
+        QStringLiteral("Bandsegmente im Spektrum zeigen"), bpGroup);
+    m_bandPlanShow->setToolTip(QStringLiteral(
+        "Faerbt die Bandsegmente des gewaehlten Plans am unteren Rand "
+        "des Spektrums ein — CW, SSB, Digimodes, Baken."));
+    bpForm->addRow(m_bandPlanShow);
+
+    m_bandPlanCombo = new QComboBox(bpGroup);
+    m_bandPlanCombo->setToolTip(QStringLiteral(
+        "Welcher Bandplan gilt. Die Segmentgrenzen sind je Region "
+        "verschieden."));
+    bpForm->addRow(QStringLiteral("Plan"), m_bandPlanCombo);
+
+    m_bandPlanSize = new QSpinBox(bpGroup);
+    m_bandPlanSize->setRange(5, 12);
+    m_bandPlanSize->setSuffix(QStringLiteral(" pt"));
+    m_bandPlanSize->setToolTip(QStringLiteral(
+        "Schriftgroesse der Segmentbeschriftung."));
+    bpForm->addRow(QStringLiteral("Beschriftung"), m_bandPlanSize);
+
+    auto spec2 = [this]() -> SpectrumWidget* {
+        return model() ? model()->spectrumWidget() : nullptr;
+    };
+    if (auto* w = spec2()) {
+        const int pt = w->bandPlanFontSize();
+        QSignalBlocker b1(m_bandPlanShow), b2(m_bandPlanSize);
+        m_bandPlanShow->setChecked(pt > 0);
+        // Beim Ausschalten merkt sich die Stufe ihren letzten Wert, statt
+        // auf 0 zu fallen — sonst steht beim Wiedereinschalten die
+        // kleinste Groesse da und niemand weiss, warum.
+        m_bandPlanSize->setValue(pt > 0 ? pt : 6);
+        m_bandPlanSize->setEnabled(pt > 0);
+    }
+    if (model()) {
+        auto& mgr = model()->bandPlanManagerMutable();
+        QSignalBlocker b(m_bandPlanCombo);
+        m_bandPlanCombo->addItems(mgr.availablePlans());
+        const int idx = m_bandPlanCombo->findText(mgr.activePlanName());
+        if (idx >= 0) { m_bandPlanCombo->setCurrentIndex(idx); }
+    }
+    connect(m_bandPlanShow, &QCheckBox::toggled, this, [this, spec2](bool on) {
+        m_bandPlanSize->setEnabled(on);
+        if (auto* w = spec2()) {
+            w->setBandPlanFontSize(on ? m_bandPlanSize->value() : 0);
+        }
+    });
+    connect(m_bandPlanSize, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [this, spec2](int pt) {
+        if (!m_bandPlanShow->isChecked()) { return; }
+        if (auto* w = spec2()) { w->setBandPlanFontSize(pt); }
+    });
+    connect(m_bandPlanCombo, &QComboBox::currentTextChanged, this,
+            [this](const QString& name) {
+        if (model()) { model()->bandPlanManagerMutable().setActivePlan(name); }
+    });
+
+    contentLayout()->addWidget(bpGroup);
 
     // --- Section: Thread ---
     auto* threadGroup = new QGroupBox(QStringLiteral("Thread"), this);

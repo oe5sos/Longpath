@@ -98,6 +98,11 @@ private:
     void loadFromRenderer();
     void pushFps(int fps);
 
+    // Section: Bandplan (Bedienflaeche nachgezogen, 2026-08-19)
+    QCheckBox* m_bandPlanShow{nullptr};
+    QComboBox* m_bandPlanCombo{nullptr};
+    QSpinBox*  m_bandPlanSize{nullptr};
+
     // Section: Hintergrund (Port aus AetherSDR, 2026-08-18)
     class QLabel*             m_bgPathLabel{nullptr};
     class QSlider*            m_bgOpacitySlider{nullptr};

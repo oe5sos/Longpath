@@ -20,13 +20,42 @@ Ein Klon würde also 120 eigene Merkmale gegen 90 fremde tauschen. Was
 Sinn ergibt, ist die Gegenrichtung: aus den 90 die holen, die wir
 wirklich wollen.
 
+## Korrektur vom selben Tag: der Bandplan war nie eine Lücke
+
+**Diese Liste hatte den Bandplan als Empfehlung Nummer 1. Das war
+falsch.** Er ist vollständig portiert und läuft:
+
+* `src/models/BandPlanManager.{h,cpp}` und `BandPlan.h`
+* fünf Pläne als JSON in `resources/bandplans/`, im `qrc` eingetragen
+* `SpectrumWidget::drawBandPlan()`, in **beiden** Malwegen gerufen
+  (CPU bei :3576, GPU bei :8994)
+* Schriftgröße persistiert unter `BandPlanFontSize`, Vorgabe 6 pt
+
+Der Vergleich hat ihn übersehen, weil er nach Methodennamen sucht:
+AetherSDR heißt der Schalter `setShowBandPlan(bool)`, bei uns
+`setBandPlanFontSize(int)` mit 0 = aus. Zwei Namen, ein Merkmal — genau
+der Fehlalarm, vor dem der Abschnitt „Namensunterschiede" unten warnt,
+und ich bin ihm selbst aufgesessen.
+
+**Was wirklich fehlt, ist etwas anderes und Billigeres:** eine
+Bedienfläche. Es gibt keinen Schalter, keine Plan-Auswahl und keine
+Schriftgrößen-Einstellung — weder im Setup noch in der Overlay-Leiste.
+Der Bandplan ist damit derselbe Fall wie die Modusgruppen am Vortag:
+gebaut, geprüft, an keiner Fläche.
+
+Die Lehre für den Rest dieser Liste: **jeder Punkt gehört im Baum
+gesucht, bevor er gebaut wird.** Ein Merkmalsvergleich über
+Methodennamen findet Lücken, die keine sind, und übersieht Lücken, die
+zwischen zwei Namen liegen.
+
+---
+
 ## Was AetherSDR hat und wir nicht
 
 ### Lohnt sich — mein Vorschlag zum Holen
 
 | Merkmal | Methoden | Warum |
 | --- | --- | --- |
-| **Bandplan-Überlagerung** | `setShowBandPlan`, `setBandPlanShowSpots`, `bandPlanFontSize` | Farbige Bandsegmente im Spektrum. Das auffälligste fehlende Stück — man sieht sofort, wo CW, wo SSB, wo Bake. |
 | **S-Verlauf** | `setShowSHistory`, `setSHistoryMarkers`, `setSHistorySnapToStep`, `setShowSHistoryQrm` | Signalstärke über Zeit als eigener Streifen. Zeigt QSB und QRM, die im Wasserfall untergehen. |
 | **Abstimmhilfen** | `setShowTuneGuides`, `setSingleClickTune`, `setSpectrumCursor` | Führungslinien beim Abstimmen; Einfachklick statt Doppelklick. |
 | **Squelch-Linie** | `setSquelchLine`, `setAutoSquelchEnable`, `setAutoSqlMarginDb` | Die Schwelle im Bild statt nur als Zahl. Automatik mit Abstand zum Rauschboden. |
@@ -73,16 +102,22 @@ Der Vollständigkeit halber, weil es die Richtung des Handels bestimmt:
 
 ## Empfehlung
 
-**Acht Merkmale holen, in dieser Reihenfolge:**
+**Zuerst: den Bandplan bedienbar machen.** Er ist da und läuft, ihm
+fehlt nur der Schalter. Das ist der billigste sichtbare Gewinn dieser
+ganzen Liste.
 
-1. Bandplan-Überlagerung — die größte sichtbare Lücke
-2. Squelch-Linie mit Automatik — direkter Nutzen im Betrieb
-3. Abstimmhilfen und Einfachklick — Bedienung
-4. S-Verlauf — eigener Streifen, sichtbar aufwendiger
-5. TX im Wasserfall
-6. SWR-Kurve (Controller ist da)
-7. Erweiterter Durchlass
-8. Ausbreitungsvorhersage — hängt an externen Daten, deshalb zuletzt
+**Danach sieben Merkmale holen, in dieser Reihenfolge:**
+
+1. Squelch-Linie mit Automatik — direkter Nutzen im Betrieb
+2. Abstimmhilfen und Einfachklick — Bedienung
+3. S-Verlauf — eigener Streifen, sichtbar aufwendiger
+4. TX im Wasserfall
+5. SWR-Kurve (Controller ist da)
+6. Erweiterter Durchlass
+7. Ausbreitungsvorhersage — hängt an externen Daten, deshalb zuletzt
+
+Und jeder dieser sieben wird **erst im Baum gesucht**, bevor er gebaut
+wird — siehe die Korrektur oben.
 
 Jedes davon ist ein eigener Port mit eigener Provenance-Zeile, jedes für
 sich prüfbar, jedes einzeln zurücknehmbar. Zusammen sind es Wochen — als
