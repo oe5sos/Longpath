@@ -249,6 +249,10 @@ void SpectrumDefaultsPage::loadFromRenderer()
         QSignalBlocker b(m_showMHzOnCursorToggle);
         m_showMHzOnCursorToggle->setChecked(sw->cursorFreqVisible());
     }
+    if (m_showTuneGuideToggle) {
+        QSignalBlocker b(m_showTuneGuideToggle);
+        m_showTuneGuideToggle->setChecked(sw->tuneGuideEnabled());
+    }
     if (m_showBinWidthToggle) {
         QSignalBlocker b(m_showBinWidthToggle);
         m_showBinWidthToggle->setChecked(sw->showBinWidth());
@@ -886,6 +890,30 @@ void SpectrumDefaultsPage::buildUI()
             on ? QStringLiteral("True") : QStringLiteral("False"));
     });
     overlayForm->addRow(QString(), m_showMHzOnCursorToggle);
+
+    // Abstimmhilfe — senkrechte Linie am Zeiger plus Frequenz auf das
+    // Hertz. Steht neben dem Haekchen darueber, weil beide am Zeiger
+    // haengen; es sind aber zwei Merkmale: die Ablesung bleibt liegen,
+    // die Hilfe blendet nach vier Sekunden aus.
+    // Port aus AetherSDR: dort ein Eintrag im Kontextmenue
+    // (SpectrumWidget.cpp:9916 [@0cd4559] tuneGuideAction). Bei uns ein
+    // Haekchen im Setup, weil unsere Anzeigeschalter dort stehen und
+    // unser Kontextmenue den Spots und Kerben gehoert.
+    m_showTuneGuideToggle = new QCheckBox(
+        QStringLiteral("Show tune guide"), overlayGroup);
+    m_showTuneGuideToggle->setToolTip(QStringLiteral(
+        "Draw a vertical guide line at the mouse cursor with the frequency "
+        "under it to the Hz. Fades out four seconds after the pointer stops; "
+        "suppressed while the pointer is over a notch marker."));
+    connect(m_showTuneGuideToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setTuneGuideEnabled(on);
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayShowTuneGuide"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    overlayForm->addRow(QString(), m_showTuneGuideToggle);
 
     // ShowBinWidth — live bin-width readout.
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth.

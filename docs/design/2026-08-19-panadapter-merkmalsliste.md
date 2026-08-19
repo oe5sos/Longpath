@@ -48,6 +48,37 @@ gesucht, bevor er gebaut wird.** Ein Merkmalsvergleich über
 Methodennamen findet Lücken, die keine sind, und übersieht Lücken, die
 zwischen zwei Namen liegen.
 
+## Zweite Korrektur: „Abstimmhilfen" waren drei Setter, einer ist eine Lücke
+
+Bei der Suche vor dem Bauen (2026-08-19) hat sich die Zeile
+**Abstimmhilfen** in drei Teile zerlegt, von denen nur einer fehlte:
+
+* `setShowTuneGuides` — **echte Lücke**, gebaut in diesem Commit.
+* `setSingleClickTune` — **keine Lücke, eine Vorliebe.** Wir stimmen
+  längst beim Einfachklick ab, bedingungslos, portiert aus derselben
+  AetherSDR-Stelle: `SpectrumWidget.cpp` in `mouseReleaseEvent`, 4
+  Bildpunkte Schwelle. AetherSDRs Schalter steht auf `false` als
+  Vorgabe, dort ist der Doppelklick der Normalfall. Ihn zu holen heißt,
+  eine Option zu bauen, die unser Verhalten verschlechtert. Nicht
+  gebaut; als Betriebsfrage dem Betreiber vorgelegt.
+* `setSpectrumCursor` — **kein Merkmal.** Setzt die Mauszeiger-*Form*
+  während Zieh-Gesten (`Qt::CrossCursor`, `SizeHorCursor`,
+  `ClosedHandCursor`), samt Kommentar über einen macOS-Absturz im
+  Zeigerwechsel. Vierter Fehlalarm der Sorte, vor der der Abschnitt
+  „Namensunterschiede" warnt — diesmal nicht ein Name für zwei
+  Merkmale, sondern ein Setter, der gar keins ist.
+
+**Damit steht die Zwischenbilanz bei drei von sieben anders als
+notiert** (Squelch-Automatik offen, SWR-Kurve vorhanden, Abstimmhilfen
+gedrittelt). Die Regel „erst im Baum suchen" hat sich zweimal an zwei
+Tagen bezahlt.
+
+Noch offen aus Merkmal 1: `setAutoSquelchEnable` und
+`setAutoSqlMarginDb` — die **Automatik mit Abstand zum Rauschboden**.
+Die Linie ist da, die Automatik nicht. Sie braucht den
+`NoiseFloorEstimator` aus 3G-9c als Eingang und ist deshalb ein eigener
+Schritt, kein Nachtrag.
+
 ---
 
 ## Was AetherSDR hat und wir nicht

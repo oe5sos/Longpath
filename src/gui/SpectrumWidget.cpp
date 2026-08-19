@@ -1072,6 +1072,10 @@ void SpectrumWidget::loadSettings()
     m_showFps = readBool(QStringLiteral("DisplayShowFps"), false);
     // B8 Task 21: cursor frequency readout persists across restarts.
     m_showCursorFreq = readBool(QStringLiteral("DisplayShowCursorFreq"), true);
+    // Abstimmhilfe: aus als Vorgabe, wie ShowTuneGuides bei AetherSDR
+    // (SpectrumWidget.h:1760 [@0cd4559] m_showTuneGuides{false}). Eine
+    // Linie, die am Zeiger klebt, gehoert nicht ungefragt ins Bild.
+    m_tuneGuideEnabled = readBool(QStringLiteral("DisplayShowTuneGuide"), false);
     m_dbmScaleVisible = readBool(QStringLiteral("DisplayDbmScaleVisible"), true);
     m_bandPlanFontSize = s.value(QStringLiteral("BandPlanFontSize"),
                                  QStringLiteral("6")).toInt();
@@ -1305,6 +1309,8 @@ void SpectrumWidget::saveSettings()
               m_showFps ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayShowCursorFreq"), m_panIndex),
               m_showCursorFreq ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayShowTuneGuide"), m_panIndex),
+              m_tuneGuideEnabled ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayDbmScaleVisible"), m_panIndex),
               m_dbmScaleVisible ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("BandPlanFontSize"),
@@ -3586,6 +3592,9 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
     if (m_showCursorFreq) {
         drawCursorInfo(p, specRect);
     }
+    // Danach, nicht davor: die Abstimmhilfe soll ueber der Ablesung
+    // liegen, nicht unter ihr.
+    drawTuneGuide(p, specRect);
 
     // FPS overlay (Phase 3G-8 commit 5 / G8 ShowFPS). Cheap rolling counter
     // updated once per second. QPainter fallback path only; GPU path prints
@@ -4357,6 +4366,109 @@ void SpectrumWidget::drawSquelchLine(QPainter& p, const QRect& specRect)
     // Linie waere die Beschriftung im Signal.
     p.drawText(specRect.left() + 4, y - 2,
                QStringLiteral("SQL %1 dBm").arg(m_squelchDbm, 0, 'f', 0));
+}
+
+// ── Abstimmhilfe ─────────────────────────────────────────────────────
+//
+// Port aus AetherSDR SpectrumWidget.cpp:15046-15074 [@0cd4559]
+// (Zeichnung), :9157-9164 (Sichtbarkeit in updateTrackedCursorState)
+// und :4068-4090 (Schalter setShowTuneGuides).
+//
+// Uebernommen: senkrechte Linie am Zeiger, Beschriftung mit der
+// Frequenz auf das Hertz genau, Ausblenden nach vier Sekunden Ruhe,
+// Unterdrueckung solange der Zeiger ueber einer Kerbe steht.
+//
+// Nicht uebernommen ist die Weitergabe an Geschwister-Widgets (dort in
+// setShowTuneGuides, ueber window() alle SpectrumWidgets): sie loest ein
+// Problem, das wir bis Phase 3F nicht haben.
+
+void SpectrumWidget::setTuneGuideEnabled(bool on)
+{
+    if (m_tuneGuideEnabled == on) { return; }
+    m_tuneGuideEnabled = on;
+    if (!on) {
+        m_tuneGuideShowing = false;
+        if (m_tuneGuideHideTimer) { m_tuneGuideHideTimer->stop(); }
+    }
+    scheduleSettingsSave();
+    markOverlayDirty();
+    update();
+}
+
+void SpectrumWidget::noteTuneGuideActivity()
+{
+    if (!m_tuneGuideEnabled) { return; }
+
+    // Ueber einer Kerbe nicht: dort steht schon der Kerben-Hinweis
+    // (QToolTip in mouseMoveEvent), und zwei Beschriftungen am selben
+    // Zeiger ueberdecken sich. AetherSDR entscheidet genauso, dort ueber
+    // m_hoveredTnfId < 0 (SpectrumWidget.cpp:9157 [@0cd4559]).
+    const bool wanted = (m_hoveredNotchId < 0);
+
+    if (!m_tuneGuideHideTimer) {
+        m_tuneGuideHideTimer = new QTimer(this);
+        m_tuneGuideHideTimer->setSingleShot(true);
+        // Vier Sekunden wie bei AetherSDR (:1986 setInterval(4000)) —
+        // laenger als die drei der Squelch-Linie, weil das Abstimmen
+        // laenger dauert als das Einstellen einer Schwelle.
+        m_tuneGuideHideTimer->setInterval(4000);
+        connect(m_tuneGuideHideTimer, &QTimer::timeout, this, [this] {
+            m_tuneGuideShowing = false;
+            m_overlayStaticDirty = true;
+            update();
+        });
+    }
+
+    if (wanted) {
+        m_tuneGuideShowing = true;
+        m_tuneGuideHideTimer->start();   // jede Bewegung setzt die Zeit neu
+    } else {
+        m_tuneGuideShowing = false;
+        m_tuneGuideHideTimer->stop();
+    }
+    m_overlayStaticDirty = true;
+}
+
+void SpectrumWidget::drawTuneGuide(QPainter& p, const QRect& specRect)
+{
+    if (!m_tuneGuideEnabled || !m_tuneGuideShowing) { return; }
+    if (specRect.isEmpty() || !m_mouseInWidget) { return; }
+
+    const int cx = m_mousePos.x();
+    if (cx < specRect.left() || cx > specRect.right()) { return; }
+
+    const QColor col = roleColor("text-secondary", Style::kTextSecondary, 220);
+    p.setPen(QPen(col, 1));
+    p.drawLine(cx, specRect.top(), cx, specRect.bottom());
+
+    // Punktgruppen statt MHz mit Nachkommastellen: beim Abstimmen zaehlt
+    // das Hertz, und 14.270.000 liest sich schneller als 14.270000 MHz.
+    // Format aus AetherSDR SpectrumWidget.cpp:15053-15062 [@0cd4559].
+    const long long hz = static_cast<long long>(std::llround(xToHz(cx, specRect)));
+    const QString label = QStringLiteral("%1.%2.%3")
+        .arg(hz / 1000000)
+        .arg((hz / 1000) % 1000, 3, 10, QChar('0'))
+        .arg(hz % 1000, 3, 10, QChar('0'));
+
+    QFont f = p.font();
+    f.setPixelSize(Style::kFontCaption + 2);
+    f.setBold(true);
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    const int tw = fm.horizontalAdvance(label) + 8;
+    const int th = fm.height() + 4;
+
+    // Rechts vom Zeiger, sonst links, wenn der Rand naeher ist — und
+    // oberhalb, sonst unterhalb. Sonst schiebt sich die Beschriftung am
+    // Bildrand aus dem Bild.
+    int lx = cx + 12;
+    if (lx + tw > specRect.right()) { lx = cx - tw - 4; }
+    int ly = m_mousePos.y() - th - 4;
+    if (ly < specRect.top()) { ly = m_mousePos.y() + 16; }
+
+    p.fillRect(lx, ly, tw, th, roleColor("panel", Style::kPanelBg, 200));
+    p.setPen(roleColor("text-primary", Style::kTextPrimary));
+    p.drawText(lx + 4, ly + fm.ascent() + 2, label);
 }
 
 // ---- Frequency scale bar ----
@@ -8051,6 +8163,12 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
             m_selectedNotchId = hoverNotch;
             markOverlayDirty();
         }
+        // Abstimmhilfe: HIER, nicht oben am Anfang der Funktion. Sie
+        // liest m_hoveredNotchId, und der Wert steht erst nach den drei
+        // Zeilen darueber. Weiter oben gerufen zeigte sie sich fuer ein
+        // Ereignis auch ueber einer Kerbe — sichtbar als Flackern beim
+        // Darueberfahren.
+        noteTuneGuideActivity();
         if (hoverNotch >= 0) {
             const NotchMarker* n = notchMarkerById(hoverNotch);
             if (n) {
@@ -8216,6 +8334,14 @@ void SpectrumWidget::leaveEvent(QEvent* event)
 {
     m_mouseInWidget = false;
     QToolTip::hideText();
+    // Der Zeiger ist weg, also auch seine Hilfe — ohne das blieben Linie
+    // und Beschriftung bis zum Ablauf der vier Sekunden am letzten Ort
+    // stehen, wo kein Zeiger mehr ist.
+    if (m_tuneGuideShowing) {
+        m_tuneGuideShowing = false;
+        if (m_tuneGuideHideTimer) { m_tuneGuideHideTimer->stop(); }
+        markOverlayDirty();
+    }
     if (m_hoverSpotIndex != -1) {
         m_hoverSpotIndex = -1;
         emit spotHoverIndexChanged(-1);
@@ -9158,6 +9284,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             if (m_showCursorFreq && m_mouseInWidget) {
                 drawCursorInfo(p, specRect);
             }
+            // Abstimmhilfe im GPU-Malweg, gleiche Reihenfolge wie oben.
+            drawTuneGuide(p, specRect);
 
             // 2026-05-26 KG4VCF perf instrumentation overlay.  Painted
             // into the static cache so the cost is only paid when the

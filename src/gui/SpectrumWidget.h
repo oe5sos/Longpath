@@ -719,6 +719,37 @@ public:
     bool squelchLineVisible() const { return m_squelchLineVisible; }
     double squelchLineDbm() const { return m_squelchDbm; }
 
+    // ── Abstimmhilfe ─────────────────────────────────────────────────
+    //
+    // Port aus AetherSDR: Schalter setShowTuneGuides
+    // (SpectrumWidget.cpp:4068-4090 [@0cd4559]), Sichtbarkeit in
+    // updateTrackedCursorState (:9157-9164), Zeichnung im Malweg
+    // (:15046-15074).
+    //
+    // Senkrechte Linie am Zeiger ueber die ganze Hoehe, dazu die
+    // Frequenz auf das Hertz genau (14.270.000). Blendet nach vier
+    // Sekunden Ruhe aus, wie bei AetherSDR und aus demselben Grund wie
+    // die Squelch-Linie darueber: sie hilft beim ABSTIMMEN, und was
+    // dauerhaft steht, wird zum Raster.
+    //
+    // Zwei NereusSDR-Abweichungen, beide mit Grund:
+    //
+    // 1. Keine Weitergabe an Geschwister-Widgets. AetherSDR sucht ueber
+    //    window() alle SpectrumWidgets ab, weil dort mehrere
+    //    Panadapter nebeneinander stehen. Bei uns gibt es bis Phase 3F
+    //    genau einen — eine Schleife ueber eine Menge mit einem
+    //    Element ist kein Merkmal, sondern toter Code.
+    //
+    // 2. Der Schluessel heisst DisplayShowTuneGuide und laeuft ueber
+    //    settingsKey(..., m_panIndex), nicht ShowTuneGuides global wie
+    //    bei AetherSDR: unsere Anzeigeschalter liegen samt und sonders
+    //    pro Panadapter, siehe die Nachbarn DisplayShowCursorFreq und
+    //    DisplayShowZeroLine. Ein einzelner globaler Schluessel mitten
+    //    darin waere die Ausnahme, die spaeter jemand sucht.
+    void setTuneGuideEnabled(bool on);
+    bool tuneGuideEnabled() const { return m_tuneGuideEnabled; }
+    bool tuneGuideShowing() const { return m_tuneGuideShowing; }
+
     void setBandPlanFontSize(int pt);             // 0 = off
     int  bandPlanFontSize() const { return m_bandPlanFontSize; }
     bool bandPlanVisible() const { return m_bandPlanFontSize > 0; }
@@ -1610,6 +1641,9 @@ private:
     void drawDbmScale(QPainter& p, const QRect& specRect);
     void drawBandPlan(QPainter& p, const QRect& specRect);
     void drawSquelchLine(QPainter& p, const QRect& specRect);
+    void drawTuneGuide(QPainter& p, const QRect& specRect);
+    // Zeigerbewegung: Hilfe zeigen und die vier Sekunden neu starten.
+    void noteTuneGuideActivity();
 
     // ── Waterfall scrollback (sub-epic E) ─────────────────────────────────
     // From AetherSDR SpectrumWidget.h:402-413 [@0cd4559]
@@ -2154,6 +2188,10 @@ private:
     bool                         m_squelchLineVisible{false};
     double                       m_squelchDbm{-150.0};
     class QTimer*                m_squelchHideTimer{nullptr};
+
+    bool                         m_tuneGuideEnabled{false};
+    bool                         m_tuneGuideShowing{false};
+    class QTimer*                m_tuneGuideHideTimer{nullptr};
 
     QColor m_gridColor{255, 255, 255, 40};       // vertical freq grid
     QColor m_gridFineColor{255, 255, 255, 20};   // 1/5 step fine grid

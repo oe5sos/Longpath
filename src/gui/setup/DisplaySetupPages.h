@@ -173,6 +173,7 @@ private:
     // Section: Spectrum Overlays (Task 2.3)
     // From Thetis setup.designer.cs:33043 [v2.10.3.13] chkShowMHzOnCursor
     QCheckBox* m_showMHzOnCursorToggle{nullptr};
+    QCheckBox* m_showTuneGuideToggle{nullptr};
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth
     QCheckBox* m_showBinWidthToggle{nullptr};
     QLabel*    m_binWidthReadout{nullptr};
