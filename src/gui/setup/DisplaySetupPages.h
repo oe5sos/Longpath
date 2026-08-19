@@ -174,6 +174,8 @@ private:
     // From Thetis setup.designer.cs:33043 [v2.10.3.13] chkShowMHzOnCursor
     QCheckBox* m_showMHzOnCursorToggle{nullptr};
     QCheckBox* m_showTuneGuideToggle{nullptr};
+    QCheckBox* m_extendedLineToggle{nullptr};
+    QCheckBox* m_extendedPassbandToggle{nullptr};
     QCheckBox* m_autoSquelchToggle{nullptr};
     QSpinBox*  m_autoSqlMarginSpin{nullptr};
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth

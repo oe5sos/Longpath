@@ -751,6 +751,29 @@ public:
     bool tuneGuideEnabled() const { return m_tuneGuideEnabled; }
     bool tuneGuideShowing() const { return m_tuneGuideShowing; }
 
+    // ── Verlaengerung in den Wasserfall ──────────────────────────────
+    //
+    // Port aus AetherSDR setExtendedFrequencyLine + setExtendedPassband
+    // (SpectrumWidget.cpp:4094-4130 [@0cd4559], Wirkung bei :16845 und
+    // :16903). Dort zwei Schalter mit Vorgabe AUS.
+    //
+    // NereusSDR-Abweichung: Vorgabe EIN. Wir haben Mittellinie,
+    // Filterkanten und Durchlassflaeche seit je unbedingt bis
+    // wfRect.bottom() gemalt — das ist der Istzustand, den Betreiber
+    // kennen, und eine Vorgabe darf niemandem das Bild umstellen. Der
+    // Schalter fuegt die Moeglichkeit hinzu, sie abzuschalten, und
+    // nichts weiter.
+    //
+    // Zweite Abweichung: die Wasserfall-Haelfte der FILTERKANTEN haengt
+    // mit an m_extendedFrequencyLine. Bei AetherSDR enden die Kanten
+    // ohnehin am Spektrum; wir malen sie durch. Ein eigener dritter
+    // Schalter waere eine Einstellung, die niemand sucht — Kante und
+    // Linie gehoeren zum selben Bild.
+    void setExtendedFrequencyLine(bool on);
+    bool extendedFrequencyLine() const { return m_extendedFrequencyLine; }
+    void setExtendedPassband(bool on);
+    bool extendedPassband() const { return m_extendedPassband; }
+
     // ── Squelch-Automatik ────────────────────────────────────────────
     //
     // Port aus AetherSDR: setAutoSquelchEnable + setAutoSqlMarginDb +
@@ -2238,6 +2261,10 @@ private:
     bool                         m_squelchLineVisible{false};
     double                       m_squelchDbm{-150.0};
     class QTimer*                m_squelchHideTimer{nullptr};
+
+    // Vorgabe ein — Begruendung oben bei den Settern.
+    bool                         m_extendedFrequencyLine{true};
+    bool                         m_extendedPassband{true};
 
     bool                         m_autoSquelchEnabled{false};
     // 10 dB wie AetherSDR (SpectrumWidget.h:1414 m_autoSqlMarginDb{10}).

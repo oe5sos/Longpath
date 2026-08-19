@@ -253,6 +253,14 @@ void SpectrumDefaultsPage::loadFromRenderer()
         QSignalBlocker b(m_showTuneGuideToggle);
         m_showTuneGuideToggle->setChecked(sw->tuneGuideEnabled());
     }
+    if (m_extendedLineToggle) {
+        QSignalBlocker b(m_extendedLineToggle);
+        m_extendedLineToggle->setChecked(sw->extendedFrequencyLine());
+    }
+    if (m_extendedPassbandToggle) {
+        QSignalBlocker b(m_extendedPassbandToggle);
+        m_extendedPassbandToggle->setChecked(sw->extendedPassband());
+    }
     if (m_autoSquelchToggle) {
         QSignalBlocker b(m_autoSquelchToggle);
         m_autoSquelchToggle->setChecked(sw->autoSquelchEnabled());
@@ -923,6 +931,41 @@ void SpectrumDefaultsPage::buildUI()
             on ? QStringLiteral("True") : QStringLiteral("False"));
     });
     overlayForm->addRow(QString(), m_showTuneGuideToggle);
+
+    // Verlaengerung in den Wasserfall — zwei Schalter, Vorgabe ein.
+    // Port aus AetherSDR setExtendedFrequencyLine + setExtendedPassband
+    // (SpectrumWidget.cpp:4094-4130 [@0cd4559]), dort im Kontextmenue und
+    // mit Vorgabe aus. Unsere Vorgabe ist ein, weil wir es seit je so
+    // malen; der Schalter nimmt nichts weg, er erlaubt das Abschalten.
+    m_extendedLineToggle = new QCheckBox(
+        QStringLiteral("Extend VFO line into waterfall"), overlayGroup);
+    m_extendedLineToggle->setToolTip(QStringLiteral(
+        "Continue the VFO centre line and the filter edge lines down through "
+        "the waterfall. Off keeps them inside the spectrum."));
+    connect(m_extendedLineToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setExtendedFrequencyLine(on);
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayExtendedFrequencyLine"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    overlayForm->addRow(QString(), m_extendedLineToggle);
+
+    m_extendedPassbandToggle = new QCheckBox(
+        QStringLiteral("Extend passband shading into waterfall"), overlayGroup);
+    m_extendedPassbandToggle->setToolTip(QStringLiteral(
+        "Continue the translucent receive-filter shading down through the "
+        "waterfall. Off keeps the shading inside the spectrum."));
+    connect(m_extendedPassbandToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setExtendedPassband(on);
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayExtendedPassband"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    overlayForm->addRow(QString(), m_extendedPassbandToggle);
 
     // ShowBinWidth — live bin-width readout.
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth.

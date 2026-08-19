@@ -1079,6 +1079,11 @@ void SpectrumWidget::loadSettings()
     // Squelch-Automatik: aus als Vorgabe. Sie schreibt eine Schwelle in
     // das Modell, und das tut nichts ungefragt.
     m_autoSquelchEnabled = readBool(QStringLiteral("DisplayAutoSquelch"), false);
+    // Vorgabe true: das ist unser Istzustand seit je, nicht AetherSDRs aus.
+    m_extendedFrequencyLine =
+        readBool(QStringLiteral("DisplayExtendedFrequencyLine"), true);
+    m_extendedPassband =
+        readBool(QStringLiteral("DisplayExtendedPassband"), true);
     m_autoSqlMarginDb = qBound(5,
         readInt(QStringLiteral("DisplayAutoSqlMarginDb"), 10), 20);
     m_dbmScaleVisible = readBool(QStringLiteral("DisplayDbmScaleVisible"), true);
@@ -1319,6 +1324,10 @@ void SpectrumWidget::saveSettings()
     s.setValue(settingsKey(QStringLiteral("DisplayAutoSquelch"), m_panIndex),
               m_autoSquelchEnabled ? QStringLiteral("True") : QStringLiteral("False"));
     writeInt(QStringLiteral("DisplayAutoSqlMarginDb"), m_autoSqlMarginDb);
+    s.setValue(settingsKey(QStringLiteral("DisplayExtendedFrequencyLine"), m_panIndex),
+              m_extendedFrequencyLine ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayExtendedPassband"), m_panIndex),
+              m_extendedPassband ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayDbmScaleVisible"), m_panIndex),
               m_dbmScaleVisible ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("BandPlanFontSize"),
@@ -4455,6 +4464,34 @@ void SpectrumWidget::noteTuneGuideActivity()
 // Begruendung steht im Header; kurz: die Schwelle muss an der sichtbaren
 // Linie ablesbar sein.
 
+// ── Verlaengerung in den Wasserfall ──────────────────────────────────
+//
+// Port aus AetherSDR setExtendedFrequencyLine + setExtendedPassband
+// (SpectrumWidget.cpp:4094-4130 [@0cd4559]). Vorgabe bei uns EIN, nicht
+// aus — Begruendung im Header.
+//
+// Nicht uebernommen ist die Weitergabe an Geschwister-Widgets, aus
+// demselben Grund wie bei der Abstimmhilfe: bis Phase 3F gibt es genau
+// ein Panadapter.
+
+void SpectrumWidget::setExtendedFrequencyLine(bool on)
+{
+    if (m_extendedFrequencyLine == on) { return; }
+    m_extendedFrequencyLine = on;
+    scheduleSettingsSave();
+    markOverlayDirty();
+    update();
+}
+
+void SpectrumWidget::setExtendedPassband(bool on)
+{
+    if (m_extendedPassband == on) { return; }
+    m_extendedPassband = on;
+    scheduleSettingsSave();
+    markOverlayDirty();
+    update();
+}
+
 void SpectrumWidget::setAutoSquelchEnabled(bool on)
 {
     if (m_autoSquelchEnabled == on) { return; }
@@ -5800,7 +5837,13 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
         }
 
         // Waterfall passband fill — Plan 4 D9b: same user-pickable colour.
-        p.fillRect(xLo, wfRect.top(), fW, wfRect.height(), m_rxFilterColor);
+        // Ab 2026-08-19 abschaltbar (m_extendedPassband, Vorgabe ein):
+        // AetherSDRs setExtendedPassband, dort mit Vorgabe AUS. Wir haben
+        // die Verlaengerung seit je unbedingt gemalt, also bleibt sie die
+        // Vorgabe — der Schalter fuegt nur die Moeglichkeit hinzu.
+        if (m_extendedPassband) {
+            p.fillRect(xLo, wfRect.top(), fW, wfRect.height(), m_rxFilterColor);
+        }
     }
 
     // Filter edge lines — from AetherSDR line 3237: slice color, alpha=130
@@ -5808,15 +5851,26 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     // the bandplan strip's top edge.
     p.setPen(QPen(QColor(kSliceR, kSliceG, kSliceB, 130), 1));
     p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
-    p.drawLine(xLo, wfRect.top(),   xLo, wfRect.bottom());
     p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
-    p.drawLine(xHi, wfRect.top(),   xHi, wfRect.bottom());
+    // Die Wasserfall-Haelfte der Kanten haengt am selben Schalter wie die
+    // Mittellinie: bei AetherSDR enden die Kanten immer am Spektrum, und
+    // nur die Frequenzlinie hat den Schalter. Ein dritter Schalter fuer
+    // die Kanten allein waere eine Einstellung, die niemand sucht — Kante
+    // und Linie gehoeren zum selben Bild.
+    if (m_extendedFrequencyLine) {
+        p.drawLine(xLo, wfRect.top(), xLo, wfRect.bottom());
+        p.drawLine(xHi, wfRect.top(), xHi, wfRect.bottom());
+    }
 
     // VFO center line — from AetherSDR line 3281: slice color, alpha=220, width=2
     // Width narrows to 1 when filter edge is ≤4px away (CW modes)
     qreal vfoLineW = (std::abs(vfoX - xLo) <= 4 || std::abs(vfoX - xHi) <= 4) ? 1.0 : 2.0;
     p.setPen(QPen(QColor(kSliceR, kSliceG, kSliceB, 220), vfoLineW));
-    p.drawLine(vfoX, specRect.top(), vfoX, wfRect.bottom());
+    // Port aus AetherSDR: drawFrequencyLine malt immer im Spektrum und nur
+    // bei m_extendedFrequencyLine auch im Wasserfall
+    // (SpectrumWidget.cpp:16843-16848 [@0cd4559]).
+    p.drawLine(vfoX, specRect.top(), vfoX,
+               m_extendedFrequencyLine ? wfRect.bottom() : specBottomClipped);
 
     // VFO triangle marker — from AetherSDR line 3285-3293
     // Drawn below any VFO flag widget that may be positioned at the top.
