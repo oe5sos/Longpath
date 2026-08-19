@@ -353,6 +353,7 @@ warren@wpratt.com
 #include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
+#include <QFileInfo>
 #include <QVector>
 
 namespace NereusSDR {
@@ -546,6 +547,17 @@ RadioModel::RadioModel(QObject* parent)
     // treats a null as a safe no-op (tests that build AudioEngine
     // standalone).
     m_audioEngine->setRadioModel(this);
+
+    // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
+    // laden. Neben die Einstellungen und nicht in den Programmordner —
+    // dort ueberlebt er ein Neuinstallieren, und genau das erwartet
+    // jemand, der zehn Ansagen eingesprochen hat.
+    {
+        const QFileInfo settingsFile(AppSettings::instance().filePath());
+        m_voiceKeyer.setFolder(settingsFile.absolutePath()
+                               + QStringLiteral("/voicekeyer"));
+        m_voiceKeyer.load();
+    }
 
     // The per-board codec arriving makes a previously unanswerable DDC
     // assignment answerable, so ask again.

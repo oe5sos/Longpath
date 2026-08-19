@@ -54,11 +54,20 @@ public:
 private:
     void buildUI();
 
-    // Control 1 — 4 voice keyer slots: label + rec + play + stop
-    QLabel*      m_slotLabel[4]  = {};
-    QPushButton* m_recBtn[4]     = {};
-    QPushButton* m_playBtn[4]    = {};
-    QPushButton* m_stopBtn[4]    = {};
+    // Zehn Plaetze, nicht vier (2026-08-19, auf Ansage des Betreibers:
+    // „10 audio files aufnehmen … mit shortcuts verbinden … als CQ CALL
+    // abspielen"). Die Zeile zeigt Taste, Beschriftung, Dauer und die
+    // drei Knoepfe.
+    static constexpr int kSlots = 10;
+
+    QLabel*      m_slotKey[kSlots]   = {};
+    QLabel*      m_slotLabel[kSlots] = {};
+    QPushButton* m_recBtn[kSlots]    = {};
+    QPushButton* m_playBtn[kSlots]   = {};
+    QPushButton* m_stopBtn[kSlots]   = {};
+    QPushButton* m_loadBtn[kSlots]   = {};
+
+    void refreshSlot(int index);
 
     // Control 2 — record level gauge (0-100)
     HGauge*      m_recLevel      = nullptr;

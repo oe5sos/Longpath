@@ -69,6 +69,7 @@
 
 #include "core/ConnectionState.h"
 #include "core/CouplerZero.h"
+#include "core/audio/VoiceKeyer.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
 #include "core/TgxlConnection.h"
@@ -421,6 +422,13 @@ public:
 
     // Apollo PA + ATU + LPF accessory controller — present/filter/tuner enable flags.
     // Loaded per-MAC at connect time. Setup UI deferred (Phase 3P-F Task 5a).
+    // Sprachspeicher: zehn Ansagen mit Tasten (2026-08-19). Hier und
+    // nicht im Applet, damit die Tastenkuerzel spaeter global greifen
+    // und die Wiedergabe an den Sendeweg kommt, ohne dass zwei Stellen
+    // dieselben Plaetze fuehren.
+    VoiceKeyerStore& voiceKeyer() { return m_voiceKeyer; }
+    const VoiceKeyerStore& voiceKeyer() const { return m_voiceKeyer; }
+
     const ApolloController& apolloController()        const { return m_apolloController; }
     ApolloController&       apolloControllerMutable()       { return m_apolloController; }
 
@@ -3178,6 +3186,7 @@ private:
     // Apollo PA + ATU + LPF accessory state (present/filter/tuner enable bools).
     // MAC and load() are called on connect. Phase 3P-F Task 5a.
     ApolloController m_apolloController;
+    VoiceKeyerStore m_voiceKeyer;
 
     // PennyLane external-control master toggle. Composes with OcMatrix (Phase 3P-D).
     // MAC and load() are called on connect. Phase 3P-F Task 5b.

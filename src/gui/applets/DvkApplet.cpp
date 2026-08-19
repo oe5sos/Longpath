@@ -23,6 +23,9 @@
 // =================================================================
 
 #include "DvkApplet.h"
+#include "models/RadioModel.h"
+#include <QMessageBox>
+#include <QFileDialog>
 #include "NyiOverlay.h"
 #include "gui/HGauge.h"
 #include "gui/StyleConstants.h"
@@ -41,6 +44,27 @@ DvkApplet::DvkApplet(RadioModel* model, QWidget* parent)
     buildUI();
 }
 
+// Eine Zeile auffrischen: Taste, Beschriftung, Dauer.
+void DvkApplet::refreshSlot(int index)
+{
+    if (index < 0 || index >= kSlots || !m_model) { return; }
+    const VoiceKeyerSlot& s = m_model->voiceKeyer().slot(index);
+
+    if (m_slotKey[index]) {
+        m_slotKey[index]->setText(s.shortcut);
+    }
+    if (m_slotLabel[index]) {
+        // Leerer Platz sagt das auch. „Slot 3" allein laesst offen, ob
+        // da etwas liegt.
+        const QString name = s.label.isEmpty()
+            ? QStringLiteral("Slot %1").arg(index + 1) : s.label;
+        m_slotLabel[index]->setText(s.isEmpty()
+            ? QStringLiteral("%1 — empty").arg(name)
+            : QStringLiteral("%1 · %2 s").arg(name)
+                  .arg(s.seconds, 0, 'f', 1));
+    }
+}
+
 void DvkApplet::buildUI()
 {
     auto* root = new QVBoxLayout(this);
@@ -55,35 +79,85 @@ void DvkApplet::buildUI()
     vbox->setContentsMargins(4, 2, 4, 4);
     vbox->setSpacing(2);
 
-    // --- Control 1: Voice keyer slots (4 rows) ---
-    const QString slotNames[4] = {
-        QStringLiteral("Slot 1"), QStringLiteral("Slot 2"),
-        QStringLiteral("Slot 3"), QStringLiteral("Slot 4")
-    };
-
-    for (int i = 0; i < 4; ++i) {
+    // --- Die zehn Plaetze ---------------------------------------
+    //
+    // Was hier WIRKT und was nicht, und warum das so dasteht:
+    //
+    //   Laden (WAV)  — wirkt. Reine Dateiarbeit, kein Funkgeraet noetig.
+    //   Beschriftung — wirkt, per Doppelklick auf den Namen.
+    //   Rec / Play   — brauchen den Sendeweg (Mikrofonabgriff bzw.
+    //                  Einspeisung samt Sendetastung) und sind bis dahin
+    //                  gesperrt, MIT Begruendung im Tooltip.
+    //
+    // Ein gesperrter Knopf ohne Erklaerung ist ein Versprechen, das die
+    // Anwendung nicht haelt — davon haben wir 72 im Setup, das reicht.
+    for (int i = 0; i < kSlots; ++i) {
         auto* row = new QHBoxLayout;
         row->setSpacing(3);
 
-        m_slotLabel[i] = new QLabel(slotNames[i], this);
-        m_slotLabel[i]->setFixedWidth(44);
+        m_slotKey[i] = new QLabel(this);
+        m_slotKey[i]->setFixedWidth(26);
+        m_slotKey[i]->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 10px; font-weight: bold; }")
+                .arg(Style::kAmberText));
+        row->addWidget(m_slotKey[i]);
+
+        m_slotLabel[i] = new QLabel(this);
+        m_slotLabel[i]->setMinimumWidth(70);
         m_slotLabel[i]->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextSecondary));
-        row->addWidget(m_slotLabel[i]);
+        m_slotLabel[i]->setToolTip(QStringLiteral(
+            "Double-click to name this announcement (CQ, 73, callsign …)."));
+        row->addWidget(m_slotLabel[i], 1);
 
-        m_recBtn[i]  = styledButton(QStringLiteral("\u25CF Rec"));
-        m_playBtn[i] = styledButton(QStringLiteral("\u25BA Play"));
-        m_stopBtn[i] = styledButton(QStringLiteral("\u25A0 Stop"));
+        m_recBtn[i]  = styledButton(QStringLiteral("\u25CF"));
+        m_playBtn[i] = styledButton(QStringLiteral("\u25BA"));
+        m_stopBtn[i] = styledButton(QStringLiteral("\u25A0"));
+        m_loadBtn[i] = styledButton(QStringLiteral("WAV"));
+
+        m_recBtn[i]->setToolTip(QStringLiteral(
+            "Record from the microphone — needs the transmit path, which "
+            "is the next step. Load a WAV in the meantime."));
+        m_playBtn[i]->setToolTip(QStringLiteral(
+            "Send this announcement — needs the transmit path, which is "
+            "the next step."));
+        m_loadBtn[i]->setToolTip(QStringLiteral(
+            "Load a WAV file into this slot. Works now: the file is read "
+            "and checked immediately, not when you press send."));
 
         row->addWidget(m_recBtn[i]);
         row->addWidget(m_playBtn[i]);
         row->addWidget(m_stopBtn[i]);
+        row->addWidget(m_loadBtn[i]);
 
         vbox->addLayout(row);
 
-        NyiOverlay::markNyi(m_recBtn[i],  QStringLiteral("3I-1"));
-        NyiOverlay::markNyi(m_playBtn[i], QStringLiteral("3I-1"));
-        NyiOverlay::markNyi(m_stopBtn[i], QStringLiteral("3I-1"));
+        // Bis der Sendeweg haengt: gesperrt, aber mit Grund im Tooltip.
+        m_recBtn[i]->setEnabled(false);
+        m_playBtn[i]->setEnabled(false);
+        m_stopBtn[i]->setEnabled(false);
+
+        const int slot = i;
+        connect(m_loadBtn[i], &QPushButton::clicked, this, [this, slot]() {
+            if (!m_model) { return; }
+            const QString path = QFileDialog::getOpenFileName(
+                this, QStringLiteral("Load announcement"), QString{},
+                QStringLiteral("WAV files (*.wav)"));
+            if (path.isEmpty()) { return; }
+
+            QString err;
+            if (!m_model->voiceKeyer().importFile(slot, path, &err)) {
+                QMessageBox::warning(this, QStringLiteral("Voice Keyer"),
+                    QStringLiteral("Could not use that file:\n%1").arg(err));
+                return;
+            }
+            refreshSlot(slot);
+        });
+    }
+
+    if (m_model) {
+        connect(&m_model->voiceKeyer(), &VoiceKeyerStore::slotChanged,
+                this, &DvkApplet::refreshSlot);
     }
 
     // --- Control 2: Record level gauge (0-100) ---
@@ -136,7 +210,12 @@ void DvkApplet::buildUI()
 
 void DvkApplet::syncFromModel()
 {
-    // NYI — Phase 3I-1
+    // Die zehn Zeilen aus dem Speicher auffrischen. Aufnahme und
+    // Wiedergabe bleiben gesperrt, bis der Sendeweg haengt — siehe die
+    // Tooltips an den Knoepfen, die den Grund nennen.
+    for (int i = 0; i < kSlots; ++i) {
+        refreshSlot(i);
+    }
 }
 
 } // namespace NereusSDR
