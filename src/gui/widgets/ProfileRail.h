@@ -90,6 +90,13 @@ signals:
 private:
     void showMenuFor(const QString& name, const QPoint& globalPos);
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
+private:
+    // Je Abzeichen ein Loeschkreuz, sichtbar beim Ueberfahren.
+    QHash<QString, QPushButton*> m_closers;
+
     QPointer<LayoutProfiles> m_profiles;
     QVBoxLayout* m_column{nullptr};
     QPushButton* m_plus{nullptr};

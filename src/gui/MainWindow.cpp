@@ -5108,6 +5108,19 @@ void MainWindow::populateDefaultMeter()
                                 m_radioModel->audioEngine(), nullptr);
     panel->addApplet(m_vaxApplet);
 
+    // DvkApplet — der Sprachspeicher (2026-08-19).
+    //
+    // Er stand bis heute in der Geister-Liste weiter unten: gebaut, aber
+    // nie erzeugt. Ich habe ihn mit zehn Plaetzen gefuellt, OHNE vorher
+    // nachzusehen, ob ihn jemand oeffnen kann — genau der Fehler, den
+    // ich heute vier Mal woanders gefunden habe. Jetzt haengt er.
+    //
+    // Er ist auch ohne Funkgeraet brauchbar: Ansagen aus WAV-Dateien
+    // laden, benennen, Tasten zuordnen. Aufnahme und Wiedergabe brauchen
+    // den Sendeweg und sagen das an ihren Knoepfen.
+    m_dvkApplet = new DvkApplet(m_radioModel, nullptr);
+    panel->addApplet(m_dvkApplet);
+
     // Phase 3M-4 Task 13 — PureSignalApplet quick-access surface.
     //
     // Constructed unconditionally and added to the right panel, but
@@ -5381,6 +5394,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
+    m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("PureSignal")] = m_pureSignalApplet;
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
@@ -5422,6 +5436,12 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("RADE"),         true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
+    // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
+    // Funkgeraet brauchbar (Ansagen laden, benennen, Tasten zuordnen),
+    // und ein Merkmal, das man erst in einem Menue suchen muss, findet
+    // niemand.
+    m_appletVis->registerApplet(QStringLiteral("Dvk"),
+                                QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
                                 QStringLiteral("PureSignal"),   true);
     m_appletVis->registerApplet(QStringLiteral("Amp"),
@@ -5959,7 +5979,6 @@ void MainWindow::populateDefaultMeter()
     // m_digitalApplet    = new DigitalApplet(m_radioModel, nullptr);    // TODO 3-VAX
     // m_diversityApplet  = new DiversityApplet(m_radioModel, nullptr);  // TODO 3F (multi-RX)
     // m_cwxApplet        = new CwxApplet(m_radioModel, nullptr);        // TODO 3M-2 (CW TX)
-    // m_dvkApplet        = new DvkApplet(m_radioModel, nullptr);        // TODO 3M-1 (DVK)
     // m_catApplet        = new CatApplet(m_radioModel, nullptr);        // TODO 3J/3K/3-VAX
 
     c0->setContent(panel);
