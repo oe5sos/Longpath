@@ -1390,6 +1390,13 @@ public:
 signals:
     /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
     void openSetupPageRequested(const QString& page);
+
+    /// Mitte und Spanne haben sich geaendert.
+    ///
+    /// Es gab bisher kein Signal dafuer — jede Anzeige, die die Mitte
+    /// zeigen wollte, haette pollen muessen. Die Kopfleiste des
+    /// Panadapters ist die erste, die sie braucht.
+    void frequencyRangeChanged(double centerHz, double bandwidthHz);
     // 2026-05-22 bench fix: emitted after each updateSpectrumLinear
     // completes (m_renderedPixels populated). MainWindow consumes this
     // to push peakDbmInSlicePassband() into WdspEngine's MaxBin detector

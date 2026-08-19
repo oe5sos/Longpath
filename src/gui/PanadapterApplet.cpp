@@ -29,6 +29,10 @@
 #include <QMenu>
 #include <QResizeEvent>
 #include <QVBoxLayout>
+#include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
+#include <QLabel>
+#include <QHBoxLayout>
 
 namespace NereusSDR {
 
@@ -40,7 +44,51 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(m_spectrum);
+
+    // ── Kopfleiste ────────────────────────────────────────────────────
+    //
+    // Zeus setzt ueber den Panadapter eine Zeile mit Punkt, Namen und
+    // laufender Mittenfrequenz. Die fehlte hier ganz: der Panadapter
+    // war die einzige Flaeche ohne Kopf, obwohl jede Applet daneben
+    // einen hat.
+    //
+    // ABSICHTLICH OHNE die Zoom- und Geschwindigkeitsregler, die Zeus
+    // dort ebenfalls zeigt. Zeus hat keine Overlay-Leiste; wir haben
+    // eine, und sie traegt beide Regler bereits. Sie hier zu
+    // wiederholen waere genau die Doppelung, die an diesem Tag zweimal
+    // aufgeraeumt wurde.
+    auto* head = new QWidget(this);
+    auto* headLay = new QHBoxLayout(head);
+    headLay->setContentsMargins(8, 3, 8, 3);
+    headLay->setSpacing(6);
+
+    auto* dot = new QLabel(QString::fromUtf8("\xe2\x97\x8f"), head);
+    dot->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: %1; }").arg(Style::kGreenText)));
+    headLay->addWidget(dot);
+
+    m_titleLabel = new QLabel(QStringLiteral("PANADAPTER"), head);
+    m_titleLabel->setFont(Style::capsFont(m_titleLabel->font(),
+                                          Style::kFontCaption));
+    m_titleLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: %1; }").arg(Style::kTitleText)));
+    headLay->addWidget(m_titleLabel);
+    headLay->addStretch(1);
+
+    head->setStyleSheet(Style::themed(QStringLiteral(
+        "QWidget { background: %1; border-bottom: 1px solid %2; }")
+        .arg(Style::kPanelBg, Style::kBorder)));
+    layout->addWidget(head, 0);
+
+    layout->addWidget(m_spectrum, 1);
+
+    // Die Mitte laeuft mit. Ohne Verbindung steht nur der Name da —
+    // eine Frequenz ohne Radio waere eine Behauptung.
+    connect(m_spectrum, &SpectrumWidget::frequencyRangeChanged, this,
+            [this](double centerHz, double) {
+        m_titleLabel->setText(QString::fromUtf8("PANADAPTER \xc2\xb7 %1 MHz")
+            .arg(centerHz / 1.0e6, 0, 'f', 6));
+    });
 
     // Phase 3F Sub-Epic E Task 2: per-pan status overlay in top-right.
     // Positioned manually in resizeEvent so the spectrum host owns the full

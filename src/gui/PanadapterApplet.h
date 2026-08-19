@@ -45,6 +45,12 @@
 class QContextMenuEvent;
 class QMenu;
 
+// Qt-Vorwaertsdeklaration im globalen Raum: `class QLabel*`
+// INNERHALB des namespace deklarierte sonst ein neues
+// NereusSDR::QLabel und der Uebersetzer meldet einen unvollstaendigen
+// Typ, obwohl <QLabel> eingebunden ist.
+class QLabel;
+
 namespace NereusSDR {
 
 class SpectrumWidget;
@@ -67,6 +73,9 @@ public:
 
     QString panId() const { return m_panId; }
     SpectrumWidget* spectrumWidget() const { return m_spectrum; }
+
+    /// Die Beschriftung der Kopfleiste, fuer Tests.
+    QLabel* titleLabel() const { return m_titleLabel; }
 
     /// Associate a slice (its flag will overlay when in visible range).
     void addSlice(int sliceIndex);
@@ -198,6 +207,7 @@ private:
 
     QString                 m_panId;
     SpectrumWidget*         m_spectrum {nullptr};
+    QLabel*                 m_titleLabel {nullptr};
     SpectrumStatusOverlay*  m_statusOverlay {nullptr};
     int                     m_activeSliceIndex {-1};
     QSet<int>               m_associatedSlices;

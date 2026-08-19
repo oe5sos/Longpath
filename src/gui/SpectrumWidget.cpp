@@ -1445,6 +1445,7 @@ void SpectrumWidget::setFrequencyRange(double centerHz, double bandwidthHz)
     // chain. The "off" direction also fires here when the operator
     // zooms back inside the listenable island.
     recomputeExtendedMode();
+    emit frequencyRangeChanged(m_centerHz, m_bandwidthHz);
 }
 
 void SpectrumWidget::setCenterFrequency(double centerHz)
