@@ -90,6 +90,30 @@ schreibt die Automatik absichtlich nichts.
 | 5.1 | Automatik + Squelch ein, dann MOX oder TUNE mit Dummy-Load | Während des Sendens rührt sich die Schwelle **nicht**, obwohl der gemessene Boden hochgeht | |
 | 5.2 | MOX loslassen | Kein zugezogener Squelch danach: die Schwelle steht noch dort, wo sie vor dem Senden stand, und stellt sich normal weiter ein | |
 
+## §6 S-Verlauf: erkannte Signale als Marken — braucht Signal
+
+Schalter: dieselbe Seite, „Mark detected signals (S-history)" und
+„Mark suspected interference (QRM)". **Beide Vorgabe aus.**
+
+Der Erkenner läuft nur bei eingeschaltetem Schalter und dann auf 10 Hz
+gedrosselt. Zeile 6.1 ist deshalb die wichtigste der ganzen Matrix: sie
+prüft, dass ein ausgeschaltetes Merkmal wirklich nichts kostet.
+
+| # | Schritt | Erwartet | Ergebnis |
+|---|---------|----------|----------|
+| 6.1 | Beide Häkchen aus, CPU-Last im Bottom-Banner über eine Minute beobachten (verbunden, Wasserfall läuft) | Kein messbarer Unterschied zu vorher. Ausgeschaltet kostet das Merkmal einen Vergleich je Bild | |
+| 6.2 | „Mark detected signals" ein, auf ein belegtes Band (z. B. 40 m abends) | Nach wenigen Sekunden erscheinen bernsteinfarbene Marken über den Stationen, beschriftet mit der S-Stufe (`S7`, `S9+10`) statt eines Rufzeichens | |
+| 6.3 | Eine Station verstummt | Ihre Marke bleibt zunächst stehen und verschwindet nach etwa 30 s | |
+| 6.4 | Auf ein leeres Band wechseln | Innerhalb einer Minute sind alle Marken weg (Eintrag verfällt nach 60 s) | |
+| 6.5 | Marken und DX-Spots gleichzeitig einschalten, auf eine gespottete Station gehen | Wo ein Spot liegt, steht **nur** der Spot mit Rufzeichen — die S-Marke daneben wird unterdrückt (3-kHz-Regel). Keine zwei Etiketten übereinander | |
+| 6.6 | Viele Marken plus viele Spots gleichzeitig | Die Kollisionsstapelung gilt für beide Sorten zusammen; keine Überlappung, `+N`-Bündel zählen beide mit | |
+| 6.7 | CPU-Last mit eingeschaltetem Merkmal beobachten | Erkennbarer, aber erträglicher Anstieg. **Wenn hier etwas auffällt: notieren, das ist die ungemessene Stelle** | |
+| 6.8 | „Mark suspected interference" zusätzlich ein, auf einen Dauerträger (z. B. Rundfunk-Splatter oder eine Trägerlinie) | Nach etwa 6 s wird der Träger **rot** markiert. Sprachsignale bleiben bernsteinfarben | |
+| 6.9 | Ein langes QSO auf einer Frequenz beobachten | Es wird **nicht** rot: sprachbreite Signale brauchen zwei ununterbrochene Minuten ohne Lücke, und Sprache hat Lücken | |
+| 6.10 | Beide Häkchen aus, während Marken stehen | Alle Marken verschwinden sofort | |
+| 6.11 | Häkchen ein, App neu starten | Die Häkchen stehen noch auf ein, Marken bauen sich neu auf | |
+| 6.12 | Bandplan mit Fonie-Bereichen aktiv, ein sprachbreites Signal außerhalb der Fonie-Bereiche (z. B. im CW-Teil) | Es bekommt **keine** Sprachmarke. Ein Schmalband-Störträger dort bekommt bei eingeschaltetem QRM-Häkchen sehr wohl eine | |
+
 ---
 
 ## Bekannte Auslassungen

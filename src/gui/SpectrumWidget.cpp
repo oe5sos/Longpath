@@ -1082,6 +1082,10 @@ void SpectrumWidget::loadSettings()
     // Vorgabe true: das ist unser Istzustand seit je, nicht AetherSDRs aus.
     m_extendedFrequencyLine =
         readBool(QStringLiteral("DisplayExtendedFrequencyLine"), true);
+    m_showSignalHistory =
+        readBool(QStringLiteral("DisplayShowSignalHistory"), false);
+    m_showSignalHistoryQrm =
+        readBool(QStringLiteral("DisplayShowSignalHistoryQrm"), false);
     m_extendedPassband =
         readBool(QStringLiteral("DisplayExtendedPassband"), true);
     m_autoSqlMarginDb = qBound(5,
@@ -1328,6 +1332,10 @@ void SpectrumWidget::saveSettings()
               m_extendedFrequencyLine ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayExtendedPassband"), m_panIndex),
               m_extendedPassband ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayShowSignalHistory"), m_panIndex),
+              m_showSignalHistory ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayShowSignalHistoryQrm"), m_panIndex),
+              m_showSignalHistoryQrm ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayDbmScaleVisible"), m_panIndex),
               m_dbmScaleVisible ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("BandPlanFontSize"),
@@ -2261,6 +2269,11 @@ void SpectrumWidget::processNoiseFloor()
     // jedem Rahmen zappeln. m_nfLerpAverage ist derselbe Wert, den die
     // Anzeige nimmt (siehe die Notiz in onNoiseFloorChanged).
     updateAutoSquelch(m_nfLerpAverage);
+
+    // S-Verlauf am selben Wert, aus demselben Grund: der Erkenner misst
+    // „6 dB ueber dem Boden", und gemeint ist der Boden, den die NF-Linie
+    // zeigt. Ausgeschaltet kehrt die Funktion sofort zurueck.
+    updateSignalHistory(m_nfLerpAverage);
 }
 
 // ---- NF-aware grid (Task 2.9) ----
@@ -3573,7 +3586,7 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
     // but below the slice/VFO marker chrome. Mirrors AetherSDR
     // SpectrumWidget.cpp:3787 [@0cd4559] paint ordering
     // (drawSpotMarkers between drawTnfMarkers and drawSliceMarkers).
-    if (m_showSpots) {
+    if (m_showSpots || m_showSignalHistory || m_showSignalHistoryQrm) {
         drawSpotMarkers(p, specRect);
     }
     drawVfoMarker(p, specRect, wfRect);
@@ -6521,6 +6534,124 @@ void SpectrumWidget::setSpotMarkers(const QVector<SpotMarker>& markers)
     update();
 }
 
+// ── S-Verlauf: die Speisung ──────────────────────────────────────────
+//
+// Aufbau nach AetherSDR MainWindow::onSpectrumReadyForSHistory
+// (:9757-9950 [@0cd4559]) und expireSHistoryMarkers (:9732-9755), aber
+// an anderer Stelle: dort haengt es an einem eigenen FFT-Abgriff, hier
+// an processNoiseFloor. Begruendung im Header.
+void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
+{
+    // Ausgeschaltet kostet das Merkmal einen Vergleich. Wer es nie
+    // einschaltet, zahlt nichts — deshalb steht diese Pruefung ganz
+    // vorne und nicht hinter der Drosselung.
+    if (!m_showSignalHistory && !m_showSignalHistoryQrm) {
+        if (!m_signalHistoryMarkers.isEmpty()) {
+            m_signalHistory.clear();
+            setSignalHistoryMarkers({});
+        }
+        return;
+    }
+
+    const QVector<float>& src = measurementPixels();
+    if (src.isEmpty() || m_bandwidthHz <= 0.0) { return; }
+
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+
+    // Drosselung auf 10 Hz. Das Vorbild laeuft je Bild; unser Erkenner
+    // sieht dieselbe Lage bei 10 Hz genauso gut, und die Belegungsrechnung
+    // unten bekommt die tatsaechliche Rate gesagt, nicht die Bildrate.
+    constexpr qint64 kMinIntervalMs = 100;
+    if (m_shLastRunMs != 0 && (nowMs - m_shLastRunMs) < kMinIntervalMs) {
+        return;
+    }
+    if (m_shLastRunMs != 0) {
+        const float observed = 1000.0f / static_cast<float>(nowMs - m_shLastRunMs);
+        // EWMA wie beim Vorbild (fpsEwma, α = 0.05).
+        constexpr float kAlpha = 0.05f;
+        m_shRunRateEwma = (1.0f - kAlpha) * m_shRunRateEwma + kAlpha * observed;
+    }
+    m_shLastRunMs = nowMs;
+
+    // Fonie-Bereiche aus dem aktiven Bandplan. Sprachbreite Signale
+    // ausserhalb zaehlen nicht; Schmalbandstoerungen schon — die halten
+    // sich nicht an Bandplaene.
+    QVector<QPair<double, double>> voiceRanges;
+    if (m_bandPlanMgr) {
+        for (const auto& seg : m_bandPlanMgr->segments()) {
+            if (NereusSDR::isVoiceSegmentLabel(seg.label)) {
+                voiceRanges.append({seg.lowMhz, seg.highMhz});
+            }
+        }
+    }
+
+    const double centerMhz    = m_centerHz / 1.0e6;
+    const double bandwidthMhz = m_bandwidthHz / 1.0e6;
+
+    m_signalHistory.ingest(
+        NereusSDR::detectVoiceSignals(src, centerMhz, bandwidthMhz,
+                                      voiceRanges, noiseFloorDbm),
+        nowMs);
+
+    // Altern und einordnen im Sekundentakt — auch ohne neue Treffer,
+    // sonst bleiben Marken stehen, deren Zeitstempel weggealtert sind
+    // (AetherSDR expireSHistoryMarkers, derselbe Takt).
+    if (nowMs - m_shLastRebuildMs < 1000) { return; }
+    m_shLastRebuildMs = nowMs;
+
+    m_signalHistory.expire(nowMs);
+    m_signalHistory.rebuild(nowMs, m_shRunRateEwma);
+
+    // Farben wie beim Vorbild: Bernstein fuer Sprache, Rot fuer Stoerung.
+    QVector<SpotMarker> markers;
+    for (const auto& e : m_signalHistory.visibleEntries()) {
+        SpotMarker m;
+        m.callsign    = NereusSDR::sLabel(e.peakDbm);
+        m.freqMhz     = e.freqMhz;
+        m.mode        = e.mode;
+        m.source      = e.suspectQrm ? QStringLiteral("QRM")
+                                     : QStringLiteral("SHistory");
+        m.color       = e.suspectQrm ? QStringLiteral("#FF0000")
+                                     : QStringLiteral("#FFC800");
+        m.timestampMs = e.lastSeenMs;
+        markers.append(m);
+    }
+    setSignalHistoryMarkers(markers);
+}
+
+// ── S-Verlauf: der zweite Markenkanal ────────────────────────────────
+//
+// Dieselbe Sichtgleichheits-Bremse wie bei den DX-Spots: der Erkenner
+// liefert im Sekundentakt, und in ruhiger Lage ist die Liste dabei
+// unveraendert. Ohne diese Pruefung waere das ein Neuzeichnen je
+// Sekunde fuer ein byteweise gleiches Bild.
+void SpectrumWidget::setSignalHistoryMarkers(const QVector<SpotMarker>& markers)
+{
+    const bool visualChange =
+        !spotMarkersVisuallyEqual(m_signalHistoryMarkers, markers);
+    m_signalHistoryMarkers = markers;
+    if (!visualChange) {
+        return;
+    }
+    update();
+}
+
+void SpectrumWidget::setShowSignalHistory(bool on)
+{
+    if (m_showSignalHistory == on) { return; }
+    m_showSignalHistory = on;
+    scheduleSettingsSave();
+    update();
+}
+
+void SpectrumWidget::setShowSignalHistoryQrm(bool on)
+{
+    if (m_showSignalHistoryQrm == on) { return; }
+    m_showSignalHistoryQrm = on;
+    scheduleSettingsSave();
+    update();
+}
+
 // Phase 3J-2 + 3R M2: refresh every Spot Display knob from AppSettings.
 // The producer side lives on SpotHubDialog F4 (buildDisplayTab,
 // SpotHubDialog.cpp:1619-2010); every knob change writes to AppSettings
@@ -6584,7 +6715,34 @@ void SpectrumWidget::loadSpotDisplaySettings()
 // From AetherSDR src/gui/SpectrumWidget.cpp:4497-4633 [@0cd4559]
 void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
 {
-    if (m_spotMarkers.isEmpty()) {
+    // Merge DX spots, Signal History markers, and QRM History markers.
+    // Each category is gated by its own flag.  S-History markers within 3 kHz of
+    // an active DX spot are suppressed — the spot carries richer callsign/DXCC info.
+    //
+    // From AetherSDR SpectrumWidget.cpp:15719-15741 [@0cd4559]. Der gemeinsame
+    // Weg ist der Punkt: Kollisionsstapelung, Buendelabzeichen und Klickfelder
+    // gelten dann fuer beide Sorten zusammen. Zwei getrennte Zeichnungen
+    // wuerden uebereinander malen.
+    QVector<SpotMarker> allMarkers;
+    if (m_showSpots) { allMarkers = m_spotMarkers; }
+    if (m_showSignalHistory || m_showSignalHistoryQrm) {
+        constexpr double kSpotOverrideMhz = 0.003;
+        for (const auto& sh : m_signalHistoryMarkers) {
+            const bool isQrm = (sh.source == QStringLiteral("QRM"));
+            if (isQrm  && !m_showSignalHistoryQrm) { continue; }
+            if (!isQrm && !m_showSignalHistory)    { continue; }
+            bool masked = false;
+            for (const auto& sp : m_spotMarkers) {
+                if (std::abs(sh.freqMhz - sp.freqMhz) < kSpotOverrideMhz) {
+                    masked = true;
+                    break;
+                }
+            }
+            if (!masked) { allMarkers.append(sh); }
+        }
+    }
+
+    if (allMarkers.isEmpty()) {
         m_spotClickRects.clear();
         m_spotClusters.clear();
         return;
@@ -6641,7 +6799,7 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
         s_lastSpotMaskLogMs = nowMs;
     }
 
-    for (const auto& spot : m_spotMarkers) {
+    for (const auto& spot : allMarkers) {
         // 2026-05-12 bench fix (Gap #7).  Per-source panadapter
         // visibility mask.  Missing key in m_spotSourceVisible defaults
         // to visible, so untouched sources keep the prior behaviour;
@@ -9342,7 +9500,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // sit below the slice marker chrome. Mirrors the CPU paintEvent
             // ordering and AetherSDR SpectrumWidget.cpp:3787 [@0cd4559]
             // (drawSpotMarkers between trace and drawSliceMarkers).
-            if (m_showSpots) {
+            if (m_showSpots || m_showSignalHistory || m_showSignalHistoryQrm) {
                 drawSpotMarkers(p, specRect);
             }
             drawVfoMarker(p, specRect, wfRect);

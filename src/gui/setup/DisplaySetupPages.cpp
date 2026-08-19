@@ -261,6 +261,14 @@ void SpectrumDefaultsPage::loadFromRenderer()
         QSignalBlocker b(m_extendedPassbandToggle);
         m_extendedPassbandToggle->setChecked(sw->extendedPassband());
     }
+    if (m_signalHistoryToggle) {
+        QSignalBlocker b(m_signalHistoryToggle);
+        m_signalHistoryToggle->setChecked(sw->showSignalHistory());
+    }
+    if (m_signalHistoryQrmToggle) {
+        QSignalBlocker b(m_signalHistoryQrmToggle);
+        m_signalHistoryQrmToggle->setChecked(sw->showSignalHistoryQrm());
+    }
     if (m_autoSquelchToggle) {
         QSignalBlocker b(m_autoSquelchToggle);
         m_autoSquelchToggle->setChecked(sw->autoSquelchEnabled());
@@ -966,6 +974,47 @@ void SpectrumDefaultsPage::buildUI()
             on ? QStringLiteral("True") : QStringLiteral("False"));
     });
     overlayForm->addRow(QString(), m_extendedPassbandToggle);
+
+    // S-Verlauf: zwei Schalter, Vorgabe aus.
+    // Port aus AetherSDR (applySHistoryEnabled / applySHistoryQrmEnabled,
+    // MainWindow.cpp:9545-9563 [@0cd4559]); dort im SpotHub-Reiter
+    // „Display", bei uns hier, weil es Anzeigeschalter des Panadapters
+    // sind wie ihre Nachbarn.
+    //
+    // Vorgabe aus, anders als bei den Verlaengerungs-Schaltern darueber:
+    // das Merkmal ist neu, es gibt keinen Istzustand zu erhalten. Und
+    // ausgeschaltet laeuft der Erkenner gar nicht erst.
+    m_signalHistoryToggle = new QCheckBox(
+        QStringLiteral("Mark detected signals (S-history)"), overlayGroup);
+    m_signalHistoryToggle->setToolTip(QStringLiteral(
+        "Detect voice-width signals in the spectrum and mark them with their "
+        "S-meter reading, alongside the DX spots. A marker within 3 kHz of a "
+        "real spot is suppressed — the spot carries the callsign."));
+    connect(m_signalHistoryToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setShowSignalHistory(on);
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayShowSignalHistory"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    overlayForm->addRow(QString(), m_signalHistoryToggle);
+
+    m_signalHistoryQrmToggle = new QCheckBox(
+        QStringLiteral("Mark suspected interference (QRM)"), overlayGroup);
+    m_signalHistoryQrmToggle->setToolTip(QStringLiteral(
+        "Also mark carriers and wideband signals that sit on one frequency "
+        "without a gap — continuous carriers after a few seconds, voice-width "
+        "signals only after two unbroken minutes."));
+    connect(m_signalHistoryQrmToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setShowSignalHistoryQrm(on);
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("DisplayShowSignalHistoryQrm"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    overlayForm->addRow(QString(), m_signalHistoryQrmToggle);
 
     // ShowBinWidth — live bin-width readout.
     // From Thetis setup.cs:7061 [v2.10.3.13] lblDisplayBinWidth.

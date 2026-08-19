@@ -174,6 +174,7 @@ mw0lge@grange-lane.co.uk
 #include <utility>
 
 #include "core/ConnectionState.h"
+#include "core/SignalHistoryStore.h"
 #include "core/WdspTypes.h"  // DSPMode — for TX filter IQ-space mapping (Plan 4 D9)
 
 QT_BEGIN_NAMESPACE
@@ -1315,6 +1316,45 @@ public:
     };
 
     void setSpotMarkers(const QVector<SpotMarker>& markers);
+
+    // ── S-Verlauf: Marken aus dem Signalerkenner ─────────────────────
+    //
+    // Zweiter Markenkanal neben den DX-Spots. Beide laufen durch
+    // drawSpotMarkers, weil Kollisionsstapelung und Buendelabzeichen
+    // nur dann fuer alles zusammen gelten — Port aus AetherSDR
+    // (SpectrumWidget.cpp:15719-15741 [@0cd4559]).
+    //
+    // Eine Verlaufsmarke wird unterdrueckt, wenn binnen 3 kHz ein
+    // echter Spot liegt: der traegt ein Rufzeichen, die Verlaufsmarke
+    // nur eine S-Stufe.
+    //
+    // Quelle der Marken ist SignalHistoryStore; source == "QRM"
+    // unterscheidet Stoerung von Sprache.
+    void setSignalHistoryMarkers(const QVector<SpotMarker>& markers);
+    QVector<SpotMarker> signalHistoryMarkersForTest() const
+    {
+        return m_signalHistoryMarkers;
+    }
+
+    void setShowSignalHistory(bool on);
+    bool showSignalHistory() const { return m_showSignalHistory; }
+    void setShowSignalHistoryQrm(bool on);
+    bool showSignalHistoryQrm() const { return m_showSignalHistoryQrm; }
+
+    // Die Speisung des S-Verlaufs, gerufen aus processNoiseFloor().
+    //
+    // DORT und nicht in MainWindow, aus demselben Grund wie bei der
+    // Squelch-Automatik: hier liegt m_nfLerpAverage, der SICHTBARE
+    // Rauschboden. Naehme der Erkenner einen anderen Schaetzer, faende
+    // er Signale an Stellen, wo das Auge keine sieht.
+    //
+    // Bei ausgeschalteten Schaltern kostet die Funktion einen
+    // Vergleich: der Erkenner laeuft nur, wenn jemand die Marken sehen
+    // will. Eingeschaltet ist sie auf 10 Hz gedrosselt — die
+    // Belegungsrechnung im Speicher rechnet mit der TATSAECHLICHEN
+    // Aufrufrate, nicht mit der Bildrate, also bleibt die
+    // Stoerungsschwelle richtig.
+    void updateSignalHistory(float noiseFloorDbm);
     // 2026-05-12 bench fix (Gap #6 — Spot List hover sync).  Driven
     // by SpotHubDialog when the user mouses over a row so the
     // matching marker on the panadapter highlights.  -1 clears.
@@ -2349,6 +2389,15 @@ private:
     QVector<SpotHitRect> m_spotClickRects;
     QVector<SpotCluster> m_spotClusters;
     bool   m_showSpots{true};
+    // Vorgabe aus: das Merkmal ist neu, es gibt keinen Istzustand zu
+    // erhalten (anders als bei der Verlaengerung in den Wasserfall).
+    bool   m_showSignalHistory{false};
+    bool   m_showSignalHistoryQrm{false};
+    QVector<SpotMarker> m_signalHistoryMarkers;
+    NereusSDR::SignalHistoryStore m_signalHistory;
+    qint64 m_shLastRunMs{0};
+    qint64 m_shLastRebuildMs{0};
+    float  m_shRunRateEwma{10.0f};   // gemessene Aufrufrate des Erkenners
     int    m_spotFontSize{16};
     int    m_spotMaxLevels{3};
     int    m_spotStartPct{50};       // % down from top of spectrum
