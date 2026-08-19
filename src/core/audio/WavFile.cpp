@@ -234,6 +234,54 @@ bool writeWavMono(const QString& path, const QVector<float>& samples,
     return true;
 }
 
+bool writeWavStereo(const QString& path, const QVector<float>& interleaved,
+                    int sampleRate, QString* error)
+{
+    if (sampleRate <= 0) {
+        fail(error, QStringLiteral("sample rate must be positive"));
+        return false;
+    }
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        fail(error, QStringLiteral("cannot write %1").arg(path));
+        return false;
+    }
+
+    const quint32 dataBytes = static_cast<quint32>(interleaved.size()) * 4u;
+
+    auto putU32 = [&f](quint32 v) {
+        uchar b[4]; qToLittleEndian(v, b); f.write(reinterpret_cast<const char*>(b), 4);
+    };
+    auto putU16 = [&f](quint16 v) {
+        uchar b[2]; qToLittleEndian(v, b); f.write(reinterpret_cast<const char*>(b), 2);
+    };
+
+    f.write("RIFF", 4);
+    putU32(36u + dataBytes);
+    f.write("WAVE", 4);
+
+    f.write("fmt ", 4);
+    putU32(16);
+    putU16(kFormatIeeeFloat);
+    putU16(2);                                       // zwei Kanaele
+    putU32(static_cast<quint32>(sampleRate));
+    putU32(static_cast<quint32>(sampleRate) * 8u);   // Bytes je Sekunde
+    putU16(8);                                       // Bytes je Rahmen
+    putU16(32);
+
+    f.write("data", 4);
+    putU32(dataBytes);
+    for (float v : interleaved) {
+        uchar b[4];
+        std::memcpy(b, &v, 4);
+        f.write(reinterpret_cast<const char*>(b), 4);
+    }
+
+    f.close();
+    return true;
+}
+
 double wavDurationSeconds(const QString& path)
 {
     const WavData d = readWavMono(path, nullptr);

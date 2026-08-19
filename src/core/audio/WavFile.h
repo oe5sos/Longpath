@@ -58,6 +58,11 @@ WavData readWavMono(const QString& path, QString* error = nullptr);
 bool writeWavMono(const QString& path, const QVector<float>& samples,
                   int sampleRate, QString* error = nullptr);
 
+// Zweikanalig, verschachtelt (L,R,L,R …). Fuer die QSO-Aufnahme:
+// links, was ankam, rechts, was man selbst gesagt hat.
+bool writeWavStereo(const QString& path, const QVector<float>& interleaved,
+                    int sampleRate, QString* error = nullptr);
+
 // Dauer in Sekunden, ohne die Datei ganz zu lesen wenn moeglich.
 // Gibt 0 zurueck, wenn die Datei nicht lesbar ist.
 double wavDurationSeconds(const QString& path);

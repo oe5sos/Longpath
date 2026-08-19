@@ -615,6 +615,7 @@ set(CORE_SOURCES
     src/core/SignalHistoryStore.cpp
     src/core/audio/WavFile.cpp
     src/core/audio/VoiceKeyer.cpp
+    src/core/audio/QsoRecorder.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp
