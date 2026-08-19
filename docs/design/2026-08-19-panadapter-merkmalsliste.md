@@ -185,6 +185,21 @@ Einschränkung, damit die Notiz nicht mehr behauptet als geprüft ist: der
 tatsächlich das TX-Signal zeigt, ist eine Frage an die Bank, nicht an den
 Quelltext — sie steht auf der TX-Prüfliste.
 
+### Einfachklick: nicht gebaut, und zwar absichtlich
+
+`setSingleClickTune` ist bei AetherSDR ein Schalter zwischen Einfach-
+und Doppelklick, Vorgabe **aus** — dort ist Doppelklick der Normalfall.
+Wir stimmen beim Einfachklick ab, bedingungslos, seit dem Port aus
+derselben Datei ([SpectrumWidget.cpp:8140](../../src/gui/SpectrumWidget.cpp)).
+Den Schalter zu holen hiesse, eine Einstellung anzubieten, deren einzige
+Wirkung ist, unser Verhalten zu verschlechtern.
+
+Dem Betreiber am 2026-08-19 vorgelegt, Antwort: „wie du meinst".
+Entscheidung: **nicht bauen.** Jede Option kostet eine Zeile im Setup,
+eine in der Persistenz und eine in der Prüfmatrix; dafür ist der Nutzen
+zu klein. Wer versehentliches Verstimmen fürchtet, hat mit der
+4-Bildpunkt-Schwelle bereits einen Schutz.
+
 **Fehlalarm-Bilanz nach zwei Tagen: fünf.** Bandplan, Einfachklick,
 Zeigerform, erweiterter Durchlass, TX im Wasserfall — plus der S-Verlauf,
 der keiner ist, sondern etwas anderes und Größeres. Von sieben
