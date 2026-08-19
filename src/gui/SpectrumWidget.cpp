@@ -176,6 +176,7 @@
 #include <cstddef>
 #include <cstring>
 #include <utility>
+#include <QTimer>
 
 namespace NereusSDR {
 
@@ -3524,6 +3525,7 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
     // keiner: dann haengt das Bild an der Grafikkarte.
     paintBackgroundLayer(p, specRect);
     drawGrid(p, specRect);
+    drawSquelchLine(p, specRect);
     drawSpectrum(p, specRect);
     drawWaterfall(p, wfRect);
     // TNF notch overlay immediately before the spots, matching upstream's
@@ -4294,6 +4296,67 @@ void SpectrumWidget::paintBackgroundLayer(QPainter& p, const QRect& specRect)
     p.setOpacity(1.0 - m_bgOpacity / 100.0);
     p.drawImage(specRect.topLeft(), m_bgScaled);
     p.setOpacity(keep);
+}
+
+
+// ── Squelch-Linie ────────────────────────────────────────────────────
+//
+// Port aus AetherSDR SpectrumWidget.cpp:4453-4506 [@0cd4559].
+// Uebernommen sind die Idee (waagerechter Strich auf Schwellenhoehe,
+// Beschriftung links) und das Ausblenden nach drei Sekunden.
+//
+// Nicht uebernommen ist AetherSDRs Stufenrechnung `kSqlMinDbm + level`:
+// die stammt daher, dass FlexRadio den Schwellwert als 0..160 meldet.
+// Unser SliceModel haelt ihn in dBm, also ist die Umrechnung ueberfluessig
+// — und eine ueberfluessige Umrechnung ist eine Fehlerquelle ohne Nutzen.
+
+void SpectrumWidget::setSquelchLine(bool visible, double dbm)
+{
+    m_squelchDbm = dbm;
+    m_squelchLineVisible = visible;
+
+    if (!m_squelchHideTimer) {
+        m_squelchHideTimer = new QTimer(this);
+        m_squelchHideTimer->setSingleShot(true);
+        // Drei Sekunden wie bei AetherSDR. Die Linie beantwortet die
+        // Frage „wo steht die Schwelle" beim EINSTELLEN; danach ist sie
+        // ein Strich, der zum Raster wird und nichts mehr sagt.
+        m_squelchHideTimer->setInterval(3000);
+        connect(m_squelchHideTimer, &QTimer::timeout, this, [this] {
+            m_squelchLineVisible = false;
+            m_overlayStaticDirty = true;
+            update();
+        });
+    }
+    if (visible) {
+        m_squelchHideTimer->start();
+    } else {
+        m_squelchHideTimer->stop();
+    }
+    m_overlayStaticDirty = true;
+    update();
+}
+
+void SpectrumWidget::drawSquelchLine(QPainter& p, const QRect& specRect)
+{
+    if (!m_squelchLineVisible || specRect.isEmpty()) { return; }
+
+    const int y = dbmToY(static_cast<float>(m_squelchDbm), specRect);
+    if (y < specRect.top() || y > specRect.bottom()) { return; }
+
+    const QColor col = roleColor("warn", Style::kAmberWarn, 220);
+    p.setPen(QPen(col, 1));
+    p.drawLine(specRect.left(), y, specRect.right(), y);
+
+    QFont f = p.font();
+    f.setPixelSize(Style::kFontCaption);
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(col);
+    // Links, zwei Bildpunkte ueber der Linie — wie AetherSDR. Unter der
+    // Linie waere die Beschriftung im Signal.
+    p.drawText(specRect.left() + 4, y - 2,
+               QStringLiteral("SQL %1 dBm").arg(m_squelchDbm, 0, 'f', 0));
 }
 
 // ---- Frequency scale bar ----
@@ -8970,6 +9033,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // muessen HINTER den Signalspitzen liegen, nicht darueber.
             paintBackgroundLayer(p, specRect);
             drawGrid(p, specRect);
+            drawSquelchLine(p, specRect);
             if (m_dbmScaleVisible) {
                 // drawDbmScale needs the FULL-WIDTH rect so the strip
                 // lands in the reserved right-edge zone at x=[w-kDbmStripW..w-1].

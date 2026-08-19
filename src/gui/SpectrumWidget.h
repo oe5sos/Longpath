@@ -701,6 +701,24 @@ public:
 
     // Bandplan overlay (Phase 3G RX Epic sub-epic D)
     void setBandPlanManager(NereusSDR::BandPlanManager* mgr);
+    // ── Squelch-Linie ────────────────────────────────────────────────
+    //
+    // Port aus AetherSDR SpectrumWidget (setSquelchLine +
+    // drawSquelchLine, dort SpectrumWidget.cpp:4453-4506 [@0cd4559]).
+    //
+    // NereusSDR-Abweichung: AetherSDR rechnet aus einer 0..160-Stufe
+    // (kSqlMinDbm + level), weil FlexRadio den Schwellwert so meldet.
+    // Unser SliceModel haelt ihn direkt in dBm (amsqThresh), also faellt
+    // die Umrechnung weg — und mit ihr die Frage, was Stufe 0 bedeutet.
+    //
+    // Die Linie blendet sich nach drei Sekunden aus, wie bei AetherSDR:
+    // sie sagt „hier steht die Schwelle", und das muss man beim
+    // Einstellen sehen, nicht dauerhaft. Ein Strich, der immer liegt,
+    // wird zum Teil des Rasters.
+    void setSquelchLine(bool visible, double dbm);
+    bool squelchLineVisible() const { return m_squelchLineVisible; }
+    double squelchLineDbm() const { return m_squelchDbm; }
+
     void setBandPlanFontSize(int pt);             // 0 = off
     int  bandPlanFontSize() const { return m_bandPlanFontSize; }
     bool bandPlanVisible() const { return m_bandPlanFontSize > 0; }
@@ -1591,6 +1609,7 @@ private:
     void drawFreqScale(QPainter& p, const QRect& r);
     void drawDbmScale(QPainter& p, const QRect& specRect);
     void drawBandPlan(QPainter& p, const QRect& specRect);
+    void drawSquelchLine(QPainter& p, const QRect& specRect);
 
     // ── Waterfall scrollback (sub-epic E) ─────────────────────────────────
     // From AetherSDR SpectrumWidget.h:402-413 [@0cd4559]
@@ -2132,6 +2151,9 @@ private:
 
     NereusSDR::BandPlanManager* m_bandPlanMgr{nullptr};   // non-owning
     int                          m_bandPlanFontSize{6};   // 0 = off; AetherSDR default
+    bool                         m_squelchLineVisible{false};
+    double                       m_squelchDbm{-150.0};
+    class QTimer*                m_squelchHideTimer{nullptr};
 
     QColor m_gridColor{255, 255, 255, 40};       // vertical freq grid
     QColor m_gridFineColor{255, 255, 255, 20};   // 1/5 step fine grid

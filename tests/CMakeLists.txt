@@ -4915,6 +4915,7 @@ nereus_add_test(tst_applet_detach)
 nereus_add_test(tst_applet_grid)
 nereus_add_test(tst_tx_switch_bar)
 nereus_add_test(tst_panadapter_header)
+nereus_add_test(tst_squelch_line)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still

@@ -8669,6 +8669,28 @@ void MainWindow::wireSliceToSpectrum()
     // carried them alongside the flag's own setMode: switching to CW or FM
     // stopped changing the PhoneCw page, and RADE stopped revealing its
     // applet.
+    // ── Squelch-Linie im Panadapter ───────────────────────────────────
+    //
+    // Die Linie erscheint, wenn die Schwelle EINGESTELLT wird, und
+    // blendet sich nach drei Sekunden aus (SpectrumWidget::setSquelchLine).
+    // Beide Quellen fuehren dorthin: das Ein- und Ausschalten und jede
+    // Aenderung des Wertes.
+    //
+    // Ohne diese Verdrahtung waere die Linie der naechste Fall von
+    // „gebaut und an keiner Flaeche" — zwei davon hatten wir an zwei
+    // Tagen (Modusgruppen, Bandplan).
+    {
+        auto pushSquelch = [this, slice] {
+            if (auto* sw = activeSpectrumWidget()) {
+                sw->setSquelchLine(slice->ssqlEnabled(), slice->amsqThresh());
+            }
+        };
+        connect(slice, &SliceModel::ssqlEnabledChanged, this,
+                [pushSquelch](bool) { pushSquelch(); });
+        connect(slice, &SliceModel::amsqThreshChanged, this,
+                [pushSquelch](double) { pushSquelch(); });
+    }
+
     connect(slice, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
         // Phase 3R L2: RADE applet shows for either RADE sideband, IN ADDITION
         // to PhoneCwApplet -- bench feedback showed PhoneCw hosts the mic gain
