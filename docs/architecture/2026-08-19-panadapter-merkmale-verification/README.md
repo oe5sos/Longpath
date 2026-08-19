@@ -99,6 +99,11 @@ Der Erkenner läuft nur bei eingeschaltetem Schalter und dann auf 10 Hz
 gedrosselt. Zeile 6.1 ist deshalb die wichtigste der ganzen Matrix: sie
 prüft, dass ein ausgeschaltetes Merkmal wirklich nichts kostet.
 
+Die Rechenlast ist inzwischen am Schreibtisch gemessen (siehe 6.7) und
+liegt bei einem Vierzigstel Prozent eines Kerns. Die Zeilen 6.1 und 6.7
+bleiben trotzdem in der Matrix: gemessen wurde eine **Funktion**, nicht
+die laufende Anwendung.
+
 | # | Schritt | Erwartet | Ergebnis |
 |---|---------|----------|----------|
 | 6.1 | Beide Häkchen aus, CPU-Last im Bottom-Banner über eine Minute beobachten (verbunden, Wasserfall läuft) | Kein messbarer Unterschied zu vorher. Ausgeschaltet kostet das Merkmal einen Vergleich je Bild | |
@@ -107,7 +112,7 @@ prüft, dass ein ausgeschaltetes Merkmal wirklich nichts kostet.
 | 6.4 | Auf ein leeres Band wechseln | Innerhalb einer Minute sind alle Marken weg (Eintrag verfällt nach 60 s) | |
 | 6.5 | Marken und DX-Spots gleichzeitig einschalten, auf eine gespottete Station gehen | Wo ein Spot liegt, steht **nur** der Spot mit Rufzeichen — die S-Marke daneben wird unterdrückt (3-kHz-Regel). Keine zwei Etiketten übereinander | |
 | 6.6 | Viele Marken plus viele Spots gleichzeitig | Die Kollisionsstapelung gilt für beide Sorten zusammen; keine Überlappung, `+N`-Bündel zählen beide mit | |
-| 6.7 | CPU-Last mit eingeschaltetem Merkmal beobachten | Erkennbarer, aber erträglicher Anstieg. **Wenn hier etwas auffällt: notieren, das ist die ungemessene Stelle** | |
+| 6.7 | CPU-Last mit eingeschaltetem Merkmal beobachten | **Kein nennenswerter Anstieg erwartet.** Am Schreibtisch gemessen (`tst_signal_history_cost`, 2026-08-19, M-Mac): Erkenner **26 µs** je Bild auf einem Band mit 12 Stationen plus 2 Störern, Verwaltung **2,2 µs** je Durchlauf. Bei 10 Hz sind das **0,026 % eines Kerns**. Zeigt die Bank etwas anderes, liegt es nicht am Erkenner — dann notieren und melden | |
 | 6.8 | „Mark suspected interference" zusätzlich ein, auf einen Dauerträger (z. B. Rundfunk-Splatter oder eine Trägerlinie) | Nach etwa 6 s wird der Träger **rot** markiert. Sprachsignale bleiben bernsteinfarben | |
 | 6.9 | Ein langes QSO auf einer Frequenz beobachten | Es wird **nicht** rot: sprachbreite Signale brauchen zwei ununterbrochene Minuten ohne Lücke, und Sprache hat Lücken | |
 | 6.10 | Beide Häkchen aus, während Marken stehen | Alle Marken verschwinden sofort | |
