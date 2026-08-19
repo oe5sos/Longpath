@@ -70,6 +70,7 @@
 #include "core/ConnectionState.h"
 #include "core/CouplerZero.h"
 #include "core/audio/VoiceKeyer.h"
+#include "core/audio/QsoRecorderController.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
 #include "core/TgxlConnection.h"
@@ -428,6 +429,12 @@ public:
     // dieselben Plaetze fuehren.
     VoiceKeyerStore& voiceKeyer() { return m_voiceKeyer; }
     const VoiceKeyerStore& voiceKeyer() const { return m_voiceKeyer; }
+
+    // Die QSO-Aufnahme. Sie haengt an AudioEngine und TxWorkerThread,
+    // sobald beide stehen — angeschlossen wird in wireConnectionSignals,
+    // damit sie einen Verbindungswechsel ueberlebt.
+    QsoRecorderController& qsoRecorder() { return m_qsoRecorder; }
+    const QsoRecorderController& qsoRecorder() const { return m_qsoRecorder; }
 
     const ApolloController& apolloController()        const { return m_apolloController; }
     ApolloController&       apolloControllerMutable()       { return m_apolloController; }
@@ -3187,6 +3194,7 @@ private:
     // MAC and load() are called on connect. Phase 3P-F Task 5a.
     ApolloController m_apolloController;
     VoiceKeyerStore m_voiceKeyer;
+    QsoRecorderController m_qsoRecorder;
 
     // PennyLane external-control master toggle. Composes with OcMatrix (Phase 3P-D).
     // MAC and load() are called on connect. Phase 3P-F Task 5b.

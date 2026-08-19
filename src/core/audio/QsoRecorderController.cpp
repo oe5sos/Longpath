@@ -15,6 +15,9 @@
 #include "core/AudioEngine.h"
 #include "core/TxWorkerThread.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace NereusSDR {
 
 QsoRecorderController::QsoRecorderController(QObject* parent)
@@ -114,10 +117,16 @@ void QsoRecorderController::drain()
     // Sprechspur bis zum aktuellen Empfangsstand mit Stille auf, sobald
     // Mikrofonton kommt. Holte man das Mikrofon zuerst ab, laege die
     // eigene Stimme um einen Zeitgeber-Takt zu frueh.
+    float rxPeak = 0.0f;
+    float txPeak = 0.0f;
+
     while (true) {
         const int n = m_rxRing.read(m_scratch.data(),
                                     static_cast<int>(m_scratch.size()));
         if (n <= 0) { break; }
+        for (int i = 0; i < n; ++i) {
+            rxPeak = std::max(rxPeak, std::abs(m_scratch[i]));
+        }
         m_recorder.feedRx(m_scratch.data(), n / 2);
     }
 
@@ -125,8 +134,14 @@ void QsoRecorderController::drain()
         const int n = m_txRing.read(m_scratch.data(),
                                     static_cast<int>(m_scratch.size()));
         if (n <= 0) { break; }
+        for (int i = 0; i < n; ++i) {
+            txPeak = std::max(txPeak, std::abs(m_scratch[i]));
+        }
         m_recorder.feedTx(m_scratch.data(), n);
     }
+
+    m_rxPeak = rxPeak;
+    m_txPeak = txPeak;
 
     if (!m_lossReported && droppedSamples() > 0) {
         m_lossReported = true;

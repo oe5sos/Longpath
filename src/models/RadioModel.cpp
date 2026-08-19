@@ -8985,6 +8985,15 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
                 m_txWorker.get(), &TxWorkerThread::onAntiVoxBlockReady,
                 Qt::DirectConnection);
 
+        // Die QSO-Aufnahme an beide Abgriffe haengen. Hier und nicht im
+        // Baukasten: m_audioEngine und m_txWorker stehen erst an dieser
+        // Stelle beide, und attach() muss einen Verbindungswechsel
+        // ueberleben — es loest die alte Verbindung selbst.
+        //
+        // Angeschlossen heisst NICHT aufnehmend. Der Abgriff im
+        // AudioEngine wird erst in start() aufgemacht.
+        m_qsoRecorder.attach(m_audioEngine, m_txWorker.get());
+
         // 3M-3a-iv: RxDspWorker::bufferSizesChanged → TxWorkerThread::setAntiVoxBlockGeometry.
         //
         // Aligns DEXP's antivox_size / antivox_rate with the post-

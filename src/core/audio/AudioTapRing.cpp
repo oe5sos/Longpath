@@ -40,6 +40,16 @@ void AudioTapRing::reset() noexcept
 
 int AudioTapRing::write(const float* data, int count) noexcept
 {
+    const int took = tryWrite(data, count);
+    if (took < count) {
+        m_dropped.fetch_add(static_cast<long long>(count - took),
+                            std::memory_order_relaxed);
+    }
+    return took;
+}
+
+int AudioTapRing::tryWrite(const float* data, int count) noexcept
+{
     if (m_buf.empty() || data == nullptr || count <= 0) { return 0; }
 
     const size_t cap = m_buf.size();
@@ -58,11 +68,6 @@ int AudioTapRing::write(const float* data, int count) noexcept
     // Leser einen Stand, an dem noch nichts steht.
     m_writePos.store((w + take) % cap, std::memory_order_release);
 
-    if (take < static_cast<size_t>(count)) {
-        m_dropped.fetch_add(static_cast<long long>(count) -
-                                static_cast<long long>(take),
-                            std::memory_order_relaxed);
-    }
     return static_cast<int>(take);
 }
 

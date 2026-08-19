@@ -353,6 +353,7 @@ warren@wpratt.com
 #include "applets/DiversityApplet.h"
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
+#include "applets/QsoRecorderApplet.h"
 #include "applets/CatApplet.h"
 #include "applets/TunerApplet.h"
 // Phase 23: TCI server + applets (guarded so non-WebSocket builds still compile)
@@ -5132,6 +5133,17 @@ void MainWindow::populateDefaultMeter()
     m_dvkApplet = new DvkApplet(m_radioModel, nullptr);
     panel->addApplet(m_dvkApplet);
 
+    // QsoRecorderApplet — die QSO-Aufnahme (2026-08-19, Entwurf 3).
+    //
+    // Direkt neben dem Sprachspeicher, weil beide dasselbe Mikrofon
+    // abgreifen und man sonst zweimal sucht.
+    //
+    // Auch ohne Funkgeraet sichtbar: die Liste der Aufnahmen und der
+    // Ordner sind Dateiarbeit. Der Knopf braucht die Verbindung; ohne
+    // sie bleiben beide Spuren still und der Kopf sagt „no radio".
+    m_qsoRecorderApplet = new QsoRecorderApplet(m_radioModel, nullptr);
+    panel->addApplet(m_qsoRecorderApplet);
+
     // Phase 3M-4 Task 13 — PureSignalApplet quick-access surface.
     //
     // Constructed unconditionally and added to the right panel, but
@@ -5406,6 +5418,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
+    m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
     m_appletsById[QStringLiteral("PureSignal")] = m_pureSignalApplet;
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
@@ -5453,6 +5466,8 @@ void MainWindow::populateDefaultMeter()
     // niemand.
     m_appletVis->registerApplet(QStringLiteral("Dvk"),
                                 QStringLiteral("Voice Keyer"),  true);
+    m_appletVis->registerApplet(QStringLiteral("QsoRec"),
+                                QStringLiteral("QSO Recorder"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
                                 QStringLiteral("PureSignal"),   true);
     m_appletVis->registerApplet(QStringLiteral("Amp"),
@@ -5530,6 +5545,19 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
          QStringLiteral("routing"), QStringLiteral("kanal")});
+    // Sprachspeicher und QSO-Aufnahme. Der Sprachspeicher hatte bisher
+    // keine Beschreibung und landete in „Sonstiges" — meine eigene
+    // Auslassung von heute frueh.
+    m_appletVis->describeApplet(QStringLiteral("Dvk"),
+        QStringLiteral("Audio"),
+        {QStringLiteral("dvk"), QStringLiteral("sprachspeicher"),
+         QStringLiteral("ansage"), QStringLiteral("cq"),
+         QStringLiteral("voice keyer"), QStringLiteral("wav")});
+    m_appletVis->describeApplet(QStringLiteral("QsoRec"),
+        QStringLiteral("Audio"),
+        {QStringLiteral("aufnahme"), QStringLiteral("recorder"),
+         QStringLiteral("qso"), QStringLiteral("mitschnitt"),
+         QStringLiteral("wav"), QStringLiteral("stereo")});
     m_appletVis->describeApplet(QStringLiteral("PureSignal"),
         QStringLiteral("Senden"),
         {QStringLiteral("puresignal"), QStringLiteral("ps"),

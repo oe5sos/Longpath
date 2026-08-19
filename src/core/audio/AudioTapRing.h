@@ -67,9 +67,29 @@ public:
     int capacity() const { return static_cast<int>(m_buf.size()); }
 
     // ── Audio-Faden ──────────────────────────────────────────────────
-    // Schreibt, was hineinpasst, und verwirft den Rest. Gibt zurueck,
-    // wie viele Werte angekommen sind.
+    //
+    // Schreibt, was hineinpasst, VERWIRFT den Rest und zaehlt ihn als
+    // verloren. Gibt zurueck, wie viele Werte angekommen sind.
+    //
+    // Fuer Schreiber, die nicht warten koennen — der Audio-Faden hat
+    // seinen Block jetzt, und beim naechsten Aufruf ist er weg. Was
+    // hier nicht hineinpasst, ist wirklich verloren.
     int write(const float* data, int count) noexcept;
+
+    // Dasselbe, aber OHNE als Verlust zu zaehlen.
+    //
+    // Fuer Schreiber, die es gleich nochmal versuchen. Der Unterschied
+    // ist nicht kosmetisch: dropped() traegt die Aussage „in der
+    // Aufnahme fehlt etwas", und die Anzeige stellt sie dem Betreiber
+    // als Warnung hin. Ein Schreiber, der nach einem Teilschreiben
+    // erneut anklopft, hat nichts verloren — er hat gewartet. Wuerde
+    // write() auch das zaehlen, stuende die Warnung bei jeder vollen
+    // Runde da und waere nach dem dritten Mal nichts mehr wert.
+    //
+    // Gefunden von tst_audio_tap_ring unter Last: der Test schrieb in
+    // einer Wiederholungsschleife und bekam Zehntausende „Verluste"
+    // gemeldet, obwohl jeder Wert ankam.
+    int tryWrite(const float* data, int count) noexcept;
 
     // ── Hauptfaden ───────────────────────────────────────────────────
     // Holt bis zu maxCount Werte ab und gibt zurueck, wie viele es

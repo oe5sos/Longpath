@@ -112,6 +112,38 @@ private slots:
         QCOMPARE(r.available(), 4);
     }
 
+    // ── Der Unterschied zwischen verloren und gewartet ───────────────
+    //
+    // dropped() traegt die Aussage „in der Aufnahme fehlt etwas", und die
+    // Anzeige stellt sie dem Betreiber als Warnung hin. Ein Schreiber,
+    // der nach einem Teilschreiben erneut anklopft, hat nichts verloren.
+    // Wuerde beides gleich zaehlen, stuende die Warnung bei jeder vollen
+    // Runde da und waere nach dem dritten Mal nichts mehr wert.
+    void retryingIsNotLosing()
+    {
+        AudioTapRing r(4);
+        const float in[6] = {1, 2, 3, 4, 5, 6};
+
+        QCOMPARE(r.tryWrite(in, 6), 4);
+        QVERIFY2(r.dropped() == 0LL,
+                 "wer es gleich nochmal versucht, hat nichts verloren");
+
+        float out[4] = {};
+        r.read(out, 4);
+        QCOMPARE(r.tryWrite(in + 4, 2), 2);
+        QCOMPARE(r.dropped(), 0LL);
+    }
+
+    // Und umgekehrt: wer nicht warten kann, verliert wirklich.
+    void theAudioThreadCannotWaitSoItsLossIsCounted()
+    {
+        AudioTapRing r(4);
+        const float in[6] = {1, 2, 3, 4, 5, 6};
+
+        QCOMPARE(r.write(in, 6), 4);
+        QCOMPARE(r.dropped(), 2LL);
+    }
+
     void resetEmptiesItAndForgetsTheLosses()
     {
         AudioTapRing r(2);
@@ -139,9 +171,15 @@ private slots:
                 for (int i = 0; i < n; ++i) {
                     block[i] = static_cast<float>((sent + i) % 1000);
                 }
+                // tryWrite, nicht write: dieser Schreiber versucht es
+                // gleich nochmal. write() wuerde jeden Teilschreibvorgang
+                // als Verlust zaehlen, und die Anzeige stellt dropped()
+                // dem Betreiber als „in der Aufnahme fehlt etwas" hin.
+                // GENAU DAS hat dieser Test unter Last gefunden: 61 376
+                // gemeldete Verluste, obwohl jeder Wert ankam.
                 int done = 0;
                 while (done < n) {
-                    done += r.write(block + done, n - done);
+                    done += r.tryWrite(block + done, n - done);
                     std::this_thread::yield();
                 }
                 sent += n;

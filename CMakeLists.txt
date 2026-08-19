@@ -1082,6 +1082,7 @@ set(GUI_SOURCES
     src/gui/applets/DiversityApplet.cpp
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
+    src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp
     src/gui/applets/AmpApplet.cpp

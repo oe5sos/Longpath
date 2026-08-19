@@ -100,6 +100,16 @@ public:
     long long droppedSamples() const
     { return m_rxRing.dropped() + m_txRing.dropped(); }
 
+    // Der Spitzenwert des letzten Abholvorgangs, je Spur, 0..1.
+    //
+    // Hier gerechnet und nicht in der Anzeige: die Werte liegen beim
+    // Abholen ohnehin in der Hand, und ein Pegel, der aus einer ANDEREN
+    // Quelle kommt als die Aufnahme, kann zappeln, waehrend die Datei
+    // still bleibt. Dieser bewegt sich genau dann, wenn wirklich etwas
+    // in der Aufnahme landet.
+    float lastRxPeak() const { return m_rxPeak; }
+    float lastTxPeak() const { return m_txPeak; }
+
 signals:
     void recordingChanged(bool on);
     void secondsChanged(double seconds);
@@ -120,6 +130,9 @@ private:
 
     int  m_sliceId{0};
     bool m_lossReported{false};
+
+    float m_rxPeak{0.0f};
+    float m_txPeak{0.0f};
 
     std::vector<float> m_scratch;   // Hauptfaden, einmal angefordert
 };
