@@ -102,6 +102,16 @@ public:
     /// Die Gruppennamen in Reihenfolge.
     QStringList groups() const;
 
+    // Die Pillen-Optik der oberen Leiste — oeffentlich, seit die UNTERE
+    // Leiste sie auch benutzt (2026-08-19, auf Ansage des Betreibers:
+    // „die Taskleiste unten sollte auch wie die Taskleiste oben
+    // aussehen, gleiches Design").
+    //
+    // Eine Funktion statt zweier Stylesheets: zwei Leisten, die
+    // „gleich" aussehen sollen und ihre Farben getrennt fuehren, sehen
+    // nach dem naechsten Feinschliff wieder verschieden aus.
+    static QString pillStyle();
+
     static constexpr int kPillHeight = 27;
     static constexpr int kPillRadius = 6;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.

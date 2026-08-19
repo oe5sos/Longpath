@@ -7376,9 +7376,25 @@ void MainWindow::buildStatusBar()
     QStatusBar* sb = statusBar();
     sb->setFixedHeight(46);
     sb->setSizeGripEnabled(false);
+    // ── Gleiches Design wie die obere Leiste (2026-08-19) ────────────
+    //
+    // Auf Ansage des Betreibers: „die Taskleiste unten sollte auch wie
+    // die Taskleiste oben aussehen, gleiches Design."
+    //
+    // Die untere Leiste trug eigene harte Farben (#0a0a14, #203040), die
+    // obere zieht ihre aus Style::. Zwei Leisten mit getrennt gefuehrten
+    // Farben sehen nach dem naechsten Feinschliff wieder verschieden
+    // aus — also dieselben Konstanten, und die Pillen kommen aus
+    // CommandBar::pillStyle(), damit es nur EINE Optik gibt.
+    //
+    // Der Rahmen bleibt oben abgesetzt statt rundum: die Statusleiste
+    // sitzt am Fensterrand, ein Rahmen dort hinterliesse eine
+    // Doppellinie.
     sb->setStyleSheet(Style::themed(QStringLiteral(
-        "QStatusBar { background: #0a0a14; border-top: 1px solid #203040; }"
-        "QStatusBar::item { border: none; }")));
+        "QStatusBar { background: %1; border-top: 1px solid %2; }"
+        "QStatusBar::item { border: none; }")
+        .arg(QString::fromLatin1(Style::kPanelBg),
+             QString::fromLatin1(Style::kBorderSubtle))));
 
     // Wrapper widget for the full-width custom layout. Stored as a
     // member so resizeEvent can read its width for m_chromeBar->relayout().
@@ -7392,7 +7408,9 @@ void MainWindow::buildStatusBar()
     // Helper: styled separator dot
     auto makeSep = [&]() -> QLabel* {
         auto* sep = new QLabel(QStringLiteral(" · "), barWidget);
-        sep->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #304050; font-size: 22px; }")));
+        sep->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: %1; font-size: 22px; }")
+            .arg(QString::fromLatin1(Style::kBorder))));
         return sep;
     };
 

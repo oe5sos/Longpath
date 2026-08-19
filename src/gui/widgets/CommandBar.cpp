@@ -40,9 +40,12 @@ QLabel* captionLabel(const QString& text, QWidget* parent)
     return l;
 }
 
+} // namespace
+
 /// Das Aussehen einer Pille. Über Style::-Konstanten, damit die
-/// Theme-Datei sie erreicht.
-QString pillStyle()
+/// Theme-Datei sie erreicht. Oeffentlich, weil die untere Leiste
+/// dieselbe Optik traegt.
+QString CommandBar::pillStyle()
 {
     return QStringLiteral(
         "QPushButton {"
@@ -66,8 +69,6 @@ QString pillStyle()
              QString::fromLatin1(Style::kBlueBorder),
              QString::fromLatin1(Style::kBlueText));
 }
-
-} // namespace
 
 CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
 {
