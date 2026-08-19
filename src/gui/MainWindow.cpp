@@ -3196,6 +3196,15 @@ void MainWindow::buildUI()
         m_mainSplitter->setSizes({1024, 256});
     }
 
+    // Die zuletzt gewaehlte Richtung wiederherstellen. Vorgabe ist
+    // daneben — das ist der Istzustand, und eine Vorgabe stellt niemandem
+    // das Fenster um.
+    if (AppSettings::instance().value(QStringLiteral("AppletPanelBelow"),
+                                      QStringLiteral("False")).toString()
+            == QStringLiteral("True")) {
+        setAppletPanelBelow(true);
+    }
+
     // Wire spectrum display to SliceModel (values come from persisted state,
     // no longer hardcoded). Connection is deferred to wireSliceToSpectrum()
     // which runs after RadioModel creates slice 0.
@@ -6051,6 +6060,37 @@ void MainWindow::buildMenuBar()
             if (m_panStack) {
                 m_panStack->floatPanadapter(m_panStack->activePanId());
             }
+        });
+    }
+
+    // ── Applet-Leiste neben oder unter den Panadapter ────────────────
+    //
+    // 2026-08-19, auf Ansage des Betreibers: „jedes Fenster sollte man
+    // frei ändern können in der Größe. beim Panadapter sehe ich keine
+    // Möglichkeit" — und als Zielbild Zeus Link, wo der Panadapter ein
+    // mittleres Feld ist und andere Fenster darunter liegen.
+    //
+    // Die Ursache war nicht ein fehlender Griff, sondern seine RICHTUNG:
+    // der Hauptsplitter steht waagerecht, also gibt es einen Griff
+    // links/rechts und keinen oben/unten. Ein QSplitter kann seine
+    // Richtung wechseln, und damit liegt die Applet-Leiste unter dem
+    // Panadapter — mit ziehbarem Griff dazwischen.
+    //
+    // Das ist der erste Schritt zum Zielbild, nicht das Zielbild: dort
+    // liegen auch Fenster ÜBER dem Panadapter. Das braucht eine echte
+    // Kachelfläche und ist eine eigene Arbeit.
+    {
+        QAction* belowAct = viewMenu->addAction(
+            QStringLiteral("Applets &below panadapter"));
+        belowAct->setCheckable(true);
+        belowAct->setToolTip(QStringLiteral(
+            "Put the applet panel under the panadapter instead of beside "
+            "it. The handle between them then resizes the panadapter's "
+            "height."));
+        belowAct->setChecked(m_mainSplitter
+                             && m_mainSplitter->orientation() == Qt::Vertical);
+        connect(belowAct, &QAction::toggled, this, [this](bool below) {
+            setAppletPanelBelow(below);
         });
     }
 
@@ -9976,6 +10016,49 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);
     }
     return qobject_cast<RotorLogbookPanel*>(m_rotorDock->widget());
+}
+
+// ── Applet-Leiste neben oder unter den Panadapter ────────────────────
+//
+// Begruendung und Zielbild stehen beim Menueeintrag (View → Applets
+// below panadapter). Hier nur die Mechanik.
+//
+// Der spectrumPane hat eine Mindestbreite von 400 Bildpunkten, damit er
+// waagerecht nicht zur Leiste zerdrueckt wird. Untereinander ist die
+// Breite kein Thema mehr, aber die HOEHE: ohne Mindesthoehe laesst sich
+// der Panadapter auf null ziehen, und dann ist das Fenster leer und
+// niemand weiss, warum.
+void MainWindow::setAppletPanelBelow(bool below)
+{
+    if (!m_mainSplitter) { return; }
+
+    const Qt::Orientation want = below ? Qt::Vertical : Qt::Horizontal;
+    if (m_mainSplitter->orientation() == want) { return; }
+
+    m_mainSplitter->setOrientation(want);
+
+    if (QWidget* spectrumPane = m_mainSplitter->widget(0)) {
+        if (below) {
+            spectrumPane->setMinimumWidth(0);
+            spectrumPane->setMinimumHeight(200);
+        } else {
+            spectrumPane->setMinimumHeight(0);
+            spectrumPane->setMinimumWidth(400);
+        }
+    }
+
+    // Neue Richtung, neue Groessen: die gemerkten Werte stammen aus der
+    // anderen Richtung und waeren hier sinnlos (eine Breite als Hoehe
+    // gelesen). 70 zu 30 ist die Aufteilung, die auch waagerecht die
+    // Vorgabe ist.
+    const int total = below ? m_mainSplitter->height() : m_mainSplitter->width();
+    if (total > 0) {
+        m_mainSplitter->setSizes({total * 7 / 10, total * 3 / 10});
+    }
+
+    AppSettings::instance().setValue(
+        QStringLiteral("AppletPanelBelow"),
+        below ? QStringLiteral("True") : QStringLiteral("False"));
 }
 
 void MainWindow::openRotorDial()

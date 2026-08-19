@@ -581,6 +581,13 @@ private:
     void openAntennaWindow();
     void openChannelStrip();
     class RotorLogbookPanel* ensureRotorPanel();
+
+    // Applet-Leiste neben (false) oder unter (true) den Panadapter legen.
+    // Wechselt die Richtung des Hauptsplitters, damit der Griff zwischen
+    // beiden die HOEHE des Panadapters verstellt statt seiner Breite.
+    // Persistiert unter „AppletPanelBelow". Begruendung und Zielbild
+    // stehen in MainWindow.cpp beim Menueeintrag.
+    void setAppletPanelBelow(bool below);
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
     void ensureQrzClient();
