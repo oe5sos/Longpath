@@ -22,6 +22,7 @@
 // no-port-check: NereusSDR-original test file.
 
 #include <QtTest>
+#include <QFileInfo>
 #include <QTemporaryDir>
 
 #include "core/audio/WavFile.h"
@@ -246,6 +247,88 @@ private slots:
         QCOMPARE(out.samples.size(), 2);
         QVERIFY(qAbs(out.samples[0] - 0.25f) < 1e-3f);
     }
+    // ── 16 Bit mit Dither ────────────────────────────────────────────
+    //
+    // Aus der Thetis-Durchsicht vom 2026-08-19 (AudioBitDepthMode +
+    // DitherEnabled). Eine halbe Stunde Stereo sind in float32 690 MB,
+    // in PCM16 noch 173 MB.
+    void sixteenBitStereoRoundTripsWithinOneBit()
+    {
+        const QString p = pathFor(QStringLiteral("pcm16.wav"));
+        QVector<float> stereo;
+        for (int i = 0; i < 500; ++i) {
+            stereo << 0.5f << -0.25f;
+        }
+        QString err;
+        QVERIFY2(writeWavStereo16(p, stereo, 48000, true, &err),
+                 qPrintable(err));
+
+        const WavData back = readWavMono(p, &err);
+        QVERIFY2(back.ok, qPrintable(err));
+        QCOMPARE(back.sampleRate, 48000);
+        QCOMPARE(back.samples.size(), 500);
+
+        // readWavMono mittelt: (0,5 + -0,25) / 2 = 0,125. Ein Bit bei
+        // 16 Bit sind rund 3e-5, der Dither traegt bis zu einem Bit.
+        for (int i = 0; i < 500; ++i) {
+            QVERIFY2(qAbs(back.samples[i] - 0.125f) < 1e-4f,
+                     "16-Bit-Rundung darf hoechstens ein Bit kosten");
+        }
+    }
+
+    // Ohne Dither muss dieselbe Eingabe zweimal dieselbe Datei ergeben —
+    // und MIT Dither auch, weil der Startwert fest ist. Zufall, der
+    // sich nicht wiederholen laesst, macht jeden Vergleich unmoeglich.
+    void savingTwiceGivesTheSameBytes()
+    {
+        QVector<float> stereo;
+        for (int i = 0; i < 200; ++i) { stereo << 0.3f << 0.1f; }
+
+        const QString a = pathFor(QStringLiteral("twice-a.wav"));
+        const QString b = pathFor(QStringLiteral("twice-b.wav"));
+        QVERIFY(writeWavStereo16(a, stereo, 8000, true));
+        QVERIFY(writeWavStereo16(b, stereo, 8000, true));
+
+        QFile fa(a), fb(b);
+        QVERIFY(fa.open(QIODevice::ReadOnly));
+        QVERIFY(fb.open(QIODevice::ReadOnly));
+        QCOMPARE(fa.readAll(), fb.readAll());
+    }
+
+    // Was ueber den Rand geht, wird gekappt und laeuft nicht um. Ein
+    // Ueberlauf, der umlaeuft, klingt wie ein Schuss.
+    void loudInputIsClippedNotWrapped()
+    {
+        const QString p = pathFor(QStringLiteral("loud.wav"));
+        QVector<float> stereo;
+        for (int i = 0; i < 100; ++i) { stereo << 2.0f << -2.0f; }
+        QVERIFY(writeWavStereo16(p, stereo, 8000, false));
+
+        const WavData back = readWavMono(p);
+        QVERIFY(back.ok);
+        for (float v : back.samples) {
+            QVERIFY2(qAbs(v) < 1e-3f,
+                     "+1 und -1 mitteln sich zu null; ein Umlauf haette "
+                     "das Vorzeichen gedreht");
+        }
+    }
+
+    // Die Datei ist halb so gross wie float32 — der ganze Grund.
+    void itIsHalfTheSizeOfFloat32()
+    {
+        QVector<float> stereo(2000, 0.2f);
+        const QString big   = pathFor(QStringLiteral("size-f32.wav"));
+        const QString small = pathFor(QStringLiteral("size-16.wav"));
+        QVERIFY(writeWavStereo(big, stereo, 8000));
+        QVERIFY(writeWavStereo16(small, stereo, 8000, true));
+
+        const qint64 b = QFileInfo(big).size();
+        const qint64 s = QFileInfo(small).size();
+        QVERIFY2(s < b / 2 + 64,
+                 qPrintable(QStringLiteral("float32 %1 B, PCM16 %2 B")
+                                .arg(b).arg(s)));
+    }
+
 };
 
 QTEST_MAIN(TestWavFile)

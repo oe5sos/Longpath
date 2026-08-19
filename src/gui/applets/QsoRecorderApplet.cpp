@@ -13,14 +13,21 @@
 #include "QsoRecorderApplet.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/styles/PopupMenuStyle.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
 #include <QDir>
+#include <QAction>
+#include <QUrl>
+#include <QDesktopServices>
+#include <QMenu>
+#include <QStorageInfo>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QListWidgetItem>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStandardPaths>
@@ -243,6 +250,48 @@ void QsoRecorderApplet::buildUI()
              QLatin1String(Style::kTextSecondary),
              QLatin1String(Style::kBlueBg),
              QLatin1String(Style::kBlueText)));
+    // Loeschen aus der Liste. Aus der Thetis-Durchsicht
+    // (DeleteRecording, clsAudioRecordPlayback.cs:776
+    // [v2.10.3.15-5-g852bf0e]) — dort raeumt sie auch den Ordner mit
+    // weg, wenn er leer bleibt; das lassen wir, unser Ordner ist fest.
+    //
+    // Mit Rueckfrage: eine geloeschte Aufnahme kommt nicht wieder, und
+    // die Beschreibung geht mit.
+    m_list->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_list, &QListWidget::customContextMenuRequested, this,
+            [this](const QPoint& pos) {
+        QListWidgetItem* item = m_list->itemAt(pos);
+        if (!item) { return; }
+        const QString file = item->data(Qt::UserRole).toString();
+        if (file.isEmpty()) { return; }
+
+        QMenu menu(this);
+        menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
+        QAction* reveal = menu.addAction(QStringLiteral("Show in folder"));
+        menu.addSeparator();
+        QAction* del = menu.addAction(QStringLiteral("Delete recording"));
+
+        const QAction* chosen = menu.exec(m_list->mapToGlobal(pos));
+        if (chosen == reveal) {
+            QDesktopServices::openUrl(
+                QUrl::fromLocalFile(recordingFolder()));
+        } else if (chosen == del) {
+            if (QMessageBox::question(this, QStringLiteral("QSO Recorder"),
+                    QStringLiteral("Delete this recording and its "
+                                   "description? This cannot be undone."))
+                != QMessageBox::Yes) {
+                return;
+            }
+            QFile::remove(file);
+            QString side = file;
+            if (side.endsWith(QStringLiteral(".wav"), Qt::CaseInsensitive)) {
+                side.chop(4);
+                QFile::remove(side + QStringLiteral(".json"));
+            }
+            refreshList();
+        }
+    });
+
     m_list->setToolTip(QStringLiteral(
         "Recordings on disk. Left channel is the other station, right "
         "channel is your own voice — any audio editor can split them."));
@@ -289,6 +338,40 @@ void QsoRecorderApplet::onRecordClicked()
         }
         refreshList();
     } else {
+        // ── Passt das ueberhaupt noch? ───────────────────────────
+        //
+        // Aus der Thetis-Durchsicht vom 2026-08-19: Thetis prueft mit
+        // OkToRecord() vor dem Start und noch einmal WAEHREND der
+        // Aufnahme auf einem Zeitgeber, und stoppt sich selbst, wenn
+        // der Platz knapp wird (clsAudioRecordPlayback.cs:633 + :662
+        // [v2.10.3.15-5-g852bf0e]).
+        //
+        // Bei uns reicht die Pruefung VOR dem Start: wir sammeln im
+        // Arbeitsspeicher und schreiben erst am Ende. Der laufende
+        // Zeitgeber waere hier eine Antwort auf eine Frage, die sich
+        // nicht stellt.
+        //
+        // Gerechnet wird gegen die VOLLE halbe Stunde, nicht gegen den
+        // Augenblick. Eine Aufnahme, die nach 25 Minuten am Platz
+        // scheitert, ist schlimmer als eine, die gar nicht erst
+        // anfaengt.
+        {
+            const QStorageInfo disk(recordingFolder());
+            const qint64 needed = static_cast<qint64>(QsoRecorder::kMaxMinutes)
+                                * 60 * 48000 * 4;   // Stereo, 16 Bit
+            if (disk.isValid() && disk.bytesAvailable() > 0
+                && disk.bytesAvailable() < needed) {
+                QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
+                    QStringLiteral(
+                        "Not enough room for a full recording: %1 MB free, "
+                        "%2 MB needed for %3 minutes.")
+                        .arg(disk.bytesAvailable() / (1024 * 1024))
+                        .arg(needed / (1024 * 1024))
+                        .arg(QsoRecorder::kMaxMinutes));
+                return;
+            }
+        }
+
         if (m_lossLabel) { m_lossLabel->setVisible(false); }
 
         QsoRecordingInfo info;
@@ -371,9 +454,34 @@ void QsoRecorderApplet::refreshList()
     const auto files = dir.entryInfoList(QStringList{QStringLiteral("*.wav")},
                                          QDir::Files, QDir::Time);
     for (const QFileInfo& f : files) {
-        m_list->addItem(QStringLiteral("%1   %2")
-            .arg(f.lastModified().toString(QStringLiteral("dd.MM. HH:mm")),
-                 f.completeBaseName()));
+        // Die Beschreibung neben der Datei, wenn es sie gibt. Ein
+        // Dateiname ist in einem halben Jahr keine Auskunft; „DL1ABC ·
+        // 14.205.000 · LSB · 6:41" ist eine.
+        //
+        // Aus der Thetis-Durchsicht (GetJSONDetailsFromFile,
+        // clsAudioRecordPlayback.cs:1102 [v2.10.3.15-5-g852bf0e]).
+        const QsoRecordingInfo info = readQsoDescription(f.absoluteFilePath());
+
+        QStringList parts;
+        parts << (info.utcStart.isValid()
+                      ? info.utcStart.toLocalTime()
+                            .toString(QStringLiteral("dd.MM. HH:mm"))
+                      : f.lastModified().toString(
+                            QStringLiteral("dd.MM. HH:mm")));
+
+        if (!info.callsign.isEmpty())  { parts << info.callsign; }
+        if (!info.frequency.isEmpty()) { parts << info.frequency; }
+        if (!info.mode.isEmpty())      { parts << info.mode; }
+        if (info.seconds > 0.0)        { parts << clockText(info.seconds); }
+
+        // Ohne Beschreibung bleibt der Dateiname — besser als eine
+        // Zeile, die nur ein Datum traegt.
+        if (parts.size() == 1) { parts << f.completeBaseName(); }
+
+        auto* item = new QListWidgetItem(parts.join(QStringLiteral("  ·  ")));
+        item->setData(Qt::UserRole, f.absoluteFilePath());
+        item->setToolTip(f.absoluteFilePath());
+        m_list->addItem(item);
     }
     if (files.isEmpty()) {
         m_list->addItem(QStringLiteral("no recordings yet"));

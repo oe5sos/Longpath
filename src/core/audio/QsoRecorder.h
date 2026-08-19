@@ -67,6 +67,19 @@ struct QsoRecordingInfo {
     double    seconds{0.0};
 };
 
+// Die Beschreibung neben einer Aufnahme wieder einlesen.
+//
+// Aus der Thetis-Durchsicht vom 2026-08-19 (`GetJSONDetailsFromFile`,
+// clsAudioRecordPlayback.cs:1102 [v2.10.3.15-5-g852bf0e]): Thetis liest
+// seine Beschreibungen zurueck, wir haben sie bisher nur geschrieben.
+// Der Unterschied steht in der Liste der Aufnahmen — „19.08. 18:02 ·
+// DL1ABC · 14.205.000 · LSB" statt „qso-20260819-180213".
+//
+// `wavPath` darf auf die WAV oder direkt auf die JSON zeigen. Bei
+// Fehlern kommt ein leerer Datensatz zurueck (utcStart ungueltig); eine
+// Aufnahme ohne Beschreibung ist kein Fehler, nur aermer.
+QsoRecordingInfo readQsoDescription(const QString& wavPath);
+
 class QsoRecorder
 {
 public:
@@ -95,7 +108,17 @@ public:
 
     // Schreibt die Stereodatei (links Empfang, rechts eigene Stimme)
     // und daneben eine JSON-Beschreibung, wie Thetis es tut.
+    //
+    // 16 Bit mit Dither, es sei denn jemand will ausdruecklich float32
+    // (siehe setSaveFloat32). Eine halbe Stunde Stereo sind in float32
+    // 690 MB, in PCM16 noch 173 MB — und der Dynamikumfang eines
+    // Sprach-QSOs liegt weit unter dem, was 16 Bit tragen.
     bool save(const QString& wavPath, QString* error = nullptr) const;
+
+    // Fuer den Fall, dass jemand die Aufnahme weiterverarbeiten will
+    // und keine Rundung im Weg haben moechte. Vorgabe ist 16 Bit.
+    void setSaveFloat32(bool on) { m_saveFloat32 = on; }
+    bool saveFloat32() const { return m_saveFloat32; }
 
     void clear();
 
@@ -109,6 +132,7 @@ private:
     QsoRecordingInfo m_info;
     int              m_rate{48000};
     bool             m_recording{false};
+    bool             m_saveFloat32{false};
 };
 
 } // namespace NereusSDR

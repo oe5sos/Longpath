@@ -63,6 +63,27 @@ bool writeWavMono(const QString& path, const QVector<float>& samples,
 bool writeWavStereo(const QString& path, const QVector<float>& interleaved,
                     int sampleRate, QString* error = nullptr);
 
+// Dasselbe als 16-Bit-PCM, mit Dither.
+//
+// AUS DER THETIS-DURCHSICHT vom 2026-08-19: Thetis kann float32, PCM
+// 32 / 24 / 16 / 8 und hat einen eigenen Schalter `DitherEnabled`
+// (clsAudioRecordPlayback.cs:66 + :215 [v2.10.3.15-5-g852bf0e]).
+//
+// WARUM 16 BIT FUER EIN QSO REICHT: eine halbe Stunde Stereo in float32
+// sind 690 MB, als PCM16 noch 173 MB. Der Dynamikumfang eines
+// Sprach-QSOs liegt bei vielleicht 50 dB; 16 Bit tragen 96.
+//
+// WARUM DITHER NICHT WEGGELASSEN WIRD: beim Kuerzen auf 16 Bit wird der
+// Rundungsfehler mit dem Signal KORRELIERT — bei leisen Stellen hoert
+// man das als Rasseln, das mit dem Ton mitgeht, nicht als Rauschen.
+// Ein halbes Bit Zufall vorher macht daraus gleichmaessiges Rauschen
+// weit unter der Hoergrenze. Dreieckverteilt (zwei Zufallszahlen
+// addiert), weil gleichverteilter Dither die Modulation nur
+// halbherzig aufloest.
+bool writeWavStereo16(const QString& path, const QVector<float>& interleaved,
+                      int sampleRate, bool dither = true,
+                      QString* error = nullptr);
+
 // Dauer in Sekunden, ohne die Datei ganz zu lesen wenn moeglich.
 // Gibt 0 zurueck, wenn die Datei nicht lesbar ist.
 double wavDurationSeconds(const QString& path);

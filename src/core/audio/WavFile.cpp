@@ -15,7 +15,9 @@
 #include <QFile>
 #include <QtEndian>
 
+#include <cmath>
 #include <cstring>
+#include <random>
 
 namespace NereusSDR {
 
@@ -277,6 +279,73 @@ bool writeWavStereo(const QString& path, const QVector<float>& interleaved,
         std::memcpy(b, &v, 4);
         f.write(reinterpret_cast<const char*>(b), 4);
     }
+
+    f.close();
+    return true;
+}
+
+bool writeWavStereo16(const QString& path, const QVector<float>& interleaved,
+                      int sampleRate, bool dither, QString* error)
+{
+    if (sampleRate <= 0) {
+        fail(error, QStringLiteral("sample rate must be positive"));
+        return false;
+    }
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        fail(error, QStringLiteral("cannot write %1").arg(path));
+        return false;
+    }
+
+    const quint32 dataBytes = static_cast<quint32>(interleaved.size()) * 2u;
+
+    auto putU32 = [&f](quint32 v) {
+        uchar b[4]; qToLittleEndian(v, b); f.write(reinterpret_cast<const char*>(b), 4);
+    };
+    auto putU16 = [&f](quint16 v) {
+        uchar b[2]; qToLittleEndian(v, b); f.write(reinterpret_cast<const char*>(b), 2);
+    };
+
+    f.write("RIFF", 4);
+    putU32(36u + dataBytes);
+    f.write("WAVE", 4);
+
+    f.write("fmt ", 4);
+    putU32(16);
+    putU16(kFormatPcm);
+    putU16(2);                                       // zwei Kanaele
+    putU32(static_cast<quint32>(sampleRate));
+    putU32(static_cast<quint32>(sampleRate) * 4u);   // Bytes je Sekunde
+    putU16(4);                                       // Bytes je Rahmen
+    putU16(16);
+
+    f.write("data", 4);
+    putU32(dataBytes);
+
+    // Fester Startwert: eine Aufnahme, die zweimal gespeichert wird,
+    // soll zweimal dieselbe Datei ergeben. Zufall, der sich nicht
+    // wiederholen laesst, macht jeden Vergleich unmoeglich.
+    std::mt19937 rng(20260819u);
+    std::uniform_real_distribution<float> half(-0.5f, 0.5f);
+
+    QByteArray block;
+    block.reserve(interleaved.size() * 2);
+    for (float v : interleaved) {
+        // Dreieckverteilt: zwei gleichverteilte Zufallszahlen addiert.
+        // Gleichverteilter Dither allein loest die Modulation des
+        // Rundungsfehlers nur halb auf.
+        float x = v * 32767.0f;
+        if (dither) { x += half(rng) + half(rng); }
+
+        const int r = static_cast<int>(std::lround(x));
+        const qint16 s16 = static_cast<qint16>(std::clamp(r, -32768, 32767));
+
+        uchar b[2];
+        qToLittleEndian(s16, b);
+        block.append(reinterpret_cast<const char*>(b), 2);
+    }
+    f.write(block);
 
     f.close();
     return true;

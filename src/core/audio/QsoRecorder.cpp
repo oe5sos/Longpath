@@ -17,6 +17,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 
 #include <algorithm>
 
@@ -123,7 +124,10 @@ bool QsoRecorder::save(const QString& wavPath, QString* error) const
         stereo[2 * i + 1] = i < m_tx.size() ? m_tx[i] : 0.0f;
     }
 
-    if (!writeWavStereo(wavPath, stereo, m_rate, error)) {
+    const bool ok = m_saveFloat32
+        ? writeWavStereo(wavPath, stereo, m_rate, error)
+        : writeWavStereo16(wavPath, stereo, m_rate, /*dither=*/true, error);
+    if (!ok) {
         return false;
     }
 
@@ -138,6 +142,12 @@ bool QsoRecorder::save(const QString& wavPath, QString* error) const
     j.insert(QStringLiteral("band"),      m_info.band);
     j.insert(QStringLiteral("callsign"),  m_info.callsign);
     j.insert(QStringLiteral("sampleRate"), m_rate);
+    // Damit man in einem halben Jahr nicht raten muss, was in der
+    // Datei steht.
+    j.insert(QStringLiteral("bitDepth"), m_saveFloat32 ? 32 : 16);
+    j.insert(QStringLiteral("format"),
+             m_saveFloat32 ? QStringLiteral("IEEE float32")
+                           : QStringLiteral("PCM 16-bit, dithered"));
     j.insert(QStringLiteral("seconds"),
              static_cast<double>(frames) / std::max(1, m_rate));
     j.insert(QStringLiteral("tracks"),
@@ -158,6 +168,40 @@ bool QsoRecorder::save(const QString& wavPath, QString* error) const
     // gescheitert zu melden: der Ton ist das Wertvolle.
 
     return true;
+}
+
+// Der Gegenpart zu save(). Siehe Header fuer die Herkunft.
+QsoRecordingInfo readQsoDescription(const QString& wavPath)
+{
+    QsoRecordingInfo info;
+
+    QString jsonPath = wavPath;
+    if (jsonPath.endsWith(QStringLiteral(".wav"), Qt::CaseInsensitive)) {
+        jsonPath.chop(4);
+        jsonPath += QStringLiteral(".json");
+    }
+
+    QFile f(jsonPath);
+    if (!f.open(QIODevice::ReadOnly)) { return info; }
+    const QByteArray blob = f.readAll();
+    f.close();
+
+    QJsonParseError err{};
+    const QJsonDocument doc = QJsonDocument::fromJson(blob, &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) {
+        return info;
+    }
+
+    const QJsonObject j = doc.object();
+    info.utcStart   = QDateTime::fromString(
+        j.value(QStringLiteral("utcStart")).toString(), Qt::ISODate);
+    info.frequency  = j.value(QStringLiteral("frequency")).toString();
+    info.mode       = j.value(QStringLiteral("mode")).toString();
+    info.band       = j.value(QStringLiteral("band")).toString();
+    info.callsign   = j.value(QStringLiteral("callsign")).toString();
+    info.sampleRate = j.value(QStringLiteral("sampleRate")).toInt();
+    info.seconds    = j.value(QStringLiteral("seconds")).toDouble();
+    return info;
 }
 
 } // namespace NereusSDR

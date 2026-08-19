@@ -173,10 +173,29 @@ private slots:
         // Beide Kanaele heben sich beim Mitteln auf — genau daran
         // erkennt man, dass sie GETRENNT geschrieben wurden und nicht
         // vorher zusammengemischt.
+        //
+        // NICHT auf exakt null pruefen, und nicht an einer einzigen
+        // Stelle. Seit die Aufnahme als 16-Bit-PCM mit Dither
+        // geschrieben wird (Thetis-Durchsicht 2026-08-19), traegt jeder
+        // Abtastwert bis zu einem Bit Zufall, und die beiden Kanaele
+        // bekommen ihren eigenen. Die alte Fassung verglich EINEN Wert
+        // gegen 1e-6 und blieb gruen, weil sich der Dither an genau
+        // dieser Stelle zufaellig aufhob — ein Test, der aus Glueck
+        // besteht, prueft nichts.
+        //
+        // Ein Bit bei 16 Bit sind rund 3e-5; die Schranke liegt bei
+        // 1e-4, also deutlich unter den 0,25, die ein
+        // ZUSAMMENGEMISCHTER Kanal zeigen wuerde.
         const WavData back = readWavMono(p);
         QVERIFY(back.ok);
-        QVERIFY2(qAbs(back.samples[400]) < 1e-6f,
-                 "links +0,25 und rechts -0,25 mitteln sich zu null");
+        float worst = 0.0f;
+        for (int i = 100; i < 700; ++i) {
+            worst = qMax(worst, qAbs(back.samples[i]));
+        }
+        QVERIFY2(worst < 1e-4f,
+                 qPrintable(QStringLiteral(
+                     "links +0,25 und rechts -0,25 muessen sich zu null "
+                     "mitteln; groesster Rest war %1").arg(worst)));
     }
 
     // Die Beschreibung daneben: eine Aufnahme ohne Frequenz, Modus und
