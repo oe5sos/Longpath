@@ -83,6 +83,35 @@ public:
     void zoomBy(double factor);
     double zoom() const { return m_zoom; }
 
+    // Wie weit hinein? Bis 2026-08-19 war die Decke fest bei 6x. Das war
+    // die falsche Groesse: die Grenze ist nicht der Zoom, sondern die
+    // TEXTUR. Bei 2048 Bildpunkten Breite ist ein Texturpixel etwa 0,18
+    // Grad, bei 5400 etwa 0,067 — wer weiter hineinzoomt, vergroessert
+    // Matsch und sieht nichts Neues.
+    //
+    // Also haengt die Decke an der geladenen Textur: ohne Textur bleibt
+    // es bei 6x (mehr zeigt ein Gitternetz nicht), mit dem grossen Blue
+    // Marble sind es rund 16x.
+    double maxZoom() const;
+
+    // Bildpunkt -> Ort. Umkehrung der orthographischen Projektion
+    // (Snyder, Map Projections, orthographic inverse). Liefert false
+    // ausserhalb der Scheibe — dort ist kein Ort, nicht der Rand.
+    //
+    // Gebraucht fuer „zoome dorthin, wo der Zeiger steht": ohne
+    // Rueckrechnung zoomt ein Globus immer auf seine Mitte, und das ist
+    // der Unterschied, den man zu Google Earth am deutlichsten spuert.
+    bool unproject(const QPointF& pos, double& lat, double& lon) const;
+
+    // Testnaht fuer den Rundgang Ort -> Bildpunkt -> Ort. project() ist
+    // privat, weil niemand von aussen zeichnet; der Rundgang ist aber
+    // die einzige Pruefung, die einen vertauschten Sinus in der
+    // Umkehrung sicher zeigt.
+    bool projectForTest(double lat, double lon, QPointF& out) const
+    {
+        return project(lat, lon, out);
+    }
+
     // Spin slowly when idle. Off by default: motion in the corner of
     // the eye is a distraction while operating.
     void setAutoRotate(bool on);

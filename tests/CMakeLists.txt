@@ -4926,6 +4926,7 @@ nereus_add_test(tst_signal_history_cost)
 nereus_add_test(tst_tune_guide_behaviour)
 nereus_add_test(tst_applet_panel_below)
 nereus_add_test(tst_spot_double_click)
+nereus_add_test(tst_globe_unproject)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still

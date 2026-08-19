@@ -189,7 +189,7 @@ void GlobeWidget::setBeamSpread(double deg)
 void GlobeWidget::zoomBy(double factor)
 {
     const double before = m_zoom;
-    m_zoom = std::clamp(m_zoom * factor, 0.6, 6.0);
+    m_zoom = std::clamp(m_zoom * factor, 0.6, maxZoom());
     if (qFuzzyCompare(before, m_zoom)) { return; }
     m_frameDirty = true;
     update();
@@ -276,8 +276,28 @@ void GlobeWidget::wheelEvent(QWheelEvent* e)
     if (qFuzzyIsNull(steps)) { QWidget::wheelEvent(e); return; }
 
     const double before = m_zoom;
-    m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 0.6, 6.0);
+    m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 0.6, maxZoom());
     if (!qFuzzyCompare(before, m_zoom)) {
+        // Zum Zeiger hin, nicht zur Mitte (2026-08-19). Beim Hineinzoomen
+        // wandert die Kamera einen Teil des Weges zu dem Ort, auf den der
+        // Betreiber zeigt — das ist der Unterschied, den man zu Google
+        // Earth am deutlichsten spuert.
+        //
+        // Ein Teil des Weges, nicht der ganze: den Punkt exakt unter dem
+        // Zeiger festzunageln erfordert auf der Kugel eine Drehung um die
+        // Sehachse, und die verdreht den Horizont. Ein Drittel je
+        // Radschritt fuehlt sich wie Hinfliegen an und laesst Nord oben.
+        double lat = 0.0, lon = 0.0;
+        if (steps > 0.0 && unproject(e->position(), lat, lon)) {
+            constexpr double kEase = 0.34;
+            m_viewLat = std::clamp(m_viewLat + (lat - m_viewLat) * kEase,
+                                   -85.0, 85.0);
+            // Kuerzester Weg in Laengengraden: ohne das dreht die Kugel
+            // beim Zoomen auf Kamtschatka einmal falsch herum.
+            double dLon = norm180(lon - m_viewLon);
+            m_viewLon = norm180(m_viewLon + dLon * kEase);
+            m_targetViewLon = m_viewLon;
+        }
         m_frameDirty = true;
         update();
     }
@@ -387,6 +407,43 @@ bool GlobeWidget::projectAlt(double lat, double lon, double alt,
 
     const double r = radiusPx();
     out = QPointF(width() * 0.5 + r * X, height() * 0.5 - r * Y);
+    return true;
+}
+
+double GlobeWidget::maxZoom() const
+{
+    const QImage& tex = WorldTexture::image();
+    if (tex.isNull()) { return 6.0; }
+
+    // 6x ist die Decke, die zur kleinen 2048er Textur passt. Groessere
+    // Bilder tragen linear mehr; 24x als harte Obergrenze, weil darueber
+    // die Kugel nur noch ein Ausschnitt ist und die flache Karte das
+    // besser kann.
+    const double scale = static_cast<double>(tex.width()) / 2048.0;
+    return std::clamp(6.0 * scale, 6.0, 24.0);
+}
+
+bool GlobeWidget::unproject(const QPointF& pos, double& lat, double& lon) const
+{
+    const double r = radiusPx();
+    if (r <= 0.0) { return false; }
+
+    const double X = (pos.x() - width() * 0.5) / r;
+    const double Y = (height() * 0.5 - pos.y()) / r;
+    const double rho2 = X * X + Y * Y;
+    if (rho2 > 1.0) { return false; }   // ausserhalb der Scheibe
+
+    const double Z   = std::sqrt(1.0 - rho2);
+    const double vla = m_viewLat * kDeg;
+
+    // Umkehrung von projectAlt(): dort ist
+    //   sin(la) = cos(vla) * Y + sin(vla) * Z
+    //   cos(la) * sin(lo) = X
+    //   cos(la) * cos(lo) = Z * cos(vla) - Y * sin(vla)
+    const double sinLa = std::cos(vla) * Y + std::sin(vla) * Z;
+    lat = std::asin(std::clamp(sinLa, -1.0, 1.0)) / kDeg;
+    lon = norm180(m_viewLon
+                  + std::atan2(X, Z * std::cos(vla) - Y * std::sin(vla)) / kDeg);
     return true;
 }
 
