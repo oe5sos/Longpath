@@ -1,0 +1,169 @@
+// =================================================================
+// tests/tst_qso_recorder_controller.cpp  (NereusSDR)
+// =================================================================
+//
+// Was die Abgriffe mit der Aufnahme verbindet.
+//
+// Geprueft wird OHNE Funkgeraet und ohne Audiogeraet: der Test
+// schreibt selbst in die Zwischenspeicher, genau wie es der Audio-Faden
+// tut, und sieht nach, was hinten in der Aufnahme steht.
+//
+// DER FALL, DER STILL FALSCH WIRD, ist die Reihenfolge beim Abholen.
+// Der Empfang ist die Uhr: QsoRecorder fuellt die Sprechspur bis zum
+// aktuellen Empfangsstand mit Stille auf, sobald Mikrofonton kommt.
+// Wer zuerst das Mikrofon abholt, legt die eigene Stimme um einen
+// Zeitgeber-Takt zu frueh — 200 ms, hoerbar, und im Quelltext
+// unsichtbar.
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+// =================================================================
+
+// no-port-check: NereusSDR-original test file.
+
+#include <QtTest>
+#include <QSignalSpy>
+#include <vector>
+
+#include "core/audio/QsoRecorderController.h"
+
+using namespace NereusSDR;
+
+namespace {
+
+QsoRecordingInfo someQso()
+{
+    QsoRecordingInfo i;
+    i.utcStart  = QDateTime(QDate(2026, 8, 19), QTime(21, 0), Qt::UTC);
+    i.frequency = QStringLiteral("7.131.300");
+    i.mode      = QStringLiteral("LSB");
+    i.band      = QStringLiteral("40m");
+    i.callsign  = QStringLiteral("DL1ABC");
+    return i;
+}
+
+} // namespace
+
+class TestQsoRecorderController : public QObject
+{
+    Q_OBJECT
+
+private slots:
+
+    void nothingIsCollectedBeforeStart()
+    {
+        QsoRecorderController c;
+        c.setSampleRate(1000);
+
+        const std::vector<float> rx(200, 0.5f);   // 100 Rahmen stereo
+        c.rxRing().write(rx.data(), static_cast<int>(rx.size()));
+        c.drainNow();
+
+        // Abgeholt wird, angenommen nicht: QsoRecorder::feedRx tut vor
+        // start() nichts. Wichtig, weil der Abgriff im Leerlauf
+        // weiterlaufen kann — was dabei anfaellt, gehoert nicht in die
+        // naechste Aufnahme.
+        QCOMPARE(c.recorder().rxFrames(), 0);
+        QVERIFY(!c.isRecording());
+    }
+
+    void whatTheAudioThreadWritesEndsUpInTheRecording()
+    {
+        QsoRecorderController c;
+        c.setSampleRate(1000);
+        c.start(someQso());
+
+        const std::vector<float> rx(2000, 0.25f);  // 1000 Rahmen = 1 s
+        QCOMPARE(c.rxRing().write(rx.data(), 2000), 2000);
+        c.drainNow();
+
+        QCOMPARE(c.recorder().rxFrames(), 1000);
+        QVERIFY(qAbs(c.recorder().recordedSeconds() - 1.0) < 1e-9);
+    }
+
+    // DIE REIHENFOLGE. Zehn Sekunden Empfang liegen bereit, dann eine
+    // Sekunde eigene Stimme — beide im selben Abholvorgang. Die Stimme
+    // muss BEI SEKUNDE ZEHN landen.
+    void theReceiverIsTheClockEvenWhenBothArriveTogether()
+    {
+        QsoRecorderController c;
+        c.setSampleRate(1000);
+        c.start(someQso());
+
+        const std::vector<float> rx(2000, 0.2f);   // 1 s Empfang stereo
+        const std::vector<float> tx(500, 0.9f);    // 0,5 s Stimme mono
+
+        c.rxRing().write(rx.data(), 2000);
+        c.txRing().write(tx.data(), 500);
+        c.drainNow();
+
+        QCOMPARE(c.recorder().rxFrames(), 1000);
+        QVERIFY2(c.recorder().txFrames() == 1500,
+                 "die Sprechspur muss bis zum Empfangsstand aufgefuellt "
+                 "sein und DANN die Stimme tragen — sonst liegt die "
+                 "eigene Stimme einen Takt zu frueh");
+    }
+
+    void stoppingCollectsWhatIsStillWaiting()
+    {
+        QsoRecorderController c;
+        c.setSampleRate(1000);
+        c.start(someQso());
+
+        const std::vector<float> rx(600, 0.3f);   // 300 Rahmen
+        c.rxRing().write(rx.data(), 600);
+
+        QSignalSpy spy(&c, &QsoRecorderController::recordingChanged);
+        c.stop();
+
+        QCOMPARE(c.recorder().rxFrames(), 300);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.takeFirst().at(0).toBool(), false);
+        QVERIFY(!c.isRecording());
+    }
+
+    // Ein Ueberlauf darf nicht still bleiben. Eine Luecke in einer
+    // Aufnahme faellt sonst erst auf, wenn man sie braucht.
+    void aLossIsAnnouncedOnce()
+    {
+        QsoRecorderController c;
+        c.setSampleRate(100);          // winzige Zwischenspeicher
+        c.start(someQso());
+
+        QSignalSpy spy(&c, &QsoRecorderController::samplesLost);
+
+        const std::vector<float> flood(5000, 0.1f);
+        c.rxRing().write(flood.data(), 5000);
+        QVERIFY2(c.droppedSamples() > 0, "so viel kann nicht passen");
+
+        c.drainNow();
+        QCOMPARE(spy.count(), 1);
+
+        c.rxRing().write(flood.data(), 5000);
+        c.drainNow();
+        QVERIFY2(spy.count() == 1,
+                 "einmal melden reicht — sonst steht die Warnung "
+                 "fuenfmal je Sekunde da");
+    }
+
+    void startingAgainBeginsWithAnEmptyRecording()
+    {
+        QsoRecorderController c;
+        c.setSampleRate(1000);
+
+        c.start(someQso());
+        const std::vector<float> rx(400, 0.4f);
+        c.rxRing().write(rx.data(), 400);
+        c.drainNow();
+        c.stop();
+        QCOMPARE(c.recorder().rxFrames(), 200);
+
+        c.start(someQso());
+        QCOMPARE(c.recorder().rxFrames(), 0);
+    }
+};
+
+QTEST_MAIN(TestQsoRecorderController)
+#include "tst_qso_recorder_controller.moc"

@@ -133,6 +133,9 @@ namespace NereusSDR { class PipeWireThreadLoop; }
 
 namespace NereusSDR {
 
+class AudioTapRing;
+
+
 class RadioModel;
 class SliceModel;
 
@@ -193,6 +196,12 @@ public:
     void simulateSuccessfulFeed();
     void simulateUnderrun();
     void simulatePersistentUnderrun();
+
+    // Abgriff fuer die QSO-Aufnahme. Nicht besitzend; der Audio-Faden
+    // liest den Zeiger bei jedem Block neu, damit Abschalten sofort
+    // wirkt.
+    std::atomic<AudioTapRing*> m_qsoTap{nullptr};
+    std::atomic<int>           m_qsoTapSlice{-1};
 
     // Non-owning back-pointer so rxBlockReady can look up the active
     // SliceModel to read mute / VAX-channel state. Null is safe (unit
@@ -366,6 +375,24 @@ public:
     // Task 9 moved that tap here from RxDspWorker, where it forked slice
     // A's demod output alone; see the note at the bottom of RxDspWorker's
     // drain loop.
+    /// ── Abgriff fuer die QSO-Aufnahme ────────────────────────────────
+    ///
+    /// Der Audio-Faden schreibt den demodulierten Ton EINER Scheibe in
+    /// einen bereitgestellten Zwischenspeicher; abgeholt wird im
+    /// Hauptfaden. Kein Signal, kein Schloss, keine
+    /// Speicheranforderung — die drei Dinge, die im Audio-Rueckruf
+    /// nichts zu suchen haben.
+    ///
+    /// Abgegriffen wird VOR MasterMixer und Lautstaerkeregler, also
+    /// derselbe Punkt wie der VAX-Abgriff. Eine Aufnahme soll nicht
+    /// leiser werden, weil jemand am Lautsprecher dreht.
+    ///
+    /// `ring` gehoert dem Aufrufer und muss laenger leben als der
+    /// Abgriff. Zum Abschalten nullptr uebergeben; danach darf der
+    /// Zwischenspeicher weg — der Audio-Faden liest den Zeiger bei
+    /// jedem Block neu.
+    void setQsoTap(AudioTapRing* ring, int sliceId);
+
     void rxBlockReady(int sliceId, const float* samples, int frames);
 
     /// TX-monitor block consumer. Called via Qt::DirectConnection from

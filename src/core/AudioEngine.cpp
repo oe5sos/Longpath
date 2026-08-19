@@ -114,6 +114,7 @@
 // =================================================================
 
 #include "AudioEngine.h"
+#include "core/audio/AudioTapRing.h"
 
 #include "AppSettings.h"
 #include "LogCategories.h"
@@ -1063,6 +1064,21 @@ void AudioEngine::setVaxTxBusForTest(std::unique_ptr<IAudioBus> bus)
 
 #endif
 
+void AudioEngine::setQsoTap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge zaehlt. Beim EINSCHALTEN erst die Scheibe, dann den
+    // Zeiger — sonst sieht der Audio-Faden einen gueltigen Speicher mit
+    // der Scheibe von letztem Mal. Beim ABSCHALTEN erst den Zeiger weg,
+    // dann darf der Aufrufer den Speicher freigeben.
+    if (ring) {
+        m_qsoTapSlice.store(sliceId, std::memory_order_release);
+        m_qsoTap.store(ring, std::memory_order_release);
+    } else {
+        m_qsoTap.store(nullptr, std::memory_order_release);
+        m_qsoTapSlice.store(-1, std::memory_order_release);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1249,6 +1265,21 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                         payloadBytes);
                 }
             }
+        }
+    }
+
+    // ── Abgriff fuer die QSO-Aufnahme ────────────────────────────────
+    //
+    // Derselbe Punkt wie der VAX-Abgriff: vor MasterMixer und
+    // Lautstaerkeregler. Eine Aufnahme soll nicht leiser werden, weil
+    // jemand am Lautsprecher dreht.
+    //
+    // Kein Signal, kein Schloss, keine Speicheranforderung. Der Zeiger
+    // wird bei jedem Block neu gelesen, damit Abschalten sofort wirkt.
+    // Ueberlauf verwirft und zaehlt — siehe AudioTapRing::dropped().
+    if (AudioTapRing* tap = m_qsoTap.load(std::memory_order_acquire)) {
+        if (sliceId == m_qsoTapSlice.load(std::memory_order_acquire)) {
+            tap->write(samples, frames * 2);
         }
     }
 
