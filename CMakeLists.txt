@@ -616,6 +616,7 @@ set(CORE_SOURCES
     src/core/audio/AudioTapRing.cpp
     src/core/audio/QsoRecorderController.cpp
     src/core/audio/WavFile.cpp
+    src/core/audio/WavPlayer.cpp
     src/core/audio/VoiceKeyer.cpp
     src/core/audio/QsoRecorder.cpp
     src/core/AdifParser.cpp

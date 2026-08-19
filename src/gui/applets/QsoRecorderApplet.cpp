@@ -267,12 +267,27 @@ void QsoRecorderApplet::buildUI()
 
         QMenu menu(this);
         menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
+        QAction* listen = menu.addAction(
+            m_player.isPlaying() && m_player.currentPath() == file
+                ? QStringLiteral("Stop playback")
+                : QStringLiteral("Listen (double-click)"));
         QAction* reveal = menu.addAction(QStringLiteral("Show in folder"));
         menu.addSeparator();
         QAction* del = menu.addAction(QStringLiteral("Delete recording"));
 
         const QAction* chosen = menu.exec(m_list->mapToGlobal(pos));
-        if (chosen == reveal) {
+        if (chosen == listen) {
+            if (m_player.isPlaying() && m_player.currentPath() == file) {
+                m_player.stop();
+            } else {
+                QString err;
+                if (!m_player.play(file, &err) && m_lossLabel) {
+                    m_lossLabel->setText(
+                        QStringLiteral("cannot play: %1").arg(err));
+                    m_lossLabel->setVisible(true);
+                }
+            }
+        } else if (chosen == reveal) {
             QDesktopServices::openUrl(
                 QUrl::fromLocalFile(recordingFolder()));
         } else if (chosen == del) {
@@ -282,6 +297,10 @@ void QsoRecorderApplet::buildUI()
                 != QMessageBox::Yes) {
                 return;
             }
+            // Erst anhalten, dann loeschen: eine Datei, die gerade
+            // gespielt wird, unter dem Abspieler wegzuziehen ist der
+            // kuerzeste Weg zu einem Absturz.
+            if (m_player.currentPath() == file) { m_player.stop(); }
             QFile::remove(file);
             QString side = file;
             if (side.endsWith(QStringLiteral(".wav"), Qt::CaseInsensitive)) {
@@ -292,9 +311,32 @@ void QsoRecorderApplet::buildUI()
         }
     });
 
+    // Doppelklick zum Nachhoeren. Nachhoeren gehoert zum Aufnehmen —
+    // aus der Thetis-Durchsicht (PlayFileViaPCAudio,
+    // clsAudioRecordPlayback.cs:1862 [v2.10.3.15-5-g852bf0e]). Der Ton
+    // geht an das Standard-Ausgabegeraet, nicht in den Sender.
+    connect(m_list, &QListWidget::itemDoubleClicked, this,
+            [this](QListWidgetItem* item) {
+        if (!item) { return; }
+        const QString file = item->data(Qt::UserRole).toString();
+        if (file.isEmpty()) { return; }
+
+        if (m_player.isPlaying() && m_player.currentPath() == file) {
+            m_player.stop();
+            return;
+        }
+        QString err;
+        if (!m_player.play(file, &err) && m_lossLabel) {
+            m_lossLabel->setText(QStringLiteral("cannot play: %1").arg(err));
+            m_lossLabel->setVisible(true);
+        }
+    });
+
     m_list->setToolTip(QStringLiteral(
-        "Recordings on disk. Left channel is the other station, right "
-        "channel is your own voice — any audio editor can split them."));
+        "Recordings on disk. Double-click to listen through the speakers "
+        "— nothing is transmitted. Left channel is the other station, "
+        "right channel is your own voice; any audio editor can split "
+        "them."));
     vbox->addWidget(m_list);
 
     vbox->addStretch();

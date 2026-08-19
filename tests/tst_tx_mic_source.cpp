@@ -270,10 +270,35 @@ private slots:
 
         std::vector<double> drained(static_cast<size_t>(kTotal), 0.0);
 
+        // ── Der Vorsprung wird begrenzt, und das ist kein Trick ────────
+        //
+        // Der Ring UEBERSCHREIBT, wenn er voll ist — dokumentiert am
+        // Kopf von inbound() und so gewollt (Thetis Inbound() hat
+        // ebenfalls keine Ueberlaufpruefung, cmbuffs.c:108-109). Er
+        // fasst kRingBlockMultiple == 8 Bloecke.
+        //
+        // Die alte Fassung schob 32 Bloecke mit 50 µs Pause hinein und
+        // verliess sich darauf, dass der Leser mitkommt. Unter Last tut
+        // er das nicht: acht Testlaeufe gleichzeitig, und der Leser
+        // bekommt fuer eine Weile keinen Kern. Dann laeuft der
+        // Schreiber ueber den Ring, der Anfang wird ueberschrieben, und
+        // der Vergleich meldet einen Sprung von genau 512 Werten — acht
+        // Bloecke, also exakt die Ringgroesse. Gefunden in der Nacht
+        // vom 2026-08-19, als fuenf neue Testprogramme die Suite
+        // schwerer machten; der Fehler lag vorher schon da.
+        //
+        // Das Ueberschreiben ist RICHTIG. Falsch war die Annahme des
+        // Tests, der Leser komme immer mit. Der Schreiber wartet jetzt,
+        // sobald er acht Bloecke Vorsprung hat — dieselbe Nebenlaeufig-
+        // keit, nur ohne die Annahme.
+        std::atomic<int> consumed{0};
+
         std::thread prod([&] {
-            // Push in chunks of 1 block at a time with a short yield
-            // between, simulating the 1.33-ms-per-block radio cadence.
             for (int blk = 0; blk < kBlocks; ++blk) {
+                while (blk - consumed.load(std::memory_order_acquire)
+                           >= TxMicSource::kRingBlockMultiple) {
+                    std::this_thread::yield();
+                }
                 src.inbound(produced.data() + blk * kBlk, kBlk);
                 std::this_thread::sleep_for(std::chrono::microseconds(50));
             }
@@ -288,6 +313,7 @@ private slots:
                 for (int i = 0; i < kBlk; ++i) {
                     drained[static_cast<size_t>(blk * kBlk + i)] = tmp[2 * i + 0];
                 }
+                consumed.store(blk + 1, std::memory_order_release);
             }
         });
 

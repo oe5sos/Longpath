@@ -21,7 +21,7 @@ Bereichen stehen aus.
 | 2 | `GetJSONDetailsFromFile` — Beschreibung wieder einlesen | ✅ **erledigt** 19.08. | nein | **hoch** — die Liste zeigt Dateinamen statt QSO |
 | 3 | `OkToRecord(pfad)` + Platzprüfung **während** der Aufnahme (Zeitgeber, stoppt selbst) | ✅ **erledigt** 19.08. (nur vor dem Start, siehe unten) | nein | **hoch** — eine vergessene Aufnahme kann die Platte füllen |
 | 4 | `DeleteRecording(..., delete_containing_folder_if_empty)` | ✅ **erledigt** 19.08. (Rechtsklick in der Liste) | nein | mittel |
-| 5 | `PlayFileViaPCAudio` — Aufnahme über die Lautsprecher anhören | nichts | nein | mittel — Nachhören gehört zum Aufnehmen |
+| 5 | `PlayFileViaPCAudio` — Aufnahme über die Lautsprecher anhören | ✅ **erledigt** 19.08. (Doppelklick in der Liste) | nein | mittel — Nachhören gehört zum Aufnehmen |
 | 6 | `PlayFileViaWDSP(..., adjustGain_dB)` + `MoxOnPlayback` — Datei senden | nichts | **ja** | hoch, aber erst mit Funkgerät prüfbar |
 | 7 | `AudioRecordRxSource.ReceiverInputIQ` — auch I/Q mitschneiden | nur Ton | nein | niedrig (eigenes Vorhaben, Phase 3M) |
 | 8 | `AudioRecordTxSource.TransmitterOutputIQ` | nur Mikrofon | ja | niedrig |
@@ -61,7 +61,7 @@ Braucht dich:
 
 ## Was in der Nacht vom 19. auf den 20. daraus wurde
 
-Punkte 1 bis 4 sind gebaut, mit Tests, ohne Hardware:
+Punkte 1 bis 5 sind gebaut, mit Tests, ohne Hardware:
 
 * **PCM16 mit Dither** (`writeWavStereo16`). Dreieckverteilt, mit festem
   Startwert — dieselbe Aufnahme zweimal gespeichert ergibt zweimal
@@ -77,6 +77,12 @@ Punkte 1 bis 4 sind gebaut, mit Tests, ohne Hardware:
   schreiben erst am Ende, die Frage stellt sich also während der
   Aufnahme nicht.
 * **Löschen per Rechtsklick**, mit Rückfrage; die Beschreibung geht mit.
+* **Nachhören per Doppelklick** (`WavPlayer`). Der Ton geht an das
+  Standard-Ausgabegerät, nicht in den Sender — Thetis' zweiter
+  Wiedergabeweg. Vermerkte Schuld: `TxVoiceCheckDialog.cpp:632-658`
+  macht dasselbe inline, aber einkanalig aus dem Speicher. Die beiden
+  gehören zusammengelegt, sobald jemand Zeit hat; der Hinweis steht in
+  `WavPlayer.h`.
 
 Nebenbei ein Test repariert, der aus Glück grün war: `tst_qso_recorder`
 prüfte, ob sich beide Kanäle zu null mitteln, und verglich **einen**

@@ -39,6 +39,8 @@
 
 #include "AppletWidget.h"
 
+#include "core/audio/WavPlayer.h"
+
 class QLabel;
 class QPushButton;
 class QListWidget;
@@ -79,6 +81,9 @@ private:
     QWidget*     m_txFill{nullptr};
 
     QListWidget* m_list{nullptr};
+
+    // Nachhoeren ueber die Lautsprecher. Sendet nichts.
+    WavPlayer    m_player;
 
     int m_lastRxFrames{0};
     int m_lastTxFrames{0};
