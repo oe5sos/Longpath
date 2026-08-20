@@ -25,6 +25,8 @@
 #include "gui/containers/FloatingContainer.h"
 #include "gui/WindowChrome.h"
 #include <QScreen>
+#include "gui/applets/AppletFloatingWindow.h"
+#include "gui/applets/AppletWidget.h"
 
 using namespace Longpath;
 
@@ -184,6 +186,42 @@ private slots:
                      .arg(form->height()).arg(avail.height())));
         QVERIFY2(form->findChild<ResizeGrip*>() != nullptr,
                  "und einen sichtbaren Anfasser unten rechts haben");
+
+        // ── Und die Applets DARIN einzeln ────────────────────────────
+        //
+        // Der Betreiber, 2026-08-20, mit Blick auf das abgeloeste
+        // „RX1 Main Panel": „im rx panel sind vielen sachen, die
+        // einzeln verschiebbar sein sollen. der recorder ist zum
+        // beispiel dort inkludiert. weiters ist der voice keyer auch
+        // da drinnen."
+        //
+        // Sie tragen ihr ↗ sichtbar in der Kopfleiste. Die Frage ist,
+        // ob es auch WIRKT, wenn die Spalte selbst schon in einem
+        // eigenen Fenster steht — der Weg fuehrt durch
+        // AppletPanelWidget, und dessen Elternschaft hat sich beim
+        // Abloesen geaendert.
+        int detachButtons = 0;
+        QPushButton* one = nullptr;
+        for (QPushButton* b : form->findChildren<QPushButton*>()) {
+            if (b->isVisible() && b->text() == QStringLiteral("↗")) {
+                ++detachButtons;
+                if (!one) { one = b; }
+            }
+        }
+        qDebug() << "Ablöseknoepfe im abgeloesten Container:" << detachButtons;
+        QVERIFY2(detachButtons >= 2,
+                 "jedes Applet im Container MUSS sein eigenes ↗ tragen");
+        QVERIFY(one);
+
+        const int before = mwp->findChildren<AppletFloatingWindow*>().size();
+        QTest::mouseClick(one, Qt::LeftButton);
+        QTest::qWait(500);
+        const int after = mwp->findChildren<AppletFloatingWindow*>().size();
+        QVERIFY2(after == before + 1,
+                 qPrintable(QStringLiteral(
+                     "ein Applet MUSS sich auch aus dem abgeloesten "
+                     "Container einzeln loesen lassen (vorher %1, "
+                     "nachher %2)").arg(before).arg(after)));
     }
 };
 QTEST_MAIN(TestRealContainerMove)

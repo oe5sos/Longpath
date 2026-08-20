@@ -35,6 +35,12 @@ namespace {
 constexpr double kRadiusOfWidth   = 148.0 / 520.0;
 constexpr double kTroughOfRadius  =  13.0 / 148.0;
 constexpr double kPivotFromBottom =  22.0 / 190.0;   // 190 - 168
+// Derselbe Abstand, aber am RADIUS gemessen statt an der Feldhoehe.
+// Der Entwurf ist 520 x 190 mit Radius 148 und 22 px unter dem
+// Drehpunkt — also 22/148. Siehe die Notiz in paintEvent: an der
+// Feldhoehe gemessen wandert der Bogen in einem hohen Feld nach oben
+// und laesst darunter Luft stehen.
+constexpr double kPivotOfRadius   =  22.0 / 148.0;
 // Radius im Verhaeltnis zur Hoehe UEBER dem Drehpunkt. Im Entwurf
 // liegt der Drehpunkt 168 px unter der Oberkante und der Radius ist
 // 148 — der Bogen laesst also 20 px Luft. Dieses Verhaeltnis begrenzt
@@ -168,11 +174,31 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     // so behaelt der Bogen seine Form und passt in jedes Seiten-
     // verhaeltnis, statt in der einen Richtung zu stimmen und in der
     // anderen hinauszulaufen.
-    const QPointF pivot(face.center().x(),
-                        face.bottom() - face.height() * kPivotFromBottom);
-    const qreal radiusByWidth  = face.width() * kRadiusOfWidth;
-    const qreal radiusByHeight = (pivot.y() - face.top()) * kRadiusOfPivotHeight;
+    // ── Und er soll die Flaeche AUSFUELLEN ───────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „auch der swr zeiger sollte
+    // flaechenfuellender sein."
+    //
+    // Der Drehpunkt hing an der HOEHE des Feldes
+    // (face.height() * 22/190). In einem hohen Feld rutscht er damit
+    // weit nach oben, der Bogen sitzt in der oberen Haelfte, und
+    // darunter bleibt Luft, die niemand braucht. Auf seinem Bild war
+    // das Feld rund 460 x 290; der Abstand unter dem Drehpunkt betrug
+    // damit 34 px statt der 22 des Entwurfs.
+    //
+    // Jetzt haengt der Abstand am RADIUS: der Bogen behaelt sein
+    // Verhaeltnis und sitzt immer gleich tief ueber dem unteren Rand,
+    // egal wie hoch das Feld ist. Weil der Radius selbst aus der Hoehe
+    // kommt, muss beides gemeinsam geloest werden — daher erst der
+    // Radius aus der vollen Hoehe, dann der Drehpunkt daraus.
+    const qreal radiusByWidth = face.width() * kRadiusOfWidth;
+    // h = radius/kRadiusOfPivotHeight + radius*kPivotOfRadius, nach
+    // radius aufgeloest.
+    const qreal radiusByHeight =
+        face.height() / (1.0 / kRadiusOfPivotHeight + kPivotOfRadius);
     const qreal radius = qMin(radiusByWidth, radiusByHeight);
+    const QPointF pivot(face.center().x(),
+                        face.bottom() - radius * kPivotOfRadius);
     const qreal trough = radius * kTroughOfRadius;
 
     ArcSpine spine(pivot, radius, trough, kDeg0, kDeg1);

@@ -5976,6 +5976,39 @@ void MainWindow::populateDefaultMeter()
     // kennen. Also drin steht, wonach jemand SUCHEN wuerde, nicht was
     // der Titel ohnehin schon sagt.
     //
+    // ── Feinere Aufteilung (2026-08-20) ──────────────────────────────
+    //
+    // Der Betreiber: „bei der auswahl der widget sollte es mehr
+    // aufteilung geben, um mehr auswaehlbar sein um individueller
+    // auswaehlen zu koennen."
+    //
+    // Vorher lagen 17 Applets in 8 Toepfen, und die grossen waren die
+    // unbrauchbaren: unter „Empfang" standen Frequenz, RX, S-Meter und
+    // Bandfilter nebeneinander — vier Dinge, die man zu verschiedenen
+    // Zeiten sucht. Unter „Audio" lagen VAX, Sprachspeicher und
+    // Aufnahme, die ausser dem Wort Audio nichts teilen.
+    //
+    // Jetzt 12 Toepfe, geschnitten nach dem, WOFUER man etwas sucht,
+    // nicht nach dem Baustein:
+    //
+    //   Abstimmen        Frequenz
+    //   Empfang          RX
+    //   Senden           TX
+    //   Betriebsart      Phone/CW
+    //   Messanzeigen     S-Meter, Stehwelle
+    //   Filter           Bandfilter
+    //   Sprachspeicher   DVK
+    //   Aufnahme         QSO-Recorder
+    //   Audio            VAX
+    //   Digital          RADE
+    //   Linearisierung   PureSignal
+    //   Endstufen        Verstaerker, RF-Kit
+    //   Tuner            Tuner
+    //   Netzwerk         TCI, Client-Kette
+    //
+    // Die Schlagwoerter bleiben unangetastet: wer „swr" tippt, findet
+    // die Stehwelle weiterhin, egal in welchem Topf sie steht.
+    //
     // Die Reihenfolge der Kategorien ergibt sich aus der Anmeldung
     // oben, nicht aus dem Alphabet — siehe categories().
     // Die beiden Instrumente. Ohne describeApplet landen sie im
@@ -5984,18 +6017,18 @@ void MainWindow::populateDefaultMeter()
     // wer „swr" oder „zeiger" eingibt, soll sie finden, ohne den
     // Applet-Namen zu kennen.
     m_appletVis->describeApplet(QStringLiteral("Frequency"),
-        QStringLiteral("Empfang"),
+        QStringLiteral("Abstimmen"),
         {QStringLiteral("frequenz"), QStringLiteral("vfo"),
          QStringLiteral("qrg"), QStringLiteral("band"),
          QStringLiteral("abstimmen"), QStringLiteral("split"),
          QStringLiteral("mhz")});
     m_appletVis->describeApplet(QStringLiteral("SwrInstrument"),
-        QStringLiteral("Senden"),
+        QStringLiteral("Messanzeigen"),
         {QStringLiteral("swr"), QStringLiteral("stehwelle"),
          QStringLiteral("anpassung"), QStringLiteral("zeiger"),
          QStringLiteral("instrument"), QStringLiteral("balken")});
     m_appletVis->describeApplet(QStringLiteral("SignalInstrument"),
-        QStringLiteral("Empfang"),
+        QStringLiteral("Messanzeigen"),
         {QStringLiteral("s-meter"), QStringLiteral("smeter"),
          QStringLiteral("signal"), QStringLiteral("pegel"),
          QStringLiteral("zeiger"), QStringLiteral("instrument"),
@@ -6013,7 +6046,7 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("vox"), QStringLiteral("tune"),
          QStringLiteral("swr"), QStringLiteral("mikrofon")});
     m_appletVis->describeApplet(QStringLiteral("PhoneCw"),
-        QStringLiteral("Senden"),
+        QStringLiteral("Betriebsart"),
         {QStringLiteral("cw"), QStringLiteral("morse"),
          QStringLiteral("keyer"), QStringLiteral("phone"),
          QStringLiteral("wpm"), QStringLiteral("paddle")});
@@ -6030,23 +6063,23 @@ void MainWindow::populateDefaultMeter()
     // keine Beschreibung und landete in „Sonstiges" — meine eigene
     // Auslassung von heute frueh.
     m_appletVis->describeApplet(QStringLiteral("Dvk"),
-        QStringLiteral("Audio"),
+        QStringLiteral("Sprachspeicher"),
         {QStringLiteral("dvk"), QStringLiteral("sprachspeicher"),
          QStringLiteral("ansage"), QStringLiteral("cq"),
          QStringLiteral("voice keyer"), QStringLiteral("wav")});
     m_appletVis->describeApplet(QStringLiteral("QsoRec"),
-        QStringLiteral("Audio"),
+        QStringLiteral("Aufnahme"),
         {QStringLiteral("aufnahme"), QStringLiteral("recorder"),
          QStringLiteral("qso"), QStringLiteral("mitschnitt"),
          QStringLiteral("wav"), QStringLiteral("stereo")});
     m_appletVis->describeApplet(QStringLiteral("BwFilter"),
-        QStringLiteral("Empfang"),
+        QStringLiteral("Filter"),
         {QStringLiteral("filter"), QStringLiteral("bandbreite"),
          QStringLiteral("durchlass"), QStringLiteral("passband"),
          QStringLiteral("low cut"), QStringLiteral("high cut"),
          QStringLiteral("shift")});
     m_appletVis->describeApplet(QStringLiteral("PureSignal"),
-        QStringLiteral("Senden"),
+        QStringLiteral("Linearisierung"),
         {QStringLiteral("puresignal"), QStringLiteral("ps"),
          QStringLiteral("linearisierung"), QStringLiteral("vorverzerrung"),
          QStringLiteral("zweiton")});
