@@ -51,9 +51,31 @@ namespace Longpath::Style {
 // docs/design/HAUSSTIL.md.
 constexpr auto kAppBg           = "#08080a";   // war #0f0f1a
 constexpr auto kPanelBg         = "#0c0c0e";   // war #0a0a18
-constexpr auto kTextPrimary     = "#c4c4c9";   // war #c8d8e8
-constexpr auto kTextSecondary   = "#8e8e93";
-constexpr auto kTextTertiary    = "#76767a";
+// ── Die Textleiter, 2026-08-20 angehoben ─────────────────────────────
+//
+// Der Betreiber: „generell ist die schrift sehr dunkel. heller waere
+// besser. zahlen und zeiger aufhellen."
+//
+// Angehoben wurde die GANZE Leiter, nicht einzelne Werte. Die Abstaende
+// zwischen den Stufen tragen die Bedeutung (Fliesstext vor Nebentext
+// vor Skala vor Inaktiv); haette man nur die dunkelste angehoben, waere
+// sie ihrer Nachbarin zu nah gekommen und der Unterschied zwischen
+// „leise" und „aus" verloren.
+//
+//   text          #c4c4c9 -> #dcdce1
+//   title-text    #a8a8ae -> #c4c4ca
+//   secondary     #8e8e93 -> #a6a6ac
+//   tertiary      #76767a -> #909096
+//   scale         #5c5c60 -> #7e7e85     Skalen und Gradzahlen
+//   inactive      #3d3d41 -> #58585e
+//   measured      #c2924f -> #d8a55f     Zeiger und Messwerte
+//
+// Dieselben Werte stehen ein zweites Mal in themes/oe5sos.json: die
+// Palette bedient den Malcode, die Themendatei die Stylesheets. Wer
+// eine der beiden aendert, muss die andere mitziehen.
+constexpr auto kTextPrimary     = "#dcdce1";   // war #c8d8e8, dann #c4c4c9
+constexpr auto kTextSecondary   = "#a6a6ac";
+constexpr auto kTextTertiary    = "#909096";
 // ── Sechs Schriftstufen ─────────────────────────────────────────────
 //
 // OE5SOS, 2026-08-18: „sechs Stufen, QFont::setLetterSpacing, benannte
@@ -94,13 +116,13 @@ constexpr int kFontDisplay = 38;
 /// dort schon einmal eine Stunde gekostet.
 constexpr double kCapsTracking = 0.18;
 
-constexpr auto kTextScale       = "#5c5c60";
-constexpr auto kTextInactive    = "#3d3d41";
+constexpr auto kTextScale       = "#7e7e85";
+constexpr auto kTextInactive    = "#58585e";
 // NereusSDR-original — used in 5+ places for AGC-T / pan / similar labels;
 // sits between kTextSecondary (#8090a0) and kTextScale (#607080).
 constexpr auto kLabelMid        = "#828288";
 constexpr auto kAccent          = "#4a7ba8";
-constexpr auto kTitleText       = "#a8a8ae";
+constexpr auto kTitleText       = "#c4c4ca";
 
 // Borders & Surfaces
 //
@@ -143,7 +165,7 @@ constexpr auto kBlueText        = "#cfe2f5";
 constexpr auto kBlueBorder      = "#2f5c86";
 constexpr auto kBlueHover       = "#2d5885";
 constexpr auto kAmberBg         = "#33280f";
-constexpr auto kAmberText       = "#c2924f";
+constexpr auto kAmberText       = "#d8a55f";
 // Die gedaempfte Messwertstufe. Sie stand bis 2026-08-17 dreimal als
 // nacktes #6b5630 im Baum -- dateilokal in HGauge.cpp:13, noch einmal
 // in InstrumentPainter.cpp und als Literal in VfoWidget. Eine Farbe mit

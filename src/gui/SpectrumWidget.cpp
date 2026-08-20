@@ -7243,8 +7243,11 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(pt, radius, radius);
     };
-    drawMarker(f0L,   QColor("#c2924f"), 6.0f);
-    drawMarker(f0U,   QColor("#c2924f"), 6.0f);
+    // Aus der Palette, nicht als Zahl: #c2924f war der Wert von
+    // kAmberText bis zur Aufhellung am 2026-08-20. Eine abgeschriebene
+    // Farbe erfaehrt von einer Aenderung an der Vorlage nichts.
+    drawMarker(f0L,   QColor(QString::fromLatin1(Style::kAmberText)), 6.0f);
+    drawMarker(f0U,   QColor(QString::fromLatin1(Style::kAmberText)), 6.0f);
     drawMarker(imd3L, QColor("#c25a5c"), 5.0f);
     drawMarker(imd3U, QColor("#c25a5c"), 5.0f);
     drawMarker(imd5L, QColor("#c25a5c"), 4.0f);

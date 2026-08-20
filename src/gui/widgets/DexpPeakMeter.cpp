@@ -58,6 +58,8 @@
 
 #include "DexpPeakMeter.h"
 
+#include "gui/StyleConstants.h"
+
 #include <QPaintEvent>
 #include <QPainter>
 
@@ -67,17 +69,31 @@ namespace Longpath {
 
 namespace {
 
-// NereusSDR-original palette per plan §9.1.  Hex callouts kept in
-// the trailing comment so a designer audit can grep for them.
-constexpr QColor kBg            {  8,   8,  10};   // kInsetBg — versenkter Grund
-constexpr QColor kBorder        { 44,  44,  49};   // kBorder — 1 px frame
+// ── Aus der Palette, nicht abgeschrieben ─────────────────────────────
+//
+// Hier standen RGB-Tripel, die die Palette von Hand nachbildeten:
+// {194,146,79} fuer kAmberText, {44,44,49} fuer kBorder und so fort,
+// mit dem Namen der Konstanten nur im Kommentar dahinter.
+//
+// Am 2026-08-20 hat der Betreiber die ganze Textleiter aufhellen
+// lassen. kAmberText ging dabei von #c2924f auf #d8a55f — und dieses
+// Messwerkzeug blieb dunkel, weil eine abgeschriebene Zahl von einer
+// Aenderung an der Vorlage nichts erfaehrt. Aufgefallen ist es nur,
+// weil tst_dexp_peak_meter die gemalte Farbe gegen Style::kAmberText
+// prueft statt gegen eine zweite Abschrift.
+//
+// constexpr faellt damit weg: QColor laesst sich nicht constexpr aus
+// einer Zeichenkette bauen. Der Preis ist ein Funktionsaufruf je
+// Zeichenvorgang bei einem Widget von 8 px Hoehe — kein Preis.
+const QColor kBg            {QString::fromLatin1(Style::kInsetBg)};
+const QColor kBorder        {QString::fromLatin1(Style::kBorder)};
 // Aussteuerung ist gemessen, nicht ein Zustand: Bernstein statt
 // Signalgruen. Siehe die Notiz in VfoStyles.h.
-constexpr QColor kGreenPeak     {194, 146,  79};   // kAmberText — Messwert
+const QColor kGreenPeak     {QString::fromLatin1(Style::kAmberText)};
 // Ueber der Schwelle ist es keine Messung mehr, sondern eine
 // Warnung: uebersteuert. Bleibt kraeftig und wird nicht gedaempft.
-constexpr QColor kRedOverlay    {168, 107, 109};   // kRedBorder — uebersteuert
-constexpr QColor kRedThreshLine {168, 107, 109};   // kRedBorder — Schwellenmarke
+const QColor kRedOverlay    {QString::fromLatin1(Style::kRedBorder)};
+const QColor kRedThreshLine {QString::fromLatin1(Style::kRedBorder)};
 
 } // namespace
 

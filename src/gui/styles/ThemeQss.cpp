@@ -86,6 +86,18 @@ const QVector<ThemeEntry>& table()
         { "sel-hover",         "#0088d8", Style::kBlueHover },
         { "measured-bg",       "#604000", Style::kAmberBg },
         { "measured",          "#ffb800", Style::kAmberText },
+        // Zweiter Vorgaenger derselben Rolle.
+        //
+        // Der Quelltext schreibt an 67 Stellen #c2924f hin — das war
+        // der Wert von kAmberText, bis die Textleiter am 2026-08-20
+        // auf #d8a55f angehoben wurde. In der Tabelle stand als
+        // „legacy" aber nur der noch aeltere Wert #ffb800, und damit
+        // blieben alle 67 Stellen im alten, dunkleren Ton stehen,
+        // waehrend der Rest heller wurde.
+        //
+        // Eine Rolle darf mehrere Vorgaenger haben: `seen` schluesselt
+        // auf den legacy-Wert, nicht auf die Rolle.
+        { "measured",          "#c2924f", Style::kAmberText },
         { "measured-border",   "#906000", Style::kAmberBorder },
         { "warn",              "#ddbb00", Style::kAmberWarn },
         { "danger-bg",         "#cc2222", Style::kRedBg },
