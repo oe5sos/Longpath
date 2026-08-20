@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Longpath — das PROGRAMMSYMBOL.
+
+  Nicht dasselbe wie die Bildmarke: macOS erwartet eine abgerundete
+  Kachel, kein freistehendes Zeichen. Ein nacktes Zeichen sieht im Dock
+  zwischen lauter Kacheln aus wie ein Fehler — und wenn es dann noch
+  auf Weiss gerendert wird, wie ein Loch.
+
+  Masse nach Apples Raster (Big Sur und spaeter):
+    Leinwand      1024 x 1024
+    Kachel         824 x 824, mittig (also 100 Rand rundum)
+    Eckradius      185 (rund 22,4 % der Kachelbreite)
+
+  Farben aus src/gui/StyleConstants.h — die Kachel traegt denselben
+  Verlauf wie die Titelleisten im Programm, damit Symbol und Anwendung
+  zusammengehoeren.
+
+  © 2026 Martin Fischer (OE5SOS). GPL, wie das ganze Programm.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"
+     width="1024" height="1024" role="img"
+     aria-label="Longpath">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#26262b"/>
+      <stop offset="0.5" stop-color="#16161a"/>
+      <stop offset="1"   stop-color="#0b0b0e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Die Kachel -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185"
+        fill="url(#tile)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" ry="184.5"
+        fill="none" stroke="#33333b" stroke-width="1"/>
+
+  <!-- Das Zeichen, mittig. Der Ring hat r=210 bei Mitte 512, also
+       gut 200 Luft zur Kachelkante — Apples Raster will das Motiv
+       deutlich innerhalb der Rundung. -->
+  <g transform="translate(512,512)">
+    <circle cx="0" cy="0" r="210" fill="none" stroke="#c4c4c9" stroke-width="58"/>
+    <path d="M -152 -105 A 210 210 0 0 0 0 210 A 210 210 0 0 0 152 -105"
+          fill="none" stroke="#c2924f" stroke-width="47" stroke-linecap="round"/>
+  </g>
+</svg>

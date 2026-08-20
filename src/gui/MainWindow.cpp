@@ -1283,17 +1283,53 @@ void MainWindow::returnAppletFromCanvas(const QString& id)
     }
 }
 
+// ── WARUM HIER ECHTE FENSTER STEHEN UND KEINE KACHELN ────────────────
+//
+// Am 2026-08-20 habe ich einen halben Tag lang Kacheln gebaut:
+// ContainerWidget im Zustand OverlayDocked, absolute Lage ueber dem
+// Hauptbereich, Ziehen an der Titelleiste. Die Tests waren gruen, auf
+// dem Schirm aenderte sich NICHTS. Der Betreiber hat es viermal
+// gemeldet, bevor ich den Grund gesucht habe statt weiterzubauen.
+//
+// Der Grund steht in unserem eigenen Quelltext, SpectrumWidget.cpp:551:
+//
+//     „QRhiWidget with WA_NativeWindow on macOS does not support
+//      child widget overlays"
+//
+// Der Panadapter ist ein NATIVES Fenster (setAttribute(WA_NativeWindow),
+// SpectrumWidget.cpp:519). Auf macOS zeichnet ein natives NSView immer
+// UEBER allen nicht-nativen Geschwistern — unabhaengig von raise() und
+// unabhaengig von der Reihenfolge im Baum. Die Kacheln hingen als
+// Kinder derselben Flaeche und lagen damit hinter dem Panadapter.
+//
+// Das ist keine Frage von mehr Muehe. Es ist strukturell. Zeus Link
+// kann in-Fenster-Kacheln, weil Zeus im BROWSER laeuft und seine
+// „Fenster" DOM-Elemente sind; dort gibt es keine nativen Geschwister.
+//
+// AetherSDR ist gegen dieselbe Wand gelaufen und hat dieselbe Antwort
+// gefunden: FloatingContainerWindow — ECHTE Fenster. Die liegen immer
+// oben, lassen sich ueberall hinschieben, in der Groesse aendern, auf
+// einen zweiten Schirm ziehen, und ihre Geometrie steht im Profil.
+//
+// Genau das tut detachApplet, und genau das gab es schon, bevor ich
+// angefangen habe. Mein Pfeil im Fensterkopf zeigte eine Zeit lang auf
+// den Kachelweg — das war eine Verschlechterung, und sie ist
+// zurueckgenommen.
 void MainWindow::moveAllAppletsToCanvas()
 {
     if (!m_appletPanel) { return; }
 
-    // Ab jetzt kommen auch NEUE Fenster als Kachel. Sonst waere das
-    // hier eine einmalige Aktion, und das naechste Fenster aus dem
-    // Plus laege wieder im Stapel.
-    setFreeCanvasMode(true);
+    // Kopie der Liste: detachApplet nimmt das Applet aus m_applets
+    // heraus, und wer waehrend des Herausnehmens ueber dieselbe Liste
+    // laeuft, ueberspringt jedes zweite.
     const QList<AppletWidget*> all = m_appletPanel->applets();
     for (AppletWidget* a : all) {
-        moveAppletToCanvas(a);
+        detachApplet(a, m_appletPanel->appletPosition(a));
+    }
+
+    if (m_layoutProfiles) {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
     }
 }
 
@@ -1459,13 +1495,12 @@ void MainWindow::applyAppletVisibility(const QString& id, bool effective)
             // eigene Lage. Sonst muesste man jedes neue Fenster erst
             // wieder von Hand freistellen — und dann ist das Plus nur
             // ein halber Weg.
-            if (effective && m_freeCanvasMode) {
-                if (!m_canvasApplets.contains(id)) {
-                    if (!m_appletPanel->applets().contains(a)) {
-                        m_appletPanel->addApplet(a);
-                    }
-                    moveAppletToCanvas(a);
+            if (effective && m_freeCanvasMode
+                && !m_floatingApplets.contains(id)) {
+                if (!m_appletPanel->applets().contains(a)) {
+                    m_appletPanel->addApplet(a);
                 }
+                detachApplet(a, m_appletPanel->appletPosition(a));
                 return;
             }
 
@@ -6144,8 +6179,7 @@ void MainWindow::populateDefaultMeter()
         // der Wiederherstellung gespeicherter Fenster.
         connect(m_appletPanel, &AppletPanelWidget::appletDetachRequested,
                 this, [this](AppletWidget* a, int dockIndex) {
-            Q_UNUSED(dockIndex)
-            moveAppletToCanvas(a);
+            detachApplet(a, dockIndex);
             if (m_layoutProfiles) {
                 m_layoutProfiles->captureIntoCurrent();
                 m_layoutProfiles->save();
@@ -7369,7 +7403,7 @@ void MainWindow::buildMenuBar()
     // Hand zu warten.
     if (m_appletPanel) {
         m_freeCanvasAction = containersMenu->addAction(
-            QStringLiteral("Fenster frei platzieren"));
+            QStringLiteral("Neue Fenster gleich ablösen"));
         m_freeCanvasAction->setCheckable(true);
         m_freeCanvasAction->setChecked(m_freeCanvasMode);
         m_freeCanvasAction->setToolTip(QStringLiteral(
@@ -7390,10 +7424,11 @@ void MainWindow::buildMenuBar()
     // im Kopf.
     if (m_appletPanel) {
         QAction* freeAll = containersMenu->addAction(
-            QStringLiteral("Alle Fenster frei stellen"));
+            QStringLiteral("Alle Fenster als eigene Fenster ablösen"));
         freeAll->setToolTip(QStringLiteral(
-            "Jedes Fenster bekommt eine eigene Lage auf der Flaeche und "
-            "laesst sich frei schieben — wie bei Zeus."));
+            "Jedes Fenster wird ein eigenes Betriebssystem-Fenster: "
+            "ueberall hinschiebbar, in der Groesse aenderbar, auch auf "
+            "einen zweiten Schirm. Zurueck ueber das ✕ am Fenster."));
         connect(freeAll, &QAction::triggered,
                 this, &MainWindow::moveAllAppletsToCanvas);
     }
