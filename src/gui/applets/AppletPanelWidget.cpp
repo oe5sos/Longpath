@@ -286,11 +286,19 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     titleLayout->setContentsMargins(2, 0, 4, 0);
     titleLayout->setSpacing(4);
 
-    // Grip dots (⋮⋮) — from AetherSDR: #607080, 10px
-    auto* grip = new QLabel(QStringLiteral("\u22EE\u22EE"), titleBar);
+    // ── Der Griff ist ein gelber Strich ──────────────────────────────
+    //
+    // War „⋮⋮" in kTextScale — grau auf grau. Der Betreiber hat am
+    // 2026-08-19 zum Container-Kopf gesagt: „die 6 punkte vor dem titel
+    // koennten farbe benoetigen oder wie bei zeus der gelbe strich."
+    // Dasselbe gilt hier: Zeus Link setzt vor JEDEN Fensternamen
+    // denselben bernsteinfarbenen Strich (Bildschirmvideo 2026-08-20,
+    // sichtbar an PANADAPTER, FREQUENCY·VFO und S-METER).
+    auto* grip = new QLabel(titleBar);
+    grip->setFixedWidth(3);
     grip->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 11px; background: transparent; }"
-    ).arg(Style::kTextScale));
+        "QLabel { background: %1; border-radius: 1px; margin: 3px 0; }"
+    ).arg(QString::fromLatin1(Style::kAmberText)));
     titleLayout->addWidget(grip);
 
     // Title label — from AetherSDR: #8aa8c0, 10px bold
@@ -308,6 +316,55 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
         // state — callers manage show/hide via their own API (e.g.
         // setBannerMenu for the ☰ button).
         titleLayout->addWidget(trailing);
+    }
+
+    // ── Ablösen und Schliessen, SICHTBAR ─────────────────────────────
+    //
+    // Beides gab es schon: „Als Fenster ablösen" im Rechtsklick-Menue
+    // der Titelleiste (seit 2026-08-16) und das Ausblenden ueber
+    // Containers-Menue und ☰. Der Betreiber hat trotzdem gesagt „man
+    // kann alles x beliebig verschieben! das geht bei uns nicht!" —
+    // weil ein Weg, den man nicht sieht, kein Weg ist.
+    //
+    // Zeus Link setzt beides sichtbar in jede Fensterleiste
+    // (Bildschirmvideo 2026-08-20: Schloss und ✕ rechts in JEDEM
+    // Fensterkopf). Hier dasselbe.
+    //
+    // Nur wenn der Empfaenger hinhoert: das Panel loest NICHT selbst ab
+    // (siehe appletDetachRequested im Kopf) und weiss auch nichts vom
+    // Ausblenden. Ohne angeschlossenen Empfaenger waere der Knopf ein
+    // Versprechen, das niemand einloest.
+    if (AppletWidget* aw = qobject_cast<AppletWidget*>(child)) {
+        const QString btnCss = QStringLiteral(
+            "QPushButton { background: transparent; border: none;"
+            "  color: %1; font-size: 10px; padding: 0; }"
+            "QPushButton:hover { background: %2; color: %3;"
+            "  border-radius: 3px; }")
+            .arg(QString::fromLatin1(Style::kTextScale),
+                 QString::fromLatin1(Style::kButtonHover),
+                 QString::fromLatin1(Style::kTextPrimary));
+
+        auto* detach = new QPushButton(QStringLiteral("\u2197"), titleBar);
+        detach->setFixedSize(16, 14);
+        detach->setCursor(Qt::PointingHandCursor);
+        detach->setToolTip(QStringLiteral(
+            "Als eigenes Fenster ablösen — dann frei verschiebbar."));
+        detach->setStyleSheet(btnCss);
+        connect(detach, &QPushButton::clicked, this, [this, aw]() {
+            emit appletDetachRequested(aw, appletPosition(aw));
+        });
+        titleLayout->addWidget(detach);
+
+        auto* close = new QPushButton(QStringLiteral("\u2715"), titleBar);
+        close->setFixedSize(16, 14);
+        close->setCursor(Qt::PointingHandCursor);
+        close->setToolTip(QStringLiteral(
+            "Ausblenden. Mit dem + unten rechts kommt es zurück."));
+        close->setStyleSheet(btnCss);
+        connect(close, &QPushButton::clicked, this, [this, aw]() {
+            emit appletHideRequested(aw);
+        });
+        titleLayout->addWidget(close);
     }
 
     wrapLayout->addWidget(titleBar);

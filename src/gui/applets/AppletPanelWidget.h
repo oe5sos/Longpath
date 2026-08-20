@@ -176,6 +176,11 @@ signals:
     /// kann, wo es herkam.
     void appletDetachRequested(AppletWidget* applet, int dockIndex);
 
+    /// Das ✕ im Fensterkopf. Wie beim Ablösen macht das Panel es NICHT
+    /// selbst: es kennt die Sichtbarkeitsverwaltung nicht. MainWindow
+    /// hoert zu und setzt AppletVisibilityController.
+    void appletHideRequested(AppletWidget* applet);
+
 protected:
     void resizeEvent(QResizeEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;

@@ -996,6 +996,83 @@ QString MainWindow::canonicalAppletKey(const QString& key) const
     return AppletKeys::canonical(m_appletsById, key);
 }
 
+// ── Ein Applet auf die freie Flaeche legen ───────────────────────────
+//
+// OE5SOS, 2026-08-20, zum zehnten Mal: „man kann alles x beliebig
+// verschieben! das geht bei uns nicht!"
+//
+// Er hat recht, und der Grund ist keine fehlende Taste: unsere
+// Oberflaeche ist ein QSplitter-Geruest — Spektrum links, Applet-STAPEL
+// rechts, Rotor unten. Ein Stapel hat keine Positionen, nur eine
+// Reihenfolge. Da hilft kein Knopf.
+//
+// Zeus Link legt jedes Fenster als KACHEL mit eigener Position auf eine
+// freie Flaeche (Bildschirmvideo 2026-08-20: neues Layout = leere
+// Flaeche, Fenster einzeln hinzugefuegt, frei geschoben, an den Ecken
+// gezogen, aneinander geschnappt).
+//
+// Genau das kann ContainerWidget im Zustand OverlayDocked seit Phase
+// 3G-1: absolute Lage ueber dem Hauptbereich, Ziehen an der
+// Titelleiste, Groesse an der Ecke, Schloss. Was fehlte, war der Weg
+// von einem Applet DORTHIN — detachApplet macht ein eigenes
+// Betriebssystem-Fenster daraus, was etwas anderes ist.
+//
+// Hier ist der Weg. Das Applet verlaesst den Stapel und bekommt eine
+// Kachel; von da an gilt fuer es alles, was fuer Container gilt.
+void MainWindow::moveAppletToCanvas(AppletWidget* applet)
+{
+    if (!applet || !m_appletPanel || !m_containerManager) { return; }
+
+    const QString id = panelIdFor(applet);
+    if (id.isEmpty() || m_canvasApplets.contains(id)) { return; }
+
+    // Erst aus dem Stapel nehmen, dann umhaengen. Andersherum haelt das
+    // Panel einen Zeiger auf ein Widget, das schon woanders lebt.
+    const int dockIndex = m_appletPanel->appletPosition(applet);
+    m_appletPanel->removeApplet(applet);
+
+    ContainerWidget* tile =
+        m_containerManager->createContainer(1, DockMode::OverlayDocked);
+    if (!tile) { return; }
+
+    tile->setNotes(m_appletVis ? m_appletVis->displayName(id) : id);
+    tile->setContent(applet);
+    applet->show();
+
+    // Versetzt legen, nicht gestapelt: zwei Kacheln genau uebereinander
+    // sehen aus wie eine, und man sucht die zweite.
+    const int n = static_cast<int>(m_canvasApplets.size());
+    tile->setDockedLocation(QPoint(40 + 26 * n, 40 + 26 * n));
+    tile->setDockedSize(QSize(360, 260));
+    tile->restoreLocation();
+    tile->show();
+    tile->raise();
+
+    m_canvasApplets.insert(id, tile->id());
+
+    Q_UNUSED(dockIndex)
+
+    if (m_layoutProfiles) {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
+    }
+}
+
+// Alles auf einmal. „es muss alles auf den mm verschoben werden
+// koennen. jedes window! jeder panel, ueberall" (OE5SOS, 2026-08-20).
+//
+// Ueber eine Kopie der Liste: moveAppletToCanvas nimmt das Applet aus
+// m_applets heraus, und wer waehrend des Herausnehmens ueber dieselbe
+// Liste laeuft, ueberspringt jedes zweite.
+void MainWindow::moveAllAppletsToCanvas()
+{
+    if (!m_appletPanel) { return; }
+    const QList<AppletWidget*> all = m_appletPanel->applets();
+    for (AppletWidget* a : all) {
+        moveAppletToCanvas(a);
+    }
+}
+
 void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                               const QRect& rect, const QString& screenKey)
 {
@@ -5441,22 +5518,27 @@ void MainWindow::populateDefaultMeter()
     // the dspModeChanged lambda further down. The menu toggle here is a
     // user override that lasts until the next mode change repopulates
     // visibility. Acceptable for v1; tighter integration is a follow-up.
-    // ── BEIM START IST DIE FLAECHE LEER ──────────────────────────────
+    // ── „LEER BEIM START" GAB ES SCHON, NUR WOANDERS ─────────────────
     //
-    // Auf Ansage des Betreibers (2026-08-20): „zum start im linken
-    // menue, wenn ich neu starte, sollte alles leer sein. danach soll
-    // ich mit plus jedes windows adden koennen und verschieben."
-    // Vorbild ist Zeus Link, das genau so aufmacht.
+    // Am 2026-08-20 habe ich hier alle 17 Fenster auf „unsichtbar"
+    // vorgegeben, weil der Betreiber sagte, beim Start solle alles leer
+    // sein. FALSCH, und am selben Tag zurueckgenommen.
     //
-    // Umgesetzt ueber die VORGABE, nicht ueber ein Loeschen: wer schon
-    // eine Anordnung eingerichtet hat, hat sie in AppSettings stehen
-    // und behaelt sie. Leer ist nur, wer noch nichts gewaehlt hat.
-    // Eine gewachsene Anordnung ungefragt wegzuraeumen waere kein
-    // Umbau, sondern ein Datenverlust.
+    // Das Bildschirmvideo zeigt, was er meint: in Zeus Link legt das
+    // Plus in der linken Leiste ein NEUES LAYOUT an, und DAS ist leer —
+    // das vorhandene behaelt seine Fenster. Genau das gibt es bei uns
+    // seit dem 2026-08-15, auf seine eigene Ansage hin, im
+    // newProfileRequested-Empfaenger (MainWindow.cpp, „Leer, nicht als
+    // Kopie").
     //
-    // Die zwei Chrome-Eintraege (Knopfleiste am Spektrum, Statuszeile)
-    // bleiben AN: das sind keine Fenster, die man hinzufuegt, sondern
-    // Teile des Rahmens.
+    // Eine globale Vorgabe waere etwas anderes gewesen: sie haette
+    // jede frische Installation mit einer leeren Flaeche begruesst,
+    // auch die von jemandem, der nie ein Layout anlegt. Zeus tut das
+    // nicht — dort steht beim ersten Start das Layout „D" mit Fenstern
+    // darin.
+    //
+    // Was bleibt: „Alle Fenster ausblenden" im Containers-Menue, fuer
+    // den, der EINMAL aufraeumen will.
     m_appletVis = new AppletVisibilityController(this);
 
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
@@ -5493,11 +5575,11 @@ void MainWindow::populateDefaultMeter()
     // permanently hide it. Defaulting to true here means new G2 users see
     // PS immediately without having to discover the menu toggle.
     m_appletVis->registerApplet(QStringLiteral("Rx"),
-                                QStringLiteral("RX"),           false);
+                                QStringLiteral("RX"),           true);
     m_appletVis->registerApplet(QStringLiteral("Tx"),
-                                QStringLiteral("TX"),           false);
+                                QStringLiteral("TX"),           true);
     m_appletVis->registerApplet(QStringLiteral("PhoneCw"),
-                                QStringLiteral("Phone / CW"),   false);
+                                QStringLiteral("Phone / CW"),   true);
     // RADE: defaultVisible=true (user pref). Actual visibility is gated
     // on the active slice's mode via the availability axis — the
     // dspModeChanged lambda below calls setAvailable(true) only when
@@ -5505,37 +5587,37 @@ void MainWindow::populateDefaultMeter()
     // since the default startup mode is USB; the mode lambda fires
     // shortly after to correct it if needed.
     m_appletVis->registerApplet(QStringLiteral("Rade"),
-                                QStringLiteral("RADE"),         false);
+                                QStringLiteral("RADE"),         true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
-                                QStringLiteral("VAX"),          false);
+                                QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
     // Funkgeraet brauchbar (Ansagen laden, benennen, Tasten zuordnen),
     // und ein Merkmal, das man erst in einem Menue suchen muss, findet
     // niemand.
     m_appletVis->registerApplet(QStringLiteral("Dvk"),
-                                QStringLiteral("Voice Keyer"),  false);
+                                QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
-                                QStringLiteral("QSO Recorder"), false);
+                                QStringLiteral("QSO Recorder"), true);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),
-                                QStringLiteral("Bandwidth Filter"), false);
+                                QStringLiteral("Bandwidth Filter"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
-                                QStringLiteral("PureSignal"),   false);
+                                QStringLiteral("PureSignal"),   true);
     m_appletVis->registerApplet(QStringLiteral("Amp"),
-                                QStringLiteral("Power Genius"), false);
+                                QStringLiteral("Power Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("Tuner"),
-                                QStringLiteral("Tuner Genius"), false);
+                                QStringLiteral("Tuner Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
-                                QStringLiteral("RF-Kit RF2K-S"), false);
+                                QStringLiteral("RF-Kit RF2K-S"), true);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
     // Plus aus wie jedes andere Widget.
     m_appletVis->registerApplet(QStringLiteral("Frequency"),
-                                QStringLiteral("Frequenz"),     false);
+                                QStringLiteral("Frequenz"),     true);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
-                                QStringLiteral("Stehwelle"),    false);
+                                QStringLiteral("Stehwelle"),    true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
-                                QStringLiteral("S-Meter"),      false);
+                                QStringLiteral("S-Meter"),      true);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -5636,7 +5718,7 @@ void MainWindow::populateDefaultMeter()
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletVis->registerApplet(QStringLiteral("Tci"),
-                                    QStringLiteral("TCI Server"),  false);
+                                    QStringLiteral("TCI Server"),  true);
         // Ohne describeApplet landen sie in „Sonstiges" und sind nur
         // ueber ihren Anzeigenamen zu finden — die Suche im Auswaehler
         // greift dann nicht auf „netzwerk" oder „fernsteuerung".
@@ -5649,7 +5731,7 @@ void MainWindow::populateDefaultMeter()
     }
     if (m_clientChainApplet) {
         m_appletVis->registerApplet(QStringLiteral("ClientChain"),
-                                    QStringLiteral("TCI Clients"), false);
+                                    QStringLiteral("TCI Clients"), true);
         m_appletVis->describeApplet(QStringLiteral("ClientChain"),
             QStringLiteral("Netzwerk"),
             {QStringLiteral("tci"), QStringLiteral("clients"),
@@ -5792,9 +5874,36 @@ void MainWindow::populateDefaultMeter()
 
         // Beide Wege hinaus enden hier: der Zug über die seitliche
         // Schwelle und der Menüpunkt „Als Fenster ablösen".
+        // ── Der Pfeil legt auf die FLAECHE, nicht in ein eigenes
+        //    Betriebssystem-Fenster ─────────────────────────────────
+        //
+        // detachApplet() macht ein Fenster daraus. Das ist zwar auch
+        // beweglich, aber es ist nicht, was der Betreiber meint: „es
+        // muss alles auf den mm verschoben werden koennen. jedes
+        // window! jeder panel, ueberall" — gemeint sind Kacheln INNEN,
+        // wie bei Zeus Link, nicht ein Schwarm einzelner Fenster.
+        //
+        // detachApplet bleibt: es haengt am Rechtsklick-Menue und an
+        // der Wiederherstellung gespeicherter Fenster.
         connect(m_appletPanel, &AppletPanelWidget::appletDetachRequested,
                 this, [this](AppletWidget* a, int dockIndex) {
-            detachApplet(a, dockIndex);
+            Q_UNUSED(dockIndex)
+            moveAppletToCanvas(a);
+            if (m_layoutProfiles) {
+                m_layoutProfiles->captureIntoCurrent();
+                m_layoutProfiles->save();
+            }
+        });
+
+        // Das ✕ im Fensterkopf (2026-08-20). Es blendet aus, es
+        // loescht nichts — das Plus unten rechts holt jedes Fenster
+        // zurueck, und der Tooltip am Knopf sagt das auch.
+        connect(m_appletPanel, &AppletPanelWidget::appletHideRequested,
+                this, [this](AppletWidget* a) {
+            if (!a || !m_appletVis) { return; }
+            const QString id = panelIdFor(a);
+            if (id.isEmpty()) { return; }
+            m_appletVis->setVisible(id, false);
             if (m_layoutProfiles) {
                 m_layoutProfiles->captureIntoCurrent();
                 m_layoutProfiles->save();
@@ -6984,6 +7093,22 @@ void MainWindow::buildMenuBar()
         QAction* resetAction = containersMenu->addAction(QStringLiteral("&Reset Default Layout"));
         connect(resetAction, &QAction::triggered, this,
                 &MainWindow::resetDefaultLayout);
+    }
+
+    // ── Alles frei stellen ───────────────────────────────────────────
+    //
+    // Der Weg zu „alles x-beliebig verschiebbar" in einem Klick. Jedes
+    // Applet verlaesst den Stapel und bekommt eine Kachel mit eigener
+    // Lage — ziehen an der Titelleiste, Groesse an der Ecke, Schloss
+    // im Kopf.
+    if (m_appletPanel) {
+        QAction* freeAll = containersMenu->addAction(
+            QStringLiteral("Alle Fenster frei stellen"));
+        freeAll->setToolTip(QStringLiteral(
+            "Jedes Fenster bekommt eine eigene Lage auf der Flaeche und "
+            "laesst sich frei schieben — wie bei Zeus."));
+        connect(freeAll, &QAction::triggered,
+                this, &MainWindow::moveAllAppletsToCanvas);
     }
 
     // ── Alles ausblenden ─────────────────────────────────────────────

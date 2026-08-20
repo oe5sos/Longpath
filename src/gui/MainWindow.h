@@ -747,6 +747,16 @@ private:
     /// `dockIndex` ist die Stelle, an die es beim Andocken zurückkehrt.
     /// `rect` und `screenKey` kommen aus dem Profil, wenn es dazu etwas
     /// sagt; sonst leer, und dann platziert ensureOnVisibleScreen().
+    /// Ein Applet aus dem Stapel nehmen und als frei bewegliche Kachel
+    /// auf die Flaeche legen. Ab dann gilt fuer es alles, was fuer
+    /// Container gilt: Ziehen an der Titelleiste, Groesse an der Ecke,
+    /// Schloss, Rechtsklick-Menue.
+    void moveAppletToCanvas(AppletWidget* applet);
+
+    /// Jedes sichtbare Applet auf die Flaeche legen. Der Weg zu „alles
+    /// x-beliebig verschiebbar" in einem Schritt.
+    void moveAllAppletsToCanvas();
+
     void detachApplet(AppletWidget* applet, int dockIndex,
                       const QRect& rect = QRect(),
                       const QString& screenKey = QString());
@@ -1304,6 +1314,10 @@ private:
     class AddWidgetButton* m_addWidget{nullptr};
     class ProfileRail* m_profileRail{nullptr};
     class AddWidgetButton* m_addWidgetBtn{nullptr};
+
+    /// Welche Applets als freie Kachel auf der Flaeche liegen:
+    /// Panelkennung -> Container-Kennung.
+    QHash<QString, QString> m_canvasApplets;
     class LayoutProfiles* m_layoutProfiles{nullptr};
 
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
