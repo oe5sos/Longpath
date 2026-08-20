@@ -1202,6 +1202,7 @@ private:
     class CwxApplet*        m_cwxApplet{nullptr};
     class DvkApplet*        m_dvkApplet{nullptr};
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
+    class BandwidthFilterApplet* m_bwFilterApplet{nullptr};
     class CatApplet*        m_catApplet{nullptr};
     class TunerApplet*      m_tunerApplet{nullptr};
 

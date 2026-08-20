@@ -354,6 +354,7 @@ warren@wpratt.com
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
 #include "applets/QsoRecorderApplet.h"
+#include "applets/BandwidthFilterApplet.h"
 #include "applets/CatApplet.h"
 #include "applets/TunerApplet.h"
 // Phase 23: TCI server + applets (guarded so non-WebSocket builds still compile)
@@ -5144,6 +5145,22 @@ void MainWindow::populateDefaultMeter()
     m_qsoRecorderApplet = new QsoRecorderApplet(m_radioModel, nullptr);
     panel->addApplet(m_qsoRecorderApplet);
 
+    // BandwidthFilterApplet — die Durchlassflaeche (2026-08-20).
+    //
+    // Eine Flaeche je Empfaenger auf ECHTER Frequenzachse, nach der
+    // Vorlage des Betreibers (Zeus Link „BANDWIDTH FILTER"). Die
+    // Rechenregeln dahinter kommen aus Thetis und sitzen im Modell
+    // (SliceModel::widthToEdges), damit sie auch fuer CAT und Tastatur
+    // gelten.
+    //
+    // HINWEIS ZUR DOPPELUNG: das kleine FilterPassbandWidget im
+    // RxApplet kann dasselbe Ziehen, zeichnet aber ein festes Trapez
+    // ohne Frequenzbezug. Es bleibt vorerst stehen; sobald klar ist,
+    // dass diese Flaeche traegt, gehoert es zurueckgebaut. Zwei
+    // Stellen, an denen man dasselbe zieht, sind eine zu viel.
+    m_bwFilterApplet = new BandwidthFilterApplet(m_radioModel, nullptr);
+    panel->addApplet(m_bwFilterApplet);
+
     // Phase 3M-4 Task 13 — PureSignalApplet quick-access surface.
     //
     // Constructed unconditionally and added to the right panel, but
@@ -5419,6 +5436,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
+    m_appletsById[QStringLiteral("BwFilter")]   = m_bwFilterApplet;
     m_appletsById[QStringLiteral("PureSignal")] = m_pureSignalApplet;
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
@@ -5468,6 +5486,8 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
                                 QStringLiteral("QSO Recorder"), true);
+    m_appletVis->registerApplet(QStringLiteral("BwFilter"),
+                                QStringLiteral("Bandwidth Filter"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
                                 QStringLiteral("PureSignal"),   true);
     m_appletVis->registerApplet(QStringLiteral("Amp"),
@@ -5558,6 +5578,12 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("aufnahme"), QStringLiteral("recorder"),
          QStringLiteral("qso"), QStringLiteral("mitschnitt"),
          QStringLiteral("wav"), QStringLiteral("stereo")});
+    m_appletVis->describeApplet(QStringLiteral("BwFilter"),
+        QStringLiteral("Empfang"),
+        {QStringLiteral("filter"), QStringLiteral("bandbreite"),
+         QStringLiteral("durchlass"), QStringLiteral("passband"),
+         QStringLiteral("low cut"), QStringLiteral("high cut"),
+         QStringLiteral("shift")});
     m_appletVis->describeApplet(QStringLiteral("PureSignal"),
         QStringLiteral("Senden"),
         {QStringLiteral("puresignal"), QStringLiteral("ps"),

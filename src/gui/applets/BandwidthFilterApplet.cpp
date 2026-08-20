@@ -1,0 +1,310 @@
+// =================================================================
+// src/gui/applets/BandwidthFilterApplet.cpp  (NereusSDR)
+// =================================================================
+//
+// NereusSDR-original. Begruendung steht im Header.
+//
+// =================================================================
+// Modification history (NereusSDR):
+//   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+// =================================================================
+
+#include "BandwidthFilterApplet.h"
+
+#include "gui/StyleConstants.h"
+#include "gui/widgets/BandwidthFilterPane.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
+
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QSignalBlocker>
+#include <QSpinBox>
+#include <QVBoxLayout>
+
+#include <algorithm>
+
+namespace NereusSDR {
+
+namespace {
+
+// Die Farben der Empfaenger, wie in der Vorlage: der erste blau, der
+// zweite gruen. Danach zwei weitere, damit vier Scheiben nicht in
+// derselben Farbe stehen.
+QColor accentFor(int index)
+{
+    switch (index) {
+    case 0:  return QColor(Style::kAccent);      // blau
+    case 1:  return QColor(Style::kGreenText);   // gruen
+    case 2:  return QColor(Style::kAmberText);   // bernstein
+    default: return QColor(Style::kTextSecondary);
+    }
+}
+
+} // namespace
+
+BandwidthFilterApplet::BandwidthFilterApplet(RadioModel* model, QWidget* parent)
+    : AppletWidget(model, parent)
+{
+    buildUI();
+
+    if (m_model) {
+        // Kommt eine Scheibe dazu oder faellt eine weg, aendert sich die
+        // Zahl der Flaechen.
+        connect(m_model, &RadioModel::sliceAdded,
+                this, [this](int) { rebuildPanes(); });
+        connect(m_model, &RadioModel::sliceRemoved,
+                this, [this](int) { rebuildPanes(); });
+    }
+
+    rebuildPanes();
+}
+
+void BandwidthFilterApplet::buildUI()
+{
+    auto* root = new QVBoxLayout(this);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
+
+    auto* body = new QWidget(this);
+    auto* col = new QVBoxLayout(body);
+    col->setContentsMargins(5, 4, 5, 5);
+    col->setSpacing(5);
+
+    // Die Flaechen. Nebeneinander, gleich breit — man vergleicht sie.
+    m_paneRow = new QHBoxLayout;
+    m_paneRow->setSpacing(4);
+    col->addLayout(m_paneRow, 1);
+
+    // ── Die Zahlen ───────────────────────────────────────────────────
+    //
+    // Sie gelten fuer die AKTIVE Scheibe. Eine Zeile je Empfaenger
+    // waere ehrlicher, aber bei vier Scheiben unlesbar; die
+    // Beschriftung sagt, welche gemeint ist.
+    {
+        auto* row = new QHBoxLayout;
+        row->setSpacing(6);
+
+        auto label = [&](const QString& t) {
+            auto* l = new QLabel(t, body);
+            l->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; font-size: 10px; font-weight: bold; }")
+                .arg(QLatin1String(Style::kTextScale)));
+            return l;
+        };
+
+        auto box = [&](int lo, int hi) {
+            auto* sb = new QSpinBox(body);
+            sb->setRange(lo, hi);
+            sb->setSingleStep(50);
+            sb->setSuffix(QStringLiteral(" Hz"));
+            sb->setFixedWidth(92);
+            sb->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+            sb->setKeyboardTracking(false);   // erst bei Enter/Verlassen
+            return sb;
+        };
+
+        m_modeLbl = new QLabel(QStringLiteral("—"), body);
+        m_modeLbl->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
+            .arg(QLatin1String(Style::kTextPrimary)));
+        row->addWidget(m_modeLbl);
+
+        row->addWidget(label(QStringLiteral("LOW")));
+        m_lowBox = box(-SliceModel::kMaxFilterWidthHz,
+                        SliceModel::kMaxFilterWidthHz);
+        m_lowBox->setObjectName(QStringLiteral("bwFilterLow"));
+        row->addWidget(m_lowBox);
+
+        row->addWidget(label(QStringLiteral("WIDTH")));
+        m_widthBox = box(10, 2 * SliceModel::kMaxFilterWidthHz);
+        m_widthBox->setObjectName(QStringLiteral("bwFilterWidth"));
+        m_widthBox->setToolTip(QStringLiteral(
+            "Type a width and the edges land where this mode wants them: "
+            "CW centred on the sidetone, SSB anchored at the default low "
+            "cut, AM symmetric around zero."));
+        row->addWidget(m_widthBox);
+
+        row->addWidget(label(QStringLiteral("HIGH")));
+        m_highBox = box(-SliceModel::kMaxFilterWidthHz,
+                         SliceModel::kMaxFilterWidthHz);
+        m_highBox->setObjectName(QStringLiteral("bwFilterHigh"));
+        row->addWidget(m_highBox);
+
+        m_resetBtn = styledButton(QStringLiteral("↺ Centre"), 78);
+        m_resetBtn->setToolTip(QStringLiteral(
+            "Put the passband back where this mode wants it — on the "
+            "sidetone for CW, at the default low cut for SSB."));
+        row->addWidget(m_resetBtn);
+
+        row->addStretch(1);
+
+        m_spanBtn = styledButton(QStringLiteral("10 kHz"), 62);
+        m_spanBtn->setToolTip(QStringLiteral(
+            "How much band the panes show. Click to cycle."));
+        row->addWidget(m_spanBtn);
+
+        col->addLayout(row);
+
+        // ── Verdrahtung ──────────────────────────────────────────────
+        connect(m_lowBox, &QSpinBox::valueChanged, this, [this](int v) {
+            if (m_updatingFromModel) { return; }
+            if (SliceModel* s = activeSlice()) { s->setFilterLow(v); }
+        });
+        connect(m_highBox, &QSpinBox::valueChanged, this, [this](int v) {
+            if (m_updatingFromModel) { return; }
+            if (SliceModel* s = activeSlice()) { s->setFilterHigh(v); }
+        });
+        connect(m_widthBox, &QSpinBox::valueChanged, this, [this](int v) {
+            if (m_updatingFromModel) { return; }
+            // Die Regel je Betriebsart steckt im Modell, nicht hier.
+            if (SliceModel* s = activeSlice()) { s->setFilterWidth(v); }
+        });
+        connect(m_resetBtn, &QPushButton::clicked, this, [this]() {
+            if (SliceModel* s = activeSlice()) { s->resetFilterCenter(); }
+        });
+        connect(m_spanBtn, &QPushButton::clicked, this, [this]() {
+            // Vier Stufen reichen: eng genug fuer CW, weit genug fuer AM.
+            static const int kSpans[] = {4000, 10000, 20000, 40000};
+            int next = 0;
+            for (int i = 0; i < 4; ++i) {
+                if (kSpans[i] == m_spanHz) { next = (i + 1) % 4; break; }
+            }
+            m_spanHz = kSpans[next];
+            m_spanBtn->setText(QStringLiteral("%1 kHz").arg(m_spanHz / 1000));
+            for (BandwidthFilterPane* p : m_panes) { p->setSpan(m_spanHz); }
+        });
+    }
+
+    root->addWidget(body);
+}
+
+SliceModel* BandwidthFilterApplet::sliceAt(int i) const
+{
+    if (!m_model) { return nullptr; }
+    const QList<SliceModel*> list = m_model->slices();
+    return (i >= 0 && i < list.size()) ? list.at(i) : nullptr;
+}
+
+SliceModel* BandwidthFilterApplet::activeSlice() const
+{
+    if (!m_model) { return nullptr; }
+    if (SliceModel* s = m_model->activeSlice()) { return s; }
+    return sliceAt(0);
+}
+
+void BandwidthFilterApplet::rebuildPanes()
+{
+    if (!m_model || !m_paneRow) { return; }
+
+    // Mindestens EINE Flaeche, auch ohne Empfaenger. Eine leere Kachel
+    // sieht aus wie ein Fehler; eine Flaeche, auf der „no radio" steht,
+    // sagt, woran es liegt. Dieselbe Regel wie beim Panadapter-Kopf.
+    const int want = std::max<int>(1, static_cast<int>(m_model->slices().size()));
+
+    // Zu viele: die ueberzaehligen weg.
+    while (m_panes.size() > want) {
+        BandwidthFilterPane* p = m_panes.takeLast();
+        m_sliceIndices.removeLast();
+        m_paneRow->removeWidget(p);
+        p->deleteLater();
+    }
+
+    // Zu wenige: nachlegen. Die vorhandenen bleiben stehen — eine
+    // Flaeche, die beim Hinzufuegen einer Scheibe kurz verschwindet,
+    // flackert.
+    while (m_panes.size() < want) {
+        const int i = m_panes.size();
+        auto* pane = new BandwidthFilterPane(this);
+        pane->setAccent(accentFor(i));
+        pane->setSpan(m_spanHz);
+        m_paneRow->addWidget(pane, 1);
+        m_panes.append(pane);
+        m_sliceIndices.append(i);
+        wirePane(pane, i);
+    }
+
+    for (int i = 0; i < m_panes.size(); ++i) { refreshPane(i); }
+    refreshNumbers();
+}
+
+void BandwidthFilterApplet::wirePane(BandwidthFilterPane* pane, int sliceIndex)
+{
+    connect(pane, &BandwidthFilterPane::filterChanged, this,
+            [this, sliceIndex](int low, int high) {
+        // Nicht begrenzen — das tut setFilter. Die Flaeche meldet
+        // Wunschwerte.
+        if (SliceModel* s = sliceAt(sliceIndex)) { s->setFilter(low, high); }
+    });
+
+    connect(pane, &BandwidthFilterPane::filterCentreChanged, this,
+            [this, sliceIndex](int centre) {
+        // Eigener Weg, weil hier die BREITE erhalten bleiben muss:
+        // setFilterCenter begrenzt mit filterShift und laesst die andere
+        // Kante mitwandern, wenn eine anstoesst.
+        if (SliceModel* s = sliceAt(sliceIndex)) { s->setFilterCenter(centre); }
+    });
+
+    if (SliceModel* s = sliceAt(sliceIndex)) {
+        connect(s, &SliceModel::filterChanged, this,
+                [this, sliceIndex](int, int) {
+            refreshPane(sliceIndex);
+            refreshNumbers();
+        });
+        connect(s, &SliceModel::frequencyChanged, this,
+                [this, sliceIndex](double) { refreshPane(sliceIndex); });
+        connect(s, &SliceModel::dspModeChanged, this,
+                [this, sliceIndex](DSPMode) {
+            refreshPane(sliceIndex);
+            refreshNumbers();
+        });
+    }
+}
+
+void BandwidthFilterApplet::refreshPane(int i)
+{
+    if (i < 0 || i >= m_panes.size()) { return; }
+    BandwidthFilterPane* pane = m_panes.at(i);
+    pane->setLabel(QStringLiteral("RX%1").arg(i + 1));
+
+    SliceModel* s = sliceAt(i);
+    if (!s) {
+        // Kein Empfaenger dahinter: die Flaeche steht da und sagt es.
+        pane->setHasFrequency(false);
+        return;
+    }
+
+    pane->setFilter(s->filterLow(), s->filterHigh());
+    pane->setVfoFrequency(s->frequency());
+
+    // Ohne Frequenz keine Achse. Eine erfundene waere eine Behauptung.
+    pane->setHasFrequency(s->frequency() > 0.0);
+}
+
+void BandwidthFilterApplet::refreshNumbers()
+{
+    SliceModel* s = activeSlice();
+    if (!s || !m_lowBox) { return; }
+
+    m_updatingFromModel = true;
+
+    const QSignalBlocker b1(m_lowBox);
+    const QSignalBlocker b2(m_highBox);
+    const QSignalBlocker b3(m_widthBox);
+
+    m_lowBox->setValue(s->filterLow());
+    m_highBox->setValue(s->filterHigh());
+    m_widthBox->setValue(s->filterWidth());
+    m_modeLbl->setText(SliceModel::modeName(s->dspMode()));
+
+    m_updatingFromModel = false;
+}
+
+void BandwidthFilterApplet::syncFromModel()
+{
+    rebuildPanes();
+}
+
+} // namespace NereusSDR

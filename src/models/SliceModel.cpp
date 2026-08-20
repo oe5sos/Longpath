@@ -539,6 +539,164 @@ bool SliceModel::constrainFilter(int& low, int& high, DSPMode mode,
     return (low != originalLow) || (high != originalHigh);
 }
 
+// ── Breite und Lage rechnen mit ──────────────────────────────────────
+//
+// Begruendung und die Regeln stehen am Kopf der Deklaration.
+
+namespace {
+
+// From Thetis display.cs:1023 [v2.10.3.15-5-g852bf0e] — cw_pitch
+// default 600. Dieselbe Quelle und dieselben Grenzen wie in
+// presetsForMode; bewusst nicht dorthin ausgelagert, weil das eine
+// Aenderung an einem geprueften Pfad waere.
+int currentCwPitch()
+{
+    auto& s = AppSettings::instance();
+    int pitch = s.value(QStringLiteral("CWPitch"), 600).toInt();
+    if (pitch < 100)  { pitch = 100;  }
+    if (pitch > 2000) { pitch = 2000; }
+    return pitch;
+}
+
+// From Thetis console.cs:14636 / :14671 [v2.10.3.15-5-g852bf0e].
+// Upstream inline attribution preserved verbatim:
+//   :14669  //reset preset filter's center frequency - W4TME
+constexpr int kDiguClickTuneOffset = 1500;
+constexpr int kDiglClickTuneOffset = 2210;
+
+// Bei AM, SAM, FM und DSB ist die ANGEZEIGTE Breite die halbe.
+// From Thetis console.cs:35222-35229 — `bw /= 2` fuer genau diese vier.
+bool isDoubleSidebandMode(DSPMode mode)
+{
+    return mode == DSPMode::AM  || mode == DSPMode::SAM
+        || mode == DSPMode::FM  || mode == DSPMode::DSB;
+}
+
+} // namespace
+
+int SliceModel::defaultLowCut()
+{
+    // From Thetis console.cs:12718 [v2.10.3.15-5-g852bf0e] —
+    // default_low_cut = 150.
+    auto& s = AppSettings::instance();
+    int v = s.value(QStringLiteral("DefaultLowCut"), 150).toInt();
+    if (v < 0)    { v = 0; }
+    if (v > 1000) { v = 1000; }
+    return v;
+}
+
+void SliceModel::setDefaultLowCut(int hz)
+{
+    AppSettings::instance().setValue(QStringLiteral("DefaultLowCut"),
+                                     QString::number(qBound(0, hz, 1000)));
+}
+
+// From Thetis console.cs:35318-35348 [v2.10.3.15-5-g852bf0e] —
+// der switch am Ende von ptbFilterWidth_Scroll.
+void SliceModel::widthToEdges(int widthHz, DSPMode mode, int currentCenter,
+                              int& low, int& high)
+{
+    // From Thetis console.cs:35293 — „10 step minimum".
+    if (widthHz < 10) { widthHz = 10; }
+
+    switch (mode) {
+    case DSPMode::LSB:
+    case DSPMode::RADE_L:
+        high = -defaultLowCut();
+        low  = high - widthHz;
+        break;
+
+    case DSPMode::USB:
+    case DSPMode::RADE_U:
+        low  = defaultLowCut();
+        high = low + widthHz;
+        break;
+
+    case DSPMode::CWL:
+    case DSPMode::CWU:
+    case DSPMode::DIGL:
+    case DSPMode::DIGU:
+        // Mitte bleibt stehen, nur die Breite aendert sich.
+        low  = currentCenter - widthHz / 2;
+        high = currentCenter + widthHz / 2;
+        break;
+
+    case DSPMode::AM:
+    case DSPMode::SAM:
+    case DSPMode::FM:
+    case DSPMode::DSB:
+        // ±Breite, NICHT ±Breite/2: bei diesen vier ist die angezeigte
+        // Breite die halbe (console.cs:35225 rechnet vorher `bw /= 2`).
+        low  = currentCenter - widthHz;
+        high = currentCenter + widthHz;
+        break;
+
+    default:
+        // SPEC, DRM und alles Kuenftige: symmetrisch, das ist die
+        // harmloseste Annahme.
+        low  = currentCenter - widthHz / 2;
+        high = currentCenter + widthHz / 2;
+        break;
+    }
+}
+
+// From Thetis console.cs:35076-35097 [v2.10.3.15-5-g852bf0e] —
+// die default_center-Berechnung aus ptbFilterShift_Scroll.
+int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
+{
+    switch (mode) {
+    case DSPMode::USB:
+    case DSPMode::RADE_U:
+        return defaultLowCut() + widthHz / 2;
+    case DSPMode::LSB:
+    case DSPMode::RADE_L:
+        return -defaultLowCut() - widthHz / 2;
+    case DSPMode::CWU:
+        return currentCwPitch();
+    case DSPMode::CWL:
+        return -currentCwPitch();
+    case DSPMode::DIGU:
+        return kDiguClickTuneOffset;
+    case DSPMode::DIGL:
+        return -kDiglClickTuneOffset;
+    default:
+        // AM, SAM, FM, DSB und der Rest sitzen um null.
+        return 0;
+    }
+}
+
+void SliceModel::setFilterWidth(int widthHz)
+{
+    int low = 0, high = 0;
+    widthToEdges(widthHz, m_dspMode, filterCenter(), low, high);
+    setFilter(low, high);   // geht durch die Begrenzung
+}
+
+void SliceModel::setFilterCenter(int centerHz)
+{
+    // Die Breite bleibt — das ist der Unterschied zum Ziehen einer
+    // Kante. Deshalb hier constrainFilter mit filterShift == true:
+    // stoesst eine Kante an, wandert die andere mit.
+    const int bw = filterWidth();
+    int low  = centerHz - bw / 2;
+    int high = low + bw;
+
+    constrainFilter(low, high, m_dspMode, /*filterShift=*/true,
+                    m_limitFiltersToSidebands);
+    if (low == high) { return; }
+
+    if (m_filterLow != low || m_filterHigh != high) {
+        m_filterLow  = low;
+        m_filterHigh = high;
+        emit filterChanged(m_filterLow, m_filterHigh);
+    }
+}
+
+void SliceModel::resetFilterCenter()
+{
+    setFilterCenter(defaultFilterCenter(m_dspMode, filterWidth()));
+}
+
 void SliceModel::setLimitFiltersToSidebands(bool on)
 {
     if (m_limitFiltersToSidebands == on) { return; }

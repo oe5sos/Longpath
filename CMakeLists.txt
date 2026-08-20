@@ -775,6 +775,7 @@ set(GUI_SOURCES
     src/gui/widgets/DspQuickPopups.cpp
     src/gui/widgets/DspQuickPopups.h
     src/gui/widgets/FilterPassbandWidget.cpp
+    src/gui/widgets/BandwidthFilterPane.cpp
     src/gui/widgets/FilterPresetEditDialog.cpp
     src/gui/widgets/GuardedComboBox.h
     src/gui/widgets/GuardedSlider.h
@@ -1084,6 +1085,7 @@ set(GUI_SOURCES
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
+    src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp
     src/gui/applets/AmpApplet.cpp

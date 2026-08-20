@@ -481,6 +481,64 @@ public:
     bool limitFiltersToSidebands() const { return m_limitFiltersToSidebands; }
     void setLimitFiltersToSidebands(bool on);
 
+    // ── Breite und Lage rechnen mit ──────────────────────────────────
+    //
+    // From Thetis console.cs:35318-35348 (Breite je Betriebsart,
+    // ptbFilterWidth_Scroll) und console.cs:35076-35097 (Vorgabe-Mitte,
+    // ptbFilterShift_Scroll) [v2.10.3.15-5-g852bf0e].
+    //
+    // WARUM IM MODELL UND NICHT IM WIDGET: dieselbe Rechnung gilt auch
+    // ohne die Bedienflaeche — per CAT, per Tastatur, aus einem
+    // gespeicherten Filter. Zwei Rechnungen an zwei Stellen laufen
+    // beim naechsten Umbau auseinander.
+    //
+    // Die Regeln, kurz:
+    //
+    //   CWL / CWU      zentriert auf ∓Mithoerton. Ein Durchlass, der
+    //                  nicht auf dem Ton sitzt, laesst ihn wandern,
+    //                  sobald man schmaler zieht.
+    //   DIGL / DIGU    zentriert auf den Click-Tune-Versatz.
+    //   LSB            oben verankert bei −Standardflanke.
+    //   USB            unten verankert bei +Standardflanke.
+    //   AM SAM FM DSB  symmetrisch um null. ACHTUNG: dort ist die
+    //                  ANGEZEIGTE Breite die halbe — Thetis rechnet
+    //                  `bw /= 2` (console.cs:35225) und setzt dann
+    //                  ±bw. Wer das uebersieht, bekommt bei AM den
+    //                  doppelten Durchlass.
+
+    /// Die gewuenschte Breite in Hz auf zwei Kanten umrechnen.
+    ///
+    /// `currentCenter` wird nur von den zentrierten Betriebsarten
+    /// benutzt (CW, DIG, AM-Familie): dort bleibt die Mitte stehen und
+    /// nur die Breite aendert sich. LSB und USB rechnen aus der
+    /// Standardflanke und ignorieren ihn.
+    static void widthToEdges(int widthHz, DSPMode mode, int currentCenter,
+                             int& low, int& high);
+
+    /// Wo der Durchlass in dieser Betriebsart „von Haus aus" sitzt.
+    /// Der Rueckstellknopf springt hierher.
+    static int defaultFilterCenter(DSPMode mode, int widthHz);
+
+    /// Breite setzen, Mitte behalten (soweit die Betriebsart das
+    /// zulaesst). Geht durch setFilter, also durch die Begrenzung.
+    void setFilterWidth(int widthHz);
+
+    /// Den ganzen Durchlass verschieben, Breite behalten.
+    /// `centerHz` ist die neue Mitte, bezogen auf die VFO-Frequenz.
+    void setFilterCenter(int centerHz);
+
+    /// Zurueck auf die Vorgabe-Mitte der Betriebsart.
+    void resetFilterCenter();
+
+    int filterWidth()  const { return m_filterHigh - m_filterLow; }
+    int filterCenter() const { return (m_filterLow + m_filterHigh) / 2; }
+
+    /// From Thetis console.cs:12718 [v2.10.3.15-5-g852bf0e] —
+    /// default_low_cut = 150. Die Flanke, an der ein SSB-Durchlass
+    /// haengt: bei USB unten, bei LSB (gespiegelt) oben.
+    static int defaultLowCut();
+    static void setDefaultLowCut(int hz);
+
     // ---- AGC ----
 
     AGCMode agcMode() const { return m_agcMode; }
