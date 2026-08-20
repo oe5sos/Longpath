@@ -7673,12 +7673,22 @@ void MainWindow::buildStatusBar()
     hbox->setContentsMargins(6, 0, 6, 0);
     hbox->setSpacing(6);
 
-    // Helper: styled separator dot
+    // ── Gruppentrenner: ein duenner Strich, kein Punkt ───────────────
+    //
+    // Zeus setzt zwischen die Gruppen der unteren Leiste einen
+    // senkrechten Haarstrich. Wir hatten ein „ · " in 22 Punkt — das
+    // liest sich als Satzzeichen und traegt kein Gewicht; zwischen
+    // zwanzig kleinen Pillen sah man ueberhaupt nicht mehr, wo eine
+    // Gruppe aufhoert.
+    //
+    // Ein Strich ist ruhiger UND deutlicher, weil er senkrecht steht,
+    // wo alles andere waagerecht laeuft.
     auto makeSep = [&]() -> QLabel* {
-        auto* sep = new QLabel(QStringLiteral(" · "), barWidget);
-        sep->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: %1; font-size: 22px; }")
-            .arg(QString::fromLatin1(Style::kBorder))));
+        auto* sep = new QLabel(barWidget);
+        sep->setFixedWidth(1);
+        sep->setStyleSheet(QStringLiteral(
+            "QLabel { background: %1; margin: 9px 7px; }")
+            .arg(QString::fromLatin1(Style::kBorder)));
         return sep;
     };
 

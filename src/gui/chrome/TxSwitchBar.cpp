@@ -11,6 +11,7 @@
 #include "models/TransmitModel.h"
 
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QPushButton>
 #include <QSignalBlocker>
 
@@ -59,21 +60,58 @@ TxSwitch::TxSwitch(Kind kind, RadioModel* model, QWidget* parent)
     // die Farbe sagt „hier geht Leistung raus", nicht „hier ist ein
     // Knopf".
     const bool isRf = (kind == Kind::Mox || kind == Kind::Tune);
+
+    // ── Zuschnitt wie bei Zeus (2026-08-20) ──────────────────────────
+    //
+    // Vorlage ist der Bildschirm des Betreibers: dort stehen MOX, VOX,
+    // TUNE und PS als GROSSER, GESPERRTER TEXT ohne Rahmen, mit einem
+    // kleinen Punkt davor, der den Zustand traegt. Bei uns waren es
+    // kleine umrandete Pillen zwischen zwanzig anderen kleinen
+    // umrandeten Pillen — die vier wichtigsten Schalter der ganzen
+    // Leiste sahen aus wie alles andere auch.
+    //
+    // Der Rahmen faellt weg, die Schrift wird groesser und gesperrt.
+    // Angeschaltet traegt der TEXT die Farbe, nicht ein gefuellter
+    // Kasten: bei MOX und TUNE die Sendefarbe, bei VOX und PS die
+    // neutrale. Ein rot gefuellter Kasten unten links sieht aus wie
+    // eine Warnung; roter Text sagt „hier geht Leistung raus".
+    const QString onColour = QString::fromLatin1(isRf ? Style::kTxRed
+                                                      : Style::kAccent);
     m_btn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: transparent; color: %1;"
-        " border: 1px solid %2; border-radius: 6px;"
-        " padding: 1px 7px; font-weight: bold; }"
-        "QPushButton:hover { background: %3; }"
-        "QPushButton:checked { background: %4; color: %5;"
-        " border-color: %4; }")
-        .arg(Style::kTextSecondary,
-             Style::kBorder,
-             Style::kButtonAltHover,
-             isRf ? Style::kTxRed : Style::kAccent,
-             Style::kTextPrimary)));
+        " border: none; padding: 2px 4px; font-weight: 600;"
+        " font-size: 14px; letter-spacing: 2px; }"
+        "QPushButton:hover { color: %2; }"
+        "QPushButton:checked { color: %3; }")
+        .arg(QString::fromLatin1(Style::kTextScale),
+             QString::fromLatin1(Style::kTextPrimary),
+             onColour)));
+
+    // Der Punkt davor. Er traegt denselben Zustand ein zweites Mal —
+    // Farbe UND Fuellung — damit man ihn auch im Augenwinkel sieht,
+    // ohne den Text zu lesen. Zeus macht es genauso.
+    m_dot = new QLabel(QStringLiteral("\u25CF"), this);
+    m_dot->setFixedWidth(11);
+    m_dot->setAlignment(Qt::AlignCenter);
+    m_dotOnColour = onColour;
+    lay->addWidget(m_dot);
+    lay->addSpacing(1);
     lay->addWidget(m_btn);
+    updateDot(false);
 
     wire();
+}
+
+// Der Zustandspunkt. Aus, heisst blass und klein; an, heisst in der
+// Farbe des Schalters.
+void TxSwitch::updateDot(bool on)
+{
+    if (!m_dot) { return; }
+    m_dot->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: %2px; background: transparent; }")
+        .arg(on ? m_dotOnColour
+                : QString::fromLatin1(Style::kTextInactive))
+        .arg(on ? 11 : 8));
 }
 
 int TxSwitch::rung() const { return specFor(m_kind).rung; }
@@ -91,7 +129,14 @@ void TxSwitch::wire()
         m_updatingFromModel = true;
         b->setChecked(on);
         m_updatingFromModel = false;
+        updateDot(on);
     };
+
+    // Auch die eigene Bedienung faerbt den Punkt — sonst zoege er nur
+    // nach, wenn das Modell antwortet, und bliebe bei einer abgelehnten
+    // Umschaltung falsch stehen.
+    connect(m_btn, &QPushButton::toggled, this,
+            [this](bool on) { updateDot(on); });
 
     switch (m_kind) {
     case Kind::Mox: {

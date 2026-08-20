@@ -32,6 +32,8 @@
 
 class QPushButton;
 
+class QLabel;
+
 namespace NereusSDR {
 
 class RadioModel;
@@ -60,9 +62,14 @@ public:
 private:
     void wire();
 
+    /// Den Zustandspunkt vor dem Text nachziehen.
+    void updateDot(bool on);
+
     Kind         m_kind;
     RadioModel*  m_model{nullptr};
     QPushButton* m_btn{nullptr};
+    QLabel* m_dot{nullptr};
+    QString m_dotOnColour;
     bool         m_updatingFromModel{false};
 };
 
