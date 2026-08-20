@@ -252,6 +252,8 @@ warren@wpratt.com
 #include "PanadapterStack.h"
 #include "PanadapterApplet.h"
 #include "PanLayoutDialog.h"
+
+#include <QColorDialog>
 #include "core/FFTRouter.h"
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
@@ -2721,6 +2723,28 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::dockRequested,
                 this, &MainWindow::onPanDockRequested,
                 Qt::UniqueConnection);
+
+        // ── Der Zahnrad-Knopf in der Panadapter-Kopfleiste ───────────
+        //
+        // Das Applet meldet nur den Wunsch; geaendert wird hier, an der
+        // Stelle, die den Renderer kennt. Member-Zeiger als Ziel, aus
+        // demselben Grund wie oben: diese Funktion laeuft bei jedem
+        // countChanged erneut, und Qt::UniqueConnection wirkt nur mit
+        // einem Zeiger auf eine Methode — mit einem Lambda stellt Qt
+        // die Verbindung GAR NICHT her (am 2026-08-20 schon einmal
+        // teuer gelernt, siehe AppletPanelWidget::addApplet).
+        connect(applet, &PanadapterApplet::backgroundImageRequested,
+                this, &MainWindow::onPanBackgroundImage,
+                Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::backgroundOpacityRequested,
+                this, &MainWindow::onPanBackgroundOpacity,
+                Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::backgroundColourRequested,
+                this, &MainWindow::onPanBackgroundColour,
+                Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::displaySetupRequested,
+                this, &MainWindow::onPanDisplaySetup,
+                Qt::UniqueConnection);
         // Phase 3F: clicking a pan makes it the active pan. Straight to the
         // stack's setter, exactly as AetherSDR MainWindow.cpp:12964 [@6a142807]
         // does it:
@@ -2807,6 +2831,55 @@ void MainWindow::onPanAddSliceRequested(const QString& panId)
 void MainWindow::onPanFloatRequested(const QString& panId)
 {
     if (m_panStack) { m_panStack->floatPanadapter(panId); }
+}
+
+// ── Anzeige-Wuensche aus der Panadapter-Kopfleiste ───────────────────
+//
+// Der Betreiber, 2026-08-20: „weiters fehlt auch die option button um
+// beim pandapter gleich etwas zu aendern wie zb bild, groesse usw."
+//
+// Bild, Deckkraft und Grundfarbe lagen nur unter Setup -> Display,
+// also drei Klicks und einen Dialog entfernt von der Flaeche, die man
+// gerade ansieht.
+void MainWindow::onPanBackgroundImage(const QString& path)
+{
+    if (SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget()
+                                         : nullptr) {
+        w->setBackgroundImage(path);
+    }
+}
+
+void MainWindow::onPanBackgroundOpacity(int percent)
+{
+    if (SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget()
+                                         : nullptr) {
+        w->setBackgroundOpacity(percent);
+    }
+}
+
+void MainWindow::onPanBackgroundColour()
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w) { return; }
+    // Mit Alphakanal: die Grundflaeche darf durchscheinen, wenn ein
+    // Hintergrundbild darunter liegt.
+    const QColor c = QColorDialog::getColor(
+        w->backgroundFillColor(), this, tr("Grundfarbe des Panadapters"),
+        QColorDialog::ShowAlphaChannel);
+    if (c.isValid()) { w->setBackgroundFillColor(c); }
+}
+
+void MainWindow::onPanDisplaySetup()
+{
+    // Der Weg zum Rest. Ein Menue, das ALLES kann, waere wieder der
+    // Dialog, nur schlechter.
+    // Dasselbe Muster wie beim Overlay-Panel weiter oben: frisch
+    // gebaut, WA_DeleteOnClose, verdrahtet, auf die Seite gestellt.
+    auto* dialog = new SetupDialog(m_radioModel, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    wireSetupDialog(dialog);
+    dialog->selectPage(QStringLiteral("Colors & Theme"));
+    dialog->show();
 }
 
 void MainWindow::onPanDockRequested(const QString& panId)
@@ -6804,6 +6877,40 @@ void MainWindow::buildMenuBar()
         // bottom-bar +PAN icon uses the same method.
         connect(panLayoutAct, &QAction::triggered, this,
                 &MainWindow::showPanLayoutDialog);
+
+        // ── Ausgegraut statt stillschweigend wirkungslos ─────────────
+        //
+        // Der Betreiber, 2026-08-20: „pan layout geht ueber den reiter
+        // oben nicht."
+        //
+        // Er hatte recht, und es war schlimmer als ein Fehler:
+        // showPanLayoutDialog() kehrt ohne Verbindung SOFORT zurueck.
+        // Der Eintrag sah benutzbar aus, liess sich anklicken und tat
+        // nichts — ohne ein Wort dazu. Ein Weg, der nichts sagt, ist
+        // schlimmer als einer, der „geht gerade nicht" sagt.
+        //
+        // Die Sperre selbst bleibt richtig: wie viele Panadapter
+        // moeglich sind, haengt an den DDCs des angeschlossenen
+        // Geraets (siehe die Begruendung an showPanLayoutDialog). Ohne
+        // Geraet gibt es keine Zahl, gegen die man pruefen koennte.
+        //
+        // Also grau, mit Grund im Tooltip.
+        auto syncPanLayoutEnabled = [this, panLayoutAct]() {
+            const bool on = m_radioModel && m_radioModel->isConnected();
+            panLayoutAct->setEnabled(on);
+            panLayoutAct->setToolTip(on
+                ? QStringLiteral("Pick a panadapter layout template")
+                : QStringLiteral(
+                      "Erst verbinden: wie viele Panadapter moeglich "
+                      "sind, sagt das Geraet (DDC-Anzahl)."));
+        };
+        syncPanLayoutEnabled();
+        if (m_radioModel) {
+            connect(m_radioModel, &RadioModel::connectionStateChanged, this,
+                    [syncPanLayoutEnabled](Longpath::ConnectionState) {
+                syncPanLayoutEnabled();
+            });
+        }
     }
 
     {
@@ -8174,6 +8281,27 @@ void MainWindow::buildStatusBar()
     hbox->addWidget(panBtn);
     m_addPanButton = panBtn;
     m_bandStackLabel = bandStackLabel;
+
+    // ── Aufgeraeumt auf Ansage (2026-08-20) ──────────────────────────
+    //
+    // Der Betreiber: „weiters kannst du in der fussleiste auch
+    // A-TX-LSB-2,9k, M, NR und ATN loeschen, dafuer gibt es widgets,
+    // 40m kannst du auch loeschen. daneben sind ganz links noch
+    // zeichen, bitte weg."
+    //
+    // VERSTECKT, nicht geloescht. Die Elemente haengen an lebender
+    // Verdrahtung (Bandstapel, Kettenzustand, Slice-Zeile); sie
+    // herauszuschneiden hiesse, diese Wege mit zu entfernen und beim
+    // naechsten Sinneswandel neu zu bauen. Ein setVisible(false) ist
+    // umkehrbar, kostet nichts und laesst die Verdrahtung heil.
+    //
+    // Was jeweils an ihre Stelle tritt:
+    //   Bandstapel-Punkte  ->  Band-Menue in der Menueleiste
+    //   +PAN-Symbol        ->  View -> Pan Layout… (Ctrl+L)
+    //   CH 0 / 40m         ->  die Pille im Panadapter-Kopf
+    //   A/TX/LSB/2.9k/…    ->  die Applets RX, Filter, Frequenz
+    bandStackLabel->setVisible(false);
+    panBtn->setVisible(false);
     updateAddPanButtonState();
 
     // Phase 3F Sub-Epic D Task 11: per-chain (ADC) BPF state indicators
@@ -8206,6 +8334,9 @@ void MainWindow::buildStatusBar()
     };
 
     auto* chain0Widget = makeChainIndicator(0);
+    // Siehe die Notiz weiter oben: versteckt, nicht geloescht. Der
+    // Kettenzustand steht als Pille im Kopf des Panadapters.
+    chain0Widget->setVisible(false);
     hbox->addWidget(chain0Widget);
     m_chain0IndicatorWidget = chain0Widget;
     auto* chain1Widget = makeChainIndicator(1);
@@ -8358,6 +8489,15 @@ void MainWindow::buildStatusBar()
     // nothing to bind here. When disconnected the badges show placeholder
     // "—" until the slice receives live values from the radio.
     m_rxDashboard = new RxDashboard(barWidget);
+    // Versteckt auf Ansage (2026-08-20) — siehe die ausfuehrliche
+    // Notiz bei bandStackLabel weiter oben. Die Slice-Zeile
+    // A / TX / LSB / 2.9k / M / NR / ANT sagt dasselbe wie die Applets
+    // RX, Filter und Frequenz, nur kleiner und ohne Bedienung.
+    //
+    // Die Verdrahtung bleibt: bindSlice, setSliceLetter und
+    // badgeForRung laufen weiter, damit ein Wiedereinschalten ein
+    // setVisible(true) ist und keine Reparatur.
+    m_rxDashboard->setVisible(false);
     hbox->addWidget(m_rxDashboard);
 
     // ── Phase 3M-4 Task 10: PSA bottom-banner pair (FB + PS) ──────────────────

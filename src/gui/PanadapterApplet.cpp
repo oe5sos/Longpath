@@ -19,6 +19,7 @@
 // =================================================================
 
 #include "gui/PanadapterApplet.h"
+#include <QFileDialog>
 #include "gui/SpectrumWidget.h"
 #include "gui/widgets/SpectrumStatusOverlay.h"
 #include "models/SliceModel.h"
@@ -123,6 +124,45 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
                                .arg(QLatin1String(Style::kBorder)));
         headLay->addWidget(sep);
     }
+
+    // ── Der Zahnrad-Knopf ────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „weiters fehlt auch die option button
+    // um beim pandapter gleich etwas zu aendern wie zb bild, groesse
+    // usw."
+    //
+    // Bild, Deckkraft und Grundfarbe lagen bisher nur unter
+    // Setup -> Display -> Colors & Theme, also drei Klicks und ein
+    // Dialog entfernt von der Flaeche, die man gerade ansieht. Der
+    // Panadapter ist das Ding, an dem man am haeufigsten dreht; das
+    // Naheliegende gehoert an seine eigene Kopfleiste.
+    //
+    // Nur das Haeufige steht im Menue. Der letzte Eintrag fuehrt in
+    // den Setup-Dialog — ein Menue, das ALLES kann, waere wieder der
+    // Dialog, nur schlechter.
+    m_btnOptions = new QPushButton(QStringLiteral("\u2699"), head);
+    m_btnOptions->setFixedSize(22, 18);
+    m_btnOptions->setCursor(Qt::PointingHandCursor);
+    m_btnOptions->setToolTip(QStringLiteral(
+        "Anzeige: Hintergrundbild, Deckkraft, Grundfarbe"));
+    m_btnOptions->setStyleSheet(QStringLiteral(
+        "QPushButton { background: %1; border: 1px solid %2;"
+        "  border-radius: 4px; color: %3; font-size: 11px; padding: 0; }"
+        "QPushButton:hover { background: %4; color: %5;"
+        "  border-color: %6; }")
+        .arg(QLatin1String(Style::kButtonBg),
+             QLatin1String(Style::kBorder),
+             QLatin1String(Style::kTextSecondary),
+             QLatin1String(Style::kButtonHover),
+             QLatin1String(Style::kTextPrimary),
+             QLatin1String(Style::kAccent)));
+    headLay->addWidget(m_btnOptions);
+    connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
+        QMenu* m = buildDisplayMenu(this);
+        m->exec(m_btnOptions->mapToGlobal(
+            QPoint(0, m_btnOptions->height())));
+        m->deleteLater();
+    });
 
     m_btnFloat = new QPushButton(QStringLiteral("\u2197"), head);
     m_btnFloat->setFixedSize(22, 18);
@@ -438,6 +478,48 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
     extAct->setChecked(m_extendedViewEnabled);
     connect(extAct, &QAction::toggled, this, &PanadapterApplet::setExtendedViewEnabled);
 
+    return menu;
+}
+
+// Das Menue hinter dem Zahnrad. Ausgelagert, damit eine Pruefung es
+// bauen und seine Eintraege ueber ihren Text ausloesen kann, ohne eine
+// verschachtelte Ereignisschleife zu starten — dasselbe Muster wie
+// buildContextMenu().
+QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
+{
+    auto* menu = new QMenu(qobject_cast<QWidget*>(parent));
+
+    menu->addAction(tr("Hintergrundbild wählen…"), this, [this]() {
+        const QString f = QFileDialog::getOpenFileName(
+            this, tr("Hintergrundbild"), QString(),
+            tr("Bilder (*.png *.jpg *.jpeg *.webp *.bmp)"));
+        if (!f.isEmpty()) { emit backgroundImageRequested(f); }
+    });
+    menu->addAction(tr("Hintergrundbild entfernen"), this, [this]() {
+        emit backgroundImageRequested(QString());
+    });
+
+    auto* opa = menu->addMenu(tr("Deckkraft"));
+    for (int pct : {0, 20, 40, 60, 80, 100}) {
+        QAction* a = opa->addAction(QStringLiteral("%1 %").arg(pct));
+        a->setCheckable(true);
+        a->setChecked(pct == m_bgOpacityPct);
+        connect(a, &QAction::triggered, this, [this, pct]() {
+            m_bgOpacityPct = pct;
+            emit backgroundOpacityRequested(pct);
+        });
+    }
+
+    menu->addAction(tr("Grundfarbe…"), this, [this]() {
+        emit backgroundColourRequested();
+    });
+
+    menu->addSeparator();
+    // Der Weg zum Rest. Ein Menue, das ALLES kann, waere wieder der
+    // Dialog, nur schlechter.
+    menu->addAction(tr("Alle Anzeige-Einstellungen…"), this, [this]() {
+        emit displaySetupRequested();
+    });
     return menu;
 }
 

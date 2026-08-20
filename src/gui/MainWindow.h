@@ -462,6 +462,13 @@ private slots:
     void onPanFloatRequested(const QString& panId);
     void onPanDockRequested(const QString& panId);
 
+    /// Wuensche aus dem Zahnrad in der Panadapter-Kopfleiste. Das
+    /// Applet aendert nichts selbst — es kennt den Renderer nicht.
+    void onPanBackgroundImage(const QString& path);
+    void onPanBackgroundOpacity(int percent);
+    void onPanBackgroundColour();
+    void onPanDisplaySetup();
+
     void onConnectionStateChanged();
     void showConnectionPanel();
     void showSupportDialog();

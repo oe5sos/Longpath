@@ -160,6 +160,11 @@ public:
     /// NereusSDR-native test seam.
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
 
+    /// Dasselbe fuer das Zahnrad-Menue: eine Pruefung soll die
+    /// Eintraege ueber ihren Text ausloesen koennen, ohne eine
+    /// verschachtelte Ereignisschleife zu starten.
+    QMenu* buildDisplayMenuForTesting() { return buildDisplayMenu(this); }
+
 signals:
     void activated(const QString& panId);  // emitted on any click within applet
     void closeRequested(const QString& panId);
@@ -187,6 +192,18 @@ signals:
     /// pan.
     void addSliceRequested(const QString& panId);
     void floatRequested(const QString& panId);
+
+    // ── Anzeige-Wuensche aus der Kopfleiste (2026-08-20) ─────────────
+    //
+    // Das Applet AENDERT nichts selbst: es kennt die SpectrumWidget-
+    // Instanz des Programms nicht, und ein Applet, das sich seinen
+    // Renderer selbst sucht, ist genau die Abkuerzung, die spaeter
+    // niemand mehr zurueckverfolgen kann. MainWindow verdrahtet das —
+    // so wie bei addSliceRequested und floatRequested auch.
+    void backgroundImageRequested(const QString& path);   ///< leer = entfernen
+    void backgroundOpacityRequested(int percent);
+    void backgroundColourRequested();
+    void displaySetupRequested();
 
     /// Zurueck in die Anordnung. Der Kopf traegt EINEN Schalter fuer
     /// beide Richtungen — „Ablösen" ohne Rueckweg ist eine
@@ -220,11 +237,19 @@ private:
     /// untouched. Mirrors AmpApplet::buildContextMenu().
     QMenu* buildContextMenu(QObject* parent);
 
+    /// Das Menue hinter dem Zahnrad in der Kopfleiste: Hintergrundbild,
+    /// Deckkraft, Grundfarbe, und der Weg in den Setup-Dialog.
+    QMenu* buildDisplayMenu(QObject* parent);
+
     QString                 m_panId;
     SpectrumWidget*         m_spectrum {nullptr};
     QLabel*                 m_titleLabel {nullptr};
     QLabel*                 m_grip {nullptr};
     QPushButton*            m_btnFloat {nullptr};
+    QPushButton*            m_btnOptions {nullptr};
+    /// Zuletzt gewaehlte Deckkraft — nur fuer den Haken im Menue. Der
+    /// wahre Wert lebt in SpectrumWidget und in den Einstellungen.
+    int                     m_bgOpacityPct {80};
     bool                    m_floating {false};
     SpectrumStatusOverlay*  m_statusOverlay {nullptr};
     int                     m_activeSliceIndex {-1};
