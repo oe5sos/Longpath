@@ -14,7 +14,7 @@ private slots:
     void dialogInstantiates()
     {
         AboutDialog dlg;
-        QCOMPARE(dlg.windowTitle(), QStringLiteral("About NereusSDR"));
+        QCOMPARE(dlg.windowTitle(), QStringLiteral("About Longpath"));
     }
 
     void hasAuthorCredit()

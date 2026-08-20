@@ -19,7 +19,7 @@ private slots:
     void emptyProfileResolvesToLegacyPath() {
         // PR #238 unified the path resolver: both macOS and the other
         // platforms route through QStandardPaths::writableLocation(
-        // GenericConfigLocation) + "/NereusSDR" so TestSandboxInit's
+        // GenericConfigLocation) + "/Longpath" so TestSandboxInit's
         // setTestModeEnabled(true) redirect actually takes effect on
         // every platform. The pre-#238 macOS branch hardcoded
         // ~/Library/Preferences/NereusSDR which bypassed the test
@@ -29,7 +29,7 @@ private slots:
         const QString path = AppSettings::resolveSettingsPath(QString());
         const QString expected = QStandardPaths::writableLocation(
             QStandardPaths::GenericConfigLocation) +
-            "/NereusSDR/NereusSDR.settings";
+            "/Longpath/Longpath.settings";
         QCOMPARE(path, expected);
     }
 
@@ -37,7 +37,7 @@ private slots:
         const QString path = AppSettings::resolveSettingsPath("hf");
         QVERIFY2(path.contains("/profiles/hf/"),
                  qPrintable("got: " + path));
-        QVERIFY(path.endsWith("/NereusSDR.settings"));
+        QVERIFY(path.endsWith("/Longpath.settings"));
     }
 
     void distinctProfilesDoNotCollide() {
@@ -49,7 +49,7 @@ private slots:
         const QString dir  = AppSettings::resolveConfigDir("hf");
         const QString path = AppSettings::resolveSettingsPath("hf");
         QVERIFY(path.startsWith(dir + "/"));
-        QCOMPARE(path, dir + "/NereusSDR.settings");
+        QCOMPARE(path, dir + "/Longpath.settings");
     }
 
     void unsafeProfileNameFallsBackToDefault() {
