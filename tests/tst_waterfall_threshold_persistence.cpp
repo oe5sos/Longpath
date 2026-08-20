@@ -1,3 +1,10 @@
+// no-port-check: Longpath-original Regressionstest. Er ZITIERT Thetis
+// (display.cs, console.cs) in seiner Begruendung, weil er das dort
+// beschriebene Verhalten festnagelt — uebernommener Code steht keiner
+// darin. Aufgefallen erst am 2026-08-20: der Pruefer sieht nur
+// GEAENDERTE Dateien, und die Umbenennung des Namensraums hat diese
+// Datei zum ersten Mal in seinen Blick gebracht.
+
 // Regression tests for issue #230 — "Waterfall gain seems unstable and not
 // saving settings in 4.0".
 //

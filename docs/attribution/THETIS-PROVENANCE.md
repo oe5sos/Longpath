@@ -464,3 +464,8 @@ column 2 (not column 1) so the header-verifier script does not scan them.
 | src/core/audio/WavFile.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umfang (WAV + Beschreibung) als Vorbild; Leser/Schreiber NereusSDR-original |
 | src/core/audio/WavPlayer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | PlayFileViaPCAudio als Vorbild fuer den Lautsprecher-Weg |
 | src/gui/applets/QsoRecorderApplet.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Platzpruefung, Loeschen, Beschreibung einlesen, Nachhoeren |
+| src/core/audio/QsoRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | Umsetzung zu QsoRecorder.h; kein Zeilenport |
+| src/core/audio/VoiceKeyer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu VoiceKeyer.h; kein Zeilenport |
+| src/core/audio/WavFile.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umsetzung zu WavFile.h; Leser/Schreiber Longpath-original |
+| src/core/audio/WavPlayer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | Umsetzung zu WavPlayer.h; kein Zeilenport |
+| src/gui/applets/QsoRecorderApplet.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Kopf zu QsoRecorderApplet.cpp |
