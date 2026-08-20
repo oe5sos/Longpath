@@ -4860,6 +4860,7 @@ nereus_add_test(tst_theme_file)
 #    gehoert hat, wird eingehaengt und muss hinterher die Farben des
 #    Betreibers tragen, ohne dass jemand es angefasst hat --
 nereus_add_test(tst_theme_filter)
+nereus_add_test(tst_theme_selection)
 
 # -- Der Wasserfall ist die groesste Farbflaeche im Programm, und der
 #    Theme-Filter erreicht ihn nicht: er wird gemalt, nicht gestylt.

@@ -189,6 +189,15 @@ void RotorDialWidget::refreshTooltip()
 
 // ── Geometry, shared by drawing and hit-testing ─────────────────────
 
+bool RotorDialWidget::isLandscape() const
+{
+    // Deutlich breiter als hoch, und hoch genug, dass eine Rose ueber
+    // die volle Hoehe noch lesbar ist. Unterhalb davon greift weiter
+    // isCompassOnly: dort ist fuer eine Ablesung ohnehin kein Platz,
+    // egal auf welcher Seite.
+    return width() > height() * 1.7 && height() >= 120;
+}
+
 bool RotorDialWidget::isCompassOnly() const
 {
     // The rose normally sits in the top 84% and the two readout lines
@@ -200,11 +209,22 @@ bool RotorDialWidget::isCompassOnly() const
 
 QPointF RotorDialWidget::roseCentre() const
 {
+    if (isLandscape()) {
+        // Links, mit einem Rand von der Breite des Randabstands. Die
+        // Ablesung bekommt den Rest.
+        return {roseRadius() + 10.0, height() * 0.5};
+    }
     return {width() * 0.5, height() * (isCompassOnly() ? 0.5 : 0.42)};
 }
 
 double RotorDialWidget::roseRadius() const
 {
+    if (isLandscape()) {
+        // Die volle Hoehe, nicht 36 % davon. Nach oben begrenzt, damit
+        // die Rose in einer sehr hohen, sehr breiten Flaeche nicht die
+        // Ablesung erdrueckt.
+        return std::min(height() * 0.46 - 4.0, width() * 0.34);
+    }
     return isCompassOnly()
                ? std::min(width(), height()) * 0.46 - 3.0
                : std::min(width() * 0.42, height() * 0.36);
@@ -672,11 +692,20 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // Jetzt aus der Geometrie: unterer Rand der Rose, plus die
     // Oberlaenge der Schrift, plus Luft. Damit stimmt es bei jeder
     // Groesse, statt bei einer.
-    const double readoutY = qMin(h - 6.0,
-                                 c.y() + r + bfm.ascent() + 8.0);
+    // Im Querformat NEBEN die Rose, sonst darunter.
+    //
+    // Unter einer Rose, die die volle Hoehe nimmt, ist kein Platz mehr
+    // — und rechts davon liegt die Flaeche brach, die den flachen
+    // Streifen ueberhaupt erst breit macht.
+    const bool land = isLandscape();
+    const double readoutX = land
+        ? c.x() + r + 22.0
+        : (w - bfm.horizontalAdvance(line1)) / 2.0;
+    const double readoutY = land
+        ? c.y() - 4.0
+        : qMin(h - 6.0, c.y() + r + bfm.ascent() + 8.0);
     p.setPen(line1Col);
-    p.drawText(QPointF((w - bfm.horizontalAdvance(line1)) / 2.0, readoutY),
-               line1);
+    p.drawText(QPointF(readoutX, readoutY), line1);
 
     QFont small = Style::monoFont(p.font(), 11);
     small.setPixelSize(11);
@@ -708,8 +737,10 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     p.setPen(kMuted);
     // Zweite Zeile immer unter der ersten, mit derselben Rechnung
     // statt einer zweiten festen Zahl.
-    p.drawText(QPointF((w - sfm.horizontalAdvance(line2)) / 2.0,
-                       qMin(h - 4.0, readoutY + sfm.height() + 6.0)),
+    p.drawText(QPointF(land ? readoutX
+                            : (w - sfm.horizontalAdvance(line2)) / 2.0,
+                       land ? readoutY + sfm.height() + 8.0
+                            : qMin(h - 4.0, readoutY + sfm.height() + 6.0)),
                line2);
 }
 

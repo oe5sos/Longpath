@@ -1,5 +1,7 @@
 #include "AppearanceSetupPages.h"
 #include "gui/styles/ThemeQss.h"
+#include <QApplication>
+#include "gui/styles/Theme.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/StyleConstants.h"
@@ -52,6 +54,79 @@ void ColorsThemePage::buildUI()
         });
         return btn;
     };
+
+    // ── Palette waehlen ─────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: zwei helle Paletten „welche ich bei
+    // viel licht nutzen kann", und man solle „bei themes wechseln"
+    // koennen.
+    //
+    // Sofort wirksam, ohne Neustart: der ThemeFilter haengt an der
+    // Anwendung und faerbt jedes Widget bei QEvent::Polish um. Was
+    // schon steht, bekommt unten den Anstoss.
+    {
+        auto* themeGroup = new QGroupBox(QStringLiteral("Palette"), this);
+        auto* themeForm  = new QFormLayout(themeGroup);
+        themeForm->setSpacing(6);
+
+        m_themeCombo = new QComboBox(themeGroup);
+        m_themeCombo->addItem(Style::Theme::builtInName());
+        for (const Style::Theme::Entry& e : Style::Theme::available()) {
+            m_themeCombo->addItem(e.name);
+        }
+        const QString active = Style::Theme::instance().isActive()
+                                   ? Style::Theme::instance().name()
+                                   : Style::Theme::builtInName();
+        const int idx = m_themeCombo->findText(active);
+        m_themeCombo->setCurrentIndex(idx >= 0 ? idx : 0);
+        m_themeCombo->setToolTip(QStringLiteral(
+            "Farbpalette des ganzen Programms. Tageslicht und Werkbank "
+            "sind fuer helles Umgebungslicht gemacht: dort sind "
+            "Bernstein und Gruen dunkler, weil die hellen Toene der "
+            "Nachtpalette auf weissem Grund nicht mehr lesbar waeren.\n\n"
+            "Eigene Dateien liegen neben den Einstellungen und "
+            "ueberschreiben eine gleichnamige mitgelieferte."));
+
+        connect(m_themeCombo, &QComboBox::currentTextChanged, this,
+                [this](const QString& name) {
+            QString err;
+            if (!Style::Theme::instance().activate(name, &err)) {
+                if (m_themeHint) {
+                    m_themeHint->setText(
+                        QStringLiteral("Konnte nicht laden: %1").arg(err));
+                }
+                return;
+            }
+            if (m_themeHint) {
+                m_themeHint->setText(
+                    Style::Theme::instance().isActive()
+                        ? QStringLiteral("Aus %1")
+                              .arg(Style::Theme::instance().loadedFrom())
+                        : QStringLiteral("Eingebaute Palette"));
+            }
+            // Was schon gezeichnet ist, bekommt kein Polish mehr. Den
+            // Anstoss geben: Stylesheet neu setzen loest den Filter aus.
+            for (QWidget* w : QApplication::allWidgets()) {
+                if (w && !w->styleSheet().isEmpty()) {
+                    w->setStyleSheet(w->styleSheet());
+                }
+                if (w) { w->update(); }
+            }
+        });
+        themeForm->addRow(QStringLiteral("Farben:"), m_themeCombo);
+
+        m_themeHint = new QLabel(
+            Style::Theme::instance().isActive()
+                ? QStringLiteral("Aus %1").arg(Style::Theme::instance().loadedFrom())
+                : QStringLiteral("Eingebaute Palette"), themeGroup);
+        m_themeHint->setWordWrap(true);
+        m_themeHint->setStyleSheet(
+            QStringLiteral("color: %1; font-size: 11px;")
+                .arg(QLatin1String(Style::kTextTertiary)));
+        themeForm->addRow(QString(), m_themeHint);
+
+        layout()->addWidget(themeGroup);
+    }
 
     // --- Section: Spectrum ---
     auto* specGroup = new QGroupBox(QStringLiteral("Spectrum"), this);

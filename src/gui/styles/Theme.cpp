@@ -11,6 +11,9 @@
 // =================================================================
 
 #include "gui/styles/Theme.h"
+#include "core/AppSettings.h"
+#include <algorithm>
+#include <QSet>
 
 #include "gui/styles/ThemeQss.h"
 
@@ -98,6 +101,95 @@ bool Theme::loadUserTheme()
         }
     }
     return false;
+}
+
+// ── Auswaehlbare Paletten ───────────────────────────────────────────
+//
+// Siehe Theme.h fuer den Grund. Kurz: mit einer Datei war „nimm die
+// erste" eine Wahl, mit dreien ist es Zufall.
+
+QString Theme::builtInName()
+{
+    return QStringLiteral("Nacht (eingebaut)");
+}
+
+QVector<Theme::Entry> Theme::available()
+{
+    QVector<Entry> out;
+    QSet<QString> seenName;
+
+    // searchPaths() liefert vom Spezifischen zum Allgemeinen. Wer
+    // zuerst kommt, behaelt den Namen: eine eigene „Tageslicht"-Datei
+    // neben den Einstellungen schlaegt die mitgelieferte.
+    for (const QString& dir : searchPaths()) {
+        QDir d(dir);
+        if (!d.exists()) { continue; }
+        const QStringList files =
+            d.entryList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
+        for (const QString& f : files) {
+            const QString path = d.filePath(f);
+            QFile file(path);
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
+            const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+            if (!doc.isObject()) { continue; }
+            // Ohne Namen der Dateiname ohne Endung: eine Palette ohne
+            // Namen ist immer noch besser als keine in der Liste.
+            QString name = doc.object().value(QStringLiteral("name")).toString();
+            if (name.isEmpty()) { name = QFileInfo(f).completeBaseName(); }
+            if (seenName.contains(name)) { continue; }
+            seenName.insert(name);
+            out.append({name, path});
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const Entry& a, const Entry& b) {
+        return a.name.localeAwareCompare(b.name) < 0;
+    });
+    return out;
+}
+
+bool Theme::activate(const QString& displayName, QString* error)
+{
+    auto& st = AppSettings::instance();
+
+    if (displayName.isEmpty() || displayName == builtInName()) {
+        clear();
+        st.setValue("ActiveTheme", QString());
+        return true;
+    }
+    for (const Entry& e : available()) {
+        if (e.name != displayName) { continue; }
+        // Erst laden, dann merken. Andersherum stuende nach einem
+        // Neustart eine kaputte Datei im Merker und das Programm
+        // faende jedes Mal dieselbe Enttaeuschung.
+        if (!loadFile(e.path, error)) { return false; }
+        st.setValue("ActiveTheme", displayName);
+        return true;
+    }
+    if (error) {
+        *error = QStringLiteral("Palette %1 nicht gefunden").arg(displayName);
+    }
+    return false;
+}
+
+bool Theme::applyStoredChoice()
+{
+    const QString choice =
+        AppSettings::instance().value("ActiveTheme", QString()).toString();
+
+    // Kein Merker: das Verhalten von vorher. Wer schon eine eigene
+    // Datei liegen hat, soll sie nach dem Aktualisieren wiederfinden,
+    // ohne sie neu auszuwaehlen.
+    if (choice.isEmpty()) {
+        if (AppSettings::instance().contains("ActiveTheme")) {
+            clear();          // bewusst „eingebaut" gewaehlt
+            return true;
+        }
+        return loadUserTheme();
+    }
+    QString err;
+    if (activate(choice, &err)) { return true; }
+    qWarning("Gemerkte Palette nicht anwendbar: %s", qUtf8Printable(err));
+    return loadUserTheme();
 }
 
 bool Theme::loadFile(const QString& path, QString* error)

@@ -25,6 +25,10 @@ private:
     void buildUI();
 
     // Section: Spectrum — functional colour pickers (live, wired to SpectrumWidget).
+    /// Auswahlliste der Paletten (2026-08-20). Siehe Theme::available().
+    QComboBox* m_themeCombo{nullptr};
+    QLabel*    m_themeHint{nullptr};
+
     ColorSwatchButton* m_traceFillColorBtn{nullptr};   // → setFillColor
     ColorSwatchButton* m_gridColorBtn{nullptr};        // → setGridColor       (G9)
     ColorSwatchButton* m_gridFineColorBtn{nullptr};    // → setGridFineColor   (G10)

@@ -1169,6 +1169,24 @@ if(NEREUSSDR_LTO_AVAILABLE)
 endif()
 
 add_executable(Longpath src/main.cpp ${APP_ICON_SOURCES})
+
+# ── Mitgelieferte Farbpaletten ───────────────────────────────────────
+#
+# Theme::searchPaths() sucht unter anderem "themes" NEBEN der
+# Binaerdatei — genau dafuer ist dieser Schritt da.
+#
+# Nicht in themes/ im Quellbaum: das Verzeichnis steht in .gitignore
+# und gehoert den eigenen Dateien des Betreibers, die eine
+# gleichnamige mitgelieferte ueberschreiben duerfen (siehe
+# Theme::available()).
+add_custom_command(TARGET Longpath POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:Longpath>/themes"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/resources/themes/tageslicht.json"
+            "${CMAKE_SOURCE_DIR}/resources/themes/werkbank.json"
+            "$<TARGET_FILE_DIR:Longpath>/themes/"
+    COMMENT "Farbpaletten neben die Binaerdatei legen")
 if(NEREUSSDR_LTO_AVAILABLE)
     # Main app + its OBJECT-lib link both get LTO when enabled.  The
     # IPO property on the executable arranges -flto on the link line;

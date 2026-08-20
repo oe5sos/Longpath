@@ -155,6 +155,24 @@ private:
     // its own copy of the old formula, so on a small dial a click aimed
     // at a heading several degrees from the one under the cursor —
     // silently, and worse the smaller it got.
+    // ── Querformat ───────────────────────────────────────────────────
+    //
+    // Die Leiste unten ist rund 1000 px breit und 300 hoch, und der
+    // Rotor bekommt darin einen flachen Streifen. roseRadius() nahm
+    // dort min(w*0.42, h*0.36) — die Hoehe gewinnt, und aus 160 px
+    // Streifenhoehe werden 58 px Radius. Beim Rendern am 2026-08-20
+    // gemessen: Zifferblatt rund 110 px in einer 1950 px breiten
+    // Flaeche, und die Gradzahlen fielen ganz weg, weil sie erst ab
+    // r > 84 gezeichnet werden.
+    //
+    // Genau das hat der Betreiber gemeldet: der Inhalt aendert sich
+    // beim Verkleinern nicht im Massstab. Er tat es doch — nur an der
+    // falschen Achse.
+    //
+    // Im Querformat steht die Rose links und nimmt die volle Hoehe;
+    // die Ablesung rueckt nach rechts daneben, statt darunter zu
+    // stehen, wo kein Platz ist.
+    bool    isLandscape()   const;
     bool    isCompassOnly() const;
     QPointF roseCentre()    const;
     double  roseRadius()    const;

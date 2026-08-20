@@ -317,7 +317,11 @@ int main(int argc, char* argv[])
         // printf-Form statt Stream: qInfo() << … braucht QDebug, und ein
         // Header, der nur über QApplication mitkommt, ist ein Bruch, der
         // erst bei jemand anderem auffällt.
-        if (theme.loadUserTheme()) {
+        // applyStoredChoice statt loadUserTheme: seit 2026-08-20 gibt es
+        // eine Auswahl (Setup -> Appearance -> Colors & Theme). Ohne
+        // gemerkte Wahl faellt sie auf loadUserTheme() zurueck, damit
+        // bestehende Installationen ihre Datei behalten.
+        if (theme.applyStoredChoice()) {
             qInfo("Theme: %s aus %s",
                   qPrintable(theme.name()), qPrintable(theme.loadedFrom()));
         } else {

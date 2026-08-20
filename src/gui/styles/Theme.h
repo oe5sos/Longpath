@@ -54,6 +54,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 
 namespace Longpath::Style {
 
@@ -74,6 +75,42 @@ public:
     /// Load the first theme found in searchPaths(). No file is the
     /// normal case and not an error — dann gilt die Nereus-Palette.
     bool loadUserTheme();
+
+    // ── Auswaehlbare Paletten ────────────────────────────────────────
+    //
+    // Bis 2026-08-20 nahm loadUserTheme() die ERSTE JSON-Datei in
+    // alphabetischer Reihenfolge. Mit einer Datei war das eine Wahl,
+    // mit dreien ist es Zufall — „tageslicht.json" gewaenne gegen
+    // „werkbank.json", weil t vor w kommt, und der Betreiber haette
+    // nie danach gefragt.
+    //
+    // Der Betreiber wollte zwei helle Paletten „welche ich bei viel
+    // licht nutzen kann" und sie „bei themes wechseln" koennen. Dafuer
+    // braucht es drei Dinge: die Liste, eine Wahl, und dass die Wahl
+    // den Neustart ueberlebt.
+
+    /// Eine gefundene Palette: Anzeigename und Datei.
+    struct Entry { QString name; QString path; };
+
+    /// Alle Paletten aus searchPaths(), nach Anzeigename sortiert.
+    /// Doppelte Namen gewinnt der spezifischere Pfad — die eigene
+    /// Datei neben den Einstellungen schlaegt die mitgelieferte.
+    static QVector<Entry> available();
+
+    /// Palette nach Anzeigenamen setzen und die Wahl merken. Ein
+    /// leerer Name heisst „eingebaute Palette" (clear()).
+    /// Gibt false zurueck, wenn der Name nicht gefunden wurde ODER die
+    /// Datei kaputt ist — in beiden Faellen bleibt die laufende
+    /// Palette stehen, statt das Programm farblos zu machen.
+    bool activate(const QString& displayName, QString* error = nullptr);
+
+    /// Die gemerkte Wahl anwenden. Ohne gemerkte Wahl faellt es auf
+    /// loadUserTheme() zurueck, damit bestehende Installationen ihre
+    /// Datei behalten.
+    bool applyStoredChoice();
+
+    /// Name der eingebauten Palette in der Auswahlliste.
+    static QString builtInName();
 
     /// Back to the built-in palette.
     void clear();
