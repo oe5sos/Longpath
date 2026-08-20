@@ -1430,6 +1430,12 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // stillschweigend rückgängig gemacht.
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
+        // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
+        // Anordnung fast nichts, danach ihre echte Untergrenze — und
+        // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
+        // Profil nichts vorgibt; eine gespeicherte Lage gehoert dem
+        // Betreiber.
+        if (!rect.isValid()) { win->applyDefaultSize(); }
         win->raise();
     }
 }
@@ -2998,7 +3004,12 @@ void MainWindow::buildUI()
     // so their title stays exactly as it was. main() fills BuildIdentity in
     // from a header regenerated on every build, so the sha here is the sha
     // that was compiled, not the one that was current at the last configure.
-    QString title = QStringLiteral("NereusSDR %1").arg(NEREUSSDR_VERSION);
+    // Der Name der Anwendung, nicht der des Vorgaengers. Der
+    // Betreiber hat am 2026-08-20 zu Recht reklamiert, dass hier
+    // noch „NereusSDR" stand, obwohl das Programm laengst Longpath
+    // heisst — alle Urhebervermerke der Vorlagen bleiben davon
+    // unberuehrt und stehen weiterhin im Ueber-Dialog.
+    QString title = QStringLiteral("Longpath %1").arg(NEREUSSDR_VERSION);
 
     const QString buildTag = BuildIdentity::buildTag();
     if (!buildTag.isEmpty()) {

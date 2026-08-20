@@ -33,7 +33,25 @@
 namespace Longpath {
 
 PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
-    : QWidget(parent, Qt::Window)
+    // ── Qt::Tool, nicht Qt::Window ──────────────────────────────────
+    //
+    // Auf macOS wird aus Qt::Tool ein NSPanel mit der Sammelregel
+    // „FullScreenAuxiliary": es SCHWEBT ueber einem Elternfenster, das
+    // im Vollbild steht, statt in dessen Vollbildflaeche einzuziehen.
+    //
+    // Genau daran hing die Klage des Betreibers vom 2026-08-20 („es
+    // geht immer ein neues fenster bildschirm fuellend auf"). Sein
+    // MainWindowGeometry sagt Rahmen (0,33)-(1469,955) mit gesetztem
+    // Vollbild-Vermerk. Ein Qt::Window, das waehrenddessen aufgeht,
+    // landet in derselben Flaeche und wirkt bildschirmfuellend — Qt
+    // meldet dabei brav 900x460, gemessen am 2026-08-20. Die Zahl war
+    // richtig und das Bild trotzdem falsch, weshalb kein Test es sehen
+    // konnte.
+    //
+    // Ein Werkzeugfenster steht ausserdem immer ueber seinem
+    // Elternfenster und nicht im Programmumschalter — beides richtig
+    // fuer ein abgeloestes Teil der Konsole.
+    : QWidget(parent, Qt::Tool)
     , m_applet(applet)
 {
     setWindowTitle(QStringLiteral("Longpath - Pan %1")
@@ -60,6 +78,11 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
             this, &QWidget::close);
     connect(m_titleBar, &WindowTitleBar::dockRequested,
             this, &PanFloatingWindow::requestDock);
+    // Je Panadapter ein eigener Schluessel: zwei festgestellte Fenster
+    // duerfen sich nicht gegenseitig ueberschreiben.
+    m_titleBar->setLockKey(QStringLiteral("Pan_%1")
+                               .arg(applet ? applet->panId()
+                                           : QStringLiteral("A")));
     layout->addWidget(m_titleBar);
 
     if (applet) {

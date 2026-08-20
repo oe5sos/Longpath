@@ -209,6 +209,27 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
     // darunter, sonst zöge jeder Regler das ganze Feld mit.
     cell->titleBar()->installEventFilter(this);
     m_titleBars.insert(cell->titleBar(), cell);
+
+    // Die beiden Knoepfe der Kopfleiste an die Empfaenger weiterreichen.
+    // Das Panel loest NICHT selbst ab (siehe appletDetachRequested im
+    // Kopf) — es meldet nur, dass jemand es will.
+    //
+    // KEIN Qt::UniqueConnection hier. Qt kann Lambdas nicht auf
+    // Doppelung pruefen und stellt die Verbindung dann GAR NICHT her —
+    // stillschweigend, bis auf eine Warnung, die im Startgetoese
+    // untergeht. Am 2026-08-20 habe ich genau das geschrieben, der
+    // Knopf war da, sichtbar, eingeschaltet, und ein Druck darauf tat
+    // nichts. Doppelung droht ohnehin nicht: jedes Feld wird hier
+    // genau einmal angelegt (addApplet steigt vorher aus, wenn das
+    // Applet schon da ist).
+    connect(cell, &GridCellWidget::detachRequested,
+            this, [this](AppletWidget* a) {
+        if (a) { emit appletDetachRequested(a, appletPosition(a)); }
+    });
+    connect(cell, &GridCellWidget::hideRequested,
+            this, [this](AppletWidget* a) {
+        if (a) { emit appletHideRequested(a); }
+    });
 }
 
 void AppletPanelWidget::removeApplet(AppletWidget* applet)

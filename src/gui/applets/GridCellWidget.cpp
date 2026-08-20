@@ -18,6 +18,7 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -51,6 +52,8 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     m_titleLayout->addWidget(m_titleLabel);
     m_titleLayout->addStretch();
 
+    buildCellButtons();
+
     root->addWidget(m_titleBar);
 
     // KEINE Zwischenebene fuer den Inhalt: die Inhalte haengen direkt
@@ -67,6 +70,53 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     m_titleBar->setCursor(Qt::OpenHandCursor);
     updateTitleBarHeight();
     refreshTitleText();
+}
+
+// Die beiden Knoepfe rechts in der Kopfleiste.
+//
+// Zeus Link setzt sie sichtbar in JEDEN Fensterkopf. Ein Weg, den man
+// nicht sieht, ist kein Weg — das hat uns dieses Vorhaben achtmal
+// gezeigt, zuletzt hier: der Ablöseknopf existierte seit dem
+// 2026-08-19 im Quelltext, aber in einer Kopfleiste, die kein Applet
+// mehr benutzt.
+void GridCellWidget::buildCellButtons()
+{
+    const QString btnCss = QStringLiteral(
+        "QPushButton { background: transparent; border: none;"
+        "  color: %1; font-size: 10px; padding: 0; }"
+        "QPushButton:hover { background: %2; color: %3;"
+        "  border-radius: 3px; }")
+        .arg(QString::fromLatin1(Style::kTextScale),
+             QString::fromLatin1(Style::kButtonHover),
+             QString::fromLatin1(Style::kTextPrimary));
+
+    auto* detach = new QPushButton(QStringLiteral("\u2197"), m_titleBar);
+    detach->setFixedSize(16, 14);
+    detach->setCursor(Qt::PointingHandCursor);
+    detach->setToolTip(QStringLiteral(
+        "Als eigenes Fenster ablösen — dann frei verschiebbar "
+        "und in der Ecke ziehbar."));
+    detach->setStyleSheet(btnCss);
+    connect(detach, &QPushButton::clicked, this, [this]() {
+        // Das erste Applet im Feld. Bei mehreren Inhalten ist es das
+        // oberste — dieselbe Auswahl, die auch das Rechtsklick-Menue
+        // trifft.
+        const QList<AppletWidget*> as = applets();
+        if (!as.isEmpty()) { emit detachRequested(as.first()); }
+    });
+    m_titleLayout->addWidget(detach);
+
+    auto* close = new QPushButton(QStringLiteral("\u2715"), m_titleBar);
+    close->setFixedSize(16, 14);
+    close->setCursor(Qt::PointingHandCursor);
+    close->setToolTip(QStringLiteral(
+        "Ausblenden. Mit dem + unten rechts kommt es zurück."));
+    close->setStyleSheet(btnCss);
+    connect(close, &QPushButton::clicked, this, [this]() {
+        const QList<AppletWidget*> as = applets();
+        if (!as.isEmpty()) { emit hideRequested(as.first()); }
+    });
+    m_titleLayout->addWidget(close);
 }
 
 void GridCellWidget::addWidget(QWidget* w)

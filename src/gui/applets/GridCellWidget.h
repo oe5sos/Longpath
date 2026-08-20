@@ -107,7 +107,27 @@ public:
     /// wrapWithTitleBar, damit Schritt 1 dasselbe Bild ergibt.
     void updateTitleBarHeight();
 
+    // ── Abloesen und Ausblenden ──────────────────────────────────────
+    //
+    // Bis 2026-08-20 hatte diese Kopfleiste NUR Griff und Titel. Die
+    // beiden Knoepfe standen in AppletPanelWidget::wrapWithTitleBar —
+    // und die wird seit der Umstellung auf das Raster nur noch fuer die
+    // S-Meter-Kopfzeile gerufen. Jedes echte Applet laeuft ueber diese
+    // Klasse hier und hatte damit nichts zum Anklicken.
+    //
+    // Das ist der Grund, warum der Betreiber ueber Tage hinweg gemeldet
+    // hat, es lasse sich nichts abloesen und nichts verschieben: der
+    // Weg war gebaut, aber nirgends erreichbar. Der achte Fall dieser
+    // Art in diesem Vorhaben.
+signals:
+    /// Der Nutzer will DIESES Applet als eigenes Fenster.
+    void detachRequested(AppletWidget* applet);
+    /// Der Nutzer will es ausblenden.
+    void hideRequested(AppletWidget* applet);
+
 private:
+    void buildCellButtons();
+
     void refreshTitleText();
 
     QString m_id;

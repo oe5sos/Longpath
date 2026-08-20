@@ -298,7 +298,10 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // fresh initialize() against the floating window's own surface.
     applet->hide();
 
-    auto* floater = new PanFloatingWindow(applet, nullptr);
+    // Mit Elternfenster: ein Qt::Tool ohne Elternteil ist kein
+    // Hilfsfenster, sondern ein weiteres Hauptfenster — und faellt in
+    // die Vollbildflaeche zurueck, die es gerade vermeiden soll.
+    auto* floater = new PanFloatingWindow(applet, window());
     m_floating[panId] = floater;
 
     connect(floater, &PanFloatingWindow::dockRequested, this, [this, panId]() {

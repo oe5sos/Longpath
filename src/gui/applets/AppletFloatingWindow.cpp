@@ -16,6 +16,8 @@
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QTimer>
+#include <QScreen>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -23,7 +25,11 @@ namespace Longpath {
 AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
                                            const QString& panelId,
                                            int dockIndex, QWidget* parent)
-    : QWidget(parent, Qt::Window)
+    // Qt::Tool statt Qt::Window: auf macOS ein NSPanel mit der
+    // Sammelregel „FullScreenAuxiliary" — es schwebt ueber einem
+    // Elternfenster im Vollbild, statt in dessen Flaeche einzuziehen.
+    // Siehe die ausfuehrliche Begruendung in PanFloatingWindow.cpp.
+    : QWidget(parent, Qt::Tool)
     , m_applet(applet)
     , m_panelId(panelId)
     , m_dockIndex(dockIndex)
@@ -46,14 +52,37 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     connect(m_titleBar, &WindowTitleBar::dockRequested, this, [this]() {
         emit dockRequested(appletId());
     });
+    m_titleBar->setLockKey(QStringLiteral("Applet_%1").arg(panelId));
     lay->addWidget(m_titleBar);
 
     if (applet) {
-        // Die Spalte gibt 260 px vor; ein abgelöstes Applet darf breiter
-        // werden, aber nicht schmaler als das, wofür es gebaut wurde.
+        // ── Der Inhalt kommt in einen Rollbereich ───────────────────
+        //
+        // Sonst bestimmt die Mindestgroesse des Applets die des
+        // Fensters, und bei den groesseren Applets heisst das:
+        // bildschirmfuellend. Der Betreiber am 2026-08-20, nachdem ich
+        // es schon einmal falsch repariert hatte: „es geht immer ein
+        // neues fenster bildschirm fuellend auf, dass ist falsch".
+        //
+        // Mein erster Anlauf setzte nur minimumHeight(0) auf dem
+        // Applet. Das half beim RX-Applet (300x368 gemessen) und half
+        // nicht bei den anderen, weil deren Anordnung die Untergrenze
+        // aus ihren KINDERN zieht — die bleibt.
+        //
+        // Ein Rollbereich schneidet diese Kette durch: er hat selbst
+        // fast keine Untergrenze, und was nicht hineinpasst, wird
+        // gerollt statt das Fenster aufzuziehen. Dieselbe Loesung, die
+        // die Applet-Spalte schon benutzt.
         applet->setParent(this);
         applet->show();
-        lay->addWidget(applet);
+
+        m_scroll = new QScrollArea(this);
+        m_scroll->setWidgetResizable(true);
+        m_scroll->setFrameShape(QFrame::NoFrame);
+        m_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        m_scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        m_scroll->setWidget(applet);
+        lay->addWidget(m_scroll);
     }
     setMinimumWidth(Style::kAppletPanelW);
 
@@ -93,17 +122,58 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     });
 }
 
+void AppletFloatingWindow::applyDefaultSize()
+{
+    if (m_sizedOnce) { return; }   // wer nachher zieht, darf es behalten
+    m_sizedOnce = true;
+
+    // Der Rollbereich hat selbst kaum eine Untergrenze; hier wird nur
+    // noch festgelegt, wie klein das Fenster von Hand werden darf.
+    setMinimumHeight(m_titleBar ? m_titleBar->height() + 60 : 80);
+
+    // Die Wunschgroesse ist die des Inhalts — aber gedeckelt. Ein
+    // abgeloestes Applet ist ein Werkzeug neben der Konsole, kein
+    // zweiter Vollbild.
+    const int barH = m_titleBar ? m_titleBar->height() : 0;
+    QSize want(Style::kAppletPanelW + 40,
+               qMax(160, m_applet ? m_applet->sizeHint().height() + barH
+                                  : 240));
+    if (m_applet) {
+        want.setWidth(qMax(want.width(), m_applet->sizeHint().width() + 4));
+    }
+    if (QScreen* sc = screen()) {
+        const QSize avail = sc->availableSize();
+        want.setWidth (qMin(want.width(),  avail.width()  - 80));
+        // Hoechstens zwei Drittel des Schirms: ein abgeloestes Applet
+        // ist ein Werkzeug neben der Konsole, kein zweiter Vollbild.
+        want.setHeight(qMin(want.height(), (avail.height() * 2) / 3));
+        want.setWidth (qMin(want.width(),  (avail.width()  * 1) / 2));
+    }
+    resize(want);
+}
+
 AppletFloatingWindow::~AppletFloatingWindow() = default;
 
 AppletWidget* AppletFloatingWindow::releaseApplet()
 {
     AppletWidget* a = m_applet.data();
     if (!a) { return nullptr; }
-    // Aus dem Layout UND aus der Elternschaft. Nur removeWidget zu
-    // rufen liesse das Applet Kind dieses Fensters — es stürbe mit ihm,
-    // und der Aufrufer hielte einen baumelnden Zeiger auf etwas, das er
+    // Aus dem Behaelter UND aus der Elternschaft. Nur zu entnehmen
+    // liesse das Applet Kind dieses Fensters — es stürbe mit ihm, und
+    // der Aufrufer hielte einen baumelnden Zeiger auf etwas, das er
     // gerade zurückbekommen zu haben glaubt.
-    if (layout()) { layout()->removeWidget(a); }
+    //
+    // takeWidget(), nicht removeWidget(): seit dem 2026-08-20 haengt
+    // das Applet in einem QScrollArea (siehe Baukasten), und ein
+    // Rollbereich BESITZT sein Widget. layout()->removeWidget(a)
+    // fuende es dort gar nicht — das Applet bliebe Kind des
+    // Rollbereichs und stuerbe beim deleteLater des Fensters, mitten
+    // im Andocken.
+    if (m_scroll && m_scroll->widget() == a) {
+        m_scroll->takeWidget();          // gibt die Elternschaft ab
+    } else if (layout()) {
+        layout()->removeWidget(a);
+    }
     a->setParent(nullptr);
     m_applet.clear();
     return a;

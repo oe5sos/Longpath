@@ -57,6 +57,9 @@ class QTimer;
 namespace Longpath {
 
 class WindowTitleBar;
+} // namespace Longpath
+class QScrollArea;
+namespace Longpath {
 
 class AppletWidget;
 
@@ -90,6 +93,19 @@ public:
     /// Aufrufer ist dran, es wieder einzuhängen.
     AppletWidget* releaseApplet();
 
+    /// Setzt eine vernuenftige Anfangsgroesse — NACHDEM das Applet
+    /// sichtbar ist.
+    ///
+    /// Im Baukasten ginge es nicht: solange das Applet versteckt ist,
+    /// verlangt die Anordnung fast nichts; sobald es auftaucht,
+    /// meldet sie ihre echte Mindestgroesse und zieht das Fenster mit
+    /// auf. Der Betreiber hat am 2026-08-20 genau das gesehen — „wenn
+    /// ich dies klicke wird es nur komplett gross, fuer den ganzen
+    /// bildschirm". Dieselbe Falle wie bei
+    /// PanFloatingWindow::applyDefaultSize, dort seit demselben Tag
+    /// beschrieben.
+    void applyDefaultSize();
+
 signals:
     /// Der Bediener will es zurück in die Spalte (Fenster geschlossen).
     void dockRequested(const QString& appletId);
@@ -112,6 +128,8 @@ private:
     int      m_dockIndex{-1};
     QTimer*  m_settleTimer{nullptr};
     WindowTitleBar* m_titleBar{nullptr};
+    bool m_sizedOnce{false};
+    QScrollArea* m_scroll{nullptr};
 
     /// Gleiche Grössenordnung wie StripEqPanel. Lang genug, dass ein
     /// Zug über den halben Schirm eine Meldung erzeugt und nicht

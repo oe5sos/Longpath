@@ -10,6 +10,7 @@
 
 #include "gui/FramelessMoveHelper.h"
 #include "gui/StyleConstants.h"
+#include "core/AppSettings.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -17,6 +18,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QSignalBlocker>
 
 namespace Longpath {
 
@@ -29,6 +31,13 @@ constexpr int kGripSize   = 16;
 // kuehlen Akzent — der Akzent gehoert den Bedienelementen, diese Marke
 // gehoert dem Fenster.
 constexpr auto kGripStripe = "#d8a13a";
+
+// Ein Schluessel je Fenster, damit sich zwei festgestellte Fenster
+// nicht gegenseitig ueberschreiben.
+QString settingsKeyFor(const QString& id)
+{
+    return QStringLiteral("WindowLocked_") + id;
+}
 
 } // namespace
 
@@ -64,6 +73,16 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     lay->addWidget(m_label);
     lay->addStretch();
 
+    // Das Schloss ganz links neben den anderen Knoepfen: es betrifft
+    // das Fenster als Ganzes, nicht seinen Inhalt.
+    m_lockBtn = new QPushButton(this);
+    m_lockBtn->setFixedSize(16, 16);
+    m_lockBtn->setCursor(Qt::ArrowCursor);
+    m_lockBtn->setCheckable(true);
+    connect(m_lockBtn, &QPushButton::toggled,
+            this, &WindowTitleBar::setLocked);
+    lay->addWidget(m_lockBtn);
+
     auto* dock = new QPushButton(QStringLiteral("↙"), this);
     dock->setFixedSize(16, 16);
     dock->setToolTip(QStringLiteral("Zurueck in die Spalte"));
@@ -86,6 +105,8 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
             .arg(Style::kTextPrimary));
     connect(close, &QPushButton::clicked, this, &WindowTitleBar::closeRequested);
     lay->addWidget(close);
+
+    applyLockVisuals();   // offenes Schloss, richtiger Zeiger
 }
 
 void WindowTitleBar::setTitle(const QString& title)
@@ -93,8 +114,70 @@ void WindowTitleBar::setTitle(const QString& title)
     if (m_label) { m_label->setText(title); }
 }
 
+void WindowTitleBar::setLockKey(const QString& key)
+{
+    m_lockKey = key;
+    if (m_lockKey.isEmpty()) { return; }
+    // Gemerkten Zustand holen. Ohne das waere das Feststellen eine
+    // Geste, die jeder Neustart zurueckdreht.
+    const bool on = AppSettings::instance()
+                        .value(settingsKeyFor(m_lockKey),
+                               QStringLiteral("False"))
+                        .toString() == QStringLiteral("True");
+    setLocked(on);
+}
+
+void WindowTitleBar::setLocked(bool on)
+{
+    if (m_locked == on) { applyLockVisuals(); return; }
+    m_locked = on;
+
+    // Die Eigenschaft am FENSTER, nicht an der Leiste: FramelessResizer
+    // horcht auf dem Fenster und fragt genau diese ab.
+    if (QWidget* win = window()) {
+        win->setProperty("longpathWindowLocked", on);
+    }
+    // Der Anfasser unten rechts gehoert zum selben Fenster.
+    if (QWidget* win = window()) {
+        for (ResizeGrip* g : win->findChildren<ResizeGrip*>()) {
+            g->setLocked(on);
+        }
+    }
+    applyLockVisuals();
+
+    if (!m_lockKey.isEmpty()) {
+        AppSettings::instance().setValue(
+            settingsKeyFor(m_lockKey),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    }
+    emit lockedChanged(on);
+}
+
+void WindowTitleBar::applyLockVisuals()
+{
+    if (!m_lockBtn) { return; }
+    QSignalBlocker block(m_lockBtn);
+    m_lockBtn->setChecked(m_locked);
+    m_lockBtn->setText(m_locked ? QStringLiteral("🔒")
+                                : QStringLiteral("🔓"));
+    m_lockBtn->setToolTip(m_locked
+        ? QStringLiteral("Festgestellt — Klicken zum Loesen. "
+                         "Das Fenster laesst sich weder schieben noch "
+                         "in der Groesse aendern.")
+        : QStringLiteral("Feststellen — dann bleibt das Fenster, wo es "
+                         "steht, und behaelt seine Groesse."));
+    m_lockBtn->setStyleSheet(
+        QStringLiteral("QPushButton { background: transparent; border: none;"
+                       " font-size: 9px; padding: 0; }"
+                       "QPushButton:hover { background: %1; }")
+            .arg(Style::kButtonHover));
+    setCursor(m_locked ? Qt::ArrowCursor : Qt::OpenHandCursor);
+}
+
 void WindowTitleBar::mousePressEvent(QMouseEvent* ev)
 {
+    // Festgestellt heisst festgestellt.
+    if (m_locked) { QWidget::mousePressEvent(ev); return; }
     if (FramelessMoveHelper::start(this, ev)) {
         setCursor(Qt::ClosedHandCursor);
         return;
@@ -104,6 +187,7 @@ void WindowTitleBar::mousePressEvent(QMouseEvent* ev)
 
 void WindowTitleBar::mouseMoveEvent(QMouseEvent* ev)
 {
+    if (m_locked) { QWidget::mouseMoveEvent(ev); return; }
     if (FramelessMoveHelper::move(this, ev)) { return; }
     QWidget::mouseMoveEvent(ev);
 }
@@ -162,7 +246,9 @@ void ResizeGrip::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing, false);
     // Klammern, keine runden: QPen pen(QColor(...)) liest der
     // Uebersetzer als Funktionsdeklaration, nicht als Objekt.
-    QPen pen{QColor(QString::fromLatin1(Style::kTextPrimary))};
+    QColor ink(QString::fromLatin1(Style::kTextPrimary));
+    if (m_locked) { ink.setAlpha(70); }   // festgestellt: nur noch angedeutet
+    QPen pen{ink};
     pen.setWidth(1);
     p.setPen(pen);
     // Drei Schraegstriche, von aussen nach innen kuerzer — die Form, die
@@ -176,8 +262,19 @@ void ResizeGrip::paintEvent(QPaintEvent*)
     }
 }
 
+void ResizeGrip::setLocked(bool on)
+{
+    if (m_locked == on) { return; }
+    m_locked = on;
+    setCursor(on ? Qt::ArrowCursor : Qt::SizeFDiagCursor);
+    setToolTip(on ? QStringLiteral("Fenster ist festgestellt")
+                  : QStringLiteral("Groesse ziehen"));
+    update();   // blass zeichnen
+}
+
 void ResizeGrip::mousePressEvent(QMouseEvent* ev)
 {
+    if (m_locked) { QWidget::mousePressEvent(ev); return; }
     if (ev->button() != Qt::LeftButton) {
         QWidget::mousePressEvent(ev);
         return;

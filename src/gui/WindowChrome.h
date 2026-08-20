@@ -30,6 +30,8 @@
 
 #include <QWidget>
 
+class QPushButton;
+
 class QLabel;
 
 namespace Longpath {
@@ -53,6 +55,26 @@ public:
 
     void setTitle(const QString& title);
 
+    // ── Das Schloss ──────────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20, nachdem der abgeloeste Panadapter
+    // endlich schwebte: „das schloss fehlt dann zum fixieren". Zeus
+    // setzt in jeden Fensterkopf ein Schloss; ein verriegeltes Fenster
+    // bleibt, wo es steht, und behaelt seine Groesse.
+    //
+    // Der Zustand wird unter `key` in den Einstellungen gemerkt, damit
+    // ein festgestelltes Fenster nach dem Neustart festgestellt bleibt
+    // — sonst waere das Feststellen eine Geste, die jeder Neustart
+    // zurueckdreht.
+    void setLockKey(const QString& key);
+    bool isLocked() const { return m_locked; }
+    void setLocked(bool on);
+
+signals:
+    void lockedChanged(bool locked);
+
+public:
+
     // Doppelklick auf die Leiste heisst „andocken", nicht „maximieren".
     // Ein abgeloestes Fenster gehoert eigentlich in die Spalte zurueck;
     // das ist die Bewegung, die man erwartet.
@@ -67,7 +89,12 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* ev) override;
 
 private:
-    QLabel* m_label{nullptr};
+    void applyLockVisuals();
+
+    QLabel*      m_label{nullptr};
+    QPushButton* m_lockBtn{nullptr};
+    QString      m_lockKey;
+    bool         m_locked{false};
 };
 
 // ── Der Anfasser unten rechts ───────────────────────────────────────
@@ -85,6 +112,9 @@ class ResizeGrip : public QWidget {
 public:
     explicit ResizeGrip(QWidget* parent = nullptr);
 
+    /// Verriegelt: der Anfasser wird blass und nimmt keinen Zug mehr an.
+    void setLocked(bool on);
+
 protected:
     void paintEvent(QPaintEvent* ev) override;
     void mousePressEvent(QMouseEvent* ev) override;
@@ -92,6 +122,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* ev) override;
 
 private:
+    bool   m_locked{false};
     bool   m_dragging{false};
     QPoint m_pressGlobal;
     QSize  m_startSize;

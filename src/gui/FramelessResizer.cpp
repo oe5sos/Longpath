@@ -143,6 +143,21 @@ bool FramelessResizer::eventFilter(QObject* obj, QEvent* ev)
         return false;
     }
 
+    // ── Verriegelt? Dann Finger weg ──────────────────────────────────────
+    //
+    // Longpath-Zusatz (2026-08-20): der Betreiber wollte ein Schloss in
+    // jedem Fensterkopf, wie bei Zeus — „das schloss fehlt dann zum
+    // fixieren". Ein verriegeltes Fenster laesst sich weder ziehen noch
+    // in der Groesse aendern.
+    //
+    // Ueber eine dynamische Eigenschaft statt ueber die Schnittstelle:
+    // so bleibt der Rest dieser Datei der Wortlaut des Ports aus
+    // AetherSDR, und das Schloss braucht keine Aenderung an jeder
+    // Aufrufstelle.
+    if (m_window && m_window->property("longpathWindowLocked").toBool()) {
+        return false;
+    }
+
     // ── Phase 2: QWindow (native handle) ─────────────────────────────────
     // Hands off when the window has native decorations — the OS handles resize.
     if (!(m_window->windowFlags() & Qt::FramelessWindowHint)) {
