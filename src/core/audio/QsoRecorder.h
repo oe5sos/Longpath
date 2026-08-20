@@ -125,7 +125,7 @@ struct QsoRecordingInfo {
 // Die Beschreibung neben einer Aufnahme wieder einlesen.
 //
 // Aus der Thetis-Durchsicht vom 2026-08-19 (`GetJSONDetailsFromFile`,
-// clsAudioRecordPlayback.cs:1102 [v2.10.3.15-5-g852bf0e]): Thetis liest
+// clsAudioRecordPlayback.cs:1102 [@852bf0e]): Thetis liest
 // seine Beschreibungen zurueck, wir haben sie bisher nur geschrieben.
 // Der Unterschied steht in der Liste der Aufnahmen — „19.08. 18:02 ·
 // DL1ABC · 14.205.000 · LSB" statt „qso-20260819-180213".

@@ -4683,6 +4683,13 @@ nereus_add_test(tst_applet_detach_reachable)
 nereus_add_test(tst_applet_window_size)
 nereus_add_test(tst_real_mainwindow_detach)
 nereus_add_test(tst_real_pan_float)
+nereus_add_test(tst_real_container_move)
+nereus_add_test(tst_real_zoom_visible)
+nereus_add_test(tst_needle_fits)
+nereus_add_test(tst_rotor_dial_paint)
+nereus_add_test(tst_design_consistency)
+set_tests_properties(tst_design_consistency PROPERTIES
+    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 
 # -- AppletVisibilityController: state, persistence, signal emission --
 nereus_add_test(tst_applet_visibility_controller)

@@ -303,6 +303,13 @@ SpectrumOverlayPanel::SpectrumOverlayPanel(QWidget* parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    // Nativ, sonst unsichtbar — dieselbe Begruendung wie beim
+    // Zoomstreifen in buildZoomButtons(): der Panadapter ist ein
+    // QRhiWidget mit WA_NativeWindow, und ein natives NSView zeichnet
+    // auf macOS ueber allen nicht-nativen Geschwistern
+    // (SpectrumWidget.cpp:551). Die Bedienflaeche liegt in genau diesem
+    // Panadapter.
+    setAttribute(Qt::WA_NativeWindow);
 
     // ── Die Spalte braucht eine eigene Flaeche ───────────────────────
     //
@@ -1509,6 +1516,22 @@ void SpectrumOverlayPanel::buildZoomButtons()
     m_zoomStrip = new QWidget(parentWidget());
     m_zoomStrip->setAttribute(Qt::WA_TransparentForMouseEvents, false);
     m_zoomStrip->setAttribute(Qt::WA_NoSystemBackground, true);
+    // Nativ, sonst unsichtbar.
+    //
+    // Der Panadapter ist ein QRhiWidget mit WA_NativeWindow. Unser
+    // eigener Vermerk in SpectrumWidget.cpp:551 sagt, was das heisst:
+    // „QRhiWidget with WA_NativeWindow on macOS does not support child
+    // widget overlays". Ein natives NSView zeichnet ueber allen
+    // NICHT-nativen Geschwistern, und kein raise() aendert das.
+    //
+    // Der Betreiber am 2026-08-20: der Zoom sei im Panadapter „nicht
+    // einfach zu finden". Er war nicht schwer zu finden — er war nicht
+    // zu sehen. Gemessen: Streifen bei (4,544), 106x24, sichtbar laut
+    // Qt, Elternteil SpectrumWidget, selbst nicht nativ.
+    //
+    // Native Geschwister sortieren sich untereinander; damit greift
+    // raise() wieder.
+    m_zoomStrip->setAttribute(Qt::WA_NativeWindow);
 
     static constexpr int kZBtnW = 24;
     static constexpr int kZBtnH = 20;

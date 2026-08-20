@@ -58,6 +58,7 @@ mw0lge@grange-lane.co.uk
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
 #include "gui/WindowPlacement.h"
+#include "gui/WindowChrome.h"
 
 #include <QCloseEvent>
 #include <QVBoxLayout>
@@ -65,13 +66,28 @@ mw0lge@grange-lane.co.uk
 namespace Longpath {
 
 FloatingContainer::FloatingContainer(int rxSource, QWidget* parent)
-    : QWidget(parent, Qt::Window | Qt::FramelessWindowHint)
+    // Qt::Tool statt Qt::Window — dieselbe Begruendung wie bei
+    // PanFloatingWindow (2026-08-20): auf macOS zieht ein Qt::Window,
+    // das aufgeht waehrend das Elternfenster im Vollbild steht, in
+    // dessen Vollbildflaeche ein und fuellt sie. Der Betreiber hat
+    // genau das als „RX1 Main Panel" bildschirmfuellend gesehen. Ein
+    // Qt::Tool wird auf macOS ein NSPanel mit der Sammelregel
+    // „FullScreenAuxiliary" und schwebt darueber.
+    : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint)
     , m_rxSource(rxSource)
 {
     setMinimumSize(ContainerWidget::kMinContainerWidth,
                    ContainerWidget::kMinContainerHeight);
     setStyleSheet(Style::themed(QStringLiteral("background: #0f0f1a;")));
     updateTitle();
+
+    // Ein sichtbarer Anfasser unten rechts. ContainerWidget kann zwar
+    // an allen Kanten ziehen (Thetis-Port), aber unsichtbar — man muss
+    // die Ecke erst finden. Derselbe Anfasser wie an den anderen
+    // Fenstern, und er ist nativ, damit ihn kein QRhiWidget im Inhalt
+    // verdeckt (SpectrumWidget.cpp:551).
+    attachResizeGrip(this);
+
     qCDebug(lcContainer) << "FloatingContainer created for RX" << rxSource;
 }
 

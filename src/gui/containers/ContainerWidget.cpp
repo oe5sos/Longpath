@@ -140,10 +140,13 @@ void ContainerWidget::buildUI()
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(kTitleBarHeight);
     m_titleBar->setVisible(false);
-    m_titleBar->setStyleSheet(QStringLiteral(
-        "background: %1; border-bottom: 1px solid %2;")
-        .arg(QLatin1String(Style::kTitleGradBot),
-             QLatin1String(Style::kBorderSubtle)));
+    // Derselbe Verlauf wie jede andere Kopfleiste (WindowChrome,
+    // GridCellWidget). Hier stand eine flache Flaeche aus
+    // kTitleGradBot — der unterste Ton DESSELBEN Verlaufs, also
+    // dieselbe Familie, aber ohne den Verlauf. Nebeneinander sah eine
+    // Leiste plastisch aus und die andere flach.
+    m_titleBar->setStyleSheet(QStringLiteral("%1")
+                                  .arg(Style::titleBarStyle()));
 
     auto* barLayout = new QHBoxLayout(m_titleBar);
     barLayout->setContentsMargins(5, 0, 0, 0);
@@ -165,6 +168,8 @@ void ContainerWidget::buildUI()
     // gleich.
     m_grip = new QLabel(m_titleBar);
     m_grip->setFixedWidth(3);
+    m_grip->setStyleSheet(QStringLiteral("background: %1;")
+                              .arg(QLatin1String(Style::kAmberText)));
     m_grip->setCursor(Qt::SizeAllCursor);
     m_grip->setToolTip(QStringLiteral("Drag to move this container"));
     barLayout->addWidget(m_grip);

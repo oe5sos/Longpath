@@ -1386,6 +1386,35 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // beruht. Zwischen den beiden Zeilen hat das Applet keinen
     // Besitzer; deshalb stehen sie direkt beieinander und nichts
     // dazwischen, was scheitern könnte.
+    // ── Wo stand die Flaeche? ────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „man muss zuerst den pfeil klicken,
+    // dann oeffnet sich das fenster wo anders. man sollte gleich das
+    // bestehende fenster verschieben koennen."
+    //
+    // Ein Fenster, das an einer fremden Stelle aufgeht, sieht aus wie
+    // ein NEUES Fenster. Geht es genau dort auf, wo das Applet eben
+    // stand, sieht dieselbe Geste aus wie „aufheben" — und danach
+    // schiebt man es, wohin man will. Das ist der Unterschied zwischen
+    // zwei Schritten und einem.
+    //
+    // Vor removeApplet greifen: danach ist das Applet aus der Spalte
+    // heraus und hat keine Lage auf dem Schirm mehr.
+    QRect pickedUpAt;
+    if (applet->isVisible()) {
+        // Vom Rasterfeld, nicht vom Applet: das Feld schliesst die
+        // Kopfleiste ein, und die gehoert zu dem, was der Nutzer als
+        // „diese Flaeche" sieht.
+        QWidget* box = applet;
+        for (QWidget* w = applet->parentWidget(); w; w = w->parentWidget()) {
+            if (QString::fromLatin1(w->metaObject()->className())
+                    .contains(QStringLiteral("GridCellWidget"))) {
+                box = w; break;
+            }
+        }
+        pickedUpAt = QRect(box->mapToGlobal(QPoint(0, 0)), box->size());
+    }
+
     m_appletPanel->removeApplet(applet);
     auto* win = new AppletFloatingWindow(applet, id, dockIndex, this);
     m_floatingApplets.insert(id, win);
@@ -1435,7 +1464,17 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
         // Profil nichts vorgibt; eine gespeicherte Lage gehoert dem
         // Betreiber.
-        if (!rect.isValid()) { win->applyDefaultSize(); }
+        if (!rect.isValid()) {
+            win->applyDefaultSize();
+            // Und dann dorthin, wo es hergekommen ist. Die Groesse
+            // bleibt die eben berechnete — die Lage des Feldes waere
+            // meist zu schmal fuer ein Fenster mit eigener Leiste.
+            if (pickedUpAt.isValid()) {
+                win->move(pickedUpAt.topLeft());
+                ensureOnVisibleScreen(win, this,
+                                      QSize(Style::kAppletPanelW, 120));
+            }
+        }
         win->raise();
     }
 }
@@ -7991,10 +8030,16 @@ void MainWindow::buildStatusBar()
     // Der Rahmen bleibt oben abgesetzt statt rundum: die Statusleiste
     // sitzt am Fensterrand, ein Rahmen dort hinterliesse eine
     // Doppellinie.
+    //
+    // 2026-08-20, Nachtrag: hier stand kPanelBg (#0c0c0e), die obere
+    // Leiste nimmt kStatusBarBg (#0a0a0c). Zwei Toene, die sich um
+    // zwei Stufen unterscheiden — auf dem Schirm kaum zu benennen und
+    // trotzdem der Grund, warum die beiden Leisten nicht wie ein Paar
+    // wirkten. Jetzt dieselbe Konstante wie oben.
     sb->setStyleSheet(Style::themed(QStringLiteral(
         "QStatusBar { background: %1; border-top: 1px solid %2; }"
         "QStatusBar::item { border: none; }")
-        .arg(QString::fromLatin1(Style::kPanelBg),
+        .arg(QString::fromLatin1(Style::kStatusBarBg),
              QString::fromLatin1(Style::kBorderSubtle))));
 
     // Wrapper widget for the full-width custom layout. Stored as a
@@ -8743,7 +8788,20 @@ void MainWindow::buildStatusBar()
     // SVG-backed icon — see PA badge note above for rationale. The dot
     // shape matches the U+25CF BLACK CIRCLE glyph it replaces.
     m_txStatusBadge->setSvgIcon(QStringLiteral(":/icons/badge-dot.svg"));
-    m_txStatusBadge->setLabel(QStringLiteral("TX"));
+    // ── „ON AIR", nicht „TX" ─────────────────────────────────────────
+    //
+    // Hier stand „TX" — genau wie am Abzeichen der Scheibe weiter
+    // links, das RxDashboard fuehrt. Die beiden sagen Verschiedenes:
+    // links „diese Scheibe ist der Sender", hier „es wird gerade
+    // gesendet". Im Ruhezustand stehen beide matt und gleich
+    // beschriftet nebeneinander, und der Betreiber hat sie am
+    // 2026-08-20 zu Recht fuer eine Doppelung gehalten.
+    //
+    // Geloescht wird keines: dann fehlte eine der beiden Aussagen. Ein
+    // Wort loest es. „ON AIR" ist im Funkbetrieb die uebliche Anzeige
+    // dafuer, dass gerade gesendet wird, und niemand verwechselt es
+    // mit der Angabe, welche Scheibe der Sender ist.
+    m_txStatusBadge->setLabel(QStringLiteral("ON AIR"));
     m_txStatusBadge->setVariant(StatusBadge::Variant::Off);
     m_txStatusBadge->setToolTip(tr("Receive (MOX off)"));
 

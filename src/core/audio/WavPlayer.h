@@ -69,7 +69,7 @@ mw0lge@grange-lane.co.uk
 // `PlayFileViaPCAudio` (nur an die Lautsprecher, zum Kontrollhoeren).
 // Dies ist der zweite. Er braucht kein Funkgeraet und taste nichts.
 //
-// clsAudioRecordPlayback.cs:1862 [v2.10.3.15-5-g852bf0e]
+// clsAudioRecordPlayback.cs:1862 [@852bf0e]
 //
 // ── Warum noch ein Abspieler, und das ist eine Schuld ───────────────
 //

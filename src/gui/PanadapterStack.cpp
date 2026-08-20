@@ -296,6 +296,19 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // per frame forever. Hiding first lets the old context tear down cleanly
     // (releaseResources clears m_rhiInitialized), so the show below drives a
     // fresh initialize() against the floating window's own surface.
+    // Wo stand der Panadapter? Das Fenster geht genau dort auf —
+    // siehe die Begruendung in MainWindow::detachApplet (2026-08-20):
+    // ein Fenster, das an fremder Stelle aufgeht, liest sich als NEUES
+    // Fenster; geht es dort auf, wo die Flaeche stand, liest sich
+    // dieselbe Geste als „aufheben".
+    //
+    // Vor dem Verstecken greifen: ein verstecktes Widget hat keine
+    // Lage auf dem Schirm mehr.
+    QRect pickedUpAt;
+    if (applet->isVisible()) {
+        pickedUpAt = QRect(applet->mapToGlobal(QPoint(0, 0)), applet->size());
+    }
+
     applet->hide();
 
     // Mit Elternfenster: ein Qt::Tool ohne Elternteil ist kein
@@ -328,6 +341,9 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // verlangte die Anordnung fast nichts, und jede vorher gesetzte
     // Zahl wird von der Mindestgroesse des Inhalts ueberschrieben.
     floater->applyDefaultSize();
+    if (pickedUpAt.isValid()) {
+        floater->move(pickedUpAt.topLeft());
+    }
 
     applet->setFloatingIndicator(true);
     emit panFloatStateChanged(panId, true);

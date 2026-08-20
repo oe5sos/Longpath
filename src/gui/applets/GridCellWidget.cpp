@@ -38,6 +38,18 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     m_titleLayout->setContentsMargins(2, 0, 4, 0);
     m_titleLayout->setSpacing(4);
 
+    // Die gelbe Anfassmarke, wie an den eigenen Fenstern und wie bei
+    // Zeus. Sie sagt „hier anfassen" — ein Kopf ohne diese Marke sieht
+    // aus wie einer, den man nicht anfassen kann.
+    auto* stripe = new QLabel(m_titleBar);
+    stripe->setFixedWidth(3);
+    // Aus der Palette: derselbe Ton wie an den Fensterleisten und an
+    // den Containern (Style::kAmberText). Hier stand #d8a13a — eine
+    // eigene Zahl fuer dieselbe Marke.
+    stripe->setStyleSheet(QStringLiteral("background: %1;")
+                              .arg(QLatin1String(Style::kAmberText)));
+    m_titleLayout->addWidget(stripe);
+
     auto* grip = new QLabel(QStringLiteral("⋮⋮"), m_titleBar);
     grip->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; background: transparent; }"
@@ -50,9 +62,25 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
         " background: transparent; }"
     ).arg(Style::kTitleText));
     m_titleLayout->addWidget(m_titleLabel);
-    m_titleLayout->addStretch();
 
+    // ── Die Knoepfe DICHT beim Titel, nicht am Rand ──────────────────
+    //
+    // Hier stand addStretch() VOR den Knoepfen; sie sassen damit am
+    // rechten Rand der Spalte. Am 2026-08-20 hat der Betreiber die
+    // Spalte auf gut 700 px gezogen und gemeldet: „nur am pandaper
+    // funktioniert das". Nachgemessen: bei 702 px Spaltenbreite endet
+    // der Titel bei 40 px und das ↗ begann bei 662 — 622 px Abstand.
+    //
+    // Beim Panadapter steht sein ↗ dicht bei der Beschriftung, und
+    // genau dort hat er es gefunden. Ein Knopf, den man erst am
+    // anderen Ende der Zeile suchen muss, ist so gut wie keiner — das
+    // ist dieselbe Lehre wie beim Knopf, den es gar nicht gab, nur
+    // eine Stufe subtiler.
+    //
+    // Die Dehnung kommt jetzt DANACH: Marke, Griff, Titel, Knoepfe,
+    // dann der leere Rest.
     buildCellButtons();
+    m_titleLayout->addStretch();
 
     root->addWidget(m_titleBar);
 

@@ -30,8 +30,28 @@ namespace {
 // rather than carrying its own look. The four needle states reuse the
 // existing semantic colours: accent for the target, amber for motion,
 // green for arrival.
+// ── Dieselbe Handschrift wie die uebrigen Instrumente ────────────────
+//
+// Der Betreiber, 2026-08-20: „weiters sieht die grafik des rotors
+// nicht im stil der anderen grafiken aus, bitte aendern."
+//
+// Er hat recht, und der Unterschied ist benennbar: die Zeiger- und
+// Balkeninstrumente fuehren jeden GEMESSENEN Wert in Bernstein
+// (Instrument::measured(), Rolle „measured"), die Teilung in
+// kTextScale und die Beschriftung in der Schmalschrift
+// Style::monoFont. Der Rotor zeichnete seinen Zeiger in kTextPrimary —
+// dasselbe Grau wie ein Beschriftungstext. Neben einem
+// Stehwellenzeiger in Bernstein sieht das aus wie ein Bauteil aus
+// einem anderen Programm.
+//
+// Die Richtung, in die die Antenne zeigt, IST eine Messung. Sie
+// bekommt dieselbe Farbe wie jede andere.
+//
+// Das Ziel bleibt im Akzentblau: es ist keine Messung, sondern eine
+// Vorgabe, und der Unterschied zwischen „wo sie steht" und „wo sie
+// hin soll" ist genau der, den man auf einen Blick lesen will.
 const QColor kBackground(Style::kPanelBg);      // #0a0a18
-const QColor kActual    (Style::kTextPrimary);  // where it is
+const QColor kActual    (Style::kAmberText);    // where it is — gemessen
 const QColor kTarget    (Style::kAccent);       // where it should go
 const QColor kTurning   (Style::kAmberText);    // in motion
 const QColor kArrived   (Style::kGreenText);    // on target
@@ -328,30 +348,85 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     p.setPen(QPen(kRingInner, 1));
     p.drawEllipse(c, r * 0.83, r * 0.83);
 
-    // Ticks every 30°, longer on the cardinals
-    for (int deg = 0; deg < 360; deg += 30) {
+    // ── Die Teilung: drei Stufen statt einer ─────────────────────────
+    //
+    // Hier stand eine Teilung alle 30° und sonst nichts. Der Betreiber
+    // hat am 2026-08-20 um „neue, passende und aufwendigere Grafiken"
+    // gebeten, und eine Windrose mit zwoelf Strichen ist fuer ein
+    // Instrument, an dem man Grade ablesen soll, zu grob.
+    //
+    // Drei Stufen, wie an jedem Kompass: alle 10° ein kurzer Strich,
+    // alle 30° ein laengerer, auf den Haupthimmelsrichtungen der
+    // laengste. Die Abstufung macht das Zaehlen ueberfluessig — man
+    // sieht die Zehner, ohne sie abzuzaehlen.
+    for (int deg = 0; deg < 360; deg += 10) {
         const double a = bearingToRadians(deg);
         const bool cardinal = (deg % 90) == 0;
-        const double r0 = r * (cardinal ? 0.86 : 0.92);
-        p.setPen(QPen(cardinal ? kMuted : kRing, cardinal ? 1.5 : 1.0));
+        const bool major    = (deg % 30) == 0;
+        const double r0 = r * (cardinal ? 0.86 : major ? 0.90 : 0.94);
+        p.setPen(QPen(cardinal ? kMuted : kRing,
+                      cardinal ? 1.5 : major ? 1.1 : 0.7));
         p.drawLine(QPointF(c.x() + r0 * std::cos(a), c.y() - r0 * std::sin(a)),
                    QPointF(c.x() + r  * std::cos(a), c.y() - r  * std::sin(a)));
     }
 
+    // ── Gradzahlen alle 30°, wenn Platz ist ──────────────────────────
+    //
+    // Nur ab einem Radius, bei dem sie sich nicht beruehren, und ohne
+    // die vier Himmelsrichtungen: dort stehen schon N/E/S/W, und eine
+    // „0" unter dem N waere doppelt gemoppelt.
+    if (r > 84.0) {
+        QFont df = Style::monoFont(p.font(), 9);
+        df.setPixelSize(9);
+        p.setFont(df);
+        const QFontMetrics dfm(df);
+        QColor degInk(Style::kTextScale);
+        degInk.setAlpha(150);
+        p.setPen(degInk);
+        for (int deg = 30; deg < 360; deg += 30) {
+            if (deg % 90 == 0) { continue; }
+            const double a  = bearingToRadians(deg);
+            const double rr = r * 0.755;
+            const QString t = QStringLiteral("%1").arg(deg);
+            p.drawText(QPointF(c.x() + rr * std::cos(a)
+                                   - dfm.horizontalAdvance(t) / 2.0,
+                               c.y() - rr * std::sin(a) + dfm.ascent() / 2.0),
+                       t);
+        }
+    }
+
     // Cardinal letters
-    QFont cf = p.font();
+    //
+    // In derselben Schmalschrift wie die Teilung der uebrigen
+    // Instrumente (InstrumentPainter benutzt Style::monoFont fuer die
+    // Skalenbeschriftung). Eine Windrose in der Fliesstextschrift neben
+    // Zifferblaettern in Schmalschrift war der zweite Teil dessen, was
+    // der Betreiber am 2026-08-20 als „nicht im stil der anderen
+    // grafiken" gesehen hat — der erste war die Farbe des Zeigers.
+    QFont cf = Style::monoFont(p.font(), 11);
     cf.setPixelSize(11);
     p.setFont(cf);
     p.setPen(kCardinal);
     const QFontMetrics cfm(cf);
     const struct { const char* s; int deg; } kCards[] = {
         {"N", 0}, {"E", 90}, {"S", 180}, {"W", 270}};
+    // ── Die Himmelsrichtungen INNEN, im Ring der Gradzahlen ─────────
+    //
+    // Sie standen AUSSERHALB der Rose (r + 11). Damit lag das „S"
+    // unter dem unteren Ringrand — genau dort, wo die Ablesung
+    // beginnt, und auf dem Bild vom 2026-08-20 steckte es in der
+    // „120°".
+    //
+    // Auf demselben Radius wie die Gradzahlen ergeben die vier
+    // Buchstaben und die acht Zahlen EINEN Beschriftungsring statt
+    // zweier, die Rose gewinnt aussen 11 px, und unter ihr bleibt die
+    // Flaeche frei fuer das, was dort hingehoert.
     for (const auto& card : kCards) {
         const double a = bearingToRadians(card.deg);
-        const double rr = r + 11;
+        const double rr = r * 0.755;
         const QString s = QString::fromLatin1(card.s);
         p.drawText(QPointF(c.x() + rr * std::cos(a) - cfm.horizontalAdvance(s) / 2.0,
-                           c.y() - rr * std::sin(a) + 4),
+                           c.y() - rr * std::sin(a) + cfm.ascent() / 2.0),
                    s);
     }
 
@@ -374,7 +449,19 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // Beam-width wedge around the actual heading
     if (m_beamWidth > 0.5) {
         const QRectF box(c.x() - r * 0.95, c.y() - r * 0.95, r * 1.9, r * 1.9);
-        const int startQt = static_cast<int>((90.0 - m_actual - m_beamWidth / 2.0) * 16);
+        // ── Die Keule sitzt auf der Antennenrichtung ────────────────
+        //
+        // Hier stand `- m_beamWidth / 2.0`. Qt zaehlt von 3 Uhr gegen
+        // den Uhrzeigersinn, eine Peilung von Nord im Uhrzeigersinn;
+        // die Umrechnung ist Qt = 90 - Peilung. Der Sektor soll um
+        // diesen Wert HERUM liegen, also bei Qt+Haelfte anfangen und
+        // mit negativer Spanne darueber hinweglaufen.
+        //
+        // Mit dem Minus fing er eine halbe Keulenbreite zu frueh an und
+        // lief eine halbe zu frueh aus — die ganze Keule stand um ihre
+        // eigene Breite neben dem Zeiger. Beim Rendern am 2026-08-20
+        // sofort zu sehen: Zeiger auf 45°, Keule nach Osten.
+        const int startQt = static_cast<int>((90.0 - m_actual + m_beamWidth / 2.0) * 16);
         const int spanQt  = static_cast<int>(-m_beamWidth * 16);
         QColor wedge = kActual;
         wedge.setAlpha(16);
@@ -384,20 +471,88 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
         p.setBrush(Qt::NoBrush);
     }
 
+    // ── Der Zeiger ───────────────────────────────────────────────────
+    //
+    // Bisher ein Strich von der Mitte nach aussen. Ein Instrumenten-
+    // zeiger ist etwas anderes: er verjuengt sich zur Spitze, und er
+    // hat hinter der Achse ein kurzes Gegengewicht. Beides hat einen
+    // Zweck, nicht nur ein Aussehen — die Verjuengung sagt, welches
+    // Ende die Ablesung ist, und das Gegengewicht macht die Drehachse
+    // als Achse kenntlich statt als Anfangspunkt eines Strichs.
+    //
+    // Der gestrichelte Zielzeiger bleibt ein Strich: er ist eine
+    // Vorgabe, kein Messwerk, und soll auch so aussehen.
     auto drawNeedle = [&](double deg, const QColor& col, double len,
                           bool dashed, double width) {
         const double a = bearingToRadians(deg);
-        const QPointF tip(c.x() + r * len * std::cos(a),
-                          c.y() - r * len * std::sin(a));
+        const QPointF dir(std::cos(a), -std::sin(a));
+        const QPointF nrm(-dir.y(), dir.x());
+        const QPointF tip(c.x() + r * len * dir.x(),
+                          c.y() + r * len * dir.y());
+
+        if (dashed) {
+            QColor halo = col;
+            halo.setAlpha(70);
+            p.setPen(QPen(halo, width + 2.6, Qt::SolidLine, Qt::RoundCap));
+            p.drawLine(c, tip);
+            QPen pen(col, width, Qt::DashLine, Qt::RoundCap);
+            pen.setDashPattern({2.2, 1.6});
+            p.setPen(pen);
+            p.drawLine(c, tip);
+            return;
+        }
+
+        const double halfW = width * 0.9;
+        const double tailL = r * 0.16;
+        const QPointF tail(c.x() - tailL * dir.x(), c.y() - tailL * dir.y());
+
+        QPolygonF body;
+        body << tip
+             << QPointF(c.x() + nrm.x() * halfW, c.y() + nrm.y() * halfW)
+             << QPointF(tail.x() + nrm.x() * halfW * 0.7,
+                        tail.y() + nrm.y() * halfW * 0.7)
+             << QPointF(tail.x() - nrm.x() * halfW * 0.7,
+                        tail.y() - nrm.y() * halfW * 0.7)
+             << QPointF(c.x() - nrm.x() * halfW, c.y() - nrm.y() * halfW);
+
         QColor halo = col;
-        halo.setAlpha(70);
-        p.setPen(QPen(halo, width + 2.6, Qt::SolidLine, Qt::RoundCap));
-        p.drawLine(c, tip);
-        QPen pen(col, width, dashed ? Qt::DashLine : Qt::SolidLine, Qt::RoundCap);
-        if (dashed) { pen.setDashPattern({2.2, 1.6}); }
-        p.setPen(pen);
-        p.drawLine(c, tip);
+        halo.setAlpha(60);
+        // Vierter Parameter ist die KAPPE, nicht die Ecke — der
+        // Eckenstil kommt danach.
+        QPen haloPen(halo, 3.0, Qt::SolidLine, Qt::RoundCap);
+        haloPen.setJoinStyle(Qt::RoundJoin);
+        p.setPen(haloPen);
+        p.setBrush(Qt::NoBrush);
+        p.drawPolygon(body);
+
+        p.setPen(Qt::NoPen);
+        p.setBrush(col);
+        p.drawPolygon(body);
+        p.setBrush(Qt::NoBrush);
     };
+
+    // ── Die Zielmarke am Rand ────────────────────────────────────────
+    //
+    // Ein gestrichelter Strich sagt die Richtung, aber nicht genau, wo
+    // sie den Rand trifft. Ein kleines Dreieck auf dem Ring tut das —
+    // und bleibt lesbar, wenn Zeiger und Ziel dicht beieinander
+    // stehen, wo sich zwei Striche sonst zu einem verwischen.
+    if (m_hasTarget) {
+        const double a = bearingToRadians(m_target);
+        const QPointF dir(std::cos(a), -std::sin(a));
+        const QPointF nrm(-dir.y(), dir.x());
+        const QPointF onRim(c.x() + r * dir.x(), c.y() + r * dir.y());
+        const QPointF inner(c.x() + (r - 9.0) * dir.x(),
+                            c.y() + (r - 9.0) * dir.y());
+        QPolygonF mark;
+        mark << onRim
+             << QPointF(inner.x() + nrm.x() * 4.5, inner.y() + nrm.y() * 4.5)
+             << QPointF(inner.x() - nrm.x() * 4.5, inner.y() - nrm.y() * 4.5);
+        p.setPen(Qt::NoPen);
+        p.setBrush(m_state == State::OnTarget ? kArrived : kTarget);
+        p.drawPolygon(mark);
+        p.setBrush(Qt::NoBrush);
+    }
 
     // Target first so the actual needle reads on top of it.
     if (m_hasTarget && m_state != State::OnTarget) {
@@ -408,16 +563,26 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // as a real reading otherwise, and an operator who mistakes one for
     // the other turns the wrong way at three in the morning — or,
     // worse, believes the antenna moved when it did not. (2026-08-10)
+    // ── Der Zeiger spricht dieselbe Sprache wie Nabe und Ablesung ────
+    //
+    // Hier stand fuer BEIDE Zustaende — dreht und am Ziel — dasselbe
+    // Rot, waehrend die Nabe darunter schon amber (dreht) und gruen
+    // (am Ziel) faerbte und die Ablesung ebenso. Drei Stellen
+    // desselben Instruments sagten damit zwei verschiedene Dinge, und
+    // das Rot behauptete oben Gefahr, wo unten „angekommen" stand.
+    //
+    // Jetzt einheitlich: bernsteinfarben in Ruhe (gemessen), waehrend
+    // der Fahrt dasselbe Amber wie die Nabe, am Ziel gruen.
     const QColor actualCol = m_simulated                  ? kMuted
-                           : (m_state == State::Turning)  ? QColor(Style::kRedText)
-                           : (m_state == State::OnTarget) ? QColor(Style::kRedText)
+                           : (m_state == State::Turning)  ? kTurning
+                           : (m_state == State::OnTarget) ? kArrived
                                                           : kActual;
     drawNeedle(m_actual, actualCol, 0.90, m_simulated, m_simulated ? 2.0 : 2.6);
 
     // Hub
     const QColor hubCol = (m_state == State::Turning)  ? kTurning
                         : (m_state == State::OnTarget) ? kArrived
-                                                       : QColor(Style::kTextPrimary);
+                                                       : QColor(Style::kAmberText);
     QRadialGradient hub(c, 9);
     hub.setColorAt(0.0, hubCol);
     QColor hubEdge = hubCol;
@@ -465,7 +630,11 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // it would be worse than saying nothing.
     if (compassOnly) { return; }
 
-    QFont big = p.font();
+    // Die Ablesung in Schmalschrift — wie die Zahlenfelder der
+    // Zeigerinstrumente. Ziffern, die untereinander stehen sollen,
+    // gehoeren in eine Schrift mit gleichen Ziffernbreiten; sonst
+    // wandert die Zahl bei jeder Aenderung seitlich.
+    QFont big = Style::monoFont(p.font(), 13);
     big.setPixelSize(std::max(13, static_cast<int>(h * 0.075)));
     big.setBold(true);
     p.setFont(big);
@@ -493,11 +662,23 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
         line1Col = kArrived;
         break;
     }
+    // ── Die Ablesung gehoert UNTER die Rose ──────────────────────────
+    //
+    // Hier stand h * 0.84 — eine feste Zahl, die nichts von der Rose
+    // weiss. Bei 360x400 landete die Grundlinie damit genau auf dem
+    // „S" der Windrose; auf dem Bild vom 2026-08-20 steckte die 045°
+    // im S.
+    //
+    // Jetzt aus der Geometrie: unterer Rand der Rose, plus die
+    // Oberlaenge der Schrift, plus Luft. Damit stimmt es bei jeder
+    // Groesse, statt bei einer.
+    const double readoutY = qMin(h - 6.0,
+                                 c.y() + r + bfm.ascent() + 8.0);
     p.setPen(line1Col);
-    p.drawText(QPointF((w - bfm.horizontalAdvance(line1)) / 2.0, h * 0.84),
+    p.drawText(QPointF((w - bfm.horizontalAdvance(line1)) / 2.0, readoutY),
                line1);
 
-    QFont small = p.font();
+    QFont small = Style::monoFont(p.font(), 11);
     small.setPixelSize(11);
     small.setBold(false);
     p.setFont(small);
@@ -525,7 +706,10 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
         break;
     }
     p.setPen(kMuted);
-    p.drawText(QPointF((w - sfm.horizontalAdvance(line2)) / 2.0, h * 0.95),
+    // Zweite Zeile immer unter der ersten, mit derselben Rechnung
+    // statt einer zweiten festen Zahl.
+    p.drawText(QPointF((w - sfm.horizontalAdvance(line2)) / 2.0,
+                       qMin(h - 4.0, readoutY + sfm.height() + 6.0)),
                line2);
 }
 

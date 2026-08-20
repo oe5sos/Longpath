@@ -122,7 +122,7 @@ bool writeWavStereo(const QString& path, const QVector<float>& interleaved,
 //
 // AUS DER THETIS-DURCHSICHT vom 2026-08-19: Thetis kann float32, PCM
 // 32 / 24 / 16 / 8 und hat einen eigenen Schalter `DitherEnabled`
-// (clsAudioRecordPlayback.cs:66 + :215 [v2.10.3.15-5-g852bf0e]).
+// (clsAudioRecordPlayback.cs:66 + :215 [@852bf0e]).
 //
 // WARUM 16 BIT FUER EIN QSO REICHT: eine halbe Stunde Stereo in float32
 // sind 690 MB, als PCM16 noch 173 MB. Der Dynamikumfang eines

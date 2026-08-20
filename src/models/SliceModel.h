@@ -440,7 +440,7 @@ public:
 
     // ── Die Kanten begrenzen ─────────────────────────────────────────
     //
-    // From Thetis console.cs:34974-35062 [v2.10.3.15-5-g852bf0e] —
+    // From Thetis console.cs:34974-35062 [@852bf0e] —
     // ConstrainFilter(ref nNewLow, ref nNewHigh, int rx, bool
     // filterShift).
     //
@@ -474,11 +474,11 @@ public:
                                 bool filterShift = false,
                                 bool limitToSidebands = false);
 
-    // From Thetis console.cs:13151 [v2.10.3.15-5-g852bf0e] —
+    // From Thetis console.cs:13151 [@852bf0e] —
     // _max_filter_width = 10000.
     static constexpr int kMaxFilterWidthHz = 10000;
 
-    // From Thetis console.cs:13138 [v2.10.3.15-5-g852bf0e] —
+    // From Thetis console.cs:13138 [@852bf0e] —
     // _max_filter_shift = 10000.
     static constexpr int kMaxFilterShiftHz = 10000;
 
@@ -491,7 +491,7 @@ public:
 
     // ── VAR1 und VAR2: die Handeinstellung aufheben ──────────────────
     //
-    // From Thetis console.cs:7237-7249 [v2.10.3.15-5-g852bf0e] —
+    // From Thetis console.cs:7237-7249 [@852bf0e] —
     // SelectRX1VarFilter, und enums.cs:328-345, wo die Filterliste
     // F1..F10 um VAR1 und VAR2 ergaenzt ist.
     //
@@ -526,7 +526,7 @@ public:
     //
     // From Thetis console.cs:35318-35348 (Breite je Betriebsart,
     // ptbFilterWidth_Scroll) und console.cs:35076-35097 (Vorgabe-Mitte,
-    // ptbFilterShift_Scroll) [v2.10.3.15-5-g852bf0e].
+    // ptbFilterShift_Scroll) [@852bf0e].
     //
     // WARUM IM MODELL UND NICHT IM WIDGET: dieselbe Rechnung gilt auch
     // ohne die Bedienflaeche — per CAT, per Tastatur, aus einem
@@ -574,7 +574,7 @@ public:
     int filterWidth()  const { return m_filterHigh - m_filterLow; }
     int filterCenter() const { return (m_filterLow + m_filterHigh) / 2; }
 
-    /// From Thetis console.cs:12718 [v2.10.3.15-5-g852bf0e] —
+    /// From Thetis console.cs:12718 [@852bf0e] —
     /// default_low_cut = 150. Die Flanke, an der ein SSB-Durchlass
     /// haengt: bei USB unten, bei LSB (gespiegelt) oben.
     static int defaultLowCut();

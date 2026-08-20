@@ -39,6 +39,7 @@
 #include <QtTest>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QLabel>
 
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/GridCellWidget.h"
@@ -95,6 +96,51 @@ private slots:
         QVERIFY2(detach->isVisible(),
                  "und er muss zu sehen sein, nicht nur zu existieren");
         QVERIFY2(detach->isEnabled(), "und anklickbar");
+    }
+
+    // ── Und bei BREITER Spalte? ──────────────────────────────────────
+    //
+    // Der Betreiber hat am 2026-08-20 die Spalte auf gut 700 px
+    // gezogen und gemeldet, nur am Panadapter gehe es. Beim
+    // Panadapter steht das ↗ dicht beim Titel; in der Applet-Spalte
+    // sitzt es am rechten Rand — bei 700 px sind das 700 px Abstand
+    // vom Titel, auf den man schaut.
+    void theDetachButtonIsNearTheTitleEvenInAWideColumn()
+    {
+        RadioModel model;
+        model.addSlice();
+        auto* rx = new RxApplet(model.slices().value(0), &model);
+
+        AppletPanelWidget panel;
+        panel.addApplet(rx);
+        panel.resize(710, 600);          // die Breite des Betreibers
+        panel.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+
+        auto* cell = panel.findChild<GridCellWidget*>();
+        QVERIFY(cell);
+        QPushButton* detach = buttonWithText(cell->titleBar(),
+                                             QStringLiteral("↗"));
+        QVERIFY(detach);
+
+        // Wo steht der Titel, wo der Knopf?
+        int titleRight = 0;
+        for (QLabel* l : cell->titleBar()->findChildren<QLabel*>()) {
+            if (!l->text().isEmpty() && l->text() != QStringLiteral("⋮⋮")) {
+                titleRight = l->geometry().right();
+            }
+        }
+        const int gap = detach->geometry().left() - titleRight;
+        qDebug() << "Spaltenbreite" << cell->titleBar()->width()
+                 << "Titel endet bei" << titleRight
+                 << "Knopf beginnt bei" << detach->geometry().left()
+                 << "Abstand" << gap;
+
+        QVERIFY2(gap <= 120,
+                 qPrintable(QStringLiteral(
+                     "der Ablöseknopf steht %1 px vom Titel entfernt — bei "
+                     "breiter Spalte sucht ihn dort niemand")
+                     .arg(gap)));
     }
 
     // Und der Druck muss am anderen Ende ankommen. Ein Knopf, der

@@ -444,8 +444,26 @@ void SliceModel::setFilterHigh(int high)
 
 // ── Die Kanten begrenzen ─────────────────────────────────────────────
 //
-// From Thetis console.cs:34974-35062 [v2.10.3.15-5-g852bf0e] —
-// ConstrainFilter. Begruendung und die beiden Regeln stehen am
+// From Thetis console.cs:34974-35062 [@852bf0e] —
+// ConstrainFilter.
+//
+// Der Stempel nennt den COMMIT, nicht den describe-Text.
+//
+// Hier stand [v2.10.3.15-5-g852bf0e]. Das ist die Ausgabe von
+// `git describe`, und der Pruefer liest daraus den TAG v2.10.3.15 —
+// also einen Baum fuenf Commits vor dem, gegen den portiert wurde.
+// Dort stehen an denselben Zeilennummern voellig andere Stellen
+// (34994 ist im Tag `// G8NJJ update popup`), und
+// verify-inline-tag-preservation meldete folgerichtig fuenf fehlende
+// Autorenkuerzel, die es nie gab.
+//
+// Die Zeilennummern stimmen fuer 852bf0e: dort beginnt ConstrainFilter
+// auf 34974. Der einzige Autorenvermerk im zitierten Bereich ist
+// //MW0LGE_21k9 am SPEC-Zweig, und der steht in diesem Port weiter
+// unten wortgleich.
+//
+// Grammatik: docs/attribution/HOW-TO-PORT.md §Inline cite versioning —
+// [v<version>] fuer eine Freigabe, [@<shortsha>] sonst. Begruendung und die beiden Regeln stehen am
 // Kopf der Deklaration.
 bool SliceModel::constrainFilter(int& low, int& high, DSPMode mode,
                                  bool filterShift, bool limitToSidebands)
@@ -545,7 +563,7 @@ bool SliceModel::constrainFilter(int& low, int& high, DSPMode mode,
 
 namespace {
 
-// From Thetis display.cs:1023 [v2.10.3.15-5-g852bf0e] — cw_pitch
+// From Thetis display.cs:1023 [@852bf0e] — cw_pitch
 // default 600. Dieselbe Quelle und dieselben Grenzen wie in
 // presetsForMode; bewusst nicht dorthin ausgelagert, weil das eine
 // Aenderung an einem geprueften Pfad waere.
@@ -558,7 +576,7 @@ int currentCwPitch()
     return pitch;
 }
 
-// From Thetis console.cs:14636 / :14671 [v2.10.3.15-5-g852bf0e].
+// From Thetis console.cs:14636 / :14671 [@852bf0e].
 // Upstream inline attribution preserved verbatim:
 //   :14669  //reset preset filter's center frequency - W4TME
 constexpr int kDiguClickTuneOffset = 1500;
@@ -576,7 +594,7 @@ bool isDoubleSidebandMode(DSPMode mode)
 
 int SliceModel::defaultLowCut()
 {
-    // From Thetis console.cs:12718 [v2.10.3.15-5-g852bf0e] —
+    // From Thetis console.cs:12718 [@852bf0e] —
     // default_low_cut = 150.
     auto& s = AppSettings::instance();
     int v = s.value(QStringLiteral("DefaultLowCut"), 150).toInt();
@@ -591,7 +609,7 @@ void SliceModel::setDefaultLowCut(int hz)
                                      QString::number(qBound(0, hz, 1000)));
 }
 
-// From Thetis console.cs:35318-35348 [v2.10.3.15-5-g852bf0e] —
+// From Thetis console.cs:35318-35348 [@852bf0e] —
 // der switch am Ende von ptbFilterWidth_Scroll.
 void SliceModel::widthToEdges(int widthHz, DSPMode mode, int currentCenter,
                               int& low, int& high)
@@ -640,7 +658,7 @@ void SliceModel::widthToEdges(int widthHz, DSPMode mode, int currentCenter,
     }
 }
 
-// From Thetis console.cs:35076-35097 [v2.10.3.15-5-g852bf0e] —
+// From Thetis console.cs:35076-35097 [@852bf0e] —
 // die default_center-Berechnung aus ptbFilterShift_Scroll.
 int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
 {
@@ -667,7 +685,7 @@ int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
 
 // ── VAR1 und VAR2 ────────────────────────────────────────────────────
 //
-// From Thetis console.cs:7237-7249 [v2.10.3.15-5-g852bf0e]. Begruendung
+// From Thetis console.cs:7237-7249 [@852bf0e]. Begruendung
 // steht am Kopf der Deklaration.
 
 void SliceModel::storeVarFilter(int slot)
@@ -777,7 +795,7 @@ void SliceModel::setFilter(int low, int high)
     constrainFilter(low, high, m_dspMode, /*filterShift=*/false,
                     m_limitFiltersToSidebands);
 
-    // From Thetis console.cs:7512 [v2.10.3.15-5-g852bf0e]:
+    // From Thetis console.cs:7512 [@852bf0e]:
     //   if (low == high) return; // not a good idea to have a 0hz width filter
     // Ein Filter ohne Breite ist Stille, und Stille sieht aus wie ein
     // kaputter Empfaenger.

@@ -30,7 +30,13 @@ constexpr int kGripSize   = 16;
 // Marke; sie sagt „hier anfassen". Wir nehmen denselben Ton, nicht den
 // kuehlen Akzent — der Akzent gehoert den Bedienelementen, diese Marke
 // gehoert dem Fenster.
-constexpr auto kGripStripe = "#d8a13a";
+//
+// Aus der Palette, nicht als eigene Zahl. Hier stand #d8a13a, waehrend
+// ContainerWidget denselben Strich seit dem 2026-08-19 in
+// Style::kAmberText (#c2924f) malt — zwei Ambertoene fuer dieselbe
+// Aussage, und der zweite kam von mir. Genau danach hat der Betreiber
+// am 2026-08-20 gefragt: ob das Design ueberall dasselbe ist.
+constexpr auto kGripStripe = Style::kAmberText;
 
 // Ein Schluessel je Fenster, damit sich zwei festgestellte Fenster
 // nicht gegenseitig ueberschreiben.

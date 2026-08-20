@@ -186,7 +186,25 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     p.drawEllipse(c, r, r);
 
     // Range rings at 30 percent and 50 percent (dashed).
-    QPen ringPen(QColor(0, 200, 220, 140), 0.8, Qt::DashLine);
+    // ── Struktur in der Hausfarbe, nicht in Neon ────────────────────
+    //
+    // Hier standen (0,200,220), (0,255,255), (0,220,255) und reines
+    // Weiss — eine Neon-Cyan-Familie, die es sonst nirgends im
+    // Programm gibt. Der Betreiber hat am 2026-08-20 gebeten zu
+    // pruefen, ob die Grafik ueberall dieselbe ist; dieses Zifferblatt
+    // war neben den bernsteinfarbenen Instrumenten der auffaelligste
+    // Fremdkoerper.
+    //
+    // Aufgeteilt nach derselben Regel wie ueberall sonst: was die
+    // Flaeche GLIEDERT (Ringe, Achsen), traegt die Randfarbe; was
+    // GEMESSEN ist (die Keule), traegt Bernstein; was man ANFASST
+    // (Griff, Mittelpunkt), traegt die Textfarbe.
+    //
+    // Die Zeilengeometrie und die Thetis-Belege darunter bleiben
+    // unangetastet — geaendert sind nur die Farben.
+    QColor ringInk(Style::kBorder);
+    ringInk.setAlpha(160);
+    QPen ringPen(ringInk, 0.8, Qt::DashLine);
     p.setPen(ringPen);
     p.setBrush(Qt::NoBrush);
     p.drawEllipse(c, r * 0.3, r * 0.3);
@@ -194,16 +212,18 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
 
     // X and Y axis cross.
     // From Thetis DiversityForm.cs:1511-1512 [v2.10.3.15] (picRadar_Paint).
-    QPen axisPen(QColor(0, 255, 255, 160), 0.8);
+    QColor axisInk(Style::kTextScale);
+    axisInk.setAlpha(150);
+    QPen axisPen(axisInk, 0.8);
     p.setPen(axisPen);
     p.drawLine(QPointF(c.x() - r, c.y()), QPointF(c.x() + r, c.y()));
     p.drawLine(QPointF(c.x(), c.y() - r), QPointF(c.x(), c.y() + r));
 
     // Compass labels (NereusSDR-original chrome).
-    QFont labelFont = p.font();
-    labelFont.setPointSizeF(labelFont.pointSizeF() * 0.85);
+    QFont labelFont = Style::monoFont(p.font(), 11);
+    labelFont.setPointSizeF(p.font().pointSizeF() * 0.85);
     p.setFont(labelFont);
-    p.setPen(QColor(Style::kBlueText));
+    p.setPen(QColor(Style::kTextScale));
     const QString labels[4] = {QStringLiteral("N"), QStringLiteral("E"),
                                QStringLiteral("S"), QStringLiteral("W")};
     const QPointF offsets[4] = {
@@ -243,14 +263,18 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
         lobe << QPointF(sx, sy);
     }
 
-    QPen lobePen(QColor(Style::kBlueText), 1.6);
+    // Die Keule ist eine BERECHNETE Groesse — also Bernstein, wie jede
+    // Messung in den uebrigen Instrumenten.
+    QPen lobePen(QColor(Style::kAmberText), 1.6);
     p.setPen(lobePen);
-    p.setBrush(QColor(0, 220, 255, 60));
+    QColor lobeFill(Style::kAmberText);
+    lobeFill.setAlpha(48);
+    p.setBrush(lobeFill);
     p.drawPolygon(lobe);
 
     // Centre dot (white) + steering vector to the on-lobe focal point.
-    p.setPen(QPen(QColor(255, 255, 255), 1.2));
-    p.setBrush(Qt::white);
+    p.setPen(QPen(QColor(Style::kTextPrimary), 1.2));
+    p.setBrush(QColor(Style::kTextPrimary));
     p.drawEllipse(c, 4.0, 4.0);
 
     // The "control handle" sits at the steering angle on a unit ring.
@@ -260,10 +284,12 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     const double handleR = 0.85 * r;
     const double hx = c.x() + handleR * std::sin(m_phase);
     const double hy = c.y() - handleR * std::cos(m_phase);
-    p.setPen(QPen(QColor(255, 255, 255, 200), 1.0, Qt::DashLine));
+    QColor steerInk(Style::kTextPrimary);
+    steerInk.setAlpha(190);
+    p.setPen(QPen(steerInk, 1.0, Qt::DashLine));
     p.drawLine(c, QPointF(hx, hy));
     p.setBrush(QColor(Style::kAmberText));
-    p.setPen(QPen(QColor(255, 255, 255), 1.0));
+    p.setPen(QPen(QColor(Style::kTextPrimary), 1.0));
     p.drawEllipse(QPointF(hx, hy), 5.0, 5.0);
 }
 

@@ -35,6 +35,11 @@ namespace {
 constexpr double kRadiusOfWidth   = 148.0 / 520.0;
 constexpr double kTroughOfRadius  =  13.0 / 148.0;
 constexpr double kPivotFromBottom =  22.0 / 190.0;   // 190 - 168
+// Radius im Verhaeltnis zur Hoehe UEBER dem Drehpunkt. Im Entwurf
+// liegt der Drehpunkt 168 px unter der Oberkante und der Radius ist
+// 148 — der Bogen laesst also 20 px Luft. Dieses Verhaeltnis begrenzt
+// den Radius, wenn das Feld breiter als hoch wird (2026-08-20).
+constexpr double kRadiusOfPivotHeight = 148.0 / 168.0;
 
 /// Der Sweep aus dem Entwurf: 168 Grad links, 12 Grad rechts.
 constexpr double kDeg0 = 168.0;
@@ -147,10 +152,28 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     const QRectF face(0, 0, width(), qMax(0, height() - footerH));
     if (face.width() < 40.0 || face.height() < 30.0) { return; }
 
-    const qreal radius = face.width() * kRadiusOfWidth;
-    const qreal trough = radius * kTroughOfRadius;
+    // ── Der Bogen muss in BEIDE Richtungen passen ────────────────────
+    //
+    // Hier stand nur `face.width() * kRadiusOfWidth`. Solange das
+    // Instrument die Breite der Applet-Spalte hatte (260 px), ging das
+    // gut. Zieht man die Spalte breit — der Betreiber hatte am
+    // 2026-08-20 gut 700 px — waechst der Radius mit, die Hoehe aber
+    // nicht, und der Zeiger laeuft oben aus dem Feld heraus. Genau das
+    // war auf seinem Bild zu sehen: „RX1 laesst sich zwar verkleinern,
+    // der inhalt aendert sich aber nicht im massstab".
+    //
+    // Der Entwurf ist 520 x 190 mit Radius 148 und Drehpunkt 22 ueber
+    // dem unteren Rand; senkrecht bleiben damit 168 - 148 = 20 px Luft.
+    // Beide Verhaeltnisse werden gerechnet und das KLEINERE genommen —
+    // so behaelt der Bogen seine Form und passt in jedes Seiten-
+    // verhaeltnis, statt in der einen Richtung zu stimmen und in der
+    // anderen hinauszulaufen.
     const QPointF pivot(face.center().x(),
                         face.bottom() - face.height() * kPivotFromBottom);
+    const qreal radiusByWidth  = face.width() * kRadiusOfWidth;
+    const qreal radiusByHeight = (pivot.y() - face.top()) * kRadiusOfPivotHeight;
+    const qreal radius = qMin(radiusByWidth, radiusByHeight);
+    const qreal trough = radius * kTroughOfRadius;
 
     ArcSpine spine(pivot, radius, trough, kDeg0, kDeg1);
 

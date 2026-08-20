@@ -61,7 +61,7 @@ QList<ReadingDescriptor> buildTable()
     //
     // Die drei Grössen, die auf einer S-Skala stehen. Bereich und
     // Kennlinie aus Thetis MeterManager.cs:22870-22872
-    // [v2.10.3.15-5-g852bf0e] — S0 = -127 dBm, S9 = -73 dBm,
+    // [@852bf0e] — S0 = -127 dBm, S9 = -73 dBm,
     // S9+60 = -13 dBm; siehe ReadingSource.h fuer den Wortlaut und die
     // zwei gewollten Abweichungen. KEINE Schwelle: „Wo es keine
     // Schwelle gibt — Empfangsskala —, gibt es keinen roten Abschnitt"

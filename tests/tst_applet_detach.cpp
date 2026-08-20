@@ -221,7 +221,18 @@ private slots:
         // m_floatingApplets nicht kannte.
         QCOMPARE(win->appletId(), QStringLiteral("Rx"));
         QCOMPARE(win->dockIndex(), 3);
-        QCOMPARE(rx->parentWidget(), static_cast<QWidget*>(win));
+        // window(), nicht parentWidget().
+        //
+        // Seit dem 2026-08-20 haengt das Applet in einem QScrollArea
+        // im Fenster — sonst bestimmte seine Mindestgroesse die des
+        // Fensters, und die groesseren Applets gingen bildschirm-
+        // fuellend auf. Sein unmittelbarer Elternteil ist damit die
+        // Sichtflaeche des Rollbereichs, nicht mehr das Fenster.
+        //
+        // Geprueft gehoert ohnehin die Eigenschaft, um die es geht:
+        // das Applet steckt in DIESEM Fenster. Die bleibt richtig,
+        // egal wie viele Huellen dazwischen liegen.
+        QCOMPARE(rx->window(), static_cast<QWidget*>(win));
 
         AppletWidget* back = win->releaseApplet();
         QCOMPARE(back, static_cast<AppletWidget*>(rx));
@@ -378,7 +389,10 @@ private slots:
         QVERIFY2(rx->isVisible(),
                  "das Applet im Fenster ist unsichtbar — removeApplet "
                  "versteckt es, und das Fenster muss es wieder zeigen");
-        QCOMPARE(rx->parentWidget(), static_cast<QWidget*>(win));
+        // window() statt parentWidget() — siehe die ausfuehrliche
+        // Begruendung weiter oben in releaseGivesTheAppletBackAlive:
+        // das Applet haengt seit 2026-08-20 in einem Rollbereich.
+        QCOMPARE(rx->window(), static_cast<QWidget*>(win));
 
         // ── und zurueck ──────────────────────────────────────────────
         const int back = win->dockIndex();

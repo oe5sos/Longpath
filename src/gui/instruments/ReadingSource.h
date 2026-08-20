@@ -127,7 +127,7 @@ QList<const ReadingDescriptor*> readingsWithScale();
 // ── Die Empfangsskala ────────────────────────────────────────────────
 //
 // Die drei Stuetzstellen kommen aus THETIS, nicht aus einer eigenen
-// Rechnung. Thetis MeterManager.cs:22870-22872 [v2.10.3.15-5-g852bf0e]
+// Rechnung. Thetis MeterManager.cs:22870-22872 [@852bf0e]
 // legt die Kalibrierpunkte des S-Meter-Balkens fest:
 //
 //     cb.ScaleCalibration.Add(-133, new PointF(0, 0));      // position for S0 or below

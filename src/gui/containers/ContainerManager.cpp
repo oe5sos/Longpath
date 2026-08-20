@@ -360,6 +360,29 @@ void ContainerManager::overlayDockContainer(const QString& id)
 void ContainerManager::setMeterFloating(ContainerWidget* container, FloatingContainer* form)
 {
     // From Thetis MeterManager.cs:5894-5918
+    // ── Wo stand der Container, und wie gross? ──────────────────────
+    //
+    // Der Betreiber, 2026-08-20: das Fenster solle dort aufgehen, wo
+    // die Flaeche stand, statt „wo anders" — und es ging bisher
+    // bildschirmfuellend auf. Beides wird hier behandelt: die Lage
+    // uebernehmen, die Groesse deckeln.
+    //
+    // Vor dem Verstecken greifen: ein verstecktes Widget hat keine
+    // Lage auf dem Schirm mehr.
+    QRect pickedUpAt;
+    if (container->isVisible()) {
+        pickedUpAt = QRect(container->mapToGlobal(QPoint(0, 0)),
+                           container->size());
+    }
+
+    // Elternfenster nachtragen: ein Qt::Tool ohne Elternteil ist kein
+    // Hilfsfenster, sondern ein weiteres Hauptfenster — und faellt in
+    // die Vollbildflaeche zurueck, die es gerade vermeiden soll.
+    if (!form->parentWidget() && m_dockParent) {
+        form->setParent(m_dockParent->window(),
+                        form->windowFlags());
+    }
+
     container->hide();
     const QString payload = extractMeterItems(container);
     form->takeOwner(container);
@@ -368,6 +391,22 @@ void ContainerManager::setMeterFloating(ContainerWidget* container, FloatingCont
     container->setTopMost();  // Re-apply pin-on-top now that parent is set
     form->ensureVisiblePosition(m_dockParent);
     form->show();
+
+    // Erst JETZT Lage und Groesse: solange der Inhalt versteckt war,
+    // verlangte die Anordnung fast nichts; beim Anzeigen meldet sie
+    // ihre echte Untergrenze und zieht das Fenster auf. Dieselbe Falle
+    // wie bei den Applet- und Panadapterfenstern, dort am 2026-08-20
+    // beschrieben.
+    if (pickedUpAt.isValid()) {
+        QSize want = pickedUpAt.size();
+        if (QScreen* sc = form->screen()) {
+            const QSize avail = sc->availableSize();
+            want.setWidth (qMin(want.width(),  (avail.width()  * 2) / 3));
+            want.setHeight(qMin(want.height(), (avail.height() * 4) / 5));
+        }
+        form->resize(want);
+        form->move(pickedUpAt.topLeft());
+    }
     installFreshMeter(container, payload);
     qCDebug(lcContainer) << "Floated container:" << container->id();
 }

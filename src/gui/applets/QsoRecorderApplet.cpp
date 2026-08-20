@@ -305,7 +305,7 @@ void QsoRecorderApplet::buildUI()
              QLatin1String(Style::kBlueText)));
     // Loeschen aus der Liste. Aus der Thetis-Durchsicht
     // (DeleteRecording, clsAudioRecordPlayback.cs:776
-    // [v2.10.3.15-5-g852bf0e]) — dort raeumt sie auch den Ordner mit
+    // [@852bf0e]) — dort raeumt sie auch den Ordner mit
     // weg, wenn er leer bleibt; das lassen wir, unser Ordner ist fest.
     //
     // Mit Rueckfrage: eine geloeschte Aufnahme kommt nicht wieder, und
@@ -366,7 +366,7 @@ void QsoRecorderApplet::buildUI()
 
     // Doppelklick zum Nachhoeren. Nachhoeren gehoert zum Aufnehmen —
     // aus der Thetis-Durchsicht (PlayFileViaPCAudio,
-    // clsAudioRecordPlayback.cs:1862 [v2.10.3.15-5-g852bf0e]). Der Ton
+    // clsAudioRecordPlayback.cs:1862 [@852bf0e]). Der Ton
     // geht an das Standard-Ausgabegeraet, nicht in den Sender.
     connect(m_list, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem* item) {
@@ -439,7 +439,7 @@ void QsoRecorderApplet::onRecordClicked()
         // OkToRecord() vor dem Start und noch einmal WAEHREND der
         // Aufnahme auf einem Zeitgeber, und stoppt sich selbst, wenn
         // der Platz knapp wird (clsAudioRecordPlayback.cs:633 + :662
-        // [v2.10.3.15-5-g852bf0e]).
+        // [@852bf0e]).
         //
         // Bei uns reicht die Pruefung VOR dem Start: wir sammeln im
         // Arbeitsspeicher und schreiben erst am Ende. Der laufende
@@ -554,7 +554,7 @@ void QsoRecorderApplet::refreshList()
         // 14.205.000 · LSB · 6:41" ist eine.
         //
         // Aus der Thetis-Durchsicht (GetJSONDetailsFromFile,
-        // clsAudioRecordPlayback.cs:1102 [v2.10.3.15-5-g852bf0e]).
+        // clsAudioRecordPlayback.cs:1102 [@852bf0e]).
         const QsoRecordingInfo info = readQsoDescription(f.absoluteFilePath());
 
         QStringList parts;
