@@ -263,6 +263,8 @@ warren@wpratt.com
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
 #include "widgets/RotorLogbookPanel.h"
+#include "gui/ToolWindow.h"
+#include "gui/WindowChrome.h"
 #include "widgets/SwrSweepPanel.h"
 #include "core/Maidenhead.h"
 #include "core/CredentialStore.h"
@@ -10888,6 +10890,68 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
     return m_rotorPanel;
 }
 
+// ── Rotor/Log als eigenes Fenster ────────────────────────────────────
+//
+// Derselbe Weg wie bei den Applets: das Panel wandert in ein Fenster
+// mit eigener Leiste, Schloss und Anfasser, und kommt auf Wunsch
+// zurueck. Es wird NICHT kopiert — ein zweites Logbuch mit eigenem
+// Zustand waere genau die Art Fehler, die niemand bemerkt, bis zwei
+// Eintraege auseinanderlaufen.
+void MainWindow::detachRotorPanel()
+{
+    RotorLogbookPanel* panel = ensureRotorPanel();
+    if (!panel) { return; }
+    if (m_rotorWindow) {                 // schon draussen: nach vorn
+        m_rotorWindow->show();
+        m_rotorWindow->raise();
+        return;
+    }
+
+    // Wo stand es? Das Fenster geht dort auf — der Klick liest sich
+    // dann als „aufheben" statt als „woanders neu oeffnen".
+    QRect pickedUpAt;
+    if (panel->isVisible()) {
+        pickedUpAt = QRect(panel->mapToGlobal(QPoint(0, 0)), panel->size());
+    }
+
+    if (auto* col = m_belowPane
+                        ? qobject_cast<QVBoxLayout*>(m_belowPane->layout())
+                        : nullptr) {
+        col->removeWidget(panel);
+    }
+    if (m_rotorDock && m_rotorDock->widget() == panel) {
+        m_rotorDock->setWidget(nullptr);
+    }
+    if (m_rotorHeader) { m_rotorHeader->hide(); }
+    if (m_belowPane)   { m_belowPane->hide(); }
+    if (m_rotorDock)   { m_rotorDock->hide(); }
+
+    m_rotorWindow = new ToolWindow(panel, QStringLiteral("RotorLog"),
+                                   QStringLiteral("Rotor / Log"), this);
+    connect(m_rotorWindow, &ToolWindow::dockRequested, this,
+            [this](const QString&) { dockRotorPanel(); });
+    m_rotorWindow->show();
+    m_rotorWindow->applyDefaultSize(
+        pickedUpAt.isValid() ? pickedUpAt.size() : QSize(900, 420));
+    if (pickedUpAt.isValid()) { m_rotorWindow->move(pickedUpAt.topLeft()); }
+    m_rotorWindow->raise();
+}
+
+void MainWindow::dockRotorPanel()
+{
+    if (!m_rotorWindow) { return; }
+    QWidget* panel = m_rotorWindow->releaseContent();
+    m_rotorWindow->deleteLater();
+    m_rotorWindow = nullptr;
+    if (!panel) { return; }
+    // Zurueck an den Ort, den die Einstellung nennt.
+    const bool below = AppSettings::instance()
+                           .value(QStringLiteral("RotorPanelBelow"),
+                                  QStringLiteral("True"))
+                           .toString() == QStringLiteral("True");
+    setRotorPanelBelow(below);
+}
+
 // ── Rotor/Log unter den Panadapter ───────────────────────────────────
 //
 // Die untere Flaeche des aeusseren Splitters bekommt Inhalt. Ohne
@@ -10908,6 +10972,28 @@ void MainWindow::setRotorPanelBelow(bool below)
 
     if (below) {
         m_rotorDock->setWidget(nullptr);
+        // ── Eine Kopfleiste, wie sie jedes andere Feld hat ───────────
+        //
+        // Der Betreiber, 2026-08-20: „rotor noch immer in keinem
+        // window welches man wie alle andern verschieben und
+        // vergroessern kann."
+        //
+        // Er hatte recht: unter dem Panadapter lag das Panel nackt im
+        // Splitter — keine Marke, kein ↗, kein Schloss. Alles andere
+        // im Programm traegt inzwischen dieselbe Leiste; dies war das
+        // letzte Feld ohne.
+        if (!m_rotorHeader) {
+            m_rotorHeader = new WindowTitleBar(
+                QStringLiteral("Rotor / Log"), m_belowPane);
+            // Andocken und Schliessen heissen hier dasselbe: das Panel
+            // gehoert unter den Panadapter, das ist sein Zuhause.
+            connect(m_rotorHeader, &WindowTitleBar::dockRequested, this,
+                    [this]() { detachRotorPanel(); });
+            connect(m_rotorHeader, &WindowTitleBar::closeRequested, this,
+                    [this]() { setRotorPanelBelow(false); });
+            col->addWidget(m_rotorHeader);
+        }
+        m_rotorHeader->show();
         col->addWidget(panel);
         panel->show();
         m_belowPane->show();
@@ -10921,6 +11007,7 @@ void MainWindow::setRotorPanelBelow(bool below)
         }
     } else {
         col->removeWidget(panel);
+        if (m_rotorHeader) { m_rotorHeader->hide(); }
         m_rotorDock->setWidget(panel);
         m_belowPane->hide();
         m_rotorDock->show();

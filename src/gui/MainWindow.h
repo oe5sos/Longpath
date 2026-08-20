@@ -583,6 +583,17 @@ private:
     void openChannelStrip();
     class RotorLogbookPanel* ensureRotorPanel();
 
+    /// Rotor/Log in ein eigenes Fenster — mit Leiste, Schloss und
+    /// Anfasser wie jedes andere Feld. Bis 2026-08-20 lag das Panel
+    /// nackt im Splitter: keine Marke, kein ↗, kein Schloss. Es war
+    /// das letzte Feld ohne.
+    // Q_INVOKABLE, damit eine Pruefung sie ueber den Namen erreicht:
+    // sie haengen an Menue und Kopfleiste, nicht an einer oeffentlichen
+    // Schnittstelle, und ein Test soll den ECHTEN Weg gehen duerfen,
+    // ohne dass die Klasse dafuer aufgemacht wird.
+    Q_INVOKABLE void detachRotorPanel();
+    Q_INVOKABLE void dockRotorPanel();
+
     // Applet-Leiste neben (false) oder unter (true) den Panadapter legen.
     // Wechselt die Richtung des Hauptsplitters, damit der Griff zwischen
     // beiden die HOEHE des Panadapters verstellt statt seiner Breite.
@@ -593,7 +604,9 @@ private:
     // Rotor/Log unter den Panadapter legen statt an den Rand andocken.
     // Gibt der unteren Flaeche des aeusseren Splitters Inhalt — ohne
     // Inhalt waere der senkrechte Griff da, aber sinnlos.
-    void setRotorPanelBelow(bool below);
+    // Q_INVOKABLE aus demselben Grund wie detachRotorPanel:
+    // eine Pruefung soll den echten Weg gehen duerfen.
+    Q_INVOKABLE void setRotorPanelBelow(bool below);
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
     void ensureQrzClient();
@@ -1320,6 +1333,8 @@ private:
     // Constructed in the layout-build path after the panel is wired.
     // Rotor + logbook dock (Tools > Rotor...). Lazy; owned by `this`.
     QDockWidget*     m_rotorDock{nullptr};
+    class WindowTitleBar* m_rotorHeader{nullptr};
+    class ToolWindow*     m_rotorWindow{nullptr};
     QrzClient*           m_qrzClient{nullptr};
     // One window, reused. Kept so a second measurement lands in the
     // same place as the first rather than beside it.
