@@ -67,7 +67,7 @@ mw0lge@grange-lane.co.uk
 #include "BoardCapabilities.h"
 #include <QList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct HardwareProfile {
     HPSDRModel               model{HPSDRModel::HERMES};
@@ -97,4 +97,4 @@ HPSDRModel defaultModelForBoard(HPSDRHW board);
 //   :160  //[2.10.3.9]MW0LGE added board check, issue icon shown in setup
 QList<HPSDRModel> compatibleModels(HPSDRHW board);
 
-} // namespace NereusSDR
+} // namespace Longpath

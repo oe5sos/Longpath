@@ -24,7 +24,7 @@
 
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Per-DDC assignment emitted by codec, consumed by P2RadioConnection (P2 wire bytes)
 /// or NetworkIO calls (P1). Strict extension of PsDdcConfig from Phase 3M-4.
@@ -102,4 +102,4 @@ constexpr int adcForDdc(const DdcAssignment& a, int ddc)
     return (word >> shift) & 0x3;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -60,7 +60,7 @@
 
 #include <atomic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Zehn Plaetze, wie vom Betreiber verlangt. Nicht mehr: eine Taste je
 // Platz, und mehr als zehn Tasten merkt sich niemand.
@@ -159,4 +159,4 @@ private:
     std::atomic<bool>   m_repeat{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -22,7 +22,7 @@
 
 #include "gui/instruments/InstrumentSpine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 constexpr double kEps = 1e-6;

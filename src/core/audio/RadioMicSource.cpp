@@ -12,7 +12,7 @@
 
 #include <algorithm>  // std::min
 
-namespace NereusSDR {
+namespace Longpath {
 
 RadioMicSource::RadioMicSource(RadioConnection* connection, QObject* parent)
     : QObject(parent)
@@ -126,4 +126,4 @@ int RadioMicSource::ringDroppedForTest() const
 }
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

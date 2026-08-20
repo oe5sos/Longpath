@@ -40,7 +40,7 @@
 
 #include "core/audio/RadeTxFilters.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 class RadeChannel;
@@ -525,4 +525,4 @@ private:
     std::atomic<TxPath> m_currentTxPath{TxPath::Wdsp};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

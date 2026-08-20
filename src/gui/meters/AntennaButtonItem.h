@@ -56,7 +56,7 @@ mw0lge@grange-lane.co.uk
 
 #include "ButtonBoxItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class HPSDRModel : int;  // forward declaration — Phase 3P-I-b T10
 
@@ -103,4 +103,4 @@ private:
     static constexpr int kAntennaCount = 10;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

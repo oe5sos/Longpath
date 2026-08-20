@@ -25,7 +25,7 @@
 #include "gui/widgets/MetricLabel.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── NullRadioConnection ──────────────────────────────────────────────────────
 // Minimal concrete subclass so RadioModel::injectConnectionForTest accepts a
@@ -36,7 +36,7 @@ class TestNullConnection : public RadioConnection {
 public:
     TestNullConnection() : RadioConnection() {}
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

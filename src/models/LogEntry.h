@@ -28,7 +28,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct LogEntry {
     QString   call;          // CALL
@@ -110,6 +110,6 @@ struct LogEntry {
     static bool modelsAdifField(const QString& upperName);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::LogEntry)
+Q_DECLARE_METATYPE(Longpath::LogEntry)

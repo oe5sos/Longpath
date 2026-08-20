@@ -63,7 +63,7 @@ mw0lge@grange-lane.co.uk
 #include <QPushButton>
 #include <QSpinBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 constexpr const char* kComboStyle =
@@ -266,4 +266,4 @@ void ScaleItemEditor::buildTypeSpecific()
     addRow(QStringLiteral("Title color"), m_btnTitleColor);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

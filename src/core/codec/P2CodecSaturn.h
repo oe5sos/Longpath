@@ -122,7 +122,7 @@
 
 #include "P2CodecOrionMkII.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Saturn (ANAN-G2 / G2-1K, G8NJJ contribution) — extends P2CodecOrionMkII
 // with the BPF1 band-edge override. When CodecContext.p2SaturnBpfHpfBits
@@ -175,4 +175,4 @@ protected:
     quint32 buildAlex1(const CodecContext& ctx) const override;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

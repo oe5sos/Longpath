@@ -38,7 +38,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MicSpectrum {
 public:
@@ -83,4 +83,4 @@ private:
     std::atomic<unsigned long long> m_seen{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

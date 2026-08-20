@@ -35,7 +35,7 @@
 
 #include "core/DxccColorProvider.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Path resolvers mirror C1 / C2 conventions: the cty.dat lives at
 // the worktree root; the ADIF sample fixture lives at

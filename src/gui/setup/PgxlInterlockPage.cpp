@@ -24,7 +24,7 @@
 #include <QHBoxLayout>
 #include <QScrollArea>
 
-namespace NereusSDR {
+namespace Longpath {
 
 PgxlInterlockPage::PgxlInterlockPage(RadioModel* model, QWidget* parent)
     : QWidget(parent)
@@ -206,4 +206,4 @@ void PgxlInterlockPage::onSwrGateMaxChanged(double val)
     m_policy->setSwrGateMax(static_cast<float>(val));
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

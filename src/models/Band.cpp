@@ -69,7 +69,7 @@
 
 #include <QStringLiteral>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -232,4 +232,4 @@ Band bandFromName(const QString& name)
     return Band::GEN;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

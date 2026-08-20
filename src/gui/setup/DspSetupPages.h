@@ -95,7 +95,7 @@
 
 class QTableWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 enum class AGCMode : int;
@@ -140,7 +140,7 @@ public:
 
     // Programmatically select a sub-tab by NrSlot. Used by MainWindow to
     // route "More Settings…" popup clicks to the correct filter's sub-tab.
-    void selectSubtab(NereusSDR::NrSlot slot);
+    void selectSubtab(Longpath::NrSlot slot);
 
 private:
     QTabWidget* m_tabs{nullptr};  // owned by content layout
@@ -299,4 +299,4 @@ private:
     bool m_rebuilding{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

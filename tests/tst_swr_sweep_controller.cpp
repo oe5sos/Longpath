@@ -33,7 +33,7 @@
 
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 
@@ -141,8 +141,8 @@ class TstSwrSweepController : public QObject
 private slots:
     void initTestCase()
     {
-        qRegisterMetaType<SwrSweepPlan>("NereusSDR::SwrSweepPlan");
-        qRegisterMetaType<SwrSweepResult>("NereusSDR::SwrSweepResult");
+        qRegisterMetaType<SwrSweepPlan>("Longpath::SwrSweepPlan");
+        qRegisterMetaType<SwrSweepResult>("Longpath::SwrSweepResult");
         qRegisterMetaType<SwrSweepPlan>("SwrSweepPlan");
         qRegisterMetaType<SwrSweepResult>("SwrSweepResult");
     }

@@ -9,7 +9,7 @@
 
 #include "core/FFTRouter.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void FFTRouter::mapPanToReceiver(const QString& panId, int receiverId)
 {
@@ -50,4 +50,4 @@ void FFTRouter::onFftFrame(int receiverId, const QVector<float>& binsDbm)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

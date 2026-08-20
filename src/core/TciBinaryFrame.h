@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QtCore/QByteArray>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── TciBinaryFrame ────────────────────────────────────────────────────────────
 //
@@ -157,4 +157,4 @@ public:
     static int bytesPerSample(int sampleType);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

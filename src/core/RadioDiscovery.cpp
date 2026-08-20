@@ -72,7 +72,7 @@ mw0lge@grange-lane.co.uk
 #include <sys/socket.h>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 // --- RadioInfo static helpers ---
 
@@ -714,4 +714,4 @@ void RadioDiscovery::probeAddress(const QHostAddress& addr,
     timer->start(int(timeout.count()));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

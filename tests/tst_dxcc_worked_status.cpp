@@ -37,7 +37,7 @@
 #include "core/DxccWorkedStatus.h"
 #include "core/AdifParser.h"  // for QsoRecord
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDxccWorkedStatus : public QObject {
     Q_OBJECT

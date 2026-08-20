@@ -65,7 +65,7 @@ class QVBoxLayout;
 class QTimer;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class EqHost;
 class RadioModel;
@@ -370,4 +370,4 @@ private:
     QLabel* m_compMeter{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

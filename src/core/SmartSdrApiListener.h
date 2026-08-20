@@ -21,7 +21,7 @@
 #include <QTimer>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Minimal SmartSDR API server on TCP 4992 so that FlexRadio-aware accessories
 // (PGXL, TGXL) can pull slice / transmit / band state from NereusSDR after
@@ -333,4 +333,4 @@ private:
     QPair<int, int> defaultFilterForMode(const QString& mode) const;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

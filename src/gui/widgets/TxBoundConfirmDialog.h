@@ -27,7 +27,7 @@
 #include <QDialog>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 
@@ -53,4 +53,4 @@ private:
     Outcome m_outcome {Cancelled};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

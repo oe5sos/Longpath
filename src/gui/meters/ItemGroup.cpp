@@ -86,7 +86,7 @@ mw0lge@grange-lane.co.uk
 #include <QtAlgorithms>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Constructor / Destructor
@@ -1606,4 +1606,4 @@ ItemGroup* ItemGroup::createContestPreset(QObject* parent)
     return group;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

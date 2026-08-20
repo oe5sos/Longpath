@@ -24,7 +24,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // SettingsHygiene: validates AppSettings persisted under hardware/<mac>/...
 // against the BoardCapabilities of the currently connected radio.
@@ -101,4 +101,4 @@ private:
     void addAttClampIssue(const QString& mac, int persisted, int maxDb);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

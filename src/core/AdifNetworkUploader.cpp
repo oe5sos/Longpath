@@ -16,7 +16,7 @@
 #include <QTcpSocket>
 #include <QUdpSocket>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AdifNetworkUploader::AdifNetworkUploader(QObject* parent)
     : QsoUploader(parent) {}
@@ -91,4 +91,4 @@ void AdifNetworkUploader::upload(const LogEntry& entry)
         QStringLiteral("delivered by TCP"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -24,7 +24,7 @@
 
 #include "core/VoiceSignalDetector.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

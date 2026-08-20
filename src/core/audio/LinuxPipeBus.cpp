@@ -44,7 +44,7 @@
 #include <cstring>
 #include <mutex>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -414,4 +414,4 @@ qint64 LinuxPipeBus::pull(char* data, qint64 maxBytes) {
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

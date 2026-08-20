@@ -35,7 +35,7 @@
 class QGridLayout;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class AudioEngine;
@@ -116,4 +116,4 @@ private:
     float m_lastUserAdc0Volts{-1.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

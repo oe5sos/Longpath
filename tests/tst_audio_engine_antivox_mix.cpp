@@ -33,7 +33,7 @@
 #include <array>
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioEngineAntiVoxMix : public QObject {
     Q_OBJECT

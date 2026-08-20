@@ -70,7 +70,7 @@ class QPushButton;
 class QFormLayout;
 class QFrame;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 struct RadioInfo;
@@ -122,4 +122,4 @@ private:
     QString m_currentInfo;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

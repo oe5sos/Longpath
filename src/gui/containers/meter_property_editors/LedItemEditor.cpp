@@ -8,7 +8,7 @@
 #include <QComboBox>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 LedItemEditor::LedItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -221,4 +221,4 @@ void LedItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -21,7 +21,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -308,4 +308,4 @@ int WavTxSource::pullSamples(float* dst, int n)
     return n;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

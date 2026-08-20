@@ -20,7 +20,7 @@
 #include "core/AppSettings.h"
 #include "TestMockRadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciInitBurstRegen : public QObject {
     Q_OBJECT

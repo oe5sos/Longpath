@@ -26,7 +26,7 @@
 #include "core/AppSettings.h"
 #include "gui/LayoutProfiles.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestLayoutProfiles : public QObject
 {

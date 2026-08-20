@@ -3,7 +3,7 @@
 #include "core/PaTempUnit.h"
 #include "gui/widgets/SystemTile.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstSystemTile : public QObject {
     Q_OBJECT

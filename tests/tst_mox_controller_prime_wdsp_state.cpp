@@ -44,7 +44,7 @@
 
 #include "core/MoxController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMoxControllerPrimeWdspState : public QObject {
     Q_OBJECT

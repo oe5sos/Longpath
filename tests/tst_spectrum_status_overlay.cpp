@@ -8,7 +8,7 @@
 #include <QtTest/QtTest>
 #include "gui/widgets/SpectrumStatusOverlay.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSpectrumStatusOverlay : public QObject {
     Q_OBJECT

@@ -36,7 +36,7 @@
 #include <vector>
 #include <Accelerate/Accelerate.h>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // macOS spectral noise reduction using Apple Accelerate (vDSP).
 //
@@ -165,6 +165,6 @@ private:
     std::atomic<float> m_gsmooth{DEF_GSMOOTH};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // __APPLE__

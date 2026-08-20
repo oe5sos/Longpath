@@ -54,10 +54,10 @@ mw0lge@grange-lane.co.uk
 
 #include "BandButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsBandButtonBox (MeterManager.cs:11482+).
-// Order matches NereusSDR::Band enum (src/models/Band.h) — keep in sync
+// Order matches Longpath::Band enum (src/models/Band.h) — keep in sync
 // when adding/reordering bands. WWV and XVTR added in Phase 3G-8 commit 2.
 static const char* const kBandLabels[] = {
     "160m", "80m", "60m", "40m", "30m", "20m",
@@ -126,4 +126,4 @@ bool BandButtonItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

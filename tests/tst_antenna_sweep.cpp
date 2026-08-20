@@ -39,7 +39,7 @@
 #include <cmath>
 #include <functional>
 
-using namespace NereusSDR;
+using namespace Longpath;
 using Kind = AntennaTrim::Kind;
 
 namespace {

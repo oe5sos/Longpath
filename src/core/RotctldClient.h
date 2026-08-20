@@ -47,7 +47,7 @@
 
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RotctldClient : public RotorController {
     Q_OBJECT
@@ -150,4 +150,4 @@ private:
     QDateTime m_lastPosition;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -71,7 +71,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxChannelPerModeConfig : public QObject {
     Q_OBJECT

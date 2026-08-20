@@ -18,7 +18,7 @@
 #include <QPainter>
 #include <QRect>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -269,4 +269,4 @@ void SpectrumStatusOverlay::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

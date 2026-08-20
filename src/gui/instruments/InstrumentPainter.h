@@ -41,7 +41,7 @@ class QPainter;
 class QPainterPath;
 class QRectF;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ArcSpine;
 class Spine;
@@ -125,4 +125,4 @@ QColor measuredDim();
 QColor danger();
 
 } // namespace Instrument
-} // namespace NereusSDR
+} // namespace Longpath

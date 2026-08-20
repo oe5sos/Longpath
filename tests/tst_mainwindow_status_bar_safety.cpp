@@ -51,7 +51,7 @@
 #include "gui/chrome/ChromeBarItems.h"
 
 using namespace Qt::StringLiterals;
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMainWindowStatusBarSafety : public QObject
 {

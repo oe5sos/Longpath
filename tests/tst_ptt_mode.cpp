@@ -15,7 +15,7 @@
 #include <QtTest/QtTest>
 #include "core/PttMode.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPttMode : public QObject {
     Q_OBJECT

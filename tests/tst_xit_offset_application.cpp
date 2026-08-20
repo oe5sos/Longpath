@@ -37,7 +37,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockTxFreqConnection ──────────────────────────────────────────────────────
 // Minimal RadioConnection that records every setTxFrequency() call.
@@ -53,7 +53,7 @@ public:
     }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64 hz) override { txFreqCalls.append(hz); }

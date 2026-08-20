@@ -73,7 +73,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RxDspWorker::RxDspWorker(QObject* parent)
     : QObject(parent)
@@ -959,4 +959,4 @@ void RxDspWorker::resetAccumulator()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

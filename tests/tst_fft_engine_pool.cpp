@@ -8,7 +8,7 @@
 #include <QtTest/QtTest>
 #include "core/FFTRouter.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestFftEnginePool : public QObject {
     Q_OBJECT

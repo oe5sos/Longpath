@@ -39,7 +39,7 @@
 #include <QSlider>
 #include <QFrame>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // Mikrofonrate des Sendewegs — dieselbe Zahl, die der Sprach-Selbsttest
@@ -415,4 +415,4 @@ void DvkApplet::syncFromModel()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

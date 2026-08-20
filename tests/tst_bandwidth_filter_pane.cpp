@@ -31,7 +31,7 @@
 
 #include "gui/widgets/BandwidthFilterPane.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

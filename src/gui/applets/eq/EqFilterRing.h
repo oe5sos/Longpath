@@ -46,7 +46,7 @@
 
 #include "core/strip/ClientEq.h"
 
-namespace NereusSDR::EqFilterRing {
+namespace Longpath::EqFilterRing {
 
 // How many entries the ring has. A static_assert cannot check an enum's
 // size, so this is the one place the count lives and step() is written
@@ -109,4 +109,4 @@ inline void applyTo(ClientEq& eq, int bandIdx, ClientEq::FilterType t)
     eq.setBand(bandIdx, p);
 }
 
-} // namespace NereusSDR::EqFilterRing
+} // namespace Longpath::EqFilterRing

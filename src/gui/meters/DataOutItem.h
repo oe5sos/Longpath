@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "MeterItem.h"
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 // External data output bridge (MMIO). From Thetis clsDataOut (MeterManager.cs:16047+).
 class DataOutItem : public MeterItem {
     Q_OBJECT
@@ -87,4 +87,4 @@ private:
     OutputFormat m_outputFormat{OutputFormat::Json};
     TransportMode m_transportMode{TransportMode::Udp};
 };
-} // namespace NereusSDR
+} // namespace Longpath

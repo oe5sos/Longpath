@@ -17,7 +17,7 @@
 #include "core/HpsdrModel.h"
 #include "core/RadioDiscovery.h" // ProtocolVersion
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSampleRateCatalog : public QObject {
     Q_OBJECT

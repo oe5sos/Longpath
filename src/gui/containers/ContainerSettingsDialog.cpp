@@ -196,7 +196,7 @@ mw0lge@grange-lane.co.uk
 #include <QClipboard>
 #include <QApplication>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Style helpers (scoped to this translation unit)
@@ -2324,4 +2324,4 @@ QWidget* ContainerSettingsDialog::buildTypeSpecificEditor(MeterItem* item)
     return ed;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

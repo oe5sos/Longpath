@@ -53,21 +53,21 @@ void applyThemed(QWidget* w, QString sheet)
 {
     if (!w) { return; }
     sheet.replace(QStringLiteral("{{color.text.primary}}"),
-                  QString::fromLatin1(NereusSDR::Style::kTextPrimary));
+                  QString::fromLatin1(Longpath::Style::kTextPrimary));
     sheet.replace(QStringLiteral("{{color.text.secondary}}"),
-                  QString::fromLatin1(NereusSDR::Style::kTextSecondary));
+                  QString::fromLatin1(Longpath::Style::kTextSecondary));
     sheet.replace(QStringLiteral("{{color.background.0}}"),
-                  QString::fromLatin1(NereusSDR::Style::kAppBg));
+                  QString::fromLatin1(Longpath::Style::kAppBg));
     sheet.replace(QStringLiteral("{{color.background.1}}"),
-                  QString::fromLatin1(NereusSDR::Style::kButtonBg));
+                  QString::fromLatin1(Longpath::Style::kButtonBg));
     sheet.replace(QStringLiteral("{{color.background.3}}"),
-                  NereusSDR::EqPalette::textScale().name());
+                  Longpath::EqPalette::textScale().name());
     w->setStyleSheet(sheet);
 }
 
 } // namespace
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -397,4 +397,4 @@ void ClientEqOutputFader::wheelEvent(QWheelEvent* ev)
     ev->accept();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

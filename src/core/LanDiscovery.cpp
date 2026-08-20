@@ -18,7 +18,7 @@
 #include <QLoggingCategory>
 #include <QHostAddress>
 
-namespace NereusSDR {
+namespace Longpath {
 
 Q_LOGGING_CATEGORY(lcLan, "nereus.lan")
 
@@ -85,4 +85,4 @@ void LanDiscovery::parseAnnouncement(const QString& payload, quint16 port) {
                           m.captured("nick"));
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

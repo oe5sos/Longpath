@@ -13,7 +13,7 @@
 #include "TciVfoCoalescer.h"
 #include <QtCore/QMutexLocker>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void TciVfoCoalescer::update(const QString& key, const QString& frame)
 {
@@ -57,4 +57,4 @@ int TciVfoCoalescer::pending() const
     return m_order.size();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

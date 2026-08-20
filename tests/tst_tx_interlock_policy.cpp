@@ -26,8 +26,8 @@ private slots:
 // worst-case (ampPresent=false, ampInOperate=false, SWR=99).
 void TxInterlockPolicyTest::disabledAlwaysAllows()
 {
-    NereusSDR::TxInterlockPolicy p;
-    p.setMode(NereusSDR::TxInterlockPolicy::Disabled);
+    Longpath::TxInterlockPolicy p;
+    p.setMode(Longpath::TxInterlockPolicy::Disabled);
     QVERIFY(p.evaluateTxRequest(false, false, 99.0f));
     // Also verify with an amp present but not in operate -- still allowed.
     QVERIFY(p.evaluateTxRequest(true, false, 1.5f));
@@ -37,9 +37,9 @@ void TxInterlockPolicyTest::disabledAlwaysAllows()
 // not yet in OPERATE (standby state).
 void TxInterlockPolicyTest::blockDeniesWhenAmpStandby()
 {
-    NereusSDR::TxInterlockPolicy p;
-    p.setMode(NereusSDR::TxInterlockPolicy::Block);
-    QSignalSpy spy(&p, &NereusSDR::TxInterlockPolicy::denied);
+    Longpath::TxInterlockPolicy p;
+    p.setMode(Longpath::TxInterlockPolicy::Block);
+    QSignalSpy spy(&p, &Longpath::TxInterlockPolicy::denied);
     QVERIFY(!p.evaluateTxRequest(true, false, 1.5f));
     QCOMPARE(spy.count(), 1);
 }
@@ -48,9 +48,9 @@ void TxInterlockPolicyTest::blockDeniesWhenAmpStandby()
 // toast the operator.
 void TxInterlockPolicyTest::warnAllowsButEmits()
 {
-    NereusSDR::TxInterlockPolicy p;
-    p.setMode(NereusSDR::TxInterlockPolicy::Warn);
-    QSignalSpy spy(&p, &NereusSDR::TxInterlockPolicy::warned);
+    Longpath::TxInterlockPolicy p;
+    p.setMode(Longpath::TxInterlockPolicy::Warn);
+    QSignalSpy spy(&p, &Longpath::TxInterlockPolicy::warned);
     QVERIFY(p.evaluateTxRequest(true, false, 1.5f));
     QCOMPARE(spy.count(), 1);
 }

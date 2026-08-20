@@ -29,7 +29,7 @@
 #include "gui/PanadapterApplet.h"
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPanadapterHeader : public QObject
 {

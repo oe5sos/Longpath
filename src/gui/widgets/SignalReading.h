@@ -47,7 +47,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace SignalReading {
 
 /// Unterhalb dessen ist es keine Messung mehr.
@@ -84,4 +84,4 @@ inline QString text(float dbm, const QString& unit = QStringLiteral("dBm"))
 }
 
 } // namespace SignalReading
-} // namespace NereusSDR
+} // namespace Longpath

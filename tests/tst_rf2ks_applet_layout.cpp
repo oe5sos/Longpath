@@ -2,7 +2,7 @@
 #include "gui/applets/Rf2ksApplet.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class Rf2ksAppletLayoutTest : public QObject {
     Q_OBJECT

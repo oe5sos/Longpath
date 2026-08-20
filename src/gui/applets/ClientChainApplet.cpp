@@ -47,7 +47,7 @@
 #include <QVariant>
 #include <QWebSocket>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── File-local helpers ────────────────────────────────────────────────────────
 
@@ -578,6 +578,6 @@ QString ClientChainApplet::formatLastCommandAge(qint64 lastCommandAtMs) const
     return QStringLiteral("%1h ago").arg(ageSec / 3600);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

@@ -34,7 +34,7 @@
 #include <errno.h>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 // PGXL appears to validate that radio_license_id starts with FlexRadio
 // Systems' OUI prefix 00-1C-2D. Bench finding 2026-05-19: using the host's
@@ -570,4 +570,4 @@ QHostAddress FlexRadioDiscoveryBroadcaster::computeBroadcastAddress() const
     return QHostAddress::Broadcast;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

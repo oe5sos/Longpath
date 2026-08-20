@@ -11,7 +11,7 @@
 #include <QSlider>
 #include <QSpinBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Diagnostics > Signal Generator
@@ -92,4 +92,4 @@ private:
     void buildUI();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -43,7 +43,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FourO3APage::FourO3APage(RadioModel* model, QWidget* parent)
     : QWidget(parent)
@@ -283,4 +283,4 @@ void FourO3APage::refreshFlexApiStatus()
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

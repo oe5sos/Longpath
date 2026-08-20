@@ -28,7 +28,7 @@
 #include <QtCore/QQueue>
 #include <QtCore/QMutex>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // TciVfoCoalescer — thread-safe latest-wins frame map with arrival-order drain.
 //
@@ -70,4 +70,4 @@ private:
     QHash<QString, QString> m_frames;  // key → latest frame
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

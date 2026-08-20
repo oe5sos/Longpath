@@ -19,7 +19,7 @@
 #include <vector>
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Phase 3F reworked MasterMixer from "accumulate then unconditionally
 // flush" into per-slice rings behind a readiness barrier, so N slices

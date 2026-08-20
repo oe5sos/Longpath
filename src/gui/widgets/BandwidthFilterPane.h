@@ -54,7 +54,7 @@
 #include <QString>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class BandwidthFilterPane : public QWidget
 {
@@ -139,4 +139,4 @@ private:
     static constexpr int kStepHz = 10;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

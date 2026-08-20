@@ -40,7 +40,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Helper: find the first QRadioButton with the given text inside a parent.
 static QRadioButton* findRadioButton(QWidget* parent, const QString& text)

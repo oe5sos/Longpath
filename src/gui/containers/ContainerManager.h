@@ -66,7 +66,7 @@ mw0lge@grange-lane.co.uk
 class QSplitter;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ContainerWidget;
 class FloatingContainer;
@@ -259,4 +259,4 @@ private:
     bool m_suppressMeterAnnouncements{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

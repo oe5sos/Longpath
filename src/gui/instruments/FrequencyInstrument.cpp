@@ -23,7 +23,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -535,4 +535,4 @@ void FrequencyInstrument::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

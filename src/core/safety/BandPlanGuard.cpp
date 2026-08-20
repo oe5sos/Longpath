@@ -116,7 +116,7 @@ mw0lge@grange-lane.co.uk
 #include "core/safety/BandPlanGuard.h"
 #include <array>
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 namespace {
 
@@ -548,4 +548,4 @@ BandPlanGuard::checkMoxAllowed(Region region, std::int64_t freqHz,
     return {true, QString()};
 }
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

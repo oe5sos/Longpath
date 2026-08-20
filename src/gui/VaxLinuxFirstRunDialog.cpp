@@ -54,7 +54,7 @@
 #  include "core/audio/LinuxAudioBackend.h"
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -436,4 +436,4 @@ void VaxLinuxFirstRunDialog::onDismiss()
     accept();
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

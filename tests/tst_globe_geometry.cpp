@@ -10,7 +10,7 @@
 
 #include "gui/widgets/GlobeWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

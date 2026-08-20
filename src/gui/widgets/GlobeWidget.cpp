@@ -34,7 +34,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1038,4 +1038,4 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

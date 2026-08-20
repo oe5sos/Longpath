@@ -73,7 +73,7 @@ mw0lge@grange-lane.co.uk
 #include <QLabel>
 #include <QFrame>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -567,4 +567,4 @@ void NeedleItemEditor::buildTypeSpecific()
     m_form->addRow(calGroup);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

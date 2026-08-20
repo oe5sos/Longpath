@@ -33,7 +33,7 @@
 
 #include "core/TxWorkerThread.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTxWorkerRadePathEnum : public QObject {
     Q_OBJECT

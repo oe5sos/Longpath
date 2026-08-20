@@ -61,7 +61,7 @@ void  destroy_resampleFV(void* ptr);
 #include <QWebSocketServer>
 #include <QDateTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Constructor / destructor ─────────────────────────────────────────────────
 //
@@ -746,7 +746,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // NereusSDR fires SliceModel::dspModeChanged directly; we re-read via
     // SliceModel::modeName for the canonical uppercase string used by TCI.
     connect(slice, &SliceModel::dspModeChanged, this,
-            [this, sliceId](NereusSDR::DSPMode mode) {
+            [this, sliceId](Longpath::DSPMode mode) {
                 const QString modeStr = SliceModel::modeName(mode);
                 m_protocol->enqueueLocalBroadcast(
                     QStringLiteral("modulation:%1,%2;").arg(sliceId).arg(modeStr));
@@ -771,7 +771,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // without the normalize step, broadcasts read "agc_mode:0,MED;" instead
     // of "agc_mode:0,normal;".
     connect(slice, &SliceModel::agcModeChanged, this,
-            [this, sliceId](NereusSDR::AGCMode) {
+            [this, sliceId](Longpath::AGCMode) {
                 QString modeStr;
                 QMetaObject::invokeMethod(m_model, "agcMode",
                                           Qt::DirectConnection,
@@ -898,8 +898,8 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // sendRxNbEnable at TCIServer.cs:1901-1905 [v2.10.3.13].  Production
     // SliceModel exposes the enum directly; treat None as off.
     connect(slice, &SliceModel::nbModeChanged, this,
-            [this, sliceId](NereusSDR::NbMode mode) {
-                const bool on = (mode != NereusSDR::NbMode::Off);
+            [this, sliceId](Longpath::NbMode mode) {
+                const bool on = (mode != Longpath::NbMode::Off);
                 m_protocol->enqueueLocalBroadcast(
                     QStringLiteral("rx_nb_enable:%1,%2;")
                         .arg(sliceId)
@@ -929,7 +929,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // reports, and keeping it here preserves the grouped tri-frame the init
     // burst golden pins.
     connect(slice, &SliceModel::activeNrChanged, this,
-            [this, sliceId](NereusSDR::NrSlot /*slot*/) {
+            [this, sliceId](Longpath::NrSlot /*slot*/) {
                 bool nrOn = false;
                 int  nrIdx = 0;
                 bool anfOn = false;
@@ -1211,12 +1211,12 @@ void TciServer::hookGlobalBroadcasts()
     // documented in RadioModel::powerOn() shim and the buildInitialRadioState
     // start;/stop; emission site.
     connect(m_model, &RadioModel::connectionStateChanged, this,
-            [this](NereusSDR::ConnectionState newState) {
+            [this](Longpath::ConnectionState newState) {
                 // Mirror buildInitialRadioStateLines: emit one or the other
                 // (never both).  ConnectionState::Connected -> start; any
                 // other state -> stop;.  Format from sendStart / sendStop in
                 // TCIServer.cs:5786-5792 [v2.10.3.15].
-                if (newState == NereusSDR::ConnectionState::Connected) {
+                if (newState == Longpath::ConnectionState::Connected) {
                     m_protocol->enqueueLocalBroadcast(QStringLiteral("start;"));
                 } else {
                     m_protocol->enqueueLocalBroadcast(QStringLiteral("stop;"));
@@ -2695,6 +2695,6 @@ int TciServer::activeIqSubscriberCount(int receiver) const
     return count;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

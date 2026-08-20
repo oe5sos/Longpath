@@ -5,7 +5,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Die gedaempfte Stufe des Messwert-Tons. Dieselbe Zahl wie beim
 // Pegelbalken unter S9 (VfoStyles.h) -- eine Groesse, zwei
@@ -155,4 +155,4 @@ void HGauge::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

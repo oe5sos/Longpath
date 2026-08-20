@@ -86,7 +86,7 @@
 #include <QVector>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // RadioStatus: aggregates live PA telemetry and PTT state received from the
 // radio hardware via status/meter packets.
@@ -190,4 +190,4 @@ private:
     static constexpr int kMaxPttHistory = 8;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

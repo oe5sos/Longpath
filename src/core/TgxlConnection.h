@@ -25,7 +25,7 @@
 #include <QMap>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Direct TCP connection to a 4O3A Tuner Genius XL on port 9010.
 // Provides manual relay control (C1/L/C2) via the TGXL's native protocol,
@@ -170,4 +170,4 @@ private:
     quint16 m_lastPort{9010};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -20,7 +20,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 PgxlSaveRebootDialog::PgxlSaveRebootDialog(QWidget* parent)
     : QDialog(parent)
@@ -58,4 +58,4 @@ PgxlSaveRebootDialog::PgxlSaveRebootDialog(QWidget* parent)
     resize(420, 200);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

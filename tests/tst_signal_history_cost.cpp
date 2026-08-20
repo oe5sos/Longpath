@@ -36,7 +36,7 @@
 #include "core/SignalHistoryStore.h"
 #include "core/VoiceSignalDetector.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

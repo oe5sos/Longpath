@@ -73,7 +73,7 @@
 #include <QVector>
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// One detected peak blob entry.
 /// From Thetis Display.cs:4421-4428 [v2.10.3.13] Maximums struct (X /
@@ -194,4 +194,4 @@ private:
     void resetBlobMaximums();
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

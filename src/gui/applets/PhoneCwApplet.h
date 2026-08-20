@@ -99,7 +99,7 @@ class QLabel;
 class QComboBox;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 class DexpPeakMeter;
@@ -261,4 +261,4 @@ private:
     QPushButton* m_fmMemNext{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

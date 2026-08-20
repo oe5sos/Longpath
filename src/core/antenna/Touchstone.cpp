@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR::Touchstone {
+namespace Longpath::Touchstone {
 namespace {
 
 double unitMultiplier(const QString& u, bool* ok)
@@ -212,4 +212,4 @@ Sweep readS1p(const QString& path)
     return parseS1p(in.readAll(), QFileInfo(path).fileName());
 }
 
-} // namespace NereusSDR::Touchstone
+} // namespace Longpath::Touchstone

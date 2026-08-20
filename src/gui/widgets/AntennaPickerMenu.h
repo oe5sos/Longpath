@@ -21,7 +21,7 @@
 #include <QMenu>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 class AlexController;
@@ -44,4 +44,4 @@ signals:
     void antennaSelected(int sliceIndex, const QString& antennaName);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

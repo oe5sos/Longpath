@@ -72,7 +72,7 @@ warren@wpratt.com
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // WDSP TX channel ID — from Thetis cmaster.c:177-190 [v2.10.3.13].
 static constexpr int kTxChannelId = 1;

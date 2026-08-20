@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QColor>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsHistoryItem (MeterManager.cs:16149+)
 // Scrolling time-series graph with dual-axis ring buffer.
@@ -182,4 +182,4 @@ private:
     int     m_bindingId1{-1};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -25,7 +25,7 @@
 
 Q_LOGGING_CATEGORY(lcMemLock, "nereus.memlock")
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -189,4 +189,4 @@ MemoryLockStats memoryLockStats()
     return s;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

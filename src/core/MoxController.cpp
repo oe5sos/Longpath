@@ -120,7 +120,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Construction / destruction
@@ -1335,4 +1335,4 @@ void MoxController::onTciPtt(bool /*pressed*/)
     return;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

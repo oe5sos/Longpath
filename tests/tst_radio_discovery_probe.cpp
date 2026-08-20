@@ -63,7 +63,7 @@ mw0lge@grange-lane.co.uk
 #include <QtTest>
 #include "core/RadioDiscovery.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Fake P1 radio that listens on a loopback port and replies to a probe.
 // Keeps the test self-contained — no network dependencies.

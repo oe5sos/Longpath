@@ -50,7 +50,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
 {
@@ -923,4 +923,4 @@ void QsoMapWindow::applyBackgroundChoice(int index)
     WorldTexture::setPath(path);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

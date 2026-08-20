@@ -24,7 +24,7 @@
 #include <atomic>
 #include <memory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // QAudioSinkAdapter — IAudioBus concrete adapter wrapping QAudioSink.
@@ -93,4 +93,4 @@ private:
     AudioFormat m_negotiatedFormat;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -116,7 +116,7 @@
 
 #include <utility>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -295,7 +295,7 @@ void SetupDialog::selectPage(const QString& label)
 // -> TCI Server. Record the pointer so the page factory can replay it when
 // the page is finally realized; forward straight through when the page is
 // already up (a later server start/stop while Setup is open).
-void SetupDialog::setTciServer(NereusSDR::TciServer* server)
+void SetupDialog::setTciServer(Longpath::TciServer* server)
 {
     m_pendingTciServer = server;
     if (m_tciServerPage) {
@@ -885,4 +885,4 @@ void SetupDialog::applyPaVisibility(const BoardCapabilities& caps)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -26,7 +26,7 @@
 #include "core/AudioEngine.h"
 #include "gui/TitleBar.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTitleBarClock : public QObject {
     Q_OBJECT

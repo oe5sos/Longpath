@@ -36,7 +36,7 @@
 
 #include "core/AdifParser.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Path resolver: the fixture lives in tests/fixtures/adif/sample.adi.
 // __FILE__ resolves to .../tests/tst_adif_parser.cpp inside the

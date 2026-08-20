@@ -6,7 +6,7 @@
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // StationBlock — bordered cyan box anchoring the connected radio's name.
 // Click → emits clicked() (host opens ConnectionPanel).
@@ -49,4 +49,4 @@ private:
     QLabel*  m_hardwareLabel{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

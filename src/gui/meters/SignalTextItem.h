@@ -109,7 +109,7 @@ mw0lge@grange-lane.co.uk
 #include "MeterItem.h"
 #include <QColor>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsSignalText (MeterManager.cs:20286+)
 // Large text signal display with S-units/dBm/uV format switching.
@@ -208,4 +208,4 @@ private:
     int   m_peakHoldCounter{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

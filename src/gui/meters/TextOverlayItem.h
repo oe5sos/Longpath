@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QColor>
 #include <QMap>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsTextOverlay (MeterManager.cs:18746+)
 // Two-line text display with %VARIABLE% substitution.
@@ -172,4 +172,4 @@ private:
     mutable int m_precision{1};  // current precision for %PRECIS=n%
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

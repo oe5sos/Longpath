@@ -51,7 +51,7 @@ warren@wpratt.com
 
 Q_LOGGING_CATEGORY(lcTxMicSrc, "nereus.tx.micsrc")
 
-namespace NereusSDR {
+namespace Longpath {
 
 TxMicSource::TxMicSource(QObject* parent)
     : QObject(parent)
@@ -289,4 +289,4 @@ void TxMicSource::drainBlock(double* dst)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

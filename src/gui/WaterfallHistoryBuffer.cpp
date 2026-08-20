@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace NereusSDR {
+namespace Longpath {
 
 WaterfallHistoryBuffer::WaterfallHistoryBuffer(
     WaterfallHistoryBuffer&& other) noexcept
@@ -173,4 +173,4 @@ int WaterfallHistoryBuffer::rowsInChunk(int chunkIndex) const
     return std::clamp(m_capacityRows - firstRow, 0, kRowsPerChunk);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

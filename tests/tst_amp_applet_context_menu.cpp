@@ -28,7 +28,7 @@
 
 #include "gui/applets/AmpApplet.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class AmpAppletContextMenuTest : public QObject {
     Q_OBJECT
@@ -42,8 +42,8 @@ private slots:
 // navigationRequested with "pgxlAdvanced" as the page key.
 void AmpAppletContextMenuTest::menuOpensPgxlAdvanced()
 {
-    NereusSDR::AmpApplet a(nullptr);
-    QSignalSpy spy(&a, &NereusSDR::AmpApplet::navigationRequested);
+    Longpath::AmpApplet a(nullptr);
+    QSignalSpy spy(&a, &Longpath::AmpApplet::navigationRequested);
 
     QMenu* menu = a.buildContextMenuForTesting();
     QVERIFY(menu != nullptr);
@@ -63,10 +63,10 @@ void AmpAppletContextMenuTest::menuOpensPgxlAdvanced()
 // connectionToggleRequested().
 void AmpAppletContextMenuTest::disconnectActionEmitsToggle()
 {
-    NereusSDR::AmpApplet a(nullptr);
+    Longpath::AmpApplet a(nullptr);
     a.setPgxlConnected(true);  // causes the label to read "Disconnect"
 
-    QSignalSpy spy(&a, &NereusSDR::AmpApplet::connectionToggleRequested);
+    QSignalSpy spy(&a, &Longpath::AmpApplet::connectionToggleRequested);
 
     QMenu* menu = a.buildContextMenuForTesting();
     QVERIFY(menu != nullptr);
@@ -91,8 +91,8 @@ void AmpAppletContextMenuTest::disconnectActionEmitsToggle()
 // Triggering "Copy diagnostics to clipboard" must emit diagnosticsCopyRequested().
 void AmpAppletContextMenuTest::copyDiagnosticsActionEmitsSignal()
 {
-    NereusSDR::AmpApplet a(nullptr);
-    QSignalSpy spy(&a, &NereusSDR::AmpApplet::diagnosticsCopyRequested);
+    Longpath::AmpApplet a(nullptr);
+    QSignalSpy spy(&a, &Longpath::AmpApplet::diagnosticsCopyRequested);
 
     QMenu* menu = a.buildContextMenuForTesting();
     QVERIFY(menu != nullptr);

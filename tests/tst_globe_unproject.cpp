@@ -28,7 +28,7 @@
 
 #include "gui/widgets/GlobeWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestGlobeUnproject : public QObject
 {

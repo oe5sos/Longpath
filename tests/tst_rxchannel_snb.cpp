@@ -106,7 +106,7 @@ warren@wpratt.com
 #include <QtTest/QtTest>
 #include "core/RxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Use a channel id that definitely has no WDSP channel allocated.
 // All paths tested here must not invoke any WDSP API.

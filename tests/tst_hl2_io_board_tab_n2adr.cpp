@@ -26,7 +26,7 @@
 #include "gui/setup/hardware/Hl2IoBoardTab.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

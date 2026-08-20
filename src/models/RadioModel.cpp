@@ -356,7 +356,7 @@ warren@wpratt.com
 #include <QFileInfo>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─── Phase 3P-H Task 4: per-board PA telemetry scaling ─────────────────────
 //
@@ -376,7 +376,7 @@ namespace {
 // See src/core/PaTelemetryScaling.{h,cpp} — same Thetis-canonical math
 // (computeAlexFwdPower at console.cs:25008-25072 [v2.10.3.13 @501e3f5]),
 // same per-board triplet table, same default-case fallthrough.  The
-// callsite in handlePaTelemetry now reads NereusSDR::scaleFwdPowerWatts
+// callsite in handlePaTelemetry now reads Longpath::scaleFwdPowerWatts
 // (Phase 4 Agent 4A migration).
 
 // From Thetis console.cs:24928-24996 [@501e3f5] computeRefPower():
@@ -1166,7 +1166,7 @@ RadioModel::RadioModel(QObject* parent)
     {
         const HPSDRModel hw = m_hardwareProfile.model;
         constexpr quint16 kProbe = 4000;
-        const double fw = NereusSDR::scaleFwdPowerWatts(hw, kProbe);
+        const double fw = Longpath::scaleFwdPowerWatts(hw, kProbe);
         const double rw = scaleRevPowerWatts(kProbe, hw);
         if (fw > 0.0 && rw > 0.0) {
             m_swrSweep->setBridgeRatio(std::sqrt(rw / fw));
@@ -2249,7 +2249,7 @@ RadioModel::RadioModel(QObject* parent)
     // populated by addSlice() in onConnected() (which runs earlier on the
     // same callstack inside onConnectionStateChanged).
     connect(this, &RadioModel::currentRadioChanged, this,
-            [this](const NereusSDR::RadioInfo& info) {
+            [this](const Longpath::RadioInfo& info) {
         if (m_txSliceArbiter) {
             m_txSliceArbiter->setMacAddress(info.macAddress);
             m_txSliceArbiter->load();
@@ -2262,7 +2262,7 @@ RadioModel::RadioModel(QObject* parent)
     // (Sub-Epic F polish T7-T10).  Parented to RadioModel so they tear
     // down with the model.
     for (int i = 0; i < 2; ++i) {
-        m_widebandFftEngines[i] = new NereusSDR::WidebandFftEngine(this);
+        m_widebandFftEngines[i] = new Longpath::WidebandFftEngine(this);
         m_widebandFftEngines[i]->setAdcSampleRateHz(122880000.0);
     }
 }
@@ -2307,11 +2307,11 @@ namespace {
 // DxClusterClient port (DxClusterClient.h:36-44, NereusSDR addition)
 // promotes "Cluster" to "RBN" when the spotter callsign carries the
 // -# suffix.
-QMap<QString, QString> kvsFromSpot(const NereusSDR::DxSpot& spot,
+QMap<QString, QString> kvsFromSpot(const Longpath::DxSpot& spot,
                                    int defaultLifetimeSec,
                                    const QString& defaultColor)
 {
-    using NereusSDR::SpotTableModel;
+    using Longpath::SpotTableModel;
     QMap<QString, QString> kvs;
     kvs[QStringLiteral("callsign")]         = spot.dxCall;
     kvs[QStringLiteral("rx_freq")]          = QString::number(spot.freqMhz, 'f', 4);
@@ -3155,7 +3155,7 @@ double RadioModel::rxMeterOffsetDb() const
 
     // Per-radio factory cal default + user override (AppSettings key
     // RX1_MeterCalOffsetDb).  Default = Thetis factory value per model.
-    const float factoryDefault = ::NereusSDR::rxMeterCalOffsetDefaultFor(model);
+    const float factoryDefault = ::Longpath::rxMeterCalOffsetDefaultFor(model);
     bool keyOk = false;
     const double userOverride = AppSettings::instance()
         .value(QStringLiteral("RX1_MeterCalOffsetDb"),
@@ -3183,7 +3183,7 @@ double RadioModel::rxMeterOffsetDb() const
             // Preamp-mode path: lookup table per console.cs:1991-2001.
             const int modeIdx = static_cast<int>(
                 m_stepAttController->preampMode());
-            preampOffset = ::NereusSDR::rxPreampOffsetDbFor(modeIdx);
+            preampOffset = ::Longpath::rxPreampOffsetDbFor(modeIdx);
         }
     }
 
@@ -4003,7 +4003,7 @@ bool RadioModel::sampleRateIsRadioWide() const
     // takes a single sampleRate and encodes it as srBits, so there is no
     // per-receiver rate to set. Protocol 2 carries a per-DDC rate through
     // DdcAssignment::rate[], which the codecs populate per stream.
-    return qobject_cast<NereusSDR::P1RadioConnection*>(m_connection) != nullptr;
+    return qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr;
 }
 
 QVector<int> RadioModel::allowedStreamSampleRates() const
@@ -4013,10 +4013,10 @@ QVector<int> RadioModel::allowedStreamSampleRates() const
     if (m_connection == nullptr) {
         return {};
     }
-    const NereusSDR::ProtocolVersion proto =
-        sampleRateIsRadioWide() ? NereusSDR::ProtocolVersion::Protocol1
-                                : NereusSDR::ProtocolVersion::Protocol2;
-    const std::vector<int> allowed = NereusSDR::allowedSampleRates(
+    const Longpath::ProtocolVersion proto =
+        sampleRateIsRadioWide() ? Longpath::ProtocolVersion::Protocol1
+                                : Longpath::ProtocolVersion::Protocol2;
+    const std::vector<int> allowed = Longpath::allowedSampleRates(
         proto, boardCapabilities(), m_hardwareProfile.model);
     QVector<int> out;
     out.reserve(static_cast<int>(allowed.size()));
@@ -4410,7 +4410,7 @@ bool RadioModel::bindSliceToStream(SliceModel* slice, double frequencyHz,
             : m_streamAllocator.retuneSlice(previousStream, soleOccupant,
                                             ddcPinned, frequencyHz);
 
-    using Outcome = NereusSDR::SliceStreamAllocator::Outcome;
+    using Outcome = Longpath::SliceStreamAllocator::Outcome;
 
     // Placement diagnostic. Added 2026-08-01 chasing a bench report that a
     // second pan sometimes lands on the same DDC as the first, so tuning one
@@ -4873,7 +4873,7 @@ int RadioModel::addSlice(const QString& initialPanId)
     // a radio is attached. wireSliceSignals's own nbModeChanged connect (the
     // WDSP push) still only runs once m_connection exists, and stays there
     // untouched.
-    connect(slice, &SliceModel::nbModeChanged, this, [this, slice](NereusSDR::NbMode m) {
+    connect(slice, &SliceModel::nbModeChanged, this, [this, slice](Longpath::NbMode m) {
         if (m_mirroringNbMode) { return; }
         m_mirroringNbMode = true;
         const int stream = slice->streamIndex();
@@ -6145,7 +6145,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     int rxIdx = m_receiverManager->createReceiver();
     if (info.protocol == ProtocolVersion::Protocol2) {
         const int primaryDdc =
-            NereusSDR::P2RadioConnection::primaryRxDdcForBoard(info.boardType);
+            Longpath::P2RadioConnection::primaryRxDdcForBoard(info.boardType);
         if (primaryDdc != 0) {
             m_receiverManager->setDdcMapping(rxIdx, primaryDdc);
         }
@@ -6392,7 +6392,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                     // Prefer AppSettings override; fall back to the bundled dev-path.
                     // From Thetis wdsp/rnnr.c:161-176 [v2.10.3.13]
                     {
-                        const QString defaultModelPath = NereusSDR::ModelPaths::rnnoiseDefaultLargeBin();
+                        const QString defaultModelPath = Longpath::ModelPaths::rnnoiseDefaultLargeBin();
                         const QString model = AppSettings::instance().value(
                             QStringLiteral("Nr3ModelPath"), defaultModelPath).toString();
                         if (!model.isEmpty()) {
@@ -8356,7 +8356,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // Bumped to USER_INTERACTIVE so it sits in the same scheduling
     // class as the audio + GUI threads.
     connect(m_connThread, &QThread::started, m_connection,
-            []() { NereusSDR::elevateLatencyCriticalThreadPriority(); });
+            []() { Longpath::elevateLatencyCriticalThreadPriority(); });
 
     m_connThread->start();
 
@@ -8588,7 +8588,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // ddcConfigChanged observation consumers (notably PsccPump). The P2 wire
     // deliberately does not consume that partial PsDdcConfig signal:
     // refreshDdcAssignmentForRadioState sends one full DdcAssignment instead.
-    if (auto* p2 = qobject_cast<NereusSDR::P2RadioConnection*>(m_connection)) {
+    if (auto* p2 = qobject_cast<Longpath::P2RadioConnection*>(m_connection)) {
         // Phase 3M-4 Task 17 — feed the per-board codec into ReceiverManager
         // so updateDdcAssignment() can produce a non-empty PsDdcConfig.
         // Without this, ReceiverManager::m_p2Codec stays null and
@@ -8638,7 +8638,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // routing needs cntrl1=4 ADC steering during PS-MOX) and HermesII /
     // ANAN10E / ANAN100B (nddc=2 boards — same plus the bank 2/3 freq
     // override which fires off m_psNDdc + m_mox + m_puresignalRun).
-    if (auto* p1 = qobject_cast<NereusSDR::P1RadioConnection*>(m_connection)) {
+    if (auto* p1 = qobject_cast<Longpath::P1RadioConnection*>(m_connection)) {
         connect(m_receiverManager, &ReceiverManager::ddcConfigChanged,
                 p1, &P1RadioConnection::applyPsDdcConfig,
                 Qt::QueuedConnection);
@@ -8755,7 +8755,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // the default, so the route stops, which is what "there is no wire state
     // to route from" should do.
     reconcileExternalDiversityRoute(
-        computeDdcAssignment().value_or(NereusSDR::DdcAssignment{}));
+        computeDdcAssignment().value_or(Longpath::DdcAssignment{}));
 
     // Phase 3R K-bench: retroactive RADE RX wire-up.
     //
@@ -8816,7 +8816,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
 
     // Error handling
     connect(m_connection, &RadioConnection::errorOccurred,
-            this, [](NereusSDR::RadioConnectionError code, const QString& msg) {
+            this, [](Longpath::RadioConnectionError code, const QString& msg) {
         Q_UNUSED(code);
         qCWarning(lcConnection) << "Connection error:" << msg;
     });
@@ -8828,7 +8828,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // The flag is cleared immediately so a later user-initiated Connect
     // does not re-trigger this path.
     connect(m_connection, &RadioConnection::connectFailed,
-            this, [this](NereusSDR::ConnectFailure reason, const QString& detail) {
+            this, [this](Longpath::ConnectFailure reason, const QString& detail) {
         Q_UNUSED(detail);
         if (m_autoConnectInProgress) {
             const QString mac = m_autoConnectChosenMac;
@@ -9106,9 +9106,9 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
                        && m_moxController->state() != MoxState::Rx;
     m_couplerZero.observe(fwdRaw, revRaw, onAir);
 
-    const double fwdW = NereusSDR::scaleFwdPowerWattsWithZero(
+    const double fwdW = Longpath::scaleFwdPowerWattsWithZero(
         model, fwdRaw,
-        m_couplerZero.forwardZero(NereusSDR::tabledFwdZero(model)));
+        m_couplerZero.forwardZero(Longpath::tabledFwdZero(model)));
     // The reverse table's zero is not exposed, so -1 means "keep the
     // tabled one" until CouplerZero has grounds of its own.
     const double revW = scaleRevPowerWattsWithZero(
@@ -9153,7 +9153,7 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
                               static_cast<double>(m_hl2TempCount);
         const auto avgQuantised =
             static_cast<quint16>(qBound(0.0, qRound(avgRaw) + 0.0, 65535.0));
-        hl2TempC = NereusSDR::scaleHermesLiteTempCelsius(avgQuantised);
+        hl2TempC = Longpath::scaleHermesLiteTempCelsius(avgQuantised);
         hl2TempValid = true;
     }
     Q_UNUSED(paV);       // RadioStatus does not expose PA volts directly (per its design header)
@@ -10046,7 +10046,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     // parameters before the active-slot run-flag.
 
     connect(slice, &SliceModel::nr4PositionChanged, this,
-            [this, slice](NereusSDR::NrPosition p) {
+            [this, slice](Longpath::NrPosition p) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setSbnrPosition(p); }
         scheduleSettingsSave();
@@ -10077,7 +10077,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         scheduleSettingsSave();
     });
     connect(slice, &SliceModel::anfPositionChanged, this,
-            [this, slice](NereusSDR::NrPosition p) {
+            [this, slice](Longpath::NrPosition p) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setAnfPosition(p); }
         scheduleSettingsSave();
@@ -10105,7 +10105,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         if (rxCh) { rxCh->setAnrLeakage(v); }
         scheduleSettingsSave();
     });
-    connect(slice, &SliceModel::nr1PositionChanged, this, [this, slice](NereusSDR::NrPosition p) {
+    connect(slice, &SliceModel::nr1PositionChanged, this, [this, slice](Longpath::NrPosition p) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setAnrPosition(p); }
         scheduleSettingsSave();
@@ -10113,12 +10113,12 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
 
     // NR2 (EMNR) — gain-method + npe-method + AE filter + position + Post2 cascade
     // From Thetis setup.cs NR2 group [v2.10.3.13]
-    connect(slice, &SliceModel::nr2GainMethodChanged, this, [this, slice](NereusSDR::EmnrGainMethod v) {
+    connect(slice, &SliceModel::nr2GainMethodChanged, this, [this, slice](Longpath::EmnrGainMethod v) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setEmnrGainMethod(static_cast<int>(v)); }
         scheduleSettingsSave();
     });
-    connect(slice, &SliceModel::nr2NpeMethodChanged, this, [this, slice](NereusSDR::EmnrNpeMethod v) {
+    connect(slice, &SliceModel::nr2NpeMethodChanged, this, [this, slice](Longpath::EmnrNpeMethod v) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setEmnrNpeMethod(static_cast<int>(v)); }
         scheduleSettingsSave();
@@ -10138,7 +10138,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         if (rxCh) { rxCh->setEmnrAeRun(v); }
         scheduleSettingsSave();
     });
-    connect(slice, &SliceModel::nr2PositionChanged, this, [this, slice](NereusSDR::NrPosition p) {
+    connect(slice, &SliceModel::nr2PositionChanged, this, [this, slice](Longpath::NrPosition p) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setEmnrPosition(static_cast<int>(p)); }
         scheduleSettingsSave();
@@ -10171,7 +10171,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
 
     // NR3 (RNNR) — position + useDefaultGain
     // From Thetis setup.cs:35460-35462 [v2.10.3.13]
-    connect(slice, &SliceModel::nr3PositionChanged, this, [this, slice](NereusSDR::NrPosition p) {
+    connect(slice, &SliceModel::nr3PositionChanged, this, [this, slice](Longpath::NrPosition p) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setRnnrPosition(p); }
         scheduleSettingsSave();
@@ -10209,7 +10209,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         if (rxCh) { rxCh->setSbnrPostFilterThreshold(v); }
         scheduleSettingsSave();
     });
-    connect(slice, &SliceModel::nr4AlgoChanged, this, [this, slice](NereusSDR::SbnrAlgo a) {
+    connect(slice, &SliceModel::nr4AlgoChanged, this, [this, slice](Longpath::SbnrAlgo a) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setSbnrAlgo(a); }
         scheduleSettingsSave();
@@ -10271,7 +10271,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     // WDSP run flags. Kept as a dedicated connect so it also fires on the
     // VFO-popup NR toggle without needing a full struct rebuild.
     // From Thetis console.cs:43297 SelectNR [v2.10.3.13]
-    connect(slice, &SliceModel::activeNrChanged, this, [this, slice](NereusSDR::NrSlot slot) {
+    connect(slice, &SliceModel::activeNrChanged, this, [this, slice](Longpath::NrSlot slot) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) {
             rxCh->setActiveNr(slot);
@@ -10312,7 +10312,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     // has to hold whether or not a radio is attached -- the same reasoning
     // that put the frequencyChanged rollback handler in addSlice instead of
     // here. See the connect beside it there for the mirror itself.
-    connect(slice, &SliceModel::nbModeChanged, this, [this, slice](NereusSDR::NbMode m) {
+    connect(slice, &SliceModel::nbModeChanged, this, [this, slice](Longpath::NbMode m) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) {
             rxCh->setNbMode(m);
@@ -12033,7 +12033,7 @@ void RadioModel::applyClaritySmoothDefaults()
 // P1CodecRedPitaya.cpp:77).
 void RadioModel::applyHpsdrModel(HPSDRModel m)
 {
-    m_hardwareProfile = ::NereusSDR::profileForModel(m);
+    m_hardwareProfile = ::Longpath::profileForModel(m);
     m_transmitModel.setHpsdrModel(m_hardwareProfile.model);
     if (m_receiverManager) {
         m_receiverManager->setHpsdrModel(m_hardwareProfile.model);
@@ -12053,7 +12053,7 @@ void RadioModel::applyHpsdrModel(HPSDRModel m)
         // which two copies of a value drift apart, which is the defect class
         // being closed here. Seed both from the same board-gated source.
         const quint16 seed =
-            NereusSDR::defaultRxAdcCtrl(boardCapabilities().adcCount);
+            Longpath::defaultRxAdcCtrl(boardCapabilities().adcCount);
         m_receiverManager->setRxAdcCtrl1(static_cast<quint8>(seed & 0xff));
         m_receiverManager->setRxAdcCtrl2(static_cast<quint8>((seed >> 8) & 0x3f));
     }
@@ -14089,7 +14089,7 @@ qint64 RadioModel::setSampleRateLive(int newRateHz,
         // Same reasoning as the other reconcile call site: no codec means no
         // DDC pair to resolve, and the default assignment stops the route.
         reconcileExternalDiversityRoute(
-            computeDdcAssignment().value_or(NereusSDR::DdcAssignment{}));
+            computeDdcAssignment().value_or(Longpath::DdcAssignment{}));
     }
 
     // Persist the new rate per-MAC so the next connect picks it up.
@@ -14762,7 +14762,7 @@ void RadioModel::sendTgxlAutotuneCmd()
 //
 // Connected from addSlice() to every SliceModel::bandChanged. Only the
 // stable TX binding may propagate a band transition to the global TGXL.
-void RadioModel::onSliceBandChanged(SliceModel* source, NereusSDR::Band band)
+void RadioModel::onSliceBandChanged(SliceModel* source, Longpath::Band band)
 {
     if (source != txBoundSlice()) { return; }
     if (!m_tuneMemoryStore || !m_tgxlConnection) { return; }
@@ -14810,7 +14810,7 @@ void RadioModel::onSliceBandChanged(SliceModel* source, NereusSDR::Band band)
 
 // ── Phase 3F Sub-Epic B Task 16 ────────────────────────────────────────────
 
-std::array<NereusSDR::SliceConfig, 5>
+std::array<Longpath::SliceConfig, 5>
 RadioModel::buildStreamConfigsForCodec() const
 {
     // NereusSDR-original: assembles the input array the codec's
@@ -14824,13 +14824,13 @@ RadioModel::buildStreamConfigsForCodec() const
     // so one receiver is one DDC is one stream). Indexing by slice handed
     // two co-hosted slices DDC2 and DDC3, contradicting the sharing model
     // they had just been bound under.
-    std::array<NereusSDR::SliceConfig, 5> configs{};
+    std::array<Longpath::SliceConfig, 5> configs{};
 
     const int streams = std::min(m_streamAllocator.streamCount(), 5);
     for (int st = 0; st < streams; ++st) {
         if (!m_streamAllocator.isStreamActive(st)) { continue; }
 
-        NereusSDR::SliceConfig& cfg = configs[st];
+        Longpath::SliceConfig& cfg = configs[st];
         cfg.live = true;
 
         // The DDC tunes to the window centre, not to any one slice: slices
@@ -14838,7 +14838,7 @@ RadioModel::buildStreamConfigsForCodec() const
         // into WDSP by RxChannel::setShiftFrequency).
         const double centreHz = m_streamAllocator.streamCentreHz(st);
         cfg.frequencyHz  = static_cast<qint64>(centreHz);
-        cfg.bandIndex    = static_cast<int>(NereusSDR::bandFromFrequency(centreHz));
+        cfg.bandIndex    = static_cast<int>(Longpath::bandFromFrequency(centreHz));
         cfg.sampleRateHz = m_streamAllocator.streamSampleRateHz(st);
 
         // Fold the per-slice flags across the stream's members. Iterating
@@ -14877,12 +14877,12 @@ RadioModel::buildStreamConfigsForCodec() const
     return configs;
 }
 
-NereusSDR::CodecContext RadioModel::currentCodecContext() const
+Longpath::CodecContext RadioModel::currentCodecContext() const
 {
     // Phase 3F Sub-Epic I closeout, defect F3: single read of the radio-state
     // inputs, so computeDdcAssignment and describeSuspendedStreams cannot
     // disagree about whether PureSignal is transmitting.
-    NereusSDR::CodecContext ctx{};
+    Longpath::CodecContext ctx{};
 
     // Defect D2: the per-DDC ADC routing word. Thetis's fresh-install value
     // is rx_adc_ctrl1 = 4 (console.cs:15099 [v2.10.3.15]) with
@@ -14901,7 +14901,7 @@ NereusSDR::CodecContext RadioModel::currentCodecContext() const
     // diversity branches without a live radio) exercises the same ADC map
     // production does. defaultRxAdcCtrl gates on the board's ADC count so a
     // 1-ADC SKU is never handed an ADC1 selector.
-    ctx.adcCtrl = NereusSDR::defaultRxAdcCtrl(boardCapabilities().adcCount);
+    ctx.adcCtrl = Longpath::defaultRxAdcCtrl(boardCapabilities().adcCount);
 
     if (m_ddcCtxForTest) {
         ctx.mox           = m_ddcCtxMoxForTest;
@@ -14949,7 +14949,7 @@ bool RadioModel::diversityActive() const
 }
 
 bool RadioModel::resolveExternalDiversitySources(
-    const NereusSDR::DdcAssignment& assignment,
+    const Longpath::DdcAssignment& assignment,
     const SliceModel* target, int& primaryDdc, int& secondaryDdc) const
 {
     primaryDdc = -1;
@@ -15011,7 +15011,7 @@ void RadioModel::configureExternalDiversityRotation(
 }
 
 void RadioModel::reconcileExternalDiversityRoute(
-    const NereusSDR::DdcAssignment& assignment)
+    const Longpath::DdcAssignment& assignment)
 {
     SliceModel* target =
         sliceById(kExternalDiversityTargetSliceId);
@@ -15251,7 +15251,7 @@ void RadioModel::pushWidebandStateForChain(int chainIdx)
     // by-value captures; the metatype system is only involved for the
     // Q_ARG / string-name overload or for a queued signal-slot
     // connection carrying them as parameters.
-    if (auto* p2 = qobject_cast<NereusSDR::P2RadioConnection*>(m_connection)) {
+    if (auto* p2 = qobject_cast<Longpath::P2RadioConnection*>(m_connection)) {
         QMetaObject::invokeMethod(p2, [p2, chainIdx, on]() {
             p2->setWidebandEnabled(chainIdx, on);
         });
@@ -15319,12 +15319,12 @@ bool RadioModel::widebandActiveForChain(int chainIdx) const
     return false;
 }
 
-std::optional<NereusSDR::DdcAssignment> RadioModel::computeDdcAssignment() const
+std::optional<Longpath::DdcAssignment> RadioModel::computeDdcAssignment() const
 {
     // NereusSDR-original glue. No Thetis equivalent at this abstraction layer.
-    const NereusSDR::CodecContext ctx = currentCodecContext();
+    const Longpath::CodecContext ctx = currentCodecContext();
 
-    const std::array<NereusSDR::SliceConfig, 5> streams = buildStreamConfigsForCodec();
+    const std::array<Longpath::SliceConfig, 5> streams = buildStreamConfigsForCodec();
 
     // Codec source. The RadioConnection owns the codec and is authoritative
     // whenever a connection object exists. ReceiverManager holds the same
@@ -15333,18 +15333,18 @@ std::optional<NereusSDR::DdcAssignment> RadioModel::computeDdcAssignment() const
     // no connection to ask. That is what lets the mapping be computed, and
     // unit-tested, without standing up a UDP socket.
     if (auto* p2conn = qobject_cast<P2RadioConnection*>(m_connection)) {
-        if (NereusSDR::IP2Codec* codec = p2conn->p2Codec()) {
+        if (Longpath::IP2Codec* codec = p2conn->p2Codec()) {
             return codec->applyDdcAssignment(ctx, streams);
         }
-    } else if (auto* p1conn = qobject_cast<NereusSDR::P1RadioConnection*>(m_connection)) {
-        if (NereusSDR::IP1Codec* codec = p1conn->p1Codec()) {
+    } else if (auto* p1conn = qobject_cast<Longpath::P1RadioConnection*>(m_connection)) {
+        if (Longpath::IP1Codec* codec = p1conn->p1Codec()) {
             return codec->applyDdcAssignment(ctx, streams);
         }
     } else if (m_receiverManager) {
-        if (NereusSDR::IP2Codec* codec = m_receiverManager->p2Codec()) {
+        if (Longpath::IP2Codec* codec = m_receiverManager->p2Codec()) {
             return codec->applyDdcAssignment(ctx, streams);
         }
-        if (NereusSDR::IP1Codec* codec = m_receiverManager->p1Codec()) {
+        if (Longpath::IP1Codec* codec = m_receiverManager->p1Codec()) {
             return codec->applyDdcAssignment(ctx, streams);
         }
     }
@@ -15371,7 +15371,7 @@ std::optional<NereusSDR::DdcAssignment> RadioModel::computeDdcAssignment() const
     return std::nullopt;
 }
 
-void RadioModel::publishDdcAssignment(const NereusSDR::DdcAssignment& assignment)
+void RadioModel::publishDdcAssignment(const Longpath::DdcAssignment& assignment)
 {
     // Remote bench 2026-08-11 (second round): sync the PS-orchestration
     // rates from the stream allocator on EVERY assignment publish — the
@@ -15423,7 +15423,7 @@ void RadioModel::publishDdcAssignment(const NereusSDR::DdcAssignment& assignment
     // The slice-level publish below still carries the codec's DDC number on
     // P1: that is the wire-level truth, just not a routing key.
     const bool protocol1 =
-        (qobject_cast<NereusSDR::P1RadioConnection*>(m_connection) != nullptr)
+        (qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr)
         || (m_connection == nullptr && m_receiverManager
             && m_receiverManager->p1Codec() != nullptr);
 
@@ -15486,7 +15486,7 @@ void RadioModel::publishDdcAssignment(const NereusSDR::DdcAssignment& assignment
             if (ddc < 0) { continue; }   // suspended: keep the last known ADC
             const size_t streamIndex = static_cast<size_t>(st);
             m_streamAdc[streamIndex] =
-                NereusSDR::adcForDdc(assignment, ddc);
+                Longpath::adcForDdc(assignment, ddc);
             if (m_receiverManager) {
                 // Mirror the already-decoded physical map. Do not decode the
                 // control bytes again here: SliceModel, ReceiverManager, and
@@ -15708,7 +15708,7 @@ QString RadioModel::describeSuspendedStreams(const QVector<int>& streams) const
                             : QStringLiteral("Slices %1 have").arg(letters.join(
                                   QStringLiteral(", ")));
 
-    const NereusSDR::CodecContext ctx = currentCodecContext();
+    const Longpath::CodecContext ctx = currentCodecContext();
     const bool mox = ctx.mox;
     const bool ps  = ctx.puresignalRun;
     const bool div = ctx.diversity;
@@ -15737,7 +15737,7 @@ void RadioModel::refreshDdcAssignmentForRadioState()
 
 void RadioModel::invokeCodecDdcAssignment()
 {
-    const std::optional<NereusSDR::DdcAssignment> computed =
+    const std::optional<Longpath::DdcAssignment> computed =
         computeDdcAssignment();
 
     // No codec, so no assignment, so nothing to publish. Everything below
@@ -15773,7 +15773,7 @@ void RadioModel::invokeCodecDdcAssignment()
         reconcileWidebandForAllChains();
         return;
     }
-    const NereusSDR::DdcAssignment assignment = *computed;
+    const Longpath::DdcAssignment assignment = *computed;
 
     // Phase 3F: publish stream-1 liveness to ReceiverManager.
     //
@@ -15784,7 +15784,7 @@ void RadioModel::invokeCodecDdcAssignment()
     // liveness and is what computeDdcAssignment() just consumed, so reading
     // it again here cannot disagree with the assignment above.
     if (m_receiverManager) {
-        const std::array<NereusSDR::SliceConfig, 5> streams =
+        const std::array<Longpath::SliceConfig, 5> streams =
             buildStreamConfigsForCodec();
         m_receiverManager->setRx2Rate(streams[1].live ? streams[1].sampleRateHz
                                                       : 0);
@@ -15832,4 +15832,4 @@ void RadioModel::invokeCodecDdcAssignment()
     publishDdcAssignment(assignment);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

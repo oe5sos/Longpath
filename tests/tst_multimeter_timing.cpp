@@ -25,7 +25,7 @@
 
 #include "gui/meters/MeterPoller.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMultimeterTiming : public QObject {
     Q_OBJECT

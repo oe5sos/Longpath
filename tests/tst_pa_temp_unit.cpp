@@ -22,7 +22,7 @@
 #include "core/AppSettings.h"
 #include "core/PaTempUnit.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPaTempUnit : public QObject {
     Q_OBJECT

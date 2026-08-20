@@ -45,7 +45,7 @@
 #include <QString>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Per-peak record used for IMD measurement.  Direct port of Thetis
 // `private struct Maximums` at display.cs:4421-4428 [v2.10.3.13]:
@@ -159,4 +159,4 @@ private:
     bool m_emaInitialized = false;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

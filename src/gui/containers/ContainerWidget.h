@@ -149,8 +149,8 @@ mw0lge@grange-lane.co.uk
 #include <cstdint>
 
 // Vorwaerts-Deklarationen fuer Qt-Klassen gehoeren VOR den
-// Namensraum. Innerhalb von „namespace NereusSDR" waere „class QTabBar"
-// eine Deklaration von NereusSDR::QTabBar — ein anderer, leerer Typ.
+// Namensraum. Innerhalb von „namespace Longpath" waere „class QTabBar"
+// eine Deklaration von Longpath::QTabBar — ein anderer, leerer Typ.
 // Dieselbe Falle ist mir am 2026-08-20 dreimal untergekommen
 // (PanadapterApplet, TxSwitchBar, hier).
 class QContextMenuEvent;
@@ -159,7 +159,7 @@ class QTabBar;
 class QLabel;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct BoardCapabilities;
 class MeterItem;
@@ -318,7 +318,7 @@ public slots:
     // AntennaButtonItem hosted inside this container. Called by
     // MainWindow on connect / currentRadioChanged. Stored locally so
     // items added later (via wireInteractiveItem) inherit the flag.
-    void setBoardCapabilities(const NereusSDR::BoardCapabilities& caps);
+    void setBoardCapabilities(const Longpath::BoardCapabilities& caps);
 
 signals:
     void floatRequested();
@@ -457,4 +457,4 @@ private:
     bool m_hasAlex{true};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

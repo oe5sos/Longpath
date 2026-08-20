@@ -65,7 +65,7 @@ mw0lge@grange-lane.co.uk
 #include <QPushButton>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -191,4 +191,4 @@ void MmioVariablePickerPopup::onClear()
     accept();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

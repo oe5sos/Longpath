@@ -49,7 +49,7 @@
 #include <QStringList>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // One row of `rotctl --list`.
 struct HamlibRotorEntry {
@@ -119,4 +119,4 @@ private:
     QString  m_carry;      // partial line held over between reads
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

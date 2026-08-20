@@ -26,7 +26,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-namespace NereusSDR::TargetFromFile {
+namespace Longpath::TargetFromFile {
 
 namespace {
 
@@ -343,4 +343,4 @@ QVector<double> fromWavFile(const QString& path, QString* error)
     return ltasAtTargetPoints(mono, info.sampleRate, error);
 }
 
-} // namespace NereusSDR::TargetFromFile
+} // namespace Longpath::TargetFromFile

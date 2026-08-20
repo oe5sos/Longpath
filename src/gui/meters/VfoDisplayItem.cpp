@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include <QMouseEvent>
 #include <QWheelEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 VfoDisplayItem::VfoDisplayItem(QObject* parent) : MeterItem(parent) {}
 
@@ -177,4 +177,4 @@ bool VfoDisplayItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

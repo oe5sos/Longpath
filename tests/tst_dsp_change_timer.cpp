@@ -6,7 +6,7 @@
 #include <QSignalSpy>
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDspChangeTimer : public QObject {
     Q_OBJECT

@@ -61,7 +61,7 @@ mw0lge@grange-lane.co.uk
 #include <QTcpSocket>
 #include <QHostAddress>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TcpListenerEndpointWorker::TcpListenerEndpointWorker(MmioEndpoint* endpoint, QObject* parent)
     : ITransportWorker(parent)
@@ -221,4 +221,4 @@ void TcpListenerEndpointWorker::onClientDisconnected()
     setState(State::Listening);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

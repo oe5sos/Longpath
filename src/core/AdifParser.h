@@ -33,7 +33,7 @@
 #include <QVector>
 #include <QObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/AdifParser.h:9-14 [@0cd4559]
 struct QsoRecord {
@@ -83,6 +83,6 @@ private:
     static QString freqToBand(double mhz);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::QsoRecord)
+Q_DECLARE_METATYPE(Longpath::QsoRecord)

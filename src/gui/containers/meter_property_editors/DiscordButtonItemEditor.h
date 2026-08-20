@@ -1,7 +1,7 @@
 #pragma once
 #include "ButtonBoxItemEditor.h"
 
-namespace NereusSDR {
+namespace Longpath {
 class DiscordButtonItem;
 
 class DiscordButtonItemEditor : public ButtonBoxItemEditor {
@@ -14,4 +14,4 @@ private:
     void buildDiscordSpecific();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

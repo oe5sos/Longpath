@@ -53,7 +53,7 @@
 #include "core/TciServer.h"
 #endif
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

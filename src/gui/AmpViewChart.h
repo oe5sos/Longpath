@@ -57,7 +57,7 @@
 
 class QPaintEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AmpViewChart : public QWidget {
     Q_OBJECT
@@ -133,4 +133,4 @@ private:
     static QColor colourPhsCorr() { return QColor(0x00, 0xFF, 0x00); } // Lime
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

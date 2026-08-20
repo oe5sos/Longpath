@@ -35,7 +35,7 @@
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPaCalibrationGroup : public QObject {
     Q_OBJECT

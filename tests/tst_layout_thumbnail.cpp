@@ -4,7 +4,7 @@
 #include <QtTest/QtTest>
 #include "gui/widgets/LayoutThumbnail.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 const PanLayoutGeometry& byId(const QString& id) {

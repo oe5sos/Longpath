@@ -21,7 +21,7 @@
 #include <QStringList>
 #include <QHash>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletVisibilityController : public QObject {
     Q_OBJECT
@@ -118,4 +118,4 @@ private:
     QStringList m_order;               // registration order
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

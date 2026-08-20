@@ -71,7 +71,7 @@ mw0lge@grange-lane.co.uk
 #include <atomic>
 #include <chrono>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Protocol version supported by the radio.
 enum class ProtocolVersion : int {
@@ -254,8 +254,8 @@ public:
 signals:
     void discoveryStarted();
     void discoveryFinished();
-    void radioDiscovered(const NereusSDR::RadioInfo& info);
-    void radioUpdated(const NereusSDR::RadioInfo& info);
+    void radioDiscovered(const Longpath::RadioInfo& info);
+    void radioUpdated(const Longpath::RadioInfo& info);
     void radioLost(const QString& macAddress);
     void probeFailed(const QHostAddress& addr, quint16 port);
 
@@ -321,8 +321,8 @@ private:
     std::atomic<bool> m_stopRequested{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::RadioInfo)
-Q_DECLARE_METATYPE(NereusSDR::ProtocolVersion)
-Q_DECLARE_METATYPE(NereusSDR::DiscoveryProfile)
+Q_DECLARE_METATYPE(Longpath::RadioInfo)
+Q_DECLARE_METATYPE(Longpath::ProtocolVersion)
+Q_DECLARE_METATYPE(Longpath::DiscoveryProfile)

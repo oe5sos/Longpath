@@ -29,7 +29,7 @@
 #include <QMap>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TgxlConnection;
 
@@ -113,4 +113,4 @@ private:
     float m_fwd{0.0f}, m_swr{1.0f};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

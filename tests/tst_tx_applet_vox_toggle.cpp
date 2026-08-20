@@ -31,7 +31,7 @@
 
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxAppletVoxToggle : public QObject
 {

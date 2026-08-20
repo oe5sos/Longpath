@@ -26,7 +26,7 @@
 
 #include "gui/SetupPage.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -42,4 +42,4 @@ public:
     ~HardwareDdcRoutingPage() override = default;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

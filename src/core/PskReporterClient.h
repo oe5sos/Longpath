@@ -82,7 +82,7 @@
 class QUdpSocket;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // PSK Reporter IPFIX (RFC 5101) v0.1 client. Speaks the wire format
 // understood by report.pskreporter.info:4739.
@@ -169,7 +169,7 @@ public:
 
 signals:
     // Drives SpotModel via the SpotCollector adapter.
-    void spotReceived(const NereusSDR::DxSpot& spot);
+    void spotReceived(const Longpath::DxSpot& spot);
 
     // Lifecycle / error.
     void errorOccurred(const QString& error);
@@ -214,4 +214,4 @@ private:
     quint32           m_randomIdentifier{0};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

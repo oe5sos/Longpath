@@ -19,7 +19,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Helper: fresh AppSettings sandbox (TestSandboxInit ensures test-mode path).
 static AppSettings& testSettings()

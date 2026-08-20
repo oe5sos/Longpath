@@ -38,7 +38,7 @@
 #include "core/safety/BandPlanGuard.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

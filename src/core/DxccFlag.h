@@ -26,7 +26,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Emoji flag for a cty.dat primary prefix ("G", "OE", "VK"), or an
 // empty string when the entity has no unambiguous national flag or is
@@ -37,4 +37,4 @@ QString dxccFlagEmoji(const QString& primaryPrefix);
 // because a future flag-image path would want the code, not the emoji.
 QString dxccIsoCode(const QString& primaryPrefix);
 
-} // namespace NereusSDR
+} // namespace Longpath

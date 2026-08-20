@@ -8,51 +8,51 @@
 #include <QtTest/QtTest>
 #include "core/HpsdrModel.h"
 
-using NereusSDR::HPSDRModel;
+using Longpath::HPSDRModel;
 
 class TestHpsdrModelPaConstants : public QObject {
     Q_OBJECT
 private slots:
     void hl2_rfPowerSlider() {
-        QCOMPARE(NereusSDR::rfPowerSliderMaxFor(HPSDRModel::HERMESLITE),  90);
-        QCOMPARE(NereusSDR::rfPowerSliderStepFor(HPSDRModel::HERMESLITE),  6);
+        QCOMPARE(Longpath::rfPowerSliderMaxFor(HPSDRModel::HERMESLITE),  90);
+        QCOMPARE(Longpath::rfPowerSliderStepFor(HPSDRModel::HERMESLITE),  6);
     }
     void hl2_tuneSlider() {
         // Station ceiling: see kTuneSliderMaxWatts. Was 99 upstream.
-        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::HERMESLITE),
-                 NereusSDR::kTuneSliderMaxWatts);
-        QCOMPARE(NereusSDR::tuneSliderStepFor(HPSDRModel::HERMESLITE),  3);
+        QCOMPARE(Longpath::tuneSliderMaxFor(HPSDRModel::HERMESLITE),
+                 Longpath::kTuneSliderMaxWatts);
+        QCOMPARE(Longpath::tuneSliderStepFor(HPSDRModel::HERMESLITE),  3);
     }
     void hl2_fixedTuneSpinbox() {
-        QCOMPARE(NereusSDR::fixedTuneSpinboxMinFor(HPSDRModel::HERMESLITE), -16.5f);
-        QCOMPARE(NereusSDR::fixedTuneSpinboxMaxFor(HPSDRModel::HERMESLITE),   0.0f);
-        QCOMPARE(NereusSDR::fixedTuneSpinboxStepFor(HPSDRModel::HERMESLITE), 0.5f);
-        QCOMPARE(NereusSDR::fixedTuneSpinboxDecimalsFor(HPSDRModel::HERMESLITE), 1);
-        QCOMPARE(QString(NereusSDR::fixedTuneSpinboxSuffixFor(HPSDRModel::HERMESLITE)),
+        QCOMPARE(Longpath::fixedTuneSpinboxMinFor(HPSDRModel::HERMESLITE), -16.5f);
+        QCOMPARE(Longpath::fixedTuneSpinboxMaxFor(HPSDRModel::HERMESLITE),   0.0f);
+        QCOMPARE(Longpath::fixedTuneSpinboxStepFor(HPSDRModel::HERMESLITE), 0.5f);
+        QCOMPARE(Longpath::fixedTuneSpinboxDecimalsFor(HPSDRModel::HERMESLITE), 1);
+        QCOMPARE(QString(Longpath::fixedTuneSpinboxSuffixFor(HPSDRModel::HERMESLITE)),
                  QStringLiteral(" dB"));
     }
     void hl2_attenuator() {
-        QCOMPARE(NereusSDR::hl2AttenuatorDbPerStep(),  0.5f);
-        QCOMPARE(NereusSDR::hl2AttenuatorStepCount(), 16);
+        QCOMPARE(Longpath::hl2AttenuatorDbPerStep(),  0.5f);
+        QCOMPARE(Longpath::hl2AttenuatorStepCount(), 16);
     }
     void anan100_default_100W() {
         // NOTE: enum is ANAN100 (no underscore), not ANAN_100
-        QCOMPARE(NereusSDR::rfPowerSliderMaxFor(HPSDRModel::ANAN100), 100);
-        QCOMPARE(NereusSDR::rfPowerSliderStepFor(HPSDRModel::ANAN100), 1);
-        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::ANAN100),
-                 NereusSDR::kTuneSliderMaxWatts);
-        QCOMPARE(NereusSDR::tuneSliderStepFor(HPSDRModel::ANAN100),     1);
-        QCOMPARE(NereusSDR::fixedTuneSpinboxMinFor(HPSDRModel::ANAN100),  0.0f);
-        QCOMPARE(NereusSDR::fixedTuneSpinboxMaxFor(HPSDRModel::ANAN100), 100.0f);
-        QCOMPARE(QString(NereusSDR::fixedTuneSpinboxSuffixFor(HPSDRModel::ANAN100)),
+        QCOMPARE(Longpath::rfPowerSliderMaxFor(HPSDRModel::ANAN100), 100);
+        QCOMPARE(Longpath::rfPowerSliderStepFor(HPSDRModel::ANAN100), 1);
+        QCOMPARE(Longpath::tuneSliderMaxFor(HPSDRModel::ANAN100),
+                 Longpath::kTuneSliderMaxWatts);
+        QCOMPARE(Longpath::tuneSliderStepFor(HPSDRModel::ANAN100),     1);
+        QCOMPARE(Longpath::fixedTuneSpinboxMinFor(HPSDRModel::ANAN100),  0.0f);
+        QCOMPARE(Longpath::fixedTuneSpinboxMaxFor(HPSDRModel::ANAN100), 100.0f);
+        QCOMPARE(QString(Longpath::fixedTuneSpinboxSuffixFor(HPSDRModel::ANAN100)),
                  QStringLiteral(" W"));
     }
     void ananG2_1k_default_100W_slider() {
         // Slider range stays 0-100 on every SKU - the per-band PA gain table
         // does the actual scaling. mi0bot only deviates for HERMESLITE.
-        QCOMPARE(NereusSDR::rfPowerSliderMaxFor(HPSDRModel::ANAN_G2_1K), 100);
-        QCOMPARE(NereusSDR::tuneSliderMaxFor(HPSDRModel::ANAN_G2_1K),
-                 NereusSDR::kTuneSliderMaxWatts);
+        QCOMPARE(Longpath::rfPowerSliderMaxFor(HPSDRModel::ANAN_G2_1K), 100);
+        QCOMPARE(Longpath::tuneSliderMaxFor(HPSDRModel::ANAN_G2_1K),
+                 Longpath::kTuneSliderMaxWatts);
     }
 };
 

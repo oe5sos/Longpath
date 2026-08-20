@@ -42,7 +42,7 @@
 
 #include <QString>
 
-namespace NereusSDR::QsoConfirmation {
+namespace Longpath::QsoConfirmation {
 
 // What one ADIF confirmation field says.
 enum class State {
@@ -80,4 +80,4 @@ QString badge(const LogEntry& e);
 // The same thing spelled out, for a tooltip or a detail line.
 QString describe(const LogEntry& e);
 
-} // namespace NereusSDR::QsoConfirmation
+} // namespace Longpath::QsoConfirmation

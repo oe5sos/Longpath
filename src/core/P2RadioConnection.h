@@ -190,10 +190,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "codec/CodecContext.h"
 #include "DdcAssignment.h"
 
-namespace NereusSDR { class OcMatrix; }              // forward decl — full header in .cpp
-namespace NereusSDR { class CalibrationController; } // forward decl — Phase 3P-G
+namespace Longpath { class OcMatrix; }              // forward decl — full header in .cpp
+namespace Longpath { class CalibrationController; } // forward decl — Phase 3P-G
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Protocol 2 connection for Orion MkII / Saturn (ANAN-G2) radios.
 //
@@ -234,7 +234,7 @@ public:
 
 public slots:
     void init() override;
-    void connectToRadio(const NereusSDR::RadioInfo& info) override;
+    void connectToRadio(const Longpath::RadioInfo& info) override;
     void disconnect() override;
 
     void setReceiverFrequency(int receiverIndex, quint64 frequencyHz) override;
@@ -325,7 +325,7 @@ public slots:
     // codec for ReceiverManager::setP2Codec injection.  Returns nullptr
     // until selectCodec() runs at connectToRadio time; subscribers
     // should listen to p2CodecChanged() to know when this becomes valid.
-    NereusSDR::IP2Codec* p2Codec() const { return m_codec.get(); }
+    Longpath::IP2Codec* p2Codec() const { return m_codec.get(); }
 
     // Phase 3F Sub-Epic F Task 1: enable the wideband ADC stream for the
     // given ADC index. Bit N of m_wbEnableMask corresponds to ADCN.
@@ -522,7 +522,7 @@ private:
     // slotted back into sequence position, true losses concealed by
     // repeating the last block. See MicReorderBuffer.h for design.
     // Stats reported inside the auditMicSeq() 5 s window.
-    NereusSDR::MicReorderBuffer m_micReorder;
+    Longpath::MicReorderBuffer m_micReorder;
     static constexpr int kMicLosTimeoutMs = 3000;  // network.c:656 [v2.10.3.13]
 
     // --- Run state (from Thetis _radionet, network.h:65-66) ---
@@ -999,4 +999,4 @@ public:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

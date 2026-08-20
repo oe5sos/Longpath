@@ -72,7 +72,7 @@
 #include <QObject>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class WdspEngine;
 class AudioEngine;
@@ -530,4 +530,4 @@ private:
     QByteArray                  m_radeRxIqScratch;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -15,7 +15,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -201,4 +201,4 @@ void TxSwitch::wire()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

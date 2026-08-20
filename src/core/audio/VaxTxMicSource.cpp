@@ -11,7 +11,7 @@
 #include "core/audio/VaxTxMicSource.h"
 #include "core/AudioEngine.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 VaxTxMicSource::VaxTxMicSource(AudioEngine* engine)
     : m_engine(engine)
@@ -26,4 +26,4 @@ int VaxTxMicSource::pullSamples(float* dst, int n)
     return m_engine->pullVaxTxMic(dst, n);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

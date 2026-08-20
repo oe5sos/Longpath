@@ -21,7 +21,7 @@
 #include "TciVfoCoalescer.h"
 #include "models/Band.h"  // bandFromFrequency + bandLabel for tx_frequency_thetis
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis TCIServer.cs:2260-2279 [v2.10.3.15] -- agcModeToTciMode.
 // Ported verbatim, including the default-falls-to-"normal" branch.  Input
@@ -3190,4 +3190,4 @@ QString TciProtocol::handleCwMsgCommand(const QStringList& args)
     return {};
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

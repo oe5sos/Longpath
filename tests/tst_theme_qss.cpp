@@ -26,7 +26,7 @@
 
 #include <QSet>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestThemeQss : public QObject
 {

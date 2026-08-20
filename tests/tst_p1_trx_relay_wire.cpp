@@ -40,7 +40,7 @@
 #include "core/P1RadioConnection.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1TrxRelayWire : public QObject {
     Q_OBJECT

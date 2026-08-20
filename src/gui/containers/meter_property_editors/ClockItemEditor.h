@@ -4,7 +4,7 @@
 class QCheckBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class ClockItem;
 
 class ClockItemEditor : public BaseItemEditor {
@@ -23,4 +23,4 @@ private:
     QPushButton* m_btnTitleColour{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

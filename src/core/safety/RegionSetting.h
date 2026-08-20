@@ -147,7 +147,7 @@
 
 #include <QString>
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 /// Number of entries in Region. The display table is checked against
 /// this at compile time so a new region cannot be added to one and
@@ -189,4 +189,4 @@ bool isValidTxFreqEverywhere(const BandPlanGuard& guard,
                              std::int64_t freqHz, DSPMode mode,
                              bool extended) noexcept;
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

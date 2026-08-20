@@ -156,7 +156,7 @@
 // Phase 3P-II Task 87: TxInterlockPolicy gate in setMox(true).
 #include "core/TxInterlockPolicy.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // MoxState — the 7-state TX/RX transition machine.
@@ -1178,11 +1178,11 @@ private:
     QTimer m_breakInDelayTimer; // 300 ms — 3M-2 CW QSK; NOT started from any B.3 logic
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // Qt metatype registration — required so MoxState can be carried by
 // QVariant / QSignalSpy::value<MoxState>() without silently returning
 // a zero-initialised value on Qt6 builds that haven't called
 // qRegisterMetaType<>().  Matches the pattern in WdspTypes.h:298-305.
 #include <QMetaType>
-Q_DECLARE_METATYPE(NereusSDR::MoxState)
+Q_DECLARE_METATYPE(Longpath::MoxState)

@@ -57,7 +57,7 @@
 
 #include "gui/applets/eq/EqHistory.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ClientEq;
 class StripChain;
@@ -111,4 +111,4 @@ private:
     bool        m_replaying{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

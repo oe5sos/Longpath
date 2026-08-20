@@ -1,5 +1,5 @@
 // =================================================================
-// hal-plugin/NereusSDRVAX.cpp  (NereusSDR)
+// hal-plugin/LongpathVAX.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -591,7 +591,7 @@ private:
 
 // ── Driver entry point ──────────────────────────────────────────────────────
 
-extern "C" void* NereusSDRVAX_Create(CFAllocatorRef allocator, CFUUIDRef typeUUID)
+extern "C" void* LongpathVAX_Create(CFAllocatorRef allocator, CFUUIDRef typeUUID)
 {
     if (!CFEqual(typeUUID, kAudioServerPlugInTypeUUID)) {
         return nullptr;

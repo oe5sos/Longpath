@@ -25,7 +25,7 @@
 #include "core/HpsdrModel.h"
 #include "gui/AddCustomRadioDialog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAddCustomRadioDialog : public QObject {
     Q_OBJECT

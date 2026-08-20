@@ -42,7 +42,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -929,4 +929,4 @@ void TxVoiceCheckDialog::refreshButtons()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

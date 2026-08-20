@@ -40,7 +40,7 @@ class QTimer;
 class QVBoxLayout;
 class QWebSocket;
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct TciClientSession;
 class TciServer;
@@ -122,6 +122,6 @@ private:
     bool         m_rebuildInProgress{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

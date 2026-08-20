@@ -96,7 +96,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: disable every child widget inside a group box (NYI guard).
@@ -1861,13 +1861,13 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     // HardwarePage.cpp:144-153.
     if (model) {
         connect(model, &RadioModel::currentRadioChanged,
-                this, [this](const NereusSDR::RadioInfo& info) {
-            const auto& caps = NereusSDR::BoardCapsTable::forBoard(info.boardType);
+                this, [this](const Longpath::RadioInfo& info) {
+            const auto& caps = Longpath::BoardCapsTable::forBoard(info.boardType);
             setHasSidetoneGenerator(caps.hasSidetoneGenerator);
         });
         connect(model, &RadioModel::connectionStateChanged,
-                this, [this](NereusSDR::ConnectionState s) {
-            if (s != NereusSDR::ConnectionState::Connected) {
+                this, [this](Longpath::ConnectionState s) {
+            if (s != Longpath::ConnectionState::Connected) {
                 // On any non-Connected transition (Disconnected /
                 // Connecting / Disconnecting / Error), hide the row so
                 // the user doesn't see a useless control between
@@ -1878,7 +1878,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
         // Apply current state — the dialog may have been opened while a
         // radio is already connected.
         if (model->isConnected() && model->connection()) {
-            const auto& caps = NereusSDR::BoardCapsTable::forBoard(
+            const auto& caps = Longpath::BoardCapsTable::forBoard(
                 model->connection()->radioInfo().boardType);
             setHasSidetoneGenerator(caps.hasSidetoneGenerator);
         }
@@ -2735,4 +2735,4 @@ void NrAnfSetupPage::selectSubtab(NrSlot slot)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

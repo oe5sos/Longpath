@@ -1,7 +1,7 @@
 #include <QtTest/QtTest>
 #include "core/Rf2ksConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class Rf2ksConnectionParseTest : public QObject {
     Q_OBJECT

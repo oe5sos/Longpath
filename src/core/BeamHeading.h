@@ -39,7 +39,7 @@
 
 #include <QString>
 
-namespace NereusSDR::BeamHeading {
+namespace Longpath::BeamHeading {
 
 // Normalise any angle to 0..360.
 double wrap360(double deg);
@@ -76,4 +76,4 @@ Move plan(double fromDeg, double toDeg, Stop stop);
 // move is a long one. Empty when there is nothing worth saying.
 QString advice(const Move& m);
 
-} // namespace NereusSDR::BeamHeading
+} // namespace Longpath::BeamHeading

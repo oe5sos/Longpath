@@ -38,7 +38,7 @@
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Style constants — same palette as DeviceCard / STYLEGUIDE.md
@@ -933,4 +933,4 @@ void AudioVaxPage::wirePillFeedback()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

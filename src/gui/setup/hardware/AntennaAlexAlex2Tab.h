@@ -96,7 +96,7 @@ class QFrame;
 class QGroupBox;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -245,4 +245,4 @@ private:
     static const std::vector<LpfBandEntry>& lpfBands();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -30,7 +30,7 @@
 #include <QStringLiteral>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FilterPolicyDialog::FilterPolicyDialog(int chainIndex, AlexController* alex, QWidget* parent)
     : QDialog(parent)
@@ -121,4 +121,4 @@ FilterPolicyDialog::FilterPolicyDialog(int chainIndex, AlexController* alex, QWi
 
 FilterPolicyDialog::~FilterPolicyDialog() = default;
 
-} // namespace NereusSDR
+} // namespace Longpath

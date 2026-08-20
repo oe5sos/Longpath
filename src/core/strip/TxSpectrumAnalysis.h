@@ -58,7 +58,7 @@
 
 #include <vector>
 
-namespace NereusSDR::TxSpectrumAnalysis {
+namespace Longpath::TxSpectrumAnalysis {
 
 // The long-term average spectrum of a block of modulator output, in dB
 // per FFT bin. Power-domain average over overlapping Hann windows, for
@@ -104,4 +104,4 @@ Occupancy occupiedBandwidth(const std::vector<double>& magDb, double binHz,
 // only when the number affects somebody else.
 QString advice(const Occupancy& occ, double filterHighHz);
 
-} // namespace NereusSDR::TxSpectrumAnalysis
+} // namespace Longpath::TxSpectrumAnalysis

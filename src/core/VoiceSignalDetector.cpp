@@ -29,7 +29,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // AetherSDR fuehrt diese Kategorie zentral in LogManager.h; bei uns ist
 // sie oertlich, wie in QrzClient.cpp.
@@ -340,4 +340,4 @@ QString sLabel(float dbm)
     return QString("S%1").arg(sNum);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

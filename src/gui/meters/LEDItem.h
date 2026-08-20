@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "MeterItem.h"
 #include <QColor>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsLed (MeterManager.cs:19448+)
 // LED indicator with 3 shapes, 2 styles, blink/pulsate animations.
@@ -145,4 +145,4 @@ private:
     float m_pulsateDir{-0.05f};  // alpha change per frame
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

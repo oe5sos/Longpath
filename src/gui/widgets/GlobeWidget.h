@@ -32,7 +32,7 @@ class QDateTime;
 class QPainter;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Orthographic globe: the Earth as seen from far above one point.
 //
@@ -251,4 +251,4 @@ private:
     double m_dragStartLon{0.0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

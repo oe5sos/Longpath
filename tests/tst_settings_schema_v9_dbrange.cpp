@@ -26,7 +26,7 @@
 #include <QtTest/QtTest>
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 QString get(const QString& k)

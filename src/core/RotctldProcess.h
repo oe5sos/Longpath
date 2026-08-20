@@ -33,7 +33,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RotctldProcess : public QObject {
     Q_OBJECT
@@ -80,4 +80,4 @@ private:
     QProcess m_proc;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

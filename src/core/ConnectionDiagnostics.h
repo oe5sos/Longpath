@@ -23,7 +23,7 @@
 #include <QTimer>
 #include <QDateTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PgxlConnection;
 class TgxlConnection;
@@ -111,4 +111,4 @@ private:
     QMetaObject::Connection m_connStatus;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -29,7 +29,7 @@
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestActiveRxCountLiveApply : public QObject {
     Q_OBJECT

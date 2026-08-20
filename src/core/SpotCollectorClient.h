@@ -36,7 +36,7 @@
 
 #include "DxSpot.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/SpotCollectorClient.h [@0cd4559]
 //
@@ -81,4 +81,4 @@ private:
     std::atomic<bool> m_listening{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

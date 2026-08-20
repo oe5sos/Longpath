@@ -7,7 +7,7 @@ class QCheckBox;
 class QComboBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class ButtonBoxItem;
 
 // Shared base editor for all ButtonBoxItem subclass editors.
@@ -41,4 +41,4 @@ private:
     QCheckBox*      m_chkFadeOnTx{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -25,7 +25,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis TCIServer.cs:4110-4120 [v2.10.3.13] — linearToDbVolume.
 // Maps linear int [0..100] to dB double [-60..0] via linear interpolation.
@@ -77,4 +77,4 @@ inline double tciAudioGainToDb(double gain)
     return 20.0 * std::log10(gain);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

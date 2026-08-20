@@ -126,7 +126,7 @@ mw0lge@grange-lane.co.uk
 class QLabel;
 class QMouseEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class PureSignal;
@@ -250,4 +250,4 @@ private:
     bool m_useSmallFonts{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

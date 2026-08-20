@@ -28,7 +28,7 @@
 #include "core/audio/WavFile.h"
 #include "core/audio/WavPlayer.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWavPlayer : public QObject
 {

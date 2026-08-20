@@ -22,7 +22,7 @@
 
 #include "wdsp_api.h"   // ::SetInputSamplerate (HAVE_WDSP-gated)
 
-namespace NereusSDR {
+namespace Longpath {
 
 PsFeedbackChannel::PsFeedbackChannel(int channelId, QObject* parent)
     : QObject(parent)
@@ -70,4 +70,4 @@ void PsFeedbackChannel::feedSamples(const float* iqInterleaved, int size)
     (void)iqInterleaved;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -40,7 +40,7 @@
 #include <QStringList>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class StripChain;
 
@@ -99,4 +99,4 @@ QVector<Preset> builtInPresets();
 bool applyBuiltIn(const QString& name, StripChain& chain);
 
 } // namespace StripSettings
-} // namespace NereusSDR
+} // namespace Longpath

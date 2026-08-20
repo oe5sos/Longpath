@@ -27,7 +27,7 @@
 #include <QMenu>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/gui/AmpApplet.cpp:11-77 [@0cd4559]
 AmpApplet::AmpApplet(RadioModel* model, QWidget* parent)
@@ -278,4 +278,4 @@ QMenu* AmpApplet::buildContextMenu(QObject* menuParent)
 
     return menu;
 }
-} // namespace NereusSDR
+} // namespace Longpath

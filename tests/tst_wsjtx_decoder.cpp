@@ -21,7 +21,7 @@
 #include "core/WsjtxClient.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Write a QString in the WSJT-X wire format (the format
 // WsjtxClient::readQString() expects): big-endian quint32 length

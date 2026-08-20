@@ -13,7 +13,7 @@
 #include "core/strip/StripChain.h"
 #include "core/strip/StripTuner.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

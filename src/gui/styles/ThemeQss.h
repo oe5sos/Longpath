@@ -64,7 +64,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR::Style {
+namespace Longpath::Style {
 
 /// One row of the theme table.
 ///
@@ -105,4 +105,4 @@ bool hasLegacyColour(const QString& qss);
 ///     p.setPen(QColor(Style::role("measured", Style::kAmberText)));
 QString role(const char* roleName, const char* fallback);
 
-} // namespace NereusSDR::Style
+} // namespace Longpath::Style

@@ -35,7 +35,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PerfMonitor {
 public:
@@ -261,4 +261,4 @@ private:
     Snapshot m_lastSnapshot;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

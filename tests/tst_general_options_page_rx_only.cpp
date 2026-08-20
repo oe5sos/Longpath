@@ -23,7 +23,7 @@
 #include "gui/setup/GeneralOptionsPage.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestGeneralOptionsPageRxOnly : public QObject
 {

@@ -48,7 +48,7 @@
 #include <QTimer>
 #include <QFileSystemWatcher>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct QsoRecord;
 class AdifParser;
@@ -137,4 +137,4 @@ private:
     QString            m_watchedPath;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 #include <QCloseEvent>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FloatingContainer::FloatingContainer(int rxSource, QWidget* parent)
     : QWidget(parent, Qt::Window | Qt::FramelessWindowHint)
@@ -227,4 +227,4 @@ void FloatingContainer::setFormEnabled(bool enabled) { m_formEnabled = enabled; 
 void FloatingContainer::setHiddenByMacro(bool hidden) { m_hiddenByMacro = hidden; }
 void FloatingContainer::setContainerFloating(bool floating) { m_floating = floating; }
 
-} // namespace NereusSDR
+} // namespace Longpath

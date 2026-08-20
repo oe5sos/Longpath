@@ -1,7 +1,7 @@
 #include <QtTest/QtTest>
 #include "gui/widgets/MetricLabel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstMetricLabel : public QObject {
     Q_OBJECT

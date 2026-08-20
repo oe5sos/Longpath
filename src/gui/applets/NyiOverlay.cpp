@@ -1,7 +1,7 @@
 #include "NyiOverlay.h"
 #include "gui/styles/ThemeQss.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 NyiOverlay::NyiOverlay(const QString& phaseHint, QWidget* parent)
     : QLabel(QStringLiteral("NYI"), parent)
@@ -33,4 +33,4 @@ NyiOverlay* NyiOverlay::markNyi(QWidget* target, const QString& phaseHint)
     return nullptr;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

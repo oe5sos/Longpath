@@ -67,7 +67,7 @@ class QGroupBox;
 class QLabel;
 class QSpinBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 struct RadioInfo;
@@ -100,4 +100,4 @@ private:
     QCheckBox*   m_autoPauseCheck{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

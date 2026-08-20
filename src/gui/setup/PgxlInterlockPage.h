@@ -31,7 +31,7 @@ class QDoubleSpinBox;
 class QCheckBox;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class TxInterlockPolicy;
@@ -64,4 +64,4 @@ private:
     bool m_loading{false};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

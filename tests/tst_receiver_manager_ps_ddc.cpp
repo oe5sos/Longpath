@@ -35,7 +35,7 @@
 #include "core/codec/P2CodecSaturn.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 
@@ -94,7 +94,7 @@ void TstReceiverManagerPsDdc::initTestCase()
 {
     // Q_DECLARE_METATYPE in CodecContext.h covers the static type, but
     // QSignalSpy needs runtime registration too.
-    qRegisterMetaType<PsDdcConfig>("NereusSDR::PsDdcConfig");
+    qRegisterMetaType<PsDdcConfig>("Longpath::PsDdcConfig");
     qRegisterMetaType<PsDdcConfig>("PsDdcConfig");
 }
 

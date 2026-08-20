@@ -18,7 +18,7 @@
 
 #include "core/SmartSdrApiListener.h"
 
-using NereusSDR::SmartSdrApiListener;
+using Longpath::SmartSdrApiListener;
 
 namespace {
 

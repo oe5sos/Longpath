@@ -106,7 +106,7 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -707,4 +707,4 @@ void DspOptionsPage::recomputeWarnings()
            "others use Low Latency. WDSP will use the mode-specific type."));
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

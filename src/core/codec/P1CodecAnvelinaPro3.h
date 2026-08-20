@@ -40,7 +40,7 @@
 
 #include "P1CodecStandard.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // AnvelinaPro3 (ANAN-8000DLE / G8NJJ contribution) — extends Standard
 // with a 17th bank carrying extra OC pin outputs (4 bits in C1).
@@ -64,4 +64,4 @@ public:
         const std::array<SliceConfig, 5>& slices) const override;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

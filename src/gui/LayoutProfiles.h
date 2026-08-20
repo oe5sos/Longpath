@@ -72,7 +72,7 @@
 #include <functional>
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class LayoutProfiles : public QObject {
     Q_OBJECT
@@ -186,4 +186,4 @@ private:
     Apply m_apply;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

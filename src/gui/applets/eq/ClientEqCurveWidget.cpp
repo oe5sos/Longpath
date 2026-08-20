@@ -43,7 +43,7 @@
 #include <array>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -949,4 +949,4 @@ QVariantMap ClientEqCurveWidget::eqstatsSnapshot(bool reset)
     return stats;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

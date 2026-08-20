@@ -63,7 +63,7 @@
 
 #include "BoardCapabilities.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class WdspEngine;
 class TxChannel;
@@ -766,4 +766,4 @@ private:
     BoardCapabilities m_caps;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

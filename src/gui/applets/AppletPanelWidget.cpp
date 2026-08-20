@@ -44,7 +44,7 @@
 #include <QMouseEvent>
 #include <QContextMenuEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     : QWidget(parent)
@@ -580,4 +580,4 @@ void AppletPanelWidget::dragTo(int globalY)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -34,7 +34,7 @@
 #include <cmath>
 #include <complex>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1093,4 +1093,4 @@ void StripBandCurve::paintEvent(QPaintEvent*)
     p.setClipping(false);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

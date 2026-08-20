@@ -22,7 +22,7 @@
 
 #include <vector>
 
-using NereusSDR::MicReorderBuffer;
+using Longpath::MicReorderBuffer;
 
 namespace {
 

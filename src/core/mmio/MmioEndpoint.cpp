@@ -14,7 +14,7 @@
 
 #include "../LogCategories.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 MmioEndpoint::MmioEndpoint(QObject* parent)
     : QObject(parent)
@@ -87,4 +87,4 @@ QString MmioEndpoint::stripGuidPrefix(const QString& key) const
     return key;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -66,7 +66,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR::Feedline {
+namespace Longpath::Feedline {
 
 // One coax type. `lossDb100m` is matched loss per 100 m at `refHz`.
 struct Cable {
@@ -109,4 +109,4 @@ Result deEmbed(const Sweep& measured, double lengthM, const Cable& cable);
 // the round trip checkable.
 Sweep embed(const Sweep& atAntenna, double lengthM, const Cable& cable);
 
-} // namespace NereusSDR::Feedline
+} // namespace Longpath::Feedline

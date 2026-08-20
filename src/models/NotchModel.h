@@ -151,7 +151,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Canonical store for operator-placed notches (TNF).
 ///
@@ -344,4 +344,4 @@ private:
     bool m_restoring{false};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

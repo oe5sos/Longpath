@@ -29,7 +29,7 @@
 #include "core/RadioConnection.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockConnection ─────────────────────────────────────────────────────────────
 // Minimal mock that satisfies RadioConnection pure virtuals.
@@ -43,7 +43,7 @@ public:
         setState(ConnectionState::Connected);
     }
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

@@ -59,7 +59,7 @@ class QPushButton;
 class QTimer;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class CallsignCache;
 class QrzClient;
@@ -159,4 +159,4 @@ private:
     bool   m_haveRotor{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

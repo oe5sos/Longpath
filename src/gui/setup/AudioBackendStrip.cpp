@@ -25,7 +25,7 @@
 #  include "core/audio/LinuxAudioBackend.h"
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioBackendStrip::AudioBackendStrip(AudioEngine* eng, QWidget* parent)
     : QWidget(parent)
@@ -78,7 +78,7 @@ void AudioBackendStrip::refresh()
 #if defined(Q_OS_LINUX)
     if (m_eng) {
         const LinuxAudioBackend backend = m_eng->linuxBackend();
-        const QString name = NereusSDR::toString(backend);
+        const QString name = Longpath::toString(backend);
         m_primaryLabel->setText(name);
 
         switch (backend) {
@@ -121,4 +121,4 @@ void AudioBackendStrip::onOpenLogsClicked()
     QDesktopServices::openUrl(QUrl::fromLocalFile(logDir));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

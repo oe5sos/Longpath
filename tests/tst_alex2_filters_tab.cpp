@@ -5,7 +5,7 @@
 #include "gui/setup/hardware/AntennaAlexAlex2Tab.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAlex2FiltersTab : public QObject {
     Q_OBJECT

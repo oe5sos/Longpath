@@ -46,7 +46,7 @@ class QSplitter;
 class QTableWidget;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class QrzClient;
 class QsoDetailPane;
@@ -219,4 +219,4 @@ private:
     QList<int> m_uploadBatch;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -21,7 +21,7 @@
 #include "core/PaGainProfile.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPaGainProfile : public QObject {
     Q_OBJECT

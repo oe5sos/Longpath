@@ -14,7 +14,7 @@
 #include <QtTest/QtTest>
 #include "models/NotchModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchSpatialHelpers : public QObject {
     Q_OBJECT

@@ -15,7 +15,7 @@
 
 #include <cmath>
 
-namespace NereusSDR::BeamHeading {
+namespace Longpath::BeamHeading {
 
 double wrap360(double deg)
 {
@@ -90,4 +90,4 @@ QString advice(const Move& m)
     return s;
 }
 
-} // namespace NereusSDR::BeamHeading
+} // namespace Longpath::BeamHeading

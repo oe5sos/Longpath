@@ -39,7 +39,7 @@
 #include <QMessageBox>
 #include <QScrollArea>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── bar meter limit constants ──────────────────────────────────────────────
 // PA temp bar: 0–75°C (NereusSDR-original safe operating range for
@@ -850,4 +850,4 @@ void RadioStatusPage::refreshHygieneRows()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

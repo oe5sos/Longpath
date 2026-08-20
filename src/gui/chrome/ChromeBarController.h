@@ -15,7 +15,7 @@
 
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Owns the banner's item table and applies one fold decision per resize.
 ///
@@ -144,4 +144,4 @@ private:
     int                    m_foldedThrough{-1};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

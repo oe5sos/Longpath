@@ -44,7 +44,7 @@
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWdspChannelIdMap : public QObject {
     Q_OBJECT

@@ -31,7 +31,7 @@
 #include <QString>
 #include <QTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/DxClusterClient.h:13-23 [@0cd4559]
 struct DxSpot {
@@ -46,6 +46,6 @@ struct DxSpot {
     int     lifetimeSec{0};  // 0 = use source default from AppSettings
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::DxSpot)
+Q_DECLARE_METATYPE(Longpath::DxSpot)

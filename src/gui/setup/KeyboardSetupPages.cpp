@@ -6,7 +6,7 @@
 #include <QGridLayout>
 #include <QGroupBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 KeyboardShortcutsPage::KeyboardShortcutsPage(QWidget* parent)
     : SetupPage(QStringLiteral("Shortcuts"), parent)
@@ -76,4 +76,4 @@ void KeyboardShortcutsPage::buildUI()
     contentLayout()->addStretch();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -5,7 +5,7 @@
 // no-port-check: NereusSDR-original test file.  The Thetis citation
 // below documents which upstream behaviour is exercised; no C# is
 // translated in this file.  The math kernel under test
-// (NereusSDR::scaleHermesLiteTempCelsius) is registered in
+// (Longpath::scaleHermesLiteTempCelsius) is registered in
 // THETIS-PROVENANCE.md as a port from mi0bot console.cs:25079
 // [v2.10.3.13-beta2 @c26a8a4].
 //
@@ -40,7 +40,7 @@
 #include "core/RadioStatus.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstRadioModelHl2TempRouting : public QObject {
     Q_OBJECT

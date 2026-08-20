@@ -17,7 +17,7 @@
 #include <QVBoxLayout>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -223,4 +223,4 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     Instrument::paintHub(p, spine);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 class QTcpServer;
 class QTcpSocket;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MmioEndpoint;
 
@@ -87,4 +87,4 @@ private:
     QByteArray    m_lineBuffer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

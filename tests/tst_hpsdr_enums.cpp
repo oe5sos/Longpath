@@ -86,7 +86,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <QtTest/QtTest>
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestHpsdrEnums : public QObject {
     Q_OBJECT

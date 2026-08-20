@@ -76,7 +76,7 @@ class QPushButton;
 class QLabel;
 class QFrame;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AddCustomRadioDialog : public QDialog {
     Q_OBJECT
@@ -156,4 +156,4 @@ private:
     bool         m_savedOffline{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

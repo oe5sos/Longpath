@@ -6,7 +6,7 @@
 
 #include <array>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP2CodecOrionMkII : public QObject {
     Q_OBJECT

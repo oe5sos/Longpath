@@ -23,7 +23,7 @@
 
 #include <cstring>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Helper: build a QByteArray of Int16 interleaved stereo samples from a

@@ -29,7 +29,7 @@
 
 #include <QDateTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct SolarInfo {
     // Both invalid inside the polar day and the polar night — there is
@@ -61,4 +61,4 @@ struct SolarInfo {
 // CtyDatParser already flips it.)
 SolarInfo solarInfo(const QDateTime& utc, double lat, double lonEast);
 
-} // namespace NereusSDR
+} // namespace Longpath

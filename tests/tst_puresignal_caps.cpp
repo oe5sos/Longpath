@@ -42,7 +42,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPureSignalCaps : public QObject {
     Q_OBJECT

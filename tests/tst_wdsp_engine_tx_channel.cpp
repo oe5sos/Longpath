@@ -51,7 +51,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"
 #include "core/WdspEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Channel ID convention (Thetis cmaster.c / dsp.cs [v2.10.3.13]):

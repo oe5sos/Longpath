@@ -65,7 +65,7 @@ mw0lge@grange-lane.co.uk
 #include <QSplitter>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // Locate the MeterWidget hosted inside a container's content widget.
@@ -835,4 +835,4 @@ void ContainerManager::restoreState()
                           << skipped << "skipped (already live)";
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

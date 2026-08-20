@@ -39,9 +39,9 @@
 class QLabel;
 class QPushButton;
 
-namespace NereusSDR { class AudioEngine; }
+namespace Longpath { class AudioEngine; }
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // AudioBackendStrip
@@ -74,4 +74,4 @@ private:
     QPushButton*  m_openLogs{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

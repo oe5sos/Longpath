@@ -36,7 +36,7 @@
 #include <QEvent>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ScrollableLabel::ScrollableLabel(QWidget* parent)
     : QStackedWidget(parent)
@@ -173,4 +173,4 @@ bool ScrollableLabel::eventFilter(QObject* obj, QEvent* ev) {
     return QStackedWidget::eventFilter(obj, ev);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -59,7 +59,7 @@ mw0lge@grange-lane.co.uk
 #include <QMap>
 #include <QPointF>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsNeedleScalePwrItem (MeterManager.cs:14888+)
 // Renders power scale text labels at calibration points around needle arcs.
@@ -140,4 +140,4 @@ private:
     QMap<float, QPointF> m_calibration;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

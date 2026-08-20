@@ -32,7 +32,7 @@
 #include <QRect>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Top-right per-pan overlay widget. Mirror of SpectrumOverlayPanel pattern.
 /// Shows: slice letter badge, freq, mode, CH N tag, TX/WIDE/DIV/PS HOLD pills.
@@ -143,4 +143,4 @@ private:
     bool     m_psPaused {false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

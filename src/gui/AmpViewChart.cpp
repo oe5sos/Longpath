@@ -25,7 +25,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -304,4 +304,4 @@ void AmpViewChart::paintEvent(QPaintEvent* /*event*/)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

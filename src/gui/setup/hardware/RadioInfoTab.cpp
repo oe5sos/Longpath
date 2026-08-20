@@ -82,7 +82,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RadioInfoTab::RadioInfoTab(RadioModel* model, QWidget* parent)
     : QWidget(parent), m_model(model)
@@ -399,4 +399,4 @@ void RadioInfoTab::restoreSettings(const QMap<QString, QVariant>& settings)
     // is honored by RadioModel via the connection-init path.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

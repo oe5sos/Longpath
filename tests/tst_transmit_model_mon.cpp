@@ -25,7 +25,7 @@
 #include <QtTest/QtTest>
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTransmitModelMon : public QObject {
     Q_OBJECT

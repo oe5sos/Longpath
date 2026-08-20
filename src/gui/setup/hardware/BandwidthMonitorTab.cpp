@@ -68,7 +68,7 @@ mw0lge@grange-lane.co.uk
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 BandwidthMonitorTab::BandwidthMonitorTab(RadioModel* model, QWidget* parent)
     : QWidget(parent), m_model(model)
@@ -161,4 +161,4 @@ void BandwidthMonitorTab::restoreSettings(const QMap<QString, QVariant>& setting
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

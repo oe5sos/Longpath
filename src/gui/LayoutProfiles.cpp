@@ -18,7 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 LayoutProfiles::LayoutProfiles(QObject* parent) : QObject(parent) {}
 
@@ -329,4 +329,4 @@ void LayoutProfiles::load()
     emit currentChanged(m_current);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

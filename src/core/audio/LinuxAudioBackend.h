@@ -21,7 +21,7 @@
 #include <QString>
 #include <functional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class LinuxAudioBackend {
     PipeWire,   // libpipewire-0.3 native path
@@ -47,4 +47,4 @@ LinuxAudioBackend detectLinuxBackend();
 
 QString toString(LinuxAudioBackend b);
 
-}  // namespace NereusSDR
+}  // namespace Longpath

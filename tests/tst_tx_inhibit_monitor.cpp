@@ -2,7 +2,7 @@
 #include <QtTest>
 #include "core/safety/TxInhibitMonitor.h"
 
-using namespace NereusSDR::safety;
+using namespace Longpath::safety;
 
 class TestTxInhibitMonitor : public QObject
 {

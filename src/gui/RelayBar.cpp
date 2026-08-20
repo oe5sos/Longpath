@@ -29,7 +29,7 @@
 #include <QWheelEvent>
 #include <QFontMetrics>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/gui/HGauge.h:206-288 [@0cd4559]
 RelayBar::RelayBar(const QString& label, QWidget* parent)
@@ -120,4 +120,4 @@ void RelayBar::paintEvent(QPaintEvent*)
     p.drawText(w - valueW, barY + barH / 2 + fm.ascent() / 2, valText);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

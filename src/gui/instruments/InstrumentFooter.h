@@ -31,7 +31,7 @@
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class InstrumentFooter : public QWidget {
     Q_OBJECT
@@ -60,4 +60,4 @@ private:
     QLabel* m_value{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

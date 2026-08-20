@@ -39,11 +39,11 @@
 #include <vector>
 #include <QDebug>
 
-namespace NereusSDR {
+namespace Longpath {
 
 DeepFilterFilter::DeepFilterFilter()
 {
-    QByteArray modelPath = NereusSDR::ModelPaths::dfnrModelTarball().toUtf8();
+    QByteArray modelPath = Longpath::ModelPaths::dfnrModelTarball().toUtf8();
     if (modelPath.isEmpty()) {
         qCWarning(lcDsp) << "DeepFilterFilter: model not found via ModelPaths::dfnrModelTarball() — DFNR disabled";
         return;
@@ -71,7 +71,7 @@ void DeepFilterFilter::reset()
         df_free(m_state);
         m_state = nullptr;
     }
-    QByteArray modelPath = NereusSDR::ModelPaths::dfnrModelTarball().toUtf8();
+    QByteArray modelPath = Longpath::ModelPaths::dfnrModelTarball().toUtf8();
     if (modelPath.isEmpty()) {
         qCWarning(lcDsp) << "DeepFilterFilter::reset(): model not found — DFNR stays disabled";
     } else {
@@ -165,6 +165,6 @@ void DeepFilterFilter::process(float* outL, float* outR, int sampleCount)
     // (passing the input through — avoids dropouts while DFNR warms up).
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_DFNR

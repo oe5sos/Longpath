@@ -93,7 +93,7 @@ class QTableWidget;
 class QTimer;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HermesLiteBandwidthMonitor;
 class RadioModel;
@@ -169,7 +169,7 @@ signals:
 
 private slots:
     void onDetectedChanged(bool detected);
-    void onRegisterChanged(NereusSDR::IoBoardHl2::Register reg, quint8 value);
+    void onRegisterChanged(Longpath::IoBoardHl2::Register reg, quint8 value);
     void onStepAdvanced(int newStep);
     void onI2cQueueChanged();
     void onThrottledChanged(bool throttled);
@@ -273,4 +273,4 @@ private:
     static constexpr int kRegRowCount = 8;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

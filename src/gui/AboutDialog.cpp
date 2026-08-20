@@ -111,7 +111,7 @@ mw0lge@grange-lane.co.uk
 #include <QPushButton>
 #include <QListWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AboutDialog::AboutDialog(QWidget* parent)
     : QDialog(parent)
@@ -516,4 +516,4 @@ void AboutDialog::buildUI()
     mainLayout->addLayout(btnLayout);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -19,7 +19,7 @@
 #include <QVector>
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Relay position snapshot for a single (antenna, band) combination.
 struct TuneMemory {
@@ -69,4 +69,4 @@ private:
     QString slotKey(int antenna, Band band) const;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -66,7 +66,7 @@
 #include <QSlider>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 DiversityApplet::DiversityApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
@@ -168,4 +168,4 @@ void DiversityApplet::syncFromModel()
     // NYI — Phase 3F
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

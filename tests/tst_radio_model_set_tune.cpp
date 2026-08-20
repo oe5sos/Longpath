@@ -40,7 +40,7 @@
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── isLsbFamily reference copy (test seam) ───────────────────────────────────
 // G.4 fixup: isLsbFamily() is a file-scope static in RadioModel.cpp and cannot
@@ -74,7 +74,7 @@ public:
 
     // ── Pure-virtual overrides ────────────────────────────────────────────────
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

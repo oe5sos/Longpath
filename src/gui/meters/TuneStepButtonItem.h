@@ -56,7 +56,7 @@ mw0lge@grange-lane.co.uk
 
 #include "ButtonBoxItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Tuning step buttons: 1Hz, 10Hz, 100Hz, 1kHz, 10kHz, 100kHz, 1MHz.
 // Ported from Thetis clsTunestepButtons (MeterManager.cs:7999+).
@@ -82,4 +82,4 @@ private:
     static constexpr int kStepCount = 7;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

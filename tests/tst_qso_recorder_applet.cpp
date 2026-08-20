@@ -30,7 +30,7 @@
 #include "gui/applets/QsoRecorderApplet.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

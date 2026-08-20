@@ -28,7 +28,7 @@
 #include "models/TransmitModel.h"
 #include "core/HpsdrModel.h"
 
-using NereusSDR::HPSDRModel;
+using Longpath::HPSDRModel;
 
 class TestTransmitSetupPowerPageHl2 : public QObject {
     Q_OBJECT
@@ -62,8 +62,8 @@ void TestTransmitSetupPowerPageHl2::initTestCase()
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_exists()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     QGroupBox* g = page.findChild<QGroupBox*>(QStringLiteral("grpPATune"));
     QVERIFY(g != nullptr);
     QCOMPARE(g->title(), QStringLiteral("Tune"));
@@ -71,8 +71,8 @@ void TestTransmitSetupPowerPageHl2::tuneGroup_exists()
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_hasThreeRadios()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     QVERIFY(page.findChild<QRadioButton*>(QStringLiteral("radUseFixedDriveTune")));
     QVERIFY(page.findChild<QRadioButton*>(QStringLiteral("radUseDriveSliderTune")));
     QVERIFY(page.findChild<QRadioButton*>(QStringLiteral("radUseTuneSliderTune")));
@@ -80,15 +80,15 @@ void TestTransmitSetupPowerPageHl2::tuneGroup_hasThreeRadios()
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_hasMeterCombo()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     QVERIFY(page.findChild<QComboBox*>(QStringLiteral("comboTXTUNMeter")));
 }
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_fixedSpinbox_hl2()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     page.applyHpsdrModel(HPSDRModel::HERMESLITE);
     auto* sb = page.findChild<QDoubleSpinBox*>(QStringLiteral("udTXTunePower"));
     QVERIFY(sb != nullptr);
@@ -101,8 +101,8 @@ void TestTransmitSetupPowerPageHl2::tuneGroup_fixedSpinbox_hl2()
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_fixedSpinbox_anan100()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     page.applyHpsdrModel(HPSDRModel::ANAN100);
     auto* sb = page.findChild<QDoubleSpinBox*>(QStringLiteral("udTXTunePower"));
     QVERIFY(sb != nullptr);
@@ -115,19 +115,19 @@ void TestTransmitSetupPowerPageHl2::tuneGroup_fixedSpinbox_anan100()
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_radioToggle_persists()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     auto* radFixed = page.findChild<QRadioButton*>(QStringLiteral("radUseFixedDriveTune"));
     QVERIFY(radFixed != nullptr);
     radFixed->setChecked(true);
     QCOMPARE(rm.transmitModel().tuneDrivePowerSource(),
-             NereusSDR::DrivePowerSource::Fixed);
+             Longpath::DrivePowerSource::Fixed);
 }
 
 void TestTransmitSetupPowerPageHl2::tuneGroup_fixedSpinbox_disabledWhenNotFixed()
 {
-    NereusSDR::RadioModel rm;
-    NereusSDR::PowerPage page(&rm);
+    Longpath::RadioModel rm;
+    Longpath::PowerPage page(&rm);
     auto* radTune  = page.findChild<QRadioButton*>(QStringLiteral("radUseTuneSliderTune"));
     QVERIFY(radTune != nullptr);
     radTune->setChecked(true);
@@ -141,11 +141,11 @@ void TestTransmitSetupPowerPageHl2::tuneGroup_fixedSpinbox_disabledWhenNotFixed(
 // conversion: display == stored, watts).
 void TestTransmitSetupPowerPageHl2::fixedTunePowerSpinbox_initFromModel_anan100()
 {
-    NereusSDR::RadioModel rm;
+    Longpath::RadioModel rm;
     rm.transmitModel().setHpsdrModel(HPSDRModel::ANAN100);
     rm.transmitModel().setTunePower(42);
 
-    NereusSDR::PowerPage page(&rm);
+    Longpath::PowerPage page(&rm);
     page.applyHpsdrModel(HPSDRModel::ANAN100);
 
     auto* sb = page.findChild<QDoubleSpinBox*>(QStringLiteral("udTXTunePower"));
@@ -157,10 +157,10 @@ void TestTransmitSetupPowerPageHl2::fixedTunePowerSpinbox_initFromModel_anan100(
 // TransmitModel::setTunePower on a non-HL2 SKU (identity conversion).
 void TestTransmitSetupPowerPageHl2::fixedTunePowerSpinbox_writesToModel_anan100()
 {
-    NereusSDR::RadioModel rm;
+    Longpath::RadioModel rm;
     rm.transmitModel().setHpsdrModel(HPSDRModel::ANAN100);
 
-    NereusSDR::PowerPage page(&rm);
+    Longpath::PowerPage page(&rm);
     page.applyHpsdrModel(HPSDRModel::ANAN100);
 
     auto* sb = page.findChild<QDoubleSpinBox*>(QStringLiteral("udTXTunePower"));
@@ -175,10 +175,10 @@ void TestTransmitSetupPowerPageHl2::fixedTunePowerSpinbox_writesToModel_anan100(
 // formulae land bit-for-bit (mi0bot setup.cs:5307 + 9397 [v2.10.3.13-beta2]).
 void TestTransmitSetupPowerPageHl2::fixedTunePowerSpinbox_dBRoundTrip_hl2()
 {
-    NereusSDR::RadioModel rm;
+    Longpath::RadioModel rm;
     rm.transmitModel().setHpsdrModel(HPSDRModel::HERMESLITE);
 
-    NereusSDR::PowerPage page(&rm);
+    Longpath::PowerPage page(&rm);
     page.applyHpsdrModel(HPSDRModel::HERMESLITE);
 
     auto* sb = page.findChild<QDoubleSpinBox*>(QStringLiteral("udTXTunePower"));

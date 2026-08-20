@@ -92,7 +92,7 @@ class ParametricEqPaintTester;         // Batch 3 (this batch)
 class ParametricEqInteractionTester;   // Batch 4
 class ParametricEqJsonTester;          // Batch 5
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ParametricEqWidget : public QWidget {
     Q_OBJECT
@@ -490,4 +490,4 @@ private:
     bool             m_dragDirtySelectedIndex  = false;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -2,7 +2,7 @@
 #include "core/audio/PortAudioBus.h"
 #include <portaudio.h>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPortAudioBus : public QObject {
     Q_OBJECT

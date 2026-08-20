@@ -37,7 +37,7 @@
 #include <cstdint>
 #include <memory>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Helper: build a QByteArray of Int16 interleaved stereo samples.

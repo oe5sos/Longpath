@@ -71,7 +71,7 @@
 #include "ApolloController.h"
 #include "core/AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Source: setup.cs:15566-15590 + console.cs:19068-19105 [@501e3f5]
 // Upstream inline attribution preserved verbatim:
@@ -161,4 +161,4 @@ void ApolloController::save()
     s.setValue(QStringLiteral("%1/tunerEnabled").arg(base),  m_tunerEnabled  ? QStringLiteral("True") : QStringLiteral("False"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

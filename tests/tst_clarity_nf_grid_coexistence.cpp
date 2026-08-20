@@ -22,7 +22,7 @@
 #include "core/ClarityController.h"
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestClarityNFGridCoexistence : public QObject {
     Q_OBJECT

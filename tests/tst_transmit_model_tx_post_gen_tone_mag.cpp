@@ -20,7 +20,7 @@
 #include <QSignalSpy>
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTransmitModelTxPostGenToneMag : public QObject {
     Q_OBJECT

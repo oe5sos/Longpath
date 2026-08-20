@@ -22,7 +22,7 @@
 #include "core/BoardCapabilities.h"
 #include "gui/applets/RxApplet.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestUiCapabilityGating : public QObject {
     Q_OBJECT

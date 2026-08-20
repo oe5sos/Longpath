@@ -43,7 +43,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct RotorModel {
     int     hamlibId;
@@ -114,4 +114,4 @@ inline QVector<int> commonRotorBauds()
     return {1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -148,7 +148,7 @@ class QStackedWidget;
 class QToolButton;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class HPSDRModel : int;
 class BandwidthFilterPane;
@@ -209,11 +209,11 @@ public:
 public slots:
     // Phase 3P-I-a T16 — gate ANT buttons on caps.hasAlex + antenna count.
     // Hidden on HL2/Atlas and any board without an Alex front-end.
-    void setBoardCapabilities(const NereusSDR::BoardCapabilities& caps);
+    void setBoardCapabilities(const Longpath::BoardCapabilities& caps);
 
     // Per-SKU UI overlay for antenna popup (B3) — mirrors VfoWidget::setHpsdrSku.
     // Called by MainWindow on currentRadioChanged after setBoardCapabilities.
-    void setHpsdrSku(NereusSDR::HPSDRModel sku);
+    void setHpsdrSku(Longpath::HPSDRModel sku);
 
 #ifdef NEREUS_BUILD_TESTS
 public:
@@ -254,7 +254,7 @@ signals:
     // Der Schnellregler-Rechtsklick. MainWindow leitet ihn auf dieselbe
     // Setup-Seite wie bisher — die Signale heissen darum wie die der
     // Flagge, damit die Verdrahtung dort eine Zeile bleibt.
-    void openNrSetupRequested(NereusSDR::NrSlot slot);
+    void openNrSetupRequested(Longpath::NrSlot slot);
     void openNbSetupRequested();
 
 private:
@@ -268,7 +268,7 @@ private:
 
     // Phase 3P-F Task 4: read AlexController per-band assignments and push
     // them into SliceModel so the antenna buttons reflect the active band.
-    void populateAntennaButtons(NereusSDR::Band band);
+    void populateAntennaButtons(Longpath::Band band);
 
     static QString formatFilterWidth(int low, int high);
 
@@ -427,4 +427,4 @@ private:
     QCheckBox*   m_rx1PreampToggle{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

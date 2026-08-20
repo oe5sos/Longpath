@@ -24,7 +24,7 @@
 #include "AppSettings.h"
 #include "codec/AlexFilterMap.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -329,4 +329,4 @@ void SettingsHygiene::addAttClampIssue(const QString& mac,
     m_issues.append(issue);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

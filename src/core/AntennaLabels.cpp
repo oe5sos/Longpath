@@ -1,7 +1,7 @@
 #include "AntennaLabels.h"
 #include "BoardCapabilities.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 QStringList antennaLabels(const BoardCapabilities& caps)
 {
@@ -21,4 +21,4 @@ std::array<QString, 3> rxOnlyLabels(const SkuUiProfile& sku)
     return sku.rxOnlyLabels;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -49,7 +49,7 @@ class QStackedWidget;
 class QComboBox;
 class QEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FlatMapWidget;
 class GlobeWidget;
@@ -168,4 +168,4 @@ private:
     QVector<QWidget*> m_rangeControls;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

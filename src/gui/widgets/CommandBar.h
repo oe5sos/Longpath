@@ -65,7 +65,7 @@
 class QHBoxLayout;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 
@@ -159,4 +159,4 @@ private:
     QVector<QPair<QString, int>> m_allSteps;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

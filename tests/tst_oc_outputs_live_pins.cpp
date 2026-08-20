@@ -17,7 +17,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestOcOutputsLivePins : public QObject {
     Q_OBJECT

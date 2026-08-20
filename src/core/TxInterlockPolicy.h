@@ -28,7 +28,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TxInterlockPolicy : public QObject {
     Q_OBJECT
@@ -95,4 +95,4 @@ private:
     bool   m_prevAmpInOperate{false};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

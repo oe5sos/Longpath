@@ -52,7 +52,7 @@
 
 #include "AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Thetis Penny.cs:53-63 init: all pin actions default to MOX_TUNE_TWOTONE
 // From Thetis HPSDR/Penny.cs:59 [@501e3f5]
@@ -243,4 +243,4 @@ void OcMatrix::resetDefaults()
     emit changed();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

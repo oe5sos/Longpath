@@ -19,7 +19,7 @@
 
 namespace {
 
-constexpr int kMaxRows = NereusSDR::SpectrumWidget::kMaxWaterfallHistoryRows;
+constexpr int kMaxRows = Longpath::SpectrumWidget::kMaxWaterfallHistoryRows;
 constexpr qint64 k20MinMs = 20LL * 60 * 1000;
 
 // Mirrors SpectrumWidget::waterfallHistoryCapacityRows() — pure arithmetic.

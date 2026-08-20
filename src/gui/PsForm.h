@@ -82,7 +82,7 @@ class QSpinBox;
 class QTimer;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AmpViewWindow;
 class RadioModel;
@@ -286,4 +286,4 @@ private:
     AmpViewWindow* m_ampView{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

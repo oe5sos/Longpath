@@ -70,7 +70,7 @@
 
 #include "core/RadioStatus.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioStatus : public QObject {
     Q_OBJECT

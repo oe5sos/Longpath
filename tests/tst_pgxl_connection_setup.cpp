@@ -27,8 +27,8 @@ private slots:
 // readSetupSendsCommand: conn.readSetup() returns a positive seq and emits a
 // frame containing "setup read" via the testFrameWrittenForTesting seam.
 void PgxlConnectionSetupTest::readSetupSendsCommand() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     quint32 seq = conn.readSetup();
     QVERIFY(seq > 0);
     QCOMPARE(frameSpy.count(), 1);
@@ -40,8 +40,8 @@ void PgxlConnectionSetupTest::readSetupSendsCommand() {
 // "setup" and all supplied k=v pairs (order-independent).
 // Wire format: "setup nickname=ShackAmp fan=Quiet" per FlexRadio wiki spec.
 void PgxlConnectionSetupTest::writeSetupBuildsKvCommand() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     QMap<QString,QString> fields;
     fields.insert(QStringLiteral("nickname"), QStringLiteral("ShackAmp"));
     fields.insert(QStringLiteral("fan"),      QStringLiteral("Quiet"));
@@ -59,8 +59,8 @@ void PgxlConnectionSetupTest::writeSetupBuildsKvCommand() {
 // PgxlConnection emits statusUpdated (not a dedicated setupResponse) for all
 // kv bodies in R-frames -- confirmed by reading processLine() in PgxlConnection.cpp.
 void PgxlConnectionSetupTest::parsesSetupResponse() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy statusSpy(&conn, &NereusSDR::PgxlConnection::statusUpdated);
+    Longpath::PgxlConnection conn;
+    QSignalSpy statusSpy(&conn, &Longpath::PgxlConnection::statusUpdated);
 
     // Handshake required before R-frames are processed.
     conn.injectLineForTesting(QStringLiteral("V3.8.9"));
@@ -80,7 +80,7 @@ void PgxlConnectionSetupTest::parsesSetupResponse() {
 // seqIncrementsBetweenCalls: a second readSetup() returns a seq > the first.
 // Guards against accidental seq regression.
 void PgxlConnectionSetupTest::seqIncrementsBetweenCalls() {
-    NereusSDR::PgxlConnection conn;
+    Longpath::PgxlConnection conn;
     quint32 seq1 = conn.readSetup();
     quint32 seq2 = conn.readSetup();
     QVERIFY(seq2 > seq1);

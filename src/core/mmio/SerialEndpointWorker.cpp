@@ -65,7 +65,7 @@ mw0lge@grange-lane.co.uk
 #include <QString>
 #include <QVariant>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SerialEndpointWorker::SerialEndpointWorker(MmioEndpoint* endpoint, QObject* parent)
     : ITransportWorker(parent)
@@ -186,6 +186,6 @@ void SerialEndpointWorker::onErrorOccurred()
     setState(State::Error);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_SERIALPORT

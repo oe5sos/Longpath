@@ -28,7 +28,7 @@
 #include <QTimer>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Non-blocking bottom-right toast for antenna auto-switch with Undo
 /// button. 8s auto-dismiss. Designed to overlay MainWindow without
@@ -48,4 +48,4 @@ private:
     QTimer m_autoDismissTimer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -69,7 +69,7 @@ mw0lge@grange-lane.co.uk
 class QPushButton;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 
@@ -179,4 +179,4 @@ private:
     QLabel* m_correctionDb       = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

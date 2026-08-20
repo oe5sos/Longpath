@@ -69,7 +69,7 @@ class QLabel;
 class QPushButton;
 class QSpinBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MicProfileManager;
 class RadioModel;
@@ -206,4 +206,4 @@ private:
     UnsavedPromptHook     m_unsavedPromptHook;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

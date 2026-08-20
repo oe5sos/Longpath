@@ -24,7 +24,7 @@
 
 #include <thread>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 // Matches PerfMonitor::kRingSize.  Kept local because the constant is

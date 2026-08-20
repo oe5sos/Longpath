@@ -32,7 +32,7 @@
 #include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstFilterPresetStore : public QObject {
     Q_OBJECT

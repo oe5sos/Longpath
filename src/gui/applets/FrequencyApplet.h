@@ -25,7 +25,7 @@
 #include "gui/applets/AppletWidget.h"
 #include "gui/instruments/FrequencyInstrument.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 
@@ -50,4 +50,4 @@ private:
     QPointer<SliceModel> m_slice;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

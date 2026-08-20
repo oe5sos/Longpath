@@ -51,8 +51,8 @@ private slots:
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::defaults_areNoneClass()
 {
-    NereusSDR::CalibrationController ctrl;
-    QCOMPARE(ctrl.paCalProfile().boardClass, NereusSDR::PaCalBoardClass::None);
+    Longpath::CalibrationController ctrl;
+    QCOMPARE(ctrl.paCalProfile().boardClass, Longpath::PaCalBoardClass::None);
     // None-class watts is value-initialized to all zeros.
     for (float w : ctrl.paCalProfile().watts) {
         QCOMPARE(w, 0.0f);
@@ -65,16 +65,16 @@ void TstCalibrationControllerPaCal::defaults_areNoneClass()
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::setPaCalProfile_emitsBothSignals()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy profileSpy(&ctrl, &NereusSDR::CalibrationController::paCalProfileChanged);
-    QSignalSpy changedSpy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy profileSpy(&ctrl, &Longpath::CalibrationController::paCalProfileChanged);
+    QSignalSpy changedSpy(&ctrl, &Longpath::CalibrationController::changed);
 
-    const auto p = NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan100);
+    const auto p = Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan100);
     ctrl.setPaCalProfile(p);
 
     QCOMPARE(profileSpy.count(), 1);
     QCOMPARE(changedSpy.count(), 1);
-    QCOMPARE(ctrl.paCalProfile().boardClass, NereusSDR::PaCalBoardClass::Anan100);
+    QCOMPARE(ctrl.paCalProfile().boardClass, Longpath::PaCalBoardClass::Anan100);
     QCOMPARE(ctrl.paCalProfile().watts[10], 100.0f);
 }
 
@@ -85,12 +85,12 @@ void TstCalibrationControllerPaCal::setPaCalProfile_emitsBothSignals()
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::setPaCalProfile_idempotentNoSignals()
 {
-    NereusSDR::CalibrationController ctrl;
-    const auto p = NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan100);
+    Longpath::CalibrationController ctrl;
+    const auto p = Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan100);
     ctrl.setPaCalProfile(p);  // first install — fires signals
 
-    QSignalSpy profileSpy(&ctrl, &NereusSDR::CalibrationController::paCalProfileChanged);
-    QSignalSpy changedSpy(&ctrl, &NereusSDR::CalibrationController::changed);
+    QSignalSpy profileSpy(&ctrl, &Longpath::CalibrationController::paCalProfileChanged);
+    QSignalSpy changedSpy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setPaCalProfile(p);  // same value — must not fire
     QCOMPARE(profileSpy.count(), 0);
     QCOMPARE(changedSpy.count(), 0);
@@ -102,12 +102,12 @@ void TstCalibrationControllerPaCal::setPaCalProfile_idempotentNoSignals()
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::setPaCalPoint_emitsBothSignals()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
     ctrl.setPaCalProfile(
-        NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan10));
+        Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan10));
 
-    QSignalSpy pointSpy(&ctrl, &NereusSDR::CalibrationController::paCalPointChanged);
-    QSignalSpy changedSpy(&ctrl, &NereusSDR::CalibrationController::changed);
+    QSignalSpy pointSpy(&ctrl, &Longpath::CalibrationController::paCalPointChanged);
+    QSignalSpy changedSpy(&ctrl, &Longpath::CalibrationController::changed);
 
     ctrl.setPaCalPoint(5, 4.7f);
 
@@ -127,12 +127,12 @@ void TstCalibrationControllerPaCal::setPaCalPoint_emitsBothSignals()
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::setPaCalPoint_idxZero_isNoOp()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
     ctrl.setPaCalProfile(
-        NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan10));
+        Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan10));
 
-    QSignalSpy pointSpy(&ctrl, &NereusSDR::CalibrationController::paCalPointChanged);
-    QSignalSpy changedSpy(&ctrl, &NereusSDR::CalibrationController::changed);
+    QSignalSpy pointSpy(&ctrl, &Longpath::CalibrationController::paCalPointChanged);
+    QSignalSpy changedSpy(&ctrl, &Longpath::CalibrationController::changed);
 
     ctrl.setPaCalPoint(0, 99.0f);
 
@@ -147,13 +147,13 @@ void TstCalibrationControllerPaCal::setPaCalPoint_idxZero_isNoOp()
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::setPaCalPoint_outOfRange_isNoOp()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
     ctrl.setPaCalProfile(
-        NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan10));
+        Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan10));
     const auto before = ctrl.paCalProfile().watts;
 
-    QSignalSpy pointSpy(&ctrl, &NereusSDR::CalibrationController::paCalPointChanged);
-    QSignalSpy changedSpy(&ctrl, &NereusSDR::CalibrationController::changed);
+    QSignalSpy pointSpy(&ctrl, &Longpath::CalibrationController::paCalPointChanged);
+    QSignalSpy changedSpy(&ctrl, &Longpath::CalibrationController::changed);
 
     ctrl.setPaCalPoint(-1, 1.0f);
     ctrl.setPaCalPoint(11, 1.0f);
@@ -172,8 +172,8 @@ void TstCalibrationControllerPaCal::setPaCalPoint_outOfRange_isNoOp()
 // ---------------------------------------------------------------------------
 void TstCalibrationControllerPaCal::calibratedFwdPowerWatts_forwardsToInterpolate()
 {
-    NereusSDR::CalibrationController ctrl;
-    auto p = NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan100);
+    Longpath::CalibrationController ctrl;
+    auto p = Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan100);
     // Skew the table: at raw=15W report calibrated 25W (between 10W and 30W cal points).
     p.watts[1] = 5.0f;
     p.watts[2] = 25.0f;
@@ -197,9 +197,9 @@ void TstCalibrationControllerPaCal::persistence_roundTrip()
     const QString testMac = QStringLiteral("AA:BB:CC:DD:EE:01");
 
     {
-        NereusSDR::CalibrationController ctrl;
+        Longpath::CalibrationController ctrl;
         ctrl.setMacAddress(testMac);
-        auto p = NereusSDR::PaCalProfile::defaults(NereusSDR::PaCalBoardClass::Anan100);
+        auto p = Longpath::PaCalProfile::defaults(Longpath::PaCalBoardClass::Anan100);
         ctrl.setPaCalProfile(p);
         ctrl.setPaCalPoint(1, 9.5f);
         ctrl.setPaCalPoint(5, 47.5f);
@@ -208,12 +208,12 @@ void TstCalibrationControllerPaCal::persistence_roundTrip()
     }
 
     {
-        NereusSDR::CalibrationController ctrl;
+        Longpath::CalibrationController ctrl;
         ctrl.setMacAddress(testMac);
         ctrl.load();
 
         const auto p = ctrl.paCalProfile();
-        QCOMPARE(p.boardClass, NereusSDR::PaCalBoardClass::Anan100);
+        QCOMPARE(p.boardClass, Longpath::PaCalBoardClass::Anan100);
         QCOMPARE(p.watts[0], 0.0f);
         QCOMPARE(p.watts[1], 9.5f);
         QCOMPARE(p.watts[2], 20.0f);  // unchanged factory default

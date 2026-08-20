@@ -30,7 +30,7 @@
 #include "gui/setup/PaSetupPages.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPaSetupPerSkuVisibility : public QObject {
     Q_OBJECT

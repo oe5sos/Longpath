@@ -15,7 +15,7 @@
 
 #include <QStringList>
 
-namespace NereusSDR::QsoConfirmation {
+namespace Longpath::QsoConfirmation {
 
 State parse(const QString& adifValue)
 {
@@ -94,4 +94,4 @@ QString describe(const LogEntry& e)
     return parts.join(QStringLiteral(" · "));
 }
 
-} // namespace NereusSDR::QsoConfirmation
+} // namespace Longpath::QsoConfirmation

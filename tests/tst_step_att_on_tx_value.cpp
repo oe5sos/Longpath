@@ -77,7 +77,7 @@
 #include "core/StepAttenuatorController.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestStepAttOnTxValue : public QObject {
     Q_OBJECT

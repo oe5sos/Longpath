@@ -32,7 +32,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // PAPR-reduction phase rotator — TX DSP chain stage (#2887).
 //
@@ -144,4 +144,4 @@ private:
     std::array<AllPass, kMaxStages> m_sections;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

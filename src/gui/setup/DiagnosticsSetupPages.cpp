@@ -8,7 +8,7 @@
 #include <QGroupBox>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // DiagSignalGeneratorPage
@@ -312,4 +312,4 @@ void DiagLoggingPage::buildUI()
     contentLayout()->addStretch();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

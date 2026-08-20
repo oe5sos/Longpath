@@ -65,7 +65,7 @@ mw0lge@grange-lane.co.uk
 
 Q_LOGGING_CATEGORY(lcWebImageItem, "nereus.gui.meters.webimageitem")
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Local serialization helpers (mirror pattern from SpacerItem.cpp)
@@ -244,4 +244,4 @@ bool WebImageItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

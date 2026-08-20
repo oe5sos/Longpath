@@ -78,7 +78,7 @@ mw0lge@grange-lane.co.uk
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // setBackgroundImagePath()
@@ -747,4 +747,4 @@ bool RotatorItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

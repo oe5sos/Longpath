@@ -36,7 +36,7 @@
 class QLabel;
 class QLineEdit;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ScrollableLabel — editable numeric display for RIT/XIT/DIG-offset/FM-offset.
 // Slot 0: QLabel showing formatted value. Slot 1: QLineEdit for inline edit.
@@ -99,4 +99,4 @@ private:
     static constexpr int kEditPage  = 1;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

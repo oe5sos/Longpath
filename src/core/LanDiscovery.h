@@ -21,7 +21,7 @@
 #include <QSet>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class LanDiscovery : public QObject {
     Q_OBJECT
@@ -57,4 +57,4 @@ private:
     QSet<QString> m_seenSerials;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

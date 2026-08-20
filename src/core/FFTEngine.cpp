@@ -68,7 +68,7 @@
 #include <cmath>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FFTEngine::FFTEngine(int receiverId, QObject* parent)
     : QObject(parent)
@@ -636,9 +636,9 @@ void FFTEngine::processFrame()
     // post-processing (detector / avenger / overlap-shift).  ns to ms
     // via nsecsElapsed() for sub-millisecond precision; the perf
     // overlay rounds for display.
-    NereusSDR::PerfMonitor::instance().recordFftCompute(
+    Longpath::PerfMonitor::instance().recordFftCompute(
         static_cast<double>(perfTimer.nsecsElapsed()) / 1e6);
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -79,7 +79,7 @@
 #include <QSlider>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 
@@ -268,4 +268,4 @@ public:
     static const QVector<int> kBufferSizes;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

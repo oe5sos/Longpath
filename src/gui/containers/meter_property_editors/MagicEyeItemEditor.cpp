@@ -9,7 +9,7 @@
 #include <QColorDialog>
 #include <QFileDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 MagicEyeItemEditor::MagicEyeItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -91,4 +91,4 @@ void MagicEyeItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -195,7 +195,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TxApplet::TxApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
@@ -912,7 +912,7 @@ void TxApplet::wireControls()
     // (HL2 → 0..90/6 and 0..99/3 with -X.X dB labels via mi0bot formulae;
     //  every other SKU → canonical 0..100/1 with bare integer labels).
     connect(m_model, &RadioModel::currentRadioChanged, this,
-            [this](const NereusSDR::RadioInfo&) {
+            [this](const Longpath::RadioInfo&) {
         const auto model = m_model->hardwareProfile().model;
         rescaleFwdGaugeForModel(model);
         rescalePowerSlidersForModel(model);
@@ -2067,7 +2067,7 @@ void TxApplet::requestOpenCfcDialog()
 // Mirrors the RxApplet::setBoardCapabilities pattern.  No-op when m_psaBtn
 // is null (e.g. during early construction or after teardown).
 // ---------------------------------------------------------------------------
-void TxApplet::setBoardCapabilities(const NereusSDR::BoardCapabilities& caps)
+void TxApplet::setBoardCapabilities(const Longpath::BoardCapabilities& caps)
 {
     if (!m_psaBtn) { return; }
     m_psaBtn->setVisible(caps.hasPureSignal);
@@ -2085,7 +2085,7 @@ void TxApplet::setBoardCapabilities(const NereusSDR::BoardCapabilities& caps)
 // Pass nullptr to clear bindings on teardown (RadioModel emits this at
 // disconnect via pureSignalCoordinatorReady(nullptr)).
 // ---------------------------------------------------------------------------
-void TxApplet::setPureSignal(NereusSDR::PureSignal* coordinator)
+void TxApplet::setPureSignal(Longpath::PureSignal* coordinator)
 {
     if (m_ps == coordinator) { return; }
 
@@ -2098,7 +2098,7 @@ void TxApplet::setPureSignal(NereusSDR::PureSignal* coordinator)
     if (!m_psaBtn) { return; }
 
     if (m_ps) {
-        connect(m_ps, &NereusSDR::PureSignal::autoCalEnabledChanged, this,
+        connect(m_ps, &Longpath::PureSignal::autoCalEnabledChanged, this,
                 [this](bool on) {
             if (!m_psaBtn) { return; }
             QSignalBlocker blk(m_psaBtn);
@@ -2152,4 +2152,4 @@ void TxApplet::rebuildProfileCombo()
     m_updatingFromModel = false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

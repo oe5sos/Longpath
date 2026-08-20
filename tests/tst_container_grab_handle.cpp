@@ -37,7 +37,7 @@
 
 #include "gui/containers/ContainerWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

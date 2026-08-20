@@ -22,7 +22,7 @@
 #include <cmath>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -433,4 +433,4 @@ void SwrChartWidget::leaveEvent(QEvent* /*ev*/)
     update();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

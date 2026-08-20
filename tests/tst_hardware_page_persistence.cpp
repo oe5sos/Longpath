@@ -7,7 +7,7 @@
 #include <QTemporaryDir>
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestHardwarePagePersistence : public QObject {
     Q_OBJECT

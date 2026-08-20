@@ -12,8 +12,8 @@
 #include "models/SliceModel.h"
 #include "fakes/P1FakeRadio.h"
 
-using namespace NereusSDR;
-using NereusSDR::Test::P1FakeRadio;
+using namespace Longpath;
+using Longpath::Test::P1FakeRadio;
 
 namespace {
 // ReceiverManager has no getter for the config it last computed, so read it

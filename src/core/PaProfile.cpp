@@ -76,7 +76,7 @@
 #include <QLatin1Char>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -489,4 +489,4 @@ bool PaProfile::dataFromString(const QString& data) {
     return true;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

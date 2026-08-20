@@ -17,7 +17,7 @@
 #include <QWebSocket>
 #include "core/TciServer.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciServerPing : public QObject {
     Q_OBJECT

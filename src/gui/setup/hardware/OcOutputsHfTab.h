@@ -101,7 +101,7 @@ class QPushButton;
 class QScrollArea;
 class QSpinBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class OcMatrix;
@@ -198,4 +198,4 @@ private:
     quint8 m_currentOcByte{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

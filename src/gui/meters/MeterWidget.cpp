@@ -95,7 +95,7 @@ mw0lge@grange-lane.co.uk
 #include <rhi/qshader.h>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ============================================================================
 // Constructor / Destructor
@@ -1015,4 +1015,4 @@ void MeterWidget::releaseResources()
 
 #endif // NEREUS_GPU_SPECTRUM
 
-} // namespace NereusSDR
+} // namespace Longpath

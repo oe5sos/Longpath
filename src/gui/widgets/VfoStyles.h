@@ -26,7 +26,7 @@
 #include <QColor>
 #include <QStringView>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── VFO Flag Style Strings ─────────────────────────────────────────────────
 // Ported verbatim from AetherSDR src/gui/VfoWidget.cpp:134-177.
@@ -127,4 +127,4 @@ inline const QColor kLabelMuted   { 0x8e, 0x8e, 0x93 }; // kTextSecondary
 inline const QColor kBodyText     { 0xc4, 0xc4, 0xc9 }; // kTextPrimary
 inline const QColor kBgDark       { 0x08, 0x08, 0x0a }; // kInsetBg -- versenkt
 
-} // namespace NereusSDR
+} // namespace Longpath

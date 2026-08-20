@@ -248,7 +248,7 @@
 #include <atomic>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PaProfile;
 class PureSignal;
@@ -2472,4 +2472,4 @@ private:
     bool m_cessbOn = false;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

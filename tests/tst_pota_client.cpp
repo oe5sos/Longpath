@@ -11,7 +11,7 @@
 #include "core/PotaClient.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPotaClient : public QObject {
     Q_OBJECT

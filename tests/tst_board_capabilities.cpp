@@ -3,7 +3,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Phase A1 — pin G2E enum values per Thetis network.h [v2.10.3.15] //N1GP G2E added
 static_assert(static_cast<int>(HPSDRHW::HermesC10) == 20,

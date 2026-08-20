@@ -73,7 +73,7 @@
 #include "codec/CodecContext.h"   // PsDdcConfig + Q_DECLARE_METATYPE
 #include "HpsdrModel.h"           // HPSDRModel
 
-namespace NereusSDR {
+namespace Longpath {
 
 class IP1Codec;
 class IP2Codec;
@@ -280,7 +280,7 @@ signals:
     // wire-byte map; the consumer (RadioConnection follow-up) writes it
     // to the radio via NetworkIO.EnableRxs / SetDDCRate / SetADC_cntrl*
     // (per Thetis console.cs:8527-8534 [v2.10.3.13]).
-    void ddcConfigChanged(const NereusSDR::PsDdcConfig& config);
+    void ddcConfigChanged(const Longpath::PsDdcConfig& config);
 
     // A per-board codec was installed or replaced. Distinct from
     // ddcConfigChanged, which carries the PureSignal wire-byte map and is not
@@ -362,4 +362,4 @@ private:
     static const ReceiverConfig kInvalidConfig;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

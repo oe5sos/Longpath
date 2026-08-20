@@ -48,7 +48,7 @@
 #include <QPushButton>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 
@@ -142,12 +142,12 @@ public:
     void setBusOpen(bool open);
 
 signals:
-    void configChanged(int channel, NereusSDR::AudioDeviceConfig cfg);
+    void configChanged(int channel, Longpath::AudioDeviceConfig cfg);
     void enabledChanged(int channel, bool on);
 
 private slots:
     void onAutoDetectClicked();
-    void onInnerConfigChanged(NereusSDR::AudioDeviceConfig cfg);
+    void onInnerConfigChanged(Longpath::AudioDeviceConfig cfg);
     void onInnerEnabledChanged(bool on);
     void updateBadge();
     void onRenameClicked();
@@ -219,4 +219,4 @@ private:
     QVector<VaxChannelCard*>    m_channelCards;  // index 0 = channel 1
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

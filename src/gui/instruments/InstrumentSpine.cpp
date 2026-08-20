@@ -15,7 +15,7 @@
 #include <QRadialGradient>
 #include <QtMath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // QPainterPath::arcTo rechnet in ganzen Grad, 0° auf drei Uhr, positive
 // Winkel gegen den Uhrzeigersinn — dieselbe Zählung wie die Entwürfe.
@@ -246,4 +246,4 @@ QLineF LinearSpine::crossAt(qreal f, qreal outward, qreal inward) const
                   QPointF(x, m_r.bottom() + inward));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

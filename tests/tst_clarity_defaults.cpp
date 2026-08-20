@@ -14,7 +14,7 @@
 
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestClarityDefaults : public QObject {
     Q_OBJECT

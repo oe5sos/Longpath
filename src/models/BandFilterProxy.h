@@ -57,7 +57,7 @@
 #include <QString>
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/gui/DxClusterDialog.h:62-75 [@0cd4559]
 class BandFilterProxy : public QSortFilterProxyModel {
@@ -96,4 +96,4 @@ private:
     QSet<QString> m_hiddenSources;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

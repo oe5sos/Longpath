@@ -44,7 +44,7 @@
 #include <QDateTime>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // Issue #263: 30 s sweeper cadence.  Cheap (the spot map is bounded at a
@@ -244,4 +244,4 @@ void SpotModel::expireOlderThan(qint64 nowMs)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

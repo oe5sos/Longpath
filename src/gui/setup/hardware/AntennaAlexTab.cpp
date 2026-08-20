@@ -74,7 +74,7 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
@@ -183,4 +183,4 @@ void AntennaAlexTab::restoreSettings(const QMap<QString, QVariant>& /*settings*/
     // No additional action needed here for the filtered map variant.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -82,7 +82,7 @@
 #include <QTimer>
 #include <QUdpSocket>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -608,4 +608,4 @@ void PskReporterClient::onAutoSendTick() {
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

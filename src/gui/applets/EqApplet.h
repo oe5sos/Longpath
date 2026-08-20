@@ -29,7 +29,7 @@ class QSlider;
 class QComboBox;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // EqApplet — 10-band graphic equalizer panel (NYI until Phase 3I-3).
 //
@@ -69,4 +69,4 @@ private:
     QComboBox* m_presetCombo = nullptr;  // Flat/Voice/Music/Custom
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

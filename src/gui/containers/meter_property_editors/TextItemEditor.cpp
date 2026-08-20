@@ -9,7 +9,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TextItemEditor::TextItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -133,4 +133,4 @@ void TextItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

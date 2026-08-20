@@ -39,7 +39,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RfKitPage::RfKitPage(RadioModel* model, QWidget* parent)
     : QWidget(parent)
@@ -416,4 +416,4 @@ bool RfKitPage::detailTabIsEnabledForTesting() const
     return m_tabs->isTabEnabled(m_tabs->indexOf(m_rf2ksTab));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

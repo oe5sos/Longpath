@@ -15,7 +15,7 @@
 
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceModelSnr : public QObject {
     Q_OBJECT

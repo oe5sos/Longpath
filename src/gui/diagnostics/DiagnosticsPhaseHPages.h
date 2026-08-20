@@ -30,7 +30,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -111,4 +111,4 @@ private:
     void buildUI();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

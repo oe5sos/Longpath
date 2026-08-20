@@ -22,7 +22,7 @@
 #include <cstring>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Single-threaded test fake — not safe for concurrent push from multiple threads.
 class FakeAudioBus : public IAudioBus {
@@ -129,4 +129,4 @@ private:
     int         m_pulls{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

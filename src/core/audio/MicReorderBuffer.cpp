@@ -14,7 +14,7 @@
 
 #include "MicReorderBuffer.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void MicReorderBuffer::push(quint32 seq, const Block& samples,
                             const EmitFn& emitFn)
@@ -174,4 +174,4 @@ void MicReorderBuffer::drainPending(const EmitFn& emitFn)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

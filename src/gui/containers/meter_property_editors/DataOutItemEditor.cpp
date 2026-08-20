@@ -4,7 +4,7 @@
 #include <QComboBox>
 #include <QLineEdit>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 constexpr const char* kComboStyle =
@@ -118,4 +118,4 @@ void DataOutItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -1,7 +1,7 @@
 #include "OtherButtonItemEditor.h"
 #include "../../meters/OtherButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 OtherButtonItemEditor::OtherButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -26,4 +26,4 @@ void OtherButtonItemEditor::buildOtherSpecific()
     // the visual property editor.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -37,7 +37,7 @@
 #include "core/AppSettings.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSlicePersistencePerBand : public QObject {
     Q_OBJECT

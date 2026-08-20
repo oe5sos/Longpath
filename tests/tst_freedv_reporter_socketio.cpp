@@ -36,7 +36,7 @@
 #include "core/FreeDVStation.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Wrap a Socket.IO Event in the on-the-wire form: Engine.IO type '4'
 // (Message) + Socket.IO type '2' (Event) + JSON array
@@ -66,8 +66,8 @@ void TestFreeDVReporterSocketIo::initTestCase() {
     // qRegisterMetaType() is normally needed for QSignalSpy. Q_DECLARE_
     // METATYPE on DxSpot + FreeDVStation makes this automatic at first
     // use, but the explicit call documents the dependency.
-    qRegisterMetaType<NereusSDR::DxSpot>("NereusSDR::DxSpot");
-    qRegisterMetaType<NereusSDR::FreeDVStation>("NereusSDR::FreeDVStation");
+    qRegisterMetaType<Longpath::DxSpot>("Longpath::DxSpot");
+    qRegisterMetaType<Longpath::FreeDVStation>("Longpath::FreeDVStation");
 }
 
 void TestFreeDVReporterSocketIo::engineIOOpenParsesPingIntervalAndSendsAuth() {

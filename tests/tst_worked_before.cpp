@@ -14,7 +14,7 @@
 
 #include "core/WorkedBefore.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

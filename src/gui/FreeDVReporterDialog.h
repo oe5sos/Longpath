@@ -191,7 +191,7 @@ class QTableView;
 class QTimer;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FreeDVReporterClient;
 class FreeDVReporterTableModel;
@@ -309,8 +309,8 @@ private slots:
     // FreeDVStationModel signal handlers. Each forwards into the
     // private QAbstractTableModel adapter and into applyHighlightFor
     // Station so the per-row TX-red / RX-green tint tracks the model.
-    void onStationAdded(const QString& sid, const NereusSDR::FreeDVStation& info);
-    void onStationUpdated(const QString& sid, const NereusSDR::FreeDVStation& info);
+    void onStationAdded(const QString& sid, const Longpath::FreeDVStation& info);
+    void onStationUpdated(const QString& sid, const Longpath::FreeDVStation& info);
     void onStationRemoved(const QString& sid);
     void onCleared();
 
@@ -346,7 +346,7 @@ private:
     void persistColumnFilters();
     void loadColumnFiltersFromSettings();
     void applyHighlightForStation(const QString& sid,
-                                  const NereusSDR::FreeDVStation& info);
+                                  const Longpath::FreeDVStation& info);
     void setHighlight(const QString& sid, const QColor& bg);
     void refreshDelegateSidOrder();
 
@@ -427,4 +427,4 @@ private:
     QTimer*                           m_coloringTimer{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

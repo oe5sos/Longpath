@@ -38,7 +38,7 @@
 #include "core/audio/VirtualCableDetector.h"
 #include "gui/setup/AudioVaxPage.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioVaxPageAutoDetect : public QObject {
     Q_OBJECT

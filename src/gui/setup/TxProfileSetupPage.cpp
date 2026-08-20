@@ -32,7 +32,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -474,4 +474,4 @@ void TxProfileSetupPage::setUnsavedPromptHook(UnsavedPromptHook hook)
     m_unsavedPromptHook = std::move(hook);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

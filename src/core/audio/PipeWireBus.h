@@ -27,7 +27,7 @@
 #include "core/IAudioBus.h"
 #include "core/audio/PipeWireStream.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PipeWireThreadLoop;
 
@@ -125,6 +125,6 @@ private:
     AudioFormat m_negotiatedFormat;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 #endif  // NEREUS_HAVE_PIPEWIRE

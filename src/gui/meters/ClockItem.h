@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QColor>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 // Dual UTC/Local time display. From Thetis clsClock (MeterManager.cs:14075+).
 class ClockItem : public MeterItem {
     Q_OBJECT
@@ -90,4 +90,4 @@ private:
     QColor m_typeTitleColour{0x70, 0x80, 0x90};
     QTimer m_updateTimer;
 };
-} // namespace NereusSDR
+} // namespace Longpath

@@ -41,7 +41,7 @@
 #include "core/RadioConnection.h"
 #include "core/StepAttenuatorController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockConnection ─────────────────────────────────────────────────────────
 // Records QThread::currentThread() at the moment each setter slot fires.
@@ -61,7 +61,7 @@ public:
     }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

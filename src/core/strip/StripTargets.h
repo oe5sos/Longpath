@@ -33,7 +33,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR::StripTargets {
+namespace Longpath::StripTargets {
 
 struct Profile {
     QString name;
@@ -99,4 +99,4 @@ inline constexpr char kUserProfileName[] = "Mine";
 // missing profile should not produce a flat line that looks deliberate.
 double targetDb(const QString& profile, double hz);
 
-} // namespace NereusSDR::StripTargets
+} // namespace Longpath::StripTargets

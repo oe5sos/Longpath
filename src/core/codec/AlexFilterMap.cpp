@@ -72,7 +72,7 @@
 
 #include "AlexFilterMap.h"
 
-namespace NereusSDR::codec::alex {
+namespace Longpath::codec::alex {
 
 // From Thetis console.cs:6830-6942 [@501e3f5]
 // Upstream tags preserved: //N1GP (from cited console.cs:6830) [v2.10.3.15]
@@ -167,13 +167,13 @@ quint8 computeBpf1(double freqMhz)
 //   defect this function exists to fix.  SettingsHygiene.cpp already
 //   classified SaturnMKII as a BPF1 board before this function existed, so
 //   this also keeps one answer to the question in the codebase.
-bool usesBpf1Preselector(NereusSDR::HPSDRHW board) noexcept
+bool usesBpf1Preselector(Longpath::HPSDRHW board) noexcept
 {
     switch (board) {
-        case NereusSDR::HPSDRHW::OrionMKII:   // ANAN-7000DLE / 8000DLE / AnvelinaPro3 / RedPitaya
-        case NereusSDR::HPSDRHW::Saturn:      // ANAN-G2 / ANAN-G2-1K
-        case NereusSDR::HPSDRHW::SaturnMKII:  // ANAN-G2 MkII board revision (see note above)
-        case NereusSDR::HPSDRHW::HermesC10:   // ANAN-G2E  //N1GP G2E added (HermesC10) //DK1HLM
+        case Longpath::HPSDRHW::OrionMKII:   // ANAN-7000DLE / 8000DLE / AnvelinaPro3 / RedPitaya
+        case Longpath::HPSDRHW::Saturn:      // ANAN-G2 / ANAN-G2-1K
+        case Longpath::HPSDRHW::SaturnMKII:  // ANAN-G2 MkII board revision (see note above)
+        case Longpath::HPSDRHW::HermesC10:   // ANAN-G2E  //N1GP G2E added (HermesC10) //DK1HLM
             return true;
         default:
             return false;
@@ -181,7 +181,7 @@ bool usesBpf1Preselector(NereusSDR::HPSDRHW board) noexcept
 }
 
 // From Thetis console.cs:6827-6837 setAlex1HPF [v2.10.3.15]
-quint8 computeRxPreselector(double freqMhz, NereusSDR::HPSDRHW board)
+quint8 computeRxPreselector(double freqMhz, Longpath::HPSDRHW board)
 {
     return usesBpf1Preselector(board) ? computeBpf1(freqMhz)
                                       : computeHpf(freqMhz);
@@ -230,4 +230,4 @@ double receiveLpfFrequencyMhz(double rx1Mhz, double rx2Mhz,
     return rx1Mhz;
 }
 
-} // namespace NereusSDR::codec::alex
+} // namespace Longpath::codec::alex

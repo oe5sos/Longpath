@@ -51,7 +51,7 @@
 #include <QStringList>
 #include <QVariantMap>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct GridCell {
     /// Stabile Kennung des FELDES. Bleibt, wenn der Inhalt wechselt.
@@ -89,4 +89,4 @@ struct GridCell {
     static GridCell fromVariant(const QString& id, const QVariantMap& m);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

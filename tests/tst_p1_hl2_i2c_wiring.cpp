@@ -10,7 +10,7 @@
 #include "core/IoBoardHl2.h"
 #include "core/codec/P1CodecHl2.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1Hl2I2cWiring : public QObject {
     Q_OBJECT

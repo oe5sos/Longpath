@@ -137,7 +137,7 @@ class QDoubleSpinBox;
 class QGroupBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class CalibrationController;
@@ -240,4 +240,4 @@ private:
     bool m_updatingFromModel{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

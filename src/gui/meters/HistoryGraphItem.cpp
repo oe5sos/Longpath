@@ -61,7 +61,7 @@ mw0lge@grange-lane.co.uk
 #include <cmath>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Constructor
@@ -402,4 +402,4 @@ bool HistoryGraphItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

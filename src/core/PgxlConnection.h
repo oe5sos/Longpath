@@ -23,7 +23,7 @@
 #include <QMap>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PgxlConnection : public QObject {
     Q_OBJECT
@@ -168,4 +168,4 @@ private:
     quint16 m_lastPort{9008};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -37,7 +37,7 @@
 
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSpectrumPipelineModes : public QObject
 {

@@ -26,7 +26,7 @@
 #include <QHash>
 #include <QSet>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/CtyDatParser.h:9-15 [@0cd4559]
 struct DxccEntity {
@@ -88,4 +88,4 @@ private:
     int m_maxPrefixLen{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

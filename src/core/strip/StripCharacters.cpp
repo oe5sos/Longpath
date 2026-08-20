@@ -14,7 +14,7 @@
 
 #include "core/strip/StripCharacters.h"
 
-namespace NereusSDR::StripCharacters {
+namespace Longpath::StripCharacters {
 
 namespace {
 
@@ -597,4 +597,4 @@ QString inEffect(const StripChain& chain, StripChain::Stage stage)
     return {};
 }
 
-} // namespace NereusSDR::StripCharacters
+} // namespace Longpath::StripCharacters

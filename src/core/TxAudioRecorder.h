@@ -37,7 +37,7 @@
 #include <atomic>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TxAudioRecorder : public QObject {
     Q_OBJECT
@@ -104,4 +104,4 @@ private:
     std::atomic<bool>     m_announcedFull{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

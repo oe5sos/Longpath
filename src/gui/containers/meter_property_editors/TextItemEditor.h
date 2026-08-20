@@ -7,7 +7,7 @@ class QDoubleSpinBox;
 class QCheckBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TextItem;
 
@@ -30,4 +30,4 @@ private:
     QDoubleSpinBox* m_spinMinValid{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -35,7 +35,7 @@
 #include <QPainter>
 #include <QPainterPath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // A small custom-painted button drawing one filter's curve shape. The
 // shape is derived from the filter type; colour comes from the band's
@@ -249,4 +249,4 @@ void ClientEqIconRow::rebuild()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

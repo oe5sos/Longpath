@@ -6,7 +6,7 @@ class QPushButton;
 class QSpinBox;
 class QComboBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HistoryGraphItem;
 
@@ -30,4 +30,4 @@ private:
     QComboBox*   m_comboBinding1{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

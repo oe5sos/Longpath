@@ -47,7 +47,7 @@
 #include "core/TxChannel.h"
 #include "core/RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockConnection ──────────────────────────────────────────────────────────
 // Records sendTxIq() calls so tests can assert exactly how many times the
@@ -61,7 +61,7 @@ public:
     }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

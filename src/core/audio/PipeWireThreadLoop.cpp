@@ -11,7 +11,7 @@
 
 Q_LOGGING_CATEGORY(lcPw, "nereussdr.pipewire")
 
-namespace NereusSDR {
+namespace Longpath {
 
 PipeWireThreadLoop::PipeWireThreadLoop()
 {
@@ -77,6 +77,6 @@ bool PipeWireThreadLoop::connect()
     return true;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 #endif  // NEREUS_HAVE_PIPEWIRE

@@ -38,7 +38,7 @@ class QPushButton;
 class QFrame;
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -77,4 +77,4 @@ protected:
     bool m_updatingFromModel = false;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

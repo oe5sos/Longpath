@@ -7,7 +7,7 @@
 #include <QPushButton>
 #include <QMap>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -53,4 +53,4 @@ private:
     static constexpr int kMaxLogViewLines = 2000;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

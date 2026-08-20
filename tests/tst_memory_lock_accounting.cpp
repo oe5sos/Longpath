@@ -25,7 +25,7 @@
 
 #include <vector>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstMemoryLockAccounting : public QObject {
     Q_OBJECT

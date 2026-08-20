@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -53,4 +53,4 @@ private:
     static QString sanitizeLine(const QString& line);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

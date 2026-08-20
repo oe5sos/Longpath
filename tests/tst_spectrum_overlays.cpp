@@ -70,7 +70,7 @@
 #include "gui/SpectrumWidget.h"
 #include "core/FFTEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // TestSpectrumOverlays

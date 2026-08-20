@@ -82,7 +82,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Band table helpers ────────────────────────────────────────────────────────
 
@@ -718,4 +718,4 @@ void AntennaAlexAlex2Tab::updateActiveLeds()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

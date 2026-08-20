@@ -15,7 +15,7 @@
 
 #include <cmath>
 
-namespace NereusSDR::AntennaTrim {
+namespace Longpath::AntennaTrim {
 namespace {
 
 // Beyond this the linear scaling is a direction rather than a figure.
@@ -163,4 +163,4 @@ QString instruction(const Trim& t, Kind kind)
     return s;
 }
 
-} // namespace NereusSDR::AntennaTrim
+} // namespace Longpath::AntennaTrim

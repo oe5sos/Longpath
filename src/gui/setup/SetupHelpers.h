@@ -13,7 +13,7 @@ class QSlider;
 class QSpinBox;
 class QDoubleSpinBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Integer slider + QSpinBox pair.
 struct SliderRow {
@@ -52,4 +52,4 @@ SliderRowD makeDoubleSliderRow(double min, double max, double initial,
                                const QString& suffix = QString(),
                                QWidget* parent = nullptr);
 
-} // namespace NereusSDR
+} // namespace Longpath

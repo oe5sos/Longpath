@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 
 class QSerialPort;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MmioEndpoint;
 
@@ -100,6 +100,6 @@ private:
     QByteArray    m_lineBuffer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_SERIALPORT

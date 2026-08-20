@@ -6,7 +6,7 @@
 #include "core/OcMatrix.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestOcOutputsHfTab : public QObject {
     Q_OBJECT

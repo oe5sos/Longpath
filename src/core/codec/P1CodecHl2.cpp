@@ -41,7 +41,7 @@
 #include "core/DdcAssignment.h"
 #include "core/IoBoardHl2.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void P1CodecHl2::composeCcForBank(int bank, const CodecContext& ctx,
                                   quint8 out[5]) const
@@ -936,4 +936,4 @@ DdcAssignment P1CodecHl2::applyDdcAssignment(
     return a;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

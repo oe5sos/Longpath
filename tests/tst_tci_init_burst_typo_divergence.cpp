@@ -8,7 +8,7 @@
 #include "core/TciProtocol.h"
 #include "TestMockRadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciInitBurstTypoDivergence : public QObject {
     Q_OBJECT

@@ -37,7 +37,7 @@
 
 #include "models/RxDspWorker.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRxDspWorkerThread : public QObject {
     Q_OBJECT

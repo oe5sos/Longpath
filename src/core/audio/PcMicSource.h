@@ -39,7 +39,7 @@
 
 #include "core/TxMicRouter.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 
@@ -68,4 +68,4 @@ private:
     AudioEngine* m_engine;  // non-owning; lifetime managed by RadioModel
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -12,7 +12,7 @@
 #include "gui/setup/hardware/Hl2OptionsTab.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestHl2OptionsTab : public QObject {
     Q_OBJECT

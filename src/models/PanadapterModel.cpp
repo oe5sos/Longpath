@@ -71,7 +71,7 @@
 
 #include <QStringLiteral>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -330,4 +330,4 @@ void PanadapterModel::saveBandGridToSettings(Band b) const
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

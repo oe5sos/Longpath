@@ -32,7 +32,7 @@
 #include "core/TuneMemoryStore.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TunerAppletContextMenuTest : public QObject {
     Q_OBJECT
@@ -46,10 +46,10 @@ private slots:
 // for Band::Band20m / antenna 1 in the TuneMemoryStore.
 void TunerAppletContextMenuTest::saveCurrentMemoryStoresSlot()
 {
-    NereusSDR::TuneMemoryStore store;
+    Longpath::TuneMemoryStore store;
     // Construct with nullptr RadioModel + TunerModel; pass store directly.
-    NereusSDR::TunerApplet a(nullptr, nullptr, nullptr, &store);
-    a.testSetCurrentBandAndAntenna(NereusSDR::Band::Band20m, 1);
+    Longpath::TunerApplet a(nullptr, nullptr, nullptr, &store);
+    a.testSetCurrentBandAndAntenna(Longpath::Band::Band20m, 1);
     a.testSetRelayValues(42, 199, 88);
 
     QMenu* menu = a.buildContextMenuForTesting();
@@ -66,7 +66,7 @@ void TunerAppletContextMenuTest::saveCurrentMemoryStoresSlot()
              "Context menu must contain 'Save current tune memory'");
     saveAction->trigger();
 
-    auto rec = store.recall(1, NereusSDR::Band::Band20m);
+    auto rec = store.recall(1, Longpath::Band::Band20m);
     QVERIFY2(rec.has_value(), "TuneMemoryStore must contain an entry after Save");
     QCOMPARE(rec->c1, 42);
     QCOMPARE(rec->l, 199);
@@ -78,13 +78,13 @@ void TunerAppletContextMenuTest::saveCurrentMemoryStoresSlot()
 // After saving, triggering "Clear tune memory" must remove the stored entry.
 void TunerAppletContextMenuTest::clearActionRemovesEntry()
 {
-    NereusSDR::TuneMemoryStore store;
-    NereusSDR::TunerApplet a(nullptr, nullptr, nullptr, &store);
-    a.testSetCurrentBandAndAntenna(NereusSDR::Band::Band40m, 2);
+    Longpath::TuneMemoryStore store;
+    Longpath::TunerApplet a(nullptr, nullptr, nullptr, &store);
+    a.testSetCurrentBandAndAntenna(Longpath::Band::Band40m, 2);
     a.testSetRelayValues(10, 20, 30);
 
     // Pre-condition: save a memory slot.
-    store.store({2, NereusSDR::Band::Band40m, 10, 20, 30, 0LL});
+    store.store({2, Longpath::Band::Band40m, 10, 20, 30, 0LL});
 
     QMenu* menu = a.buildContextMenuForTesting();
     QVERIFY(menu != nullptr);
@@ -100,7 +100,7 @@ void TunerAppletContextMenuTest::clearActionRemovesEntry()
              "Context menu must contain 'Clear tune memory'");
     clearAction->trigger();
 
-    auto rec = store.recall(2, NereusSDR::Band::Band40m);
+    auto rec = store.recall(2, Longpath::Band::Band40m);
     QVERIFY2(!rec.has_value(), "TuneMemoryStore must be empty after Clear");
 
     menu->deleteLater();
@@ -110,8 +110,8 @@ void TunerAppletContextMenuTest::clearActionRemovesEntry()
 // navigationRequested with "tgxlAdvanced" as the page key.
 void TunerAppletContextMenuTest::menuOpensTgxlAdvanced()
 {
-    NereusSDR::TunerApplet a(nullptr, nullptr, nullptr, nullptr);
-    QSignalSpy spy(&a, &NereusSDR::TunerApplet::navigationRequested);
+    Longpath::TunerApplet a(nullptr, nullptr, nullptr, nullptr);
+    QSignalSpy spy(&a, &Longpath::TunerApplet::navigationRequested);
 
     QMenu* menu = a.buildContextMenuForTesting();
     QVERIFY(menu != nullptr);

@@ -102,7 +102,7 @@ mw0lge@grange-lane.co.uk
 #include <QObject>
 #include <atomic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // HL2 LAN PHY byte-rate monitor + throttle detector.
 //
@@ -211,4 +211,4 @@ private:
     static int64_t nowMs();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

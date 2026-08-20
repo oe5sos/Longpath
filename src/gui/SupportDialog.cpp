@@ -18,7 +18,7 @@
 #include <QClipboard>
 #include <QMessageBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SupportDialog::SupportDialog(RadioModel* model, QWidget* parent)
     : QDialog(parent)
@@ -346,4 +346,4 @@ void SupportDialog::onCategoryToggled(const QString& id, bool on)
         .arg(id, on ? QStringLiteral("enabled") : QStringLiteral("disabled")));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

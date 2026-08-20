@@ -58,7 +58,7 @@
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTxChannelDexpGate : public QObject {
     Q_OBJECT

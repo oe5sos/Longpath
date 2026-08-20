@@ -11,7 +11,7 @@
 
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FrequencyApplet::FrequencyApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
@@ -61,4 +61,4 @@ void FrequencyApplet::syncFromModel()
     m_instrument->setActiveIsThis(true);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

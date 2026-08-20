@@ -69,7 +69,7 @@
 
 Q_LOGGING_CATEGORY(lcRadeReporterBridge, "nereus.freedv.rade.bridge")
 
-namespace NereusSDR {
+namespace Longpath {
 
 FreeDVRadeReporterBridge::FreeDVRadeReporterBridge(
     FreeDVReporterClient* freedv,
@@ -207,4 +207,4 @@ int FreeDVRadeReporterBridge::roundedSnrDb_() const
     return static_cast<int>(m_snrDb + 0.5);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

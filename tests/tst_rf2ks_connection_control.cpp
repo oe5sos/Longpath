@@ -4,7 +4,7 @@
 #include <QTcpSocket>
 #include "core/Rf2ksConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class RecordingAmpServer : public QTcpServer {
     Q_OBJECT

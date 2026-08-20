@@ -22,7 +22,7 @@ class QLabel;
 class QPushButton;
 class QSpinBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 struct DetectedCable;
@@ -95,4 +95,4 @@ private:
     void installWheelFilter(QComboBox* combo);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

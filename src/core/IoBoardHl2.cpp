@@ -102,7 +102,7 @@
 
 #include "IoBoardHl2.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 IoBoardHl2::IoBoardHl2(QObject* parent) : QObject(parent)
 {
@@ -368,4 +368,4 @@ void IoBoardHl2::setDetected(bool on)
     emit detectedChanged(on);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

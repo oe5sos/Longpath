@@ -18,7 +18,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Test-only RadioModel subclass that exposes the protected
 // QObject::receivers() helper so we can observe how many subscribers

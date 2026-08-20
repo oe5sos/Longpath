@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "MeterItem.h"
 #include <QColor>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SpacerItem : public MeterItem {
     Q_OBJECT
@@ -87,4 +87,4 @@ private:
     float  m_padding{0.1f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -33,7 +33,7 @@
 #include <QSlider>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 CwxApplet::CwxApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
@@ -138,4 +138,4 @@ void CwxApplet::syncFromModel()
     // NYI — Phase 3I-2
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

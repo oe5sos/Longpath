@@ -5,7 +5,7 @@
 #include <QDoubleSpinBox>
 #include <QCheckBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ButtonBoxItemEditor::ButtonBoxItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -116,4 +116,4 @@ void ButtonBoxItemEditor::buildButtonBoxSection()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

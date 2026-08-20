@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 #include <QLinearGradient>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis MeterManager.cs:16121
 SpacerItem::SpacerItem(QObject* parent)
@@ -166,4 +166,4 @@ bool SpacerItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

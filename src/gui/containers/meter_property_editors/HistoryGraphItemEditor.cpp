@@ -10,7 +10,7 @@
 #include <QComboBox>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 HistoryGraphItemEditor::HistoryGraphItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -162,4 +162,4 @@ void HistoryGraphItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

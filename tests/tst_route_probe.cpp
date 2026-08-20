@@ -22,7 +22,7 @@
 #include <QtTest/QtTest>
 #include "core/RouteProbe.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstRouteProbe : public QObject {
     Q_OBJECT

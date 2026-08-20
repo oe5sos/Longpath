@@ -22,7 +22,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-namespace NereusSDR::TxSpectrumAnalysis {
+namespace Longpath::TxSpectrumAnalysis {
 
 namespace {
 
@@ -188,4 +188,4 @@ QString advice(const Occupancy& occ, double filterHighHz)
     return {};
 }
 
-} // namespace NereusSDR::TxSpectrumAnalysis
+} // namespace Longpath::TxSpectrumAnalysis

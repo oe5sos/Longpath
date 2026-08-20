@@ -39,7 +39,7 @@ class QLabel;
 class QPushButton;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class EqHost;
 class ClientEqEditorCanvas;
@@ -177,4 +177,4 @@ private:
     bool                       m_restoring{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

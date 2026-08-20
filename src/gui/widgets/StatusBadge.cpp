@@ -13,7 +13,7 @@
 #include <QPixmap>
 #include <QSvgRenderer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 StatusBadge::StatusBadge(QWidget* parent) : QWidget(parent)
 {
@@ -255,4 +255,4 @@ void StatusBadge::applyStyle()
     ).arg(bg, fg));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -29,7 +29,7 @@
 #include <QDate>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct LogFilter {
     // Anything: callsign, name, QTH, country, grid, band, mode,
@@ -76,4 +76,4 @@ struct LogFilter {
     bool matches(const LogEntry& e) const;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

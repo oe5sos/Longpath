@@ -51,7 +51,7 @@
 
 #include "core/P1RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

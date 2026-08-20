@@ -38,7 +38,7 @@
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 const QString kTestMac = QStringLiteral("00:11:22:33:44:55");

@@ -5,7 +5,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
 {
@@ -63,4 +63,4 @@ void OverflowChip::setDroppedItems(const QStringList& items)
     // exactly when folding starts.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

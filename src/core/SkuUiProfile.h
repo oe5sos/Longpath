@@ -73,7 +73,7 @@
 #include <QString>
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct SkuUiProfile {
     bool                    hasExt1OutOnTx  {false};
@@ -97,4 +97,4 @@ struct SkuUiProfile {
 
 SkuUiProfile skuUiProfileFor(HPSDRModel sku);
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -53,7 +53,7 @@
 
 class QNetworkAccessManager;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class StationPhoto : public QWidget {
     Q_OBJECT
@@ -105,4 +105,4 @@ private:
     bool    m_havePhoto{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

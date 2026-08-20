@@ -11,7 +11,7 @@
 #include <QFileDialog>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
@@ -215,4 +215,4 @@ void RotatorItemEditor::buildTypeSpecific()
     makeColorBtn(QStringLiteral("Background"),   m_btnBackground,&RotatorItem::setBackgroundColour);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

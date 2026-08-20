@@ -12,8 +12,8 @@
 
 #include "core/ReceiverManager.h"
 
-using NereusSDR::ReceiverManager;
-using NereusSDR::ReceiverConfig;
+using Longpath::ReceiverManager;
+using Longpath::ReceiverConfig;
 
 class TstReceiverManagerReconnect : public QObject
 {

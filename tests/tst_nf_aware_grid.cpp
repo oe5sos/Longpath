@@ -17,7 +17,7 @@
 #include "gui/SpectrumWidget.h"
 #include "core/NoiseFloorEstimator.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNFAwareGrid : public QObject
 {

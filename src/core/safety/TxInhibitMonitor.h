@@ -78,7 +78,7 @@
 #include <cstdint>
 #include <functional>
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 /// GPIO-poll-based TX inhibit monitor ported from Thetis PollTXInhibit.
 ///
@@ -162,7 +162,7 @@ public:
     Source lastSource() const noexcept;
 
 signals:
-    void txInhibitedChanged(bool inhibited, NereusSDR::safety::TxInhibitMonitor::Source source);
+    void txInhibitedChanged(bool inhibited, Longpath::safety::TxInhibitMonitor::Source source);
 
 private slots:
     void recompute();
@@ -191,4 +191,4 @@ private:
     static constexpr int kPollIntervalMs = 100;
 };
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

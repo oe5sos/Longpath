@@ -51,7 +51,7 @@
 #include <utility>
 #include <vector>
 
-using NereusSDR::MasterMixer;
+using Longpath::MasterMixer;
 
 namespace {
 

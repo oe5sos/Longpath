@@ -49,7 +49,7 @@
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTxChannelPushVoxCallback : public QObject {
     Q_OBJECT

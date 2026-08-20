@@ -40,7 +40,7 @@
 
 class QPainter;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ClientEq;
 
@@ -263,4 +263,4 @@ private:
     PerfStats m_perfStats;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

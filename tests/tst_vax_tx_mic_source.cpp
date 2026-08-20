@@ -41,7 +41,7 @@
 #include <cstring>
 #include <memory>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Helper: pack interleaved float32 stereo frames into a QByteArray.

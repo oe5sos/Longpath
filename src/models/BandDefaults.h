@@ -61,7 +61,7 @@
 #include "../core/WdspTypes.h"
 #include "Band.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Seed entry for a single band: the default VFO frequency and DSP mode
 /// applied by RadioModel::onBandButtonClicked(Band) when the slice has
@@ -82,4 +82,4 @@ namespace BandDefaults {
 BandSeed seedFor(Band b);
 
 } // namespace BandDefaults
-} // namespace NereusSDR
+} // namespace Longpath

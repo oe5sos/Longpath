@@ -21,7 +21,7 @@
 #include "gui/meters/MeterItem.h"
 #include "gui/meters/MeterWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstContainerPersistence : public QObject
 {

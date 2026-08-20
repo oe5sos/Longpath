@@ -35,7 +35,7 @@ extern "C" {
 
 Q_LOGGING_CATEGORY(lcRadeText, "nereus.rade.text")
 
-namespace NereusSDR {
+namespace Longpath {
 
 RadeText::RadeText(QObject* parent)
     : QObject(parent)
@@ -105,4 +105,4 @@ void RadeText::processRxEooBits(const float* eooBits, int nBits)
     emit textDecoded(callsign);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

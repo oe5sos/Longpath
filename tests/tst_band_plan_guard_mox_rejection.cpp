@@ -54,8 +54,8 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
-using namespace NereusSDR::safety;
+using namespace Longpath;
+using namespace Longpath::safety;
 
 // ---------------------------------------------------------------------------
 // Helpers

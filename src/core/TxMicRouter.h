@@ -29,7 +29,7 @@
 
 #include <algorithm>  // std::fill_n
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Strategy-pattern interface for TX mic sources.
 ///
@@ -104,4 +104,4 @@ public:
     }
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

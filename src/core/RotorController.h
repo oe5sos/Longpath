@@ -31,7 +31,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RotorController : public QObject {
     Q_OBJECT
@@ -76,7 +76,7 @@ public:
     virtual void stop() = 0;
 
 signals:
-    void stateChanged(NereusSDR::RotorController::State state);
+    void stateChanged(Longpath::RotorController::State state);
 
     // A fresh reading from the rotator. Not emitted for values the
     // software worked out for itself.
@@ -89,4 +89,4 @@ signals:
     void errorOccurred(const QString& message);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

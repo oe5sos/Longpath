@@ -78,7 +78,7 @@
 class QVariant;
 class QString;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppSettings;
 
@@ -149,4 +149,4 @@ int resolveActiveRxCount(const AppSettings& settings,
                          const QString& mac,
                          const BoardCapabilities& caps);
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -32,7 +32,7 @@
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/widgets/WidgetPicker.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

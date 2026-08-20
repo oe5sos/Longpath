@@ -97,7 +97,7 @@
 #include <QFileInfo>
 #include "models/BandPlanManager.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Helpers (file-local)
@@ -351,7 +351,7 @@ void SpectrumDefaultsPage::loadFromRenderer()
 
 void SpectrumDefaultsPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // Phase 3G-9b: Reset to Smooth Defaults button. Destructive — shows
     // a confirmation dialog before overwriting because it resets the
@@ -1804,7 +1804,7 @@ void WaterfallDefaultsPage::updateEffectiveDepthLabel()
 
 void WaterfallDefaultsPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: Levels ---
     auto* levGroup = new QGroupBox(QStringLiteral("Levels"), this);
@@ -2342,7 +2342,7 @@ void GridScalesPage::loadFromRenderer()
 
 void GridScalesPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: Grid ---
     auto* gridGroup = new QGroupBox(QStringLiteral("Grid"), this);
@@ -2643,7 +2643,7 @@ Rx2DisplayPage::Rx2DisplayPage(RadioModel* model, QWidget* parent)
 
 void Rx2DisplayPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: RX2 Spectrum ---
     auto* specGroup = new QGroupBox(QStringLiteral("RX2 Spectrum"), this);
@@ -2710,7 +2710,7 @@ TxDisplayPage::TxDisplayPage(RadioModel* model, QWidget* parent)
 
 void TxDisplayPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: TX Spectrum ---
     auto* specGroup = new QGroupBox(QStringLiteral("TX Spectrum"), this);
@@ -2747,4 +2747,4 @@ void TxDisplayPage::buildUI()
     contentLayout()->addStretch();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

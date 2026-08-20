@@ -43,7 +43,7 @@
 #include "../../models/RadioModel.h"
 #include "../PgxlSaveRebootDialog.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // TgxlFaultLogTableModel (private inline class)
@@ -886,7 +886,7 @@ QString TgxlAdvancedPage::formatBytes(quint64 bytes)
     return QStringLiteral("%1 B").arg(bytes);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 // TgxlFaultLogTableModel and TuneMemoryTableModel use Q_OBJECT so we need
 // the moc file included. Both classes are defined in this .cpp, so we

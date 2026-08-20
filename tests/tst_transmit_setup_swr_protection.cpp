@@ -14,7 +14,7 @@
 #include "gui/setup/TransmitSetupPages.h"
 #include "core/safety/SwrProtectionController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTransmitSetupSwrProtection : public QObject
 {

@@ -2,7 +2,7 @@
 #include "models/SliceModel.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstSliceModelVax : public QObject {
     Q_OBJECT

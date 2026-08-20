@@ -10,7 +10,7 @@
 #include "core/RadioDiscovery.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioConnectionFailure : public QObject {
     Q_OBJECT

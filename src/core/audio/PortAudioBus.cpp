@@ -23,7 +23,7 @@
 #include <cmath>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -250,13 +250,13 @@ PortAudioBus::PortAudioBus() {
     // under-load audio jitter we measured.  Lock failure is logged
     // by MemoryLock and the ring continues to work as pageable
     // memory, so this is best-effort.
-    NereusSDR::lockMemory(m_ring.data(),
+    Longpath::lockMemory(m_ring.data(),
                           m_ring.size() * sizeof(float),
                           "PortAudioBus::m_ring");
 }
 
 PortAudioBus::~PortAudioBus() {
-    NereusSDR::unlockMemory(m_ring.data(),
+    Longpath::unlockMemory(m_ring.data(),
                             m_ring.size() * sizeof(float));
     close();
 }
@@ -576,7 +576,7 @@ int PortAudioBus::paCallback(const void* in, void* out,
             1, std::memory_order_relaxed);
         // 2026-05-26 KG4VCF: mirror to PerfMonitor so the in-spectrum
         // perf overlay can show "audio underruns: N in last 1 s".
-        NereusSDR::PerfMonitor::instance().incAudioUnderrun();
+        Longpath::PerfMonitor::instance().incAudioUnderrun();
     }
     if (flags & paOutputOverflow) {
         self->m_paOutputOverflowEvents.fetch_add(
@@ -611,7 +611,7 @@ int PortAudioBus::paCallback(const void* in, void* out,
                     * static_cast<double>(fillChans) / 1000.0;
                 const double fillMs =
                     static_cast<double>(fillSamples) / samplesPerMs;
-                NereusSDR::PerfMonitor::instance().recordAudioFillMs(fillMs);
+                Longpath::PerfMonitor::instance().recordAudioFillMs(fillMs);
             }
         }
 
@@ -849,4 +849,4 @@ QVector<PortAudioBus::DeviceInfo> PortAudioBus::inputDevicesFor(int hostApiIndex
     return out;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -24,7 +24,7 @@
 #include "gui/widgets/CommandBar.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestCommandBar : public QObject
 {

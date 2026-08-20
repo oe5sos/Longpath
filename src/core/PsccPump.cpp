@@ -32,7 +32,7 @@ extern "C" {
     void pscc(int channel, int size, double* tx, double* rx);
 }
 
-namespace NereusSDR {
+namespace Longpath {
 
 PsccPump::PsccPump(QObject* parent)
     : QObject(parent)
@@ -363,4 +363,4 @@ void PsccPump::tryPump()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

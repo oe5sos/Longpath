@@ -5,7 +5,7 @@
 #include "core/HardwareProfile.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Data table sourced from Thetis clsHardwareSpecific.cs:85-191 [v2.10.3.15].

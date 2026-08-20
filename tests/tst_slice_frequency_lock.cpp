@@ -12,7 +12,7 @@
 #include <QtTest/QtTest>
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceFrequencyLock : public QObject {
     Q_OBJECT

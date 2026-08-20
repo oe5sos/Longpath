@@ -9,7 +9,7 @@
 #include <QStringList>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// One banner item's contribution to the width budget.
 ///
@@ -57,4 +57,4 @@ public:
                                     int foldThroughRung);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

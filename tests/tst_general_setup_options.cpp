@@ -12,7 +12,7 @@
 #include <QCheckBox>
 #include "gui/setup/GeneralOptionsPage.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestGeneralSetupOptions : public QObject
 {

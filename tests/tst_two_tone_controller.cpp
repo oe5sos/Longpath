@@ -48,8 +48,8 @@
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
-using namespace NereusSDR::safety;
+using namespace Longpath;
+using namespace Longpath::safety;
 
 // ---------------------------------------------------------------------------
 // RecordingTxChannel — overrides the 13 TXPostGen setters to record the

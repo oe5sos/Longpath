@@ -26,7 +26,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -393,4 +393,4 @@ void TestTwoTonePage::onModelDrivePowerSourceChanged(DrivePowerSource source)
     selectDriveRadioFor(source);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

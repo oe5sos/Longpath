@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QMouseEvent>
 #include <QtMath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ButtonBoxItem::ButtonBoxItem(QObject* parent)
     : MeterItem(parent)
@@ -331,4 +331,4 @@ bool ButtonBoxItem::deserialize(const QString& data)
     return false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

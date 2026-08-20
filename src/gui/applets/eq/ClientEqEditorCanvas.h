@@ -28,7 +28,7 @@
 
 #include "gui/applets/eq/ClientEqCurveWidget.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class EqHost;
 
@@ -108,4 +108,4 @@ private:
     CutoffEdge m_draggingCutoff{CutoffEdge::None};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

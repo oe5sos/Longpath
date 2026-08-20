@@ -10,7 +10,7 @@
 #include <QtTest/QtTest>
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioModelMaxSlices : public QObject {
     Q_OBJECT

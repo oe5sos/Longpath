@@ -34,7 +34,7 @@
 #include <QDir>
 #include <QFileInfo>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/PotaClient.cpp:16-23 [@0cd4559]
 PotaClient::PotaClient(QObject* parent)
@@ -195,7 +195,7 @@ QVector<DxSpot> PotaClient::parseAndCollect(const QByteArray& data)
 void PotaClient::onPollTimer()
 {
     QNetworkRequest req{QUrl{ApiUrl}};
-    req.setHeader(QNetworkRequest::UserAgentHeader, "NereusSDR");
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Longpath");
     // Disable HTTP keep-alive to avoid a known Qt6/macOS bug where the
     // CFSocket source for a kept-alive socket fires into a destroyed
     // QSocketNotifier after the server's idle-close, crashing in
@@ -246,4 +246,4 @@ void PotaClient::onPollTimer()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

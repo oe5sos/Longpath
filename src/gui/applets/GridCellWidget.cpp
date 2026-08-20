@@ -20,7 +20,7 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     : QWidget(parent)
@@ -139,4 +139,4 @@ void GridCellWidget::refreshTitleText()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

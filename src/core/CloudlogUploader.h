@@ -32,7 +32,7 @@
 
 class QNetworkReply;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class CloudlogUploader : public QsoUploader {
     Q_OBJECT
@@ -77,4 +77,4 @@ private:
     QString m_stationId;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

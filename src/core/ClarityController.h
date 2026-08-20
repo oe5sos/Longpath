@@ -65,7 +65,7 @@
 #include <QObject>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ClarityController : public QObject {
     Q_OBJECT
@@ -167,4 +167,4 @@ private:
     float  m_minGapDb       = 30.0f;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

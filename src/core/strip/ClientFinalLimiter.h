@@ -33,7 +33,7 @@
 
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Final-stage brickwall limiter for the TX audio chain — sits at the
 // very tail of the chain, after every user-configurable stage (Gate,
@@ -168,4 +168,4 @@ private:
     float m_activityAcc{0.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -63,7 +63,7 @@ mw0lge@grange-lane.co.uk
 
 class QMouseEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Shared base for all button grid items.
 // Ported from Thetis clsButtonBox (MeterManager.cs:12307+).
@@ -184,4 +184,4 @@ private:
     QTimer m_clickTimer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

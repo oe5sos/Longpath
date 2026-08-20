@@ -22,7 +22,7 @@
 #include "core/AudioEngine.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstNetworkDiagnosticsDialog : public QObject {
     Q_OBJECT

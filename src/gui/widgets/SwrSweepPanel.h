@@ -36,7 +36,7 @@ class QProgressBar;
 class QLabel;
 class QListWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SwrChartWidget;
 
@@ -151,7 +151,7 @@ signals:
     /// whose reverse channel never moved: neither is a measurement, and
     /// handing either to an analysis that will dutifully draw it is how
     /// a fabricated curve gets treated as data.
-    void analysisReady(const NereusSDR::Sweep& sweep);
+    void analysisReady(const Longpath::Sweep& sweep);
 
     /// A sweep is about to key, for this band and this stretch of
     /// spectrum. Emitted before the first point arrives.
@@ -252,4 +252,4 @@ private:
     QTimer*       m_powerPoll{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

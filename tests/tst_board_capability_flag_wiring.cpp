@@ -57,7 +57,7 @@
 #include <QApplication>
 #include <QSignalSpy>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

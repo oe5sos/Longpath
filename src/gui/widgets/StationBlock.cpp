@@ -7,7 +7,7 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 StationBlock::StationBlock(QWidget* parent) : QWidget(parent)
 {
@@ -117,4 +117,4 @@ void StationBlock::applyStyle()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

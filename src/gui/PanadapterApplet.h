@@ -47,13 +47,13 @@ class QMenu;
 
 // Qt-Vorwaertsdeklaration im globalen Raum: `class QLabel*`
 // INNERHALB des namespace deklarierte sonst ein neues
-// NereusSDR::QLabel und der Uebersetzer meldet einen unvollstaendigen
+// Longpath::QLabel und der Uebersetzer meldet einen unvollstaendigen
 // Typ, obwohl <QLabel> eingebunden ist.
 class QLabel;
 
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SpectrumWidget;
 class SliceModel;
@@ -234,4 +234,4 @@ private:
     bool                    m_extendedViewEnabled {true};  // Phase 3F Sub-Epic F Task 13
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

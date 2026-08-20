@@ -16,7 +16,7 @@
 #include <cmath>
 #include <complex>
 
-namespace NereusSDR::Feedline {
+namespace Longpath::Feedline {
 namespace {
 
 constexpr double kC = 299'792'458.0;
@@ -117,4 +117,4 @@ Sweep embed(const Sweep& atAntenna, double lengthM, const Cable& cable)
     return applyLine(atAntenna, lengthM, cable, -1.0, nullptr);
 }
 
-} // namespace NereusSDR::Feedline
+} // namespace Longpath::Feedline

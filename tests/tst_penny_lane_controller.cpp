@@ -4,7 +4,7 @@
 #include "core/accessories/PennyLaneController.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPennyLaneController : public QObject {
     Q_OBJECT

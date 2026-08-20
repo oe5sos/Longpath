@@ -75,7 +75,7 @@
 #include <QtGlobal>
 #include "../HpsdrModel.h"
 
-namespace NereusSDR::codec::alex {
+namespace Longpath::codec::alex {
 
 // ── Two RX preselector designs, one set of relay bits ────────────────────────
 //
@@ -122,14 +122,14 @@ quint8 computeBpf1(double freqMhz);
 // From Thetis console.cs:6827-6837 setAlex1HPF [v2.10.3.15]
 // Upstream inline attribution preserved verbatim:
 //   :6829  || (HardwareSpecific.Hardware == HPSDRHW.HermesC10))  //N1GP G2E added (HermesC10) //DK1HLM
-bool usesBpf1Preselector(NereusSDR::HPSDRHW board) noexcept;
+bool usesBpf1Preselector(Longpath::HPSDRHW board) noexcept;
 
 // Frequency + board → RX preselector select bits.  This is the entry point
 // every receive-filter call site should use; it picks the ladder the board
 // actually has.
 //
 // From Thetis console.cs:6827-6837 setAlex1HPF [v2.10.3.15]
-quint8 computeRxPreselector(double freqMhz, NereusSDR::HPSDRHW board);
+quint8 computeRxPreselector(double freqMhz, Longpath::HPSDRHW board);
 
 // Frequency → Alex TRANSMIT low-pass select bits (bank 10 C4 in the P1 packet,
 // or bytes 1428-1431 in the P2 CmdHighPriority packet).
@@ -179,4 +179,4 @@ quint8 computeLpf(double freqMhz);
 double receiveLpfFrequencyMhz(double rx1Mhz, double rx2Mhz,
                               bool rx2Live, bool rx2PreampPresent) noexcept;
 
-} // namespace NereusSDR::codec::alex
+} // namespace Longpath::codec::alex

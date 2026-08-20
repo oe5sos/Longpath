@@ -56,7 +56,7 @@
 #include <cstdint>
 #include <functional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MicReorderBuffer {
 public:
@@ -137,4 +137,4 @@ private:
     Stats   m_stats;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

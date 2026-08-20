@@ -21,7 +21,7 @@
 #include "core/codec/P2CodecOrionMkII.h"
 #include "core/codec/P2CodecSaturn.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestCodec5SliceAssignment : public QObject {
     Q_OBJECT
@@ -1109,7 +1109,7 @@ private slots:
         P2CodecSaturn codec;
         CodecContext ctx{};
         ctx.diversity = true;
-        ctx.adcCtrl = NereusSDR::defaultRxAdcCtrl(2);   // 2-ADC board
+        ctx.adcCtrl = Longpath::defaultRxAdcCtrl(2);   // 2-ADC board
 
         std::array<SliceConfig, 5> slices{};
         slices[0].live = true;
@@ -1138,8 +1138,8 @@ private slots:
     // the context in the first place.
     void one_adc_board_seeds_no_second_chain()
     {
-        QCOMPARE(NereusSDR::defaultRxAdcCtrl(1), quint16(0x0000));
-        QCOMPARE(NereusSDR::defaultRxAdcCtrl(2), quint16(0x0004));
+        QCOMPARE(Longpath::defaultRxAdcCtrl(1), quint16(0x0000));
+        QCOMPARE(Longpath::defaultRxAdcCtrl(2), quint16(0x0004));
     }
 };
 

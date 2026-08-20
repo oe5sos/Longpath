@@ -64,7 +64,7 @@ mw0lge@grange-lane.co.uk
 #include <QColor>
 #include <QImage>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsRotatorItem (MeterManager.cs:15042+)
 // Antenna rotator compass dial with AZ/ELE/BOTH modes.
@@ -172,4 +172,4 @@ private:
     float m_smoothedEle{0.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

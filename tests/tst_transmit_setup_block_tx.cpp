@@ -18,7 +18,7 @@
 #include <QCheckBox>
 #include "gui/setup/TransmitSetupPages.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTransmitSetupBlockTx : public QObject
 {

@@ -59,7 +59,7 @@ mw0lge@grange-lane.co.uk
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterWidget;
 
@@ -202,4 +202,4 @@ private:
     QVector<MeterItem*> m_items;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

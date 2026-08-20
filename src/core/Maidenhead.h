@@ -37,7 +37,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Centre of the given Maidenhead square. Accepts 4- or 6-character
 // locators; anything shorter leaves the outputs untouched. Takes the
@@ -68,4 +68,4 @@ bool isValidGridSquare(const QString& gridSquare);
 // currently produces coordinates here.
 QString gridSquareFromLatLon(double lat, double lon);
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -2,7 +2,7 @@
 #include <QtTest/QtTest>
 #include "core/codec/P1CodecRedPitaya.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1CodecRedPitaya : public QObject {
     Q_OBJECT

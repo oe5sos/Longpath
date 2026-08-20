@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void TrimSession::record(double lengthM, double resonanceHz,
                          const QString& label)
@@ -163,4 +163,4 @@ AntennaTrim::Trim TrimSession::recommend(AntennaTrim::Kind kind,
                                 l.valid ? l.exponent : 1.0);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -48,7 +48,7 @@
 #include <array>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── The chain, as tiles ──────────────────────────────────────────────
 
@@ -296,4 +296,4 @@ private:
     double m_liveGr{0.0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

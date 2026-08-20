@@ -34,7 +34,7 @@
 
 #include "gui/widgets/StatusToast.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 using namespace Qt::StringLiterals;
 
 class TestStatusToastPreservesBottomBar : public QObject

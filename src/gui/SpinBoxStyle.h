@@ -15,7 +15,7 @@
 #include <QStringLiteral>
 #include "StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 inline void applySpinBoxStyle(QAbstractSpinBox* spin)
 {
@@ -54,4 +54,4 @@ inline void applySpinBoxStyle(QAbstractSpinBox* spin)
           QString::fromLatin1(Style::kButtonHover)));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

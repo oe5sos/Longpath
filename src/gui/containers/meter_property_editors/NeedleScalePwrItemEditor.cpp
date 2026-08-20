@@ -70,7 +70,7 @@ mw0lge@grange-lane.co.uk
 #include <QVBoxLayout>
 #include <QHeaderView>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -443,4 +443,4 @@ void NeedleScalePwrItemEditor::buildTypeSpecific()
     addRow(QStringLiteral("Cal. points"), calContainer);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

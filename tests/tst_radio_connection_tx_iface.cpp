@@ -19,7 +19,7 @@
 #include "core/P1RadioConnection.h"
 #include "core/P2RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioConnectionTxIface : public QObject {
     Q_OBJECT

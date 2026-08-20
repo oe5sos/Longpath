@@ -13,7 +13,7 @@
 #include "gui/meters/HistoryGraphItem.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSignalHistory : public QObject {
     Q_OBJECT

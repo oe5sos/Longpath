@@ -89,7 +89,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"
 #include "core/RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockConnection ──────────────────────────────────────────────────────────
 // Minimal mock so TxChannel's null-connection guard does not short-circuit
@@ -103,7 +103,7 @@ public:
     }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

@@ -14,8 +14,8 @@
 //
 // Usage (main.cpp, after `app.setStyle(QStyleFactory::create("Fusion"))`):
 //
-//     NereusSDR::applyDarkPalette(app);
-//     NereusSDR::applyAppBaselineQss(app);
+//     Longpath::applyDarkPalette(app);
+//     Longpath::applyAppBaselineQss(app);
 //
 // Per-page stylesheets remain authoritative — the baseline only paints
 // what they don't.
@@ -30,7 +30,7 @@
 
 #include "../StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Build a dark QPalette from STYLEGUIDE.md constants and install it on
 // the QApplication. Run AFTER QApplication::setStyle("Fusion") and
@@ -142,4 +142,4 @@ inline void applyAppBaselineQss(QApplication& app)
           QString::fromLatin1(Style::kTextInactive)));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

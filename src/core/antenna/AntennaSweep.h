@@ -59,7 +59,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR::AntennaSweep {
+namespace Longpath::AntennaSweep {
 
 // ── Point arithmetic ────────────────────────────────────────────────
 
@@ -139,4 +139,4 @@ std::complex<double> impedanceAt(const Sweep& s, double freqHz);
 // A sentence naming what was found and, where they differ, saying so.
 QString describe(const Sweep& s, double targetHz);
 
-} // namespace NereusSDR::AntennaSweep
+} // namespace Longpath::AntennaSweep

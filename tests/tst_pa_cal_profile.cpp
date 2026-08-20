@@ -21,7 +21,7 @@
 #include "core/HpsdrModel.h"
 #include "core/PaCalProfile.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPaCalProfile : public QObject {
     Q_OBJECT

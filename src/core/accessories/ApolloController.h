@@ -73,7 +73,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Apollo PA + ATU + LPF accessory board state model.
 //
@@ -141,4 +141,4 @@ private:
     QString persistenceKey() const;  // "hardware/<mac>/apollo"
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -79,7 +79,7 @@ class QLabel;
 class QMenuBar;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MasterOutputWidget;
 
@@ -233,4 +233,4 @@ private:
     QTimer*             m_utcTimer{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

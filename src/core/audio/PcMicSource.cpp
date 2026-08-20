@@ -11,7 +11,7 @@
 #include "core/audio/PcMicSource.h"
 #include "core/AudioEngine.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 PcMicSource::PcMicSource(AudioEngine* engine)
     : m_engine(engine)
@@ -26,4 +26,4 @@ int PcMicSource::pullSamples(float* dst, int n)
     return m_engine->pullTxMic(dst, n);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

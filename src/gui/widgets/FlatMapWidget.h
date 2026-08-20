@@ -38,7 +38,7 @@
 #include <QVector>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FlatMapWidget : public QWidget {
     Q_OBJECT
@@ -191,4 +191,4 @@ private:
     QPointF m_panFrom;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

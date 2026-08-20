@@ -24,7 +24,7 @@
 #include <QNetworkDatagram>
 #include <cstring>
 
-namespace NereusSDR::Test {
+namespace Longpath::Test {
 
 P1FakeRadio::P1FakeRadio(QObject* parent)
     : QObject(parent)
@@ -300,4 +300,4 @@ void P1FakeRadio::onAutoStreamTick()
     m_socket->writeDatagram(frame, m_clientAddress, m_clientPort);
 }
 
-} // namespace NereusSDR::Test
+} // namespace Longpath::Test

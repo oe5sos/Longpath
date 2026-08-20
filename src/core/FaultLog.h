@@ -16,7 +16,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Single fault event captured when a PGXL (or TGXL) state transitions
 /// to a value beginning with "FAULT".
@@ -66,4 +66,4 @@ private:
     QVector<FaultEvent> m_events;    // newest-first; capped at 10
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

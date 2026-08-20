@@ -24,7 +24,7 @@ class QComboBox;
 class QLabel;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 struct RxDecode;
@@ -121,4 +121,4 @@ private:
     QPushButton* m_resetButton{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

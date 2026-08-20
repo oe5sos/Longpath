@@ -31,7 +31,7 @@
 
 #include "core/RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── TestRadioConnection ──────────────────────────────────────────────────────
 //
@@ -47,7 +47,7 @@ public:
 
     // Pure-virtual slot stubs — no-ops.
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

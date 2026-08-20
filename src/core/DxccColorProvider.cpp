@@ -74,7 +74,7 @@
 #include <QFileInfo>
 #include <QMetaObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/DxccColorProvider.cpp:9-65 [@0cd4559]
 DxccColorProvider::DxccColorProvider(QObject* parent)
@@ -319,4 +319,4 @@ QColor DxccColorProvider::colorForSpot(const QString& callsign,
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

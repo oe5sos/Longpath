@@ -20,7 +20,7 @@
 #include <QUrl>
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -50,10 +50,10 @@ Rf2ksConnection::Rf2ksConnection(QObject* parent)
     : QObject(parent),
       m_nam(std::make_unique<QNetworkAccessManager>())
 {
-    qRegisterMetaType<RfKitPowerSnapshot>("NereusSDR::RfKitPowerSnapshot");
-    qRegisterMetaType<RfKitTunerSnapshot>("NereusSDR::RfKitTunerSnapshot");
-    qRegisterMetaType<RfKitAntenna>("NereusSDR::RfKitAntenna");
-    qRegisterMetaType<QList<RfKitAntenna>>("QList<NereusSDR::RfKitAntenna>");
+    qRegisterMetaType<RfKitPowerSnapshot>("Longpath::RfKitPowerSnapshot");
+    qRegisterMetaType<RfKitTunerSnapshot>("Longpath::RfKitTunerSnapshot");
+    qRegisterMetaType<RfKitAntenna>("Longpath::RfKitAntenna");
+    qRegisterMetaType<QList<RfKitAntenna>>("QList<Longpath::RfKitAntenna>");
 
     // Own the reconnect timer so disconnect() can cancel a pending retry.
     // Review blocker [P1] on PR #291: scheduleReconnect() previously called
@@ -600,4 +600,4 @@ void Rf2ksConnection::issuePost(const QString& path)
     trackReply(reply);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -17,7 +17,7 @@
 #include <QVBoxLayout>
 #include "models/RadioModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
                                    RadioModel* model, QWidget* parent)
@@ -49,7 +49,7 @@ InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
             m_needle->setOffline(offline);
         };
         connect(m_model, &RadioModel::connectionStateChanged,
-                this, [push](NereusSDR::ConnectionState) { push(); });
+                this, [push](Longpath::ConnectionState) { push(); });
         push();
     }
 }
@@ -219,4 +219,4 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     return menu;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -7,7 +7,7 @@
 #include <QtTest/QtTest>
 #include "core/Maidenhead.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstMaidenhead : public QObject {
     Q_OBJECT

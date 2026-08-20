@@ -40,7 +40,7 @@
 
 #include "P1CodecStandard.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // RedPitaya (DH1KLM port) — extends Standard with bank 12 ADC1 carve-out.
 // During MOX, RedPitaya does NOT force ADC1 to 0x1F like other boards;
@@ -75,4 +75,4 @@ protected:
     void bank12(const CodecContext& ctx, quint8 out[5]) const override;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

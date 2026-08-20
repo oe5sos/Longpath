@@ -115,7 +115,7 @@ mw0lge@grange-lane.co.uk
 
 #include "PaGainProfile.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -428,4 +428,4 @@ float bypassPaGainsForBand(Band band) noexcept {
     return defaultPaGainsForBand(HPSDRModel::FIRST, band);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

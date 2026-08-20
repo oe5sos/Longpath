@@ -55,7 +55,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // From AetherSDR PanLayoutDialog.cpp:138 [@c6481cb].
@@ -175,4 +175,4 @@ void PanLayoutDialog::buildUi(int maxPanCount, const QString& currentLayoutId,
     footerRow->addStretch(1);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

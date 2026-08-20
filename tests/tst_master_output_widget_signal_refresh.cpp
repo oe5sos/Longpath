@@ -29,7 +29,7 @@
 #include "core/AudioEngine.h"
 #include "gui/widgets/MasterOutputWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstMasterOutputWidgetSignalRefresh : public QObject {
     Q_OBJECT

@@ -13,7 +13,7 @@
 #include "models/Band.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestOcOutputsSwlTab : public QObject {
     Q_OBJECT

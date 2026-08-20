@@ -133,7 +133,7 @@
 class QDoubleSpinBox;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class CalibrationController;
 
@@ -188,4 +188,4 @@ private:
     QMetaObject::Connection m_profileConn;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

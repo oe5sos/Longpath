@@ -189,7 +189,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <algorithm>
 #include <bit>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // primaryRxDdcForBoard — see header.
 //
@@ -631,9 +631,9 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
     if (m_rx[primaryDdc].frequency == 0) {
         m_rx[primaryDdc].frequency = 3865000;   // 80m LSB — first-boot default only
         double freqMhz = m_rx[primaryDdc].frequency / 1.0e6;
-        m_alex.hpfBits   = NereusSDR::codec::alex::computeRxPreselector(
+        m_alex.hpfBits   = Longpath::codec::alex::computeRxPreselector(
             freqMhz, m_caps ? m_caps->board : HPSDRHW::Unknown);
-        m_alex.lpfBitsRx = NereusSDR::codec::alex::computeLpf(freqMhz);
+        m_alex.lpfBitsRx = Longpath::codec::alex::computeLpf(freqMhz);
     } else {
         // Same FIFO ordering as above, with a consequence the original fix did
         // not have to think about: setReceiverFrequency ran BEFORE us, and at
@@ -651,7 +651,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
         // Upstream inline attribution preserved verbatim (console.cs:6830):
         //    || (HardwareSpecific.Hardware == HPSDRHW.HermesC10))  //N1GP G2E added (HermesC10) //DK1HLM
         const double freqMhz = m_rx[primaryDdc].frequency / 1.0e6;
-        m_alex.hpfBits = NereusSDR::codec::alex::computeRxPreselector(
+        m_alex.hpfBits = Longpath::codec::alex::computeRxPreselector(
             freqMhz, m_caps ? m_caps->board : HPSDRHW::Unknown);
     }
     // The primary DDC's samplingRate is set by setSampleRate() which
@@ -680,7 +680,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
         // splits the two -- UpdateTXDDSFreq assigns the low-pass and the NCO
         // from tx_dds_freq_mhz in one call (console.cs:15464-15468
         // [v2.10.3.15]) -- so neither do we.
-        m_alex.lpfBitsTx = NereusSDR::codec::alex::computeLpf(
+        m_alex.lpfBitsTx = Longpath::codec::alex::computeLpf(
             m_tx[0].frequency / 1.0e6);
     }
 
@@ -839,7 +839,7 @@ void P2RadioConnection::setReceiverFrequency(int receiverIndex, quint64 frequenc
     // neighbouring filter.
     // From Thetis console.cs:6827-6837 setAlex1HPF [v2.10.3.15]
     double freqMhz = frequencyHz / 1e6;
-    m_alex.hpfBits = NereusSDR::codec::alex::computeRxPreselector(
+    m_alex.hpfBits = Longpath::codec::alex::computeRxPreselector(
         freqMhz, m_caps ? m_caps->board : HPSDRHW::Unknown);
 
     // RF-SAFETY: a receive frequency selects the RECEIVE low-pass only. It
@@ -864,7 +864,7 @@ void P2RadioConnection::setReceiverFrequency(int receiverIndex, quint64 frequenc
     // Thetis cannot reach the receive-derived write at all while keyed, so a
     // retune arriving mid-transmission must leave both words untouched.
     if (!m_mox) {
-        m_alex.lpfBitsRx = NereusSDR::codec::alex::computeLpf(freqMhz);
+        m_alex.lpfBitsRx = Longpath::codec::alex::computeLpf(freqMhz);
     }
 
     if (m_running) {
@@ -898,7 +898,7 @@ void P2RadioConnection::setTxFrequency(quint64 frequencyHz)
     // HdwMOXChanged [v2.10.3.15]), so the transmit selection is kept live
     // whether the radio is keyed or not.
     const int newLpfBitsTx =
-        NereusSDR::codec::alex::computeLpf(static_cast<double>(frequencyHz) / 1e6);
+        Longpath::codec::alex::computeLpf(static_cast<double>(frequencyHz) / 1e6);
     if (newLpfBitsTx != m_alex.lpfBitsTx) {
         // The one line that makes the transmit low-pass observable on a bench.
         // Logged on change only, so it marks the event rather than the
@@ -3541,4 +3541,4 @@ quint32 P2RadioConnection::buildAlex1() const
     return reg;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

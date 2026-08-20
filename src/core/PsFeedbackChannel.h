@@ -44,7 +44,7 @@
 #include <QObject>
 #include <atomic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Wraps the WDSP feedback RX channel that calcc reads autonomously.
 // One per WdspEngine.  Created when the engine initializes, destroyed at
@@ -97,4 +97,4 @@ private:
     std::atomic<qint64> m_totalSamples{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

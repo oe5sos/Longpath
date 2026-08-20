@@ -15,7 +15,7 @@
 #include "core/AdifLog.h"
 #include "core/CallsignInfo.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -146,4 +146,4 @@ bool WorkedBefore::wouldDuplicate(const LogEntry& entry) const
     return false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

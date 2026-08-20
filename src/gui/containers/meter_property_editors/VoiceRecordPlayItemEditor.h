@@ -1,7 +1,7 @@
 #pragma once
 #include "ButtonBoxItemEditor.h"
 
-namespace NereusSDR {
+namespace Longpath {
 class VoiceRecordPlayItem;
 
 class VoiceRecordPlayItemEditor : public ButtonBoxItemEditor {
@@ -14,4 +14,4 @@ private:
     void buildVoiceSpecific();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

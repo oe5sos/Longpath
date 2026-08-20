@@ -2,7 +2,7 @@
 #include <QtTest/QtTest>
 #include "gui/PanLayoutDialog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // PanLayoutDialog's ctor takes a single pre-computed ceiling: the caller
 // (MainWindow::showPanLayoutDialog) is responsible for reducing

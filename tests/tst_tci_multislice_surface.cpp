@@ -33,7 +33,7 @@
 
 #include "core/TciProtocol.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 using namespace Qt::StringLiterals;
 
 namespace {

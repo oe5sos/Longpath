@@ -5,7 +5,7 @@
 #include <QColorDialog>
 #include <QStringLiteral>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ColorSwatchButton::ColorSwatchButton(const QColor& initial, QWidget* parent)
     : QPushButton(parent)
@@ -85,4 +85,4 @@ QColor ColorSwatchButton::colorFromHex(const QString& hex)
     return QColor::fromString(hex);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

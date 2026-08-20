@@ -18,7 +18,7 @@
 #include <atomic>
 #include <memory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Structured failure taxonomy for the initial connect attempt — design §4.1.
 // Emitted by connectFailed() when connectToRadio() cannot reach Connected state.
@@ -199,7 +199,7 @@ public slots:
     virtual void init() = 0;
 
     // Connect to the specified radio. Auto-queued from main thread.
-    virtual void connectToRadio(const NereusSDR::RadioInfo& info) = 0;
+    virtual void connectToRadio(const Longpath::RadioInfo& info) = 0;
 
     // Graceful disconnect.
     virtual void disconnect() = 0;
@@ -526,8 +526,8 @@ signals:
     void userAdc0Changed(float volts);
 
     // --- State ---
-    void connectionStateChanged(NereusSDR::ConnectionState state);
-    void errorOccurred(NereusSDR::RadioConnectionError code, const QString& message);
+    void connectionStateChanged(Longpath::ConnectionState state);
+    void errorOccurred(Longpath::RadioConnectionError code, const QString& message);
 
     // Emitted once per valid ep6 (P1) or DDC I/Q (P2) frame arrival.
     // The TitleBar activity LED throttles this to ≤10 Hz visible refresh —
@@ -540,7 +540,7 @@ signals:
     // explanation suitable for display in the ConnectionPanel / TitleBar.
     // Fully-qualified type names required for Qt MOC queued-connection support.
     // Design doc §4.1.
-    void connectFailed(NereusSDR::ConnectFailure reason, QString detail);
+    void connectFailed(Longpath::ConnectFailure reason, QString detail);
 
     // --- Data ---
     // Emitted for each receiver's I/Q block.
@@ -807,7 +807,7 @@ protected:
     bool m_micXlr{true};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::RadioConnectionError)
-Q_DECLARE_METATYPE(NereusSDR::ConnectFailure)
+Q_DECLARE_METATYPE(Longpath::RadioConnectionError)
+Q_DECLARE_METATYPE(Longpath::ConnectFailure)

@@ -29,7 +29,7 @@
 #include <QFileInfo>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR SpotCollectorClient.cpp:13-19 [@0cd4559]
 SpotCollectorClient::SpotCollectorClient(QObject* parent)
@@ -184,4 +184,4 @@ bool SpotCollectorClient::parseDxSpotLine(const QString& line, DxSpot& spot) con
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

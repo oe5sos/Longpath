@@ -35,7 +35,7 @@
 #include <QSet>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct QsoRecord;
 
@@ -76,4 +76,4 @@ private:
     int m_totalQsos{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

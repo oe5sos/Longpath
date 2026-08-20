@@ -74,7 +74,7 @@
 #include <QVector>
 #include <limits>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Per-bin peak-hold trace with configurable decay and TX-state gating.
 ///
@@ -151,4 +151,4 @@ private:
     QVector<float> m_peaks;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

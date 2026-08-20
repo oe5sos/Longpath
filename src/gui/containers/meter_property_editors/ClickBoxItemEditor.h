@@ -1,7 +1,7 @@
 #pragma once
 #include "BaseItemEditor.h"
 
-namespace NereusSDR {
+namespace Longpath {
 class ClickBoxItem;
 
 // ClickBoxItem is an invisible hit-target with no configurable visual
@@ -17,4 +17,4 @@ private:
     void buildTypeSpecific() override;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

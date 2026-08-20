@@ -23,7 +23,7 @@
 #include <cmath>
 #include <limits>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

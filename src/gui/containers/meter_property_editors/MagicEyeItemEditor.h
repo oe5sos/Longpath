@@ -4,7 +4,7 @@
 class QPushButton;
 class QLineEdit;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MagicEyeItem;
 
@@ -22,4 +22,4 @@ private:
     QPushButton* m_btnBrowseBezel{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

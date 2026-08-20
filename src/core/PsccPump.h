@@ -100,7 +100,7 @@
 #include "codec/CodecContext.h"   // PsDdcConfig
 #include "WdspEngine.h"           // kTxChannelId
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MoxController;
 
@@ -202,7 +202,7 @@ public slots:
     // with both PS streams enabled (ddcEnable+syncEnable bits both
     // set + ps rate on those DDCs), activate the pump and identify
     // the indices.  When PS gates close, deactivate.
-    void onDdcConfigChanged(const NereusSDR::PsDdcConfig& cfg);
+    void onDdcConfigChanged(const Longpath::PsDdcConfig& cfg);
 
     // Manual activation hook for tests + the off-band production
     // case where ReceiverManager isn't available (unit tests).
@@ -255,4 +255,4 @@ private:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

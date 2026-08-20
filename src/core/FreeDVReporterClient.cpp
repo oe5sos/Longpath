@@ -107,7 +107,7 @@
 #include <QUrl>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FreeDVReporterClient::FreeDVReporterClient(QObject* parent)
     : QObject(parent)
@@ -1070,4 +1070,4 @@ void FreeDVReporterClient::emitSpotFromRxReport(const QJsonObject& data)
     emit spotReceived(spot);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

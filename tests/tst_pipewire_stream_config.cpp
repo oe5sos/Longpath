@@ -9,7 +9,7 @@
 #include <pipewire/keys.h>
 #include "core/audio/PipeWireStream.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPipeWireStreamConfig : public QObject {
     Q_OBJECT

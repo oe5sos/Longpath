@@ -17,7 +17,7 @@
 #include <QPushButton>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Active-blue style: matches kModeBtn in VfoStyles.h — #0070c0 / #0090e0 / #ffffff
 static const char* kVaxBtnStyle =
@@ -100,4 +100,4 @@ void VaxChannelSelector::simulateClick(int ch)
     m_buttons[ch]->click();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

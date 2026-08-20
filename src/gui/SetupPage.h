@@ -12,7 +12,7 @@
 #include <QLineEdit>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -92,4 +92,4 @@ private:
     QVBoxLayout*  m_activeSectionLayout = nullptr;  // layout of the last added section
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

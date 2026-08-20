@@ -71,7 +71,7 @@
 
 #include "core/HpsdrModel.h"
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 /// Per-board PA scaling triplet. Values port from Thetis
 /// computeAlexFwdPower (console.cs:25012-25053 [v2.10.3.13]).
@@ -94,4 +94,4 @@ PaScalingTriplet paScalingFor(HPSDRModel model) noexcept;
 /// volts = 0; ... if (watts < 0) watts = 0;`).
 float computeAlexFwdPower(HPSDRModel model, int adcCounts) noexcept;
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

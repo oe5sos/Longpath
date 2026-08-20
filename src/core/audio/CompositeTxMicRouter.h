@@ -42,7 +42,7 @@
 
 #include <atomic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PcMicSource;
 class RadioMicSource;
@@ -192,4 +192,4 @@ private:
     std::atomic<VaxTxMicSource*> m_vaxSource {nullptr};  // non-owning; registered post-ctor
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

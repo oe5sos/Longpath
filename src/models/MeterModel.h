@@ -2,7 +2,7 @@
 
 #include <QObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Meter data from the radio (forward power, SWR, ALC, etc.).
 // In Protocol 1, meter data comes from the C&C feedback in EP6 frames.
@@ -39,4 +39,4 @@ private:
     float m_sMeter{0.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

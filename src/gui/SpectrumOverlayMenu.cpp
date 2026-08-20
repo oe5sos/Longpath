@@ -5,7 +5,7 @@
 #include <QHBoxLayout>
 #include <QGroupBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SpectrumOverlayMenu::SpectrumOverlayMenu(QWidget* parent)
     : QWidget(parent)
@@ -24,7 +24,7 @@ void SpectrumOverlayMenu::buildUI()
     // Dark theme matching NereusSDR STYLEGUIDE
     // QSS Type selectors match QMetaObject::className(), and Qt rewrites
     // namespace `::` as `--`. The bare `SpectrumOverlayMenu` selector
-    // never matched `NereusSDR::SpectrumOverlayMenu`, so the popup
+    // never matched `Longpath::SpectrumOverlayMenu`, so the popup
     // background fell through to the system Fusion palette (white on
     // Linux/Ubuntu Yaru). With the namespaced form below the panel
     // gets its dark surface back. Same trap applies to any future
@@ -296,4 +296,4 @@ void SpectrumOverlayMenu::setValues(int wfColorGain, int wfBlackLevel, bool auto
     m_ctunCheck->blockSignals(false);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -25,7 +25,7 @@
 
 #include "TciVfoCoalescer.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─────────────────────────────────────────────────────────────────────────
 // AppSettings keys introduced by Phase 3J-1 TCI Server.
@@ -675,4 +675,4 @@ private:
     int m_queryDispatchCount{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

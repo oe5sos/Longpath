@@ -5,7 +5,7 @@
 #include <QWidget>
 #include "gui/chrome/ChromeBarController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstChromeBarController : public QObject {
     Q_OBJECT

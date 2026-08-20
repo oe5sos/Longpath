@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 #include <QRect>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // tidyPower()
@@ -286,4 +286,4 @@ bool NeedleScalePwrItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -31,7 +31,7 @@
 
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class DexpPeakMeter : public QWidget {
     Q_OBJECT
@@ -58,4 +58,4 @@ private:
     double m_threshold01 = 0.5;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

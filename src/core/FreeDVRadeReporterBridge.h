@@ -73,7 +73,7 @@
 
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FreeDVReporterClient;
 class PskReporterClient;
@@ -151,6 +151,6 @@ private:
     bool m_reportingEnabled {false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H

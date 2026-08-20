@@ -26,8 +26,8 @@ private slots:
 // readIfconfSendsCommand: conn.readIfconf() returns a positive seq and emits
 // a frame containing "ifconf read" via the testFrameWrittenForTesting seam.
 void PgxlConnectionIfconfTest::readIfconfSendsCommand() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     quint32 seq = conn.readIfconf();
     QVERIFY(seq > 0);
     QCOMPARE(frameSpy.count(), 1);
@@ -40,8 +40,8 @@ void PgxlConnectionIfconfTest::readIfconfSendsCommand() {
 // Wire format: "ifconf address=<ip> netmask=<mask> gateway=<gw> dhcp=<true|false>"
 // per FlexRadio PowerGenius Ethernet API wiki spec (design section 6.4).
 void PgxlConnectionIfconfTest::writeIfconfBuildsCommandWithIpFields() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     quint32 seq = conn.writeIfconf(
         QStringLiteral("192.168.1.43"),
         QStringLiteral("255.255.255.0"),
@@ -62,8 +62,8 @@ void PgxlConnectionIfconfTest::writeIfconfBuildsCommandWithIpFields() {
 // PgxlConnection emits statusUpdated (not a dedicated ifconfResponse) for all
 // kv bodies in R-frames -- confirmed by reading processLine() in PgxlConnection.cpp.
 void PgxlConnectionIfconfTest::parsesIfconfResponse() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy statusSpy(&conn, &NereusSDR::PgxlConnection::statusUpdated);
+    Longpath::PgxlConnection conn;
+    QSignalSpy statusSpy(&conn, &Longpath::PgxlConnection::statusUpdated);
 
     // Handshake required before R-frames are processed.
     conn.injectLineForTesting(QStringLiteral("V3.8.9"));

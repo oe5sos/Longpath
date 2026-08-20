@@ -70,7 +70,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Three-column painted thumbnail grid, ported structurally from
 /// AetherSDR PanLayoutDialog. Shows every layout in `kPanLayouts` whose
@@ -110,4 +110,4 @@ private:
     QString     m_footerText;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -51,7 +51,7 @@ class QSlider;
 class QLabel;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class DiversityRadarWidget;
 class RadioModel;
@@ -132,4 +132,4 @@ private:
     QWidget*                   m_pauseOverlay{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

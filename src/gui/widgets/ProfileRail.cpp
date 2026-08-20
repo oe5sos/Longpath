@@ -19,7 +19,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 QString badgeStyle(bool active)
@@ -229,4 +229,4 @@ bool ProfileRail::clickBadge(const QString& name)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

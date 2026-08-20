@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 #include <QColor>
 #include <QImage>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsMagicEyeItem (MeterManager.cs:15855+)
 // Vacuum tube magic eye — green phosphor arc opens/closes with signal.
@@ -99,4 +99,4 @@ private:
     float   m_smoothedDbm{kS0Dbm};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

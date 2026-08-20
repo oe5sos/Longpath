@@ -62,7 +62,7 @@
 
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Lerp-based noise floor tracker ported from Thetis display.cs.
 // From Thetis v2.10.3.13 display.cs:4628-4693 — noise floor estimation
@@ -85,4 +85,4 @@ private:
     float m_elapsedMs{0.0f};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

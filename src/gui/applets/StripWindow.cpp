@@ -53,7 +53,7 @@
 #include <cmath>
 #include <functional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1761,4 +1761,4 @@ void StripWindow::refreshMeters()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

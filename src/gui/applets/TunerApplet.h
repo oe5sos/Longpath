@@ -39,7 +39,7 @@ class QMenu;
 class QWidget;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 class RelayBar;
@@ -245,4 +245,4 @@ private:
     bool m_tgxlConnected{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

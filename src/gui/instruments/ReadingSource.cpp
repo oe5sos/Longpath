@@ -21,7 +21,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -379,4 +379,4 @@ QList<const ReadingDescriptor*> readingsWithScale()
     return out;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

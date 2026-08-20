@@ -14,7 +14,7 @@
 // =================================================================
 #include "core/WidebandFrameAccumulator.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 WidebandFrameAccumulator::WidebandFrameAccumulator(QObject* parent)
     : QObject(parent)
@@ -106,4 +106,4 @@ void WidebandFrameAccumulator::decode512Samples(const QByteArray& payload,
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

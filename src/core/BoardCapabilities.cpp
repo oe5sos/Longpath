@@ -269,7 +269,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "BoardCapabilities.h"
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 // ─── Atlas / HPSDR kit ──────────────────────────────────────────────────────
@@ -1454,4 +1454,4 @@ int stepAttMaxDb(HPSDRHW hw, bool alexPresent) noexcept
 }
 
 } // namespace BoardCapsTable
-} // namespace NereusSDR
+} // namespace Longpath

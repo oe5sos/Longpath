@@ -23,8 +23,8 @@ private slots:
 };
 
 void PgxlConnectionKeepaliveTest::enableKeepaliveSendsKeepaliveEnable() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     conn.enableKeepalive();
     // At least one frame must have been written (the keepalive enable command).
     QVERIFY(frameSpy.count() >= 1);
@@ -39,7 +39,7 @@ void PgxlConnectionKeepaliveTest::enableKeepaliveSendsKeepaliveEnable() {
 }
 
 void PgxlConnectionKeepaliveTest::keepaliveTimerStartsAfterEnable() {
-    NereusSDR::PgxlConnection conn;
+    Longpath::PgxlConnection conn;
     QVERIFY(!conn.testKeepaliveTimerActive());
     conn.enableKeepalive();
     QVERIFY(conn.testKeepaliveTimerActive());

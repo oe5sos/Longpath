@@ -16,7 +16,7 @@
 #include "core/P2RadioConnection.h"
 #include "core/DdcAssignment.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP2RadioConnectionApplyDdcAssignment : public QObject {
     Q_OBJECT

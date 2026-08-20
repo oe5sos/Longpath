@@ -63,7 +63,7 @@
 #include <cmath>
 #include <numeric>
 
-namespace NereusSDR {
+namespace Longpath {
 
 NoiseFloorTracker::NoiseFloorTracker() = default;
 
@@ -106,4 +106,4 @@ void NoiseFloorTracker::triggerFastAttack()
     m_isGood = false;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

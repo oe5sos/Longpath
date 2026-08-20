@@ -76,7 +76,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 Q_LOGGING_CATEGORY(lcHl2Options, "nereus.hl2.options")
@@ -596,4 +596,4 @@ bool Hl2OptionsTab::isI2cWriteEnabledForTest() const
 }
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

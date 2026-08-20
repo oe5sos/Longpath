@@ -73,7 +73,7 @@ class QCheckBox;
 class QLabel;
 class QGroupBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Setup → DSP → Options page.
 //
@@ -198,4 +198,4 @@ private:
     void recomputeWarnings();
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

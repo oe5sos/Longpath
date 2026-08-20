@@ -13,7 +13,7 @@
 #include <QLabel>
 #include "gui/setup/GeneralOptionsPage.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestGeneralSetupHardwareConfig : public QObject
 {

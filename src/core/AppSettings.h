@@ -72,7 +72,7 @@
 #include <QHostAddress>
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Saved-radio bundle (Phase 3I Task 15).
 // Combines RadioInfo with the client-side flags that only live in settings.
@@ -479,4 +479,4 @@ private:
     bool    m_recoveredFromBackup{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

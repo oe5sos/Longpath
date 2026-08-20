@@ -32,7 +32,7 @@
 #include "core/PaProfile.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPaProfile : public QObject {
     Q_OBJECT

@@ -30,7 +30,7 @@
 #include <QRegularExpression>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // One station's contact data as returned by a callsign-database
 // lookup. Provider-neutral so a future HamQTH/hamdb backend can fill
@@ -107,9 +107,9 @@ inline QString normalized(const QString& call)
 }
 
 } // namespace Callsigns
-} // namespace NereusSDR
+} // namespace Longpath
 
 // Travels through QrzClient::lookupSucceeded, so the meta-object
 // system has to know it. Matches the convention the rest of the
 // project follows for struct signal payloads (see FreeDVStation.h).
-Q_DECLARE_METATYPE(NereusSDR::CallsignInfo)
+Q_DECLARE_METATYPE(Longpath::CallsignInfo)

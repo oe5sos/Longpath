@@ -61,7 +61,7 @@ mw0lge@grange-lane.co.uk
 class QTreeWidget;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Phase 3G-6 block 5 — popup that lets the user pick an MMIO
 // (endpoint, variableName) pair to bind a meter item to. Opened
@@ -104,4 +104,4 @@ private:
     bool    m_cleared{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

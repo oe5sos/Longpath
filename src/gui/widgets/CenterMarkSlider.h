@@ -27,7 +27,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // CenterMarkSlider — ported from AetherSDR src/gui/VfoWidget.cpp:79-94
 // ResetSlider that paints a small antialiased circle at the slider groove
@@ -51,4 +51,4 @@ protected:
     }
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

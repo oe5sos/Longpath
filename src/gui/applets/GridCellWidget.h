@@ -52,7 +52,7 @@ class QLabel;
 class QVBoxLayout;
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletWidget;
 
@@ -122,4 +122,4 @@ private:
     QList<QWidget*> m_contents;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

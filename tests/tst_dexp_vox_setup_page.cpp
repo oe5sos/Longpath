@@ -31,7 +31,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDexpVoxSetupPage : public QObject
 {

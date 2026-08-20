@@ -132,7 +132,7 @@
 
 #include <cstddef>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -350,4 +350,4 @@ void PaCalibrationGroup::setSpinValueForTest(int idx, double v)
 
 #endif  // NEREUS_BUILD_TESTS
 
-}  // namespace NereusSDR
+}  // namespace Longpath

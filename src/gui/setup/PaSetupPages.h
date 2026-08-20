@@ -175,7 +175,7 @@ class QProgressBar;
 class QPushButton;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PaCalibrationGroup;
 class PaProfile;
@@ -776,4 +776,4 @@ private:
                                            const PeakMin& pmCelsius);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

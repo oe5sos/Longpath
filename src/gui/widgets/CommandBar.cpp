@@ -22,7 +22,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 /// Die Versalzeile über einer Gruppe. 8 px, weite Laufweite,
@@ -362,4 +362,4 @@ bool CommandBar::clickPill(const QString& groupName, const QString& label)
     return false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

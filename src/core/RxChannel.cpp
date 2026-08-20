@@ -274,7 +274,7 @@ extern "C" {
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RxChannel::RxChannel(int channelId, int bufferSize, int sampleRate,
                      QObject* parent)
@@ -285,7 +285,7 @@ RxChannel::RxChannel(int channelId, int bufferSize, int sampleRate,
 {
 #ifdef HAVE_WDSP
     // From design doc §sub-epic B — one NbFamily per WDSP channel.
-    m_nb = std::make_unique<NereusSDR::NbFamily>(
+    m_nb = std::make_unique<Longpath::NbFamily>(
         m_channelId,
         /*sampleRate=*/ m_sampleRate,
         /*bufferSize=*/ m_bufferSize);
@@ -295,7 +295,7 @@ RxChannel::RxChannel(int channelId, int bufferSize, int sampleRate,
     // Sub-epic C-1 Task 9 — DeepFilterNet3 post-WDSP noise reduction.
     // Instantiate unconditionally; the filter self-disables if the model
     // tarball is not found (isValid() returns false).
-    m_dfnr = std::make_unique<NereusSDR::DeepFilterFilter>();
+    m_dfnr = std::make_unique<Longpath::DeepFilterFilter>();
     if (!m_dfnr->isValid()) {
         qCWarning(lcDsp) << "DFNR not available on channel" << m_channelId
                          << "(model not found or df_create failed)";
@@ -308,7 +308,7 @@ RxChannel::RxChannel(int channelId, int bufferSize, int sampleRate,
     // Accelerate is a system framework — always available on macOS.
     // isValid() returns false only if vDSP_create_fftsetup failed (never
     // in practice), so no warning-and-reset needed; log if it ever fires.
-    m_mnr = std::make_unique<NereusSDR::MacNRFilter>();
+    m_mnr = std::make_unique<Longpath::MacNRFilter>();
     if (!m_mnr->isValid()) {
         qCWarning(lcDsp) << "MNR (Apple Accelerate) FFT setup failed on channel"
                          << m_channelId;
@@ -660,14 +660,14 @@ void RxChannel::setAgcMaxGain(int dB)
 // Noise blanker family (NB / NB2 / SNB) — see NbFamily.h
 // ---------------------------------------------------------------------------
 
-void RxChannel::setNbMode(NereusSDR::NbMode mode)
+void RxChannel::setNbMode(Longpath::NbMode mode)
 {
     if (m_nb) m_nb->setMode(mode);
 }
 
-NereusSDR::NbMode RxChannel::nbMode() const
+Longpath::NbMode RxChannel::nbMode() const
 {
-    return m_nb ? m_nb->mode() : NereusSDR::NbMode::Off;
+    return m_nb ? m_nb->mode() : Longpath::NbMode::Off;
 }
 
 // Phase 3F Sub-Epic I Task 4b. Written by RxDspWorker's drain loop before
@@ -1852,10 +1852,10 @@ void RxChannel::processIq(float* inI, float* inQ,
     // holds one ANB / NOB per receiver rather than per sub-receiver
     // (ChannelMaster cmaster.h:79-81 [v2.10.3.15]).
     if (!m_nbBypassed.load(std::memory_order_acquire)) {
-        switch (m_nb ? m_nb->mode() : NereusSDR::NbMode::Off) {
-            case NereusSDR::NbMode::NB:  xanbEXTF(m_channelId, inI, inQ); break;
-            case NereusSDR::NbMode::NB2: xnobEXTF(m_channelId, inI, inQ); break;
-            case NereusSDR::NbMode::Off: /* no-op */                      break;
+        switch (m_nb ? m_nb->mode() : Longpath::NbMode::Off) {
+            case Longpath::NbMode::NB:  xanbEXTF(m_channelId, inI, inQ); break;
+            case Longpath::NbMode::NB2: xnobEXTF(m_channelId, inI, inQ); break;
+            case Longpath::NbMode::Off: /* no-op */                      break;
         }
     }
 
@@ -2601,4 +2601,4 @@ QVector<float> RxChannel::filterResponseMagnitudes(int nPoints) const
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

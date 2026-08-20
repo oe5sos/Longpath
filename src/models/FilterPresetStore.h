@@ -25,7 +25,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// A single filter preset slot.
 /// name   — display label (e.g., "F1", "DX-2.4k"); user-renameable.
@@ -97,7 +97,7 @@ public:
 signals:
     /// Emitted on any mutation for the affected mode.
     /// RxApplet and VfoWidget subscribe and call rebuildFilterButtons.
-    void presetsChanged(NereusSDR::DSPMode mode);
+    void presetsChanged(Longpath::DSPMode mode);
 
 private:
     // Returns the AppSettings key prefix for a mode+slot, e.g.
@@ -122,4 +122,4 @@ private:
     static std::optional<FilterPreset> loadSlot(DSPMode mode, int slot);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -44,7 +44,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct WavData {
     QVector<float> samples;      // einkanalig, -1..+1
@@ -92,4 +92,4 @@ bool writeWavStereo16(const QString& path, const QVector<float>& interleaved,
 // Gibt 0 zurueck, wenn die Datei nicht lesbar ist.
 double wavDurationSeconds(const QString& path);
 
-} // namespace NereusSDR
+} // namespace Longpath

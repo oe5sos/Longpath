@@ -41,7 +41,7 @@
 #include "models/TransmitModel.h"
 #include "core/audio/CompositeTxMicRouter.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxAppletMon : public QObject
 {

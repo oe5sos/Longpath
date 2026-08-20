@@ -26,7 +26,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -366,4 +366,4 @@ void BandwidthFilterApplet::syncFromModel()
     rebuildPanes();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

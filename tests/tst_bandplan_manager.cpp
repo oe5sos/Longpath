@@ -6,7 +6,7 @@
 #include "models/BandPlan.h"
 #include "models/BandPlanManager.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestBandPlanManager : public QObject
 {

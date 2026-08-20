@@ -78,7 +78,7 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 OcOutputsTab::OcOutputsTab(RadioModel* model, QWidget* parent)
     : QWidget(parent)
@@ -306,4 +306,4 @@ void OcOutputsTab::toggleUserDigOutCheckboxForTest(int bit, bool checked)
     cb->setChecked(checked);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -35,7 +35,7 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     : QWidget(parent)
@@ -453,4 +453,4 @@ void PanadapterApplet::setFloatingIndicator(bool floating)
         : QStringLiteral("Detach into its own window"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

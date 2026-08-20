@@ -19,7 +19,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Somewhere to put a password that is not the settings file.
 //
@@ -56,4 +56,4 @@ public:
     static QString backendDescription();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

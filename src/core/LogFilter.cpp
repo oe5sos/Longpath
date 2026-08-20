@@ -14,7 +14,7 @@
 
 #include "core/QsoConfirmation.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -91,4 +91,4 @@ bool LogFilter::matches(const LogEntry& e) const
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

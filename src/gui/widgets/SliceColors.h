@@ -32,7 +32,7 @@
 
 #include <QColor>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Die Farbe der Scheibe mit diesem Index. Unbekannte Indizes
 /// bekommen die Farbe von A — eine fuenfte Scheibe faellt damit auf,
@@ -49,4 +49,4 @@ inline QColor sliceColor(int index)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

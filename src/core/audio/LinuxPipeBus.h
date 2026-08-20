@@ -33,7 +33,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── LinuxPipeBus ─────────────────────────────────────────────────────────────
 //
@@ -157,4 +157,4 @@ private:
     static constexpr int kMeterStride = 10;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

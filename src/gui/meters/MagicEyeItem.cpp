@@ -64,7 +64,7 @@ mw0lge@grange-lane.co.uk
 #include <cmath>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // setBezelImagePath()
@@ -204,4 +204,4 @@ bool MagicEyeItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

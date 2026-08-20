@@ -5,7 +5,7 @@
 #include <utility>
 #include "core/Rf2ksConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class ControlledInfoServer : public QTcpServer {
     Q_OBJECT

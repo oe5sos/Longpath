@@ -4,7 +4,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 MetricLabel::MetricLabel(const QString& label, const QString& initialValue,
                          QWidget* parent)
@@ -51,4 +51,4 @@ void MetricLabel::applyStyle()
     )));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

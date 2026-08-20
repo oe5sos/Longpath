@@ -19,7 +19,7 @@
 #include <QStyle>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 Rf2ksApplet::Rf2ksApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
@@ -398,4 +398,4 @@ void Rf2ksApplet::contextMenuEvent(QContextMenuEvent* ev)
     delete menu;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

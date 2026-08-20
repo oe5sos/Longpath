@@ -73,7 +73,7 @@ mw0lge@grange-lane.co.uk
 #include <QTableWidget>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -133,8 +133,8 @@ public:
     static StatePill statePillForLastSeen(qint64 lastSeenMs, qint64 nowMs);
 
 public slots:
-    void onRadioDiscovered(const NereusSDR::RadioInfo& info);
-    void onRadioUpdated(const NereusSDR::RadioInfo& info);
+    void onRadioDiscovered(const Longpath::RadioInfo& info);
+    void onRadioUpdated(const Longpath::RadioInfo& info);
     void onRadioLost(const QString& macAddress);
     void onConnectionStateChanged();
 
@@ -243,4 +243,4 @@ private:
     };
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

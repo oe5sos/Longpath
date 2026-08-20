@@ -54,7 +54,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 constexpr const char* kTestMac = "AA:BB:CC:DD:EE:FF";

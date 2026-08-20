@@ -22,7 +22,7 @@
 #include <QComboBox>
 #include <QTableWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FilterPresetStore;
 
@@ -48,7 +48,7 @@ private slots:
     void onResetThisRow();
     void onResetThisMode();
     void onResetAll();
-    void onPresetsChanged(NereusSDR::DSPMode mode);
+    void onPresetsChanged(Longpath::DSPMode mode);
 
 private:
     void buildUi();
@@ -65,4 +65,4 @@ private:
     bool m_updatingTable{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

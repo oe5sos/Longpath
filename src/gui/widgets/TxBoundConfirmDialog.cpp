@@ -23,7 +23,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TxBoundConfirmDialog::TxBoundConfirmDialog(const QString& proposedAntenna,
                                            const QString& existingAntenna,
@@ -90,4 +90,4 @@ TxBoundConfirmDialog::TxBoundConfirmDialog(const QString& proposedAntenna,
     main->addLayout(footer);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -34,7 +34,7 @@
 #include "core/dsp/ChannelConfig.h"
 #include "core/dsp/TxChannelState.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Use channel 3 / 4 to avoid collision with production channel 1 (WdspEngine TX)
 // and to stay within the WDSP MAX_CHANNELS=32 bound (txa[] array size).

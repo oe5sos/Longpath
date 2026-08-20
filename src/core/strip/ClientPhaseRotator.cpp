@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 constexpr float kMinusInfDb = -120.0f;
@@ -176,4 +176,4 @@ void ClientPhaseRotator::process(float* interleaved, int frames, int channels) n
     m_meters.outNegDb.store(linToDb(-outNeg),      std::memory_order_relaxed);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

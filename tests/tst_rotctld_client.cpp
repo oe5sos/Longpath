@@ -16,7 +16,7 @@
 
 #include "core/RotctldClient.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // A rotctld that never moves anything. It answers, it can be told to
 // refuse, and it can be told to reply in fragments — which is what a

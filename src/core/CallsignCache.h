@@ -57,7 +57,7 @@
 #include <QJsonObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class CallsignCache {
 public:
@@ -123,4 +123,4 @@ private:
     qint64                       m_maxAge{kDefaultMaxAgeSeconds};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

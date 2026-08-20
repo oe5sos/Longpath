@@ -20,7 +20,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -98,4 +98,4 @@ void StatusToast::mousePressEvent(QMouseEvent* event)
     close();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

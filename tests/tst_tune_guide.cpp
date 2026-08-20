@@ -26,7 +26,7 @@
 
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTuneGuide : public QObject
 {

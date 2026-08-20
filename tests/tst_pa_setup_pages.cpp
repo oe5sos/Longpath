@@ -18,7 +18,7 @@
 
 #include "gui/setup/PaSetupPages.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPaSetupPages : public QObject {
     Q_OBJECT

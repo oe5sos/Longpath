@@ -36,7 +36,7 @@
 
 #include <QElapsedTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PeakHold {
 public:
@@ -100,4 +100,4 @@ private:
     bool   m_seeded{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

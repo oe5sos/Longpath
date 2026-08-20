@@ -19,7 +19,7 @@
 
 Q_DECLARE_LOGGING_CATEGORY(lcPw)
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // configToProperties — pure, unit-testable (no daemon required).
@@ -482,6 +482,6 @@ void PipeWireStream::maybeEmitTelemetry()
                               Qt::QueuedConnection);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 #endif  // NEREUS_HAVE_PIPEWIRE

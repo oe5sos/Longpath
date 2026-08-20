@@ -21,7 +21,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace KmlExport {
 
 namespace {
@@ -221,7 +221,7 @@ Result toKml(const QVector<LogEntry>& entries, const Options& opt)
     r.kml = QStringLiteral(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<kml xmlns=\"http://www.opengis.net/kml/2.2\">"
-        "<Document><name>NereusSDR logbook</name>%1</Document></kml>\n")
+        "<Document><name>Longpath logbook</name>%1</Document></kml>\n")
         .arg(body);
     return r;
 }
@@ -252,4 +252,4 @@ bool writeKml(const QString& path, const QVector<LogEntry>& entries,
 }
 
 } // namespace KmlExport
-} // namespace NereusSDR
+} // namespace Longpath

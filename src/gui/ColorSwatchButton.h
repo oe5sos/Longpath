@@ -5,7 +5,7 @@
 #include <QPushButton>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Reusable color picker button: shows a color swatch, opens QColorDialog on click.
 ///
@@ -41,4 +41,4 @@ private:
     QColor m_color;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

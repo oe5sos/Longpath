@@ -20,7 +20,7 @@
 #include "gui/setup/hardware/PaCalibrationGroup.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPaWattMeterPage : public QObject {
     Q_OBJECT

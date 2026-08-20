@@ -67,7 +67,7 @@
 
 #include "core/NoiseFloorTracker.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNoiseFloorTracker : public QObject {
     Q_OBJECT

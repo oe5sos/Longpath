@@ -14,7 +14,7 @@
 #include "core/SkuUiProfile.h"
 #include "gui/AntennaPopupBuilder.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAntennaPopupBuilder : public QObject {
     Q_OBJECT

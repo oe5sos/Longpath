@@ -40,7 +40,7 @@
 
 #include "core/FFTEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWindowFunctions : public QObject
 {

@@ -21,7 +21,7 @@
 #include <QDateTime>
 #include <QLoggingCategory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 Q_LOGGING_CATEGORY(lcTgxl, "nereus.tgxl")
 
@@ -582,4 +582,4 @@ void TgxlConnection::testFlushPingTimeouts()
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

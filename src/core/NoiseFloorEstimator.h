@@ -63,7 +63,7 @@
 #include <QVector>
 #include <limits>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class NoiseFloorEstimator {
 public:
@@ -97,4 +97,4 @@ private:
     float          m_primedValue{std::numeric_limits<float>::quiet_NaN()};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

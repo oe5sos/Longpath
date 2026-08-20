@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 QsoRecorderController::QsoRecorderController(QObject* parent)
     : QObject(parent)
@@ -151,4 +151,4 @@ void QsoRecorderController::drain()
     emit secondsChanged(m_recorder.recordedSeconds());
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

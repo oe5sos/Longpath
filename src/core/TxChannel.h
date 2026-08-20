@@ -330,7 +330,7 @@ warren@wpratt.com
 #include "dsp/TxChannelState.h"
 #include "wdsp_api.h"  // NEREUS_STDCALL macro for s_pushVoxCallback (Task 17)
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioConnection;
 class TxMicRouter;
@@ -3240,4 +3240,4 @@ private:
     std::vector<float> m_tciTxResampleOut;  // scratch output buffer
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

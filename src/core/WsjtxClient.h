@@ -52,7 +52,7 @@
 #include "DxSpot.h"
 #include "models/LogEntry.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/WsjtxClient.h:11-61 [@0cd4559]
 //
@@ -96,7 +96,7 @@ signals:
     // WSJT-X logged a contact (message type 12, "Logged ADIF"). The
     // entry is the parsed ADIF record WSJT-X broadcast — band, mode,
     // reports and grid included.
-    void qsoLogged(const NereusSDR::LogEntry& entry);
+    void qsoLogged(const Longpath::LogEntry& entry);
 
 private slots:
     void onReadyRead();
@@ -126,4 +126,4 @@ private:
     QString m_mode;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

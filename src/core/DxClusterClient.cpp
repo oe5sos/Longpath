@@ -44,7 +44,7 @@
 #include <QFileInfo>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/DxClusterClient.cpp:12-25 [@0cd4559]
 DxClusterClient::DxClusterClient(QObject* parent)
@@ -405,4 +405,4 @@ bool DxClusterClient::parseDxSpotLine(const QString& line, DxSpot& spot) const
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

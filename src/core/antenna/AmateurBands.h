@@ -41,7 +41,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR::AmateurBands {
+namespace Longpath::AmateurBands {
 
 enum class Region {
     One   = 1,   // Europe, Africa, Middle East, northern Asia — OE is here
@@ -86,4 +86,4 @@ QVector<Band> allOverlapping(double startHz, double stopHz,
 
 QString regionName(Region r);
 
-} // namespace NereusSDR::AmateurBands
+} // namespace Longpath::AmateurBands

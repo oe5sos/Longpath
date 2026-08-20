@@ -13,7 +13,7 @@
 #include "gui/MainWindow.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPanadapterStackLayouts : public QObject {
     Q_OBJECT

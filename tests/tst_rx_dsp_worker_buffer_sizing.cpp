@@ -25,7 +25,7 @@
 
 #include "models/RxDspWorker.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRxDspWorkerBufferSizing : public QObject {
     Q_OBJECT

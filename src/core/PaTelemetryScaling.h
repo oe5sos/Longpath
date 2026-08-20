@@ -81,7 +81,7 @@
 
 #include "core/HpsdrModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Scale raw PA forward-power ADC counts (typically 0..4095, 12-bit) to
 /// calibrated forward power in watts using the per-board curve from
@@ -203,4 +203,4 @@ float scaleExciterPowerMw(HPSDRModel model, quint16 raw) noexcept;
 ///   // MI0BOT: temp for HL2
 double scaleHermesLiteTempCelsius(quint16 raw) noexcept;
 
-}  // namespace NereusSDR
+}  // namespace Longpath

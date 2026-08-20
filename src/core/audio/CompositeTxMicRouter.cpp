@@ -14,7 +14,7 @@
 #include "core/audio/RadioMicSource.h"
 #include "core/audio/VaxTxMicSource.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 CompositeTxMicRouter::CompositeTxMicRouter(PcMicSource*    pcSource,
                                            RadioMicSource* radioSource,
@@ -109,4 +109,4 @@ int CompositeTxMicRouter::pullSamples(float* dst, int n)
     return n;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

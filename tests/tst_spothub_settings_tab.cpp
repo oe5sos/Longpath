@@ -52,7 +52,7 @@
 #include "models/SpotModel.h"
 #include "models/SpotTableModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

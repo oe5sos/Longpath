@@ -205,7 +205,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <array>
 #include <span>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Saturn BPF1 band edges — per-band start/end frequency in MHz.
 // When populated by user via Phase B Task 8 Alex-1 Filters page, the
@@ -612,4 +612,4 @@ namespace BoardCapsTable {
     int stepAttMaxDb(HPSDRHW hw, bool alexPresent) noexcept;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -21,7 +21,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Decides which DDC stream should host a slice at a given frequency.
 ///
@@ -138,4 +138,4 @@ private:
     int m_defaultRateHz{192000};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

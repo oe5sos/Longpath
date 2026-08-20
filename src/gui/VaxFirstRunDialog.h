@@ -31,7 +31,7 @@
 class QPushButton;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class FirstRunScenario {
     WindowsCablesFound,   // A: Windows, 3rd-party virtual cables detected
@@ -117,4 +117,4 @@ private:
     QVector<DetectedCable> m_detected;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

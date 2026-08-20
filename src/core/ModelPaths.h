@@ -18,7 +18,7 @@
 
 #include <QString>
 
-namespace NereusSDR::ModelPaths {
+namespace Longpath::ModelPaths {
 
 // Path to the bundled rnnoise "Default (large)" model. Resolves to:
 //   macOS:   .app/Contents/Resources/models/rnnoise/Default_large.bin
@@ -51,4 +51,4 @@ QString rnnoiseDefaultSmallBin();
 // disable DFNR in that case.
 QString dfnrModelTarball();
 
-} // namespace NereusSDR::ModelPaths
+} // namespace Longpath::ModelPaths

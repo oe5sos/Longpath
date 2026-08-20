@@ -36,7 +36,7 @@
 #include "core/WdspTypes.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDspModeRade : public QObject {
     Q_OBJECT

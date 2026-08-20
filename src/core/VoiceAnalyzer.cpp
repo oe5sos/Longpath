@@ -20,7 +20,7 @@
 #include <numeric>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -432,4 +432,4 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     return r;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

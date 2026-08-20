@@ -8,7 +8,7 @@
 
 #include "gui/applets/AppletWidget.h"
 
-namespace NereusSDR {
+namespace Longpath {
 namespace AppletKeys {
 
 QString panelIdFor(const AppletMap& map, const AppletWidget* applet)
@@ -40,4 +40,4 @@ QString canonical(const AppletMap& map, const QString& key)
 }
 
 } // namespace AppletKeys
-} // namespace NereusSDR
+} // namespace Longpath

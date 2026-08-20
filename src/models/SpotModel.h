@@ -44,7 +44,7 @@
 #include <QDateTime>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/models/SpotModel.h:10-25 [@0cd4559]
 struct SpotData {
@@ -151,6 +151,6 @@ private:
     QTimer m_expireTimer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::SpotData)
+Q_DECLARE_METATYPE(Longpath::SpotData)

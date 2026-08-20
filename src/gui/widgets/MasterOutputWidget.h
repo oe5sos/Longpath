@@ -39,7 +39,7 @@ class QPoint;
 class QPushButton;
 class QSlider;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 
@@ -101,7 +101,7 @@ private slots:
     // Receives the negotiated AudioDeviceConfig from the engine after any
     // speakers bus reconfig and updates m_currentDeviceName so the right-
     // click picker's checkmark stays consistent.
-    void onSpeakersConfigChanged(const NereusSDR::AudioDeviceConfig& cfg);
+    void onSpeakersConfigChanged(const Longpath::AudioDeviceConfig& cfg);
 
 private:
     AudioEngine* m_audio{nullptr};
@@ -112,4 +112,4 @@ private:
     QString      m_currentDeviceName;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

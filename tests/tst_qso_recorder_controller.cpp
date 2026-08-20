@@ -29,7 +29,7 @@
 
 #include "core/audio/QsoRecorderController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

@@ -31,7 +31,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Client-side tube saturator — TX DSP chain Phase 4 (#1661).  Per-
 // sample soft-clipping waveshaper that adds tube-like harmonic
@@ -184,4 +184,4 @@ private:
     float    m_toneStateR{0.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

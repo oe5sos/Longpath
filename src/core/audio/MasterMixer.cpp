@@ -98,7 +98,7 @@ warren@wpratt.com
 #include <vector>
 #include <limits>
 
-namespace NereusSDR {
+namespace Longpath {
 
 
 void MasterMixer::setSliceGain(int sliceId, float gain, float pan) {
@@ -578,4 +578,4 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
     return n;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

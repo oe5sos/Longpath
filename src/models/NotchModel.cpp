@@ -153,7 +153,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -691,4 +691,4 @@ void NotchModel::restoreFromSettings()
     emit notchesReset();
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

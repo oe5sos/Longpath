@@ -31,8 +31,8 @@ private slots:
 // "R1|0|state=OPERATE" -> emits statusUpdated() -> +1 framesIn
 void ConnectionDiagnosticsTest::tracksFrameCount()
 {
-    NereusSDR::PgxlConnection conn;
-    NereusSDR::ConnectionDiagnostics diag;
+    Longpath::PgxlConnection conn;
+    Longpath::ConnectionDiagnostics diag;
     diag.bindTo(&conn);
 
     conn.injectLineForTesting("V3.8.9");
@@ -47,10 +47,10 @@ void ConnectionDiagnosticsTest::tracksFrameCount()
 // Uses testForceDisconnect() (already exists on PgxlConnection, Task 59).
 void ConnectionDiagnosticsTest::countsReconnectsFromSignal()
 {
-    NereusSDR::AppSettings::instance().setValue("PGXL_AutoReconnect", "True");
+    Longpath::AppSettings::instance().setValue("PGXL_AutoReconnect", "True");
 
-    NereusSDR::PgxlConnection conn;
-    NereusSDR::ConnectionDiagnostics diag;
+    Longpath::PgxlConnection conn;
+    Longpath::ConnectionDiagnostics diag;
     diag.bindTo(&conn);
 
     // Seed a non-routable host so scheduleReconnect does not bail on empty host.
@@ -71,9 +71,9 @@ void ConnectionDiagnosticsTest::countsReconnectsFromSignal()
 // PGXL must not alter the diagnostics anymore.
 void ConnectionDiagnosticsTest::rebindToTgxlClearsPgxlCounts()
 {
-    NereusSDR::PgxlConnection pgxl;
-    NereusSDR::TgxlConnection tgxl;
-    NereusSDR::ConnectionDiagnostics diag;
+    Longpath::PgxlConnection pgxl;
+    Longpath::TgxlConnection tgxl;
+    Longpath::ConnectionDiagnostics diag;
 
     // Bind to PGXL and inject two frames.
     diag.bindTo(&pgxl);

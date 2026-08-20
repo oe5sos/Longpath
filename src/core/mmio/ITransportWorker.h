@@ -5,7 +5,7 @@
 #include <QHash>
 #include <QVariant>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Phase 3G-6 block 5 — abstract base for every MMIO transport worker.
 // Concrete subclasses (UdpEndpointWorker, TcpListenerEndpointWorker,
@@ -67,4 +67,4 @@ private:
     State m_state{State::Disconnected};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

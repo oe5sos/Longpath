@@ -32,7 +32,7 @@
 #include <QVector>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// One pan-layout arrangement. rows holds the column count per row, so
 /// {2, 1} is two pans over one.
@@ -75,4 +75,4 @@ private:
     bool              m_enabled{true};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

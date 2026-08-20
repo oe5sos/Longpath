@@ -15,7 +15,7 @@
 
 Q_LOGGING_CATEGORY(lcWindowPlacement, "nereus.windowplacement")
 
-namespace NereusSDR {
+namespace Longpath {
 
 void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
 {
@@ -74,4 +74,4 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
                                           : QStringLiteral("(null)"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

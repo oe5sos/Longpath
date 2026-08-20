@@ -16,7 +16,7 @@
 #include "PgxlConnection.h"
 #include "TgxlConnection.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 ConnectionDiagnostics::ConnectionDiagnostics(QObject* parent)
     : QObject(parent)
@@ -267,4 +267,4 @@ void ConnectionDiagnostics::testFlushCoalesceTimer()
     m_dirty = false;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

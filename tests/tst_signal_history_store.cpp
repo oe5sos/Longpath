@@ -25,7 +25,7 @@
 
 #include "core/SignalHistoryStore.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

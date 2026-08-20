@@ -28,7 +28,7 @@
 #include <QMoveEvent>
 #include <QResizeEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     : QWidget(parent, Qt::Window)
@@ -114,4 +114,4 @@ void PanFloatingWindow::resizeEvent(QResizeEvent*)
     emit geometryChanged(panId(), saveGeometry());
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

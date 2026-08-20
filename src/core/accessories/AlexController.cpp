@@ -50,7 +50,7 @@
 #include <set>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Source: HPSDR/Alex.cs:Alex() ctor — "for(int i=0;i<12;i++) { TxAnt[i]=1; RxAnt[i]=1; RxOnlyAnt[i]=0; }" [v2.10.3.13 @501e3f5]
 // NereusSDR: Tx/RxAnt default to 1 (the standard ant port); RxOnlyAnt defaults
@@ -422,4 +422,4 @@ void AlexController::save()
     s.setValue(QStringLiteral("%1/Alex1_BpfMode").arg(base), QString::number(int(m_perAdcState[1].mode)));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

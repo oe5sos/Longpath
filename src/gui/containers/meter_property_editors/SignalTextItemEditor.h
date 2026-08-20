@@ -7,7 +7,7 @@ class QDoubleSpinBox;
 class QComboBox;
 class QFontComboBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SignalTextItem;
 
@@ -33,4 +33,4 @@ private:
     QComboBox*      m_comboBarStyle{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -54,7 +54,7 @@ mw0lge@grange-lane.co.uk
 
 #include "ModeButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsModeButtonBox (MeterManager.cs:9951+)
 static const char* const kModeLabels[] = {
@@ -120,4 +120,4 @@ bool ModeButtonItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

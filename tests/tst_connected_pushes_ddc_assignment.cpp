@@ -41,7 +41,7 @@
 #include "core/codec/CodecContext.h"
 #include "core/codec/P2CodecOrionMkII.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstConnectedPushesDdcAssignment : public QObject
 {
@@ -50,7 +50,7 @@ class TstConnectedPushesDdcAssignment : public QObject
 private slots:
     void initTestCase()
     {
-        qRegisterMetaType<PsDdcConfig>("NereusSDR::PsDdcConfig");
+        qRegisterMetaType<PsDdcConfig>("Longpath::PsDdcConfig");
         qRegisterMetaType<PsDdcConfig>("PsDdcConfig");
     }
 

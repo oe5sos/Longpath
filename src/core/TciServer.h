@@ -46,7 +46,7 @@ class QWebSocketServer;
 class QWebSocket;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class RxChannel;
@@ -535,6 +535,6 @@ private:
     AudioRingSpsc<131072> m_txAudioRing;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

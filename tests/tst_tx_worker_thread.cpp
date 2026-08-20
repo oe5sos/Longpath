@@ -91,7 +91,7 @@
 
 #include "fakes/FakeAudioBus.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockConnection — counts sendTxIq calls + records lastN ──────────────────
 class MockConnection : public RadioConnection {
@@ -103,7 +103,7 @@ public:
         setState(ConnectionState::Connected);
     }
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

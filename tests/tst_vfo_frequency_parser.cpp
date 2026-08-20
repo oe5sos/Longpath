@@ -18,7 +18,7 @@
 #include <QtTest/QtTest>
 #include "gui/instruments/FrequencyInstrument.h"
 
-using NereusSDR::FrequencyInstrument;
+using Longpath::FrequencyInstrument;
 
 class TestVfoFrequencyParser : public QObject {
     Q_OBJECT

@@ -29,7 +29,7 @@
 
 #include "QsoUploader.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AdifNetworkUploader : public QsoUploader {
     Q_OBJECT
@@ -63,4 +63,4 @@ private:
     Transport m_transport{Transport::Udp};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

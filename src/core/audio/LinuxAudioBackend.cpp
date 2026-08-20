@@ -48,7 +48,7 @@ bool pactlBinaryRunnableImpl(int timeoutMs)
 
 QString forcedOverrideImpl()
 {
-    return NereusSDR::AppSettings::instance()
+    return Longpath::AppSettings::instance()
         .value(QStringLiteral("Audio/LinuxBackendPreferred"),
                QStringLiteral(""))
         .toString();
@@ -56,7 +56,7 @@ QString forcedOverrideImpl()
 
 }  // anonymous
 
-namespace NereusSDR {
+namespace Longpath {
 
 LinuxAudioBackend detectLinuxBackend(const LinuxAudioBackendProbes& probes)
 {
@@ -115,4 +115,4 @@ LinuxAudioBackendProbes defaultProbes()
     return p;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -50,7 +50,7 @@
 #include "core/codec/P2CodecSaturn.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 
@@ -241,7 +241,7 @@ private slots:
 
         // What the Hermes-class codec emits while PureSignal transmits:
         // every user stream loses its DDC while still hosting its slices.
-        NereusSDR::DdcAssignment suspended;
+        Longpath::DdcAssignment suspended;
         for (int st = 0; st < 5; ++st) { suspended.streamDdc[st] = -1; }
         suspended.psFwdDdc = 0;
         suspended.psRevDdc = 1;

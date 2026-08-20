@@ -49,7 +49,7 @@
 #include <QtTest/QtTest>
 #include "core/P1RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1WatchdogWire : public QObject {
     Q_OBJECT

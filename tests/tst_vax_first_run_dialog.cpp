@@ -28,7 +28,7 @@
 #include "core/audio/VirtualCableDetector.h"
 #include "gui/VaxFirstRunDialog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

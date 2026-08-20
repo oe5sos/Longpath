@@ -67,7 +67,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Constants (from AetherSDR SpectrumOverlayMenu.cpp) ───────────────────────
 // ── Maße aus docs/design/HAUSSTIL.md §Maße ──────────────────────────
@@ -1591,4 +1591,4 @@ void SpectrumOverlayPanel::setClarityStatus(bool active, bool paused)
     m_clarityBadge->show();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

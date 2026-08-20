@@ -44,7 +44,7 @@
 #include "gui/applets/GridCell.h"
 #include "gui/applets/GridCellWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

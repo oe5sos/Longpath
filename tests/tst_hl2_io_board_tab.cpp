@@ -7,7 +7,7 @@
 #include "core/IoBoardHl2.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestHl2IoBoardTab : public QObject {
     Q_OBJECT

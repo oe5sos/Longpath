@@ -4,7 +4,7 @@
 
 #include "models/SliceModel.h"   // for Mode enum (alias of DSPMode)
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Snapshot of all per-channel TX DSP state that survives a rebuild.
 /// Captured before WDSP channel destroy; reapplied after recreate.
@@ -78,4 +78,4 @@ struct TxChannelState {
     bool   pureSignalEnabled            = false;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

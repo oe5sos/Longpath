@@ -6,7 +6,7 @@
 // =================================================================
 #include "PerfMonitor.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 PerfMonitor& PerfMonitor::instance()
 {
@@ -132,4 +132,4 @@ void PerfMonitor::resetAll()
     m_memFootprintMb = 0.0;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -43,7 +43,7 @@
 
 #include <cstddef>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Pin the given memory region.  Internally aligns to the kernel's
 /// page size (round addr down, length up) so callers can pass any
@@ -79,4 +79,4 @@ struct MemoryLockStats {
 };
 MemoryLockStats memoryLockStats();
 
-} // namespace NereusSDR
+} // namespace Longpath

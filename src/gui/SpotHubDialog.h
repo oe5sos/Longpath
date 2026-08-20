@@ -205,7 +205,7 @@ class QCheckBox;
 class QPlainTextEdit;
 class QTableView;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class DxClusterClient;
 class WsjtxClient;
@@ -460,4 +460,4 @@ private:
     QLabel*      m_statNewBands{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

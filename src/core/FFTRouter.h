@@ -31,7 +31,7 @@
 #include <QList>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Routes FFT frames from receivers to subscribed pans.
 /// One receiver (DDC) -> 1..N pans (different zoom levels of same data).
@@ -61,4 +61,4 @@ private:
     QMap<int, QList<QString>> m_receiverToPans;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

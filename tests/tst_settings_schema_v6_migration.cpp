@@ -12,7 +12,7 @@
 #include <QtTest/QtTest>
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSettingsSchemaV6Migration : public QObject {
     Q_OBJECT

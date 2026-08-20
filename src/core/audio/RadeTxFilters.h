@@ -39,7 +39,7 @@
 
 #include <memory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─────────────────────────────────────────────────────────────────────
 // RadeTxHpf80 - 80 Hz Butterworth high-pass filter (biquad).
@@ -121,4 +121,4 @@ private:
     std::unique_ptr<Impl> m_impl;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -86,7 +86,7 @@ mw0lge@grange-lane.co.uk
 #include <QStringList>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ContainerWidget::ContainerWidget(QWidget* parent)
     : QWidget(parent)
@@ -1283,4 +1283,4 @@ void ContainerWidget::setBoardCapabilities(const BoardCapabilities& caps)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

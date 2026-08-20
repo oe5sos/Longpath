@@ -37,7 +37,7 @@
 
 #include "models/SpotModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSpotModel : public QObject {
     Q_OBJECT

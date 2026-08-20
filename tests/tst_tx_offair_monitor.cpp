@@ -13,7 +13,7 @@
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTxOffAirMonitor : public QObject {
     Q_OBJECT

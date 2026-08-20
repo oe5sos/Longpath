@@ -88,7 +88,7 @@
 #include <QCoreApplication>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace DspQuickPopup {
 namespace {
 
@@ -134,7 +134,7 @@ void showNr1Popup(QWidget* parent, SliceModel* m_slice,
                      {QStringLiteral("Pre-AGC"), QStringLiteral("Post-AGC")},
                      static_cast<int>(m_slice->nr1Position()),
                      [m_slice](int v) {
-                         if (m_slice) m_slice->setNr1Position(static_cast<NereusSDR::NrPosition>(v));
+                         if (m_slice) m_slice->setNr1Position(static_cast<Longpath::NrPosition>(v));
                      });
     p->finalize(onMore, nullptr);
     p->showAt(globalPos);
@@ -155,14 +155,14 @@ void showNr2Popup(QWidget* parent, SliceModel* m_slice,
                       QStringLiteral("Gamma"), QStringLiteral("Trained")},
                      static_cast<int>(m_slice->nr2GainMethod()),
                      [m_slice](int v) {
-                         if (m_slice) m_slice->setNr2GainMethod(static_cast<NereusSDR::EmnrGainMethod>(v));
+                         if (m_slice) m_slice->setNr2GainMethod(static_cast<Longpath::EmnrGainMethod>(v));
                      });
     // From Thetis setup.designer.cs grpDSPNR2NPEMethod / radDSPNR2OSMS/MMSE/NSTAT [v2.10.3.13].
     p->addRadioGroup(QStringLiteral("NPE Method"),
                      {QStringLiteral("OSMS"), QStringLiteral("MMSE"), QStringLiteral("NSTAT")},
                      static_cast<int>(m_slice->nr2NpeMethod()),
                      [m_slice](int v) {
-                         if (m_slice) m_slice->setNr2NpeMethod(static_cast<NereusSDR::EmnrNpeMethod>(v));
+                         if (m_slice) m_slice->setNr2NpeMethod(static_cast<Longpath::EmnrNpeMethod>(v));
                      });
     // From Thetis setup.designer.cs chkDSPNR2AE.Text = "AE Filter" [v2.10.3.13].
     p->addCheckbox(QStringLiteral("AE Filter"), m_slice->nr2AeFilter(),
@@ -197,7 +197,7 @@ void showNr3Popup(QWidget* parent, SliceModel* m_slice,
                      {QStringLiteral("Pre-AGC"), QStringLiteral("Post-AGC")},
                      static_cast<int>(m_slice->nr3Position()),
                      [m_slice](int v) {
-                         if (m_slice) m_slice->setNr3Position(static_cast<NereusSDR::NrPosition>(v));
+                         if (m_slice) m_slice->setNr3Position(static_cast<Longpath::NrPosition>(v));
                      });
     // From Thetis setup.designer.cs chkNR3_RNNoiseFixedGain.Text =
     // "Use fixed gain for input samples" [v2.10.3.13].
@@ -243,7 +243,7 @@ void showNr4Popup(QWidget* parent, SliceModel* m_slice,
                      {QStringLiteral("Algo 1"), QStringLiteral("Algo 2"), QStringLiteral("Algo 3")},
                      static_cast<int>(m_slice->nr4Algo()),
                      [m_slice](int v) {
-                         if (m_slice) m_slice->setNr4Algo(static_cast<NereusSDR::SbnrAlgo>(v));
+                         if (m_slice) m_slice->setNr4Algo(static_cast<Longpath::SbnrAlgo>(v));
                      });
     p->finalize(onMore, nullptr);
     p->showAt(globalPos);
@@ -414,4 +414,4 @@ void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
 }
 
 } // namespace DspQuickPopup
-} // namespace NereusSDR
+} // namespace Longpath

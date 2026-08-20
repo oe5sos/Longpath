@@ -21,7 +21,7 @@
 
 #include <limits>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSignalReading : public QObject
 {

@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 WidebandFftEngine::WidebandFftEngine(QObject* parent)
     : QObject(parent)
@@ -71,4 +71,4 @@ void WidebandFftEngine::computeFft(const QVector<float>& realSamples,
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

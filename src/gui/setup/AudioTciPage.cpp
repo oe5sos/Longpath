@@ -23,7 +23,7 @@
 #include <QLabel>
 #include <QPushButton>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioTciPage::AudioTciPage(RadioModel* model, QWidget* parent)
     : SetupPage(QStringLiteral("TCI"), model, parent)
@@ -33,7 +33,7 @@ AudioTciPage::AudioTciPage(RadioModel* model, QWidget* parent)
 
 void AudioTciPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     buildSampleRateGroup();
     buildFormatGroup();
@@ -272,4 +272,4 @@ void AudioTciPage::buildMasterMuteNoteGroup()
     contentLayout()->addWidget(group);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

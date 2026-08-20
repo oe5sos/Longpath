@@ -8,7 +8,7 @@
 
 #include <QUdpSocket>
 
-namespace NereusSDR {
+namespace Longpath {
 
 QHostAddress probeLocalAddressFor(const QHostAddress& target)
 {
@@ -43,4 +43,4 @@ QHostAddress probeLocalAddressFor(const QHostAddress& target)
     return local;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

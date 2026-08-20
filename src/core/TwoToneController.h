@@ -57,7 +57,7 @@
 #include "core/WdspTypes.h"
 #include "models/TransmitModel.h"  // for DrivePowerSource enum
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MoxController;
 class PaProfileManager;
@@ -322,4 +322,4 @@ private:
     QTimer m_deactivationSettleTimer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

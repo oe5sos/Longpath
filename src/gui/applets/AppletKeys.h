@@ -60,7 +60,7 @@
 #include <QHash>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletWidget;
 
@@ -84,4 +84,4 @@ AppletWidget* appletFor(const AppletMap& map, const QString& key);
 QString canonical(const AppletMap& map, const QString& key);
 
 } // namespace AppletKeys
-} // namespace NereusSDR
+} // namespace Longpath

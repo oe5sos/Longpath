@@ -25,7 +25,7 @@
 
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 using Stop = BeamHeading::Stop;
 
 class TstBeamHeading : public QObject {

@@ -18,7 +18,7 @@
 #include "models/Band.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceNbPersistence : public QObject {
     Q_OBJECT

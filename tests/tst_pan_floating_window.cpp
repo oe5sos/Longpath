@@ -11,7 +11,7 @@
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterApplet.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPanFloatingWindow : public QObject {
     Q_OBJECT

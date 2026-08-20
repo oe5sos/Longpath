@@ -4,7 +4,7 @@
 #include <QSignalSpy>
 #include "core/AudioEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioEngineFlowState : public QObject {
     Q_OBJECT

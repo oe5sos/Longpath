@@ -5,7 +5,7 @@
 #include <QString>
 #include <QList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Logging categories for NereusSDR.
 // Usage: qCDebug(lcDiscovery) << "message";
@@ -68,4 +68,4 @@ private:
     QList<LogCategoryInfo> m_categories;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

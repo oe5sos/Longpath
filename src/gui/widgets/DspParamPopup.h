@@ -29,7 +29,7 @@ class QRadioButton;
 class QButtonGroup;
 class QCheckBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // DspParamPopup — floating right-click popup for quick NR parameter access.
 // Shows essential controls with a "More Settings..." link to the full dialog.
@@ -64,4 +64,4 @@ private:
     QVector<std::function<void()>> m_resetters;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -128,7 +128,7 @@
 #include <memory>  // std::unique_ptr
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ReceiverManager;
 class AudioEngine;
@@ -250,7 +250,7 @@ public:
     /// Returns nullptr if adcIndex out of range (valid: 0 or 1).  Used by
     /// SpectrumWidget and bench rigs to inspect the wideband FFT pipeline
     /// without going through the widebandSpectrumReady signal hop.
-    NereusSDR::WidebandFftEngine* widebandFftEngine(int adc) const {
+    Longpath::WidebandFftEngine* widebandFftEngine(int adc) const {
         return (adc >= 0 && adc < 2) ? m_widebandFftEngines[adc] : nullptr;
     }
 
@@ -856,7 +856,7 @@ public:
     // Acts on activeSlice(). No-op if active slice is null.
     //
     // Issue #118.
-    void onBandButtonClicked(NereusSDR::Band band);
+    void onBandButtonClicked(Longpath::Band band);
 
     // Panadapter management (client-side)
     QList<PanadapterModel*> panadapters() const { return m_panadapters; }
@@ -1091,8 +1091,8 @@ public:
     //   RadeChannel::rxTextDecoded    -> onRadeTextDecoded    -> RxDecodeModel::addDecode
     //
     // Null channel or null slice is a safe no-op.
-    void wireRadeChannel(int sliceId, NereusSDR::RadeChannel* channel,
-                         NereusSDR::SliceModel* slice);
+    void wireRadeChannel(int sliceId, Longpath::RadeChannel* channel,
+                         Longpath::SliceModel* slice);
 
     // Reads the latest RADE sync state for the given slice ID. Returns
     // false when the slice has no recorded sync state (e.g. RADE was
@@ -1479,7 +1479,7 @@ public:
     // Test-only: inject board caps without a live radio connection.
     // Mirrors P1RadioConnection::setBoardForTest pattern.
     void setBoardForTest(HPSDRHW board) {
-        m_hardwareProfile = ::NereusSDR::profileForModel(
+        m_hardwareProfile = ::Longpath::profileForModel(
             defaultModelForBoard(board));
     }
 
@@ -1526,7 +1526,7 @@ public:
     // tst_radio_model_mic_ptt_wire can verify the signal/slot bind + prime
     // path without spinning up the full wireConnectionSignals pipeline.
     void wireMicPttDisabledForTest() { connectMicPttDisabledSignal(); }
-    void setLastBandForTest(NereusSDR::Band b) {
+    void setLastBandForTest(Longpath::Band b) {
         const bool cross = (b != m_lastBand);
         m_lastBand = b;
         if (cross) {
@@ -1539,8 +1539,8 @@ public:
             // RX-only label slot wins over the ANT* default. Mirror that
             // here so band-cross tests exercise the same path.
             if (m_activeSlice) {
-                const NereusSDR::SkuUiProfile sku =
-                    NereusSDR::skuUiProfileFor(m_hardwareProfile.model);
+                const Longpath::SkuUiProfile sku =
+                    Longpath::skuUiProfileFor(m_hardwareProfile.model);
                 m_activeSlice->refreshAntennasFromAlex(m_alexController, b, &sku);
             }
         }
@@ -1549,7 +1549,7 @@ public:
         applyAlexAntennaForBand(m_lastBand);
     }
     // Phase 3P-I-b (T6): expose with isTx parameter for composition tests.
-    void applyAlexAntennaForBandForTest(NereusSDR::Band band, bool isTx) {
+    void applyAlexAntennaForBandForTest(Longpath::Band band, bool isTx) {
         applyAlexAntennaForBand(band, isTx);
     }
     void setCapsForTest(bool hasAlex) {
@@ -1593,16 +1593,16 @@ public:
     // Emit currentRadioChanged with a default-constructed RadioInfo for test use.
     // Use this to simulate a reconnect when testing signal-driven visibility updates.
     void emitCurrentRadioChangedForTest() {
-        emit currentRadioChanged(NereusSDR::RadioInfo{});
+        emit currentRadioChanged(Longpath::RadioInfo{});
     }
-    NereusSDR::Band lastBand() const { return m_lastBand; }
+    Longpath::Band lastBand() const { return m_lastBand; }
 
     // Phase 3F: expose the codec's input array so tests can assert what the
     // per-board codec is actually handed (SliceConfig::txBound in
     // particular, which is the OR of SliceModel::isTxSlice across the slices
     // sharing a DDC stream). Production callers reach the same builder
     // through requestDdcAssignment.
-    std::array<NereusSDR::SliceConfig, 5> buildStreamConfigsForCodecForTest() const {
+    std::array<Longpath::SliceConfig, 5> buildStreamConfigsForCodecForTest() const {
         return buildStreamConfigsForCodec();
     }
 
@@ -1610,7 +1610,7 @@ public:
     // Added with the D2 fix (CodecContext::adcCtrl was never seeded on
     // Protocol 2), so a test can assert the seed without standing up a
     // connection to observe it through a wire frame.
-    NereusSDR::CodecContext currentCodecContextForTest() const {
+    Longpath::CodecContext currentCodecContextForTest() const {
         return currentCodecContext();
     }
 
@@ -1625,12 +1625,12 @@ public:
     // Deliberately the whole function rather than a setter for m_streamAdc.
     // A narrow ADC setter could drift from what publishDdcAssignment
     // actually writes and the suite would never notice; routing through the
-    // real body means the decode (NereusSDR::adcForDdc) is under test too.
+    // real body means the decode (Longpath::adcForDdc) is under test too.
     //
     // For tests that want the codec's own answer instead of a hand-built
     // one, inject a codec and use requestDdcAssignment: that is the fuller
     // path and it is what tst_alex_per_adc_bpf_wire drives.
-    void publishDdcAssignmentForTest(const NereusSDR::DdcAssignment& a) {
+    void publishDdcAssignmentForTest(const Longpath::DdcAssignment& a) {
         publishDdcAssignment(a);
     }
 
@@ -1638,7 +1638,7 @@ public:
     // standing up a fake RadioConnection so peripheralValue / setPeripheralValue
     // can resolve their per-MAC scope.  Production code populates this via
     // the connection-thread handshake.
-    void setLastRadioInfoForTest(const NereusSDR::RadioInfo& info) {
+    void setLastRadioInfoForTest(const Longpath::RadioInfo& info) {
         m_lastRadioInfo = info;
     }
 
@@ -2286,7 +2286,7 @@ signals:
     // a secondary RadioModel::connectionState() read under race conditions.
     // Existing no-arg slot connections (ConnectionPanel, MainWindow, SpectrumWidget)
     // remain valid: Qt discards excess signal args when slot arity is lower.
-    void connectionStateChanged(NereusSDR::ConnectionState newState);
+    void connectionStateChanged(Longpath::ConnectionState newState);
     // Emitted when the on-air sample rate for the current connection is
     // known. MainWindow reacts by updating FFTEngine + SpectrumWidget so
     // bin math matches the wire rate (P1=192k, P2=768k).
@@ -2307,7 +2307,7 @@ signals:
     // Fires on each transition to Connected with the RadioInfo of the live
     // connection. HardwarePage (Phase 3I) listens to this to repopulate
     // sub-tabs with per-radio fields.
-    void currentRadioChanged(const NereusSDR::RadioInfo& info);
+    void currentRadioChanged(const Longpath::RadioInfo& info);
 
     // ── Phase 3M-4 Task 13: late-bound PureSignal coordinator handoff ──────
     // Fires when m_pureSignal is created (post-WDSP-init) or torn down.
@@ -2321,7 +2321,7 @@ signals:
     // signal is the late-binding seam.  Tests call
     // emit pureSignalCoordinatorReady(...) directly to inject a test-owned
     // coordinator into the applet wiring.
-    void pureSignalCoordinatorReady(NereusSDR::PureSignal* coordinator);
+    void pureSignalCoordinatorReady(Longpath::PureSignal* coordinator);
     void sliceAdded(int index);
     void sliceRemoved(int index);
 
@@ -2404,7 +2404,7 @@ signals:
     // slice's current DSPMode + audio-space filter cutoffs.  Tests use
     // it as a proxy for "push helper triggered with X"; production code
     // can wire it into diagnostic logging.
-    void txModeAndBandpassPushed(NereusSDR::DSPMode mode,
+    void txModeAndBandpassPushed(Longpath::DSPMode mode,
                                  int audioLowHz, int audioHighHz);
     void panadapterAdded(int index);
     void panadapterRemoved(int index);
@@ -2430,7 +2430,7 @@ signals:
     // bar so the user learns why their band click did nothing — prevents
     // silent failure. `reason` is a one-line human-readable message.
     // Issue #118.
-    void bandClickIgnored(NereusSDR::Band band, QString reason);
+    void bandClickIgnored(Longpath::Band band, QString reason);
 
     // Phase 3M-0 Task 6: Ganymede PA-trip live state.
     // Emitted whenever the trip latch changes (true = tripped, false = clear).
@@ -2452,7 +2452,7 @@ signals:
     // `mac`    — the saved-radio MAC key that was attempted.
     // `reason` — typed failure code (Timeout is the most common: radio unreachable).
     // MainWindow reacts by opening the ConnectionPanel and posting a status-bar message.
-    void autoConnectFailed(const QString& mac, NereusSDR::ConnectFailure reason);
+    void autoConnectFailed(const QString& mac, Longpath::ConnectFailure reason);
 
     // autoConnectAmbiguous — emitted when tryAutoReconnect finds more than one
     // saved radio with autoConnect = true. The most-recently-connected MAC wins;
@@ -2484,7 +2484,7 @@ signals:
     // the slot on TxWorkerThread where the debounce timer is live.
     //
     // NereusSDR-original glue (no Thetis equivalent needed).
-    void txFilterRequest(int audioLowHz, int audioHighHz, NereusSDR::DSPMode mode);
+    void txFilterRequest(int audioLowHz, int audioHighHz, Longpath::DSPMode mode);
 
     // ── Phase 3R Task I5: RadeChannel slot-graph re-emit signals ─────────────
     //
@@ -2534,7 +2534,7 @@ signals:
     void externalAmpFwdSwrUpdated(int forwardW, float swr);
 
 private slots:
-    void onConnectionStateChanged(NereusSDR::ConnectionState state);
+    void onConnectionStateChanged(Longpath::ConnectionState state);
 
     // ── #202 deep-fix: Audio.RadioVolume setter analogue ─────────────────────
     //
@@ -2597,13 +2597,13 @@ private slots:
     // freedv-gui has no equivalent feed). WsjtxClient does not have a
     // separate decodeReceived signal; the single spotReceived signal is the
     // source for both sinks.
-    void onClusterSpotReceived(const NereusSDR::DxSpot& spot);
-    void onRbnSpotReceived(const NereusSDR::DxSpot& spot);
-    void onWsjtxSpotReceived(const NereusSDR::DxSpot& spot);
-    void onSpotCollectorSpotReceived(const NereusSDR::DxSpot& spot);
-    void onPotaSpotReceived(const NereusSDR::DxSpot& spot);
-    void onFreeDvReporterSpotReceived(const NereusSDR::DxSpot& spot);
-    void onPskReporterSpotReceived(const NereusSDR::DxSpot& spot);
+    void onClusterSpotReceived(const Longpath::DxSpot& spot);
+    void onRbnSpotReceived(const Longpath::DxSpot& spot);
+    void onWsjtxSpotReceived(const Longpath::DxSpot& spot);
+    void onSpotCollectorSpotReceived(const Longpath::DxSpot& spot);
+    void onPotaSpotReceived(const Longpath::DxSpot& spot);
+    void onFreeDvReporterSpotReceived(const Longpath::DxSpot& spot);
+    void onPskReporterSpotReceived(const Longpath::DxSpot& spot);
 
     // Phase 3P-II Task 19: PGXL status update handler.
     // Called on every statusUpdated from PgxlConnection. On first call sets
@@ -2624,7 +2624,7 @@ private slots:
     // TGXL_AutoTuneMemoryRecall == "True" and a stored entry exists for
     // (activeAntenna, newBand).  Falls back to issuing "tune start" per
     // design bench-caveat (absolute relay-write API not yet confirmed).
-    void onSliceBandChanged(SliceModel* source, NereusSDR::Band band);
+    void onSliceBandChanged(SliceModel* source, Longpath::Band band);
 
 private:
     // Phase 3Q-1: drives the RadioModel-level connection state machine.
@@ -2668,7 +2668,7 @@ private:
     // are unaffected.
     //
     // Source: Thetis HPSDR/Alex.cs:310-413 [@501e3f5].
-    void applyAlexAntennaForBand(NereusSDR::Band band, bool isTx = false);
+    void applyAlexAntennaForBand(Longpath::Band band, bool isTx = false);
     // Reconciles the TX-bound slice's stored antenna intent into the
     // per-band Alex state. Called at every authority boundary (slice edit,
     // TX handoff, and immediately before MOX routing).
@@ -2886,7 +2886,7 @@ public:
     // contradicting the sharing model they were bound under.
     // NereusSDR-original; no Thetis equivalent (Thetis builds UpdateDDCs
     // inputs inline in console.cs:8186-8538 [v2.10.3.15]).
-    std::array<NereusSDR::SliceConfig, 5> buildStreamConfigsForCodec() const;
+    std::array<Longpath::SliceConfig, 5> buildStreamConfigsForCodec() const;
 
     // Phase 3F Sub-Epic I Task 7b: run the per-board codec over the current
     // stream set and return its DdcAssignment. Pure: no wire I/O, no model
@@ -2908,12 +2908,12 @@ public:
     // "no DDCs anywhere", deactivated the receiver it had activated forty
     // lines earlier, and dropped every I/Q packet until the operator moved the
     // VFO. See tst_connect_routes_first_iq.
-    std::optional<NereusSDR::DdcAssignment> computeDdcAssignment() const;
+    std::optional<Longpath::DdcAssignment> computeDdcAssignment() const;
 
     /// Phase 3F Sub-Epic I closeout, defect F3: single read of the radio-state
     /// codec inputs (MOX / PureSignal / diversity), so computeDdcAssignment and
     /// describeSuspendedStreams cannot disagree about them.
-    NereusSDR::CodecContext currentCodecContext() const;
+    Longpath::CodecContext currentCodecContext() const;
 
     /// Whether the radio is running the diversity DDC pair right now.
     /// Extracted from currentCodecContext so republishAlexAdcSlices reads the
@@ -2928,7 +2928,7 @@ public:
     /// owner, which keeps source selection and hardware publication atomic from
     /// the model's point of view.
     void reconcileExternalDiversityRoute(
-        const NereusSDR::DdcAssignment& assignment);
+        const Longpath::DdcAssignment& assignment);
 
     /// Resolve the stable target's primary DDC plus the assignment's DDC0 sync
     /// partner. Returns false when PureSignal owns the pair or the codec did not
@@ -2936,7 +2936,7 @@ public:
     /// appear in ddcEnable; Hermes-class Thetis assignments enable DDC0 and
     /// activate DDC1 through syncEnable alone.
     bool resolveExternalDiversitySources(
-        const NereusSDR::DdcAssignment& assignment,
+        const Longpath::DdcAssignment& assignment,
         const SliceModel* target, int& primaryDdc, int& secondaryDdc) const;
 
     /// Apply the target's current phase/gain rotation to an already-created
@@ -2949,7 +2949,7 @@ public:
     // the DDC of the stream hosting it, and reconciles ReceiverManager's
     // per-stream active flag against slicesOnStream(). No wire I/O, so it
     // runs whether or not a connection exists.
-    void publishDdcAssignment(const NereusSDR::DdcAssignment& assignment);
+    void publishDdcAssignment(const Longpath::DdcAssignment& assignment);
 
     // Drive the per-board codec's applyDdcAssignment(), forward the result to
     // P2RadioConnection (P1 wire integration deferred to Sub-Epic C), then
@@ -3184,7 +3184,7 @@ private:
     // Phase 3F Sub-Epic F Task 5: per-ADC WidebandFftEngine instances.
     // Indexed by adcIndex (0 or 1). Constructed in the RadioModel ctor with
     // a default 122.88 MHz ADC sample rate. Owned via QObject parent.
-    std::array<NereusSDR::WidebandFftEngine*, 2> m_widebandFftEngines{};
+    std::array<Longpath::WidebandFftEngine*, 2> m_widebandFftEngines{};
 
     // Band-plan overlay manager — app-global, loaded once from Qt resources.
     // Phase 3G RX Epic sub-epic D.
@@ -3213,7 +3213,7 @@ private:
     // Phase 3F Sub-Epic I: which DDC stream hosts which slice. Pure policy;
     // sized by configureStreamPool at connect, empty (and therefore
     // bind-refusing) while disconnected.
-    NereusSDR::SliceStreamAllocator m_streamAllocator;
+    Longpath::SliceStreamAllocator m_streamAllocator;
 
     // Rate handed to configureStreamPool, used when a stream is claimed
     // before m_connectionSampleRateHz has been set (Slice A binds during
@@ -3965,4 +3965,4 @@ private:
     class SmartSdrApiListener* m_smartSdrListener{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

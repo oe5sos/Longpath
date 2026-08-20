@@ -40,7 +40,7 @@
 
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestFilterConstrain : public QObject
 {

@@ -93,7 +93,7 @@ class QPushButton;
 class QRadioButton;
 class QButtonGroup;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Transmit > Power
@@ -341,4 +341,4 @@ private:
     QSpinBox*       m_udAntiVoxTau{nullptr};            // ms      int (range 1..500)
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -28,7 +28,7 @@
 
 class QWheelEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // RelayBar: horizontal bar for relay position (0–255)
 // Supports mousewheel scrolling for manual relay adjustment.
@@ -59,4 +59,4 @@ private:
     int m_angleAccum{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

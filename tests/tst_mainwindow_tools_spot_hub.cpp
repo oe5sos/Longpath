@@ -56,7 +56,7 @@
 #include "gui/SpotHubDialog.h"
 #include "gui/FreeDVReporterDialog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

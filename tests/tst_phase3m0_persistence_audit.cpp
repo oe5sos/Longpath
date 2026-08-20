@@ -23,7 +23,7 @@
 
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPhase3m0Persistence : public QObject
 {

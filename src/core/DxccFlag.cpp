@@ -15,7 +15,7 @@
 
 #include <QHash>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -173,4 +173,4 @@ QString dxccFlagEmoji(const QString& primaryPrefix)
     return QString::fromUcs4(pair, 2);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

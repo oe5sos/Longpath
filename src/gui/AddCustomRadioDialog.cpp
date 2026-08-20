@@ -89,7 +89,7 @@ mw0lge@grange-lane.co.uk
 #include <QHostAddress>
 #include <QStandardItemModel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Style constants (local to this translation unit)
@@ -899,4 +899,4 @@ bool AddCustomRadioDialog::autoConnect() const
     return m_autoConnectCheck->isChecked();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

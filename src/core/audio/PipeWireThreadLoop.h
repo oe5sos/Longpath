@@ -10,7 +10,7 @@
 #include <QString>
 #include <pipewire/pipewire.h>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PipeWireThreadLoop {
 public:
@@ -40,6 +40,6 @@ private:
     QString m_serverVersion;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 #endif  // NEREUS_HAVE_PIPEWIRE

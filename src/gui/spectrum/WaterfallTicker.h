@@ -39,7 +39,7 @@
 #include <QTimer>
 #include <atomic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class WaterfallTicker : public QObject {
     Q_OBJECT
@@ -90,4 +90,4 @@ private:
     std::atomic<bool> m_running{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

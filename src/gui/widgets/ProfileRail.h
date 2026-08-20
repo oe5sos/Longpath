@@ -51,7 +51,7 @@
 class QVBoxLayout;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class LayoutProfiles;
 
@@ -104,4 +104,4 @@ private:
     QStringList m_order;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

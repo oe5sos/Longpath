@@ -16,7 +16,7 @@ class QContextMenuEvent;
 class QLabel;
 class QMenu;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 class RadioModel;
@@ -128,4 +128,4 @@ private:
     QPushButton*             m_bypassBtn{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

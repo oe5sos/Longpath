@@ -77,7 +77,7 @@ mw0lge@grange-lane.co.uk
 #include "core/AppSettings.h"
 #include "core/PureSignal.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // AppSettings keys.  PascalCase per CLAUDE.md → "Settings Persistence".
 static const char* const kSetShowGain   = "ampview/showGain";
@@ -504,4 +504,4 @@ void AmpViewWindow::showEvent(QShowEvent* event)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

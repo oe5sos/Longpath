@@ -20,7 +20,7 @@
 
 #include <QDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AlexController;
 
@@ -36,4 +36,4 @@ public:
     ~FilterPolicyDialog() override;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

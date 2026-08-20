@@ -47,7 +47,7 @@
 #include <QPointF>
 #include <QRectF>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Der Massstab, in dem die Entwürfe notiert sind ───────────────────
 //
@@ -236,4 +236,4 @@ private:
     qreal  m_rad{3.0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

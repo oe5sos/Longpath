@@ -25,7 +25,7 @@
 #include "core/P1RadioConnection.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1DriveLevelWire : public QObject {
     Q_OBJECT

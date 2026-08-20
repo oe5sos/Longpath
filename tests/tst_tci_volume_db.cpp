@@ -16,7 +16,7 @@
 #include <QtTest>
 #include "core/TciVolume.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciVolumeDb : public QObject {
     Q_OBJECT

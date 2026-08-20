@@ -49,7 +49,7 @@
 #include "models/NotchModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTnfUiWiring : public QObject {
     Q_OBJECT

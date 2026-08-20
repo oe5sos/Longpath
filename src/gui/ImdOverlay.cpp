@@ -22,7 +22,7 @@
 #include <cstdlib>
 #include <limits>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ImdOverlay::ImdOverlay(QObject* parent)
     : QObject(parent)
@@ -442,4 +442,4 @@ ImdOverlay::ReadoutText ImdOverlay::formatReadout() const
     return t;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

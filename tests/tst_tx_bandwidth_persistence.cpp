@@ -30,7 +30,7 @@
 #include "core/MicProfileManager.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Unique MAC to avoid colliding with factory profile tests.
 static const QString kTestMac = QStringLiteral("aa:bb:cc:dd:ee:ff");

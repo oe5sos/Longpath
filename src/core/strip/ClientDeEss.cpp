@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -301,4 +301,4 @@ void ClientDeEss::process(float* interleaved, int frames, int channels) noexcept
     m_meters.gainReductionDb.store(worstGrDb, std::memory_order_relaxed);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

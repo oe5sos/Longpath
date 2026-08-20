@@ -119,7 +119,7 @@
 // Forward-declare only — AudioEngine.h must not drag in libpipewire types.
 // The full type is available in AudioEngine.cpp via
 // #include "core/audio/PipeWireThreadLoop.h".
-namespace NereusSDR { class PipeWireThreadLoop; }
+namespace Longpath { class PipeWireThreadLoop; }
 #endif
 
 #include <QObject>
@@ -131,7 +131,7 @@ namespace NereusSDR { class PipeWireThreadLoop; }
 #include <memory>
 #include <mutex>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioTapRing;
 
@@ -478,7 +478,7 @@ public:
     // or no data is ready.
     //
     // Format contract: VAX TX shm is fixed at 48 kHz stereo float32 by
-    // the plugin↔CoreAudioHalBus contract (hal-plugin/NereusSDRVAX.cpp
+    // the plugin↔CoreAudioHalBus contract (hal-plugin/LongpathVAX.cpp
     // makePCMFormat + CoreAudioHalBus negotiated format); other
     // formats are not expected and treated as "no data".
     //
@@ -686,7 +686,7 @@ signals:
     // Drives the ConnectionSegment ♪ pip status indicator (sub-PR-2 B.4).
     // Production wiring of QAudioSink::stateChanged → setFlowState
     // lands with the segment integration in sub-PR-4 / D.2.
-    void flowStateChanged(NereusSDR::AudioEngine::FlowState state);
+    void flowStateChanged(Longpath::AudioEngine::FlowState state);
 
     /// One mixed anti-VOX reference block, interleaved stereo float32,
     /// length = frames * 2. Emitted from rxBlockReady on the DSP thread,
@@ -736,10 +736,10 @@ signals:
     // Each carries the AudioDeviceConfig the engine actually negotiated
     // after opening the bus (or the last-good config if the open failed).
     // DeviceCard's "Negotiated" pill subscribes to these.
-    void speakersConfigChanged(NereusSDR::AudioDeviceConfig cfg);
-    void headphonesConfigChanged(NereusSDR::AudioDeviceConfig cfg);
-    void txInputConfigChanged(NereusSDR::AudioDeviceConfig cfg);
-    void vaxConfigChanged(int channel, NereusSDR::AudioDeviceConfig cfg);
+    void speakersConfigChanged(Longpath::AudioDeviceConfig cfg);
+    void headphonesConfigChanged(Longpath::AudioDeviceConfig cfg);
+    void txInputConfigChanged(Longpath::AudioDeviceConfig cfg);
+    void vaxConfigChanged(int channel, Longpath::AudioDeviceConfig cfg);
 
 #if defined(Q_OS_LINUX)
     void linuxBackendChanged(LinuxAudioBackend oldBackend,
@@ -997,4 +997,4 @@ private:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

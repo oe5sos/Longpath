@@ -17,7 +17,7 @@
 #include <QtTest/QtTest>
 #include "core/P2RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP2WidebandEnableByte : public QObject {
     Q_OBJECT

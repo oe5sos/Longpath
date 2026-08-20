@@ -75,7 +75,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -643,4 +643,4 @@ QStringList PaProfileManager::factoryProfileNames()
     return out;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

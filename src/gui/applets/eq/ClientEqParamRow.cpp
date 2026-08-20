@@ -41,7 +41,7 @@
 #include <QWheelEvent>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -448,4 +448,4 @@ void ClientEqParamRow::rebuild()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

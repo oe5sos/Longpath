@@ -40,7 +40,7 @@
 #include "gui/SetupDialog.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 std::atomic<int>* g_layoutDoubleAdd = nullptr;

@@ -68,7 +68,7 @@
 #include <QByteArray>
 #include <zlib.h>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace ParaEqEnvelope {
 
 namespace {
@@ -216,4 +216,4 @@ std::optional<QString> decode(const QString& blob)
 }
 
 }  // namespace ParaEqEnvelope
-}  // namespace NereusSDR
+}  // namespace Longpath

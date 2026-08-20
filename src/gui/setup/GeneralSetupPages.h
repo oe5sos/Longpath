@@ -2,7 +2,7 @@
 
 #include "gui/SetupPage.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // General > Startup & Preferences
@@ -31,4 +31,4 @@ public:
     explicit NavigationPage(RadioModel* model, QWidget* parent = nullptr);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

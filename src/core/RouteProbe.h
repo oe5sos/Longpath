@@ -26,7 +26,7 @@
 
 #include <QHostAddress>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Ask the kernel which local IPv4 source address it would use to
 /// reach `target`.  Returns a null QHostAddress if the probe fails
@@ -49,4 +49,4 @@ namespace NereusSDR {
 /// calling thread.
 QHostAddress probeLocalAddressFor(const QHostAddress& target);
 
-} // namespace NereusSDR
+} // namespace Longpath

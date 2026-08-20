@@ -21,7 +21,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-namespace NereusSDR::EqLoudness {
+namespace Longpath::EqLoudness {
 
 namespace {
 
@@ -178,4 +178,4 @@ void apply(ClientEq& eq)
     eq.setMasterGain(float(std::pow(10.0, makeupDb(eq) / 20.0)));
 }
 
-} // namespace NereusSDR::EqLoudness
+} // namespace Longpath::EqLoudness

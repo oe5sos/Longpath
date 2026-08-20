@@ -25,7 +25,7 @@
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioDeviceConfigRoundtrip : public QObject {
     Q_OBJECT

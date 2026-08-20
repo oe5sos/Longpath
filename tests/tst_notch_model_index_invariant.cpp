@@ -16,7 +16,7 @@
 #include <QSignalSpy>
 #include "models/NotchModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchModelIndexInvariant : public QObject {
     Q_OBJECT

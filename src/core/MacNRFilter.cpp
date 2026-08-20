@@ -34,7 +34,7 @@
 #include <cstring>
 #include <QLoggingCategory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Constructor / destructor ────────────────────────────────────────────────
 // Ported from AetherSDR src/core/MacNRFilter.cpp [@0cd4559] — constructor body.
@@ -288,6 +288,6 @@ void MacNRFilter::process(float* outL, float* outR, int sampleCount)
         m_outAccum.erase(m_outAccum.begin(), m_outAccum.begin() + take);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // __APPLE__

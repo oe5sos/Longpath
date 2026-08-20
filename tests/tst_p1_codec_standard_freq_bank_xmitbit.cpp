@@ -30,7 +30,7 @@
 #include "core/codec/P1CodecStandard.h"
 #include "core/codec/CodecContext.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1CodecStandardFreqBankXmitBit : public QObject {
     Q_OBJECT

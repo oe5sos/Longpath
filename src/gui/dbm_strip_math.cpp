@@ -6,7 +6,7 @@
 
 #include "dbm_strip_math.h"
 
-namespace NereusSDR::DbmStrip {
+namespace Longpath::DbmStrip {
 
 QRect stripRect(const QRect& specRect, int stripW)
 {
@@ -38,4 +38,4 @@ float adaptiveStepDb(float dynamicRange)
     return 2.0f;
 }
 
-}  // namespace NereusSDR::DbmStrip
+}  // namespace Longpath::DbmStrip

@@ -28,7 +28,7 @@
 #include <QtTest/QtTest>
 #include "core/TxMicRouter.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxMicRouter : public QObject {
     Q_OBJECT

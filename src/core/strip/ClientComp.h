@@ -32,7 +32,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ClientPhaseRotator;
 
@@ -180,4 +180,4 @@ private:
     std::unique_ptr<ClientPhaseRotator> m_phaseRotator;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

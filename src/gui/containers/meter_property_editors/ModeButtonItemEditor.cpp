@@ -1,7 +1,7 @@
 #include "ModeButtonItemEditor.h"
 #include "../../meters/ModeButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 ModeButtonItemEditor::ModeButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -23,4 +23,4 @@ void ModeButtonItemEditor::buildModeSpecific()
     // ModeButtonItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

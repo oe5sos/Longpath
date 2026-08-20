@@ -25,7 +25,7 @@
 #include "models/Band.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDiversityDialogPersistence : public QObject {
     Q_OBJECT
@@ -36,7 +36,7 @@ private:
     static void resetDiversityKeysFor(Band band) {
         auto& s = AppSettings::instance();
         const QString bp = QStringLiteral("Slice0/Band%1/")
-                              .arg(NereusSDR::bandKeyName(band));
+                              .arg(Longpath::bandKeyName(band));
         for (const auto& field : {
                  QStringLiteral("DiversityPhaseDeg"),
                  QStringLiteral("DiversityGainDb"),

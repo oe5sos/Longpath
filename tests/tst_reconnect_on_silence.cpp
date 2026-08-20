@@ -22,8 +22,8 @@
 #include "core/HpsdrModel.h"
 #include "fakes/P1FakeRadio.h"
 
-using namespace NereusSDR;
-using NereusSDR::Test::P1FakeRadio;
+using namespace Longpath;
+using Longpath::Test::P1FakeRadio;
 
 class TestReconnectOnSilence : public QObject {
     Q_OBJECT

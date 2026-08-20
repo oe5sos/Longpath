@@ -78,7 +78,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RadioStatus::RadioStatus(QObject* parent)
     : QObject(parent)
@@ -224,4 +224,4 @@ double RadioStatus::computeSwr(double fwd, double refl)
     return std::clamp(swr, 1.0, 99.0);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

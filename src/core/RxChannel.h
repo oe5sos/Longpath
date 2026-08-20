@@ -217,7 +217,7 @@ warren@wpratt.com
 #include <cstring>
 #include <memory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class WdspEngine;  // forward declaration for rebuild()
 
@@ -236,8 +236,8 @@ class WdspEngine;  // forward declaration for rebuild()
 class RxChannel : public QObject {
     Q_OBJECT
 
-    Q_PROPERTY(NereusSDR::DSPMode mode READ mode WRITE setMode NOTIFY modeChanged)
-    Q_PROPERTY(NereusSDR::AGCMode agcMode READ agcMode WRITE setAgcMode NOTIFY agcModeChanged)
+    Q_PROPERTY(Longpath::DSPMode mode READ mode WRITE setMode NOTIFY modeChanged)
+    Q_PROPERTY(Longpath::AGCMode agcMode READ agcMode WRITE setAgcMode NOTIFY agcModeChanged)
     Q_PROPERTY(bool active READ isActive WRITE setActive NOTIFY activeChanged)
 
 public:
@@ -341,8 +341,8 @@ public:
     // From design doc phase3g-rx-experience-epic-design.md §sub-epic B —
     // NB/NB2 are mutually exclusive via a single NbMode atomic. SNB is
     // independent and runs alongside whichever NbMode is active.
-    void setNbMode(NereusSDR::NbMode mode);
-    NereusSDR::NbMode nbMode() const;
+    void setNbMode(Longpath::NbMode mode);
+    Longpath::NbMode nbMode() const;
 
     // Per-slice NB / SNB detailed tuning. Removed 2026-04-22 in favour of
     // Setup → DSP → NB/SNB calling SetEXTANB* / SetRXASNBA* directly, but
@@ -368,7 +368,7 @@ public:
     // call seedSnbFromSettings() after OpenChannel succeeds — see
     // WdspEngine::createRxChannel. Returns nullptr if built without
     // HAVE_WDSP.
-    NereusSDR::NbFamily* nb() { return m_nb.get(); }
+    Longpath::NbFamily* nb() { return m_nb.get(); }
 
     /// Phase 3F Sub-Epic I Task 4b: when true, processIq skips its internal
     /// noise-blanker pass because the caller has already blanked the shared
@@ -907,8 +907,8 @@ public:
     qint64 onModeChanged(DSPMode newMode);
 
 signals:
-    void modeChanged(NereusSDR::DSPMode mode);
-    void agcModeChanged(NereusSDR::AGCMode mode);
+    void modeChanged(Longpath::DSPMode mode);
+    void agcModeChanged(Longpath::AGCMode mode);
     void activeChanged(bool active);
     void filterChanged(double low, double high);
 
@@ -959,7 +959,7 @@ private:
     // Atomic flags for lock-free audio thread reads
     std::atomic<int> m_mode{static_cast<int>(DSPMode::LSB)};  // Must match WdspEngine::createRxChannel init
     std::atomic<int> m_agcMode{static_cast<int>(AGCMode::Med)};
-    std::unique_ptr<NereusSDR::NbFamily> m_nb;
+    std::unique_ptr<Longpath::NbFamily> m_nb;
     // Phase 3F Sub-Epic I Task 4b: NB bypass for co-hosted slices. Atomic
     // because processIq reads it on the DSP thread; matches the convention
     // of every other flag this hot path reads (m_active, m_dfnrActive,
@@ -1043,7 +1043,7 @@ private:
     // Created in constructor; null if model not found or df_create failed.
     // Accessed only from the audio thread during processIq(); main thread
     // writes tuning parameters via atomic setters in DeepFilterFilter.
-    std::unique_ptr<NereusSDR::DeepFilterFilter> m_dfnr;
+    std::unique_ptr<Longpath::DeepFilterFilter> m_dfnr;
 #endif
 
 #ifdef HAVE_MNR
@@ -1052,7 +1052,7 @@ private:
     // a system framework — no external model or library dependency).
     // Accessed only from the audio thread during processIq(); main thread
     // writes strength via setMnrStrength() which calls the atomic setter.
-    std::unique_ptr<NereusSDR::MacNRFilter> m_mnr;
+    std::unique_ptr<Longpath::MacNRFilter> m_mnr;
 #endif
 
     // Cached filter state
@@ -1132,4 +1132,4 @@ private:
     int m_dspBlockSize{4096}; // matches createRxChannel dsp_size
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -26,8 +26,8 @@
 #include "core/AppSettings.h"
 #include "core/SwrSweepController.h"
 
-using namespace NereusSDR;
-using namespace NereusSDR::safety;
+using namespace Longpath;
+using namespace Longpath::safety;
 
 class TestRegionSetting : public QObject
 {

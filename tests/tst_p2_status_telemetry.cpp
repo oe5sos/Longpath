@@ -29,7 +29,7 @@
 
 #include "core/P2RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

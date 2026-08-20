@@ -42,7 +42,7 @@
 
 #include "core/MoxController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMoxControllerAntiVox : public QObject {
     Q_OBJECT

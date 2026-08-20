@@ -46,7 +46,7 @@
 class QMenu;
 class QStackedWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class BarInstrument;
 class NeedleInstrument;
@@ -103,4 +103,4 @@ private:
     BarInstrument*    m_bar{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

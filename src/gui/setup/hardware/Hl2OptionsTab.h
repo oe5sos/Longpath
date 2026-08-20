@@ -96,7 +96,7 @@ class QLabel;
 class QPushButton;
 class QSpinBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class Hl2OptionsModel;
 class IoBoardHl2;
@@ -190,4 +190,4 @@ private:
     bool m_syncing{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

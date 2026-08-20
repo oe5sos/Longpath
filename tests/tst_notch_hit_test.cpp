@@ -54,7 +54,7 @@
 #include "gui/PanadapterStack.h"
 #include "models/NotchModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

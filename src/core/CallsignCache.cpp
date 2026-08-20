@@ -22,7 +22,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 
-namespace NereusSDR {
+namespace Longpath {
 
 QString CallsignCache::defaultPath()
 {
@@ -190,4 +190,4 @@ void CallsignCache::clear()
     m_entries.clear();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

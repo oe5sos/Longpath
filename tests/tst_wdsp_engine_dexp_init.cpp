@@ -82,7 +82,7 @@ extern DEXP pdexp[];
 }
 #endif
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Channel ID convention (matches tst_wdsp_engine_tx_channel.cpp):
 //   TX channel: WDSP.id(1, 0) = CMsubrcvr * CMrcvr = 1 * 1 = 1

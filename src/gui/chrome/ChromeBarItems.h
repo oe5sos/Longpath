@@ -9,7 +9,7 @@
 
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ChromeBarController;
 
@@ -84,4 +84,4 @@ struct ChromeBarWidgets {
 void registerChromeBarItems(ChromeBarController& controller,
                             const ChromeBarWidgets& widgets);
 
-} // namespace NereusSDR
+} // namespace Longpath

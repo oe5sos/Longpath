@@ -37,7 +37,7 @@
 
 #include <limits>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWaterfallThresholdFit : public QObject
 {

@@ -5,7 +5,7 @@
 #include <QtTest/QtTest>
 #include "core/DxccFlag.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstDxccFlag : public QObject {
     Q_OBJECT

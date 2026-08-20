@@ -29,7 +29,7 @@
 #include "core/AppSettings.h"
 #include "core/MicProfileManager.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static const QString kMacA = QStringLiteral("aa:bb:cc:11:22:33");
 

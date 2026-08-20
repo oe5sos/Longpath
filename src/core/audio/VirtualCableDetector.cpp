@@ -9,7 +9,7 @@
 #include <QStringList>
 #include "PortAudioBus.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

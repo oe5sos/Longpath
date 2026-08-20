@@ -124,7 +124,7 @@ mw0lge@grange-lane.co.uk
 
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Timing instrumentation, sibling to SetupDialog.cpp's nereus.setup.timing.
 // Issue #301 reported the RX audio buffer looping when either the Settings
@@ -1582,4 +1582,4 @@ void ConnectionPanel::onModelComboChanged(int index)
         .arg(QString::fromLatin1(displayName(model)), info.macAddress));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

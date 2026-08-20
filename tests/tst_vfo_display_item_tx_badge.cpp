@@ -32,7 +32,7 @@
 #include "core/MoxController.h"
 #include "gui/meters/VfoDisplayItem.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

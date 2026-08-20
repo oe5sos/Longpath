@@ -40,7 +40,7 @@ class QPushButton;
 class QSpinBox;
 class QTabWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -122,4 +122,4 @@ private:
     QPushButton* m_saveBtn{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

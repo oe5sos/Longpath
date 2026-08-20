@@ -53,7 +53,7 @@
 #include <array>
 #include "models/Band.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // OC (open-collector) output assignments per band per pin per
 // {RX, TX}. Plus TX Pin Action mapping (which pin triggers on
@@ -135,4 +135,4 @@ private:
     static TXPinAction actionFromSlug(const QString& slug);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

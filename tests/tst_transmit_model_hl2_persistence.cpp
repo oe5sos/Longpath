@@ -27,32 +27,32 @@
 #include "models/TransmitModel.h"
 #include "core/HpsdrModel.h"
 
-using NereusSDR::HPSDRModel;
+using Longpath::HPSDRModel;
 
 class TestTransmitModelHl2Persistence : public QObject {
     Q_OBJECT
 private slots:
     void hl2_clamp_to_99() {
         // On HL2, per-band tune power clamps [0, 99] (mi0bot encoding).
-        NereusSDR::TransmitModel m;
+        Longpath::TransmitModel m;
         m.setHpsdrModel(HPSDRModel::HERMESLITE);
-        m.setTunePowerForBand(NereusSDR::Band::Band40m, 150);
-        QCOMPARE(m.tunePowerForBand(NereusSDR::Band::Band40m), 99);
+        m.setTunePowerForBand(Longpath::Band::Band40m, 150);
+        QCOMPARE(m.tunePowerForBand(Longpath::Band::Band40m), 99);
     }
 
     void nonHl2_clamp_to_100() {
         // On non-HL2, per-band tune power clamps [0, 100] (existing).
-        NereusSDR::TransmitModel m;
+        Longpath::TransmitModel m;
         m.setHpsdrModel(HPSDRModel::ANAN100);
-        m.setTunePowerForBand(NereusSDR::Band::Band40m, 150);
-        QCOMPARE(m.tunePowerForBand(NereusSDR::Band::Band40m), 100);
+        m.setTunePowerForBand(Longpath::Band::Band40m, 150);
+        QCOMPARE(m.tunePowerForBand(Longpath::Band::Band40m), 100);
     }
 
     void hl2_negative_clamps_to_zero() {
-        NereusSDR::TransmitModel m;
+        Longpath::TransmitModel m;
         m.setHpsdrModel(HPSDRModel::HERMESLITE);
-        m.setTunePowerForBand(NereusSDR::Band::Band40m, -10);
-        QCOMPARE(m.tunePowerForBand(NereusSDR::Band::Band40m), 0);
+        m.setTunePowerForBand(Longpath::Band::Band40m, -10);
+        QCOMPARE(m.tunePowerForBand(Longpath::Band::Band40m), 0);
     }
 
     void hl2_dB_to_int_round_trip_at_boundaries() {
@@ -78,7 +78,7 @@ private slots:
         // polymorph the same way as setTunePowerForBand.  Without the
         // fix, the global Fixed value would be allowed to reach 100 on
         // an HL2, violating spec §6 [0, 99] HL2 ceiling.
-        NereusSDR::TransmitModel m;
+        Longpath::TransmitModel m;
         m.setHpsdrModel(HPSDRModel::HERMESLITE);
         m.setTunePower(150);
         QCOMPARE(m.tunePower(), 99);
@@ -86,7 +86,7 @@ private slots:
 
     void nonHl2_setTunePower_global_clamps_to_100() {
         // Mirror test for non-HL2: ceiling stays at 100.
-        NereusSDR::TransmitModel m;
+        Longpath::TransmitModel m;
         m.setHpsdrModel(HPSDRModel::ANAN100);
         m.setTunePower(150);
         QCOMPARE(m.tunePower(), 100);

@@ -14,7 +14,7 @@
 #include "core/accessories/N2adrPreset.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestN2adrPreset : public QObject {
     Q_OBJECT

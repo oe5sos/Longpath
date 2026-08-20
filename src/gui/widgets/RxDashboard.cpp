@@ -34,7 +34,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RxDashboard::RxDashboard(QWidget* parent) : QWidget(parent)
 {
@@ -457,4 +457,4 @@ void RxDashboard::onSsqlChanged(bool active)
     emit badgeAvailabilityChanged(5, true);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

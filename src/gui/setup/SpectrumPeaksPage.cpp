@@ -80,7 +80,7 @@
 #include <QPushButton>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -490,4 +490,4 @@ void SpectrumPeaksPage::buildUI()
     contentLayout()->addStretch();
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

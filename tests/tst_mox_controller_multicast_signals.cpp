@@ -36,7 +36,7 @@
 
 #include "core/MoxController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Helper: drain TX→RX walk (two 0ms timers — keyUpDelay + pttOutDelay).

@@ -33,7 +33,7 @@
 #include "models/NotchModel.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchTciRxNfEnable : public QObject {
     Q_OBJECT

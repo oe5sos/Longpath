@@ -68,7 +68,7 @@
 #include <QMetaType>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Ham + SWL band identity used by the per-band display grid (Phase 3G-8),
 /// per-band state (Alex filter selection, band stacks, etc.) and N2ADR
@@ -183,6 +183,6 @@ int uiIndexFromBand(Band b);
 /// ContainerWidget::bandClicked through a single RadioModel handler.
 Band bandFromName(const QString& name);
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::Band)
+Q_DECLARE_METATYPE(Longpath::Band)

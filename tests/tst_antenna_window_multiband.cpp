@@ -28,7 +28,7 @@
 
 #include <complex>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

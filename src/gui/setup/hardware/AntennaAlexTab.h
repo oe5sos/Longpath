@@ -70,7 +70,7 @@
 
 class QTabWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 struct RadioInfo;
@@ -127,4 +127,4 @@ private:
     QString m_lastMac;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

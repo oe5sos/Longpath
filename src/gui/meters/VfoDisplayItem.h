@@ -59,7 +59,7 @@ mw0lge@grange-lane.co.uk
 class QMouseEvent;
 class QWheelEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 // VFO frequency display with mouse wheel digit tuning.
 // Ported from Thetis clsVfoDisplay (MeterManager.cs:12881+).
 class VfoDisplayItem : public MeterItem {
@@ -133,4 +133,4 @@ private:
     QColor m_splitColour{0xff, 0xa5, 0x00};
     QColor m_digitHighlight{0x80, 0x80, 0x80};
 };
-} // namespace NereusSDR
+} // namespace Longpath

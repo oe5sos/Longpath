@@ -25,7 +25,7 @@
 #include <QJsonObject>
 #include <QLoggingCategory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 Q_LOGGING_CATEGORY(lcBandPlan, "nereussdr.bandplan")
@@ -142,4 +142,4 @@ bool BandPlanManager::loadPlanFromJson(const QString& path, PlanData& out)
     return true;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

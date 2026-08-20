@@ -120,7 +120,7 @@ class QSlider;
 class QPushButton;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // FM mode controls applet — NYI shell (Phase 3I-3).
 //
@@ -178,4 +178,4 @@ private:
     QComboBox*   m_txProfileCombo = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

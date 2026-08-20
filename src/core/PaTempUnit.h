@@ -24,7 +24,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class PaTempUnit {
     Celsius,
@@ -81,7 +81,7 @@ public:
 signals:
     // Emitted when setUnit() changes the persisted value.  Surfaces
     // displaying PA temperature should reformat on receipt.
-    void unitChanged(NereusSDR::PaTempUnit unit);
+    void unitChanged(Longpath::PaTempUnit unit);
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

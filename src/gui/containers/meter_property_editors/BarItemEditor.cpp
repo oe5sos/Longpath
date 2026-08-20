@@ -7,7 +7,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 BarItemEditor::BarItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -272,4 +272,4 @@ void BarItemEditor::buildTypeSpecific()
     addRow(QStringLiteral("Edge avg color"), m_btnEdgeAvg);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

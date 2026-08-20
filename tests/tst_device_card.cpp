@@ -31,7 +31,7 @@
 #include "core/AudioDeviceConfig.h"
 #include "gui/setup/DeviceCard.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstDeviceCard : public QObject {
     Q_OBJECT

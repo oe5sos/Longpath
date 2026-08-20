@@ -12,7 +12,7 @@
 #include <QSignalSpy>
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceModelPhase3FProperties : public QObject {
     Q_OBJECT

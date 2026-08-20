@@ -77,7 +77,7 @@
 
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class CouplerZero {
 public:
@@ -131,4 +131,4 @@ private:
     int m_sinceTx{kSettleSamples};   // start ready, not mid-settle
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

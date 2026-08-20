@@ -1,7 +1,7 @@
 #include "ClickBoxItemEditor.h"
 #include "../../meters/ClickBoxItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 ClickBoxItemEditor::ClickBoxItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -23,4 +23,4 @@ void ClickBoxItemEditor::buildTypeSpecific()
     // No additional rows are needed.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

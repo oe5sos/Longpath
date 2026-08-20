@@ -70,7 +70,7 @@
 #include <fftw3.h>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Window function types for FFT pre-processing.
 // Integer values match Thetis WDSP analyzer.c:52-173 [v2.10.3.13]
@@ -346,4 +346,4 @@ private:
     static constexpr int kMaxFftSize = 262144;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

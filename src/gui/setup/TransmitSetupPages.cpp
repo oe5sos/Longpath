@@ -185,7 +185,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // PowerPage
@@ -199,7 +199,7 @@ PowerPage::PowerPage(RadioModel* model, QWidget* parent)
 
 void PowerPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     buildPowerGroup();
     buildTuneGroup();           // Issue #175 Task 8 — grpPATune
@@ -213,7 +213,7 @@ void PowerPage::buildUI()
     // the first connection.
     if (model()) {
         connect(model(), &RadioModel::currentRadioChanged, this,
-                [this](const NereusSDR::RadioInfo&) {
+                [this](const Longpath::RadioInfo&) {
             applyHpsdrModel(model()->hardwareProfile().model);
         });
         applyHpsdrModel(model()->hardwareProfile().model);
@@ -812,7 +812,7 @@ TxProfilesPage::TxProfilesPage(RadioModel* model, QWidget* parent)
 
 void TxProfilesPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // Issue #175 Wave 1 follow-up — page body was a fully disabled
     // placeholder (5 controls all setEnabled(false), zero connect()).
@@ -873,7 +873,7 @@ SpeechProcessorPage::SpeechProcessorPage(RadioModel* model, QWidget* parent)
 
 void SpeechProcessorPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     buildActiveProfileSection();
     buildStageStatusSection();
@@ -1377,7 +1377,7 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
     // and the rest of the Setup pages.  Same one-line call PowerPage,
     // TxProfilesPage, SpeechProcessorPage, and other Transmit Setup pages
     // all use.
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     if (!model) {
         // No model — show empty placeholder (matches CfcSetupPage no-model path).
@@ -1946,4 +1946,4 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
 }
 
 
-} // namespace NereusSDR
+} // namespace Longpath

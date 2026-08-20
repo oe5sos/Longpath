@@ -15,7 +15,7 @@
 #include "core/RxChannel.h"
 #include "gui/meters/FilterDisplayItem.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestFilterDisplayHighResolution : public QObject {
     Q_OBJECT

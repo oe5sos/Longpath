@@ -21,7 +21,7 @@
 
 #include <QAction>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AntennaPickerMenu::AntennaPickerMenu(SliceModel* slice,
                                      AlexController* /*alex*/,
@@ -74,4 +74,4 @@ AntennaPickerMenu::AntennaPickerMenu(SliceModel* slice,
 
 AntennaPickerMenu::~AntennaPickerMenu() = default;
 
-} // namespace NereusSDR
+} // namespace Longpath

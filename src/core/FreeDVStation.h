@@ -42,7 +42,7 @@
 #include <QMetaType>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From freedv-gui src/gui/dialogs/freedv_reporter.h:367-417 [@77e793a]
 //
@@ -80,6 +80,6 @@ struct FreeDVStation {
     QColor backgroundColor;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::FreeDVStation)
+Q_DECLARE_METATYPE(Longpath::FreeDVStation)

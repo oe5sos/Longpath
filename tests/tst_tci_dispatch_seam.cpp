@@ -42,7 +42,7 @@
 #include "models/SliceModel.h"
 #include "TestMockRadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciDispatchSeam : public QObject {
     Q_OBJECT

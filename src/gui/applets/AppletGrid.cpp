@@ -13,7 +13,7 @@
 
 #include <QGridLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 /// Abstand zwischen zwei FELDERN. Im Zielbild 9 px; Schritt 1 laesst
@@ -244,4 +244,4 @@ void AppletGrid::relayout()
     m_layout->setRowStretch(rows, 1);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -43,7 +43,7 @@
 #include <QString>
 #include <QPair>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // A voice-bandwidth SSB signal detected in a single FFT frame.
 struct DetectedVoiceSignal {
@@ -95,4 +95,4 @@ QVector<DetectedVoiceSignal> detectVoiceSignals(
 // tests/tst_voice_signal_detector.cpp haelt beide Faelle fest.
 QString sLabel(float dbm);
 
-} // namespace NereusSDR
+} // namespace Longpath

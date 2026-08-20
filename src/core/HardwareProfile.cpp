@@ -68,7 +68,7 @@ mw0lge@grange-lane.co.uk
 
 #include "HardwareProfile.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsHardwareSpecific.cs:85-184 [v2.10.3.13]
 // Upstream inline attribution preserved verbatim:
@@ -307,4 +307,4 @@ QList<HPSDRModel> compatibleModels(HPSDRHW board)
     return result;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

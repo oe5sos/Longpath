@@ -41,7 +41,7 @@
 
 #include "DxSpot.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/PotaClient.h:13-47 [@0cd4559]
 //
@@ -99,4 +99,4 @@ private:
     static constexpr const char* ApiUrl = "https://api.pota.app/spot/activator";
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

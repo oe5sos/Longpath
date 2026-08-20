@@ -32,11 +32,11 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Shared memory layout — canonical definition ─────────────────────────────
 //
-// MUST match byte-for-byte the mirrored struct in hal-plugin/NereusSDRVAX.cpp.
+// MUST match byte-for-byte the mirrored struct in hal-plugin/LongpathVAX.cpp.
 // Any change to field order, size, alignment, or ring size here requires the
 // matching change in the HAL plugin or the shm contract breaks. Both sides
 // carry an equivalent static_assert pinning the total size.
@@ -56,7 +56,7 @@ namespace NereusSDR {
 // error rather than a runtime shm-format mismatch.
 
 struct VaxShmBlock {
-    // Field ORDER is the shm wire contract with hal-plugin/NereusSDRVAX.cpp.
+    // Field ORDER is the shm wire contract with hal-plugin/LongpathVAX.cpp.
     // Both sides must declare these fields in the same sequence so offsetof
     // values agree. DO NOT REORDER without updating the plugin in lockstep.
     // The static_asserts below pin the layout at compile time on both sides.
@@ -77,7 +77,7 @@ static_assert(
       + 2 * sizeof(uint32_t)                // sampleRate, channels
       + 3 * sizeof(uint32_t)                // reserved[3]
       + VaxShmBlock::RING_SIZE * sizeof(float),
-    "VaxShmBlock layout changed — update hal-plugin/NereusSDRVAX.cpp to match");
+    "VaxShmBlock layout changed — update hal-plugin/LongpathVAX.cpp to match");
 
 static_assert(offsetof(VaxShmBlock, writePos)    == 0,  "VaxShmBlock.writePos offset changed");
 static_assert(offsetof(VaxShmBlock, readPos)     == 4,  "VaxShmBlock.readPos offset changed");
@@ -166,4 +166,4 @@ private:
     static constexpr int kMeterStride = 10;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

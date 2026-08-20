@@ -22,7 +22,7 @@
 #include <QFile>
 #include <QStandardPaths>
 
-namespace NereusSDR::ModelPaths {
+namespace Longpath::ModelPaths {
 
 namespace {
 
@@ -54,14 +54,14 @@ QString probeModel(const QString& subdir, const QString& filename)
     if (!p.isEmpty()) { return QDir(p).canonicalPath(); }
 
     // 3. Linux install prefix (cmake --install -> /usr/local/share).
-    p = probe(exeDir + QStringLiteral("/../share/NereusSDR") + base);
+    p = probe(exeDir + QStringLiteral("/../share/Longpath") + base);
     if (!p.isEmpty()) { return QDir(p).canonicalPath(); }
 
     // 4. XDG data dir (Linux user install).
     const QString xdg = QStandardPaths::writableLocation(
         QStandardPaths::GenericDataLocation);
     if (!xdg.isEmpty()) {
-        p = probe(xdg + QStringLiteral("/NereusSDR") + base);
+        p = probe(xdg + QStringLiteral("/Longpath") + base);
         if (!p.isEmpty()) { return p; }
     }
 
@@ -105,4 +105,4 @@ QString dfnrModelTarball()
     return probeModel(QStringLiteral("dfnet3"), QStringLiteral("DeepFilterNet3_onnx.tar.gz"));
 }
 
-} // namespace NereusSDR::ModelPaths
+} // namespace Longpath::ModelPaths

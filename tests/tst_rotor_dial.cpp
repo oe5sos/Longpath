@@ -11,7 +11,7 @@
 #include <QSignalSpy>
 #include "gui/widgets/RotorDialWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 using State = RotorDialWidget::State;
 
 class TstRotorDial : public QObject {

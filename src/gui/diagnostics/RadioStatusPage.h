@@ -29,7 +29,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioStatus;
 class SettingsHygiene;
@@ -121,4 +121,4 @@ private:
     QElapsedTimer m_connectClock;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

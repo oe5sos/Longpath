@@ -39,7 +39,7 @@
 
 class QWebSocket;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Architectural divergence: Thetis 49 fields → NereusSDR 14 fields ────────
 //
@@ -171,6 +171,6 @@ struct TciClientSession {
     int txSensorIntervalMs{200};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

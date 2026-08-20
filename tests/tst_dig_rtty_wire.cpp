@@ -158,7 +158,7 @@ mw0lge@grange-lane.co.uk
 #include "models/SliceModel.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDigRttyWire : public QObject {
     Q_OBJECT

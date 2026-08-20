@@ -11,7 +11,7 @@
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // AdcOverloadBadge — stacked alarm badge for ADC overload events.
 //
@@ -61,4 +61,4 @@ private:
     QLabel*  m_bottomLabel{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

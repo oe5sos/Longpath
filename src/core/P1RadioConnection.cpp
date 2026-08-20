@@ -284,7 +284,7 @@ mw0lge@grange-lane.co.uk
 #include <QVariant>
 #include <QCoreApplication>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // composeEp2Frame
@@ -1973,7 +1973,7 @@ void P1RadioConnection::setPuresignalRun(bool run)
 // the next round-robin cycle.  m_psNDdc=4 disables the bank-2/3 freq
 // override (correct: HL2 firmware handles freq routing internally).
 // ---------------------------------------------------------------------------
-void P1RadioConnection::applyPsDdcConfig(const NereusSDR::PsDdcConfig& cfg)
+void P1RadioConnection::applyPsDdcConfig(const Longpath::PsDdcConfig& cfg)
 {
     bool changed = false;
 
@@ -4206,4 +4206,4 @@ int P1RadioConnection::getAdcForDdc(int /*ddc*/) const
     return 0;  // All P1 DDCs map to ADC0 for now
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

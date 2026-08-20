@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -854,4 +854,4 @@ void FlatMapWidget::wheelEvent(QWheelEvent* e)
     e->accept();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

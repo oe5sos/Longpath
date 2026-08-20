@@ -54,7 +54,7 @@ mw0lge@grange-lane.co.uk
 
 #include "OtherButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsOtherButtons (MeterManager.cs:8225+)
 static const char* const kCoreLabels[] = {
@@ -140,4 +140,4 @@ bool OtherButtonItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -90,7 +90,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // PaProfileManager — per-MAC profile bank for PaProfile instances.
@@ -272,4 +272,4 @@ private:
     QString m_activeProfileName;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

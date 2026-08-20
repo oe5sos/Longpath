@@ -9,7 +9,7 @@
 
 #include "core/SliceStreamAllocator.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void SliceStreamAllocator::configure(int userDdcCount, int maxSlices)
 {
@@ -211,4 +211,4 @@ int SliceStreamAllocator::streamSampleRateHz(int streamIndex) const
     return m_streams.at(streamIndex).sampleRateHz;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

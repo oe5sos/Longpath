@@ -73,7 +73,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 SwrProtectionController::SwrProtectionController(QObject* parent)
     : QObject(parent)
@@ -414,4 +414,4 @@ float SwrProtectionController::measuredSwr() const noexcept
     return m_measuredSwr;
 }
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

@@ -53,7 +53,7 @@
 #include "core/WdspTypes.h"
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstSpectrumTxOverlay : public QObject {
     Q_OBJECT

@@ -69,7 +69,7 @@ mw0lge@grange-lane.co.uk
 #include <QTimer>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RxChannel;
 class TxChannel;
@@ -384,4 +384,4 @@ private:
     std::function<double()> m_rxOffsetSource;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

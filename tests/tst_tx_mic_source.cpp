@@ -39,7 +39,7 @@
 
 #include "core/audio/TxMicSource.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxMicSource : public QObject {
     Q_OBJECT

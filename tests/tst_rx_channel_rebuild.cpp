@@ -43,7 +43,7 @@
 #include "core/dsp/ChannelConfig.h"
 #include "core/dsp/RxChannelState.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static constexpr int kTestChannel  = 99;  // Never opened via OpenChannel
 static constexpr int kTestBufSize  = 64;

@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // SwrSweepResult
@@ -773,4 +773,4 @@ void SwrSweepController::finish(bool completed, const QString& reason)
     m_stepTimer.start(m_tuneSettleMs);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -44,7 +44,7 @@
 
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // WDSP's graphic EQ has fixed band centres; the analysis uses the same
 // ones so its output needs no conversion.
@@ -117,4 +117,4 @@ public:
                           double& outPreampDb);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -32,7 +32,7 @@
 #include <complex>
 #include <vector>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

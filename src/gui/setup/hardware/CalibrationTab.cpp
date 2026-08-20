@@ -149,7 +149,7 @@
 #include <QLayout>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Helper: create a QDoubleSpinBox with common settings
 static QDoubleSpinBox* makeSpinBox(double min, double max, double val,
@@ -620,4 +620,4 @@ int CalibrationTab::groupBoxCountForTest() const
 }
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

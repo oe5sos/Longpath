@@ -38,7 +38,7 @@
 // =================================================================
 #pragma once
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Opaque per-thread token.  Constructed on the elevating thread; the
 // same token must be passed to leave() on the same thread before it
@@ -97,4 +97,4 @@ void elevateComputeThreadPriority();
 // the time slice race.
 void elevateLatencyCriticalThreadPriority();
 
-} // namespace NereusSDR
+} // namespace Longpath

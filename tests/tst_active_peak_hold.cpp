@@ -67,7 +67,7 @@
 
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestActivePeakHold : public QObject {
     Q_OBJECT

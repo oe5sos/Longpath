@@ -1,7 +1,7 @@
 #include "VoiceRecordPlayItemEditor.h"
 #include "../../meters/VoiceRecordPlayItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 VoiceRecordPlayItemEditor::VoiceRecordPlayItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -23,4 +23,4 @@ void VoiceRecordPlayItemEditor::buildVoiceSpecific()
     // VoiceRecordPlayItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

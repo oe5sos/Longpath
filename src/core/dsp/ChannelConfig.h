@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Inputs for RxChannel/TxChannel rebuild. All values authoritative for the
 /// new channel; rebuild captures current state, destroys, recreates with this
@@ -15,4 +15,4 @@ struct ChannelConfig {
     bool highResFilterCharacteristics = false;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

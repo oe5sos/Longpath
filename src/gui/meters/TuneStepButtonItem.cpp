@@ -54,7 +54,7 @@ mw0lge@grange-lane.co.uk
 
 #include "TuneStepButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis TuneStepList with "Hz" stripped (MeterManager.cs:7999+)
 static const char* const kStepLabels[] = {
@@ -110,4 +110,4 @@ bool TuneStepButtonItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

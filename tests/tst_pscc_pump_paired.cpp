@@ -25,7 +25,7 @@
 #include "core/PsccPump.h"
 #include "core/WdspEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPsccPumpPaired : public QObject {
     Q_OBJECT

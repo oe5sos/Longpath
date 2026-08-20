@@ -56,7 +56,7 @@ mw0lge@grange-lane.co.uk
 
 #include "ButtonBoxItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Mode selection buttons: LSB, USB, DSB, CWL, CWU, FM, AM, SAM, DIGL, DIGU.
 // Ported from Thetis clsModeButtonBox (MeterManager.cs:9951+).
@@ -82,4 +82,4 @@ private:
     static constexpr int kModeCount = 10;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

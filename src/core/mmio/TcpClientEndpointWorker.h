@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 class QTcpSocket;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MmioEndpoint;
 
@@ -93,4 +93,4 @@ private:
     static constexpr int kReconnectDelayMs = 3000;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

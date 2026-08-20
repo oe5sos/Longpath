@@ -29,7 +29,7 @@
 #include <cstring>
 #include <memory>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

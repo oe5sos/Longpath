@@ -5,7 +5,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Helper macro-style lambda factory used locally to reduce repetition for
 // color buttons in this file only.
@@ -94,4 +94,4 @@ void DialItemEditor::buildTypeSpecific()
                  &DialItem::fastColour, &DialItem::setFastColour);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

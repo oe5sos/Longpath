@@ -90,7 +90,7 @@ class QComboBox;
 class QPushButton;
 class QGroupBox;
 
-namespace NereusSDR {
+namespace Longpath {
 class HistoryGraphItem;
 class MeterItem;
 
@@ -140,4 +140,4 @@ private:
     QPushButton* m_backBtn{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

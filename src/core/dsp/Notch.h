@@ -69,7 +69,7 @@
 
 #pragma once
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// One manual notch, in absolute RF Hz.
 ///
@@ -100,4 +100,4 @@ struct Notch {
     bool   active{true};    ///< per-notch bypass
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

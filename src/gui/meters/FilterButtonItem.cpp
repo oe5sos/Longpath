@@ -54,7 +54,7 @@ mw0lge@grange-lane.co.uk
 
 #include "FilterButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsFilterButtonBox (MeterManager.cs:7674+)
 static const char* const kFilterLabels[] = {
@@ -129,4 +129,4 @@ bool FilterButtonItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

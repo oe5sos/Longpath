@@ -54,7 +54,7 @@
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

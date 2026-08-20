@@ -20,7 +20,7 @@
 
 #include <functional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // ColorsThemePage
@@ -34,7 +34,7 @@ ColorsThemePage::ColorsThemePage(RadioModel* model, QWidget* parent)
 
 void ColorsThemePage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     SpectrumWidget* sw = model() ? model()->spectrumWidget() : nullptr;
 
@@ -236,7 +236,7 @@ MeterStylesPage::MeterStylesPage(RadioModel* model, QWidget* parent)
 
 void MeterStylesPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: S-Meter ---
     auto* smGroup = new QGroupBox(QStringLiteral("S-Meter"), this);
@@ -305,7 +305,7 @@ GradientsPage::GradientsPage(RadioModel* model, QWidget* parent)
 
 void GradientsPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: Waterfall Gradient ---
     auto* gradGroup = new QGroupBox(QStringLiteral("Waterfall Gradient"), this);
@@ -347,7 +347,7 @@ SkinsPage::SkinsPage(RadioModel* model, QWidget* parent)
 
 void SkinsPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: Skins ---
     auto* skinGroup = new QGroupBox(QStringLiteral("Skins"), this);
@@ -403,7 +403,7 @@ CollapsibleDisplayPage::CollapsibleDisplayPage(RadioModel* model, QWidget* paren
 
 void CollapsibleDisplayPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     // --- Section: Collapsible ---
     auto* colGroup = new QGroupBox(QStringLiteral("Collapsible"), this);
@@ -435,4 +435,4 @@ void CollapsibleDisplayPage::buildUI()
     contentLayout()->addStretch();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

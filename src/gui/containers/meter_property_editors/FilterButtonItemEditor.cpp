@@ -1,7 +1,7 @@
 #include "FilterButtonItemEditor.h"
 #include "../../meters/FilterButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 FilterButtonItemEditor::FilterButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -24,4 +24,4 @@ void FilterButtonItemEditor::buildFilterSpecific()
     // FilterButtonItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

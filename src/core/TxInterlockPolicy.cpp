@@ -12,7 +12,7 @@
 
 #include <QDateTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TxInterlockPolicy::TxInterlockPolicy(QObject* parent)
     : QObject(parent)
@@ -124,4 +124,4 @@ void TxInterlockPolicy::setSwrGateMax(float x)
     emit changed();
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

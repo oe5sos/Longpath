@@ -71,7 +71,7 @@
 #include "PeakBlobDetector.h"
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // trigger_delta: the dB drop required to register a peak (and rise to
 // register a trough).  From Thetis Display.cs:5217 [v2.10.3.13]:
@@ -321,4 +321,4 @@ void PeakBlobDetector::tickFrame(int fps, int elapsedMs)
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

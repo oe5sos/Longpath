@@ -31,7 +31,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // 100 ms cadence — same as Thetis's PSForm thread loop (PSForm.cs:154-186
 // [v2.10.3.13] PSLoop runs timer1code every 10 ms when _power and counts
@@ -1659,4 +1659,4 @@ void PureSignal::autoAttentionTick()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

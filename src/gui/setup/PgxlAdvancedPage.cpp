@@ -47,7 +47,7 @@
 #include "../../models/RadioModel.h"
 #include "../PgxlSaveRebootDialog.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // FaultLogTableModel (private inline class)
@@ -965,7 +965,7 @@ QString PgxlAdvancedPage::formatBytes(quint64 bytes)
     return QStringLiteral("%1 B").arg(bytes);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 // FaultLogTableModel uses Q_OBJECT so we need the moc file included.
 // The class is defined in the .cpp, so we include the moc manually.

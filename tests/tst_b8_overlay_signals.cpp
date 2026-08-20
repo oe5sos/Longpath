@@ -22,7 +22,7 @@
 #include "core/AppSettings.h"
 #include "gui/SpectrumOverlayPanel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstB8OverlaySignals : public QObject {
     Q_OBJECT

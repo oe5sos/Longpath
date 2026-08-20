@@ -61,7 +61,7 @@
 
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Ein beschrifteter Teilstrich.
 struct ReadingTick {
@@ -175,4 +175,4 @@ double sUnitsFromDbm(double dbm);
 /// dBm → Anteil 0..1 mit der Stauchung über S9.
 double signalFraction(double dbm);
 
-} // namespace NereusSDR
+} // namespace Longpath

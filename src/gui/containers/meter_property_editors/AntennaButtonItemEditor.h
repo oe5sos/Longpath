@@ -1,7 +1,7 @@
 #pragma once
 #include "ButtonBoxItemEditor.h"
 
-namespace NereusSDR {
+namespace Longpath {
 class AntennaButtonItem;
 
 class AntennaButtonItemEditor : public ButtonBoxItemEditor {
@@ -14,4 +14,4 @@ private:
     void buildAntennaSpecific();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

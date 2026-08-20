@@ -49,7 +49,7 @@
 #include "core/MoxController.h"
 #include "core/PttMode.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

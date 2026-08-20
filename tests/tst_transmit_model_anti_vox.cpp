@@ -30,7 +30,7 @@
 #include "core/AppSettings.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTransmitModelAntiVox : public QObject {
     Q_OBJECT

@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 #include <QLinearGradient>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis MeterManager.cs:7667 — clsFadeCover constructor
 // ZOrder = int.MaxValue (always rendered on top of all other items)
@@ -198,4 +198,4 @@ bool FadeCoverItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -119,7 +119,7 @@
 
 #include "PaCalProfile.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // --- HPSDRModel → PaCalBoardClass mapping --------------------------------
 //
@@ -335,4 +335,4 @@ float PaCalProfile::interpolate(float rawWatts) const noexcept {
                   + frac * static_cast<float>(idx + 1));
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

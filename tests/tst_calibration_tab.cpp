@@ -35,16 +35,16 @@ private slots:
 
 void TstCalibrationTab::construction_doesNotCrash()
 {
-    NereusSDR::RadioModel model;
-    NereusSDR::CalibrationTab tab(&model);
+    Longpath::RadioModel model;
+    Longpath::CalibrationTab tab(&model);
     // Verify it's a QWidget and has children
     QVERIFY(tab.isWidgetType());
 }
 
 void TstCalibrationTab::groupBoxCount_isFive()
 {
-    NereusSDR::RadioModel model;
-    NereusSDR::CalibrationTab tab(&model);
+    Longpath::RadioModel model;
+    Longpath::CalibrationTab tab(&model);
     // 5 group boxes: Freq Cal, Level Cal, HPSDR Freq Cal Diagnostic,
     // TX Display Cal, Volts/Amps Calibration.
     // Group 6 (PA Forward Power Calibration / PaCalibrationGroup) was
@@ -57,11 +57,11 @@ void TstCalibrationTab::groupBoxCount_isFive()
 
 void TstCalibrationTab::controllerToUi_freqFactor()
 {
-    NereusSDR::RadioModel model;
-    NereusSDR::CalibrationTab tab(&model);
+    Longpath::RadioModel model;
+    Longpath::CalibrationTab tab(&model);
 
     // Set a distinctive value via controller
-    NereusSDR::CalibrationController& ctrl = model.calibrationControllerMutable();
+    Longpath::CalibrationController& ctrl = model.calibrationControllerMutable();
     ctrl.setFreqCorrectionFactor(1.000007);
     // onControllerChanged() should have been triggered synchronously;
     // find the freqFactorSpin by walking the hierarchy
@@ -71,10 +71,10 @@ void TstCalibrationTab::controllerToUi_freqFactor()
 
 void TstCalibrationTab::uiToController_rx1LnaOffset()
 {
-    NereusSDR::RadioModel model;
-    NereusSDR::CalibrationTab tab(&model);
+    Longpath::RadioModel model;
+    Longpath::CalibrationTab tab(&model);
 
-    NereusSDR::CalibrationController& ctrl = model.calibrationControllerMutable();
+    Longpath::CalibrationController& ctrl = model.calibrationControllerMutable();
     // Default should be 0
     QCOMPARE(ctrl.rx1_6mLnaOffset(), 0.0);
 

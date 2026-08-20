@@ -24,7 +24,7 @@
 #include "../DdcAssignment.h"
 #include "../HpsdrModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class IP1Codec {
 public:
@@ -92,4 +92,4 @@ public:
         const std::array<SliceConfig, 5>& slices) const = 0;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

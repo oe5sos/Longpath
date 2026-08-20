@@ -58,7 +58,7 @@
 
 #include <complex>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // One measured point: a frequency and the reflection coefficient there.
 struct SweepPoint {
@@ -112,4 +112,4 @@ Sweep parseS1p(const QString& text, const QString& sourceName = {});
 Sweep readS1p(const QString& path);
 
 } // namespace Touchstone
-} // namespace NereusSDR
+} // namespace Longpath

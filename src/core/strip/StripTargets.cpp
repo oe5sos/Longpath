@@ -19,7 +19,7 @@
 #include <cmath>
 #include <vector>
 
-namespace NereusSDR::StripTargets {
+namespace Longpath::StripTargets {
 
 namespace {
 
@@ -213,4 +213,4 @@ double targetDb(const QString& profile, double hz)
     return interp(kSsb27, hz);
 }
 
-} // namespace NereusSDR::StripTargets
+} // namespace Longpath::StripTargets

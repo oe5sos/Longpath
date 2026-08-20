@@ -15,7 +15,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
                                            const QString& panelId,
@@ -107,4 +107,4 @@ void AppletFloatingWindow::scheduleGeometryReport()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

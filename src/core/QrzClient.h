@@ -35,7 +35,7 @@
 
 class QNetworkReply;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Minimal QRZ.com XML API client (https://xmldata.qrz.com/xml/current/).
 //
@@ -97,7 +97,7 @@ signals:
     // queries — consumers must key their state on `call`, not
     // info.call (upstream #3990).
     void lookupSucceeded(const QString& call,
-                         const NereusSDR::CallsignInfo& info);
+                         const Longpath::CallsignInfo& info);
     void lookupFailed(const QString& call, Error error,
                       const QString& message);
     void loginTestFinished(bool ok, const QString& message);
@@ -120,4 +120,4 @@ private:
     bool            m_loginInFlight{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

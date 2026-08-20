@@ -66,7 +66,7 @@
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Thetis xvtr.cs supports up to 16 rows (chkEnable0..15).
 static constexpr int kMaxXvtrRows = 16;
@@ -306,4 +306,4 @@ void XvtrTab::restoreSettings(const QMap<QString, QVariant>& settings)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

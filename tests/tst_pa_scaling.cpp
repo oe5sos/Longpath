@@ -1,4 +1,4 @@
-// no-port-check: test file — verifies NereusSDR::safety::paScalingFor() +
+// no-port-check: test file — verifies Longpath::safety::paScalingFor() +
 // computeAlexFwdPower() output values; the Thetis source reference is a
 // citation in the docstring, not a derivation claim. The ported functions
 // themselves are registered in THETIS-PROVENANCE.md.
@@ -6,8 +6,8 @@
 // tests/tst_pa_scaling.cpp  (NereusSDR)
 // =================================================================
 //
-// Unit tests for NereusSDR::safety::paScalingFor() and
-// NereusSDR::safety::computeAlexFwdPower(), which port the per-board
+// Unit tests for Longpath::safety::paScalingFor() and
+// Longpath::safety::computeAlexFwdPower(), which port the per-board
 // PA scaling table from Thetis console.cs:25008-25072 [v2.10.3.13].
 //
 // Expected values derived directly from the ported formula:
@@ -19,8 +19,8 @@
 #include "core/safety/safety_constants.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
-using namespace NereusSDR::safety;
+using namespace Longpath;
+using namespace Longpath::safety;
 
 class TestPaScaling : public QObject
 {

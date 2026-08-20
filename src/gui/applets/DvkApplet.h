@@ -29,7 +29,7 @@ class QPushButton;
 class QLabel;
 class QSlider;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 
@@ -107,4 +107,4 @@ private:
     QPushButton* m_importBtn     = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

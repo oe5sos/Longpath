@@ -1,7 +1,7 @@
 #include "BandButtonItemEditor.h"
 #include "../../meters/BandButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 BandButtonItemEditor::BandButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -24,4 +24,4 @@ void BandButtonItemEditor::buildBandSpecific()
     // BandButtonItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

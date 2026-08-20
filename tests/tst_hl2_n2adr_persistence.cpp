@@ -22,7 +22,7 @@
 #include "core/AppSettings.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

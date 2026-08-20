@@ -3,7 +3,7 @@
 
 #include <QRect>
 
-namespace NereusSDR::DbmStrip {
+namespace Longpath::DbmStrip {
 
 // Strip occupies the rightmost `stripW` pixels of the given rect.
 //
@@ -34,4 +34,4 @@ int arrowHit(int x, const QRect& arrowRow);
 // From AetherSDR SpectrumWidget.cpp:4901-4906 [@0cd4559]
 float adaptiveStepDb(float dynamicRange);
 
-}  // namespace NereusSDR::DbmStrip
+}  // namespace Longpath::DbmStrip

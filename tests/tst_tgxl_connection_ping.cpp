@@ -26,8 +26,8 @@ private slots:
 
 void TgxlConnectionPingTest::pingEmitsPongReceivedOnReply()
 {
-    NereusSDR::TgxlConnection conn;
-    QSignalSpy spy(&conn, &NereusSDR::TgxlConnection::pongReceived);
+    Longpath::TgxlConnection conn;
+    QSignalSpy spy(&conn, &Longpath::TgxlConnection::pongReceived);
     // Establish version handshake so injectLineForTesting routes R-frames.
     conn.injectLineForTesting("V1.2.17");
     quint32 seq = conn.ping("test");
@@ -45,8 +45,8 @@ void TgxlConnectionPingTest::pingEmitsPongReceivedOnReply()
 
 void TgxlConnectionPingTest::pingTimesOutAfterFiveSeconds()
 {
-    NereusSDR::TgxlConnection conn;
-    QSignalSpy spy(&conn, &NereusSDR::TgxlConnection::pingTimedOut);
+    Longpath::TgxlConnection conn;
+    QSignalSpy spy(&conn, &Longpath::TgxlConnection::pingTimedOut);
     conn.injectLineForTesting("V1.2.17");
     quint32 seq = conn.ping();
     // Use the test seam to evict all pending pings immediately (bypasses 5 s).

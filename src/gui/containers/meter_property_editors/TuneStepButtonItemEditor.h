@@ -1,7 +1,7 @@
 #pragma once
 #include "ButtonBoxItemEditor.h"
 
-namespace NereusSDR {
+namespace Longpath {
 class TuneStepButtonItem;
 
 class TuneStepButtonItemEditor : public ButtonBoxItemEditor {
@@ -14,4 +14,4 @@ private:
     void buildTuneStepSpecific();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

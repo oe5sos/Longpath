@@ -46,7 +46,7 @@ class QPushButton;
 class QSpinBox;
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class BandwidthFilterPane;
 class SliceModel;
@@ -97,4 +97,4 @@ private:
     int  m_spanHz{10000};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

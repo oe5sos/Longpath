@@ -25,7 +25,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 WavPlayer::WavPlayer(QObject* parent) : QObject(parent) {}
 
@@ -121,4 +121,4 @@ void WavPlayer::teardown()
     m_path.clear();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

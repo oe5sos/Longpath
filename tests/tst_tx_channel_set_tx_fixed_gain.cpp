@@ -57,7 +57,7 @@
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxChannelSetTxFixedGain : public QObject {
     Q_OBJECT

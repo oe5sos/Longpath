@@ -69,7 +69,7 @@ mw0lge@grange-lane.co.uk
 #include <QtCore/QList>
 #include <QtCore/QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── TciSensorManager ──────────────────────────────────────────────────────────
 //
@@ -185,4 +185,4 @@ public:
     }
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -13,7 +13,7 @@
 
 #include "RxDecodeModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 RxDecodeModel::RxDecodeModel(int maxSize, QObject* parent)
     : QObject(parent)
@@ -38,4 +38,4 @@ void RxDecodeModel::clear()
     emit cleared();
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

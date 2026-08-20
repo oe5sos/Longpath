@@ -71,7 +71,7 @@ class QSpinBox;
 class QPushButton;
 class QGroupBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ColorSwatchButton;
 
@@ -122,4 +122,4 @@ private:
     QPushButton* m_backBtn{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -146,7 +146,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -3084,4 +3084,4 @@ void SpotHubDialog::setHoveredPanadapterSpot(int spotIdx)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

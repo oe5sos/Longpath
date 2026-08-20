@@ -24,7 +24,7 @@
 
 #include <QTemporaryDir>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestThemeFile : public QObject
 {

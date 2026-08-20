@@ -6,7 +6,7 @@
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // OverflowChip — small "…" pill that surfaces items the host has hidden
 // for layout-fit reasons.
@@ -42,4 +42,4 @@ private:
     QLabel*     m_glyph{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

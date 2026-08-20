@@ -37,7 +37,7 @@
 #include "core/MicProfileManager.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static const QString kMacA = QStringLiteral("aa:bb:cc:11:22:33");
 

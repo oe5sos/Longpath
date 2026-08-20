@@ -244,7 +244,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // Number of bands in the per-band TX array — HF amateur + GEN/WWV/XVTR (14).
@@ -3011,4 +3011,4 @@ QString TransmitModel::filterDisplayText(DSPMode mode) const
         .arg(bwKhz, 0, 'f', 1);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

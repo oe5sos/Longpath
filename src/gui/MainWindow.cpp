@@ -472,7 +472,7 @@ warren@wpratt.com
 #include <windows.h>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // First-run/rescan wants the "relevant" virtual cables for the current
@@ -717,7 +717,7 @@ MainWindow::MainWindow(QWidget* parent)
     // handshake. Open the ConnectionPanel, highlight the failed target,
     // and post an 8-second status-bar explanation.
     connect(m_radioModel, &RadioModel::autoConnectFailed,
-            this, [this](const QString& mac, NereusSDR::ConnectFailure reason) {
+            this, [this](const QString& mac, Longpath::ConnectFailure reason) {
         showConnectionPanel();
         if (m_connectionPanel) {
             m_connectionPanel->highlightMac(mac);
@@ -726,7 +726,7 @@ MainWindow::MainWindow(QWidget* parent)
         const QString name = (saved.has_value() && !saved->info.name.isEmpty())
             ? saved->info.name : mac;
         const QString reasonText =
-            (reason == NereusSDR::ConnectFailure::Timeout)
+            (reason == Longpath::ConnectFailure::Timeout)
                 ? QStringLiteral("isn't reachable from this network")
                 : QStringLiteral("returned an error");
         showToast(
@@ -3102,7 +3102,7 @@ void MainWindow::buildUI()
     connect(m_radioModel, &RadioModel::sliceRemoved, this,
             [this](int) { refreshPanNotchMinWidth(); });
     connect(m_radioModel, &RadioModel::connectionStateChanged, this,
-            [this](NereusSDR::ConnectionState) { refreshPanNotchMinWidth(); });
+            [this](Longpath::ConnectionState) { refreshPanNotchMinWidth(); });
 
     // The S-meter poller's slice list keys off SLICE lifetime, not pan count.
     // Adding a slice to an existing pan moves no pan count, so hanging this on
@@ -3923,7 +3923,7 @@ void MainWindow::buildUI()
     // enough for the whole pool.  Engines created later (at connect, when the
     // SKU's stream count is known) land on an already-elevated thread.
     connect(m_fftThread, &QThread::started, primaryFftEngine(),
-            []() { NereusSDR::elevateLatencyCriticalThreadPriority(); });
+            []() { Longpath::elevateLatencyCriticalThreadPriority(); });
 
     // Per-engine cleanup (QThread::finished -> deleteLater) and the raw I/Q
     // feed are wired inside createFftEngineForStream, so engines added after
@@ -4363,7 +4363,7 @@ void MainWindow::buildUI()
             // remembered state rather than cold-starting from an uninitialized floor.
             // NaN is ignored by snapToFloor (band with no stored data is a no-op).
             connect(pan0, &PanadapterModel::bandChanged,
-                    this, [this, pan0](NereusSDR::Band newBand) {
+                    this, [this, pan0](Longpath::Band newBand) {
                 // NereusSDR-original — no Thetis equivalent.
                 // Prime estimator with last-seen NF for this band to eliminate
                 // cold-start visual jump after band change.
@@ -4383,7 +4383,7 @@ void MainWindow::buildUI()
             // matching Thetis display.cs:5906 minimum delay).
             if (activeSpectrumWidget()) {
                 connect(pan0, &PanadapterModel::bandChanged,
-                        this, [this](NereusSDR::Band) {
+                        this, [this](Longpath::Band) {
                     activeSpectrumWidget()->setNoiseFloorFastAttack(true);
                 });
             }
@@ -6909,7 +6909,7 @@ void MainWindow::buildMenuBar()
         m_nrGroup = new QActionGroup(this);
         m_nrGroup->setExclusive(true);
 
-        using Slot = NereusSDR::NrSlot;
+        using Slot = Longpath::NrSlot;
         struct Entry { const char* label; Slot slot; bool hidden; };
         const Entry nrSlots[] = {
             { "&Off",   Slot::Off,  false },
@@ -6954,7 +6954,7 @@ void MainWindow::buildMenuBar()
         m_nbGroup = new QActionGroup(this);
         m_nbGroup->setExclusive(true);
 
-        using Mode = NereusSDR::NbMode;
+        using Mode = Longpath::NbMode;
         const struct { const char* label; Mode mode; } nbModes[] = {
             { "&Off",  Mode::Off },
             { "&NB",   Mode::NB  },
@@ -7103,13 +7103,13 @@ void MainWindow::buildMenuBar()
         if (!slice) { return; }
 
         // NR submenu sync — actions appended to m_nrGroup in this fixed order.
-        const NereusSDR::NrSlot nrOrder[] = {
-            NereusSDR::NrSlot::Off,  NereusSDR::NrSlot::NR1,
-            NereusSDR::NrSlot::NR2,  NereusSDR::NrSlot::NR3,
-            NereusSDR::NrSlot::NR4,  NereusSDR::NrSlot::DFNR,
-            NereusSDR::NrSlot::MNR,  NereusSDR::NrSlot::BNR,
+        const Longpath::NrSlot nrOrder[] = {
+            Longpath::NrSlot::Off,  Longpath::NrSlot::NR1,
+            Longpath::NrSlot::NR2,  Longpath::NrSlot::NR3,
+            Longpath::NrSlot::NR4,  Longpath::NrSlot::DFNR,
+            Longpath::NrSlot::MNR,  Longpath::NrSlot::BNR,
         };
-        auto syncNr = [this, nrOrder](NereusSDR::NrSlot slot) {
+        auto syncNr = [this, nrOrder](Longpath::NrSlot slot) {
             QList<QAction*> acts = m_nrGroup->actions();
             const int n = static_cast<int>(std::size(nrOrder));
             for (int i = 0; i < acts.size() && i < n; ++i) {
@@ -7121,10 +7121,10 @@ void MainWindow::buildMenuBar()
         connect(slice, &SliceModel::activeNrChanged, this, syncNr);
 
         // NB submenu sync — three actions in m_nbGroup: Off, NB, NB2.
-        const NereusSDR::NbMode nbOrder[] = {
-            NereusSDR::NbMode::Off, NereusSDR::NbMode::NB, NereusSDR::NbMode::NB2,
+        const Longpath::NbMode nbOrder[] = {
+            Longpath::NbMode::Off, Longpath::NbMode::NB, Longpath::NbMode::NB2,
         };
-        auto syncNb = [this, nbOrder](NereusSDR::NbMode mode) {
+        auto syncNb = [this, nbOrder](Longpath::NbMode mode) {
             QList<QAction*> acts = m_nbGroup->actions();
             for (int i = 0; i < acts.size() && i < 3; ++i) {
                 QSignalBlocker b(acts[i]);
@@ -8284,7 +8284,7 @@ void MainWindow::buildStatusBar()
             this, &MainWindow::showStationContextMenu);
     // Update the block's name on connection state changes.
     connect(m_radioModel, &RadioModel::currentRadioChanged, this,
-            [this](const NereusSDR::RadioInfo& info) {
+            [this](const Longpath::RadioInfo& info) {
         const bool connected =
             (m_radioModel->connectionState() == ConnectionState::Connected);
         m_stationBlock->setRadioName(connected ? info.name : QString());
@@ -9658,7 +9658,7 @@ void MainWindow::wireSliceToSpectrum()
             });
             // From Thetis v2.10.3.13 display.cs:880 — mode change
             connect(slice, &SliceModel::dspModeChanged,
-                    this, [nfTracker](NereusSDR::DSPMode /*mode*/) {
+                    this, [nfTracker](Longpath::DSPMode /*mode*/) {
                 nfTracker->triggerFastAttack();
             });
         }
@@ -9779,7 +9779,7 @@ void MainWindow::wireSliceToSpectrum()
             dialog->show();
         });
         connect(m_rxApplet, &RxApplet::openNrSetupRequested, this,
-                [this](NereusSDR::NrSlot slot) {
+                [this](Longpath::NrSlot slot) {
             auto* dialog = new SetupDialog(m_radioModel, this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             wireSetupDialog(dialog);
@@ -9843,7 +9843,7 @@ void MainWindow::wireSliceToSpectrum()
     // Use the slice's actual frequency rather than a band center lookup because
     // Band.h has no centerFreqHz() helper (not needed elsewhere).
     connect(slice, &SliceModel::bandChanged,
-            this, [this](NereusSDR::Band /*b*/) {
+            this, [this](Longpath::Band /*b*/) {
         PgxlConnection* pgxl = m_radioModel->pgxlConnection();
         if (!pgxl || !pgxl->isConnected()) { return; }
         SliceModel* s = m_radioModel->activeSlice();
@@ -9897,7 +9897,7 @@ void MainWindow::wireSliceToSpectrum()
         }
     });
     connect(slice, &SliceModel::dspModeChanged,
-            this, [this](NereusSDR::DSPMode mode) {
+            this, [this](Longpath::DSPMode mode) {
         if (auto* l = m_radioModel->smartSdrListener()) {
             l->setSliceMode(/*sliceId=*/0, SliceModel::modeName(mode));
         }
@@ -12706,4 +12706,4 @@ void MainWindow::showFeatureRequestDialogImpl()
     dlg->show();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

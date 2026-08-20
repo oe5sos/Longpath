@@ -41,7 +41,7 @@
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 
@@ -85,4 +85,4 @@ private:
     QLabel*      m_stateLabel{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

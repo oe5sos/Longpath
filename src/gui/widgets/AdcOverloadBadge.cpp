@@ -5,7 +5,7 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AdcOverloadBadge::AdcOverloadBadge(QWidget* parent) : QWidget(parent)
 {
@@ -120,4 +120,4 @@ void AdcOverloadBadge::applyStyle()
     ).arg(bg, fg));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

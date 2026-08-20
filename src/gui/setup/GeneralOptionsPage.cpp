@@ -76,7 +76,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -125,7 +125,7 @@ QSpinBox* makeHoldSpinBox(QWidget* parent)
 GeneralOptionsPage::GeneralOptionsPage(RadioModel* model, QWidget* parent)
     : SetupPage(QStringLiteral("Options"), model, parent)
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
     m_ctrl = model ? model->stepAttController() : nullptr;
 
     buildHardwareConfigGroup();
@@ -192,7 +192,7 @@ void GeneralOptionsPage::setReceiveOnlyVisible(bool visible)
 // The named slot form is auto-disconnected when 'this' dies (Qt::AutoConnection),
 // with no shutdown-race on pointer capture.  m_model is the SetupPage base member.
 
-void GeneralOptionsPage::onCurrentRadioChanged(const NereusSDR::RadioInfo& /*info*/)
+void GeneralOptionsPage::onCurrentRadioChanged(const Longpath::RadioInfo& /*info*/)
 {
     if (model()) {
         setReceiveOnlyVisible(model()->boardCapabilities().isRxOnlySku);
@@ -818,4 +818,4 @@ void GeneralOptionsPage::syncFromModel()
     m_spnAutoAttHoldRx1->setEnabled(autoOn && m_chkAutoAttUndoRx1->isChecked());
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

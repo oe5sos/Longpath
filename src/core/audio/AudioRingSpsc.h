@@ -13,7 +13,7 @@
 #include <thread>
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Single-producer single-consumer lock-free byte ring.
 // Capacity must be a power of two. One byte of the buffer is always
@@ -206,4 +206,4 @@ private:
     std::array<uint8_t, kCapacity> m_buf{};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

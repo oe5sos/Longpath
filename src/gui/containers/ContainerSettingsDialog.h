@@ -72,7 +72,7 @@ class QLineEdit;
 class QPushButton;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ContainerWidget;
 class ContainerManager;
@@ -264,4 +264,4 @@ private:
     void onOpenMmioDialog();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

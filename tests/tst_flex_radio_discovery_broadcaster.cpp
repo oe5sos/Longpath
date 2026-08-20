@@ -21,7 +21,7 @@ private slots:
 
 void FlexRadioDiscoveryBroadcasterTest::headerLayout()
 {
-    NereusSDR::FlexRadioDiscoveryBroadcaster b;
+    Longpath::FlexRadioDiscoveryBroadcaster b;
     b.setSerial(QStringLiteral("1234-5678-9012-3456"));
     b.setVersion(QStringLiteral("4.0.0.1"));
     b.setNickname(QStringLiteral("NereusSDR"));
@@ -64,7 +64,7 @@ void FlexRadioDiscoveryBroadcasterTest::headerLayout()
 
 void FlexRadioDiscoveryBroadcasterTest::payloadIsAscii()
 {
-    NereusSDR::FlexRadioDiscoveryBroadcaster b;
+    Longpath::FlexRadioDiscoveryBroadcaster b;
     b.setSerial(QStringLiteral("0001-0002-0003-0004"));
     b.setVersion(QStringLiteral("4.0.0.1"));
     b.setNickname(QStringLiteral("TestNick"));
@@ -101,7 +101,7 @@ void FlexRadioDiscoveryBroadcasterTest::payloadIsAscii()
 
 void FlexRadioDiscoveryBroadcasterTest::packetCountRolls()
 {
-    NereusSDR::FlexRadioDiscoveryBroadcaster b;
+    Longpath::FlexRadioDiscoveryBroadcaster b;
     b.setVersion(QStringLiteral("4.0.0.1"));
     b.setNickname(QStringLiteral("NereusSDR"));
 
@@ -119,7 +119,7 @@ void FlexRadioDiscoveryBroadcasterTest::packetCountRolls()
 
 void FlexRadioDiscoveryBroadcasterTest::totalSizeIsMultipleOf4()
 {
-    NereusSDR::FlexRadioDiscoveryBroadcaster b;
+    Longpath::FlexRadioDiscoveryBroadcaster b;
     b.setSerial(QStringLiteral("5555-6666-7777-8888"));
     b.setVersion(QStringLiteral("4.0.0.1"));
     b.setNickname(QStringLiteral("NereusSDR"));
@@ -145,7 +145,7 @@ void FlexRadioDiscoveryBroadcasterTest::totalSizeIsMultipleOf4()
 
 void FlexRadioDiscoveryBroadcasterTest::startSucceedsWithValidIp()
 {
-    NereusSDR::FlexRadioDiscoveryBroadcaster b;
+    Longpath::FlexRadioDiscoveryBroadcaster b;
     b.setVersion(QStringLiteral("4.0.0.1"));
     b.setNickname(QStringLiteral("TestBroadcaster"));
 

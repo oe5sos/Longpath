@@ -9,7 +9,7 @@
 #include "models/FreeDVStationModel.h"
 #include "core/FreeDVStation.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestFreeDVStationModel : public QObject {
     Q_OBJECT

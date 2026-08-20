@@ -66,7 +66,7 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
-namespace NereusSDR {
+namespace Longpath {
 
 class OcMatrix;
 
@@ -89,4 +89,4 @@ class OcMatrix;
 // is required (Hl2IoBoardTab does; the codec layer does not).
 void applyN2adrPreset(OcMatrix& oc, bool enabled);
 
-} // namespace NereusSDR
+} // namespace Longpath

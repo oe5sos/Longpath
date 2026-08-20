@@ -66,7 +66,7 @@ class QLineEdit;
 class QListWidget;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletVisibilityController;
 
@@ -160,4 +160,4 @@ private:
     WidgetPicker* m_picker{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

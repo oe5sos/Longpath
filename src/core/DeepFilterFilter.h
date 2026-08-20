@@ -35,7 +35,7 @@
 
 struct DFState;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Client-side neural noise reduction using DeepFilterNet3.
 // Processes 48 kHz stereo float audio in-place via the DeepFilterNet3 model.
@@ -83,6 +83,6 @@ private:
     std::atomic<bool>  m_paramsDirty{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_DFNR

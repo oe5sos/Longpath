@@ -63,7 +63,7 @@
 
 #include <initializer_list>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void applyN2adrPreset(OcMatrix& oc, bool enabled)
 {
@@ -131,4 +131,4 @@ void applyN2adrPreset(OcMatrix& oc, bool enabled)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

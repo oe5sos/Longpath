@@ -13,7 +13,7 @@
 
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

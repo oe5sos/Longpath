@@ -15,10 +15,10 @@
 #include <QVector>
 #include <QWidget>
 
-namespace NereusSDR { class TciServer; }
-namespace NereusSDR { class RadioModel; }
+namespace Longpath { class TciServer; }
+namespace Longpath { class RadioModel; }
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // CAT > Serial Ports
@@ -68,7 +68,7 @@ public:
     // tracks the pointer via QPointer so a stale connection is harmless.
     //
     // Idempotent: re-calls with the same pointer just refresh the snapshot.
-    void setTciServer(class NereusSDR::TciServer* server);
+    void setTciServer(class Longpath::TciServer* server);
 
 signals:
     // Emitted when the operator toggles the Enable TCI Server checkbox.
@@ -121,7 +121,7 @@ private:
     // clientConnected and decrement on clientDisconnected (TciServer
     // exposes connect/disconnect signals but not a count getter; local
     // tracking is the canonical pattern.
-    QPointer<class NereusSDR::TciServer> m_tciServerRef;
+    QPointer<class Longpath::TciServer> m_tciServerRef;
     bool m_tciServerRunning{false};
     int  m_tciClientCount{0};
     void refreshTciStatusDisplay();
@@ -240,4 +240,4 @@ private:
     QVector<QPushButton*>  m_connectBtns;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -1,7 +1,7 @@
 #include "TuneStepButtonItemEditor.h"
 #include "../../meters/TuneStepButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 TuneStepButtonItemEditor::TuneStepButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -23,4 +23,4 @@ void TuneStepButtonItemEditor::buildTuneStepSpecific()
     // TuneStepButtonItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

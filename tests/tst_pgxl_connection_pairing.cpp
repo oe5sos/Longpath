@@ -24,8 +24,8 @@ private slots:
 };
 
 void PgxlConnectionPairingTest::amplifierCreateEmitsExpectedFrame() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     conn.amplifierCreate("NereusSDR-AA:BB:CC", "NereusSDR", "ANT1:PORTA,ANT2:PORTB");
     QCOMPARE(frameSpy.count(), 1);
     QString frame = frameSpy.takeFirst().at(0).toString();
@@ -36,8 +36,8 @@ void PgxlConnectionPairingTest::amplifierCreateEmitsExpectedFrame() {
 }
 
 void PgxlConnectionPairingTest::pairingSuccessEmitsPairingResultTrue() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy resultSpy(&conn, &NereusSDR::PgxlConnection::pairingResult);
+    Longpath::PgxlConnection conn;
+    QSignalSpy resultSpy(&conn, &Longpath::PgxlConnection::pairingResult);
     conn.injectLineForTesting("V3.8.9");
     quint32 seq = conn.flexradioPair('A', "NereusSDR-AA:BB", "ANT1");
     conn.injectLineForTesting(QString("R%1|0|serial=NereusSDR-AA:BB txant=ANT1").arg(seq));
@@ -46,8 +46,8 @@ void PgxlConnectionPairingTest::pairingSuccessEmitsPairingResultTrue() {
 }
 
 void PgxlConnectionPairingTest::pairingFailureEmitsPairingResultFalse() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy resultSpy(&conn, &NereusSDR::PgxlConnection::pairingResult);
+    Longpath::PgxlConnection conn;
+    QSignalSpy resultSpy(&conn, &Longpath::PgxlConnection::pairingResult);
     conn.injectLineForTesting("V3.8.9");
     quint32 seq = conn.flexradioPair('A', "NereusSDR-AA:BB", "ANT1");
     conn.injectLineForTesting(QString("R%1|2|invalid serial format").arg(seq));

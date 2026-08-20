@@ -50,7 +50,7 @@
 
 #include "gui/PsaIndicatorWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Reference colors — System.Drawing exact RGBs as documented in the
 // PsaIndicatorWidget palette comment block.  Kept here so failure

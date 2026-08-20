@@ -99,7 +99,7 @@
 #include "PennyLaneController.h"
 #include "core/AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Source: console.cs:14899 "private bool penny_ext_ctrl_enabled = true;" [@501e3f5]
 // Default true — matches Thetis initialization.
@@ -156,4 +156,4 @@ void PennyLaneController::save()
     s.setValue(QStringLiteral("%1/extCtrlEnabled").arg(base), m_extCtrlEnabled ? QStringLiteral("True") : QStringLiteral("False"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

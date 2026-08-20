@@ -134,7 +134,7 @@
 #include <optional>
 #include <utility>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Forward declaration — full type used only in refreshAntennasFromAlex()
 // which takes a const-ref. The full header is included in SliceModel.cpp.
@@ -164,10 +164,10 @@ class SliceModel : public QObject {
     Q_OBJECT
 
     Q_PROPERTY(double     frequency    READ frequency    WRITE setFrequency    NOTIFY frequencyChanged)
-    Q_PROPERTY(NereusSDR::DSPMode dspMode READ dspMode   WRITE setDspMode      NOTIFY dspModeChanged)
+    Q_PROPERTY(Longpath::DSPMode dspMode READ dspMode   WRITE setDspMode      NOTIFY dspModeChanged)
     Q_PROPERTY(int        filterLow    READ filterLow    WRITE setFilterLow    NOTIFY filterChanged)
     Q_PROPERTY(int        filterHigh   READ filterHigh   WRITE setFilterHigh   NOTIFY filterChanged)
-    Q_PROPERTY(NereusSDR::AGCMode agcMode READ agcMode   WRITE setAgcMode      NOTIFY agcModeChanged)
+    Q_PROPERTY(Longpath::AGCMode agcMode READ agcMode   WRITE setAgcMode      NOTIFY agcModeChanged)
     Q_PROPERTY(int        stepHz       READ stepHz       WRITE setStepHz       NOTIFY stepHzChanged)
     Q_PROPERTY(int        afGain       READ afGain       WRITE setAfGain       NOTIFY afGainChanged)
     Q_PROPERTY(int        rfGain       READ rfGain       WRITE setRfGain       NOTIFY rfGainChanged)
@@ -273,11 +273,11 @@ class SliceModel : public QObject {
     Q_PROPERTY(bool   xitEnabled      READ xitEnabled      WRITE setXitEnabled      NOTIFY xitEnabledChanged)
     Q_PROPERTY(int    xitHz           READ xitHz           WRITE setXitHz           NOTIFY xitHzChanged)
     // From phase3g-rx-experience-epic-design.md §sub-epic B — tri-state cycle.
-    Q_PROPERTY(NereusSDR::NbMode nbMode READ nbMode WRITE setNbMode NOTIFY nbModeChanged)
+    Q_PROPERTY(Longpath::NbMode nbMode READ nbMode WRITE setNbMode NOTIFY nbModeChanged)
     // --- Noise reduction (Sub-epic C-1) ---
     // Single source of truth for active NR slot. Mutual exclusion enforced
     // in setActiveNr. See Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13].
-    Q_PROPERTY(NereusSDR::NrSlot activeNr READ activeNr WRITE setActiveNr NOTIFY activeNrChanged)
+    Q_PROPERTY(Longpath::NrSlot activeNr READ activeNr WRITE setActiveNr NOTIFY activeNrChanged)
 
     // NR1 (ANR) tuning — 5 knobs.
     // Gain/Leakage stored in WDSP-domain values (not UI-units — UI applies
@@ -286,7 +286,7 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    nr1Delay    READ nr1Delay    WRITE setNr1Delay    NOTIFY nr1DelayChanged)
     Q_PROPERTY(double nr1Gain     READ nr1Gain     WRITE setNr1Gain     NOTIFY nr1GainChanged)
     Q_PROPERTY(double nr1Leakage  READ nr1Leakage  WRITE setNr1Leakage  NOTIFY nr1LeakageChanged)
-    Q_PROPERTY(NereusSDR::NrPosition nr1Position READ nr1Position WRITE setNr1Position NOTIFY nr1PositionChanged)
+    Q_PROPERTY(Longpath::NrPosition nr1Position READ nr1Position WRITE setNr1Position NOTIFY nr1PositionChanged)
 
     // ANF — the same four values as NR1, for the auto-notch. It was an
     // on/off switch while NR1 had the full set; same LMS filter, same
@@ -295,16 +295,16 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    anfDelay    READ anfDelay    WRITE setAnfDelay    NOTIFY anfDelayChanged)
     Q_PROPERTY(double anfGain     READ anfGain     WRITE setAnfGain     NOTIFY anfGainChanged)
     Q_PROPERTY(double anfLeakage  READ anfLeakage  WRITE setAnfLeakage  NOTIFY anfLeakageChanged)
-    Q_PROPERTY(NereusSDR::NrPosition anfPosition READ anfPosition WRITE setAnfPosition NOTIFY anfPositionChanged)
+    Q_PROPERTY(Longpath::NrPosition anfPosition READ anfPosition WRITE setAnfPosition NOTIFY anfPositionChanged)
 
     // NR2 (EMNR) tuning — gain-method + npe-method + AE + Position +
     // trainT1/T2 + post2 cascade.
-    Q_PROPERTY(NereusSDR::EmnrGainMethod nr2GainMethod READ nr2GainMethod WRITE setNr2GainMethod NOTIFY nr2GainMethodChanged)
-    Q_PROPERTY(NereusSDR::EmnrNpeMethod  nr2NpeMethod  READ nr2NpeMethod  WRITE setNr2NpeMethod  NOTIFY nr2NpeMethodChanged)
+    Q_PROPERTY(Longpath::EmnrGainMethod nr2GainMethod READ nr2GainMethod WRITE setNr2GainMethod NOTIFY nr2GainMethodChanged)
+    Q_PROPERTY(Longpath::EmnrNpeMethod  nr2NpeMethod  READ nr2NpeMethod  WRITE setNr2NpeMethod  NOTIFY nr2NpeMethodChanged)
     Q_PROPERTY(double nr2TrainT1     READ nr2TrainT1     WRITE setNr2TrainT1     NOTIFY nr2TrainT1Changed)
     Q_PROPERTY(double nr2TrainT2     READ nr2TrainT2     WRITE setNr2TrainT2     NOTIFY nr2TrainT2Changed)
     Q_PROPERTY(bool   nr2AeFilter    READ nr2AeFilter    WRITE setNr2AeFilter    NOTIFY nr2AeFilterChanged)
-    Q_PROPERTY(NereusSDR::NrPosition nr2Position READ nr2Position WRITE setNr2Position NOTIFY nr2PositionChanged)
+    Q_PROPERTY(Longpath::NrPosition nr2Position READ nr2Position WRITE setNr2Position NOTIFY nr2PositionChanged)
     Q_PROPERTY(bool   nr2Post2Run    READ nr2Post2Run    WRITE setNr2Post2Run    NOTIFY nr2Post2RunChanged)
     Q_PROPERTY(double nr2Post2Level  READ nr2Post2Level  WRITE setNr2Post2Level  NOTIFY nr2Post2LevelChanged)
     Q_PROPERTY(double nr2Post2Factor READ nr2Post2Factor WRITE setNr2Post2Factor NOTIFY nr2Post2FactorChanged)
@@ -312,19 +312,19 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    nr2Post2Taper  READ nr2Post2Taper  WRITE setNr2Post2Taper  NOTIFY nr2Post2TaperChanged)
 
     // NR3 (RNNR) — Position + UseDefaultGain (model path is GLOBAL, not per-slice).
-    Q_PROPERTY(NereusSDR::NrPosition nr3Position       READ nr3Position       WRITE setNr3Position       NOTIFY nr3PositionChanged)
+    Q_PROPERTY(Longpath::NrPosition nr3Position       READ nr3Position       WRITE setNr3Position       NOTIFY nr3PositionChanged)
     Q_PROPERTY(bool nr3UseDefaultGain READ nr3UseDefaultGain WRITE setNr3UseDefaultGain NOTIFY nr3UseDefaultGainChanged)
 
     // NR4 (SBNR) — 5 spinboxes + algo radio.
     // NR4 was the only denoiser without a position control while NR1,
     // NR2 and NR3 all had one — the same omission as ANF.
-    Q_PROPERTY(NereusSDR::NrPosition nr4Position READ nr4Position WRITE setNr4Position NOTIFY nr4PositionChanged)
+    Q_PROPERTY(Longpath::NrPosition nr4Position READ nr4Position WRITE setNr4Position NOTIFY nr4PositionChanged)
     Q_PROPERTY(double nr4Reduction  READ nr4Reduction  WRITE setNr4Reduction  NOTIFY nr4ReductionChanged)
     Q_PROPERTY(double nr4Smoothing  READ nr4Smoothing  WRITE setNr4Smoothing  NOTIFY nr4SmoothingChanged)
     Q_PROPERTY(double nr4Whitening  READ nr4Whitening  WRITE setNr4Whitening  NOTIFY nr4WhiteningChanged)
     Q_PROPERTY(double nr4Rescale    READ nr4Rescale    WRITE setNr4Rescale    NOTIFY nr4RescaleChanged)
     Q_PROPERTY(double nr4PostThresh READ nr4PostThresh WRITE setNr4PostThresh NOTIFY nr4PostThreshChanged)
-    Q_PROPERTY(NereusSDR::SbnrAlgo nr4Algo READ nr4Algo WRITE setNr4Algo NOTIFY nr4AlgoChanged)
+    Q_PROPERTY(Longpath::SbnrAlgo nr4Algo READ nr4Algo WRITE setNr4Algo NOTIFY nr4AlgoChanged)
 
     // DFNR — AttenLimit + PostFilterBeta.
     Q_PROPERTY(double dfnrAttenLimit     READ dfnrAttenLimit     WRITE setDfnrAttenLimit     NOTIFY dfnrAttenLimitChanged)
@@ -373,7 +373,7 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    fmCtcssMode     READ fmCtcssMode     WRITE setFmCtcssMode     NOTIFY fmCtcssModeChanged)
     Q_PROPERTY(double fmCtcssValueHz  READ fmCtcssValueHz  WRITE setFmCtcssValueHz  NOTIFY fmCtcssValueHzChanged)
     Q_PROPERTY(int    fmOffsetHz      READ fmOffsetHz      WRITE setFmOffsetHz      NOTIFY fmOffsetHzChanged)
-    Q_PROPERTY(NereusSDR::FmTxMode fmTxMode READ fmTxMode WRITE setFmTxMode NOTIFY fmTxModeChanged)
+    Q_PROPERTY(Longpath::FmTxMode fmTxMode READ fmTxMode WRITE setFmTxMode NOTIFY fmTxModeChanged)
     Q_PROPERTY(bool   fmReverse       READ fmReverse       WRITE setFmReverse       NOTIFY fmReverseChanged)
     Q_PROPERTY(int    diglOffsetHz    READ diglOffsetHz    WRITE setDiglOffsetHz    NOTIFY diglOffsetHzChanged)
     Q_PROPERTY(int    diguOffsetHz    READ diguOffsetHz    WRITE setDiguOffsetHz    NOTIFY diguOffsetHzChanged)
@@ -790,8 +790,8 @@ public:
     int    xitHz()           const { return m_xitHz; }
     void   setXitHz(int hz);
 
-    NereusSDR::NbMode nbMode() const { return m_nbMode; }
-    void   setNbMode(NereusSDR::NbMode v);
+    Longpath::NbMode nbMode() const { return m_nbMode; }
+    void   setNbMode(Longpath::NbMode v);
 
     // Per-slice NB TUNING (threshold / tau / lag / lead) removed 2026-04-22
     // for strict Thetis parity. Thetis has a single global NB tuning set
@@ -800,8 +800,8 @@ public:
     // channel create + live-pushed from the Setup page).
 
     // --- NR accessors (Sub-epic C-1) ---
-    NereusSDR::NrSlot activeNr() const { return m_activeNr; }
-    void              setActiveNr(NereusSDR::NrSlot slot);
+    Longpath::NrSlot activeNr() const { return m_activeNr; }
+    void              setActiveNr(Longpath::NrSlot slot);
 
     // NR1
     int    nr1Taps()    const { return m_nr1Taps; }
@@ -812,11 +812,11 @@ public:
     void   setNr1Gain(double v);
     double nr1Leakage() const { return m_nr1Leakage; }
     void   setNr1Leakage(double v);
-    NereusSDR::NrPosition nr1Position() const { return m_nr1Position; }
-    void                  setNr1Position(NereusSDR::NrPosition p);
+    Longpath::NrPosition nr1Position() const { return m_nr1Position; }
+    void                  setNr1Position(Longpath::NrPosition p);
 
-    NereusSDR::NrPosition nr4Position() const { return m_nr4Position; }
-    void                  setNr4Position(NereusSDR::NrPosition p);
+    Longpath::NrPosition nr4Position() const { return m_nr4Position; }
+    void                  setNr4Position(Longpath::NrPosition p);
 
     // ANF
     int    anfTaps()    const { return m_anfTaps; }
@@ -827,22 +827,22 @@ public:
     void   setAnfGain(double v);
     double anfLeakage() const { return m_anfLeakage; }
     void   setAnfLeakage(double v);
-    NereusSDR::NrPosition anfPosition() const { return m_anfPosition; }
-    void                  setAnfPosition(NereusSDR::NrPosition p);
+    Longpath::NrPosition anfPosition() const { return m_anfPosition; }
+    void                  setAnfPosition(Longpath::NrPosition p);
 
     // NR2
-    NereusSDR::EmnrGainMethod nr2GainMethod() const { return m_nr2GainMethod; }
-    void                      setNr2GainMethod(NereusSDR::EmnrGainMethod v);
-    NereusSDR::EmnrNpeMethod  nr2NpeMethod()  const { return m_nr2NpeMethod; }
-    void                      setNr2NpeMethod(NereusSDR::EmnrNpeMethod v);
+    Longpath::EmnrGainMethod nr2GainMethod() const { return m_nr2GainMethod; }
+    void                      setNr2GainMethod(Longpath::EmnrGainMethod v);
+    Longpath::EmnrNpeMethod  nr2NpeMethod()  const { return m_nr2NpeMethod; }
+    void                      setNr2NpeMethod(Longpath::EmnrNpeMethod v);
     double nr2TrainT1()     const { return m_nr2TrainT1; }
     void   setNr2TrainT1(double v);
     double nr2TrainT2()     const { return m_nr2TrainT2; }
     void   setNr2TrainT2(double v);
     bool   nr2AeFilter()    const { return m_nr2AeFilter; }
     void   setNr2AeFilter(bool v);
-    NereusSDR::NrPosition nr2Position() const { return m_nr2Position; }
-    void                  setNr2Position(NereusSDR::NrPosition p);
+    Longpath::NrPosition nr2Position() const { return m_nr2Position; }
+    void                  setNr2Position(Longpath::NrPosition p);
     bool   nr2Post2Run()    const { return m_nr2Post2Run; }
     void   setNr2Post2Run(bool v);
     double nr2Post2Level()  const { return m_nr2Post2Level; }
@@ -855,8 +855,8 @@ public:
     void   setNr2Post2Taper(int v);
 
     // NR3
-    NereusSDR::NrPosition nr3Position() const { return m_nr3Position; }
-    void                  setNr3Position(NereusSDR::NrPosition p);
+    Longpath::NrPosition nr3Position() const { return m_nr3Position; }
+    void                  setNr3Position(Longpath::NrPosition p);
     bool   nr3UseDefaultGain() const { return m_nr3UseDefaultGain; }
     void   setNr3UseDefaultGain(bool v);
 
@@ -871,8 +871,8 @@ public:
     void   setNr4Rescale(double v);
     double nr4PostThresh() const { return m_nr4PostThresh; }
     void   setNr4PostThresh(double v);
-    NereusSDR::SbnrAlgo nr4Algo() const { return m_nr4Algo; }
-    void                setNr4Algo(NereusSDR::SbnrAlgo v);
+    Longpath::SbnrAlgo nr4Algo() const { return m_nr4Algo; }
+    void                setNr4Algo(Longpath::SbnrAlgo v);
 
     // DFNR
     double dfnrAttenLimit()     const { return m_dfnrAttenLimit; }
@@ -1034,8 +1034,8 @@ public:
     // band click should seed defaults or restore last-used state.
     bool hasSettingsFor(Band band) const;
 
-    void saveToSettings(NereusSDR::Band band);
-    void restoreFromSettings(NereusSDR::Band band);
+    void saveToSettings(Longpath::Band band);
+    void restoreFromSettings(Longpath::Band band);
     static void migrateLegacyKeys();
 
     // Reads the persisted "last band" marker for this slice index from
@@ -1045,7 +1045,7 @@ public:
     // panadapter's default. Returns std::nullopt when the key is absent
     // (fresh install, or pre-LastBand settings file). Static so RadioModel
     // can read it before any SliceModel exists.
-    static std::optional<NereusSDR::Band> loadLastBandFromSettings(int sliceIndex);
+    static std::optional<Longpath::Band> loadLastBandFromSettings(int sliceIndex);
 
     // Load band-agnostic slice settings (e.g. VAX channel) from AppSettings.
     // Called on startup when no specific band context is needed. Does NOT
@@ -1085,19 +1085,19 @@ public slots:
     // about the actual radio routing). The optional SkuUiProfile parameter
     // carries the per-SKU label trio; nullptr keeps the prior ANT-only
     // behavior for callers that have no SKU context.
-    void refreshAntennasFromAlex(const NereusSDR::AlexController& alex,
-                                 NereusSDR::Band band,
-                                 const NereusSDR::SkuUiProfile* sku = nullptr);
+    void refreshAntennasFromAlex(const Longpath::AlexController& alex,
+                                 Longpath::Band band,
+                                 const Longpath::SkuUiProfile* sku = nullptr);
 
 signals:
     void frequencyChanged(double freq);
     // Phase 3P-II Task 64: emitted when frequency crosses a ham-band boundary.
     // Uses Band::bandFromFrequency(freq) to detect crossings; emits once per
     // distinct Band change. Consumed by MainWindow to notify PgxlConnection.
-    void bandChanged(NereusSDR::Band newBand);
-    void dspModeChanged(NereusSDR::DSPMode mode);
+    void bandChanged(Longpath::Band newBand);
+    void dspModeChanged(Longpath::DSPMode mode);
     void filterChanged(int low, int high);
-    void agcModeChanged(NereusSDR::AGCMode mode);
+    void agcModeChanged(Longpath::AGCMode mode);
     void stepHzChanged(int hz);
     void afGainChanged(int gain);
     void rfGainChanged(int gain);
@@ -1144,39 +1144,39 @@ signals:
     void ritHzChanged(int hz);
     void xitEnabledChanged(bool v);
     void xitHzChanged(int hz);
-    void nbModeChanged(NereusSDR::NbMode v);
+    void nbModeChanged(Longpath::NbMode v);
     // NR signals (Sub-epic C-1)
-    void activeNrChanged(NereusSDR::NrSlot slot);
-    void nr4PositionChanged(NereusSDR::NrPosition p);
+    void activeNrChanged(Longpath::NrSlot slot);
+    void nr4PositionChanged(Longpath::NrPosition p);
     void anfTapsChanged(int v);
     void anfDelayChanged(int v);
     void anfGainChanged(double v);
     void anfLeakageChanged(double v);
-    void anfPositionChanged(NereusSDR::NrPosition p);
+    void anfPositionChanged(Longpath::NrPosition p);
     void nr1TapsChanged(int v);
     void nr1DelayChanged(int v);
     void nr1GainChanged(double v);
     void nr1LeakageChanged(double v);
-    void nr1PositionChanged(NereusSDR::NrPosition v);
-    void nr2GainMethodChanged(NereusSDR::EmnrGainMethod v);
-    void nr2NpeMethodChanged(NereusSDR::EmnrNpeMethod v);
+    void nr1PositionChanged(Longpath::NrPosition v);
+    void nr2GainMethodChanged(Longpath::EmnrGainMethod v);
+    void nr2NpeMethodChanged(Longpath::EmnrNpeMethod v);
     void nr2TrainT1Changed(double v);
     void nr2TrainT2Changed(double v);
     void nr2AeFilterChanged(bool v);
-    void nr2PositionChanged(NereusSDR::NrPosition v);
+    void nr2PositionChanged(Longpath::NrPosition v);
     void nr2Post2RunChanged(bool v);
     void nr2Post2LevelChanged(double v);
     void nr2Post2FactorChanged(double v);
     void nr2Post2RateChanged(double v);
     void nr2Post2TaperChanged(int v);
-    void nr3PositionChanged(NereusSDR::NrPosition v);
+    void nr3PositionChanged(Longpath::NrPosition v);
     void nr3UseDefaultGainChanged(bool v);
     void nr4ReductionChanged(double v);
     void nr4SmoothingChanged(double v);
     void nr4WhiteningChanged(double v);
     void nr4RescaleChanged(double v);
     void nr4PostThreshChanged(double v);
-    void nr4AlgoChanged(NereusSDR::SbnrAlgo v);
+    void nr4AlgoChanged(Longpath::SbnrAlgo v);
     void dfnrAttenLimitChanged(double v);
     void dfnrPostFilterBetaChanged(double v);
     void bnrStrengthChanged(double v);
@@ -1202,7 +1202,7 @@ signals:
     void fmCtcssModeChanged(int mode);
     void fmCtcssValueHzChanged(double hz);
     void fmOffsetHzChanged(int hz);
-    void fmTxModeChanged(NereusSDR::FmTxMode mode);
+    void fmTxModeChanged(Longpath::FmTxMode mode);
     void fmReverseChanged(bool v);
     void diglOffsetHzChanged(int hz);
     void diguOffsetHzChanged(int hz);
@@ -1260,7 +1260,7 @@ private:
     int     m_ddcIndex{-1};      // Phase 3F: codec-assigned DDC; -1 = unassigned sentinel
     int    m_streamIndex{-1};     // Phase 3F Sub-Epic I: -1 = unbound
     double m_shiftOffsetHz{0.0};  // offset from stream centre
-    int     m_sampleRateHz{kDefaultSampleRate};  // Phase 3F: per-slice DDC sample rate; default 192 kHz (NereusSDR::kDefaultSampleRate)
+    int     m_sampleRateHz{kDefaultSampleRate};  // Phase 3F: per-slice DDC sample rate; default 192 kHz (Longpath::kDefaultSampleRate)
     bool    m_diversityEnabled{false};  // Phase 3F: Slice-A-only diversity mode; gated on BoardCapabilities.hasDiversityReceiver
     // Phase 3F Sub-Epic G Task 2: per-band diversity tuning. Defaults match
     // a passive reference-receiver setup (no rotation, no gain bias).
@@ -1294,15 +1294,15 @@ private:
     int    m_ritHz{0};                // Neutral default — zero offset
     bool   m_xitEnabled{false};       // Neutral default — no Thetis citation needed
     int    m_xitHz{0};                // Neutral default — zero offset
-    NereusSDR::NbMode   m_nbMode{NereusSDR::NbMode::Off};  // Tri-state: Off/NB/NB2
+    Longpath::NbMode   m_nbMode{Longpath::NbMode::Off};  // Tri-state: Off/NB/NB2
 
     // --- NR state (Sub-epic C-1) ---
     // See Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13].
-    NereusSDR::NrSlot m_activeNr{NereusSDR::NrSlot::Off};
+    Longpath::NrSlot m_activeNr{Longpath::NrSlot::Off};
 
     // NR1 — from RxChannel::Nr1Tuning defaults (Task 8 commit 8747ae4),
     // which in turn match Thetis radio.cs:673-699 [v2.10.3.13].
-    NereusSDR::NrPosition m_nr4Position = NereusSDR::NrPosition::PostAgc;
+    Longpath::NrPosition m_nr4Position = Longpath::NrPosition::PostAgc;
 
     // ANF defaults from Thetis radio.cs:722-729 [@852bf0e]. Gain and
     // leakage differ from NR1's on purpose: a notch has to settle on a
@@ -1311,22 +1311,22 @@ private:
     int    m_anfDelay   = 16;
     double m_anfGain    = 10e-4;
     double m_anfLeakage = 1e-7;
-    NereusSDR::NrPosition m_anfPosition = NereusSDR::NrPosition::PostAgc;
+    Longpath::NrPosition m_anfPosition = Longpath::NrPosition::PostAgc;
 
     int    m_nr1Taps    = 64;           // radio.cs:674   nr_taps = 64
     int    m_nr1Delay   = 16;           // radio.cs:675   nr_delay = 16
     double m_nr1Gain    = 16e-4;        // radio.cs:677   nr_gain = 16e-4 (WDSP-domain)
     double m_nr1Leakage = 10e-7;        // radio.cs:679   nr_leak = 10e-7 (WDSP-domain)
-    NereusSDR::NrPosition m_nr1Position = NereusSDR::NrPosition::PostAgc;  // setup.cs:8723
+    Longpath::NrPosition m_nr1Position = Longpath::NrPosition::PostAgc;  // setup.cs:8723
 
     // NR2 — from RxChannel::Nr2Tuning defaults (Task 8 commit 8747ae4),
     // matching Thetis radio.cs:2062-2213, setup.cs:34711-34748 [v2.10.3.13].
-    NereusSDR::EmnrGainMethod m_nr2GainMethod = NereusSDR::EmnrGainMethod::Gamma;  // setup.cs:17359-17468
-    NereusSDR::EmnrNpeMethod  m_nr2NpeMethod  = NereusSDR::EmnrNpeMethod::Osms;    // setup.cs:17374-17404
+    Longpath::EmnrGainMethod m_nr2GainMethod = Longpath::EmnrGainMethod::Gamma;  // setup.cs:17359-17468
+    Longpath::EmnrNpeMethod  m_nr2NpeMethod  = Longpath::EmnrNpeMethod::Osms;    // setup.cs:17374-17404
     double m_nr2TrainT1 = -0.5;         // EMNR zetaThresh default (unsigned domain)
     double m_nr2TrainT2 = 0.20;         // EMNR t2 default
     bool   m_nr2AeFilter = true;        // radio.cs:2103  rx_nr2_ae_run = 1
-    NereusSDR::NrPosition m_nr2Position = NereusSDR::NrPosition::PostAgc;    // radio.cs:2237
+    Longpath::NrPosition m_nr2Position = Longpath::NrPosition::PostAgc;    // radio.cs:2237
     bool   m_nr2Post2Run    = false;    // radio.cs:2122  default off
     double m_nr2Post2Level  = 15.0;    // radio.cs:2139  rx_nr2_ae_post2_nlevel = 15.0
     double m_nr2Post2Factor = 15.0;    // radio.cs:2158  rx_nr2_ae_post2_factor = 15.0
@@ -1335,7 +1335,7 @@ private:
 
     // NR3 — from RxChannel::Nr3Tuning defaults (Task 8 commit 8747ae4),
     // matching Thetis radio.cs:2257-2311, setup.cs:35460-35462 [v2.10.3.13].
-    NereusSDR::NrPosition m_nr3Position = NereusSDR::NrPosition::PostAgc;  // radio.cs:2275
+    Longpath::NrPosition m_nr3Position = Longpath::NrPosition::PostAgc;  // radio.cs:2275
     bool   m_nr3UseDefaultGain = true;  // setup.cs:35460  RXANR3FixedGain default
 
     // NR4 — from RxChannel::Nr4Tuning defaults (Task 8 commit 8747ae4),
@@ -1345,7 +1345,7 @@ private:
     double m_nr4Whitening  = 2.0;      // setup.cs default
     double m_nr4Rescale    = 2.0;      // setup.cs default
     double m_nr4PostThresh = -10.0;    // setup.cs default
-    NereusSDR::SbnrAlgo m_nr4Algo = NereusSDR::SbnrAlgo::Algo2;  // setup.cs:34511-34527
+    Longpath::SbnrAlgo m_nr4Algo = Longpath::SbnrAlgo::Algo2;  // setup.cs:34511-34527
 
     // DFNR — AetherSDR DeepFilterFilter defaults [@0cd4559] (post-WDSP, not
     // in Thetis). m_attenLimit{100.0f}, m_postFilterBeta{0.0f} verbatim.
@@ -1447,4 +1447,4 @@ private:
     void setupRadeIdleClearTimer();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -73,7 +73,7 @@
 
 #include "core/PaTelemetryScaling.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -339,4 +339,4 @@ double scaleHermesLiteTempCelsius(quint16 raw) noexcept
     return (3.26 * (static_cast<double>(raw) / 4096.0) - 0.5) / 0.01;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

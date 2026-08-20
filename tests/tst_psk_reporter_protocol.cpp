@@ -31,7 +31,7 @@
 #include "core/PskReporterClient.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Big-endian uint16 / uint32 read helpers. PSK Reporter IPFIX is
 // network byte order on every numeric field.
@@ -59,7 +59,7 @@ private slots:
 };
 
 void TestPskReporterProtocol::initTestCase() {
-    qRegisterMetaType<NereusSDR::DxSpot>("NereusSDR::DxSpot");
+    qRegisterMetaType<Longpath::DxSpot>("Longpath::DxSpot");
 }
 
 void TestPskReporterProtocol::buildsValidIpfixHeader() {

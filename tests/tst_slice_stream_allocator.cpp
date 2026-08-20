@@ -10,7 +10,7 @@
 #include <QtTest/QtTest>
 #include "core/SliceStreamAllocator.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceStreamAllocator : public QObject {
     Q_OBJECT

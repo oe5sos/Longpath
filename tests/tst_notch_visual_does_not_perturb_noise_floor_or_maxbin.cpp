@@ -56,7 +56,7 @@
 #include "gui/SpectrumWidget.h"
 #include "models/NotchModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchVisualDoesNotPerturbNoiseFloorOrMaxbin : public QObject
 {

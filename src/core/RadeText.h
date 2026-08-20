@@ -77,7 +77,7 @@
 // `struct rade` via `#include "rade_api.h"`.
 struct rade;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Thin Qt6 wrapper around third_party/rade's native callsign-over-EOO
 // channel (rade_tx_set_eoo_callsign / rade_rx_get_eoo_callsign, declared
@@ -136,4 +136,4 @@ private:
     QString m_ourCallsign;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -30,7 +30,7 @@
 
 #include <vector>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPortAudioCaptureResample : public QObject {
     Q_OBJECT

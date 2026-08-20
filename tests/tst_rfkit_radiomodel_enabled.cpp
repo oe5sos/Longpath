@@ -33,18 +33,18 @@ private slots:
     void currentRadioMacReturnsMacWhileConnected();
 
 private:
-    static void primeConnectedRadio(NereusSDR::RadioModel& m,
+    static void primeConnectedRadio(Longpath::RadioModel& m,
                                     const QString& mac =
                                         QStringLiteral("aa:bb:cc:dd:ee:01"));
 };
 
-void RfKitEnabledTest::primeConnectedRadio(NereusSDR::RadioModel& m,
+void RfKitEnabledTest::primeConnectedRadio(Longpath::RadioModel& m,
                                            const QString& mac)
 {
-    NereusSDR::RadioInfo info;
+    Longpath::RadioInfo info;
     info.macAddress = mac;
     m.setLastRadioInfoForTest(info);
-    m.setConnectionStateForTest(NereusSDR::ConnectionState::Connected);
+    m.setConnectionStateForTest(Longpath::ConnectionState::Connected);
     // Drive applyPeripheralsForCurrentMac() so the one-shot migration
     // sentinel ("PeripheralsMigrationDone") flips to True; otherwise the
     // first test seeds globals via setRfKitEnabled which (before migration
@@ -55,31 +55,31 @@ void RfKitEnabledTest::primeConnectedRadio(NereusSDR::RadioModel& m,
 }
 
 void RfKitEnabledTest::initTestCase() {
-    NereusSDR::AppSettings::instance().clear();
+    Longpath::AppSettings::instance().clear();
 }
 
 void RfKitEnabledTest::cleanup() {
     // Each test runs in its own RadioModel/AppSettings sandbox; wipe between.
-    NereusSDR::AppSettings::instance().clear();
+    Longpath::AppSettings::instance().clear();
 }
 
 void RfKitEnabledTest::defaultsFalse() {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m);
     QCOMPARE(m.rfKitEnabled(), false);
 }
 
 void RfKitEnabledTest::setterPersistsAndEmits() {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m);
-    QSignalSpy spy(&m, &NereusSDR::RadioModel::rfKitEnabledChanged);
+    QSignalSpy spy(&m, &Longpath::RadioModel::rfKitEnabledChanged);
 
     m.setRfKitEnabled(true);
 
     QCOMPARE(m.rfKitEnabled(), true);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.takeFirst().at(0).toBool(), true);
-    QCOMPARE(NereusSDR::AppSettings::instance()
+    QCOMPARE(Longpath::AppSettings::instance()
         .hardwareValue(m.currentRadioMac(),
                        QStringLiteral("peripherals/RfKit_Enabled"))
         .toString(),
@@ -87,9 +87,9 @@ void RfKitEnabledTest::setterPersistsAndEmits() {
 }
 
 void RfKitEnabledTest::getterReadsFromAppSettings() {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m);
-    NereusSDR::AppSettings::instance().setHardwareValue(
+    Longpath::AppSettings::instance().setHardwareValue(
         m.currentRadioMac(),
         QStringLiteral("peripherals/RfKit_Enabled"),
         QStringLiteral("True"));
@@ -97,19 +97,19 @@ void RfKitEnabledTest::getterReadsFromAppSettings() {
 }
 
 void RfKitEnabledTest::exposesRf2ksConnection() {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     QVERIFY(m.rfKitConnection() != nullptr);
 }
 
 void RfKitEnabledTest::enablingTriggersConnect() {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m);
     const QString mac = m.currentRadioMac();
-    NereusSDR::AppSettings::instance().setHardwareValue(
+    Longpath::AppSettings::instance().setHardwareValue(
         mac,
         QStringLiteral("peripherals/RfKit_ManualIp"),
         QStringLiteral("127.0.0.1"));
-    NereusSDR::AppSettings::instance().setHardwareValue(
+    Longpath::AppSettings::instance().setHardwareValue(
         mac,
         QStringLiteral("peripherals/RfKit_ManualPort"),
         QStringLiteral("12345"));
@@ -119,14 +119,14 @@ void RfKitEnabledTest::enablingTriggersConnect() {
 }
 
 void RfKitEnabledTest::disablingTriggersDisconnect() {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m);
     const QString mac = m.currentRadioMac();
-    NereusSDR::AppSettings::instance().setHardwareValue(
+    Longpath::AppSettings::instance().setHardwareValue(
         mac,
         QStringLiteral("peripherals/RfKit_ManualIp"),
         QStringLiteral("127.0.0.1"));
-    NereusSDR::AppSettings::instance().setHardwareValue(
+    Longpath::AppSettings::instance().setHardwareValue(
         mac,
         QStringLiteral("peripherals/RfKit_ManualPort"),
         QStringLiteral("12345"));
@@ -135,7 +135,7 @@ void RfKitEnabledTest::disablingTriggersDisconnect() {
     // the subsequent disconnect() actually emits disconnected().
     m.setRfKitEnabled(true);
     m.rfKitConnection()->testForceConnectedForTesting();
-    QSignalSpy disSpy(m.rfKitConnection(), &NereusSDR::Rf2ksConnection::disconnected);
+    QSignalSpy disSpy(m.rfKitConnection(), &Longpath::Rf2ksConnection::disconnected);
     m.setRfKitEnabled(false);
     QCOMPARE(disSpy.count(), 1);
 }
@@ -157,12 +157,12 @@ void RfKitEnabledTest::disablingTriggersDisconnect() {
 // stand up.
 void RfKitEnabledTest::currentRadioMacIsEmptyWhileOffline()
 {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m, QStringLiteral("aa:bb:cc:dd:ee:42"));
     QCOMPARE(m.currentRadioMac(), QStringLiteral("aa:bb:cc:dd:ee:42"));
 
     // Radio goes away.  m_lastRadioInfo is deliberately still populated.
-    m.setConnectionStateForTest(NereusSDR::ConnectionState::Disconnected);
+    m.setConnectionStateForTest(Longpath::ConnectionState::Disconnected);
 
     QVERIFY2(m.currentRadioMac().isEmpty(),
              "currentRadioMac() still reported the previous radio's MAC "
@@ -172,7 +172,7 @@ void RfKitEnabledTest::currentRadioMacIsEmptyWhileOffline()
 
 void RfKitEnabledTest::currentRadioMacReturnsMacWhileConnected()
 {
-    NereusSDR::RadioModel m;
+    Longpath::RadioModel m;
     primeConnectedRadio(m, QStringLiteral("aa:bb:cc:dd:ee:43"));
 
     // The normal case must keep working -- a gate that always denies

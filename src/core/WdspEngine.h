@@ -142,7 +142,7 @@ class TestNotchChannelSync;
 class TestMnfSetupPage;
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RxChannel;
 class TxChannel;
@@ -795,4 +795,4 @@ private:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

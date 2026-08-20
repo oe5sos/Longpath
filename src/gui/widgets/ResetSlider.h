@@ -26,7 +26,7 @@
 #include "GuardedSlider.h"
 #include <QMouseEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ResetSlider — ported from AetherSDR src/gui/VfoWidget.cpp:68-76
 // GuardedSlider that snaps back to a configurable reset value on double-click.
@@ -44,4 +44,4 @@ private:
     int m_resetVal;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

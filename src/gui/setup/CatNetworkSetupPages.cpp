@@ -30,7 +30,7 @@
 
 Q_LOGGING_CATEGORY(lcPeripherals, "nereus.peripherals")
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // CatSerialPortsPage
@@ -118,7 +118,7 @@ CatTciServerPage::CatTciServerPage(QWidget* parent)
 
 void CatTciServerPage::buildUI()
 {
-    NereusSDR::Style::applyDarkPageStyle(this);
+    Longpath::Style::applyDarkPageStyle(this);
 
     buildServerGroup();
     buildCompatibilityGroup();
@@ -724,7 +724,7 @@ void CatTciServerPage::populateBindAddressCombo()
     }
 }
 
-void CatTciServerPage::setTciServer(NereusSDR::TciServer* server)
+void CatTciServerPage::setTciServer(Longpath::TciServer* server)
 {
 #ifdef HAVE_WEBSOCKETS
     // Disconnect any previous hookup so re-calls don't accumulate slots.
@@ -736,24 +736,24 @@ void CatTciServerPage::setTciServer(NereusSDR::TciServer* server)
     m_tciClientCount = 0;  // reset; we'll learn the count from signal flow
 
     if (server) {
-        connect(server, &NereusSDR::TciServer::serverStarted,
+        connect(server, &Longpath::TciServer::serverStarted,
                 this, [this](quint16) {
                     m_tciServerRunning = true;
                     m_tciClientCount = 0;
                     refreshTciStatusDisplay();
                 });
-        connect(server, &NereusSDR::TciServer::serverStopped,
+        connect(server, &Longpath::TciServer::serverStopped,
                 this, [this]() {
                     m_tciServerRunning = false;
                     m_tciClientCount = 0;
                     refreshTciStatusDisplay();
                 });
-        connect(server, &NereusSDR::TciServer::clientConnected,
+        connect(server, &Longpath::TciServer::clientConnected,
                 this, [this](QWebSocket*) {
                     ++m_tciClientCount;
                     refreshTciStatusDisplay();
                 });
-        connect(server, &NereusSDR::TciServer::clientDisconnected,
+        connect(server, &Longpath::TciServer::clientDisconnected,
                 this, [this](QWebSocket*) {
                     if (m_tciClientCount > 0) { --m_tciClientCount; }
                     refreshTciStatusDisplay();
@@ -1266,4 +1266,4 @@ void PeripheralsPage::onConnect(int rowIdx)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

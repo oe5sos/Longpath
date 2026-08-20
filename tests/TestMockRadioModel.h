@@ -60,7 +60,7 @@
 #include <QString>
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TestMockRadioModel : public QObject {
     Q_OBJECT
@@ -681,4 +681,4 @@ private:
     int  m_diguOffset{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

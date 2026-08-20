@@ -67,7 +67,7 @@
 
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Reusable 1..8 bit LED strip.  Mirrors mi0bot's ucOCLedStrip:
 //   - `bits()`/`setBits()`            ↔ ucOCLedStrip.Bits
@@ -115,4 +115,4 @@ private:
     bool                   m_interactive{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

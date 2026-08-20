@@ -31,7 +31,7 @@
 #include <QImage>
 #include <QPainter>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

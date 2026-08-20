@@ -66,7 +66,7 @@
 
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Frame-averaging policy + linear→dB conversion stage of the WDSP
 /// analyzer pipeline.  Owns per-channel state (av_sum running
@@ -159,4 +159,4 @@ private:
     int m_availFrames{0};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -56,7 +56,7 @@ mw0lge@grange-lane.co.uk
 
 #include "ButtonBoxItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Filter preset buttons: F1-F10, Var1, Var2.
 // Ported from Thetis clsFilterButtonBox (MeterManager.cs:7674+).
@@ -86,4 +86,4 @@ private:
     static constexpr int kFilterCount = 12;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -62,7 +62,7 @@ class QComboBox;
 class QSlider;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Diversity reception controls (two-antenna phase/gain combining).
 // NYI — Phase 3F (Multi-Panadapter + DDC assignment).
@@ -94,4 +94,4 @@ private:
     QLabel*  m_r2PhaseValue      = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

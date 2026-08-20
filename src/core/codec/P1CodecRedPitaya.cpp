@@ -39,7 +39,7 @@
 #include "P1CodecRedPitaya.h"
 #include "core/DdcAssignment.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Bank 12 ADC1 — RedPitaya carve-out: respect user attn even under MOX,
 // mask to 5 bits.
@@ -365,4 +365,4 @@ DdcAssignment P1CodecRedPitaya::applyDdcAssignment(
     return a;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -5,7 +5,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 int ChromeFoldPlan::requiredWidth(const QVector<ChromeFoldEntry>& items,
                                   int foldThroughRung)
@@ -77,4 +77,4 @@ QStringList ChromeFoldPlan::foldedLabels(const QVector<ChromeFoldEntry>& items,
     return out;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -21,7 +21,7 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct RfKitPowerSnapshot {
     int   forwardW       = 0;
@@ -224,9 +224,9 @@ private:
     // about.
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::RfKitPowerSnapshot)
-Q_DECLARE_METATYPE(NereusSDR::RfKitTunerSnapshot)
-Q_DECLARE_METATYPE(NereusSDR::RfKitAntenna)
-Q_DECLARE_METATYPE(QList<NereusSDR::RfKitAntenna>)
+Q_DECLARE_METATYPE(Longpath::RfKitPowerSnapshot)
+Q_DECLARE_METATYPE(Longpath::RfKitTunerSnapshot)
+Q_DECLARE_METATYPE(Longpath::RfKitAntenna)
+Q_DECLARE_METATYPE(QList<Longpath::RfKitAntenna>)

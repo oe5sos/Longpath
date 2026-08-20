@@ -63,7 +63,7 @@ mw0lge@grange-lane.co.uk
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // participatesIn()
@@ -325,4 +325,4 @@ bool DialItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -74,7 +74,7 @@
 
 #include <limits>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Per-band grid scale storage. Added in Phase 3G-8 (commit 2).
 // dbStep is NOT per-band — Thetis keeps it as a single global value
@@ -169,7 +169,7 @@ signals:
     void bandwidthChanged(double bw);
     void levelChanged();
     void fftSizeChanged(int size);
-    void bandChanged(NereusSDR::Band band);
+    void bandChanged(Longpath::Band band);
     void gridStepChanged(int step);
 
 private:
@@ -193,4 +193,4 @@ private:
     int m_gridStep{10};            // NereusSDR divergence from Thetis 2.
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

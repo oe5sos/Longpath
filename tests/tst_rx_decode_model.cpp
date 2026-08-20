@@ -12,7 +12,7 @@
 
 #include "models/RxDecodeModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRxDecodeModel : public QObject {
     Q_OBJECT

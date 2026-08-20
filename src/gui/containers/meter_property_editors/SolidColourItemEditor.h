@@ -3,7 +3,7 @@
 
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterItem;
 class SolidColourItem;
@@ -20,4 +20,4 @@ private:
     QPushButton* m_btnColour{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

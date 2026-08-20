@@ -23,7 +23,7 @@
 #include <QByteArray>
 #include <QHostAddress>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Broadcasts a SmartSDR-format discovery beacon on UDP 4992 so that
 // FlexRadio-aware accessories (PGXL, TGXL) auto-discover NereusSDR
@@ -88,4 +88,4 @@ private:
     QHostAddress m_peerHint;         // optional route-lookup hint; default-route probe if null
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

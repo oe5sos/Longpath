@@ -64,7 +64,7 @@ class QPushButton;
 class QFontComboBox;
 class QTableWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class NeedleScalePwrItem;
 
@@ -99,4 +99,4 @@ private:
     QTableWidget*   m_calTable{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

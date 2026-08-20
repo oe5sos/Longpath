@@ -53,7 +53,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR::StripCharacters {
+namespace Longpath::StripCharacters {
 
 struct Character {
     QString name;
@@ -115,4 +115,4 @@ QVector<float> captureStage(const StripChain& chain,
 void restoreStage(StripChain& chain, StripChain::Stage stage,
                   const QVector<float>& values);
 
-} // namespace NereusSDR::StripCharacters
+} // namespace Longpath::StripCharacters

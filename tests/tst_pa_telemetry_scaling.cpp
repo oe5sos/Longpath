@@ -1,5 +1,5 @@
-// no-port-check: test file — verifies NereusSDR::scaleFwdPowerWatts(),
-// NereusSDR::scaleFwdRevVoltage(), and NereusSDR::scaleExciterPowerMw()
+// no-port-check: test file — verifies Longpath::scaleFwdPowerWatts(),
+// Longpath::scaleFwdRevVoltage(), and Longpath::scaleExciterPowerMw()
 // output values; the Thetis source references are citations in the
 // docstrings, not derivation claims. The ported functions themselves are
 // registered in THETIS-PROVENANCE.md.
@@ -7,8 +7,8 @@
 // tests/tst_pa_telemetry_scaling.cpp  (NereusSDR)
 // =================================================================
 //
-// Unit tests for NereusSDR::scaleFwdPowerWatts() and
-// NereusSDR::scaleFwdRevVoltage(), which lift the per-board PA telemetry
+// Unit tests for Longpath::scaleFwdPowerWatts() and
+// Longpath::scaleFwdRevVoltage(), which lift the per-board PA telemetry
 // scaling helpers from RadioModel.cpp into a public free-function API
 // (Phase 1 Agent 1B of issue #167 PA calibration safety hotfix).
 //
@@ -26,7 +26,7 @@
 #include "core/HpsdrModel.h"
 #include "core/PaTelemetryScaling.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPaTelemetryScaling : public QObject
 {

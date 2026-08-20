@@ -51,7 +51,7 @@ class QLabel;
 class QPushButton;
 class QTableWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SwrCurveWidget;
 class SwrSweepPanel;
@@ -274,4 +274,4 @@ private:
     SwrSweepPanel* m_sweepPanel{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

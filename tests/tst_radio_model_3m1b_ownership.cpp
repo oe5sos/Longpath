@@ -79,7 +79,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // MockRadioConnection — minimal concrete RadioConnection for tests that need
@@ -93,7 +93,7 @@ public:
         setState(ConnectionState::Connected);
     }
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

@@ -124,7 +124,7 @@
 
 #include "P2CodecOrionMkII.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Hermes-class P2 codec — ANAN-10 / ANAN-100 (Hermes), ANAN-10E / ANAN-100B
 // (HermesII) and ANAN-G2E (HermesC10) running community Protocol 2 firmware.
@@ -210,4 +210,4 @@ protected:
     int familyPsP1DdcConfig() const noexcept override { return 5; }
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

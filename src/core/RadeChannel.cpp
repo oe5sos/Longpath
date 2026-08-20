@@ -174,7 +174,7 @@ extern "C" {
 
 Q_LOGGING_CATEGORY(lcRade, "nereus.rade")
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Custom deleter for the opaque FARGANState handle held by
 // std::unique_ptr<void, FarganDeleter> on RadeChannel. Resolves the
@@ -799,4 +799,4 @@ void RadeChannel::resetTx()
     m_radeTxCallCount = 0;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

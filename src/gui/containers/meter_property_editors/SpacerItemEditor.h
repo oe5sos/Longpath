@@ -4,7 +4,7 @@
 class QDoubleSpinBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterItem;
 class SpacerItem;
@@ -23,4 +23,4 @@ private:
     QDoubleSpinBox* m_spinPadding{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

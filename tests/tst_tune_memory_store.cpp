@@ -26,36 +26,36 @@ private slots:
 // Store a memory for (antenna=1, Band20m) and recall it; verify relay values.
 void TuneMemoryStoreTest::recallReturnsStoredValue()
 {
-    NereusSDR::TuneMemoryStore store;
+    Longpath::TuneMemoryStore store;
     // Clear just this slot to avoid stale data from other runs.
-    store.clear(1, NereusSDR::Band::Band20m);
+    store.clear(1, Longpath::Band::Band20m);
 
-    NereusSDR::TuneMemory mem;
+    Longpath::TuneMemory mem;
     mem.antenna   = 1;
-    mem.band      = NereusSDR::Band::Band20m;
+    mem.band      = Longpath::Band::Band20m;
     mem.c1        = 42;
     mem.l         = 199;
     mem.c2        = 88;
     mem.savedAtMs = qint64(12345000);
     store.store(mem);
 
-    auto rec = store.recall(1, NereusSDR::Band::Band20m);
+    auto rec = store.recall(1, Longpath::Band::Band20m);
     QVERIFY(rec.has_value());
     QCOMPARE(rec->c1, 42);
     QCOMPARE(rec->l,  199);
     QCOMPARE(rec->c2, 88);
     QCOMPARE(rec->antenna, 1);
-    QCOMPARE(rec->band,    NereusSDR::Band::Band20m);
+    QCOMPARE(rec->band,    Longpath::Band::Band20m);
 }
 
 // After clearing a slot, recall must return nullopt.
 void TuneMemoryStoreTest::clearRemovesEntry()
 {
-    NereusSDR::TuneMemoryStore store;
+    Longpath::TuneMemoryStore store;
 
-    NereusSDR::TuneMemory mem;
+    Longpath::TuneMemory mem;
     mem.antenna   = 2;
-    mem.band      = NereusSDR::Band::Band40m;
+    mem.band      = Longpath::Band::Band40m;
     mem.c1        = 10;
     mem.l         = 20;
     mem.c2        = 30;
@@ -63,25 +63,25 @@ void TuneMemoryStoreTest::clearRemovesEntry()
     store.store(mem);
 
     // Verify it's there.
-    QVERIFY(store.recall(2, NereusSDR::Band::Band40m).has_value());
+    QVERIFY(store.recall(2, Longpath::Band::Band40m).has_value());
 
     // Clear and verify it's gone.
-    store.clear(2, NereusSDR::Band::Band40m);
-    QVERIFY(!store.recall(2, NereusSDR::Band::Band40m).has_value());
+    store.clear(2, Longpath::Band::Band40m);
+    QVERIFY(!store.recall(2, Longpath::Band::Band40m).has_value());
 }
 
 // Store via instance A, construct instance B, verify the value survived.
 void TuneMemoryStoreTest::persistsAcrossInstances()
 {
     const int ant  = 3;
-    const NereusSDR::Band band = NereusSDR::Band::Band80m;
+    const Longpath::Band band = Longpath::Band::Band80m;
 
     // Write via instance A.
     {
-        NereusSDR::TuneMemoryStore a;
+        Longpath::TuneMemoryStore a;
         a.clear(ant, band);
 
-        NereusSDR::TuneMemory mem;
+        Longpath::TuneMemory mem;
         mem.antenna   = ant;
         mem.band      = band;
         mem.c1        = 77;
@@ -93,7 +93,7 @@ void TuneMemoryStoreTest::persistsAcrossInstances()
 
     // Read via instance B.
     {
-        NereusSDR::TuneMemoryStore b;
+        Longpath::TuneMemoryStore b;
         auto rec = b.recall(ant, band);
         QVERIFY(rec.has_value());
         QCOMPARE(rec->c1,        77);

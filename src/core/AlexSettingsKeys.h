@@ -26,7 +26,7 @@
 
 #include <array>
 
-namespace NereusSDR::alexKeys {
+namespace Longpath::alexKeys {
 
 // ── Preselector row slugs ────────────────────────────────────────────────────
 //
@@ -94,4 +94,4 @@ inline constexpr const char* kAlex1Bpf1Prefix = "alex/bpf1";
 // board, so there is no capability gate that would make them stray data.
 // They are intentionally absent here rather than forgotten.
 
-} // namespace NereusSDR::alexKeys
+} // namespace Longpath::alexKeys

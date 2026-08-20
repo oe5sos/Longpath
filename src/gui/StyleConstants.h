@@ -30,7 +30,7 @@
 
 #include <QFont>
 
-namespace NereusSDR::Style {
+namespace Longpath::Style {
 
 // ── Entblaut, 2026-08-15 ──────────────────────────────────────────────
 //
@@ -591,4 +591,4 @@ inline QFont monoFont(const QFont& base, int px, QFont::Weight w = QFont::Normal
     return f;
 }
 
-} // namespace NereusSDR::Style
+} // namespace Longpath::Style

@@ -64,7 +64,7 @@
 
 #include <memory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Bounds: dispatch wait covers the time between posting the lambda
 // and the worker servicing it; post-quit wait covers the event-loop
@@ -127,4 +127,4 @@ inline void teardownWorkerThreadedConnection(RadioConnection*& conn,
     thread = nullptr;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

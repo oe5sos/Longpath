@@ -23,8 +23,8 @@ private slots:
 };
 
 void PgxlConnectionPingTest::pingEmitsPongReceivedOnReply() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy pongSpy(&conn, &NereusSDR::PgxlConnection::pongReceived);
+    Longpath::PgxlConnection conn;
+    QSignalSpy pongSpy(&conn, &Longpath::PgxlConnection::pongReceived);
     // Establish version handshake so injectLineForTesting routes R-frames.
     conn.injectLineForTesting("V3.8.9");
     quint32 seq = conn.ping("test-tag");
@@ -41,8 +41,8 @@ void PgxlConnectionPingTest::pingEmitsPongReceivedOnReply() {
 }
 
 void PgxlConnectionPingTest::pingTimesOutViaFlushSeam() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy timeoutSpy(&conn, &NereusSDR::PgxlConnection::pingTimedOut);
+    Longpath::PgxlConnection conn;
+    QSignalSpy timeoutSpy(&conn, &Longpath::PgxlConnection::pingTimedOut);
     conn.injectLineForTesting("V3.8.9");
     quint32 seq = conn.ping("timeout-tag");
     // Use the test seam to evict all pending pings immediately (bypasses 5 s).

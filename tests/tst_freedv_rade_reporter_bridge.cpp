@@ -32,7 +32,7 @@
 #include "core/FreeDVRadeReporterBridge.h"
 #include "core/FreeDVReporterClient.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

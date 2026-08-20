@@ -21,7 +21,7 @@
 #include <QList>
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -210,4 +210,4 @@ void FilterPresetStore::resetAll()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -19,7 +19,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 Q_LOGGING_CATEGORY(lcQrzLog, "nereus.qrz.logbook")
@@ -129,4 +129,4 @@ QrzLogbookUploader::parseResponse(const QByteArray& body)
     return out;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

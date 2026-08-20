@@ -31,7 +31,7 @@
 
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class EqHost;
 
@@ -74,4 +74,4 @@ private:
     int          m_selectedBand{-1};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

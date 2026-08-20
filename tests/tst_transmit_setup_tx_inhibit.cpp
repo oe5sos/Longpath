@@ -13,7 +13,7 @@
 #include "gui/setup/TransmitSetupPages.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTransmitSetupTxInhibit : public QObject
 {

@@ -5,7 +5,7 @@ class QLineEdit;
 class QSpinBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class WebImageItem;
 
 class WebImageItemEditor : public BaseItemEditor {
@@ -22,4 +22,4 @@ private:
     QPushButton* m_btnFallback{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

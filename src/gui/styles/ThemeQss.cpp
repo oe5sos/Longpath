@@ -21,7 +21,7 @@
 
 #include <QHash>
 
-namespace NereusSDR::Style {
+namespace Longpath::Style {
 namespace {
 
 // ── Die Tabelle ──────────────────────────────────────────────────────
@@ -281,4 +281,4 @@ bool hasLegacyColour(const QString& qss)
     return false;
 }
 
-} // namespace NereusSDR::Style
+} // namespace Longpath::Style

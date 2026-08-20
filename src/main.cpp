@@ -143,15 +143,15 @@ int main(int argc, char* argv[])
     // Hand the build stamp to the core accessor before anything can build a
     // window title from it. Empty on release artifacts, in which case the
     // title stays exactly as it was.
-    NereusSDR::BuildIdentity::setBuildTag(
+    Longpath::BuildIdentity::setBuildTag(
         QString::fromUtf8(NEREUSSDR_BUILD_TAG));
 
     // Resolve profile name first — downstream path lookups (AppSettings,
     // log dir, pre-QApplication UI scale read) all consult it.
     const QString earlyProfile = extractProfileFromArgv(argc, argv);
     if (!earlyProfile.isEmpty()) {
-        if (NereusSDR::AppSettings::isValidProfileName(earlyProfile)) {
-            NereusSDR::AppSettings::setProfileOverride(earlyProfile);
+        if (Longpath::AppSettings::isValidProfileName(earlyProfile)) {
+            Longpath::AppSettings::setProfileOverride(earlyProfile);
         } else {
             fprintf(stderr,
                     "Longpath: ignoring invalid --profile '%s' "
@@ -159,12 +159,12 @@ int main(int argc, char* argv[])
                     earlyProfile.toLocal8Bit().constData());
         }
     }
-    const QString activeProfile = NereusSDR::AppSettings::profileOverride();
+    const QString activeProfile = Longpath::AppSettings::profileOverride();
 
     // Apply saved UI scale factor BEFORE QApplication is created.
     {
         const QString settingsPath =
-            NereusSDR::AppSettings::resolveSettingsPath(activeProfile);
+            Longpath::AppSettings::resolveSettingsPath(activeProfile);
         QFile f(settingsPath);
         if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QByteArray data = f.readAll();
@@ -203,7 +203,7 @@ int main(int argc, char* argv[])
     //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
     //   Linux:   nice(-5)  (soft-fail without privilege)
     //   Windows: SetThreadPriority(HIGHEST)
-    NereusSDR::elevateGuiMainThreadPriority();
+    Longpath::elevateGuiMainThreadPriority();
 
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM
     // by default; the OS terminates the process without giving Qt a chance
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
     // (issue #203). The OS only prompts when something actually engages
     // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
     // on machines without a built-in mic, so call AVCaptureDevice directly.
-    NereusSDR::requestMicrophonePermission();
+    Longpath::requestMicrophonePermission();
 
     // Re-parse properly so --help / --version / unknown options surface
     // via Qt's standard machinery. The earlyProfile pass above already
@@ -258,7 +258,7 @@ int main(int argc, char* argv[])
 
     // Set up file logging in ~/.config/NereusSDR/ (or the profile's
     // isolated config dir when --profile is set).
-    const QString logDir = NereusSDR::AppSettings::resolveConfigDir(activeProfile);
+    const QString logDir = Longpath::AppSettings::resolveConfigDir(activeProfile);
     QDir().mkpath(logDir);
 
     const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
@@ -294,8 +294,8 @@ int main(int argc, char* argv[])
     // light-grey backgrounds and orange Highlight through into popups,
     // group-box titles, tooltips, and any unstyled control.
     app.setStyle(QStyleFactory::create("Fusion"));
-    NereusSDR::applyDarkPalette(app);
-    NereusSDR::applyAppBaselineQss(app);
+    Longpath::applyDarkPalette(app);
+    Longpath::applyAppBaselineQss(app);
 
     // ── Technik Nereus, Design der Betreiber ─────────────────────────
     //
@@ -313,7 +313,7 @@ int main(int argc, char* argv[])
     // Vor dem Hauptfenster, damit das erste Zeichnen schon stimmt.
     // Siehe gui/styles/Theme.h und docs/design/ROADMAP.md.
     {
-        NereusSDR::Style::Theme& theme = NereusSDR::Style::Theme::instance();
+        Longpath::Style::Theme& theme = Longpath::Style::Theme::instance();
         // printf-Form statt Stream: qInfo() << … braucht QDebug, und ein
         // Header, der nur über QApplication mitkommt, ist ein Bruch, der
         // erst bei jemand anderem auffällt.
@@ -325,32 +325,32 @@ int main(int argc, char* argv[])
             // ins Log: „warum greift meine Datei nicht" ist sonst eine
             // Fehlersuche ohne Anhaltspunkt.
             qInfo("Kein Theme gefunden. Gesucht in: %s",
-                  qPrintable(NereusSDR::Style::Theme::searchPaths().join(
+                  qPrintable(Longpath::Style::Theme::searchPaths().join(
                       QStringLiteral(", "))));
         }
     }
-    app.installEventFilter(new NereusSDR::Style::ThemeFilter(&app));
+    app.installEventFilter(new Longpath::Style::ThemeFilter(&app));
 
     // Register custom metatypes for cross-thread signal/slot connections.
-    qRegisterMetaType<NereusSDR::RadioConnectionError>();
-    qRegisterMetaType<NereusSDR::AudioDeviceConfig>();
+    qRegisterMetaType<Longpath::RadioConnectionError>();
+    qRegisterMetaType<Longpath::AudioDeviceConfig>();
 
     // Load XML settings
-    NereusSDR::AppSettings::instance().load();
+    Longpath::AppSettings::instance().load();
 
     // Phase 3O schema migration — must run before any AppSettings reads.
-    NereusSDR::AppSettings::migrateVaxSchemaV1ToV2();
+    Longpath::AppSettings::migrateVaxSchemaV1ToV2();
 
     // hermes-filter-debug Bug 2: legacy global "hl2IoBoard/n2adrFilter" key
     // → per-MAC scope under hardware/<mac>/hl2IoBoard/n2adrFilter for every
     // saved HL2.  Idempotent.
-    NereusSDR::AppSettings::migrateLegacyN2adrFilter(
-        NereusSDR::AppSettings::instance());
+    Longpath::AppSettings::migrateLegacyN2adrFilter(
+        Longpath::AppSettings::instance());
 
     // Issue #174: drop the orphan "hardware/oc/n2adrFilter" key written by
     // the now-removed OcOutputsHfTab checkbox.  Idempotent.
-    NereusSDR::AppSettings::removeOrphanOcN2adrFilter(
-        NereusSDR::AppSettings::instance());
+    Longpath::AppSettings::removeOrphanOcN2adrFilter(
+        Longpath::AppSettings::instance());
 
     // v0.3.0 / v0.3.x settings schema migrations — must run after load(),
     // after other one-shot migrations above. v3 retires legacy display
@@ -366,12 +366,12 @@ int main(int argc, char* argv[])
     // v8 zieht die FFT-Größe von 4096 auf 16384, sofern noch der alte
     // Vorgabewert steht — 47 Hz je Bin waren weniger Messwerte als das
     // Fenster Pixel hat.
-    NereusSDR::AppSettings::instance().ensureSettingsAtVersion(9);
+    Longpath::AppSettings::instance().ensureSettingsAtVersion(9);
 
     // Restore logging category toggles from settings
-    NereusSDR::LogManager::instance().loadSettings();
+    Longpath::LogManager::instance().loadSettings();
 
-    qDebug() << "Starting NereusSDR" << app.applicationVersion();
+    qDebug() << "Starting Longpath" << app.applicationVersion();
     if (!activeProfile.isEmpty()) {
         qDebug() << "Profile:" << activeProfile
                  << "config dir:" << logDir;
@@ -380,16 +380,16 @@ int main(int argc, char* argv[])
     // Phase 3G-6 block 5: bring up the MMIO subsystem so persisted
     // endpoints (under AppSettings MmioEndpoints/<guid>/*) start
     // their transport workers before the main window is shown.
-    NereusSDR::ExternalVariableEngine::instance().init();
+    Longpath::ExternalVariableEngine::instance().init();
 
-    NereusSDR::MainWindow window;
+    Longpath::MainWindow window;
     window.show();
 
     const int rc = app.exec();
 
     // Graceful shutdown so worker threads drain before the engine
     // singleton is destroyed.
-    NereusSDR::ExternalVariableEngine::instance().shutdown();
+    Longpath::ExternalVariableEngine::instance().shutdown();
 
     // Restore the default message handler before statics start
     // tearing down. Qt's QThreadStoragePrivate::finish() emits

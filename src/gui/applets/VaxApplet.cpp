@@ -42,7 +42,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -458,4 +458,4 @@ void VaxApplet::hideEvent(QHideEvent* e)
     AppletWidget::hideEvent(e);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

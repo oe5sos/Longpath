@@ -38,7 +38,7 @@
 #include "gui/applets/TxApplet.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

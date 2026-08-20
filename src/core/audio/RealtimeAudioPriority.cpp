@@ -11,7 +11,7 @@
 
 Q_LOGGING_CATEGORY(lcRtAudio, "nereussdr.rt_audio")
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Token struct holds whatever platform-specific state is needed to
 // undo the elevation in leave().  Per-platform members are gated so
@@ -38,7 +38,7 @@ struct AudioPriorityToken {
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // ---------------------------------------------------------------- macOS
 
@@ -49,7 +49,7 @@ struct AudioPriorityToken {
 #include <pthread/qos.h>
 #include <pthread.h>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -186,7 +186,7 @@ void elevateLatencyCriticalThreadPriority()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif  // Q_OS_MAC
 
@@ -200,7 +200,7 @@ void elevateLatencyCriticalThreadPriority()
 #include <cerrno>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioPriorityToken* elevateAudioThreadPriority()
 {
@@ -279,7 +279,7 @@ void elevateLatencyCriticalThreadPriority()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif  // Q_OS_LINUX
 
@@ -290,7 +290,7 @@ void elevateLatencyCriticalThreadPriority()
 #include <windows.h>
 #include <avrt.h>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioPriorityToken* elevateAudioThreadPriority()
 {
@@ -344,7 +344,7 @@ void elevateLatencyCriticalThreadPriority()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif  // Q_OS_WIN
 
@@ -352,7 +352,7 @@ void elevateLatencyCriticalThreadPriority()
 
 #if !defined(Q_OS_MAC) && !defined(Q_OS_LINUX) && !defined(Q_OS_WIN)
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioPriorityToken* elevateAudioThreadPriority() { return nullptr; }
 void leaveAudioThreadPriority(AudioPriorityToken*) {}
@@ -360,6 +360,6 @@ void elevateGuiMainThreadPriority() {}
 void elevateComputeThreadPriority() {}
 void elevateLatencyCriticalThreadPriority() {}
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif

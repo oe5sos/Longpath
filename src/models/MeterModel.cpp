@@ -1,6 +1,6 @@
 #include "MeterModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 MeterModel::MeterModel(QObject* parent)
     : QObject(parent)
@@ -41,4 +41,4 @@ void MeterModel::setSMeter(float value)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

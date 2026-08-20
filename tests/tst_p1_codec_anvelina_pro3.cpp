@@ -2,7 +2,7 @@
 #include <QtTest/QtTest>
 #include "core/codec/P1CodecAnvelinaPro3.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1CodecAnvelinaPro3 : public QObject {
     Q_OBJECT

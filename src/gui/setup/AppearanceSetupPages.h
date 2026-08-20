@@ -9,7 +9,7 @@ class QCheckBox;
 class QLabel;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ColorSwatchButton;
 
@@ -112,4 +112,4 @@ private:
     QCheckBox* m_enableToggle{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

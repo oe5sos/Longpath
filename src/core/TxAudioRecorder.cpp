@@ -19,7 +19,7 @@
 #include <cmath>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -168,4 +168,4 @@ bool TxAudioRecorder::saveWav(const QString& path, QString* error) const
     return f.write(wav) == wav.size();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

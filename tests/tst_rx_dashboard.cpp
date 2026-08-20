@@ -12,7 +12,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstRxDashboard : public QObject {
     Q_OBJECT
@@ -219,7 +219,7 @@ private slots:
         d.bindSlice(&b);
         QCOMPARE(d.slice(), &b);
         // The old slice must no longer drive the badges.
-        a.setDspMode(NereusSDR::DSPMode::CWU);
+        a.setDspMode(Longpath::DSPMode::CWU);
         QVERIFY(!d.modeText().contains(QStringLiteral("CW")));
     }
 };

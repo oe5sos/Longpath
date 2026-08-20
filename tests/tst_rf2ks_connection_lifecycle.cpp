@@ -21,7 +21,7 @@
 
 #include "core/Rf2ksConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // In-process HTTP/1.0 fake with two modes the older fakes lack:
 //

@@ -19,7 +19,7 @@
 
 #include "gui/popup_placement.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPopupPlacement : public QObject
 {

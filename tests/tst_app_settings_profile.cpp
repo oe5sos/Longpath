@@ -11,7 +11,7 @@
 #include <QDir>
 #include <QStandardPaths>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAppSettingsProfile : public QObject {
     Q_OBJECT

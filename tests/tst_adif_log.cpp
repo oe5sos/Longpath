@@ -11,7 +11,7 @@
 
 #include "core/AdifLog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAdifLog : public QObject {
     Q_OBJECT

@@ -35,7 +35,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 // ── On by default, which reverses the first decision here ────────────
@@ -716,4 +716,4 @@ void QsoDetailPane::refresh()
     refreshExtras();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

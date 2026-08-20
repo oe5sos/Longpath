@@ -40,7 +40,7 @@
 #include "core/codec/P2CodecOrionMkII.h"
 #include "core/codec/P2CodecSaturn.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

@@ -44,7 +44,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace NereusSDR::TargetFromFile {
+namespace Longpath::TargetFromFile {
 
 // What the header said. `ok` false means `error` is worth showing.
 struct WavInfo {
@@ -115,4 +115,4 @@ inline constexpr double kDynamicRangeDb = 60.0;
 // about a second of sound to average.
 QVector<double> fromWavFile(const QString& path, QString* error);
 
-} // namespace NereusSDR::TargetFromFile
+} // namespace Longpath::TargetFromFile

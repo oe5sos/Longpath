@@ -46,7 +46,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Records every transmit frequency the model pushes at the radio.
 // File scope, not an anonymous namespace: moc cannot generate a
@@ -63,7 +63,7 @@ public:
     }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64 hz) override { txFreqCalls.append(hz); }

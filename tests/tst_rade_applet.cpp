@@ -31,7 +31,7 @@
 #include "core/WdspEngine.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadeApplet : public QObject {
     Q_OBJECT

@@ -83,7 +83,7 @@ mw0lge@grange-lane.co.uk
 
 #include <QDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AboutDialog : public QDialog {
     Q_OBJECT
@@ -95,4 +95,4 @@ private:
     void buildUI();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

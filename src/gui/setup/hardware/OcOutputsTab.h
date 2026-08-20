@@ -67,7 +67,7 @@ class QCheckBox;
 class QGroupBox;
 class QTabWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class OcMatrix;
@@ -158,4 +158,4 @@ private:
     bool m_syncingFromModel{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

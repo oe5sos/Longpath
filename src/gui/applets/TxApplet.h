@@ -158,7 +158,7 @@ class QLabel;
 class QSpinBox;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 class MicProfileManager;
@@ -281,7 +281,7 @@ public slots:
     // support (HL2 / Atlas) and shows on PS-capable boards (G2-class /
     // Hermes II / Angelia / Orion / Saturn).  Mirrors the existing
     // RxApplet::setBoardCapabilities pattern.
-    void setBoardCapabilities(const NereusSDR::BoardCapabilities& caps);
+    void setBoardCapabilities(const Longpath::BoardCapabilities& caps);
 
     // ── Phase 3M-4 Task 13: late-bound PureSignal coordinator wiring ───────
     // PureSignal is constructed by RadioModel inside the WDSP-init lambda
@@ -289,7 +289,7 @@ public slots:
     // RadioModel::pureSignalCoordinatorReady to wire the [PS-A] toggle
     // when the coordinator becomes available.  Tests call this slot
     // directly with their own coordinator instance.
-    void setPureSignal(NereusSDR::PureSignal* coordinator);
+    void setPureSignal(Longpath::PureSignal* coordinator);
 public:
 
     // ── Test accessors ──────────────────────────────────────────────────────
@@ -476,7 +476,7 @@ private:
     // QPointer auto-nulls on QObject destruction, so the m_ps null-guard
     // at setPureSignal:2010 now properly skips the redundant disconnect
     // (Qt auto-disconnects on sender destruction anyway).
-    QPointer<NereusSDR::PureSignal> m_ps;
+    QPointer<Longpath::PureSignal> m_ps;
     // ── Plan 4 Cluster C (Task 4 / D2+D3+D9-status): TX BW spinbox row ─────────
     // Low/High cutoff spinboxes (Hz) — bidirectional with TransmitModel::filterLow
     // and filterHigh via the filterChanged(int,int) signal.
@@ -531,4 +531,4 @@ private:
     bool m_updatingFromModel{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

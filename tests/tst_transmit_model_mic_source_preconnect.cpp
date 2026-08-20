@@ -40,7 +40,7 @@
 #include "models/TransmitModel.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTransmitModelMicSourcePreconnect : public QObject {
     Q_OBJECT

@@ -54,7 +54,7 @@
 
 class QGridLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletWidget;
 class GridCellWidget;
@@ -172,4 +172,4 @@ private:
     bool m_columnsExplicit{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -39,7 +39,7 @@
 
 #include "P1CodecStandard.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void P1CodecStandard::composeCcForBank(int bank, const CodecContext& ctx,
                                        quint8 out[5]) const
@@ -985,4 +985,4 @@ DdcAssignment P1CodecStandard::applyDdcAssignment(
     return a;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

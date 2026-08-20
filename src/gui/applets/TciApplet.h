@@ -34,7 +34,7 @@ class QStackedWidget;
 class QTimer;
 class QWebSocket;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 class TciServer;
@@ -136,6 +136,6 @@ private:
     int m_mockLevelPhase{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

@@ -9,7 +9,7 @@
 #include <QtTest/QtTest>
 #include "core/QrzClient.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstQrzClient : public QObject {
     Q_OBJECT

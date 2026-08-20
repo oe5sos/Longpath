@@ -20,7 +20,7 @@
 
 #include <QAudioFormat>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Constructor / Destructor
@@ -90,4 +90,4 @@ qint64 QAudioSinkAdapter::push(const char* data, qint64 bytes)
     return m_io ? m_io->write(data, bytes) : 0;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

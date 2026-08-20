@@ -45,10 +45,10 @@
 #include "codec/IP1Codec.h"
 #include "codec/CodecContext.h"
 
-namespace NereusSDR { class OcMatrix; }                  // forward decl — full header in .cpp
-namespace NereusSDR { class IoBoardHl2; }                // forward decl — full header in .cpp
-namespace NereusSDR { class HermesLiteBandwidthMonitor; }// forward decl — full header in .cpp
-namespace NereusSDR { class TxMicSource; }               // forward decl — full header in audio/TxMicSource.h
+namespace Longpath { class OcMatrix; }                  // forward decl — full header in .cpp
+namespace Longpath { class IoBoardHl2; }                // forward decl — full header in .cpp
+namespace Longpath { class HermesLiteBandwidthMonitor; }// forward decl — full header in .cpp
+namespace Longpath { class TxMicSource; }               // forward decl — full header in audio/TxMicSource.h
 
 #include <atomic>
 #include <memory>
@@ -59,7 +59,7 @@ namespace NereusSDR { class TxMicSource; }               // forward decl — ful
 #include <QDateTime>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class P1RadioConnection : public RadioConnection {
     Q_OBJECT
@@ -175,7 +175,7 @@ public:
 
 public slots:
     void init() override;
-    void connectToRadio(const NereusSDR::RadioInfo& info) override;
+    void connectToRadio(const Longpath::RadioInfo& info) override;
     void disconnect() override;
 
     void setReceiverFrequency(int receiverIndex, quint64 frequencyHz) override;
@@ -274,13 +274,13 @@ public slots:
     // already arm m_forceBank0Next / m_forceBank11Next so the gating
     // bits land within ≤1 frame; the per-DDC freq overrides land in
     // banks 2-9 over the next 4-9 frames (~10-25 ms at 380.95 fps).
-    void applyPsDdcConfig(const NereusSDR::PsDdcConfig& cfg);
+    void applyPsDdcConfig(const Longpath::PsDdcConfig& cfg);
 
     // Phase 3M-4 Task 17 P1 follow-up — read-only access to the per-board
     // codec for ReceiverManager::setP1Codec injection.  Returns nullptr
     // until selectCodec() runs at applyBoardQuirks() time; subscribers
     // listen to p1CodecChanged() to know when this becomes valid.
-    NereusSDR::IP1Codec* p1Codec() const { return m_codec.get(); }
+    Longpath::IP1Codec* p1Codec() const { return m_codec.get(); }
 
     // HL2-specific: enqueue the I/O board probe (HW version + FW major/minor
     // reads). Public entry point for the Setup → Hardware → HL2 I/O Board
@@ -1087,4 +1087,4 @@ public:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

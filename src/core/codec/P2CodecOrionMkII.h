@@ -106,7 +106,7 @@
 #include "IP2Codec.h"
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Base P2 codec for the Orion-MKII / 7000D / 8000D / AnvelinaPro3 family.
 // Saturn (ANAN-G2 / G2-1K) extends this with Saturn BPF1 band-edge
@@ -192,4 +192,4 @@ protected:
     static constexpr int kBufLen = 1444;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

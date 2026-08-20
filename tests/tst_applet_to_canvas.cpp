@@ -40,7 +40,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAppletToCanvas : public QObject
 {

@@ -84,7 +84,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Band table helpers ────────────────────────────────────────────────────────
 
@@ -964,4 +964,4 @@ void AntennaAlexAlex1Tab::setImdWarningResultForTest(TestImdResult result)
                           : ImdAutoResult::Cancel;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -26,7 +26,7 @@
 #include "models/TransmitModel.h"
 #include "core/BoardCapabilities.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPhoneAppletMicGain : public QObject
 {

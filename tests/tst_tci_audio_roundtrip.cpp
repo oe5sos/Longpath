@@ -21,7 +21,7 @@
 
 #include "core/TciServer.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciAudioRoundtrip : public QObject {
     Q_OBJECT

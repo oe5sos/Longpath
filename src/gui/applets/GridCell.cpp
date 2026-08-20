@@ -6,7 +6,7 @@
 
 #include "gui/applets/GridCell.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 QVariantMap GridCell::toVariant() const
 {
@@ -38,4 +38,4 @@ GridCell GridCell::fromVariant(const QString& id, const QVariantMap& m)
     return c;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

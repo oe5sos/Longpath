@@ -86,24 +86,24 @@ void applyThemed(QWidget* w, QString sheet)
 {
     if (!w) { return; }
     sheet.replace(QStringLiteral("{{color.background.0}}"),
-                  QString::fromLatin1(NereusSDR::Style::kAppBg));
+                  QString::fromLatin1(Longpath::Style::kAppBg));
     sheet.replace(QStringLiteral("{{color.background.1}}"),
-                  QString::fromLatin1(NereusSDR::Style::kButtonBg));
+                  QString::fromLatin1(Longpath::Style::kButtonBg));
     sheet.replace(QStringLiteral("{{color.background.3}}"),
-                  NereusSDR::EqPalette::textScale().name());
+                  Longpath::EqPalette::textScale().name());
     sheet.replace(QStringLiteral("{{color.text.primary}}"),
-                  QString::fromLatin1(NereusSDR::Style::kTextPrimary));
+                  QString::fromLatin1(Longpath::Style::kTextPrimary));
     w->setStyleSheet(sheet);
 }
 
 void applyComboStyle(QComboBox* c)
 {
-    if (c) { c->setStyleSheet(QString::fromLatin1(NereusSDR::Style::kComboStyle)); }
+    if (c) { c->setStyleSheet(QString::fromLatin1(Longpath::Style::kComboStyle)); }
 }
 
 } // namespace
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -817,4 +817,4 @@ void StripEqPanel::restoreGeometryFromSettings()
     m_restoring = false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

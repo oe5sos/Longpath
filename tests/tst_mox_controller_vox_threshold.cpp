@@ -36,7 +36,7 @@
 
 #include "core/MoxController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Helper: compute the expected threshold for cross-check tests.
 // Mirrors computeScaledThreshold() exactly.

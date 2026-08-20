@@ -15,7 +15,7 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
-namespace NereusSDR {
+namespace Longpath {
 
 RotctldProcess::RotctldProcess(QObject* parent) : QObject(parent)
 {
@@ -135,4 +135,4 @@ void RotctldProcess::stop()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

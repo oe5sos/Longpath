@@ -45,9 +45,9 @@
 
 // Tester shim -- friended in ParametricEqWidget.h so this subclass can
 // reach private state for hand-computed expecteds and dragging-state setup.
-class ParametricEqJsonTester : public NereusSDR::ParametricEqWidget {
+class ParametricEqJsonTester : public Longpath::ParametricEqWidget {
 public:
-    using NereusSDR::ParametricEqWidget::ParametricEqWidget;
+    using Longpath::ParametricEqWidget::ParametricEqWidget;
 
     // Direct member access for assertions.
     QVector<EqPoint>& pointsMut()                { return m_points; }

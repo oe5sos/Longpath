@@ -98,7 +98,7 @@ mw0lge@grange-lane.co.uk
 #include <QWidget>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ContainerWidget;
 
@@ -171,4 +171,4 @@ private:
     int  m_unminimisedHeight{0};   // cached height before minimise collapse
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

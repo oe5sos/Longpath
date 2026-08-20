@@ -29,7 +29,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Combined horizontal level meter + gain slider.
 // Background shows RMS level, draggable thumb controls gain.
@@ -157,4 +157,4 @@ private:
     bool  m_dragging{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

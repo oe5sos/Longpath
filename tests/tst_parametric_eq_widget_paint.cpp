@@ -30,17 +30,17 @@
 
 // Tester shim: friended in ParametricEqWidget.h so this subclass can
 // reach private paint helpers, math, bar-chart state, and member fields.
-class ParametricEqPaintTester : public NereusSDR::ParametricEqWidget {
+class ParametricEqPaintTester : public Longpath::ParametricEqWidget {
 public:
-    using NereusSDR::ParametricEqWidget::ParametricEqWidget;
+    using Longpath::ParametricEqWidget::ParametricEqWidget;
 
     // Math under test.
-    using NereusSDR::ParametricEqWidget::responseDbAtFrequency;
-    using NereusSDR::ParametricEqWidget::computePlotRect;
-    using NereusSDR::ParametricEqWidget::yFromDb;
+    using Longpath::ParametricEqWidget::responseDbAtFrequency;
+    using Longpath::ParametricEqWidget::computePlotRect;
+    using Longpath::ParametricEqWidget::yFromDb;
 
     // Bar-chart helpers we want to drive directly.
-    using NereusSDR::ParametricEqWidget::applyBarChartPeakDecay;
+    using Longpath::ParametricEqWidget::applyBarChartPeakDecay;
 
     // Member access for hand-computing expecteds.
     QVector<EqPoint>& pointsMut()                       { return m_points; }
@@ -271,9 +271,9 @@ void TestParametricEqPaint::responseDbGraphicEqLinearInterpolation() {
     w.setParametric(false);
     // Two points: 0 Hz @ 0 dB,  4000 Hz @ +12 dB.
     w.pointsMut().clear();
-    NereusSDR::ParametricEqWidget::EqPoint p0;
+    Longpath::ParametricEqWidget::EqPoint p0;
     p0.bandId = 1; p0.frequencyHz = 0.0;    p0.gainDb = 0.0;
-    NereusSDR::ParametricEqWidget::EqPoint p1;
+    Longpath::ParametricEqWidget::EqPoint p1;
     p1.bandId = 2; p1.frequencyHz = 4000.0; p1.gainDb = 12.0;
     w.pointsMut().append(p0);
     w.pointsMut().append(p1);

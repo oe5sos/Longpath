@@ -21,7 +21,7 @@
 
 #include <QtTest/QtTest>
 
-using namespace NereusSDR;
+using namespace Longpath;
 using State = QsoConfirmation::State;
 
 namespace {

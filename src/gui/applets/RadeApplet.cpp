@@ -30,7 +30,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -410,4 +410,4 @@ void RadeApplet::repaintSyncIndicator()
         "QLabel { background: %1; border-radius: 6px; }").arg(colour));
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

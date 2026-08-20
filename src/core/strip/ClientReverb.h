@@ -32,7 +32,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Client-side reverb — TX DSP chain Phase 6 (Freeverb).  Eight parallel
 // lowpass-feedback comb filters in parallel summed through four series
@@ -158,4 +158,4 @@ private:
     std::atomic<float> m_wetRmsDb{-120.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

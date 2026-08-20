@@ -87,7 +87,7 @@ class QMenu;
 class QAudioSource;
 class QIODevice;
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Defined in gui/widgets/StatusToast.h. Forward-declared with its fixed
 /// underlying type so this header keeps to Qt includes only.
@@ -1378,4 +1378,4 @@ private:
     bool m_powerCapToastShown{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

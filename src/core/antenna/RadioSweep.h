@@ -61,7 +61,7 @@
 #include "core/antenna/Touchstone.h"
 #include "core/SwrSweepController.h"
 
-namespace NereusSDR::RadioSweep {
+namespace Longpath::RadioSweep {
 
 /// |Γ| from SWR. Exact, not an approximation: SWR = (1+|Γ|)/(1−|Γ|)
 /// inverts to |Γ| = (SWR−1)/(SWR+1).
@@ -80,4 +80,4 @@ double reflectionMagnitude(double swr);
 /// and can be told apart from them.
 Sweep fromResult(const SwrSweepResult& result);
 
-} // namespace NereusSDR::RadioSweep
+} // namespace Longpath::RadioSweep

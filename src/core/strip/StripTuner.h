@@ -58,7 +58,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class StripChain;
 
@@ -103,4 +103,4 @@ inline constexpr double kHumWorthNotchingDb = 25.0;
 bool humWorthNotching(const VoiceAnalysis& a);
 
 } // namespace StripTuner
-} // namespace NereusSDR
+} // namespace Longpath

@@ -51,7 +51,7 @@
 
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MicSpectrum;
 
@@ -87,7 +87,7 @@ public:
 signals:
     // Emitted whenever a fresh measurement lands, so a status line
     // elsewhere can carry the width without polling.
-    void measured(const NereusSDR::TxSpectrumAnalysis::Occupancy& occ);
+    void measured(const Longpath::TxSpectrumAnalysis::Occupancy& occ);
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -122,4 +122,4 @@ private:
     mutable double m_plotL{0.0}, m_plotR{0.0}, m_plotT{0.0}, m_plotB{0.0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

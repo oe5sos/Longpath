@@ -38,7 +38,7 @@
 #include "core/RadeChannel.h"
 #include "core/WdspEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Slice-id namespace.  Picked 7 to stay clear of the kTxChannelId=1 /
 // PsFeedbackChannelId=5 slots used by other WdspEngine tests; the value

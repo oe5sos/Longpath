@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 #include <QJsonValue>
 #include <QXmlStreamReader>
 
-namespace NereusSDR::FormatParser {
+namespace Longpath::FormatParser {
 
 namespace {
 
@@ -188,4 +188,4 @@ QHash<QString, QVariant> parseRaw(const QByteArray& payload, const QUuid& endpoi
     return out;
 }
 
-} // namespace NereusSDR::FormatParser
+} // namespace Longpath::FormatParser

@@ -25,10 +25,10 @@ private slots:
 // Capture 12 events and verify only the 10 newest are retained, newest first.
 void FaultLogTest::ringBufferKeepsNewestTen()
 {
-    NereusSDR::FaultLog log("PGXL_FaultHistory");
+    Longpath::FaultLog log("PGXL_FaultHistory");
     log.clear();
     for (int i = 0; i < 12; ++i) {
-        NereusSDR::FaultEvent ev;
+        Longpath::FaultEvent ev;
         ev.whenMs       = static_cast<qint64>(i) * 1000;
         ev.state        = "FAULT";
         ev.fwdAtFaultW  = 1500.0f;
@@ -47,7 +47,7 @@ void FaultLogTest::ringBufferKeepsNewestTen()
 // Verify the SWR-trip heuristic fires when SWR exceeds 2.5.
 void FaultLogTest::likelyCauseSwrTrip()
 {
-    const QString cause = NereusSDR::FaultLog::likelyCauseFor(1500.0f, 3.0f, 60.0f);
+    const QString cause = Longpath::FaultLog::likelyCauseFor(1500.0f, 3.0f, 60.0f);
     QCOMPARE(cause, QString("SWR trip"));
 }
 
@@ -59,15 +59,15 @@ void FaultLogTest::persistsAcrossInstances()
 
     // Write via instance A.
     {
-        NereusSDR::FaultLog a(key);
+        Longpath::FaultLog a(key);
         a.clear();
-        NereusSDR::FaultEvent ev;
+        Longpath::FaultEvent ev;
         ev.whenMs       = qint64(99000);
         ev.state        = "FAULT_PROTECT";
         ev.fwdAtFaultW  = 1800.0f;
         ev.swrAtFault   = 2.9f;
         ev.tempAtFaultC = 72.0f;
-        ev.likelyCause  = NereusSDR::FaultLog::likelyCauseFor(
+        ev.likelyCause  = Longpath::FaultLog::likelyCauseFor(
                               ev.fwdAtFaultW, ev.swrAtFault, ev.tempAtFaultC);
         a.capture(ev);
         QCOMPARE(a.events().size(), 1);
@@ -75,10 +75,10 @@ void FaultLogTest::persistsAcrossInstances()
 
     // Read via instance B with the same key -- should see the persisted event.
     {
-        NereusSDR::FaultLog b(key);
-        const QVector<NereusSDR::FaultEvent> evs = b.events();
+        Longpath::FaultLog b(key);
+        const QVector<Longpath::FaultEvent> evs = b.events();
         QCOMPARE(evs.size(), 1);
-        const NereusSDR::FaultEvent& ev = evs.first();
+        const Longpath::FaultEvent& ev = evs.first();
         QCOMPARE(ev.whenMs,       qint64(99000));
         QCOMPARE(ev.state,        QString("FAULT_PROTECT"));
         QCOMPARE(ev.likelyCause,  QString("SWR trip"));

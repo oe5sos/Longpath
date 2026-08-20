@@ -55,7 +55,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -226,4 +226,4 @@ void SpectrumAvenger::apply(const QVector<float>& tPixels,
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

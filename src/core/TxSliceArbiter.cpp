@@ -11,7 +11,7 @@
 #include "core/MoxController.h"
 #include "core/AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 TxSliceArbiter::TxSliceArbiter(QObject* parent) : QObject(parent) {}
 
@@ -233,4 +233,4 @@ void TxSliceArbiter::load()
     syncToSliceList();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

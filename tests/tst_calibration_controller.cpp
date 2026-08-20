@@ -36,7 +36,7 @@ private slots:
 
 void TstCalibrationController::defaults_allCorrect()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
 
     // Source: setup.cs:5137 udHPSDRFreqCorrectFactor default 1.0 [@501e3f5]
     QCOMPARE(ctrl.freqCorrectionFactor(), 1.0);
@@ -60,8 +60,8 @@ void TstCalibrationController::defaults_allCorrect()
 
 void TstCalibrationController::setFreqCorrectionFactor_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setFreqCorrectionFactor(1.000001);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.freqCorrectionFactor(), 1.000001);
@@ -69,17 +69,17 @@ void TstCalibrationController::setFreqCorrectionFactor_emitsChanged()
 
 void TstCalibrationController::setFreqCorrectionFactor_idempotentNoSignal()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
     ctrl.setFreqCorrectionFactor(1.5);
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setFreqCorrectionFactor(1.5); // same value — no signal
     QCOMPARE(spy.count(), 0);
 }
 
 void TstCalibrationController::setFreqCorrectionFactor10M_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setFreqCorrectionFactor10M(0.9999998);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.freqCorrectionFactor10M(), 0.9999998);
@@ -87,8 +87,8 @@ void TstCalibrationController::setFreqCorrectionFactor10M_emitsChanged()
 
 void TstCalibrationController::setUsing10MHzRef_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setUsing10MHzRef(true);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.using10MHzRef(), true);
@@ -100,7 +100,7 @@ void TstCalibrationController::setUsing10MHzRef_emitsChanged()
 // Source: setup.cs:14036-14050 udHPSDRFreqCorrectFactor_ValueChanged [@501e3f5]
 void TstCalibrationController::effectiveFreqCorrectionFactor_normalMode()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
     ctrl.setFreqCorrectionFactor(1.000002);
     ctrl.setFreqCorrectionFactor10M(0.999998);
     ctrl.setUsing10MHzRef(false);
@@ -110,7 +110,7 @@ void TstCalibrationController::effectiveFreqCorrectionFactor_normalMode()
 
 void TstCalibrationController::effectiveFreqCorrectionFactor_10MHzMode()
 {
-    NereusSDR::CalibrationController ctrl;
+    Longpath::CalibrationController ctrl;
     ctrl.setFreqCorrectionFactor(1.000002);
     ctrl.setFreqCorrectionFactor10M(0.999998);
     ctrl.setUsing10MHzRef(true);
@@ -120,8 +120,8 @@ void TstCalibrationController::effectiveFreqCorrectionFactor_10MHzMode()
 
 void TstCalibrationController::setLevelOffsetDb_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setLevelOffsetDb(-3.5);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.levelOffsetDb(), -3.5);
@@ -129,8 +129,8 @@ void TstCalibrationController::setLevelOffsetDb_emitsChanged()
 
 void TstCalibrationController::setRx1_6mLnaOffset_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setRx1_6mLnaOffset(2.0);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.rx1_6mLnaOffset(), 2.0);
@@ -138,8 +138,8 @@ void TstCalibrationController::setRx1_6mLnaOffset_emitsChanged()
 
 void TstCalibrationController::setRx2_6mLnaOffset_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setRx2_6mLnaOffset(-1.5);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.rx2_6mLnaOffset(), -1.5);
@@ -147,8 +147,8 @@ void TstCalibrationController::setRx2_6mLnaOffset_emitsChanged()
 
 void TstCalibrationController::setTxDisplayOffsetDb_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setTxDisplayOffsetDb(0.5);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.txDisplayOffsetDb(), 0.5);
@@ -156,8 +156,8 @@ void TstCalibrationController::setTxDisplayOffsetDb_emitsChanged()
 
 void TstCalibrationController::setPaCurrentSensitivity_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setPaCurrentSensitivity(2.5);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.paCurrentSensitivity(), 2.5);
@@ -165,8 +165,8 @@ void TstCalibrationController::setPaCurrentSensitivity_emitsChanged()
 
 void TstCalibrationController::setPaCurrentOffset_emitsChanged()
 {
-    NereusSDR::CalibrationController ctrl;
-    QSignalSpy spy(&ctrl, &NereusSDR::CalibrationController::changed);
+    Longpath::CalibrationController ctrl;
+    QSignalSpy spy(&ctrl, &Longpath::CalibrationController::changed);
     ctrl.setPaCurrentOffset(-0.1);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(ctrl.paCurrentOffset(), -0.1);
@@ -178,7 +178,7 @@ void TstCalibrationController::persistence_roundTrip()
 
     // Write side
     {
-        NereusSDR::CalibrationController ctrl;
+        Longpath::CalibrationController ctrl;
         ctrl.setMacAddress(testMac);
         ctrl.setFreqCorrectionFactor(1.000003);
         ctrl.setFreqCorrectionFactor10M(0.999997);
@@ -194,7 +194,7 @@ void TstCalibrationController::persistence_roundTrip()
 
     // Read side
     {
-        NereusSDR::CalibrationController ctrl;
+        Longpath::CalibrationController ctrl;
         ctrl.setMacAddress(testMac);
         ctrl.load();
 

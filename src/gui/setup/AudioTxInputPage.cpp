@@ -37,7 +37,7 @@
 // used here (no direct Pa_* calls); PortAudioBus wraps the C API.
 #include "core/audio/PortAudioBus.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Static constant: discrete buffer-size steps exposed by the slider.
@@ -1118,4 +1118,4 @@ void AudioTxInputPage::onModelMicXlrChanged(bool on)
     m_updatingFromModel = false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

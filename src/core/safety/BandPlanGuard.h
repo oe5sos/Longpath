@@ -120,7 +120,7 @@ mw0lge@grange-lane.co.uk
 #include "models/Band.h"
 #include "core/WdspTypes.h"
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 /// IARU + per-country region selector.
 /// 24 entries match Thetis comboFRSRegion
@@ -203,4 +203,4 @@ public:
                                    bool extended) const noexcept;
 };
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

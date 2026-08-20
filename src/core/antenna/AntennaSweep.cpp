@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR::AntennaSweep {
+namespace Longpath::AntennaSweep {
 namespace {
 
 // An |Γ| this close to 1 is an open or a short, and 1/(1-|Γ|) runs away.
@@ -350,4 +350,4 @@ QString describe(const Sweep& s, double targetHz)
     return out;
 }
 
-} // namespace NereusSDR::AntennaSweep
+} // namespace Longpath::AntennaSweep

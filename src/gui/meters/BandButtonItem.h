@@ -56,12 +56,12 @@ mw0lge@grange-lane.co.uk
 
 #include "ButtonBoxItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Band selection grid: 160m-6m + GEN + WWV + XVTR.
 // Ported from Thetis clsBandButtonBox (MeterManager.cs:11482+).
 //
-// Button order matches NereusSDR::Band enum (src/models/Band.h): index 0 =
+// Button order matches Longpath::Band enum (src/models/Band.h): index 0 =
 // 160m ... index 11 = GEN, index 12 = WWV, index 13 = XVTR. WWV and XVTR
 // were added in Phase 3G-8 (commit 2) to match Thetis's 14-band set and
 // to provide a home for the per-band grid storage on PanadapterModel.
@@ -91,4 +91,4 @@ private:
     static constexpr int kBandCount = 14;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

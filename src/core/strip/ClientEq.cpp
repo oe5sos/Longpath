@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -695,4 +695,4 @@ ClientEq::BandParams ClientEq::defaultBand(int idx)
     return p;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

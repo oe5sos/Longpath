@@ -391,7 +391,7 @@ void  destroy_resampleFV(void* ptr);
 }
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Phase 3M-3a-iii Task 17 — DEXP pushvox bridge static members
@@ -4926,4 +4926,4 @@ void TxChannel::setPSTxIdx(int txid, int idx)
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

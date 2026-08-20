@@ -1,6 +1,6 @@
 #include <QtTest/QtTest>
 #include "gui/widgets/ScrollableLabel.h"
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestScrollableLabel : public QObject {
     Q_OBJECT

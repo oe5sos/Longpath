@@ -30,7 +30,7 @@
 #include <cmath>
 #include <complex>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -127,4 +127,4 @@ void ClientEqFftAnalyzer::update(const float* samples, int count) noexcept
     m_primed = true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -28,7 +28,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -177,4 +177,4 @@ void FilterPresetEditDialog::onResetToDefault()
     accept();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

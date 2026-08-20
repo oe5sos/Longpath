@@ -55,7 +55,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ButtonBoxItem.h"
-namespace NereusSDR {
+namespace Longpath {
 // Discord Rich Presence controls. From Thetis clsDiscordButtonBox (MeterManager.cs:11983+).
 class DiscordButtonItem : public ButtonBoxItem {
     Q_OBJECT
@@ -70,4 +70,4 @@ private:
     void onButtonClicked(int index, Qt::MouseButton button);
     static constexpr int kDiscordButtonCount = 12;
 };
-} // namespace NereusSDR
+} // namespace Longpath

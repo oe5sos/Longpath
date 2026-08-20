@@ -53,7 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "DiscordButtonItem.h"
-namespace NereusSDR {
+namespace Longpath {
 static const char* const kDiscordLabels[] = {
     "Active", "Away", "Double", "CQ", "QRV", "QRT",
     "QSY", "QRX", "DX", "Version", "Net Start", "Net Fin"
@@ -90,4 +90,4 @@ bool DiscordButtonItem::deserialize(const QString& data)
     if (parts.size() > 7) { setColumns(parts[7].toInt()); }
     return true;
 }
-} // namespace NereusSDR
+} // namespace Longpath

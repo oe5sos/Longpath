@@ -10,7 +10,7 @@
 #include <QtTest>
 #include "core/TciVfoCoalescer.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciVfoCoalescer : public QObject {
     Q_OBJECT

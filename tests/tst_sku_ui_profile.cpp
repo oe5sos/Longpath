@@ -69,7 +69,7 @@
 #include <QTest>
 #include "core/SkuUiProfile.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSkuUiProfile : public QObject {
     Q_OBJECT

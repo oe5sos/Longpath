@@ -34,7 +34,7 @@
 #include "core/MoxController.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxAppletTuneWiring : public QObject
 {

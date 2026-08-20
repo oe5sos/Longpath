@@ -27,7 +27,7 @@
 #include "core/codec/P1CodecStandard.h"
 #include "core/codec/P2CodecOrionMkII.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPsDdcIndicesPerBoard : public QObject {
     Q_OBJECT

@@ -5,7 +5,7 @@ class QComboBox;
 class QCheckBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class VfoDisplayItem;
 
 class VfoDisplayItemEditor : public BaseItemEditor {
@@ -28,4 +28,4 @@ private:
     QPushButton* m_btnTxColour{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

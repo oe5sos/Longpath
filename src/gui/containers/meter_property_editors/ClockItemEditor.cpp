@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
@@ -96,4 +96,4 @@ void ClockItemEditor::buildTypeSpecific()
     addRow(QStringLiteral("Title color"), m_btnTitleColour);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

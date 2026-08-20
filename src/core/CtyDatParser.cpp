@@ -29,7 +29,7 @@
 #include <QRegularExpression>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/CtyDatParser.cpp:10-23 [@0cd4559]
 //
@@ -252,4 +252,4 @@ const DxccEntity* CtyDatParser::entityByPrefix(const QString& primaryPrefix) con
     return &it.value();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

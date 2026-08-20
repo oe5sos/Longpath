@@ -64,7 +64,7 @@
 
 #include "SkuUiProfile.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 SkuUiProfile skuUiProfileFor(HPSDRModel sku)
 {
@@ -226,4 +226,4 @@ SkuUiProfile skuUiProfileFor(HPSDRModel sku)
     return p;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

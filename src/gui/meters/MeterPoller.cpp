@@ -85,7 +85,7 @@ mw0lge@grange-lane.co.uk
 #include "core/wdsp_api.h"
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 MeterPoller::MeterPoller(QObject* parent)
     : QObject(parent)
@@ -553,4 +553,4 @@ void MeterPoller::setRadioStatus(RadioStatus* status)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

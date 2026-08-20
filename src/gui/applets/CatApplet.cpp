@@ -36,7 +36,7 @@
 #include <QLabel>
 #include <QComboBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 static QLabel* makeLed(const QString& name, QWidget* parent)
 {
@@ -174,4 +174,4 @@ void CatApplet::syncFromModel()
     // NYI — Phase 3K / 3-VAX
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

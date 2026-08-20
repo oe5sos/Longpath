@@ -69,7 +69,7 @@
 
 #include "core/safety/safety_constants.h"
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 // Ports computeAlexFwdPower per-board switch (console.cs:25008-25017 [v2.10.3.13]).
 // Per-group cites below reference each case block's upstream lines.
@@ -125,4 +125,4 @@ float computeAlexFwdPower(HPSDRModel model, int adcCounts) noexcept
     return watts;
 }
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

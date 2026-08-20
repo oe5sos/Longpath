@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 // 4096 at 48 kHz is 11.7 Hz per bin — fine enough to place a band edge
@@ -331,4 +331,4 @@ void TxSpectrumWidget::paintEvent(QPaintEvent*)
                                     "the amplifier and the antenna."));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -23,7 +23,7 @@
 
 #include "gui/meters/RotatorItem.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 // Drive enough poll ticks for the geometric approach (20% of the

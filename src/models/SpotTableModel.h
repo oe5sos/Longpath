@@ -43,7 +43,7 @@
 
 #include "core/DxSpot.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/gui/DxClusterDialog.h:33-58 [@0cd4559]
 class SpotTableModel : public QAbstractTableModel {
@@ -73,4 +73,4 @@ private:
     int m_maxSpots{500};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

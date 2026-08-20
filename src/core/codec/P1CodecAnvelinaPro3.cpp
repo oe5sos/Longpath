@@ -39,7 +39,7 @@
 #include "P1CodecAnvelinaPro3.h"
 #include "core/DdcAssignment.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void P1CodecAnvelinaPro3::composeCcForBank(int bank, const CodecContext& ctx,
                                            quint8 out[5]) const
@@ -237,4 +237,4 @@ DdcAssignment P1CodecAnvelinaPro3::applyDdcAssignment(
     return a;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -109,7 +109,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -178,14 +178,14 @@ TxCfcDialog::TxCfcDialog(TransmitModel* tm,
     // follow-up bench test.  The block layers on the project's
     // StyleConstants helpers via QSS selectors; per-widget setStyleSheet
     // calls (OG Guide hyperlink button below) keep their own specificity.
-    setStyleSheet(QString::fromLatin1(NereusSDR::Style::kPageStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kGroupBoxStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kSpinBoxStyle)
-                  + NereusSDR::Style::doubleSpinBoxStyle()
-                  + QString::fromLatin1(NereusSDR::Style::kComboStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kCheckBoxStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kRadioButtonStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kButtonStyle));
+    setStyleSheet(QString::fromLatin1(Longpath::Style::kPageStyle)
+                  + QString::fromLatin1(Longpath::Style::kGroupBoxStyle)
+                  + QString::fromLatin1(Longpath::Style::kSpinBoxStyle)
+                  + Longpath::Style::doubleSpinBoxStyle()
+                  + QString::fromLatin1(Longpath::Style::kComboStyle)
+                  + QString::fromLatin1(Longpath::Style::kCheckBoxStyle)
+                  + QString::fromLatin1(Longpath::Style::kRadioButtonStyle)
+                  + QString::fromLatin1(Longpath::Style::kButtonStyle));
 
     buildUi();
     wireSignals();
@@ -1416,4 +1416,4 @@ void TxCfcDialog::closeEvent(QCloseEvent* event)
     hide();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

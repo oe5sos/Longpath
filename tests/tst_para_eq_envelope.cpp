@@ -29,7 +29,7 @@
 
 #include "core/ParaEqEnvelope.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstParaEqEnvelope : public QObject {
     Q_OBJECT

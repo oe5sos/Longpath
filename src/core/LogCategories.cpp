@@ -7,7 +7,7 @@
 #include <QFileInfo>
 #include <QLoggingCategory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // --- Category Definitions ---
 Q_LOGGING_CATEGORY(lcDiscovery,  "nereus.discovery")
@@ -185,4 +185,4 @@ void LogManager::loadSettings()
     applyFilterRules();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

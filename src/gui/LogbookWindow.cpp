@@ -53,7 +53,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1603,4 +1603,4 @@ void LogbookWindow::showStatistics()
     dlg.exec();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

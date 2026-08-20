@@ -23,7 +23,7 @@
 
 Q_LOGGING_CATEGORY(lcTunerModel, "nereus.tuner.model")
 
-namespace NereusSDR {
+namespace Longpath {
 
 TunerModel::TunerModel(QObject* parent)
     : QObject(parent)
@@ -306,4 +306,4 @@ void TunerModel::adjustRelay(int relay, int dir)
     m_conn->adjustRelay(relay, dir);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

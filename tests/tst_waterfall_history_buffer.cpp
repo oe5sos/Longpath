@@ -27,7 +27,7 @@
 
 #include "gui/WaterfallHistoryBuffer.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

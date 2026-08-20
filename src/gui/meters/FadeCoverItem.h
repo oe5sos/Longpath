@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "MeterItem.h"
 #include <QColor>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FadeCoverItem : public MeterItem {
     Q_OBJECT
@@ -101,4 +101,4 @@ private:
     bool   m_active{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

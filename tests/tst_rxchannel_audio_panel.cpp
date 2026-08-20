@@ -98,7 +98,7 @@ warren@wpratt.com
 #include <QtTest/QtTest>
 #include "core/RxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static constexpr int kTestChannel  = 99;  // Never opened via OpenChannel
 static constexpr int kTestBufSize  = 1024;

@@ -43,7 +43,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── File-local helpers ────────────────────────────────────────────────────────
 
@@ -604,6 +604,6 @@ void TciApplet::onTxGainChanged(int dB)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS

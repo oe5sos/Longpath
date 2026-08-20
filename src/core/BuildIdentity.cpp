@@ -1,6 +1,6 @@
 #include "BuildIdentity.h"
 
-namespace NereusSDR {
+namespace Longpath {
 namespace BuildIdentity {
 
 // Set once by main() from the generated build/generated/LongpathBuildTag.h,
@@ -20,4 +20,4 @@ QString buildTag()
 }
 
 } // namespace BuildIdentity
-} // namespace NereusSDR
+} // namespace Longpath

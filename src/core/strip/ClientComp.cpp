@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -370,4 +370,4 @@ void ClientComp::process(float* interleaved, int frames, int channels) noexcept
     m_meters.limiterActive.store(limFired, std::memory_order_relaxed);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

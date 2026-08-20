@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // The two conversions the setup page performs. Kept here as the
 // specification: if the page changes, this is what it has to keep

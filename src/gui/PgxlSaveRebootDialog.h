@@ -19,7 +19,7 @@
 
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PgxlSaveRebootDialog : public QDialog {
     Q_OBJECT
@@ -31,4 +31,4 @@ private:
     QPushButton* m_saveBtn{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

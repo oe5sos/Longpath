@@ -15,7 +15,7 @@
 #include "core/RadioDiscovery.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestHardwarePageGating : public QObject {
     Q_OBJECT

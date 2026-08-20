@@ -44,7 +44,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 const QString kKindKey   = QStringLiteral("AntennaTrimKind");
@@ -1551,4 +1551,4 @@ void AntennaWindow::refresh()
     m_caution->setVisible(true);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

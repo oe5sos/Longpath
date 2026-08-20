@@ -5,7 +5,7 @@
 #include <QRect>
 #include <QSize>
 
-namespace NereusSDR::PopupPlacement {
+namespace Longpath::PopupPlacement {
 
 // Clamp a popup's desired top-left so the whole popup lands inside `available`.
 //
@@ -30,4 +30,4 @@ namespace NereusSDR::PopupPlacement {
 QPoint clampToAvailable(const QPoint& desiredTopLeft, const QSize& popupSize,
                         const QRect& available);
 
-} // namespace NereusSDR::PopupPlacement
+} // namespace Longpath::PopupPlacement

@@ -17,7 +17,7 @@
 #include <QRadialGradient>
 #include <QRectF>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace Instrument {
 
 namespace {
@@ -340,4 +340,4 @@ QColor valueColour(const ReadingDescriptor& d, double value)
 }
 
 } // namespace Instrument
-} // namespace NereusSDR
+} // namespace Longpath

@@ -27,7 +27,7 @@
 #include <QtCore/QQueue>
 #include <QtCore/QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // TciSendQueue — three-priority outbound queue with bounded-depth oldest-drop.
 //
@@ -84,4 +84,4 @@ private:
     int             m_dropCount{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

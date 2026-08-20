@@ -98,7 +98,7 @@
 #include <QLabel>
 #include <QScrollArea>
 
-namespace NereusSDR {
+namespace Longpath {
 
 MultimeterPage::MultimeterPage(RadioModel* radioModel, QWidget* parent)
     : SetupPage(QStringLiteral("Multimeter"), radioModel, parent)
@@ -349,4 +349,4 @@ void MultimeterPage::connectSignals()
             &MultimeterPage::backToSpectrumDefaultsRequested);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

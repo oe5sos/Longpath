@@ -17,7 +17,7 @@
 #include "core/SpotCollectorClient.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSpotCollectorParser : public QObject {
     Q_OBJECT

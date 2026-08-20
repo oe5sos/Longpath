@@ -2,7 +2,7 @@
 #pragma once
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge : public QWidget {
     Q_OBJECT
@@ -53,4 +53,4 @@ private:
     QStringList m_tickLabels;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

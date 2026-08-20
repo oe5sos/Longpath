@@ -6,7 +6,7 @@
 #include <QtTest/QtTest>
 #include "core/CloudlogUploader.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstCloudlogUploader : public QObject {
     Q_OBJECT

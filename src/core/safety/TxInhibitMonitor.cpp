@@ -68,7 +68,7 @@
 
 #include "core/safety/TxInhibitMonitor.h"
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 TxInhibitMonitor::TxInhibitMonitor(QObject* parent)
     : QObject(parent)
@@ -220,4 +220,4 @@ void TxInhibitMonitor::recompute()
     }
 }
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

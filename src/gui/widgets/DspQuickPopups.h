@@ -104,7 +104,7 @@
 
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 
@@ -119,4 +119,4 @@ void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
              const std::function<void()>& onMore = {});
 
 } // namespace DspQuickPopup
-} // namespace NereusSDR
+} // namespace Longpath

@@ -30,7 +30,7 @@
 #include <QApplication>
 #include <QScreen>
 
-namespace NereusSDR {
+namespace Longpath {
 
 static const QString kPopupStyle = QStringLiteral(
     "QWidget#DspParamPopup { background: rgba(15, 15, 26, 240);"
@@ -190,4 +190,4 @@ bool DspParamPopup::event(QEvent* ev)
     return QWidget::event(ev);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

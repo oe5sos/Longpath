@@ -19,7 +19,7 @@
 #include <functional>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class SetupPage;
@@ -53,7 +53,7 @@ public:
     // nullptr to detach (e.g. server destroyed).  The dialog forwards to the
     // page's setTciServer(); the page tracks via QPointer so the connection
     // is safe across server lifecycle changes.
-    void setTciServer(class NereusSDR::TciServer* server);
+    void setTciServer(class Longpath::TciServer* server);
 
 signals:
     // Phase 3M-3a-ii Batch 6 (Task 3): forwarded from CfcSetupPage's
@@ -239,4 +239,4 @@ public:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

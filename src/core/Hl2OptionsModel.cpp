@@ -60,7 +60,7 @@
 
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 constexpr const char* kKeySwapAudio   = "hl2/swapAudioChannels";
@@ -168,4 +168,4 @@ NEREUS_SETTER_BOOL(setBandVolts,         m_bandVolts,         bandVoltsChanged)
 #undef NEREUS_SETTER_BOOL
 #undef NEREUS_SETTER_INT
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -30,7 +30,7 @@
 
 class QLineEdit;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Combined vertical fader + level meter.  One custom-painted bar shows
 // the post-EQ peak level as a gradient fill rising from the bottom, with
@@ -98,4 +98,4 @@ private:
     int m_stripH{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

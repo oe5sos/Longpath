@@ -46,7 +46,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TunerApplet::TunerApplet(RadioModel* model, TunerModel* tunerModel, QWidget* parent,
                          TuneMemoryStore* tuneStore)
@@ -736,4 +736,4 @@ TuneMemory TunerApplet::currentMem() const
     mem.savedAtMs = QDateTime::currentMSecsSinceEpoch();
     return mem;
 }
-} // namespace NereusSDR
+} // namespace Longpath

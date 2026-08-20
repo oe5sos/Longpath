@@ -58,7 +58,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From WDSP analyzer.c:283-462 [v2.10.3.13] — verbatim port.
 void applySpectrumDetector(SpectrumDetector detType,
@@ -290,4 +290,4 @@ void applySpectrumDetector(SpectrumDetector detType,
                           0.0);                      // detOffset — no offset
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

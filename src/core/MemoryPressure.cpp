@@ -26,7 +26,7 @@
 #include <psapi.h>
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 #ifdef Q_OS_MAC
 
@@ -189,4 +189,4 @@ MemoryPressureSample pollMemoryPressure()
 
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

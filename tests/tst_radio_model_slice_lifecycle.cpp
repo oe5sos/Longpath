@@ -13,7 +13,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioModelSliceLifecycle : public QObject {
     Q_OBJECT
@@ -266,12 +266,12 @@ private slots:
         sb->setFrequency(7'245'000.0);
         QCOMPARE(sa->streamIndex(), sb->streamIndex());
 
-        sa->setNbMode(NereusSDR::NbMode::NB);
-        QCOMPARE(sb->nbMode(), NereusSDR::NbMode::NB);
+        sa->setNbMode(Longpath::NbMode::NB);
+        QCOMPARE(sb->nbMode(), Longpath::NbMode::NB);
 
         // And the other direction.
-        sb->setNbMode(NereusSDR::NbMode::Off);
-        QCOMPARE(sa->nbMode(), NereusSDR::NbMode::Off);
+        sb->setNbMode(Longpath::NbMode::Off);
+        QCOMPARE(sa->nbMode(), Longpath::NbMode::Off);
     }
 
     // A slice joining an occupied stream adopts that stream's NB state; a
@@ -284,12 +284,12 @@ private slots:
         const int a = radio.addSlice(QStringLiteral("pan-0"));
         SliceModel* sa = radio.sliceById(a);
         sa->setFrequency(7'240'000.0);
-        sa->setNbMode(NereusSDR::NbMode::NB2);
+        sa->setNbMode(Longpath::NbMode::NB2);
 
         const int b = radio.addSlice(QStringLiteral("pan-0"));
         SliceModel* sb = radio.sliceById(b);
         QCOMPARE(sa->streamIndex(), sb->streamIndex());
-        QCOMPARE(sb->nbMode(), NereusSDR::NbMode::NB2);
+        QCOMPARE(sb->nbMode(), Longpath::NbMode::NB2);
     }
 
     // Sub-Epic J follow-up. The NB tuning knobs share the blanker's fate for

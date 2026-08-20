@@ -124,7 +124,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // --------------------------------------------------------------------------
 // DigitalApplet
@@ -340,4 +340,4 @@ void DigitalApplet::syncFromModel()
     // NYI — no model wiring until Phase 3-VAX
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

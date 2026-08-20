@@ -45,7 +45,7 @@ class QLabel;
 class QPushButton;
 class QListWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class QsoRecorderApplet : public AppletWidget {
     Q_OBJECT
@@ -89,4 +89,4 @@ private:
     int m_lastTxFrames{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

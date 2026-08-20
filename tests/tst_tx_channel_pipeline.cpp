@@ -50,7 +50,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"
 #include "core/WdspEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Stage count from wdsp/TXA.c [v2.10.3.13] — 31 create_*() calls in create_txa().
 // Pre-code review §8.1 said "25 stages"; authoritative source has 31.

@@ -40,7 +40,7 @@
 
 #include <functional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct WorkedSummary {
     // The entity this callsign belongs to, or empty when the prefix
@@ -107,4 +107,4 @@ private:
     QHash<QString, QVector<int>> m_byCall;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

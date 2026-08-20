@@ -41,7 +41,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace AdifLog {
 
 namespace {
@@ -258,7 +258,7 @@ bool write(const QString& path, const QVector<LogEntry>& entries,
     }
 
     QTextStream out(&f);
-    out << "NereusSDR logbook\n"
+    out << "Longpath logbook\n"
         << "<ADIF_VER:5>3.1.4 <PROGRAMID:9>NereusSDR <EOH>\n";
     for (const LogEntry& e : entries) {
         out << e.toAdifRecord() << "\n";
@@ -416,4 +416,4 @@ QString toCsv(const QVector<LogEntry>& entries)
 }
 
 } // namespace AdifLog
-} // namespace NereusSDR
+} // namespace Longpath

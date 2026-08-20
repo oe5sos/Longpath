@@ -9,7 +9,7 @@
 #include <QtTest>
 #include "gui/ConnectionPanel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstConnectionPanelStatePills : public QObject {
     Q_OBJECT

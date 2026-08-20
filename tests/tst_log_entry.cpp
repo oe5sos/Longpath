@@ -8,7 +8,7 @@
 #include "models/LogEntry.h"
 #include "core/QrzLogbookUploader.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstLogEntry : public QObject {
     Q_OBJECT

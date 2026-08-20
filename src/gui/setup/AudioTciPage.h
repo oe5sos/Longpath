@@ -38,7 +38,7 @@
 #include <QLabel>
 #include <QSpinBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // AudioTciPage
@@ -75,4 +75,4 @@ private:
     void buildMasterMuteNoteGroup();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

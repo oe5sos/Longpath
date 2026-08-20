@@ -25,7 +25,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -661,4 +661,4 @@ bool DeviceCard::eventFilter(QObject* obj, QEvent* event)
     return QGroupBox::eventFilter(obj, event);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

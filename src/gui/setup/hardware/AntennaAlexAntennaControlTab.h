@@ -95,7 +95,7 @@ class QLabel;
 class QRadioButton;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class AlexController;
@@ -127,7 +127,7 @@ public:
     AlexController& controller();
 
 private slots:
-    void onAntennaChanged(NereusSDR::Band band);
+    void onAntennaChanged(Longpath::Band band);
     void onBlockTxChanged();
 
 private:
@@ -185,4 +185,4 @@ private:
     QCheckBox* m_chkUseTxAntForRx {nullptr};  // "Use TX antenna for RX"
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

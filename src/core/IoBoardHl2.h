@@ -106,7 +106,7 @@
 #include <QString>
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Per-HL2 I/O board state — ports mi0bot IOBoard class and UpdateIOBoard()
 // state machine.
@@ -300,7 +300,7 @@ public:
 signals:
     void i2cQueueChanged();
     void stepAdvanced(int newStep);
-    void registerChanged(NereusSDR::IoBoardHl2::Register reg, quint8 value);
+    void registerChanged(Longpath::IoBoardHl2::Register reg, quint8 value);
     void hardwareVersionChanged(quint8 version);
     void detectedChanged(bool detected);
     // Emitted when applyI2cReadResponse() stores a new EP6 response.
@@ -359,4 +359,4 @@ private:
     int m_pendingCount{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

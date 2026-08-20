@@ -1,4 +1,16 @@
-# NereusSDR — Project Context for Claude
+# Longpath — Project Context for Claude
+
+> **Longpath ist ein Fork von NereusSDR** (© J.J. Boyd, KG4VCF), das
+> seinerseits ein Port von Thetis ist. Umbenannt am 2026-08-20.
+>
+> Alles, was dieses Dokument über Herkunft, Ports und Zitate sagt,
+> gilt unverändert weiter — die Quellen sind dieselben, nur der Name
+> des Programms hat sich geändert. Historische Einträge unten
+> („shipped in v0.5.0", „Modification history (NereusSDR)") sind
+> absichtlich NICHT umbenannt: sie berichten von damals.
+>
+> Der C++-Namensraum heißt seit dem 2026-08-20 `Longpath`.
+
 
 ## Project Goal
 
@@ -15,7 +27,7 @@ demodulation). The radio is essentially an ADC/DAC with network transport.
 
 ## ⚠️ SOURCE-FIRST PORTING PROTOCOL (Read This Before Every Task)
 
-NereusSDR is a **port**, not a reimagination. The Thetis codebase is the
+Longpath is a **port**, not a reimagination. The Thetis codebase is the
 authoritative source for all radio logic, DSP behavior, protocol handling,
 constants, state machines, and feature behavior. **Do not guess. Do not
 infer. Do not improvise.** Read the source, then translate it.
@@ -26,7 +38,7 @@ For every piece of logic you write that has a Thetis equivalent:
 
 1. **READ** the relevant Thetis source file(s). Use `find`, `grep`, or `rg`
    to locate the C# code. The Thetis repo should be cloned at
-   `../Thetis/` (relative to the NereusSDR root). Capture the Thetis
+   `../Thetis/` (relative to the Longpath root). Capture the Thetis
    version tag once at the start of the session — `git -C ../Thetis
    describe --tags` (release) or `git -C ../Thetis rev-parse --short
    HEAD` (between releases) — every inline cite you write in this
@@ -41,7 +53,7 @@ For every piece of logic you write that has a Thetis equivalent:
 ### License-preservation rule (non-negotiable)
 
 When porting any Thetis file, you MUST — in the same commit that introduces
-the port — copy the following from the Thetis source into the NereusSDR
+the port — copy the following from the Thetis source into the Longpath
 file's header comment:
 
 1. All `Copyright (C)` lines naming contributors (FlexRadio, Wigley,
@@ -65,7 +77,7 @@ interchangeable.
 
 - Copy each source file's header **byte-for-byte** — do not paraphrase,
   summarize, or merge headers from different files.
-- If a NereusSDR file ports from **multiple** Thetis files, include **every**
+- If a Longpath file ports from **multiple** Thetis files, include **every**
   relevant header, separated by `// --- From [filename] ---` markers.
 - Include the Thetis version (`v2.10.3.15`) and commit (`3759d09`) in the
   "Ported from" line.
@@ -121,8 +133,8 @@ upstream contributors aren't in the committed corpus.
 Before reading any Thetis source file (`../Thetis/...`), state out loud:
 
 1. **Thetis file** you're about to read.
-2. **NereusSDR file(s)** the port will touch (new or existing).
-3. **Provenance status** of each NereusSDR file — run:
+2. **Longpath file(s)** the port will touch (new or existing).
+3. **Provenance status** of each Longpath file — run:
     ```
     grep -l "<nereussdr-path>" docs/attribution/THETIS-PROVENANCE.md
     ```
@@ -167,7 +179,7 @@ primary control is this checklist.
 ### Constants and Magic Numbers
 
 Preserve ALL constants, thresholds, scaling factors, and magic numbers exactly
-as they appear in Thetis. If Thetis uses `0.98f`, NereusSDR uses `0.98f`. If
+as they appear in Thetis. If Thetis uses `0.98f`, Longpath uses `0.98f`. If
 Thetis uses `2048` as a buffer size, document where it came from and keep it.
 Give constants a `constexpr` name but note the Thetis origin — with a
 version stamp — in a comment:
@@ -253,7 +265,7 @@ constants, protocol handling, DSP flow, feature behavior).
 
 ## AI Agent Guidelines
 
-When helping with NereusSDR:
+When helping with Longpath:
 
 * Prefer C++20 / Qt6 idioms (std::ranges, concepts if clean, Qt signals/slots)
 * Keep classes small and single-responsibility
@@ -309,7 +321,7 @@ maintainer review.
 ```
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j$(nproc)
-./build/NereusSDR
+./build/Longpath
 ```
 
 Dependencies (Arch): `qt6-base qt6-multimedia qt6-svg qt6-websockets cmake ninja pkgconf fftw alsa-lib jack2 pipewire`
@@ -321,7 +333,7 @@ Notes:
 
 WDSP source is in `third_party/wdsp/` (TAPR v1.29 + linux_port.h for cross-platform).
 FFTW3: system package on Linux/macOS, pre-built DLL on Windows (`third_party/fftw3/`).
-First run generates FFTW wisdom (~15 min). Cached in `~/.config/NereusSDR/` for subsequent launches.
+First run generates FFTW wisdom (~15 min). Cached in `~/.config/Longpath/` for subsequent launches.
 
 Current version: **0.5.2** (set in `CMakeLists.txt`; tagged pre-releases use `vX.Y.Z-rcN` suffix). 3M-2 CW TX is the next major epic; the exact version of the next release is picked by the `/release` skill at release time.
 
@@ -380,7 +392,7 @@ Key source directories: `src/core/` (protocol, audio, DSP), `src/models/`
 * `SpotModel` (`src/models/SpotModel.h`): TCI-keyed sink for all spot sources (ported from AetherSDR). Owns the canonical SpotData ring + emits `spotReceived` / `spotExpired`. Per-source dedup window (10 s, configurable).
 * `SpotTableModel` (`src/models/SpotTableModel.h`): QAbstractTableModel backing the Spot List tab (extracted from AetherSDR DxClusterDialog).
 * `BandFilterProxy` (`src/models/BandFilterProxy.h`): QSortFilterProxyModel for band + source pill filtering.
-* `FreeDVStationModel` (`src/models/FreeDVStationModel.h`): NereusSDR-native 14-field live station map driven by FreeDVReporterClient.
+* `FreeDVStationModel` (`src/models/FreeDVStationModel.h`): Longpath-native 14-field live station map driven by FreeDVReporterClient.
 * `RxDecodeModel` (`src/models/RxDecodeModel.h`): local decode ring buffer; sources WSJT-X UDP + RADE callsign-over-EOO decodes.
 * `DxClusterClient` / `WsjtxClient` / `SpotCollectorClient` / `PotaClient` / `FreeDVReporterClient` / `PskReporterClient` (`src/core/`): 6 spot-source clients (RBN handled through DxClusterClient on the RBN telnet host).
 * `CtyDatParser` / `AdifParser` / `DxccWorkedStatus` / `DxccColorProvider` (`src/core/`): 4-tier DXCC color resolver stack (ported from AetherSDR).
@@ -453,9 +465,9 @@ User tunes VFO:
 
 ### Settings Persistence (AppSettings — NOT QSettings)
 
-**IMPORTANT:** Do NOT use `QSettings` anywhere in NereusSDR. All client-side
+**IMPORTANT:** Do NOT use `QSettings` anywhere in Longpath. All client-side
 settings are stored via `AppSettings` (`src/core/AppSettings.h`), which writes
-an XML file at `~/.config/NereusSDR/NereusSDR.settings`. Key names use
+an XML file at `~/.config/Longpath/Longpath.settings`. Key names use
 PascalCase (e.g. `LastConnectedRadioMac`, `DisplayFftAverage`). Boolean
 values are stored as `"True"` / `"False"` strings.
 
@@ -473,7 +485,7 @@ antenna selection.
 **Hardware sample rate and active RX count:** persisted per-MAC in AppSettings
 under `hardware/<mac>/radioInfo/sampleRate` and `.../activeRxCount`. Applied
 on next connect. This matches Thetis, which persists rate globally via
-`DB.SaveVarsDictionary("Options", ...)` (setup.cs:1627). NereusSDR scopes
+`DB.SaveVarsDictionary("Options", ...)` (setup.cs:1627). Longpath scopes
 per-MAC so users with multiple radios retain per-radio selections.
 **Live-apply of rate changes lands via `RadioModel::setSampleRateLive` (12-step
 sequence ported from Thetis `setup.cs:7003-7159 [v2.10.3.13]`) + the
@@ -507,7 +519,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 
 | Document | Description |
 | --- | --- |
-| [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) | Full phased roadmap, menu bar layout, GUI container mapping (Thetis → NereusSDR), skin system design, progress tracking |
+| [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) | Full phased roadmap, menu bar layout, GUI container mapping (Thetis → Longpath), skin system design, progress tracking |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guidelines, coding conventions, PR process |
 | [docs/development/fast-test-loop.md](docs/development/fast-test-loop.md) | **Read before running tests.** Per-test builds, `ctest -L` subsystem labels, macOS first-run-scan exemption, ccache setup, and how to write tests that stay fast. Building the whole suite costs ~32 min; almost nothing needs it. |
 | [STYLEGUIDE.md](STYLEGUIDE.md) | Applet color palette, button states, gauge zones, slider/combo styling |
@@ -673,14 +685,14 @@ preferences. OpenHPSDR radios don't store per-slice state.
    * Architectural template: radio abstraction, state management, signal/slot patterns, GPU rendering, multi-pan layout
 2. **Thetis** — `https://github.com/ramdor/Thetis`
    * Feature source: every Thetis capability must be accounted for and ported
-   * **Clone to `../Thetis/` relative to NereusSDR root**
+   * **Clone to `../Thetis/` relative to Longpath root**
 3. **WDSP** — `https://github.com/TAPR/OpenHPSDR-wdsp`
    * DSP engine: all signal processing functions
 4. **freedv-gui** - `https://github.com/drowe67/freedv-gui`
    * RADE codec wrappers (RADEReceiveStep, RADETransmitStep, rade_text)
    * FreeDV Reporter Socket.IO client (qso.freedv.org)
    * PSK Reporter UDP client
-   * **Clone to `../freedv-gui/` relative to NereusSDR root**
+   * **Clone to `../freedv-gui/` relative to Longpath root**
 5. **radae_nopy (peterbmarks)** - `https://github.com/peterbmarks/radae_nopy`
    * RADE C library (BSD-2-Clause) vendored at SHA b289102 into `third_party/rade/`
    * Neural-net weights compiled into librade; no external model file ships
@@ -689,7 +701,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
    * MIT-licensed 24-bit polyphase resampler vendored at `third_party/r8brain/`
    * Used by the RADE 48-to-16 kHz TX audio chain and reserved for future general resampling needs
 7. **n1gp-Anvelina_PROIII (FPGA gateware)** - `https://github.com/n1gp/Anvelina_PROIII`
-   * **Clone to `../n1gp-Anvelina_PROIII/` relative to NereusSDR root.** Pinned at
+   * **Clone to `../n1gp-Anvelina_PROIII/` relative to Longpath root.** Pinned at
      SHA `8e86a61` ("Version 2.2.14 Final", 2026-07-06). Do not `git pull`.
    * Verilog FPGA gateware for an OpenHPSDR Protocol 2 board. This is the
      **hardware** authority for facts Thetis can only report second-hand:
@@ -710,7 +722,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 
 ### Gateware citations — cite facts, don't port logic
 
-The gateware is **GPLv3**, the same licence NereusSDR itself ships under (root
+The gateware is **GPLv3**, the same licence Longpath itself ships under (root
 `LICENSE`), so there is **no licence conflict** — unlike a GPLv2-only or
 proprietary upstream, this can be used freely. The constraint below is about
 scope and correctness, not legal risk:
@@ -720,7 +732,7 @@ scope and correctness, not legal risk:
   `// From n1gp-Anvelina_PROIII Orion.v:958 [@8e86a61] — NR = 8` records where a
   hardware number actually came from, the same standing as citing a datasheet.
   Prefer this over a Thetis cite whenever the claim is about *hardware*.
-* **Stop and ask first** — translating Verilog *logic* into NereusSDR. It is
+* **Stop and ask first** — translating Verilog *logic* into Longpath. It is
   licence-compatible but almost always the wrong move: gateware logic runs on
   the radio, not in the client, so needing it usually means the design took a
   wrong turn. If a task genuinely calls for it, the full port protocol applies

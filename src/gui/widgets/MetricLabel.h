@@ -5,7 +5,7 @@
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // MetricLabel — labelled-metric pair widget for the right-side status strip.
 // Renders [LABEL] [value] horizontally where LABEL is uppercase 9px and
@@ -31,4 +31,4 @@ private:
     QLabel*  m_valuePart{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -62,7 +62,7 @@ class QDoubleSpinBox;
 class QSpinBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ScaleItem;
 
@@ -88,4 +88,4 @@ private:
     QPushButton*    m_btnTitleColor{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

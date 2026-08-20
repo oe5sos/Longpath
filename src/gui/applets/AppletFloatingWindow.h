@@ -54,7 +54,7 @@
 
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletWidget;
 
@@ -117,4 +117,4 @@ private:
     static constexpr int kSettleMs = 400;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

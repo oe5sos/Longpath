@@ -101,7 +101,7 @@ mw0lge@grange-lane.co.uk
 
 #include <chrono>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // nowMs — portable replacement for upstream GetTickCount64().
@@ -317,4 +317,4 @@ double HermesLiteBandwidthMonitor::ep2EgressBytesPerSec()  const { return m_outL
 bool   HermesLiteBandwidthMonitor::isThrottled()       const { return m_throttled; }
 int    HermesLiteBandwidthMonitor::throttleEventCount() const { return m_throttleEventCount; }
 
-} // namespace NereusSDR
+} // namespace Longpath

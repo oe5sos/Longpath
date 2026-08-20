@@ -67,7 +67,7 @@ using MeterBaseClass = QRhiWidget;
 using MeterBaseClass = QWidget;
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterItem;
 
@@ -207,4 +207,4 @@ private:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

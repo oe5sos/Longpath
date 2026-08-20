@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -404,4 +404,4 @@ void ClientPudu::process(float* interleaved, int frames, int channels) noexcept
                             std::memory_order_relaxed);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -1,7 +1,7 @@
 #pragma once
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class NyiOverlay : public QLabel {
     Q_OBJECT
@@ -11,4 +11,4 @@ public:
     static NyiOverlay* markNyi(QWidget* target, const QString& phaseHint);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

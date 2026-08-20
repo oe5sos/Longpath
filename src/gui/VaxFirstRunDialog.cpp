@@ -26,7 +26,7 @@
 
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1133,4 +1133,4 @@ QString VaxFirstRunDialog::headerTitle() const
     return QStringLiteral("Set up VAX channels");
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -72,7 +72,7 @@
 
 #include <QObject>
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 
 /// Two-stage SWR foldback controller ported from Thetis PollPAPWR.
 ///
@@ -275,4 +275,4 @@ private:
     int   m_tripCount           = 0;     // high_swr_count
 };
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

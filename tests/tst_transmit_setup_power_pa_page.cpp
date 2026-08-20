@@ -34,7 +34,7 @@
 #include "models/TransmitModel.h"
 #include "core/StepAttenuatorController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // TestPowerPageH4 — PowerPage wiring verification for 3M-1a H.4.

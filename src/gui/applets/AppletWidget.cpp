@@ -36,7 +36,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AppletWidget::AppletWidget(RadioModel* model, QWidget* parent)
     : QWidget(parent)
@@ -177,4 +177,4 @@ QFrame* AppletWidget::divider()
     return line;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

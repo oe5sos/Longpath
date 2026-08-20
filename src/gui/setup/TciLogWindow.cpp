@@ -21,7 +21,7 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // Cap the QPlainTextEdit at this many lines so the window stays cheap even
@@ -220,4 +220,4 @@ void TciLogWindow::saveGeometryToSettings()
         QString::fromLatin1(saveGeometry().toBase64()));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -36,7 +36,7 @@
 #include <QMessageBox>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -695,4 +695,4 @@ void SwrSweepPanel::exportCsv()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <limits>
 
-namespace NereusSDR {
+namespace Longpath {
 
 NoiseFloorEstimator::NoiseFloorEstimator(float percentile)
     : m_percentile(percentile)
@@ -54,4 +54,4 @@ void NoiseFloorEstimator::prime(double initialDb)
     m_primedValue = static_cast<float>(initialDb);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

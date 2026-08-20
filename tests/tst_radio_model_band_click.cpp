@@ -21,7 +21,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioModelBandClick : public QObject {
     Q_OBJECT

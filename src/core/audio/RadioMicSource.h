@@ -43,7 +43,7 @@
 #include <array>
 #include <atomic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioConnection;
 
@@ -139,4 +139,4 @@ private:
     std::atomic<unsigned int> m_dropped{0u};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

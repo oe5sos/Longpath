@@ -16,7 +16,7 @@
 #include "core/AppSettings.h"
 #include "models/NotchModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchModelGuards : public QObject {
     Q_OBJECT

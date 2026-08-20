@@ -77,7 +77,7 @@
 #include <cmath>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -304,4 +304,4 @@ void DiversityRadarWidget::mouseReleaseEvent(QMouseEvent* event)
     m_dragging = false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -29,8 +29,8 @@ private slots:
 };
 
 void TunerModelApplyStatusTest::appliesRelayValues() {
-    NereusSDR::TunerModel m;
-    QSignalSpy relaySpy(&m, &NereusSDR::TunerModel::relayChanged);
+    Longpath::TunerModel m;
+    QSignalSpy relaySpy(&m, &Longpath::TunerModel::relayChanged);
 
     m.applyStatus({{"relayC1","42"},{"relayL","199"},{"relayC2","88"}});
 
@@ -41,7 +41,7 @@ void TunerModelApplyStatusTest::appliesRelayValues() {
 }
 
 void TunerModelApplyStatusTest::appliesOperateAndBypass() {
-    NereusSDR::TunerModel m;
+    Longpath::TunerModel m;
     m.applyStatus({{"operate","1"},{"bypass","0"}});
     QVERIFY(m.isOperate());
     QVERIFY(!m.isBypass());
@@ -51,7 +51,7 @@ void TunerModelApplyStatusTest::appliesOperateAndBypass() {
 }
 
 void TunerModelApplyStatusTest::appliesAntennaSwitchModel() {
-    NereusSDR::TunerModel m;
+    Longpath::TunerModel m;
     QVERIFY(!m.hasAntennaSwitch());
     m.applyStatus({{"one_by_three","1"},{"antA","1"}});
     QVERIFY(m.hasAntennaSwitch());
@@ -59,8 +59,8 @@ void TunerModelApplyStatusTest::appliesAntennaSwitchModel() {
 }
 
 void TunerModelApplyStatusTest::appliesMeters() {
-    NereusSDR::TunerModel m;
-    QSignalSpy metersSpy(&m, &NereusSDR::TunerModel::metersChanged);
+    Longpath::TunerModel m;
+    QSignalSpy metersSpy(&m, &Longpath::TunerModel::metersChanged);
     m.applyStatus({{"fwd","12.5"},{"swr","1.4"}});
     QCOMPARE(m.fwdPower(), 12.5f);
     QCOMPARE(m.swr(),      1.4f);
@@ -68,8 +68,8 @@ void TunerModelApplyStatusTest::appliesMeters() {
 }
 
 void TunerModelApplyStatusTest::emitsPresenceOnFirstStatus() {
-    NereusSDR::TunerModel m;
-    QSignalSpy presenceSpy(&m, &NereusSDR::TunerModel::presenceChanged);
+    Longpath::TunerModel m;
+    QSignalSpy presenceSpy(&m, &Longpath::TunerModel::presenceChanged);
     m.applyStatus({{"model","TunerGeniusXL"},{"serial_num","TGXL1234"}});
     QVERIFY(m.isPresent());
     QCOMPARE(presenceSpy.count(), 1);

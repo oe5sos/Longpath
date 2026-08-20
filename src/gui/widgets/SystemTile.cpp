@@ -12,7 +12,7 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SystemTile::SystemTile(QWidget* parent)
     : QWidget(parent)
@@ -124,4 +124,4 @@ void SystemTile::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

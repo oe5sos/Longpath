@@ -26,7 +26,7 @@
 #include <QPointF>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Compass rose showing where the antenna IS and where it SHOULD point.
 //
@@ -172,4 +172,4 @@ private:
     State  m_state{State::Idle};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -26,7 +26,7 @@
 
 #include "CDSPResampler.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/Resampler.cpp:7-13 [@0cd4559]
 Resampler::Resampler(double srcRate, double dstRate, int maxBlockSamples)
@@ -176,4 +176,4 @@ QByteArray Resampler::processStereoToStereo(const float* stereoIn, int numStereo
     return result;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

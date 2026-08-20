@@ -9,7 +9,7 @@
 #include "core/TciProtocol.h"
 #include "TestMockRadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciInitBurstSmoke : public QObject {
     Q_OBJECT

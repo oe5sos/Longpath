@@ -33,7 +33,7 @@
 
 #include "core/audio/AudioTapRing.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAudioTapRing : public QObject
 {

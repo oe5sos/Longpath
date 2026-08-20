@@ -7,7 +7,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SpacerItemEditor::SpacerItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -86,4 +86,4 @@ void SpacerItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

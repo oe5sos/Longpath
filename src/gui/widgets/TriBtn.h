@@ -25,7 +25,7 @@
 
 #include <QPushButton>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // TriBtn — fixed-size 22×22 button that paints a filled directional triangle.
 // Ported from AetherSDR src/gui/VfoWidget.cpp:97-129.
@@ -43,4 +43,4 @@ private:
     Dir m_dir;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

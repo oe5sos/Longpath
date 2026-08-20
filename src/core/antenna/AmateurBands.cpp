@@ -15,7 +15,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR::AmateurBands {
+namespace Longpath::AmateurBands {
 namespace {
 
 Band mk(double lowMHz, double highMHz, const char* name)
@@ -160,4 +160,4 @@ Band bestOverlap(double startHz, double stopHz, Region r)
     return best;
 }
 
-} // namespace NereusSDR::AmateurBands
+} // namespace Longpath::AmateurBands

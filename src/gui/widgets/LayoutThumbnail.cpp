@@ -31,7 +31,7 @@
 #include <QPainter>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Nine layouts, Single first. AetherSDR orders Single last; NereusSDR leads
 // with it because it is where an operator starts and returns.
@@ -124,4 +124,4 @@ void LayoutThumbnail::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

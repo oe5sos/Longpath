@@ -58,7 +58,7 @@
 
 #include <array>
 
-namespace NereusSDR::EqPalette {
+namespace Longpath::EqPalette {
 
 inline QColor of(const char* token) { return QColor(QLatin1String(token)); }
 
@@ -149,4 +149,4 @@ inline QColor modeSsb()   { return of(Style::kAmberText); }
 inline QColor modeEssb()  { return of(Style::kAccent); }
 inline QColor modeWide()  { return of(Style::kRedBorder); }
 
-} // namespace NereusSDR::EqPalette
+} // namespace Longpath::EqPalette

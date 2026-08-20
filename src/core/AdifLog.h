@@ -29,7 +29,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace AdifLog {
 
@@ -130,4 +130,4 @@ MergeResult merge(const QVector<LogEntry>& existing,
 
 } // namespace AdifLog
 
-} // namespace NereusSDR
+} // namespace Longpath

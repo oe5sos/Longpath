@@ -12,7 +12,7 @@
 #include <QtTest/QtTest>
 #include "core/WidebandFftEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWidebandFftEngine : public QObject {
     Q_OBJECT

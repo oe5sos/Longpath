@@ -41,19 +41,19 @@
 // Tester shim: friended in ParametricEqWidget.h so this subclass can
 // reach private state for hand-computed expecteds.  We keep public
 // access tight: only what the test needs.
-class ParametricEqInteractionTester : public NereusSDR::ParametricEqWidget {
+class ParametricEqInteractionTester : public Longpath::ParametricEqWidget {
 public:
-    using NereusSDR::ParametricEqWidget::ParametricEqWidget;
+    using Longpath::ParametricEqWidget::ParametricEqWidget;
 
     // Promote the math + ordering helpers so we can hand-compute pixel
     // positions and dB/Hz round-trips precisely.
-    using NereusSDR::ParametricEqWidget::computePlotRect;
-    using NereusSDR::ParametricEqWidget::xFromFreq;
-    using NereusSDR::ParametricEqWidget::yFromDb;
-    using NereusSDR::ParametricEqWidget::freqFromX;
-    using NereusSDR::ParametricEqWidget::dbFromY;
-    using NereusSDR::ParametricEqWidget::chooseFrequencyStep;
-    using NereusSDR::ParametricEqWidget::indexFromBandId;
+    using Longpath::ParametricEqWidget::computePlotRect;
+    using Longpath::ParametricEqWidget::xFromFreq;
+    using Longpath::ParametricEqWidget::yFromDb;
+    using Longpath::ParametricEqWidget::freqFromX;
+    using Longpath::ParametricEqWidget::dbFromY;
+    using Longpath::ParametricEqWidget::chooseFrequencyStep;
+    using Longpath::ParametricEqWidget::indexFromBandId;
 
     // Direct member access for assertions.
     QVector<EqPoint>& pointsMut()                  { return m_points; }
@@ -145,8 +145,8 @@ void TestParametricEqInteraction::leftClickOnBandSelectsIt() {
     // (mid-range) so it's safely interior.
     QVERIFY(w.pointsConst().size() == 10);
 
-    QSignalSpy spySel(&w, &NereusSDR::ParametricEqWidget::pointSelected);
-    QSignalSpy spyIdxCh(&w, &NereusSDR::ParametricEqWidget::selectedIndexChanged);
+    QSignalSpy spySel(&w, &Longpath::ParametricEqWidget::pointSelected);
+    QSignalSpy spyIdxCh(&w, &Longpath::ParametricEqWidget::selectedIndexChanged);
 
     QRect plot = w.computePlotRect();
     int idx = 5;
@@ -194,11 +194,11 @@ void TestParametricEqInteraction::leftDragMovesBandFreqAndGain() {
     // the middle one.
     w.pointsMut().clear();
     {
-        NereusSDR::ParametricEqWidget::EqPoint p0;
+        Longpath::ParametricEqWidget::EqPoint p0;
         p0.bandId = 1; p0.frequencyHz = 0.0;    p0.gainDb = 0.0; p0.q = 4.0;
-        NereusSDR::ParametricEqWidget::EqPoint p1;
+        Longpath::ParametricEqWidget::EqPoint p1;
         p1.bandId = 2; p1.frequencyHz = 2000.0; p1.gainDb = 0.0; p1.q = 4.0;
-        NereusSDR::ParametricEqWidget::EqPoint p2;
+        Longpath::ParametricEqWidget::EqPoint p2;
         p2.bandId = 3; p2.frequencyHz = 4000.0; p2.gainDb = 0.0; p2.q = 4.0;
         w.pointsMut().append(p0);
         w.pointsMut().append(p1);
@@ -215,8 +215,8 @@ void TestParametricEqInteraction::leftDragMovesBandFreqAndGain() {
     QTest::mousePress(&w, Qt::LeftButton, Qt::NoModifier, dot);
     QVERIFY(w.draggingPoint());
 
-    QSignalSpy spyPC  (&w, &NereusSDR::ParametricEqWidget::pointsChanged);
-    QSignalSpy spyPDC (&w, &NereusSDR::ParametricEqWidget::pointDataChanged);
+    QSignalSpy spyPC  (&w, &Longpath::ParametricEqWidget::pointsChanged);
+    QSignalSpy spyPDC (&w, &Longpath::ParametricEqWidget::pointDataChanged);
 
     // Move 30px right (freq up) and 20px down (gain down).
     QPoint moved(dot.x() + 30, dot.y() + 20);
@@ -284,9 +284,9 @@ void TestParametricEqInteraction::rightClickIsIgnored() {
     w.show();
     QVERIFY(QTest::qWaitForWindowExposed(&w));
 
-    QSignalSpy spySel  (&w, &NereusSDR::ParametricEqWidget::pointSelected);
-    QSignalSpy spyUnsel(&w, &NereusSDR::ParametricEqWidget::pointUnselected);
-    QSignalSpy spyIdxCh(&w, &NereusSDR::ParametricEqWidget::selectedIndexChanged);
+    QSignalSpy spySel  (&w, &Longpath::ParametricEqWidget::pointSelected);
+    QSignalSpy spyUnsel(&w, &Longpath::ParametricEqWidget::pointUnselected);
+    QSignalSpy spyIdxCh(&w, &Longpath::ParametricEqWidget::selectedIndexChanged);
 
     QRect plot = w.computePlotRect();
     const auto& p = w.pointsConst().at(3);
@@ -322,8 +322,8 @@ void TestParametricEqInteraction::wheelNoModifierMultipliesQ() {
     w.setSelectedIndex(idx);
     QCOMPARE(w.selectedIndex(), idx);
 
-    QSignalSpy spyPC (&w, &NereusSDR::ParametricEqWidget::pointsChanged);
-    QSignalSpy spyPDC(&w, &NereusSDR::ParametricEqWidget::pointDataChanged);
+    QSignalSpy spyPC (&w, &Longpath::ParametricEqWidget::pointsChanged);
+    QSignalSpy spyPDC(&w, &Longpath::ParametricEqWidget::pointDataChanged);
 
     sendWheel(&w, dot, /*angleDeltaY=*/120, Qt::NoModifier);
 
@@ -429,7 +429,7 @@ void TestParametricEqInteraction::clickOnGlobalGainHandleStartsDrag() {
     QPoint handle(handleX, handleY);
 
     double startGlobal = w.globalGainDb();
-    QSignalSpy spyGGC(&w, &NereusSDR::ParametricEqWidget::globalGainChanged);
+    QSignalSpy spyGGC(&w, &Longpath::ParametricEqWidget::globalGainChanged);
 
     QTest::mousePress(&w, Qt::LeftButton, Qt::NoModifier, handle);
     QVERIFY(w.draggingGlobalGain());
@@ -470,8 +470,8 @@ void TestParametricEqInteraction::releaseFiresFinalNonDraggingSignal() {
     QPoint moved(dot.x() + 25, dot.y() + 15);
     QTest::mouseMove(&w, moved);
 
-    QSignalSpy spyPC (&w, &NereusSDR::ParametricEqWidget::pointsChanged);
-    QSignalSpy spyPDC(&w, &NereusSDR::ParametricEqWidget::pointDataChanged);
+    QSignalSpy spyPC (&w, &Longpath::ParametricEqWidget::pointsChanged);
+    QSignalSpy spyPDC(&w, &Longpath::ParametricEqWidget::pointDataChanged);
 
     // Pin signal-emit order: downstream observers (future TxCfcDialog
     // CFC-redispatch) depend on pointsChanged firing before
@@ -487,13 +487,13 @@ void TestParametricEqInteraction::releaseFiresFinalNonDraggingSignal() {
     // m_dragDirtySelectedIndex flag).  A 3-band reorder test that
     // exercises selectedDirty's release path is queued as Task 5.
     QStringList emitOrder;
-    QObject::connect(&w, &NereusSDR::ParametricEqWidget::pointsChanged,
+    QObject::connect(&w, &Longpath::ParametricEqWidget::pointsChanged,
                      [&]() { emitOrder << QStringLiteral("pointsChanged"); });
-    QObject::connect(&w, &NereusSDR::ParametricEqWidget::pointDataChanged,
+    QObject::connect(&w, &Longpath::ParametricEqWidget::pointDataChanged,
                      [&]() { emitOrder << QStringLiteral("pointDataChanged"); });
-    QObject::connect(&w, &NereusSDR::ParametricEqWidget::globalGainChanged,
+    QObject::connect(&w, &Longpath::ParametricEqWidget::globalGainChanged,
                      [&]() { emitOrder << QStringLiteral("globalGainChanged"); });
-    QObject::connect(&w, &NereusSDR::ParametricEqWidget::selectedIndexChanged,
+    QObject::connect(&w, &Longpath::ParametricEqWidget::selectedIndexChanged,
                      [&]() { emitOrder << QStringLiteral("selectedIndexChanged"); });
 
     QTest::mouseRelease(&w, Qt::LeftButton, Qt::NoModifier, moved);
@@ -540,8 +540,8 @@ void TestParametricEqInteraction::clickOnEmptyAreaDeselects() {
     double prevGain   = prevP.gainDb;
     double prevQ      = prevP.q;
 
-    QSignalSpy spyUnsel(&w, &NereusSDR::ParametricEqWidget::pointUnselected);
-    QSignalSpy spyIdxCh(&w, &NereusSDR::ParametricEqWidget::selectedIndexChanged);
+    QSignalSpy spyUnsel(&w, &Longpath::ParametricEqWidget::pointUnselected);
+    QSignalSpy spyIdxCh(&w, &Longpath::ParametricEqWidget::selectedIndexChanged);
 
     QRect plot = w.computePlotRect();
 

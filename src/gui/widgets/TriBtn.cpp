@@ -7,7 +7,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TriBtn::TriBtn(Dir dir, QWidget* parent)
     : QPushButton(parent), m_dir(dir)
@@ -48,4 +48,4 @@ void TriBtn::paintEvent(QPaintEvent* ev)
     p.drawPolygon(tri);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

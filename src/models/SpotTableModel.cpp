@@ -38,7 +38,7 @@
 #include <QStringList>
 #include <QTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/gui/DxClusterDialog.cpp:75-88 [@0cd4559]
 QString SpotTableModel::extractMode(const QString& comment)
@@ -179,4 +179,4 @@ QString SpotTableModel::bandForFreq(double mhz)
     return "";
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

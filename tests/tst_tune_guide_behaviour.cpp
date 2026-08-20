@@ -27,7 +27,7 @@
 
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

@@ -111,7 +111,7 @@ class QWebSocket;
 #include "DxSpot.h"
 #include "FreeDVStation.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // FreeDV Reporter Engine.IO / Socket.IO client.
 //
@@ -213,12 +213,12 @@ signals:
     void connectionError(const QString& error);
 
     // Station model signals (drive FreeDVStationModel)
-    void stationAdded(const QString& sid, const NereusSDR::FreeDVStation& info);
-    void stationUpdated(const QString& sid, const NereusSDR::FreeDVStation& info);
+    void stationAdded(const QString& sid, const Longpath::FreeDVStation& info);
+    void stationUpdated(const QString& sid, const Longpath::FreeDVStation& info);
     void stationRemoved(const QString& sid);
 
     // Spot signal (drives SpotModel via adapter; NereusSDR dual-feed)
-    void spotReceived(const NereusSDR::DxSpot& spot);
+    void spotReceived(const Longpath::DxSpot& spot);
 
     // Debug stream
     void rawLineReceived(const QString& line);
@@ -315,4 +315,4 @@ private:
     static constexpr int InitialReconnectDelayMs = 5000;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

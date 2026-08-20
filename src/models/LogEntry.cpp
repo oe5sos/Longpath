@@ -22,7 +22,7 @@
 
 #include <QSet>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -129,4 +129,4 @@ QString LogEntry::toAdifRecord() const
     return r;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

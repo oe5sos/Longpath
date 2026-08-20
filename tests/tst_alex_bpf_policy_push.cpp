@@ -45,7 +45,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Records every per-ADC BPF decision RadioModel pushes at the connection.
 // Deliberately does NOT de-duplicate: P2RadioConnection::setAlexRxBpf does
@@ -66,7 +66,7 @@ public:
     }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

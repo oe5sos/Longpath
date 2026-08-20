@@ -19,7 +19,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioDevicesPage::AudioDevicesPage(RadioModel* model, QWidget* parent)
     : SetupPage(QStringLiteral("Devices"), model, parent)
@@ -106,4 +106,4 @@ void AudioDevicesPage::wireEngineConnections()
             });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

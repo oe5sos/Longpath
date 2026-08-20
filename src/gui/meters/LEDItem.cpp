@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 #include <QPainterPath>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis MeterManager.cs:19448 — clsLed constructor
 LEDItem::LEDItem(QObject* parent)
@@ -334,4 +334,4 @@ bool LEDItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -25,7 +25,7 @@
 #include "core/MoxController.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMoxControllerVoxEnabled : public QObject {
     Q_OBJECT

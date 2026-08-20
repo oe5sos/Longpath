@@ -147,7 +147,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Register display table rows ───────────────────────────────────────────────
 // 8 principal registers per spec §10 mockup.
@@ -1122,4 +1122,4 @@ void Hl2IoBoardTab::setN2adrCheckboxStateForTest(bool checked)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

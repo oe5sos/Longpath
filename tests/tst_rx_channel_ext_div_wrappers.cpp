@@ -13,7 +13,7 @@
 
 #include "core/WdspEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWdspEngineExternalDiversity : public QObject {
     Q_OBJECT

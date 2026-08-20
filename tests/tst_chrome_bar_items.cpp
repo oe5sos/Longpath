@@ -6,7 +6,7 @@
 #include "gui/chrome/ChromeBarController.h"
 #include "gui/chrome/ChromeBarItems.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstChromeBarItems : public QObject {
     Q_OBJECT

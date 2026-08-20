@@ -30,7 +30,7 @@
 #include <QSet>
 #include <QStringList>
 
-namespace NereusSDR {
+namespace Longpath {
 
 PanadapterStack::PanadapterStack(QWidget* parent) : QWidget(parent)
 {
@@ -496,4 +496,4 @@ void PanadapterStack::rootSplitterSetSizesForTest(const QList<int>& sizes)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

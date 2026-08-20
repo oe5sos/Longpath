@@ -9,7 +9,7 @@
 #include "models/BandFilterProxy.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSpotTableModel : public QObject {
     Q_OBJECT

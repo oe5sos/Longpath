@@ -30,7 +30,7 @@
 #include <QPainter>
 #include <QtTest/QtTest>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

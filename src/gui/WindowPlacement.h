@@ -31,7 +31,7 @@
 
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Dafür sorgen, dass `w` auf einem verbundenen Bildschirm zu sehen
 /// ist. Verschoben wird, wenn (a) keine Geometrie gespeichert war,
@@ -62,4 +62,4 @@ namespace NereusSDR {
 ///     können.
 void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize);
 
-} // namespace NereusSDR
+} // namespace Longpath

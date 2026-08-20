@@ -64,7 +64,7 @@ class QCheckBox;
 class QPushButton;
 class QTableWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class NeedleItem;
 
@@ -113,4 +113,4 @@ private:
     QTableWidget*   m_calTable{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

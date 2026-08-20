@@ -3,7 +3,7 @@
 #include <QComboBox>
 #include "StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 inline void applyComboStyle(QComboBox* combo)
 {
@@ -38,4 +38,4 @@ inline void applyComboStyle(QComboBox* combo)
           Style::kInsetBg));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -14,7 +14,7 @@
 #include "models/Band.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceHasSettingsFor : public QObject {
     Q_OBJECT

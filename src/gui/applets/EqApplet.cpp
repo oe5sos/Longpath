@@ -41,7 +41,7 @@
 #include <QPen>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── ResetButton: 22×22 button that paints a 3/4-circle undo arrow ────────────
 // Matches AetherSDR EqApplet.cpp ResetButton exactly.
@@ -257,7 +257,7 @@ void EqApplet::buildUI()
             slider->setRange(-10, 10);
             slider->setValue(0);
             slider->setTickPosition(QSlider::NoTicks);
-            slider->setStyleSheet(NereusSDR::Style::sliderVStyle());
+            slider->setStyleSheet(Longpath::Style::sliderVStyle());
             slider->setFixedHeight(100);
             slider->setToolTip(
                 QStringLiteral("%1 Hz band, \u221210 to +10 dB").arg(
@@ -349,4 +349,4 @@ void EqApplet::syncFromModel()
     // NYI — Phase 3I-3 will sync band values, enabled state, and preset from model.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

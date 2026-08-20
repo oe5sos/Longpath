@@ -21,7 +21,7 @@
 #include <QMetaType>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Operator-driven configuration that the codec consumes to produce a
 /// DdcAssignment. Phase 3F Sub-Epic B Task 1.
@@ -597,9 +597,9 @@ struct PsDdcConfig {
     int      txMonDdc   = -1;    // TX monitor DDC index (-1 = no PS pair)
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // Phase 3M-4 Task 6: PsDdcConfig must round-trip through Qt's signal/slot
 // queue (ReceiverManager::ddcConfigChanged → RadioConnection consumer) and
 // through QSignalSpy in tests, so it needs a metatype declaration.
-Q_DECLARE_METATYPE(NereusSDR::PsDdcConfig)
+Q_DECLARE_METATYPE(Longpath::PsDdcConfig)

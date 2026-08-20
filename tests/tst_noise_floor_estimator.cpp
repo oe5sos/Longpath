@@ -10,7 +10,7 @@
 
 #include "core/NoiseFloorEstimator.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNoiseFloorEstimator : public QObject {
     Q_OBJECT

@@ -59,7 +59,7 @@
 
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class EqHistory {
 public:
@@ -116,4 +116,4 @@ private:
     QVector<Snapshot> m_redo;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

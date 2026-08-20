@@ -2,7 +2,7 @@
 #include <QSignalSpy>
 #include "gui/widgets/VaxChannelSelector.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstVaxChannelSelector : public QObject {
     Q_OBJECT

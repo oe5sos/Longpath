@@ -61,7 +61,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TrimSession {
 public:
@@ -129,4 +129,4 @@ private:
     QVector<Observation> m_obs;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

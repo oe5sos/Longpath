@@ -5,7 +5,7 @@
 #include <utility>
 #include "core/Rf2ksConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Minimal in-process HTTP/1.0 server that answers fixture JSON for the 8
 // documented endpoints.  Listens on an ephemeral port; tests connect to

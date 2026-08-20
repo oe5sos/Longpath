@@ -153,7 +153,7 @@ warren@wpratt.com
 
 #include "WdspTypes.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // NB1/NB2 tuning knobs. Field units chosen to match Thetis setup.cs
 // user-visible units (milliseconds for times, linear for threshold)
@@ -285,4 +285,4 @@ private:
     void pushAllTuning();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

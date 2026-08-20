@@ -160,7 +160,7 @@ warren@wpratt.com
 #include <unordered_map>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Audio-thread-safe per-slice mixing. UI thread mutates per-slice params;
 // audio thread reads via atomics. Map structural changes are guarded by a
@@ -468,4 +468,4 @@ private:
 #endif
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -93,7 +93,7 @@ mw0lge@grange-lane.co.uk
 #include <limits>
 #include "gui/StyleConstants.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Das Chrome des Entzerrers, erreichbar für die Theme-Datei ────────
 //
@@ -2699,4 +2699,4 @@ bool ParametricEqWidget::loadFromJson(const QString& json) {
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

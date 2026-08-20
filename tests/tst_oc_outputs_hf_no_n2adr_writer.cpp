@@ -24,7 +24,7 @@
 #include "gui/setup/hardware/OcOutputsHfTab.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstOcOutputsHfNoN2adrWriter : public QObject {
     Q_OBJECT

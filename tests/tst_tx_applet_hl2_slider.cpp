@@ -44,7 +44,7 @@
 #include "gui/applets/TxApplet.h"
 #include "models/RadioModel.h"
 
-using NereusSDR::HPSDRModel;
+using Longpath::HPSDRModel;
 
 class TestTxAppletHl2Slider : public QObject {
     Q_OBJECT
@@ -61,8 +61,8 @@ private slots:
     // ── 1. HL2: RF Power slider rescales to 0..90 step 6 ────────────────
     void hl2_rfSlider_rescales()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
         QCOMPARE(ta.rfPowerSlider()->maximum(),    90);
         QCOMPARE(ta.rfPowerSlider()->singleStep(),  6);
@@ -76,33 +76,33 @@ private slots:
     // test is really about and is unchanged.
     void hl2_tuneSlider_rescales()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
         QCOMPARE(ta.tunePowerSlider()->maximum(),
-                 NereusSDR::kTuneSliderMaxWatts);
+                 Longpath::kTuneSliderMaxWatts);
         QCOMPARE(ta.tunePowerSlider()->singleStep(),  3);
     }
 
     // ── 3. SKU swap-back: HL2 → ANAN-100 returns to canonical 0..100 ───
     void anan100_returnsToDefault()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
         ta.rescalePowerSlidersForModel(HPSDRModel::ANAN100);
         QCOMPARE(ta.rfPowerSlider()->maximum(),     100);
         QCOMPARE(ta.rfPowerSlider()->singleStep(),    1);
         QCOMPARE(ta.tunePowerSlider()->maximum(),
-                 NereusSDR::kTuneSliderMaxWatts);
+                 Longpath::kTuneSliderMaxWatts);
     }
 
     // ── 4. HL2 RF Power label formula at slider=60 ─────────────────────
     //   (round(60/6.0)/2) - 7.5 = (10/2) - 7.5 = 5 - 7.5 = -2.5
     void hl2_label_formula_at_60()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
         ta.rfPowerSlider()->setValue(60);
         ta.updatePowerSliderLabels();
@@ -113,8 +113,8 @@ private slots:
     //   (round(90/6.0)/2) - 7.5 = (15/2) - 7.5 = 7.5 - 7.5 = 0.0
     void hl2_label_at_max()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
         ta.rfPowerSlider()->setValue(90);
         ta.updatePowerSliderLabels();
@@ -124,8 +124,8 @@ private slots:
     // ── 6. Non-HL2 label is plain integer (no dB conversion) ───────────
     void nonHl2_label_is_int()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::ANAN100);
         ta.rfPowerSlider()->setValue(75);
         ta.updatePowerSliderLabels();
@@ -135,8 +135,8 @@ private slots:
     // ── 7. Thetis-faithful tooltip on RF Power slider ──────────────────
     void tooltip_thetis_faithful()
     {
-        NereusSDR::RadioModel rm;
-        NereusSDR::TxApplet ta(&rm);
+        Longpath::RadioModel rm;
+        Longpath::TxApplet ta(&rm);
         ta.rescalePowerSlidersForModel(HPSDRModel::HERMESLITE);
         QVERIFY(ta.rfPowerSlider()->toolTip().contains("relative value"));
         QVERIFY(ta.rfPowerSlider()->toolTip().contains("MAX watts"));

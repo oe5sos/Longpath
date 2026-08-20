@@ -10,7 +10,7 @@
 #include "core/CtyDatParser.h"
 #include "core/Maidenhead.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

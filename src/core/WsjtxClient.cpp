@@ -40,7 +40,7 @@
 #include <QFileInfo>
 #include <QRegularExpression>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/WsjtxClient.cpp:14-19 [@0cd4559]
 WsjtxClient::WsjtxClient(QObject* parent)
@@ -337,4 +337,4 @@ bool WsjtxClient::readBool(QDataStream& ds, bool& out)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -104,7 +104,7 @@
 #include "P2CodecOrionMkII.h"
 #include "CodecContext.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // --- Static helpers ---
 
@@ -1291,4 +1291,4 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     return a;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

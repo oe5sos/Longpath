@@ -79,7 +79,7 @@
 #include <QDateTime>
 #include <QMetaObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 StepAttenuatorController::StepAttenuatorController(QObject* parent)
     : QObject(parent)
@@ -1147,4 +1147,4 @@ void StepAttenuatorController::loadSettings(const QString& mac)
     emit stepAttEnabledChanged(m_stepAttEnabled);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

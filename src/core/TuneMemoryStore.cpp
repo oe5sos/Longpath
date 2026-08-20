@@ -14,7 +14,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 // Antenna range: 1..3 (TGXL has three antenna ports).
@@ -104,4 +104,4 @@ QString TuneMemoryStore::slotKey(int antenna, Band band) const
                .arg(bandKeyName(band));
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

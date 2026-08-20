@@ -33,7 +33,7 @@
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Style constants (matching AudioVaxPage / DeviceCard palette)
@@ -600,4 +600,4 @@ bool AudioAdvancedPage::eventFilter(QObject* obj, QEvent* event)
     return SetupPage::eventFilter(obj, event);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

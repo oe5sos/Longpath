@@ -50,7 +50,7 @@ class QLabel;
 class QEvent;
 class QMouseEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct BoardCapabilities;
 class RadioModel;
@@ -90,7 +90,7 @@ public slots:
     // both RX/TX rows on boards without Alex (HL2/Atlas). Also reseeds
     // the combo's current value from the resolved slice so the label matches the
     // new port list (e.g. a persisted ANT3 preserves after reconnect).
-    void setBoardCapabilities(const NereusSDR::BoardCapabilities& caps);
+    void setBoardCapabilities(const Longpath::BoardCapabilities& caps);
 
 signals:
     // Band flyout
@@ -251,4 +251,4 @@ private:
     QPushButton* m_zoomInBtn{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

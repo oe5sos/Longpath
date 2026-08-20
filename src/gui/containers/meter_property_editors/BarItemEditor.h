@@ -5,7 +5,7 @@ class QComboBox;
 class QDoubleSpinBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterItem;
 class BarItem;
@@ -43,4 +43,4 @@ private:
     QPushButton*    m_btnEdgeAvg{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

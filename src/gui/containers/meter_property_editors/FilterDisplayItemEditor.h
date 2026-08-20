@@ -6,7 +6,7 @@ class QDoubleSpinBox;
 class QCheckBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class FilterDisplayItem;
 
 class FilterDisplayItemEditor : public BaseItemEditor {
@@ -34,4 +34,4 @@ private:
     QPushButton*    m_btnText{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -79,7 +79,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // HL2-specific radio behavior knobs (mi0bot tpHL2Options.groupBoxHL2RXOptions).
 class Hl2OptionsModel : public QObject {
@@ -164,4 +164,4 @@ private:
     bool m_bandVolts{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

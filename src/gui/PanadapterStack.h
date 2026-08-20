@@ -44,7 +44,7 @@
 
 class QSplitter;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PanadapterApplet;
 class PanFloatingWindow;
@@ -187,4 +187,4 @@ private:
     QString                                    m_activePanId;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

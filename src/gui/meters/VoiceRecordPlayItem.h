@@ -55,7 +55,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ButtonBoxItem.h"
-namespace NereusSDR {
+namespace Longpath {
 // DVK record/play/stop controls. From Thetis clsVoiceRecordPlay (MeterManager.cs:10222+).
 class VoiceRecordPlayItem : public ButtonBoxItem {
     Q_OBJECT
@@ -71,4 +71,4 @@ private:
     void onButtonClicked(int index, Qt::MouseButton button);
     static constexpr int kButtonCount = 5;
 };
-} // namespace NereusSDR
+} // namespace Longpath

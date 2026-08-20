@@ -7,10 +7,10 @@
 #include <QtTest/QtTest>
 #include "core/audio/LinuxAudioBackend.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Helper — QCOMPARE on scoped enum LinuxAudioBackend can't use QTest's
-// Internal::toString path because ADL picks up NereusSDR::toString(...)
+// Internal::toString path because ADL picks up Longpath::toString(...)
 // (QString return type) and collides with QTest's char* contract. Comparing
 // the underlying int is equivalent for equality and gives a readable failure.
 static int asInt(LinuxAudioBackend b) { return static_cast<int>(b); }

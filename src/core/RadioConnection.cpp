@@ -9,7 +9,7 @@
 #include "P2RadioConnection.h"
 #include "LogCategories.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 RadioConnection::RadioConnection(QObject* parent)
     : QObject(parent)
@@ -175,4 +175,4 @@ void RadioConnection::handleUserAdc0Raw(quint16 raw)
     emit userAdc0Changed(v);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -53,7 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "VoiceRecordPlayItem.h"
-namespace NereusSDR {
+namespace Longpath {
 static const char* const kVoiceLabels[] = { "REC", "PLAY", "STOP", "NEXT", "PREV" };
 
 VoiceRecordPlayItem::VoiceRecordPlayItem(QObject* parent) : ButtonBoxItem(parent)
@@ -86,4 +86,4 @@ bool VoiceRecordPlayItem::deserialize(const QString& data)
     if (parts.size() > 7) { setColumns(parts[7].toInt()); }
     return true;
 }
-} // namespace NereusSDR
+} // namespace Longpath

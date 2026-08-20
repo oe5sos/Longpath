@@ -19,7 +19,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -373,4 +373,4 @@ void RotctldClient::fail(const QString& why)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

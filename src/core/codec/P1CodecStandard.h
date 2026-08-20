@@ -41,7 +41,7 @@
 
 #include "IP1Codec.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ramdor WriteMainLoop port. Banks 0-16. Used for every non-HL2 P1
 // board by default; AnvelinaPro3 and RedPitaya extend it with bank-17
@@ -101,4 +101,4 @@ protected:
         int rx1Rate, int rx2Rate, bool rx2Enabled) const;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

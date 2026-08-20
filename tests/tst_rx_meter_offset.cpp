@@ -22,7 +22,7 @@
 #include "core/HpsdrModel.h"
 #include "gui/meters/MeterPoller.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRxMeterOffset : public QObject
 {

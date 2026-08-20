@@ -7,7 +7,7 @@ class QCheckBox;
 class QLineEdit;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class RotatorItem;
 
 class RotatorItemEditor : public BaseItemEditor {
@@ -40,4 +40,4 @@ private:
     QPushButton*    m_btnBackground{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

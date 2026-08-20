@@ -6,7 +6,7 @@ class QPushButton;
 class QDoubleSpinBox;
 class QComboBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class LEDItem;
 
@@ -34,4 +34,4 @@ private:
     QDoubleSpinBox* m_spinRedThreshold{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

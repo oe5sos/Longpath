@@ -5,7 +5,7 @@ class QCheckBox;
 class QDoubleSpinBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterItem;
 class FadeCoverItem;
@@ -26,4 +26,4 @@ private:
     QDoubleSpinBox* m_spinAlpha{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

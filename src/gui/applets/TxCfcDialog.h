@@ -97,7 +97,7 @@ class QRadioButton;
 class QSpinBox;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ParametricEqWidget;
 class TransmitModel;
@@ -343,4 +343,4 @@ private:
     // We don't allocate at construction to keep the dialog cheap to build.
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -33,7 +33,7 @@
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTxChannelDexpEnvelope : public QObject {
     Q_OBJECT

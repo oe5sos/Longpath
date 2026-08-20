@@ -16,7 +16,7 @@
 
 #include <QSet>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

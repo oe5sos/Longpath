@@ -12,7 +12,7 @@
 
 #include <vector>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstMicSpectrum : public QObject {
     Q_OBJECT

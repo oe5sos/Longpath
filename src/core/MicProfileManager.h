@@ -66,7 +66,7 @@
 #include <QStringList>
 #include <QVariant>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TransmitModel;
 
@@ -220,4 +220,4 @@ private:
     QString m_mac;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

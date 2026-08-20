@@ -3,7 +3,7 @@
 #include <QSignalSpy>
 #include "core/IoBoardHl2.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestIoBoardHl2 : public QObject {
     Q_OBJECT

@@ -50,7 +50,7 @@
 #include <cmath>
 #include <vector>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

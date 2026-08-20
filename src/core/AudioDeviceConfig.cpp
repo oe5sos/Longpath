@@ -12,7 +12,7 @@
 #include "AudioDeviceConfig.h"
 #include "AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // AudioDeviceConfig::loadFromSettings
@@ -96,4 +96,4 @@ void AudioDeviceConfig::saveToSettings(const QString& prefix) const
                QString::number(manualLatencyMs));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

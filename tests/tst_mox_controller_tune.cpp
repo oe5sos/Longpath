@@ -26,7 +26,7 @@
 
 #include "core/MoxController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // Helper: run processEvents() enough times to drain the full TX→RX walk

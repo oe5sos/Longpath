@@ -176,7 +176,7 @@ Q_DECLARE_LOGGING_CATEGORY(lcRade)
 struct rade;
 struct LPCNetEncState;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Forward declarations for the NereusSDR-native helpers RadeChannel
 // owns by unique_ptr. The full type definitions live in Resampler.h
@@ -364,4 +364,4 @@ private:
     std::unique_ptr<RadeText> m_textChannel;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

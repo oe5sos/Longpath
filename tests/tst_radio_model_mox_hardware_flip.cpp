@@ -30,7 +30,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── SignalEmitter ─────────────────────────────────────────────────────────────
 // Minimal QObject with a signal matching MoxController::hardwareFlipped.
@@ -76,7 +76,7 @@ public:
 
     // ── Pure-virtual overrides ────────────────────────────────────────────────
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

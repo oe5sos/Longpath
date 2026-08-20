@@ -5,7 +5,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SolidColourItemEditor::SolidColourItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -49,4 +49,4 @@ void SolidColourItemEditor::buildTypeSpecific()
     addRow(QStringLiteral("Color"), m_btnColour);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

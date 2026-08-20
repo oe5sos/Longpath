@@ -70,7 +70,7 @@ mw0lge@grange-lane.co.uk
 #include <QLabel>
 #include <QFrame>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -341,4 +341,4 @@ void BaseItemEditor::notifyChanged()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -56,7 +56,7 @@ mw0lge@grange-lane.co.uk
 #include <QPainter>
 #include <QDateTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ClockItem::ClockItem(QObject* parent) : MeterItem(parent)
 {
@@ -133,4 +133,4 @@ bool ClockItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

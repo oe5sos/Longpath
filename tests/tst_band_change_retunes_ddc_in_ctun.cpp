@@ -41,7 +41,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Records the receive frequencies that actually reach a connection.
 // File scope, not an anonymous namespace: moc cannot generate a
@@ -55,7 +55,7 @@ public:
         : RadioConnection(parent) { setState(ConnectionState::Connected); }
 
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64 hz) override { rxFreqCalls.append(hz); }
     void setTxFrequency(quint64) override {}

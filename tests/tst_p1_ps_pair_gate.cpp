@@ -44,7 +44,7 @@
 #include "core/codec/CodecContext.h"
 #include "core/codec/P1CodecHl2.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

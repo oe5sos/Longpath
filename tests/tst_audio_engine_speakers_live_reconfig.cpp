@@ -37,7 +37,7 @@
 #include <memory>
 #include <thread>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

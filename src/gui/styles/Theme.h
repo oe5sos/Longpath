@@ -55,7 +55,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace NereusSDR::Style {
+namespace Longpath::Style {
 
 class Theme {
 public:
@@ -142,4 +142,4 @@ public:
     static quint64 appliedCount();
 };
 
-} // namespace NereusSDR::Style
+} // namespace Longpath::Style

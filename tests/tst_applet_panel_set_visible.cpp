@@ -9,7 +9,7 @@
 #include "gui/applets/GridCellWidget.h"
 #include "gui/applets/AppletWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 class FakeApplet : public AppletWidget {
@@ -48,7 +48,7 @@ private slots:
 
 static QWidget* wrapperFor(AppletPanelWidget& panel, QWidget* applet)
 {
-    for (auto* cell : panel.findChildren<NereusSDR::GridCellWidget*>()) {
+    for (auto* cell : panel.findChildren<Longpath::GridCellWidget*>()) {
         if (cell && cell->isAncestorOf(applet)) { return cell; }
     }
     return nullptr;

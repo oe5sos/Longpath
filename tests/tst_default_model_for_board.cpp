@@ -17,9 +17,9 @@
 #include "core/HardwareProfile.h"
 #include "core/HpsdrModel.h"
 
-using NereusSDR::HPSDRHW;
-using NereusSDR::HPSDRModel;
-using NereusSDR::defaultModelForBoard;
+using Longpath::HPSDRHW;
+using Longpath::HPSDRModel;
+using Longpath::defaultModelForBoard;
 
 class TestDefaultModelForBoard : public QObject {
     Q_OBJECT

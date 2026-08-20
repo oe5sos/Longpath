@@ -29,7 +29,7 @@
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -416,4 +416,4 @@ void FilterPresetsSetupPage::onPresetsChanged(DSPMode mode)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

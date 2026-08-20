@@ -53,7 +53,7 @@ warren@wpratt.com
 #include <atomic>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // TxMicSource — ring + semaphore handoff from the network thread to
@@ -176,4 +176,4 @@ private:
     std::atomic<bool> m_running{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

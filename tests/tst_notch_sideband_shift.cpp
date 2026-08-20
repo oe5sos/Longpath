@@ -17,7 +17,7 @@
 #include <QtTest/QtTest>
 #include "models/NotchModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchSidebandShift : public QObject {
     Q_OBJECT

@@ -36,7 +36,7 @@
 
 #include <functional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace KmlExport {
 
@@ -71,4 +71,4 @@ bool writeKml(const QString& path, const QVector<LogEntry>& entries,
 
 } // namespace KmlExport
 
-} // namespace NereusSDR
+} // namespace Longpath

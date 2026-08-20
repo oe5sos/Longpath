@@ -20,7 +20,7 @@
 #include <QDateTime>
 #include <QLoggingCategory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 Q_LOGGING_CATEGORY(lcPgxl, "nereus.pgxl")
 
@@ -561,4 +561,4 @@ void PgxlConnection::processLine(const QString& line) {
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

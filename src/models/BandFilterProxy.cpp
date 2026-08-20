@@ -45,7 +45,7 @@
 #include "BandFilterProxy.h"
 #include "SpotTableModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/gui/DxClusterDialog.cpp:208-215 [@0cd4559]
 void BandFilterProxy::setBandVisible(const QString& band, bool visible)
@@ -94,4 +94,4 @@ bool BandFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

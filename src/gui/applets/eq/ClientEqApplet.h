@@ -28,11 +28,11 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ClientEqApplet {
 public:
     enum class Path { Rx = 0, Tx = 1 };
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

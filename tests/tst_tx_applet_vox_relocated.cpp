@@ -42,7 +42,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxAppletVoxRelocated : public QObject {
     Q_OBJECT

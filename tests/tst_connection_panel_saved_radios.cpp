@@ -13,7 +13,7 @@
 #include "core/RadioDiscovery.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestConnectionPanelSavedRadios : public QObject {
     Q_OBJECT

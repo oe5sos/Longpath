@@ -58,7 +58,7 @@ extern "C" {
 #include "rade_api.h"
 }
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadeText : public QObject {
     Q_OBJECT

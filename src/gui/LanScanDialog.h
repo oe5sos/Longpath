@@ -21,7 +21,7 @@ class QTableWidget;
 class QProgressBar;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class LanDiscovery;
 
@@ -74,4 +74,4 @@ private:
     QLabel*         m_statusLabel{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

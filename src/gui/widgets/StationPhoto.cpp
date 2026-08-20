@@ -25,7 +25,7 @@
 #include <QStandardPaths>
 #include <QUrl>
 
-namespace NereusSDR {
+namespace Longpath {
 
 QString StationPhoto::cacheDir()
 {
@@ -185,4 +185,4 @@ void StationPhoto::paintEvent(QPaintEvent*)
                Qt::AlignCenter | Qt::TextWordWrap, m_placeholder);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -41,9 +41,9 @@
 
 #include "IP1Codec.h"
 
-namespace NereusSDR { class IoBoardHl2; }  // forward decl — full header in .cpp
+namespace Longpath { class IoBoardHl2; }  // forward decl — full header in .cpp
 
-namespace NereusSDR {
+namespace Longpath {
 
 // mi0bot WriteMainLoop_HL2 port. Banks 0-18.
 //
@@ -115,4 +115,4 @@ private:
     IoBoardHl2* m_io{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

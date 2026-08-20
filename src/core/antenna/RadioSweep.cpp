@@ -15,7 +15,7 @@
 
 #include "models/Band.h"
 
-namespace NereusSDR::RadioSweep {
+namespace Longpath::RadioSweep {
 
 double reflectionMagnitude(double swr)
 {
@@ -69,4 +69,4 @@ Sweep fromResult(const SwrSweepResult& result)
     return out;
 }
 
-} // namespace NereusSDR::RadioSweep
+} // namespace Longpath::RadioSweep

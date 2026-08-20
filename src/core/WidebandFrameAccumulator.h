@@ -31,7 +31,7 @@
 #include <QByteArray>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Assembles wideband ADC packets into 32-packet frames.
 ///
@@ -76,7 +76,7 @@ private:
                           QVector<float>::iterator out);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // QVector<float> is already a Qt built-in metatype via QList<float>
 // (Qt6 aliases QVector<T> = QList<T>); no Q_DECLARE_METATYPE needed

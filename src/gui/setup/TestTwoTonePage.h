@@ -64,7 +64,7 @@
 #include <QRadioButton>
 #include <QSpinBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 enum class DrivePowerSource : int;
@@ -152,4 +152,4 @@ private:
     QRadioButton* m_fixedDriveRadio{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

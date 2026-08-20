@@ -29,7 +29,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace WorldTexture {
 
 // Settings key holding the path the operator chose or downloaded.
@@ -85,4 +85,4 @@ private:
 };
 
 } // namespace WorldTexture
-} // namespace NereusSDR
+} // namespace Longpath

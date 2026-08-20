@@ -4,7 +4,7 @@
 class QComboBox;
 class QLineEdit;
 
-namespace NereusSDR {
+namespace Longpath {
 class DataOutItem;
 
 class DataOutItemEditor : public BaseItemEditor {
@@ -22,4 +22,4 @@ private:
     QLineEdit* m_editVariable{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

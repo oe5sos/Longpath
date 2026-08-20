@@ -30,7 +30,7 @@
 #include <QLabel>
 #include <QPushButton>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Right-click overlay menu for SpectrumWidget display settings.
 // Tier 2 settings: occasional adjustment (per-band or per-mode).
@@ -106,4 +106,4 @@ private:
     double       m_notchAddFreqHz{0.0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -11,7 +11,7 @@
 #include "core/codec/P2CodecHermes.h"
 #include "core/codec/CodecContext.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP2CodecHermes : public QObject {
     Q_OBJECT

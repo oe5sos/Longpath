@@ -31,7 +31,7 @@
 #include "gui/instruments/ReadingSource.h"
 #include "gui/meters/MeterPoller.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestInstrumentNoReading : public QObject
 {

@@ -8,7 +8,7 @@
 #include <QCoreApplication>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 /// Skip-on-null so callers need no per-item guard.
@@ -137,4 +137,4 @@ void registerChromeBarItems(ChromeBarController& c, const ChromeBarWidgets& w)
         QCoreApplication::translate("ChromeBar", "TNF"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

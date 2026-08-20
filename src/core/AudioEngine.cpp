@@ -142,7 +142,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1525,7 +1525,7 @@ int AudioEngine::pullVaxTxMic(float* dst, int n)
     //
     // VAX TX shm is fixed at 48 kHz stereo float32 by the
     // plugin↔CoreAudioHalBus contract (see makePCMFormat in
-    // hal-plugin/NereusSDRVAX.cpp + CoreAudioHalBus negotiated
+    // hal-plugin/LongpathVAX.cpp + CoreAudioHalBus negotiated
     // format).  We assume that contract here — if a Linux backend
     // ever negotiates a different format, this method will need the
     // same dispatch shape as pullTxMic.
@@ -2093,4 +2093,4 @@ void AudioEngine::simulatePersistentUnderrun()
     setFlowState(FlowState::Stalled);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

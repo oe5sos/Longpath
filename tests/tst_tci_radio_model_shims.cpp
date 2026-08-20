@@ -16,7 +16,7 @@
 #include "models/SliceModel.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciRadioModelShims : public QObject {
     Q_OBJECT

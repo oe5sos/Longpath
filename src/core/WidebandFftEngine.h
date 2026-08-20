@@ -37,7 +37,7 @@
 
 #include <fftw3.h>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Real-to-complex 16384-pt FFT engine for the P2 wideband ADC stream.
 ///
@@ -77,4 +77,4 @@ private:
     fftwf_complex* m_output    {nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

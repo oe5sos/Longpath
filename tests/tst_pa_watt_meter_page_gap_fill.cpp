@@ -27,7 +27,7 @@
 #include "gui/setup/PaSetupPages.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstPaWattMeterPageGapFill : public QObject {
     Q_OBJECT

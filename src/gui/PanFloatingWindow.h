@@ -40,7 +40,7 @@
 #include <QWidget>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PanadapterApplet;
 
@@ -83,4 +83,4 @@ private:
     bool m_sizedOnce{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

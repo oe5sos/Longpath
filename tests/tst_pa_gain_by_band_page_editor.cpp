@@ -50,7 +50,7 @@
 #include "models/Band.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

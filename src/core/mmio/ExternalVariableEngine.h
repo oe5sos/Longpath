@@ -64,7 +64,7 @@ mw0lge@grange-lane.co.uk
 
 class QThread;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MmioEndpoint;
 class ITransportWorker;
@@ -138,4 +138,4 @@ private:
     QThread* m_workerThread{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

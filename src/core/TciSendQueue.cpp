@@ -12,7 +12,7 @@
 
 #include <QtCore/QMutexLocker>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TciSendQueue::TciSendQueue(int capacityPerQueue)
     : m_capacityPerQueue(capacityPerQueue)
@@ -78,4 +78,4 @@ void TciSendQueue::reset()
     m_dropCount = 0;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

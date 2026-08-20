@@ -61,7 +61,7 @@
 
 #include <QString>
 
-namespace NereusSDR::AntennaTrim {
+namespace Longpath::AntennaTrim {
 
 // How a change in total wire length is shared out, and what the
 // operator physically does about it.
@@ -164,4 +164,4 @@ QString instruction(const Trim& t, Kind kind);
 // velocity factor of the wire they actually own is not known here.
 double halfWaveEstimateM(double freqHz, double velocityFactor = 0.95);
 
-} // namespace NereusSDR::AntennaTrim
+} // namespace Longpath::AntennaTrim

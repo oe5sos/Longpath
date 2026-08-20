@@ -5,7 +5,7 @@
 #include <QMetaType>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Lifecycle of a single connection attempt + steady-state.
 // Single source of truth for connection-state semantics — TitleBar,
@@ -33,6 +33,6 @@ inline QString connectionStateName(ConnectionState s) {
     return QStringLiteral("Unknown");
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::ConnectionState)
+Q_DECLARE_METATYPE(Longpath::ConnectionState)

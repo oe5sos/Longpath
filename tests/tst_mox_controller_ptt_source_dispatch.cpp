@@ -45,7 +45,7 @@
 #include "core/MoxController.h"
 #include "core/PttMode.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Convenience: make the state-machine walk synchronous for all tests.
 static void makeSync(MoxController& ctrl)

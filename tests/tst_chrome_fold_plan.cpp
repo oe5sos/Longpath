@@ -2,7 +2,7 @@
 #include <QtTest/QtTest>
 #include "gui/chrome/ChromeFoldPlan.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 QVector<ChromeFoldEntry> sampleTable()

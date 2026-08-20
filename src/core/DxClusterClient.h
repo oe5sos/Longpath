@@ -56,7 +56,7 @@
 
 #include "DxSpot.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/DxClusterClient.h:25-83 [@0cd4559]
 //
@@ -141,4 +141,4 @@ private:
     static constexpr int ConnectTimeoutMs        = 10000;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

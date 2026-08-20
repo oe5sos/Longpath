@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "core/SkuUiProfile.h"
 #include "core/HpsdrModel.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsAntennaButtonBox (MeterManager.cs:9502+)
 static const char* const kAntennaLabels[] = {
@@ -162,4 +162,4 @@ bool AntennaButtonItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

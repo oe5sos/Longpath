@@ -25,7 +25,7 @@
 
 #include "core/MoxController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ---------------------------------------------------------------------------
 // TestMoxControllerBasic — state transitions, no timers (timers come in B.3)

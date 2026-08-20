@@ -68,7 +68,7 @@
 
 class QTabWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 struct RadioInfo;
@@ -160,4 +160,4 @@ private:
     int m_bwMonitorIdx{-1};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

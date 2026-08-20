@@ -111,7 +111,7 @@
 #include <QVBoxLayout>
 #include <QtGlobal>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // =====================================================================
 // Highlight color defaults
@@ -2173,4 +2173,4 @@ QString FreeDVReporterDialog::qrzUrlForCallsignForTest(
     return QStringLiteral("https://www.qrz.com/db/%1").arg(callsign);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

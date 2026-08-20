@@ -37,7 +37,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -1490,4 +1490,4 @@ void MicProfileManager::applyValuesToModel(const QHash<QString, QVariant>& value
                                               QStringLiteral("True")) == QLatin1String("True"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

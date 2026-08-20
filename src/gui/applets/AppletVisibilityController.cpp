@@ -9,7 +9,7 @@
 #include "AppletVisibilityController.h"
 #include "core/AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 AppletVisibilityController::AppletVisibilityController(QObject* parent)
     : QObject(parent)
@@ -110,14 +110,14 @@ void AppletVisibilityController::setAvailable(const QString& id, bool available)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // ── Kategorie und Schlagwoerter ──────────────────────────────────────
 //
 // Siehe den Header: die Schlagwoerter sind das, was das Suchfeld im
 // „Widget hinzufuegen"-Dialog brauchbar macht.
 
-namespace NereusSDR {
+namespace Longpath {
 
 QString AppletVisibilityController::uncategorised()
 {
@@ -188,4 +188,4 @@ bool AppletVisibilityController::matches(const QString& id,
     return false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

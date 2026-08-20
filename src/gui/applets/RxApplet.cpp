@@ -161,7 +161,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─── RxApplet ─────────────────────────────────────────────────────────────────
 
@@ -2309,4 +2309,4 @@ void RxApplet::syncInheritedFromSlice()
     if (m_apfSlider) { m_apfSlider->setValue(m_slice->apfTuneHz()); }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

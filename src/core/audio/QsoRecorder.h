@@ -56,7 +56,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Was neben der Aufnahme steht. Feldauswahl aus Thetis
 // RecordingDetails (clsAudioRecordPlayback.cs:88-108) — ohne die
@@ -139,4 +139,4 @@ private:
     bool             m_saveFloat32{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -64,7 +64,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ActivePeakHoldTrace::ActivePeakHoldTrace(int nBins)
 {
@@ -123,4 +123,4 @@ void ActivePeakHoldTrace::tickFrame(int fps)
     }
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

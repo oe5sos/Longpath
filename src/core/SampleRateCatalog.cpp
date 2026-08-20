@@ -71,7 +71,7 @@
 #include <array>
 #include <span>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -166,4 +166,4 @@ int resolveActiveRxCount(const AppSettings& settings,
     return std::min(persisted, caps.maxReceivers);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

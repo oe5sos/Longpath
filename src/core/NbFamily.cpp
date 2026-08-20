@@ -165,7 +165,7 @@ warren@wpratt.com
 #include "AppSettings.h"
 #include "wdsp_api.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 constexpr double kMsToSec = 0.001;
@@ -512,4 +512,4 @@ void NbFamily::pushAllTuning()
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

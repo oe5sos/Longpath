@@ -13,7 +13,7 @@
 #include "core/RotctldProcess.h"
 #include "core/RotorModels.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstRotctldProcess : public QObject {
     Q_OBJECT

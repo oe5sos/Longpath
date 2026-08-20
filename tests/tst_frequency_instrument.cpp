@@ -27,7 +27,7 @@
 
 #include "gui/instruments/FrequencyInstrument.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

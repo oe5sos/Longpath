@@ -25,34 +25,34 @@
 // Tester shim: friended in ParametricEqWidget.h so this subclass can
 // reach private axis/ordering helpers and member state.  The widget
 // itself remains encapsulated; only this test sees through.
-class ParametricEqAxisTester : public NereusSDR::ParametricEqWidget {
+class ParametricEqAxisTester : public Longpath::ParametricEqWidget {
 public:
-    using NereusSDR::ParametricEqWidget::ParametricEqWidget;
+    using Longpath::ParametricEqWidget::ParametricEqWidget;
 
     // Promote the math + ordering helpers into the tester's public API.
-    using NereusSDR::ParametricEqWidget::computePlotRect;
-    using NereusSDR::ParametricEqWidget::xFromFreq;
-    using NereusSDR::ParametricEqWidget::yFromDb;
-    using NereusSDR::ParametricEqWidget::freqFromX;
-    using NereusSDR::ParametricEqWidget::dbFromY;
-    using NereusSDR::ParametricEqWidget::getNormalizedFrequencyPosition;
-    using NereusSDR::ParametricEqWidget::frequencyFromNormalizedPosition;
-    using NereusSDR::ParametricEqWidget::getLogFrequencyCentreHz;
-    using NereusSDR::ParametricEqWidget::getLogFrequencyShape;
-    using NereusSDR::ParametricEqWidget::getLogFrequencyTicks;
-    using NereusSDR::ParametricEqWidget::chooseFrequencyStep;
-    using NereusSDR::ParametricEqWidget::chooseDbStep;
-    using NereusSDR::ParametricEqWidget::getYAxisStepDb;
-    using NereusSDR::ParametricEqWidget::hitTestPoint;
-    using NereusSDR::ParametricEqWidget::hitTestGlobalGainHandle;
-    using NereusSDR::ParametricEqWidget::resetPointsDefault;
-    using NereusSDR::ParametricEqWidget::rescaleFrequencies;
-    using NereusSDR::ParametricEqWidget::enforceOrdering;
-    using NereusSDR::ParametricEqWidget::clampAllGains;
-    using NereusSDR::ParametricEqWidget::clampAllQ;
-    using NereusSDR::ParametricEqWidget::isFrequencyLockedIndex;
-    using NereusSDR::ParametricEqWidget::getLockedFrequencyForIndex;
-    using NereusSDR::ParametricEqWidget::indexFromBandId;
+    using Longpath::ParametricEqWidget::computePlotRect;
+    using Longpath::ParametricEqWidget::xFromFreq;
+    using Longpath::ParametricEqWidget::yFromDb;
+    using Longpath::ParametricEqWidget::freqFromX;
+    using Longpath::ParametricEqWidget::dbFromY;
+    using Longpath::ParametricEqWidget::getNormalizedFrequencyPosition;
+    using Longpath::ParametricEqWidget::frequencyFromNormalizedPosition;
+    using Longpath::ParametricEqWidget::getLogFrequencyCentreHz;
+    using Longpath::ParametricEqWidget::getLogFrequencyShape;
+    using Longpath::ParametricEqWidget::getLogFrequencyTicks;
+    using Longpath::ParametricEqWidget::chooseFrequencyStep;
+    using Longpath::ParametricEqWidget::chooseDbStep;
+    using Longpath::ParametricEqWidget::getYAxisStepDb;
+    using Longpath::ParametricEqWidget::hitTestPoint;
+    using Longpath::ParametricEqWidget::hitTestGlobalGainHandle;
+    using Longpath::ParametricEqWidget::resetPointsDefault;
+    using Longpath::ParametricEqWidget::rescaleFrequencies;
+    using Longpath::ParametricEqWidget::enforceOrdering;
+    using Longpath::ParametricEqWidget::clampAllGains;
+    using Longpath::ParametricEqWidget::clampAllQ;
+    using Longpath::ParametricEqWidget::isFrequencyLockedIndex;
+    using Longpath::ParametricEqWidget::getLockedFrequencyForIndex;
+    using Longpath::ParametricEqWidget::indexFromBandId;
 
     // Direct member access for pin-tight ordering tests.
     QVector<EqPoint>& pointsMut()                  { return m_points; }

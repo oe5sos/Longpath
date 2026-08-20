@@ -43,7 +43,7 @@
 
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDetectorModes : public QObject {
     Q_OBJECT

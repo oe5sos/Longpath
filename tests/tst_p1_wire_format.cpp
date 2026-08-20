@@ -6,7 +6,7 @@
 #include "core/HpsdrModel.h"
 #include <vector>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1WireFormat : public QObject {
     Q_OBJECT

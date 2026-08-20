@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -115,4 +115,4 @@ SolarInfo solarInfo(const QDateTime& utc, double lat, double lonEast)
     return info;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

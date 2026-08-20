@@ -26,7 +26,7 @@
 
 Q_DECLARE_LOGGING_CATEGORY(lcPw)
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // configFor() — role → StreamConfig translation.
@@ -64,7 +64,7 @@ StreamConfig PipeWireBus::configFor(Role role,
             // the key has not been set.
             const QString defaultDesc =
                 QStringLiteral("NereusSDR VAX %1").arg(n);
-            cfg.nodeDescription = NereusSDR::AppSettings::instance()
+            cfg.nodeDescription = Longpath::AppSettings::instance()
                 .value(QStringLiteral("Audio/Vax%1/NodeDescription").arg(n),
                        defaultDesc)
                 .toString();
@@ -207,6 +207,6 @@ qint64 PipeWireBus::pull(char* data, qint64 maxBytes)
     return m_stream->pull(data, maxBytes);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 #endif  // NEREUS_HAVE_PIPEWIRE

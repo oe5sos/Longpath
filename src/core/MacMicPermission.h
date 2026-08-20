@@ -17,7 +17,7 @@
 // is attached, so the user gets the prompt on first launch and the answer is
 // cached for every subsequent mic open. No-op on non-macOS platforms.
 #ifdef Q_OS_MAC
-namespace NereusSDR { void requestMicrophonePermission(); }
+namespace Longpath { void requestMicrophonePermission(); }
 #else
-namespace NereusSDR { inline void requestMicrophonePermission() {} }
+namespace Longpath { inline void requestMicrophonePermission() {} }
 #endif

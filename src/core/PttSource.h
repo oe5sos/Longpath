@@ -19,7 +19,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class PttSource {
     None      = 0,
@@ -47,4 +47,4 @@ inline QString pttSourceLabel(PttSource s) {
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

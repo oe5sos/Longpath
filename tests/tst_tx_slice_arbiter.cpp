@@ -14,7 +14,7 @@
 #include "core/MoxController.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxSliceArbiter : public QObject {
     Q_OBJECT

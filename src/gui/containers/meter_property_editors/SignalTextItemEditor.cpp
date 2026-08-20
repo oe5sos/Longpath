@@ -9,7 +9,7 @@
 #include <QFontComboBox>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SignalTextItemEditor::SignalTextItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -193,4 +193,4 @@ void SignalTextItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

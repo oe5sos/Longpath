@@ -19,7 +19,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAlex1LiveLeds : public QObject {
     Q_OBJECT

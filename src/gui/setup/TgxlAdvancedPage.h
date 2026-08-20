@@ -44,7 +44,7 @@ class QScrollArea;
 class QVBoxLayout;
 class QGridLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class ConnectionDiagnostics;
@@ -164,4 +164,4 @@ private:
     bool m_updatingFromDevice{false};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

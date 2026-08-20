@@ -69,7 +69,7 @@
 #include "core/AppSettings.h"
 #include "core/StepAttenuatorController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestStepAttenuatorController : public QObject {
     Q_OBJECT
@@ -85,7 +85,7 @@ private slots:
         ctrl.setTickTimerEnabled(false);
 
         QSignalSpy spy(&ctrl, &StepAttenuatorController::overloadStatusChanged);
-        qRegisterMetaType<NereusSDR::OverloadLevel>();
+        qRegisterMetaType<Longpath::OverloadLevel>();
 
         ctrl.onAdcOverflow(0);
         ctrl.tick();
@@ -104,7 +104,7 @@ private slots:
         StepAttenuatorController ctrl;
         ctrl.setTickTimerEnabled(false);
 
-        qRegisterMetaType<NereusSDR::OverloadLevel>();
+        qRegisterMetaType<Longpath::OverloadLevel>();
         QSignalSpy spy(&ctrl, &StepAttenuatorController::overloadStatusChanged);
 
         // Raise to Yellow.
@@ -127,7 +127,7 @@ private slots:
         StepAttenuatorController ctrl;
         ctrl.setTickTimerEnabled(false);
 
-        qRegisterMetaType<NereusSDR::OverloadLevel>();
+        qRegisterMetaType<Longpath::OverloadLevel>();
         QSignalSpy spy(&ctrl, &StepAttenuatorController::overloadStatusChanged);
 
         // 4 ticks with overflow: level goes 0→1→2→3→4.
@@ -153,7 +153,7 @@ private slots:
         StepAttenuatorController ctrl;
         ctrl.setTickTimerEnabled(false);
 
-        qRegisterMetaType<NereusSDR::OverloadLevel>();
+        qRegisterMetaType<Longpath::OverloadLevel>();
 
         // 10 ticks with continuous overflow.
         for (int i = 0; i < 10; ++i) {
@@ -172,7 +172,7 @@ private slots:
         StepAttenuatorController ctrl;
         ctrl.setTickTimerEnabled(false);
 
-        qRegisterMetaType<NereusSDR::OverloadLevel>();
+        qRegisterMetaType<Longpath::OverloadLevel>();
         QSignalSpy spy(&ctrl, &StepAttenuatorController::overloadStatusChanged);
 
         // Pump to Red (level 5 = capped).
@@ -210,7 +210,7 @@ private slots:
         StepAttenuatorController ctrl;
         ctrl.setTickTimerEnabled(false);
 
-        qRegisterMetaType<NereusSDR::OverloadLevel>();
+        qRegisterMetaType<Longpath::OverloadLevel>();
         QSignalSpy spy(&ctrl, &StepAttenuatorController::overloadStatusChanged);
 
         // Only ADC 1 overflows.

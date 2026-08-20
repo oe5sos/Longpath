@@ -28,7 +28,7 @@
 
 #include "core/SwrSweepController.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SwrChartWidget : public QWidget
 {
@@ -92,4 +92,4 @@ private:
     int m_hoverX{-1};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

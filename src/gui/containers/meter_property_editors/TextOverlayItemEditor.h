@@ -7,7 +7,7 @@ class QPushButton;
 class QDoubleSpinBox;
 class QFontComboBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TextOverlayItem;
 
@@ -48,4 +48,4 @@ private:
     QDoubleSpinBox* m_spinPadding{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

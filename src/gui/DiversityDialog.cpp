@@ -61,7 +61,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 DiversityDialog::DiversityDialog(RadioModel* radioModel, QWidget* parent)
     : QDialog(parent)
@@ -403,4 +403,4 @@ void DiversityDialog::refreshPauseState()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

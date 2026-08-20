@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 StripChain::StripChain()
 {
@@ -169,4 +169,4 @@ void StripChain::reset() noexcept
     m_limiter.reset();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

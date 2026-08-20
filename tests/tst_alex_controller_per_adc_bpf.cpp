@@ -11,7 +11,7 @@
 #include <QSignalSpy>
 #include "core/accessories/AlexController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAlexControllerPerAdcBpf : public QObject {
     Q_OBJECT

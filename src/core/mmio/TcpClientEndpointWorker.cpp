@@ -66,7 +66,7 @@ mw0lge@grange-lane.co.uk
 #include <QUuid>
 #include <QAbstractSocket>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TcpClientEndpointWorker::TcpClientEndpointWorker(MmioEndpoint* endpoint, QObject* parent)
     : ITransportWorker(parent)
@@ -253,4 +253,4 @@ void TcpClientEndpointWorker::attemptReconnect()
     m_socket->connectToHost(host, port);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

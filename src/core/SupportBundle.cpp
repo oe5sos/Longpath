@@ -17,7 +17,7 @@
 #include <QUrl>
 #include <QStandardPaths>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SupportBundle::SystemInfo SupportBundle::collectSystemInfo()
 {
@@ -68,7 +68,7 @@ SupportBundle::RadioDiagInfo SupportBundle::collectRadioInfo(const RadioModel* m
 QString SupportBundle::bundleDirPath()
 {
     return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-           + QStringLiteral("/NereusSDR/support");
+           + QStringLiteral("/Longpath/support");
 }
 
 QString SupportBundle::createBundle(const RadioModel* model)
@@ -257,4 +257,4 @@ QString SupportBundle::createArchive(const QString& sourceDir, const QString& ar
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

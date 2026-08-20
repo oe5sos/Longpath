@@ -22,7 +22,7 @@
 #include <QLineEdit>
 #include <QSpinBox>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Small modal dialog for editing a single filter preset.
 /// Opened by right-click → "Edit this preset…" on a filter button
@@ -57,4 +57,4 @@ private:
     QLabel*    m_widthLbl{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

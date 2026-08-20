@@ -23,7 +23,7 @@
 #include "core/RxChannel.h"
 #include "core/SampleRateCatalog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 constexpr int kTestChannel = 99;   // never opened in WDSP

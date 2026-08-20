@@ -31,7 +31,7 @@
 #include <cmath>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -363,4 +363,4 @@ void ClientReverb::process(float* interleaved, int frames, int channels) noexcep
                      std::memory_order_relaxed);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

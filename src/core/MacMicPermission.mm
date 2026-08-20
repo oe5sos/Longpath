@@ -3,7 +3,7 @@
 #include "core/LogCategories.h"
 #include <QLoggingCategory>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void requestMicrophonePermission()
 {
@@ -38,9 +38,9 @@ void requestMicrophonePermission()
     case AVAuthorizationStatusRestricted:
         qCWarning(lcAudio)
             << "Microphone access denied/restricted. Open System Settings → "
-               "Privacy & Security → Microphone and enable access for NereusSDR.";
+               "Privacy & Security → Microphone and enable access for Longpath.";
         break;
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

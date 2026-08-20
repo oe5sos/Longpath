@@ -3,7 +3,7 @@
 #include "core/codec/P2CodecSaturn.h"
 #include "core/codec/P2CodecOrionMkII.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP2CodecSaturn : public QObject {
     Q_OBJECT
@@ -129,7 +129,7 @@ private slots:
             ctx.diversity     = (div != 0);
             // Seed the Thetis default so the diversity branch is exercised
             // with a non-zero incoming word rather than an all-zero one.
-            ctx.adcCtrl = NereusSDR::defaultRxAdcCtrl(2);
+            ctx.adcCtrl = Longpath::defaultRxAdcCtrl(2);
 
             std::array<SliceConfig, 5> slices{};
             for (int i = 0; i < liveCount; ++i) {

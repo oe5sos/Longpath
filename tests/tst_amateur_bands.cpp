@@ -23,7 +23,7 @@
 
 #include <QtTest/QtTest>
 
-using namespace NereusSDR::AmateurBands;
+using namespace Longpath::AmateurBands;
 
 class TstAmateurBands : public QObject {
     Q_OBJECT

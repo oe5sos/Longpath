@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 #include <QStringList>
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // resolveText()
@@ -364,4 +364,4 @@ bool TextOverlayItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

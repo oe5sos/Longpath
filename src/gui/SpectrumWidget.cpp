@@ -178,7 +178,7 @@
 #include <utility>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Flächen, Gitter und Rahmen kommen aus dem Theme ──────────────────
 //
@@ -628,7 +628,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // workers, producing visible waterfall stutter on build kickoff.
     connect(m_waterfallTickerThread, &QThread::started,
             m_waterfallTicker,
-            []() { NereusSDR::elevateLatencyCriticalThreadPriority(); });
+            []() { Longpath::elevateLatencyCriticalThreadPriority(); });
     // Queued connection (default for cross-thread): tick fires on the
     // ticker thread, slot runs on the main thread when the event loop
     // is free.  See WaterfallTicker.h for the cadence-isolation rationale.
@@ -2801,7 +2801,7 @@ void SpectrumWidget::setDbmScaleVisible(bool on)
 }
 
 // From AetherSDR SpectrumWidget.cpp:364-368 [@0cd4559]
-void SpectrumWidget::setBandPlanManager(NereusSDR::BandPlanManager* mgr)
+void SpectrumWidget::setBandPlanManager(Longpath::BandPlanManager* mgr)
 {
     if (m_bandPlanMgr == mgr) { return; }
     if (m_bandPlanMgr) {
@@ -2809,7 +2809,7 @@ void SpectrumWidget::setBandPlanManager(NereusSDR::BandPlanManager* mgr)
     }
     m_bandPlanMgr = mgr;
     if (mgr) {
-        connect(mgr, &NereusSDR::BandPlanManager::planChanged,
+        connect(mgr, &Longpath::BandPlanManager::planChanged,
                 this, [this]() {
                     markOverlayDirty();
                     update();
@@ -3078,7 +3078,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     if (m_spectrumAvenger.numPixels() != displayWidth) {
         m_spectrumAvenger.resize(displayWidth);
     }
-    NereusSDR::applySpectrumDetector(m_spectrumDetector,
+    Longpath::applySpectrumDetector(m_spectrumDetector,
                                      sliceCount,
                                      displayWidth,
                                      pixPerBin,
@@ -3144,7 +3144,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     if (m_waterfallAvenger.numPixels() != displayWidth) {
         m_waterfallAvenger.resize(displayWidth);
     }
-    NereusSDR::applySpectrumDetector(m_waterfallDetector,
+    Longpath::applySpectrumDetector(m_waterfallDetector,
                                      sliceCount,
                                      displayWidth,
                                      pixPerBin,
@@ -4686,7 +4686,7 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
 // From AetherSDR SpectrumWidget.cpp:4856-4925 [@0cd4559]
 void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
 {
-    const QRect strip = NereusSDR::DbmStrip::stripRect(specRect, kDbmStripW);
+    const QRect strip = Longpath::DbmStrip::stripRect(specRect, kDbmStripW);
 
     // Semi-opaque background
     p.fillRect(strip, roleColor("panel", Style::kPanelBg, 220));
@@ -4726,7 +4726,7 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     const QFontMetrics fm(f);
 
     const int labelTop = specRect.top() + kDbmArrowH + 4;
-    const float stepDb = NereusSDR::DbmStrip::adaptiveStepDb(m_dynamicRange);
+    const float stepDb = Longpath::DbmStrip::adaptiveStepDb(m_dynamicRange);
 
     const float bottomDbm  = m_refLevel - m_dynamicRange;
     const float firstLabel = std::ceil(bottomDbm / stepDb) * stepDb;
@@ -6587,7 +6587,7 @@ void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
     QVector<QPair<double, double>> voiceRanges;
     if (m_bandPlanMgr) {
         for (const auto& seg : m_bandPlanMgr->segments()) {
-            if (NereusSDR::isVoiceSegmentLabel(seg.label)) {
+            if (Longpath::isVoiceSegmentLabel(seg.label)) {
                 voiceRanges.append({seg.lowMhz, seg.highMhz});
             }
         }
@@ -6597,7 +6597,7 @@ void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
     const double bandwidthMhz = m_bandwidthHz / 1.0e6;
 
     m_signalHistory.ingest(
-        NereusSDR::detectVoiceSignals(src, centerMhz, bandwidthMhz,
+        Longpath::detectVoiceSignals(src, centerMhz, bandwidthMhz,
                                       voiceRanges, noiseFloorDbm),
         nowMs);
 
@@ -6625,7 +6625,7 @@ void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
     QVector<SpotMarker> markers;
     for (const auto& e : m_signalHistory.visibleEntries()) {
         SpotMarker m;
-        m.callsign    = NereusSDR::sLabel(e.peakDbm);
+        m.callsign    = Longpath::sLabel(e.peakDbm);
         m.freqMhz     = e.freqMhz;
         m.mode        = e.mode;
         m.source      = e.suspectQrm ? QStringLiteral("QRM")
@@ -8035,11 +8035,11 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // Use FULL-WIDTH rect so stripRect() lands in the reserved zone.
         // Matches the rect passed to drawDbmScale in paintEvent.
         const QRect fullSpecRect(0, 0, width(), specH);
-        const QRect strip    = NereusSDR::DbmStrip::stripRect(fullSpecRect, kDbmStripW);
-        const QRect arrowRow = NereusSDR::DbmStrip::arrowRowRect(strip, kDbmArrowH);
+        const QRect strip    = Longpath::DbmStrip::stripRect(fullSpecRect, kDbmStripW);
+        const QRect arrowRow = Longpath::DbmStrip::arrowRowRect(strip, kDbmArrowH);
 
         if (arrowRow.contains(mx, my)) {
-            const int hit = NereusSDR::DbmStrip::arrowHit(mx, arrowRow);
+            const int hit = Longpath::DbmStrip::arrowHit(mx, arrowRow);
             const float bottom = m_refLevel - m_dynamicRange;
             if (hit == 0) {
                 // Up arrow: raise ref level by 10 dB, keep bottom fixed
@@ -10412,4 +10412,4 @@ void SpectrumWidget::setConnectionState(ConnectionState s)
     update();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

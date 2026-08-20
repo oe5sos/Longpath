@@ -4,7 +4,7 @@
 
 #include "gui/dbm_strip_math.h"
 
-using namespace NereusSDR::DbmStrip;
+using namespace Longpath::DbmStrip;
 
 class TestSpectrumDbmStrip : public QObject
 {

@@ -5,7 +5,7 @@
 #include <QLabel>
 #include "gui/widgets/StationBlock.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstStationBlock : public QObject {
     Q_OBJECT

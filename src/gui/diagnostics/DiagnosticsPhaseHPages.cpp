@@ -29,7 +29,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── ConnectionQualityPage ────────────────────────────────────────────────────
 
@@ -323,4 +323,4 @@ void LogsPage::buildUI()
     contentLayout()->addStretch();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

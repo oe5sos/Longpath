@@ -51,7 +51,7 @@
 #include <QSize>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class WaterfallHistoryBuffer final {
 public:
@@ -104,4 +104,4 @@ private:
     QVector<QByteArray> m_chunks;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -14,7 +14,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AudioTapRing::AudioTapRing(int capacityFloats)
 {
@@ -98,4 +98,4 @@ int AudioTapRing::available() const noexcept
     return static_cast<int>((w + cap - r) % cap);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

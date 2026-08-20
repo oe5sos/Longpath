@@ -29,7 +29,7 @@
 #include <vector>
 #include <cmath>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioEngineTxMonitorBlock : public QObject {
     Q_OBJECT

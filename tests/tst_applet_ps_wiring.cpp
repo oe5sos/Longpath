@@ -58,7 +58,7 @@
 #include "gui/applets/TxApplet.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // WDSP TX channel id — from Thetis cmaster.c:177-190 [v2.10.3.13].
 static constexpr int kTxChannelId = 1;

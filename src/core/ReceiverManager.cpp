@@ -69,7 +69,7 @@
 #include "codec/IP1Codec.h"
 #include "codec/IP2Codec.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 const ReceiverConfig ReceiverManager::kInvalidConfig{};
 
@@ -607,4 +607,4 @@ void ReceiverManager::updateDdcAssignment()
     emit ddcConfigChanged(config);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

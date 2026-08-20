@@ -42,7 +42,7 @@ class QPushButton;
 class QLabel;
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 class MeterSlider;
@@ -113,4 +113,4 @@ private:
     QTimer* m_levelTimer{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

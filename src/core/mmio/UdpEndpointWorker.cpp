@@ -65,7 +65,7 @@ mw0lge@grange-lane.co.uk
 #include <QVariant>
 #include <QNetworkDatagram>
 
-namespace NereusSDR {
+namespace Longpath {
 
 UdpEndpointWorker::UdpEndpointWorker(MmioEndpoint* endpoint, QObject* parent)
     : ITransportWorker(parent)
@@ -165,4 +165,4 @@ void UdpEndpointWorker::onReadyRead()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

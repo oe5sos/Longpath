@@ -17,7 +17,7 @@
 class QPushButton;
 class QButtonGroup;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class VaxChannelSelector : public QWidget {
     Q_OBJECT
@@ -39,4 +39,4 @@ private:
     bool m_programmaticUpdate{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

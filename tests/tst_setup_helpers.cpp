@@ -12,7 +12,7 @@
 
 #include "gui/setup/SetupHelpers.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSetupHelpers : public QObject {
     Q_OBJECT

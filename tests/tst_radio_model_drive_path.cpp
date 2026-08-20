@@ -59,7 +59,7 @@
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── MockConnection ──────────────────────────────────────────────────────────
 // Records setTxDrive() argument values.  Mirrors the pattern used by
@@ -77,7 +77,7 @@ public:
 
     // Pure-virtual stubs.
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

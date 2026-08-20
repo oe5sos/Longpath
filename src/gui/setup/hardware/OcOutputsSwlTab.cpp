@@ -68,7 +68,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From mi0bot setup.designer.cs:14362-14364, 20414-20426
 // [v2.10.3.13-beta2] — tpOCSWLControl is the third sub-tab inside
@@ -268,4 +268,4 @@ bool OcOutputsSwlTab::txPinCheckedForTest(int swlBandRow, int pin) const
            m_txPins[swlBandRow][pin]->isChecked();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

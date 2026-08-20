@@ -37,7 +37,7 @@
 
 #include "core/WdspEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstWdspEngineBoardInit : public QObject {
     Q_OBJECT

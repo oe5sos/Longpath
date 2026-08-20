@@ -112,7 +112,7 @@
 
 Q_LOGGING_CATEGORY(lcTxWorker, "nereus.tx.worker")
 
-namespace NereusSDR {
+namespace Longpath {
 
 TxWorkerThread::TxWorkerThread(QObject* parent)
     : QThread(parent)
@@ -1229,4 +1229,4 @@ RadeChannel* TxWorkerThread::radeChannelForTest() const
 }
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

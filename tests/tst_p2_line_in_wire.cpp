@@ -33,7 +33,7 @@
 #include <QtTest/QtTest>
 #include "core/P2RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP2LineInWire : public QObject {
     Q_OBJECT

@@ -60,7 +60,7 @@
 
 #include "BandDefaults.h"
 
-namespace NereusSDR {
+namespace Longpath {
 namespace BandDefaults {
 
 BandSeed seedFor(Band b)
@@ -109,4 +109,4 @@ BandSeed seedFor(Band b)
 }
 
 } // namespace BandDefaults
-} // namespace NereusSDR
+} // namespace Longpath

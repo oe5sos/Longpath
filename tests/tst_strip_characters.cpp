@@ -25,7 +25,7 @@
 
 #include <QtTest/QtTest>
 
-using namespace NereusSDR;
+using namespace Longpath;
 using Stage = StripChain::Stage;
 
 namespace {

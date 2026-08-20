@@ -58,7 +58,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace WorldMapCatalog {
 
 /// Ein Eintrag der Auswahl. Auch ein abgelehntes Bild bekommt einen —
@@ -101,4 +101,4 @@ bool aspectIsUsable(const QSize& size, QString* reasonOut = nullptr);
 Entry describe(const QString& imagePath);
 
 } // namespace WorldMapCatalog
-} // namespace NereusSDR
+} // namespace Longpath

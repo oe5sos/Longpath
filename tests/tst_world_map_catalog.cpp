@@ -23,7 +23,7 @@
 
 #include "gui/widgets/WorldMapCatalog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWorldMapCatalog : public QObject
 {

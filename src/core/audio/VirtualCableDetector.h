@@ -5,7 +5,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class VirtualCableProduct {
     None = 0,
@@ -103,4 +103,4 @@ public:
                                                 const QString& lastCsv);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -16,7 +16,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void CouplerZero::observe(quint16 fwdRaw, quint16 revRaw, bool transmitting)
 {
@@ -71,4 +71,4 @@ void CouplerZero::reset() noexcept
     m_sinceTx = kSettleSamples;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

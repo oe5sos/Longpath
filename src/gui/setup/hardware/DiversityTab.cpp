@@ -71,7 +71,7 @@
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 DiversityTab::DiversityTab(RadioModel* model, QWidget* parent)
     : QWidget(parent), m_model(model)
@@ -271,4 +271,4 @@ void DiversityTab::restoreSettings(const QMap<QString, QVariant>& settings)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

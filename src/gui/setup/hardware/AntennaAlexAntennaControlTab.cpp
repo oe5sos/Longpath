@@ -102,7 +102,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
@@ -156,7 +156,7 @@ AntennaAlexAntennaControlTab::AntennaAlexAntennaControlTab(RadioModel* model, QW
 
     // Re-sync when the connected radio changes (may switch HPSDRModel).
     connect(m_model, &RadioModel::currentRadioChanged,
-            this, [this](const NereusSDR::RadioInfo&) { applySkuProfile(); });
+            this, [this](const Longpath::RadioInfo&) { applySkuProfile(); });
 }
 
 // ── buildBlockTxStrip ─────────────────────────────────────────────────────────
@@ -654,4 +654,4 @@ void AntennaAlexAntennaControlTab::applySkuProfile()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

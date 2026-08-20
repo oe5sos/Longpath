@@ -84,7 +84,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -2363,4 +2363,4 @@ void RotorLogbookPanel::updateGlobeFromLocators()
     m_globe->useCurrentSubsolarPoint();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -33,7 +33,7 @@
 #include "gui/meters/MeterItem.h"
 #include "gui/meters/SignalTextItem.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMultimeterUnitConversion : public QObject {
     Q_OBJECT

@@ -16,7 +16,7 @@
 #include <QStringList>
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 struct BoardCapabilities;
 
 QStringList antennaLabels(const BoardCapabilities& caps);

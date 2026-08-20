@@ -27,7 +27,7 @@
 #include <QtTest/QtTest>
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTransmitModelTwoToneDriveOrigin : public QObject {
     Q_OBJECT

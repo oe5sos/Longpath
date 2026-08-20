@@ -21,7 +21,7 @@
 #include "core/RadioDiscovery.h"   // RadioInfo
 #include "core/RadioConnection.h"  // ConnectionState
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class RfKitPageMasterGateTest : public QObject {
     Q_OBJECT

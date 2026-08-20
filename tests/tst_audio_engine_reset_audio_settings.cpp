@@ -30,7 +30,7 @@
 
 #include <memory>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioEngineResetAudioSettings : public QObject {
     Q_OBJECT

@@ -16,7 +16,7 @@
 #include <QHash>
 #include <QProcess>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -141,4 +141,4 @@ bool CredentialStore::erase(const QString& key, const QString& account)
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

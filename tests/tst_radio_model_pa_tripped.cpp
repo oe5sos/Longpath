@@ -22,7 +22,7 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioModelPaTripped : public QObject {
     Q_OBJECT

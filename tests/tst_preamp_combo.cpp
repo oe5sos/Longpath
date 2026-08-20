@@ -12,7 +12,7 @@
 #include "gui/applets/RxApplet.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPreampCombo : public QObject {
     Q_OBJECT

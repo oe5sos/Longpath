@@ -66,7 +66,7 @@ class QPushButton;
 class QSlider;
 class QStackedWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 struct RadioInfo;
@@ -98,4 +98,4 @@ private:
     QPushButton*     m_nullSignalButton{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -60,7 +60,7 @@ class QLabel;
 class QLineEdit;
 class QStackedWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class FrequencyInstrument : public QWidget {
     Q_OBJECT
@@ -151,4 +151,4 @@ private:
     static constexpr int kDigitCount = 8;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

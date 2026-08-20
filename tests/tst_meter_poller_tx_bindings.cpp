@@ -21,7 +21,7 @@
 
 #include "gui/meters/MeterPoller.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestMeterPollerTxBindings : public QObject
 {

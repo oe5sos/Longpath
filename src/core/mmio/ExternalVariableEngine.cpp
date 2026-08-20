@@ -75,7 +75,7 @@ mw0lge@grange-lane.co.uk
 #include <QLatin1String>
 #include <QMetaObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -357,4 +357,4 @@ void ExternalVariableEngine::removeEndpointFromSettings(const QUuid& guid)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -25,7 +25,7 @@
 
 #include <QVector>
 
-namespace NereusSDR { class Resampler; }
+namespace Longpath { class Resampler; }
 
 // Forward declarations so consumers of this header don't have to drag
 // in <portaudio.h>. The concrete type is typedef'd the same way by
@@ -34,7 +34,7 @@ typedef void PaStream;
 struct PaDeviceInfo;
 struct PaStreamCallbackTimeInfo;
 
-namespace NereusSDR {
+namespace Longpath {
 
 enum class AudioDirection { Output, Input };
 
@@ -176,7 +176,7 @@ private:
     // Pa_StartStream() -- the callback can fire the instant the stream
     // starts (Codex review, PR #291).
     int                                  m_nativeSampleRate{0};
-    std::unique_ptr<NereusSDR::Resampler> m_inputResampler;
+    std::unique_ptr<Longpath::Resampler> m_inputResampler;
     std::vector<float>                   m_resampleScratch;
 
     // Actual channel count of the open capture stream.  Distinct from
@@ -248,4 +248,4 @@ private:
                           void* userData);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

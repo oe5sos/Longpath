@@ -13,7 +13,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-namespace NereusSDR {
+namespace Longpath {
 
 InstrumentFooter::InstrumentFooter(QWidget* parent)
     : QWidget(parent)
@@ -78,4 +78,4 @@ void InstrumentFooter::setPeakAndLimit(const QString& peakText,
     m_middle->setText(parts.join(QStringLiteral(" · ")));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

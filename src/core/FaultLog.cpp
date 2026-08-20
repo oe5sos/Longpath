@@ -14,7 +14,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-namespace NereusSDR {
+namespace Longpath {
 
 static constexpr int kMaxEvents = 10;
 
@@ -106,4 +106,4 @@ void FaultLog::save() const
     AppSettings::instance().setValue(m_deviceKey, json);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

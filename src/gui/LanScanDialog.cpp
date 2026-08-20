@@ -22,7 +22,7 @@
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 LanScanDialog::LanScanDialog(QWidget* parent)
     : QDialog(parent)
@@ -158,4 +158,4 @@ void LanScanDialog::onCellDoubleClicked(int row, int /*column*/)
     accept();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

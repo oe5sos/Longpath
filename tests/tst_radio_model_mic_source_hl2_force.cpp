@@ -41,7 +41,7 @@
 #include "models/TransmitModel.h"
 #include "core/audio/CompositeTxMicRouter.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static const QString kMacHl2    = QStringLiteral("11:22:33:44:55:66");
 static const QString kMacHermes = QStringLiteral("aa:bb:cc:dd:ee:ff");

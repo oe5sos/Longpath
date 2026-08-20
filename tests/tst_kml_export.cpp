@@ -9,7 +9,7 @@
 
 #include "core/KmlExport.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

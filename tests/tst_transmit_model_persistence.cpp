@@ -18,7 +18,7 @@
 #include "models/TransmitModel.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static const QString kMacA = QStringLiteral("aa:bb:cc:11:22:33");
 static const QString kMacB = QStringLiteral("ff:ee:dd:cc:bb:aa");

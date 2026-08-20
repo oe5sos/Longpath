@@ -12,7 +12,7 @@
 #include <QSignalSpy>
 #include "core/WidebandFrameAccumulator.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestWidebandFrameAccumulator : public QObject {
     Q_OBJECT

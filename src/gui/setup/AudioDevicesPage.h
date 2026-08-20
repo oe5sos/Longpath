@@ -18,7 +18,7 @@
 
 #include "gui/SetupPage.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 struct AudioDeviceConfig;
@@ -55,4 +55,4 @@ private:
     bool m_updatingFromEngine{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

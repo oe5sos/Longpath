@@ -55,7 +55,7 @@
 
 #include "core/FreeDVStation.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // NEW class - no upstream equivalent.
 // Sink for FreeDVReporterClient station events; presents the live
@@ -98,4 +98,4 @@ private:
     QString m_ourGrid;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

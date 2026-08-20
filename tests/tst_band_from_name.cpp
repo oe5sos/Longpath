@@ -12,7 +12,7 @@
 
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestBandFromName : public QObject {
     Q_OBJECT

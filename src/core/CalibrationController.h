@@ -127,7 +127,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // CalibrationController — calibration-time state for frequency, level, and PA current.
 //
@@ -290,4 +290,4 @@ private:
     QString m_mac;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

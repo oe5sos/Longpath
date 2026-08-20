@@ -4,7 +4,7 @@
 
 #include "gui/widgets/StatusBadge.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstStatusBadge : public QObject {
     Q_OBJECT

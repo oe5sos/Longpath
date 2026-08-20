@@ -63,7 +63,7 @@
 #include "models/SpotModel.h"
 #include "models/SpotTableModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSpotHubDialogSmoke : public QObject {
     Q_OBJECT

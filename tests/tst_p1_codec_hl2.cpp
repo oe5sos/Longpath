@@ -8,7 +8,7 @@
 #include "core/HpsdrModel.h"
 #include "core/codec/P1CodecStandard.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1CodecHl2 : public QObject {
     Q_OBJECT

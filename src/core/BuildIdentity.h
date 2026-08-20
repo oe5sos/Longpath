@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Identity of the binary itself, as distinct from the product version.
 //
@@ -28,4 +28,4 @@ void    setBuildTag(const QString& tag);
 QString buildTag();
 
 } // namespace BuildIdentity
-} // namespace NereusSDR
+} // namespace Longpath

@@ -27,7 +27,7 @@
 // =================================================================
 #pragma once
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct MemoryPressureSample {
     bool   compressing{false};
@@ -39,4 +39,4 @@ struct MemoryPressureSample {
 // compute a delta), so call from a single thread at a steady cadence.
 MemoryPressureSample pollMemoryPressure();
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -30,7 +30,7 @@
 #include <QUrlQuery>
 #include <QXmlStreamReader>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace { Q_LOGGING_CATEGORY(lcQrz, "nereus.qrz") }
 
@@ -307,4 +307,4 @@ QrzClient::ParsedResponse QrzClient::parseXml(const QByteArray& xml)
     return resp;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

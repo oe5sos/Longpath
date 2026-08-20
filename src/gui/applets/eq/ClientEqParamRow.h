@@ -31,7 +31,7 @@
 
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Bottom-of-editor strip: one column per active band, stacking frequency
 // (Hz), gain (dB), and Q as text labels in the band's palette colour.
@@ -73,4 +73,4 @@ private:
     int          m_selectedBand{-1};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

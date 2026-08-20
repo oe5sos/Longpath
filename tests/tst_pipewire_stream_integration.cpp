@@ -7,7 +7,7 @@
 #include "core/audio/PipeWireThreadLoop.h"
 #include "core/audio/PipeWireStream.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPipeWireStreamIntegration : public QObject {
     Q_OBJECT

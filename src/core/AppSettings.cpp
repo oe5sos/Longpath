@@ -74,7 +74,7 @@
 #include <QXmlStreamWriter>
 #include <QDebug>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Profile override set by main() from --profile CLI (Issue #100).
 // Scoped to the AppSettings singleton's file path + main.cpp's log dir.
@@ -1475,4 +1475,4 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
     setValue(versionKey, QString::number(currentVersion));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

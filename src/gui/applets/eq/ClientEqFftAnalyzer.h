@@ -29,7 +29,7 @@
 #include <array>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Small, self-contained FFT analyzer used by the Client EQ editor to
 // render a live spectrum behind the response curve. Fixed 2048-point
@@ -80,4 +80,4 @@ private:
     bool                          m_primed{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

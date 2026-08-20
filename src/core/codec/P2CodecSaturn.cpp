@@ -120,7 +120,7 @@
 
 #include "P2CodecSaturn.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Saturn BPF1 override — substitute p2SaturnBpfHpfBits for the standard
 // HPF bits in Alex1 when configured.
@@ -187,4 +187,4 @@ quint32 P2CodecSaturn::buildAlex1(const CodecContext& ctx) const
     return reg;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

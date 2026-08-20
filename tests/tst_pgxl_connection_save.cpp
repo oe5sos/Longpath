@@ -28,8 +28,8 @@ private slots:
 // testFrameWrittenForTesting seam.
 // Wire format: "save" per FlexRadio PowerGenius Ethernet API wiki spec.
 void PgxlConnectionSaveTest::saveSendsCommand() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy frameSpy(&conn, &NereusSDR::PgxlConnection::testFrameWrittenForTesting);
+    Longpath::PgxlConnection conn;
+    QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
     conn.save();
     QCOMPARE(frameSpy.count(), 1);
     QString frame = frameSpy.takeFirst().at(0).toString();
@@ -42,8 +42,8 @@ void PgxlConnectionSaveTest::saveSendsCommand() {
 // and will reboot. PgxlConnection::processLine() matches body=="saving" and
 // emits saveAcknowledged() -- confirmed by reading processLine().
 void PgxlConnectionSaveTest::saveResponseEmitsSaveAcknowledged() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy saveSpy(&conn, &NereusSDR::PgxlConnection::saveAcknowledged);
+    Longpath::PgxlConnection conn;
+    QSignalSpy saveSpy(&conn, &Longpath::PgxlConnection::saveAcknowledged);
 
     // Handshake required before R-frames are processed.
     conn.injectLineForTesting(QStringLiteral("V3.8.9"));
@@ -56,7 +56,7 @@ void PgxlConnectionSaveTest::saveResponseEmitsSaveAcknowledged() {
 
 // saveSeqIsPositive: conn.save() returns a non-zero seq number.
 void PgxlConnectionSaveTest::saveSeqIsPositive() {
-    NereusSDR::PgxlConnection conn;
+    Longpath::PgxlConnection conn;
     quint32 seq = conn.save();
     QVERIFY(seq > 0);
 }

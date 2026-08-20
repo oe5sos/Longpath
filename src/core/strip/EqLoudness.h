@@ -58,7 +58,7 @@
 
 #include "core/strip/ClientEq.h"
 
-namespace NereusSDR::EqLoudness {
+namespace Longpath::EqLoudness {
 
 // A-weighting at one frequency, in dB, per IEC 61672. 0 dB at 1 kHz by
 // definition. Not used by the makeup — see the note above — but kept
@@ -108,4 +108,4 @@ inline constexpr double kMaxMakeupDb = 12.0;
 // Compute and apply. The one call the window makes.
 void apply(ClientEq& eq);
 
-} // namespace NereusSDR::EqLoudness
+} // namespace Longpath::EqLoudness

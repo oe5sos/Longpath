@@ -72,7 +72,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/SkuUiProfile.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAntennaLabels : public QObject {
     Q_OBJECT

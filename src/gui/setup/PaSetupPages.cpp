@@ -201,7 +201,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -2614,4 +2614,4 @@ bool PaValuesPage::isSupplyVoltsRowVisibleForTest() const
 }
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -5,7 +5,7 @@
 #include "models/Band.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestAlexController : public QObject {
     Q_OBJECT

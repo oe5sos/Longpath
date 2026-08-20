@@ -7,7 +7,7 @@
 class QLabel;
 class QHBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // StatusBadge — small badge with icon prefix + label, color-coded by variant.
 // Used in the redesigned status bar (RX dashboard + right-side strip) and
@@ -80,4 +80,4 @@ private:
     QLabel*  m_textLabel{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -105,7 +105,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxChannelVoxAntiVox : public QObject {
     Q_OBJECT

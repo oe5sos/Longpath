@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
@@ -105,4 +105,4 @@ void VfoDisplayItemEditor::buildTypeSpecific()
     makeColorBtn(QStringLiteral("TX label"),   m_btnTxColour,     &VfoDisplayItem::setTxColour);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

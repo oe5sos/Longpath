@@ -11,7 +11,7 @@
 
 #include "core/TciSendQueue.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciPriorityQueues : public QObject {
     Q_OBJECT

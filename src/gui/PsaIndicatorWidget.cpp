@@ -115,7 +115,7 @@ mw0lge@grange-lane.co.uk
 #include <QLabel>
 #include <QMouseEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Color palette ─────────────────────────────────────────────────────────
 //
@@ -677,4 +677,4 @@ void PsaIndicatorWidget::applyBackground(QLabel* label, const QColor& bg)
         .arg(bg.name())));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

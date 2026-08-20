@@ -31,7 +31,7 @@
 #include <QTimer>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Severity of a transient notice. Namespace scope with a fixed
 /// underlying type so MainWindow.h can forward-declare it, which keeps
@@ -77,4 +77,4 @@ private:
     QTimer  m_dismissTimer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -213,4 +213,4 @@ QVector<SignalHistoryEntry> SignalHistoryStore::visibleEntries() const
     return out;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 class QNetworkAccessManager;
 class QNetworkReply;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsWebImage (MeterManager.cs:14165+)
 // Displays an image fetched from a URL with periodic refresh.
@@ -102,4 +102,4 @@ private:
     QTimer m_refreshTimer;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

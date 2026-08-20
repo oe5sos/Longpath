@@ -42,7 +42,7 @@
 #include <cmath>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -236,7 +236,7 @@ qint64 CoreAudioHalBus::push(const char* data, qint64 bytes) {
         constexpr double kSamplesPerMs = 48.0 * 2.0;  // 48 kHz stereo
         const double fillMs =
             static_cast<double>(fillSamples) / kSamplesPerMs;
-        NereusSDR::PerfMonitor::instance().recordAudioFillMs(fillMs);
+        Longpath::PerfMonitor::instance().recordAudioFillMs(fillMs);
     }
 
     for (int i = 0; i < numSamples; ++i) {
@@ -334,4 +334,4 @@ qint64 CoreAudioHalBus::pull(char* data, qint64 maxBytes) {
 #endif
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

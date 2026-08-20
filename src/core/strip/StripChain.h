@@ -58,7 +58,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class StripChain {
 public:
@@ -182,4 +182,4 @@ private:
     MicSpectrum        m_micSpectrum;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

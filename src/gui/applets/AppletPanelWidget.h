@@ -34,7 +34,7 @@ class QScrollArea;
 class QPushButton;
 class QMenu;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppletWidget;
 class AppletGrid;
@@ -240,4 +240,4 @@ private:
     // re-parented into the S-Meter title bar via wrapWithTitleBar.
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

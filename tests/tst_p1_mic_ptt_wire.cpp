@@ -40,7 +40,7 @@
 #include <QtTest/QtTest>
 #include "core/P1RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1MicPttWire : public QObject {
     Q_OBJECT

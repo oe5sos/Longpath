@@ -115,7 +115,7 @@ mw0lge@grange-lane.co.uk
 #include "HpsdrModel.h"
 #include "models/Band.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Returns the factory PA gain (in dB) for the given (model, band) pair,
 /// matching Thetis `DefaultPAGainsForBands(HPSDRModel)` byte-for-byte.
@@ -151,4 +151,4 @@ float defaultPaGainsForBand(HPSDRModel model, Band band) noexcept;
 /// `defaultPaGainsForBand` — the linear-fallback math takes over.
 float bypassPaGainsForBand(Band band) noexcept;
 
-}  // namespace NereusSDR
+}  // namespace Longpath

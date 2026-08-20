@@ -63,7 +63,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -159,4 +159,4 @@ void DexpPeakMeter::paintEvent(QPaintEvent*)
     p.drawLine(thresholdX, 0, thresholdX, H - 1);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

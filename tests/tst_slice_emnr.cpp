@@ -62,7 +62,7 @@
 #include "core/WdspTypes.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceEmnr : public QObject {
     Q_OBJECT

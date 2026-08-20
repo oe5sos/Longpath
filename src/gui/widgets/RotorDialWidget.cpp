@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -529,4 +529,4 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
                line2);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

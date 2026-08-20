@@ -31,7 +31,7 @@
 
 class QNetworkReply;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class QrzLogbookUploader : public QsoUploader {
     Q_OBJECT
@@ -61,4 +61,4 @@ private:
     QString m_apiKey;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

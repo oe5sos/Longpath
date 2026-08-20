@@ -29,7 +29,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis enums.cs:346-359 [v2.10.3.13] — PTTMode enum; integer values
 // preserved verbatim so wire serialisation and persistence round-trip safely.
@@ -111,11 +111,11 @@ inline PttMode pttModeFromString(const QString& s)
     return PttMode::None;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // Qt metatype registration — required so PttMode can be carried by
 // QVariant / QSignalSpy::value<PttMode>() without silently returning
 // a zero-initialised value on Qt6 builds that haven't called
 // qRegisterMetaType<>().  Matches the pattern in WdspTypes.h:298-305.
 #include <QMetaType>
-Q_DECLARE_METATYPE(NereusSDR::PttMode)
+Q_DECLARE_METATYPE(Longpath::PttMode)

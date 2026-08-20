@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -321,4 +321,4 @@ void ClientFinalLimiter::process(float* interleaved, int frames, int channels) n
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

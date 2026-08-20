@@ -50,7 +50,7 @@
 
 #include "core/strip/ClientEq.h"
 
-namespace NereusSDR::EqBandLayout {
+namespace Longpath::EqBandLayout {
 
 // 0        high-pass
 // 1 - 3    mains notches, off by default
@@ -134,4 +134,4 @@ inline void ensureSeeded(ClientEq& eq)
     eq.setActiveBandCount(kBandCount);
 }
 
-} // namespace NereusSDR::EqBandLayout
+} // namespace Longpath::EqBandLayout

@@ -29,7 +29,7 @@
 #include <QTemporaryDir>
 #include <QWidget>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestThemeFilter : public QObject
 {

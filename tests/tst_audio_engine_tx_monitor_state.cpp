@@ -24,7 +24,7 @@
 
 #include "core/AudioEngine.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAudioEngineTxMonitorState : public QObject {
     Q_OBJECT

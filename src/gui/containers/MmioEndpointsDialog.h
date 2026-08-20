@@ -66,7 +66,7 @@ class QPushButton;
 class QLabel;
 class QTreeWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MmioEndpoint;
 
@@ -120,4 +120,4 @@ private:
     QPushButton* m_btnClose{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -11,7 +11,7 @@
 
 #include "core/LogFilter.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

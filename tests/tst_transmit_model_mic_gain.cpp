@@ -23,7 +23,7 @@
 #include <cmath>
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTransmitModelMicGain : public QObject {
     Q_OBJECT

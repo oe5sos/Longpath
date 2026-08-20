@@ -18,7 +18,7 @@
 #include <QNetworkRequest>
 #include <QUrl>
 
-namespace NereusSDR {
+namespace Longpath {
 
 CloudlogUploader::CloudlogUploader(QObject* parent) : QsoUploader(parent) {}
 
@@ -173,4 +173,4 @@ CloudlogUploader::Result CloudlogUploader::parseResponse(int httpStatus,
     return r;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

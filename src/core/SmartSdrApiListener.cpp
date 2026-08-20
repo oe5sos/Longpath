@@ -17,7 +17,7 @@
 #include <QDateTime>
 #include <QRandomGenerator>
 
-namespace NereusSDR {
+namespace Longpath {
 
 Q_LOGGING_CATEGORY(lcSmartSdr, "nereus.smartsdr")
 
@@ -1228,4 +1228,4 @@ QString SmartSdrApiListener::initiatingAmpName(const QString& wireSource) const
     return QString();
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

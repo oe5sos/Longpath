@@ -20,7 +20,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct MapPoint {
     double  lat{0.0};
@@ -40,4 +40,4 @@ struct MapPoint {
     bool approximate{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

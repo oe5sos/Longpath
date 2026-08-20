@@ -19,7 +19,7 @@
 #include "gui/setup/TciLogWindow.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciLogWindow : public QObject {
     Q_OBJECT

@@ -49,7 +49,7 @@
 #include "core/audio/AudioTapRing.h"
 #include "core/audio/QsoRecorder.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioEngine;
 class TxWorkerThread;
@@ -137,4 +137,4 @@ private:
     std::vector<float> m_scratch;   // Hauptfaden, einmal angefordert
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

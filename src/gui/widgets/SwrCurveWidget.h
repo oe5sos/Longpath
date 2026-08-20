@@ -67,7 +67,7 @@
 class QPainter;
 class QVariantAnimation;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SwrCurveWidget : public QWidget {
     Q_OBJECT
@@ -352,4 +352,4 @@ private:
     QVariantAnimation* m_dimAnim{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

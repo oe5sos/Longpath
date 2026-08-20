@@ -95,7 +95,7 @@ class QTableWidget;
 class QTimer;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 
@@ -238,4 +238,4 @@ private:
     QLabel*       m_numbers{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

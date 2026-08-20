@@ -42,7 +42,7 @@
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

@@ -17,7 +17,7 @@
 #include <QMenu>
 #include <QPushButton>
 
-using NereusSDR::AppletPanelWidget;
+using Longpath::AppletPanelWidget;
 
 class TstAppletPanelGutter : public QObject {
     Q_OBJECT

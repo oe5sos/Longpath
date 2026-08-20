@@ -16,7 +16,7 @@
 
 #pragma once
 
-namespace NereusSDR {
+namespace Longpath {
 
 inline constexpr const char* kPopupMenu =
     "QMenu {"
@@ -35,4 +35,4 @@ inline constexpr const char* kPopupMenu =
     "  color: #607080;"
     "}";
 
-} // namespace NereusSDR
+} // namespace Longpath

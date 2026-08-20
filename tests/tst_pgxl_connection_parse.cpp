@@ -27,8 +27,8 @@ private slots:
 };
 
 void PgxlConnectionParseTest::parsesVersionBanner() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy connectedSpy(&conn, &NereusSDR::PgxlConnection::connected);
+    Longpath::PgxlConnection conn;
+    QSignalSpy connectedSpy(&conn, &Longpath::PgxlConnection::connected);
 
     conn.injectLineForTesting("V3.8.9");
 
@@ -38,8 +38,8 @@ void PgxlConnectionParseTest::parsesVersionBanner() {
 }
 
 void PgxlConnectionParseTest::parsesResponseFrameWithKvBody() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy statusSpy(&conn, &NereusSDR::PgxlConnection::statusUpdated);
+    Longpath::PgxlConnection conn;
+    QSignalSpy statusSpy(&conn, &Longpath::PgxlConnection::statusUpdated);
 
     conn.injectLineForTesting("V3.8.9");  // need handshake first
     conn.injectLineForTesting("R1|0|state=OPERATE temp=42.5 vac=240 fwd=1480.0 swr=2.1");
@@ -54,8 +54,8 @@ void PgxlConnectionParseTest::parsesResponseFrameWithKvBody() {
 }
 
 void PgxlConnectionParseTest::parsesUnsolicitedStatusPush() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy statusSpy(&conn, &NereusSDR::PgxlConnection::statusUpdated);
+    Longpath::PgxlConnection conn;
+    QSignalSpy statusSpy(&conn, &Longpath::PgxlConnection::statusUpdated);
 
     conn.injectLineForTesting("V3.8.9");
     conn.injectLineForTesting("S0|state state=FAULT fwd=1820.0 swr=2.85 temp=78.0");

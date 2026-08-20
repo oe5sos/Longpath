@@ -15,7 +15,7 @@
 #include <QtTest/QtTest>
 #include "core/PttSource.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPttSource : public QObject {
     Q_OBJECT

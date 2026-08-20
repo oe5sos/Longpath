@@ -18,7 +18,7 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -330,4 +330,4 @@ void HamlibInstaller::drain()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -88,7 +88,7 @@ warren@wpratt.com
 
 #include "core/TxChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTxChannelMeters : public QObject {
     Q_OBJECT

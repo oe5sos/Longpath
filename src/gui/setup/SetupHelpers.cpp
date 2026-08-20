@@ -9,7 +9,7 @@
 #include <QSpinBox>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Spinbox widths tuned to fit the widest expected value + suffix without
 // clipping. Int spinboxes handle up to "-200 dBm" in ~80px; double spinboxes
@@ -102,4 +102,4 @@ SliderRowD makeDoubleSliderRow(double min, double max, double initial,
     return { slider, spin, container };
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -4,8 +4,8 @@
 #include "core/WdspTypes.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
-using namespace NereusSDR::safety;
+using namespace Longpath;
+using namespace Longpath::safety;
 
 class TestBandPlanGuard : public QObject
 {

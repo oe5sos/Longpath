@@ -64,7 +64,7 @@ mw0lge@grange-lane.co.uk
 #include "core/RadioDiscovery.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadioDiscoveryParse : public QObject {
     Q_OBJECT

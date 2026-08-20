@@ -25,9 +25,9 @@ private slots:
 };
 
 void PgxlConnectionReconnectTest::backoffSequence() {
-    NereusSDR::PgxlConnection conn;
-    QSignalSpy spy(&conn, &NereusSDR::PgxlConnection::reconnectAttempt);
-    NereusSDR::AppSettings::instance().setValue("PGXL_AutoReconnect", "True");
+    Longpath::PgxlConnection conn;
+    QSignalSpy spy(&conn, &Longpath::PgxlConnection::reconnectAttempt);
+    Longpath::AppSettings::instance().setValue("PGXL_AutoReconnect", "True");
     // Seed a last host so scheduleReconnect does not bail on empty host.
     // testForceDisconnect() calls scheduleReconnect() directly, which
     // checks m_lastHost. We set it via the public connectToPgxl path;

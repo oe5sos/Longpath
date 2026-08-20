@@ -30,7 +30,7 @@
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSampleRateLiveApply : public QObject {
     Q_OBJECT

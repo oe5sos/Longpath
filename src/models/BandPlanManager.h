@@ -26,7 +26,7 @@
 
 #include "BandPlan.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Manages selectable band-plan overlays for the spectrum display.
 // Plans are loaded from bundled Qt resource JSON files at
@@ -71,4 +71,4 @@ private:
     QVector<BandSpot>    m_spots;     // active plan's spots
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

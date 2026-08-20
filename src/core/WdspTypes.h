@@ -151,7 +151,7 @@ warren@wpratt.com
 
 #pragma once
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Demodulation mode. Values match WDSP's internal mode enum.
 // From Thetis dsp.cs DSPMode
@@ -306,17 +306,17 @@ enum class AgcHangMode : int { Off, Fast, Med, Slow };
 // From Thetis console.cs:20873 — current_fm_tx_mode = FMTXMode.Simplex
 enum class FmTxMode : int { High = 0, Simplex = 1, Low = 2 };  // High = TX above RX (+), Simplex = no repeater offset (S), Low = TX below RX (-)
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // Qt metatype registration for enum Q_PROPERTYs.
 // Required so NrSlot / NrPosition / EmnrGainMethod / EmnrNpeMethod / SbnrAlgo
 // can be used as Q_PROPERTY types without triggering "unable to find metatype"
 // warnings at runtime. Mirror the pattern used by NbMode below.
 #include <QMetaType>
-Q_DECLARE_METATYPE(NereusSDR::NrMode)
-Q_DECLARE_METATYPE(NereusSDR::NbMode)
-Q_DECLARE_METATYPE(NereusSDR::NrSlot)
-Q_DECLARE_METATYPE(NereusSDR::NrPosition)
-Q_DECLARE_METATYPE(NereusSDR::EmnrGainMethod)
-Q_DECLARE_METATYPE(NereusSDR::EmnrNpeMethod)
-Q_DECLARE_METATYPE(NereusSDR::SbnrAlgo)
+Q_DECLARE_METATYPE(Longpath::NrMode)
+Q_DECLARE_METATYPE(Longpath::NbMode)
+Q_DECLARE_METATYPE(Longpath::NrSlot)
+Q_DECLARE_METATYPE(Longpath::NrPosition)
+Q_DECLARE_METATYPE(Longpath::EmnrGainMethod)
+Q_DECLARE_METATYPE(Longpath::EmnrNpeMethod)
+Q_DECLARE_METATYPE(Longpath::SbnrAlgo)

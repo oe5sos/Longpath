@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-using namespace NereusSDR::safety;
+using namespace Longpath::safety;
 
 class TestSwrProtectionController : public QObject
 {

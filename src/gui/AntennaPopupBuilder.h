@@ -24,7 +24,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/SkuUiProfile.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Capability-gated antenna popup / label factory.
 //
@@ -82,4 +82,4 @@ public:
                               Mode mode);
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

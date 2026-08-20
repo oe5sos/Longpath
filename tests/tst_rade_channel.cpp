@@ -53,7 +53,7 @@
 
 #include "core/RadeChannel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRadeChannel : public QObject {
     Q_OBJECT

@@ -123,7 +123,7 @@
 
 #include "core/AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
@@ -395,4 +395,4 @@ void CalibrationController::save()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -55,7 +55,7 @@ mw0lge@grange-lane.co.uk
 #include "DataOutItem.h"
 #include <QPainter>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void DataOutItem::paint(QPainter& p, int widgetW, int widgetH)
 {
@@ -85,4 +85,4 @@ bool DataOutItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

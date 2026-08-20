@@ -154,7 +154,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -234,14 +234,14 @@ TxEqDialog::TxEqDialog(RadioModel* radio, QWidget* parent)
     // StyleConstants helpers via QSS selectors; per-widget setStyleSheet
     // calls in buildBandColumn() / buildLegacyPanel() (Batch 9 fix)
     // keep their own specificity and continue to override.
-    setStyleSheet(QString::fromLatin1(NereusSDR::Style::kPageStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kGroupBoxStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kSpinBoxStyle)
-                  + NereusSDR::Style::doubleSpinBoxStyle()
-                  + QString::fromLatin1(NereusSDR::Style::kComboStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kCheckBoxStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kRadioButtonStyle)
-                  + QString::fromLatin1(NereusSDR::Style::kButtonStyle));
+    setStyleSheet(QString::fromLatin1(Longpath::Style::kPageStyle)
+                  + QString::fromLatin1(Longpath::Style::kGroupBoxStyle)
+                  + QString::fromLatin1(Longpath::Style::kSpinBoxStyle)
+                  + Longpath::Style::doubleSpinBoxStyle()
+                  + QString::fromLatin1(Longpath::Style::kComboStyle)
+                  + QString::fromLatin1(Longpath::Style::kCheckBoxStyle)
+                  + QString::fromLatin1(Longpath::Style::kRadioButtonStyle)
+                  + QString::fromLatin1(Longpath::Style::kButtonStyle));
 
     buildUi();
     wireSignals();
@@ -418,7 +418,7 @@ QWidget* buildBandColumn(const QString& headerLabel,
     // Batch 9 — apply project text colour so the band header reads
     // against the dark dialog background.
     hdr->setStyleSheet(QStringLiteral("color: %1;")
-                          .arg(NereusSDR::Style::kTextPrimary));
+                          .arg(Longpath::Style::kTextPrimary));
     v->addWidget(hdr);
 
     QSlider* s = new QSlider(Qt::Vertical, col);
@@ -429,7 +429,7 @@ QWidget* buildBandColumn(const QString& headerLabel,
     s->setMinimumHeight(140);
     s->setProperty(kBandIndexProp, bandIndex);
     // Batch 9 — apply the project vertical slider style.
-    s->setStyleSheet(NereusSDR::Style::sliderVStyle());
+    s->setStyleSheet(Longpath::Style::sliderVStyle());
     v->addWidget(s, 1, Qt::AlignHCenter);
     *outSlider = s;
 
@@ -438,7 +438,7 @@ QWidget* buildBandColumn(const QString& headerLabel,
     db->setSuffix(QStringLiteral(" dB"));
     db->setProperty(kBandIndexProp, bandIndex);
     // Batch 9 — apply the project spinbox style.
-    db->setStyleSheet(NereusSDR::Style::kSpinBoxStyle);
+    db->setStyleSheet(Longpath::Style::kSpinBoxStyle);
     v->addWidget(db);
     *outDbSpin = db;
 
@@ -451,7 +451,7 @@ QWidget* buildBandColumn(const QString& headerLabel,
         // Allow 4-digit + suffix room.
         hz->setMinimumWidth(80);
         // Batch 9 — apply the project spinbox style.
-        hz->setStyleSheet(NereusSDR::Style::kSpinBoxStyle);
+        hz->setStyleSheet(Longpath::Style::kSpinBoxStyle);
         v->addWidget(hz);
         *outFreqSpin = hz;
     }
@@ -534,7 +534,7 @@ QWidget* TxEqDialog::buildLegacyPanel()
         // Batch 9 — match the band-column header styling so all dB
         // labels read against the dark dialog background.
         const QString scaleStyle = QStringLiteral("color: %1;")
-                                       .arg(NereusSDR::Style::kTextPrimary);
+                                       .arg(Longpath::Style::kTextPrimary);
         top->setStyleSheet(scaleStyle);
         mid->setStyleSheet(scaleStyle);
         bot->setStyleSheet(scaleStyle);
@@ -1486,4 +1486,4 @@ void TxEqDialog::closeEvent(QCloseEvent* event)
     hide();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

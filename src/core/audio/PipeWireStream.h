@@ -17,7 +17,7 @@
 
 #include "core/audio/AudioRingSpsc.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PipeWireThreadLoop;
 
@@ -123,6 +123,6 @@ private:
     std::atomic<int> m_streamState{int(PW_STREAM_STATE_UNCONNECTED)};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
 #endif  // NEREUS_HAVE_PIPEWIRE

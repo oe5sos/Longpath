@@ -77,7 +77,7 @@
 class QMouseEvent;
 class QPaintEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Polar paint widget rendering the diversity sensitivity lobe.
 ///
@@ -120,4 +120,4 @@ private:
     double sensitivityAtAngle(double angleRad) const;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

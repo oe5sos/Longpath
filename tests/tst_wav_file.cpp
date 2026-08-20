@@ -27,7 +27,7 @@
 
 #include "core/audio/WavFile.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

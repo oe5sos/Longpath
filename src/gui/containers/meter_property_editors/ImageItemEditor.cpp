@@ -7,7 +7,7 @@
 #include <QHBoxLayout>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ImageItemEditor::ImageItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -74,4 +74,4 @@ void ImageItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

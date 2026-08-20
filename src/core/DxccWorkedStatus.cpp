@@ -29,7 +29,7 @@
 #include "DxccWorkedStatus.h"
 #include "AdifParser.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/DxccWorkedStatus.cpp:6-16 [@0cd4559]
 void DxccWorkedStatus::load(const QVector<QsoRecord>& records)
@@ -72,4 +72,4 @@ DxccStatus DxccWorkedStatus::query(const QString& primaryPrefix,
     return DxccStatus::Worked;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

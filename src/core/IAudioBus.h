@@ -13,7 +13,7 @@
 
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct AudioFormat {
     int sampleRate = 48000;  // Hz
@@ -61,4 +61,4 @@ public:
     virtual QString errorString() const { return {}; }
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

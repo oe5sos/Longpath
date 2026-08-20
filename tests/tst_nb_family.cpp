@@ -17,9 +17,9 @@
 
 #include "core/NbFamily.h"
 
-using NereusSDR::NbMode;
-using NereusSDR::NbTuning;
-using NereusSDR::cycleNbMode;
+using Longpath::NbMode;
+using Longpath::NbTuning;
+using Longpath::cycleNbMode;
 
 class TestNbFamily : public QObject {
     Q_OBJECT

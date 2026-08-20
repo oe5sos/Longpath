@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 class QMouseEvent;
 class QWheelEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 // Invisible hit target for mouse interaction overlay.
 // From Thetis clsClickBox (MeterManager.cs:7571+).
 class ClickBoxItem : public MeterItem {
@@ -76,4 +76,4 @@ signals:
     void wheelIncrement();
     void wheelDecrement();
 };
-} // namespace NereusSDR
+} // namespace Longpath

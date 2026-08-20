@@ -123,7 +123,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // --------------------------------------------------------------------------
 // File-local style helpers
@@ -175,7 +175,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("FM Mic"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -202,7 +202,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Dev"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -284,7 +284,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Offset"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -311,7 +311,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Dir"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -345,7 +345,7 @@ void FmApplet::buildUI()
         row->setSpacing(4);
 
         auto* lbl = new QLabel(QStringLiteral("Profile"), this);
-        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(NereusSDR::Style::kTextSecondary));
+        lbl->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextSecondary));
         lbl->setFixedWidth(44);
         row->addWidget(lbl);
 
@@ -381,4 +381,4 @@ void FmApplet::syncFromModel()
     // NYI — no model wiring until Phase 3I-3
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

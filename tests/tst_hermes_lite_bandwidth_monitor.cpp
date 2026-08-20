@@ -8,7 +8,7 @@
 #include <QSignalSpy>
 #include "core/HermesLiteBandwidthMonitor.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestHermesLiteBandwidthMonitor : public QObject {
     Q_OBJECT

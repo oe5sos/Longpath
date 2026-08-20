@@ -79,7 +79,7 @@ mw0lge@grange-lane.co.uk
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -488,4 +488,4 @@ void PureSignalApplet::syncFromModel()
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

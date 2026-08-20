@@ -27,7 +27,7 @@
 
 #include "core/TciBinaryFrame.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciBinaryFrame : public QObject {
     Q_OBJECT

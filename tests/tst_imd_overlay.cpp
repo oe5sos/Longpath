@@ -39,7 +39,7 @@
 
 #include "gui/ImdOverlay.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstImdOverlay : public QObject {
     Q_OBJECT

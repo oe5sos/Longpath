@@ -64,7 +64,7 @@ class QSpinBox;
 class QCheckBox;
 class QComboBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MeterItem;
 
@@ -161,4 +161,4 @@ private:
     void populateBindingCombo();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

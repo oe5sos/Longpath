@@ -21,7 +21,7 @@
 #include "gui/applets/RxApplet.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestRxAppletAdcOvl : public QObject {
     Q_OBJECT

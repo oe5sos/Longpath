@@ -12,7 +12,7 @@
 #include <QtTest>
 #include "core/TciSensorManager.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciSensorFormats : public QObject {
     Q_OBJECT

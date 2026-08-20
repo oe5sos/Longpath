@@ -8,7 +8,7 @@
 #include "core/accessories/AlexController.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Minimal RadioConnection that captures setAntennaRouting calls.
 // Uses setState(Connected) in the constructor so the base-class
@@ -29,7 +29,7 @@ public:
 
     // --- Pure virtuals from RadioConnection ---
     void init() override {}
-    void connectToRadio(const NereusSDR::RadioInfo&) override {}
+    void connectToRadio(const Longpath::RadioInfo&) override {}
     void disconnect() override {}
     void setReceiverFrequency(int, quint64) override {}
     void setTxFrequency(quint64) override {}

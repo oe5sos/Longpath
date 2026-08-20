@@ -33,7 +33,7 @@
 #include <cstring>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -403,4 +403,4 @@ void ClientPuduMonitor::writeWavFile()
     f.close();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

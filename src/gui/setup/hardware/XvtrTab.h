@@ -63,7 +63,7 @@ class QLabel;
 class QTableWidget;
 class QTableWidgetItem;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 struct RadioInfo;
@@ -93,4 +93,4 @@ private:
     int m_visibleRows{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

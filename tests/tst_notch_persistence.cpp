@@ -19,7 +19,7 @@
 #include "models/NotchModel.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestNotchPersistence : public QObject {
     Q_OBJECT

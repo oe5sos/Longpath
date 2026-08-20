@@ -30,7 +30,7 @@
 #include <functional>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 /// Eine Karte, die auf einen Klick reagiert. QFrame kann das nicht von
@@ -430,4 +430,4 @@ QPoint AddWidgetButton::placeNear(const QSize& want) const
     return r.topLeft();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

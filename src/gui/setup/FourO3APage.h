@@ -49,7 +49,7 @@ class QTabWidget;
 class QCheckBox;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class PeripheralsPage;
@@ -110,4 +110,4 @@ private:
     TgxlAdvancedPage*     m_tgxlAdvancedPage{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

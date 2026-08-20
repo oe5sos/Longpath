@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "MeterItem.h"
 #include <QColor>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From Thetis clsDialDisplay (MeterManager.cs:15399+)
 // Circular dial with quadrant buttons for VFO/ACCEL/LOCK.
@@ -146,4 +146,4 @@ private:
     bool m_lockEnabled{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

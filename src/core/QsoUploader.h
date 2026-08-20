@@ -18,7 +18,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // One place a logged contact can be sent.
 //
@@ -59,4 +59,4 @@ signals:
                         const QString& message);
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -27,7 +27,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -188,4 +188,4 @@ HardwareDdcRoutingPage::HardwareDdcRoutingPage(RadioModel* model, QWidget* paren
     contentLayout()->addStretch(1);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

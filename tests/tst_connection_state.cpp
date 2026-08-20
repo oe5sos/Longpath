@@ -4,7 +4,7 @@
 #include "core/ConnectionState.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstConnectionState : public QObject {
     Q_OBJECT

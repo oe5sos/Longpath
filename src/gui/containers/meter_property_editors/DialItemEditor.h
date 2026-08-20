@@ -3,7 +3,7 @@
 
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 class DialItem;
 
 class DialItemEditor : public BaseItemEditor {
@@ -32,4 +32,4 @@ private:
     QPushButton* m_btnFastColour{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

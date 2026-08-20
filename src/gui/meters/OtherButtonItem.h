@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Miscellaneous control buttons + 31 macro slots.
 // Ported from Thetis clsOtherButtons (MeterManager.cs:8225+).
@@ -109,4 +109,4 @@ private:
     QVector<MacroSettings> m_macroSettings;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

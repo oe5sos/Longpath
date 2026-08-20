@@ -57,7 +57,7 @@ mw0lge@grange-lane.co.uk
 #include <QMouseEvent>
 #include <QWheelEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void ClickBoxItem::paint(QPainter& p, int widgetW, int widgetH)
 {
@@ -95,4 +95,4 @@ bool ClickBoxItem::deserialize(const QString& data)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

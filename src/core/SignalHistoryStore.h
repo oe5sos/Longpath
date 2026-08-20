@@ -62,7 +62,7 @@
 
 #include "core/VoiceSignalDetector.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Ein ueber die Zeit verfolgtes Signal.
 // Feldnamen wie AetherSDR SHistoryEntry (MainWindow.h:1023).
@@ -131,4 +131,4 @@ private:
     int m_lifetimeS{60};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -37,7 +37,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -538,4 +538,4 @@ void QsoRecorderApplet::syncFromModel()
     refreshState();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

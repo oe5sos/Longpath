@@ -193,7 +193,7 @@ using SpectrumBaseClass = QRhiWidget;
 using SpectrumBaseClass = QWidget;
 #endif
 
-namespace NereusSDR {
+namespace Longpath {
 
 class BandPlanManager;
 class SpectrumOverlayMenu;
@@ -702,7 +702,7 @@ public:
     bool dbmScaleVisible() const { return m_dbmScaleVisible; }
 
     // Bandplan overlay (Phase 3G RX Epic sub-epic D)
-    void setBandPlanManager(NereusSDR::BandPlanManager* mgr);
+    void setBandPlanManager(Longpath::BandPlanManager* mgr);
     // ── Squelch-Linie ────────────────────────────────────────────────
     //
     // Port aus AetherSDR SpectrumWidget (setSquelchLine +
@@ -1218,7 +1218,7 @@ public:
 
 public slots:
     // Phase 3Q-8: update connection state for the disconnect overlay.
-    void setConnectionState(NereusSDR::ConnectionState s);
+    void setConnectionState(Longpath::ConnectionState s);
 
     // Feed a new FFT frame.  binsLinear are |X[k]|² linear-power values,
     // one per frequency bin (full FFT, neg-freq first then pos-freq).
@@ -1720,7 +1720,7 @@ private:
     // The CPU paintEvent path can paint a QPainter overlay, but the GPU
     // (QRhi) path early-returns and refuses QPainter. To work in both modes
     // we use a child QLabel — Qt composites it on top of the QRhi surface.
-    NereusSDR::ConnectionState m_connState{NereusSDR::ConnectionState::Disconnected};
+    Longpath::ConnectionState m_connState{Longpath::ConnectionState::Disconnected};
     float m_disconnectFade{1.0f};  // animated; 1.0 connected, 0.4 disconnected
     QPropertyAnimation* m_fadeAnim{nullptr};
     QLabel* m_disconnectLabel{nullptr};
@@ -2016,8 +2016,8 @@ private:
     // the av_mode wire-format mapping (-1 peak / 0 none / 1 recursive /
     // 2 window / 3 log-recursive); analyzer.c:464-554 [v2.10.3.13] is the
     // verbatim port.
-    NereusSDR::SpectrumAvenger m_spectrumAvenger;
-    NereusSDR::SpectrumAvenger m_waterfallAvenger;
+    Longpath::SpectrumAvenger m_spectrumAvenger;
+    Longpath::SpectrumAvenger m_waterfallAvenger;
 
     // ---- Frequency range ----
     double m_centerHz{14225000.0};    // 14.225 MHz default
@@ -2324,7 +2324,7 @@ private:
     bool  m_showCursorFreq{true};   // B8 Task 21: cursor frequency readout; default on
     FreqLabelAlign m_freqLabelAlign{FreqLabelAlign::Center};
 
-    NereusSDR::BandPlanManager* m_bandPlanMgr{nullptr};   // non-owning
+    Longpath::BandPlanManager* m_bandPlanMgr{nullptr};   // non-owning
     int                          m_bandPlanFontSize{6};   // 0 = off; AetherSDR default
     bool                         m_squelchLineVisible{false};
     double                       m_squelchDbm{-150.0};
@@ -2422,7 +2422,7 @@ private:
     bool   m_showSignalHistory{false};
     bool   m_showSignalHistoryQrm{false};
     QVector<SpotMarker> m_signalHistoryMarkers;
-    NereusSDR::SignalHistoryStore m_signalHistory;
+    Longpath::SignalHistoryStore m_signalHistory;
     qint64 m_shLastRunMs{0};
     qint64 m_shLastRebuildMs{0};
     float  m_shRunRateEwma{10.0f};   // gemessene Aufrufrate des Erkenners
@@ -2938,4 +2938,4 @@ private:
     void applyResizeSettled();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

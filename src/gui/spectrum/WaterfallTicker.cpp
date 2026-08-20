@@ -8,7 +8,7 @@
 
 #include <QThread>
 
-namespace NereusSDR {
+namespace Longpath {
 
 WaterfallTicker::WaterfallTicker(QObject* parent)
     : QObject(parent)
@@ -101,4 +101,4 @@ void WaterfallTicker::onTimerTick()
     emit tick();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

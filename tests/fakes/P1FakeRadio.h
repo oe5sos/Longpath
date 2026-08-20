@@ -13,7 +13,7 @@
 #include <QUdpSocket>
 #include <QHostAddress>
 
-namespace NereusSDR::Test {
+namespace Longpath::Test {
 
 class P1FakeRadio : public QObject {
     Q_OBJECT
@@ -82,4 +82,4 @@ private:
     int          m_firmwareVersion{72};  // arbitrary default; any value is now valid
 };
 
-} // namespace NereusSDR::Test
+} // namespace Longpath::Test

@@ -60,7 +60,7 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 OcLedStripWidget::OcLedStripWidget(QWidget* parent)
     : QFrame(parent)
@@ -149,4 +149,4 @@ bool OcLedStripWidget::eventFilter(QObject* watched, QEvent* event)
     return QFrame::eventFilter(watched, event);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

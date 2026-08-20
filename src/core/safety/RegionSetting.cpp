@@ -70,7 +70,7 @@
 
 #include <array>
 
-namespace NereusSDR::safety {
+namespace Longpath::safety {
 namespace {
 
 // In Region's declaration order, and that is load-bearing: the index
@@ -168,4 +168,4 @@ bool isValidTxFreqEverywhere(const BandPlanGuard& guard,
     return true;
 }
 
-} // namespace NereusSDR::safety
+} // namespace Longpath::safety

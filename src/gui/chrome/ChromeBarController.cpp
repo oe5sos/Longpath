@@ -5,7 +5,7 @@
 
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ChromeBarController::ChromeBarController(QObject* parent)
     : QObject(parent)
@@ -143,4 +143,4 @@ void ChromeBarController::relayout(int barWidthPx)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

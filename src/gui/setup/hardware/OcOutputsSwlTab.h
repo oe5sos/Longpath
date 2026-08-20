@@ -90,7 +90,7 @@ class QCheckBox;
 class QGroupBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioModel;
 class OcMatrix;
@@ -140,4 +140,4 @@ private:
     bool m_syncing{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

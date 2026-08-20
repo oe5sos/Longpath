@@ -17,7 +17,7 @@
 #include "core/AppSettings.h"
 #include "core/strip/StripChain.h"
 
-namespace NereusSDR::StripSettings {
+namespace Longpath::StripSettings {
 
 namespace {
 
@@ -504,4 +504,4 @@ bool applyBuiltIn(const QString& name, StripChain& c)
     return false;
 }
 
-} // namespace NereusSDR::StripSettings
+} // namespace Longpath::StripSettings

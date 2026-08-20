@@ -39,7 +39,7 @@
 #include "models/RadioModel.h"
 #include "core/RadioStatus.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstSetupDialogPaResetWiring : public QObject {
     Q_OBJECT

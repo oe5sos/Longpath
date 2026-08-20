@@ -24,7 +24,7 @@
 #include "core/codec/P1CodecStandard.h"
 #include "core/codec/CodecContext.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1CodecStandardBank11Polarity : public QObject {
     Q_OBJECT

@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 #include <QVector>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RxChannel;
 
@@ -185,4 +185,4 @@ private:
     RxChannel* m_rxChannel{nullptr};  // non-owning
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -13,7 +13,7 @@
 
 #include "gui/applets/eq/EqHistory.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 EqHistory::Snapshot EqHistory::capture(const ClientEq& eq)
 {
@@ -121,4 +121,4 @@ bool EqHistory::redo(ClientEq& eq)
     return true;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

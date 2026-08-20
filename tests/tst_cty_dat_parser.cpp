@@ -29,7 +29,7 @@
 
 #include "core/CtyDatParser.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Path resolver: the cty.dat lives at the worktree root. The test
 // binary runs from build/tests/, so we hop up from __FILE__ (which

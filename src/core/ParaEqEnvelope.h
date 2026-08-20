@@ -68,7 +68,7 @@
 #include <QString>
 #include <optional>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ParaEqEnvelope — gzip+base64url codec mirroring Thetis Common.cs
 // Compress_gzip / Decompress_gzip [v2.10.3.13].
@@ -111,4 +111,4 @@ std::optional<QString> decode(const QString& blob);
 
 }  // namespace ParaEqEnvelope
 
-}  // namespace NereusSDR
+}  // namespace Longpath

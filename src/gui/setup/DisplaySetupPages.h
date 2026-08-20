@@ -69,7 +69,7 @@ class QCheckBox;
 class QLabel;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class PanadapterModel;
 class ColorSwatchButton;
@@ -344,4 +344,4 @@ private:
     QDoubleSpinBox* m_calOffsetSpin{nullptr};   // dBm offset
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

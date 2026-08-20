@@ -124,7 +124,7 @@
 
 #include "core/DdcAssignment.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // =================================================================
 // P2CodecHermes::applyDdcAssignment — Hermes-class (1 ADC, 4 DDCs)
@@ -345,4 +345,4 @@ DdcAssignment P2CodecHermes::applyDdcAssignment(
     return a;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

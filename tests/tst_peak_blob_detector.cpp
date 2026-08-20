@@ -74,7 +74,7 @@
 #include <QtTest/QtTest>
 #include "gui/spectrum/PeakBlobDetector.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestPeakBlobDetector : public QObject {
     Q_OBJECT

@@ -15,7 +15,7 @@
 #include <QtTest/QtTest>
 #include "core/P1RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1TxIqWire : public QObject {
     Q_OBJECT

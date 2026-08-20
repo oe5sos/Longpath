@@ -126,7 +126,7 @@
 
 #include <array>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Per-board-class grouping of PA forward-power calibration profiles.
 ///
@@ -258,4 +258,4 @@ struct PaCalProfile {
     float interval() const noexcept;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

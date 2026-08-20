@@ -28,7 +28,7 @@
 #include <limits>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace {
 
 // ── Farben aus dem Theme, nicht aus dem Übersetzer ───────────────────
@@ -1322,4 +1322,4 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

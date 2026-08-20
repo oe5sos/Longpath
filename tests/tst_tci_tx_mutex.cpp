@@ -24,7 +24,7 @@
 #include "core/TciServer.h"
 #include "core/TciBinaryFrame.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── Helper: build a minimal TX_AUDIO_STREAM binary frame ────────────────────
 //

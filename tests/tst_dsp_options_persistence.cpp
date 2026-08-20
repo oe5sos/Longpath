@@ -15,7 +15,7 @@
 #include <QtTest/QtTest>
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDspOptionsPersistence : public QObject {
     Q_OBJECT

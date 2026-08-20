@@ -9,7 +9,7 @@
 #include <QFontComboBox>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 TextOverlayItemEditor::TextOverlayItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -288,4 +288,4 @@ void TextOverlayItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

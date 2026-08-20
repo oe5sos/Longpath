@@ -77,7 +77,7 @@
 #include <QSizePolicy>
 #include <QTimer>
 
-namespace NereusSDR {
+namespace Longpath {
 
 
 namespace {
@@ -597,4 +597,4 @@ QString TitleBar::utcText() const
     return m_utcLabel ? m_utcLabel->text() : QString();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -39,7 +39,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Client-side parametric EQ. Runs inside AudioEngine for both the RX and
 // TX audio paths — independent of the radio-side EQ applet, which sends
@@ -218,4 +218,4 @@ private:
     std::array<Runtime,    kMaxBands> m_runtime;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

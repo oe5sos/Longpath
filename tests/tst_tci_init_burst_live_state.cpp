@@ -25,7 +25,7 @@
 #include "models/SliceModel.h"
 #include "TestMockRadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciInitBurstLiveState : public QObject {
     Q_OBJECT

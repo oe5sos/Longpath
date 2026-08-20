@@ -22,7 +22,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 AntennaSwitchToast::AntennaSwitchToast(const QString& message, QWidget* parent)
     : QWidget(parent, Qt::FramelessWindowHint | Qt::Tool)
@@ -75,4 +75,4 @@ AntennaSwitchToast::AntennaSwitchToast(const QString& message, QWidget* parent)
 
 AntennaSwitchToast::~AntennaSwitchToast() = default;
 
-} // namespace NereusSDR
+} // namespace Longpath

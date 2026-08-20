@@ -30,26 +30,26 @@ private slots:
 };
 
 void TestParametricEqWidgetSkeleton::constructsWithoutCrash() {
-    NereusSDR::ParametricEqWidget w;
+    Longpath::ParametricEqWidget w;
     QVERIFY(w.isWidgetType());
 }
 
 void TestParametricEqWidgetSkeleton::paletteHasEighteenColors() {
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteSize(), 18);
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteSize(), 18);
 }
 
 void TestParametricEqWidgetSkeleton::paletteFirstThreeRgbVerbatim() {
     // From Thetis ucParametricEq.cs:256-258 [v2.10.3.13].
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteAt(0), QColor(  0, 190, 255));
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteAt(1), QColor(  0, 220, 130));
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteAt(2), QColor(255, 210,   0));
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteAt(0), QColor(  0, 190, 255));
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteAt(1), QColor(  0, 220, 130));
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteAt(2), QColor(255, 210,   0));
 }
 
 void TestParametricEqWidgetSkeleton::paletteLastThreeRgbVerbatim() {
     // From Thetis ucParametricEq.cs:271-273 [v2.10.3.13].
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteAt(15), QColor(255, 120,  40));
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteAt(16), QColor(120, 255, 160));
-    QCOMPARE(NereusSDR::ParametricEqWidget::defaultBandPaletteAt(17), QColor(255,  60, 120));
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteAt(15), QColor(255, 120,  40));
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteAt(16), QColor(120, 255, 160));
+    QCOMPARE(Longpath::ParametricEqWidget::defaultBandPaletteAt(17), QColor(255,  60, 120));
 }
 
 QTEST_MAIN(TestParametricEqWidgetSkeleton)

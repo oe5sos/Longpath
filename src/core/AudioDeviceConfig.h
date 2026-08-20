@@ -20,7 +20,7 @@
 #include <QString>
 #include <QMetaType>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AppSettings;
 
@@ -63,8 +63,8 @@ struct AudioDeviceConfig {
     void saveToSettings(const QString& prefix) const;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
 // Required for cross-thread signal delivery of AudioDeviceConfig via Qt
 // auto-queued connections. Must be outside the namespace.
-Q_DECLARE_METATYPE(NereusSDR::AudioDeviceConfig)
+Q_DECLARE_METATYPE(Longpath::AudioDeviceConfig)

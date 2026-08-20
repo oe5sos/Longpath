@@ -4,7 +4,7 @@
 #include "core/accessories/ApolloController.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestApolloController : public QObject {
     Q_OBJECT

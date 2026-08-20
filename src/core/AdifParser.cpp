@@ -55,7 +55,7 @@
 #include <QThread>
 #include <QtAlgorithms>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // From AetherSDR src/core/AdifParser.cpp:10-29 [@0cd4559]
 //
@@ -241,4 +241,4 @@ void AdifParser::parseFileAsync(const QString& path)
     emit openFailed(path);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -127,7 +127,7 @@
 #include <QLabel>
 #include <QSignalBlocker>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── CTCSS tone list ────────────────────────────────────────────────────────
 // 41-entry ITU standard CTCSS sub-tone table.
@@ -590,4 +590,4 @@ void RttyMarkShiftContainer::syncFromSlice()
 // This is a substantial addition beyond the current phase scope.
 // Deferred to a future phase with an explicit native design document.
 
-}  // namespace NereusSDR
+}  // namespace Longpath

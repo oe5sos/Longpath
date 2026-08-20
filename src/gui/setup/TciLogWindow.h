@@ -29,7 +29,7 @@ class QCheckBox;
 class QComboBox;
 class QPushButton;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class TciLogWindow : public QDialog {
     Q_OBJECT
@@ -82,4 +82,4 @@ private:
     int  m_filter{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

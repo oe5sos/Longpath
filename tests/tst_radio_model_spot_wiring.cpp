@@ -41,7 +41,7 @@
 #include "core/FreeDVStation.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

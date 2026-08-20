@@ -19,8 +19,8 @@ private slots:
 };
 
 void LanDiscoveryRegexTest::parsesValidAnnouncement() {
-    NereusSDR::LanDiscovery d;
-    QSignalSpy spy(&d, &NereusSDR::LanDiscovery::deviceDiscovered);
+    Longpath::LanDiscovery d;
+    QSignalSpy spy(&d, &Longpath::LanDiscovery::deviceDiscovered);
     d.injectDatagramForTesting("PowerGeniusXL ip=192.168.1.43 v=3.8.9 serial=PGXL5678 nickname=ShackAmp");
     QCOMPARE(spy.count(), 1);
     auto args = spy.takeFirst();
@@ -32,16 +32,16 @@ void LanDiscoveryRegexTest::parsesValidAnnouncement() {
 }
 
 void LanDiscoveryRegexTest::rejectsMalformedLine() {
-    NereusSDR::LanDiscovery d;
-    QSignalSpy spy(&d, &NereusSDR::LanDiscovery::deviceDiscovered);
+    Longpath::LanDiscovery d;
+    QSignalSpy spy(&d, &Longpath::LanDiscovery::deviceDiscovered);
     d.injectDatagramForTesting("garbage with no fields");
     d.injectDatagramForTesting("PowerGeniusXL ip=invalid v=3.8.9 serial=X nickname=Y");
     QCOMPARE(spy.count(), 0);
 }
 
 void LanDiscoveryRegexTest::dedupsBySerial() {
-    NereusSDR::LanDiscovery d;
-    QSignalSpy spy(&d, &NereusSDR::LanDiscovery::deviceDiscovered);
+    Longpath::LanDiscovery d;
+    QSignalSpy spy(&d, &Longpath::LanDiscovery::deviceDiscovered);
     QString line = "PowerGeniusXL ip=192.168.1.43 v=3.8.9 serial=PGXL5678 nickname=ShackAmp";
     d.injectDatagramForTesting(line);
     d.injectDatagramForTesting(line);

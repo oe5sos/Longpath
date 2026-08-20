@@ -6,7 +6,7 @@
 #include "gui/applets/AppletVisibilityController.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAppletVisibilityController : public QObject {
     Q_OBJECT

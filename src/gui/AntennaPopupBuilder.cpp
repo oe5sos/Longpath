@@ -13,7 +13,7 @@
 
 #include "AntennaPopupBuilder.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 void AntennaPopupBuilder::populate(QMenu* menu,
                                    const BoardCapabilities& caps,
@@ -87,4 +87,4 @@ QStringList AntennaPopupBuilder::labels(const BoardCapabilities& caps,
     return out;
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

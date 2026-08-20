@@ -8,7 +8,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
@@ -218,4 +218,4 @@ void FilterDisplayItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

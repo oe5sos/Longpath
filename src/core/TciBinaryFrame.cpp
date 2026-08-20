@@ -63,7 +63,7 @@ mw0lge@grange-lane.co.uk
 #include <cstring>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── writeUInt32LE ────────────────────────────────────────────────────────────
 //
@@ -357,4 +357,4 @@ std::vector<float> TciBinaryFrame::decodeSamples(const QByteArray& payload,
     return samples;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

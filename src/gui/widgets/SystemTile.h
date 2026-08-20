@@ -8,7 +8,7 @@
 #include <QString>
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MetricLabel;
 
@@ -61,4 +61,4 @@ private:
     double m_celsius{0.0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

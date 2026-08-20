@@ -7,7 +7,7 @@
 #include <atomic>
 #include "core/audio/AudioRingSpsc.h"
 
-using Ring = NereusSDR::AudioRingSpsc<65536>;
+using Ring = Longpath::AudioRingSpsc<65536>;
 
 class TestAudioRingSpsc : public QObject {
     Q_OBJECT

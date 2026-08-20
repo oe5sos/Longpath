@@ -83,7 +83,7 @@ mw0lge@grange-lane.co.uk
 #include "core/AppSettings.h"
 #include "core/PureSignal.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─────────────────────────────────────────────────────────────────────────
 // Layout constants — derived from PSForm.designer.cs [v2.10.3.13].
@@ -1221,4 +1221,4 @@ void PsForm::closeEvent(QCloseEvent* event)
     hide();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

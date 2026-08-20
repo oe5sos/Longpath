@@ -14,7 +14,7 @@
 #include <QPainter>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 /// Höhe der Mulde. Entwurf: H = 20 bei einem 300 breiten Feld.
@@ -179,4 +179,4 @@ void BarInstrument::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

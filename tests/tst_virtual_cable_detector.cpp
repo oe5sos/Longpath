@@ -6,7 +6,7 @@
 #include <QtTest/QtTest>
 #include "core/audio/VirtualCableDetector.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

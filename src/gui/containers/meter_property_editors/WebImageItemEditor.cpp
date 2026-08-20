@@ -8,7 +8,7 @@
 #include <QColorDialog>
 #include <QHBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 void applyBtnColor(QPushButton* btn, const QColor& c)
@@ -103,4 +103,4 @@ void WebImageItemEditor::buildTypeSpecific()
     addRow(QStringLiteral("Fallback color"), m_btnFallback);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

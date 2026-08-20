@@ -32,7 +32,7 @@
 #include <QLoggingCategory>
 #include <QtMath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -661,4 +661,4 @@ DSPMode TwoToneController::currentTxMode() const
     return DSPMode::USB;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

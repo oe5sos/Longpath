@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 #include <QUuid>
 #include <QVariant>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Phase 3G-6 block 5 — format-driven parsers for MMIO transport
 // payloads. Each function consumes a raw payload and returns a
@@ -93,4 +93,4 @@ QHash<QString, QVariant> parseRaw(const QByteArray& payload, const QUuid& endpoi
 
 } // namespace FormatParser
 
-} // namespace NereusSDR
+} // namespace Longpath

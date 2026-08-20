@@ -120,7 +120,7 @@ class QSlider;
 class QPushButton;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // VAC/VAX digital audio routing applet — NYI shell (Phase 3-VAX).
 //
@@ -179,4 +179,4 @@ private:
     QComboBox*   m_rigctldCombo   = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

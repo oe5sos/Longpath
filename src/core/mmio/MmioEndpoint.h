@@ -62,7 +62,7 @@ mw0lge@grange-lane.co.uk
 #include <QReadWriteLock>
 #include <QDateTime>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ITransportWorker;
 
@@ -170,4 +170,4 @@ private:
     QHash<QString, QDateTime> m_lastUpdate;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

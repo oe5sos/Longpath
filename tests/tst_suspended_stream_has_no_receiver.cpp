@@ -37,7 +37,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSuspendedStreamHasNoReceiver : public QObject
 {
@@ -74,9 +74,9 @@ private:
 
     /// An assignment with every user stream suspended, which is what the
     /// Hermes-class codec emits while PureSignal transmits.
-    static NereusSDR::DdcAssignment allStreamsSuspended()
+    static Longpath::DdcAssignment allStreamsSuspended()
     {
-        NereusSDR::DdcAssignment a;
+        Longpath::DdcAssignment a;
         for (int st = 0; st < 5; ++st) { a.streamDdc[st] = -1; }
         a.psFwdDdc = 0;   // PureSignal takes DDC0, the one slice A had
         a.psRevDdc = 1;
@@ -102,7 +102,7 @@ private slots:
         // creating one leaves it inactive, and publishDdcAssignment is the
         // only thing that turns it on. This is the RX-then-key sequence the
         // bench hit, not a synthetic starting state.
-        NereusSDR::DdcAssignment live;
+        Longpath::DdcAssignment live;
         live.streamDdc[0] = 0;    // slice A on DDC0, per P2CodecHermes
         live.streamDdc[1] = 1;
         model.publishDdcAssignmentForTest(live);
@@ -134,7 +134,7 @@ private slots:
         QCOMPARE(rm->activeReceiverCount(), 0);
 
         // Unkey: the codec hands the user streams their DDCs back.
-        NereusSDR::DdcAssignment live;
+        Longpath::DdcAssignment live;
         live.streamDdc[0] = 0;
         live.streamDdc[1] = 1;
         model.publishDdcAssignmentForTest(live);
@@ -157,7 +157,7 @@ private slots:
         ReceiverManager* rm = model.receiverManager();
         QVERIFY(rm);
 
-        NereusSDR::DdcAssignment partial;
+        Longpath::DdcAssignment partial;
         partial.streamDdc[0] = -1;   // stream 0 suspended
         partial.streamDdc[1] = 3;    // stream 1 keeps DDC3
         model.publishDdcAssignmentForTest(partial);
@@ -177,7 +177,7 @@ private slots:
         ReceiverManager* rm = model.receiverManager();
         QVERIFY(rm);
 
-        NereusSDR::DdcAssignment generous;
+        Longpath::DdcAssignment generous;
         for (int st = 0; st < 5; ++st) { generous.streamDdc[st] = st; }
         model.publishDdcAssignmentForTest(generous);
 

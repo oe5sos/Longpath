@@ -21,7 +21,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 void QsoRecorder::setSampleRate(int hz)
 {
@@ -204,4 +204,4 @@ QsoRecordingInfo readQsoDescription(const QString& wavPath)
     return info;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

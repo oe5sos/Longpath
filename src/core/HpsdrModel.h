@@ -87,7 +87,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include <QMetaType>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Logical radio model — what the user says they have in Setup.
 // Source: enums.cs:109 [v2.10.3.13]
@@ -427,7 +427,7 @@ constexpr const char* boardCodeName(HPSDRHW hw) noexcept {
     return "Unknown";
 }
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::HPSDRModel)
-Q_DECLARE_METATYPE(NereusSDR::HPSDRHW)
+Q_DECLARE_METATYPE(Longpath::HPSDRModel)
+Q_DECLARE_METATYPE(Longpath::HPSDRHW)

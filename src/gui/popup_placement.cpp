@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR::PopupPlacement {
+namespace Longpath::PopupPlacement {
 
 QPoint clampToAvailable(const QPoint& desiredTopLeft, const QSize& popupSize,
                         const QRect& available)
@@ -29,4 +29,4 @@ QPoint clampToAvailable(const QPoint& desiredTopLeft, const QSize& popupSize,
     return QPoint(x, y);
 }
 
-} // namespace NereusSDR::PopupPlacement
+} // namespace Longpath::PopupPlacement

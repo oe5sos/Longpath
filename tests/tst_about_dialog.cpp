@@ -4,7 +4,7 @@
 #include <QPushButton>
 #include "gui/AboutDialog.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAboutDialog : public QObject
 {

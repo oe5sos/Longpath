@@ -50,7 +50,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -342,4 +342,4 @@ void FreeDVStationModel::applyDistanceHeading(FreeDVStation& info) const
     info.headingCardinal = getCardinalDirection(static_cast<int>(info.headingDeg + 0.5));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

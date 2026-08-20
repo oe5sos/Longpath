@@ -1,6 +1,6 @@
 #include "GeneralSetupPages.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // StartupPrefsPage
@@ -110,4 +110,4 @@ NavigationPage::NavigationPage(RadioModel* model, QWidget* parent)
     markNyi(wheelReverse, QStringLiteral("Phase 3E"));
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

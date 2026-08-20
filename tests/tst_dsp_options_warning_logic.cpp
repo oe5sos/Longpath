@@ -47,7 +47,7 @@
 
 #include "gui/setup/DspOptionsPage.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // ── Helper: build a tiny QComboBox with a single current text ────────────────
 

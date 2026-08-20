@@ -34,7 +34,7 @@
 #include "core/dsp/ChannelConfig.h"
 #include "models/RadioModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 static constexpr int kTestChannel  = 97;   // Never opened in WDSP
 static constexpr int kTestBufSize  = 64;

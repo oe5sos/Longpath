@@ -14,7 +14,7 @@
 
 #include <QTemporaryDir>
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstSettingsMigrationV03 : public QObject {
     Q_OBJECT

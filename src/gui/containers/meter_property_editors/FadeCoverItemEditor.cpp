@@ -8,7 +8,7 @@
 #include <QPushButton>
 #include <QColorDialog>
 
-namespace NereusSDR {
+namespace Longpath {
 
 FadeCoverItemEditor::FadeCoverItemEditor(QWidget* parent)
     : BaseItemEditor(parent)
@@ -108,4 +108,4 @@ void FadeCoverItemEditor::buildTypeSpecific()
     });
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -6,7 +6,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ---------------------------------------------------------------------------
 // Keyboard > Shortcuts
@@ -30,4 +30,4 @@ private:
     void buildUI();
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -18,7 +18,7 @@
 #include "core/DxClusterClient.h"
 #include "core/DxSpot.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestDxClusterParser : public QObject {
     Q_OBJECT

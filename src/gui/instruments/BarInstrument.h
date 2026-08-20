@@ -45,7 +45,7 @@
 
 #include <QWidget>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct ReadingDescriptor;
 class InstrumentFooter;
@@ -108,4 +108,4 @@ private:
     bool m_hasSecond{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

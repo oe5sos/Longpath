@@ -73,7 +73,7 @@ mw0lge@grange-lane.co.uk
 #include <QSplitter>
 #include <QFrame>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -400,4 +400,4 @@ void MmioEndpointsDialog::onVariablesDiscovered()
     refreshVariablesTree(currentEndpoint());
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

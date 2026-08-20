@@ -28,7 +28,7 @@
 #include <QScrollArea>
 #include <QFrame>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Shared style strings — mirror AetherSDR RadioSetupDialog constants
 static const QString kGroupStyle =
@@ -289,4 +289,4 @@ QHBoxLayout* SetupPage::addLabeledLabel(QLayout* parent, const QString& label, Q
     return makeLabeledRow(parent, label, value);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -101,7 +101,7 @@
 #include <QObject>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // PennyLane / Penelope external-control enable master toggle.
 //
@@ -150,4 +150,4 @@ private:
     QString persistenceKey() const;  // "hardware/<mac>/penny"
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

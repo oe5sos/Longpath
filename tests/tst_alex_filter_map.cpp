@@ -67,8 +67,8 @@
 #include "core/codec/AlexFilterMap.h"
 #include "core/HpsdrModel.h"
 
-using namespace NereusSDR::codec::alex;
-using NereusSDR::HPSDRHW;
+using namespace Longpath::codec::alex;
+using Longpath::HPSDRHW;
 
 class TestAlexFilterMap : public QObject {
     Q_OBJECT

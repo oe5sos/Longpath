@@ -32,7 +32,7 @@
 #include <QSignalBlocker>
 #include <QSlider>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Speaker button style — matches AetherSDR TitleBar.cpp:175-177:
 //   transparent background, no border, 14 px glyph font, flattens
@@ -297,4 +297,4 @@ void MasterOutputWidget::onSpeakersConfigChanged(const AudioDeviceConfig& cfg)
     m_currentDeviceName = cfg.deviceName;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

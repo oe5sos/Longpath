@@ -106,7 +106,7 @@ warren@wpratt.com
 #include <QtTest/QtTest>
 #include "models/SliceModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestSliceSnb : public QObject {
     Q_OBJECT

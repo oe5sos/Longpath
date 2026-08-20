@@ -37,7 +37,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 constexpr float kHandleHitRadius = 8.0f;
@@ -350,4 +350,4 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     ev->accept();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

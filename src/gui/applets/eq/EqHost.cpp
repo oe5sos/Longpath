@@ -17,7 +17,7 @@
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 ClientEq* EqHost::clientEqTx()
 {
@@ -89,4 +89,4 @@ bool EqHost::redoEqEdit()
     return did;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -31,7 +31,7 @@
 
 class QTimer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // DeviceCard — one audio-endpoint group box.
 //
@@ -95,7 +95,7 @@ public:
 signals:
     // Emitted on any control edit (excluding loadFromSettings).
     // Carries the card's current AudioDeviceConfig.
-    void configChanged(NereusSDR::AudioDeviceConfig cfg);
+    void configChanged(Longpath::AudioDeviceConfig cfg);
 
     // Emitted when the enable checkbox changes (Headphones card only).
     void enabledChanged(bool enabled);
@@ -141,4 +141,4 @@ private:
     QTimer*     m_bufferSizeDebounceTimer{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

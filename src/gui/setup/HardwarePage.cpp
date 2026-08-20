@@ -79,7 +79,7 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -310,4 +310,4 @@ QString HardwarePage::tabTextForTest(Tab t) const
 }
 #endif
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -1,7 +1,7 @@
 #include "DiscordButtonItemEditor.h"
 #include "../../meters/DiscordButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 DiscordButtonItemEditor::DiscordButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -23,4 +23,4 @@ void DiscordButtonItemEditor::buildDiscordSpecific()
     // DiscordButtonItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -126,7 +126,7 @@
 
 #include <algorithm>
 
-namespace NereusSDR {
+namespace Longpath {
 
 SliceModel::SliceModel(QObject* parent)
     : QObject(parent)
@@ -1232,7 +1232,7 @@ void SliceModel::setXitHz(int hz)
     }
 }
 
-void SliceModel::setNbMode(NereusSDR::NbMode v)
+void SliceModel::setNbMode(Longpath::NbMode v)
 {
     if (v == m_nbMode) { return; }
     m_nbMode = v;
@@ -1246,7 +1246,7 @@ void SliceModel::setNbMode(NereusSDR::NbMode v)
 // --- NR setters (Sub-epic C-1) ---
 // See Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13].
 
-void SliceModel::setActiveNr(NereusSDR::NrSlot slot)
+void SliceModel::setActiveNr(Longpath::NrSlot slot)
 {
     if (m_activeNr == slot) { return; }
     m_activeNr = slot;
@@ -1254,7 +1254,7 @@ void SliceModel::setActiveNr(NereusSDR::NrSlot slot)
 }
 
 // NR1
-void SliceModel::setNr4Position(NereusSDR::NrPosition p)
+void SliceModel::setNr4Position(Longpath::NrPosition p)
 {
     if (m_nr4Position == p) { return; }
     m_nr4Position = p;
@@ -1292,7 +1292,7 @@ void SliceModel::setAnfLeakage(double v)
     emit anfLeakageChanged(v);
 }
 
-void SliceModel::setAnfPosition(NereusSDR::NrPosition p)
+void SliceModel::setAnfPosition(Longpath::NrPosition p)
 {
     if (m_anfPosition == p) { return; }
     m_anfPosition = p;
@@ -1323,7 +1323,7 @@ void SliceModel::setNr1Leakage(double v)
     m_nr1Leakage = v;
     emit nr1LeakageChanged(v);
 }
-void SliceModel::setNr1Position(NereusSDR::NrPosition p)
+void SliceModel::setNr1Position(Longpath::NrPosition p)
 {
     if (m_nr1Position == p) { return; }
     m_nr1Position = p;
@@ -1331,13 +1331,13 @@ void SliceModel::setNr1Position(NereusSDR::NrPosition p)
 }
 
 // NR2
-void SliceModel::setNr2GainMethod(NereusSDR::EmnrGainMethod v)
+void SliceModel::setNr2GainMethod(Longpath::EmnrGainMethod v)
 {
     if (m_nr2GainMethod == v) { return; }
     m_nr2GainMethod = v;
     emit nr2GainMethodChanged(v);
 }
-void SliceModel::setNr2NpeMethod(NereusSDR::EmnrNpeMethod v)
+void SliceModel::setNr2NpeMethod(Longpath::EmnrNpeMethod v)
 {
     if (m_nr2NpeMethod == v) { return; }
     m_nr2NpeMethod = v;
@@ -1361,7 +1361,7 @@ void SliceModel::setNr2AeFilter(bool v)
     m_nr2AeFilter = v;
     emit nr2AeFilterChanged(v);
 }
-void SliceModel::setNr2Position(NereusSDR::NrPosition p)
+void SliceModel::setNr2Position(Longpath::NrPosition p)
 {
     if (m_nr2Position == p) { return; }
     m_nr2Position = p;
@@ -1399,7 +1399,7 @@ void SliceModel::setNr2Post2Taper(int v)
 }
 
 // NR3
-void SliceModel::setNr3Position(NereusSDR::NrPosition p)
+void SliceModel::setNr3Position(Longpath::NrPosition p)
 {
     if (m_nr3Position == p) { return; }
     m_nr3Position = p;
@@ -1443,7 +1443,7 @@ void SliceModel::setNr4PostThresh(double v)
     m_nr4PostThresh = v;
     emit nr4PostThreshChanged(v);
 }
-void SliceModel::setNr4Algo(NereusSDR::SbnrAlgo v)
+void SliceModel::setNr4Algo(Longpath::SbnrAlgo v)
 {
     if (m_nr4Algo == v) { return; }
     m_nr4Algo = v;
@@ -2302,7 +2302,7 @@ void SliceModel::restoreFromSettings(Band band)
     // if present — they'll be overwritten on next save. Per-band NB tuning
     // is not a Thetis concept.
     if (s.contains(bp + QStringLiteral("NbMode"))) {
-        setNbMode(static_cast<NereusSDR::NbMode>(
+        setNbMode(static_cast<Longpath::NbMode>(
             s.value(bp + QStringLiteral("NbMode")).toInt()));
     }
 
@@ -2332,7 +2332,7 @@ void SliceModel::restoreFromSettings(Band band)
     // ── Session state (band-agnostic) ─────────────────────────────────────────
     // NR active slot + tuning (no per-band suffix, per user directive Q10).
     if (s.contains(sp + QStringLiteral("NrActive"))) {
-        setActiveNr(static_cast<NereusSDR::NrSlot>(s.value(sp + QStringLiteral("NrActive")).toInt()));
+        setActiveNr(static_cast<Longpath::NrSlot>(s.value(sp + QStringLiteral("NrActive")).toInt()));
     }
     // NR1
     if (s.contains(sp + QStringLiteral("Nr1Taps"))) {
@@ -2348,14 +2348,14 @@ void SliceModel::restoreFromSettings(Band band)
         setNr1Leakage(s.value(sp + QStringLiteral("Nr1Leakage")).toDouble());
     }
     if (s.contains(sp + QStringLiteral("Nr1Position"))) {
-        setNr1Position(static_cast<NereusSDR::NrPosition>(s.value(sp + QStringLiteral("Nr1Position")).toInt()));
+        setNr1Position(static_cast<Longpath::NrPosition>(s.value(sp + QStringLiteral("Nr1Position")).toInt()));
     }
     // NR2
     if (s.contains(sp + QStringLiteral("Nr2GainMethod"))) {
-        setNr2GainMethod(static_cast<NereusSDR::EmnrGainMethod>(s.value(sp + QStringLiteral("Nr2GainMethod")).toInt()));
+        setNr2GainMethod(static_cast<Longpath::EmnrGainMethod>(s.value(sp + QStringLiteral("Nr2GainMethod")).toInt()));
     }
     if (s.contains(sp + QStringLiteral("Nr2NpeMethod"))) {
-        setNr2NpeMethod(static_cast<NereusSDR::EmnrNpeMethod>(s.value(sp + QStringLiteral("Nr2NpeMethod")).toInt()));
+        setNr2NpeMethod(static_cast<Longpath::EmnrNpeMethod>(s.value(sp + QStringLiteral("Nr2NpeMethod")).toInt()));
     }
     if (s.contains(sp + QStringLiteral("Nr2TrainT1"))) {
         setNr2TrainT1(s.value(sp + QStringLiteral("Nr2TrainT1")).toDouble());
@@ -2367,7 +2367,7 @@ void SliceModel::restoreFromSettings(Band band)
         setNr2AeFilter(s.value(sp + QStringLiteral("Nr2AeFilter")).toString() == QLatin1String("True"));
     }
     if (s.contains(sp + QStringLiteral("Nr2Position"))) {
-        setNr2Position(static_cast<NereusSDR::NrPosition>(s.value(sp + QStringLiteral("Nr2Position")).toInt()));
+        setNr2Position(static_cast<Longpath::NrPosition>(s.value(sp + QStringLiteral("Nr2Position")).toInt()));
     }
     if (s.contains(sp + QStringLiteral("Nr2Post2Run"))) {
         setNr2Post2Run(s.value(sp + QStringLiteral("Nr2Post2Run")).toString() == QLatin1String("True"));
@@ -2386,7 +2386,7 @@ void SliceModel::restoreFromSettings(Band band)
     }
     // NR3
     if (s.contains(sp + QStringLiteral("Nr3Position"))) {
-        setNr3Position(static_cast<NereusSDR::NrPosition>(s.value(sp + QStringLiteral("Nr3Position")).toInt()));
+        setNr3Position(static_cast<Longpath::NrPosition>(s.value(sp + QStringLiteral("Nr3Position")).toInt()));
     }
     if (s.contains(sp + QStringLiteral("Nr3UseDefaultGain"))) {
         setNr3UseDefaultGain(s.value(sp + QStringLiteral("Nr3UseDefaultGain")).toString() == QLatin1String("True"));
@@ -2408,7 +2408,7 @@ void SliceModel::restoreFromSettings(Band band)
         setNr4PostThresh(s.value(sp + QStringLiteral("Nr4PostThresh")).toDouble());
     }
     if (s.contains(sp + QStringLiteral("Nr4Algo"))) {
-        setNr4Algo(static_cast<NereusSDR::SbnrAlgo>(s.value(sp + QStringLiteral("Nr4Algo")).toInt()));
+        setNr4Algo(static_cast<Longpath::SbnrAlgo>(s.value(sp + QStringLiteral("Nr4Algo")).toInt()));
     }
     // DFNR
     if (s.contains(sp + QStringLiteral("DfnrAttenLimit"))) {
@@ -2720,4 +2720,4 @@ void SliceModel::loadFromSettings()
 
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

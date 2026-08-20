@@ -52,7 +52,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AudioTapRing
 {
@@ -115,4 +115,4 @@ private:
     std::atomic<long long> m_dropped{0};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

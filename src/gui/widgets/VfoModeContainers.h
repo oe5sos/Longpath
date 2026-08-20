@@ -114,7 +114,7 @@ warren@wpratt.com
 
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 class GuardedComboBox;
@@ -201,4 +201,4 @@ private:
     TriBtn*          m_shiftPlus{nullptr};
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

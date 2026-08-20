@@ -8,7 +8,7 @@
 #include "core/OcMatrix.h"
 #include "models/Band.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestP1OcMatrixWiring : public QObject {
     Q_OBJECT

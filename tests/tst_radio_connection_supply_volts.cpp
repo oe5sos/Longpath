@@ -4,7 +4,7 @@
 #include <QSignalSpy>
 #include "core/RadioConnection.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Minimal concrete subclass so we can instantiate the abstract base.
 class NullRadioConnection : public RadioConnection {

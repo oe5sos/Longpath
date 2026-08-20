@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace NereusSDR {
+namespace Longpath {
 
 MicSpectrum::MicSpectrum(int sampleRate)
 {
@@ -84,4 +84,4 @@ int MicSpectrum::snapshot(float* out, int count) const
     return static_cast<int>(n);
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

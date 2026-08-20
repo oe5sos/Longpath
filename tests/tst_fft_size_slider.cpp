@@ -41,7 +41,7 @@
 #include "core/FFTEngine.h"
 #include "gui/SpectrumWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestFftSizeSlider : public QObject
 {

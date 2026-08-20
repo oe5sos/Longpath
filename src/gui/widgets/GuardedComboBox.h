@@ -39,7 +39,7 @@
 #include <QWheelEvent>
 #include "GuardedSlider.h"  // for ControlsLock
 
-namespace NereusSDR {
+namespace Longpath {
 
 // GuardedComboBox — QComboBox subclass with two guards:
 //   (a) wheelEvent only forwards to QComboBox when the popup is open,
@@ -69,4 +69,4 @@ public:
     }
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

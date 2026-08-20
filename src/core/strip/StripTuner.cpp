@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR::StripTuner {
+namespace Longpath::StripTuner {
 
 namespace {
 
@@ -267,4 +267,4 @@ Result applyAnalysis(const VoiceAnalysis& a, StripChain& c)
     return r;
 }
 
-} // namespace NereusSDR::StripTuner
+} // namespace Longpath::StripTuner

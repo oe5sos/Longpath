@@ -19,7 +19,7 @@
 #include <cstring>
 #include <random>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -358,4 +358,4 @@ double wavDurationSeconds(const QString& path)
     return static_cast<double>(d.samples.size()) / d.sampleRate;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

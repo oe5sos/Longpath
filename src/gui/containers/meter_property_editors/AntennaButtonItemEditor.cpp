@@ -1,7 +1,7 @@
 #include "AntennaButtonItemEditor.h"
 #include "../../meters/AntennaButtonItem.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 AntennaButtonItemEditor::AntennaButtonItemEditor(QWidget* parent)
     : ButtonBoxItemEditor(parent)
@@ -23,4 +23,4 @@ void AntennaButtonItemEditor::buildAntennaSpecific()
     // AntennaButtonItem has no extra configurable properties beyond ButtonBoxItem.
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

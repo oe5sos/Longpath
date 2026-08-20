@@ -27,7 +27,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ControlsLock — ported from AetherSDR src/gui/GuardedSlider.h:13-19
 // Global singleton flag: when locked, all GuardedSlider (and derived) widgets
@@ -75,4 +75,4 @@ public:
     }
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

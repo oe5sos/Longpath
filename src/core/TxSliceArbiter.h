@@ -17,7 +17,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 class MoxController;
@@ -104,4 +104,4 @@ private:
     QString                   m_mac;               // per-radio AppSettings scope key
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

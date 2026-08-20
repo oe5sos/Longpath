@@ -28,7 +28,7 @@
 
 #include <atomic>
 
-namespace NereusSDR::Style {
+namespace Longpath::Style {
 namespace {
 
 const QRegularExpression& hexRe()
@@ -233,4 +233,4 @@ bool ThemeFilter::eventFilter(QObject* watched, QEvent* event)
     return false;
 }
 
-} // namespace NereusSDR::Style
+} // namespace Longpath::Style

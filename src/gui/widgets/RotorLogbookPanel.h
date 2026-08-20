@@ -31,7 +31,7 @@
 class QTimer;
 
 class QLabel;
-namespace NereusSDR { class StationPhoto; }
+namespace Longpath { class StationPhoto; }
 class QLineEdit;
 class QNetworkAccessManager;
 class QPushButton;
@@ -40,7 +40,7 @@ class QStackedWidget;
 class QTableWidget;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class QrzClient;
 class QrzLogbookUploader;
@@ -321,4 +321,4 @@ private:
     QVector<int>      m_shedHeights;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

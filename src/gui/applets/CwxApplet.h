@@ -30,7 +30,7 @@ class QTextEdit;
 class QSlider;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // CW keyer message composer and memory keyer.
 // NYI — Phase 3I-2 (CW TX, sidetone, firmware keyer, QSK/break-in).
@@ -75,4 +75,4 @@ private:
     QPushButton* m_kbCwBtn       = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

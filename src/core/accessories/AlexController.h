@@ -52,7 +52,7 @@
 #include <array>
 #include "models/Band.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Per-band antenna assignment (TX / RX1 / RX-only) + Block-TX safety.
 //
@@ -227,4 +227,4 @@ private:
     static int clampRxOnlyAnt(int v) { return v < 0 ? 0 : (v > 3 ? 3 : v); }  // allows 0 = none
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

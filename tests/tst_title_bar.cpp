@@ -33,7 +33,7 @@
 #include "gui/TitleBar.h"
 #include "gui/widgets/MasterOutputWidget.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstTitleBar : public QObject {
     Q_OBJECT

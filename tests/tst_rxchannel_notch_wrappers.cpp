@@ -22,7 +22,7 @@
 #include "core/dsp/Notch.h"
 #include "core/wdsp_api.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 

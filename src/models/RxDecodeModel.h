@@ -19,7 +19,7 @@
 #include <QString>
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // One decoded packet from a local receiver (no network sourcing).
 struct RxDecode {
@@ -59,6 +59,6 @@ private:
     QVector<RxDecode> m_decodes;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::RxDecode)
+Q_DECLARE_METATYPE(Longpath::RxDecode)

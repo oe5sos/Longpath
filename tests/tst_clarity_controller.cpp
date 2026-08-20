@@ -13,7 +13,7 @@
 
 #include "core/ClarityController.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestClarityController : public QObject {
     Q_OBJECT

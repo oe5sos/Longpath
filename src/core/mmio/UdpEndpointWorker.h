@@ -58,7 +58,7 @@ mw0lge@grange-lane.co.uk
 
 class QUdpSocket;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MmioEndpoint;
 
@@ -90,4 +90,4 @@ private:
     QUdpSocket*   m_socket{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

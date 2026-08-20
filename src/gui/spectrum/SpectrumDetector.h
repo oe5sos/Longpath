@@ -63,7 +63,7 @@
 
 #include <QVector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Reduce N linear-power FFT bins to num_pixels display pixels using the
 /// chosen detector mode.  Linear-power input — operate BEFORE averaging
@@ -107,4 +107,4 @@ void applySpectrumDetector(SpectrumDetector detType,
                            QVector<float>& pixels,
                            double invEnb);
 
-}  // namespace NereusSDR
+}  // namespace Longpath

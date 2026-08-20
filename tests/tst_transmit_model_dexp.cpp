@@ -38,7 +38,7 @@
 #include "core/AppSettings.h"
 #include "models/TransmitModel.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 namespace {
 const QString kMac = QStringLiteral("dexp:test:mac");

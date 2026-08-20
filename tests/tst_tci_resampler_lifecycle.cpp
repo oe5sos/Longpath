@@ -25,7 +25,7 @@
 
 #include "core/TciServer.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciResamplerLifecycle : public QObject {
     Q_OBJECT

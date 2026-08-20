@@ -31,7 +31,7 @@ class QPushButton;
 class QLabel;
 class QComboBox;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // CAT / rigctld control interfaces.
 // NYI — Phase 3K (CAT/rigctld) + 3-VAX (VAX/IQ).
@@ -71,4 +71,4 @@ private:
     QComboBox*   m_iqRateCombo   = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

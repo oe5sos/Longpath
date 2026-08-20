@@ -121,7 +121,7 @@ class QSpinBox;
 class QStackedWidget;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class ParametricEqWidget;
 class RadioModel;
@@ -315,4 +315,4 @@ private:
     QButtonGroup*   m_bandCountGroup      = nullptr;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

@@ -24,7 +24,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 namespace WorldMapCatalog {
 
 namespace {
@@ -139,4 +139,4 @@ QVector<Entry> entries()
 }
 
 } // namespace WorldMapCatalog
-} // namespace NereusSDR
+} // namespace Longpath

@@ -85,7 +85,7 @@
 #include "HpsdrModel.h"
 #include "models/Band.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 /// Editable per-instance per-band PA gain profile.
 ///
@@ -239,4 +239,4 @@ private:
     std::array<bool,  kBandCount>                          m_useMaxPower;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

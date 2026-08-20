@@ -79,7 +79,7 @@ class QShowEvent;
 class QTimer;
 class QWidget;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class AmpViewChart;
 class PureSignal;
@@ -189,4 +189,4 @@ private:
     QTimer* m_pollTimer{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

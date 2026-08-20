@@ -16,7 +16,7 @@
 
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 ClarityController::ClarityController(QObject* parent)
     : QObject(parent)
@@ -163,4 +163,4 @@ void ClarityController::feedBins(const QVector<float>& bins, qint64 nowMs)
     emit waterfallThresholdsChanged(low, high);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

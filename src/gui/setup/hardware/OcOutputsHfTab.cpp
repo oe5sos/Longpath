@@ -78,7 +78,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Human-readable labels for each TXPinAction value.
 // Mirrors Thetis enums.cs:443-457 TXPinActions [@501e3f5].
@@ -669,4 +669,4 @@ bool OcOutputsHfTab::txPinCheckedForTest(int bandIdx, int pin) const
     return cb ? cb->isChecked() : false;
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

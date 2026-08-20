@@ -122,7 +122,7 @@
 #include <optional>
 #include "core/WdspTypes.h"
 
-namespace NereusSDR {
+namespace Longpath {
 
 class MoxController;
 
@@ -551,10 +551,10 @@ public:
     void setTimingsForTest(int tuneSettleMs, int telemetryTimeoutMs);
 
 signals:
-    void sweepStarted(const NereusSDR::SwrSweepPlan& plan);
+    void sweepStarted(const Longpath::SwrSweepPlan& plan);
     void pointReady(int index, quint64 freqHz, double swr, double fwdW);
     void progressChanged(int done, int total);
-    void sweepFinished(const NereusSDR::SwrSweepResult& result);
+    void sweepFinished(const Longpath::SwrSweepResult& result);
     /// Human-readable refusal / abort reason for the status line.
     void reasonChanged(const QString& reason);
 
@@ -623,7 +623,7 @@ private:
     int m_telemetryTimeoutMs{kTelemetryTimeoutMs};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::SwrSweepPlan)
-Q_DECLARE_METATYPE(NereusSDR::SwrSweepResult)
+Q_DECLARE_METATYPE(Longpath::SwrSweepPlan)
+Q_DECLARE_METATYPE(Longpath::SwrSweepResult)

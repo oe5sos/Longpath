@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -383,4 +383,4 @@ void BandwidthFilterPane::leaveEvent(QEvent*)
     update();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

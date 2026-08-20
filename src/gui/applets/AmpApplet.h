@@ -30,7 +30,7 @@ class QContextMenuEvent;
 class QLabel;
 class QMenu;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class HGauge;
 class RadioModel;
@@ -137,4 +137,4 @@ private:
     bool m_isTransmitting{false};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

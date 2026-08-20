@@ -7,7 +7,7 @@ class QHBoxLayout;
 class QLabel;
 class QVBoxLayout;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class SliceModel;
 class StatusBadge;
@@ -156,4 +156,4 @@ private:
     StatusBadge* m_vaxBadge{nullptr};   ///< VAX-Kanal, Rung 10
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

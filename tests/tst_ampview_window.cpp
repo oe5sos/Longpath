@@ -69,7 +69,7 @@
 #include "gui/AmpViewChart.h"
 #include "gui/AmpViewWindow.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAmpViewWindow : public QObject {
     Q_OBJECT

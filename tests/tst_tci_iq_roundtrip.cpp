@@ -19,7 +19,7 @@
 #include "core/TciServer.h"
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TestTciIqRoundtrip : public QObject {
     Q_OBJECT

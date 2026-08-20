@@ -31,7 +31,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Client-side TX exciter — TX DSP chain Phase 5 (#1661).  The
 // centrepiece of the PooDoo Audio™ chain.  Two parallel bands ("Poo"
@@ -189,4 +189,4 @@ private:
     float        m_lfEnvLin{0.0f};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

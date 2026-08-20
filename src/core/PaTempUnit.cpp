@@ -13,7 +13,7 @@
 
 #include <QGlobalStatic>
 
-namespace NereusSDR {
+namespace Longpath {
 
 namespace {
 
@@ -77,4 +77,4 @@ QString PaTempUnitNotifier::format(double celsius)
     return QString::asprintf("%.1f°C", celsius);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

@@ -17,7 +17,7 @@
 #include <QColor>
 #include <QString>
 
-namespace NereusSDR {
+namespace Longpath {
 
 struct BandSegment {
     double  lowMhz{0.0};
@@ -32,4 +32,4 @@ struct BandSpot {
     QString label;
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath

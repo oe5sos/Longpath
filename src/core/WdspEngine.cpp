@@ -70,7 +70,7 @@ warren@wpratt.com
 #include <QTimer>
 #include <QThread>
 
-namespace NereusSDR {
+namespace Longpath {
 
 WdspEngine::WdspEngine(QObject* parent)
     : QObject(parent)
@@ -1709,4 +1709,4 @@ void WdspEngine::onSpectrumBinsForMaxBin(int receiverId, const QVector<float>& b
     if (static_cast<double>(newMaxDb) > d.maxDb) { d.maxDb = static_cast<double>(newMaxDb); }
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

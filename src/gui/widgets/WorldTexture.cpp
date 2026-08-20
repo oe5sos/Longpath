@@ -16,7 +16,7 @@
 
 #include "core/AppSettings.h"
 
-namespace NereusSDR {
+namespace Longpath {
 namespace WorldTexture {
 
 namespace {
@@ -103,4 +103,4 @@ bool setPath(const QString& path)
 }
 
 } // namespace WorldTexture
-} // namespace NereusSDR
+} // namespace Longpath

@@ -60,7 +60,7 @@ mw0lge@grange-lane.co.uk
 #include "gui/meters/MeterItem.h"
 #include "gui/meters/MeterPoller.h"  // MeterBinding namespace
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstMeterItemBar : public QObject
 {

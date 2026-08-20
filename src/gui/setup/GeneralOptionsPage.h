@@ -66,7 +66,7 @@ class QComboBox;
 class QSpinBox;
 class QLabel;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class StepAttenuatorController;
 struct RadioInfo;
@@ -112,7 +112,7 @@ private slots:
     // 3M-1a G.2 fixup: named slot mirrors HardwarePage::onCurrentRadioChanged.
     // Eliminates the capture-by-pointer shutdown race of the original lambda
     // and brings the two setup pages into stylistic parity.
-    void onCurrentRadioChanged(const NereusSDR::RadioInfo& info);
+    void onCurrentRadioChanged(const Longpath::RadioInfo& info);
 
 private:
     void buildHardwareConfigGroup();
@@ -170,4 +170,4 @@ private:
     QSpinBox*  m_spnAutoAttHoldRx2{nullptr};
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

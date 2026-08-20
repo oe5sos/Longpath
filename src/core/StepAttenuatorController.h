@@ -82,7 +82,7 @@
 #include <array>
 #include <unordered_map>
 
-namespace NereusSDR {
+namespace Longpath {
 
 class RadioConnection;
 class ReceiverManager;
@@ -347,13 +347,13 @@ public slots:
 signals:
     // Emitted when any ADC's overload level transitions between
     // None/Yellow/Red. UI surfaces connect here for badge updates.
-    void overloadStatusChanged(int adc, NereusSDR::OverloadLevel level);
+    void overloadStatusChanged(int adc, Longpath::OverloadLevel level);
 
     // Emitted when auto-att changes the attenuator value.
     void attenuationChanged(int dB);
 
     // Emitted when auto-att changes the preamp mode.
-    void preampModeChanged(NereusSDR::PreampMode mode);
+    void preampModeChanged(Longpath::PreampMode mode);
 
     // Emitted when auto-att applied/cleared state changes.
     void autoAttActiveChanged(bool applied);
@@ -588,8 +588,8 @@ private:
 #endif
 };
 
-}  // namespace NereusSDR
+}  // namespace Longpath
 
-Q_DECLARE_METATYPE(NereusSDR::OverloadLevel)
-Q_DECLARE_METATYPE(NereusSDR::PreampMode)
-Q_DECLARE_METATYPE(NereusSDR::AutoAttMode)
+Q_DECLARE_METATYPE(Longpath::OverloadLevel)
+Q_DECLARE_METATYPE(Longpath::PreampMode)
+Q_DECLARE_METATYPE(Longpath::AutoAttMode)

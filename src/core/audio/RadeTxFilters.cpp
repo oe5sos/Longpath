@@ -22,7 +22,7 @@
 #include <cmath>
 #include <vector>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ── HPF coefficient derivation -------------------------------------------------
 //
@@ -165,4 +165,4 @@ int RadeTx48to16::process(const float* in, int n, float* out, int outMax)
     return m_impl->process(in, n, out, outMax);
 }
 
-}  // namespace NereusSDR
+}  // namespace Longpath

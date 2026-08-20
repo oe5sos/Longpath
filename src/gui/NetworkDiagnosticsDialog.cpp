@@ -44,7 +44,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace NereusSDR {
+namespace Longpath {
 
 // ─── styling constants ────────────────────────────────────────────────────────
 // Color palette matches the shell-chrome redesign (docs/architecture/
@@ -443,7 +443,7 @@ void NetworkDiagnosticsDialog::refresh()
         QString backend = QStringLiteral("—");
         if (m_audio) {
 #if defined(Q_OS_LINUX)
-            backend = NereusSDR::toString(m_audio->linuxBackend());
+            backend = Longpath::toString(m_audio->linuxBackend());
 #elif defined(Q_OS_MACOS)
             backend = QStringLiteral("CoreAudio");
 #elif defined(Q_OS_WIN)
@@ -494,4 +494,4 @@ void NetworkDiagnosticsDialog::onResetSessionStats()
     refresh();
 }
 
-} // namespace NereusSDR
+} // namespace Longpath

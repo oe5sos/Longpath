@@ -123,7 +123,7 @@ class QPainter;
 class QMouseEvent;
 class QWheelEvent;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // Free function — maps a MeterBinding::* constant to the centered title
 // string ScaleItem renders when setShowType(true). Ported verbatim from
@@ -924,4 +924,4 @@ private:
     float m_decayRatio{0.3f};    // kSmoothAlpha default
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

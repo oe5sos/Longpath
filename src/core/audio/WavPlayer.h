@@ -51,7 +51,7 @@
 class QAudioSink;
 class QBuffer;
 
-namespace NereusSDR {
+namespace Longpath {
 
 class WavPlayer : public QObject
 {
@@ -85,4 +85,4 @@ private:
     QString     m_path;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

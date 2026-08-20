@@ -1,7 +1,7 @@
 #include <QtTest/QtTest>
 #include "core/AppSettings.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 class TstAppSettingsVaxMigration : public QObject {
     Q_OBJECT

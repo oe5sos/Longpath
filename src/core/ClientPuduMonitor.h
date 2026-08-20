@@ -60,7 +60,7 @@
 
 class QAudioSink;
 
-namespace NereusSDR {
+namespace Longpath {
 
 // PUDU monitor — captures up to 30 seconds of post-DSP TX audio (the
 // output of the full client-side chain) into an in-memory buffer, then
@@ -148,4 +148,4 @@ private:
     QAudioDevice  m_outputDevice;
 };
 
-} // namespace NereusSDR
+} // namespace Longpath

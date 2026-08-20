@@ -7,7 +7,7 @@
 #include "models/SliceModel.h"
 #include "core/WdspTypes.h"
 
-using namespace NereusSDR;
+using namespace Longpath;
 
 // Helper to locate a named widget child of any type T
 template<typename T>
