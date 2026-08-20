@@ -1064,9 +1064,54 @@ void MainWindow::moveAppletToCanvas(AppletWidget* applet)
 // Ueber eine Kopie der Liste: moveAppletToCanvas nimmt das Applet aus
 // m_applets heraus, und wer waehrend des Herausnehmens ueber dieselbe
 // Liste laeuft, ueberspringt jedes zweite.
+// Der Rueckweg: die Kachel aufloesen, das Applet in den Stapel.
+//
+// Ohne ihn bliebe beim Ausblenden eine leere Kachel stehen und das
+// Applet waere nirgends — es taucht dann auch ueber das Plus nicht
+// wieder auf, weil applyAppletVisibility es im Stapel sucht.
+// Die freie Flaeche an- oder abschalten. Gemerkt, damit sie einen
+// Neustart ueberlebt — eine Anordnung, die man jeden Morgen neu
+// herstellen muss, ist keine.
+void MainWindow::setFreeCanvasMode(bool on)
+{
+    if (m_freeCanvasMode == on) { return; }
+    m_freeCanvasMode = on;
+    AppSettings::instance().setValue(QStringLiteral("FreeCanvasMode"),
+                                     on ? QStringLiteral("True")
+                                        : QStringLiteral("False"));
+    if (m_freeCanvasAction) {
+        QSignalBlocker b(m_freeCanvasAction);
+        m_freeCanvasAction->setChecked(on);
+    }
+}
+
+void MainWindow::returnAppletFromCanvas(const QString& id)
+{
+    const QString tileId = m_canvasApplets.take(id);
+    if (tileId.isEmpty() || !m_containerManager) { return; }
+
+    AppletWidget* a = m_appletsById.value(id, nullptr);
+    if (a) {
+        // Erst herausnehmen, dann die Kachel abraeumen — andersherum
+        // nimmt destroyContainer das Applet als Kind mit ins Grab.
+        a->setParent(nullptr);
+    }
+    m_containerManager->destroyContainer(tileId);
+
+    if (a && m_appletPanel && !m_appletPanel->applets().contains(a)) {
+        m_appletPanel->addApplet(a);
+        m_appletPanel->setAppletVisible(a, false);
+    }
+}
+
 void MainWindow::moveAllAppletsToCanvas()
 {
     if (!m_appletPanel) { return; }
+
+    // Ab jetzt kommen auch NEUE Fenster als Kachel. Sonst waere das
+    // hier eine einmalige Aktion, und das naechste Fenster aus dem
+    // Plus laege wieder im Stapel.
+    setFreeCanvasMode(true);
     const QList<AppletWidget*> all = m_appletPanel->applets();
     for (AppletWidget* a : all) {
         moveAppletToCanvas(a);
@@ -1225,6 +1270,34 @@ void MainWindow::applyAppletVisibility(const QString& id, bool effective)
             // kommt. Ohne das braeuchte der Auswaehler Wissen darueber,
             // WO ein Applet gerade ist — und das ist genau die Frage,
             // die er nicht stellen koennen soll.
+            // ── Freie Flaeche: neue Fenster kommen als KACHEL ────────
+            //
+            // OE5SOS, 2026-08-20: „es muss alles auf den mm verschoben
+            // werden koennen. jedes window! jeder panel, ueberall."
+            //
+            // Steht die freie Flaeche an, landet ein eingeschaltetes
+            // Fenster nicht im Stapel, sondern bekommt sofort eine
+            // eigene Lage. Sonst muesste man jedes neue Fenster erst
+            // wieder von Hand freistellen — und dann ist das Plus nur
+            // ein halber Weg.
+            if (effective && m_freeCanvasMode) {
+                if (!m_canvasApplets.contains(id)) {
+                    if (!m_appletPanel->applets().contains(a)) {
+                        m_appletPanel->addApplet(a);
+                    }
+                    moveAppletToCanvas(a);
+                }
+                return;
+            }
+
+            // Ausschalten, waehrend es als Kachel liegt: die Kachel
+            // aufloesen und das Applet zurueck in den Stapel, damit es
+            // ueber das Plus wieder auftauchen kann. Ohne das bliebe
+            // eine leere Kachel stehen und das Applet waere nirgends.
+            if (!effective && m_canvasApplets.contains(id)) {
+                returnAppletFromCanvas(id);
+            }
+
             if (effective && !m_appletPanel->applets().contains(a)) {
                 m_appletPanel->addApplet(a);
             }
@@ -5539,6 +5612,12 @@ void MainWindow::populateDefaultMeter()
     //
     // Was bleibt: „Alle Fenster ausblenden" im Containers-Menue, fuer
     // den, der EINMAL aufraeumen will.
+    // Die freie Flaeche ueberlebt den Neustart. Vor dem Menue gelesen,
+    // damit der Haken gleich richtig steht.
+    m_freeCanvasMode = AppSettings::instance()
+        .value(QStringLiteral("FreeCanvasMode"), QStringLiteral("False"))
+        .toString() == QStringLiteral("True");
+
     m_appletVis = new AppletVisibilityController(this);
 
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
@@ -7093,6 +7172,27 @@ void MainWindow::buildMenuBar()
         QAction* resetAction = containersMenu->addAction(QStringLiteral("&Reset Default Layout"));
         connect(resetAction, &QAction::triggered, this,
                 &MainWindow::resetDefaultLayout);
+    }
+
+    // ── Freie Flaeche, dauerhaft ─────────────────────────────────────
+    //
+    // Der Schalter, nicht die einmalige Aktion. Steht er an, bekommt
+    // JEDES Fenster, das ueber das Plus dazukommt, sofort eine eigene
+    // Lage — statt im Stapel zu landen und dort auf ein Freistellen von
+    // Hand zu warten.
+    if (m_appletPanel) {
+        m_freeCanvasAction = containersMenu->addAction(
+            QStringLiteral("Fenster frei platzieren"));
+        m_freeCanvasAction->setCheckable(true);
+        m_freeCanvasAction->setChecked(m_freeCanvasMode);
+        m_freeCanvasAction->setToolTip(QStringLiteral(
+            "Jedes Fenster bekommt eine eigene Lage auf der Flaeche — "
+            "ziehen an der Titelleiste, Groesse an der Ecke, Schloss im "
+            "Kopf. Neue Fenster kommen gleich so."));
+        connect(m_freeCanvasAction, &QAction::toggled, this, [this](bool on) {
+            setFreeCanvasMode(on);
+            if (on) { moveAllAppletsToCanvas(); }
+        });
     }
 
     // ── Alles frei stellen ───────────────────────────────────────────

@@ -757,6 +757,14 @@ private:
     /// x-beliebig verschiebbar" in einem Schritt.
     void moveAllAppletsToCanvas();
 
+    /// Die Kachel aufloesen und das Applet in den Stapel zurueckgeben.
+    void returnAppletFromCanvas(const QString& id);
+
+    /// Freie Flaeche an oder aus. Steht sie an, kommt JEDES neu
+    /// eingeschaltete Fenster als Kachel mit eigener Lage.
+    void setFreeCanvasMode(bool on);
+    bool freeCanvasMode() const { return m_freeCanvasMode; }
+
     void detachApplet(AppletWidget* applet, int dockIndex,
                       const QRect& rect = QRect(),
                       const QString& screenKey = QString());
@@ -1318,6 +1326,11 @@ private:
     /// Welche Applets als freie Kachel auf der Flaeche liegen:
     /// Panelkennung -> Container-Kennung.
     QHash<QString, QString> m_canvasApplets;
+
+    /// Kommen neue Fenster als freie Kachel? Gemerkt unter
+    /// „FreeCanvasMode".
+    bool m_freeCanvasMode{false};
+    class QAction* m_freeCanvasAction{nullptr};
     class LayoutProfiles* m_layoutProfiles{nullptr};
 
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
