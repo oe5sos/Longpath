@@ -21,6 +21,8 @@
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterApplet.h"
 
+#include <QScreen>
+#include <QShowEvent>
 #include <QVBoxLayout>
 #include <QCloseEvent>
 #include <QMoveEvent>
@@ -39,7 +41,44 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     if (applet) {
         layout->addWidget(applet);
     }
-    resize(800, 400);
+    // Eine kleinere Untergrenze als die, die der Panadapter im Splitter
+    // mitbringt. Ohne das zieht die Mindestgroesse des Inhalts das
+    // Fenster beim Anzeigen auf — beim Selbsttest am 2026-08-20 ging es
+    // bildschirmfuellend auf, was wie ein Fehler aussieht und den
+    // Arbeitsplatz zustellt.
+    setMinimumSize(420, 240);
+    resize(900, 460);
+}
+
+// Die Groesse setzen, NACHDEM der Inhalt sichtbar ist.
+//
+// Nicht im Baukasten und nicht in showEvent — beides ist zu frueh.
+// PanadapterStack::floatPanadapter versteckt das Applet, bevor es
+// umgehaengt wird (der QRhi-Kontext muss sauber abgebaut werden), zeigt
+// das Fenster und erst DANACH das Applet. Solange es versteckt ist,
+// verlangt die Anordnung fast nichts; sobald es auftaucht, verlangt sie
+// ihre echte Mindestgroesse und zieht das Fenster mit auf.
+//
+// Beim Selbsttest am 2026-08-20 sah man genau das: Qt meldete brav
+// 900x460, auf dem Schirm stand ein bildschirmfuellendes Fenster. Die
+// Zahl war richtig und trotzdem falsch, weil sie zum falschen Zeitpunkt
+// gesetzt wurde.
+void PanFloatingWindow::applyDefaultSize()
+{
+    if (m_sizedOnce) { return; }   // wer nachher zieht, darf es behalten
+    m_sizedOnce = true;
+
+    QSize want(900, 460);
+    if (QScreen* sc = screen()) {
+        const QSize avail = sc->availableSize();
+        want.setWidth (qMin(want.width(),  avail.width()  - 80));
+        want.setHeight(qMin(want.height(), avail.height() - 80));
+    }
+
+    // Die Untergrenze des Inhalts darf nicht groesser sein als das, was
+    // wir wollen — sonst zieht sie das Fenster gleich wieder auf.
+    if (m_applet) { m_applet->setMinimumSize(360, 200); }
+    resize(want);
 }
 
 PanFloatingWindow::~PanFloatingWindow() = default;

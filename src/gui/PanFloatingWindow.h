@@ -61,6 +61,11 @@ public:
     /// dockRequested without needing the user to close the window.
     void requestDock();
 
+    /// Die Vorgabegroesse setzen. Vom Stack aufgerufen, NACHDEM das
+    /// Applet wieder sichtbar ist — vorher verlangt die Anordnung fast
+    /// nichts, und die Zahl haelt nicht. Wirkt nur beim ersten Mal.
+    void applyDefaultSize();
+
 signals:
     void dockRequested(const QString& panId);
     void geometryChanged(const QString& panId, const QByteArray& geometry);
@@ -71,7 +76,11 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
 
 private:
-    QPointer<PanadapterApplet> m_applet;  // reparented under our layout
+    QPointer<PanadapterApplet> m_applet;
+
+    // Die Groesse wird nur beim ERSTEN Anzeigen gesetzt. Wer das
+    // Fenster nachher zieht, soll es behalten duerfen.
+    bool m_sizedOnce{false};
 };
 
 } // namespace NereusSDR

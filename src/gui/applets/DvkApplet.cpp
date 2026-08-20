@@ -175,19 +175,36 @@ void DvkApplet::applyRowStyle(int index)
 {
     if (index < 0 || index >= kSlots || !m_slotRow[index]) { return; }
 
+    // ── DER SELEKTOR MUSS DEN NAMEN TRAGEN ───────────────────────────
+    //
+    // Erste Fassung schrieb „QWidget { background: … }" auf die Zeile.
+    // Qt-Stilvorlagen KASKADIEREN: der Selektor traf damit nicht nur die
+    // Zeile, sondern jedes Kind darin — und ueberschrieb Grund und Rand
+    // der vier Knoepfe und der Beschriftungen gleich mit.
+    //
+    // Ergebnis, gesehen am 2026-08-20 an der laufenden Anwendung: zehn
+    // Zeilen, in denen NUR noch das kleine Tastenfeld stand. Name,
+    // Dauer, Aufnahme, Wiedergabe, Stopp, WAV — alles unsichtbar. Es
+    // war da, es war anklickbar, man sah es nur nicht.
+    //
+    // „QWidget#dvkSlotRow" trifft die Zeile und sonst nichts.
+    const QString sel = QStringLiteral("QWidget#dvkSlotRow");
+
     if (index == m_recordingSlot) {
-        m_slotRow[index]->setStyleSheet(QStringLiteral(
-            "QWidget { background: %1; border-left: 2px solid %2; }")
-            .arg(QLatin1String(Style::kInsetBg),
-                 QLatin1String(Style::kRedBg)));
+        m_slotRow[index]->setStyleSheet(
+            sel + QStringLiteral(" { background: %1;"
+                                 " border-left: 2px solid %2; }")
+                      .arg(QLatin1String(Style::kInsetBg),
+                           QLatin1String(Style::kRedBg)));
     } else if (index % 2 == 1) {
-        m_slotRow[index]->setStyleSheet(QStringLiteral(
-            "QWidget { background: %1; border-left: 2px solid transparent; }")
-            .arg(QLatin1String(Style::kPanelBg)));
+        m_slotRow[index]->setStyleSheet(
+            sel + QStringLiteral(" { background: %1;"
+                                 " border-left: 2px solid transparent; }")
+                      .arg(QLatin1String(Style::kPanelBg)));
     } else {
-        m_slotRow[index]->setStyleSheet(QStringLiteral(
-            "QWidget { background: transparent;"
-            " border-left: 2px solid transparent; }"));
+        m_slotRow[index]->setStyleSheet(
+            sel + QStringLiteral(" { background: transparent;"
+                                 " border-left: 2px solid transparent; }"));
     }
 }
 
@@ -223,6 +240,9 @@ void DvkApplet::buildUI()
         // abzaehlbar, und die laufende Aufnahme faerbt die GANZE Zeile —
         // ein roter Punkt allein wird fuer „auf Sendung" gehalten.
         m_slotRow[i] = new QWidget(this);
+        // Der Name ist nicht Zierde: die Stilvorlage unten muss sich auf
+        // GENAU dieses Widget beziehen. Siehe applyRowStyle().
+        m_slotRow[i]->setObjectName(QStringLiteral("dvkSlotRow"));
         auto* row = new QHBoxLayout(m_slotRow[i]);
         row->setContentsMargins(4, 1, 3, 1);
         row->setSpacing(3);
@@ -283,6 +303,10 @@ void DvkApplet::buildUI()
 
         vbox->addWidget(m_slotRow[i]);
         applyRowStyle(i);
+        // Gleich fuellen und nicht erst beim naechsten Abgleich: sonst
+        // steht die Zeile leer da, bis irgendwer syncFromModel ruft —
+        // und genau so sah sie beim Selbsttest aus.
+        refreshSlot(i);
 
         // Aufnahme geht, sobald der Sendeweg steht — sie TASTET NICHT,
         // sie liest nur mit. Wiedergabe bleibt gesperrt, bis die Tastung

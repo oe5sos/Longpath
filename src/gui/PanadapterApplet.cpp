@@ -103,15 +103,41 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // Ablösen und zurueck, EIN Schalter. Bisher lag „Float this pan" nur
     // im Rechtsklick-Menue und der Rueckweg gar nirgends — man musste
     // das Fenster schliessen und wissen, dass genau das zurueckdockt.
+    //
+    // ALS ERKENNBARER KNOPF, nicht als blosses Zeichen. Erster Anlauf am
+    // 2026-08-20 setzte hier ein randloses graues ↗ — direkt neben die
+    // beiden lauten Marken CH 0 (blau) und TX (rot). Beim Selbsttest an
+    // der laufenden Anwendung gesehen: es liest sich als Verzierung,
+    // nicht als Bedienelement. Der Betreiber hat es dreimal nicht
+    // gefunden und dreimal gesagt „padapter noch immer in keinem
+    // einzelnen window" — obwohl der Weg dahinter funktionierte.
+    //
+    // Ein Knopf, den niemand als Knopf erkennt, ist kein Knopf.
+    // Deshalb: eigener Grund, sichtbarer Rand, dieselbe Groesse wie im
+    // Container-Kopf, und ein Trennstrich davor, damit er nicht zu den
+    // Marken gehoert.
+    {
+        auto* sep = new QLabel(head);
+        sep->setFixedWidth(1);
+        sep->setStyleSheet(QStringLiteral("background: %1; margin: 5px 0;")
+                               .arg(QLatin1String(Style::kBorder)));
+        headLay->addWidget(sep);
+    }
+
     m_btnFloat = new QPushButton(QStringLiteral("\u2197"), head);
-    m_btnFloat->setFixedSize(20, 20);
+    m_btnFloat->setFixedSize(22, 18);
+    m_btnFloat->setCursor(Qt::PointingHandCursor);
     m_btnFloat->setStyleSheet(QStringLiteral(
-        "QPushButton { background: transparent; border: none; color: %1;"
-        "  font-size: 11px; padding: 0; }"
-        "QPushButton:hover { background: %2; color: %3; }")
-        .arg(QLatin1String(Style::kTextSecondary),
+        "QPushButton { background: %1; border: 1px solid %2;"
+        "  border-radius: 4px; color: %3; font-size: 11px; padding: 0; }"
+        "QPushButton:hover { background: %4; color: %5;"
+        "  border-color: %6; }")
+        .arg(QLatin1String(Style::kButtonBg),
+             QLatin1String(Style::kBorder),
+             QLatin1String(Style::kTextSecondary),
              QLatin1String(Style::kButtonHover),
-             QLatin1String(Style::kTextPrimary)));
+             QLatin1String(Style::kTextPrimary),
+             QLatin1String(Style::kAccent)));
     headLay->addWidget(m_btnFloat);
     connect(m_btnFloat, &QPushButton::clicked, this, [this]() {
         if (m_floating) { emit dockRequested(m_panId); }

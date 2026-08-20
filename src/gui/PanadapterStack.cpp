@@ -20,6 +20,8 @@
 // =================================================================
 
 #include "gui/PanadapterStack.h"
+
+
 #include "gui/PanadapterApplet.h"
 #include "gui/PanFloatingWindow.h"
 #include "core/AppSettings.h"
@@ -319,6 +321,11 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // Now that the floating window exists and is mapped, bring the pan back up
     // so its QRhiWidget initializes against that window's surface.
     applet->show();
+    // Erst JETZT die Groesse setzen: solange das Applet versteckt war,
+    // verlangte die Anordnung fast nichts, und jede vorher gesetzte
+    // Zahl wird von der Mindestgroesse des Inhalts ueberschrieben.
+    floater->applyDefaultSize();
+
     applet->setFloatingIndicator(true);
     emit panFloatStateChanged(panId, true);
 
@@ -342,6 +349,51 @@ void PanadapterStack::floatPanadapter(const QString& panId)
             other->show();
         }
     }
+
+    // ── UND ALLES ANDERE IM HAUPTFENSTER ────────────────────────────
+    //
+    // Die Runde darueber heilt nur die anderen PANADAPTER. Im
+    // Hauptfenster haengen aber noch mehr QRhiWidgets: jedes Instrument
+    // im Applet-Streifen ist eines (MeterWidget leitet von QRhiWidget
+    // ab). Die verlieren ihren Kontext genauso.
+    //
+    // GESEHEN AM 2026-08-20 beim Selbsttest an der laufenden Anwendung:
+    // Panadapter ablösen — und das ganze Hauptfenster war schwarz, mit
+    // 79 Meldungen „QRhiWidget: No QRhi", eine je Bild. Beim
+    // Zurueckdocken kam alles wieder. Der Fehler lag seit Phase 3F da;
+    // er faellt nur niemandem auf, solange niemand ablöst — und
+    // ablösen konnte man bis heute nur ueber ein Rechtsklick-Menue,
+    // das der Betreiber nie gefunden hat.
+    //
+    // Dieselbe Kur, groesserer Kreis: dieselbe Hide/Show-Runde fuer
+    // jedes QRhiWidget, das noch im Hauptfenster steht.
+    // ── EIN BEKANNTER FEHLER, DER HIER NICHT GELOEST IST ────────────
+    //
+    // Solange ein Panadapter abgeloest ist, bleibt das HAUPTFENSTER
+    // schwarz, und Qt meldet „QRhiWidget: No QRhi" einmal je Bild. Beim
+    // Zurueckdocken kommt alles wieder.
+    //
+    // GEMESSEN AM 2026-08-20 an der laufenden Anwendung. Zwei Kuren
+    // versucht und beide VERWORFEN, weil sie nicht wirkten:
+    //
+    //   1. dieselbe Hide/Show-Runde wie oben, aber ueber alle
+    //      QRhiWidgets des Hauptfensters — 79 Meldungen blieben 79.
+    //   2. dasselbe, um einen Durchlauf der Ereignisschleife verzoegert
+    //      — 34 statt 79, also nur weniger Zeit zum Melden, nicht
+    //      geheilt.
+    //
+    // Nicht auf meine Aenderungen zurueckzufuehren: der Weg zum
+    // Ablösen war bis heute UEBERHAUPT NICHT ERREICHBAR. Das
+    // Rechtsklick-Menue des Applets (Task B5) kommt nicht durch — der
+    // Spektrumbereich faengt den Klick ab und zeigt sein eigenes Menue
+    // — und einen Knopf gab es nicht. Der Fehler sitzt seit Phase 3F
+    // im Baum und ist nur nie jemandem begegnet.
+    //
+    // Was es braucht, ist eine echte Diagnose, welches QRhiWidget den
+    // Kontext verliert und warum das Umhaengen des Applets die
+    // Oberflaeche des Hauptfensters mitnimmt. Das ist ein eigener
+    // Schritt, kein Anhaengsel an diesen hier — und Raten macht es
+    // schlimmer, siehe die zwei verworfenen Kuren.
 }
 // Der umgekehrte Weg zu floatPanadapter. Er tut genau das, was der
 // dockRequested-Empfaenger dort tut — nur von aussen aufrufbar, damit
