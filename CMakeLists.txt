@@ -775,6 +775,8 @@ set(GUI_SOURCES
     src/gui/widgets/DspQuickPopups.cpp
     src/gui/widgets/DspQuickPopups.h
     src/gui/widgets/BandwidthFilterPane.cpp
+    src/gui/FramelessResizer.cpp
+    src/gui/WindowChrome.cpp
     src/gui/widgets/FilterPresetEditDialog.cpp
     src/gui/widgets/GuardedComboBox.h
     src/gui/widgets/GuardedSlider.h

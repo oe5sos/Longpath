@@ -9,6 +9,7 @@
 #include <QPointer>
 #include <QSignalSpy>
 #include "gui/PanFloatingWindow.h"
+#include "gui/WindowChrome.h"
 #include "gui/PanadapterApplet.h"
 
 using namespace Longpath;
@@ -52,6 +53,32 @@ private slots:
         w->requestDock();
         delete w;
     }
+    // ── Auch der Panadapter wird geschoben und gezogen ──────────────
+    //
+    // Der Betreiber hat ihn ausdruecklich mitgemeint: „wie zum Beispiel
+    // den Pen Adapter kleiner nach rechts und nach links vergroessern
+    // lassen". Er ist der schwierige Fall, weil er ein natives Fenster
+    // ist und alles Nicht-Native verdeckt.
+    void itHasItsOwnTitleBarAndGrip()
+    {
+        auto* applet = new PanadapterApplet(QStringLiteral("A"));
+        PanFloatingWindow win(applet, nullptr);
+
+        auto* bar  = win.findChild<WindowTitleBar*>();
+        auto* grip = win.findChild<ResizeGrip*>();
+        QVERIFY2(bar,  "der Panadapter braucht eine eigene Leiste zum Ziehen");
+        QVERIFY2(grip, "und einen Anfasser unten rechts");
+        QVERIFY2(win.windowFlags() & Qt::FramelessWindowHint,
+                 "rahmenlos, sonst stehen zwei Leisten uebereinander");
+
+        // DIE Eigenschaft, an der die Kachelversuche gescheitert sind:
+        // ein nicht-natives Kind liegt auf macOS hinter dem nativen
+        // QRhiWidget des Panadapters und ist damit unerreichbar.
+        QVERIFY2(grip->testAttribute(Qt::WA_NativeWindow),
+                 "der Anfasser MUSS nativ sein — sonst liegt er hinter "
+                 "der Wasserfallflaeche (siehe SpectrumWidget.cpp:551)");
+    }
+
 };
 
 QTEST_MAIN(TestPanFloatingWindow)

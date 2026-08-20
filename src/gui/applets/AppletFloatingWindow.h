@@ -56,6 +56,8 @@ class QTimer;
 
 namespace Longpath {
 
+class WindowTitleBar;
+
 class AppletWidget;
 
 class AppletFloatingWindow : public QWidget {
@@ -109,6 +111,7 @@ private:
     QString m_panelId;
     int      m_dockIndex{-1};
     QTimer*  m_settleTimer{nullptr};
+    WindowTitleBar* m_titleBar{nullptr};
 
     /// Gleiche Grössenordnung wie StripEqPanel. Lang genug, dass ein
     /// Zug über den halben Schirm eine Meldung erzeugt und nicht

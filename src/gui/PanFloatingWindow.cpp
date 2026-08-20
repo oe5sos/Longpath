@@ -20,6 +20,8 @@
 
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterApplet.h"
+#include "gui/FramelessResizer.h"
+#include "gui/WindowChrome.h"
 
 #include <QScreen>
 #include <QShowEvent>
@@ -38,9 +40,35 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
                        .arg(applet ? applet->panId() : QString()));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    // ── Eigene Leiste, eigener Anfasser ─────────────────────────────
+    //
+    // Der Betreiber hat den Panadapter ausdruecklich mitgemeint: „wie
+    // zum Beispiel den Pen Adapter kleiner nach rechts und nach links
+    // vergroessern lassen". Bis heute hing hier der Rahmen des
+    // Betriebssystems — schiebbar, aber fremd, und ohne sichtbaren
+    // Anfasser in der Ecke.
+    //
+    // topMoveReserve == Leistenhoehe: der obere Streifen gehoert dem
+    // Ziehen. Sonst schnappt der Resizer den Griff weg und das Fenster
+    // laesst sich nicht mehr bewegen.
+    m_titleBar = new WindowTitleBar(
+        QStringLiteral("Panadapter %1").arg(applet ? applet->panId()
+                                                   : QString()), this);
+    connect(m_titleBar, &WindowTitleBar::closeRequested,
+            this, &QWidget::close);
+    connect(m_titleBar, &WindowTitleBar::dockRequested,
+            this, &PanFloatingWindow::requestDock);
+    layout->addWidget(m_titleBar);
+
     if (applet) {
         layout->addWidget(applet);
     }
+
+    setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
+    FramelessResizer::install(this, 6, m_titleBar->height());
+    attachResizeGrip(this);
     // Eine kleinere Untergrenze als die, die der Panadapter im Splitter
     // mitbringt. Ohne das zieht die Mindestgroesse des Inhalts das
     // Fenster beim Anzeigen auf — beim Selbsttest am 2026-08-20 ging es

@@ -184,3 +184,6 @@ layout is NereusSDR's own — see `src/core/strip/EqBandLayout.h`.
 the NereusSDR table instead, which adds seven spare shaping handles at
 unity gain and switched off. AetherSDR's DSP is unaffected and the three
 presets sound exactly as they did.
+| `src/gui/FramelessMoveHelper.h` | `src/gui/FramelessMoveHelper.h` | `31b29583` | 2026-08-20 | Nur Namensraum geaendert. Fenster an der Titelleiste ziehen; auf macOS bewusst OHNE startSystemMove (manuell mit grabMouse). |
+| `src/gui/FramelessResizer.{h,cpp}` | `src/gui/FramelessResizer.{h,cpp}` | `31b29583` | 2026-08-20 | Nur Namensraum geaendert. Groessenaenderung an allen Kanten und Ecken eines rahmenlosen Fensters, Filter auf dem QWindow statt im Widgetbaum. |
+| `src/gui/FloatingContainerWindow.{h,cpp}` | `src/gui/WindowChrome.{h,cpp}` | `31b29583` | 2026-08-20 | Strukturell nachgebaut, nicht uebersetzt: eigene Titelleiste als Ziehgriff plus sichtbarer Anfasser unten rechts. Longpath-eigene Zutaten: der gelbe Zeus-Streifen links, der Andock-Knopf, und WA_NativeWindow auf dem Anfasser (macOS-Notwendigkeit wegen des nativen QRhi-Panadapters). |

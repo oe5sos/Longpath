@@ -42,6 +42,8 @@
 
 namespace Longpath {
 
+class WindowTitleBar;
+
 class PanadapterApplet;
 
 /// Top-level QWidget wrapping a PanadapterApplet for multi-monitor detach.
@@ -81,6 +83,7 @@ private:
     // Die Groesse wird nur beim ERSTEN Anzeigen gesetzt. Wer das
     // Fenster nachher zieht, soll es behalten duerfen.
     bool m_sizedOnce{false};
+    WindowTitleBar* m_titleBar{nullptr};
 };
 
 } // namespace Longpath
