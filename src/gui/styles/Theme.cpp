@@ -58,6 +58,19 @@ Theme& Theme::instance()
     return t;
 }
 
+// Die Orte, an denen eine MITGELIEFERTE Palette liegt. Sie zaehlen
+// fuer available(), nicht fuer loadUserTheme().
+bool Theme::isShippedThemeDir(const QString& dir)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    if (appDir.isEmpty()) { return false; }
+    const QString a = QDir(appDir + QStringLiteral("/themes")).absolutePath();
+    const QString b = QDir(appDir + QStringLiteral("/../Resources/themes"))
+                          .absolutePath();
+    const QString d = QDir(dir).absolutePath();
+    return d == a || d == b;
+}
+
 QStringList Theme::searchPaths()
 {
     QStringList out;
@@ -86,12 +99,43 @@ QStringList Theme::searchPaths()
     // 4. Neben der Binärdatei, für ein Theme, das mit einem Build kommt.
     out << QCoreApplication::applicationDirPath() + QStringLiteral("/themes");
 
+    // 5. Auf macOS in Contents/Resources — DORT liefern wir aus.
+    //
+    // Nicht neben die Binärdatei: Contents/MacOS ist für ausführbaren
+    // Code, und codesign meldet jede andere Datei dort als
+    // „In subcomponent". Eine Signatur, die eine Datendatei im
+    // Programmverzeichnis mitsiegelt, ist beim nächsten Aktualisieren
+    // dieser Datei ungültig. Am 2026-08-20 beim Neusignieren der
+    // Schreibtischkopie aufgefallen.
+    //
+    // Pfad 4 bleibt: er trägt Linux und Windows, und ein von Hand
+    // danebengelegtes Theme soll weiter greifen.
+#ifdef Q_OS_MAC
+    out << QCoreApplication::applicationDirPath()
+               + QStringLiteral("/../Resources/themes");
+#endif
+
     return out;
 }
 
 bool Theme::loadUserTheme()
 {
+    // ── Nur EIGENE Dateien, nicht die mitgelieferten ─────────────────
+    //
+    // „User" ist woertlich gemeint: eine Datei, die der Betreiber
+    // hingelegt hat. Mitgelieferte Paletten gehoeren NICHT dazu — sie
+    // sind Angebote, keine Vorgabe.
+    //
+    // Am 2026-08-20 ist genau das schiefgegangen: mit kreide.json im
+    // Programmpaket nahm loadUserTheme() sie beim Start automatisch,
+    // ohne dass jemand sie gewaehlt hatte. Der Betreiber sah ein halb
+    // helles Programm und in seinen Einstellungen stand nicht einmal
+    // ein ActiveTheme — er HATTE nichts umgestellt.
+    //
+    // available() listet die mitgelieferten weiterhin: gewaehlt werden
+    // sollen sie, gefunden werden nicht.
     for (const QString& dir : searchPaths()) {
+        if (isShippedThemeDir(dir)) { continue; }
         QDir d(dir);
         if (!d.exists()) { continue; }
         const QStringList files =

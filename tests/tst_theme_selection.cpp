@@ -20,6 +20,7 @@
 #include <QTemporaryDir>
 #include <QFile>
 #include <QDir>
+#include <QCoreApplication>
 
 #include "gui/styles/Theme.h"
 #include "gui/styles/ThemeQss.h"
@@ -37,6 +38,11 @@ void writeTheme(const QDir& d, const QString& file, const QString& name,
     f.write(QStringLiteral(
         "{\"name\": \"%1\", \"colors\": {\"measured\": \"%2\"}}")
             .arg(name, measured).toUtf8());
+}
+
+bool Theme_isShipped(const QString& dir)
+{
+    return Style::Theme::isShippedThemeDir(dir);
 }
 
 } // namespace
@@ -125,6 +131,45 @@ private slots:
                  "Neustart nicht wieder von loadUserTheme ueberschrieben "
                  "werden — sonst kaeme die Datei zurueck, die man gerade "
                  "abgewaehlt hat");
+    }
+
+    // ── Eine MITGELIEFERTE Palette darf sich nicht selbst waehlen ───
+    //
+    // Am 2026-08-20 lag kreide.json erstmals im Programmpaket, und
+    // loadUserTheme() nahm sie beim Start automatisch — der Betreiber
+    // sah ein halb helles Programm, ohne etwas umgestellt zu haben.
+    // In seinen Einstellungen stand nicht einmal ein ActiveTheme.
+    void aShippedThemeDoesNotChooseItself()
+    {
+        // Der Ort, den das Programm als „mitgeliefert" ansieht.
+        const QString shipped =
+            QCoreApplication::applicationDirPath() + QStringLiteral("/themes");
+        QDir sd(shipped);
+        QVERIFY(sd.mkpath(QStringLiteral(".")));
+        writeTheme(sd, QStringLiteral("aaa-mitgeliefert.json"),
+                   QStringLiteral("Mitgeliefert"), QStringLiteral("#123456"));
+
+        QVERIFY2(Theme_isShipped(shipped),
+                 "das Verzeichnis neben der Binaerdatei MUSS als "
+                 "mitgeliefert gelten");
+
+        // Kein Merker: der Start faellt auf loadUserTheme() zurueck.
+        AppSettings::instance().remove(QStringLiteral("ActiveTheme"));
+        Style::Theme::instance().clear();
+        Style::Theme::instance().applyStoredChoice();
+
+        QVERIFY2(Style::Theme::instance().name()
+                     != QStringLiteral("Mitgeliefert"),
+                 "eine mitgelieferte Palette darf sich nicht selbst "
+                 "waehlen — sie ist ein Angebot, keine Vorgabe");
+
+        // Waehlbar bleibt sie trotzdem.
+        QStringList names;
+        for (const auto& e : Style::Theme::available()) { names << e.name; }
+        QVERIFY2(names.contains(QStringLiteral("Mitgeliefert")),
+                 qPrintable(QStringLiteral("available(): %1").arg(names.join(", "))));
+
+        QFile::remove(sd.filePath(QStringLiteral("aaa-mitgeliefert.json")));
     }
 
     // Eine kaputte Datei darf das Programm nicht farblos machen.

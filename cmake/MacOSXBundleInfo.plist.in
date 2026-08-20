@@ -1,0 +1,61 @@
+<!-- =================================================================
+     cmake/MacOSXBundleInfo.plist.in  (Longpath)
+     =================================================================
+
+     Kopie der CMake-Vorlage (Modules/MacOSXBundleInfo.plist.in) mit
+     EINER Ergaenzung: NSMicrophoneUsageDescription.
+
+     Warum eine eigene Vorlage und nicht der bisherige Nachtrag:
+
+     Der Schluessel wurde bis 2026-08-20 nach dem Bauen per PlistBuddy
+     eingefuegt. CMake schreibt das Info.plist aber beim KONFIGURIEREN
+     neu. Ein `cmake -B build` nach einem Bau loescht den Schluessel
+     also wieder, und der Nachtrag laeuft erst beim naechsten Binden
+     von Longpath — was `--target all_tests` nicht tut.
+
+     Genau so ist es passiert: Info.plist 21:11:55, Binaerdatei
+     21:10:53. Die App auf dem Schreibtisch startete nicht mehr, und
+     macOS sagte im Absturzbericht auch warum:
+
+       TCC: This app has crashed because it attempted to access
+       privacy-sensitive data without a usage description.
+
+     In der Vorlage steht der Schluessel dort, wo CMake ihn beim
+     Konfigurieren mitschreibt — er kann gar nicht mehr verlorengehen.
+     ================================================================= -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+	<key>CFBundleGetInfoString</key>
+	<string>${MACOSX_BUNDLE_INFO_STRING}</string>
+	<key>CFBundleIconFile</key>
+	<string>${MACOSX_BUNDLE_ICON_FILE}</string>
+	<key>CFBundleIdentifier</key>
+	<string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleLongVersionString</key>
+	<string>${MACOSX_BUNDLE_LONG_VERSION_STRING}</string>
+	<key>CFBundleName</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
+	<key>CSResourcesFileMapped</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>${MACOSX_BUNDLE_MIC_USAGE}</string>
+</dict>
+</plist>

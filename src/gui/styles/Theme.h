@@ -67,6 +67,11 @@ public:
     /// running program with the palette it had rather than with none.
     bool loadFile(const QString& path, QString* error = nullptr);
 
+    /// Liegt dieses Verzeichnis im Programmpaket? Mitgelieferte
+    /// Paletten sind Angebote, keine Vorgabe: available() listet sie,
+    /// loadUserTheme() ueberspringt sie. Siehe die Notiz dort.
+    static bool isShippedThemeDir(const QString& dir);
+
     /// The places a personal theme may live, most specific first.
     /// Public so the Setup page can show them: „lege deine Datei hier
     /// ab" ist eine bessere Antwort als „irgendwo".

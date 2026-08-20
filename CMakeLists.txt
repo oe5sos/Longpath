@@ -1168,7 +1168,29 @@ if(NEREUSSDR_LTO_AVAILABLE)
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 endif()
 
+# Der Text der Mikrofon-Begruendung. VOR dem Ziel gesetzt, weil ihn die
+# Info.plist-Vorlage einsetzt (cmake/MacOSXBundleInfo.plist.in) — eine
+# Variable, die erst danach gesetzt wird, kommt dort leer an, und ein
+# leerer NSMicrophoneUsageDescription ist so gut wie keiner.
+set(MACOSX_BUNDLE_MIC_USAGE
+    "Longpath uses the microphone for SSB voice transmission and live mic level monitoring.")
+
 add_executable(Longpath src/main.cpp ${APP_ICON_SOURCES})
+
+# Auf macOS nach Contents/Resources, sonst neben die Binaerdatei.
+#
+# NICHT nach Contents/MacOS: dort gehoert ausfuehrbarer Code hin, und
+# codesign meldet jede andere Datei als „In subcomponent" — eine
+# Signatur, die eine Datendatei im Programmverzeichnis mitsiegelt, ist
+# beim naechsten Aktualisieren der Datei ungueltig. Am 2026-08-20 beim
+# Neusignieren der Schreibtischkopie aufgefallen.
+#
+# Theme::searchPaths() kennt beide Orte.
+if(APPLE)
+    set(_nereus_theme_dest "$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Resources/themes")
+else()
+    set(_nereus_theme_dest "$<TARGET_FILE_DIR:Longpath>/themes")
+endif()
 
 # ── Mitgelieferte Farbpaletten ───────────────────────────────────────
 #
@@ -1181,11 +1203,11 @@ add_executable(Longpath src/main.cpp ${APP_ICON_SOURCES})
 # Theme::available()).
 add_custom_command(TARGET Longpath POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:Longpath>/themes"
+            "${_nereus_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/resources/themes/kreide.json"
-            "$<TARGET_FILE_DIR:Longpath>/themes/"
-    COMMENT "Farbpaletten neben die Binaerdatei legen")
+            "${_nereus_theme_dest}/"
+    COMMENT "Farbpaletten mitliefern")
 if(NEREUSSDR_LTO_AVAILABLE)
     # Main app + its OBJECT-lib link both get LTO when enabled.  The
     # IPO property on the executable arranges -flto on the link line;
@@ -1204,6 +1226,11 @@ endif()
 set_target_properties(Longpath PROPERTIES
     WIN32_EXECUTABLE TRUE
     MACOSX_BUNDLE TRUE
+    # Eigene Vorlage: sie traegt NSMicrophoneUsageDescription, damit der
+    # Schluessel schon beim Konfigurieren im Info.plist steht. Siehe den
+    # Kopf von cmake/MacOSXBundleInfo.plist.in — der Nachtrag nach dem
+    # Bauen ging bei jedem `cmake -B build` wieder verloren.
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/cmake/MacOSXBundleInfo.plist.in"
     MACOSX_BUNDLE_ICON_FILE "Longpath.icns"
     MACOSX_BUNDLE_BUNDLE_NAME "Longpath"
     MACOSX_BUNDLE_GUI_IDENTIFIER "at.oe5sos.longpath"
@@ -1222,7 +1249,7 @@ set_target_properties(Longpath PROPERTIES
 # Set succeeds when the key already exists from a prior build; falls
 # through to Add on the first build (when the key is absent).
 if(APPLE)
-    set(_nereus_mic_desc "Longpath uses the microphone for SSB voice transmission and live mic level monitoring.")
+    set(_nereus_mic_desc "${MACOSX_BUNDLE_MIC_USAGE}")
     add_custom_command(TARGET Longpath POST_BUILD
         COMMAND /bin/sh -c "/usr/libexec/PlistBuddy -c \"Set :NSMicrophoneUsageDescription '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :NSMicrophoneUsageDescription string '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\""
         COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Longpath>"
