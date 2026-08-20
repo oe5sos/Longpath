@@ -679,6 +679,11 @@ private:
     /// Duplizieren, Löschen) und den Stand beim Beenden sichern.
     void wireProfileRail();
 
+    /// Das schwebende „+" unten rechts an seinen Platz setzen. Es hat
+    /// keine Anordnung, die es mitzieht, also von Hand bei jeder
+    /// Groessenaenderung.
+    void positionAddWidgetButton();
+
     // ── Fensterteile, die keine Applets sind ─────────────────────────
     //
     // Sie stehen im Auswähler wie die Applets, hängen aber nicht in
@@ -1298,6 +1303,7 @@ private:
     class CommandBar* m_commandBar{nullptr};
     class AddWidgetButton* m_addWidget{nullptr};
     class ProfileRail* m_profileRail{nullptr};
+    class AddWidgetButton* m_addWidgetBtn{nullptr};
     class LayoutProfiles* m_layoutProfiles{nullptr};
 
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an

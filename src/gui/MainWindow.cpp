@@ -1219,6 +1219,20 @@ void MainWindow::applyChromeVisibility(const QString& id, bool visible)
     }
 }
 
+// Das Plus sitzt schwebend in der unteren rechten Ecke der
+// Arbeitsfläche — wie in der Vorlage. Es hat keinen Platz in einer
+// Anordnung, deshalb wird es von Hand gesetzt und muss bei jeder
+// Größenänderung mit.
+void MainWindow::positionAddWidgetButton()
+{
+    if (!m_addWidgetBtn || !centralWidget()) { return; }
+    const QSize s = m_addWidgetBtn->sizeHint();
+    m_addWidgetBtn->resize(s);
+    m_addWidgetBtn->move(centralWidget()->width()  - s.width()  - 18,
+                         centralWidget()->height() - s.height() - 18);
+    m_addWidgetBtn->raise();
+}
+
 void MainWindow::wireProfileRail()
 {
     if (!m_profileRail || !m_layoutProfiles) { return; }
@@ -5427,6 +5441,22 @@ void MainWindow::populateDefaultMeter()
     // the dspModeChanged lambda further down. The menu toggle here is a
     // user override that lasts until the next mode change repopulates
     // visibility. Acceptable for v1; tighter integration is a follow-up.
+    // ── BEIM START IST DIE FLAECHE LEER ──────────────────────────────
+    //
+    // Auf Ansage des Betreibers (2026-08-20): „zum start im linken
+    // menue, wenn ich neu starte, sollte alles leer sein. danach soll
+    // ich mit plus jedes windows adden koennen und verschieben."
+    // Vorbild ist Zeus Link, das genau so aufmacht.
+    //
+    // Umgesetzt ueber die VORGABE, nicht ueber ein Loeschen: wer schon
+    // eine Anordnung eingerichtet hat, hat sie in AppSettings stehen
+    // und behaelt sie. Leer ist nur, wer noch nichts gewaehlt hat.
+    // Eine gewachsene Anordnung ungefragt wegzuraeumen waere kein
+    // Umbau, sondern ein Datenverlust.
+    //
+    // Die zwei Chrome-Eintraege (Knopfleiste am Spektrum, Statuszeile)
+    // bleiben AN: das sind keine Fenster, die man hinzufuegt, sondern
+    // Teile des Rahmens.
     m_appletVis = new AppletVisibilityController(this);
 
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
@@ -5463,11 +5493,11 @@ void MainWindow::populateDefaultMeter()
     // permanently hide it. Defaulting to true here means new G2 users see
     // PS immediately without having to discover the menu toggle.
     m_appletVis->registerApplet(QStringLiteral("Rx"),
-                                QStringLiteral("RX"),           true);
+                                QStringLiteral("RX"),           false);
     m_appletVis->registerApplet(QStringLiteral("Tx"),
-                                QStringLiteral("TX"),           true);
+                                QStringLiteral("TX"),           false);
     m_appletVis->registerApplet(QStringLiteral("PhoneCw"),
-                                QStringLiteral("Phone / CW"),   true);
+                                QStringLiteral("Phone / CW"),   false);
     // RADE: defaultVisible=true (user pref). Actual visibility is gated
     // on the active slice's mode via the availability axis — the
     // dspModeChanged lambda below calls setAvailable(true) only when
@@ -5475,37 +5505,37 @@ void MainWindow::populateDefaultMeter()
     // since the default startup mode is USB; the mode lambda fires
     // shortly after to correct it if needed.
     m_appletVis->registerApplet(QStringLiteral("Rade"),
-                                QStringLiteral("RADE"),         true);
+                                QStringLiteral("RADE"),         false);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
-                                QStringLiteral("VAX"),          true);
+                                QStringLiteral("VAX"),          false);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
     // Funkgeraet brauchbar (Ansagen laden, benennen, Tasten zuordnen),
     // und ein Merkmal, das man erst in einem Menue suchen muss, findet
     // niemand.
     m_appletVis->registerApplet(QStringLiteral("Dvk"),
-                                QStringLiteral("Voice Keyer"),  true);
+                                QStringLiteral("Voice Keyer"),  false);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
-                                QStringLiteral("QSO Recorder"), true);
+                                QStringLiteral("QSO Recorder"), false);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),
-                                QStringLiteral("Bandwidth Filter"), true);
+                                QStringLiteral("Bandwidth Filter"), false);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
-                                QStringLiteral("PureSignal"),   true);
+                                QStringLiteral("PureSignal"),   false);
     m_appletVis->registerApplet(QStringLiteral("Amp"),
-                                QStringLiteral("Power Genius"), true);
+                                QStringLiteral("Power Genius"), false);
     m_appletVis->registerApplet(QStringLiteral("Tuner"),
-                                QStringLiteral("Tuner Genius"), true);
+                                QStringLiteral("Tuner Genius"), false);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
-                                QStringLiteral("RF-Kit RF2K-S"), true);
+                                QStringLiteral("RF-Kit RF2K-S"), false);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
     // Plus aus wie jedes andere Widget.
     m_appletVis->registerApplet(QStringLiteral("Frequency"),
-                                QStringLiteral("Frequenz"),     true);
+                                QStringLiteral("Frequenz"),     false);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
-                                QStringLiteral("Stehwelle"),    true);
+                                QStringLiteral("Stehwelle"),    false);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
-                                QStringLiteral("S-Meter"),      true);
+                                QStringLiteral("S-Meter"),      false);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -5606,7 +5636,7 @@ void MainWindow::populateDefaultMeter()
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletVis->registerApplet(QStringLiteral("Tci"),
-                                    QStringLiteral("TCI Server"),  true);
+                                    QStringLiteral("TCI Server"),  false);
         // Ohne describeApplet landen sie in „Sonstiges" und sind nur
         // ueber ihren Anzeigenamen zu finden — die Suche im Auswaehler
         // greift dann nicht auf „netzwerk" oder „fernsteuerung".
@@ -5619,7 +5649,7 @@ void MainWindow::populateDefaultMeter()
     }
     if (m_clientChainApplet) {
         m_appletVis->registerApplet(QStringLiteral("ClientChain"),
-                                    QStringLiteral("TCI Clients"), true);
+                                    QStringLiteral("TCI Clients"), false);
         m_appletVis->describeApplet(QStringLiteral("ClientChain"),
             QStringLiteral("Netzwerk"),
             {QStringLiteral("tci"), QStringLiteral("clients"),
@@ -5661,6 +5691,29 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("tci"), QStringLiteral("pa"),
          QStringLiteral("cpu"), QStringLiteral("spannung"),
          QStringLiteral("unten")});
+
+    // ── DAS PLUS ─────────────────────────────────────────────────────
+    //
+    // Auf Ansage des Betreibers (2026-08-20): „danach soll ich mit plus
+    // jedes windows adden können und verschieben" — wie bei Zeus Link.
+    //
+    // AddWidgetButton und der Auswähler dahinter (WidgetPicker, 433
+    // Zeilen mit Kategorien, Suchfeld und Karten, gebaut am 2026-08-15
+    // nach genau dieser Vorlage) waren FERTIG und wurden nirgends
+    // erzeugt. MainWindow.cpp hatte den include und sonst nichts. Der
+    // sechste Fall von „gebaut, an keiner Fläche" innerhalb von zwei
+    // Tagen — und der Grund, warum der Betreiber dreimal sagen musste,
+    // dass etwas nicht geht, das es längst gab.
+    //
+    // Schwebend unten rechts über der Arbeitsfläche, wie in der
+    // Vorlage. Nicht in eine Leiste gesteckt: dort wäre es eines von
+    // zwanzig Zeichen, und genau so war es bisher unsichtbar.
+    m_addWidgetBtn = new AddWidgetButton(m_appletVis, centralWidget());
+    m_addWidgetBtn->setToolTip(QStringLiteral(
+        "Fenster hinzufügen oder entfernen"));
+    m_addWidgetBtn->raise();
+    m_addWidgetBtn->show();
+    positionAddWidgetButton();
 
     // Capability gates: applets that depend on an external feature flag
     // get their availability set here. When availability is false, the
@@ -6931,6 +6984,31 @@ void MainWindow::buildMenuBar()
         QAction* resetAction = containersMenu->addAction(QStringLiteral("&Reset Default Layout"));
         connect(resetAction, &QAction::triggered, this,
                 &MainWindow::resetDefaultLayout);
+    }
+
+    // ── Alles ausblenden ─────────────────────────────────────────────
+    //
+    // Der Weg zur leeren Flaeche, ohne Einstellungen zu loeschen. Die
+    // neue Vorgabe (alles aus) gilt nur fuer eine frische
+    // Einstellungsdatei; wer schon eine Anordnung hat, behaelt sie —
+    // und braucht deshalb einen Knopf, der sie EINMAL wegraeumt.
+    //
+    // Umkehrbar: das Plus unten rechts holt jedes Fenster zurueck.
+    if (m_appletVis) {
+        QAction* clearAll = containersMenu->addAction(
+            QStringLiteral("Alle Fenster ausblenden"));
+        clearAll->setToolTip(QStringLiteral(
+            "Leere Flaeche. Mit dem + unten rechts holst du jedes "
+            "Fenster einzeln zurueck."));
+        connect(clearAll, &QAction::triggered, this, [this]() {
+            for (const QString& id : m_appletVis->registeredIds()) {
+                // Rahmen bleibt: Knopfleiste und Statuszeile sind keine
+                // Fenster, die man hinzufuegt.
+                if (id == QLatin1String(kChromeOverlayId)) { continue; }
+                if (id == QLatin1String(kChromeStatusId))  { continue; }
+                m_appletVis->setVisible(id, false);
+            }
+        });
     }
 
     containersMenu->addSeparator();
@@ -9613,6 +9691,9 @@ double MainWindow::readSystemCpuPercent()
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
+
+    // Das schwebende Plus hat keine Anordnung, die es mitzieht.
+    positionAddWidgetButton();
 
     // Update axis-lock positions for overlay-docked containers
     if (m_mainSplitter && m_containerManager) {
