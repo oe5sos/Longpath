@@ -65,6 +65,7 @@ branding.
 | File | Origin | Author | License | Added |
 | --- | --- | --- | --- | --- |
 | `NereusSDR.png` | Original NereusSDR application icon | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 (commit `c25b2f3`) |
+| ↳ heisst seit 2026-08-20 `Longpath.png` (Umbenennung der Anwendung). **Das Bild selbst ist unveraendert und bleibt Werk von J.J. Boyd (KG4VCF)** — es wird ersetzt, sobald Longpath ein eigenes Symbol hat. | | | | |
 | `NereusSDR.ico` | Windows ICO version of the same icon | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 (commit `c25b2f3`) |
 | `NereusSDR.icns` | macOS ICNS bundle version of the same icon | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 (commit `c25b2f3`) |
 | `NereusSDR.iconset/icon_16x16.png` | 16×16 variant | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 |

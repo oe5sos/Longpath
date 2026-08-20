@@ -34,7 +34,7 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     : QWidget(parent, Qt::Window)
     , m_applet(applet)
 {
-    setWindowTitle(QStringLiteral("NereusSDR - Pan %1")
+    setWindowTitle(QStringLiteral("Longpath - Pan %1")
                        .arg(applet ? applet->panId() : QString()));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);

@@ -1,6 +1,6 @@
-# Contributing to NereusSDR
+# Contributing to Longpath
 
-Thanks for your interest in NereusSDR! We're building a native, cross-platform
+Thanks for your interest in Longpath! We're building a native, cross-platform
 SDR console for OpenHPSDR radios. Community contributions are welcome.
 
 ---
@@ -18,8 +18,8 @@ SDR console for OpenHPSDR radios. Community contributions are welcome.
 ## Reporting Bugs
 
 - Open a [GitHub issue](https://github.com/boydsoftprez/NereusSDR/issues/new) directly.
-- Include: OS, NereusSDR version, radio model, protocol version (P1 or P2), firmware version.
-- Attach logs (`~/.config/NereusSDR/nereussdr.log`) if available.
+- Include: OS, Longpath version, radio model, protocol version (P1 or P2), firmware version.
+- Attach logs (`~/.config/Longpath/nereussdr.log`) if available.
 - Check existing issues first to avoid duplicates.
 
 ## Suggesting Features
@@ -32,7 +32,7 @@ SDR console for OpenHPSDR radios. Community contributions are welcome.
 
 ## Submitting Code
 
-**Development tool:** NereusSDR is developed using [Claude Code](https://claude.com/claude-code)
+**Development tool:** Longpath is developed using [Claude Code](https://claude.com/claude-code)
 as the primary development environment. We **strongly encourage all contributors to use
 Claude Code** — it has full codebase context via `CLAUDE.md` and naturally produces code
 that matches our conventions.
@@ -213,15 +213,15 @@ and proposed fix.
 ## License Preservation on Derived Code
 
 Any PR that ports, translates, or materially adapts Thetis source code
-into NereusSDR must preserve the original license header, copyright
+into Longpath must preserve the original license header, copyright
 lines, and dual-licensing notices from the Thetis source file, and append
-a dated modification note to the NereusSDR file. See
+a dated modification note to the Longpath file. See
 [docs/attribution/HOW-TO-PORT.md](docs/attribution/HOW-TO-PORT.md)
 for templates and [docs/attribution/THETIS-PROVENANCE.md](docs/attribution/THETIS-PROVENANCE.md)
 for the existing provenance inventory.
 
 Pulling a newer Thetis / mi0bot / AetherSDR / WDSP revision into
-NereusSDR? Follow
+Longpath? Follow
 [docs/attribution/UPSTREAM-SYNC-PROTOCOL.md](docs/attribution/UPSTREAM-SYNC-PROTOCOL.md)
 — it covers version-stamp refresh, cite re-verification, and how to
 log the sync in `REMEDIATION-LOG.md`.
@@ -276,5 +276,5 @@ of helping each other learn — bring that spirit here.
 
 ## License
 
-By contributing to NereusSDR, you agree that your contributions will be
+By contributing to Longpath, you agree that your contributions will be
 licensed under the [GNU General Public License v3.0](LICENSE).

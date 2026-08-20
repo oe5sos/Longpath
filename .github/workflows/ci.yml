@@ -372,7 +372,7 @@ jobs:
         # -DNEREUS_GPU_SPECTRUM=OFF on Linux.
         #
         # mold (the apt mold package) is the fast linker. With 451 test
-        # executables linking against NereusSDRObjs + Qt6 the default
+        # executables linking against LongpathObjs + Qt6 the default
         # ld linker dominated Linux build time at ~33 minutes. The
         # Configure (Linux) step below selects mold via -fuse-ld=mold.
         if: runner.os == 'Linux'
@@ -393,7 +393,7 @@ jobs:
       # SDK / .NET / GHC / unused hosted-tool-cache entries.  Phase
       # 3J-1 closeout pushed the total link-time on-disk footprint
       # past the remaining free budget: 451 test executables each
-      # linking against NereusSDRObjs (~700 MB stripped, much larger
+      # linking against LongpathObjs (~700 MB stripped, much larger
       # with debug info) plus the vendored RADE neural-codec tree.
       # Run #25835957362 died mid-link with "No space left on
       # device" and the log blob got truncated before upload finished.
@@ -703,9 +703,9 @@ jobs:
         shell: bash
         run: |
           case "${{ runner.os }}" in
-            Linux)   echo "binary=build/NereusSDR" >> "$GITHUB_OUTPUT" ;;
-            macOS)   echo "binary=build/NereusSDR.app" >> "$GITHUB_OUTPUT" ;;
-            Windows) echo "binary=build/NereusSDR.exe" >> "$GITHUB_OUTPUT" ;;
+            Linux)   echo "binary=build/Longpath" >> "$GITHUB_OUTPUT" ;;
+            macOS)   echo "binary=build/Longpath.app" >> "$GITHUB_OUTPUT" ;;
+            Windows) echo "binary=build/Longpath.exe" >> "$GITHUB_OUTPUT" ;;
           esac
 
       - name: Upload PR build artifact
@@ -714,7 +714,7 @@ jobs:
         with:
           # Strip the shard suffix from the artifact name so the Linux
           # binary appears as "Linux x64" not "Linux x64 (1/4)".
-          name: NereusSDR-pr${{ github.event.number }}-${{ runner.os == 'Linux' && 'Linux x64' || matrix.name }}
+          name: Longpath-pr${{ github.event.number }}-${{ runner.os == 'Linux' && 'Linux x64' || matrix.name }}
           path: ${{ steps.locate.outputs.binary }}
           retention-days: 7
           if-no-files-found: warn
@@ -745,7 +745,7 @@ jobs:
   # Gemeldet hat es niemand, weil JEDER bestehende Job dieser Datei mit
   # -DNEREUS_BUILD_TESTS=ON konfiguriert (ci.yml:537, :563, und der
   # Windows-Zweig). CMakeLists.txt:1691 reicht das Makro an
-  # NereusSDRObjs weiter, also übersetzte die CI immer eine
+  # LongpathObjs weiter, also übersetzte die CI immer eine
   # Objektbibliothek, in der die Funktion existiert. 678 grüne Tests,
   # jedes Mal, über Wochen.
   #
@@ -861,8 +861,8 @@ jobs:
       # dann, wenn das Ziel gar nicht Teil von `all` war.
       - name: Verify the binary exists
         run: |
-          test -x build-ship/NereusSDR
-          ls -la build-ship/NereusSDR
+          test -x build-ship/Longpath
+          ls -la build-ship/Longpath
 
       - name: ccache stats
         run: ccache --show-stats

@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in NereusSDR
+description: Report a bug in Longpath
 labels: ["bug"]
 body:
   - type: markdown
@@ -44,7 +44,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: NereusSDR Version
+      label: Longpath Version
       placeholder: "e.g. 0.1.0"
     validations:
       required: true
@@ -69,5 +69,5 @@ body:
     id: logs
     attributes:
       label: Relevant Logs
-      description: Attach logs from `~/.config/NereusSDR/nereussdr.log` if relevant
+      description: Attach logs from `~/.config/Longpath/nereussdr.log` if relevant
       render: text

@@ -436,7 +436,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
 
     // ── App-name label ─────────────────────────────────────────────────────
     // From AetherSDR TitleBar.cpp:101-104 — text swapped to "NereusSDR".
-    auto* appName = new QLabel(QStringLiteral("NereusSDR"), this);
+    auto* appName = new QLabel(QStringLiteral("Longpath"), this);
     // App-name label. From AetherSDR TitleBar.cpp:102.
     appName->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 16px; font-weight: bold; }")
                            .arg(QLatin1String(Style::kAccent)));

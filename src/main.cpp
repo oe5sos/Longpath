@@ -10,7 +10,7 @@
 #include "core/mmio/ExternalVariableEngine.h"
 #include "core/LogCategories.h"
 
-// Generated into the build tree by cmake/NereusBuildTag.cmake, once per
+// Generated into the build tree by cmake/LongpathBuildTag.cmake, once per
 // build, so NEREUSSDR_BUILD_TAG names the commit actually being compiled
 // instead of whatever HEAD happened to be at the last cmake configure.
 //
@@ -19,7 +19,7 @@
 // rebuilds this file and relinks this binary, and leaves the test suite (which
 // links the NereusSDRObjs object library) untouched. See CMakeLists.txt
 // section "Build tag" and src/core/BuildIdentity.h.
-#include "NereusBuildTag.h"
+#include "LongpathBuildTag.h"
 
 #include <QApplication>
 #include <QCommandLineOption>
@@ -154,7 +154,7 @@ int main(int argc, char* argv[])
             NereusSDR::AppSettings::setProfileOverride(earlyProfile);
         } else {
             fprintf(stderr,
-                    "NereusSDR: ignoring invalid --profile '%s' "
+                    "Longpath: ignoring invalid --profile '%s' "
                     "(allowed: [A-Za-z0-9_-]+)\n",
                     earlyProfile.toLocal8Bit().constData());
         }
@@ -184,10 +184,10 @@ int main(int argc, char* argv[])
     }
 
     QApplication app(argc, argv);
-    app.setApplicationName("NereusSDR");
+    app.setApplicationName("Longpath");
     app.setApplicationVersion(NEREUSSDR_VERSION);
-    app.setOrganizationName("NereusSDR");
-    app.setWindowIcon(QIcon(":/icons/NereusSDR.png"));
+    app.setOrganizationName("Longpath");
+    app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 
     // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
     // USER_INTERACTIVE QoS so heavy user-initiated background work
@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
     {
         QCommandLineParser parser;
         parser.setApplicationDescription(
-            QStringLiteral("NereusSDR — cross-platform OpenHPSDR client."));
+            QStringLiteral("Longpath — cross-platform OpenHPSDR client."));
         parser.addHelpOption();
         parser.addVersionOption();
         QCommandLineOption profileOpt(

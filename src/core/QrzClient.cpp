@@ -68,7 +68,7 @@ QNetworkReply* QrzClient::getUrl(const QString& query)
     url.setQuery(query);
     QNetworkRequest req{url};
     req.setHeader(QNetworkRequest::UserAgentHeader,
-                  QStringLiteral("NereusSDR/%1").arg(QCoreApplication::applicationVersion()));
+                  QStringLiteral("Longpath/%1").arg(QCoreApplication::applicationVersion()));
     req.setTransferTimeout(kTimeoutMs);
     return m_nam.get(req);
 }
@@ -120,7 +120,7 @@ void QrzClient::startLogin()
     q.addQueryItem(QStringLiteral("username"), m_username);
     q.addQueryItem(QStringLiteral("password"), m_password);
     q.addQueryItem(QStringLiteral("agent"),
-                   QStringLiteral("NereusSDR%1").arg(QCoreApplication::applicationVersion()));
+                   QStringLiteral("Longpath%1").arg(QCoreApplication::applicationVersion()));
     auto* reply = getUrl(q.toString(QUrl::FullyEncoded));
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         handleLoginReply(reply);
@@ -206,7 +206,7 @@ void QrzClient::testLogin(const QString& username, const QString& password)
     q.addQueryItem(QStringLiteral("username"), username);
     q.addQueryItem(QStringLiteral("password"), password);
     q.addQueryItem(QStringLiteral("agent"),
-                   QStringLiteral("NereusSDR%1").arg(QCoreApplication::applicationVersion()));
+                   QStringLiteral("Longpath%1").arg(QCoreApplication::applicationVersion()));
     auto* reply = getUrl(q.toString(QUrl::FullyEncoded));
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         reply->deleteLater();

@@ -510,7 +510,7 @@ void FreeDVReporterClient::handleEngineIO(const QString& raw)
             auth["callsign"] = m_callsign;
             auth["grid_square"] = m_gridSquare;
             auth["version"] = m_version.isEmpty()
-                                  ? QStringLiteral("NereusSDR")
+                                  ? QStringLiteral("Longpath")
                                   : m_version;
             // rx_only: NereusSDR can TX RADE per Phase 3R K-bench, so
             // default to false. Future enhancement: expose this as a

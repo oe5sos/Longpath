@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CMAKE_VER=$(grep -oE 'project\(NereusSDR VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | awk '{print $3}')
+          CMAKE_VER=$(grep -oE 'project\(Longpath VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | awk '{print $3}')
           TAG_VER="${{ steps.meta.outputs.version }}"
           BASE_VER="${TAG_VER%%-*}"
           if [[ "$CMAKE_VER" != "$BASE_VER" ]]; then
@@ -200,24 +200,24 @@ jobs:
       - name: Bundle models and license files into AppDir
         run: |
           # rnnoise models
-          mkdir -p AppDir/usr/share/NereusSDR/models/rnnoise
-          cp third_party/rnnoise/models/Default_large.bin  AppDir/usr/share/NereusSDR/models/rnnoise/
-          cp third_party/rnnoise/models/Default_small.bin  AppDir/usr/share/NereusSDR/models/rnnoise/
+          mkdir -p AppDir/usr/share/Longpath/models/rnnoise
+          cp third_party/rnnoise/models/Default_large.bin  AppDir/usr/share/Longpath/models/rnnoise/
+          cp third_party/rnnoise/models/Default_small.bin  AppDir/usr/share/Longpath/models/rnnoise/
           # DeepFilterNet3 ONNX tarball
-          mkdir -p AppDir/usr/share/NereusSDR/models/dfnet3
-          cp third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz AppDir/usr/share/NereusSDR/models/dfnet3/
+          mkdir -p AppDir/usr/share/Longpath/models/dfnet3
+          cp third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz AppDir/usr/share/Longpath/models/dfnet3/
           # License files — DFNR (Apache-2.0 + MIT) and rnnoise (BSD)
-          mkdir -p AppDir/usr/share/doc/NereusSDR/deepfilter
-          cp third_party/deepfilter/LICENSE       AppDir/usr/share/doc/NereusSDR/deepfilter/
-          cp third_party/deepfilter/LICENSE-APACHE AppDir/usr/share/doc/NereusSDR/deepfilter/
-          cp third_party/deepfilter/LICENSE-MIT   AppDir/usr/share/doc/NereusSDR/deepfilter/
-          cp third_party/deepfilter/COMMIT        AppDir/usr/share/doc/NereusSDR/deepfilter/
-          mkdir -p AppDir/usr/share/doc/NereusSDR/rnnoise
-          cp third_party/rnnoise/LICENSE          AppDir/usr/share/doc/NereusSDR/rnnoise/
+          mkdir -p AppDir/usr/share/doc/Longpath/deepfilter
+          cp third_party/deepfilter/LICENSE       AppDir/usr/share/doc/Longpath/deepfilter/
+          cp third_party/deepfilter/LICENSE-APACHE AppDir/usr/share/doc/Longpath/deepfilter/
+          cp third_party/deepfilter/LICENSE-MIT   AppDir/usr/share/doc/Longpath/deepfilter/
+          cp third_party/deepfilter/COMMIT        AppDir/usr/share/doc/Longpath/deepfilter/
+          mkdir -p AppDir/usr/share/doc/Longpath/rnnoise
+          cp third_party/rnnoise/LICENSE          AppDir/usr/share/doc/Longpath/rnnoise/
 
       - name: Build AppImage
         env:
-          LDAI_OUTPUT: NereusSDR-${{ needs.prepare.outputs.version }}-${{ matrix.arch }}.AppImage
+          LDAI_OUTPUT: Longpath-${{ needs.prepare.outputs.version }}-${{ matrix.arch }}.AppImage
           QT_SELECT: qt6
           EXTRA_QT_PLUGINS: multimedia
         run: |
@@ -227,17 +227,17 @@ jobs:
             export QMAKE=$(which qmake6 2>/dev/null || which qmake)
           fi
           mkdir -p AppDir/usr/share/applications
-          cat > AppDir/usr/share/applications/NereusSDR.desktop << 'DESKTOP'
+          cat > AppDir/usr/share/applications/Longpath.desktop << 'DESKTOP'
           [Desktop Entry]
           Type=Application
-          Name=NereusSDR
-          Exec=NereusSDR
+          Name=Longpath
+          Exec=Longpath
           Icon=nereussdr
           Categories=HamRadio;Audio;
           Comment=Cross-platform OpenHPSDR SDR Console (GPLv3 port of Thetis / mi0bot / FlexRadio PowerSDR lineage)
           DESKTOP
-          # Install the real NereusSDR icon at standard hicolor sizes.
-          # Uses the pre-rendered PNGs from resources/icons/NereusSDR.iconset/
+          # Install the real Longpath icon at standard hicolor sizes.
+          # Uses the pre-rendered PNGs from resources/icons/Longpath.iconset/
           # so there is no image-processing dependency on the runner (the
           # previous implementation called `convert` and fell back to `touch`,
           # which either produced a placeholder "NSDR" text bitmap or a
@@ -248,12 +248,12 @@ jobs:
           for size in 16 32 64 128 256 512; do
             mkdir -p AppDir/usr/share/icons/hicolor/${size}x${size}/apps
           done
-          cp resources/icons/NereusSDR.iconset/icon_16x16.png     AppDir/usr/share/icons/hicolor/16x16/apps/nereussdr.png
-          cp resources/icons/NereusSDR.iconset/icon_32x32.png     AppDir/usr/share/icons/hicolor/32x32/apps/nereussdr.png
-          cp resources/icons/NereusSDR.iconset/icon_32x32@2x.png  AppDir/usr/share/icons/hicolor/64x64/apps/nereussdr.png
-          cp resources/icons/NereusSDR.iconset/icon_128x128.png   AppDir/usr/share/icons/hicolor/128x128/apps/nereussdr.png
-          cp resources/icons/NereusSDR.iconset/icon_256x256.png   AppDir/usr/share/icons/hicolor/256x256/apps/nereussdr.png
-          cp resources/icons/NereusSDR.iconset/icon_512x512.png   AppDir/usr/share/icons/hicolor/512x512/apps/nereussdr.png
+          cp resources/icons/Longpath.iconset/icon_16x16.png     AppDir/usr/share/icons/hicolor/16x16/apps/nereussdr.png
+          cp resources/icons/Longpath.iconset/icon_32x32.png     AppDir/usr/share/icons/hicolor/32x32/apps/nereussdr.png
+          cp resources/icons/Longpath.iconset/icon_32x32@2x.png  AppDir/usr/share/icons/hicolor/64x64/apps/nereussdr.png
+          cp resources/icons/Longpath.iconset/icon_128x128.png   AppDir/usr/share/icons/hicolor/128x128/apps/nereussdr.png
+          cp resources/icons/Longpath.iconset/icon_256x256.png   AppDir/usr/share/icons/hicolor/256x256/apps/nereussdr.png
+          cp resources/icons/Longpath.iconset/icon_512x512.png   AppDir/usr/share/icons/hicolor/512x512/apps/nereussdr.png
 
           # The vendored RADE library (third_party/rade/src/CMakeLists.txt
           # ports radae_nopy at b289102) builds librade.so.0.1 as a SHARED
@@ -265,7 +265,7 @@ jobs:
           #   ERROR: Could not find dependency: librade.so.0.1
           # The --library flag SHOULD register the lib but in the linuxdeploy
           # continuous build (1-alpha @a9f929f) it did not — linuxdeploy
-          # errored on the NereusSDR dep trace before processing --library.
+          # errored on the Longpath dep trace before processing --library.
           # Use the documented LD_LIBRARY_PATH approach instead: prepend the
           # build-tree directory containing librade.so* to LD_LIBRARY_PATH so
           # linuxdeploy's standard resolver finds it during dep tracing and
@@ -283,14 +283,14 @@ jobs:
           ./linuxdeploy-${{ matrix.arch }}.AppImage \
             --appdir AppDir \
             --plugin qt \
-            --desktop-file AppDir/usr/share/applications/NereusSDR.desktop \
+            --desktop-file AppDir/usr/share/applications/Longpath.desktop \
             --output appimage
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
-          path: NereusSDR-*.AppImage
+          path: Longpath-*.AppImage
           retention-days: 7
 
   build-macos:
@@ -355,7 +355,7 @@ jobs:
       - name: Build FFTW from source for x86_64 (both precisions)
         if: matrix.arch == 'x86_64'
         run: |
-          # NereusSDR needs both libfftw3 (double, for libspecbleach + WDSP)
+          # Longpath needs both libfftw3 (double, for libspecbleach + WDSP)
           # and libfftw3f (single, for FFTEngine). FFTW autotools forces one
           # precision per configure run, so we run install twice into the
           # same prefix.
@@ -452,8 +452,8 @@ jobs:
           if [ "${{ matrix.arch }}" = "x86_64" ]; then
             # Cross-compile path: FFTW comes from our source build at
             # ${{ github.workspace }}/fftw-x86_64. PKG_CONFIG_PATH lets
-            # NereusSDR's pkg_check_modules(FFTW3 fftw3) find it; LDFLAGS
-            # adds -L so the linker resolves -lfftw3 (NereusSDR's
+            # Longpath's pkg_check_modules(FFTW3 fftw3) find it; LDFLAGS
+            # adds -L so the linker resolves -lfftw3 (Longpath's
             # third_party CMakeLists.txt files only call
             # target_link_libraries, not target_link_directories — brew's
             # /opt/homebrew/lib is in the default linker path on the arm64
@@ -494,31 +494,31 @@ jobs:
           else
             MACDEPLOYQT="$(brew --prefix qt@6)/bin/macdeployqt"
           fi
-          "$MACDEPLOYQT" build/NereusSDR.app -verbose=1 -always-overwrite
+          "$MACDEPLOYQT" build/Longpath.app -verbose=1 -always-overwrite
 
       - name: Copy license notices into app bundle
         run: |
-          mkdir -p build/NereusSDR.app/Contents/Resources/licenses
-          cp -r packaging/third-party-licenses/. build/NereusSDR.app/Contents/Resources/licenses/
-          cp LICENSE LICENSE-DUAL-LICENSING build/NereusSDR.app/Contents/Resources/licenses/
+          mkdir -p build/Longpath.app/Contents/Resources/licenses
+          cp -r packaging/third-party-licenses/. build/Longpath.app/Contents/Resources/licenses/
+          cp LICENSE LICENSE-DUAL-LICENSING build/Longpath.app/Contents/Resources/licenses/
           # DFNR (Apache-2.0 + MIT) and rnnoise (BSD) license files
-          mkdir -p build/NereusSDR.app/Contents/Resources/licenses/deepfilter
-          cp third_party/deepfilter/LICENSE       build/NereusSDR.app/Contents/Resources/licenses/deepfilter/
-          cp third_party/deepfilter/LICENSE-APACHE build/NereusSDR.app/Contents/Resources/licenses/deepfilter/
-          cp third_party/deepfilter/LICENSE-MIT   build/NereusSDR.app/Contents/Resources/licenses/deepfilter/
-          cp third_party/deepfilter/COMMIT        build/NereusSDR.app/Contents/Resources/licenses/deepfilter/
-          mkdir -p build/NereusSDR.app/Contents/Resources/licenses/rnnoise
-          cp third_party/rnnoise/LICENSE          build/NereusSDR.app/Contents/Resources/licenses/rnnoise/
+          mkdir -p build/Longpath.app/Contents/Resources/licenses/deepfilter
+          cp third_party/deepfilter/LICENSE       build/Longpath.app/Contents/Resources/licenses/deepfilter/
+          cp third_party/deepfilter/LICENSE-APACHE build/Longpath.app/Contents/Resources/licenses/deepfilter/
+          cp third_party/deepfilter/LICENSE-MIT   build/Longpath.app/Contents/Resources/licenses/deepfilter/
+          cp third_party/deepfilter/COMMIT        build/Longpath.app/Contents/Resources/licenses/deepfilter/
+          mkdir -p build/Longpath.app/Contents/Resources/licenses/rnnoise
+          cp third_party/rnnoise/LICENSE          build/Longpath.app/Contents/Resources/licenses/rnnoise/
 
       - name: Bundle models into app bundle
         run: |
           # rnnoise models
-          mkdir -p build/NereusSDR.app/Contents/Resources/models/rnnoise
-          cp third_party/rnnoise/models/Default_large.bin  build/NereusSDR.app/Contents/Resources/models/rnnoise/
-          cp third_party/rnnoise/models/Default_small.bin  build/NereusSDR.app/Contents/Resources/models/rnnoise/
+          mkdir -p build/Longpath.app/Contents/Resources/models/rnnoise
+          cp third_party/rnnoise/models/Default_large.bin  build/Longpath.app/Contents/Resources/models/rnnoise/
+          cp third_party/rnnoise/models/Default_small.bin  build/Longpath.app/Contents/Resources/models/rnnoise/
           # DeepFilterNet3 ONNX tarball
-          mkdir -p build/NereusSDR.app/Contents/Resources/models/dfnet3
-          cp third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz build/NereusSDR.app/Contents/Resources/models/dfnet3/
+          mkdir -p build/Longpath.app/Contents/Resources/models/dfnet3
+          cp third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz build/Longpath.app/Contents/Resources/models/dfnet3/
 
       # Sign the .app bundle. With APPLE_DEVELOPER_ID set we use Developer
       # ID + hardened runtime + entitlements (required for notarization).
@@ -529,11 +529,11 @@ jobs:
             codesign --force --deep --options runtime --timestamp \
               --entitlements packaging/macos/app-entitlements.plist \
               --sign "${{ secrets.APPLE_DEVELOPER_ID }}" \
-              build/NereusSDR.app
+              build/Longpath.app
           else
-            codesign --force --deep --sign - build/NereusSDR.app
+            codesign --force --deep --sign - build/Longpath.app
           fi
-          codesign --verify --verbose=2 build/NereusSDR.app
+          codesign --verify --verbose=2 build/Longpath.app
 
       - name: Build HAL plugin
         run: |
@@ -550,7 +550,7 @@ jobs:
           codesign --force --options runtime --timestamp \
             --entitlements packaging/macos/hal-entitlements.plist \
             --sign "${{ secrets.APPLE_DEVELOPER_ID }}" \
-            build-hal/NereusSDRVAX.driver
+            build-hal/LongpathVAX.driver
 
       - name: Build .pkg
         env:
@@ -572,7 +572,7 @@ jobs:
         if: env.HAS_APPLE_DEVELOPER_ID == 'true'
         run: |
           xcrun notarytool submit \
-            build/NereusSDR-${{ needs.prepare.outputs.version }}-${{ matrix.dmg_suffix }}.pkg \
+            build/Longpath-${{ needs.prepare.outputs.version }}-${{ matrix.dmg_suffix }}.pkg \
             --apple-id "${{ secrets.APPLE_ID }}" \
             --team-id "${{ secrets.APPLE_TEAM_ID }}" \
             --password "${{ secrets.APPLE_APP_PASSWORD }}" \
@@ -582,7 +582,7 @@ jobs:
         if: env.HAS_APPLE_DEVELOPER_ID == 'true'
         run: |
           xcrun stapler staple \
-            build/NereusSDR-${{ needs.prepare.outputs.version }}-${{ matrix.dmg_suffix }}.pkg
+            build/Longpath-${{ needs.prepare.outputs.version }}-${{ matrix.dmg_suffix }}.pkg
 
       - name: Create DMG
         run: |
@@ -590,24 +590,24 @@ jobs:
           # picks up the @2x sibling automatically when both files share the
           # same basename in the same directory.
           create-dmg \
-            --volname "NereusSDR" \
-            --volicon "resources/icons/NereusSDR.icns" \
+            --volname "Longpath" \
+            --volicon "resources/icons/Longpath.icns" \
             --background "packaging/macos/dmg-background.png" \
             --window-pos 200 120 \
             --window-size 680 384 \
             --icon-size 96 \
-            --icon "NereusSDR.app" 160 200 \
-            --hide-extension "NereusSDR.app" \
+            --icon "Longpath.app" 160 200 \
+            --hide-extension "Longpath.app" \
             --app-drop-link 540 200 \
-            "NereusSDR-${{ needs.prepare.outputs.version }}-${{ matrix.dmg_suffix }}.dmg" \
-            "build/NereusSDR.app" \
+            "Longpath-${{ needs.prepare.outputs.version }}-${{ matrix.dmg_suffix }}.dmg" \
+            "build/Longpath.app" \
           || true
-          ls -la NereusSDR-*.dmg
+          ls -la Longpath-*.dmg
 
       - name: Codesign DMG
         if: env.HAS_APPLE_DEVELOPER_ID == 'true'
         run: |
-          DMG_PATH=$(ls NereusSDR-*.dmg | head -1)
+          DMG_PATH=$(ls Longpath-*.dmg | head -1)
           codesign --force --timestamp \
             --sign "${{ secrets.APPLE_DEVELOPER_ID }}" \
             "$DMG_PATH"
@@ -615,7 +615,7 @@ jobs:
       - name: Notarize DMG
         if: env.HAS_APPLE_DEVELOPER_ID == 'true'
         run: |
-          DMG_PATH=$(ls NereusSDR-*.dmg | head -1)
+          DMG_PATH=$(ls Longpath-*.dmg | head -1)
           xcrun notarytool submit "$DMG_PATH" \
             --apple-id "${{ secrets.APPLE_ID }}" \
             --team-id "${{ secrets.APPLE_TEAM_ID }}" \
@@ -625,21 +625,21 @@ jobs:
       - name: Staple DMG
         if: env.HAS_APPLE_DEVELOPER_ID == 'true'
         run: |
-          DMG_PATH=$(ls NereusSDR-*.dmg | head -1)
+          DMG_PATH=$(ls Longpath-*.dmg | head -1)
           xcrun stapler staple "$DMG_PATH"
 
       - name: Upload .pkg artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-hal-pkg-${{ matrix.arch }}
-          path: build/NereusSDR-*.pkg
+          path: build/Longpath-*.pkg
           retention-days: 7
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
-          path: NereusSDR-*.dmg
+          path: Longpath-*.dmg
           retention-days: 7
 
   build-windows:
@@ -720,8 +720,8 @@ jobs:
         shell: pwsh
         run: |
           mkdir deploy
-          copy build\NereusSDR.exe deploy\
-          windeployqt deploy\NereusSDR.exe --release --no-translations --no-system-d3d-compiler
+          copy build\Longpath.exe deploy\
+          windeployqt deploy\Longpath.exe --release --no-translations --no-system-d3d-compiler
           if (Test-Path "third_party\fftw3\bin\libfftw3-3.dll") {
             copy third_party\fftw3\bin\libfftw3-3.dll deploy\
           }
@@ -747,7 +747,7 @@ jobs:
             exit 1
           }
           # rade.dll: librade SHARED library produced by third_party/rade.
-          # NereusSDR.exe load-time imports it via __declspec(dllimport),
+          # Longpath.exe load-time imports it via __declspec(dllimport),
           # so without rade.dll on the DLL search path the .exe fails to
           # launch with "rade.dll was not found". windeployqt only resolves
           # Qt DLLs, so this non-Qt dep must be staged by hand. v0.5.0
@@ -757,7 +757,7 @@ jobs:
           if (Test-Path $radeDll) {
             Copy-Item $radeDll deploy\
           } else {
-            Write-Error "rade.dll missing from build\third_party\rade\src\ (Windows artifact would ship broken: NereusSDR.exe will fail to launch with 'rade.dll was not found')"
+            Write-Error "rade.dll missing from build\third_party\rade\src\ (Windows artifact would ship broken: Longpath.exe will fail to launch with 'rade.dll was not found')"
             exit 1
           }
           # Copy third-party license notices + both root license files
@@ -785,7 +785,7 @@ jobs:
       - name: Create portable ZIP
         shell: pwsh
         run: |
-          $name = "NereusSDR-${{ needs.prepare.outputs.version }}-Windows-x64-portable.zip"
+          $name = "Longpath-${{ needs.prepare.outputs.version }}-Windows-x64-portable.zip"
           Compress-Archive -Path deploy\* -DestinationPath $name
 
       - name: Build NSIS installer
@@ -800,7 +800,7 @@ jobs:
           # not the invocation CWD. Pass an absolute path so the installer
           # lands in the repo root where the upload-artifact glob finds it.
           $repoRoot = (Resolve-Path .).Path
-          $outfile  = Join-Path $repoRoot "NereusSDR-$version-Windows-x64-setup.exe"
+          $outfile  = Join-Path $repoRoot "Longpath-$version-Windows-x64-setup.exe"
           & "C:\Program Files (x86)\NSIS\makensis.exe" `
               /DNSDR_VERSION=$version `
               /DNSDR_VERSION_NUMERIC=$versionNumeric `
@@ -818,8 +818,8 @@ jobs:
         with:
           name: windows-x64
           path: |
-            NereusSDR-*.zip
-            NereusSDR-*-setup.exe
+            Longpath-*.zip
+            Longpath-*-setup.exe
           retention-days: 7
 
   sign-and-publish:
@@ -854,8 +854,8 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}"
           TAG="${{ needs.prepare.outputs.tag }}"
           git archive --format=tar.gz \
-            --prefix="NereusSDR-${VERSION}/" \
-            "${TAG}" > "artifacts/NereusSDR-${VERSION}-source.tar.gz"
+            --prefix="Longpath-${VERSION}/" \
+            "${TAG}" > "artifacts/Longpath-${VERSION}-source.tar.gz"
 
       - name: Fetch FFTW3 corresponding source (GPLv2 §3 / GPLv3 §6)
         # The Windows installer + portable ZIP bundle a prebuilt
@@ -912,7 +912,7 @@ jobs:
           # Delete existing draft for this tag if rerunning
           gh release delete "$TAG" --yes --cleanup-tag=false 2>/dev/null || true
           gh release create "$TAG" \
-            --title "NereusSDR ${VERSION}" \
+            --title "Longpath ${VERSION}" \
             --notes-file artifacts/release_notes.md \
             --draft \
             $PRERELEASE_FLAG \

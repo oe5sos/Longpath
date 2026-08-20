@@ -1,3 +1,6 @@
+// no-port-check: Zitiert Thetis clsAudioRecordPlayback.cs an vier Stellen als Quelle fuer
+// Verhalten (Beschreibung einlesen, Platzpruefung, Loeschen, Nachhoeren);
+// die Oberflaeche ist NereusSDR-original. Siehe THETIS-PROVENANCE.md.
 // =================================================================
 // src/gui/applets/QsoRecorderApplet.cpp  (NereusSDR)
 // =================================================================

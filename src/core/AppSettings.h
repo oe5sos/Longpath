@@ -470,7 +470,7 @@ private:
     QString m_filePath;
     QMap<QString, QString> m_settings;
     QMap<QString, QString> m_stationSettings;
-    QString m_stationName{"NereusSDR"};
+    QString m_stationName{"Longpath"};
 
     // Issue #241 — corruption-recovery diagnostics (cleared at the top of
     // every load()).

@@ -3,7 +3,7 @@
 namespace NereusSDR {
 namespace BuildIdentity {
 
-// Set once by main() from the generated build/generated/NereusBuildTag.h,
+// Set once by main() from the generated build/generated/LongpathBuildTag.h,
 // read once by MainWindow::buildUI() when it composes the window title.
 // Empty is the release answer and also the answer for any binary that never
 // sets it, so no caller has to special-case a missing tag.

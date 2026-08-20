@@ -1,4 +1,4 @@
-# CI Docker image for NereusSDR
+# CI Docker image for Longpath
 # Build: docker build -t ghcr.io/boydsoftprez/nereussdr-ci:latest .github/docker/
 # This will be populated when build times warrant a custom container.
 

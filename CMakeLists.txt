@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(NereusSDR VERSION 0.5.2 LANGUAGES C CXX)
+project(Longpath VERSION 0.5.2 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
@@ -80,7 +80,7 @@ endif()
 # unoptimised so single-step debugging still works.
 option(NEREUSSDR_AGGRESSIVE_OPT "Use -O3 (instead of -O2) for release builds" ON)
 # 2026-05-26 KG4VCF: LTO default flipped to OFF.  With LTO enabled on
-# the shared NereusSDRObjs object library, every test binary (526 of
+# the shared LongpathObjs object library, every test binary (526 of
 # them) inherits the LTO bitcode and triggers a multi-minute LTO link
 # of its own.  Net effect on a clean build: 1+ hour, load avg 250+,
 # unusable while building.  Per-target IPO=FALSE on tests doesn't
@@ -101,7 +101,7 @@ if(NEREUSSDR_AGGRESSIVE_OPT)
                "${CMAKE_CXX_FLAGS_RELEASE}")
         string(REGEX REPLACE "-O[0-9s]" "-O3" CMAKE_C_FLAGS_RELEASE
                "${CMAKE_C_FLAGS_RELEASE}")
-        message(STATUS "NereusSDR: -O3 enabled for ${CMAKE_BUILD_TYPE}")
+        message(STATUS "Longpath: -O3 enabled for ${CMAKE_BUILD_TYPE}")
     endif()
 endif()
 
@@ -110,18 +110,18 @@ if(NEREUSSDR_ENABLE_LTO)
     check_ipo_supported(RESULT _lto_ok OUTPUT _lto_err)
     if(_lto_ok)
         # 2026-05-26 KG4VCF: LTO is applied PER-TARGET below (only the
-        # main NereusSDR executable + the parallel NereusSDRObjs_LTO
+        # main Longpath executable + the parallel LongpathObjs_LTO
         # object library it links).  We deliberately do NOT set the
         # global CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO
-        # flag, because that would make the shared NereusSDRObjs (used
+        # flag, because that would make the shared LongpathObjs (used
         # by 526 test executables) produce LTO bitcode, and every test
         # link would then trigger a multi-minute LTO pass.  Net effect
         # of the old global setting on a clean build: ~1 hour, load
         # avg 250+, dev-loop unusable while building.
         set(NEREUSSDR_LTO_AVAILABLE TRUE)
-        message(STATUS "NereusSDR: link-time optimization enabled (main app only)")
+        message(STATUS "Longpath: link-time optimization enabled (main app only)")
     else()
-        message(WARNING "NereusSDR: LTO requested but unsupported -- ${_lto_err}")
+        message(WARNING "Longpath: LTO requested but unsupported -- ${_lto_err}")
     endif()
 endif()
 
@@ -652,7 +652,7 @@ set(CORE_SOURCES
 )
 
 # CoreAudioHalBus — macOS-only IAudioBus implementation bridging to the
-# NereusSDRVAX HAL plugin via POSIX shared memory. The header is
+# LongpathVAX HAL plugin via POSIX shared memory. The header is
 # cross-platform-safe (falls through to error stubs off macOS) but the .cpp
 # pulls in <sys/mman.h> / shm_open, so only compile it on Apple targets.
 #
@@ -1104,19 +1104,19 @@ qt_add_resources(RESOURCES resources.qrc)
 # --------------------------------------------------------------------------
 set(APP_ICON_SOURCES "")
 if(APPLE)
-    set(APP_ICON_MACOS "${CMAKE_SOURCE_DIR}/resources/icons/NereusSDR.icns")
+    set(APP_ICON_MACOS "${CMAKE_SOURCE_DIR}/resources/icons/Longpath.icns")
     set_source_files_properties(${APP_ICON_MACOS} PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
     list(APPEND APP_ICON_SOURCES ${APP_ICON_MACOS})
 elseif(WIN32)
-    list(APPEND APP_ICON_SOURCES "${CMAKE_SOURCE_DIR}/resources/icons/NereusSDR.rc")
+    list(APPEND APP_ICON_SOURCES "${CMAKE_SOURCE_DIR}/resources/icons/Longpath.rc")
 endif()
 
 # --------------------------------------------------------------------------
 # Object library — shared between the app executable and test targets so
 # the same translation units are compiled once and consumed by both
-# (Phase 3I test infrastructure). Properties on NereusSDRObjs propagate
+# (Phase 3I test infrastructure). Properties on LongpathObjs propagate
 # to consumers (PUBLIC) via the CMake INTERFACE; the thin executable just
 # links src/main.cpp on top.
 #
@@ -1127,7 +1127,7 @@ endif()
 # the executable target below so .icns lands in Contents/Resources/ and
 # Windows .rc lands on the linker line.
 # --------------------------------------------------------------------------
-add_library(NereusSDRObjs OBJECT
+add_library(LongpathObjs OBJECT
     ${CORE_SOURCES}
     ${MODEL_SOURCES}
     ${GUI_SOURCES}
@@ -1139,56 +1139,56 @@ add_library(NereusSDRObjs OBJECT
 # already gates the menu wiring on Q_OS_LINUX, so the .cpp shouldn't enter
 # the build on macOS or Windows.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_sources(NereusSDRObjs PRIVATE src/gui/VaxLinuxFirstRunDialog.cpp)
+    target_sources(LongpathObjs PRIVATE src/gui/VaxLinuxFirstRunDialog.cpp)
 endif()
 
 # 2026-05-26 KG4VCF: parallel LTO-enabled object library, ONLY built
-# when NEREUSSDR_ENABLE_LTO=ON.  Same sources as NereusSDRObjs above,
-# but compiled with LTO bitcode so the main NereusSDR app's link can
+# when NEREUSSDR_ENABLE_LTO=ON.  Same sources as LongpathObjs above,
+# but compiled with LTO bitcode so the main Longpath app's link can
 # do cross-translation-unit optimization.  Tests continue to link the
-# plain NereusSDRObjs (no bitcode), so test link times stay fast.
+# plain LongpathObjs (no bitcode), so test link times stay fast.
 #
 # This is more work to build a release artifact (sources compile
 # twice) but it keeps the dev loop fast while preserving the LTO perf
 # benefit for shipped binaries.
 if(NEREUSSDR_LTO_AVAILABLE)
-    add_library(NereusSDRObjs_LTO OBJECT
+    add_library(LongpathObjs_LTO OBJECT
         ${CORE_SOURCES}
         ${MODEL_SOURCES}
         ${GUI_SOURCES}
         ${RESOURCES}
     )
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_sources(NereusSDRObjs_LTO PRIVATE src/gui/VaxLinuxFirstRunDialog.cpp)
+        target_sources(LongpathObjs_LTO PRIVATE src/gui/VaxLinuxFirstRunDialog.cpp)
     endif()
-    set_target_properties(NereusSDRObjs_LTO PROPERTIES
+    set_target_properties(LongpathObjs_LTO PROPERTIES
         INTERPROCEDURAL_OPTIMIZATION TRUE
         INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 endif()
 
-add_executable(NereusSDR src/main.cpp ${APP_ICON_SOURCES})
+add_executable(Longpath src/main.cpp ${APP_ICON_SOURCES})
 if(NEREUSSDR_LTO_AVAILABLE)
     # Main app + its OBJECT-lib link both get LTO when enabled.  The
     # IPO property on the executable arranges -flto on the link line;
-    # the IPO property on NereusSDRObjs_LTO above puts -flto on every
+    # the IPO property on LongpathObjs_LTO above puts -flto on every
     # compile.  Together: full cross-TU optimization for the shipped
     # binary.
-    target_link_libraries(NereusSDR PRIVATE NereusSDRObjs_LTO)
-    set_target_properties(NereusSDR PROPERTIES
+    target_link_libraries(Longpath PRIVATE LongpathObjs_LTO)
+    set_target_properties(Longpath PROPERTIES
         INTERPROCEDURAL_OPTIMIZATION TRUE
         INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 else()
-    target_link_libraries(NereusSDR PRIVATE NereusSDRObjs)
+    target_link_libraries(Longpath PRIVATE LongpathObjs)
 endif()
 
-set_target_properties(NereusSDR PROPERTIES
+set_target_properties(Longpath PROPERTIES
     WIN32_EXECUTABLE TRUE
     MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_ICON_FILE "NereusSDR.icns"
-    MACOSX_BUNDLE_BUNDLE_NAME "NereusSDR"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.boydsoftprez.NereusSDR"
+    MACOSX_BUNDLE_ICON_FILE "Longpath.icns"
+    MACOSX_BUNDLE_BUNDLE_NAME "Longpath"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "at.oe5sos.longpath"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_COPYRIGHT "© 2026 J.J. Boyd (KG4VCF); GPL port of Thetis (ramdor/Thetis) and mi0bot/OpenHPSDR-Thetis; descends from FlexRadio PowerSDR lineage. GPLv3."
@@ -1204,23 +1204,23 @@ set_target_properties(NereusSDR PROPERTIES
 # Set succeeds when the key already exists from a prior build; falls
 # through to Add on the first build (when the key is absent).
 if(APPLE)
-    set(_nereus_mic_desc "NereusSDR uses the microphone for SSB voice transmission and live mic level monitoring.")
-    add_custom_command(TARGET NereusSDR POST_BUILD
-        COMMAND /bin/sh -c "/usr/libexec/PlistBuddy -c \"Set :NSMicrophoneUsageDescription '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:NereusSDR>/Info.plist\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :NSMicrophoneUsageDescription string '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:NereusSDR>/Info.plist\""
-        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:NereusSDR>"
+    set(_nereus_mic_desc "Longpath uses the microphone for SSB voice transmission and live mic level monitoring.")
+    add_custom_command(TARGET Longpath POST_BUILD
+        COMMAND /bin/sh -c "/usr/libexec/PlistBuddy -c \"Set :NSMicrophoneUsageDescription '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :NSMicrophoneUsageDescription string '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\""
+        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Longpath>"
         COMMENT "Inject NSMicrophoneUsageDescription + re-sign bundle (mic-permission gate)"
         VERBATIM
     )
 endif()
 
-target_include_directories(NereusSDRObjs PUBLIC
+target_include_directories(LongpathObjs PUBLIC
     ${CMAKE_SOURCE_DIR}/src
 )
 
 # --------------------------------------------------------------------------
 # Linking
 # --------------------------------------------------------------------------
-target_link_libraries(NereusSDRObjs PUBLIC
+target_link_libraries(LongpathObjs PUBLIC
     Qt6::Core
     Qt6::Widgets
     Qt6::Network
@@ -1231,32 +1231,32 @@ target_link_libraries(NereusSDRObjs PUBLIC
 
 if(WIN32)
     # Needed by RadioDiscovery.cpp's setsockopt() call for SO_BROADCAST.
-    target_link_libraries(NereusSDR PRIVATE ws2_32)
+    target_link_libraries(Longpath PRIVATE ws2_32)
 endif()
 
 if(APPLE)
     # AVFoundation provides AVCaptureDevice for the launch-time mic-permission
     # prompt (src/core/MacMicPermission.mm, issue #203).
-    target_link_libraries(NereusSDRObjs PUBLIC "-framework AVFoundation")
+    target_link_libraries(LongpathObjs PUBLIC "-framework AVFoundation")
 
     # CoreAudio framework for AudioObjectGetPropertyData +
     # kAudioDevicePropertyIOThreadOSWorkgroup used by
     # src/core/audio/RealtimeAudioPriority.cpp.  The os_workgroup_*
     # APIs themselves come from libSystem (already linked) but the
     # property-query helpers and AudioDeviceID type live in CoreAudio.
-    target_link_libraries(NereusSDRObjs PUBLIC "-framework CoreAudio")
+    target_link_libraries(LongpathObjs PUBLIC "-framework CoreAudio")
 endif()
 
 if(WIN32)
     # avrt provides AvSetMmThreadCharacteristicsW + AvRevertMmThreadCharacteristics
     # used by src/core/audio/RealtimeAudioPriority.cpp to join the
     # "Pro Audio" MMCSS task class.
-    target_link_libraries(NereusSDRObjs PUBLIC avrt)
+    target_link_libraries(LongpathObjs PUBLIC avrt)
 endif()
 
 if(Qt6SerialPort_FOUND)
-    target_link_libraries(NereusSDRObjs PUBLIC Qt6::SerialPort)
-    target_compile_definitions(NereusSDRObjs PUBLIC HAVE_SERIALPORT)
+    target_link_libraries(LongpathObjs PUBLIC Qt6::SerialPort)
+    target_compile_definitions(LongpathObjs PUBLIC HAVE_SERIALPORT)
 endif()
 
 # Qt6::WebSockets is REQUIRED above; the link and HAVE_WEBSOCKETS define
@@ -1264,24 +1264,24 @@ endif()
 # FreeDVReporterClient, MainWindow, and SpotHubDialog are now redundant
 # but left in place to keep this PR surgical; cleanup tracked as a
 # follow-up.
-target_link_libraries(NereusSDRObjs PUBLIC Qt6::WebSockets)
-target_compile_definitions(NereusSDRObjs PUBLIC HAVE_WEBSOCKETS)
+target_link_libraries(LongpathObjs PUBLIC Qt6::WebSockets)
+target_compile_definitions(LongpathObjs PUBLIC HAVE_WEBSOCKETS)
 
 if(FFTW3_FOUND)
-    target_include_directories(NereusSDRObjs PUBLIC ${FFTW3_INCLUDE_DIRS})
-    target_link_libraries(NereusSDRObjs PUBLIC ${FFTW3_LIBRARIES})
-    target_compile_definitions(NereusSDRObjs PUBLIC HAVE_FFTW3)
+    target_include_directories(LongpathObjs PUBLIC ${FFTW3_INCLUDE_DIRS})
+    target_link_libraries(LongpathObjs PUBLIC ${FFTW3_LIBRARIES})
+    target_compile_definitions(LongpathObjs PUBLIC HAVE_FFTW3)
 endif()
 
 # libpipewire-0.3 — gated by the pkg_check_modules block above. Only links on
 # Linux when the dev package is present; NEREUS_HAVE_PIPEWIRE lets follow-up
 # PipeWire sources compile conditionally.
 if(PIPEWIRE_FOUND)
-    target_link_libraries(NereusSDRObjs PUBLIC ${PIPEWIRE_LIBRARIES})
-    target_include_directories(NereusSDRObjs PUBLIC ${PIPEWIRE_INCLUDE_DIRS})
-    target_compile_options(NereusSDRObjs PUBLIC ${PIPEWIRE_CFLAGS_OTHER})
-    target_compile_definitions(NereusSDRObjs PUBLIC NEREUS_HAVE_PIPEWIRE)
-    target_sources(NereusSDRObjs PRIVATE
+    target_link_libraries(LongpathObjs PUBLIC ${PIPEWIRE_LIBRARIES})
+    target_include_directories(LongpathObjs PUBLIC ${PIPEWIRE_INCLUDE_DIRS})
+    target_compile_options(LongpathObjs PUBLIC ${PIPEWIRE_CFLAGS_OTHER})
+    target_compile_definitions(LongpathObjs PUBLIC NEREUS_HAVE_PIPEWIRE)
+    target_sources(LongpathObjs PRIVATE
         src/core/audio/PipeWireThreadLoop.cpp
         src/core/audio/PipeWireStream.cpp
         src/core/audio/PipeWireBus.cpp
@@ -1295,8 +1295,8 @@ if(WDSP_FOUND)
     add_subdirectory(third_party/rnnoise)
     add_subdirectory(third_party/libspecbleach)
     add_subdirectory(third_party/wdsp)
-    target_link_libraries(NereusSDRObjs PUBLIC wdsp_static)
-    target_compile_definitions(NereusSDRObjs PUBLIC HAVE_WDSP)
+    target_link_libraries(LongpathObjs PUBLIC wdsp_static)
+    target_compile_definitions(LongpathObjs PUBLIC HAVE_WDSP)
 endif()
 
 # --------------------------------------------------------------------------
@@ -1314,8 +1314,8 @@ endif()
 # Opus source tree (under build_opus-prefix/src/build_opus). Upstream
 # adds these via directory-scope include_directories() in BuildOpus.cmake,
 # which only reaches sources compiled inside the rade subdirectory.
-# We re-expose them as target-scope include dirs on NereusSDRObjs so
-# any future NereusSDR consumer that #includes "rade_api.h" can resolve
+# We re-expose them as target-scope include dirs on LongpathObjs so
+# any future Longpath consumer that #includes "rade_api.h" can resolve
 # the transitive Opus headers.
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/rade)
@@ -1324,8 +1324,8 @@ if(NOT TARGET rade)
     message(FATAL_ERROR "RADE library target 'rade' not found after add_subdirectory(third_party/rade)")
 endif()
 
-target_link_libraries(NereusSDRObjs PUBLIC rade)
-target_include_directories(NereusSDRObjs PUBLIC
+target_link_libraries(LongpathObjs PUBLIC rade)
+target_include_directories(LongpathObjs PUBLIC
     ${CMAKE_SOURCE_DIR}/third_party/rade/src
     ${CMAKE_BINARY_DIR}/third_party/rade/build_opus-prefix/src/build_opus/include
     ${CMAKE_BINARY_DIR}/third_party/rade/build_opus-prefix/src/build_opus/dnn
@@ -1333,16 +1333,16 @@ target_include_directories(NereusSDRObjs PUBLIC
     ${CMAKE_BINARY_DIR}/third_party/rade/build_opus-prefix/src/build_opus
 )
 
-# rade is a SHARED library on Windows (rade.dll). NereusSDR.exe load-time
+# rade is a SHARED library on Windows (rade.dll). Longpath.exe load-time
 # imports it via __declspec(dllimport), so without rade.dll on the DLL
 # search path the .exe fails to launch with "rade.dll was not found".
 # CMake places rade.dll in third_party/rade/src/ but the .exe lives at
-# $<TARGET_FILE_DIR:NereusSDR>, so copy it next to the .exe at build time.
+# $<TARGET_FILE_DIR:Longpath>, so copy it next to the .exe at build time.
 # Mirrors the ENABLE_DFNR / deepfilter.dll pattern below.
 if(WIN32)
-    add_custom_command(TARGET NereusSDR POST_BUILD
+    add_custom_command(TARGET Longpath POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:rade>" "$<TARGET_FILE_DIR:NereusSDR>"
+            "$<TARGET_FILE:rade>" "$<TARGET_FILE_DIR:Longpath>"
         COMMENT "Copying rade.dll to build directory")
 endif()
 
@@ -1353,11 +1353,11 @@ endif()
 #
 # r8brain is header-only; the OBJECT library exists to anchor the
 # function-local statics in CDSPRealFFT.h to one translation unit and
-# to expose the include directory to NereusSDR sources that #include
+# to expose the include directory to Longpath sources that #include
 # "CDSPResampler.h".
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/r8brain)
-target_link_libraries(NereusSDRObjs PUBLIC r8brain)
+target_link_libraries(LongpathObjs PUBLIC r8brain)
 
 # --------------------------------------------------------------------------
 # DeepFilterNet3 DFNR — pre-built neural noise reduction library (MIT/Apache-2.0)
@@ -1408,24 +1408,24 @@ if(ENABLE_DFNR)
 endif()
 
 if(ENABLE_DFNR)
-    target_sources(NereusSDRObjs PRIVATE src/core/DeepFilterFilter.cpp)
-    target_include_directories(NereusSDRObjs PRIVATE ${DEEPFILTER_DIR}/include)
-    target_link_libraries(NereusSDRObjs PRIVATE ${DFNR_LIB})
-    target_compile_definitions(NereusSDRObjs PRIVATE HAVE_DFNR)
+    target_sources(LongpathObjs PRIVATE src/core/DeepFilterFilter.cpp)
+    target_include_directories(LongpathObjs PRIVATE ${DEEPFILTER_DIR}/include)
+    target_link_libraries(LongpathObjs PRIVATE ${DFNR_LIB})
+    target_compile_definitions(LongpathObjs PRIVATE HAVE_DFNR)
     if(WIN32)
-        target_link_libraries(NereusSDR PRIVATE ws2_32 bcrypt userenv ntdll)
+        target_link_libraries(Longpath PRIVATE ws2_32 bcrypt userenv ntdll)
         if(DFNR_DLL AND EXISTS ${DFNR_DLL})
-            add_custom_command(TARGET NereusSDR POST_BUILD
+            add_custom_command(TARGET Longpath POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${DFNR_DLL}" "$<TARGET_FILE_DIR:NereusSDR>"
+                    "${DFNR_DLL}" "$<TARGET_FILE_DIR:Longpath>"
                 COMMENT "Copying deepfilter.dll to build directory")
         endif()
     elseif(APPLE)
         # Rust runtime deps on macOS
-        target_link_libraries(NereusSDR PRIVATE "-framework Security" "-framework CoreFoundation")
+        target_link_libraries(Longpath PRIVATE "-framework Security" "-framework CoreFoundation")
     else()
         # Rust runtime deps on Linux
-        target_link_libraries(NereusSDR PRIVATE pthread dl m)
+        target_link_libraries(Longpath PRIVATE pthread dl m)
     endif()
     # Copy the model tarball to build dir + app bundle Resources so
     # findModelPath() in DeepFilterFilter.cpp can locate it at runtime.
@@ -1436,28 +1436,28 @@ if(ENABLE_DFNR)
             # reject a non-Mach-O file inside Contents/MacOS/, and so
             # ModelPaths::probeModel() probe #2 finds it at
             # <exeDir>/../Resources/models/dfnet3/<file>.
-            add_custom_command(TARGET NereusSDR POST_BUILD
+            add_custom_command(TARGET Longpath POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_BUNDLE_DIR:NereusSDR>/Contents/Resources/models/dfnet3"
+                    "$<TARGET_BUNDLE_DIR:Longpath>/Contents/Resources/models/dfnet3"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${DFNR_MODEL}" "$<TARGET_BUNDLE_DIR:NereusSDR>/Contents/Resources/models/dfnet3/"
+                    "${DFNR_MODEL}" "$<TARGET_BUNDLE_DIR:Longpath>/Contents/Resources/models/dfnet3/"
                 COMMENT "Copying DeepFilterNet3 model to app bundle Resources/models/dfnet3")
         else()
             # Non-macOS: place adjacent to exe in models/dfnet3/ subfolder so
             # ModelPaths::probeModel() probe #1 finds it at
             # <exeDir>/models/dfnet3/<file>.
-            add_custom_command(TARGET NereusSDR POST_BUILD
+            add_custom_command(TARGET Longpath POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:NereusSDR>/models/dfnet3"
+                    "$<TARGET_FILE_DIR:Longpath>/models/dfnet3"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${DFNR_MODEL}" "$<TARGET_FILE_DIR:NereusSDR>/models/dfnet3/"
+                    "${DFNR_MODEL}" "$<TARGET_FILE_DIR:Longpath>/models/dfnet3/"
                 COMMENT "Copying DeepFilterNet3 model to build directory models/dfnet3")
         endif()
         # Install the model alongside the binary for cmake --install.
-        # ModelPaths probe #3 expects <exeDir>/../share/NereusSDR/models/dfnet3/<file>.
+        # ModelPaths probe #3 expects <exeDir>/../share/Longpath/models/dfnet3/<file>.
         if(NOT APPLE)
             install(FILES "${DFNR_MODEL}"
-                DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/NereusSDR/models/dfnet3"
+                DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/Longpath/models/dfnet3"
                 OPTIONAL)
         endif()
     endif()
@@ -1469,9 +1469,9 @@ endif()
 # --------------------------------------------------------------------------
 option(ENABLE_MNR "Enable MNR Apple Accelerate noise reduction (macOS only)" ON)
 if(ENABLE_MNR AND APPLE)
-    target_sources(NereusSDRObjs PRIVATE src/core/MacNRFilter.cpp)
-    target_link_libraries(NereusSDRObjs PUBLIC "-framework Accelerate")
-    target_compile_definitions(NereusSDRObjs PUBLIC HAVE_MNR)
+    target_sources(LongpathObjs PRIVATE src/core/MacNRFilter.cpp)
+    target_link_libraries(LongpathObjs PUBLIC "-framework Accelerate")
+    target_compile_definitions(LongpathObjs PUBLIC HAVE_MNR)
     message(STATUS "MNR (Apple Accelerate) enabled")
 elseif(ENABLE_MNR)
     set(ENABLE_MNR OFF)
@@ -1480,12 +1480,12 @@ endif()
 
 # PortAudio (Phase 3O VAX) — always linked; PortAudioBus is the cross-platform
 # IAudioBus fallback when no native low-latency backend is available.
-target_link_libraries(NereusSDRObjs PRIVATE portaudio_static)
-target_include_directories(NereusSDRObjs PUBLIC ${portaudio_SOURCE_DIR}/include)
+target_link_libraries(LongpathObjs PRIVATE portaudio_static)
+target_include_directories(LongpathObjs PUBLIC ${portaudio_SOURCE_DIR}/include)
 
 if(NEREUS_GPU_SPECTRUM)
-    target_link_libraries(NereusSDRObjs PUBLIC Qt6::GuiPrivate)
-    target_compile_definitions(NereusSDRObjs PUBLIC NEREUS_GPU_SPECTRUM)
+    target_link_libraries(LongpathObjs PUBLIC Qt6::GuiPrivate)
+    target_compile_definitions(LongpathObjs PUBLIC NEREUS_GPU_SPECTRUM)
 
     # NOTE: this must use the SAME test as the gate at the top of this
     # file, and for a long time it did not.
@@ -1503,7 +1503,7 @@ if(NEREUS_GPU_SPECTRUM)
     # its own fix. One variable, set once at the gate, is the only way
     # these two places cannot drift apart again.
     if(_nereus_have_shadertools)
-        qt_add_shaders(NereusSDRObjs "nereus_shaders"
+        qt_add_shaders(LongpathObjs "nereus_shaders"
             PREFIX "/shaders"
             FILES
                 resources/shaders/waterfall.vert
@@ -1514,7 +1514,7 @@ if(NEREUS_GPU_SPECTRUM)
                 resources/shaders/overlay.frag
         )
 
-        qt_add_shaders(NereusSDRObjs "nereus_meter_shaders"
+        qt_add_shaders(LongpathObjs "nereus_meter_shaders"
             PREFIX "/shaders"
             FILES
                 resources/shaders/meter_textured.vert
@@ -1537,22 +1537,22 @@ endif()
 # binary was on screen took a `pgrep` against the executable path. The title
 # bar should have answered it.
 #
-# Release artifacts get an empty tag and keep the clean "NereusSDR 0.5.2"
+# Release artifacts get an empty tag and keep the clean "Longpath 0.5.2"
 # title. Detection needs no CI change: release.yml checks out `ref: <tag>`
 # (.github/workflows/release.yml), so HEAD sits exactly on a tag there and
 # nowhere else.
 #
-# The derivation itself lives in cmake/NereusBuildTag.cmake and runs once per
+# The derivation itself lives in cmake/LongpathBuildTag.cmake and runs once per
 # build, not once per configure. It used to run here, which meant the tag
 # froze at whatever HEAD was when the build tree was last configured; a bench
 # build was observed advertising a sha five commits stale. The script writes
-# build/generated/NereusBuildTag.h only when the text changes, so the extra
+# build/generated/LongpathBuildTag.h only when the text changes, so the extra
 # build step costs one git call and recompiles nothing on a no-op build.
 set(NEREUSSDR_BUILD_TAG "" CACHE STRING
     "Text appended to the window title identifying a non-release build. Auto-derived from git when empty; set to a single space to force it off.")
 
-set(NEREUS_BUILD_TAG_HEADER "${CMAKE_BINARY_DIR}/generated/NereusBuildTag.h")
-set(NEREUS_BUILD_TAG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/NereusBuildTag.cmake")
+set(NEREUS_BUILD_TAG_HEADER "${CMAKE_BINARY_DIR}/generated/LongpathBuildTag.h")
+set(NEREUS_BUILD_TAG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LongpathBuildTag.cmake")
 
 # Resolve git once here rather than in the script, which would repeat the
 # find_program on every build. Copied into a local rather than clearing
@@ -1586,20 +1586,20 @@ add_custom_target(nereus_build_tag ALL
     BYPRODUCTS "${NEREUS_BUILD_TAG_HEADER}"
     COMMENT "Re-deriving the smoke-build tag"
     VERBATIM)
-add_dependencies(NereusSDR nereus_build_tag)
+add_dependencies(Longpath nereus_build_tag)
 
 # Deliberately PRIVATE to the executable, and deliberately consumed only by
-# src/main.cpp. Every one of the ~450 test executables links NereusSDRObjs,
+# src/main.cpp. Every one of the ~450 test executables links LongpathObjs,
 # so a generated header reaching that object library would relink all of them
 # each time HEAD moved. Confined here, a new commit recompiles one small
 # translation unit and relinks one binary. main.cpp hands the value to
 # BuildIdentity, which is what MainWindow reads when it composes the title.
-target_include_directories(NereusSDR PRIVATE "${CMAKE_BINARY_DIR}/generated")
+target_include_directories(Longpath PRIVATE "${CMAKE_BINARY_DIR}/generated")
 
 # --------------------------------------------------------------------------
 # Version define
 # --------------------------------------------------------------------------
-target_compile_definitions(NereusSDRObjs PUBLIC
+target_compile_definitions(LongpathObjs PUBLIC
     NEREUSSDR_VERSION="${PROJECT_VERSION}"
 )
 
@@ -1607,12 +1607,12 @@ target_compile_definitions(NereusSDRObjs PUBLIC
 # Compiler warnings
 # --------------------------------------------------------------------------
 if(MSVC)
-    target_compile_options(NereusSDRObjs PRIVATE /W3 /Zc:__cplusplus)
+    target_compile_options(LongpathObjs PRIVATE /W3 /Zc:__cplusplus)
 else()
-    target_compile_options(NereusSDRObjs PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(LongpathObjs PRIVATE -Wall -Wextra -Wpedantic)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(NereusSDRObjs PUBLIC -fsanitize=address)
-        target_link_options(NereusSDR PRIVATE -fsanitize=address)
+        target_compile_options(LongpathObjs PUBLIC -fsanitize=address)
+        target_link_options(Longpath PRIVATE -fsanitize=address)
     endif()
 endif()
 
@@ -1622,7 +1622,7 @@ endif()
 # CI bake-off (ubuntu-24.04, 4 vCPU, 451 test executables) showed Linux
 # spending ~33m in the build step vs ~6m on macOS / ~12m on Windows.
 # Most of that is repeated parsing of Qt6 + STL headers across the
-# NereusSDRObjs translation units AND across every test target that
+# LongpathObjs translation units AND across every test target that
 # REUSE_FROMs this PCH (see tests/CMakeLists.txt nereus_add_test()).
 #
 # Keep the list conservative: only headers used by the vast majority of
@@ -1648,7 +1648,7 @@ if(APPLE)
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(NEREUS_USE_PCH)
-    target_precompile_headers(NereusSDRObjs PRIVATE
+    target_precompile_headers(LongpathObjs PRIVATE
         # Qt6 core (every model + worker TU)
         <QObject>
         <QString>
@@ -1688,12 +1688,12 @@ endif()
 # Install
 # --------------------------------------------------------------------------
 include(GNUInstallDirs)
-install(TARGETS NereusSDR
+install(TARGETS Longpath
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     BUNDLE  DESTINATION .
 )
 
-# Bundle third-party license notices + NereusSDR's LICENSE into release artifacts.
+# Bundle third-party license notices + Longpath's LICENSE into release artifacts.
 # LICENSE-DUAL-LICENSING is shipped alongside LICENSE because Thetis maintains
 # both at project root and GPL §1 "keep intact all notices that refer to this
 # License" extends to every license-related file upstream, not only the main
@@ -1708,12 +1708,12 @@ install(FILES LICENSE LICENSE-DUAL-LICENSING
 # --------------------------------------------------------------------------
 # Tests (Qt6::Test). Opt-in via -DNEREUS_BUILD_TESTS=ON.
 # --------------------------------------------------------------------------
-option(NEREUS_BUILD_TESTS "Build NereusSDR test suite" OFF)
+option(NEREUS_BUILD_TESTS "Build Longpath test suite" OFF)
 if(NEREUS_BUILD_TESTS)
     # Propagate the define to the object library so test-guard blocks
-    # (e.g. isTabVisibleForTest) are compiled into NereusSDRObjs and
+    # (e.g. isTabVisibleForTest) are compiled into LongpathObjs and
     # therefore available for linking into test executables.
-    target_compile_definitions(NereusSDRObjs PUBLIC NEREUS_BUILD_TESTS)
+    target_compile_definitions(LongpathObjs PUBLIC NEREUS_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
@@ -1721,9 +1721,9 @@ endif()
 # --------------------------------------------------------------------------
 # macOS HAL Audio Server Plug-In (Phase 3O VAX — Sub-Phase 5)
 #
-# Builds NereusSDRVAX.driver, a standalone CoreAudio HAL plugin that
-# exposes 4 virtual RX devices ("NereusSDR VAX 1..4") plus 1 TX device
-# ("NereusSDR TX"). Off by default because the plugin pulls libASPL via
+# Builds LongpathVAX.driver, a standalone CoreAudio HAL plugin that
+# exposes 4 virtual RX devices ("Longpath VAX 1..4") plus 1 TX device
+# ("Longpath TX"). Off by default because the plugin pulls libASPL via
 # FetchContent and its preferred build is a separate cmake tree
 # (`cmake -B build-hal -S hal-plugin`) — see docs/architecture/
 # 2026-04-19-vax-design.md §8.1. Enable here only when you want the

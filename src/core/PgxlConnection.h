@@ -67,7 +67,7 @@ public slots:
     // Tier 2 NereusSDR-native command surface.
     // From FlexRadio PowerGenius Ethernet API wiki spec (see design §6.4).
     quint32 amplifierCreate(const QString& ourSerial,
-                            const QString& ourModel = "NereusSDR",
+                            const QString& ourModel = "Longpath",
                             const QString& antMap = "ANT1:PORTA,ANT2:PORTB");
     quint32 flexradioPair(QChar ampSlice,
                           const QString& radioSerial,

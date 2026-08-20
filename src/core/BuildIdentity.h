@@ -11,7 +11,7 @@ namespace NereusSDR {
 // bench can tell which build is on screen. Release artifacts carry no tag.
 //
 // Why this is injected at startup rather than compiled in wherever it is
-// read: the tag is re-derived on every build from cmake/NereusBuildTag.cmake,
+// read: the tag is re-derived on every build from cmake/LongpathBuildTag.cmake,
 // so whatever translation unit consumes the generated header recompiles each
 // time HEAD moves. MainWindow lives in NereusSDRObjs, which all ~450 test
 // executables link, so consuming it there would relink the entire test suite

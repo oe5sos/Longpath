@@ -756,7 +756,7 @@ MainWindow::MainWindow(QWidget* parent)
         // Create dialog on first progress signal
         if (!m_wisdomDialog && percent < 100) {
             m_wisdomDialog = new QProgressDialog(this);
-            m_wisdomDialog->setWindowTitle(QStringLiteral("NereusSDR — FFTW Wisdom"));
+            m_wisdomDialog->setWindowTitle(QStringLiteral("Longpath — FFTW Wisdom"));
             m_wisdomDialog->setLabelText(
                 QStringLiteral("Optimizing FFT plans for DSP engine...\n\n"
                                "This only happens on first run."));
@@ -12309,7 +12309,7 @@ void MainWindow::showFeatureRequestDialog()
     auto* nam = new QNetworkAccessManager(this);
     QNetworkRequest req(QUrl(QStringLiteral(
         "https://api.github.com/repos/boydsoftprez/NereusSDR/releases/latest")));
-    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("NereusSDR"));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Longpath"));
     auto* reply = nam->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, nam] {
         reply->deleteLater();

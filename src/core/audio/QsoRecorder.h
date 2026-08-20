@@ -1,5 +1,9 @@
 #pragma once
 
+// no-port-check: Verhalten an Thetis clsAudioRecordPlayback.cs angelehnt (Feldauswahl der
+// Beschreibung, Stereo-Spurenaufteilung); KEIN Zeilenport, kein C#-Code
+// uebernommen. Herkunft steht als Zeile 'reference' in THETIS-PROVENANCE.md.
+
 // =================================================================
 // src/core/audio/QsoRecorder.h  (NereusSDR)
 // =================================================================

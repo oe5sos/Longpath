@@ -100,6 +100,92 @@ bool AppSettings::isValidProfileName(const QString& profile)
     return re.match(profile).hasMatch();
 }
 
+namespace {
+
+// ── Wie das Programm heisst, an EINER Stelle ─────────────────────────
+//
+// Ordner und Dateiname der Einstellungen. Zwei Stellen mit demselben
+// Namen laufen beim naechsten Umbenennen auseinander; eine tut es
+// nicht.
+QString appFolderName()   { return QStringLiteral("Longpath"); }
+QString appFileBaseName() { return QStringLiteral("Longpath"); }
+
+// Den alten Einstellungsordner EINMAL herueberkopieren.
+//
+// Bedingungen, und alle drei muessen stimmen:
+//   * der neue Ordner gibt es noch nicht — sonst uebermalte jeder
+//     Start die neuen Einstellungen mit den alten;
+//   * der alte gibt es;
+//   * der alte enthaelt eine Einstellungsdatei (ein leerer Ordner ist
+//     nichts zum Uebernehmen).
+//
+// Kopiert wird flach plus der Unterordner „profiles". Tiefer geht es
+// nicht: dort liegt nichts.
+void migrateLegacyConfigOnce(const QString& oldRoot, const QString& newRoot)
+{
+    // KEINE statische Einmal-Sperre. Der erste Entwurf hatte eine, und
+    // sie war gleich zweimal falsch: sie machte die Uebernahme
+    // unpruefbar (der Test kam nie an sie heran, weil irgendein
+    // frueher Aufruf sie schon verbraucht hatte), und sie haette einen
+    // Ordner, der spaeter auftaucht, nie mehr angesehen.
+    //
+    // Die Pruefung darunter reicht und ist von sich aus wiederholbar:
+    // gibt es den neuen Ordner, wird nichts angefasst.
+    QDir newDir(newRoot);
+    if (newDir.exists()) { return; }
+
+    QDir oldDir(oldRoot);
+    if (!oldDir.exists()) { return; }
+    if (!QFile::exists(oldRoot + QStringLiteral("/NereusSDR.settings"))) {
+        return;
+    }
+
+    if (!QDir().mkpath(newRoot)) { return; }
+
+    // Die Hauptdatei bekommt den NEUEN Namen. Sonst liegt sie da und
+    // wird nie gelesen — der stillste denkbare Fehler.
+    QFile::copy(oldRoot + QStringLiteral("/NereusSDR.settings"),
+                newRoot + QStringLiteral("/") + appFileBaseName()
+                    + QStringLiteral(".settings"));
+
+    // Alles andere flach mit: Sicherungen, Wisdom-Marken, was sonst
+    // dort liegt.
+    const auto files = oldDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+    for (const QFileInfo& f : files) {
+        if (f.fileName() == QStringLiteral("NereusSDR.settings")) { continue; }
+        QFile::copy(f.absoluteFilePath(),
+                    newRoot + QStringLiteral("/") + f.fileName());
+    }
+
+    // Und die Profile, jedes mit seiner umbenannten Datei.
+    QDir oldProfiles(oldRoot + QStringLiteral("/profiles"));
+    if (oldProfiles.exists()) {
+        const auto subs = oldProfiles.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString& sub : subs) {
+            const QString from = oldProfiles.absolutePath()
+                                 + QStringLiteral("/") + sub;
+            const QString to = newRoot + QStringLiteral("/profiles/") + sub;
+            if (!QDir().mkpath(to)) { continue; }
+            const auto pf = QDir(from).entryInfoList(QDir::Files
+                                                    | QDir::NoDotAndDotDot);
+            for (const QFileInfo& f : pf) {
+                QString name = f.fileName();
+                if (name == QStringLiteral("NereusSDR.settings")) {
+                    name = appFileBaseName() + QStringLiteral(".settings");
+                }
+                QFile::copy(f.absoluteFilePath(),
+                            to + QStringLiteral("/") + name);
+            }
+        }
+    }
+
+    qInfo("AppSettings: Einstellungen aus %s nach %s uebernommen (kopiert, "
+          "nicht verschoben)",
+          qUtf8Printable(oldRoot), qUtf8Printable(newRoot));
+}
+
+} // namespace
+
 QString AppSettings::resolveConfigDir(const QString& profile)
 {
     // 2026-05-12 (PR #238 follow-up): both branches now resolve through
@@ -113,9 +199,27 @@ QString AppSettings::resolveConfigDir(const QString& profile)
     // path on macOS (~/Library/Preferences) when test mode is OFF,
     // so production behavior is unchanged — only test isolation
     // gets fixed.
-    const QString root = QStandardPaths::writableLocation(
-                             QStandardPaths::GenericConfigLocation)
-                         + QStringLiteral("/NereusSDR");
+    const QString base = QStandardPaths::writableLocation(
+                             QStandardPaths::GenericConfigLocation);
+    const QString root = base + QStringLiteral("/") + appFolderName();
+
+    // ── Uebernahme aus der Zeit als NereusSDR ────────────────────────
+    //
+    // Bis zum 2026-08-20 hiess das Programm NereusSDR, und die
+    // Einstellungen lagen unter „<config>/NereusSDR". Ohne das Folgende
+    // wuerde die umbenannte Fassung in einem leeren Ordner nachsehen
+    // und der Betreiber saehe seine gesamte Anordnung als verloren an —
+    // Fensterlagen, Profile, Filter, Rufzeichen, alles.
+    //
+    // KOPIEREN, NICHT VERSCHIEBEN. Ein paralleler NereusSDR-Bau soll
+    // weiterlaufen, und es soll einen Rueckweg geben. Speicherplatz
+    // kostet das nichts (eine XML-Datei und ein paar Profile).
+    //
+    // Nur EINMAL: sobald der neue Ordner existiert, wird nichts mehr
+    // angefasst — sonst uebermalte jeder Start die neuen Einstellungen
+    // mit den alten.
+    migrateLegacyConfigOnce(base + QStringLiteral("/NereusSDR"), root);
+
     if (!isValidProfileName(profile)) {
         return root;
     }
@@ -124,7 +228,8 @@ QString AppSettings::resolveConfigDir(const QString& profile)
 
 QString AppSettings::resolveSettingsPath(const QString& profile)
 {
-    return resolveConfigDir(profile) + QStringLiteral("/NereusSDR.settings");
+    return resolveConfigDir(profile) + QStringLiteral("/") + appFileBaseName()
+           + QStringLiteral(".settings");
 }
 
 AppSettings& AppSettings::instance()
@@ -402,7 +507,12 @@ bool parseSettingsXml(const QString& sanitizedXml,
         xml.readNext();
         if (xml.isStartElement()) {
             const QString tag = xml.name().toString();
-            if (tag == QStringLiteral("NereusSDR")) {
+            // Beide Wurzelnamen annehmen: Dateien aus der Zeit als
+            // NereusSDR tragen „NereusSDR", neue tragen „Longpath".
+            // Nur den neuen zu kennen hiesse, jede alte Datei fuer
+            // kaputt zu halten.
+            if (tag == QStringLiteral("NereusSDR")
+                || tag == appFileBaseName()) {
                 continue;
             }
             if (!inStation && xml.attributes().hasAttribute(QStringLiteral("type"))
@@ -642,7 +752,7 @@ void AppSettings::save()
         QXmlStreamWriter xml(&file);
         xml.setAutoFormatting(true);
         xml.writeStartDocument();
-        xml.writeStartElement(QStringLiteral("NereusSDR"));
+        xml.writeStartElement(appFileBaseName());
 
         // Write top-level settings (encode keys so XML element names are valid)
         for (auto it = m_settings.constBegin(); it != m_settings.constEnd(); ++it) {

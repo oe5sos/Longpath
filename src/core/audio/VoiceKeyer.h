@@ -1,5 +1,9 @@
 #pragma once
 
+// no-port-check: Nennt Thetis clsAudioRecordPlayback.cs (MW0LGE) als Verhaltensquelle fuer
+// den Sprachspeicher; NereusSDR-original, kein Zeilenport. Siehe
+// THETIS-PROVENANCE.md, Art 'reference'.
+
 // =================================================================
 // src/core/audio/VoiceKeyer.h  (NereusSDR)
 // =================================================================

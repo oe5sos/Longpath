@@ -1,5 +1,9 @@
 #pragma once
 
+// no-port-check: Nennt Thetis PlayFileViaPCAudio (clsAudioRecordPlayback.cs) als Vorbild
+// fuer den zweiten Wiedergabeweg; NereusSDR-original. Siehe
+// THETIS-PROVENANCE.md, Art 'reference'.
+
 // =================================================================
 // src/core/audio/WavPlayer.h  (NereusSDR)
 // =================================================================

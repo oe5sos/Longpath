@@ -459,3 +459,8 @@ column 2 (not column 1) so the header-verifier script does not scan them.
 | Same as .cpp | src/gui/applets/ClientChainApplet.h | NereusSDR-original applet header; see .cpp |
 | Setup → Network → TCI Server page — NereusSDR-original Setup UI; 6 group boxes, 17 AppSettings keys | src/gui/setup/CatNetworkSetupPages.cpp | NereusSDR-native Setup page; TCI server settings surfaced from Thetis frmOptions/TCIServer section but no .Designer.cs code ported |
 | Same as .cpp | src/gui/setup/CatNetworkSetupPages.h | NereusSDR-original Setup page header; see .cpp |
+| src/core/audio/QsoRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | RecordingDetails-Feldauswahl fuer die JSON-Beschreibung; kein Zeilenport |
+| src/core/audio/VoiceKeyer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Sprachspeicher-Verhalten als Vorbild; NereusSDR-original |
+| src/core/audio/WavFile.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umfang (WAV + Beschreibung) als Vorbild; Leser/Schreiber NereusSDR-original |
+| src/core/audio/WavPlayer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | PlayFileViaPCAudio als Vorbild fuer den Lautsprecher-Weg |
+| src/gui/applets/QsoRecorderApplet.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Platzpruefung, Loeschen, Beschreibung einlesen, Nachhoeren |

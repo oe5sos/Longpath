@@ -256,7 +256,7 @@ QStringList TciProtocol::buildInitBurst() const
     // hardcode "NereusSDR" until Phase 4 Task 4.2 wires RadioModel state.
     const QString deviceName = emulateSunSdr
         ? QStringLiteral("SunSDR2PRO")
-        : QStringLiteral("NereusSDR");
+        : QStringLiteral("Longpath");
     lines << QStringLiteral("device:%1;").arg(deviceName);
 
     // From Thetis TCIServer.cs:2529 [v2.10.3.13]

@@ -116,7 +116,7 @@ namespace NereusSDR {
 AboutDialog::AboutDialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle(QStringLiteral("About NereusSDR"));
+    setWindowTitle(QStringLiteral("About Longpath"));
 
     buildUI();
 
@@ -142,14 +142,14 @@ void AboutDialog::buildUI()
 
     // ── Header ──────────────────────────────────────────────────────────
     auto* icon = new QLabel(this);
-    QPixmap pix(QStringLiteral(":/icons/NereusSDR.png"));
+    QPixmap pix(QStringLiteral(":/icons/Longpath.png"));
     if (!pix.isNull())
         icon->setPixmap(pix.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     icon->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(icon);
     mainLayout->addSpacing(8);
 
-    auto* title = new QLabel(QStringLiteral("NereusSDR"), this);
+    auto* title = new QLabel(QStringLiteral("Longpath"), this);
     title->setAlignment(Qt::AlignCenter);
     title->setStyleSheet(
         QStringLiteral("font-size: 22px; font-weight: bold; color: %1;")
@@ -202,7 +202,9 @@ void AboutDialog::buildUI()
 
     auto* origin = new QLabel(
         QStringLiteral(
-            "NereusSDR descends from "
+            "Longpath is a fork of "
+            "<a href=\"https://github.com/boydsoftprez/NereusSDR\">NereusSDR</a> "
+            "(KG4VCF), which descends from "
             "<a href=\"https://github.com/ramdor/Thetis\">Thetis</a> "
             "(MW0LGE's active fork of FlexRadio Systems' PowerSDR), "
             "adapts Qt6 / C++20 architecture from "
@@ -210,8 +212,8 @@ void AboutDialog::buildUI()
             "(KK7GWY), and embeds "
             "<a href=\"https://github.com/TAPR/OpenHPSDR-wdsp\">WDSP</a> "
             "(NR0V / TAPR). The roster below reproduces the Thetis "
-            "upstream contributor list verbatim, with NereusSDR-specific "
-            "attributions appended."),
+            "upstream contributor list verbatim; NereusSDR and Longpath "
+            "attributions are appended, never replaced."),
         this);
     origin->setWordWrap(true);
     origin->setOpenExternalLinks(true);
@@ -284,6 +286,17 @@ void AboutDialog::buildUI()
         "",
         "NereusSDR:",
         "  KG4VCF, J.J. Boyd (C++20 / Qt6 port, packaging, CI)",
+        "",
+        // ── Longpath (2026-08-20) ────────────────────────────────────
+        //
+        // ANGEHAENGT, NICHT ERSETZT. Der Betreiber, woertlich und mit
+        // drei Ausrufezeichen: „natuerlich muessen und sollen alle
+        // copyright deutlich sichtbar sein!!!" Der NereusSDR-Eintrag
+        // darueber und der ganze Thetis-Block bleiben unangetastet —
+        // ein Fork, der die Namen seiner Vorgaenger herausnimmt, waere
+        // ein Diebstahl mit Extraschritten.
+        "Longpath (fork of NereusSDR):",
+        "  OE5SOS, Martin Fischer (fork, UI, free-canvas layout)",
     };
 
     for (const auto* entry : kRoster) {

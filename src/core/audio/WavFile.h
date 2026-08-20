@@ -1,5 +1,9 @@
 #pragma once
 
+// no-port-check: Nennt Thetis clsAudioRecordPlayback.cs (MW0LGE) als Vorbild fuer Umfang
+// und Beschreibungsdatei; der WAV-Leser und -Schreiber sind
+// NereusSDR-original. Siehe THETIS-PROVENANCE.md, Art 'reference'.
+
 // =================================================================
 // src/core/audio/WavFile.h  (NereusSDR)
 // =================================================================

@@ -1,6 +1,34 @@
-# NereusSDR
+# Longpath
 
 **A cross-platform SDR console for OpenHPSDR radios**
+
+> ### Lineage and licence
+>
+> **Longpath is a fork of [NereusSDR](https://github.com/boydsoftprez/NereusSDR)**
+> © J.J. Boyd (KG4VCF), which is itself a C++20 / Qt6 port of
+> **[Thetis](https://github.com/ramdor/Thetis)** © FlexRadio Systems,
+> Doug Wigley (W5WC), Richard Samphire (MW0LGE) and the OpenHPSDR
+> contributors. Architecture and substantial code come from
+> **[AetherSDR](https://github.com/ten9876/AetherSDR)** © Jeremy (KK7GWY).
+> The DSP engine is **[WDSP](https://github.com/TAPR/OpenHPSDR-wdsp)**
+> © Warren Pratt (NR0V) / TAPR, descending from DttSP by Frank Brickle
+> (AB2KT) and Bob McGwier (N4HY). Further upstreams:
+> [freedv-gui](https://github.com/drowe67/freedv-gui),
+> [radae_nopy](https://github.com/peterbmarks/radae_nopy) (BSD-2-Clause),
+> [r8brain-free-src](https://github.com/avaneev/r8brain-free-src) (MIT),
+> and the [Anvelina PRO III gateware](https://github.com/n1gp/Anvelina_PROIII)
+> (GPLv3).
+>
+> **Every copyright notice, licence header and author tag from those
+> projects is preserved verbatim in this tree.** Nothing was removed
+> when the fork was renamed. The full record lives in
+> [`docs/attribution/`](docs/attribution/) — `THETIS-PROVENANCE.md`,
+> `AETHERSDR-PORTS.md`, `FREEDV-GUI-PROVENANCE.md`, `ASSETS.md`.
+>
+> Longpath is licensed under the **GNU General Public License**, as its
+> upstreams require. See [`LICENSE`](LICENSE).
+>
+> Fork maintained by Martin Fischer, **OE5SOS**.
 
 > [!IMPORTANT]
 > 📖 **Alpha testers, start here:** [docs/debugging/v0.5.2-alpha-tester-smoketest.md](docs/debugging/v0.5.2-alpha-tester-smoketest.md)
