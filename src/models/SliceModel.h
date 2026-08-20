@@ -430,6 +430,57 @@ public:
     // Set both filter edges atomically. Emits filterChanged once.
     void setFilter(int low, int high);
 
+    // ── Die Kanten begrenzen ─────────────────────────────────────────
+    //
+    // From Thetis console.cs:34974-35062 [v2.10.3.15-5-g852bf0e] —
+    // ConstrainFilter(ref nNewLow, ref nNewHigh, int rx, bool
+    // filterShift).
+    //
+    // WARUM DAS HIER STEHT: setFilter nahm bis 2026-08-20 JEDEN Wert an.
+    // Wer in LSB die obere Kante ueber die Null zog, bekam einen Filter,
+    // der in das andere Seitenband hineinreicht — und nichts hielt ihn
+    // auf. Auch keinen Deckel: 200 kHz Bandbreite waren moeglich.
+    // Thetis laesst jede Filteraenderung durch ConstrainFilter laufen,
+    // und zwar in UpdateRX1Filters (console.cs:7510), also im einen
+    // Trichter, durch den alles muss. setFilter ist unserer.
+    //
+    // Zwei getrennte Regeln, und nur die erste ist abschaltbar:
+    //
+    //   SEITENBAND    LSB/DIGL/CWL: obere Kante <= 0
+    //                 USB/DIGU/CWU: untere Kante >= 0
+    //                 AM/SAM/DSB/SPEC: untere <= 0 <= obere
+    //                 FM: gar nichts
+    //                 Haengt an limitFiltersToSidebands, in Thetis
+    //                 VORGABE AUS (console.cs:7446).
+    //
+    //   DECKEL        |Kante| <= kMaxFilterWidthHz, ausser bei FM.
+    //                 Gilt IMMER.
+    //
+    // `filterShift` == true heisst: die Breite soll erhalten bleiben.
+    // Stoesst eine Kante an, wandert die andere um denselben Betrag mit.
+    // Das ist der Unterschied zwischen „Kante ziehen" (Breite aendert
+    // sich) und „Durchlass verschieben" (Breite bleibt).
+    //
+    // Gibt true zurueck, wenn etwas veraendert wurde.
+    static bool constrainFilter(int& low, int& high, DSPMode mode,
+                                bool filterShift = false,
+                                bool limitToSidebands = false);
+
+    // From Thetis console.cs:13151 [v2.10.3.15-5-g852bf0e] —
+    // _max_filter_width = 10000.
+    static constexpr int kMaxFilterWidthHz = 10000;
+
+    // From Thetis console.cs:13138 [v2.10.3.15-5-g852bf0e] —
+    // _max_filter_shift = 10000.
+    static constexpr int kMaxFilterShiftHz = 10000;
+
+    // Duerfen die Kanten ins andere Seitenband? In Thetis ein Schalter
+    // im Setup, VORGABE AUS (m_bLimitFiltersToSidebands = false,
+    // console.cs:7446) — Begrenzen ist also die Ausnahme, nicht die
+    // Regel. Wir uebernehmen die Vorgabe unveraendert.
+    bool limitFiltersToSidebands() const { return m_limitFiltersToSidebands; }
+    void setLimitFiltersToSidebands(bool on);
+
     // ---- AGC ----
 
     AGCMode agcMode() const { return m_agcMode; }
@@ -1084,6 +1135,8 @@ private:
     double  m_frequency{14225000.0};     // Default: 14.225 MHz (20m USB)
     Band    m_currentBand{Band::Band20m}; // Phase 3P-II Task 64: tracks last emitted band
     DSPMode m_dspMode{DSPMode::USB};
+    // Vorgabe AUS, wie in Thetis (console.cs:7446).
+    bool    m_limitFiltersToSidebands{false};
     int     m_filterLow{100};            // USB default from Thetis F5
     int     m_filterHigh{3000};
     AGCMode m_agcMode{AGCMode::Med};

@@ -429,24 +429,142 @@ QString SliceModel::radeModelPath() const
 // Bandpass filter
 // ---------------------------------------------------------------------------
 
+// Beide gehen ueber setFilter, damit die Begrenzung nicht zu umgehen
+// ist. Vorher setzten sie direkt — ein zweiter Weg an der Pruefung
+// vorbei ist keine Pruefung.
 void SliceModel::setFilterLow(int low)
 {
-    if (m_filterLow != low) {
-        m_filterLow = low;
-        emit filterChanged(m_filterLow, m_filterHigh);
-    }
+    setFilter(low, m_filterHigh);
 }
 
 void SliceModel::setFilterHigh(int high)
 {
-    if (m_filterHigh != high) {
-        m_filterHigh = high;
-        emit filterChanged(m_filterLow, m_filterHigh);
+    setFilter(m_filterLow, high);
+}
+
+// ── Die Kanten begrenzen ─────────────────────────────────────────────
+//
+// From Thetis console.cs:34974-35062 [v2.10.3.15-5-g852bf0e] —
+// ConstrainFilter. Begruendung und die beiden Regeln stehen am
+// Kopf der Deklaration.
+bool SliceModel::constrainFilter(int& low, int& high, DSPMode mode,
+                                 bool filterShift, bool limitToSidebands)
+{
+    const int originalLow  = low;
+    const int originalHigh = high;
+
+    switch (mode) {
+    case DSPMode::LSB:
+    case DSPMode::DIGL:
+    case DSPMode::CWL:
+    case DSPMode::RADE_L:
+        if (high > 0 && limitToSidebands) {
+            if (filterShift) { low -= high; }
+            high = 0;
+        }
+        if (low < -kMaxFilterShiftHz) {
+            const int n = -kMaxFilterShiftHz - low;
+            low += n;
+            if (filterShift) { high += n; }
+        }
+        if (high > kMaxFilterShiftHz) {
+            const int n = high - kMaxFilterShiftHz;
+            high -= n;
+            if (filterShift) { low -= n; }
+        }
+        break;
+
+    case DSPMode::USB:
+    case DSPMode::DIGU:
+    case DSPMode::CWU:
+    case DSPMode::RADE_U:
+        if (low < 0 && limitToSidebands) {
+            if (filterShift) { high += -low; }
+            low = 0;
+        }
+        if (low < -kMaxFilterShiftHz) {
+            const int n = -kMaxFilterShiftHz - low;
+            low += n;
+            if (filterShift) { high += n; }
+        }
+        if (high > kMaxFilterShiftHz) {
+            const int n = high - kMaxFilterShiftHz;
+            high -= n;
+            if (filterShift) { low -= n; }
+        }
+        break;
+
+    case DSPMode::AM:
+    case DSPMode::SAM:
+    case DSPMode::DSB:
+    case DSPMode::SPEC:   //MW0LGE_21k9
+        if (low > 0 && limitToSidebands) {
+            if (filterShift) { high -= low; }
+            low = 0;
+        }
+        if (high < 0 && limitToSidebands) {
+            if (filterShift) { low += -high; }
+            high = 0;
+        }
+        if (low < -kMaxFilterShiftHz) {
+            const int n = -kMaxFilterShiftHz - low;
+            low += n;
+            if (filterShift) { high += n; }
+        }
+        if (high > kMaxFilterShiftHz) {
+            const int n = high - kMaxFilterShiftHz;
+            high -= n;
+            if (filterShift) { low -= n; }
+        }
+        break;
+
+    case DSPMode::FM:
+        // Bei FM gar nichts. Die Bandbreite kommt aus Hub und
+        // Hoehenschnitt, nicht von Hand.
+        break;
+
+    default:
+        // DRM und alles Kuenftige: nur der Deckel unten, kein
+        // Seitenband-Zwang. Lieber nichts tun als etwas Falsches.
+        break;
     }
+
+    if (mode != DSPMode::FM) {
+        if (low  < -kMaxFilterWidthHz) { low  = -kMaxFilterWidthHz; }
+        if (low  >  kMaxFilterWidthHz) { low  =  kMaxFilterWidthHz; }
+        if (high >  kMaxFilterWidthHz) { high =  kMaxFilterWidthHz; }
+        if (high < -kMaxFilterWidthHz) { high = -kMaxFilterWidthHz; }
+    }
+
+    return (low != originalLow) || (high != originalHigh);
+}
+
+void SliceModel::setLimitFiltersToSidebands(bool on)
+{
+    if (m_limitFiltersToSidebands == on) { return; }
+    m_limitFiltersToSidebands = on;
+
+    // Sofort anwenden, nicht erst beim naechsten Verstellen. Ein
+    // Schalter, der erst wirkt, wenn man etwas anderes anfasst, wirkt
+    // fuer den Bedienenden gar nicht.
+    setFilter(m_filterLow, m_filterHigh);
 }
 
 void SliceModel::setFilter(int low, int high)
 {
+    // DER EINE TRICHTER. Thetis begrenzt in UpdateRX1Filters
+    // (console.cs:7510), also an der Stelle, durch die jede
+    // Filteraenderung muss — Knopf, Ziehen, CAT, gespeicherter Filter.
+    // Hier ist unsere.
+    constrainFilter(low, high, m_dspMode, /*filterShift=*/false,
+                    m_limitFiltersToSidebands);
+
+    // From Thetis console.cs:7512 [v2.10.3.15-5-g852bf0e]:
+    //   if (low == high) return; // not a good idea to have a 0hz width filter
+    // Ein Filter ohne Breite ist Stille, und Stille sieht aus wie ein
+    // kaputter Empfaenger.
+    if (low == high) { return; }
+
     if (m_filterLow != low || m_filterHigh != high) {
         m_filterLow = low;
         m_filterHigh = high;
