@@ -4316,8 +4316,21 @@ void SpectrumWidget::loadBackgroundSettings()
     auto& st = AppSettings::instance();
     const QString path = st.value("PanadapterBackgroundImage", QString()).toString();
     m_bgOpacity = qBound(0, st.value("PanadapterBackgroundOpacity", "80").toInt(), 100);
+    // ── Die Grundflaeche gehoert der Palette ─────────────────────────
+    //
+    // Die Vorgabe kommt jetzt aus der Rolle „panadapter-bg", nicht mehr
+    // direkt aus der Konstanten. Beim ersten Rendern des Hauptfensters
+    // in der hellen Palette „Kreide" (2026-08-20) blieb der Panadapter
+    // als einzige grosse Flaeche dunkel — ein schwarzes Loch auf hellem
+    // Grund. Er ist reiner Malcode und wurde vom ThemeFilter, der nur
+    // Stylesheets anfasst, nie erreicht.
+    //
+    // Eine selbst gewaehlte Farbe (PanadapterBackgroundFill) hat
+    // weiterhin Vorrang: sie steht in den Einstellungen und gehoert
+    // dem Betreiber, nicht dem Thema.
     const QColor fill(st.value("PanadapterBackgroundFill",
-                               QString::fromLatin1(Style::kPanadapterBg)).toString());
+                               Style::role("panadapter-bg",
+                                           Style::kPanadapterBg)).toString());
     if (fill.isValid()) { m_bgFillColor = fill; }
     if (!path.isEmpty()) {
         m_bgImagePath = path;

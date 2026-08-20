@@ -94,6 +94,20 @@ const QVector<ThemeEntry>& themeTable();
 /// gets wrapped twice by mistake is harmless.
 QString themed(QString qss);
 
+// ── Eine einzelne Farbe durch die Palette ───────────────────────────
+//
+// themed() arbeitet auf Stylesheets. Malcode hat keine Stylesheets, und
+// genau dort blieben beim ersten hellen Thema die dunklen Flaechen
+// stehen (2026-08-20: zwei schwarze Balken im TX-Applet, der
+// Panadapter als schwarzes Loch).
+//
+// hexRole() nimmt einen Nereus-Farbwert, sucht die Rolle, die er in
+// der Tabelle hat, und liefert, was das laufende Thema dafuer will.
+// Ohne Thema, ohne Rolle oder bei unbekanntem Wert kommt der Wert
+// unveraendert zurueck — ein Malcode-Aufruf ist damit immer sicher.
+QString hexRole(const char* nereusHex);
+QString hexRole(const QString& nereusHex);
+
 /// True when the string still holds a legacy value the table knows
 /// about. For tests and for the audit script; not used at runtime.
 bool hasLegacyColour(const QString& qss);

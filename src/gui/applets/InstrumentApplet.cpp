@@ -6,6 +6,8 @@
 
 #include "gui/applets/InstrumentApplet.h"
 
+#include "core/AppSettings.h"
+
 #include "gui/instruments/BarInstrument.h"
 #include "gui/instruments/NeedleInstrument.h"
 #include "gui/instruments/ReadingSource.h"
@@ -83,6 +85,55 @@ void InstrumentApplet::setForm(Form f)
     m_stack->setCurrentWidget(f == Form::Needle
                                   ? static_cast<QWidget*>(m_needle)
                                   : static_cast<QWidget*>(m_bar));
+    saveState();
+}
+
+void InstrumentApplet::setSegmented(bool on)
+{
+    if (m_bar) { m_bar->setSegmented(on); }
+    saveState();
+}
+
+bool InstrumentApplet::isSegmented() const
+{
+    return m_bar && m_bar->isSegmented();
+}
+
+// ── Merken ──────────────────────────────────────────────────────────
+//
+// Ein Schluessel je Instrument: „SwrInstrument" und „SignalInstrument"
+// sollen verschiedene Formen haben duerfen.
+namespace {
+QString formKey(const QString& id) {
+    return QStringLiteral("Instrument_%1_Form").arg(id);
+}
+QString segKey(const QString& id) {
+    return QStringLiteral("Instrument_%1_BarSegments").arg(id);
+}
+} // namespace
+
+void InstrumentApplet::saveState() const
+{
+    auto& st = AppSettings::instance();
+    st.setValue(formKey(m_id), m_form == Form::Bar
+                                   ? QStringLiteral("Bar")
+                                   : QStringLiteral("Needle"));
+    st.setValue(segKey(m_id), isSegmented() ? QStringLiteral("True")
+                                            : QStringLiteral("False"));
+}
+
+void InstrumentApplet::restoreState()
+{
+    auto& st = AppSettings::instance();
+    if (m_bar) {
+        m_bar->setSegmented(
+            st.value(segKey(m_id), QStringLiteral("False")).toString()
+            == QStringLiteral("True"));
+    }
+    // setForm zuletzt: es ruft saveState, und das soll den eben
+    // gelesenen Segmentzustand mitschreiben, nicht den vorigen.
+    const QString f = st.value(formKey(m_id), QStringLiteral("Needle")).toString();
+    setForm(f == QStringLiteral("Bar") ? Form::Bar : Form::Needle);
 }
 
 void InstrumentApplet::onReading(int bindingId, double value)
@@ -177,6 +228,32 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
         connect(a, &QAction::triggered, this, [this, target]() {
             setForm(target);
         });
+    }
+
+    // ── Balkenform ───────────────────────────────────────────────────
+    //
+    // Nur wenn der Balken auch gezeigt wird: ein Untermenue, das den
+    // Zeiger nicht betrifft, gehoert nicht in dessen Menue. Der
+    // Betreiber hat die Segmentform am 2026-08-20 mit einem
+    // Bildschirmfoto aus Zeus verlangt.
+    if (m_form == Form::Bar && m_bar) {
+        auto* styleMenu = menu->addMenu(tr("Balken"));
+        auto* styleGroup = new QActionGroup(menu);
+        styleGroup->setExclusive(true);
+        const struct { const char* label; bool seg; } kStyles[] = {
+            {QT_TR_NOOP("Durchgehend"), false},
+            {QT_TR_NOOP("Segmente"),    true},
+        };
+        for (const auto& st : kStyles) {
+            QAction* a = styleMenu->addAction(tr(st.label));
+            a->setCheckable(true);
+            a->setChecked(m_bar->isSegmented() == st.seg);
+            styleGroup->addAction(a);
+            const bool seg = st.seg;
+            connect(a, &QAction::triggered, this, [this, seg]() {
+                setSegmented(seg);
+            });
+        }
     }
 
     // ── Spitzenhaltung ───────────────────────────────────────────────

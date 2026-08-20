@@ -75,6 +75,30 @@ public:
     void setForm(Form f);
     Form form() const { return m_form; }
 
+    // ── Balken: durchgehend oder Segmente ────────────────────────────
+    //
+    // Zeus zeigt das S-Meter als Kette einzelner Felder; der Betreiber
+    // hat das am 2026-08-20 mit einem Bildschirmfoto verlangt. Beides
+    // bleibt — Segmente liest man als Menge, der Verlauf zeigt kleine
+    // Aenderungen genauer.
+    void setSegmented(bool on);
+    bool isSegmented() const;
+
+    // ── Gemerkt wird es auch ─────────────────────────────────────────
+    //
+    // Bis 2026-08-20 merkte sich ein Instrument NICHTS: Form,
+    // Spitzenhaltung und Quelle standen nach jedem Start wieder auf
+    // der Vorgabe. Wer den Zeiger gegen den Balken tauscht, tut das
+    // nicht fuer eine Sitzung.
+    //
+    // Die Quelle bleibt bewusst aussen vor: MainWindow setzt sie nach
+    // dem Baukasten (setPrimary(MeterBinding::SignalAvg)), und ein
+    // wiederhergestellter Wert wuerde davon gleich wieder
+    // ueberschrieben — schlimmer als gar nicht merken, weil es
+    // manchmal ginge.
+    void saveState() const;
+    void restoreState();
+
     /// Die Spitzenhaltung einer Ansicht. Beide sollen immer gleich
     /// stehen — wer sie einzeln abfragt, prüft genau das.
     const PeakHold& peakHold(Form f) const;

@@ -5629,12 +5629,17 @@ void MainWindow::populateDefaultMeter()
                                            QStringLiteral("Stehwelle"),
                                            m_radioModel, nullptr);
     m_swrInstrument->setPrimary(MeterBinding::TxSwr);
+    m_swrInstrument->restoreState();
     panel->addApplet(m_swrInstrument);
 
     m_signalInstrument = new InstrumentApplet(QStringLiteral("SignalInstrument"),
                                               QStringLiteral("S-Meter"),
                                               m_radioModel, nullptr);
     m_signalInstrument->setPrimary(MeterBinding::SignalAvg);
+    // NACH setPrimary: restoreState stellt Form und Balkenart wieder
+    // her, nicht die Quelle — die gehoert dem Aufrufer. Siehe die
+    // Notiz an InstrumentApplet::restoreState.
+    m_signalInstrument->restoreState();
     panel->addApplet(m_signalInstrument);
 
     // Phase 23: TCI applets — live in Container #0 below the existing applets.

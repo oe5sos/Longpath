@@ -77,6 +77,18 @@ public:
     /// Die Spitzenhaltung — dieselbe Klasse wie beim Zeigerinstrument,
     /// damit eine Einstellung aus dem Rechtsklickmenue beide Ansichten
     /// erreicht und nicht nur die gerade sichtbare.
+    // ── Segmentierte Form ────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20, mit einem Bildschirmfoto aus Zeus:
+    // das S-Meter als Kette einzelner Felder. Der Balken war bis dahin
+    // ein durchgehender Verlauf.
+    //
+    // Beides bleibt: Segmente liest man als Menge, ohne die Skala zu
+    // lesen; der Verlauf zeigt kleine Aenderungen genauer. Die Wahl
+    // steht im Rechtsklickmenue des Instruments und wird dort gemerkt.
+    void setSegmented(bool on);
+    bool isSegmented() const { return m_segmented; }
+
     PeakHold&       peakHold()       { return m_peak; }
     const PeakHold& peakHold() const { return m_peak; }
     void resetPeak() { m_peak.reset(m_value); update(); }
@@ -99,6 +111,7 @@ private:
     int    m_secondary{-1};
     double m_value{0.0};
     double m_secondValue{0.0};
+    bool m_segmented{false};
     PeakHold m_peak;
 
     /// Ohne gültige Messung: kein Verlauf, keine Glut, keine Wertkante,

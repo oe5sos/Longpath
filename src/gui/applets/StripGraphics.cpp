@@ -13,6 +13,8 @@
 
 #include "gui/applets/StripGraphics.h"
 
+#include "gui/styles/ThemeQss.h"
+
 #include "core/VoiceAnalyzer.h"
 #include "core/strip/ClientTube.h"
 #include "core/strip/ClientPudu.h"
@@ -42,7 +44,20 @@ constexpr int kTileW   = 84;
 constexpr int kTileH   = 46;
 constexpr int kTileGap = 6;
 
-QColor c(const char* hex) { return QColor(QString::fromLatin1(hex)); }
+// ── Farben durch die Palette, nicht am ihr vorbei ────────────────────
+//
+// Hier stand `QColor(QString::fromLatin1(hex))` — der Wert der
+// Konstanten, direkt aufs Bild. Der ThemeFilter fasst nur Stylesheets
+// an, also blieben diese Flaechen stehen, egal welche Palette lief.
+//
+// Solange alles dunkel war, fiel das nicht auf. Beim ersten Rendern in
+// der hellen Palette „Kreide" (2026-08-20) standen im TX-Applet zwei
+// schwarze Balken (#08080a, kInsetBg) auf hellem Grund.
+//
+// Style::hexRole() sucht zur Farbe die Rolle, die sie in der Tabelle
+// hat, und fragt das laufende Thema danach. Ohne Thema oder ohne Rolle
+// kommt der uebergebene Wert unveraendert zurueck.
+QColor c(const char* hex) { return QColor(Style::hexRole(hex)); }
 
 } // namespace
 

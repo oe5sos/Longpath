@@ -85,6 +85,11 @@ const QVector<ThemeEntry>& table()
         { "sel-border",        "#0090e0", Style::kBlueBorder },
         { "sel-hover",         "#0088d8", Style::kBlueHover },
         { "measured-bg",       "#604000", Style::kAmberBg },
+        // Die Grundflaeche des Panadapters. Eigene Rolle, weil ein
+        // Thema sie unabhaengig vom Panel setzen koennen muss: manche
+        // helle Palette will ein helles Spektrum, manche behaelt das
+        // dunkle wegen des Kontrasts der Kurve.
+        { "panadapter-bg",     "#0a0a12", Style::kPanadapterBg },
         { "measured",          "#ffb800", Style::kAmberText },
         // Zweiter Vorgaenger derselben Rolle.
         //
@@ -192,6 +197,31 @@ const Plan& plan()
         p.rows.append({legacy, target.toLower().toLatin1()});
         seen.insert(legacy, true);
         if (legacy != target.toLower().toLatin1()) { p.moves = true; }
+
+        // ── Auch der HEUTIGE Wert ist ein Schluessel ─────────────────
+        //
+        // `legacy` ist der historische Wert der Rolle — beim
+        // Entblauen 2026 stehengeblieben (#203040, #205070, #ffb800).
+        // Der Quelltext schreibt aber laengst `Style::kBorderSubtle`
+        // hin, und das ist heute #1f1f23. Diesen Wert kannte die
+        // Tabelle nicht, also liess sie ihn stehen.
+        //
+        // Solange alles dunkel war, fiel das nicht auf: die Themendatei
+        // aenderte Tonwerte um zwei Stufen, und was nicht mitkam, sah
+        // trotzdem passend aus. Am 2026-08-20 kam die erste HELLE
+        // Palette (Kreide), und im gerenderten Hauptfenster blieben
+        // Panadapter, Applet-Spalte und Fussleiste dunkel — auf hellem
+        // Grund drei schwarze Loecher.
+        //
+        // Eine Rolle darf mehrere Schluessel haben; `seen` schluesselt
+        // auf den Wert, nicht auf die Rolle. Der historische bleibt
+        // stehen, damit aeltere Stellen weiter greifen.
+        const QByteArray current = QByteArray(e.current).toLower();
+        if (!current.isEmpty() && !seen.contains(current)) {
+            p.rows.append({current, target.toLower().toLatin1()});
+            seen.insert(current, true);
+            if (current != target.toLower().toLatin1()) { p.moves = true; }
+        }
     }
 
     // Farben, für die die Datei eine Meinung hat, die aber keine Rolle
@@ -240,6 +270,23 @@ QString role(const char* roleName, const char* fallback)
 {
     const QString r = Theme::instance().forRole(QString::fromLatin1(roleName));
     return r.isEmpty() ? QString::fromLatin1(fallback) : r;
+}
+
+QString hexRole(const QString& nereusHex)
+{
+    if (nereusHex.isEmpty()) { return nereusHex; }
+    const Plan& p = plan();
+    if (!p.moves) { return nereusHex; }
+    const QByteArray key = nereusHex.toLower().toLatin1();
+    for (const auto& row : p.rows) {
+        if (row.first == key) { return QString::fromLatin1(row.second); }
+    }
+    return nereusHex;
+}
+
+QString hexRole(const char* nereusHex)
+{
+    return hexRole(QString::fromLatin1(nereusHex));
 }
 
 QString themed(QString qss)

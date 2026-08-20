@@ -1183,8 +1183,7 @@ add_custom_command(TARGET Longpath POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:Longpath>/themes"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/resources/themes/tageslicht.json"
-            "${CMAKE_SOURCE_DIR}/resources/themes/werkbank.json"
+            "${CMAKE_SOURCE_DIR}/resources/themes/kreide.json"
             "$<TARGET_FILE_DIR:Longpath>/themes/"
     COMMENT "Farbpaletten neben die Binaerdatei legen")
 if(NEREUSSDR_LTO_AVAILABLE)

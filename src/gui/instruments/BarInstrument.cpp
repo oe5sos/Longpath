@@ -111,6 +111,13 @@ void BarInstrument::refreshFooter()
         d->threshold.has_value() ? d->text(d->threshold.value()) : QString());
 }
 
+void BarInstrument::setSegmented(bool on)
+{
+    if (m_segmented == on) { return; }
+    m_segmented = on;
+    update();
+}
+
 void BarInstrument::paintOne(QPainter& p, const QRectF& area,
                              const ReadingDescriptor& d, double value,
                              bool withGlow, bool hasValue)
@@ -133,9 +140,23 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
     } else {
         if (withGlow) { Instrument::paintGlow(p, spine, col); }
         Instrument::paintTrough(p, spine, thresholdF);
-        Instrument::paintFade(p, spine, f, col);
-        Instrument::paintTicks(p, spine, d);
-        Instrument::paintValueEdge(p, spine, f, col);
+        if (m_segmented) {
+            // Segmente tragen ihre Kante selbst — eine zusaetzliche
+            // Wertkante am Ende saehe aus wie ein halbes Feld.
+            Instrument::paintSegments(p, spine, f, col);
+            Instrument::paintTicks(p, spine, d);
+        } else {
+            Instrument::paintFade(p, spine, f, col);
+            Instrument::paintTicks(p, spine, d);
+            Instrument::paintValueEdge(p, spine, f, col);
+        }
+
+        // Die Spitze, wie bei Zeus: ein heller Strich, der stehen
+        // bleibt und langsam zurueckfaellt. Nur wenn sie ueberhaupt
+        // vor dem Wert liegt — sonst zeichnete sie eine zweite Kante
+        // auf die erste.
+        const double pf = d.fraction(m_peak.value());
+        if (pf > f + 0.005) { Instrument::paintPeakMark(p, spine, pf); }
     }
 
     // Die Schwellenmarke steht ÜBER der Mulde hinaus, damit sie auch

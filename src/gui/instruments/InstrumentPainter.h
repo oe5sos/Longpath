@@ -65,6 +65,32 @@ void paintTrough(QPainter& p, const Spine& s,
 /// Der auslaufende Verlauf bis zum Anteil f.
 void paintFade(QPainter& p, const Spine& s, double f, const QColor& c);
 
+// ── Segmente statt Verlauf ───────────────────────────────────────────
+//
+// Der Betreiber, 2026-08-20, mit einem Bildschirmfoto aus Zeus: das
+// S-Meter als Kette einzelner Felder statt als durchgehender Balken.
+//
+// Der Unterschied ist nicht nur Zierde. Segmente liest man als MENGE —
+// man schaetzt sie, ohne die Skala zu lesen, so wie man Finger zaehlt
+// statt eine Linie zu messen. Ein durchgehender Balken zeigt dafuer
+// kleine Aenderungen genauer: bei schwachem Signal sieht man ein
+// Zittern, das die Segmente verschlucken.
+//
+// Beides bleibt, weil beides seinen Fall hat. Die Wahl steht im
+// Rechtsklickmenue des Instruments.
+//
+// `f` ist der Anteil wie bei paintFade. Ein Segment leuchtet, sobald
+// seine MITTE unter dem Wert liegt — nicht seine Kante: sonst
+// erschiene das erste Feld schon bei einem Hauch ueber null und das
+// letzte nie.
+void paintSegments(QPainter& p, const Spine& s, double f, const QColor& c,
+                   int count = 40, double gapPx = 1.6);
+
+// Die Spitzenmarke: ein heller Strich quer ueber die Mulde. Steht in
+// derselben Datei wie der Rest, damit Balken und Zeigerwerk dieselbe
+// Marke bekommen und nicht zwei verschiedene.
+void paintPeakMark(QPainter& p, const Spine& s, double f);
+
 /// Die Glut. `intensity` ist die Deckung in der Mitte; die Vorgabe ist
 /// die 16 % aus dem Entwurf.
 void paintGlow(QPainter& p, const Spine& s, const QColor& c,

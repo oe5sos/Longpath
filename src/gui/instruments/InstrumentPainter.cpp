@@ -159,6 +159,56 @@ void paintFade(QPainter& p, const Spine& s, double f, const QColor& c)
     p.restore();
 }
 
+void paintSegments(QPainter& p, const Spine& s, double f, const QColor& c,
+                   int count, double gapPx)
+{
+    if (f <= 0.0 || count < 2) { return; }
+
+    // Nur auf einer Geraden: auf einem Bogen waeren gleich breite
+    // Segmente ungleich lange Boegen, und die Kette wuerde zur Spitze
+    // hin dichter. Wer Segmente auf einem Zeigerwerk will, braucht eine
+    // eigene Rechnung — bis dahin ist Nichtstun ehrlicher als etwas
+    // Schiefes.
+    const auto* lin = dynamic_cast<const LinearSpine*>(&s);
+    if (!lin) { paintFade(p, s, f, c); return; }
+
+    const QRectF r = lin->troughRect();
+    if (r.width() <= 0.0) { return; }
+
+    const double segW = (r.width() - gapPx * (count - 1)) / count;
+    if (segW <= 0.3) { paintFade(p, s, f, c); return; }
+
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, false);   // Kanten sollen sitzen
+    p.setPen(Qt::NoPen);
+    p.setClipPath(lin->troughPath());
+
+    for (int i = 0; i < count; ++i) {
+        // Mitte des Segments, nicht Kante — siehe die Notiz im Kopf.
+        const double mid = (i + 0.5) / static_cast<double>(count);
+        if (mid > f) { break; }
+        const double x = r.left() + i * (segW + gapPx);
+        QColor col = c;
+        // Die ersten Felder etwas matter: eine Kette, die auf ganzer
+        // Laenge gleich leuchtet, sieht aus wie ein Balken mit Luecken.
+        col.setAlphaF(0.72 + 0.28 * mid);
+        p.setBrush(col);
+        p.drawRect(QRectF(x, r.top(), segW, r.height()));
+    }
+    p.restore();
+}
+
+void paintPeakMark(QPainter& p, const Spine& s, double f)
+{
+    if (f <= 0.0) { return; }
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    QColor ink(QString::fromLatin1(Style::kTextPrimary));
+    p.setPen(QPen(ink, 1.6));
+    p.drawLine(s.crossAt(f, 2.0, 2.0));
+    p.restore();
+}
+
 // ── Glut ─────────────────────────────────────────────────────────────
 
 void paintGlow(QPainter& p, const QRectF& bounds, const QPainterPath& clip,
