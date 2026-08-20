@@ -3626,6 +3626,7 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
         drawDbmScale(p, QRect(0, 0, w, specH));
     }
     drawBandPlan(p, specRect);
+    drawCompassOverlay(p, specRect);
     // Sub-epic E: time-scale + LIVE button on the right edge of the
     // waterfall area (always painted; widens automatically when paused).
     // Use a full-width wfRect (not the clipped `wfRect` at line 1141) so the
@@ -4784,6 +4785,59 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
 
 // ---- Band-plan strip ----
 // From AetherSDR SpectrumWidget.cpp:4220-4293 [@0cd4559]
+// ── Der eingeblendete Kompass ────────────────────────────────────────
+//
+// Siehe SpectrumWidget.h: hier kommt ein fertiges Bild an, und es wird
+// in die linke untere Ecke des Spektrums gelegt.
+//
+// Links unten, weil dort am wenigsten liegt: rechts steht die
+// dBm-Skala, oben die Bedienflaeche, unten quer der Bandplan. Ueber
+// dem Bandplan bleibt eine Ecke, in der nichts steht, das man beim
+// Abstimmen braucht.
+//
+// Halb durchsichtig: der Kompass ist eine BEIGABE. Er soll ablesbar
+// sein, ohne dass man ein Signal verliert, das darunter liegt —
+// deshalb 0.72 und nicht deckend.
+void SpectrumWidget::drawCompassOverlay(QPainter& p, const QRect& specRect)
+{
+    if (!m_compassVisible || m_compassImg.isNull()) { return; }
+
+    const int side = m_compassImg.width() / qMax(1, int(m_compassImg.devicePixelRatio()));
+    // Nicht groesser als ein Viertel der kleineren Kante: in einem
+    // schmalen Panadapter frisst ein fester Wert die halbe Anzeige.
+    const int maxSide = qMin(specRect.width(), specRect.height()) / 4;
+    if (maxSide < 40) { return; }          // kein Platz, dann lieber gar nicht
+
+    const int bandH = m_bandPlanFontSize + 4;
+    const int draw  = qMin(side, maxSide);
+    const QRect target(specRect.left() + 10,
+                       specRect.bottom() - bandH - draw - 8,
+                       draw, draw);
+    if (target.top() < specRect.top()) { return; }
+
+    p.save();
+    p.setOpacity(0.72);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    p.drawImage(target, m_compassImg);
+    p.restore();
+}
+
+void SpectrumWidget::setCompassOverlay(const QImage& img)
+{
+    m_compassImg = img;
+    if (m_compassVisible) { update(); }
+}
+
+void SpectrumWidget::setCompassOverlayVisible(bool on)
+{
+    if (m_compassVisible == on) { return; }
+    m_compassVisible = on;
+    AppSettings::instance().setValue(
+        "PanadapterCompassOverlay",
+        on ? QStringLiteral("True") : QStringLiteral("False"));
+    update();
+}
+
 void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
 {
     if (!m_bandPlanMgr || m_bandPlanFontSize <= 0) {

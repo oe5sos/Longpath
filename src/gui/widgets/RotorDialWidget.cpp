@@ -326,6 +326,25 @@ void RotorDialWidget::mouseDoubleClickEvent(QMouseEvent* ev)
     emit rotateRequested(deg);
 }
 
+QImage RotorDialWidget::renderTransparent(int sidePx, qreal dpr)
+{
+    if (sidePx < 24) { return {}; }
+    QImage img(QSize(sidePx, sidePx) * dpr, QImage::Format_ARGB32_Premultiplied);
+    img.setDevicePixelRatio(dpr);
+    img.fill(Qt::transparent);
+
+    // Groesse und Zustand vorruebergehend umstellen, dann zurueck. Das
+    // Widget bleibt dabei sichtbar oder unsichtbar wie es war — es
+    // wird nur einmal in ein Bild gemalt.
+    const QSize was = size();
+    m_bare = true;
+    resize(sidePx, sidePx);
+    render(&img, QPoint(), QRegion(), QWidget::DrawChildren);
+    m_bare = false;
+    resize(was);
+    return img;
+}
+
 void RotorDialWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
@@ -333,17 +352,29 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
 
     const double w = width();
     const double h = height();
-    p.fillRect(rect(), kBackground);
+    // m_bare: die Rose soll mit dem Panadapter EINS sein, nicht als
+    // Kasten davor liegen. Also kein Grund und weiter unten keine
+    // Ablesung — nur Ring, Teilung, Zeiger und Ziel.
+    if (!m_bare) { p.fillRect(rect(), kBackground); }
 
     // Faint accent wash from below so the face is not dead flat. Kept
     // subtle and in the app's accent hue rather than a warm lamp — the
     // surrounding panels are cool-toned.
+    // Der Schimmer gehoert zur Flaeche, nicht zur Rose. Ohne Grund
+    // haette er nichts, worauf er faellt — also im durchsichtigen
+    // Fall ueberspringen.
+    //
+    // Als Block, nicht als Sprung: STYLEGUIDE.md verbietet goto, und
+    // hier zu Recht — der Sprung haette Initialisierungen uebersprungen,
+    // was der Uebersetzer ohnehin zurueckgewiesen hat.
+    if (!m_bare) {
     QRadialGradient glow(QPointF(w * 0.5, h * 1.10), w * 0.85);
     QColor glowInner = QColor(Style::kAccent);
     glowInner.setAlpha(26);
     glow.setColorAt(0.0, glowInner);
     glow.setColorAt(1.0, QColor(0, 0, 0, 0));
     p.fillRect(rect(), glow);
+    }
 
     // Compass-only mode (2026-08-10). The geometry lives in
     // isCompassOnly/roseCentre/roseRadius so that bearingAt() cannot
@@ -648,7 +679,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     // Skipped entirely when the widget is small: there is no room under
     // the rose because the rose now fills the widget, and drawing over
     // it would be worse than saying nothing.
-    if (compassOnly) { return; }
+    if (compassOnly || m_bare) { return; }
 
     // Die Ablesung in Schmalschrift — wie die Zahlenfelder der
     // Zeigerinstrumente. Ziffern, die untereinander stehen sollen,

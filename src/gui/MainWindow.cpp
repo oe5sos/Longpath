@@ -8300,8 +8300,9 @@ void MainWindow::buildStatusBar()
     //   +PAN-Symbol        ->  View -> Pan Layout… (Ctrl+L)
     //   CH 0 / 40m         ->  die Pille im Panadapter-Kopf
     //   A/TX/LSB/2.9k/…    ->  die Applets RX, Filter, Frequenz
-    bandStackLabel->setVisible(false);
-    panBtn->setVisible(false);
+    // Das Ausblenden selbst steht weiter unten, NACH
+    // registerChromeBarItems — siehe die Notiz dort. Hier waere es zu
+    // frueh und ausserdem am Regler vorbei.
     updateAddPanButtonState();
 
     // Phase 3F Sub-Epic D Task 11: per-chain (ADC) BPF state indicators
@@ -8334,9 +8335,6 @@ void MainWindow::buildStatusBar()
     };
 
     auto* chain0Widget = makeChainIndicator(0);
-    // Siehe die Notiz weiter oben: versteckt, nicht geloescht. Der
-    // Kettenzustand steht als Pille im Kopf des Panadapters.
-    chain0Widget->setVisible(false);
     hbox->addWidget(chain0Widget);
     m_chain0IndicatorWidget = chain0Widget;
     auto* chain1Widget = makeChainIndicator(1);
@@ -8489,15 +8487,6 @@ void MainWindow::buildStatusBar()
     // nothing to bind here. When disconnected the badges show placeholder
     // "—" until the slice receives live values from the radio.
     m_rxDashboard = new RxDashboard(barWidget);
-    // Versteckt auf Ansage (2026-08-20) — siehe die ausfuehrliche
-    // Notiz bei bandStackLabel weiter oben. Die Slice-Zeile
-    // A / TX / LSB / 2.9k / M / NR / ANT sagt dasselbe wie die Applets
-    // RX, Filter und Frequenz, nur kleiner und ohne Bedienung.
-    //
-    // Die Verdrahtung bleibt: bindSlice, setSliceLetter und
-    // badgeForRung laufen weiter, damit ein Wiedereinschalten ein
-    // setVisible(true) ist und keine Reparatur.
-    m_rxDashboard->setVisible(false);
     hbox->addWidget(m_rxDashboard);
 
     // ── Phase 3M-4 Task 10: PSA bottom-banner pair (FB + PS) ──────────────────
@@ -9131,6 +9120,40 @@ void MainWindow::buildStatusBar()
     }
 
     registerChromeBarItems(*m_chromeBar, bar);
+
+    // ── Aufgeraeumt auf Ansage — ueber den REGLER ────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „A-TX-LSB-2,9k, M, NR und ATN
+    // loeschen, dafuer gibt es widgets, 40m kannst du auch loeschen.
+    // daneben sind ganz links noch zeichen, bitte weg."
+    //
+    // Beim ersten Versuch stand hier ein setVisible(false) direkt an
+    // den Widgets — und mit MOX, VOX und TUNE verschwand auch, was
+    // bleiben sollte. Der Grund steht im Kopf von ChromeBarController:
+    //
+    //   „assumes it is the sole writer of visibility for every item it
+    //    registers; calling setVisible directly on a registered widget
+    //    … will desync it from the next relayout's decision."
+    //
+    // Die Faltungsrechnung arbeitet mit gemeldeten Breiten; ein Widget,
+    // das ohne ihr Wissen verschwindet, verschiebt die Rechnung, und
+    // sie faltet weiter unten in der Leiter weg, was noch gepasst
+    // haette. setItemAvailable ist der dafuer vorgesehene Weg — der
+    // Regler weiss dann, dass das Element nicht da ist, und rechnet
+    // ohne es.
+    //
+    // Versteckt, nicht geloescht: die Verdrahtung bleibt heil, ein
+    // Wiedereinschalten ist eine Zeile. Was an ihre Stelle tritt:
+    //   Bandstapel-Punkte  ->  Band-Menue in der Menueleiste
+    //   +PAN-Symbol        ->  View -> Pan Layout… (Ctrl+L)
+    //   CH 0 / 40m         ->  die Pille im Panadapter-Kopf
+    //   A/TX/LSB/2.9k/…    ->  die Applets RX, Filter, Frequenz
+    for (QWidget* w : {static_cast<QWidget*>(bar.bandStackLabel),
+                       static_cast<QWidget*>(bar.panButton),
+                       static_cast<QWidget*>(bar.chain0),
+                       static_cast<QWidget*>(bar.rxDashRow)}) {
+        if (w) { m_chromeBar->setItemAvailable(w, false); }
+    }
 
     // registerChromeBarItems just measured w.rxDashRow's raw sizeHint(),
     // which at this point in construction happens to equal tag + mode +

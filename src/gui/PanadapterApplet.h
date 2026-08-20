@@ -247,7 +247,9 @@ private:
     QLabel*                 m_grip {nullptr};
     QPushButton*            m_btnFloat {nullptr};
     QPushButton*            m_btnOptions {nullptr};
-    /// Zuletzt gewaehlte Deckkraft — nur fuer den Haken im Menue. Der
+    /// Sichtbarkeit der FUELLFARBE in Prozent (100 = nur Fuellfarbe,
+    /// 0 = nur Bild) — dieselbe Zaehlweise wie SpectrumWidget und der
+    /// Regler unter Setup -> Display. Nur fuer den Haken im Menue; der
     /// wahre Wert lebt in SpectrumWidget und in den Einstellungen.
     int                     m_bgOpacityPct {80};
     bool                    m_floating {false};

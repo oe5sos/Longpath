@@ -24,6 +24,7 @@
 // =================================================================
 
 #include <QPointF>
+#include <QImage>
 #include <QWidget>
 
 namespace Longpath {
@@ -79,6 +80,22 @@ public:
     double endStop() const noexcept { return m_endStop; }
 
     // Antenna beam width, drawn as a wedge around the actual heading.
+    // ── Als durchsichtiges Bild ──────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „kann man den rotorzeiger alleine auch
+    // im panadapter einblenden lassen? … sodass der hintergrund mit dem
+    // panadapter eines ist, quasi transparent."
+    //
+    // Liefert die Windrose ohne Grundflaeche und ohne Ablesung — nur
+    // Ring, Teilung, Zeiger und Ziel — auf durchsichtigem Grund. Der
+    // Panadapter legt das Bild in eine Ecke; er bekommt dabei KEIN
+    // Rotorwissen (siehe SpectrumWidget::setCompassOverlay).
+    //
+    // Ein Bild und kein Kindwidget, weil ein nicht-natives Kind auf
+    // macOS hinter dem QRhi-Inhalt verschwindet und ein natives keine
+    // Durchsichtigkeit ueber die GPU-Flaeche bekommt.
+    QImage renderTransparent(int sidePx, qreal dpr = 2.0);
+
     void setBeamWidth(double deg);
 
     // ── Is the actual needle reporting, or pretending? ───────────────
@@ -172,6 +189,9 @@ private:
     // Im Querformat steht die Rose links und nimmt die volle Hoehe;
     // die Ablesung rueckt nach rechts daneben, statt darunter zu
     // stehen, wo kein Platz ist.
+    /// Waehrend renderTransparent(): kein Grund, keine Ablesung.
+    bool    m_bare{false};
+
     bool    isLandscape()   const;
     bool    isCompassOnly() const;
     QPointF roseCentre()    const;

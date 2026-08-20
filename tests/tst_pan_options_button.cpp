@@ -84,10 +84,17 @@ private slots:
         QVERIFY2(imgSpy.at(0).at(0).toString().isEmpty(),
                  "Entfernen heisst: leerer Pfad");
 
-        QVERIFY2(fire(QStringLiteral("40 %")),
-                 "die Deckkraft MUSS waehlbar sein");
+        // „Bild sichtbar 75 %" heisst intern „Fuellfarbe sichtbar 25".
+        //
+        // Der Wert, den SpectrumWidget haelt, ist die Sichtbarkeit der
+        // FUELLFARBE (100 = nur Fuellfarbe, 0 = nur Bild). Das Menue
+        // sprach zuerst von „Deckkraft" mit demselben Zahlenwert — also
+        // genau verkehrt herum, und der Betreiber sah am 2026-08-20
+        // sein Foto nicht. Diese Pruefung haelt die Umrechnung fest.
+        QVERIFY2(fire(QStringLiteral("75 %")),
+                 "die Bildsichtbarkeit MUSS waehlbar sein");
         QCOMPARE(opaSpy.count(), 1);
-        QCOMPARE(opaSpy.at(0).at(0).toInt(), 40);
+        QCOMPARE(opaSpy.at(0).at(0).toInt(), 25);
 
         QVERIFY2(fire(QStringLiteral("Grundfarbe…")), "Grundfarbe fehlt");
         QCOMPARE(colSpy.count(), 1);

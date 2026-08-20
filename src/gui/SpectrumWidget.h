@@ -689,6 +689,27 @@ public:
 
     // Right-edge dBm scale strip visibility. When false, the strip is
     // hidden and the spectrum fills the full widget width.
+    // ── Eingeblendeter Kompass ───────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „kann man den rotorzeiger alleine auch
+    // im panadapter einblenden lassen?"
+    //
+    // Der Panadapter bekommt dabei KEIN Rotorwissen: er nimmt ein
+    // fertiges Bild und legt es in eine Ecke. Wer es malt und wann es
+    // sich aendert, ist seine Sache nicht — sonst haette das Spektrum
+    // plotzlich eine Meinung zu Peilungen, Endanschlaegen und
+    // Keulenbreiten, und die naechste Aenderung am Rotor muesste hier
+    // nachgezogen werden.
+    //
+    // Als BILD und nicht als Kindwidget, weil ein nicht-natives Kind
+    // auf macOS hinter dem QRhi-Inhalt verschwindet
+    // (SpectrumWidget.cpp:551) und ein natives Kind keine
+    // Durchsichtigkeit ueber die GPU-Flaeche bekommt. Im
+    // QPainter-Durchgang der Ueberlagerung stimmt beides.
+    void setCompassOverlay(const QImage& img);
+    void setCompassOverlayVisible(bool on);
+    bool compassOverlayVisible() const { return m_compassVisible; }
+
     void setBackgroundImage(const QString& path);
     QString backgroundImagePath() const { return m_bgImagePath; }
     void setBackgroundOpacity(int pct);
@@ -697,6 +718,7 @@ public:
     QColor backgroundFillColor() const { return m_bgFillColor; }
     void loadBackgroundSettings();
     void paintBackgroundLayer(QPainter& p, const QRect& specRect);
+    void drawCompassOverlay(QPainter& p, const QRect& specRect);
 
     void setDbmScaleVisible(bool on);
     bool dbmScaleVisible() const { return m_dbmScaleVisible; }
@@ -2833,6 +2855,8 @@ private:
     QString m_bgImagePath;
     int     m_bgOpacity{80};
     QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
+    QImage  m_compassImg;
+    bool    m_compassVisible{false};
 
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};

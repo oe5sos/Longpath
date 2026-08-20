@@ -493,20 +493,46 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         const QString f = QFileDialog::getOpenFileName(
             this, tr("Hintergrundbild"), QString(),
             tr("Bilder (*.png *.jpg *.jpeg *.webp *.bmp)"));
-        if (!f.isEmpty()) { emit backgroundImageRequested(f); }
+        if (f.isEmpty()) { return; }
+        emit backgroundImageRequested(f);
+        // Ein Bild waehlen und nichts sehen ist kein Ergebnis.
+        //
+        // Die Vorgabe fuer „Fuellfarbe sichtbar" ist 80 — davon bleiben
+        // vom Bild 20 %, auf einem dunklen Panadapter praktisch nichts.
+        // Wer gerade ein Foto ausgesucht hat, will es sehen; steht die
+        // Fuellfarbe noch auf einem Wert, der das Bild verschluckt,
+        // wird sie einmalig auf die Haelfte gesetzt. Wer danach anders
+        // will, findet den Wert im selben Menue.
+        if (m_bgOpacityPct >= 70) {
+            m_bgOpacityPct = 50;
+            emit backgroundOpacityRequested(m_bgOpacityPct);
+        }
     });
     menu->addAction(tr("Hintergrundbild entfernen"), this, [this]() {
         emit backgroundImageRequested(QString());
     });
 
-    auto* opa = menu->addMenu(tr("Deckkraft"));
-    for (int pct : {0, 20, 40, 60, 80, 100}) {
+    // ── „Bild sichtbar", nicht „Deckkraft" ───────────────────────────
+    //
+    // Der Wert, den SpectrumWidget haelt, ist die Sichtbarkeit der
+    // FUELLFARBE: 100 = nur Fuellfarbe, 0 = nur Bild (so steht es auch
+    // am Regler unter Setup -> Display). Hier stand „Deckkraft" mit
+    // demselben Zahlenwert — also genau verkehrt herum.
+    //
+    // Der Betreiber, 2026-08-20: „fotos sehe ich nicht im hintergrund
+    // beim pandapter." Bei der Vorgabe 80 blieben vom Bild 20 %, und
+    // wer im Menue 100 waehlte, um es kraeftiger zu machen, bekam gar
+    // keins mehr.
+    //
+    // Das Menue spricht jetzt vom BILD und rechnet selbst um.
+    auto* opa = menu->addMenu(tr("Bild sichtbar"));
+    for (int pct : {0, 25, 50, 75, 100}) {
         QAction* a = opa->addAction(QStringLiteral("%1 %").arg(pct));
         a->setCheckable(true);
-        a->setChecked(pct == m_bgOpacityPct);
+        a->setChecked(pct == 100 - m_bgOpacityPct);
         connect(a, &QAction::triggered, this, [this, pct]() {
-            m_bgOpacityPct = pct;
-            emit backgroundOpacityRequested(pct);
+            m_bgOpacityPct = 100 - pct;          // gespeichert wird die Fuellfarbe
+            emit backgroundOpacityRequested(m_bgOpacityPct);
         });
     }
 

@@ -7,6 +7,8 @@
 // =================================================================
 
 #include "gui/instruments/NeedleInstrument.h"
+#include <cmath>
+#include <QtMath>
 
 #include "gui/instruments/InstrumentFooter.h"
 #include "gui/instruments/InstrumentPainter.h"
@@ -191,11 +193,38 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     // egal wie hoch das Feld ist. Weil der Radius selbst aus der Hoehe
     // kommt, muss beides gemeinsam geloest werden — daher erst der
     // Radius aus der vollen Hoehe, dann der Drehpunkt daraus.
-    const qreal radiusByWidth = face.width() * kRadiusOfWidth;
-    // h = radius/kRadiusOfPivotHeight + radius*kPivotOfRadius, nach
-    // radius aufgeloest.
+    // ── Aus der ECHTEN Bogenbreite, nicht aus einem Verhaeltnis ──────
+    //
+    // Hier stand `face.width() * 148/520` — die Zahlen des Entwurfs.
+    // Der Bogen laeuft von 168° bis 12°, ist also symmetrisch um die
+    // Senkrechte und 2·sin(78°) = 1,956 Radien BREIT. Mit dem festen
+    // Verhaeltnis nahm er 55 % der Flaechenbreite ein und liess links
+    // und rechts je gut 20 % leer.
+    //
+    // Der Betreiber, 2026-08-20, nach dem ersten Anlauf: „s meter und
+    // swr noch immer nicht formatfuellend." Er hatte recht — ich hatte
+    // nur den Drehpunkt nach unten geholt, die Breite aber weiter aus
+    // dem Entwurfsverhaeltnis genommen.
+    //
+    // Jetzt umgekehrt gerechnet: aus der Flaeche wird der groesste
+    // Radius bestimmt, dessen Bogen samt Mulde noch hineinpasst —
+    // waagerecht UND senkrecht, das Kleinere gewinnt. Damit fuellt der
+    // Zeiger jedes Format, statt in einem zu stimmen.
+    const qreal halfSpanRad = qDegreesToRadians((kDeg0 - kDeg1) / 2.0);
+    const qreal arcWidthPerRadius = 2.0 * std::sin(halfSpanRad);
+    const qreal pad = 6.0;
+
+    // Waagerecht: Bogenbreite + halbe Mulde auf jeder Seite.
+    const qreal radiusByWidth =
+        (face.width() - 2.0 * pad)
+        / (arcWidthPerRadius + kTroughOfRadius);
+
+    // Senkrecht: vom Drehpunkt bis zum Scheitel ein Radius, plus halbe
+    // Mulde, plus der Abstand unter dem Drehpunkt.
     const qreal radiusByHeight =
-        face.height() / (1.0 / kRadiusOfPivotHeight + kPivotOfRadius);
+        (face.height() - pad)
+        / (1.0 + kTroughOfRadius / 2.0 + kPivotOfRadius);
+
     const qreal radius = qMin(radiusByWidth, radiusByHeight);
     const QPointF pivot(face.center().x(),
                         face.bottom() - radius * kPivotOfRadius);
