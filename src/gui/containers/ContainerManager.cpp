@@ -558,6 +558,12 @@ void ContainerManager::setContentFactory(ContainerContentFactory factory)
     m_contentFactory = std::move(factory);
 }
 
+void ContainerManager::setPersisted(const QString& id, bool on)
+{
+    if (on) { m_notPersisted.remove(id); }
+    else    { m_notPersisted.insert(id); }
+}
+
 void ContainerManager::saveState()
 {
     // From Thetis MeterManager.cs:6391-6447
@@ -584,6 +590,10 @@ void ContainerManager::saveState()
     QStringList idList;
     for (auto it = m_containers.constBegin(); it != m_containers.constEnd(); ++it) {
         ContainerWidget* c = it.value();
+        // Applet-Kacheln speichern ihre Lage selbst — siehe
+        // setPersisted(). Sie hier mitzuschreiben ergaebe beim
+        // naechsten Start einen leeren Rahmen neben dem Applet.
+        if (m_notPersisted.contains(it.key())) { continue; }
         if (c->isOverlayDocked()) {
             c->storeLocation();
         }

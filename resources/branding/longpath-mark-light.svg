@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Longpath — Bildmarke fuer HELLEN Grund.
+  Bernstein muss dort dunkler werden, sonst verschwindet er.
+  © 2026 Martin Fischer (OE5SOS). GPL.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"
+     width="1024" height="1024" role="img"
+     aria-label="Longpath: ein Ring mit dem langen Weg darin">
+  <circle cx="50" cy="50" r="36" fill="none" stroke="#16161a" stroke-width="10"/>
+  <path d="M24 32 A 36 36 0 0 0 50 86 A 36 36 0 0 0 76 32"
+        fill="none" stroke="#a97a2c" stroke-width="8" stroke-linecap="round"/>
+</svg>

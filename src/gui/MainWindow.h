@@ -753,6 +753,19 @@ private:
     /// Schloss, Rechtsklick-Menue.
     void moveAppletToCanvas(AppletWidget* applet);
 
+    /// Die Lagen aller Kacheln in die Einstellungen schreiben.
+    /// Das Menue am Zahnrad einer Kachel: welche anderen freien
+    /// Fenster koennen als Reiter hierher.
+    void showTileTabMenu(const QString& tileId);
+
+    /// Einen Reiter wieder als eigene Kachel herausloesen.
+    void detachTabToOwnTile(const QString& containerId, int index);
+
+    void saveCanvasLayout();
+
+    /// Und beim Start zurueckholen. Nach der Sichtbarkeit aufrufen.
+    void restoreCanvasLayout();
+
     /// Jedes sichtbare Applet auf die Flaeche legen. Der Weg zu „alles
     /// x-beliebig verschiebbar" in einem Schritt.
     void moveAllAppletsToCanvas();

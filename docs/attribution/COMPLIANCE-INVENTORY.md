@@ -60,8 +60,8 @@ Total tracked files: **724**
 - `src/gui/applets/TxApplet.cpp`
 - `src/gui/applets/TxApplet.h`
 - `src/gui/widgets/CenterMarkSlider.h`
-- `src/gui/widgets/FilterPassbandWidget.cpp`
-- `src/gui/widgets/FilterPassbandWidget.h`
+- `src/gui/widgets/FilterPassbandWidget.cpp` *(am 2026-08-20 entfernt; ersetzt durch `BandwidthFilterPane`. Eintrag bleibt: der Port hat stattgefunden.)*
+- `src/gui/widgets/FilterPassbandWidget.h` *(dito)*
 - `src/gui/widgets/GuardedComboBox.h`
 - `src/gui/widgets/GuardedSlider.h`
 - `src/gui/widgets/ResetSlider.h`

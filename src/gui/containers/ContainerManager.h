@@ -54,6 +54,7 @@ mw0lge@grange-lane.co.uk
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+#include <QSet>
 #include <QObject>
 #include <QList>
 #include <QMap>
@@ -116,6 +117,19 @@ public:
 
     // --- Persistence ---
     void saveState();
+
+    /// Einen Container von der eigenen Speicherung ausnehmen.
+    ///
+    /// Applet-Kacheln (MainWindow::moveAppletToCanvas) sind Container,
+    /// aber KEINE Instrumentenbehaelter: ihr Inhalt ist ein Applet, das
+    /// woanders lebt und woanders gespeichert wird. Wuerde saveState()
+    /// sie mitschreiben, kaeme beim naechsten Start ein LEERER Rahmen
+    /// zurueck, waehrend das Applet im Stapel liegt — doppeltes
+    /// Mobiliar, und der Rahmen liesse sich nicht einmal wegraeumen.
+    ///
+    /// Wer eine Kachel anlegt, meldet sie hier ab und speichert ihre
+    /// Lage selbst.
+    void setPersisted(const QString& id, bool on);
 
     /// Herstellen aus den Einstellungen.
     ///
@@ -227,6 +241,9 @@ private:
     QMap<QString, ContainerWidget*> m_containers;
     QMap<QString, FloatingContainer*> m_floatingForms;
     QString m_panelContainerId;
+
+    /// Container, die saveState() auslaesst — siehe setPersisted().
+    QSet<QString> m_notPersisted;
     ContainerContentFactory m_contentFactory;
 
     // Restore path guard. During restoreState() a Floating container

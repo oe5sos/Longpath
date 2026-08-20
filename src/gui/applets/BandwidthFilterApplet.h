@@ -75,6 +75,9 @@ private:
     void refreshPane(int i);
     void refreshNumbers();
 
+    /// Die beiden VAR-Knoepfe nachziehen: leer oder mit Breite.
+    void refreshVarButtons();
+
     SliceModel* sliceAt(int i) const;
     SliceModel* activeSlice() const;
 
@@ -85,6 +88,7 @@ private:
     QSpinBox*    m_lowBox{nullptr};
     QSpinBox*    m_widthBox{nullptr};
     QSpinBox*    m_highBox{nullptr};
+    QList<QPushButton*> m_varBtns;
     QPushButton* m_resetBtn{nullptr};
     QPushButton* m_spanBtn{nullptr};
     QLabel*      m_modeLbl{nullptr};

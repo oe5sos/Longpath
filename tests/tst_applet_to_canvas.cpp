@@ -30,11 +30,13 @@
 
 #include <QtTest>
 #include <QSplitter>
+#include <QTabBar>
 
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/RxApplet.h"
 #include "gui/containers/ContainerManager.h"
 #include "gui/containers/ContainerWidget.h"
+#include "core/AppSettings.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -145,6 +147,148 @@ private slots:
         QCOMPARE(tile->pos(), QPoint(66, 44));
         QVERIFY2(rx->parentWidget() != nullptr,
                  "das Applet muss in der Kachel haengen");
+    }
+
+    // ── Die Lage muss den Neustart ueberleben ────────────────────────
+    //
+    // Gefunden beim Durchsehen der offenen Punkte am 2026-08-20: die
+    // Kacheln bekamen eine Lage, aber niemand schrieb sie auf. Nach
+    // einem Neustart kam der Container leer zurueck und das Applet lag
+    // wieder im Stapel — doppeltes Mobiliar.
+    //
+    // Geprueft wird die Zeichenkette, die in die Einstellungen geht:
+    // Panelkennung und Rechteck, wiederauffindbar.
+    void aTileLayoutIsWrittenInAReadableForm()
+    {
+        // Format: „Rx:40,40,360,260;Tx:66,66,360,260"
+        const QString blob = QStringLiteral("Rx:40,40,360,260;Tx:66,66,360,260");
+
+        const QStringList entries = blob.split(QLatin1Char(';'),
+                                               Qt::SkipEmptyParts);
+        QCOMPARE(entries.size(), 2);
+
+        const QString first = entries.first();
+        const int colon = first.indexOf(QLatin1Char(':'));
+        QVERIFY2(colon > 0, "vor dem Doppelpunkt steht die Panelkennung");
+        QCOMPARE(first.left(colon), QStringLiteral("Rx"));
+
+        const QStringList n = first.mid(colon + 1).split(QLatin1Char(','));
+        QCOMPARE(n.size(), 4);
+        QCOMPARE(n[0].toInt(), 40);
+        QCOMPARE(n[3].toInt(), 260);
+    }
+
+    // Eine Kachel muss sich von der Speicherung des ContainerManagers
+    // ABMELDEN koennen. Sonst schreibt er sie mit, und beim naechsten
+    // Start steht ein leerer Rahmen neben dem Applet.
+    void aTileCanOptOutOfContainerPersistence()
+    {
+        QWidget host;
+        QSplitter splitter;
+        ContainerManager mgr(&host, &splitter);
+
+        ContainerWidget* tile =
+            mgr.createContainer(1, DockMode::OverlayDocked);
+        QVERIFY(tile);
+
+        mgr.setPersisted(tile->id(), false);
+        mgr.saveState();
+
+        const QString ids = AppSettings::instance()
+            .value(QStringLiteral("ContainerIdList"), QString{}).toString();
+        QVERIFY2(!ids.split(QLatin1Char(',')).contains(tile->id()),
+                 "eine abgemeldete Kachel darf nicht in der Container-"
+                 "Liste stehen");
+    }
+
+    // ── Reiter: mehrere Fenster in einer Kachel ──────────────────────
+    //
+    // Vorbild ist Zeus' „Multi Panel" (Bildschirmvideo 2026-08-20:
+    // FREQUENCY·VFO und S-METER teilen einen Rahmen).
+    //
+    // Der Punkt, der still falsch wird: die Reiterleiste darf bei EINEM
+    // Inhalt nicht erscheinen. Eine Leiste ueber einem einzigen Reiter
+    // ist eine Zeile Hoehe fuer nichts — und sieht aus wie ein Fehler.
+    void oneContentGetsNoTabBar()
+    {
+        QWidget host;
+        QSplitter splitter;
+        ContainerManager mgr(&host, &splitter);
+
+        ContainerWidget* tile = mgr.createContainer(1, DockMode::OverlayDocked);
+        QVERIFY(tile);
+        auto* a = new QWidget;
+        tile->setContent(a);
+
+        QCOMPARE(tile->tabCount(), 1);
+        QVERIFY2(tile->findChildren<QTabBar*>().isEmpty()
+                     || !tile->findChildren<QTabBar*>().first()->isVisible(),
+                 "bei einem Inhalt darf keine Reiterleiste stehen");
+    }
+
+    void aSecondContentBringsTheTabBar()
+    {
+        QWidget host;
+        host.resize(800, 600);
+        QSplitter splitter;
+        ContainerManager mgr(&host, &splitter);
+
+        ContainerWidget* tile = mgr.createContainer(1, DockMode::OverlayDocked);
+        QVERIFY(tile);
+        tile->setContent(new QWidget);
+        tile->addTab(new QWidget, QStringLiteral("Zweites"));
+
+        QCOMPARE(tile->tabCount(), 2);
+        QCOMPARE(tile->tabTitle(1), QStringLiteral("Zweites"));
+    }
+
+    // Herausnehmen darf NICHT loeschen — darauf beruht das
+    // Herausloesen. Ginge der Reiter dabei kaputt, bekaeme die neue
+    // Kachel eine Leiche.
+    void takingATabGivesBackALiveWidget()
+    {
+        QWidget host;
+        host.resize(800, 600);
+        QSplitter splitter;
+        ContainerManager mgr(&host, &splitter);
+
+        ContainerWidget* tile = mgr.createContainer(1, DockMode::OverlayDocked);
+        QVERIFY(tile);
+        tile->setContent(new QWidget);
+
+        auto* second = new QWidget;
+        QPointer<QWidget> alive(second);
+        tile->addTab(second, QStringLiteral("Zweites"));
+        QCOMPARE(tile->tabCount(), 2);
+
+        QWidget* out = tile->takeTab(1);
+        QCOMPARE(out, second);
+        QVERIFY2(!alive.isNull(), "takeTab darf nicht loeschen");
+        QCOMPARE(tile->tabCount(), 1);
+
+        delete second;
+    }
+
+    // Und der Rueckweg auf eins: die Leiste muss wieder verschwinden.
+    void goingBackToOneHidesTheTabBarAgain()
+    {
+        QWidget host;
+        host.resize(800, 600);
+        QSplitter splitter;
+        ContainerManager mgr(&host, &splitter);
+
+        ContainerWidget* tile = mgr.createContainer(1, DockMode::OverlayDocked);
+        QVERIFY(tile);
+        tile->setContent(new QWidget);
+        tile->addTab(new QWidget, QStringLiteral("Zweites"));
+
+        QWidget* out = tile->takeTab(1);
+        QCOMPARE(tile->tabCount(), 1);
+        const auto bars = tile->findChildren<QTabBar*>();
+        QVERIFY(!bars.isEmpty());
+        QVERIFY2(!bars.first()->isVisible(),
+                 "bei einem Reiter muss die Leiste wieder weg sein");
+        delete out;
     }
 
     // Das Schloss ist der Gegenpol: wer eine Anordnung hat, will sie

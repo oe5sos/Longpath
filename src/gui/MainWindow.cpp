@@ -380,6 +380,7 @@ warren@wpratt.com
 #include "widgets/OverflowChip.h"
 #include "widgets/SystemTile.h"
 #include "gui/chrome/ChromeBarController.h"
+#include "gui/styles/PopupMenuStyle.h"
 #include "gui/chrome/ChromeBarItems.h"
 #include "gui/chrome/TxSwitchBar.h"
 #include "core/AudioDeviceConfig.h"
@@ -1019,6 +1020,152 @@ QString MainWindow::canonicalAppletKey(const QString& key) const
 //
 // Hier ist der Weg. Das Applet verlaesst den Stapel und bekommt eine
 // Kachel; von da an gilt fuer es alles, was fuer Container gilt.
+// ── Die Lagen der Kacheln merken ─────────────────────────────────────
+//
+// Format: „Rx:40,40,360,260;Tx:66,66,360,260" — Panelkennung und
+// Rechteck, mit Strichpunkt getrennt.
+//
+// EIGENE Speicherung und nicht die des ContainerManagers: dessen
+// saveState() schreibt Instrumentenbehaelter, deren INHALT mitgehoert.
+// Bei einer Applet-Kachel gehoert der Inhalt woanders hin — er lebt im
+// Applet-Stapel und wird ueber die Sichtbarkeit gefuehrt. Beides in
+// denselben Topf zu werfen hiesse, dass beim Start zwei Stellen
+// dasselbe Fenster herstellen wollen.
+// Welche anderen Fenster koennen in diese Kachel? Das Menue am
+// Zahnrad der Kachel.
+void MainWindow::showTileTabMenu(const QString& tileId)
+{
+    if (!m_containerManager || !m_appletVis) { return; }
+    ContainerWidget* tile = m_containerManager->container(tileId);
+    if (!tile) { return; }
+
+    QMenu menu(this);
+    menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
+    menu.addSection(QStringLiteral("Fenster hierher holen"));
+
+    QHash<QAction*, QString> byAction;
+    for (auto it = m_canvasApplets.constBegin();
+         it != m_canvasApplets.constEnd(); ++it) {
+        if (it.value() == tileId) { continue; }   // sich selbst nicht
+        QAction* a = menu.addAction(m_appletVis->displayName(it.key()));
+        byAction.insert(a, it.key());
+    }
+
+    if (byAction.isEmpty()) {
+        QAction* none = menu.addAction(
+            QStringLiteral("keine anderen freien Fenster"));
+        none->setEnabled(false);
+    }
+
+    QAction* chosen = menu.exec(QCursor::pos());
+    if (!chosen || !byAction.contains(chosen)) { return; }
+
+    const QString otherId = byAction.value(chosen);
+    AppletWidget* a = m_appletsById.value(otherId, nullptr);
+    if (!a) { return; }
+
+    // Aus seiner eigenen Kachel heraus, in diese hinein.
+    const QString otherTileId = m_canvasApplets.take(otherId);
+    if (!otherTileId.isEmpty()) {
+        if (ContainerWidget* other = m_containerManager->container(otherTileId)) {
+            // Erst herausnehmen, dann abraeumen — sonst nimmt
+            // destroyContainer das Applet als Kind mit ins Grab.
+            a->setParent(nullptr);
+            m_containerManager->destroyContainer(otherTileId);
+        }
+    }
+    tile->addTab(a, m_appletVis->displayName(otherId));
+    a->show();
+
+    // Der Reiter gehoert jetzt zu DIESER Kachel. Die Zuordnung muss
+    // mit, sonst findet returnAppletFromCanvas ihn nicht wieder.
+    m_canvasApplets.insert(otherId, tileId);
+    saveCanvasLayout();
+}
+
+// Ein Reiter wird wieder eigenstaendig.
+void MainWindow::detachTabToOwnTile(const QString& containerId, int index)
+{
+    if (!m_containerManager) { return; }
+    ContainerWidget* tile = m_containerManager->container(containerId);
+    if (!tile) { return; }
+
+    QWidget* w = tile->takeTab(index);
+    auto* a = qobject_cast<AppletWidget*>(w);
+    if (!a) { return; }
+
+    const QString id = panelIdFor(a);
+    if (!id.isEmpty()) { m_canvasApplets.remove(id); }
+
+    // Ueber den gewoehnlichen Weg zurueck: erst in den Stapel, dann
+    // auf die Flaeche. So laeuft es durch dieselbe Stelle wie jedes
+    // andere Freistellen und kann nicht auseinanderlaufen.
+    if (m_appletPanel && !m_appletPanel->applets().contains(a)) {
+        m_appletPanel->addApplet(a);
+    }
+    moveAppletToCanvas(a);
+}
+
+void MainWindow::saveCanvasLayout()
+{
+    QStringList parts;
+    for (auto it = m_canvasApplets.constBegin();
+         it != m_canvasApplets.constEnd(); ++it) {
+        ContainerWidget* tile = m_containerManager
+            ? m_containerManager->container(it.value()) : nullptr;
+        if (!tile) { continue; }
+        const QRect r(tile->pos(), tile->size());
+        parts << QStringLiteral("%1:%2,%3,%4,%5")
+                     .arg(it.key())
+                     .arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height());
+    }
+    AppSettings::instance().setValue(QStringLiteral("CanvasApplets"),
+                                     parts.join(QLatin1Char(';')));
+}
+
+// Beim Start wiederherstellen.
+//
+// NACH der Sichtbarkeit aufrufen: ein Applet, das gar nicht sichtbar
+// ist, bekommt keine Kachel. Und nur wenn die freie Flaeche ansteht —
+// sonst wuerde ein einmal freigestelltes Fenster fuer immer
+// freigestellt bleiben, auch nachdem der Betreiber den Schalter wieder
+// ausgemacht hat.
+void MainWindow::restoreCanvasLayout()
+{
+    if (!m_freeCanvasMode || !m_appletPanel || !m_containerManager) { return; }
+
+    const QString blob = AppSettings::instance()
+        .value(QStringLiteral("CanvasApplets"), QString{}).toString();
+    if (blob.isEmpty()) { return; }
+
+    for (const QString& entry : blob.split(QLatin1Char(';'), Qt::SkipEmptyParts)) {
+        const int colon = entry.indexOf(QLatin1Char(':'));
+        if (colon <= 0) { continue; }
+        const QString id = entry.left(colon);
+        const QStringList n = entry.mid(colon + 1).split(QLatin1Char(','));
+        if (n.size() != 4) { continue; }
+
+        AppletWidget* a = m_appletsById.value(id, nullptr);
+        if (!a) { continue; }
+        if (m_appletVis && !m_appletVis->isEffectivelyVisible(id)) { continue; }
+
+        moveAppletToCanvas(a);
+
+        const QString tileId = m_canvasApplets.value(id);
+        ContainerWidget* tile = m_containerManager->container(tileId);
+        if (!tile) { continue; }
+
+        bool ok = true;
+        const QPoint pos(n[0].toInt(&ok), n[1].toInt(&ok));
+        const QSize  sz (n[2].toInt(&ok), n[3].toInt(&ok));
+        if (!ok || sz.width() < 80 || sz.height() < 60) { continue; }
+
+        tile->setDockedLocation(pos);
+        tile->setDockedSize(sz);
+        tile->restoreLocation();
+    }
+}
+
 void MainWindow::moveAppletToCanvas(AppletWidget* applet)
 {
     if (!applet || !m_appletPanel || !m_containerManager) { return; }
@@ -1048,7 +1195,38 @@ void MainWindow::moveAppletToCanvas(AppletWidget* applet)
     tile->show();
     tile->raise();
 
+    // ── Fenster hierher holen ────────────────────────────────────
+    //
+    // Zeus fasst Fenster durch Ziehen-und-Fallenlassen zu Reitern
+    // zusammen. Das ist die schoenere Geste und der riskantere Weg:
+    // ein Wurf ueber Fenstergrenzen mit QRhiWidgets darin ist genau
+    // die Stelle, an der AetherSDR abstuerzte (#2495, #4319) — und
+    // der Grund, warum unser Applet-Ziehen bis heute auf das
+    // Umsortieren in der Spalte beschraenkt ist.
+    //
+    // Deshalb erst ueber das Menue. Erreichbar ist wichtiger als
+    // elegant; ein Wurf, den man nicht findet, hilft niemandem, und
+    // einer, der abstuerzt, hilft noch weniger.
+    connect(tile, &ContainerWidget::settingsRequested, this,
+            [this, tileId = tile->id()]() { showTileTabMenu(tileId); });
+
+    connect(tile, &ContainerWidget::tabDetachRequested, this,
+            &MainWindow::detachTabToOwnTile);
+
+    // Diese Kachel speichert ihre Lage SELBST — der ContainerManager
+    // soll sie nicht mitschreiben, sonst kaeme beim naechsten Start ein
+    // leerer Rahmen zurueck, waehrend das Applet im Stapel liegt.
+    m_containerManager->setPersisted(tile->id(), false);
+
     m_canvasApplets.insert(id, tile->id());
+
+    // Beim Ziehen und beim Groessenaendern mitschreiben. Ohne das
+    // ueberlebt eine Anordnung den Neustart nicht — und eine Anordnung,
+    // die man jeden Morgen neu herstellen muss, ist keine.
+    connect(tile, &ContainerWidget::dockedMoved, this,
+            [this]() { saveCanvasLayout(); });
+
+    saveCanvasLayout();
 
     Q_UNUSED(dockIndex)
 
@@ -1097,6 +1275,7 @@ void MainWindow::returnAppletFromCanvas(const QString& id)
         a->setParent(nullptr);
     }
     m_containerManager->destroyContainer(tileId);
+    saveCanvasLayout();
 
     if (a && m_appletPanel && !m_appletPanel->applets().contains(a)) {
         m_appletPanel->addApplet(a);
@@ -2221,7 +2400,7 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
     // Drag a filter edge on this pan.
     connect(sw, &SpectrumWidget::filterEdgeDragged, this,
             [this, panId](int low, int high) {
-        if (SliceModel* s = sliceForPan(panId)) { s->setFilter(low, high); }
+        if (SliceModel* s = sliceForPan(panId)) { s->setFilterByHand(low, high); }
     });
 
     // Drag the pan. Non-CTUN moves the VFO; CTUN pins the DDC to the pan centre
@@ -5317,11 +5496,10 @@ void MainWindow::populateDefaultMeter()
     // (SliceModel::widthToEdges), damit sie auch fuer CAT und Tastatur
     // gelten.
     //
-    // HINWEIS ZUR DOPPELUNG: das kleine FilterPassbandWidget im
-    // RxApplet kann dasselbe Ziehen, zeichnet aber ein festes Trapez
-    // ohne Frequenzbezug. Es bleibt vorerst stehen; sobald klar ist,
-    // dass diese Flaeche traegt, gehoert es zurueckgebaut. Zwei
-    // Stellen, an denen man dasselbe zieht, sind eine zu viel.
+    // Die Doppelung, die hier bis 2026-08-20 vermerkt war, ist
+    // aufgeloest: das alte FilterPassbandWidget im RxApplet ist
+    // entfernt, dort steht jetzt dieselbe BandwidthFilterPane, nur
+    // kleiner. Eine Umsetzung, zwei Plaetze.
     m_bwFilterApplet = new BandwidthFilterApplet(m_radioModel, nullptr);
     panel->addApplet(m_bwFilterApplet);
 
@@ -6232,6 +6410,15 @@ void MainWindow::populateDefaultMeter()
     for (const QString& id : m_appletVis->registeredIds()) {
         applyAppletVisibility(id, m_appletVis->isEffectivelyVisible(id));
     }
+
+    // Und die Kacheln an ihre Plaetze. NACH der Sichtbarkeit: ein
+    // Fenster, das gar nicht sichtbar ist, bekommt keine Kachel.
+    //
+    // Der Aufruf steht ausserhalb der Schleife darueber, weil
+    // moveAppletToCanvas das Applet aus dem Stapel NIMMT — waehrend
+    // derselben Schleife haette applyAppletVisibility es gleich danach
+    // wieder hineingelegt.
+    restoreCanvasLayout();
 
     // Pump future EFFECTIVE-visibility changes from the controller into
     // the panel. effectiveVisibilityChanged fires when either the user

@@ -133,6 +133,33 @@ void BandwidthFilterApplet::buildUI()
         m_highBox->setObjectName(QStringLiteral("bwFilterHigh"));
         row->addWidget(m_highBox);
 
+        // ── VAR1 und VAR2 ────────────────────────────────────────
+        //
+        // Der Grund: ohne sie ist die eigene Handeinstellung nach einem
+        // Klick auf „2.4k" weg. VAR1 fuellt sich VON SELBST, sobald man
+        // zieht (SliceModel::setFilterByHand); VAR2 ist der zweite
+        // Platz, den man bewusst belegt — Rechtsklick.
+        //
+        // Ein Klick holt zurueck, ein Rechtsklick legt ab. Ein leerer
+        // Platz sagt das auch, statt still nichts zu tun.
+        for (int i = 0; i < SliceModel::kVarSlots; ++i) {
+            QPushButton* b = styledButton(
+                QStringLiteral("VAR %1").arg(i + 1), 56);
+            b->setContextMenuPolicy(Qt::CustomContextMenu);
+            m_varBtns.append(b);
+            row->addWidget(b);
+
+            connect(b, &QPushButton::clicked, this, [this, i]() {
+                if (SliceModel* s = activeSlice()) { s->recallVarFilter(i); }
+                refreshVarButtons();
+            });
+            connect(b, &QPushButton::customContextMenuRequested, this,
+                    [this, i](const QPoint&) {
+                if (SliceModel* s = activeSlice()) { s->storeVarFilter(i); }
+                refreshVarButtons();
+            });
+        }
+
         m_resetBtn = styledButton(QStringLiteral("↺ Centre"), 78);
         m_resetBtn->setToolTip(QStringLiteral(
             "Put the passband back where this mode wants it — on the "
@@ -236,7 +263,7 @@ void BandwidthFilterApplet::wirePane(BandwidthFilterPane* pane, int sliceIndex)
             [this, sliceIndex](int low, int high) {
         // Nicht begrenzen — das tut setFilter. Die Flaeche meldet
         // Wunschwerte.
-        if (SliceModel* s = sliceAt(sliceIndex)) { s->setFilter(low, high); }
+        if (SliceModel* s = sliceAt(sliceIndex)) { s->setFilterByHand(low, high); }
     });
 
     connect(pane, &BandwidthFilterPane::filterCentreChanged, this,
@@ -283,6 +310,37 @@ void BandwidthFilterApplet::refreshPane(int i)
     pane->setHasFrequency(s->frequency() > 0.0);
 }
 
+// Ein leerer Platz sagt „leer" und ist blass; ein belegter zeigt seine
+// Breite. Ein Knopf, der nur „VAR 1" sagt, laesst offen, ob ein Klick
+// etwas tut.
+void BandwidthFilterApplet::refreshVarButtons()
+{
+    SliceModel* s = activeSlice();
+    for (int i = 0; i < m_varBtns.size(); ++i) {
+        QPushButton* b = m_varBtns.at(i);
+        const bool filled = s && s->hasVarFilter(i);
+        if (filled) {
+            const QPair<int,int> v = s->varFilter(i);
+            const int bw = v.second - v.first;
+            b->setText(bw >= 1000
+                ? QStringLiteral("%1k").arg(bw / 1000.0, 0, 'f', 1)
+                : QStringLiteral("%1").arg(bw));
+            b->setToolTip(QStringLiteral(
+                "VAR %1: %2 Hz … %3 Hz — Klick holt zurück, "
+                "Rechtsklick überschreibt.").arg(i + 1)
+                .arg(v.first).arg(v.second));
+        } else {
+            b->setText(QStringLiteral("VAR %1").arg(i + 1));
+            b->setToolTip(QStringLiteral(
+                "Noch leer. VAR 1 füllt sich von selbst, sobald du am "
+                "Filter ziehst; Rechtsklick legt die jetzige "
+                "Einstellung ab."));
+        }
+        b->setEnabled(true);
+        b->setProperty("varFilled", filled);
+    }
+}
+
 void BandwidthFilterApplet::refreshNumbers()
 {
     SliceModel* s = activeSlice();
@@ -300,6 +358,7 @@ void BandwidthFilterApplet::refreshNumbers()
     m_modeLbl->setText(SliceModel::modeName(s->dspMode()));
 
     m_updatingFromModel = false;
+    refreshVarButtons();
 }
 
 void BandwidthFilterApplet::syncFromModel()

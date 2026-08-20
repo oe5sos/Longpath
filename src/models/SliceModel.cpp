@@ -665,6 +665,45 @@ int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
     }
 }
 
+// ── VAR1 und VAR2 ────────────────────────────────────────────────────
+//
+// From Thetis console.cs:7237-7249 [v2.10.3.15-5-g852bf0e]. Begruendung
+// steht am Kopf der Deklaration.
+
+void SliceModel::storeVarFilter(int slot)
+{
+    if (slot < 0 || slot >= kVarSlots) { return; }
+    // Je Betriebsart getrennt: ein Handdurchlass fuer CW hat in SSB
+    // nichts verloren — dort waere er nicht einmal erlaubt.
+    m_varFilters[slot].insert(static_cast<int>(m_dspMode),
+                              qMakePair(m_filterLow, m_filterHigh));
+}
+
+void SliceModel::recallVarFilter(int slot)
+{
+    if (!hasVarFilter(slot)) { return; }
+    const QPair<int,int> v = m_varFilters[slot]
+        .value(static_cast<int>(m_dspMode));
+    setFilter(v.first, v.second);   // geht durch die Begrenzung
+}
+
+bool SliceModel::hasVarFilter(int slot) const
+{
+    if (slot < 0 || slot >= kVarSlots) { return false; }
+    const QPair<int,int> v = m_varFilters[slot]
+        .value(static_cast<int>(m_dspMode), qMakePair(0, 0));
+    // Ein Durchlass ohne Breite ist kein Durchlass — so unterscheidet
+    // sich „leer" von „zufaellig 0/0 gespeichert".
+    return v.first != v.second;
+}
+
+QPair<int,int> SliceModel::varFilter(int slot) const
+{
+    if (slot < 0 || slot >= kVarSlots) { return qMakePair(0, 0); }
+    return m_varFilters[slot].value(static_cast<int>(m_dspMode),
+                                    qMakePair(0, 0));
+}
+
 void SliceModel::setFilterWidth(int widthHz)
 {
     int low = 0, high = 0;
@@ -706,6 +745,27 @@ void SliceModel::setLimitFiltersToSidebands(bool on)
     // Schalter, der erst wirkt, wenn man etwas anderes anfasst, wirkt
     // fuer den Bedienenden gar nicht.
     setFilter(m_filterLow, m_filterHigh);
+}
+
+// ── Von Hand verstellt? Dann nach VAR1 ───────────────────────────────
+//
+// From Thetis console.cs:7237 — SelectRX1VarFilter. Dort springt die
+// Auswahl beim ersten Verstellen auf VAR1, und der benannte Filter
+// bleibt unberuehrt.
+//
+// Bei uns gibt es keine Auswahl-Marke (die Knoepfe leiten ihre
+// Hervorhebung aus den Werten ab, RxApplet::updateFilterButtons), also
+// bleibt der nuetzliche Teil: die Handeinstellung AUFHEBEN, damit sie
+// nach einem Klick auf „2.4k" nicht verloren ist.
+//
+// Warum ein eigener Weg und nicht in setFilter: setFilter laeuft auch,
+// wenn ein GESPEICHERTER Filter angewandt wird. Wuerde jeder Aufruf
+// nach VAR1 schreiben, waere VAR1 nach dem ersten Knopfdruck genau der
+// Knopf — und damit wertlos.
+void SliceModel::setFilterByHand(int low, int high)
+{
+    setFilter(low, high);
+    storeVarFilter(0);
 }
 
 void SliceModel::setFilter(int low, int high)

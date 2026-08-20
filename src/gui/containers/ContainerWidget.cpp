@@ -73,6 +73,8 @@ mw0lge@grange-lane.co.uk
 
 #include <QUuid>
 #include <QVBoxLayout>
+#include <QStackedWidget>
+#include <QTabBar>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -301,6 +303,132 @@ void ContainerWidget::setContent(QWidget* widget)
         layout->addWidget(m_content);
     }
     emit contentChanged(m_content);
+}
+
+// ── Reiter ───────────────────────────────────────────────────────────
+//
+// Begruendung steht am Kopf der Deklaration. Der Stapel wird ERST beim
+// zweiten Inhalt gebaut: eine Reiterleiste ueber einem einzigen Reiter
+// ist eine Zeile Hoehe fuer nichts.
+
+void ContainerWidget::addTab(QWidget* widget, const QString& title)
+{
+    if (!widget || !m_contentHolder) { return; }
+    auto* holderLayout = qobject_cast<QVBoxLayout*>(m_contentHolder->layout());
+    if (!holderLayout) { return; }
+
+    if (!m_stack) {
+        m_stack = new QStackedWidget(m_contentHolder);
+
+        m_tabBar = new QTabBar(m_contentHolder);
+        m_tabBar->setDrawBase(false);
+        m_tabBar->setExpanding(false);
+        m_tabBar->setTabsClosable(false);
+        m_tabBar->setStyleSheet(QStringLiteral(
+            "QTabBar { background: %1; }"
+            "QTabBar::tab { background: transparent; color: %2;"
+            "  padding: 2px 10px; font-size: 11px; font-weight: bold;"
+            "  border: none; border-bottom: 2px solid transparent; }"
+            "QTabBar::tab:selected { color: %3; border-bottom-color: %4; }"
+            "QTabBar::tab:hover { color: %3; }")
+            .arg(QLatin1String(Style::kTitleGradBot),
+                 QLatin1String(Style::kTextScale),
+                 QLatin1String(Style::kTextPrimary),
+                 QLatin1String(Style::kAmberText)));
+        m_tabBar->hide();   // erscheint erst ab zwei
+
+        connect(m_tabBar, &QTabBar::currentChanged, this, [this](int i) {
+            if (m_stack) { m_stack->setCurrentIndex(i); }
+        });
+
+        // Ein Reiter kann wieder eigenstaendig werden. Ueber das
+        // Kontextmenue der Leiste, nicht ueber ein ✕ am Reiter: ein ✕
+        // dort liest sich als „schliessen", und geschlossen wird hier
+        // nichts.
+        m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
+                [this](const QPoint& p) {
+            const int i = m_tabBar->tabAt(p);
+            if (i < 0) { return; }
+            QMenu menu(this);
+            menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
+            QAction* out = menu.addAction(
+                QStringLiteral("%1 als eigenes Fenster")
+                    .arg(m_tabBar->tabText(i)));
+            if (menu.exec(m_tabBar->mapToGlobal(p)) == out) {
+                emit tabDetachRequested(m_id, i);
+            }
+        });
+
+        // Was schon drin war, wird der erste Reiter.
+        if (m_content) {
+            holderLayout->removeWidget(m_content);
+            const QString first = m_notes.isEmpty()
+                ? QStringLiteral("RX%1").arg(m_rxSource)
+                : m_notes.section(QLatin1Char('\n'), 0, 0);
+            m_stack->addWidget(m_content);
+            m_tabBar->addTab(first);
+        }
+
+        holderLayout->addWidget(m_tabBar);
+        holderLayout->addWidget(m_stack, 1);
+    }
+
+    widget->setParent(m_stack);
+    m_stack->addWidget(widget);
+    m_tabBar->addTab(title);
+    m_tabBar->setVisible(m_tabBar->count() > 1);
+    m_tabBar->setCurrentIndex(m_tabBar->count() - 1);
+
+    // m_content zeigt weiter auf den ERSTEN Inhalt. Wer die Kachel
+    // fragt, was sie enthaelt, soll nicht je nach angeklicktem Reiter
+    // eine andere Antwort bekommen.
+}
+
+QWidget* ContainerWidget::takeTab(int index)
+{
+    if (!m_stack || !m_tabBar) { return nullptr; }
+    if (index < 0 || index >= m_stack->count()) { return nullptr; }
+
+    QWidget* w = m_stack->widget(index);
+    if (!w) { return nullptr; }
+
+    // Reihenfolge: erst aus dem Stapel, dann der Reiter. Andersherum
+    // zeigt die Leiste kurz auf einen Inhalt, den es nicht mehr gibt.
+    m_stack->removeWidget(w);
+    w->setParent(nullptr);
+    m_tabBar->removeTab(index);
+    m_tabBar->setVisible(m_tabBar->count() > 1);
+
+    if (index == 0) {
+        // Der erste Inhalt ist gegangen — m_content muss nachziehen,
+        // sonst zeigt es auf ein Widget, das woanders lebt.
+        m_content = m_stack->count() > 0 ? m_stack->widget(0) : nullptr;
+    }
+    return w;
+}
+
+int ContainerWidget::tabCount() const
+{
+    return m_tabBar ? m_tabBar->count() : (m_content ? 1 : 0);
+}
+
+QString ContainerWidget::tabTitle(int index) const
+{
+    if (!m_tabBar || index < 0 || index >= m_tabBar->count()) { return {}; }
+    return m_tabBar->tabText(index);
+}
+
+int ContainerWidget::currentTab() const
+{
+    return m_tabBar ? m_tabBar->currentIndex() : 0;
+}
+
+void ContainerWidget::setCurrentTab(int index)
+{
+    if (m_tabBar && index >= 0 && index < m_tabBar->count()) {
+        m_tabBar->setCurrentIndex(index);
+    }
 }
 
 void ContainerWidget::updateTitleBar()

@@ -63,8 +63,10 @@ BandwidthFilterPane::BandwidthFilterPane(QWidget* parent)
     : QWidget(parent)
     , m_accent(QColor(Style::role("accent", Style::kAccent)))
 {
-    setMinimumHeight(120);
-    setMinimumWidth(220);
+    // Klein genug fuer den Platz im RxApplet (dort rund 92 px), gross
+    // genug, dass Beschriftungen und Achse hineinpassen.
+    setMinimumHeight(84);
+    setMinimumWidth(180);
     setMouseTracking(true);
 }
 

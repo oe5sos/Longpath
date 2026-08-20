@@ -133,7 +133,7 @@
 #include "gui/ComboStyle.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/PopupMenuStyle.h"
-#include "gui/widgets/FilterPassbandWidget.h"
+#include "gui/widgets/BandwidthFilterPane.h"
 #include "gui/widgets/SliceColors.h"  // sliceColor — die eine Tabelle
 #include "gui/widgets/VfoModeContainers.h"  // FM/DIG/RTTY — die drei
                                             // modusabhaengigen Gruppen
@@ -546,7 +546,19 @@ void RxApplet::buildUi()
     // Control 8: FilterPassband — visual filter with drag-to-adjust
     // From AetherSDR RxApplet.cpp lines 504-513
     {
-        m_filterPassband = new FilterPassbandWidget(this);
+        // ── EINE Durchlassflaeche, nicht zwei ────────────────────
+        //
+        // Hier stand bis 2026-08-20 FilterPassbandWidget: ein FESTES
+        // Trapez, dessen Form sich mit der Breite gar nicht aenderte,
+        // und ohne Frequenzbezug. Daneben entstand am selben Tag
+        // BandwidthFilterPane mit echter Achse.
+        //
+        // Zwei Flaechen, an denen man dasselbe zieht, sind eine zu
+        // viel — das war beim Bauen schon vermerkt. Auf Ansage des
+        // Betreibers steht jetzt hier dieselbe Flaeche wie in der
+        // grossen Kachel, nur kleiner. Eine Umsetzung, zwei Plaetze.
+        m_filterPassband = new BandwidthFilterPane(this);
+        m_filterPassband->setSpan(10000);
         // 2026-05-12 bench fix (PR #238): pin a fixed height so the
         // passband visualization keeps its aspect when neighboring
         // rows shrink.  Earlier Expanding vertical policy let it
@@ -555,11 +567,18 @@ void RxApplet::buildUi()
         // single 1.7K preset), stretching the passband widget to
         // ~4× its intended height.  Fixed vertical avoids that
         // re-flow whiplash.
-        m_filterPassband->setFixedHeight(48);
+        m_filterPassband->setFixedHeight(92);
         m_filterPassband->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        connect(m_filterPassband, &FilterPassbandWidget::filterChanged,
+        connect(m_filterPassband, &BandwidthFilterPane::filterChanged,
                 this, [this](int lo, int hi) {
-            if (m_slice) { m_slice->setFilter(lo, hi); }
+            if (m_slice) { m_slice->setFilterByHand(lo, hi); }
+        });
+        // Der mittlere Griff meldet die MITTE, damit das Modell beim
+        // Anstossen die Breite erhalten kann — siehe
+        // SliceModel::setFilterCenter.
+        connect(m_filterPassband, &BandwidthFilterPane::filterCentreChanged,
+                this, [this](int centre) {
+            if (m_slice) { m_slice->setFilterCenter(centre); }
         });
         leftCol->addWidget(m_filterPassband);
     }
@@ -1503,7 +1522,8 @@ void RxApplet::syncFromModel()
     updateFilterLabel();
     updateFilterButtons();
     m_filterPassband->setFilter(m_slice->filterLow(), m_slice->filterHigh());
-    m_filterPassband->setMode(SliceModel::modeName(m_slice->dspMode()));
+    m_filterPassband->setVfoFrequency(m_slice->frequency());
+    m_filterPassband->setHasFrequency(m_slice->frequency() > 0.0);
 
     // Lock state (S2.9)
     m_lockBtn->setChecked(m_slice->locked());
@@ -1583,7 +1603,7 @@ void RxApplet::connectSlice(SliceModel* s)
         rebuildFilterButtons(mode);
         updateFilterLabel();
         updateFilterButtons();
-        m_filterPassband->setMode(name);
+
         // Die drei modusabhaengigen Gruppen mitziehen -- ohne das bliebe
         // die Gruppe des VORIGEN Modus stehen.
         applyModeVisibility(mode);

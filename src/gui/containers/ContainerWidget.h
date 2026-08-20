@@ -148,7 +148,14 @@ mw0lge@grange-lane.co.uk
 #include <QString>
 #include <cstdint>
 
+// Vorwaerts-Deklarationen fuer Qt-Klassen gehoeren VOR den
+// Namensraum. Innerhalb von „namespace NereusSDR" waere „class QTabBar"
+// eine Deklaration von NereusSDR::QTabBar — ein anderer, leerer Typ.
+// Dieselbe Falle ist mir am 2026-08-20 dreimal untergekommen
+// (PanadapterApplet, TxSwitchBar, hier).
 class QContextMenuEvent;
+class QStackedWidget;
+class QTabBar;
 class QLabel;
 class QPushButton;
 
@@ -266,6 +273,37 @@ public:
     // --- Content Slot ---
     QWidget* content() const { return m_content; }
     void setContent(QWidget* widget);
+
+    // ── Mehrere Fenster in einer Kachel ──────────────────────────────
+    //
+    // Vorbild: Zeus Link fasst Fenster zu REITERN zusammen — im
+    // Bildschirmvideo vom 2026-08-20 teilen FREQUENCY·VFO und S-METER
+    // einen Rahmen, jeder Reiter mit eigenem ↗ und ✕. In deren
+    // „ADD PANEL"-Liste heisst das „Multi Panel".
+    //
+    // WARUM DAS ETWAS BRINGT und nicht nur Platz spart: zwei Fenster,
+    // die man selten gleichzeitig braucht, kosten sonst zwei Plaetze
+    // auf der Flaeche. Als Reiter kosten sie einen.
+    //
+    // Bei EINEM Inhalt bleibt die Kachel, wie sie war — keine
+    // Reiterleiste ueber einem einzigen Reiter. Sie erscheint erst mit
+    // dem zweiten und verschwindet wieder, wenn einer geht.
+    void addTab(QWidget* widget, const QString& title);
+
+    /// Einen Reiter herausnehmen, OHNE ihn zu loeschen. Der Aufrufer
+    /// bekommt ein lebendes Widget — darauf beruht das Herausloesen.
+    QWidget* takeTab(int index);
+
+    int tabCount() const;
+    QString tabTitle(int index) const;
+    int currentTab() const;
+    void setCurrentTab(int index);
+
+signals:
+    /// Der Betreiber will diesen Reiter wieder als eigene Kachel.
+    void tabDetachRequested(const QString& containerId, int index);
+
+public:
 
     // --- Serialization ---
     QString serialize() const;
@@ -397,6 +435,12 @@ private:
     // --- UI elements ---
     QWidget* m_titleBar{nullptr};
     QWidget* m_contentHolder{nullptr};
+
+    // Die Reiterleiste erscheint erst ab zwei Inhalten. Bis dahin ist
+    // sie nicht einmal gebaut — eine Leiste ueber einem einzigen
+    // Reiter ist eine Zeile Hoehe fuer nichts.
+    QTabBar*        m_tabBar{nullptr};
+    QStackedWidget* m_stack{nullptr};
     QWidget* m_content{nullptr};
     QWidget* m_resizeGrip{nullptr};
     QLabel* m_grip{nullptr};

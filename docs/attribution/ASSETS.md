@@ -65,7 +65,11 @@ branding.
 | File | Origin | Author | License | Added |
 | --- | --- | --- | --- | --- |
 | `NereusSDR.png` | Original NereusSDR application icon | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 (commit `c25b2f3`) |
-| ↳ heisst seit 2026-08-20 `Longpath.png` (Umbenennung der Anwendung). **Das Bild selbst ist unveraendert und bleibt Werk von J.J. Boyd (KG4VCF)** — es wird ersetzt, sobald Longpath ein eigenes Symbol hat. | | | | |
+| ↳ **am 2026-08-20 ERSETZT.** Boyds Nereus-Bild ist nicht mehr im Baum; es lebt in der Geschichte weiter (letzter Commit mit dem Bild: `c3a9b089`). Die Zeile darueber bleibt stehen, weil sie festhaelt, wessen Werk dort bis dahin lag. | | | | |
+| `Longpath.png` / `Longpath.icns` / `Longpath.iconset/*` | Longpath-Bildmarke „Das O ist die Erde", erzeugt aus `resources/branding/longpath-mark.svg` durch `scripts/make-app-icons.sh` | Martin Fischer (OE5SOS) | GPL | 2026-08-20 |
+| `resources/branding/longpath-mark.svg` | Bildmarke, Quelle. Ring plus langer Weg; Farben aus `StyleConstants.h` | Martin Fischer (OE5SOS) | GPL | 2026-08-20 |
+| `resources/branding/longpath-mark-light.svg` | Dieselbe Marke fuer hellen Grund (Bernstein dunkler) | Martin Fischer (OE5SOS) | GPL | 2026-08-20 |
+| `resources/branding/longpath-wordmark.svg` | Schriftzug, das O traegt beide Wege. Setzt Barlow Condensed voraus | Martin Fischer (OE5SOS) | GPL | 2026-08-20 |
 | `NereusSDR.ico` | Windows ICO version of the same icon | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 (commit `c25b2f3`) |
 | `NereusSDR.icns` | macOS ICNS bundle version of the same icon | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 (commit `c25b2f3`) |
 | `NereusSDR.iconset/icon_16x16.png` | 16×16 variant | J.J. Boyd (KG4VCF) | GPL-2.0-or-later | 2026-04-13 |

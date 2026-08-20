@@ -121,7 +121,9 @@
 #include "core/SampleRateCatalog.h"
 #include "core/WdspTypes.h"
 
+#include <QHash>
 #include <QList>
+#include <QPair>
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
@@ -430,6 +432,12 @@ public:
     // Set both filter edges atomically. Emits filterChanged once.
     void setFilter(int low, int high);
 
+    /// Wie setFilter, aber es war eine BEDIENUNG: die Einstellung wird
+    /// zusaetzlich in VAR1 aufgehoben. Von den Ziehflaechen aufgerufen,
+    /// nicht vom Anwenden eines gespeicherten Filters — sonst waere
+    /// VAR1 nach dem ersten Knopfdruck genau dieser Knopf.
+    void setFilterByHand(int low, int high);
+
     // ── Die Kanten begrenzen ─────────────────────────────────────────
     //
     // From Thetis console.cs:34974-35062 [v2.10.3.15-5-g852bf0e] —
@@ -480,6 +488,39 @@ public:
     // Regel. Wir uebernehmen die Vorgabe unveraendert.
     bool limitFiltersToSidebands() const { return m_limitFiltersToSidebands; }
     void setLimitFiltersToSidebands(bool on);
+
+    // ── VAR1 und VAR2: die Handeinstellung aufheben ──────────────────
+    //
+    // From Thetis console.cs:7237-7249 [v2.10.3.15-5-g852bf0e] —
+    // SelectRX1VarFilter, und enums.cs:328-345, wo die Filterliste
+    // F1..F10 um VAR1 und VAR2 ergaenzt ist.
+    //
+    // DAS PROBLEM, das sie loesen: man zieht sich einen Durchlass
+    // zurecht, klickt dann einen benannten Filter — und die eigene
+    // Einstellung ist weg. Thetis haelt dafuer zwei Plaetze frei:
+    // sobald von Hand verstellt wird, landet der Wert dort und bleibt.
+    //
+    // ZWEI und nicht einer, weil Thetis zwei hat: man will zwei
+    // Handeinstellungen nebeneinander halten und vergleichen koennen.
+    //
+    // Belegt wird AUTOMATISCH, nicht ueber einen Speichern-Knopf —
+    // „SelectRX1VarFilter" heisst genau das: beim ersten Verstellen
+    // springt die Auswahl auf VAR1. Ein Knopf waere ein Schritt, den
+    // man vergisst, und dann ist die Einstellung wieder weg.
+    static constexpr int kVarSlots = 2;
+
+    /// Die aktuelle Kante in einen der beiden Plaetze legen.
+    /// `slot` ist 0 (VAR1) oder 1 (VAR2).
+    void storeVarFilter(int slot);
+
+    /// Einen Platz zurueckholen. Tut nichts, wenn er leer ist.
+    void recallVarFilter(int slot);
+
+    /// Liegt in dem Platz etwas? Ein leerer Knopf soll das sagen.
+    bool hasVarFilter(int slot) const;
+
+    /// Was drinliegt, fuer die Beschriftung. {0,0} wenn leer.
+    QPair<int,int> varFilter(int slot) const;
 
     // ── Breite und Lage rechnen mit ──────────────────────────────────
     //
@@ -1195,6 +1236,10 @@ private:
     DSPMode m_dspMode{DSPMode::USB};
     // Vorgabe AUS, wie in Thetis (console.cs:7446).
     bool    m_limitFiltersToSidebands{false};
+
+    // VAR1 und VAR2, je Betriebsart. Ein Handdurchlass fuer CW hat in
+    // SSB nichts verloren — dort waere er nicht einmal erlaubt.
+    QHash<int, QPair<int,int>> m_varFilters[kVarSlots];
     int     m_filterLow{100};            // USB default from Thetis F5
     int     m_filterHigh{3000};
     AGCMode m_agcMode{AGCMode::Med};

@@ -151,7 +151,7 @@ class QWidget;
 namespace NereusSDR {
 
 enum class HPSDRModel : int;
-class FilterPassbandWidget;
+class BandwidthFilterPane;
 class PanadapterModel;
 class SliceModel;
 
@@ -316,8 +316,9 @@ private:
     QWidget*     m_filterContainer = nullptr;
     QGridLayout* m_filterGrid      = nullptr;
 
-    // Control 8: FilterPassband (ported from AetherSDR FilterPassbandWidget)
-    FilterPassbandWidget* m_filterPassband = nullptr;
+    // Control 8: die Durchlassflaeche — seit 2026-08-20 dieselbe
+    // Umsetzung wie in der grossen Kachel (BandwidthFilterPane).
+    BandwidthFilterPane* m_filterPassband = nullptr;
 
     // ── Right column ──────────────────────────────────────────────────────
 

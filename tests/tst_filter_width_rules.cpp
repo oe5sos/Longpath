@@ -179,6 +179,93 @@ private slots:
                  "beim Verschieben muss die Breite erhalten bleiben");
     }
 
+    // ── VAR1 und VAR2 ────────────────────────────────────────────────
+    //
+    // DAS PROBLEM: man zieht sich einen Durchlass zurecht, klickt dann
+    // einen benannten Filter — und die eigene Einstellung ist weg.
+    // Thetis haelt dafuer zwei Plaetze frei (console.cs:7237).
+
+    void aHandEditIsKeptInVar1ByItself()
+    {
+        SliceModel s;
+        s.setDspMode(DSPMode::LSB);
+        s.setFilter(-2850, -150);
+        QVERIFY2(!s.hasVarFilter(0), "vorher ist der Platz leer");
+
+        s.setFilterByHand(-2380, -150);
+        QVERIFY2(s.hasVarFilter(0),
+                 "wer von Hand zieht, soll seine Einstellung behalten — "
+                 "ohne daran zu denken");
+
+        // Jetzt der Klick auf einen benannten Filter …
+        s.setFilter(-2850, -150);
+        QCOMPARE(s.filterWidth(), 2700);
+
+        // … und zurueck, mit einem Klick.
+        s.recallVarFilter(0);
+        QCOMPARE(s.filterLow(),  -2380);
+        QCOMPARE(s.filterHigh(), -150);
+    }
+
+    // DER UNTERSCHIED, DER STILL FALSCH WIRD: das ANWENDEN eines
+    // gespeicherten Filters darf VAR1 nicht ueberschreiben. Sonst waere
+    // VAR1 nach dem ersten Knopfdruck genau dieser Knopf — und damit
+    // wertlos.
+    void applyingAStoredFilterDoesNotClobberVar1()
+    {
+        SliceModel s;
+        s.setDspMode(DSPMode::LSB);
+        s.setFilterByHand(-2380, -150);
+
+        s.setFilter(-6000, -150);      // wie ein Klick auf „6.0k"
+
+        const QPair<int,int> v = s.varFilter(0);
+        QCOMPARE(v.first,  -2380);
+        QCOMPARE(v.second, -150);
+    }
+
+    // Zwei Plaetze, damit man vergleichen kann.
+    void theTwoSlotsAreIndependent()
+    {
+        SliceModel s;
+        s.setDspMode(DSPMode::USB);
+        s.setFilter(150, 2550);
+        s.storeVarFilter(0);
+        s.setFilter(300, 1800);
+        s.storeVarFilter(1);
+
+        s.recallVarFilter(0);
+        QCOMPARE(s.filterWidth(), 2400);
+        s.recallVarFilter(1);
+        QCOMPARE(s.filterWidth(), 1500);
+    }
+
+    // Je Betriebsart getrennt: ein CW-Handdurchlass hat in SSB nichts
+    // verloren — dort waere er nicht einmal erlaubt.
+    void theSlotsAreKeptPerMode()
+    {
+        SliceModel s;
+        s.setDspMode(DSPMode::CWU);
+        s.setFilter(400, 800);
+        s.storeVarFilter(0);
+        QVERIFY(s.hasVarFilter(0));
+
+        s.setDspMode(DSPMode::USB);
+        QVERIFY2(!s.hasVarFilter(0),
+                 "in einer anderen Betriebsart ist der Platz leer");
+    }
+
+    void recallingAnEmptySlotDoesNothing()
+    {
+        SliceModel s;
+        s.setDspMode(DSPMode::USB);
+        s.setFilter(150, 2550);
+
+        s.recallVarFilter(1);
+        QCOMPARE(s.filterLow(),  150);
+        QCOMPARE(s.filterHigh(), 2550);
+    }
+
     void resettingTheCentreGoesBackToTheModeDefault()
     {
         SliceModel s;
