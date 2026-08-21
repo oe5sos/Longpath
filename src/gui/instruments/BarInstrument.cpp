@@ -171,15 +171,34 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
 
 void BarInstrument::paintEvent(QPaintEvent*)
 {
+    QPainter p(this);
+    paintInto(p, size(), false);
+}
+
+// ── Malen fuer die Einblendung, ohne das Widget anzufassen ──────────
+//
+// renderTransparent hat frueher das LEBENDE Instrument auf die
+// gewuenschte Groesse umgestellt und danach zurueck — mit dem
+// Kommentar, die Spalte merke davon nichts. Sie merkt es sehr wohl:
+// ein resize() auf ein Widget in einem Layout ist ein Eingriff, den
+// das Layout beantwortet, und die Einblendung malt alle 500 ms neu.
+// Beim Rotor hat genau das die Rose plattgedrueckt (2026-08-21,
+// Bildschirmfoto: „den rotor bitte links wieder einblenden").
+//
+// Hier stand derselbe Fehler, nur noch unentdeckt. paintInto() malt
+// fuer eine verlangte Groesse in einen fremden Maler; das Widget
+// bleibt, wie es ist.
+void BarInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
+{
     const ReadingDescriptor* d = readingFor(m_primary);
     if (!d || !d->hasScale) { return; }
 
-    const int footerH = m_footer ? m_footer->height() : 0;
-    const QRectF box(10.0, 8.0, qMax(0.0, width() - 24.0),
-                     qMax(0.0, height() - footerH - 18.0));
+    const int footerH = (bare || !m_footer) ? 0 : m_footer->height();
+    const QRectF box(10.0, 8.0, qMax(0.0, forSize.width() - 24.0),
+                     qMax(0.0, forSize.height() - footerH - 18.0));
     if (box.width() < 40.0 || box.height() < kTroughHeight) { return; }
 
-    QPainter p(this);
+    QPainter& p = painter;
     p.setRenderHint(QPainter::Antialiasing, true);
 
     const ReadingDescriptor* d2 = readingFor(m_secondary);

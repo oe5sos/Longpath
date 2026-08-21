@@ -96,6 +96,12 @@ public:
     QSize sizeHint() const override { return {320, 74}; }
     QSize minimumSizeHint() const override { return {180, 56}; }
 
+public:
+    /// Malt das Instrument fuer eine verlangte Groesse in einen fremden
+    /// Maler. `bare` laesst die Fusszeile weg — fuer die Einblendung im
+    /// Panadapter. Das Widget selbst wird dabei nicht angefasst.
+    void paintInto(QPainter& painter, QSize forSize, bool bare);
+
 protected:
     void paintEvent(QPaintEvent*) override;
 

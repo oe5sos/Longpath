@@ -1264,18 +1264,35 @@ void LogbookWindow::importAdif()
         this, QStringLiteral("Import ADIF"), QString{},
         QStringLiteral("ADIF (*.adi *.adif);;All files (*)"));
     if (path.isEmpty()) { return; }
+    importAdifFile(path);
+}
 
+// ── Der Dateidialog und das Einlesen sind zwei Dinge ────────────────
+//
+// Sie standen in einer Funktion, und damit war der ganze Weg —
+// lesen, zusammenfuehren, sichern, in die Tabelle stellen — nur mit
+// einem Klick eines Menschen erreichbar. Kein Test kam daran vorbei,
+// weil getOpenFileName stehenbleibt und auf eine Maus wartet.
+//
+// Der Betreiber am 2026-08-21: „logbuch leer". Ob daran die Knoepfe,
+// das Einlesen oder das Zusammenfuehren schuld war, liess sich nicht
+// nachsehen, sondern nur raten. Genau der Zustand, aus dem in dieser
+// Sitzung schon mehrere Fehlschluesse gekommen sind.
+//
+// Jetzt nimmt importAdifFile() einen Pfad. Der Dialog sucht ihn aus,
+// ein Test reicht ihn hin. Derselbe Weg, beide Male.
+void LogbookWindow::importAdifFile(const QString& path)
+{
     QString err;
     const QVector<LogEntry> incoming = AdifLog::read(path, &err);
     if (!err.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("Import"),
-            QStringLiteral("Couldn't read that file:\n%1").arg(err));
+        tellOperator(QStringLiteral("Couldn't read that file:\n%1").arg(err));
         return;
     }
     if (incoming.isEmpty()) {
         // Distinguish "empty" from "not ADIF": a file the parser found
         // no records in is usually the wrong file, not an empty log.
-        QMessageBox::warning(this, QStringLiteral("Import"),
+        tellOperator(
             QStringLiteral("No contacts found in that file.\n\n"
                            "ADIF records are marked with <EOR>; if this "
                            "is a Cabrillo or CSV export it needs "
@@ -1291,7 +1308,7 @@ void LogbookWindow::importAdif()
     // your copies do not. Bailing out on added == 0 threw those away
     // and told the operator everything was fine.
     if (r.added == 0 && r.enriched == 0) {
-        QMessageBox::information(this, QStringLiteral("Import"),
+        tellOperator(
             QStringLiteral("All %1 contacts in that file are already in "
                            "your log, and none of them carried anything "
                            "your copies were missing. Nothing to do.")
@@ -1316,11 +1333,7 @@ void LogbookWindow::importAdif()
         "\nYour current log is copied to a dated backup first. "
         "Go ahead?");
 
-    if (QMessageBox::question(this, QStringLiteral("Import"), question,
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
-        != QMessageBox::Yes) {
-        return;
-    }
+    if (!askOperator(question)) { return; }
 
     // Back up before touching anything. This is the one operation here
     // that rewrites many records at once, and unlike an edit or a delete
@@ -1328,11 +1341,9 @@ void LogbookWindow::importAdif()
     QString backupErr;
     const QString backup = makeBackup(&backupErr);
     if (!backupErr.isEmpty()) {
-        if (QMessageBox::warning(this, QStringLiteral("Import"),
+        if (!askOperator(
                 QStringLiteral("Couldn't make a backup first: %1\n\n"
-                               "Import anyway?").arg(backupErr),
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
-            != QMessageBox::Yes) {
+                               "Import anyway?").arg(backupErr))) {
             return;
         }
     }
@@ -1354,7 +1365,30 @@ void LogbookWindow::importAdif()
     if (!backup.isEmpty()) {
         done += QStringLiteral("\n\nBackup: %1").arg(backup);
     }
-    QMessageBox::information(this, QStringLiteral("Import"), done);
+    tellOperator(done);
+}
+
+// ── Wer die Rueckfragen stellt ──────────────────────────────────────
+//
+// Voreingestellt ein Fenster, wie bisher. Ein Test setzt stattdessen
+// eine Funktion ein, die „ja" sagt und die Meldungen mitschreibt.
+//
+// Der Grund ist nicht Bequemlichkeit: ohne diese Stelle ist der
+// Import-Weg fuer einen Test unerreichbar, weil QMessageBox auf eine
+// Maus wartet. Ein Weg, den kein Test gehen kann, ist ein Weg, ueber
+// den man nur Vermutungen hat — und davon hatte diese Sitzung genug.
+bool LogbookWindow::askOperator(const QString& question)
+{
+    if (m_ask) { return m_ask(question); }
+    return QMessageBox::question(this, QStringLiteral("Import"), question,
+               QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
+           == QMessageBox::Yes;
+}
+
+void LogbookWindow::tellOperator(const QString& message)
+{
+    if (m_tell) { m_tell(message); return; }
+    QMessageBox::information(this, QStringLiteral("Import"), message);
 }
 
 // ── Export ──────────────────────────────────────────────────────────

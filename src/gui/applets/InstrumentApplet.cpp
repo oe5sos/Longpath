@@ -91,25 +91,37 @@ void InstrumentApplet::setForm(Form f)
 QImage InstrumentApplet::renderTransparent(int sidePx, qreal dpr)
 {
     if (sidePx < 24) { return {}; }
+
+    // Das Seitenverhaeltnis der Ansicht behalten. Ein Zeigerbogen ist
+    // breiter als hoch; in ein Quadrat gepresst waere er verzogen.
     QWidget* view = (m_form == Form::Needle)
                         ? static_cast<QWidget*>(m_needle)
                         : static_cast<QWidget*>(m_bar);
     if (!view) { return {}; }
 
-    QImage img(QSize(sidePx, sidePx) * dpr, QImage::Format_ARGB32_Premultiplied);
+    const QSize live = view->size();
+    const double ar = (live.height() > 0 && live.width() > 0)
+                          ? double(live.width()) / double(live.height())
+                          : 1.5;
+    const QSize want(sidePx, qMax(24, int(std::lround(sidePx / ar))));
+
+    QImage img(want * dpr, QImage::Format_ARGB32_Premultiplied);
     img.setDevicePixelRatio(dpr);
     img.fill(Qt::transparent);
 
-    // Nur die Ansicht malen, nicht das Applet: das Applet bringt
-    // Kopfleiste und Fusszeile mit, und beides gehoert nicht ueber ein
-    // Spektrum.
-    //
-    // Groesse vorruebergehend umstellen und danach zurueck — das
-    // Instrument in der Spalte soll davon nichts merken.
-    const QSize was = view->size();
-    view->resize(sidePx, sidePx);
-    view->render(&img, QPoint(), QRegion(), QWidget::DrawChildren);
-    view->resize(was);
+    // Kein resize() mehr auf das lebende Instrument. Der Kommentar hier
+    // behauptete frueher, die Spalte merke davon nichts — sie merkt es
+    // sehr wohl: ein resize() auf ein Widget in einem Layout ist ein
+    // Eingriff, und die Einblendung malt alle 500 ms neu. Beim Rotor
+    // hat genau das die Rose plattgedrueckt.
+    QPainter p(&img);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    if (m_form == Form::Needle && m_needle) {
+        m_needle->paintInto(p, want, true);
+    } else if (m_bar) {
+        m_bar->paintInto(p, want, true);
+    }
+    p.end();
     return img;
 }
 

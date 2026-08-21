@@ -410,15 +410,20 @@ QImage RotorDialWidget::renderTransparent(int sidePx, qreal dpr)
     img.setDevicePixelRatio(dpr);
     img.fill(Qt::transparent);
 
-    // Groesse und Zustand vorruebergehend umstellen, dann zurueck. Das
-    // Widget bleibt dabei sichtbar oder unsichtbar wie es war — es
-    // wird nur einmal in ein Bild gemalt.
-    const QSize was = size();
+    // Nur der Malcode wird umgestellt, nicht das Widget. Ein resize()
+    // auf ein Widget, das in einem Layout haengt, ist keine Frage —
+    // es ist ein Eingriff, den das Layout beantwortet, und genau das
+    // hat die Rose im Rotor/Log-Feld plattgedrueckt.
+    m_renderSize = QSize(sidePx, sidePx);
     m_bare = true;
-    resize(sidePx, sidePx);
-    render(&img, QPoint(), QRegion(), QWidget::DrawChildren);
+
+    QPainter p(&img);
+    p.setRenderHint(QPainter::Antialiasing);
+    paintFace(p);
+    p.end();
+
     m_bare = false;
-    resize(was);
+    m_renderSize = QSize();
     return img;
 }
 
@@ -448,8 +453,8 @@ void RotorDialWidget::setShape(Shape s)
 // Wahl und keine Ablösung.
 void RotorDialWidget::paintTape(QPainter& p)
 {
-    const double w = width();
-    const double h = height();
+    const double w = faceW();
+    const double h = faceH();
     const double pad = 14.0;
     const double bx = pad, bw = w - 2.0 * pad;
     if (bw < 80.0) { return; }
@@ -589,19 +594,39 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+    paintFace(p);
+}
 
+// ── Das Gesicht, unabhaengig von der Widget-Groesse ─────────────────
+//
+// Frueher stand das direkt im paintEvent und rechnete mit width() und
+// height(). Fuer die Einblendung im Panadapter hat renderTransparent
+// deshalb das LEBENDE Widget auf 240 Pixel umgestellt und danach
+// zurueck — mitten im Layout des Rotor-Feldes, alle 500 Millisekunden.
+//
+// Das Ergebnis stand am 2026-08-21 auf dem Bildschirmfoto des
+// Betreibers: die Rose im Rotor/Log-Feld auf Briefmarkengroesse
+// zusammengefallen, darunter ein leeres Loch. „den rotor bitte links
+// wieder einblenden."
+//
+// Jetzt fragt der Malcode nicht mehr das Widget nach seiner Groesse,
+// sondern faceW()/faceH(). Im Normalfall ist das die Widget-Groesse;
+// beim Malen ins Bild ist es die verlangte. Das Widget selbst wird
+// dabei nicht mehr angefasst.
+void RotorDialWidget::paintFace(QPainter& p)
+{
     if (m_shape == Shape::Tape) {
-        if (!m_bare) { p.fillRect(rect(), kBackground); }
+        if (!m_bare) { p.fillRect(faceRect(), kBackground); }
         paintTape(p);
         return;
     }
 
-    const double w = width();
-    const double h = height();
+    const double w = faceW();
+    const double h = faceH();
     // m_bare: die Rose soll mit dem Panadapter EINS sein, nicht als
     // Kasten davor liegen. Also kein Grund und weiter unten keine
     // Ablesung — nur Ring, Teilung, Zeiger und Ziel.
-    if (!m_bare) { p.fillRect(rect(), kBackground); }
+    if (!m_bare) { p.fillRect(faceRect(), kBackground); }
 
     // Faint accent wash from below so the face is not dead flat. Kept
     // subtle and in the app's accent hue rather than a warm lamp — the
@@ -619,7 +644,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     glowInner.setAlpha(26);
     glow.setColorAt(0.0, glowInner);
     glow.setColorAt(1.0, QColor(0, 0, 0, 0));
-    p.fillRect(rect(), glow);
+    p.fillRect(faceRect(), glow);
     }
 
     // ── Und eine Lampe hinter der Rose ───────────────────────────────

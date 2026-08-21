@@ -27,6 +27,7 @@
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 #include <QtTest>
+#include <QVBoxLayout>
 #include <QImage>
 #include <cmath>
 #include "gui/widgets/RotorDialWidget.h"
@@ -225,6 +226,111 @@ private slots:
                      "Bildpunkten — dann ist eine davon nicht gebaut")
                      .arg(diff)));
         AppSettings::instance().remove(QStringLiteral("RotorDialShape"));
+    }
+
+    /// Das Einblenden im Panadapter darf die Rose im Rotor/Log-Feld
+    /// nicht anfassen.
+    ///
+    /// Vorgeschichte, 2026-08-21: renderTransparent hat das LEBENDE
+    /// Widget auf 240 Pixel umgestellt und danach zurueck. In einem
+    /// Layout ist das kein Vorschlag, sondern ein Eingriff, und weil
+    /// die Einblendung alle 500 ms neu gemalt wird, lief er dauernd.
+    /// Auf dem Bildschirmfoto des Betreibers war die Rose auf
+    /// Briefmarkengroesse zusammengefallen: „den rotor bitte links
+    /// wieder einblenden."
+    void renderingForTheOverlayLeavesTheLivePanelAlone()
+    {
+        QWidget host;
+        auto* col = new QVBoxLayout(&host);
+        col->setContentsMargins(0, 0, 0, 0);
+        auto* dial = new RotorDialWidget(&host);
+        col->addWidget(dial, 1);
+        host.resize(320, 420);
+        host.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QCoreApplication::processEvents();
+
+        const QSize before = dial->size();
+        QVERIFY2(before.height() > 200,
+                 qPrintable(QStringLiteral("Vorher schon zu klein: %1x%2")
+                                .arg(before.width()).arg(before.height())));
+
+        // So oft, wie der Panadapter es in ein paar Sekunden tut.
+        for (int i = 0; i < 12; ++i) {
+            const QImage img = dial->renderTransparent(240);
+            QVERIFY(!img.isNull());
+            QCoreApplication::processEvents();
+        }
+
+        QCOMPARE(dial->size(), before);
+        QVERIFY2(dial->height() > 200,
+                 qPrintable(QStringLiteral(
+                     "Die Rose ist vom Einblenden geschrumpft: %1x%2 "
+                     "(vorher %3x%4)")
+                     .arg(dial->width()).arg(dial->height())
+                     .arg(before.width()).arg(before.height())));
+    }
+
+    /// Und auf dem Bild fuer die Einblendung steht wirklich eine Rose.
+    ///
+    /// Sonst waere der Fehler nur verlagert: Panel heil, Einblendung
+    /// leer. Beides muss gleichzeitig stimmen.
+    ///
+    /// Nicht ueber die Menge Farbe geprueft. Der erste Versuch tat das
+    /// und schlug bei 4,8 Prozent gegen eine geratene Schwelle von 5
+    /// fehl — eine durchsichtige Rose IST ueberwiegend leer, das ist
+    /// ihr Zweck. Eine Zahl, die man so lange dreht, bis sie passt,
+    /// prueft nichts. Geprueft wird die FORM: Ring aussen in allen
+    /// vier Vierteln, Mitte frei, damit der Panadapter durchscheint.
+    void andTheOverlayImageReallyShowsARose()
+    {
+        QWidget host;
+        auto* col = new QVBoxLayout(&host);
+        auto* dial = new RotorDialWidget(&host);
+        col->addWidget(dial, 1);
+        host.resize(320, 420);
+        host.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&host));
+
+        const QImage img = dial->renderTransparent(240);
+        QVERIFY(!img.isNull());
+
+        const int n = img.width();           // quadratisch
+        const double c = n / 2.0;
+        int rim[4] = {0, 0, 0, 0};
+        int core = 0, corePts = 0;
+
+        for (int y = 0; y < n; ++y) {
+            for (int x = 0; x < n; ++x) {
+                const double dx = x - c, dy = y - c;
+                const double r = std::sqrt(dx * dx + dy * dy) / c;
+                const bool lit = qAlpha(img.pixel(x, y)) > 40;
+                if (r > 0.72 && r < 0.99) {
+                    // Aussenring, nach Vierteln getrennt.
+                    const int q = (dy < 0 ? 0 : 2) + (dx < 0 ? 0 : 1);
+                    if (lit) { ++rim[q]; }
+                } else if (r < 0.25) {
+                    ++corePts;
+                    if (lit) { ++core; }
+                }
+            }
+        }
+
+        for (int q = 0; q < 4; ++q) {
+            QVERIFY2(rim[q] > 40,
+                     qPrintable(QStringLiteral(
+                         "Im Viertel %1 fehlt der Ring: nur %2 Punkte")
+                         .arg(q).arg(rim[q])));
+        }
+
+        // Die Mitte traegt Zeiger und Nabe, aber sie darf nicht
+        // zugemalt sein — sonst liegt ein Deckel auf dem Spektrum.
+        const double coreFrac = corePts > 0
+                                    ? double(core) / double(corePts) : 1.0;
+        QVERIFY2(coreFrac < 0.6,
+                 qPrintable(QStringLiteral(
+                     "Die Mitte ist zu: %1 Prozent zugemalt")
+                     .arg(coreFrac * 100.0, 0, 'f', 0)));
     }
 };
 QTEST_MAIN(TestRotorDialPaint)

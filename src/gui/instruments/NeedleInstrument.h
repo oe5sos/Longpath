@@ -111,6 +111,12 @@ private:
     void paintBacklight(QPainter& p, const QPointF& pivot, qreal radius,
                         const QColor& c, double strength);
 
+public:
+    /// Malt das Instrument fuer eine verlangte Groesse in einen fremden
+    /// Maler. `bare` laesst die Fusszeile weg — fuer die Einblendung im
+    /// Panadapter. Das Widget selbst wird dabei nicht angefasst.
+    void paintInto(QPainter& painter, QSize forSize, bool bare);
+
 protected:
     void paintEvent(QPaintEvent*) override;
 

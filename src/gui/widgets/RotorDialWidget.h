@@ -218,6 +218,17 @@ private:
 
     /// Das Band statt der Rose. Siehe Shape.
     void   paintTape(QPainter& p);
+    void   paintFace(QPainter& p);
+
+    /// Die Groesse, fuer die gerade gemalt wird. Normalerweise die des
+    /// Widgets; beim Malen ins Bild die verlangte. Siehe paintFace.
+    int    faceW() const
+    { return m_renderSize.isValid() ? m_renderSize.width() : width(); }
+    int    faceH() const
+    { return m_renderSize.isValid() ? m_renderSize.height() : height(); }
+    QRect  faceRect() const { return QRect(0, 0, faceW(), faceH()); }
+
+    QSize  m_renderSize;
     void   contextMenuEvent(QContextMenuEvent* ev) override;
     double bearingAtTape(const QPointF& pos) const;
     /// Sichtbarer Ausschnitt des Bandes, in Grad (Vollbreite).

@@ -141,6 +141,28 @@ private:
     // point to edit, and the dialog says so.
     void exportCabrillo();
     void importAdif();
+public:
+    /// Eine ADIF-Datei einlesen und zusammenfuehren — ohne Dateidialog.
+    /// Der Dialog ruft das hier auf; Tests koennen es direkt aufrufen.
+    void importAdifFile(const QString& path);
+
+    /// Wie viele Verbindungen das Logbuch gerade fuehrt. Nur fuer Tests.
+    int entryCountForTesting() const { return m_all.size(); }
+
+    /// Rueckfragen und Meldungen des Imports umleiten. Fuer Tests: die
+    /// eine Funktion antwortet, die andere schreibt mit. Nicht gesetzt
+    /// heisst: ganz normale Fenster.
+    void setOperatorHooks(std::function<bool(const QString&)> ask,
+                          std::function<void(const QString&)> tell)
+    { m_ask = std::move(ask); m_tell = std::move(tell); }
+
+private:
+    bool askOperator(const QString& question);
+    void tellOperator(const QString& message);
+
+    std::function<bool(const QString&)> m_ask;
+    std::function<void(const QString&)> m_tell;
+
     // Numbers about the filtered view: per band, per mode, per year,
     // unique calls and squares, furthest DX. (2026-08-10)
     void showStatistics();

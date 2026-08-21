@@ -4692,6 +4692,8 @@ nereus_add_test(tst_disconnect_label_transparent)
 nereus_add_test(tst_both_paint_paths)
 nereus_add_test(tst_overlay_drag)
 nereus_add_test(tst_surface_gradients)
+nereus_add_test(tst_logbook_import)
+nereus_add_test(tst_overlay_render_is_harmless)
 set_tests_properties(tst_both_paint_paths PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 nereus_add_test(tst_native_overlay_audit)

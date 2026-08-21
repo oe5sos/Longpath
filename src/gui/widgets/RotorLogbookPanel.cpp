@@ -88,6 +88,8 @@ namespace Longpath {
 
 namespace {
 
+
+
 const QString kMyGridKey    = QStringLiteral("StationGridSquare");
 const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
@@ -373,6 +375,7 @@ void RotorLogbookPanel::buildUi()
     m_viewStack = new QStackedWidget(this);
     m_viewStack->addWidget(m_dial);
     m_viewStack->addWidget(globePage);
+
     col->addWidget(m_viewStack, 1);
 
     const QString saved =

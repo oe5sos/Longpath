@@ -185,11 +185,32 @@ void NeedleInstrument::paintBacklight(QPainter& p, const QPointF& pivot,
 
 void NeedleInstrument::paintEvent(QPaintEvent*)
 {
+    QPainter p(this);
+    paintInto(p, size(), false);
+}
+
+// ── Malen fuer die Einblendung, ohne das Widget anzufassen ──────────
+//
+// renderTransparent hat frueher das LEBENDE Instrument auf die
+// gewuenschte Groesse umgestellt und danach zurueck — mit dem
+// Kommentar, die Spalte merke davon nichts. Sie merkt es sehr wohl:
+// ein resize() auf ein Widget in einem Layout ist ein Eingriff, den
+// das Layout beantwortet, und die Einblendung malt alle 500 ms neu.
+// Beim Rotor hat genau das die Rose plattgedrueckt (2026-08-21,
+// Bildschirmfoto: „den rotor bitte links wieder einblenden").
+//
+// Hier stand derselbe Fehler, nur noch unentdeckt. paintInto() malt
+// fuer eine verlangte Groesse in einen fremden Maler; das Widget
+// bleibt, wie es ist.
+void NeedleInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
+{
     const ReadingDescriptor* d = readingFor(m_primary);
     if (!d || !d->hasScale) { return; }
 
-    const int footerH = m_footer ? m_footer->height() : 0;
-    const QRectF face(0, 0, width(), qMax(0, height() - footerH));
+    // Ohne Fusszeile, wenn nur das Gesicht verlangt ist.
+    const int footerH = (bare || !m_footer) ? 0 : m_footer->height();
+    const QRectF face(0, 0, forSize.width(),
+                      qMax(0, forSize.height() - footerH));
     if (face.width() < 40.0 || face.height() < 30.0) { return; }
 
     // ── Der Bogen muss in BEIDE Richtungen passen ────────────────────
@@ -264,7 +285,7 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
 
     ArcSpine spine(pivot, radius, trough, kDeg0, kDeg1);
 
-    QPainter p(this);
+    QPainter& p = painter;
     p.setRenderHint(QPainter::Antialiasing, true);
 
     const double f = d->fraction(m_value);
