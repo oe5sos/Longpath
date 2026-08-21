@@ -204,6 +204,8 @@ signals:
     void backgroundOpacityRequested(int percent);
     void backgroundColourRequested();
     void displaySetupRequested();
+    /// Windrose im Spektrum ein-/ausblenden.
+    void compassOverlayRequested(bool on);
 
     /// Zurueck in die Anordnung. Der Kopf traegt EINEN Schalter fuer
     /// beide Richtungen — „Ablösen" ohne Rueckweg ist eine
@@ -252,6 +254,7 @@ private:
     /// Regler unter Setup -> Display. Nur fuer den Haken im Menue; der
     /// wahre Wert lebt in SpectrumWidget und in den Einstellungen.
     int                     m_bgOpacityPct {80};
+    bool                    m_compassOn {false};
     bool                    m_floating {false};
     SpectrumStatusOverlay*  m_statusOverlay {nullptr};
     int                     m_activeSliceIndex {-1};

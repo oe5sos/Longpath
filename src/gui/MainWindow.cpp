@@ -265,6 +265,7 @@ warren@wpratt.com
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
 #include "widgets/RotorLogbookPanel.h"
+#include "widgets/RotorDialWidget.h"
 #include "gui/ToolWindow.h"
 #include "gui/WindowChrome.h"
 #include "widgets/SwrSweepPanel.h"
@@ -2756,6 +2757,9 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::displaySetupRequested,
                 this, &MainWindow::onPanDisplaySetup,
                 Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::compassOverlayRequested,
+                this, &MainWindow::onPanCompassOverlay,
+                Qt::UniqueConnection);
         // Phase 3F: clicking a pan makes it the active pan. Straight to the
         // stack's setter, exactly as AetherSDR MainWindow.cpp:12964 [@6a142807]
         // does it:
@@ -2878,6 +2882,57 @@ void MainWindow::onPanBackgroundColour()
         w->backgroundFillColor(), this, tr("Grundfarbe des Panadapters"),
         QColorDialog::ShowAlphaChannel);
     if (c.isValid()) { w->setBackgroundFillColor(c); }
+}
+
+// ── Die Windrose im Spektrum ─────────────────────────────────────────
+//
+// Der Panadapter bekommt ein fertiges durchsichtiges Bild; wer es malt
+// und wann es sich aendert, ist seine Sache nicht. Gemalt wird es vom
+// Rotorzeiger selbst (RotorDialWidget::renderTransparent), damit es
+// EIN Zifferblatt im Programm gibt und nicht zwei, die auseinander
+// laufen koennen.
+void MainWindow::onPanCompassOverlay(bool on)
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w) { return; }
+    w->setCompassOverlayVisible(on);
+
+    // ── Nachfuehren, solange sie zu sehen ist ────────────────────────
+    //
+    // RotorDialWidget meldet keine Aenderung — es ist ein Zifferblatt,
+    // kein Modell. Statt ihm dafuer ein Signal anzuhaengen (und damit
+    // jeden Weg, der seine Peilung setzt, daran zu erinnern), fragt ein
+    // Taktgeber zweimal je Sekunde nach.
+    //
+    // Zwei Hertz reicht: eine Antenne dreht sich in Sekunden, nicht in
+    // Millisekunden, und ein Bild von 220 px kostet nichts. Ein Signal
+    // waere sparsamer und zugleich die Sorte Kopplung, die man in
+    // einem Jahr sucht, wenn eine neue Stelle die Peilung setzt und
+    // das Signal vergisst.
+    if (!m_panCompassTimer) {
+        m_panCompassTimer = new QTimer(this);
+        m_panCompassTimer->setInterval(500);
+        connect(m_panCompassTimer, &QTimer::timeout,
+                this, &MainWindow::refreshPanCompass);
+    }
+    if (on) {
+        refreshPanCompass();
+        m_panCompassTimer->start();
+    } else {
+        m_panCompassTimer->stop();
+    }
+}
+
+void MainWindow::refreshPanCompass()
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w || !w->compassOverlayVisible()) { return; }
+    RotorLogbookPanel* panel = ensureRotorPanel();
+    if (!panel || !panel->dial()) { return; }
+    // 220 px: gross genug fuer Teilung und Zeiger, klein genug, dass
+    // der Panadapter ihn auf ein Viertel seiner kuerzeren Kante
+    // herunterrechnen kann, ohne dass es matschig wird.
+    w->setCompassOverlay(panel->dial()->renderTransparent(220));
 }
 
 void MainWindow::onPanDisplaySetup()

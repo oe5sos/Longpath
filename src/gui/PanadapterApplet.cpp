@@ -568,6 +568,30 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     });
 
     menu->addSeparator();
+
+    // ── Der Kompass ──────────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „kann man den rotorzeiger alleine auch
+    // im panadapter einblenden lassen? … sodass der hintergrund mit dem
+    // panadapter eines ist, quasi transparent."
+    //
+    // Der Haken sagt nur, DASS er erscheinen soll. Gemalt wird er vom
+    // Rotor, weitergereicht von MainWindow — der Panadapter bekommt ein
+    // fertiges durchsichtiges Bild und legt es in eine Ecke.
+    {
+        QAction* a = menu->addAction(tr("Rotor-Kompass einblenden"));
+        a->setCheckable(true);
+        a->setChecked(m_compassOn);
+        a->setToolTip(tr(
+            "Zeigt die Antennenrichtung als durchsichtige Windrose links "
+            "unten im Spektrum."));
+        connect(a, &QAction::toggled, this, [this](bool on) {
+            m_compassOn = on;
+            emit compassOverlayRequested(on);
+        });
+    }
+
+    menu->addSeparator();
     // Der Weg zum Rest. Ein Menue, das ALLES kann, waere wieder der
     // Dialog, nur schlechter.
     menu->addAction(tr("Alle Anzeige-Einstellungen…"), this, [this]() {

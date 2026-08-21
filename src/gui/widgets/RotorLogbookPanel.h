@@ -71,6 +71,12 @@ public:
     // Where the ADIF log is written.
     static QString logbookPath();
 
+    /// Der Zeiger selbst. Damit MainWindow ihn in ein durchsichtiges
+    /// Bild malen und dem Panadapter geben kann (siehe
+    /// SpectrumWidget::setCompassOverlay) — das Panel behaelt dabei
+    /// die Hoheit ueber seinen Zeiger, es gibt nur Einblick.
+    RotorDialWidget* dial() const { return m_dial; }
+
     // Destinations offered by the logbook window's Upload menu. Passed
     // straight through — the panel does not own them and does not use
     // them itself; live logging still goes to the single uploader given

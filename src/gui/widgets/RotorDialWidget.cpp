@@ -55,8 +55,20 @@ const QColor kActual    (Style::kAmberText);    // where it is — gemessen
 const QColor kTarget    (Style::kAccent);       // where it should go
 const QColor kTurning   (Style::kAmberText);    // in motion
 const QColor kArrived   (Style::kGreenText);    // on target
-const QColor kRing      (Style::kBorder);
-const QColor kRingInner (Style::kBorderSubtle);
+// ── Ring und Teilung eine Stufe heller ───────────────────────────────
+//
+// Der Betreiber, 2026-08-20: „grafik rotor auch leicht aufhellen."
+//
+// kBorder und kBorderSubtle sind RANDfarben — sie trennen Flaechen und
+// duerfen dabei leise sein. Auf einem Zifferblatt sind dieselben
+// Striche aber die TEILUNG, also das, was man ablesen soll. Eine
+// Randfarbe als Skala ist zu zurueckhaltend fuer ihre Aufgabe.
+//
+// Eine Stufe hoeher in derselben Leiter: kTextScale fuer den aeusseren
+// Ring, kBorder fuer den inneren. Die Abstufung zwischen beiden
+// bleibt, sie liegt nur hoeher.
+const QColor kRing      (Style::kTextScale);
+const QColor kRingInner (Style::kBorder);
 const QColor kCardinal  (Style::kTextScale);
 const QColor kMuted     (Style::kTextSecondary);
 
@@ -374,6 +386,31 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
     glow.setColorAt(0.0, glowInner);
     glow.setColorAt(1.0, QColor(0, 0, 0, 0));
     p.fillRect(rect(), glow);
+    }
+
+    // ── Und eine Lampe hinter der Rose ───────────────────────────────
+    //
+    // Dasselbe Mittel wie bei den Zeigerinstrumenten (siehe
+    // NeedleInstrument::paintEvent): ein sehr schwacher Verlauf aus der
+    // Mitte, in der Messfarbe. Er beleuchtet die ganze Scheibe, statt
+    // nur den Zeiger heller zu machen — „von hinten leicht
+    // beleuchten", wie es hiess.
+    //
+    // Auch im durchsichtigen Fall: gerade dort, ueber dem Spektrum,
+    // braucht die Rose etwas, das sie vom Untergrund abhebt.
+    {
+        const QPointF lc = roseCentre();
+        const double  lr = roseRadius();
+        QRadialGradient lamp(lc, lr * 1.05);
+        QColor warm(Style::kAmberText);
+        warm.setAlphaF(m_bare ? 0.10 : 0.12);
+        lamp.setColorAt(0.0, warm);
+        warm.setAlphaF(0.0);
+        lamp.setColorAt(1.0, warm);
+        p.setPen(Qt::NoPen);
+        p.setBrush(lamp);
+        p.drawEllipse(lc, lr * 1.05, lr * 1.05);
+        p.setBrush(Qt::NoBrush);
     }
 
     // Compass-only mode (2026-08-10). The geometry lives in
