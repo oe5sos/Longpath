@@ -13151,6 +13151,23 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // Zwei Zeilen, die das ausschliessen: die Fenster hier selbst
     // abraeumen, und danach zustellen, was sonst noch aussteht —
     // solange das Programm noch da ist.
+    // ── Offene Dialoge mit schliessen ───────────────────────────────
+    //
+    // Gefunden am 2026-08-21 beim Bau von
+    // tst_quit_leaves_no_pending_deletes: ein VaxFirstRunDialog
+    // ueberlebt das Schliessen des Hauptfensters. Er haengt zwar als
+    // Kind daran und traegt WA_DeleteOnClose — aber close() auf das
+    // Hauptfenster schliesst seine Dialoge NICHT mit. Sie bleiben
+    // offen und ihr Loeschen faellt in den Programmabbau; das ist
+    // dieselbe Familie wie c8d8161a und 1c781bae.
+    //
+    // Es ist ausserdem fuer sich richtig: ein Dialog, der laenger lebt
+    // als das Fenster, zu dem er gehoert, ist ein Fenster ohne
+    // Zuhause.
+    for (QDialog* d : findChildren<QDialog*>()) {
+        if (d->isVisible()) { d->close(); }
+    }
+
     // Auch die abgeloesten PANADAPTER — eine eigene Sammlung, die beim
     // ersten Anlauf (c8d8161a) uebersehen wurde. Eine Probe im echten
     // Hauptfenster hat den Absturz dann geliefert: abloesen, schliessen,

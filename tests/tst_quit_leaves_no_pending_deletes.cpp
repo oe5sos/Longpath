@@ -23,6 +23,7 @@
 // Schliessen ueberlebt.
 
 #include <QtTest>
+#include <QDialog>
 #include <QPointer>
 
 #include "gui/MainWindow.h"
@@ -84,6 +85,45 @@ private slots:
                                       w->metaObject()->className())
                                 : QString{})));
         }
+
+        delete mw;
+    }
+
+    /// Und kein Dialog ueberlebt das Schliessen.
+    ///
+    /// Beim ersten Bau dieses Tests (2026-08-21) fiel ein
+    /// VaxFirstRunDialog auf, der das Schliessen ueberlebt. Er wurde
+    /// damals als eigener Fall notiert und bewusst nicht mitgeprueft —
+    /// hier ist er.
+    ///
+    /// Ein Dialog haengt zwar als Kind am Hauptfenster und traegt
+    /// WA_DeleteOnClose, aber close() auf das Hauptfenster schliesst
+    /// seine Dialoge NICHT mit. Sie bleiben offen, und ihr Loeschen
+    /// faellt in den Programmabbau — dieselbe Familie wie der Absturz,
+    /// den dieser Test bewacht.
+    void noDialogSurvivesTheClose()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1200, 800);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        // Einen modelosen Dialog aufmachen, wie es das Programm tut.
+        auto* dlg = new QDialog(mw);
+        dlg->setObjectName(QStringLiteral("probeDialog"));
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->show();
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        QPointer<QObject> alive(dlg);
+        QVERIFY(dlg->isVisible());
+
+        mw->close();
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(alive.isNull() || !static_cast<QWidget*>(alive.data())->isVisible(),
+                 "Ein Dialog steht noch offen, nachdem das Hauptfenster zu "
+                 "ist — sein Loeschen faellt in den Programmabbau");
 
         delete mw;
     }
