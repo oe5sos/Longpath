@@ -1512,6 +1512,17 @@ void MainWindow::dockAppletBack(const QString& appletId)
 
 void MainWindow::applyAppletVisibility(const QString& id, bool effective)
 {
+    // ── Die eigenen Fenster ──────────────────────────────────────────
+    //
+    // Sie stehen seit 2026-08-20 mit in der Auswahl (siehe kWindows in
+    // buildAppletVisibility). Fuer den Auswaehler sind sie Eintraege
+    // wie jeder andere; DASS sie ein Fenster oeffnen statt eine Huelle
+    // in der Spalte einzuhaengen, entscheidet sich hier — und nur hier.
+    if (id.startsWith(QLatin1String("Win"))) {
+        applyWindowVisibility(id, effective);
+        return;
+    }
+
     if (auto* win = m_floatingApplets.value(id, nullptr)) {
         win->setVisible(effective);
         return;
@@ -6228,6 +6239,49 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("tci"), QStringLiteral("pa"),
          QStringLiteral("cpu"), QStringLiteral("spannung"),
          QStringLiteral("unten")});
+
+    // ── Die eigenen Fenster gehoeren auch in die Auswahl ─────────────
+    //
+    // Der Betreiber, 2026-08-20: „logbook, rotor, channel strip,
+    // antenne usw, sind nicht bei den widgets."
+    //
+    // Sie standen nicht drin, weil sie keine Applets sind: sie leben in
+    // eigenen Fenstern und haengen an Menueeintraegen. Fuer den
+    // Auswaehler ist das aber kein Unterschied — er verwaltet ABSICHTEN
+    // („zeig mir das"), nicht Widgets. Wo etwas dann auftaucht, ist die
+    // Sache von applyAppletVisibility.
+    //
+    // Vorgabe aus: ein Fenster, das beim ersten Start von selbst
+    // aufgeht, ist eine Zumutung. Sie stehen in der Liste und warten.
+    struct WindowEntry {
+        const char* id;
+        const char* label;
+        const char* category;
+        std::initializer_list<const char*> keywords;
+    };
+    static const WindowEntry kWindows[] = {
+        {"WinLogbook", "Logbuch", "Aufnahme",
+         {"logbuch", "log", "qso", "adif", "kontakte", "eintraege"}},
+        {"WinRotorLog", "Rotor / Log", "Abstimmen",
+         {"rotor", "antenne", "richtung", "peilung", "drehen", "azimut",
+          "grad", "kompass"}},
+        {"WinChannelStrip", "Kanalzug", "Senden",
+         {"kanalzug", "strip", "channel", "eq", "kompressor", "leveler",
+          "mikrofon", "sprache"}},
+        {"WinAntenna", "Antenne", "Tuner",
+         {"antenne", "swr", "stehwelle", "sweep", "wobbeln", "analyzer",
+          "resonanz", "laenge"}},
+        {"WinSpotHub", "Spot-Zentrale", "Netzwerk",
+         {"spots", "cluster", "dx", "rbn", "wsjt", "pota", "meldungen"}},
+    };
+    for (const WindowEntry& w : kWindows) {
+        const QString id = QString::fromLatin1(w.id);
+        m_appletVis->registerApplet(id, QString::fromLatin1(w.label),
+                                    /*defaultVisible=*/false);
+        QStringList kw;
+        for (const char* k : w.keywords) { kw << QString::fromLatin1(k); }
+        m_appletVis->describeApplet(id, QString::fromLatin1(w.category), kw);
+    }
 
     // ── DAS PLUS ─────────────────────────────────────────────────────
     //
@@ -11263,6 +11317,39 @@ void MainWindow::openRotorDial()
     ensureRotorPanel();
     m_rotorDock->show();
     m_rotorDock->raise();
+}
+
+// Ein Eintrag der Auswahl, der ein Fenster meint. Einschalten oeffnet,
+// Ausschalten schliesst — mehr Bedeutung hat der Haken nicht.
+void MainWindow::applyWindowVisibility(const QString& id, bool on)
+{
+    auto closeIf = [](QWidget* w) { if (w) { w->hide(); } };
+
+    if (id == QLatin1String("WinLogbook")) {
+        if (on) { openLogbookWindow(); }
+        return;                       // das Logbuch schliesst sich selbst
+    }
+    if (id == QLatin1String("WinRotorLog")) {
+        if (on) { detachRotorPanel(); } else { dockRotorPanel(); }
+        return;
+    }
+    if (id == QLatin1String("WinChannelStrip")) {
+        if (on) { openChannelStrip(); } else { closeIf(m_stripWindow); }
+        return;
+    }
+    if (id == QLatin1String("WinAntenna")) {
+        if (on) { openAntennaWindow(); } else { closeIf(m_antennaWindow); }
+        return;
+    }
+    // Die QSO-Karte steht bewusst NICHT in der Liste: sie lebt im
+    // Logbuchfenster (LogbookWindow.cpp:1213) und hat von hier keinen
+    // eigenen Weg. Einen zu erfinden hiesse, ein zweites Kartenfenster
+    // mit eigenem Zustand zu bauen — dieselbe Falle wie ein zweites
+    // Logbuch.
+    if (id == QLatin1String("WinSpotHub")) {
+        if (on) { openSpotHub(); } else { closeIf(m_spotHubDialog); }
+        return;
+    }
 }
 
 void MainWindow::openLogbookWindow()

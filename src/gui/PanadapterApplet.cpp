@@ -20,6 +20,8 @@
 
 #include "gui/PanadapterApplet.h"
 #include <QFileDialog>
+#include <QImage>
+#include <QMessageBox>
 #include "gui/SpectrumWidget.h"
 #include "gui/widgets/SpectrumStatusOverlay.h"
 #include "models/SliceModel.h"
@@ -490,10 +492,35 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     auto* menu = new QMenu(qobject_cast<QWidget*>(parent));
 
     menu->addAction(tr("Hintergrundbild wählen…"), this, [this]() {
+        // ── Der Dialog gehoert dem FENSTER, nicht dem Applet ─────
+        //
+        // Mit `this` als Elternteil haengt er an einem Widget, das in
+        // einem rahmenlosen Qt::Tool-Fenster stecken kann. Ein modaler
+        // Dialog geht dann leicht dahinter auf, und der Betreiber sieht
+        // nichts passieren — was er am 2026-08-20 als
+        // „hintergrundbild funktioniert auch nicht" gemeldet hat.
+        //
+        // Nachgemessen ist der Rest der Kette in Ordnung: ein direkt
+        // gesetztes Bild landet auf der Flaeche (66854 Magenta-Punkte
+        // im GPU-Bild). Es fehlte also nicht das Malen, sondern der Weg
+        // zum Dateinamen.
+        QWidget* dlgParent = window() ? window() : this;
         const QString f = QFileDialog::getOpenFileName(
-            this, tr("Hintergrundbild"), QString(),
-            tr("Bilder (*.png *.jpg *.jpeg *.webp *.bmp)"));
+            dlgParent, tr("Hintergrundbild"), QString(),
+            tr("Bilder (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"));
         if (f.isEmpty()) { return; }
+
+        // Ladbar? Sonst sagt es das, statt still nichts zu tun.
+        // SpectrumWidget schreibt zwar eine Warnung ins Protokoll, aber
+        // ein Protokoll liest niemand, der gerade ein Foto ausgesucht
+        // hat.
+        if (QImage(f).isNull()) {
+            QMessageBox::warning(
+                dlgParent, tr("Hintergrundbild"),
+                tr("Diese Datei laesst sich nicht als Bild lesen:\n%1")
+                    .arg(f));
+            return;
+        }
         emit backgroundImageRequested(f);
         // Ein Bild waehlen und nichts sehen ist kein Ergebnis.
         //

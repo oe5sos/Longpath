@@ -813,6 +813,12 @@ private:
     /// keine Hülle.
     void applyAppletVisibility(const QString& id, bool effective);
 
+    /// Ein Eintrag der Widget-Auswahl, der ein eigenes FENSTER meint
+    /// (Logbuch, Rotor, Kanalzug, Antenne …). Der Auswaehler verwaltet
+    /// Absichten; dass daraus ein Fenster wird statt einer Huelle in
+    /// der Spalte, entscheidet sich hier und nur hier.
+    void applyWindowVisibility(const QString& id, bool on);
+
     /// Bildschirmkennung für die Geometrie im Profil.
     /// QScreen::serialNumber() zuerst — nur sie hält zwei baugleiche
     /// Monitore auseinander; name() tut das nicht. Wo die Plattform
