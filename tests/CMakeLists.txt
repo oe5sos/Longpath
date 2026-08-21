@@ -4697,6 +4697,7 @@ nereus_add_test(tst_overlay_render_is_harmless)
 nereus_add_test(tst_quit_leaves_no_pending_deletes)
 nereus_add_test(tst_notch_removable_offline)
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
+nereus_add_test(tst_rotor_aim_menu)
 nereus_add_test(tst_reachability_audit)
 set_tests_properties(tst_reachability_audit PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
