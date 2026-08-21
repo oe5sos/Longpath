@@ -386,10 +386,37 @@ int main(int argc, char* argv[])
     // their transport workers before the main window is shown.
     Longpath::ExternalVariableEngine::instance().init();
 
-    Longpath::MainWindow window;
-    window.show();
+    // ── Warum das Fenster in einem eigenen Block steht ───────────────
+    //
+    // Aus den Absturzberichten vom 2026-08-20 und -21: fuenfzehn
+    // Abstuerze, alle dieselbe Familie. Einmal die Fensterleiste, einmal
+    // ein QSplitter, immer derselbe Stapel:
+    //
+    //   exit -> __cxa_finalize -> QThreadDataDestroyer
+    //   -> sendPostedEvents -> irgendein ~QWidget
+    //   -> QWindow::~QWindow -> QSurface::~QSurface
+    //   -> QOpenGLContext::currentContext() -> SIGSEGV
+    //
+    // Ein „spaeter loeschen" wird nur zugestellt, solange eine Runde
+    // laeuft. Nach app.exec() laeuft keine mehr — was das Fenster beim
+    // Abraeumen noch anmeldet, bleibt liegen und wird erst beim Abbau
+    // der Faden-Daten ausgefuehrt. Da ist der Speicher, den ein
+    // Fenster-Destruktor ueber den OpenGL-Kontext anfasst, schon weg.
+    //
+    // Der Block sorgt dafuer, dass das Fenster stirbt, WAEHREND es die
+    // App noch gibt; die zweite Zustellung danach nimmt mit, was beim
+    // Sterben noch angemeldet wurde. Das closeEvent raeumt zusaetzlich
+    // die schwebenden Fenster selbst ab — beides zusammen, weil ein
+    // Absturz beim Beenden sonst nur die Stelle wechselt.
+    int rc = 0;
+    {
+        Longpath::MainWindow window;
+        window.show();
 
-    const int rc = app.exec();
+        rc = app.exec();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 
     // Graceful shutdown so worker threads drain before the engine
     // singleton is destroyed.
