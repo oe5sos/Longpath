@@ -1493,79 +1493,18 @@ void SpectrumDefaultsPage::buildUI()
         if (auto* w = spectrum()) { w->setBackgroundFillColor(c); }
     });
 
-    // ── Einblendungen im Panadapter ──────────────────────────────────
+    // ── Nicht mehr hier ──────────────────────────────────────────────
     //
-    // Der Betreiber, 2026-08-20: „erstelle auch die option, dass der
-    // rotor und ds swr transparent im pandapter erscheint, groesse und
-    // helligkeit sollte man dann dort ebenfalls veraendern koennen
-    // unter einstellungen im top."
+    // Die Einblendungen (Rotor-Kompass, Stehwelle) samt Groesse und
+    // Helligkeit standen bis 2026-08-21 an dieser Stelle. Auf Ansage
+    // des Betreibers sind sie ins Zahnrad-Menue des Panadapters
+    // gewandert: „hier im menue sollte man auswaehlen, was man genau
+    // im pandapter einblenden will und danach zur jeweiligen groesse
+    // und helligkeit usw. das ganze nicht im display menue."
     //
-    // Die Schalter stehen ausserdem im Zahnrad-Menue des Panadapters
-    // (der kurze Weg); Groesse und Helligkeit gehoeren hierher, weil
-    // man sie einmal einstellt und dann in Ruhe laesst.
-    //
-    // Eine Groesse und eine Helligkeit fuer BEIDE: zwei Einblendungen
-    // in verschiedenen Groessen saehen aus wie ein Versehen, nicht wie
-    // eine Entscheidung.
-    {
-        auto* ovGroup = new QGroupBox(
-            QStringLiteral("Einblendungen im Panadapter"), this);
-        auto* ovForm = new QFormLayout(ovGroup);
-        ovForm->setSpacing(6);
-
-        auto* cbCompass = new QCheckBox(
-            QStringLiteral("Rotor-Kompass"), ovGroup);
-        cbCompass->setToolTip(QStringLiteral(
-            "Zeigt die Antennenrichtung als durchsichtige Windrose links "
-            "unten im Spektrum."));
-        auto* cbSwr = new QCheckBox(QStringLiteral("Stehwelle"), ovGroup);
-        cbSwr->setToolTip(QStringLiteral(
-            "Zeigt das Stehwellen-Zifferblatt durchsichtig rechts unten "
-            "im Spektrum."));
-        if (auto* w = spectrum()) {
-            cbCompass->setChecked(
-                w->overlayVisible(SpectrumWidget::OverlaySlot::Compass));
-            cbSwr->setChecked(
-                w->overlayVisible(SpectrumWidget::OverlaySlot::Swr));
-        }
-        connect(cbCompass, &QCheckBox::toggled, this, [spectrum](bool on) {
-            if (auto* w = spectrum()) {
-                w->setOverlayVisible(SpectrumWidget::OverlaySlot::Compass, on);
-            }
-        });
-        connect(cbSwr, &QCheckBox::toggled, this, [spectrum](bool on) {
-            if (auto* w = spectrum()) {
-                w->setOverlayVisible(SpectrumWidget::OverlaySlot::Swr, on);
-            }
-        });
-        ovForm->addRow(QString(), cbCompass);
-        ovForm->addRow(QString(), cbSwr);
-
-        auto* scale = new QSlider(Qt::Horizontal, ovGroup);
-        scale->setRange(10, 40);
-        scale->setValue(spectrum() ? spectrum()->overlayScalePercent() : 25);
-        scale->setToolTip(QStringLiteral(
-            "Groesse der Einblendungen, in Prozent der kuerzeren Kante "
-            "des Spektrums. Unter 10 %% waere nichts mehr zu lesen, ueber "
-            "40 %% bliebe kein Spektrum mehr uebrig."));
-        connect(scale, &QSlider::valueChanged, this, [spectrum](int v) {
-            if (auto* w = spectrum()) { w->setOverlayScalePercent(v); }
-        });
-        ovForm->addRow(QStringLiteral("Groesse (%)"), scale);
-
-        auto* opa = new QSlider(Qt::Horizontal, ovGroup);
-        opa->setRange(10, 100);
-        opa->setValue(spectrum() ? spectrum()->overlayOpacityPercent() : 72);
-        opa->setToolTip(QStringLiteral(
-            "Helligkeit der Einblendungen. 100 %% deckt das Spektrum "
-            "darunter ganz ab; die Vorgabe 72 %% laesst es durchscheinen."));
-        connect(opa, &QSlider::valueChanged, this, [spectrum](int v) {
-            if (auto* w = spectrum()) { w->setOverlayOpacityPercent(v); }
-        });
-        ovForm->addRow(QStringLiteral("Helligkeit (%)"), opa);
-
-        bgForm->addRow(ovGroup);
-    }
+    // Er hat recht: man musste den Panadapter verlassen, um zu sehen,
+    // was man am Panadapter aendert. Siehe
+    // PanadapterApplet::buildDisplayMenu.
 
     if (auto* w = spectrum()) {
         QSignalBlocker b1(m_bgOpacitySlider);

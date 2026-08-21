@@ -473,6 +473,9 @@ private slots:
     /// Gemalt wird sie vom Rotorzeiger selbst — EIN Zifferblatt im
     /// Programm, nicht zwei, die auseinanderlaufen koennen.
     void onPanCompassOverlay(bool on);
+    void onPanSwrOverlay(bool on);
+    void onPanOverlayScale(int percent);
+    void onPanOverlayOpacity(int percent);
     void refreshPanCompass();
     /// Startet oder stoppt den Taktgeber je nachdem, ob
     /// ueberhaupt eine Einblendung zu sehen ist.

@@ -2760,6 +2760,15 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::compassOverlayRequested,
                 this, &MainWindow::onPanCompassOverlay,
                 Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::swrOverlayRequested,
+                this, &MainWindow::onPanSwrOverlay,
+                Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::overlayScaleRequested,
+                this, &MainWindow::onPanOverlayScale,
+                Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::overlayOpacityRequested,
+                this, &MainWindow::onPanOverlayOpacity,
+                Qt::UniqueConnection);
         // Phase 3F: clicking a pan makes it the active pan. Straight to the
         // stack's setter, exactly as AetherSDR MainWindow.cpp:12964 [@6a142807]
         // does it:
@@ -2897,6 +2906,30 @@ void MainWindow::onPanCompassOverlay(bool on)
     if (!w) { return; }
     w->setOverlayVisible(SpectrumWidget::OverlaySlot::Compass, on);
     startPanOverlayTimer();
+}
+
+void MainWindow::onPanSwrOverlay(bool on)
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w) { return; }
+    w->setOverlayVisible(SpectrumWidget::OverlaySlot::Swr, on);
+    startPanOverlayTimer();
+}
+
+void MainWindow::onPanOverlayScale(int percent)
+{
+    if (SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget()
+                                         : nullptr) {
+        w->setOverlayScalePercent(percent);
+    }
+}
+
+void MainWindow::onPanOverlayOpacity(int percent)
+{
+    if (SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget()
+                                         : nullptr) {
+        w->setOverlayOpacityPercent(percent);
+    }
 }
 
 // Der Taktgeber laeuft, solange IRGENDEINE Einblendung zu sehen ist.

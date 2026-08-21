@@ -569,26 +569,67 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
 
     menu->addSeparator();
 
-    // ── Der Kompass ──────────────────────────────────────────────────
+    // ── Einblendungen ────────────────────────────────────────────────
     //
-    // Der Betreiber, 2026-08-20: „kann man den rotorzeiger alleine auch
-    // im panadapter einblenden lassen? … sodass der hintergrund mit dem
-    // panadapter eines ist, quasi transparent."
+    // Der Betreiber, 2026-08-21: „hier im menue sollte man auswaehlen,
+    // was man genau im pandapter einblenden will und danach zur
+    // jeweiligen groesse und helligkeit usw. das ganze nicht im
+    // display menue."
     //
-    // Der Haken sagt nur, DASS er erscheinen soll. Gemalt wird er vom
-    // Rotor, weitergereicht von MainWindow — der Panadapter bekommt ein
-    // fertiges durchsichtiges Bild und legt es in eine Ecke.
+    // Also alles an EINER Stelle: erst WAS, dann WIE GROSS und WIE
+    // HELL. Vorher standen die Schalter hier und die Regler unter
+    // Setup -> Display — zwei Orte fuer eine Entscheidung, und man
+    // musste den Panadapter verlassen, um zu sehen, was man am
+    // Panadapter aendert.
     {
-        QAction* a = menu->addAction(tr("Rotor-Kompass einblenden"));
-        a->setCheckable(true);
-        a->setChecked(m_compassOn);
-        a->setToolTip(tr(
-            "Zeigt die Antennenrichtung als durchsichtige Windrose links "
-            "unten im Spektrum."));
-        connect(a, &QAction::toggled, this, [this](bool on) {
+        auto* ov = menu->addMenu(tr("Im Panadapter einblenden"));
+
+        QAction* a1 = ov->addAction(tr("Rotor-Kompass"));
+        a1->setCheckable(true);
+        a1->setChecked(m_compassOn);
+        a1->setToolTip(tr("Antennenrichtung als durchsichtige Windrose, "
+                          "links unten im Spektrum."));
+        connect(a1, &QAction::toggled, this, [this](bool on) {
             m_compassOn = on;
             emit compassOverlayRequested(on);
         });
+
+        QAction* a2 = ov->addAction(tr("Stehwelle"));
+        a2->setCheckable(true);
+        a2->setChecked(m_swrOverlayOn);
+        a2->setToolTip(tr("Stehwellen-Zifferblatt durchsichtig, rechts "
+                          "unten im Spektrum."));
+        connect(a2, &QAction::toggled, this, [this](bool on) {
+            m_swrOverlayOn = on;
+            emit swrOverlayRequested(on);
+        });
+
+        ov->addSeparator();
+
+        // Groesse und Helligkeit gelten fuer BEIDE. Zwei Einblendungen
+        // in verschiedenen Groessen saehen aus wie ein Versehen, nicht
+        // wie eine Entscheidung.
+        auto* sz = ov->addMenu(tr("Groesse"));
+        for (int pct : {15, 20, 25, 30, 35, 40}) {
+            QAction* a = sz->addAction(QStringLiteral("%1 %").arg(pct));
+            a->setCheckable(true);
+            a->setChecked(pct == m_overlayScalePct);
+            connect(a, &QAction::triggered, this, [this, pct]() {
+                m_overlayScalePct = pct;
+                emit overlayScaleRequested(pct);
+            });
+        }
+
+        auto* hl = ov->addMenu(tr("Helligkeit"));
+        for (int pct : {30, 50, 70, 85, 100}) {
+            QAction* a = hl->addAction(QStringLiteral("%1 %").arg(pct));
+            a->setCheckable(true);
+            a->setChecked(pct == m_overlayOpacityPct);
+            connect(a, &QAction::triggered, this, [this, pct]() {
+                m_overlayOpacityPct = pct;
+                emit overlayOpacityRequested(pct);
+            });
+        }
     }
 
     menu->addSeparator();
