@@ -13153,6 +13153,12 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // Zwei Zeilen, die das ausschliessen: die Fenster hier selbst
     // abraeumen, und danach zustellen, was sonst noch aussteht —
     // solange das Programm noch da ist.
+    // Auch die abgeloesten PANADAPTER — eine eigene Sammlung, die beim
+    // ersten Anlauf (c8d8161a) uebersehen wurde. Eine Probe im echten
+    // Hauptfenster hat den Absturz dann geliefert: abloesen, schliessen,
+    // SIGSEGV.
+    if (m_panStack) { m_panStack->dockAllFloating(); }
+
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
     m_floatingApplets.clear();
     if (m_rotorWindow) { delete m_rotorWindow; m_rotorWindow = nullptr; }

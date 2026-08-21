@@ -424,6 +424,47 @@ void PanadapterStack::floatPanadapter(const QString& panId)
 // Hide/Show-Runde fuer die QRhi-Kontexte der Nachbarn). Das hier zu
 // wiederholen waere ein zweiter Weg, der beim naechsten Umbau
 // auseinanderlaeuft.
+// ── Alle abgeloesten Panadapter zurueckholen ─────────────────────────
+//
+// Gebraucht beim Beenden. Am 2026-08-21 hat eine Probe im echten
+// Hauptfenster einen SIGSEGV geliefert: Panadapter abloesen, Fenster
+// schliessen — Absturz beim Abbau.
+//
+// Die Ursache ist dieselbe Familie wie der Absturz von heute
+// Vormittag (c8d8161a, 1c781bae): ein Fenster, das das Schliessen
+// ueberlebt. Dort waren es die schwebenden APPLET-Fenster
+// (m_floatingApplets im MainWindow); PanFloatingWindow ist eine
+// ANDERE Sammlung, und die habe ich uebersehen. Ein abgeloester
+// Panadapter gehoert beim Beenden dem schwebenden Fenster, das
+// Applet steht aber weiter in m_pans — beim Abbau greift einer ins
+// Leere.
+//
+// Reihenfolge wie im dockRequested-Weg: erst aus m_floating nehmen,
+// dann applyLayout (das holt das Applet aus dem Fenster zurueck unter
+// den Stapel), erst dann das Fenster loeschen. Andersherum naehme das
+// Fenster das Applet mit ins Grab.
+void PanadapterStack::dockAllFloating()
+{
+    if (m_floating.isEmpty()) { return; }
+
+    const QStringList ids = m_floating.keys();
+    QVector<PanFloatingWindow*> windows;
+    for (const QString& id : ids) {
+        if (auto* w = m_floating.take(id)) { windows.append(w); }
+        emit panFloatStateChanged(id, false);
+        if (auto* a = m_pans.value(id, nullptr)) {
+            a->setFloatingIndicator(false);
+        }
+    }
+
+    applyLayout(m_currentLayoutId, m_pans.keys());
+
+    // Sofort loeschen, nicht nachreichen: beim Beenden laeuft keine
+    // Runde mehr, in der ein deleteLater ankaeme. Genau daran ist der
+    // Absturz von heute Vormittag gehangen.
+    for (PanFloatingWindow* w : windows) { delete w; }
+}
+
 void PanadapterStack::dockPanadapter(const QString& panId)
 {
     PanFloatingWindow* floater = m_floating.value(panId, nullptr);
