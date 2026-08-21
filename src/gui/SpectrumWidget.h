@@ -719,6 +719,19 @@ public:
     /// und Deckkraft in Prozent (10..100). Gilt fuer BEIDE Plaetze:
     /// zwei Einblendungen in verschiedenen Groessen saehen aus wie ein
     /// Versehen.
+    /// Wo eine Einblendung sitzt — als Anteil der Spektrumsflaeche
+    /// (0..1), damit sie beim Groessenaendern des Fensters an ihrem
+    /// Platz bleibt. Verschoben wird sie mit der Maus.
+    void   setOverlayPos(OverlaySlot slot, const QPointF& frac);
+    QPointF overlayPos(OverlaySlot slot) const;
+
+    /// Wo eine Einblendung gerade LIEGT, in Bildpunkten. Oeffentlich,
+    /// weil eine Pruefung sonst die Hoehe des Spektrums nachrechnen
+    /// muesste — und eine nachgebaute Rechnung ist eine zweite, die
+    /// auseinanderlaufen kann. Genau daran ist die erste Fassung von
+    /// tst_overlay_drag gescheitert.
+    QRect overlayRectNow(OverlaySlot slot) const;
+
     void setOverlayScalePercent(int pct);
     void setOverlayOpacityPercent(int pct);
     int  overlayScalePercent() const   { return m_overlayScalePct; }
@@ -757,6 +770,10 @@ public:
     void loadBackgroundSettings();
     void paintBackgroundLayer(QPainter& p, const QRect& specRect);
     void drawCompassOverlay(QPainter& p, const QRect& specRect);
+    /// Das Rechteck einer Einblendung, oder ein leeres, wenn sie nicht
+    /// zu sehen ist. Eine Rechnung fuer Zeichnen UND Treffen — zwei
+    /// waeren zwei Orte, an denen sie auseinanderlaufen koennen.
+    QRect overlayRect(OverlaySlot slot, const QRect& specRect) const;
 
     void setDbmScaleVisible(bool on);
     bool dbmScaleVisible() const { return m_dbmScaleVisible; }
@@ -2900,6 +2917,13 @@ private:
     int     m_overlayScalePct{25};
     int     m_overlayOpacityPct{72};
     int     m_bgBrightnessPct{100};
+    /// Lage der beiden Einblendungen als Anteil der Spektrumsflaeche.
+    /// Vorgabe: links unten und rechts unten, ueber dem Bandplan.
+    QPointF m_compassPos{0.13, 0.80};
+    QPointF m_swrPos{0.87, 0.80};
+    /// Welche Einblendung gerade gezogen wird (-1 = keine).
+    int     m_draggingOverlay{-1};
+    QPointF m_dragGrabFrac;
 
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};

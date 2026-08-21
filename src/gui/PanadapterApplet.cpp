@@ -610,7 +610,7 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         // in verschiedenen Groessen saehen aus wie ein Versehen, nicht
         // wie eine Entscheidung.
         auto* sz = ov->addMenu(tr("Groesse"));
-        for (int pct : {15, 20, 25, 30, 35, 40}) {
+        for (int pct : {15, 20, 25, 30, 40, 50, 60}) {
             QAction* a = sz->addAction(QStringLiteral("%1 %").arg(pct));
             a->setCheckable(true);
             a->setChecked(pct == m_overlayScalePct);
@@ -621,7 +621,9 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         }
 
         auto* hl = ov->addMenu(tr("Helligkeit"));
-        for (int pct : {30, 50, 70, 85, 100}) {
+        // Ueber 100 wird additiv nachgelegt — „auch heller"
+        // geht sonst nicht weiter als bis zum Bild selbst.
+        for (int pct : {30, 50, 70, 85, 100, 125, 150}) {
             QAction* a = hl->addAction(QStringLiteral("%1 %").arg(pct));
             a->setCheckable(true);
             a->setChecked(pct == m_overlayOpacityPct);

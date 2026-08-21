@@ -4378,9 +4378,21 @@ void SpectrumWidget::loadBackgroundSettings()
                             QStringLiteral("False")).toString()
                    == QStringLiteral("True");
     m_overlayScalePct   = qBound(10, st.value("PanadapterOverlayScale",
-                                              "25").toInt(), 40);
+                                              "25").toInt(), 60);
     m_overlayOpacityPct = qBound(10, st.value("PanadapterOverlayOpacity",
-                                              "72").toInt(), 100);
+                                              "72").toInt(), 150);
+    auto readPos = [&st](const char* key, QPointF fallback) {
+        const QStringList parts =
+            st.value(key, QString()).toString().split(QLatin1Char(','));
+        if (parts.size() != 2) { return fallback; }
+        bool ok1 = false, ok2 = false;
+        const double x = parts[0].toDouble(&ok1);
+        const double y = parts[1].toDouble(&ok2);
+        if (!ok1 || !ok2) { return fallback; }
+        return QPointF(qBound(0.04, x, 0.96), qBound(0.04, y, 0.96));
+    };
+    m_compassPos = readPos("PanadapterCompassPos", QPointF(0.13, 0.80));
+    m_swrPos     = readPos("PanadapterSwrPos",     QPointF(0.87, 0.80));
     m_bgBrightnessPct = qBound(100,
         st.value("PanadapterBackgroundBrightness", "100").toInt(), 300);
     if (!path.isEmpty()) {
@@ -4865,41 +4877,86 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
 // Halb durchsichtig: der Kompass ist eine BEIGABE. Er soll ablesbar
 // sein, ohne dass man ein Signal verliert, das darunter liegt —
 // deshalb 0.72 und nicht deckend.
-void SpectrumWidget::drawCompassOverlay(QPainter& p, const QRect& specRect)
+// ── Das Rechteck einer Einblendung ───────────────────────────────────
+//
+// EINE Rechnung fuer Zeichnen und Treffen. Zwei waeren zwei Orte, an
+// denen sie auseinanderlaufen koennen — und dann zieht man an einer
+// Stelle und es bewegt sich an einer anderen.
+QRect SpectrumWidget::overlayRect(OverlaySlot slot, const QRect& specRect) const
 {
-    // ── Zwei Plaetze, eine Rechnung ──────────────────────────────────
-    //
-    // Links unten der Kompass, rechts unten die Stehwelle. Beide ueber
-    // dem Bandplan, weil dort nichts steht, das man beim Abstimmen
-    // braucht.
-    //
-    // Groesse und Deckkraft kommen aus den Einstellungen und gelten
-    // fuer BEIDE: zwei Einblendungen in verschiedenen Groessen saehen
-    // aus wie ein Versehen, nicht wie eine Entscheidung.
-    const int bandH = m_bandPlanFontSize + 4;
+    const QImage& img = (slot == OverlaySlot::Compass) ? m_compassImg : m_swrImg;
+    if (img.isNull() || !overlayVisible(slot)) { return {}; }
+
     const int maxSide = qMin(specRect.width(), specRect.height())
                         * m_overlayScalePct / 100;
-    if (maxSide < 40) { return; }          // kein Platz, dann lieber gar nicht
+    if (maxSide < 40) { return {}; }
+    const int native = img.width() / qMax(1, int(img.devicePixelRatio()));
+    const int draw = qMin(native, maxSide);
 
-    auto place = [&](const QImage& img, bool left) {
-        if (img.isNull()) { return; }
-        const int native = img.width()
-                           / qMax(1, int(img.devicePixelRatio()));
-        const int draw = qMin(native, maxSide);
-        const QRect target(left ? specRect.left() + 10
-                                : specRect.right() - draw - 10,
-                           specRect.bottom() - bandH - draw - 8,
-                           draw, draw);
-        if (target.top() < specRect.top()) { return; }
+    const QPointF f = (slot == OverlaySlot::Compass) ? m_compassPos : m_swrPos;
+    // Die Lage nennt die MITTE, nicht die Ecke: beim Groessenaendern
+    // soll die Einblendung um ihren Mittelpunkt wachsen und nicht nach
+    // rechts unten wegwandern.
+    int cx = specRect.left() + int(f.x() * specRect.width());
+    int cy = specRect.top()  + int(f.y() * specRect.height());
+    QRect r(cx - draw / 2, cy - draw / 2, draw, draw);
+
+    // Im Bild halten. Wer sie an den Rand zieht, soll sie dort finden
+    // und nicht halb ausserhalb.
+    if (r.left()   < specRect.left())   { r.moveLeft(specRect.left()); }
+    if (r.top()    < specRect.top())    { r.moveTop(specRect.top()); }
+    if (r.right()  > specRect.right())  { r.moveRight(specRect.right()); }
+    if (r.bottom() > specRect.bottom()) { r.moveBottom(specRect.bottom()); }
+    return r;
+}
+
+// ── Die eingeblendeten Instrumente ───────────────────────────────────
+//
+// Groesse, Helligkeit und LAGE kommen aus den Einstellungen; gezogen
+// werden sie mit der Maus (siehe mousePressEvent).
+//
+// Helligkeit ueber 100 %: ein zweiter Durchgang mit Plus-Verrechnung.
+// Der Betreiber am 2026-08-21: „noch groesser machen koennen und auch
+// heller". Ueber die Deckkraft allein geht es nicht weiter als bis zum
+// Bild selbst — additiv schon.
+void SpectrumWidget::drawCompassOverlay(QPainter& p, const QRect& specRect)
+{
+    auto place = [&](OverlaySlot slot, const QImage& img) {
+        const QRect target = overlayRect(slot, specRect);
+        if (target.isEmpty()) { return; }
         p.save();
-        p.setOpacity(m_overlayOpacityPct / 100.0);
         p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        p.setOpacity(qMin(100, m_overlayOpacityPct) / 100.0);
         p.drawImage(target, img);
+        if (m_overlayOpacityPct > 100) {
+            p.setCompositionMode(QPainter::CompositionMode_Plus);
+            p.setOpacity((m_overlayOpacityPct - 100) / 100.0);
+            p.drawImage(target, img);
+            p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        }
         p.restore();
     };
+    place(OverlaySlot::Compass, m_compassImg);
+    place(OverlaySlot::Swr,     m_swrImg);
+}
 
-    if (m_compassVisible) { place(m_compassImg, /*left=*/true); }
-    if (m_swrVisible)     { place(m_swrImg,     /*left=*/false); }
+void SpectrumWidget::setOverlayPos(OverlaySlot slot, const QPointF& frac)
+{
+    QPointF& dst = (slot == OverlaySlot::Compass) ? m_compassPos : m_swrPos;
+    const QPointF v(qBound(0.04, frac.x(), 0.96), qBound(0.04, frac.y(), 0.96));
+    if (dst == v) { return; }
+    dst = v;
+    AppSettings::instance().setValue(
+        slot == OverlaySlot::Compass ? "PanadapterCompassPos"
+                                     : "PanadapterSwrPos",
+        QStringLiteral("%1,%2").arg(v.x(), 0, 'f', 4).arg(v.y(), 0, 'f', 4));
+    m_overlayStaticDirty = true;
+    update();
+}
+
+QPointF SpectrumWidget::overlayPos(OverlaySlot slot) const
+{
+    return (slot == OverlaySlot::Compass) ? m_compassPos : m_swrPos;
 }
 
 void SpectrumWidget::setOverlayImage(OverlaySlot slot, const QImage& img)
@@ -4930,7 +4987,9 @@ bool SpectrumWidget::overlayVisible(OverlaySlot slot) const
 
 void SpectrumWidget::setOverlayScalePercent(int pct)
 {
-    const int v = qBound(10, pct, 40);
+    // Bis 60 %: der Betreiber wollte „noch groesser machen
+    // koennen". Darueber bliebe kein Spektrum mehr uebrig.
+    const int v = qBound(10, pct, 60);
     if (m_overlayScalePct == v) { return; }
     m_overlayScalePct = v;
     AppSettings::instance().setValue("PanadapterOverlayScale",
@@ -4941,7 +5000,10 @@ void SpectrumWidget::setOverlayScalePercent(int pct)
 
 void SpectrumWidget::setOverlayOpacityPercent(int pct)
 {
-    const int v = qBound(10, pct, 100);
+    // Bis 150: ueber 100 wird additiv nachgelegt (siehe
+    // drawCompassOverlay) — „auch heller" geht sonst nicht
+    // weiter als bis zum Bild selbst.
+    const int v = qBound(10, pct, 150);
     if (m_overlayOpacityPct == v) { return; }
     m_overlayOpacityPct = v;
     AppSettings::instance().setValue("PanadapterOverlayOpacity",
@@ -7682,6 +7744,14 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 //
 // Defined here rather than beside drawNotchMarkers because specHFromHeight is
 // a file-local static defined immediately above.
+QRect SpectrumWidget::overlayRectNow(OverlaySlot slot) const
+{
+    const QRect sr(0, 0, width(),
+                   specHFromHeight(height(), m_spectrumFrac,
+                                   kFreqScaleH + kDividerH));
+    return overlayRect(slot, sr);
+}
+
 QRect SpectrumWidget::notchSpecRect() const
 {
     const int specH = specHFromHeight(height(), m_spectrumFrac,
@@ -7926,6 +7996,45 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
 
 void SpectrumWidget::mousePressEvent(QMouseEvent* event)
 {
+    // ── Eine Einblendung anfassen ────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-21: „man sollte diese im pandapter
+    // verschieben koennen."
+    //
+    // VOR der Getrennt-Sperre darunter, und das ist der Punkt: die
+    // faengt im getrennten Zustand JEDEN Linksklick ab und oeffnet die
+    // Verbindungsflaeche. Stuende die Pruefung dahinter, liesse sich
+    // eine Einblendung nur bei bestehender Verbindung schieben — und
+    // der Betreiber ist beim Einrichten gerade nicht verbunden.
+    //
+    // Die Pruefung darauf gekommen, nicht ich: sie schlug fehl, weil
+    // die Lage sich nicht aenderte.
+    //
+    // Nur wenn der Druck wirklich auf einer
+    // Einblendung landet: sie liegen ueber dem Spektrum, also gehoert
+    // ihnen der Klick dort — und ueberall sonst aendert sich nichts.
+    if (event->button() == Qt::LeftButton) {
+        const QRect sr(0, 0, width(),
+                       specHFromHeight(height(), m_spectrumFrac,
+                                       kFreqScaleH + kDividerH));
+        for (int i = 0; i < 2; ++i) {
+            const OverlaySlot slot = (i == 0) ? OverlaySlot::Compass
+                                              : OverlaySlot::Swr;
+            const QRect r = overlayRect(slot, sr);
+            if (r.isEmpty() || !r.contains(event->position().toPoint())) {
+                continue;
+            }
+            m_draggingOverlay = i;
+            // Den Griffpunkt merken, damit die Einblendung nicht unter
+            // dem Zeiger wegspringt.
+            const QPointF c = QPointF(r.center());
+            m_dragGrabFrac = event->position() - c;
+            setCursor(Qt::ClosedHandCursor);
+            event->accept();
+            return;
+        }
+    }
+
     // Phase 3Q-8: while disconnected, swallow all left-clicks and signal
     // MainWindow to open the ConnectionPanel instead.
     if (m_connState != ConnectionState::Connected
@@ -8396,6 +8505,22 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
 
 void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
 {
+    // Eine Einblendung im Zug — siehe mousePressEvent.
+    if (m_draggingOverlay >= 0) {
+        const QRect sr(0, 0, width(),
+                       specHFromHeight(height(), m_spectrumFrac,
+                                       kFreqScaleH + kDividerH));
+        if (sr.width() > 0 && sr.height() > 0) {
+            const QPointF c = event->position() - m_dragGrabFrac;
+            setOverlayPos(m_draggingOverlay == 0 ? OverlaySlot::Compass
+                                                 : OverlaySlot::Swr,
+                          QPointF((c.x() - sr.left()) / sr.width(),
+                                  (c.y() - sr.top())  / sr.height()));
+        }
+        event->accept();
+        return;
+    }
+
     m_mousePos = event->pos();
     m_mouseInWidget = true;
     int mx = static_cast<int>(event->position().x());
@@ -8829,6 +8954,13 @@ void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_draggingOverlay >= 0) {
+        m_draggingOverlay = -1;
+        setCursor(Qt::CrossCursor);
+        event->accept();
+        return;
+    }
+
     // Sub-epic E: time-scale drag end
     // From AetherSDR SpectrumWidget.cpp:2382-2387 [@0cd4559]
     //   note: drag release does NOT auto-resume to live — m_wfLive is only
