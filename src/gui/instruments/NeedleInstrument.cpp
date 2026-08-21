@@ -267,9 +267,55 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
         return;
     }
 
+    // ── Hinterleuchtung ──────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „das design der zeiger koennte man von
+    // hinten leicht beleuchten, mache mir vorschlaege weil relativ
+    // dunkel." Und spaeter, beim Vergleich mit meinen Testbildern: „die
+    // swr anzeige usw. sehe ich im test deutlich heller als dann in der
+    // app."
+    //
+    // Das Testbild log — es lag auf durchsichtigem Grund und wurde vom
+    // Betrachter auf Hell gezeigt. Die Beobachtung dahinter stimmt
+    // trotzdem: auf dem dunklen Panel ist das Zifferblatt zu flau.
+    //
+    // Zwei Stufen, beide zurueckhaltend:
+    //
+    //   1. Die vorhandene Glut von 0,16 auf 0,30. Sie sitzt IN der
+    //      Mulde und hebt den Teil an, der schon einen Wert traegt.
+    //
+    //   2. Eine Lampe DAHINTER: ein breiter Verlauf vom Drehpunkt nach
+    //      oben, in der Messfarbe, sehr schwach. Sie beleuchtet die
+    //      ganze Scheibe, nicht nur den gefuellten Teil — das ist der
+    //      Unterschied zwischen „der Wert leuchtet" und „das
+    //      Instrument ist beleuchtet", und der Betreiber hat um das
+    //      zweite gebeten.
+    //
+    // Beides in der Messfarbe und nicht in Weiss: eine weisse Lampe
+    // hinter einem bernsteinfarbenen Zeiger macht ihn blass.
+    {
+        QRadialGradient lamp(pivot, radius * 1.15);
+        QColor warm = col;
+        warm.setAlphaF(0.13);
+        lamp.setColorAt(0.0, warm);
+        warm.setAlphaF(0.05);
+        lamp.setColorAt(0.55, warm);
+        warm.setAlphaF(0.0);
+        lamp.setColorAt(1.0, warm);
+        p.save();
+        p.setPen(Qt::NoPen);
+        p.setBrush(lamp);
+        // Nur der obere Halbkreis: unter dem Drehpunkt ist keine
+        // Scheibe, die man beleuchten koennte.
+        p.drawPie(QRectF(pivot.x() - radius * 1.15, pivot.y() - radius * 1.15,
+                         radius * 2.3, radius * 2.3),
+                  0, 180 * 16);
+        p.restore();
+    }
+
     // Reihenfolge wie im Entwurf: Glut ganz hinten, dann die Mulde,
     // dann der Sektor, dann Teilung, Zeiger und Kante.
-    Instrument::paintGlow(p, spine, col);
+    Instrument::paintGlow(p, spine, col, 0.30);
     Instrument::paintTrough(p, spine, thresholdF);
     Instrument::paintFade(p, spine, f, col);
     Instrument::paintTicks(p, spine, *d);
