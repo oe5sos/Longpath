@@ -474,15 +474,8 @@ private slots:
     /// Windrose im Spektrum ein-/ausblenden und ihr Bild nachfuehren.
     /// Gemalt wird sie vom Rotorzeiger selbst — EIN Zifferblatt im
     /// Programm, nicht zwei, die auseinanderlaufen koennen.
-    void onPanCompassOverlay(bool on);
-    void onPanSwrOverlay(bool on);
-    void onPanSmeterOverlay(bool on);
-    void onPanOverlayScale(int percent);
-    void onPanOverlayOpacity(int percent);
-    void refreshPanCompass();
     /// Startet oder stoppt den Taktgeber je nachdem, ob
     /// ueberhaupt eine Einblendung zu sehen ist.
-    void startPanOverlayTimer();
 
     void onConnectionStateChanged();
     void showConnectionPanel();
@@ -1362,8 +1355,6 @@ private:
     // Rotor + logbook dock (Tools > Rotor...). Lazy; owned by `this`.
     QDockWidget*     m_rotorDock{nullptr};
     /// Fuehrt die Windrose im Spektrum nach, solange sie zu
-    /// sehen ist. Siehe onPanCompassOverlay.
-    QTimer*          m_panCompassTimer{nullptr};
     class WindowTitleBar* m_rotorHeader{nullptr};
     class ToolWindow*     m_rotorWindow{nullptr};
     QrzClient*           m_qrzClient{nullptr};

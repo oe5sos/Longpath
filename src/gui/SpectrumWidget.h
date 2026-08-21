@@ -706,62 +706,10 @@ public:
     // (SpectrumWidget.cpp:551) und ein natives Kind keine
     // Durchsichtigkeit ueber die GPU-Flaeche bekommt. Im
     // QPainter-Durchgang der Ueberlagerung stimmt beides.
-    // ── Drei Plaetze ─────────────────────────────────────────────────
-    //
-    // Kompass, Stehwelle, S-Meter. Der dritte kam am 2026-08-21 auf
-    // Ansage dazu („s-meter bitte auch einbauen").
-    //
-    // Ab hier keine Wenn-Dann-Ketten mehr: bei zwei Plaetzen waren
-    // Paare aus if/else ertraeglich, bei dreien wird jede Stelle, die
-    // sie anfasst, zu einer Liste, die man vergessen kann. Zustand
-    // liegt jetzt in Feldern, die ueber kSlotCount laufen — wer einen
-    // vierten Platz will, aendert die Aufzaehlung und sonst nichts.
-    enum class OverlaySlot { Compass = 0, Swr = 1, SMeter = 2 };
-    static constexpr int kSlotCount = 3;
-
-    void setOverlayImage(OverlaySlot slot, const QImage& img);
-    void setOverlayVisible(OverlaySlot slot, bool on);
-    bool overlayVisible(OverlaySlot slot) const;
-
-    /// Groesse in Prozent der kuerzeren Kante des Spektrums (10..40)
-    /// und Deckkraft in Prozent (10..100). Gilt fuer BEIDE Plaetze:
-    /// zwei Einblendungen in verschiedenen Groessen saehen aus wie ein
-    /// Versehen.
-    /// Wo eine Einblendung sitzt — als Anteil der Spektrumsflaeche
-    /// (0..1), damit sie beim Groessenaendern des Fensters an ihrem
-    /// Platz bleibt. Verschoben wird sie mit der Maus.
-    void   setOverlayPos(OverlaySlot slot, const QPointF& frac);
-    QPointF overlayPos(OverlaySlot slot) const;
-
-    /// Wo eine Einblendung gerade LIEGT, in Bildpunkten. Oeffentlich,
-    /// weil eine Pruefung sonst die Hoehe des Spektrums nachrechnen
-    /// muesste — und eine nachgebaute Rechnung ist eine zweite, die
-    /// auseinanderlaufen kann. Genau daran ist die erste Fassung von
-    /// tst_overlay_drag gescheitert.
-    QRect overlayRectNow(OverlaySlot slot) const;
-
     /// Die Flaeche des Spektrums — OHNE die dBm-Leiste am rechten
     /// Rand, genau so, wie dort auch gezeichnet wird. Eine Rechnung
-    /// fuer Zeichnen und Treffen; zwei waeren zwei Orte, an denen sie
-    /// auseinanderlaufen (2026-08-21 genau daran gescheitert).
+    /// fuer Zeichnen und Treffen.
     QRect spectrumRect() const;
-
-    /// Der Einstellungsschluessel eines Platzes. Als Funktion, damit
-    /// ein vierter Platz genau EINEN neuen Namen braucht.
-    static QString overlaySettingKey(OverlaySlot slot, const char* what);
-
-    void setOverlayScalePercent(int pct);
-    void setOverlayOpacityPercent(int pct);
-    int  overlayScalePercent() const   { return m_overlayScalePct; }
-    int  overlayOpacityPercent() const { return m_overlayOpacityPct; }
-
-    // Alt, bleibt fuer den Schalter im Zahnrad-Menue.
-    void setCompassOverlay(const QImage& img)
-        { setOverlayImage(OverlaySlot::Compass, img); }
-    void setCompassOverlayVisible(bool on)
-        { setOverlayVisible(OverlaySlot::Compass, on); }
-    bool compassOverlayVisible() const
-        { return overlayVisible(OverlaySlot::Compass); }
 
     void setBackgroundImage(const QString& path);
     QString backgroundImagePath() const { return m_bgImagePath; }
@@ -790,11 +738,6 @@ public:
     void resetBackgroundFillColor();
     void loadBackgroundSettings();
     void paintBackgroundLayer(QPainter& p, const QRect& specRect);
-    void drawCompassOverlay(QPainter& p, const QRect& specRect);
-    /// Das Rechteck einer Einblendung, oder ein leeres, wenn sie nicht
-    /// zu sehen ist. Eine Rechnung fuer Zeichnen UND Treffen — zwei
-    /// waeren zwei Orte, an denen sie auseinanderlaufen koennen.
-    QRect overlayRect(OverlaySlot slot, const QRect& specRect) const;
 
     void setDbmScaleVisible(bool on);
     bool dbmScaleVisible() const { return m_dbmScaleVisible; }
@@ -1806,6 +1749,10 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
+
+    /// Zeigt der Panadapter an dieser Stelle ein eigenes Menue?
+    bool hasOwnContextMenuAt(const QPoint& pos) const;
     void wheelEvent(QWheelEvent* event) override;
     void leaveEvent(QEvent* event) override;
 
@@ -2938,19 +2885,11 @@ private:
     QString m_bgImagePath;
     int     m_bgOpacity{80};
     QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
-    QImage  m_overlayImg[kSlotCount];
-    bool    m_overlayOn[kSlotCount]{false, false, false};
-    int     m_overlayScalePct{25};
-    int     m_overlayOpacityPct{72};
     int     m_bgBrightnessPct{100};
     /// Lage der Einblendungen als Anteil der Spektrumsflaeche.
     /// Vorgabe: links unten, rechts unten, Mitte unten — ueber dem
     /// Bandplan, wo beim Abstimmen nichts steht.
-    QPointF m_overlayPos[kSlotCount]{{0.13, 0.80}, {0.87, 0.80},
-                                     {0.50, 0.80}};
     /// Welche Einblendung gerade gezogen wird (-1 = keine).
-    int     m_draggingOverlay{-1};
-    QPointF m_dragGrabFrac;
 
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};

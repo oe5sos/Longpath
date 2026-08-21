@@ -76,7 +76,6 @@ private slots:
             QStringLiteral("paintBackgroundLayer"),
             QStringLiteral("drawGrid"),
             QStringLiteral("drawBandPlan"),
-            QStringLiteral("drawCompassOverlay"),
         };
         for (const QString& fn : layers) {
             const int n = countCalls(src, fn);

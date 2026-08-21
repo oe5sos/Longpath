@@ -114,6 +114,8 @@
 
 #include "SpectrumWidget.h"
 
+#include <QContextMenuEvent>
+
 #include "widgets/NotchEditPopup.h"
 #include "core/FFTEngine.h"   // kDefaultFftSize
 #include "gui/StyleConstants.h"
@@ -3651,7 +3653,6 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
         drawDbmScale(p, QRect(0, 0, w, specH));
     }
     drawBandPlan(p, specRect);
-    drawCompassOverlay(p, specRect);
     // Sub-epic E: time-scale + LIVE button on the right edge of the
     // waterfall area (always painted; widens automatically when paused).
     // Use a full-width wfRect (not the clipped `wfRect` at line 1141) so the
@@ -4401,37 +4402,6 @@ void SpectrumWidget::loadBackgroundSettings()
                                            Style::kPanadapterBg)).toString());
     if (fill.isValid()) { m_bgFillColor = fill; }
 
-    // Die Einblendungen (Kompass, Stehwelle) und ihre gemeinsame
-    // Groesse und Deckkraft. Hier mit gelesen, damit sie beim Start
-    // stehen und nicht erst, wenn jemand die Einstellungen oeffnet.
-    for (int i = 0; i < kSlotCount; ++i) {
-        const OverlaySlot sl = static_cast<OverlaySlot>(i);
-        m_overlayOn[i] = st.value(overlaySettingKey(sl, "Overlay"),
-                                  QStringLiteral("False")).toString()
-                         == QStringLiteral("True");
-    }
-    m_overlayScalePct   = qBound(10, st.value("PanadapterOverlayScale",
-                                              "25").toInt(), 60);
-    m_overlayOpacityPct = qBound(10, st.value("PanadapterOverlayOpacity",
-                                              "72").toInt(), 150);
-    auto readPos = [&st](const char* key, QPointF fallback) {
-        const QStringList parts =
-            st.value(key, QString()).toString().split(QLatin1Char(','));
-        if (parts.size() != 2) { return fallback; }
-        bool ok1 = false, ok2 = false;
-        const double x = parts[0].toDouble(&ok1);
-        const double y = parts[1].toDouble(&ok2);
-        if (!ok1 || !ok2) { return fallback; }
-        return QPointF(qBound(0.04, x, 0.96), qBound(0.04, y, 0.96));
-    };
-    const QPointF kDefaultPos[kSlotCount] = {{0.13, 0.80}, {0.87, 0.80},
-                                             {0.50, 0.80}};
-    for (int i = 0; i < kSlotCount; ++i) {
-        const OverlaySlot sl = static_cast<OverlaySlot>(i);
-        m_overlayPos[i] = readPos(
-            overlaySettingKey(sl, "Pos").toUtf8().constData(),
-            kDefaultPos[i]);
-    }
     m_bgBrightnessPct = qBound(100,
         st.value("PanadapterBackgroundBrightness", "100").toInt(), 300);
     if (!path.isEmpty()) {
@@ -4899,154 +4869,6 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
             QPointF(strip.left() + 6, y - staticAscent / 2.0),
             cit.value());
     }
-}
-
-// ---- Band-plan strip ----
-// From AetherSDR SpectrumWidget.cpp:4220-4293 [@0cd4559]
-// ── Der eingeblendete Kompass ────────────────────────────────────────
-//
-// Siehe SpectrumWidget.h: hier kommt ein fertiges Bild an, und es wird
-// in die linke untere Ecke des Spektrums gelegt.
-//
-// Links unten, weil dort am wenigsten liegt: rechts steht die
-// dBm-Skala, oben die Bedienflaeche, unten quer der Bandplan. Ueber
-// dem Bandplan bleibt eine Ecke, in der nichts steht, das man beim
-// Abstimmen braucht.
-//
-// Halb durchsichtig: der Kompass ist eine BEIGABE. Er soll ablesbar
-// sein, ohne dass man ein Signal verliert, das darunter liegt —
-// deshalb 0.72 und nicht deckend.
-// ── Das Rechteck einer Einblendung ───────────────────────────────────
-//
-// EINE Rechnung fuer Zeichnen und Treffen. Zwei waeren zwei Orte, an
-// denen sie auseinanderlaufen koennen — und dann zieht man an einer
-// Stelle und es bewegt sich an einer anderen.
-QRect SpectrumWidget::overlayRect(OverlaySlot slot, const QRect& specRect) const
-{
-    const int i = static_cast<int>(slot);
-    const QImage& img = m_overlayImg[i];
-    if (img.isNull() || !overlayVisible(slot)) { return {}; }
-
-    const int maxSide = qMin(specRect.width(), specRect.height())
-                        * m_overlayScalePct / 100;
-    if (maxSide < 40) { return {}; }
-    const int native = img.width() / qMax(1, int(img.devicePixelRatio()));
-    const int draw = qMin(native, maxSide);
-
-    const QPointF f = m_overlayPos[i];
-    // Die Lage nennt die MITTE, nicht die Ecke: beim Groessenaendern
-    // soll die Einblendung um ihren Mittelpunkt wachsen und nicht nach
-    // rechts unten wegwandern.
-    int cx = specRect.left() + int(f.x() * specRect.width());
-    int cy = specRect.top()  + int(f.y() * specRect.height());
-    QRect r(cx - draw / 2, cy - draw / 2, draw, draw);
-
-    // Im Bild halten. Wer sie an den Rand zieht, soll sie dort finden
-    // und nicht halb ausserhalb.
-    if (r.left()   < specRect.left())   { r.moveLeft(specRect.left()); }
-    if (r.top()    < specRect.top())    { r.moveTop(specRect.top()); }
-    if (r.right()  > specRect.right())  { r.moveRight(specRect.right()); }
-    if (r.bottom() > specRect.bottom()) { r.moveBottom(specRect.bottom()); }
-    return r;
-}
-
-// ── Die eingeblendeten Instrumente ───────────────────────────────────
-//
-// Groesse, Helligkeit und LAGE kommen aus den Einstellungen; gezogen
-// werden sie mit der Maus (siehe mousePressEvent).
-//
-// Helligkeit ueber 100 %: ein zweiter Durchgang mit Plus-Verrechnung.
-// Der Betreiber am 2026-08-21: „noch groesser machen koennen und auch
-// heller". Ueber die Deckkraft allein geht es nicht weiter als bis zum
-// Bild selbst — additiv schon.
-void SpectrumWidget::drawCompassOverlay(QPainter& p, const QRect& specRect)
-{
-    auto place = [&](OverlaySlot slot, const QImage& img) {
-        const QRect target = overlayRect(slot, specRect);
-        if (target.isEmpty()) { return; }
-        p.save();
-        p.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        p.setOpacity(qMin(100, m_overlayOpacityPct) / 100.0);
-        p.drawImage(target, img);
-        if (m_overlayOpacityPct > 100) {
-            p.setCompositionMode(QPainter::CompositionMode_Plus);
-            p.setOpacity((m_overlayOpacityPct - 100) / 100.0);
-            p.drawImage(target, img);
-            p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        }
-        p.restore();
-    };
-    for (int i = 0; i < kSlotCount; ++i) {
-        place(static_cast<OverlaySlot>(i), m_overlayImg[i]);
-    }
-}
-
-void SpectrumWidget::setOverlayPos(OverlaySlot slot, const QPointF& frac)
-{
-    QPointF& dst = m_overlayPos[static_cast<int>(slot)];
-    const QPointF v(qBound(0.04, frac.x(), 0.96), qBound(0.04, frac.y(), 0.96));
-    if (dst == v) { return; }
-    dst = v;
-    AppSettings::instance().setValue(
-        overlaySettingKey(slot, "Pos"),
-        QStringLiteral("%1,%2").arg(v.x(), 0, 'f', 4).arg(v.y(), 0, 'f', 4));
-    m_overlayStaticDirty = true;
-    update();
-}
-
-QPointF SpectrumWidget::overlayPos(OverlaySlot slot) const
-{
-    return m_overlayPos[static_cast<int>(slot)];
-}
-
-void SpectrumWidget::setOverlayImage(OverlaySlot slot, const QImage& img)
-{
-    m_overlayImg[static_cast<int>(slot)] = img;
-    if (overlayVisible(slot)) { m_overlayStaticDirty = true; update(); }
-}
-
-void SpectrumWidget::setOverlayVisible(OverlaySlot slot, bool on)
-{
-    bool& flag = m_overlayOn[static_cast<int>(slot)];
-    if (flag == on) { return; }
-    flag = on;
-    AppSettings::instance().setValue(
-        overlaySettingKey(slot, "Overlay"),
-        on ? QStringLiteral("True") : QStringLiteral("False"));
-    m_overlayStaticDirty = true;
-    update();
-}
-
-bool SpectrumWidget::overlayVisible(OverlaySlot slot) const
-{
-    return m_overlayOn[static_cast<int>(slot)];
-}
-
-void SpectrumWidget::setOverlayScalePercent(int pct)
-{
-    // Bis 60 %: der Betreiber wollte „noch groesser machen
-    // koennen". Darueber bliebe kein Spektrum mehr uebrig.
-    const int v = qBound(10, pct, 60);
-    if (m_overlayScalePct == v) { return; }
-    m_overlayScalePct = v;
-    AppSettings::instance().setValue("PanadapterOverlayScale",
-                                     QString::number(v));
-    m_overlayStaticDirty = true;
-    update();
-}
-
-void SpectrumWidget::setOverlayOpacityPercent(int pct)
-{
-    // Bis 150: ueber 100 wird additiv nachgelegt (siehe
-    // drawCompassOverlay) — „auch heller" geht sonst nicht
-    // weiter als bis zum Bild selbst.
-    const int v = qBound(10, pct, 150);
-    if (m_overlayOpacityPct == v) { return; }
-    m_overlayOpacityPct = v;
-    AppSettings::instance().setValue("PanadapterOverlayOpacity",
-                                     QString::number(v));
-    m_overlayStaticDirty = true;
-    update();
 }
 
 void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
@@ -7787,30 +7609,6 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 #endif
 }
 
-// ===========================================================================
-// Notch (TNF) geometry -- design sections 8.1 and 8.2
-// ===========================================================================
-//
-// The single geometry source for the notch overlay.  Reproduces the rect
-// each paint site builds for itself, through the same specHFromHeight helper
-// so the GPU/CPU layout split is honoured without restating it: the QPainter
-// path puts the frequency bar at the bottom of the widget and takes
-// h * spectrumFrac, the QRhi path puts it between spectrum and waterfall and
-// takes (h - chrome) * spectrumFrac.
-//
-// Defined here rather than beside drawNotchMarkers because specHFromHeight is
-// a file-local static defined immediately above.
-// Ein Schluessel je Platz und Zweck. Als Funktion und nicht als
-// Wenn-Dann-Kette an jeder Fundstelle: ein vierter Platz braucht dann
-// genau EINEN neuen Namen hier und keinen zweiten anderswo.
-QString SpectrumWidget::overlaySettingKey(OverlaySlot slot, const char* what)
-{
-    static const char* kName[kSlotCount] = {"Compass", "Swr", "SMeter"};
-    return QStringLiteral("Panadapter%1%2")
-        .arg(QLatin1String(kName[static_cast<int>(slot)]),
-             QLatin1String(what));
-}
-
 // ── EINE Rechnung fuer die Spektrumsflaeche ──────────────────────────
 //
 // Gezeichnet wird in `w - effectiveStripW()` — ohne die dBm-Leiste am
@@ -7829,12 +7627,6 @@ QRect SpectrumWidget::spectrumRect() const
                  specHFromHeight(height(), m_spectrumFrac,
                                  kFreqScaleH + kDividerH));
 }
-
-QRect SpectrumWidget::overlayRectNow(OverlaySlot slot) const
-{
-    return overlayRect(slot, spectrumRect());
-}
-
 QRect SpectrumWidget::notchSpecRect() const
 {
     const int specH = specHFromHeight(height(), m_spectrumFrac,
@@ -8133,42 +7925,6 @@ void SpectrumWidget::openNotchEditor(int id, const QPoint& globalPos)
 
 void SpectrumWidget::mousePressEvent(QMouseEvent* event)
 {
-    // ── Eine Einblendung anfassen ────────────────────────────────────
-    //
-    // Der Betreiber, 2026-08-21: „man sollte diese im pandapter
-    // verschieben koennen."
-    //
-    // VOR der Getrennt-Sperre darunter, und das ist der Punkt: die
-    // faengt im getrennten Zustand JEDEN Linksklick ab und oeffnet die
-    // Verbindungsflaeche. Stuende die Pruefung dahinter, liesse sich
-    // eine Einblendung nur bei bestehender Verbindung schieben — und
-    // der Betreiber ist beim Einrichten gerade nicht verbunden.
-    //
-    // Die Pruefung darauf gekommen, nicht ich: sie schlug fehl, weil
-    // die Lage sich nicht aenderte.
-    //
-    // Nur wenn der Druck wirklich auf einer
-    // Einblendung landet: sie liegen ueber dem Spektrum, also gehoert
-    // ihnen der Klick dort — und ueberall sonst aendert sich nichts.
-    if (event->button() == Qt::LeftButton) {
-        const QRect sr = spectrumRect();
-        for (int i = 0; i < kSlotCount; ++i) {
-            const OverlaySlot slot = static_cast<OverlaySlot>(i);
-            const QRect r = overlayRect(slot, sr);
-            if (r.isEmpty() || !r.contains(event->position().toPoint())) {
-                continue;
-            }
-            m_draggingOverlay = i;
-            // Den Griffpunkt merken, damit die Einblendung nicht unter
-            // dem Zeiger wegspringt.
-            const QPointF c = QPointF(r.center());
-            m_dragGrabFrac = event->position() - c;
-            setCursor(Qt::ClosedHandCursor);
-            event->accept();
-            return;
-        }
-    }
-
     // Phase 3Q-8: while disconnected, swallow all left-clicks and signal
     // MainWindow to open the ConnectionPanel instead.
     if (m_connState != ConnectionState::Connected
@@ -8639,19 +8395,6 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
 
 void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    // Eine Einblendung im Zug — siehe mousePressEvent.
-    if (m_draggingOverlay >= 0) {
-        const QRect sr = spectrumRect();
-        if (sr.width() > 0 && sr.height() > 0) {
-            const QPointF c = event->position() - m_dragGrabFrac;
-            setOverlayPos(static_cast<OverlaySlot>(m_draggingOverlay),
-                          QPointF((c.x() - sr.left()) / sr.width(),
-                                  (c.y() - sr.top())  / sr.height()));
-        }
-        event->accept();
-        return;
-    }
-
     m_mousePos = event->pos();
     m_mouseInWidget = true;
     int mx = static_cast<int>(event->position().x());
@@ -9060,6 +8803,58 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
 // Verlaufsmarken des S-Verlaufs sind ausgenommen: ihr Etikett ist eine
 // S-Stufe („S7"), kein Rufzeichen. Sie tragen markerIndex -1, und genau
 // daran erkennt man sie.
+// ── Der Rechtsklick erzeugt ZWEI Ereignisse ──────────────────────────
+//
+// Der Betreiber, 2026-08-21, mit einem Bildschirmfoto: Rechtsklick
+// genau auf einen gelben Notch-Balken — und aufgegangen ist das
+// Pan-Menue („Add slice on this pan / Float this pan / Extended
+// view"), nicht das Notch-Menue.
+//
+// Der Grund steht nicht im Notch-Code, sondern in Qt: ein Rechtsklick
+// liefert einen mousePressEvent UND, davon unabhaengig, einen
+// QContextMenuEvent. mousePressEvent hat unser Notch-Menue mit popup()
+// aufgemacht und das Ereignis angenommen — das Kontextmenue-Ereignis
+// aber blieb unbeantwortet, wanderte zum Elternteil, und
+// PanadapterApplet::contextMenuEvent macht sein Menue mit exec() auf.
+// exec() haelt die Runde an und legt sich obenauf. Unseres lag darunter.
+//
+// Genau deshalb ist der Test von gestern gruen gewesen: er hat auf
+// einen freistehenden SpectrumWidget geklickt. Ohne Elternteil gibt es
+// niemanden, zu dem das zweite Ereignis wandern koennte.
+//
+// Hier wird es beantwortet — aber nur dort, wo WIR schon etwas zeigen.
+// Auf freier Flaeche bleibt es unbeantwortet und das Pan-Menue geht auf
+// wie bisher.
+void SpectrumWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    if (hasOwnContextMenuAt(event->pos())) {
+        event->accept();
+        return;
+    }
+    event->ignore();
+}
+
+/// Zeigt der Panadapter an dieser Stelle ein eigenes Menue?
+///
+/// Dieselben Treffertests wie im Druckereignis — bewusst hier
+/// zusammengefasst, damit die beiden nicht auseinanderlaufen koennen.
+/// Liefen sie auseinander, waere das Ergebnis genau der Fehler von
+/// oben: eines der beiden Menues sichtbar, das andere nicht.
+bool SpectrumWidget::hasOwnContextMenuAt(const QPoint& pos) const
+{
+    const QRect nRect = notchSpecRect();
+    if (pos.y() < nRect.height() && pos.x() <= nRect.right()) {
+        if (notchAtPixel(pos.x(), nRect) >= 0) { return true; }
+    }
+
+    if (m_showSpots) {
+        for (const auto& hr : m_spotClickRects) {
+            if (hr.rect.contains(pos)) { return true; }
+        }
+    }
+    return false;
+}
+
 void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
     // ── Doppelklick auf einen Notch macht den Editor auf ─────────────
@@ -9111,13 +8906,6 @@ void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_draggingOverlay >= 0) {
-        m_draggingOverlay = -1;
-        setCursor(Qt::CrossCursor);
-        event->accept();
-        return;
-    }
-
     // Sub-epic E: time-scale drag end
     // From AetherSDR SpectrumWidget.cpp:2382-2387 [@0cd4559]
     //   note: drag release does NOT auto-resume to live — m_wfLive is only
@@ -10074,7 +9862,6 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             //
             // Zwei Zeichenwege sind zwei Orte, an denen etwas fehlen
             // kann. Wer den einen aendert, muss den anderen mitnehmen.
-            drawCompassOverlay(p, specRect);
 
             // Sub-epic E: time-scale + LIVE button on the right edge of the
             // waterfall area. Same FULL-WIDTH wfRect contract as the QPainter
