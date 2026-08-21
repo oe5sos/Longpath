@@ -4371,12 +4371,12 @@ void SpectrumWidget::loadBackgroundSettings()
     // Die Einblendungen (Kompass, Stehwelle) und ihre gemeinsame
     // Groesse und Deckkraft. Hier mit gelesen, damit sie beim Start
     // stehen und nicht erst, wenn jemand die Einstellungen oeffnet.
-    m_compassVisible = st.value("PanadapterCompassOverlay",
-                                QStringLiteral("False")).toString()
-                       == QStringLiteral("True");
-    m_swrVisible = st.value("PanadapterSwrOverlay",
-                            QStringLiteral("False")).toString()
-                   == QStringLiteral("True");
+    for (int i = 0; i < kSlotCount; ++i) {
+        const OverlaySlot sl = static_cast<OverlaySlot>(i);
+        m_overlayOn[i] = st.value(overlaySettingKey(sl, "Overlay"),
+                                  QStringLiteral("False")).toString()
+                         == QStringLiteral("True");
+    }
     m_overlayScalePct   = qBound(10, st.value("PanadapterOverlayScale",
                                               "25").toInt(), 60);
     m_overlayOpacityPct = qBound(10, st.value("PanadapterOverlayOpacity",
@@ -4391,8 +4391,14 @@ void SpectrumWidget::loadBackgroundSettings()
         if (!ok1 || !ok2) { return fallback; }
         return QPointF(qBound(0.04, x, 0.96), qBound(0.04, y, 0.96));
     };
-    m_compassPos = readPos("PanadapterCompassPos", QPointF(0.13, 0.80));
-    m_swrPos     = readPos("PanadapterSwrPos",     QPointF(0.87, 0.80));
+    const QPointF kDefaultPos[kSlotCount] = {{0.13, 0.80}, {0.87, 0.80},
+                                             {0.50, 0.80}};
+    for (int i = 0; i < kSlotCount; ++i) {
+        const OverlaySlot sl = static_cast<OverlaySlot>(i);
+        m_overlayPos[i] = readPos(
+            overlaySettingKey(sl, "Pos").toUtf8().constData(),
+            kDefaultPos[i]);
+    }
     m_bgBrightnessPct = qBound(100,
         st.value("PanadapterBackgroundBrightness", "100").toInt(), 300);
     if (!path.isEmpty()) {
@@ -4884,7 +4890,8 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
 // Stelle und es bewegt sich an einer anderen.
 QRect SpectrumWidget::overlayRect(OverlaySlot slot, const QRect& specRect) const
 {
-    const QImage& img = (slot == OverlaySlot::Compass) ? m_compassImg : m_swrImg;
+    const int i = static_cast<int>(slot);
+    const QImage& img = m_overlayImg[i];
     if (img.isNull() || !overlayVisible(slot)) { return {}; }
 
     const int maxSide = qMin(specRect.width(), specRect.height())
@@ -4893,7 +4900,7 @@ QRect SpectrumWidget::overlayRect(OverlaySlot slot, const QRect& specRect) const
     const int native = img.width() / qMax(1, int(img.devicePixelRatio()));
     const int draw = qMin(native, maxSide);
 
-    const QPointF f = (slot == OverlaySlot::Compass) ? m_compassPos : m_swrPos;
+    const QPointF f = m_overlayPos[i];
     // Die Lage nennt die MITTE, nicht die Ecke: beim Groessenaendern
     // soll die Einblendung um ihren Mittelpunkt wachsen und nicht nach
     // rechts unten wegwandern.
@@ -4936,19 +4943,19 @@ void SpectrumWidget::drawCompassOverlay(QPainter& p, const QRect& specRect)
         }
         p.restore();
     };
-    place(OverlaySlot::Compass, m_compassImg);
-    place(OverlaySlot::Swr,     m_swrImg);
+    for (int i = 0; i < kSlotCount; ++i) {
+        place(static_cast<OverlaySlot>(i), m_overlayImg[i]);
+    }
 }
 
 void SpectrumWidget::setOverlayPos(OverlaySlot slot, const QPointF& frac)
 {
-    QPointF& dst = (slot == OverlaySlot::Compass) ? m_compassPos : m_swrPos;
+    QPointF& dst = m_overlayPos[static_cast<int>(slot)];
     const QPointF v(qBound(0.04, frac.x(), 0.96), qBound(0.04, frac.y(), 0.96));
     if (dst == v) { return; }
     dst = v;
     AppSettings::instance().setValue(
-        slot == OverlaySlot::Compass ? "PanadapterCompassPos"
-                                     : "PanadapterSwrPos",
+        overlaySettingKey(slot, "Pos"),
         QStringLiteral("%1,%2").arg(v.x(), 0, 'f', 4).arg(v.y(), 0, 'f', 4));
     m_overlayStaticDirty = true;
     update();
@@ -4956,25 +4963,22 @@ void SpectrumWidget::setOverlayPos(OverlaySlot slot, const QPointF& frac)
 
 QPointF SpectrumWidget::overlayPos(OverlaySlot slot) const
 {
-    return (slot == OverlaySlot::Compass) ? m_compassPos : m_swrPos;
+    return m_overlayPos[static_cast<int>(slot)];
 }
 
 void SpectrumWidget::setOverlayImage(OverlaySlot slot, const QImage& img)
 {
-    QImage& dst = (slot == OverlaySlot::Compass) ? m_compassImg : m_swrImg;
-    dst = img;
+    m_overlayImg[static_cast<int>(slot)] = img;
     if (overlayVisible(slot)) { m_overlayStaticDirty = true; update(); }
 }
 
 void SpectrumWidget::setOverlayVisible(OverlaySlot slot, bool on)
 {
-    bool& flag = (slot == OverlaySlot::Compass) ? m_compassVisible
-                                                : m_swrVisible;
+    bool& flag = m_overlayOn[static_cast<int>(slot)];
     if (flag == on) { return; }
     flag = on;
     AppSettings::instance().setValue(
-        slot == OverlaySlot::Compass ? "PanadapterCompassOverlay"
-                                     : "PanadapterSwrOverlay",
+        overlaySettingKey(slot, "Overlay"),
         on ? QStringLiteral("True") : QStringLiteral("False"));
     m_overlayStaticDirty = true;
     update();
@@ -4982,7 +4986,7 @@ void SpectrumWidget::setOverlayVisible(OverlaySlot slot, bool on)
 
 bool SpectrumWidget::overlayVisible(OverlaySlot slot) const
 {
-    return (slot == OverlaySlot::Compass) ? m_compassVisible : m_swrVisible;
+    return m_overlayOn[static_cast<int>(slot)];
 }
 
 void SpectrumWidget::setOverlayScalePercent(int pct)
@@ -7744,12 +7748,39 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 //
 // Defined here rather than beside drawNotchMarkers because specHFromHeight is
 // a file-local static defined immediately above.
+// Ein Schluessel je Platz und Zweck. Als Funktion und nicht als
+// Wenn-Dann-Kette an jeder Fundstelle: ein vierter Platz braucht dann
+// genau EINEN neuen Namen hier und keinen zweiten anderswo.
+QString SpectrumWidget::overlaySettingKey(OverlaySlot slot, const char* what)
+{
+    static const char* kName[kSlotCount] = {"Compass", "Swr", "SMeter"};
+    return QStringLiteral("Panadapter%1%2")
+        .arg(QLatin1String(kName[static_cast<int>(slot)]),
+             QLatin1String(what));
+}
+
+// ── EINE Rechnung fuer die Spektrumsflaeche ──────────────────────────
+//
+// Gezeichnet wird in `w - effectiveStripW()` — ohne die dBm-Leiste am
+// rechten Rand. Meine Trefferpruefung nahm die volle Breite, und damit
+// lag sie neben dem Bild: bei der rechten Einblendung um die
+// Streifenbreite daneben, also genau dort, wo man NICHT klickt.
+//
+// Der Betreiber, 2026-08-21: „verschieben funktioniert nicht." Mein
+// Test bestand trotzdem — er benutzte dieselbe falsche Rechnung wie
+// der Code, den er prueft. Zwei Rechnungen fuer dieselbe Flaeche sind
+// zwei Orte, an denen sie auseinanderlaufen; hier ist es die dritte
+// Wiederholung desselben Musters an einem Tag.
+QRect SpectrumWidget::spectrumRect() const
+{
+    return QRect(0, 0, width() - effectiveStripW(),
+                 specHFromHeight(height(), m_spectrumFrac,
+                                 kFreqScaleH + kDividerH));
+}
+
 QRect SpectrumWidget::overlayRectNow(OverlaySlot slot) const
 {
-    const QRect sr(0, 0, width(),
-                   specHFromHeight(height(), m_spectrumFrac,
-                                   kFreqScaleH + kDividerH));
-    return overlayRect(slot, sr);
+    return overlayRect(slot, spectrumRect());
 }
 
 QRect SpectrumWidget::notchSpecRect() const
@@ -8014,12 +8045,9 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     // Einblendung landet: sie liegen ueber dem Spektrum, also gehoert
     // ihnen der Klick dort — und ueberall sonst aendert sich nichts.
     if (event->button() == Qt::LeftButton) {
-        const QRect sr(0, 0, width(),
-                       specHFromHeight(height(), m_spectrumFrac,
-                                       kFreqScaleH + kDividerH));
-        for (int i = 0; i < 2; ++i) {
-            const OverlaySlot slot = (i == 0) ? OverlaySlot::Compass
-                                              : OverlaySlot::Swr;
+        const QRect sr = spectrumRect();
+        for (int i = 0; i < kSlotCount; ++i) {
+            const OverlaySlot slot = static_cast<OverlaySlot>(i);
             const QRect r = overlayRect(slot, sr);
             if (r.isEmpty() || !r.contains(event->position().toPoint())) {
                 continue;
@@ -8507,13 +8535,10 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
 {
     // Eine Einblendung im Zug — siehe mousePressEvent.
     if (m_draggingOverlay >= 0) {
-        const QRect sr(0, 0, width(),
-                       specHFromHeight(height(), m_spectrumFrac,
-                                       kFreqScaleH + kDividerH));
+        const QRect sr = spectrumRect();
         if (sr.width() > 0 && sr.height() > 0) {
             const QPointF c = event->position() - m_dragGrabFrac;
-            setOverlayPos(m_draggingOverlay == 0 ? OverlaySlot::Compass
-                                                 : OverlaySlot::Swr,
+            setOverlayPos(static_cast<OverlaySlot>(m_draggingOverlay),
                           QPointF((c.x() - sr.left()) / sr.width(),
                                   (c.y() - sr.top())  / sr.height()));
         }

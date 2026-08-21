@@ -2763,6 +2763,9 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::swrOverlayRequested,
                 this, &MainWindow::onPanSwrOverlay,
                 Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::smeterOverlayRequested,
+                this, &MainWindow::onPanSmeterOverlay,
+                Qt::UniqueConnection);
         connect(applet, &PanadapterApplet::overlayScaleRequested,
                 this, &MainWindow::onPanOverlayScale,
                 Qt::UniqueConnection);
@@ -2916,6 +2919,14 @@ void MainWindow::onPanSwrOverlay(bool on)
     startPanOverlayTimer();
 }
 
+void MainWindow::onPanSmeterOverlay(bool on)
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w) { return; }
+    w->setOverlayVisible(SpectrumWidget::OverlaySlot::SMeter, on);
+    startPanOverlayTimer();
+}
+
 void MainWindow::onPanOverlayScale(int percent)
 {
     if (SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget()
@@ -2937,9 +2948,12 @@ void MainWindow::startPanOverlayTimer()
 {
     SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
     if (!w) { return; }
-    const bool any =
-        w->overlayVisible(SpectrumWidget::OverlaySlot::Compass)
-        || w->overlayVisible(SpectrumWidget::OverlaySlot::Swr);
+    bool any = false;
+    for (int i = 0; i < SpectrumWidget::kSlotCount; ++i) {
+        if (w->overlayVisible(static_cast<SpectrumWidget::OverlaySlot>(i))) {
+            any = true; break;
+        }
+    }
 
     // ── Nachfuehren, solange sie zu sehen ist ────────────────────────
     //
@@ -2997,6 +3011,15 @@ void MainWindow::refreshPanCompass()
         && m_swrInstrument) {
         w->setOverlayImage(SpectrumWidget::OverlaySlot::Swr,
                            m_swrInstrument->renderTransparent(240));
+    }
+
+    // Und das S-Meter, auf Ansage vom 2026-08-21 („s-meter bitte auch
+    // einbauen"). Dasselbe Verfahren: das Instrument malt sich selbst
+    // durchsichtig, der Panadapter legt es hin.
+    if (w->overlayVisible(SpectrumWidget::OverlaySlot::SMeter)
+        && m_signalInstrument) {
+        w->setOverlayImage(SpectrumWidget::OverlaySlot::SMeter,
+                           m_signalInstrument->renderTransparent(240));
     }
 }
 

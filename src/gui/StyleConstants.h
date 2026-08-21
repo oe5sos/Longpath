@@ -25,8 +25,13 @@
 // =================================================================
 
 #pragma once
+#include <algorithm>
+
+#include <QColor>
 #include <QString>
 #include <QWidget>
+
+#include "styles/ThemeQss.h"
 
 #include <QFont>
 
@@ -338,6 +343,88 @@ constexpr auto kStatusBarBorder = "#1f1f23";
 constexpr auto kStatusSep       = "#2c2c31";
 
 // Shared Stylesheet Fragments
+// ── Flaechen mit Verlauf statt flacher Fuellung ──────────────────────
+//
+// Der Betreiber, 2026-08-21, mit einem Bildschirmfoto aus Zeus: „die
+// uebergaenge im hintergrund bei den widget wirken sehr gut" — und
+// nach dem Entwurfsblatt: „sehe keinen unterschied beim den pdf.
+// mache es wie bei zeus."
+//
+// Der Unterschied ist benennbar: bei Zeus ist keine Flaeche eine
+// Farbe, sondern ein Verlauf von oben nach unten, mit einer helleren
+// Oberkante. Das Auge liest das als Licht von oben und damit als
+// Flaeche mit DICKE — ein Stueck Blech statt eines Rechtecks. Bei uns
+// war alles flach.
+//
+// Zwei Regeln, mehr steckt nicht dahinter:
+//
+//   AUFGESETZT (Platte, Kopfleiste, Knopf): oben heller, unten dunkler,
+//   eine helle Linie an der Oberkante.
+//
+//   VERSENKT (Mulde, Eingabefeld, Rille): genau ANDERSHERUM — oben
+//   dunkel, unten heller. Dasselbe Mittel, umgedreht, und die Flaeche
+//   liegt drin statt drauf.
+//
+// Kein neuer Farbton: alle Stufen kommen aus der Familie, die die
+// Palette ohnehin fuehrt. Und alles an EINER Stelle — wer hier etwas
+// aendert, aendert das ganze Programm mit.
+//
+// Ein senkrechter Verlauf in Qt-Stylesheets:
+//   qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 …, stop:1 …)
+// Die Stufen werden aus der Grundfarbe GERECHNET, nicht getippt.
+// Grund: die Themenverwaltung tauscht Farben ueber ihren Hexwert aus
+// (ThemeQss). Ein von Hand gesetztes "#22222a" kennt sie nicht — im
+// hellen Thema „Kreide" waere der Knopf dunkel geblieben. Also: die
+// Grundfarbe durch hexRole() durchs Thema schicken und die helle und
+// dunkle Stufe daraus ableiten. Dann stimmt jedes Thema von selbst,
+// auch die, die es noch nicht gibt.
+// Die Stufen werden AUS der Grundfarbe gerechnet, nicht getippt.
+//
+// Zwei Gruende. Erstens die Themenverwaltung: sie tauscht Farben ueber
+// ihren Hexwert aus (ThemeQss). Ein von Hand gesetztes "#22222a" kennt
+// sie nicht — im hellen Thema „Kreide" waere der Knopf dunkel
+// geblieben. Also geht die Grundfarbe durch hexRole() und die Stufen
+// werden daraus abgeleitet; dann stimmt jedes Thema von selbst, auch
+// die, die es noch nicht gibt.
+//
+// Zweitens die Rechenart. Der erste Versuch nahm QColor::lighter(118),
+// und das ist eine MULTIPLIKATION der Helligkeit. Auf unserem fast
+// schwarzen Grund (#1a1a1e, Helligkeit 26) sind 18 Prozent davon
+// gerade fuenf Stufen — der Testknopf kam auf einen Abstand von 6,
+// und genau das war der Fehler, den der Betreiber am Entwurfsblatt
+// gesehen hat: „sehe keinen unterschied". Auf Dunkel muss ADDIERT
+// werden. shiftL() legt einen festen Betrag drauf, unabhaengig davon,
+// wie dunkel der Grund ist.
+inline QString shiftL(const QColor& base, int deltaL)
+{
+    QColor c = base.toHsl();
+    const int l = std::clamp(c.lightness() + deltaL, 0, 255);
+    c.setHsl(c.hslHue(), c.hslSaturation(), l, c.alpha());
+    return c.name();
+}
+
+/// AUFGESETZT: oben heller, unten dunkler — Licht von oben, die
+/// Flaeche bekommt Dicke. Fuer Platten, Kopfleisten, Knoepfe.
+inline QString raisedFill(const char* baseHex, int lift = 16, int drop = 12)
+{
+    const QColor base(hexRole(baseHex));
+    return QStringLiteral(
+        "qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        " stop:0 %1, stop:0.55 %2, stop:1 %3)")
+        .arg(shiftL(base, lift), base.name(), shiftL(base, -drop));
+}
+
+/// VERSENKT: genau andersherum — oben dunkel, unten heller. Dasselbe
+/// Mittel, umgedreht, und die Flaeche liegt drin statt drauf.
+inline QString sunkenFill(const char* baseHex, int deepen = 10, int lift = 12)
+{
+    const QColor base(hexRole(baseHex));
+    return QStringLiteral(
+        "qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        " stop:0 %1, stop:1 %2)")
+        .arg(shiftL(base, -deepen), shiftL(base, lift));
+}
+
 inline QString buttonBaseStyle()
 {
     return QStringLiteral(
@@ -346,7 +433,15 @@ inline QString buttonBaseStyle()
         "  color: %3; font-size: 11px; font-weight: bold; padding: 2px 4px;"
         "}"
         "QPushButton:hover { background: %4; }"
-    ).arg(kButtonBg, kBorder, kTextPrimary, kButtonAltHover);
+        // Gedrueckt: der Verlauf kippt. Ein Knopf, der sich beim
+        // Druecken nicht bewegt, fuehlt sich tot an — und das kostet
+        // hier kein einziges Pixel Verschiebung.
+        "QPushButton:pressed { background: %5; }"
+    ).arg(raisedFill(kButtonBg),
+          QLatin1String(kBorder),
+          QLatin1String(kTextPrimary),
+          raisedFill(kButtonAltHover, 20, 10),
+          sunkenFill(kButtonBg));
 }
 
 inline QString greenCheckedStyle()
@@ -421,16 +516,25 @@ inline QString sliderVStyle()
 
 inline QString insetValueStyle()
 {
+    // VERSENKT: oben dunkel, unten heller — siehe die Notiz bei
+    // buttonBaseStyle. Dasselbe Mittel wie bei der Platte, nur
+    // umgedreht, und das Feld liegt drin statt drauf.
     return QStringLiteral(
         "QLabel {"
         "  font-size: 11px; background: %1; border: 1px solid %2;"
         "  border-radius: 6px; padding: 1px 2px; color: %3;"
         "}"
-    ).arg(kInsetBg, kInsetBorder, kTextPrimary);
+    ).arg(sunkenFill(kInsetBg),
+          QLatin1String(kInsetBorder),
+          QLatin1String(kTextPrimary));
 }
 
 inline QString titleBarStyle()
 {
+    // Die Kopfleiste soll AUFLIEGEN, nicht eingelassen sein: etwas
+    // kraeftiger als die Platte darunter, und eine dunkle Unterkante,
+    // die sie von ihr abhebt. Die Toene stehen weiter in der Palette
+    // (kTitleGrad*) — hier ist nur der Schluss dunkler geworden.
     return QStringLiteral(
         "background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
         " stop:0 %1, stop:0.5 %2, stop:1 %3);"

@@ -604,6 +604,15 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
             emit swrOverlayRequested(on);
         });
 
+        QAction* a3 = ov->addAction(tr("S-Meter"));
+        a3->setCheckable(true);
+        a3->setChecked(m_smeterOverlayOn);
+        a3->setToolTip(tr("S-Meter durchsichtig im Spektrum."));
+        connect(a3, &QAction::toggled, this, [this](bool on) {
+            m_smeterOverlayOn = on;
+            emit smeterOverlayRequested(on);
+        });
+
         ov->addSeparator();
 
         // Groesse und Helligkeit gelten fuer BEIDE. Zwei Einblendungen

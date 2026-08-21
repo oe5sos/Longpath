@@ -208,6 +208,8 @@ signals:
     void compassOverlayRequested(bool on);
     /// Stehwellen-Zifferblatt im Spektrum ein-/ausblenden.
     void swrOverlayRequested(bool on);
+    /// S-Meter im Spektrum ein-/ausblenden.
+    void smeterOverlayRequested(bool on);
     /// Groesse und Helligkeit BEIDER Einblendungen, in Prozent.
     void overlayScaleRequested(int percent);
     void overlayOpacityRequested(int percent);
@@ -261,6 +263,7 @@ private:
     int                     m_bgOpacityPct {80};
     bool                    m_compassOn {false};
     bool                    m_swrOverlayOn {false};
+    bool                    m_smeterOverlayOn {false};
     int                     m_overlayScalePct {25};
     int                     m_overlayOpacityPct {72};
     bool                    m_floating {false};

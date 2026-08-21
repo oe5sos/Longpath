@@ -99,6 +99,31 @@ private slots:
         QVERIFY2(fire(QStringLiteral("Grundfarbe…")), "Grundfarbe fehlt");
         QCOMPARE(colSpy.count(), 1);
 
+        // ── Die drei Einblendungen ───────────────────────────────
+        //
+        // Rotor-Kompass, Stehwelle und S-Meter („s-meter bitte auch
+        // einbauen", 2026-08-21). Jede muss im Zahnrad stehen UND ihr
+        // Signal wirklich abfeuern — ein Eintrag, der nur da ist, hat
+        // dem Betreiber schon einmal nichts genuetzt.
+        QSignalSpy compSpy(&applet,
+                           &PanadapterApplet::compassOverlayRequested);
+        QSignalSpy swrSpy(&applet,
+                          &PanadapterApplet::swrOverlayRequested);
+        QSignalSpy smSpy(&applet,
+                         &PanadapterApplet::smeterOverlayRequested);
+
+        QVERIFY2(fire(QStringLiteral("Rotor-Kompass")),
+                 "Rotor-Kompass fehlt im Zahnrad");
+        QVERIFY2(fire(QStringLiteral("Stehwelle")),
+                 "Stehwelle fehlt im Zahnrad");
+        QVERIFY2(fire(QStringLiteral("S-Meter")),
+                 "S-Meter fehlt im Zahnrad");
+        QCOMPARE(compSpy.count(), 1);
+        QCOMPARE(swrSpy.count(), 1);
+        QCOMPARE(smSpy.count(), 1);
+        QVERIFY2(smSpy.at(0).at(0).toBool(),
+                 "Der erste Klick muss einschalten, nicht aus");
+
         QVERIFY2(fire(QStringLiteral("Alle Anzeige-Einstellungen…")),
                  "der Weg in den Setup-Dialog MUSS bleiben — ein Menue, "
                  "das alles kann, waere wieder der Dialog, nur schlechter");

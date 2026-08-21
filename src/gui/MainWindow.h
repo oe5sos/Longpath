@@ -474,6 +474,7 @@ private slots:
     /// Programm, nicht zwei, die auseinanderlaufen koennen.
     void onPanCompassOverlay(bool on);
     void onPanSwrOverlay(bool on);
+    void onPanSmeterOverlay(bool on);
     void onPanOverlayScale(int percent);
     void onPanOverlayOpacity(int percent);
     void refreshPanCompass();
