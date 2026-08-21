@@ -567,6 +567,19 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         emit backgroundColourRequested();
     });
 
+    // Der Weg zurueck. Es gab ihn nicht: eine einmal gewaehlte
+    // Grundfarbe stand in den Einstellungen und gewann von da an gegen
+    // den eingebauten Wert UND gegen jedes Thema. Beim Betreiber war
+    // das deckendes Schwarz, und der blaugraue Standard kam nie mehr
+    // durch (2026-08-21: „bitte setze ihn als standard").
+    QAction* reset = menu->addAction(tr("Grundfarbe zurücksetzen"));
+    reset->setToolTip(tr(
+        "Vergisst die selbst gewählte Grundfarbe. Danach folgt der "
+        "Panadapter wieder dem Thema — im dunklen Thema das Blaugrau."));
+    connect(reset, &QAction::triggered, this, [this]() {
+        emit backgroundColourResetRequested();
+    });
+
     menu->addSeparator();
 
     // ── Einblendungen ────────────────────────────────────────────────

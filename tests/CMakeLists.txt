@@ -4696,6 +4696,7 @@ nereus_add_test(tst_logbook_import)
 nereus_add_test(tst_overlay_render_is_harmless)
 nereus_add_test(tst_quit_leaves_no_pending_deletes)
 nereus_add_test(tst_notch_removable_offline)
+nereus_add_test(tst_panadapter_base_colour_reset)
 set_tests_properties(tst_both_paint_paths PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 nereus_add_test(tst_native_overlay_audit)

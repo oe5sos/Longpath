@@ -2784,6 +2784,9 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::backgroundOpacityRequested,
                 this, &MainWindow::onPanBackgroundOpacity,
                 Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::backgroundColourResetRequested,
+                this, &MainWindow::onPanBackgroundColourReset,
+                Qt::UniqueConnection);
         connect(applet, &PanadapterApplet::backgroundColourRequested,
                 this, &MainWindow::onPanBackgroundColour,
                 Qt::UniqueConnection);
@@ -2915,6 +2918,13 @@ void MainWindow::onPanBackgroundOpacity(int percent)
                                          : nullptr) {
         w->setBackgroundOpacity(percent);
     }
+}
+
+void MainWindow::onPanBackgroundColourReset()
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w) { return; }
+    w->resetBackgroundFillColor();
 }
 
 void MainWindow::onPanBackgroundColour()

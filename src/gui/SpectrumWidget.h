@@ -785,6 +785,9 @@ public:
     int  backgroundOpacity() const { return m_bgOpacity; }
     void setBackgroundFillColor(const QColor& c);
     QColor backgroundFillColor() const { return m_bgFillColor; }
+
+    /// Die eigene Grundfarbe vergessen und wieder dem Thema folgen.
+    void resetBackgroundFillColor();
     void loadBackgroundSettings();
     void paintBackgroundLayer(QPainter& p, const QRect& specRect);
     void drawCompassOverlay(QPainter& p, const QRect& specRect);

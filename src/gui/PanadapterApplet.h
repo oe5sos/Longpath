@@ -203,6 +203,8 @@ signals:
     void backgroundImageRequested(const QString& path);   ///< leer = entfernen
     void backgroundOpacityRequested(int percent);
     void backgroundColourRequested();
+    /// Die eigene Grundfarbe vergessen und wieder dem Thema folgen.
+    void backgroundColourResetRequested();
     void displaySetupRequested();
     /// Windrose im Spektrum ein-/ausblenden.
     void compassOverlayRequested(bool on);

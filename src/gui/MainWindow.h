@@ -468,6 +468,7 @@ private slots:
     void onPanBackgroundImage(const QString& path);
     void onPanBackgroundOpacity(int percent);
     void onPanBackgroundColour();
+    void onPanBackgroundColourReset();
     void onPanDisplaySetup();
 
     /// Windrose im Spektrum ein-/ausblenden und ihr Bild nachfuehren.

@@ -4337,6 +4337,37 @@ void SpectrumWidget::setBackgroundOpacity(int pct)
     update();
 }
 
+// ── Zurueck auf den Standard ─────────────────────────────────────────
+//
+// Der Betreiber, 2026-08-21: „der raster inkl. blau-graue hintergrund
+// gefaellt mir beim test sehr gut, bitte setze ihn als standard."
+//
+// Der Standard WAR schon das Blaugrau (Style::kPanadapterBg, #141e27).
+// Was es nicht gab, war ein Weg zurueck: „Grundfarbe…" schreibt die
+// gewaehlte Farbe in die Einstellungen, und von da an gewinnt sie —
+// gegen den eingebauten Wert und gegen jedes Thema. Bei ihm stand dort
+// deckendes Schwarz (#ff000000), und der Panadapter blieb schwarz, egal
+// was der Standard sagte.
+//
+// Eine einmal getroffene Wahl soll gewinnen; nur muss man sie
+// zuruecknehmen koennen. Der Schluessel wird geloescht, nicht auf einen
+// Wert gesetzt: danach fragt das Laden wieder das Thema, und wer spaeter
+// ein anderes Thema waehlt, bekommt dessen Panadapter-Farbe statt einer
+// eingefrorenen von heute.
+void SpectrumWidget::resetBackgroundFillColor()
+{
+    auto& st = AppSettings::instance();
+    st.remove(QStringLiteral("PanadapterBackgroundFill"));
+    st.save();
+
+    m_bgFillColor = QColor(Style::role("panadapter-bg", Style::kPanadapterBg));
+    if (!m_bgFillColor.isValid()) {
+        m_bgFillColor = QColor(Style::kPanadapterBg);
+    }
+    m_overlayStaticDirty = true;
+    update();
+}
+
 void SpectrumWidget::setBackgroundFillColor(const QColor& c)
 {
     if (!c.isValid() || c == m_bgFillColor) { return; }
