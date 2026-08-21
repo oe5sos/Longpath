@@ -3208,9 +3208,8 @@ void MainWindow::buildUI()
     // AetherSDR pattern: right panel is a proper layout element, not an overlay.
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
     m_mainSplitter->setChildrenCollapsible(false);
-    m_mainSplitter->setHandleWidth(3);
-    m_mainSplitter->setStyleSheet(Style::themed(QStringLiteral(
-        "QSplitter::handle { background: #203040; }")));
+    m_mainSplitter->setHandleWidth(Style::kSplitterHandlePx);
+    m_mainSplitter->setStyleSheet(Style::splitterStyle());
 
     // Left side: spectrum + zoom bar
     auto* spectrumPane = new QWidget(m_mainSplitter);
@@ -3595,9 +3594,8 @@ void MainWindow::buildUI()
     m_outerSplitter = new QSplitter(Qt::Vertical, this);
     m_outerSplitter->setObjectName(QStringLiteral("outerSplitter"));
     m_outerSplitter->setChildrenCollapsible(false);
-    m_outerSplitter->setHandleWidth(3);
-    m_outerSplitter->setStyleSheet(Style::themed(QStringLiteral(
-        "QSplitter::handle { background: #203040; }")));
+    m_outerSplitter->setHandleWidth(Style::kSplitterHandlePx);
+    m_outerSplitter->setStyleSheet(Style::splitterStyle());
     m_outerSplitter->addWidget(m_mainSplitter);
 
     // Die untere Flaeche bleibt leer und verborgen, bis jemand etwas

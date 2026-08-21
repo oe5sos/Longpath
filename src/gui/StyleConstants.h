@@ -443,6 +443,38 @@ inline QString sunkenFill(const char* baseHex, int deepen = 10, int lift = 12)
         .arg(shiftL(base, -deepen), shiftL(base, lift));
 }
 
+// ── Griffleisten zwischen den Feldern ────────────────────────────────
+//
+// Der Betreiber, 2026-08-21: „der pandapter muss jetzt endlich mal
+// funktionieren, das ist das kernstueck" — und davor: er loese ihn nur
+// ab, weil das „der einzige Weg" sei, die Groesse zu aendern.
+//
+// Es war nie der einzige Weg. Die Splitter waren immer da, ihre Griffe
+// aber DREI PIXEL breit (MainWindow.cpp: setHandleWidth(3)), und die
+// Splitter im Panadapter-Stapel setzten gar nichts, blieben also auf
+// Qts Vorgabe. Ein Ziehgriff von drei Pixeln ist auf einem Retina-
+// Schirm mit der Maus nicht zu treffen. Vorhanden und unerreichbar —
+// dieselbe Fehlerklasse wie beim Erreichbarkeits-Durchgang, nur in
+// Pixeln statt in Signalen.
+//
+// Sechs Pixel sind greifbar, und ein sichtbarer Strich in der Mitte
+// sagt, DASS man ziehen kann. Ohne den weiss es niemand.
+constexpr int kSplitterHandlePx = 6;
+
+inline QString splitterStyle()
+{
+    return QStringLiteral(
+        "QSplitter::handle { background: %1; }"
+        "QSplitter::handle:horizontal { width: %2px; "
+        "  image: none; border-left: 1px solid %3; }"
+        "QSplitter::handle:vertical { height: %2px; "
+        "  image: none; border-top: 1px solid %3; }"
+        "QSplitter::handle:hover { background: %4; }")
+        .arg(hexRole(kPanelBg))
+        .arg(kSplitterHandlePx)
+        .arg(hexRole(kBorder), hexRole(kAccent));
+}
+
 inline QString buttonBaseStyle()
 {
     return QStringLiteral(

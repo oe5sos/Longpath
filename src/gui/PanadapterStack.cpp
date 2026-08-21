@@ -23,6 +23,7 @@
 
 
 #include "gui/PanadapterApplet.h"
+#include "gui/StyleConstants.h"
 #include "gui/PanFloatingWindow.h"
 #include "core/AppSettings.h"
 #include <QVBoxLayout>
@@ -58,6 +59,12 @@ PanadapterStack::PanadapterStack(QWidget* parent) : QWidget(parent)
     // beseitigt die Bedingung, unter der ueberhaupt etwas
     // stehenbleiben kann.
     m_rootSplitter = new QSplitter(Qt::Vertical, this);
+    // Griffe, die man treffen kann — siehe die Notiz bei
+    // Style::kSplitterHandlePx. Hier stand bisher gar nichts, also
+    // Qts Vorgabe; genau deshalb liess sich der Panadapter nur durch
+    // Abloesen vergroessern.
+    m_rootSplitter->setHandleWidth(Style::kSplitterHandlePx);
+    m_rootSplitter->setStyleSheet(Style::splitterStyle());
     layout->addWidget(m_rootSplitter);
 
     addPanadapter(QStringLiteral("pan-0"));
