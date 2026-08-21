@@ -25,6 +25,7 @@
 
 #include <QtTest>
 #include <QContextMenuEvent>
+#include <QMenu>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -127,6 +128,44 @@ private slots:
         QCoreApplication::processEvents();
 
         QCOMPARE(m_host.reached, 1);
+    }
+
+    /// Und jetzt der ECHTE Klick, nicht das nachgebaute Ereignis.
+    ///
+    /// Die zwei Pruefungen oben schicken einen QContextMenuEvent von
+    /// Hand los. Das beweist, dass wir ihn richtig beantworten — aber
+    /// nicht, dass beim Druck der rechten Taste wirklich ein Menue
+    /// aufgeht. Genau diese Luecke hat der Betreiber gemeldet:
+    /// „rechte mouse taste funktioniert nicht" (2026-08-21), waehrend
+    /// beide Pruefungen gruen waren.
+    void aRealRightClickOpensOurMenu()
+    {
+        // Frisch, damit kein Menue aus einer frueheren Pruefung
+        // herumsteht und der Nachweis wertlos wird.
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            for (QMenu* m : w->findChildren<QMenu*>()) { m->close(); }
+        }
+        QCoreApplication::processEvents();
+
+        m_host.reached = 0;
+        QTest::mouseClick(m_pan, Qt::RightButton, Qt::NoModifier,
+                          QPoint(m_notchX, 80));
+        QCoreApplication::processEvents();
+
+        QMenu* mine = m_pan->findChild<QMenu*>();
+        QVERIFY2(mine, "Rechtsklick auf den Balken oeffnet KEIN Menue");
+
+        bool hasNotchEntry = false;
+        for (QAction* a : mine->actions()) {
+            if (a->text().contains(QStringLiteral("Notch"))
+                || a->text().contains(QStringLiteral("bearbeiten"))) {
+                hasNotchEntry = true;
+                break;
+            }
+        }
+        QVERIFY2(hasNotchEntry,
+                 "Ein Menue geht auf, aber es ist nicht das des Notches");
+        QCOMPARE(m_host.reached, 0);
     }
 };
 

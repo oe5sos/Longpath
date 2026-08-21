@@ -10622,6 +10622,29 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     if (event->type() == QEvent::MouseButtonPress) {
         auto* label = qobject_cast<QLabel*>(watched);
         if (label && label->property("isTnfToggle").toBool()) {
+            auto* me = static_cast<QMouseEvent*>(event);
+
+            // ── Rechtsklick: die Filter selbst ───────────────────────
+            //
+            // Der Betreiber, 2026-08-21: „finde keinen button fuer die
+            // aenderung des notch filter" — und vorher schon: „man
+            // koennte auch unten in der taskleiste das menue erweitern
+            // mit notchfiltereigenschaften."
+            //
+            // Bis hierher ging Bearbeiten nur AM BALKEN: Rechtsklick
+            // oder Doppelklick auf die gelbe Flaeche im Spektrum. Das
+            // setzt voraus, dass man sie trifft — und dass sie
+            // ueberhaupt im sichtbaren Ausschnitt liegt. Ein Filter auf
+            // 7,19 MHz ist unerreichbar, solange man 7,05 ansieht.
+            //
+            // Die TNF-Anzeige ist der richtige Ort dafuer: sie ist
+            // immer da, sie zeigt ohnehin schon, ob Filter liegen und
+            // ob sie wirken.
+            if (me->button() == Qt::RightButton) {
+                showNotchBarMenu(me->globalPosition().toPoint());
+                return true;
+            }
+
             NotchModel* notches =
                 m_radioModel ? m_radioModel->notchModel() : nullptr;
             if (notches) {
@@ -10632,6 +10655,97 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     }
 
     return QMainWindow::eventFilter(watched, event);
+}
+
+// ── Die Notch-Filter aus der Fussleiste erreichen ────────────────────
+//
+// Siehe die Notiz im Ereignisfilter: der Weg am Balken taugt nur fuer
+// Filter, die man gerade sieht. Hier stehen alle, mit Frequenz und
+// Breite, und jeder laesst sich von hier aus oeffnen, stummschalten
+// oder wegwerfen.
+//
+// Der Editor ist derselbe wie am Balken (SpectrumWidget::
+// openNotchEditor), und die Wuensche gehen denselben Weg ins Modell.
+// Ein zweiter Bearbeitungspfad waere ein zweiter Ort, an dem etwas
+// auseinanderlaufen kann.
+void MainWindow::showNotchBarMenu(const QPoint& globalPos)
+{
+    NotchModel* notches = m_radioModel ? m_radioModel->notchModel() : nullptr;
+    if (!notches) { return; }
+
+    auto* menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+
+    const QList<Notch>& list = notches->notches();
+
+    QAction* head = menu->addAction(
+        list.isEmpty()
+            ? tr("Keine Notch-Filter")
+            : tr("%n Notch-Filter", "", static_cast<int>(list.size())));
+    head->setEnabled(false);
+
+    QAction* global = menu->addAction(tr("TNF aktiv"));
+    global->setCheckable(true);
+    global->setChecked(notches->globalEnabled());
+    global->setToolTip(tr(
+        "Alle Notch-Filter auf einmal stumm schalten, ohne sie zu "
+        "verlieren. Dasselbe wie ein Linksklick auf TNF."));
+    connect(global, &QAction::toggled, this, [notches](bool on) {
+        notches->setGlobalEnabled(on);
+    });
+
+    if (list.isEmpty()) {
+        menu->addSeparator();
+        QAction* hint = menu->addAction(
+            tr("Anlegen: Cmd-Klick ins Spektrum"));
+        hint->setEnabled(false);
+        menu->popup(globalPos);
+        return;
+    }
+
+    menu->addSeparator();
+
+    for (const Notch& n : list) {
+        // Frequenz in MHz mit sechs Stellen — dieselbe Schreibweise wie
+        // im Kopf des Menues am Balken, damit man dieselbe Zeile
+        // wiedererkennt.
+        QMenu* sub = menu->addMenu(
+            tr("%1 MHz · %2 Hz")
+                .arg(n.centerHz / 1.0e6, 0, 'f', 6)
+                .arg(qRound(n.widthHz)));
+
+        const int id = n.id;
+
+        QAction* edit = sub->addAction(tr("Bearbeiten…"));
+        connect(edit, &QAction::triggered, this, [this, id, globalPos]() {
+            SpectrumWidget* w =
+                m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+            if (w) { w->openNotchEditor(id, globalPos); }
+        });
+
+        QAction* act = sub->addAction(tr("Aktiv"));
+        act->setCheckable(true);
+        act->setChecked(n.active);
+        connect(act, &QAction::toggled, this, [notches, id](bool on) {
+            notches->setActive(id, on);
+        });
+
+        sub->addSeparator();
+        QAction* del = sub->addAction(tr("Löschen"));
+        connect(del, &QAction::triggered, this, [notches, id]() {
+            notches->removeNotch(id);
+        });
+    }
+
+    if (list.size() > 1) {
+        menu->addSeparator();
+        QAction* all = menu->addAction(
+            tr("Alle %1 entfernen…").arg(list.size()));
+        connect(all, &QAction::triggered,
+                this, &MainWindow::onNotchRemoveAll);
+    }
+
+    menu->popup(globalPos);
 }
 
 void MainWindow::applyDarkTheme()

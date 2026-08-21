@@ -378,6 +378,8 @@ private slots:
     void onNotchActiveRequested(int id, bool active);
     void onNotchRemoveRequested(int id);
     void onNotchRemoveAll();
+    /// Alle Notch-Filter aus der Fussleiste erreichbar machen.
+    void showNotchBarMenu(const QPoint& globalPos);
 
     /// TNF: the +TNF overlay button on pan `panId`. A distinct slot from
     /// onNotchCreateRequested above, which takes an already-resolved
