@@ -38,6 +38,25 @@ PanadapterStack::PanadapterStack(QWidget* parent) : QWidget(parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
+    // ── Der Stapel malt seinen eigenen Grund ────────────────────────
+    //
+    // Gefunden am 2026-08-21 auf die Meldung „sobald ich den pandapter
+    // veraendern moechte kommt eine kopie", mit Bildschirmfoto: das
+    // Spektrum zweimal, leicht versetzt.
+    //
+    // Es sind NICHT zwei Widgets — das wurde gemessen: nach dem
+    // Abloesen existiert genau ein SpectrumWidget, korrekt im
+    // schwebenden Fenster. Was zurueckbleibt, ist ein sichtbarer,
+    // LEERER QSplitter ueber die volle Flaeche (1125x647 gemessen).
+    // Ein leerer Splitter malt nichts, und der Stapel darunter malte
+    // bisher auch nichts. Eine Flaeche, die Platz belegt und die
+    // niemand uebermalt, behaelt, was zuletzt darin stand — das alte
+    // Spektrum. Daneben zeigt das schwebende Fenster das echte.
+    //
+    // Deshalb malt der Stapel jetzt selbst. Das kostet nichts, solange
+    // ein Panadapter darin steht (er deckt ihn ohnehin ab), und es
+    // beseitigt die Bedingung, unter der ueberhaupt etwas
+    // stehenbleiben kann.
     m_rootSplitter = new QSplitter(Qt::Vertical, this);
     layout->addWidget(m_rootSplitter);
 
@@ -230,6 +249,7 @@ void PanadapterStack::applyLayout(const QString& layoutId, const QStringList& pa
         }
         m_rootSplitter->addWidget(bottomRow);
     }
+
 }
 
 PanadapterApplet* PanadapterStack::panadapter(const QString& id) const { return m_pans.value(id, nullptr); }

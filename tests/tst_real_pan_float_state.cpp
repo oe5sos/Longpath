@@ -163,9 +163,92 @@ private slots:
                          .arg(s->geometry().width()).arg(s->geometry().height())));
         }
 
+        // ── Bleibt im Hauptfenster ein LOCH? ────────────────────────
+        //
+        // Der Betreiber: „bitte kontrolliere selbst." Die Frage war,
+        // ob das doppelte Bild beim Groessenaendern verschwindet.
+        //
+        // Mit den Augen kann ich das nicht — aber die Bedingung dafuer
+        // ist messbar: stehengebliebene Pixel brauchen eine Flaeche,
+        // die Platz belegt und NICHTS Sichtbares enthaelt. Dort malt
+        // niemand, also bleibt stehen, was zuletzt darin stand.
+        auto describe = [&](const char* when) {
+            int visibleKids = 0;
+            for (QWidget* k : stack->findChildren<QWidget*>()) {
+                if (k->isVisible() && k->parentWidget() == stack) {
+                    ++visibleKids;
+                }
+            }
+            int anyVisible = 0;
+            for (QWidget* k : stack->findChildren<QWidget*>()) {
+                if (k->isVisible()) { ++anyVisible; }
+            }
+            for (QWidget* k : stack->findChildren<QWidget*>()) {
+                if (!k->isVisible()) { continue; }
+                qInfo() << "   " << when << "sichtbar im Stapel:"
+                        << k->metaObject()->className()
+                        << k->geometry()
+                        << "Elter"
+                        << (k->parentWidget()
+                                ? k->parentWidget()->metaObject()->className()
+                                : "-");
+            }
+            qInfo() << when
+                    << "Stapel" << stack->size()
+                    << "sichtbar" << stack->isVisible()
+                    << "direkte sichtbare Kinder" << visibleKids
+                    << "sichtbare Nachfahren" << anyVisible;
+        };
+        describe("nach dem Abloesen:");
+
+        // ── Was NICHT geprueft werden kann ──────────────────────────
+        //
+        // Ob die zurueckbleibende Flaeche auf dem Schirm uebermalt
+        // wird, laesst sich hier nicht messen. QWidget::render() malt
+        // den Fensterhintergrund entweder immer mit (dann ist die
+        // Pruefung blind fuer den Fehler) oder gar nicht (dann ist sie
+        // blind fuer die Behebung). Beides ausprobiert, beides gruen
+        // beziehungsweise rot in BEIDEN Faellen. Ein Messgeraet, das
+        // den Unterschied nicht sehen kann, beweist nichts — und eine
+        // Pruefung, die immer dasselbe sagt, ist keine.
+        //
+        // Was geprueft WIRD, steht unten: dass das Zurueckholen den
+        // Panadapter wieder ins Hauptfenster bringt. Das ist die
+        // Eigenschaft, die durch das Verstecken leerer Splitter kaputt
+        // gehen KOENNTE — und darum die, die bewacht gehoert.
+
+        // Und jetzt das, was der Betreiber tun wuerde: Fenster ziehen.
+        mw->resize(1500, 900);
+        for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
+        QTest::qWait(200);
+        describe("nach Groessenaenderung:");
+
+        // ── Zurueckholen muss den Panadapter zurueckbringen ─────────
+        //
+        // hideEmptySplitters() versteckt beim Abloesen die leer
+        // gewordene Flaeche. Wuerde sie beim Zurueckdocken nicht
+        // wieder hervorgeholt, bliebe das Hauptfenster leer — eine
+        // schlimmere Krankheit als die behandelte.
+        stack->dockPanadapter(QStringLiteral("pan-0"));
+        for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
+        QTest::qWait(250);
+
+        QCOMPARE(stack->floatingCountForTesting(), 0);
+
+        int backHome = 0;
+        for (SpectrumWidget* w : mw->findChildren<SpectrumWidget*>()) {
+            if (w->isVisible() && w->window() == mw) { ++backHome; }
+        }
+        QVERIFY2(backHome == 1,
+                 qPrintable(QStringLiteral(
+                     "Nach dem Zurueckdocken stehen %1 sichtbare "
+                     "Panadapter im Hauptfenster statt einem")
+                     .arg(backHome)));
+
         mw->close();
         for (int i=0;i<6;++i) QCoreApplication::processEvents();
-        delete mw;
+        // Bewusst NICHT abgeraeumt: der Abbau stuerzt ab (siehe Kopf),
+        // und der Absturz wuerde die Messung oben verdecken.
     }
 };
 QTEST_MAIN(TstRealPanFloat)

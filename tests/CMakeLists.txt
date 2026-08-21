@@ -4697,6 +4697,8 @@ nereus_add_test(tst_overlay_render_is_harmless)
 nereus_add_test(tst_quit_leaves_no_pending_deletes)
 nereus_add_test(tst_notch_removable_offline)
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
+nereus_add_test(tst_real_pan_float_state)
+set_tests_properties(tst_real_pan_float_state PROPERTIES RUN_SERIAL TRUE)
 nereus_add_test(tst_real_notch_rightclick)
 # ── Laeuft allein ────────────────────────────────────────────────────
 #
