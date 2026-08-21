@@ -40,11 +40,20 @@ private:
     // Der Ablöse-Schalter ist der einzige Knopf im Kopf; ueber den
     // Hinweistext gefunden, damit die Suche haelt, wenn spaeter ein
     // zweiter dazukommt.
+    // Gesucht wird ueber das ZEICHEN, nicht ueber den Hinweistext.
+    //
+    // Vorher stand hier eine Suche nach „window" oder „layout" im
+    // Hinweis. Am 2026-08-21 bekam der Knopf einen deutschen Hinweis
+    // (die Sperr-Begruendung), und die Suche fand ihn nicht mehr —
+    // drei Faelle fielen aus, ohne dass am Knopf etwas kaputt war.
+    // Eine Pruefung, die an einer Formulierung haengt, bricht bei
+    // jeder Umformulierung.
     static QPushButton* floatButtonOf(PanadapterApplet& pan)
     {
         for (QPushButton* b : pan.findChildren<QPushButton*>()) {
-            if (b->toolTip().contains(QStringLiteral("window"))
-                || b->toolTip().contains(QStringLiteral("layout"))) {
+            const QString t = b->text();
+            if (t == QString::fromUtf8("\u2197")
+                || t == QString::fromUtf8("\u2199")) {
                 return b;
             }
         }
@@ -100,17 +109,31 @@ private slots:
                  "vergraben");
     }
 
-    void theSwitchAsksToDetach()
+    // Der Schalter HAT abgeloest — bis zum 2026-08-21. Seitdem ist das
+    // Abloesen gesperrt, weil es beim Beenden abstuerzt (Stapel und
+    // drei verworfene Kuren: cd6e83f5), und weil der Grund weggefallen
+    // ist, aus dem der Betreiber es benutzte: er zog damit den
+    // Panadapter groesser, was seit eaeec343 direkt am Rand geht.
+    //
+    // Der Fall bleibt stehen und dreht sich um: er bewacht jetzt, dass
+    // die Sperre haelt UND sich erklaert. Die ausfuehrliche Fassung
+    // steht in tst_pan_float_locked.
+    void theSwitchIsLockedAndSaysWhy()
     {
         PanadapterApplet pan(QStringLiteral("pan-0"));
         QSignalSpy spy(&pan, &PanadapterApplet::floatRequested);
 
         QPushButton* b = floatButtonOf(pan);
         QVERIFY(b);
+        QVERIFY2(!b->isEnabled(), "Der Schalter loest noch ab");
         b->click();
+        QCOMPARE(spy.count(), 0);
 
-        QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.takeFirst().at(0).toString(), QStringLiteral("pan-0"));
+        QVERIFY2(!b->toolTip().isEmpty()
+                     && b->toolTip().contains(QString::fromUtf8("gesperrt")),
+                 qPrintable(QStringLiteral(
+                     "Ein grauer Schalter ohne Begruendung laesst den "
+                     "Bediener raten: '%1'").arg(b->toolTip())));
     }
 
     // DER FALL, DER VORHER FEHLTE: derselbe Schalter muss zurueckfuehren.

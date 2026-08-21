@@ -135,6 +135,10 @@ public:
     /// eigenen Klick nachzieht, luegt beim naechsten Weg.
     void setFloatingIndicator(bool floating);
 
+    /// Warum das Abloesen gesperrt ist — als Text fuer Knopf und Menue,
+    /// damit beide dieselbe Begruendung zeigen.
+    static QString floatLockReason();
+
     /// Phase 3F: light (or clear) this pan's WIDE pill.
     /// A pan shows WIDE when the RX preselector chain feeding it is bypassed
     /// on the wire. The decision is per chain and is made by

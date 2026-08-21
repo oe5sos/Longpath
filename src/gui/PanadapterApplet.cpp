@@ -182,8 +182,10 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kAccent)));
     headLay->addWidget(m_btnFloat);
     connect(m_btnFloat, &QPushButton::clicked, this, [this]() {
-        if (m_floating) { emit dockRequested(m_panId); }
-        else            { emit floatRequested(m_panId); }
+        if (m_floating) { emit dockRequested(m_panId); return; }
+        // Gesperrt — siehe floatLockReason(). Der Waechter steht hier
+        // zusaetzlich zum grauen Knopf: eine Tastenkombination oder ein
+        // Menue koennte den Knopf umgehen.
     });
     setFloatingIndicator(false);
 
@@ -470,7 +472,10 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
     menu->addAction(tr("Add slice on this pan"), this, [this]() {
         emit addSliceRequested(panId());
     });
-    menu->addAction(tr("Float this pan"), this, [this]() {
+    QAction* floatAct = menu->addAction(tr("Float this pan"));
+    floatAct->setEnabled(false);
+    floatAct->setToolTip(floatLockReason());
+    connect(floatAct, &QAction::triggered, this, [this]() {
         emit floatRequested(panId());
     });
     menu->addSeparator();
@@ -589,15 +594,50 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
 }
 
 // ↗ heisst „ablösen", ↙ heisst „zurueck in die Anordnung".
+// ── Warum das Abloesen gesperrt ist ─────────────────────────────────
+//
+// Es stuerzt ab. Panadapter abloesen, Fenster schliessen — SIGSEGV,
+// nachgestellt und mit Stapel belegt (2026-08-21):
+//
+//   QRhiWidgetPrivate::ensureRhi()::$_0 — EXC_BAD_ACCESS
+//
+// Qts eigener Aufraeum-Rueckruf am Zeichenkontext ueberlebt das
+// Widget. Die Spur endet in Qt; lldb liefert nach dem obersten Rahmen
+// keine verwertbare Kette. Drei Kuren versucht, alle durch Messung
+// verworfen (siehe cd6e83f5).
+//
+// Gesperrt wird, weil der Grund WEGGEFALLEN ist, aus dem der Betreiber
+// es ueberhaupt benutzt hat: er loeste ab, um den Panadapter groesser
+// zu ziehen — und das ging nur deshalb nicht direkt, weil die
+// Griffleisten drei Pixel breit waren (eaeec343). Seit die sechs
+// Pixel haben, zieht man den Rand.
+//
+// Es bleibt SICHTBAR und erklaert sich selbst, statt zu verschwinden.
+// Ein Knopf, der spurlos weg ist, laesst den Bediener suchen; einer,
+// der grau ist und sagt warum, beantwortet die Frage vorher.
+//
+// Der Rueckweg bleibt IMMER offen: steht ein Panadapter noch
+// abgeloest — etwa aus einer gespeicherten Anordnung —, muss man ihn
+// zurueckholen koennen.
+QString PanadapterApplet::floatLockReason()
+{
+    return tr("Ablösen ist vorübergehend gesperrt: es stürzt beim "
+              "Beenden ab.\n\nDie Größe ändern Sie direkt — ziehen Sie "
+              "am Rand zwischen Panadapter und den Feldern daneben.");
+}
+
 void PanadapterApplet::setFloatingIndicator(bool floating)
 {
     m_floating = floating;
     if (!m_btnFloat) { return; }
     m_btnFloat->setText(floating ? QStringLiteral("\u2199")
                                  : QStringLiteral("\u2197"));
+
+    // Zurueckholen immer erlaubt, Abloesen gesperrt.
+    m_btnFloat->setEnabled(floating);
     m_btnFloat->setToolTip(floating
         ? QStringLiteral("Back into the layout")
-        : QStringLiteral("Detach into its own window"));
+        : floatLockReason());
 }
 
 } // namespace Longpath

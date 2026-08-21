@@ -199,6 +199,18 @@ private slots:
         QVERIFY2(floatActA, "buildContextMenu() did not add \"Float this pan\"");
 
         addActA->trigger();
+
+        // „Float this pan" ist seit dem 2026-08-21 gesperrt (der
+        // Absturz beim Beenden, cd6e83f5). Hier wird es fuer die Dauer
+        // der Pruefung wieder freigegeben — absichtlich: die SPERRE
+        // ist eine Entscheidung an der Oberflaeche, die VERDRAHTUNG
+        // darunter muss trotzdem stimmen. Sonst faellt beim Aufheben
+        // der Sperre auf, dass die Weiterleitung inzwischen kaputt ist,
+        // und niemand hat es gemerkt.
+        QVERIFY2(!floatActA->isEnabled(),
+                 "Die Sperre fehlt — dieser Eintrag darf nicht anklickbar "
+                 "sein, solange das Abloesen abstuerzt");
+        floatActA->setEnabled(true);
         floatActA->trigger();
 
         QCOMPARE(addSpyA.count(), 1);
