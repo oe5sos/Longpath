@@ -113,6 +113,8 @@
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
 #include "SpectrumWidget.h"
+
+#include "widgets/NotchEditPopup.h"
 #include "core/FFTEngine.h"   // kDefaultFftSize
 #include "gui/StyleConstants.h"
 #include "gui/styles/Theme.h"
@@ -6648,6 +6650,25 @@ static constexpr int kNotchHandleAlphaOff = 80;
 // From AetherSDR src/gui/SpectrumWidget.cpp:13436-13440 [@c6481cbf]
 void SpectrumWidget::setNotchMarkers(const QVector<NotchMarker>& markers)
 {
+    // Steht der Editor offen, bekommt er die Zahlen, die WIRKLICH
+    // gelten — nicht die getippten. WDSP setzt zu schmale Breiten
+    // selbst herauf (nbp.c:122-125); ohne diese Zeilen zeigte das
+    // Fenster weiter den Wunsch und der Balken das Ergebnis.
+    if (m_notchEditor && m_notchEditor->isVisible()) {
+        const int open = m_notchEditor->notchId();
+        bool stillThere = false;
+        for (const NotchMarker& m : markers) {
+            if (m.id != open) { continue; }
+            m_notchEditor->applyFromModel(m.id, m.freqMhz * 1.0e6,
+                                          m.widthHz, m.active);
+            stillThere = true;
+            break;
+        }
+        // Weg ist weg: ein Editor auf einen geloeschten Notch waere ein
+        // Fenster, dessen Knoepfe ins Leere gehen.
+        if (!stillThere) { m_notchEditor->close(); }
+    }
+
     m_notchMarkers = markers;
     markOverlayDirty();
 }
@@ -8019,10 +8040,64 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
                    });
 
     menu.addSeparator();
+
+    // ── Bearbeiten als Zahlen ────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-21: „es waere auch gut, wenn man am
+    // notchfilter klickt und dann diese bearbeite kann und auch
+    // loeschen." Die Liste fester Breiten oben deckt den haeufigen
+    // Fall; hier stehen Mitte und Breite frei.
+    menu.addAction(QStringLiteral("Notch bearbeiten…"), this,
+                   [this, id]() { openNotchEditor(id, QCursor::pos()); });
+
+    menu.addSeparator();
     // From AetherSDR src/gui/SpectrumWidget.cpp:8547 [@c6481cbf]
     // ("Remove TNF").
     menu.addAction(QStringLiteral("Remove Notch"), this,
                    [this, id]() { emit notchRemoveRequested(id); });
+
+    // ── Alle auf einmal ──────────────────────────────────────────────
+    //
+    // Sechs verirrte Notches auf 40 m waren der Anlass (Bildschirmfoto
+    // vom 2026-08-21). Sie entstehen leicht: Cmd- oder Strg-Klick ins
+    // Spektrum legt einen an, und auf dem Mac ist ein versehentlicher
+    // Cmd-Klick schnell passiert. Sechsmal zielen und rechtsklicken,
+    // um sie wieder loszuwerden, ist die falsche Antwort darauf.
+    //
+    // Nur wenn es ueberhaupt mehr als einen gibt — bei einem einzigen
+    // waere der Eintrag dasselbe wie „Remove Notch" und damit eine
+    // Falle.
+    if (m_notchMarkers.size() > 1) {
+        menu.addAction(QStringLiteral("Alle %1 Notch-Filter entfernen…")
+                           .arg(m_notchMarkers.size()),
+                       this, [this]() { emit notchRemoveAllRequested(); });
+    }
+}
+
+// ── Den Editor aufmachen ─────────────────────────────────────────────
+//
+// Ein Fenster, nicht je Notch eines: es wird auf den gerade gemeinten
+// gestellt. Die Wuensche gehen denselben Weg wie die aus dem Menue und
+// vom Ziehen — ueber die notch*Requested-Signale ins Modell und von
+// dort zurueck. Kein zweiter Pfad, der auseinanderlaufen koennte.
+void SpectrumWidget::openNotchEditor(int id, const QPoint& globalPos)
+{
+    const NotchMarker* n = notchMarkerById(id);
+    if (!n) { return; }
+
+    if (!m_notchEditor) {
+        m_notchEditor = new NotchEditPopup(this);
+        connect(m_notchEditor, &NotchEditPopup::centreRequested,
+                this, &SpectrumWidget::notchMoveRequested);
+        connect(m_notchEditor, &NotchEditPopup::widthRequested,
+                this, &SpectrumWidget::notchWidthRequested);
+        connect(m_notchEditor, &NotchEditPopup::activeRequested,
+                this, &SpectrumWidget::notchActiveRequested);
+        connect(m_notchEditor, &NotchEditPopup::removeRequested,
+                this, &SpectrumWidget::notchRemoveRequested);
+    }
+    m_notchEditor->showFor(id, n->freqMhz * 1.0e6, n->widthHz, n->active,
+                           globalPos);
 }
 
 void SpectrumWidget::mousePressEvent(QMouseEvent* event)
@@ -8956,6 +9031,32 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
 // daran erkennt man sie.
 void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
+    // ── Doppelklick auf einen Notch macht den Editor auf ─────────────
+    //
+    // „wenn man am notchfilter klickt und dann diese bearbeite kann"
+    // (2026-08-21). Doppelklick statt einfachem Klick, weil der
+    // einfache schon vergeben ist: er waehlt aus und beginnt das
+    // Ziehen.
+    //
+    // VOR der Spot-Pruefung und vor allem VOR der Getrennt-Sperre in
+    // mousePressEvent: Notches sind Einstellungen des Rechners, nicht
+    // des Geraets. Sie liegen auch ohne Funkgeraet da, sie werden
+    // gespeichert — und wer sie ohne Geraet nicht loeschen kann, sitzt
+    // fest. Genau danach hat der Betreiber gefragt, mit geschlossener
+    // App.
+    if (event->button() == Qt::LeftButton) {
+        const QPoint dp = event->position().toPoint();
+        const QRect nRect = notchSpecRect();
+        if (dp.y() < nRect.height() && dp.x() <= nRect.right()) {
+            const int hit = notchAtPixel(dp.x(), nRect);
+            if (hit >= 0) {
+                openNotchEditor(hit, event->globalPosition().toPoint());
+                event->accept();
+                return;
+            }
+        }
+    }
+
     if (event->button() == Qt::LeftButton && m_showSpots) {
         const QPoint pos = event->position().toPoint();
         for (const auto& hr : m_spotClickRects) {

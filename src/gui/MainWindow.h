@@ -377,6 +377,7 @@ private slots:
     void onNotchWidthRequested(int id, double widthHz);
     void onNotchActiveRequested(int id, bool active);
     void onNotchRemoveRequested(int id);
+    void onNotchRemoveAll();
 
     /// TNF: the +TNF overlay button on pan `panId`. A distinct slot from
     /// onNotchCreateRequested above, which takes an already-resolved

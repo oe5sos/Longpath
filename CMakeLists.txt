@@ -1000,6 +1000,7 @@ set(GUI_SOURCES
     src/gui/applets/FrequencyApplet.cpp
     src/gui/applets/FrequencyApplet.h
     src/gui/applets/AppletVisibilityController.cpp
+    src/gui/widgets/NotchEditPopup.cpp
     src/gui/widgets/RotorDialWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp
     src/gui/widgets/GlobeWidget.cpp

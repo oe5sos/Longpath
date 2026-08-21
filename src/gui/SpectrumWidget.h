@@ -1561,6 +1561,9 @@ public:
     // marker would otherwise not move on the shipping path.
     void setNotchMarkers(const QVector<NotchMarker>& markers);
 
+    /// Den Notch-Editor auf einen Filter stellen und aufmachen.
+    void openNotchEditor(int id, const QPoint& globalPos);
+
     // From AetherSDR src/gui/SpectrumWidget.cpp:13497-13501 [@c6481cbf].
     // Master TNF flag.  Repaints every marker in the TNF-off colour rather
     // than hiding it (Thetis display.cs:8704-8707 [v2.10.3.15]).
@@ -1608,6 +1611,8 @@ public:
     // section 7.4); these also give the render tests a writer for the
     // Chartreuse highlight branch.
     void setSelectedNotchIdForTest(int id) { m_selectedNotchId = id; }
+
+    class NotchEditPopup* m_notchEditor {nullptr};
     void setHoveredNotchIdForTest(int id)  { m_hoveredNotchId = id; }
 
     // ---- TNF / notch interaction (design section 7) ----
@@ -1738,6 +1743,8 @@ signals:
     void notchDragFinished();
     void notchActiveRequested(int id, bool active);
     void notchRemoveRequested(int id);
+    /// Alle Notch-Filter auf einmal — siehe die Notiz im Menuebau.
+    void notchRemoveAllRequested();
 
     // Emitted when user drags a filter edge
     void filterEdgeDragged(int lowHz, int highHz);

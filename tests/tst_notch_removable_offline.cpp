@@ -19,6 +19,10 @@
 #include <QMenu>
 
 #include "gui/SpectrumWidget.h"
+#include "gui/widgets/NotchEditPopup.h"
+
+#include <QCheckBox>
+#include <QSpinBox>
 
 using namespace Longpath;
 
@@ -82,6 +86,161 @@ private slots:
 
         QCOMPARE(gone.count(), 1);
         QCOMPARE(gone.at(0).at(0).toInt(), 4);
+    }
+
+    /// Doppelklick auf den Balken macht den Editor auf — auch getrennt.
+    ///
+    /// „es waere auch gut, wenn man am notchfilter klickt und dann
+    /// diese bearbeite kann und auch loeschen" (2026-08-21).
+    void aDoubleClickOpensTheEditor()
+    {
+        SpectrumWidget w;
+        w.resize(1200, 700);
+        w.setConnectionState(ConnectionState::Disconnected);
+        w.setFrequencyRange(7'131'200.0, 200'000.0);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+
+        QVector<SpectrumWidget::NotchMarker> notches;
+        SpectrumWidget::NotchMarker n;
+        n.id = 7; n.freqMhz = 7.1312; n.widthHz = 400.0; n.active = true;
+        notches.append(n);
+        w.setNotchMarkers(notches);
+        QCoreApplication::processEvents();
+
+        int x = -1;
+        for (int probe = 0; probe < w.width(); ++probe) {
+            if (w.notchAtPixelForTest(probe) == 7) { x = probe; break; }
+        }
+        QVERIFY(x >= 0);
+
+        QTest::mouseDClick(&w, Qt::LeftButton, Qt::NoModifier, QPoint(x, 80));
+        QCoreApplication::processEvents();
+
+        auto* ed = w.findChild<NotchEditPopup*>();
+        QVERIFY2(ed && ed->isVisible(),
+                 "Doppelklick auf einen Notch macht keinen Editor auf");
+        QCOMPARE(ed->notchId(), 7);
+    }
+
+    /// Was im Editor steht, geht als Wunsch hinaus — und was
+    /// zurueckkommt, steht danach drin.
+    ///
+    /// Der zweite Teil ist der wichtige: WDSP setzt zu schmale Breiten
+    /// selbst herauf (nbp.c:122-125). Ohne Nachfuehrung zeigte das
+    /// Fenster weiter den Wunsch und der Balken das Ergebnis — zwei
+    /// Zahlen fuer dieselbe Sache.
+    void theEditorSendsWishesAndShowsWhatCameBack()
+    {
+        SpectrumWidget w;
+        w.resize(1200, 700);
+        w.setFrequencyRange(7'131'200.0, 200'000.0);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+
+        QVector<SpectrumWidget::NotchMarker> notches;
+        SpectrumWidget::NotchMarker n;
+        n.id = 9; n.freqMhz = 7.1312; n.widthHz = 400.0; n.active = true;
+        notches.append(n);
+        w.setNotchMarkers(notches);
+
+        QSignalSpy width(&w, &SpectrumWidget::notchWidthRequested);
+        QSignalSpy off(&w, &SpectrumWidget::notchActiveRequested);
+
+        w.openNotchEditor(9, QPoint(100, 100));
+        auto* ed = w.findChild<NotchEditPopup*>();
+        QVERIFY(ed);
+
+        auto* wid = ed->findChild<QSpinBox*>();
+        QVERIFY(wid);
+        QCOMPARE(wid->value(), 400);          // zeigt den Ist-Zustand
+        wid->setValue(50);                    // zu schmal, absichtlich
+        QCoreApplication::processEvents();
+        QCOMPARE(width.count(), 1);
+        QCOMPARE(width.at(0).at(1).toDouble(), 50.0);
+
+        auto* act = ed->findChild<QCheckBox*>();
+        QVERIFY(act);
+        act->setChecked(false);
+        QCoreApplication::processEvents();
+        QCOMPARE(off.count(), 1);
+        QCOMPARE(off.at(0).at(1).toBool(), false);
+
+        // Das Modell hat 100 daraus gemacht. Der Editor muss folgen —
+        // und darf dabei keinen neuen Wunsch ausloesen.
+        notches[0].widthHz = 100.0;
+        notches[0].active = false;
+        w.setNotchMarkers(notches);
+        QCoreApplication::processEvents();
+
+        QCOMPARE(wid->value(), 100);
+        QCOMPARE(width.count(), 1);           // kein Echo
+        QCOMPARE(off.count(), 1);
+    }
+
+    /// Verschwindet der Notch, geht der Editor zu.
+    void theEditorClosesWhenTheNotchIsGone()
+    {
+        SpectrumWidget w;
+        w.resize(1200, 700);
+        w.setFrequencyRange(7'131'200.0, 200'000.0);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+
+        QVector<SpectrumWidget::NotchMarker> notches;
+        SpectrumWidget::NotchMarker n;
+        n.id = 3; n.freqMhz = 7.1312; n.widthHz = 400.0; n.active = true;
+        notches.append(n);
+        w.setNotchMarkers(notches);
+        w.openNotchEditor(3, QPoint(100, 100));
+
+        auto* ed = w.findChild<NotchEditPopup*>();
+        QVERIFY(ed && ed->isVisible());
+
+        w.setNotchMarkers({});                 // geloescht
+        QCoreApplication::processEvents();
+        QVERIFY2(!ed->isVisible(),
+                 "Der Editor steht auf einem Notch, den es nicht mehr "
+                 "gibt — seine Knoepfe gehen ins Leere");
+    }
+
+    /// „Alle entfernen" steht erst ab zwei Filtern im Menue.
+    ///
+    /// Bei einem einzigen waere der Eintrag dasselbe wie „Remove
+    /// Notch", nur gefaehrlicher formuliert.
+    void removeAllOnlyAppearsWhenThereAreSeveral()
+    {
+        SpectrumWidget w;
+        w.resize(1200, 700);
+        w.setFrequencyRange(7'131'200.0, 200'000.0);
+
+        auto entries = [&w](int id) {
+            QMenu m;
+            w.buildNotchContextMenuForTest(id, m);
+            QStringList out;
+            for (QAction* a : m.actions()) { out << a->text(); }
+            return out;
+        };
+
+        QVector<SpectrumWidget::NotchMarker> one;
+        SpectrumWidget::NotchMarker a;
+        a.id = 1; a.freqMhz = 7.1312; a.widthHz = 400.0; a.active = true;
+        one.append(a);
+        w.setNotchMarkers(one);
+        QVERIFY2(!entries(1).join(QLatin1Char('|')).contains(
+                     QLatin1String("Alle ")),
+                 "Bei einem einzigen Filter darf kein 'Alle entfernen' "
+                 "im Menue stehen");
+
+        SpectrumWidget::NotchMarker b = a;
+        b.id = 2; b.freqMhz = 7.1350;
+        one.append(b);
+        w.setNotchMarkers(one);
+        const QString all = entries(1).join(QLatin1Char('|'));
+        QVERIFY2(all.contains(QLatin1String("Alle 2")),
+                 qPrintable(QStringLiteral("Kein Sammel-Eintrag: %1").arg(all)));
+        QVERIFY2(all.contains(QLatin1String("bearbeiten")),
+                 qPrintable(QStringLiteral("Kein 'bearbeiten': %1").arg(all)));
     }
 };
 

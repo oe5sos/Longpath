@@ -2194,6 +2194,9 @@ void MainWindow::wirePanNotchHandlers()
         connect(sw, &SpectrumWidget::notchActiveRequested,
                 this, &MainWindow::onNotchActiveRequested,
                 Qt::UniqueConnection);
+        connect(sw, &SpectrumWidget::notchRemoveAllRequested,
+                this, &MainWindow::onNotchRemoveAll,
+                Qt::UniqueConnection);
         connect(sw, &SpectrumWidget::notchRemoveRequested,
                 this, &MainWindow::onNotchRemoveRequested,
                 Qt::UniqueConnection);
@@ -2258,6 +2261,29 @@ void MainWindow::onNotchRemoveRequested(int id)
 {
     if (!m_radioModel || !m_radioModel->notchModel()) { return; }
     m_radioModel->notchModel()->removeNotch(id);
+}
+
+// ── Alle Notch-Filter auf einmal ─────────────────────────────────────
+//
+// Mit Rueckfrage, und das ist kein Hoeflichkeitsschritt: es gibt kein
+// Zurueck. Ein Notch, der eine Stoerstelle abdeckt, ist Arbeit — sechs
+// davon sind sechsmal Arbeit, und ein Fehlgriff im Menue wuerfe sie
+// weg, ohne dass jemand sie wiederherstellen koennte.
+void MainWindow::onNotchRemoveAll()
+{
+    if (!m_radioModel || !m_radioModel->notchModel()) { return; }
+    const int n = m_radioModel->notchModel()->notches().size();
+    if (n <= 0) { return; }
+
+    if (QMessageBox::question(
+            this, tr("Notch-Filter"),
+            tr("Alle %1 Notch-Filter entfernen?\n\n"
+               "Das laesst sich nicht rueckgaengig machen.").arg(n),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+        != QMessageBox::Yes) {
+        return;
+    }
+    m_radioModel->notchModel()->clear();
 }
 
 // The +TNF button on one pan's control strip. Distinct from
