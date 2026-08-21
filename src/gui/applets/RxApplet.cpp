@@ -198,8 +198,6 @@ RxApplet::RxApplet(SliceModel* slice, RadioModel* model, QWidget* parent)
                 this, [this](DSPMode mode) {
             // Only rebuild when the changed mode matches the currently-active mode.
             if (m_slice && mode == m_slice->dspMode()) {
-                rebuildFilterButtons(mode);
-                updateFilterButtons();
             }
         });
     }
@@ -511,37 +509,18 @@ void RxApplet::buildUi()
         });
     }
 
-    // Control 7: Filter preset buttons — 10 buttons in 2×5 grid
-    // Rows 0-1, cols 0-4. Spacing 2px. Blue active state.
-    // Tier 1 wired → SliceModel::setFilter()
-    // From AetherSDR RxApplet.cpp rebuildFilterButtons()
-    {
-        m_filterContainer = new QWidget(this);
-        m_filterGrid = new QGridLayout(m_filterContainer);
-        m_filterGrid->setContentsMargins(0, 0, 0, 0);
-        m_filterGrid->setSpacing(2);
-        // 2026-05-12 bench fix (PR #238): pin the column count so a
-        // single-preset mode (RADE_U / RADE_L: only the 1.7 K
-        // preset is valid) doesn't collapse to a 1-column grid
-        // and stretch its lone button across the full container
-        // width.  QGridLayout infers columns from populated cells,
-        // so without these stretches an addWidget(btn, 0, 0)
-        // call with nothing in cols 1-2 leaves the grid 1 column
-        // wide and the button fills the row.  Setting equal
-        // stretch on all three cols keeps each button at ~1/3
-        // the container width regardless of how many presets
-        // the active mode declares.  Same kCols (3) used by
-        // rebuildFilterButtons further down.
-        m_filterGrid->setColumnStretch(0, 1);
-        m_filterGrid->setColumnStretch(1, 1);
-        m_filterGrid->setColumnStretch(2, 1);
-        // Seed from the slice's actual mode so a restore-from-AppSettings
-        // launch (e.g. LSB / DIGL) shows the correct preset grid before the
-        // first dspModeChanged event fires.  Falls back to USB if no slice
-        // is bound yet.
-        rebuildFilterButtons(m_slice ? m_slice->dspMode() : DSPMode::USB);
-        leftCol->addWidget(m_filterContainer);
-    }
+    // ── Die Filterwand ist ausgezogen (2026-08-21) ──────────────────
+    //
+    // Hier standen zehn Breiten in einem Raster. Sie stehen jetzt oben
+    // in der Leiste: drei vorne, der Rest im „…", dazu eine eigene
+    // Breite zum Eintippen. Auf Ansage: „bitte folgende sachen in die
+    // leiste oben! bandbreite ... dies sollte nichts rechts in den
+    // widgets stehen."
+    //
+    // Bearbeiten und Zuruecksetzen einzelner Presets sass auf dem
+    // Rechtsklick dieser Knoepfe und ist NICHT verloren: derselbe
+    // Dialog haengt an Setup -> DSP -> „Filter Presets"
+    // (SetupDialog.cpp:613). Nachgesehen, bevor geschnitten wurde.
 
     // Control 8: FilterPassband — visual filter with drag-to-adjust
     // From AetherSDR RxApplet.cpp lines 504-513
@@ -1108,162 +1087,6 @@ void RxApplet::buildUi()
     m_xitOnBtn->setToolTip(QStringLiteral("Transmit Incremental Tuning - offset TX frequency by the value below in Hz."));
 }
 
-void RxApplet::rebuildFilterButtons(DSPMode mode)
-{
-    // Remove all existing buttons from grid
-    for (QPushButton* btn : m_filterBtns) {
-        m_filterGrid->removeWidget(btn);
-        btn->deleteLater();
-    }
-    m_filterBtns.clear();
-
-    // Stage C2: prefer FilterPresetStore (user overrides over Thetis defaults).
-    // Fall back to SliceModel::presetsForMode if no store is available.
-    // InitFilterPresets source: Thetis console.cs:5180-5575 [v2.10.3.13].
-    // Up to 10 presets in 3-column grid.
-    // Tier 1 wired → SliceModel::setFilter() via applyFilterPreset(low, high).
-    FilterPresetStore* store = m_model ? m_model->filterPresetStore() : nullptr;
-
-    QList<FilterPreset> storePresets;
-    if (store) {
-        storePresets = store->presetsForMode(mode);
-        // Mirror as pairs for m_filterPresets (needed by updateFilterButtons).
-        m_filterPresets.clear();
-        for (const FilterPreset& fp : storePresets) {
-            m_filterPresets.append({fp.low, fp.high});
-        }
-    } else {
-        m_filterPresets = SliceModel::presetsForMode(mode);
-        for (const auto& [low, high] : m_filterPresets) {
-            FilterPreset fp;
-            fp.name = QString();
-            fp.low  = low;
-            fp.high = high;
-            storePresets.append(fp);
-        }
-    }
-
-    static constexpr int kCols = 3;
-    const int count = qMin(storePresets.size(), 10);
-
-    for (int i = 0; i < count; ++i) {
-        const FilterPreset& fp = storePresets[i];
-        const int widthHz = qAbs(fp.high - fp.low);
-        QString label;
-        if (widthHz >= 1000) {
-            label = QStringLiteral("%1K").arg(widthHz / 1000.0, 0, 'g', 2);
-        } else {
-            label = QStringLiteral("%1").arg(widthHz);
-        }
-
-        auto* btn = blueToggle(label, -1, 20);
-        btn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        btn->setCheckable(true);
-        // Smaller padding than base style to fit narrow column
-        // (matches AetherSDR kButtonBase: padding 1px 2px)
-        btn->setStyleSheet(btn->styleSheet() + QStringLiteral(
-            "QPushButton { padding: 1px 2px; }"));
-        // Tooltip: show name + filter edges
-        btn->setToolTip(QStringLiteral("%1: %2 Hz to %3 Hz")
-            .arg(fp.name.isEmpty() ? QStringLiteral("F%1").arg(i + 1) : fp.name)
-            .arg(fp.low).arg(fp.high));
-
-        const int low  = fp.low;
-        const int high = fp.high;
-        connect(btn, &QPushButton::clicked, this, [this, low, high, mode] {
-            applyFilterPreset(low, high);
-            // Shift+click — also snap the TX passband to match the RX preset
-            // (Thetis-style alignment shortcut).  Convert IQ-space preset
-            // values to TX audio Hz: LSB family flips magnitude order, USB
-            // family is identity, symmetric uses (0, |high|).
-            if (QGuiApplication::keyboardModifiers() & Qt::ShiftModifier) {
-                if (!m_model) { return; }
-                const bool isSymmetric =
-                    mode == DSPMode::AM || mode == DSPMode::SAM
-                 || mode == DSPMode::DSB || mode == DSPMode::FM
-                 || mode == DSPMode::DRM;
-                int audioLow, audioHigh;
-                if (isSymmetric) {
-                    audioLow  = 0;
-                    audioHigh = qAbs(high);
-                } else {
-                    const int aLow  = qAbs(low);
-                    const int aHigh = qAbs(high);
-                    audioLow  = qMin(aLow, aHigh);
-                    audioHigh = qMax(aLow, aHigh);
-                }
-                m_model->transmitModel().setFilterLow(audioLow);
-                m_model->transmitModel().setFilterHigh(audioHigh);
-            }
-        });
-
-        // Stage C2: right-click context menu → edit / reset this preset.
-        btn->setContextMenuPolicy(Qt::CustomContextMenu);
-        const int slot = i;
-        connect(btn, &QPushButton::customContextMenuRequested, this,
-                [this, slot, mode](const QPoint& pos) {
-            if (!m_model || !m_model->filterPresetStore()) { return; }
-            FilterPresetStore* store = m_model->filterPresetStore();
-            QMenu menu(this);
-            menu.setStyleSheet(QString::fromLatin1(kPopupMenu));  // Stage C2 — issue #98 parity
-            QAction* editAct = menu.addAction(QStringLiteral("Edit this preset…"));
-            QAction* resetAct = menu.addAction(QStringLiteral("Reset this preset"));
-            QAction* chosen = menu.exec(qobject_cast<QWidget*>(sender())->mapToGlobal(pos));
-            if (chosen == editAct) {
-                auto* dlg = new FilterPresetEditDialog(store, mode, slot, this);
-                dlg->setAttribute(Qt::WA_DeleteOnClose);
-                dlg->exec();
-            } else if (chosen == resetAct) {
-                store->resetPreset(mode, slot);
-            }
-        });
-
-        m_filterBtns.append(btn);
-        m_filterGrid->addWidget(btn, i / kCols, i % kCols);
-    }
-
-    // 2026-05-12 bench fix (PR #238): force the grid to re-resolve
-    // its size hints after the rebuild.  Without this, transitioning
-    // RADE -> SSB (1 button cleared, 10 added) left the button row
-    // squished until the user collapsed + reopened the flag — the
-    // container was still sized for the 1-button layout when the
-    // 10 new buttons were inserted.  invalidate() marks the layout
-    // dirty; updateGeometry() propagates the new size hint up the
-    // parent chain so the flag's QVBoxLayout reflows.
-    if (m_filterGrid) m_filterGrid->invalidate();
-    if (m_filterContainer) m_filterContainer->updateGeometry();
-}
-
-void RxApplet::applyFilterPreset(int low, int high)
-{
-    if (!m_slice) { return; }
-    // low/high come directly from SliceModel::presetsForMode() — no mode-switching needed.
-    m_slice->setFilter(low, high);
-}
-
-void RxApplet::updateFilterButtons()
-{
-    if (!m_slice) { return; }
-
-    const int curLow  = m_slice->filterLow();
-    const int curHigh = m_slice->filterHigh();
-
-    // Highlight the button matching current (low, high) within ±50 Hz tolerance per edge.
-    for (int i = 0; i < m_filterBtns.size(); ++i) {
-        QPushButton* btn = m_filterBtns[i];
-        if (i >= m_filterPresets.size()) {
-            QSignalBlocker blocker(btn);
-            btn->setChecked(false);
-            continue;
-        }
-        const auto [pLow, pHigh] = m_filterPresets[i];
-        const bool match = (qAbs(curLow - pLow) <= 50) && (qAbs(curHigh - pHigh) <= 50);
-        // Suppress toggled signal to avoid echo loop
-        QSignalBlocker blocker(btn);
-        btn->setChecked(match);
-    }
-}
-
 void RxApplet::updateFilterLabel()
 {
     if (!m_slice) {
@@ -1520,7 +1343,6 @@ void RxApplet::syncFromModel()
 
     // Filter label + preset buttons + passband widget
     updateFilterLabel();
-    updateFilterButtons();
     m_filterPassband->setFilter(m_slice->filterLow(), m_slice->filterHigh());
     m_filterPassband->setVfoFrequency(m_slice->frequency());
     m_filterPassband->setHasFrequency(m_slice->frequency() > 0.0);
@@ -1600,9 +1422,7 @@ void RxApplet::connectSlice(SliceModel* s)
         if (idx >= 0) { m_modeCombo->setCurrentIndex(idx); }
         m_updatingFromModel = false;
         // Rebuild filter buttons for the new mode (canonical preset list from SliceModel)
-        rebuildFilterButtons(mode);
         updateFilterLabel();
-        updateFilterButtons();
 
         // Die drei modusabhaengigen Gruppen mitziehen -- ohne das bliebe
         // die Gruppe des VORIGEN Modus stehen.
@@ -1657,7 +1477,6 @@ void RxApplet::connectSlice(SliceModel* s)
     // Filter change → update label + buttons + passband widget
     connect(s, &SliceModel::filterChanged, this, [this](int lo, int hi) {
         updateFilterLabel();
-        updateFilterButtons();
         m_filterPassband->setFilter(lo, hi);
     });
 
@@ -2028,11 +1847,6 @@ QString RxApplet::attLabelTextForTest() const
 // 2026-08-18 entschieden: „Die Rauschminderung verlieren wäre ein
 // Rückschritt, den ich nie bestellt habe."
 
-QList<QPushButton*> RxApplet::nrButtons() const
-{
-    return {m_nr1Btn, m_nr2Btn, m_nr3Btn, m_nr4Btn,
-            m_dfnrBtn, m_bnrBtn, m_mnrBtn};
-}
 
 void RxApplet::buildInheritedRows(QVBoxLayout* col)
 {
@@ -2092,38 +1906,21 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
             "QLabel { color: %1; }").arg(Style::kTextScale)));
         col->addWidget(cap);
 
-        auto make = [this](const QString& text, const QString& tip) {
-            QPushButton* b = greenToggle(text, -1, 20);
-            b->setToolTip(tip);
-            b->setContextMenuPolicy(Qt::CustomContextMenu);
-            return b;
-        };
-
-        m_nr1Btn  = make(QStringLiteral("NR1"),
-                         QStringLiteral("Adaptive noise reduction (ANR)"));
-        m_nr2Btn  = make(QStringLiteral("NR2"),
-                         QStringLiteral("Spectral noise reduction (EMNR)"));
-        m_nr3Btn  = make(QStringLiteral("NR3"),
-                         QStringLiteral("Neural noise reduction (RNNoise)"));
-        m_nr4Btn  = make(QStringLiteral("NR4"),
-                         QStringLiteral("Spectral-bleach noise reduction"));
-        m_dfnrBtn = make(QStringLiteral("DFNR"),
-                         QStringLiteral("DeepFilterNet3 noise reduction"));
-        m_bnrBtn  = make(QStringLiteral("BNR"),
-                         QStringLiteral("Bandpass noise reduction"));
-        m_mnrBtn  = make(QStringLiteral("MNR"),
-                         QStringLiteral("MMSE-Wiener noise reduction"));
-
-        auto* r1 = new QHBoxLayout; r1->setSpacing(4);
-        for (QPushButton* b : {m_nr1Btn, m_nr2Btn, m_nr3Btn, m_nr4Btn}) {
-            r1->addWidget(b);
-        }
-        col->addLayout(r1);
-
+        // ── Die sieben NR-Knoepfe sind ausgezogen (2026-08-21) ──────
+        //
+        // NR1 bis NR4, DFNR, BNR und MNR stehen jetzt oben in der
+        // Leiste: drei vorne, der Rest im „…". Auf Ansage: „NR1-NR4
+        // eben so ... dies sollte nichts rechts in den widgets stehen."
+        //
+        // Der Rechtsklick auf einen NR-Knopf zeigte die Schnellregler
+        // GENAU DIESER Minderung. Die sind vorher mit umgezogen
+        // (Commit 76d4e47b) — erst danach durfte hier geschnitten
+        // werden, sonst waeren sie unerreichbar geworden.
+        //
+        // ANF bleibt: das ist ein automatischer Kerbfilter gegen
+        // stehende Traeger, keine Rauschminderung. Es stand nur in
+        // derselben Reihe.
         auto* r2 = new QHBoxLayout; r2->setSpacing(4);
-        for (QPushButton* b : {m_dfnrBtn, m_bnrBtn, m_mnrBtn}) {
-            r2->addWidget(b);
-        }
         m_anfBtn = greenToggle(QStringLiteral("ANF"), -1, 20);
         m_anfBtn->setToolTip(QStringLiteral(
             "Automatic notch filter — removes steady carriers"));
@@ -2205,35 +2002,9 @@ void RxApplet::wireInheritedRows()
     // NICHT `slots` nennen: das ist Qts Makro-Schluesselwort, und der
     // Uebersetzer meldet dann „expected unqualified-id" an einer Stelle,
     // an der nichts falsch aussieht.
-    const QList<NrSlot> nrSlots = {NrSlot::NR1, NrSlot::NR2, NrSlot::NR3,
-                                   NrSlot::NR4, NrSlot::DFNR, NrSlot::BNR,
-                                   NrSlot::MNR};
-    const QList<QPushButton*> btns = nrButtons();
-    for (int i = 0; i < btns.size(); ++i) {
-        QPushButton* b = btns.at(i);
-        const NrSlot slot = nrSlots.at(i);
-        connect(b, &QPushButton::toggled, this, [this, slot](bool on) {
-            if (m_updatingFromModel || !m_slice) { return; }
-            m_slice->setActiveNr(on ? slot : NrSlot::Off);
-        });
-        connect(b, &QWidget::customContextMenuRequested, this,
-                [this, slot, b](const QPoint& pos) {
-            // ── Der Schnellregler, nicht die Einstellungsseite ──────
-            //
-            // Der erste Umzug (2026-08-18 vormittags) hatte den
-            // Rechtsklick direkt auf die Setup-Seite gelegt. Beim
-            // zeilenweisen Abgleich Flagge gegen RxApplet fiel auf:
-            // auf der Flagge oeffnet er die drei bis fuenf Regler
-            // DIESER Rauschminderung, und die Setup-Seite ist darin
-            // nur der Verweis ganz unten. 28 der 30 SliceModel-Setzer,
-            // die die Flagge bediente, sind genau diese Regler.
-            DspQuickPopup::showFor(this, m_slice, slot,
-                                   b->mapToGlobal(pos),
-                                   [this, slot]() {
-                                       emit openNrSetupRequested(slot);
-                                   });
-        });
-    }
+    // Die NR-Knoepfe sind ausgezogen — ihre Verdrahtung samt
+    // Rechtsklick-Schnellreglern liegt jetzt in CommandBar.
+
     connect(m_anfBtn, &QPushButton::toggled, this, [this](bool on) {
         if (m_updatingFromModel || !m_slice) { return; }
         m_slice->setAnfEnabled(on);
@@ -2284,13 +2055,6 @@ void RxApplet::syncInheritedFromSlice()
     // NICHT `slots` nennen: das ist Qts Makro-Schluesselwort, und der
     // Uebersetzer meldet dann „expected unqualified-id" an einer Stelle,
     // an der nichts falsch aussieht.
-    const QList<NrSlot> nrSlots = {NrSlot::NR1, NrSlot::NR2, NrSlot::NR3,
-                                   NrSlot::NR4, NrSlot::DFNR, NrSlot::BNR,
-                                   NrSlot::MNR};
-    const QList<QPushButton*> btns = nrButtons();
-    for (int i = 0; i < btns.size() && i < nrSlots.size(); ++i) {
-        if (btns.at(i)) { btns.at(i)->setChecked(active == nrSlots.at(i)); }
-    }
     if (m_anfBtn) { m_anfBtn->setChecked(m_slice->anfEnabled()); }
 
     if (m_nbBtn) {

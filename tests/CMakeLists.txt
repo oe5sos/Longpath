@@ -4698,6 +4698,16 @@ nereus_add_test(tst_quit_leaves_no_pending_deletes)
 nereus_add_test(tst_notch_removable_offline)
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
 nereus_add_test(tst_real_notch_rightclick)
+# ── Laeuft allein ────────────────────────────────────────────────────
+#
+# Dieser Test baut ein ECHTES MainWindow: Metal-Kontext, Netzsuche,
+# Audiofaeden. Zwei davon nebeneinander vertragen sich nicht — am
+# 2026-08-21 fiel er im Parallellauf nach 5,9 s um und bestand einzeln
+# ohne Beanstandung. Dieselbe Ursache wie bei
+# tst_settings_migration_longpath: nicht der Test ist falsch, sondern
+# die Annahme, er habe die Maschine fuer sich.
+set_tests_properties(tst_real_notch_rightclick PROPERTIES
+    RUN_SERIAL TRUE)
 nereus_add_test(tst_panadapter_base_colour_reset)
 set_tests_properties(tst_both_paint_paths PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

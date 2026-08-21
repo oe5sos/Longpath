@@ -110,18 +110,17 @@ private slots:
         QVERIFY2(haveAf, "kein Lautstaerkeregler in der RxApplet");
     }
 
-    void allSevenNoiseReductionsExist()
-    {
-        Harness h = make();
-        for (const QString& t : {QStringLiteral("NR1"), QStringLiteral("NR2"),
-                                 QStringLiteral("NR3"), QStringLiteral("NR4"),
-                                 QStringLiteral("DFNR"), QStringLiteral("BNR"),
-                                 QStringLiteral("MNR")}) {
-            QVERIFY2(button(*h.applet, t),
-                     qPrintable(QStringLiteral("Rauschminderung %1 fehlt").arg(t)));
-        }
-        QVERIFY(button(*h.applet, QStringLiteral("ANF")));
-    }
+    // ── Die Rauschminderung ist ausgezogen (2026-08-21) ─────────────
+    //
+    // Vier Faelle standen hier: dass alle sieben Knoepfe da sind, dass
+    // sie sich gegenseitig ausschliessen, dass der Rechtsklick ihre
+    // Schnellregler oeffnet, und dass darin ein Weg auf die
+    // Einstellungsseite fuehrt.
+    //
+    // Sie sind nicht geloescht, sondern nach tests/tst_command_bar.cpp
+    // gewandert — dorthin, wo die Faehigkeit jetzt sitzt. Ein Test, der
+    // eine umgezogene Sache am alten Ort einfordert, bewacht nichts
+    // mehr; einer, der sie am neuen Ort einfordert, bewacht sie weiter.
 
     void theBlankerFamilyExists()
     {
@@ -159,28 +158,6 @@ private slots:
         QCOMPARE(h.slice->binauralEnabled(), !before);
     }
 
-    // Genau EINE laeuft, oder keine. Ein zweiter Klick auf die
-    // laufende schaltet sie ab — das ist der einzige Weg zu „keine",
-    // ohne einen achten Knopf zu bauen.
-    void theNoiseReductionsAreMutuallyExclusive()
-    {
-        Harness h = make();
-        QPushButton* nr1 = button(*h.applet, QStringLiteral("NR1"));
-        QPushButton* nr2 = button(*h.applet, QStringLiteral("NR2"));
-        QVERIFY(nr1 && nr2);
-
-        nr1->click();
-        QCOMPARE(h.slice->activeNr(), NrSlot::NR1);
-
-        nr2->click();
-        QCOMPARE(h.slice->activeNr(), NrSlot::NR2);
-        QVERIFY2(!nr1->isChecked(),
-                 "zwei Rauschminderungen stehen gleichzeitig an");
-
-        nr2->click();
-        QCOMPARE(h.slice->activeNr(), NrSlot::Off);
-    }
-
     // Dreistufig, nicht an/aus. Die Beschriftung sagt, was LAEUFT.
     void theBlankerCyclesThroughThreeStates()
     {
@@ -210,74 +187,6 @@ private slots:
         QVERIFY(h.slice->apfEnabled());
     }
 
-    // ── Der Schnellregler-Rechtsklick ────────────────────────────────
-    //
-    // Er ist die zweite Haelfte des Erbes: der Knopf schaltet, der
-    // Rechtsklick fuehrt zu den Einstellungen. Ohne ihn waeren die
-    // Regler nur noch ueber das Setup-Menue erreichbar.
-
-    // ── DER FUND vom zeilenweisen Abgleich ───────────────────────────
-    //
-    // Der erste Umzug legte den Rechtsklick direkt auf die
-    // Einstellungsseite. Auf der Flagge oeffnet er aber die drei bis
-    // fuenf Regler DIESER Rauschminderung (DspParamPopup); die
-    // Einstellungsseite ist darin nur der Verweis „More Settings…"
-    // ganz unten. 28 der 30 SliceModel-Setzer, die die Flagge
-    // ueberhaupt bediente, sind genau diese Regler — mit der Flagge
-    // waeren sie unbedienbar geworden.
-    void rightClickOnANoiseReductionOpensItsQuickControls()
-    {
-        Harness h = make();
-        QPushButton* nr1 = button(*h.applet, QStringLiteral("NR1"));
-        QVERIFY(nr1);
-
-        emit nr1->customContextMenuRequested(QPoint(2, 2));
-
-        // Der Schnellregler ist ein eigenes Fenster mit Schiebern.
-        // Gesucht wird das Vorhandensein, nicht das Aussehen.
-        DspParamPopup* popup = nullptr;
-        for (QWidget* w : QApplication::topLevelWidgets()) {
-            if (auto* p = qobject_cast<DspParamPopup*>(w)) { popup = p; }
-        }
-        if (!popup) {
-            popup = h.applet->findChild<DspParamPopup*>();
-        }
-        QVERIFY2(popup,
-                 "Rechtsklick oeffnet keinen Schnellregler — dann sind "
-                 "die NR-Parameter nach dem Loeschen der Flagge nur noch "
-                 "ueber das Setup-Menue erreichbar");
-        QVERIFY2(!popup->findChildren<QSlider*>().isEmpty(),
-                 "der Schnellregler hat keine Regler");
-        popup->hide();
-        popup->deleteLater();
-    }
-
-    // Und der Verweis darin fuehrt weiter auf die volle Seite — das
-    // war der Teil, den der erste Umzug als das Ganze genommen hatte.
-    void theQuickControlsStillLinkToTheFullSetupPage()
-    {
-        Harness h = make();
-        QSignalSpy spy(h.applet.get(), &RxApplet::openNrSetupRequested);
-
-        QPushButton* nr3 = button(*h.applet, QStringLiteral("NR3"));
-        QVERIFY(nr3);
-        emit nr3->customContextMenuRequested(QPoint(2, 2));
-
-        DspParamPopup* popup = h.applet->findChild<DspParamPopup*>();
-        for (QWidget* w : QApplication::topLevelWidgets()) {
-            if (auto* p = qobject_cast<DspParamPopup*>(w)) { popup = p; }
-        }
-        QVERIFY(popup);
-        QPushButton* more = nullptr;
-        for (QPushButton* b : popup->findChildren<QPushButton*>()) {
-            if (b && b->text().contains(QStringLiteral("More"))) { more = b; }
-        }
-        QVERIFY2(more, "kein Verweis auf die volle Einstellungsseite");
-        more->click();
-        QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.at(0).at(0).value<NrSlot>(), NrSlot::NR3);
-    }
-
     void rightClickOnTheBlankerAsksForItsSetupPage()
     {
         Harness h = make();
@@ -293,16 +202,16 @@ private slots:
 
     void theModelDrivesTheButtonsBack()
     {
+        // Die DFNR-Haelfte dieses Falls ist mit den NR-Knoepfen
+        // ausgezogen; die Rueckmeldung des Modells an die Pillen
+        // prueft jetzt tst_command_bar. Was hier bleibt, ist alles
+        // andere, das noch am RX-Feld haengt.
         Harness h = make();
-        h.slice->setActiveNr(NrSlot::DFNR);
         h.slice->setMuted(true);
         h.applet->syncFromModel();
 
-        QPushButton* dfnr = button(*h.applet, QStringLiteral("DFNR"));
         QPushButton* mute = button(*h.applet, QStringLiteral("MUTE"));
-        QVERIFY(dfnr && mute);
-        QVERIFY2(dfnr->isChecked(),
-                 "das Modell sagt DFNR, der Knopf steht auf aus");
+        QVERIFY(mute);
         QVERIFY(mute->isChecked());
     }
 

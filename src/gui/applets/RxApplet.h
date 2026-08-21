@@ -262,9 +262,6 @@ private:
     void connectSlice(SliceModel* s);
     void disconnectSlice(SliceModel* s);
     void updateFilterLabel();
-    void rebuildFilterButtons(DSPMode mode);
-    void updateFilterButtons();
-    void applyFilterPreset(int low, int high);
 
     // Phase 3P-F Task 4: read AlexController per-band assignments and push
     // them into SliceModel so the antenna buttons reflect the active band.
@@ -285,7 +282,6 @@ private:
 
     // Filter presets for the active mode — (low_hz, high_hz) pairs from SliceModel::presetsForMode().
     // Rebuilt on every dspModeChanged via rebuildFilterButtons(mode).
-    QList<std::pair<int, int>> m_filterPresets;
 
     // ── Phase 3F (Bug 3): per-slice tab row (above Row 1) ─────────────────
     // One checkable QToolButton per live slice (A/B/C...). Hidden when the
@@ -312,9 +308,7 @@ private:
     TriBtn*      m_stepUp         = nullptr;
 
     // Control 7: Filter preset grid (10 buttons, 3×4 layout)
-    QVector<QPushButton*> m_filterBtns;
     QWidget*     m_filterContainer = nullptr;
-    QGridLayout* m_filterGrid      = nullptr;
 
     // Control 8: die Durchlassflaeche — seit 2026-08-20 dieselbe
     // Umsetzung wie in der grossen Kachel (BandwidthFilterPane).
@@ -343,13 +337,6 @@ private:
 
     // Die sieben Rauschminderungen. Gegenseitig ausschliessend ueber
     // SliceModel::setActiveNr — genau EINE laeuft, oder keine.
-    QPushButton* m_nr1Btn      = nullptr;
-    QPushButton* m_nr2Btn      = nullptr;
-    QPushButton* m_nr3Btn      = nullptr;
-    QPushButton* m_nr4Btn      = nullptr;
-    QPushButton* m_dfnrBtn     = nullptr;
-    QPushButton* m_bnrBtn      = nullptr;
-    QPushButton* m_mnrBtn      = nullptr;
 
     // NB (dreistufig: Aus / NB / NB2), SNB, ANF, APF samt Abstimmung.
     QPushButton* m_nbBtn       = nullptr;
@@ -362,7 +349,6 @@ private:
     /// Alle NR-Knoepfe in Reihenfolge, fuer das Nachfuehren aus dem
     /// Modell. Eine Liste statt sieben Zeilen: sieben Zeilen laufen
     /// auseinander, sobald eine achte dazukommt.
-    QList<QPushButton*> nrButtons() const;
 
     void buildInheritedRows(class QVBoxLayout* col);
 

@@ -23,6 +23,11 @@
 
 #include "gui/widgets/CommandBar.h"
 #include "models/SliceModel.h"
+#include "gui/widgets/DspParamPopup.h"
+#include "gui/widgets/DspQuickPopups.h"
+
+#include <QPushButton>
+#include <QSlider>
 
 using namespace Longpath;
 
@@ -301,6 +306,78 @@ private slots:
         QVERIFY(bar.clickPill(QStringLiteral("NR"),
                               QStringLiteral("DFNR")));
         QCOMPARE(slice.activeNr(), NrSlot::DFNR);
+    }
+
+    /// Rechtsklick auf eine NR-Pille oeffnet ihre Schnellregler.
+    ///
+    /// Umgezogen aus tst_rx_applet_inherited am 2026-08-21, zusammen
+    /// mit der Faehigkeit selbst. Die Begruendung von dort gilt
+    /// unveraendert: der Rechtsklick oeffnet nicht die
+    /// Einstellungsseite, sondern die drei bis fuenf Regler GENAU
+    /// DIESER Minderung; die Einstellungsseite ist darin nur der
+    /// Verweis ganz unten. Ohne diesen Weg waeren die Regler nur noch
+    /// ueber das Setup-Menue erreichbar.
+    void rightClickOnAnNrPillOpensItsQuickControls()
+    {
+        SliceModel slice;
+        CommandBar bar;
+        bar.attach(&slice);
+
+        QPushButton* nr1 = nullptr;
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("NR1")) { nr1 = b; break; }
+        }
+        QVERIFY2(nr1, "Keine NR1-Pille in der Leiste");
+
+        emit nr1->customContextMenuRequested(QPoint(2, 2));
+
+        DspParamPopup* popup = nullptr;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (auto* p = qobject_cast<DspParamPopup*>(w)) { popup = p; }
+        }
+        if (!popup) { popup = bar.findChild<DspParamPopup*>(); }
+
+        QVERIFY2(popup,
+                 "Rechtsklick oeffnet keinen Schnellregler — dann sind "
+                 "die NR-Parameter nur noch ueber das Setup-Menue "
+                 "erreichbar");
+        QVERIFY2(!popup->findChildren<QSlider*>().isEmpty(),
+                 "der Schnellregler hat keine Regler");
+        popup->close();
+    }
+
+    /// Und aus dem Schnellregler heraus fuehrt weiter ein Weg auf die
+    /// volle Einstellungsseite. Ebenfalls umgezogen aus
+    /// tst_rx_applet_inherited (2026-08-21), Mechanismus unveraendert.
+    void theQuickControlsStillLinkToTheFullSetupPage()
+    {
+        SliceModel slice;
+        CommandBar bar;
+        bar.attach(&slice);
+
+        QSignalSpy spy(&bar, &CommandBar::openNrSetupRequested);
+
+        QPushButton* nr3 = nullptr;
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("NR3")) { nr3 = b; break; }
+        }
+        QVERIFY(nr3);
+        emit nr3->customContextMenuRequested(QPoint(2, 2));
+
+        DspParamPopup* popup = bar.findChild<DspParamPopup*>();
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (auto* p = qobject_cast<DspParamPopup*>(w)) { popup = p; }
+        }
+        QVERIFY(popup);
+
+        QPushButton* more = nullptr;
+        for (QPushButton* b : popup->findChildren<QPushButton*>()) {
+            if (b && b->text().contains(QStringLiteral("More"))) { more = b; }
+        }
+        QVERIFY2(more, "kein Verweis auf die volle Einstellungsseite");
+        more->click();
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).value<NrSlot>(), NrSlot::NR3);
     }
 };
 
