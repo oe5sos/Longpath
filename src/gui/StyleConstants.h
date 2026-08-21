@@ -165,9 +165,27 @@ constexpr auto kTitleBorder     = "#0d0d0f";
 constexpr auto kGreenBg         = "#1c3a2a";
 constexpr auto kGreenText       = "#6fa384";
 constexpr auto kGreenBorder     = "#2c5c44";
-constexpr auto kBlueBg          = "#254a72";
-constexpr auto kBlueText        = "#cfe2f5";
-constexpr auto kBlueBorder      = "#2f5c86";
+// ── Der aktive Zustand ───────────────────────────────────────────────
+//
+// Der Betreiber, 2026-08-21, zu Zeus: „das design hat teilweise mehr
+// stil ... ich glaube die farblichen verlaeufe machen es."
+//
+// Die Verlaeufe waren es nicht — die stehen seit zwei Tagen drin und
+// sind nachgemessen. Gemessen wurde stattdessen die SAETTIGUNG des
+// aktiven Knopfes: bei uns 65 Prozent, bei Zeus 100. Das alte #254a72
+// hatte 39 Prozent Saettigung im Farbwert selbst; es sagte nicht „das
+// hier ist an", sondern „das hier ist irgendwie anders".
+//
+// Der neue Wert ist gesaettigt und liegt im selben Farbton (rund
+// 215 Grad), damit nichts anderes in der Palette dagegen steht.
+//
+// Fuer helle Themen aendert sich dadurch NICHTS: „Kreide" fuehrt
+// sel-bg und sel-border selbst (#e0d6ee / #a889cc). Ein gesaettigtes
+// Blau auf hellem Grund waere laut — das ist der Grund, warum die
+// Rolle dort ueberschrieben wird und nicht hier.
+constexpr auto kBlueBg          = "#3576e0";   // war #254a72 (S 39 %)
+constexpr auto kBlueText        = "#ffffff";   // war #cfe2f5
+constexpr auto kBlueBorder      = "#2a5fbe";   // war #2f5c86
 constexpr auto kBlueHover       = "#2d5885";
 constexpr auto kAmberBg         = "#33280f";
 constexpr auto kAmberText       = "#d8a55f";
@@ -429,8 +447,12 @@ inline QString buttonBaseStyle()
 {
     return QStringLiteral(
         "QPushButton {"
-        "  background: %1; border: 1px solid %2; border-radius: 6px;"
-        "  color: %3; font-size: 11px; font-weight: bold; padding: 2px 4px;"
+        // Polsterung 4/10 statt 2/4 und 7 statt 6 Punkt Eckenradius.
+        // Klingt nach nichts und ist der halbe Eindruck von Ruhe: die
+        // Knopfreihen bei Zeus wirken nicht ruhiger, weil dort weniger
+        // steht, sondern weil um jedes Ding mehr Luft ist.
+        "  background: %1; border: 1px solid %2; border-radius: 7px;"
+        "  color: %3; font-size: 11px; font-weight: bold; padding: 4px 10px;"
         "}"
         "QPushButton:hover { background: %4; }"
         // Gedrueckt: der Verlauf kippt. Ein Knopf, der sich beim
@@ -453,9 +475,16 @@ inline QString greenCheckedStyle()
 
 inline QString blueCheckedStyle()
 {
+    // raisedFill statt einer flachen Fuellung: der aktive Knopf ist
+    // dieselbe aufgesetzte Flaeche wie jeder andere, nur in der
+    // Akzentfarbe. Zwei verschiedene Bauarten fuer denselben Knopf
+    // waeren genau die Art Unstimmigkeit, die man als „unfertig" liest.
     return QStringLiteral(
-        "QPushButton:checked { background: %1; color: %2; border: 1px solid %3; }"
-    ).arg(kBlueBg, kBlueText, kBlueBorder);
+        "QPushButton:checked { background: %1; color: %2;"
+        " border: 1px solid %3; }"
+    ).arg(raisedFill(kBlueBg, 18, 14),
+          QLatin1String(kBlueText),
+          QLatin1String(kBlueBorder));
 }
 
 inline QString amberCheckedStyle()
