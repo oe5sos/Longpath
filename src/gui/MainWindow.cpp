@@ -1491,7 +1491,14 @@ void MainWindow::dockAppletBack(const QString& appletId)
 
     const int idx = win->dockIndex();
     AppletWidget* applet = win->releaseApplet();
-    win->deleteLater();
+    if (m_shuttingDown) {
+        // Beim Herunterfahren gibt es keine Runde mehr, in der ein
+        // nachgereichtes Loeschen ankaeme — siehe die Notiz im
+        // closeEvent. Dann sofort.
+        delete win;
+    } else {
+        win->deleteLater();
+    }
 
     if (!applet || !m_appletPanel) { return; }
     m_appletPanel->addApplet(applet);
@@ -13096,6 +13103,36 @@ void MainWindow::closeEvent(QCloseEvent* event)
     saveMainWindowGeometry();
 
     AppSettings::instance().save();
+
+    // ── Schwebende Fenster JETZT abraeumen ───────────────────────────
+    //
+    // Aus dem Absturzbericht vom 2026-08-21, 06:47 (und 06:29, gleicher
+    // Ablauf). Der Faden mit dem Fehler ist der Hauptfaden, und der
+    // Stapel liest sich von unten nach oben so:
+    //
+    //   NSApplication terminate → exit → __cxa_finalize
+    //   → QThreadDataDestroyer::EarlyMainThread::~EarlyMainThread
+    //   → sendPostedEvents → AppletFloatingWindow::~AppletFloatingWindow
+    //   → WindowTitleBar::~WindowTitleBar → QWidget::destroy
+    //   → QWindow::~QWindow → QSurface::~QSurface
+    //   → QOpenGLContext::currentContext() → QThreadStorageData::get()
+    //   → SIGSEGV
+    //
+    // Also: ein deleteLater auf ein schwebendes Fenster wurde nicht
+    // mehr zugestellt, solange das Programm lief. Zugestellt wurde es
+    // erst beim Abbau der Faden-Daten — da war der Faden-Speicher, den
+    // der QWindow-Destruktor ueber den OpenGL-Kontext anfasst, schon
+    // weg. Die Leiste hat ein eigenes Fenster (WA_NativeWindow, damit
+    // sie ueber dem Spektrum steht), deshalb trifft es genau sie.
+    //
+    // Zwei Zeilen, die das ausschliessen: die Fenster hier selbst
+    // abraeumen, und danach zustellen, was sonst noch aussteht —
+    // solange das Programm noch da ist.
+    for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
+    m_floatingApplets.clear();
+    if (m_rotorWindow) { delete m_rotorWindow; m_rotorWindow = nullptr; }
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
     event->accept();
 
     // Ask Qt for an orderly exit from the event loop. Previously called

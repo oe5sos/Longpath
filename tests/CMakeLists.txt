@@ -4694,6 +4694,7 @@ nereus_add_test(tst_overlay_drag)
 nereus_add_test(tst_surface_gradients)
 nereus_add_test(tst_logbook_import)
 nereus_add_test(tst_overlay_render_is_harmless)
+nereus_add_test(tst_quit_leaves_no_pending_deletes)
 set_tests_properties(tst_both_paint_paths PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 nereus_add_test(tst_native_overlay_audit)
@@ -4965,6 +4966,20 @@ nereus_add_test(tst_bandwidth_filter_applet)
 nereus_add_test(tst_applet_to_canvas)
 nereus_add_test(tst_applet_floating_window)
 nereus_add_test(tst_settings_migration_longpath)
+# ── Laeuft allein ────────────────────────────────────────────────────
+#
+# Dieser Test legt eine Attrappe der ALTEN Einstellungsdatei in den
+# geteilten qttest-Ordner (QStandardPaths::setTestModeEnabled) und
+# prueft, dass die Uebernahme sie findet. Jeder Test, der daneben ein
+# echtes MainWindow baut, schreibt in denselben Ordner — und dann
+# gewinnt, wer zuletzt schreibt.
+#
+# Aufgefallen am 2026-08-21: einzeln gruen, im Parallellauf rot,
+# nachdem neue Tests hinzukamen, die MainWindow wirklich bauen. Nicht
+# der Test ist falsch, sondern die Annahme, er habe den Ordner fuer
+# sich. RUN_SERIAL sagt genau das.
+set_tests_properties(tst_settings_migration_longpath PROPERTIES
+    RUN_SERIAL TRUE)
 nereus_add_test(tst_wav_file)
 nereus_add_test(tst_voice_keyer)
 nereus_add_test(tst_qso_recorder)
