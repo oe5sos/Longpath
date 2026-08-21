@@ -26,6 +26,16 @@
 // geht: eine Ankuendigung ohne Einloesung.
 
 #include <QtTest>
+#include <QHBoxLayout>
+#include <QLayout>
+#include <QPushButton>
+#include <QVBoxLayout>
+
+#include <functional>
+
+#include "gui/MainWindow.h"
+
+using namespace Longpath;
 #include <QDir>
 #include <QFile>
 #include <QDirIterator>
@@ -151,6 +161,95 @@ private slots:
                      "Rechtsklick beantwortet es dann der Elternteil und "
                      "legt SEIN Menue obenauf:\n  %1")
                      .arg(offenders.join(QStringLiteral("\n  ")))));
+    }
+
+    /// Kein Bedienelement darf angelegt und dann nirgends eingehaengt
+    /// werden.
+    ///
+    /// Diese Fehlerklasse hat diese Woche schon zugeschlagen: der
+    /// Abloese-Pfeil war gebaut, verdrahtet und richtig — und lag 622
+    /// Pixel neben der Kachel, weil er hinter einem addStretch()
+    /// eingehaengt war. Vorhanden, verdrahtet, unerreichbar.
+    ///
+    /// ZUERST WIRD DAS MESSGERAET GEPRUEFT. Die erste Fassung dieser
+    /// Regel benutzte QLayout::indexOf und meldete 105 Treffer,
+    /// darunter LSB und USB, die sichtbar in der Leiste stehen —
+    /// indexOf sieht nur die OBERSTE Ebene, unsere Knoepfe haengen in
+    /// verschachtelten Layouts. Beinahe als Befund gemeldet. Deshalb
+    /// baut der erste Teil hier einen echten Verstoss und verlangt,
+    /// dass er gefunden wird.
+    void noControlIsBuiltAndThenLeftOutOfEveryLayout()
+    {
+        auto inLayoutTree = [](QWidget* w) {
+            QWidget* p = w->parentWidget();
+            if (!p || !p->layout()) { return true; }   // kein Layout: nicht dieser Fall
+            std::function<bool(QLayout*)> holds = [&](QLayout* l) -> bool {
+                if (!l) { return false; }
+                for (int i = 0; i < l->count(); ++i) {
+                    QLayoutItem* it = l->itemAt(i);
+                    if (!it) { continue; }
+                    if (it->widget() == w) { return true; }
+                    if (it->layout() && holds(it->layout())) { return true; }
+                }
+                return false;
+            };
+            return holds(p->layout());
+        };
+
+        // ── Erst das Messgeraet ──────────────────────────────────────
+        {
+            QWidget host;
+            auto* col = new QVBoxLayout(&host);
+            auto* row = new QHBoxLayout;
+            col->addLayout(row);
+
+            auto* proper = new QPushButton(QStringLiteral("drin"), &host);
+            row->addWidget(proper);                 // verschachtelt eingehaengt
+            auto* orphan = new QPushButton(QStringLiteral("draussen"), &host);
+            Q_UNUSED(orphan)                        // absichtlich vergessen
+
+            QVERIFY2(inLayoutTree(proper),
+                     "Das Messgeraet findet einen verschachtelt "
+                     "eingehaengten Knopf nicht — so hat die erste "
+                     "Fassung 105 Fehlalarme erzeugt");
+            QVERIFY2(!inLayoutTree(orphan),
+                     "Das Messgeraet uebersieht einen Knopf, der in "
+                     "keinem Layout haengt — dann prueft es nichts");
+        }
+
+        // ── Dann das echte Hauptfenster ──────────────────────────────
+        auto* mw = new MainWindow();
+        mw->resize(1800, 1100);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        for (int i = 0; i < 12; ++i) { QCoreApplication::processEvents(); }
+        QTest::qWait(350);
+
+        QStringList lost;
+        int total = 0;
+        for (QPushButton* b : mw->findChildren<QPushButton*>()) {
+            ++total;
+            if (inLayoutTree(b)) { continue; }
+            lost << QStringLiteral("\"%1\" in %2")
+                        .arg(b->text(),
+                             QString::fromLatin1(b->parentWidget()
+                                 ->metaObject()->className()));
+        }
+
+        qInfo() << "Knoepfe im Hauptfenster:" << total
+                << " ohne Layout-Platz:" << lost.size();
+
+        QVERIFY2(total > 50,
+                 "Zu wenige Knoepfe gefunden — das Fenster ist wohl nicht "
+                 "fertig aufgebaut, dann prueft das hier nichts");
+        QVERIFY2(lost.isEmpty(),
+                 qPrintable(QStringLiteral(
+                     "Diese Bedienelemente sind gebaut, haengen aber in "
+                     "keinem Layout — sie koennen nie erscheinen:\n  %1")
+                     .arg(lost.join(QStringLiteral("\n  ")))));
+
+        mw->close();
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
     }
 };
 

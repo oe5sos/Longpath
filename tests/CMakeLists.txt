@@ -4702,6 +4702,7 @@ nereus_add_test(tst_splitter_handles_grabbable)
 set_tests_properties(tst_splitter_handles_grabbable PROPERTIES RUN_SERIAL TRUE)
 nereus_add_test(tst_rotor_aim_menu)
 nereus_add_test(tst_reachability_audit)
+set_tests_properties(tst_reachability_audit PROPERTIES RUN_SERIAL TRUE)
 set_tests_properties(tst_reachability_audit PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 nereus_add_test(tst_real_pan_float_state)
