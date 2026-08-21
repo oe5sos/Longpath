@@ -119,4 +119,16 @@ bool hasLegacyColour(const QString& qss);
 ///     p.setPen(QColor(Style::role("measured", Style::kAmberText)));
 QString role(const char* roleName, const char* fallback);
 
+// ── Form, nicht Farbe ────────────────────────────────────────────────
+//
+// Das Gegenstueck zu hexRole() fuer Zahlen: Eckenradius, Polsterung,
+// Verlaufstiefe. Ohne Thema oder ohne Eintrag kommt der Vorgabewert
+// zurueck, ein Aufruf ist also immer sicher.
+//
+// Warum es das gibt, steht bei Theme::forForm: was dem Betreiber an
+// fremden Oberflaechen gefaellt, sind keine Farben, sondern wie
+// plastisch eine Flaeche wirkt. Ein Thema, das nur Farben tauscht,
+// kann das nicht.
+int formInt(const char* name, int fallback);
+
 } // namespace Longpath::Style

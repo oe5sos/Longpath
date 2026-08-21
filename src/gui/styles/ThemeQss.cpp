@@ -66,6 +66,21 @@ const QVector<ThemeEntry>& table()
         { "border-subtle",     "#203040", Style::kBorderSubtle },
         { "button-alt-hover",  "#204060", Style::kButtonAltHover },
         { "border",            "#205070", Style::kBorder },
+        // ── Der GRUND des Eingabefelds fehlte hier ──────────────────
+        //
+        // Bis zum 2026-08-21 fuehrte die Tabelle nur den Rahmen
+        // (inset-border), nicht die Fuellung. kInsetBg (#08080a) kam
+        // hier null Mal vor — jedes Eingabefeld und jedes Drehfeld
+        // folgte also KEINEM Thema und blieb im hellen Thema
+        // „Kreide" fast schwarz. Dieselbe Krankheit wie beim
+        // Panadapter (siehe panadapter-bg weiter unten), nur an einer
+        // Stelle, an der sie niemandem aufgefallen ist, weil die
+        // Felder klein sind.
+        //
+        // Gefunden von tst_theme_form_knobs, nicht von mir: die
+        // Pruefung verlangte, dass ein Thema die Feldfarbe aendern
+        // kann, und das ging nicht.
+        { "inset",             "#0a0a18", Style::kInsetBg },   // eigener Wert seit 2026-08-21
         { "inset-border",      "#1e2e3e", Style::kInsetBorder },
         { "status-sep",        "#304050", Style::kStatusSep },
         { "disabled-border",   "#2a3040", Style::kDisabledBorder },
@@ -287,6 +302,11 @@ QString hexRole(const QString& nereusHex)
 QString hexRole(const char* nereusHex)
 {
     return hexRole(QString::fromLatin1(nereusHex));
+}
+
+int formInt(const char* name, int fallback)
+{
+    return Theme::instance().forForm(QString::fromLatin1(name), fallback);
 }
 
 QString themed(QString qss)

@@ -180,7 +180,7 @@ TxCfcDialog::TxCfcDialog(TransmitModel* tm,
     // calls (OG Guide hyperlink button below) keep their own specificity.
     setStyleSheet(QString::fromLatin1(Longpath::Style::kPageStyle)
                   + QString::fromLatin1(Longpath::Style::kGroupBoxStyle)
-                  + QString::fromLatin1(Longpath::Style::kSpinBoxStyle)
+                  + Longpath::Style::spinBoxStyle()
                   + Longpath::Style::doubleSpinBoxStyle()
                   + QString::fromLatin1(Longpath::Style::kComboStyle)
                   + QString::fromLatin1(Longpath::Style::kCheckBoxStyle)

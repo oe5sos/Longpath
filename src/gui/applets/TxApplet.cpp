@@ -666,7 +666,7 @@ void TxApplet::buildUI()
         m_txFilterLowSpin = new QSpinBox(this);
         m_txFilterLowSpin->setRange(0, 5000);
         m_txFilterLowSpin->setSuffix(QStringLiteral(" Hz"));
-        m_txFilterLowSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+        m_txFilterLowSpin->setStyleSheet(Style::spinBoxStyle());
         m_txFilterLowSpin->setMinimumWidth(72);
         m_txFilterLowSpin->setAccessibleName(QStringLiteral("TX filter low cutoff"));
         m_txFilterLowSpin->setToolTip(QStringLiteral(
@@ -684,7 +684,7 @@ void TxApplet::buildUI()
         m_txFilterHighSpin = new QSpinBox(this);
         m_txFilterHighSpin->setRange(200, 10000);
         m_txFilterHighSpin->setSuffix(QStringLiteral(" Hz"));
-        m_txFilterHighSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+        m_txFilterHighSpin->setStyleSheet(Style::spinBoxStyle());
         m_txFilterHighSpin->setMinimumWidth(72);
         m_txFilterHighSpin->setAccessibleName(QStringLiteral("TX filter high cutoff"));
         m_txFilterHighSpin->setToolTip(QStringLiteral(

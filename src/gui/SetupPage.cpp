@@ -279,7 +279,7 @@ QHBoxLayout* SetupPage::addLabeledSpinner(QLayout* parent, const QString& label,
 
 QHBoxLayout* SetupPage::addLabeledEdit(QLayout* parent, const QString& label, QLineEdit* edit)
 {
-    edit->setStyleSheet(Style::kLineEditStyle);
+    edit->setStyleSheet(Style::lineEditStyle());
     return makeLabeledRow(parent, label, edit);
 }
 

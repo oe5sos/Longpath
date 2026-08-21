@@ -128,6 +128,31 @@ public:
     /// no opinion.
     QString forRole(const QString& role) const;
 
+    // ── Form, nicht Farbe ────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-21, zu Zeus: „das design hat teilweise
+    // mehr stil ... die uebergaenge im hintergrund bei den widget
+    // wirken sehr gut." Und danach, auf die Frage, wie das waehlbar
+    // werden soll: „b" — also die Themendatei um Form-Regler
+    // erweitern, statt nur weitere Farbschemata anzubieten.
+    //
+    // Der Grund steht in der Frage selbst: was ihm an Zeus gefaellt,
+    // sind KEINE Farben. Es sind Verlaufstiefe, Polsterung,
+    // Eckenradius — wie plastisch eine Flaeche wirkt. Ein Thema, das
+    // nur Farben tauschen kann, kann genau das nicht.
+    //
+    // Vier Regler, mehr nicht. Jeder mit Vorgabe und Grenzen; was
+    // ausserhalb liegt, wird still auf die Vorgabe zurueckgesetzt —
+    // eine Themendatei ist Zubehoer und darf das Programm nicht
+    // entstellen koennen.
+    //
+    //   radius   Eckenradius in Punkten          0..14   (7)
+    //   luft-v   Polsterung oben/unten           0..12   (4)
+    //   luft-h   Polsterung seitlich             0..24   (10)
+    //   relief   aufgesetzt: Aufhellung oben     0..40   (16)
+    //   mulde    versenkt: Tiefe                 0..40   (10)
+    int forForm(const QString& name, int fallback) const;
+
     /// What this theme wants in place of a Nereus colour, or empty.
     QString forHex(const QString& legacyHex) const;
 
@@ -145,6 +170,7 @@ private:
     Theme() = default;
 
     QHash<QString, QString> m_byRole;
+    QHash<QString, int>     m_byForm;
     QHash<QString, QString> m_byHex;
     QString m_name;
     QString m_path;

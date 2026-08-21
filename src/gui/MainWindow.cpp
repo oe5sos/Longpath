@@ -11193,12 +11193,12 @@ void MainWindow::openQrzCredentialsDialog()
 
     // Empty required fields get an amber border, not only a sentence:
     // a status line is easy to read past when the field looks filled.
-    const QString kNeedsInput = QString::fromLatin1(Style::kLineEditStyle)
+    const QString kNeedsInput = Style::lineEditStyle()
         + QStringLiteral("QLineEdit { border: 1px solid %1; }")
               .arg(Style::kAmberBorder);
     auto markEmpty = [kNeedsInput](QLineEdit* e) {
         e->setStyleSheet(e->text().trimmed().isEmpty()
-            ? kNeedsInput : QString::fromLatin1(Style::kLineEditStyle));
+            ? kNeedsInput : Style::lineEditStyle());
     };
     for (QLineEdit* e : {userEdit, passEdit}) {
         markEmpty(e);

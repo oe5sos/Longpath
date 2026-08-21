@@ -208,7 +208,7 @@ void CatTciServerPage::buildServerGroup()
     // Port spinbox + Default button
     // From Thetis setup.designer.cs:57991-57998 [v2.10.3.13] — udTCIPort (default 50001)
     m_portSpin = new QSpinBox(group);
-    m_portSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_portSpin->setStyleSheet(Style::spinBoxStyle());
     m_portSpin->setRange(1024, 65535);
     m_portSpin->setToolTip(tr("TCP port the TCI WebSocket server listens on (1024–65535). "
                                "Default is 50001. Requires server restart to take effect."));
@@ -254,7 +254,7 @@ void CatTciServerPage::buildServerGroup()
     // Rate limit
     // From Thetis TCIServer.cs [v2.10.3.13] — per-client outbound rate cap
     m_rateLimitSpin = new QSpinBox(group);
-    m_rateLimitSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_rateLimitSpin->setStyleSheet(Style::spinBoxStyle());
     m_rateLimitSpin->setRange(0, 1000);
     m_rateLimitSpin->setSuffix(tr(" msg/s"));
     m_rateLimitSpin->setSpecialValueText(tr("Unlimited"));
@@ -446,7 +446,7 @@ void CatTciServerPage::buildAudioStreamGroup()
     // Audio block size
     // From Thetis TCIServer.cs [v2.10.3.13] — audio block size (default 2048)
     m_audioBlockSpin = new QSpinBox(group);
-    m_audioBlockSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_audioBlockSpin->setStyleSheet(Style::spinBoxStyle());
     m_audioBlockSpin->setRange(100, 2048);
     m_audioBlockSpin->setSuffix(tr(" samples"));
     m_audioBlockSpin->setToolTip(
@@ -501,7 +501,7 @@ void CatTciServerPage::buildSensorsGroup()
     // RX sensor interval
     // From Thetis TCIServer.cs [v2.10.3.13] — RX sensor push interval (default 200 ms)
     m_rxSensorSpin = new QSpinBox(group);
-    m_rxSensorSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_rxSensorSpin->setStyleSheet(Style::spinBoxStyle());
     m_rxSensorSpin->setRange(30, 1000);
     m_rxSensorSpin->setSuffix(tr(" ms"));
     m_rxSensorSpin->setToolTip(
@@ -517,7 +517,7 @@ void CatTciServerPage::buildSensorsGroup()
     // TX sensor interval
     // From Thetis TCIServer.cs [v2.10.3.13] — TX sensor push interval (default 200 ms)
     m_txSensorSpin = new QSpinBox(group);
-    m_txSensorSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_txSensorSpin->setStyleSheet(Style::spinBoxStyle());
     m_txSensorSpin->setRange(30, 1000);
     m_txSensorSpin->setSuffix(tr(" ms"));
     m_txSensorSpin->setToolTip(
@@ -840,7 +840,7 @@ void CatTcpIpPage::buildUI()
     grid->addWidget(ipLabel, 1, 0);
 
     m_bindIpEdit = new QLineEdit(QStringLiteral("0.0.0.0"), group);
-    m_bindIpEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+    m_bindIpEdit->setStyleSheet(Style::lineEditStyle());
     m_bindIpEdit->setDisabled(true);
     m_bindIpEdit->setToolTip(QStringLiteral("NYI — bind IP address"));
     grid->addWidget(m_bindIpEdit, 1, 1);
@@ -851,7 +851,7 @@ void CatTcpIpPage::buildUI()
     grid->addWidget(portLabel, 2, 0);
 
     m_portSpin = new QSpinBox(group);
-    m_portSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_portSpin->setStyleSheet(Style::spinBoxStyle());
     m_portSpin->setRange(1024, 65535);
     m_portSpin->setValue(4532);
     m_portSpin->setDisabled(true);
@@ -1112,7 +1112,7 @@ void PeripheralsPage::buildRow(int row, const QString& name,
 
     // Column 1: host IP line edit.
     auto* ipEdit = new QLineEdit(this);
-    ipEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+    ipEdit->setStyleSheet(Style::lineEditStyle());
     ipEdit->setPlaceholderText(QStringLiteral("192.168.1.42"));
     ipEdit->setToolTip(tr("IP address or hostname of the %1 on your LAN. "
                           "Leave blank to disable auto-connect.").arg(name));
@@ -1130,7 +1130,7 @@ void PeripheralsPage::buildRow(int row, const QString& name,
 
     // Column 2: port spinbox.
     auto* portSpin = new QSpinBox(this);
-    portSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    portSpin->setStyleSheet(Style::spinBoxStyle());
     portSpin->setRange(1, 65535);
     portSpin->setToolTip(tr("TCP port the %1 listens on (default %2).")
                              .arg(name).arg(defaultPort));

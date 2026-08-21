@@ -298,8 +298,41 @@ bool Theme::loadFile(const QString& path, QString* error)
         }
     }
 
+    // ── Der Formteil ────────────────────────────────────────────────
+    //
+    // Absichtlich NACH den Farben und in eine eigene Tabelle: eine
+    // Datei ohne „formen" ist vollstaendig gueltig und bekommt die
+    // Vorgaben. So bleibt jede bestehende Palette unveraendert
+    // brauchbar.
+    QHash<QString, int> byForm;
+    const QJsonObject formen = root.value(QStringLiteral("formen")).toObject();
+    struct Limit { const char* key; int lo; int hi; };
+    static const Limit kLimits[] = {
+        {"radius", 0, 14}, {"luft-v", 0, 12}, {"luft-h", 0, 24},
+        {"relief", 0, 40}, {"mulde",  0, 40},
+    };
+    for (auto it = formen.constBegin(); it != formen.constEnd(); ++it) {
+        const QString key = it.key().trimmed().toLower();
+        if (key.startsWith(QLatin1Char('_'))) { continue; }
+        bool known = false;
+        for (const Limit& l : kLimits) {
+            if (key != QLatin1String(l.key)) { continue; }
+            known = true;
+            const int v = it.value().toInt(-1);
+            // Ausserhalb der Grenzen wird STILL uebergangen, nicht
+            // abgelehnt: eine Themendatei ist Zubehoer. Ein Vertipper
+            // darf die Oberflaeche nicht entstellen, aber er darf auch
+            // nicht die ganze Palette durchfallen lassen — dann suchte
+            // man den Fehler im Programm.
+            if (v >= l.lo && v <= l.hi) { byForm.insert(key, v); }
+            break;
+        }
+        if (!known) { continue; }
+    }
+
     m_byRole = byRole;
     m_byHex  = byHex;
+    m_byForm = byForm;
     m_name   = root.value(QStringLiteral("name")).toString(
                    QFileInfo(path).completeBaseName());
     m_path   = path;
@@ -312,6 +345,7 @@ void Theme::clear()
     if (!isActive() && m_name.isEmpty()) { return; }
     m_byRole.clear();
     m_byHex.clear();
+    m_byForm.clear();
     m_name.clear();
     m_path.clear();
     ++m_generation;
@@ -320,6 +354,11 @@ void Theme::clear()
 QString Theme::forRole(const QString& role) const
 {
     return m_byRole.value(role.toLower());
+}
+
+int Theme::forForm(const QString& name, int fallback) const
+{
+    return m_byForm.value(name.toLower(), fallback);
 }
 
 QString Theme::forHex(const QString& legacyHex) const

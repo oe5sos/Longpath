@@ -248,7 +248,7 @@ void RotorLogbookPanel::buildUi()
     cf.setPixelSize(16);
     cf.setBold(true);
     m_callEdit->setFont(cf);
-    m_callEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+    m_callEdit->setStyleSheet(Style::lineEditStyle());
     callRow->addWidget(m_callEdit, 1);
 
     m_lookupBtn = new QPushButton(QStringLiteral("QRZ"), this);
@@ -475,7 +475,7 @@ void RotorLogbookPanel::buildUi()
     m_rowRst = addShedRow(col, rstRow, this);
 
     for (QLineEdit* e : {m_myGrid, m_dxGrid, m_rstSent, m_rstRcvd, m_comment}) {
-        e->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+        e->setStyleSheet(Style::lineEditStyle());
     }
 
     auto* logRow = new QHBoxLayout;
@@ -2307,11 +2307,11 @@ void RotorLogbookPanel::applyLocators()
     const QString dx   = m_dxGrid->text().trimmed().toUpper();
     AppSettings::instance().setValue(kMyGridKey, mine);
 
-    const QString needsInput = QString::fromLatin1(Style::kLineEditStyle)
+    const QString needsInput = Style::lineEditStyle()
         + QStringLiteral("QLineEdit { border: 1px solid %1; }")
               .arg(Style::kAmberBorder);
     const bool myOk = isValidGridSquare(mine);
-    m_myGrid->setStyleSheet(myOk ? QString::fromLatin1(Style::kLineEditStyle)
+    m_myGrid->setStyleSheet(myOk ? Style::lineEditStyle()
                                  : needsInput);
     if (!myOk) {
         setStatus(mine.isEmpty()

@@ -68,7 +68,7 @@ void NotchEditPopup::buildUi()
         "Breite des Notch-Filters. Sehr schmale Werte setzt die "
         "Signalverarbeitung selbst herauf — dann steht hier danach die "
         "Zahl, die wirklich gilt."));
-    m_width->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_width->setStyleSheet(Style::spinBoxStyle());
     grid->addWidget(m_width, 1, 1);
 
     m_active = new QCheckBox(tr("Aktiv"), this);

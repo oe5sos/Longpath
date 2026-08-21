@@ -37,7 +37,7 @@ void DiagSignalGeneratorPage::buildUI()
         grid->addWidget(freqLabel, 0, 0);
 
         m_toneFreqSpin = new QSpinBox(group);
-        m_toneFreqSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+        m_toneFreqSpin->setStyleSheet(Style::spinBoxStyle());
         m_toneFreqSpin->setRange(100, 20000);
         m_toneFreqSpin->setValue(1000);
         m_toneFreqSpin->setSuffix(QStringLiteral(" Hz"));

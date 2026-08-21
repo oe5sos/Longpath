@@ -175,7 +175,7 @@ void AudioTciPage::buildFormatGroup()
 
     // Block size (shared key with CatTciServerPage Group 4)
     m_blockSizeSpin = new QSpinBox(group);
-    m_blockSizeSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_blockSizeSpin->setStyleSheet(Style::spinBoxStyle());
     m_blockSizeSpin->setRange(100, 2048);
     m_blockSizeSpin->setSuffix(tr(" samples"));
     m_blockSizeSpin->setToolTip(
@@ -232,7 +232,7 @@ void AudioTciPage::buildTxDirectionGroup()
 
     // TX stream buffering
     m_txBufferingSpin = new QSpinBox(group);
-    m_txBufferingSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+    m_txBufferingSpin->setStyleSheet(Style::spinBoxStyle());
     m_txBufferingSpin->setRange(10, 200);
     m_txBufferingSpin->setSuffix(tr(" ms"));
     m_txBufferingSpin->setToolTip(

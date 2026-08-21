@@ -104,6 +104,7 @@
 //                                    Anthropic Claude Code.
 
 #include "SpotHubDialog.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
@@ -154,13 +155,18 @@ namespace {
 // SpotHub dialog visually matches AetherSDR's DxCluster dialog
 // (consistent dark panel + cyan accent + monospace console).
 
-constexpr const char* kLineEditStyle =
-    "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
-    "border: 1px solid #203040; padding: 3px; }";
-
-constexpr const char* kSpinBoxStyle =
-    "QSpinBox { background: #1a1a2a; color: #c8d8e8; "
-    "border: 1px solid #203040; padding: 3px; }";
+// ── Zwei eigene Kopien sind gefallen (2026-08-21) ────────────────────
+//
+// Hier standen kLineEditStyle und kSpinBoxStyle noch einmal, unter
+// denselben Namen wie die gemeinsamen in StyleConstants.h und mit
+// ANDEREN Farben: #1a1a2a auf #203040 — die alte blaue Palette, die
+// das Entblauen 2026 ueberall sonst abgeloest hat. Diese Kopien hat es
+// nie erreicht.
+//
+// Zwei Definitionen desselben Dings laufen auseinander; hier waren sie
+// es laengst. Beide Aufrufe gehen jetzt auf Style::lineEditStyle() und
+// Style::spinBoxStyle() — damit folgen die Felder auch dem Thema und
+// bekommen denselben versenkten Verlauf wie ueberall.
 
 constexpr const char* kAutoToggleStyle =
     "QPushButton { background: #1a6030; color: white; "
@@ -399,7 +405,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     m_settingsCallEdit->setPlaceholderText(
         "Enter Callsign Here (4-12 chars — required to publish spots)");
     m_settingsCallEdit->setMaxLength(12);
-    m_settingsCallEdit->setStyleSheet(kLineEditStyle);
+    m_settingsCallEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_settingsCallEdit, row, 1);
     row++;
 
@@ -410,7 +416,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     m_settingsGridEdit->setPlaceholderText(
         "Enter Grid Here (Maidenhead — e.g. EM73 or EM73XY)");
     m_settingsGridEdit->setMaxLength(6);
-    m_settingsGridEdit->setStyleSheet(kLineEditStyle);
+    m_settingsGridEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_settingsGridEdit, row, 1);
     row++;
 
@@ -421,7 +427,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
     m_settingsFreedvMsgEdit->setPlaceholderText(
         "shown next to your station on the FreeDV Reporter map");
     m_settingsFreedvMsgEdit->setMaxLength(200);
-    m_settingsFreedvMsgEdit->setStyleSheet(kLineEditStyle);
+    m_settingsFreedvMsgEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_settingsFreedvMsgEdit, row, 1);
     row++;
 
@@ -645,7 +651,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     m_hostEdit = new QLineEdit(s.value("DxClusterHost", "dxc.nc7j.com").toString());
     m_hostEdit->setObjectName("clusterHostEdit");
     m_hostEdit->setPlaceholderText("dxc.nc7j.com");
-    m_hostEdit->setStyleSheet(kLineEditStyle);
+    m_hostEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_hostEdit, row, 1);
     row++;
 
@@ -654,7 +660,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     m_portSpin->setObjectName("clusterPortSpin");
     m_portSpin->setRange(1, 65535);
     m_portSpin->setValue(s.value("DxClusterPort", 7300).toInt());
-    m_portSpin->setStyleSheet(kSpinBoxStyle);
+    m_portSpin->setStyleSheet(Style::spinBoxStyle());
     grid->addWidget(m_portSpin, row, 1);
     row++;
 
@@ -667,7 +673,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     m_callEdit->setObjectName("clusterCallEdit");
     m_callEdit->setPlaceholderText(
         "Enter Callsign Here (set under Settings tab)");
-    m_callEdit->setStyleSheet(kLineEditStyle);
+    m_callEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_callEdit, row, 1);
     row++;
 
@@ -877,7 +883,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     m_rbnHostEdit = new QLineEdit(s.value("RbnHost", "telnet.reversebeacon.net").toString());
     m_rbnHostEdit->setObjectName("rbnHostEdit");
     m_rbnHostEdit->setPlaceholderText("telnet.reversebeacon.net");
-    m_rbnHostEdit->setStyleSheet(kLineEditStyle);
+    m_rbnHostEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_rbnHostEdit, row, 1);
     row++;
 
@@ -886,7 +892,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     m_rbnPortSpin->setObjectName("rbnPortSpin");
     m_rbnPortSpin->setRange(1, 65535);
     m_rbnPortSpin->setValue(s.value("RbnPort", 7000).toInt());
-    m_rbnPortSpin->setStyleSheet(kSpinBoxStyle);
+    m_rbnPortSpin->setStyleSheet(Style::spinBoxStyle());
     grid->addWidget(m_rbnPortSpin, row, 1);
     row++;
 
@@ -895,7 +901,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     m_rbnCallEdit->setObjectName("rbnCallEdit");
     m_rbnCallEdit->setPlaceholderText(
         "Enter Callsign Here (set under Settings tab)");
-    m_rbnCallEdit->setStyleSheet(kLineEditStyle);
+    m_rbnCallEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_rbnCallEdit, row, 1);
     row++;
 
@@ -906,7 +912,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     rateSpin->setRange(1, 100);
     rateSpin->setValue(s.value("RbnRateLimit", 10).toInt());
     rateSpin->setSuffix(" spots/sec");
-    rateSpin->setStyleSheet(kSpinBoxStyle);
+    rateSpin->setStyleSheet(Style::spinBoxStyle());
     connect(rateSpin, &QSpinBox::valueChanged, this, [](int v) {
         auto& settings = AppSettings::instance();
         settings.setValue("RbnRateLimit", v);
@@ -1104,7 +1110,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     m_wsjtxAddrEdit = new QLineEdit(s.value("WsjtxAddress", "224.0.0.1").toString());
     m_wsjtxAddrEdit->setObjectName("wsjtxAddrEdit");
     m_wsjtxAddrEdit->setPlaceholderText("224.0.0.1 (multicast) or 0.0.0.0 (any)");
-    m_wsjtxAddrEdit->setStyleSheet(kLineEditStyle);
+    m_wsjtxAddrEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_wsjtxAddrEdit, row, 1);
     row++;
 
@@ -1113,7 +1119,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     m_wsjtxPortSpin->setObjectName("wsjtxPortSpin");
     m_wsjtxPortSpin->setRange(1, 65535);
     m_wsjtxPortSpin->setValue(s.value("WsjtxPort", 2237).toInt());
-    m_wsjtxPortSpin->setStyleSheet(kSpinBoxStyle);
+    m_wsjtxPortSpin->setStyleSheet(Style::spinBoxStyle());
     grid->addWidget(m_wsjtxPortSpin, row, 1);
     row++;
 
@@ -1394,7 +1400,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
     m_scPortSpin->setObjectName("scPortSpin");
     m_scPortSpin->setRange(1, 65535);
     m_scPortSpin->setValue(s.value("SpotCollectorPort", 9999).toInt());
-    m_scPortSpin->setStyleSheet(kSpinBoxStyle);
+    m_scPortSpin->setStyleSheet(Style::spinBoxStyle());
     grid->addWidget(m_scPortSpin, 0, 1);
 
     connLayout->addLayout(grid);
@@ -1533,7 +1539,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     m_potaIntervalSpin->setRange(15, 300);
     m_potaIntervalSpin->setValue(s.value("PotaPollInterval", 30).toInt());
     m_potaIntervalSpin->setSuffix(" sec");
-    m_potaIntervalSpin->setStyleSheet(kSpinBoxStyle);
+    m_potaIntervalSpin->setStyleSheet(Style::spinBoxStyle());
     connect(m_potaIntervalSpin, &QSpinBox::valueChanged, this, [](int v) {
         auto& settings = AppSettings::instance();
         settings.setValue("PotaPollInterval", v);
@@ -2061,7 +2067,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
     m_pskCallEdit->setObjectName("pskCallEdit");
     m_pskCallEdit->setPlaceholderText(
         "Enter Callsign Here (set under Settings tab)");
-    m_pskCallEdit->setStyleSheet(kLineEditStyle);
+    m_pskCallEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_pskCallEdit, row, 1);
     row++;
 
@@ -2069,7 +2075,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
     m_pskGridEdit = new QLineEdit(defaultGrid);
     m_pskGridEdit->setObjectName("pskGridEdit");
     m_pskGridEdit->setPlaceholderText("4-character or 6-character Maidenhead");
-    m_pskGridEdit->setStyleSheet(kLineEditStyle);
+    m_pskGridEdit->setStyleSheet(Style::lineEditStyle());
     grid->addWidget(m_pskGridEdit, row, 1);
     row++;
 

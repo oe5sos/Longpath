@@ -126,7 +126,7 @@ void TxProfileSetupPage::buildUi()
         auto* lowSpin = new QSpinBox(filterGroup);
         lowSpin->setRange(0, 5000);
         lowSpin->setSuffix(QStringLiteral(" Hz"));
-        lowSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+        lowSpin->setStyleSheet(Style::spinBoxStyle());
         lowSpin->setToolTip(QStringLiteral(
             "TX bandpass filter lower cutoff (Hz).  0 Hz for voice SSB modes."));
         lowSpin->setValue(m_tx->filterLow());
@@ -135,7 +135,7 @@ void TxProfileSetupPage::buildUi()
         auto* highSpin = new QSpinBox(filterGroup);
         highSpin->setRange(200, 10000);
         highSpin->setSuffix(QStringLiteral(" Hz"));
-        highSpin->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+        highSpin->setStyleSheet(Style::spinBoxStyle());
         highSpin->setToolTip(QStringLiteral(
             "TX bandpass filter upper cutoff (Hz).  2900 Hz for typical SSB voice."));
         highSpin->setValue(m_tx->filterHigh());

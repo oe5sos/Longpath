@@ -101,7 +101,7 @@ void BandwidthFilterApplet::buildUI()
             sb->setSingleStep(50);
             sb->setSuffix(QStringLiteral(" Hz"));
             sb->setFixedWidth(92);
-            sb->setStyleSheet(QString::fromLatin1(Style::kSpinBoxStyle));
+            sb->setStyleSheet(Style::spinBoxStyle());
             sb->setKeyboardTracking(false);   // erst bei Enter/Verlassen
             return sb;
         };

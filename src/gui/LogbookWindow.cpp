@@ -140,7 +140,7 @@ void LogbookWindow::buildUi()
     m_search->setPlaceholderText(
         QStringLiteral("Search call, name, QTH, country, grid or comment"));
     m_search->setClearButtonEnabled(true);
-    m_search->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+    m_search->setStyleSheet(Style::lineEditStyle());
     top->addWidget(m_search, 1);
 
     m_editBtn   = new QPushButton(QStringLiteral("Edit…"), this);
@@ -498,7 +498,7 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 
     for (QLineEdit* e : {m_gridEdit, m_countryEdit}) {
         e->setClearButtonEnabled(true);
-        e->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+        e->setStyleSheet(Style::lineEditStyle());
     }
     col->addLayout(row);
 

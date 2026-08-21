@@ -151,7 +151,27 @@ constexpr auto kBorderSubtle    = "#1f1f23";   // war #203040
 // Vorrang — dieser Wert ist nur die Vorgabe fuer alle, die keine
 // gewaehlt haben.
 constexpr auto kPanadapterBg    = "#141e27";
-constexpr auto kInsetBg         = "#08080a";   // war #0a0a18
+// ── Eigener Wert, nicht derselbe wie der Seitengrund ────────────────
+//
+// kInsetBg trug bis zum 2026-08-21 EXAKT denselben Wert wie kAppBg
+// (#08080a). Das ist nicht nur Geschmack, es macht die Rolle
+// unbrauchbar: die Themen-Umsetzung schluesselt ueber den FARBWERT,
+// und wer denselben Wert zweimal vergibt, bekommt nur die erste Rolle
+// — app-bg steht frueher in der Tabelle. Ein Thema konnte die
+// Eingabefelder deshalb nicht anfassen, ohne den ganzen Seitengrund
+// mitzunehmen.
+//
+// Dieselbe Krankheit wie „#203040 war vier Konstanten auf einmal"
+// weiter unten in ThemeQss.cpp, nur unbemerkt geblieben, weil beide
+// Werte gleich AUSSEHEN.
+//
+// Gefunden von tst_theme_form_knobs: die Pruefung verlangte, dass ein
+// Thema die Feldfarbe aendert, und das ging nicht.
+//
+// Der neue Wert ist zwei Stufen tiefer als der Seitengrund — was fuer
+// eine VERSENKTE Flaeche ohnehin richtig ist: ein Feld liegt im Grund,
+// es liegt nicht darauf.
+constexpr auto kInsetBg         = "#050507";   // war #08080a (= kAppBg!)
 constexpr auto kInsetBorder     = "#232329";   // war #1e2e3e
 constexpr auto kGroove          = "#1f1f23";   // war #203040
 
@@ -423,8 +443,13 @@ inline QString shiftL(const QColor& base, int deltaL)
 
 /// AUFGESETZT: oben heller, unten dunkler — Licht von oben, die
 /// Flaeche bekommt Dicke. Fuer Platten, Kopfleisten, Knoepfe.
-inline QString raisedFill(const char* baseHex, int lift = 16, int drop = 12)
+inline QString raisedFill(const char* baseHex, int lift = -1, int drop = -1)
 {
+    // Tiefe aus dem Thema, sofern es eine Meinung hat. Die Aufrufer
+    // duerfen weiter eigene Werte setzen — der aktive Knopf etwa ist
+    // absichtlich etwas kraeftiger als eine ruhende Platte.
+    if (lift < 0) { lift = formInt("relief", 16); }
+    if (drop < 0) { drop = lift * 3 / 4; }
     const QColor base(hexRole(baseHex));
     return QStringLiteral(
         "qlineargradient(x1:0, y1:0, x2:0, y2:1,"
@@ -434,8 +459,10 @@ inline QString raisedFill(const char* baseHex, int lift = 16, int drop = 12)
 
 /// VERSENKT: genau andersherum — oben dunkel, unten heller. Dasselbe
 /// Mittel, umgedreht, und die Flaeche liegt drin statt drauf.
-inline QString sunkenFill(const char* baseHex, int deepen = 10, int lift = 12)
+inline QString sunkenFill(const char* baseHex, int deepen = -1, int lift = -1)
 {
+    if (deepen < 0) { deepen = formInt("mulde", 10); }
+    if (lift < 0)   { lift   = deepen * 6 / 5; }
     const QColor base(hexRole(baseHex));
     return QStringLiteral(
         "qlineargradient(x1:0, y1:0, x2:0, y2:1,"
@@ -483,8 +510,9 @@ inline QString buttonBaseStyle()
         // Klingt nach nichts und ist der halbe Eindruck von Ruhe: die
         // Knopfreihen bei Zeus wirken nicht ruhiger, weil dort weniger
         // steht, sondern weil um jedes Ding mehr Luft ist.
-        "  background: %1; border: 1px solid %2; border-radius: 7px;"
-        "  color: %3; font-size: 11px; font-weight: bold; padding: 4px 10px;"
+        "  background: %1; border: 1px solid %2; border-radius: %6px;"
+        "  color: %3; font-size: 11px; font-weight: bold;"
+        "  padding: %7px %8px;"
         "}"
         "QPushButton:hover { background: %4; }"
         // Gedrueckt: der Verlauf kippt. Ein Knopf, der sich beim
@@ -495,7 +523,10 @@ inline QString buttonBaseStyle()
           QLatin1String(kBorder),
           QLatin1String(kTextPrimary),
           raisedFill(kButtonAltHover, 20, 10),
-          sunkenFill(kButtonBg));
+          sunkenFill(kButtonBg))
+     .arg(formInt("radius", 7))
+     .arg(formInt("luft-v", 4))
+     .arg(formInt("luft-h", 10));
 }
 
 inline QString greenCheckedStyle()
@@ -658,20 +689,58 @@ constexpr auto kRadioButtonStyle =
 // Rand auf kBorder (#2c2c31), der gegen fast Schwarz deutlich steht.
 //
 // Ein leeres Feld ist nicht inaktiv. Es wartet auf eine Eingabe.
-constexpr auto kLineEditStyle =
-    "QLineEdit { background: #08080a; border: 1px solid #2c2c31;"
-    " border-radius: 6px; color: #c4c4c9; font-size: 13px; padding: 2px 4px; }";
+// ── Eingabefelder sind VERSENKT ──────────────────────────────────────
+//
+// Der Betreiber, 2026-08-21, auf ein Bildschirmfoto zeigend: „hier
+// siehst du gut die uebergaenge: filter, customs. im feld von 150 bis
+// 2850." Gemeint sind die Eingabefelder und Rillen — weiche
+// Verlaeufe, die eine Flaeche als eingelassen lesen lassen.
+//
+// Bei uns waren genau die flach: „background: #08080a", fest
+// eingetippt. Und schlimmer — dieser Wert stand in KEINER
+// Themen-Tabelle, die Felder folgten also gar keinem Thema. Im hellen
+// Thema „Kreide" blieben sie schwarz.
+//
+// Jetzt sind es Funktionen: sunkenFill() ueber die Themenfarbe, Tiefe
+// und Eckenradius aus den Form-Reglern. Die alten Konstanten sind
+// ENTFERNT, nicht danebengestellt — sonst haette der Uebersetzer die
+// vergessenen Aufrufstellen nicht gefunden, und die Haelfte der
+// Felder waere flach geblieben.
+inline QString lineEditStyle()
+{
+    return QStringLiteral(
+        "QLineEdit { background: %1; border: 1px solid %2;"
+        " border-radius: %3px; color: %4; font-size: 13px;"
+        " padding: 2px 4px; }")
+        .arg(sunkenFill(kInsetBg),
+             hexRole(kInsetBorder))
+        .arg(formInt("radius", 7))
+        .arg(hexRole(kTextPrimary));
+}
 
-constexpr auto kSpinBoxStyle =
-    "QSpinBox { background: #08080a; border: 1px solid #2c2c31;"
-    " border-radius: 6px; color: #c4c4c9; font-size: 13px; padding: 2px 4px; }";
+inline QString spinBoxStyle()
+{
+    return QStringLiteral(
+        "QSpinBox { background: %1; border: 1px solid %2;"
+        " border-radius: %3px; color: %4; font-size: 13px;"
+        " padding: 2px 4px; }")
+        .arg(sunkenFill(kInsetBg),
+             hexRole(kInsetBorder))
+        .arg(formInt("radius", 7))
+        .arg(hexRole(kTextPrimary));
+}
 
-constexpr auto kDoubleSpinBoxStyle =
-    "QDoubleSpinBox { background: #08080a; border: 1px solid #2c2c31;"
-    " border-radius: 6px; color: #c4c4c9; font-size: 13px; padding: 2px 4px; }";
-
-// Backwards-compat wrapper for places that prefer a function form.
-inline QString doubleSpinBoxStyle() { return QString::fromLatin1(kDoubleSpinBoxStyle); }
+inline QString doubleSpinBoxStyle()
+{
+    return QStringLiteral(
+        "QDoubleSpinBox { background: %1; border: 1px solid %2;"
+        " border-radius: %3px; color: %4; font-size: 13px;"
+        " padding: 2px 4px; }")
+        .arg(sunkenFill(kInsetBg),
+             hexRole(kInsetBorder))
+        .arg(formInt("radius", 7))
+        .arg(hexRole(kTextPrimary));
+}
 
 constexpr auto kSliderStyle =
     "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"

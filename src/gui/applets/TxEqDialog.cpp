@@ -236,7 +236,7 @@ TxEqDialog::TxEqDialog(RadioModel* radio, QWidget* parent)
     // keep their own specificity and continue to override.
     setStyleSheet(QString::fromLatin1(Longpath::Style::kPageStyle)
                   + QString::fromLatin1(Longpath::Style::kGroupBoxStyle)
-                  + QString::fromLatin1(Longpath::Style::kSpinBoxStyle)
+                  + Longpath::Style::spinBoxStyle()
                   + Longpath::Style::doubleSpinBoxStyle()
                   + QString::fromLatin1(Longpath::Style::kComboStyle)
                   + QString::fromLatin1(Longpath::Style::kCheckBoxStyle)
@@ -393,7 +393,7 @@ namespace {
 // (any may be null — the preamp column has no freq spin).
 //
 // Batch 9 styling fix — applies Style::sliderVStyle() to the slider,
-// Style::kSpinBoxStyle to both spinboxes, and a kTextPrimary colour
+// Style::spinBoxStyle() to both spinboxes, and a kTextPrimary colour
 // override to the header label.  Without this, the band columns
 // rendered with the system default theme inside an otherwise-dark
 // dialog (the header was hard-to-read system grey, the slider used
@@ -438,7 +438,7 @@ QWidget* buildBandColumn(const QString& headerLabel,
     db->setSuffix(QStringLiteral(" dB"));
     db->setProperty(kBandIndexProp, bandIndex);
     // Batch 9 — apply the project spinbox style.
-    db->setStyleSheet(Longpath::Style::kSpinBoxStyle);
+    db->setStyleSheet(Longpath::Style::spinBoxStyle());
     v->addWidget(db);
     *outDbSpin = db;
 
@@ -451,7 +451,7 @@ QWidget* buildBandColumn(const QString& headerLabel,
         // Allow 4-digit + suffix room.
         hz->setMinimumWidth(80);
         // Batch 9 — apply the project spinbox style.
-        hz->setStyleSheet(Longpath::Style::kSpinBoxStyle);
+        hz->setStyleSheet(Longpath::Style::spinBoxStyle());
         v->addWidget(hz);
         *outFreqSpin = hz;
     }

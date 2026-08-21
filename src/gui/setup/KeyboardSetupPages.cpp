@@ -27,7 +27,7 @@ void KeyboardShortcutsPage::buildUI()
     // Search bar
     m_searchEdit = new QLineEdit(group);
     m_searchEdit->setPlaceholderText(QStringLiteral("Search shortcuts…"));
-    m_searchEdit->setStyleSheet(QString::fromLatin1(Style::kLineEditStyle));
+    m_searchEdit->setStyleSheet(Style::lineEditStyle());
     m_searchEdit->setDisabled(true);
     m_searchEdit->setToolTip(QStringLiteral("NYI — shortcut search"));
     vLayout->addWidget(m_searchEdit);
