@@ -166,6 +166,11 @@ private:
     void askForCustomFilter();
     /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
     static QString filterLabel(int low, int high);
+    /// Die drei Breiten, die vorne stehen (Einstellung
+    /// „CommandBarFilterFront", Vorgabe 2700,2900,3500 Hz).
+    static QVector<int> frontWidthsHz();
+    /// Eine Breite auf Flanken umrechnen; die Mitte bleibt stehen.
+    QPair<int, int> edgesForWidth(int widthHz) const;
 
     void pushModeToModel(DSPMode m);
     void pushStepToModel(int hz);

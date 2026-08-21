@@ -207,9 +207,15 @@ private slots:
                  QStringLiteral("USB"));
     }
 
-    /// Eine Filterpille setzt wirklich den Filter — und heisst, wie sie
-    /// wirkt.
-    void aFilterPillReachesTheModel()
+    /// Die drei vorderen Breiten sind 2,9 / 3,2 / 3,8 — und eine
+    /// Filterpille setzt wirklich den Filter.
+    ///
+    /// Sie sind KEINE Presets, sondern Breiten aus den Einstellungen
+    /// („CommandBarFilterFront"). Der Betreiber hat die Auswahl am
+    /// 2026-08-21 innerhalb weniger Minuten zweimal geaendert; waere
+    /// sie fest verdrahtet, waere jede Meinungsaenderung eine
+    /// Uebersetzung.
+    void theThreeFrontWidthsAreTheOnesAsked()
     {
         SliceModel slice;
         slice.setDspMode(DSPMode::LSB);
@@ -218,23 +224,39 @@ private slots:
         bar.attach(&slice);
 
         const QStringList labels = bar.pillsIn(QStringLiteral("Filter"));
-        QVERIFY2(!labels.isEmpty(), "Keine Filterpillen");
-        QVERIFY2(!labels.first().contains(QLatin1Char('-')),
-                 qPrintable(QStringLiteral(
-                     "Die Pille zeigt Flanken statt Breite: %1")
-                     .arg(labels.first())));
+        QCOMPARE(labels.size(), 3);
+        QCOMPARE(labels.at(0), QStringLiteral("2.9k"));
+        QCOMPARE(labels.at(1), QStringLiteral("3.2k"));
+        QCOMPARE(labels.at(2), QStringLiteral("3.8k"));
+    }
 
-        const auto all = SliceModel::presetsForMode(DSPMode::LSB);
-        QVERIFY(all.size() >= 2);
+    /// Ein Klick setzt die Breite und laesst die MITTE stehen.
+    ///
+    /// Sonst spraenge ein LSB-Filter auf die andere Seite des
+    /// Traegers, sobald man eine Breite waehlt — aus -2900…0 wuerde
+    /// -1600…+1600.
+    void aFilterPillKeepsTheCentre()
+    {
+        SliceModel slice;
+        slice.setDspMode(DSPMode::LSB);
+        slice.setFilter(-2900, 0);
+
+        CommandBar bar;
+        bar.attach(&slice);
+
+        const double centreBefore =
+            (slice.filterLow() + slice.filterHigh()) / 2.0;
 
         QVERIFY(bar.clickPill(QStringLiteral("Filter"),
-                      bar.pillsIn(QStringLiteral("Filter")).at(1)));
-        QCOMPARE(slice.filterLow(),  all.at(1).first);
-        QCOMPARE(slice.filterHigh(), all.at(1).second);
+                              QStringLiteral("3.8k")));
 
-        // Und die Leiste zeigt danach genau diese Breite als aktiv.
-        QCOMPARE(bar.activePill(QStringLiteral("Filter")),
-                 bar.pillsIn(QStringLiteral("Filter")).at(1));
+        QCOMPARE(qAbs(slice.filterHigh() - slice.filterLow()), 3800);
+        const double centreAfter =
+            (slice.filterLow() + slice.filterHigh()) / 2.0;
+        QVERIFY2(qAbs(centreAfter - centreBefore) <= 1.0,
+                 qPrintable(QStringLiteral(
+                     "Die Mitte ist gewandert: %1 -> %2")
+                     .arg(centreBefore).arg(centreAfter)));
     }
 
     /// Beim Moduswechsel werden die Pillen NEU BESCHRIFTET.

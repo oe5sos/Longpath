@@ -15,6 +15,7 @@
 
 #include "gui/StyleConstants.h"
 #include "gui/widgets/DspQuickPopups.h"
+#include "core/AppSettings.h"
 #include "models/SliceModel.h"
 
 #include <QHBoxLayout>
@@ -330,20 +331,63 @@ QString CommandBar::filterLabel(int low, int high)
     return QStringLiteral("%1").arg(w);
 }
 
+// ── Welche drei vorne stehen ─────────────────────────────────────────
+//
+// Der Betreiber, 2026-08-21, zuerst „2,7; 2,9; 3,5", Minuten spaeter
+// „2,9; 3,2; 3,8 bitte".
+//
+// Genau deshalb steht die Auswahl in den EINSTELLUNGEN und nicht im
+// Quelltext: die erste Bitte enthielt zwei Breiten, die unsere
+// Preset-Liste gar nicht kennt (sie fuehrt 5,0 / 4,4 / 3,8 / 3,2 /
+// 2,9 / 2,6 / 2,3 / 1,7 / 1,1 / 0,5), die zweite nur bekannte. Waere
+// die Reihe fest verdrahtet, waere jede Meinungsaenderung eine
+// Uebersetzung; so ist sie eine Zahl in einer Datei.
+//
+// Die drei vorderen sind darum keine Presets, sondern BREITEN. Das ist
+// auch naeher an der Sache: wer „3,2" sagt, meint eine Breite und
+// nicht den soundsovielten Eintrag einer Liste. Das „…" fuehrt
+// weiterhin die echten Presets des Modus.
+QVector<int> CommandBar::frontWidthsHz()
+{
+    const QString raw = AppSettings::instance()
+        .value(QStringLiteral("CommandBarFilterFront"),
+               QStringLiteral("2900,3200,3800")).toString();
+    QVector<int> out;
+    const QStringList parts = raw.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    for (const QString& p : parts) {
+        bool ok = false;
+        const int v = p.trimmed().toInt(&ok);
+        if (ok && v >= 50 && v <= 20000) { out.append(v); }
+    }
+    if (out.isEmpty()) { out = {2900, 3200, 3800}; }
+    return out;
+}
+
+/// Eine Breite auf die Flanken des laufenden Filters umrechnen: die
+/// Mitte bleibt stehen. Sonst spraenge ein LSB-Filter auf die andere
+/// Seite des Traegers, sobald man eine Breite waehlt.
+QPair<int, int> CommandBar::edgesForWidth(int widthHz) const
+{
+    if (!m_slice) { return {-widthHz, 0}; }
+    const double centre =
+        (m_slice->filterLow() + m_slice->filterHigh()) / 2.0;
+    return {qRound(centre - widthHz / 2.0), qRound(centre + widthHz / 2.0)};
+}
+
 void CommandBar::relabelFilterPills()
 {
     Group* g = group(QStringLiteral("Filter"));
     if (!g || !m_slice) { return; }
-    const auto all = SliceModel::presetsForMode(m_slice->dspMode());
+    const QVector<int> front = frontWidthsHz();
     for (int i = 0; i < g->pills.size(); ++i) {
         QPushButton* b = g->pills.at(i);
-        if (i < all.size()) {
-            b->setText(filterLabel(all.at(i).first, all.at(i).second));
-            b->setProperty("loHz", all.at(i).first);
-            b->setProperty("hiHz", all.at(i).second);
+        if (i < front.size()) {
+            const QPair<int, int> e = edgesForWidth(front.at(i));
+            b->setText(filterLabel(e.first, e.second));
+            b->setProperty("loHz", e.first);
+            b->setProperty("hiHz", e.second);
             b->setEnabled(true);
-            b->setToolTip(QStringLiteral("%1 Hz bis %2 Hz")
-                              .arg(all.at(i).first).arg(all.at(i).second));
+            b->setToolTip(QStringLiteral("%1 Hz breit").arg(front.at(i)));
         } else {
             // Weniger als drei Breiten in diesem Modus: die Pille
             // bleibt stehen, aber leer und tot. Sie zu verstecken
