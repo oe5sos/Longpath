@@ -182,6 +182,17 @@ private:
 
     QSplitter*                                 m_rootSplitter {nullptr};
     QMap<QString, PanadapterApplet*>           m_pans;
+
+public:
+    /// Nur fuer Pruefungen: welche Panadapter der Stapel fuehrt, und
+    /// wie viele davon gerade in eigenen Fenstern stehen. Ohne diese
+    /// beiden kann eine Pruefung nicht feststellen, ob ein Aufruf
+    /// ueberhaupt gegriffen hat — und pruefte dann still gar nichts.
+    QStringList panIdsForTesting() const { return m_pans.keys(); }
+    int floatingCountForTesting() const
+    { return static_cast<int>(m_floating.size()); }
+
+private:
     QMap<QString, PanFloatingWindow*>          m_floating;
     QString                                    m_currentLayoutId {"1"};
     QString                                    m_activePanId;
