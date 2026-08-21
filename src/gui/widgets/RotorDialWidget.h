@@ -24,6 +24,8 @@
 // =================================================================
 
 #include <QPointF>
+class QContextMenuEvent;
+
 #include <QImage>
 #include <QWidget>
 
@@ -95,6 +97,27 @@ public:
     // macOS hinter dem QRhi-Inhalt verschwindet und ein natives keine
     // Durchsichtigkeit ueber die GPU-Flaeche bekommt.
     QImage renderTransparent(int sidePx, qreal dpr = 2.0);
+
+    // ── Zwei Formen ──────────────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-21, nach dem Entwurfsblatt: „beide zur
+    // auswahl, standard vollkreis."
+    //
+    // Der Grund steht im Entwurf (Longpath-Kompass-Entwurf.pdf): ein
+    // Vollkreis ist so breit wie hoch. In einer Flaeche von 1180 x 330
+    // begrenzt die HOEHE den Radius auf rund 150 — er nutzt damit 300
+    // von 1180 Punkten Breite, und die restlichen 880 kann er nicht
+    // fuellen, egal wie man rechnet. S-Meter und Stehwelle wirken
+    // richtig proportioniert, weil sie Halbkreise sind.
+    //
+    // Das Band loest das, indem es die Rundform aufgibt: ein
+    // Ausschnitt von +-120 Grad um die Antenne, die fest in der Mitte
+    // steht. Was es dafuer verliert, ist das Rundherum — deshalb eine
+    // WAHL und keine Ablösung.
+    enum class Shape { Rose, Tape };
+
+    void  setShape(Shape s);
+    Shape shape() const noexcept { return m_shape; }
 
     void setBeamWidth(double deg);
 
@@ -191,6 +214,14 @@ private:
     // stehen, wo kein Platz ist.
     /// Waehrend renderTransparent(): kein Grund, keine Ablesung.
     bool    m_bare{false};
+    Shape   m_shape{Shape::Rose};
+
+    /// Das Band statt der Rose. Siehe Shape.
+    void   paintTape(QPainter& p);
+    void   contextMenuEvent(QContextMenuEvent* ev) override;
+    double bearingAtTape(const QPointF& pos) const;
+    /// Sichtbarer Ausschnitt des Bandes, in Grad (Vollbreite).
+    static constexpr double kTapeSpanDeg = 240.0;
 
     bool    isLandscape()   const;
     bool    isCompassOnly() const;

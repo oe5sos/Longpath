@@ -11,9 +11,14 @@
 // =================================================================
 
 #include "RotorDialWidget.h"
+
+#include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 
 #include <QMouseEvent>
+#include <QMenu>
+#include <QContextMenuEvent>
+#include <QActionGroup>
 #include <QPainter>
 #include <QStringList>
 #include <QRadialGradient>
@@ -107,6 +112,48 @@ RotorDialWidget::RotorDialWidget(QWidget* parent)
     // also wants the tooltip, and refreshTooltip() is what keeps the
     // two from overwriting each other.
     setHint(QStringLiteral("Click inside the rose to aim the antenna"));
+
+    // Die gemerkte Form. Vorgabe Vollkreis — so hat es der Betreiber
+    // am 2026-08-21 entschieden („beide zur auswahl, standard
+    // vollkreis").
+    m_shape = AppSettings::instance()
+                  .value(QStringLiteral("RotorDialShape"),
+                         QStringLiteral("Rose")).toString()
+                      == QStringLiteral("Tape")
+                  ? Shape::Tape : Shape::Rose;
+
+    // Die Wahl gehoert an das Ding selbst, nicht in einen Dialog: man
+    // entscheidet sie, waehrend man es ansieht.
+    setContextMenuPolicy(Qt::DefaultContextMenu);
+}
+
+void RotorDialWidget::contextMenuEvent(QContextMenuEvent* ev)
+{
+    QMenu menu(this);
+    auto* group = new QActionGroup(&menu);
+    group->setExclusive(true);
+
+    const struct { const char* label; Shape shape; const char* tip; } kForms[] = {
+        {QT_TR_NOOP("Vollkreis"), Shape::Rose,
+         QT_TR_NOOP("Ganze Windrose, Norden oben. Zeigt auch, was hinter "
+                    "der Antenne liegt.")},
+        {QT_TR_NOOP("Peilband"), Shape::Tape,
+         QT_TR_NOOP("Ein Band um die Antenne statt eines Kreises. Nutzt "
+                    "die volle Breite — dafuer fehlt das Rundherum.")},
+    };
+    for (const auto& f : kForms) {
+        QAction* a = menu.addAction(tr(f.label));
+        a->setCheckable(true);
+        a->setChecked(m_shape == f.shape);
+        a->setToolTip(tr(f.tip));
+        group->addAction(a);
+        const Shape target = f.shape;
+        connect(a, &QAction::triggered, this, [this, target]() {
+            setShape(target);
+        });
+    }
+    menu.exec(ev->globalPos());
+    ev->accept();
 }
 
 QSize RotorDialWidget::sizeHint()        const { return {190, 210}; }
@@ -320,6 +367,7 @@ double RotorDialWidget::travelDegrees() const
 // the target wildly).
 double RotorDialWidget::bearingAt(const QPointF& pos) const
 {
+    if (m_shape == Shape::Tape) { return bearingAtTape(pos); }
     const QPointF p = pos - roseCentre();
     // The dead zone scales with the rose. A fixed 8 px hub was most of
     // a compass-only dial, so on a small one the middle third of the
@@ -374,10 +422,179 @@ QImage RotorDialWidget::renderTransparent(int sidePx, qreal dpr)
     return img;
 }
 
+// ── Form waehlen ─────────────────────────────────────────────────────
+//
+// Gemerkt, weil es eine Entscheidung ist und keine Geste: wer auf das
+// Band umstellt, tut das nicht fuer eine Sitzung.
+void RotorDialWidget::setShape(Shape s)
+{
+    if (m_shape == s) { return; }
+    m_shape = s;
+    AppSettings::instance().setValue(
+        QStringLiteral("RotorDialShape"),
+        s == Shape::Tape ? QStringLiteral("Tape") : QStringLiteral("Rose"));
+    update();
+}
+
+// ── Das Peilband ─────────────────────────────────────────────────────
+//
+// Ein Ausschnitt von 240 Grad, die Antenne fest in der Mitte. Es liest
+// sich wie ein Massband, das unter einem festen Zeiger durchlaeuft —
+// beim Drehen wandert die Skala, nicht die Marke.
+//
+// Der Gewinn ist die Flaeche: das Band nutzt die volle Breite, die ein
+// Kreis nicht fuellen kann. Der Preis ist das Rundherum — was hinter
+// der Antenne liegt, steht ausserhalb des Ausschnitts. Deshalb eine
+// Wahl und keine Ablösung.
+void RotorDialWidget::paintTape(QPainter& p)
+{
+    const double w = width();
+    const double h = height();
+    const double pad = 14.0;
+    const double bx = pad, bw = w - 2.0 * pad;
+    if (bw < 80.0) { return; }
+
+    const double mid = bx + bw / 2.0;
+    const double ppd = bw / kTapeSpanDeg;          // Punkte je Grad
+
+    // ── Die Teilung waechst mit der Hoehe ────────────────────────────
+    //
+    // Erst standen hier feste Laengen (16 / 11 / 6 Punkte). In einer
+    // Flaeche von 1170 x 330 klebte das ganze Band dann auf einem
+    // duennen Streifen in der Mitte, und ringsum war Platz, den es
+    // nicht nutzte — genau der Vorwurf, den das Band eigentlich
+    // aufloesen soll.
+    //
+    // `unit` ist die Laenge des laengsten Strichs; alles andere haengt
+    // daran. Nach unten begrenzt, damit es in einem flachen Streifen
+    // nicht verschwindet, nach oben, damit es in einem hohen Fenster
+    // nicht zum Zaun wird.
+    const double unit = qBound(14.0, h * 0.22, 64.0);
+    const double yb   = m_bare ? h * 0.62 : h * 0.56 + unit * 0.25;
+
+    auto px = [&](double deg) {
+        return mid + std::fmod(deg - m_actual + 540.0, 360.0) - 180.0 <= 0.0
+                   ? mid + (std::fmod(deg - m_actual + 540.0, 360.0) - 180.0) * ppd
+                   : mid + (std::fmod(deg - m_actual + 540.0, 360.0) - 180.0) * ppd;
+    };
+
+    // Keule als warmes Feld um die Mitte
+    if (m_beamWidth > 0.5) {
+        QColor wedge = kActual;
+        wedge.setAlpha(34);
+        p.fillRect(QRectF(px(m_actual - m_beamWidth / 2.0), yb - unit * 1.15,
+                          m_beamWidth * ppd, unit * 1.15), wedge);
+    }
+
+    // Teilung: 5 Grad fein, 30 mittel, 90 lang
+    QFont f = Style::monoFont(p.font(), 10);
+    for (int d = 0; d < 360; d += 5) {
+        const double x = px(d);
+        if (x < bx - 6.0 || x > bx + bw + 6.0) { continue; }
+        const bool cardinal = (d % 90) == 0;
+        const bool major    = (d % 30) == 0;
+        const double len = unit * (cardinal ? 1.0 : major ? 0.68 : 0.34);
+        p.setPen(QPen(cardinal ? kCardinal : major ? kRing : kRingInner,
+                      cardinal ? 1.8 : major ? 1.1 : 0.7));
+        p.drawLine(QPointF(x, yb - len), QPointF(x, yb));
+        if (!major) { continue; }
+        f.setPixelSize(qBound(9, int(unit * 0.30), 15)
+                       + (cardinal ? 2 : 0));
+        f.setBold(cardinal);
+        p.setFont(f);
+        // Die vier Himmelsrichtungen in der Textfarbe: sie sind die
+        // Orientierung, nicht Beiwerk. Die Zahlen dazwischen bleiben
+        // leiser.
+        p.setPen(cardinal ? QColor(Style::kTextPrimary) : kMuted);
+        const QString lab = (d == 0)   ? QStringLiteral("N")
+                          : (d == 90)  ? QStringLiteral("E")
+                          : (d == 180) ? QStringLiteral("S")
+                          : (d == 270) ? QStringLiteral("W")
+                                       : QString::number(d);
+        p.drawText(QPointF(x - QFontMetrics(f).horizontalAdvance(lab) / 2.0,
+                           yb + QFontMetrics(f).ascent() + 5.0), lab);
+    }
+
+    // Ziel
+    if (m_hasTarget) {
+        const double tx = px(m_target);
+        if (tx > bx - 8.0 && tx < bx + bw + 8.0) {
+            QPen pen(m_state == State::OnTarget ? kArrived : kTarget, 1.6);
+            pen.setStyle(Qt::DashLine);
+            pen.setDashPattern({2.6, 2.2});
+            p.setPen(pen);
+            p.drawLine(QPointF(tx, yb - unit * 1.15), QPointF(tx, yb));
+            QPolygonF mark;
+            mark << QPointF(tx, yb) << QPointF(tx - 5.0, yb + 9.0)
+                 << QPointF(tx + 5.0, yb + 9.0);
+            p.setPen(Qt::NoPen);
+            p.setBrush(m_state == State::OnTarget ? kArrived : kTarget);
+            p.drawPolygon(mark);
+            p.setBrush(Qt::NoBrush);
+        }
+    }
+
+    // Die feste Marke in der Mitte: SIE ist die Antenne.
+    const QColor actualCol = m_simulated                 ? kMuted
+                           : (m_state == State::Turning) ? kTurning
+                           : (m_state == State::OnTarget)? kArrived
+                                                         : kActual;
+    const double headY = yb - unit * 1.45;
+    p.setPen(QPen(actualCol, 2.6));
+    p.drawLine(QPointF(mid, headY), QPointF(mid, yb + 4.0));
+    QPolygonF head;
+    head << QPointF(mid, headY)
+         << QPointF(mid - 7.0, headY - 13.0)
+         << QPointF(mid + 7.0, headY - 13.0);
+    p.setPen(Qt::NoPen);
+    p.setBrush(actualCol);
+    p.drawPolygon(head);
+    p.setBrush(Qt::NoBrush);
+
+    if (m_bare) { return; }
+
+    QFont big = Style::monoFont(p.font(), 13);
+    big.setPixelSize(std::max(15, static_cast<int>(h * 0.13)));
+    big.setBold(true);
+    p.setFont(big);
+    p.setPen(actualCol);
+    p.drawText(QPointF(bx, h - 10.0), degText(m_actual));
+
+    QFont small = Style::monoFont(p.font(), 11);
+    small.setPixelSize(11);
+    p.setFont(small);
+    p.setPen(kMuted);
+    QString line2 = m_hasTarget
+        ? QStringLiteral("Ziel %1 · %2%3°")
+              .arg(degText(m_target),
+                   travelDegrees() >= 0 ? QStringLiteral("CW ")
+                                        : QStringLiteral("CCW "))
+              .arg(qRound(std::abs(travelDegrees())))
+        : QStringLiteral("kein Ziel");
+    p.drawText(QPointF(bx + QFontMetrics(big).horizontalAdvance("000°") + 14.0,
+                       h - 12.0), line2);
+}
+
+double RotorDialWidget::bearingAtTape(const QPointF& pos) const
+{
+    const double pad = 14.0;
+    const double bw = width() - 2.0 * pad;
+    if (bw < 80.0) { return -1.0; }
+    const double mid = pad + bw / 2.0;
+    const double ppd = bw / kTapeSpanDeg;
+    return norm360(m_actual + (pos.x() - mid) / ppd);
+}
+
 void RotorDialWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+
+    if (m_shape == Shape::Tape) {
+        if (!m_bare) { p.fillRect(rect(), kBackground); }
+        paintTape(p);
+        return;
+    }
 
     const double w = width();
     const double h = height();

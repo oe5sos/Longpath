@@ -30,6 +30,8 @@
 #include <QImage>
 #include <cmath>
 #include "gui/widgets/RotorDialWidget.h"
+#include "core/AppSettings.h"
+#include <QSignalSpy>
 
 using namespace Longpath;
 
@@ -119,6 +121,110 @@ private slots:
                      .arg(qRed(ink)).arg(qGreen(ink)).arg(qBlue(ink))));
         w->hide();
         delete w;
+    }
+
+    // ── Zwei Formen zur Wahl ────────────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-21, nach dem Entwurfsblatt: „beide zur
+    // auswahl, standard vollkreis."
+    //
+    // Der Grund fuer das Band steht im Entwurf: ein Vollkreis ist so
+    // breit wie hoch und kann eine Flaeche von 1180 x 330 nie fuellen.
+    // Das Band gibt die Rundform auf und gewinnt dafuer die Breite.
+    void thePlainCircleIsTheDefault()
+    {
+        AppSettings::instance().remove(QStringLiteral("RotorDialShape"));
+        RotorDialWidget w;
+        QCOMPARE(w.shape(), RotorDialWidget::Shape::Rose);
+    }
+
+    void theShapeChoiceSurvivesARestart()
+    {
+        {
+            RotorDialWidget w;
+            w.setShape(RotorDialWidget::Shape::Tape);
+            QCOMPARE(w.shape(), RotorDialWidget::Shape::Tape);
+        }
+        // „Neustart": ein neues Zifferblatt liest die gemerkte Wahl.
+        RotorDialWidget again;
+        QCOMPARE(again.shape(), RotorDialWidget::Shape::Tape);
+        AppSettings::instance().remove(QStringLiteral("RotorDialShape"));
+    }
+
+    // Im Band steht die Antenne FEST in der Mitte — ein Klick dorthin
+    // meint also ihre eigene Richtung, und weiter rechts mehr Grad.
+    void clickingTheTapeMeansTheRightBearing()
+    {
+        auto* w = new RotorDialWidget();
+        w->setShape(RotorDialWidget::Shape::Tape);
+        w->resize(600, 200);
+        w->setActualBearing(90);
+        w->show();
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+
+        QSignalSpy spy(w, &RotorDialWidget::targetPicked);
+
+        auto click = [w](int x) {
+            QMouseEvent ev(QEvent::MouseButtonPress, QPointF(x, 100),
+                           w->mapToGlobal(QPointF(x, 100)), Qt::LeftButton,
+                           Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(w, &ev);
+        };
+
+        click(300);                      // die Mitte
+        QCOMPARE(spy.count(), 1);
+        QVERIFY2(qAbs(spy.at(0).at(0).toDouble() - 90.0) < 2.0,
+                 qPrintable(QStringLiteral(
+                     "ein Klick auf die Mitte MUSS die eigene Richtung "
+                     "meinen, kam aber als %1 an")
+                     .arg(spy.at(0).at(0).toDouble())));
+
+        spy.clear();
+        click(450);                      // ein Viertel nach rechts
+        QCOMPARE(spy.count(), 1);
+        const double right = spy.at(0).at(0).toDouble();
+        QVERIFY2(right > 90.0 && right < 210.0,
+                 qPrintable(QStringLiteral(
+                     "rechts der Mitte MUSS mehr Grad heissen, kam als %1")
+                     .arg(right)));
+
+        w->hide();
+        delete w;
+        AppSettings::instance().remove(QStringLiteral("RotorDialShape"));
+    }
+
+    // Und es malt wirklich etwas anderes.
+    void theTwoShapesLookDifferent()
+    {
+        auto shot = [](RotorDialWidget::Shape sh) {
+            auto* w = new RotorDialWidget();
+            w->setShape(sh);
+            w->resize(600, 220);
+            w->setActualBearing(45);
+            w->show();
+            QTest::qWaitForWindowExposed(w);
+            QTest::qWait(60);
+            QImage img(w->size(), QImage::Format_ARGB32);
+            img.fill(Qt::black);
+            w->render(&img);
+            w->hide();
+            delete w;
+            return img;
+        };
+        const QImage rose = shot(RotorDialWidget::Shape::Rose);
+        const QImage tape = shot(RotorDialWidget::Shape::Tape);
+        int diff = 0;
+        for (int y = 0; y < rose.height(); y += 3) {
+            for (int x = 0; x < rose.width(); x += 3) {
+                if (rose.pixel(x, y) != tape.pixel(x, y)) { ++diff; }
+            }
+        }
+        QVERIFY2(diff > 500,
+                 qPrintable(QStringLiteral(
+                     "die beiden Formen unterscheiden sich in nur %1 "
+                     "Bildpunkten — dann ist eine davon nicht gebaut")
+                     .arg(diff)));
+        AppSettings::instance().remove(QStringLiteral("RotorDialShape"));
     }
 };
 QTEST_MAIN(TestRotorDialPaint)
