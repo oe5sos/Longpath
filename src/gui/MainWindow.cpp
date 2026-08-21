@@ -10183,17 +10183,19 @@ void MainWindow::wireSliceToSpectrum()
             dialog->selectPage(QStringLiteral("NB/SNB"));
             dialog->show();
         });
-        connect(m_rxApplet, &RxApplet::openNrSetupRequested, this,
-                [this](Longpath::NrSlot slot) {
-            auto* dialog = new SetupDialog(m_radioModel, this);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            wireSetupDialog(dialog);
-            dialog->selectPage(QStringLiteral("NR/ANF"));
-            if (auto* nrPage = dialog->findChild<NrAnfSetupPage*>()) {
-                nrPage->selectSubtab(slot);
-            }
-            dialog->show();
-        });
+        connect(m_rxApplet, &RxApplet::openNrSetupRequested,
+                this, &MainWindow::openNrSetupPage);
+    }
+
+    // Dieselbe Stelle aus der oberen Leiste: der Rechtsklick auf eine
+    // NR-Pille zeigt die Schnellregler, und deren „mehr…" fuehrt hier
+    // hinein. EINE Funktion fuer beide Wege — zwei Kopien desselben
+    // Lambdas waeren zwei Stellen, an denen der naechste Seitenname
+    // vergessen wird.
+    if (m_commandBar) {
+        connect(m_commandBar, &CommandBar::openNrSetupRequested,
+                this, &MainWindow::openNrSetupPage,
+                Qt::UniqueConnection);
     }
 
     // --- PhoneCwApplet → Setup → Transmit → DEXP/VOX page (Phase 3M-3a-iii Task 15).
@@ -10746,6 +10748,21 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     }
 
     menu->popup(globalPos);
+}
+
+// Die Einstellungsseite einer Rauschminderung oeffnen und gleich auf
+// deren Reiter springen. Aus dem RX-Feld UND aus der oberen Leiste
+// erreichbar; beide gehen denselben Weg.
+void MainWindow::openNrSetupPage(Longpath::NrSlot slot)
+{
+    auto* dialog = new SetupDialog(m_radioModel, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    wireSetupDialog(dialog);
+    dialog->selectPage(QStringLiteral("NR/ANF"));
+    if (auto* nrPage = dialog->findChild<NrAnfSetupPage*>()) {
+        nrPage->selectSubtab(slot);
+    }
+    dialog->show();
 }
 
 void MainWindow::applyDarkTheme()

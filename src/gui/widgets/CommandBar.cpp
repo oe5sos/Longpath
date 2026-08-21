@@ -14,6 +14,7 @@
 #include "gui/widgets/CommandBar.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/widgets/DspQuickPopups.h"
 #include "models/SliceModel.h"
 
 #include <QHBoxLayout>
@@ -408,6 +409,31 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
         b->setProperty("nrSlot", static_cast<int>(entry.second));
         connect(b, &QPushButton::clicked, this, [this, b]() {
             pushNrToModel(static_cast<NrSlot>(b->property("nrSlot").toInt()));
+        });
+
+        // ── Rechtsklick: die Schnellregler DIESER Rauschminderung ────
+        //
+        // Die Faehigkeit sass bisher auf den NR-Knoepfen im RX-Feld.
+        // Weil die auf Ansage vom 2026-08-21 verschwinden ('dies
+        // sollte nichts rechts in den widgets stehen'), zieht sie hier
+        // mit — sonst waere sie danach unerreichbar, und das ist genau
+        // die Art Verlust, die niemandem auffaellt, bis er das erste
+        // Mal an einem Regler drehen will.
+        //
+        // Nicht die Einstellungsseite: auf der Flagge oeffnete der
+        // Rechtsklick die drei bis fuenf Regler dieser Minderung, und
+        // die Setup-Seite ist darin nur der Verweis ganz unten.
+        b->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(b, &QWidget::customContextMenuRequested, this,
+                [this, b](const QPoint& pos) {
+            if (!m_slice) { return; }
+            const NrSlot slot =
+                static_cast<NrSlot>(b->property("nrSlot").toInt());
+            DspQuickPopup::showFor(this, m_slice, slot,
+                                   b->mapToGlobal(pos),
+                                   [this, slot]() {
+                                       emit openNrSetupRequested(slot);
+                                   });
         });
     }
 

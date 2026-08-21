@@ -75,6 +75,8 @@
 #include <QActionGroup>
 #include <QKeySequence>
 #include <QPointer>
+
+#include "core/WdspTypes.h"
 #include <QTimer>
 #include <QHash>
 #include <QMap>
@@ -380,6 +382,9 @@ private slots:
     void onNotchRemoveAll();
     /// Alle Notch-Filter aus der Fussleiste erreichbar machen.
     void showNotchBarMenu(const QPoint& globalPos);
+    /// Einstellungsseite einer Rauschminderung oeffnen (RX-Feld und
+    /// obere Leiste gehen denselben Weg).
+    void openNrSetupPage(Longpath::NrSlot slot);
 
     /// TNF: the +TNF overlay button on pan `panId`. A distinct slot from
     /// onNotchCreateRequested above, which takes an already-resolved

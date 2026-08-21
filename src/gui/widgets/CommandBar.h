@@ -71,6 +71,11 @@ class SliceModel;
 
 class CommandBar : public QWidget {
     Q_OBJECT
+signals:
+    /// Aus dem Schnellregler heraus: die Einstellungsseite dieser
+    /// Rauschminderung oeffnen. Wird vom MainWindow verdrahtet.
+    void openNrSetupRequested(Longpath::NrSlot slot);
+
 public:
     explicit CommandBar(QWidget* parent = nullptr);
     ~CommandBar() override;
