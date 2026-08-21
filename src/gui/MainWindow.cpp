@@ -2895,7 +2895,18 @@ void MainWindow::onPanCompassOverlay(bool on)
 {
     SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
     if (!w) { return; }
-    w->setCompassOverlayVisible(on);
+    w->setOverlayVisible(SpectrumWidget::OverlaySlot::Compass, on);
+    startPanOverlayTimer();
+}
+
+// Der Taktgeber laeuft, solange IRGENDEINE Einblendung zu sehen ist.
+void MainWindow::startPanOverlayTimer()
+{
+    SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
+    if (!w) { return; }
+    const bool any =
+        w->overlayVisible(SpectrumWidget::OverlaySlot::Compass)
+        || w->overlayVisible(SpectrumWidget::OverlaySlot::Swr);
 
     // ── Nachfuehren, solange sie zu sehen ist ────────────────────────
     //
@@ -2915,7 +2926,7 @@ void MainWindow::onPanCompassOverlay(bool on)
         connect(m_panCompassTimer, &QTimer::timeout,
                 this, &MainWindow::refreshPanCompass);
     }
-    if (on) {
+    if (any) {
         refreshPanCompass();
         m_panCompassTimer->start();
     } else {
@@ -2926,13 +2937,34 @@ void MainWindow::onPanCompassOverlay(bool on)
 void MainWindow::refreshPanCompass()
 {
     SpectrumWidget* w = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
-    if (!w || !w->compassOverlayVisible()) { return; }
-    RotorLogbookPanel* panel = ensureRotorPanel();
-    if (!panel || !panel->dial()) { return; }
+    if (!w) { return; }
+
     // 220 px: gross genug fuer Teilung und Zeiger, klein genug, dass
-    // der Panadapter ihn auf ein Viertel seiner kuerzeren Kante
-    // herunterrechnen kann, ohne dass es matschig wird.
-    w->setCompassOverlay(panel->dial()->renderTransparent(220));
+    // der Panadapter sie herunterrechnen kann, ohne dass es matschig
+    // wird.
+    if (w->overlayVisible(SpectrumWidget::OverlaySlot::Compass)) {
+        if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+            if (panel->dial()) {
+                w->setOverlayImage(SpectrumWidget::OverlaySlot::Compass,
+                                   panel->dial()->renderTransparent(220));
+            }
+        }
+    }
+
+    // ── Und die Stehwelle ────────────────────────────────────────────
+    //
+    // Dasselbe Verfahren: das Instrument malt sich selbst in ein
+    // durchsichtiges Bild, der Panadapter legt es hin. EIN
+    // Stehwellenzeiger im Programm, nicht zwei.
+    //
+    // Gemalt wird das NeedleInstrument, nicht das Applet: das Applet
+    // bringt Kopfleiste und Fusszeile mit, und beides gehoert nicht
+    // ueber ein Spektrum.
+    if (w->overlayVisible(SpectrumWidget::OverlaySlot::Swr)
+        && m_swrInstrument) {
+        w->setOverlayImage(SpectrumWidget::OverlaySlot::Swr,
+                           m_swrInstrument->renderTransparent(240));
+    }
 }
 
 void MainWindow::onPanDisplaySetup()

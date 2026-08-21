@@ -88,6 +88,31 @@ void InstrumentApplet::setForm(Form f)
     saveState();
 }
 
+QImage InstrumentApplet::renderTransparent(int sidePx, qreal dpr)
+{
+    if (sidePx < 24) { return {}; }
+    QWidget* view = (m_form == Form::Needle)
+                        ? static_cast<QWidget*>(m_needle)
+                        : static_cast<QWidget*>(m_bar);
+    if (!view) { return {}; }
+
+    QImage img(QSize(sidePx, sidePx) * dpr, QImage::Format_ARGB32_Premultiplied);
+    img.setDevicePixelRatio(dpr);
+    img.fill(Qt::transparent);
+
+    // Nur die Ansicht malen, nicht das Applet: das Applet bringt
+    // Kopfleiste und Fusszeile mit, und beides gehoert nicht ueber ein
+    // Spektrum.
+    //
+    // Groesse vorruebergehend umstellen und danach zurueck — das
+    // Instrument in der Spalte soll davon nichts merken.
+    const QSize was = view->size();
+    view->resize(sidePx, sidePx);
+    view->render(&img, QPoint(), QRegion(), QWidget::DrawChildren);
+    view->resize(was);
+    return img;
+}
+
 void InstrumentApplet::setSegmented(bool on)
 {
     if (m_bar) { m_bar->setSegmented(on); }

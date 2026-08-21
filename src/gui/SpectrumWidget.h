@@ -706,13 +706,51 @@ public:
     // (SpectrumWidget.cpp:551) und ein natives Kind keine
     // Durchsichtigkeit ueber die GPU-Flaeche bekommt. Im
     // QPainter-Durchgang der Ueberlagerung stimmt beides.
-    void setCompassOverlay(const QImage& img);
-    void setCompassOverlayVisible(bool on);
-    bool compassOverlayVisible() const { return m_compassVisible; }
+    // Zwei Plaetze: links unten der Kompass, rechts unten die
+    // Stehwelle. Mehr braucht es nicht — wer drei Instrumente ueber
+    // das Spektrum legt, sieht kein Spektrum mehr.
+    enum class OverlaySlot { Compass, Swr };
+
+    void setOverlayImage(OverlaySlot slot, const QImage& img);
+    void setOverlayVisible(OverlaySlot slot, bool on);
+    bool overlayVisible(OverlaySlot slot) const;
+
+    /// Groesse in Prozent der kuerzeren Kante des Spektrums (10..40)
+    /// und Deckkraft in Prozent (10..100). Gilt fuer BEIDE Plaetze:
+    /// zwei Einblendungen in verschiedenen Groessen saehen aus wie ein
+    /// Versehen.
+    void setOverlayScalePercent(int pct);
+    void setOverlayOpacityPercent(int pct);
+    int  overlayScalePercent() const   { return m_overlayScalePct; }
+    int  overlayOpacityPercent() const { return m_overlayOpacityPct; }
+
+    // Alt, bleibt fuer den Schalter im Zahnrad-Menue.
+    void setCompassOverlay(const QImage& img)
+        { setOverlayImage(OverlaySlot::Compass, img); }
+    void setCompassOverlayVisible(bool on)
+        { setOverlayVisible(OverlaySlot::Compass, on); }
+    bool compassOverlayVisible() const
+        { return overlayVisible(OverlaySlot::Compass); }
 
     void setBackgroundImage(const QString& path);
     QString backgroundImagePath() const { return m_bgImagePath; }
     void setBackgroundOpacity(int pct);
+
+    // ── Helligkeit des Hintergrundbildes ─────────────────────────────
+    //
+    // Der Betreiber, 2026-08-21: „hintergrundbild viel zu dunkel bei
+    // 100 %."
+    //
+    // Bei 100 % Bildsichtbarkeit wird das Foto bereits voll gezeichnet
+    // — mehr Deckkraft gibt es nicht. Was fehlte, war eine Moeglichkeit,
+    // das BILD SELBST aufzuhellen: ein dunkles Foto bleibt ein dunkles
+    // Foto, egal wie deckend man es malt.
+    //
+    // 100 = unveraendert, darueber heller, darunter dunkler. Aufgehellt
+    // wird additiv statt ueber den Gammawert: ein dunkles Foto soll
+    // sichtbar werden, ohne dass seine hellen Stellen ausbrennen.
+    void setBackgroundBrightness(int pct);
+    int  backgroundBrightness() const { return m_bgBrightnessPct; }
     int  backgroundOpacity() const { return m_bgOpacity; }
     void setBackgroundFillColor(const QColor& c);
     QColor backgroundFillColor() const { return m_bgFillColor; }
@@ -2857,6 +2895,11 @@ private:
     QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
     QImage  m_compassImg;
     bool    m_compassVisible{false};
+    QImage  m_swrImg;
+    bool    m_swrVisible{false};
+    int     m_overlayScalePct{25};
+    int     m_overlayOpacityPct{72};
+    int     m_bgBrightnessPct{100};
 
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};

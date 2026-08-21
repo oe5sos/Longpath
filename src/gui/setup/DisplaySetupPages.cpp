@@ -1441,6 +1441,18 @@ void SpectrumDefaultsPage::buildUI()
         "Fuellfarbe, 0 = nur Bild."));
     bgForm->addRow(QStringLiteral("Fuellfarbe sichtbar (%)"), m_bgOpacitySlider);
 
+    // Helligkeit des Bildes selbst. Siehe
+    // SpectrumWidget::setBackgroundBrightness: bei voller
+    // Bildsichtbarkeit ist das Foto schon ganz gezeichnet — ein dunkles
+    // Foto bleibt trotzdem dunkel, und dagegen half bisher nichts.
+    m_bgBrightSlider = new QSlider(Qt::Horizontal, bgGroup);
+    m_bgBrightSlider->setRange(100, 300);
+    m_bgBrightSlider->setToolTip(QStringLiteral(
+        "Hellt das Bild auf. 100 = unveraendert. Aufgehellt wird "
+        "additiv: dunkle Stellen kommen hoch, helle brennen nicht aus. "
+        "Abdunkeln geht ueber die Fuellfarbe darueber."));
+    bgForm->addRow(QStringLiteral("Bild aufhellen (%)"), m_bgBrightSlider);
+
     m_bgFillButton = new ColorSwatchButton(
         QColor(Style::kPanadapterBg), bgGroup);
     m_bgFillButton->setToolTip(QStringLiteral(
@@ -1468,6 +1480,11 @@ void SpectrumDefaultsPage::buildUI()
         if (auto* w = spectrum()) { w->setBackgroundImage(QString()); }
         refreshBgLabel();
     });
+    m_bgBrightSlider->setValue(spectrum() ? spectrum()->backgroundBrightness()
+                                          : 100);
+    connect(m_bgBrightSlider, &QSlider::valueChanged, this, [spectrum](int v) {
+        if (auto* w = spectrum()) { w->setBackgroundBrightness(v); }
+    });
     connect(m_bgOpacitySlider, &QSlider::valueChanged, this, [spectrum](int v) {
         if (auto* w = spectrum()) { w->setBackgroundOpacity(v); }
     });
@@ -1475,6 +1492,81 @@ void SpectrumDefaultsPage::buildUI()
             [spectrum](const QColor& c) {
         if (auto* w = spectrum()) { w->setBackgroundFillColor(c); }
     });
+
+    // ── Einblendungen im Panadapter ──────────────────────────────────
+    //
+    // Der Betreiber, 2026-08-20: „erstelle auch die option, dass der
+    // rotor und ds swr transparent im pandapter erscheint, groesse und
+    // helligkeit sollte man dann dort ebenfalls veraendern koennen
+    // unter einstellungen im top."
+    //
+    // Die Schalter stehen ausserdem im Zahnrad-Menue des Panadapters
+    // (der kurze Weg); Groesse und Helligkeit gehoeren hierher, weil
+    // man sie einmal einstellt und dann in Ruhe laesst.
+    //
+    // Eine Groesse und eine Helligkeit fuer BEIDE: zwei Einblendungen
+    // in verschiedenen Groessen saehen aus wie ein Versehen, nicht wie
+    // eine Entscheidung.
+    {
+        auto* ovGroup = new QGroupBox(
+            QStringLiteral("Einblendungen im Panadapter"), this);
+        auto* ovForm = new QFormLayout(ovGroup);
+        ovForm->setSpacing(6);
+
+        auto* cbCompass = new QCheckBox(
+            QStringLiteral("Rotor-Kompass"), ovGroup);
+        cbCompass->setToolTip(QStringLiteral(
+            "Zeigt die Antennenrichtung als durchsichtige Windrose links "
+            "unten im Spektrum."));
+        auto* cbSwr = new QCheckBox(QStringLiteral("Stehwelle"), ovGroup);
+        cbSwr->setToolTip(QStringLiteral(
+            "Zeigt das Stehwellen-Zifferblatt durchsichtig rechts unten "
+            "im Spektrum."));
+        if (auto* w = spectrum()) {
+            cbCompass->setChecked(
+                w->overlayVisible(SpectrumWidget::OverlaySlot::Compass));
+            cbSwr->setChecked(
+                w->overlayVisible(SpectrumWidget::OverlaySlot::Swr));
+        }
+        connect(cbCompass, &QCheckBox::toggled, this, [spectrum](bool on) {
+            if (auto* w = spectrum()) {
+                w->setOverlayVisible(SpectrumWidget::OverlaySlot::Compass, on);
+            }
+        });
+        connect(cbSwr, &QCheckBox::toggled, this, [spectrum](bool on) {
+            if (auto* w = spectrum()) {
+                w->setOverlayVisible(SpectrumWidget::OverlaySlot::Swr, on);
+            }
+        });
+        ovForm->addRow(QString(), cbCompass);
+        ovForm->addRow(QString(), cbSwr);
+
+        auto* scale = new QSlider(Qt::Horizontal, ovGroup);
+        scale->setRange(10, 40);
+        scale->setValue(spectrum() ? spectrum()->overlayScalePercent() : 25);
+        scale->setToolTip(QStringLiteral(
+            "Groesse der Einblendungen, in Prozent der kuerzeren Kante "
+            "des Spektrums. Unter 10 %% waere nichts mehr zu lesen, ueber "
+            "40 %% bliebe kein Spektrum mehr uebrig."));
+        connect(scale, &QSlider::valueChanged, this, [spectrum](int v) {
+            if (auto* w = spectrum()) { w->setOverlayScalePercent(v); }
+        });
+        ovForm->addRow(QStringLiteral("Groesse (%)"), scale);
+
+        auto* opa = new QSlider(Qt::Horizontal, ovGroup);
+        opa->setRange(10, 100);
+        opa->setValue(spectrum() ? spectrum()->overlayOpacityPercent() : 72);
+        opa->setToolTip(QStringLiteral(
+            "Helligkeit der Einblendungen. 100 %% deckt das Spektrum "
+            "darunter ganz ab; die Vorgabe 72 %% laesst es durchscheinen."));
+        connect(opa, &QSlider::valueChanged, this, [spectrum](int v) {
+            if (auto* w = spectrum()) { w->setOverlayOpacityPercent(v); }
+        });
+        ovForm->addRow(QStringLiteral("Helligkeit (%)"), opa);
+
+        bgForm->addRow(ovGroup);
+    }
+
     if (auto* w = spectrum()) {
         QSignalBlocker b1(m_bgOpacitySlider);
         m_bgOpacitySlider->setValue(w->backgroundOpacity());

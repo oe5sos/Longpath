@@ -4289,6 +4289,17 @@ void SpectrumWidget::setBackgroundImage(const QString& path)
     update();
 }
 
+void SpectrumWidget::setBackgroundBrightness(int pct)
+{
+    const int v = qBound(100, pct, 300);
+    if (m_bgBrightnessPct == v) { return; }
+    m_bgBrightnessPct = v;
+    AppSettings::instance().setValue("PanadapterBackgroundBrightness",
+                                     QString::number(v));
+    m_overlayStaticDirty = true;
+    update();
+}
+
 void SpectrumWidget::setBackgroundOpacity(int pct)
 {
     const int use = qBound(0, pct, 100);
@@ -4333,6 +4344,22 @@ void SpectrumWidget::loadBackgroundSettings()
                                Style::role("panadapter-bg",
                                            Style::kPanadapterBg)).toString());
     if (fill.isValid()) { m_bgFillColor = fill; }
+
+    // Die Einblendungen (Kompass, Stehwelle) und ihre gemeinsame
+    // Groesse und Deckkraft. Hier mit gelesen, damit sie beim Start
+    // stehen und nicht erst, wenn jemand die Einstellungen oeffnet.
+    m_compassVisible = st.value("PanadapterCompassOverlay",
+                                QStringLiteral("False")).toString()
+                       == QStringLiteral("True");
+    m_swrVisible = st.value("PanadapterSwrOverlay",
+                            QStringLiteral("False")).toString()
+                   == QStringLiteral("True");
+    m_overlayScalePct   = qBound(10, st.value("PanadapterOverlayScale",
+                                              "25").toInt(), 40);
+    m_overlayOpacityPct = qBound(10, st.value("PanadapterOverlayOpacity",
+                                              "72").toInt(), 100);
+    m_bgBrightnessPct = qBound(100,
+        st.value("PanadapterBackgroundBrightness", "100").toInt(), 300);
     if (!path.isEmpty()) {
         m_bgImagePath = path;
         m_bgImage = QImage(path);
@@ -4362,6 +4389,23 @@ void SpectrumWidget::paintBackgroundLayer(QPainter& p, const QRect& specRect)
     const qreal keep = p.opacity();
     p.setOpacity(1.0 - m_bgOpacity / 100.0);
     p.drawImage(specRect.topLeft(), m_bgScaled);
+
+    // ── Aufhellen ────────────────────────────────────────────────────
+    //
+    // Ein zweiter Durchgang in Weiss mit Plus-Verrechnung. Additiv und
+    // nicht multiplikativ: so kommen die dunklen Stellen hoch, waehrend
+    // die hellen nur langsam nachziehen — ein Nachtfoto wird lesbar,
+    // ohne dass der Himmel ausbrennt.
+    //
+    // Nur nach oben. Abdunkeln kann man ueber die Fuellfarbe, dafuer
+    // braucht es keinen zweiten Weg.
+    if (m_bgBrightnessPct > 100) {
+        const double lift = (m_bgBrightnessPct - 100) / 100.0;   // 0..1
+        p.setCompositionMode(QPainter::CompositionMode_Plus);
+        p.setOpacity((1.0 - m_bgOpacity / 100.0) * lift * 0.55);
+        p.fillRect(specRect, Qt::white);
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    }
     p.setOpacity(keep);
 }
 
@@ -4800,41 +4844,86 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
 // deshalb 0.72 und nicht deckend.
 void SpectrumWidget::drawCompassOverlay(QPainter& p, const QRect& specRect)
 {
-    if (!m_compassVisible || m_compassImg.isNull()) { return; }
-
-    const int side = m_compassImg.width() / qMax(1, int(m_compassImg.devicePixelRatio()));
-    // Nicht groesser als ein Viertel der kleineren Kante: in einem
-    // schmalen Panadapter frisst ein fester Wert die halbe Anzeige.
-    const int maxSide = qMin(specRect.width(), specRect.height()) / 4;
+    // ── Zwei Plaetze, eine Rechnung ──────────────────────────────────
+    //
+    // Links unten der Kompass, rechts unten die Stehwelle. Beide ueber
+    // dem Bandplan, weil dort nichts steht, das man beim Abstimmen
+    // braucht.
+    //
+    // Groesse und Deckkraft kommen aus den Einstellungen und gelten
+    // fuer BEIDE: zwei Einblendungen in verschiedenen Groessen saehen
+    // aus wie ein Versehen, nicht wie eine Entscheidung.
+    const int bandH = m_bandPlanFontSize + 4;
+    const int maxSide = qMin(specRect.width(), specRect.height())
+                        * m_overlayScalePct / 100;
     if (maxSide < 40) { return; }          // kein Platz, dann lieber gar nicht
 
-    const int bandH = m_bandPlanFontSize + 4;
-    const int draw  = qMin(side, maxSide);
-    const QRect target(specRect.left() + 10,
-                       specRect.bottom() - bandH - draw - 8,
-                       draw, draw);
-    if (target.top() < specRect.top()) { return; }
+    auto place = [&](const QImage& img, bool left) {
+        if (img.isNull()) { return; }
+        const int native = img.width()
+                           / qMax(1, int(img.devicePixelRatio()));
+        const int draw = qMin(native, maxSide);
+        const QRect target(left ? specRect.left() + 10
+                                : specRect.right() - draw - 10,
+                           specRect.bottom() - bandH - draw - 8,
+                           draw, draw);
+        if (target.top() < specRect.top()) { return; }
+        p.save();
+        p.setOpacity(m_overlayOpacityPct / 100.0);
+        p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        p.drawImage(target, img);
+        p.restore();
+    };
 
-    p.save();
-    p.setOpacity(0.72);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    p.drawImage(target, m_compassImg);
-    p.restore();
+    if (m_compassVisible) { place(m_compassImg, /*left=*/true); }
+    if (m_swrVisible)     { place(m_swrImg,     /*left=*/false); }
 }
 
-void SpectrumWidget::setCompassOverlay(const QImage& img)
+void SpectrumWidget::setOverlayImage(OverlaySlot slot, const QImage& img)
 {
-    m_compassImg = img;
-    if (m_compassVisible) { update(); }
+    QImage& dst = (slot == OverlaySlot::Compass) ? m_compassImg : m_swrImg;
+    dst = img;
+    if (overlayVisible(slot)) { m_overlayStaticDirty = true; update(); }
 }
 
-void SpectrumWidget::setCompassOverlayVisible(bool on)
+void SpectrumWidget::setOverlayVisible(OverlaySlot slot, bool on)
 {
-    if (m_compassVisible == on) { return; }
-    m_compassVisible = on;
+    bool& flag = (slot == OverlaySlot::Compass) ? m_compassVisible
+                                                : m_swrVisible;
+    if (flag == on) { return; }
+    flag = on;
     AppSettings::instance().setValue(
-        "PanadapterCompassOverlay",
+        slot == OverlaySlot::Compass ? "PanadapterCompassOverlay"
+                                     : "PanadapterSwrOverlay",
         on ? QStringLiteral("True") : QStringLiteral("False"));
+    m_overlayStaticDirty = true;
+    update();
+}
+
+bool SpectrumWidget::overlayVisible(OverlaySlot slot) const
+{
+    return (slot == OverlaySlot::Compass) ? m_compassVisible : m_swrVisible;
+}
+
+void SpectrumWidget::setOverlayScalePercent(int pct)
+{
+    const int v = qBound(10, pct, 40);
+    if (m_overlayScalePct == v) { return; }
+    m_overlayScalePct = v;
+    AppSettings::instance().setValue("PanadapterOverlayScale",
+                                     QString::number(v));
+    m_overlayStaticDirty = true;
+    update();
+}
+
+void SpectrumWidget::setOverlayOpacityPercent(int pct)
+{
+    const int v = qBound(10, pct, 100);
+    if (m_overlayOpacityPct == v) { return; }
+    m_overlayOpacityPct = v;
+    AppSettings::instance().setValue("PanadapterOverlayOpacity",
+                                     QString::number(v));
+    m_overlayStaticDirty = true;
     update();
 }
 

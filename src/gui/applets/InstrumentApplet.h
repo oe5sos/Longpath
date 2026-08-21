@@ -43,6 +43,8 @@
 
 #include <functional>
 
+#include <QImage>
+
 class QMenu;
 class QStackedWidget;
 
@@ -81,6 +83,11 @@ public:
     // hat das am 2026-08-20 mit einem Bildschirmfoto verlangt. Beides
     // bleibt — Segmente liest man als Menge, der Verlauf zeigt kleine
     // Aenderungen genauer.
+    /// Das Zifferblatt allein, auf durchsichtigem Grund — fuer die
+    /// Einblendung im Panadapter. OHNE Kopf- und Fusszeile: beides
+    /// gehoert nicht ueber ein Spektrum.
+    QImage renderTransparent(int sidePx, qreal dpr = 2.0);
+
     void setSegmented(bool on);
     bool isSegmented() const;
 

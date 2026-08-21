@@ -106,6 +106,11 @@ private:
     // Section: Hintergrund (Port aus AetherSDR, 2026-08-18)
     class QLabel*             m_bgPathLabel{nullptr};
     class QSlider*            m_bgOpacitySlider{nullptr};
+    /// Hellt das Hintergrundbild auf (2026-08-21). Siehe
+    /// SpectrumWidget::setBackgroundBrightness — bei voller
+    /// Bildsichtbarkeit ist das Foto schon ganz gezeichnet, ein dunkles
+    /// bleibt trotzdem dunkel.
+    class QSlider*            m_bgBrightSlider{nullptr};
     class ColorSwatchButton*  m_bgFillButton{nullptr};
 
     // Section: FFT

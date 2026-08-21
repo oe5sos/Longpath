@@ -474,6 +474,9 @@ private slots:
     /// Programm, nicht zwei, die auseinanderlaufen koennen.
     void onPanCompassOverlay(bool on);
     void refreshPanCompass();
+    /// Startet oder stoppt den Taktgeber je nachdem, ob
+    /// ueberhaupt eine Einblendung zu sehen ist.
+    void startPanOverlayTimer();
 
     void onConnectionStateChanged();
     void showConnectionPanel();
