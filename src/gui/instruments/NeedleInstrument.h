@@ -104,6 +104,13 @@ public:
     QSize sizeHint() const override { return {320, 210}; }
     QSize minimumSizeHint() const override { return {200, 140}; }
 
+
+private:
+    /// Die Lampe hinter der Scheibe. `strength` daempft sie fuer den
+    /// Ruhezustand — beleuchtet bleibt das Instrument trotzdem.
+    void paintBacklight(QPainter& p, const QPointF& pivot, qreal radius,
+                        const QColor& c, double strength);
+
 protected:
     void paintEvent(QPaintEvent*) override;
 

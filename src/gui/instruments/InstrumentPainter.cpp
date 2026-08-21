@@ -118,7 +118,17 @@ void paintTrough(QPainter& p, const Spine& s, double thresholdFraction)
     p.setBrush(Qt::NoBrush);
 
     // Grund
-    p.setPen(QPen(QColor(Style::role("inset-bg", Style::kInsetBg)),
+    // ── Die Mulde eine Spur heller ───────────────────────────────────
+    //
+    // „inset-bg" ist die dunkelste Flaeche der Palette — richtig fuer
+    // ein Eingabefeld, das sich vom Panel absetzen soll. Auf einem
+    // Zifferblatt ist dieselbe Flaeche aber die SKALA, auf der man
+    // etwas ablesen will. Der Betreiber am 2026-08-20: „stehwelle noch
+    // dunkel."
+    //
+    // Eine Stufe hoeher: „button" ist die naechste Flaeche der Leiter
+    // und hebt den Ring vom Panel ab, ohne ihn zur Flaeche zu machen.
+    p.setPen(QPen(QColor(Style::role("button", Style::kButtonBg)),
                   s.troughWidth(), Qt::SolidLine, Qt::FlatCap));
     p.drawPath(s.troughPath());
 

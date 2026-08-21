@@ -151,6 +151,38 @@ void NeedleInstrument::refreshFooter()
         d->threshold.has_value() ? d->text(d->threshold.value()) : QString());
 }
 
+// ── Die Lampe hinter der Scheibe ─────────────────────────────────────
+//
+// Ein breiter, sehr schwacher Verlauf vom Drehpunkt nach oben, in der
+// Messfarbe. Er beleuchtet die GANZE Scheibe, nicht nur den gefuellten
+// Teil — das ist der Unterschied zwischen „der Wert leuchtet" und „das
+// Instrument ist beleuchtet", und gebeten wurde um das zweite
+// (2026-08-20).
+//
+// In der Messfarbe und nicht in Weiss: eine weisse Lampe hinter einem
+// bernsteinfarbenen Zeiger macht ihn blass. Nur der obere Halbkreis —
+// unter dem Drehpunkt ist keine Scheibe, die man beleuchten koennte.
+void NeedleInstrument::paintBacklight(QPainter& p, const QPointF& pivot,
+                                      qreal radius, const QColor& c,
+                                      double strength)
+{
+    QRadialGradient lamp(pivot, radius * 1.15);
+    QColor warm = c;
+    warm.setAlphaF(0.13 * strength);
+    lamp.setColorAt(0.0, warm);
+    warm.setAlphaF(0.05 * strength);
+    lamp.setColorAt(0.55, warm);
+    warm.setAlphaF(0.0);
+    lamp.setColorAt(1.0, warm);
+    p.save();
+    p.setPen(Qt::NoPen);
+    p.setBrush(lamp);
+    p.drawPie(QRectF(pivot.x() - radius * 1.15, pivot.y() - radius * 1.15,
+                     radius * 2.3, radius * 2.3),
+              0, 180 * 16);
+    p.restore();
+}
+
 void NeedleInstrument::paintEvent(QPaintEvent*)
 {
     const ReadingDescriptor* d = readingFor(m_primary);
@@ -247,6 +279,29 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
     // Sektor, Zeiger, Nachlaufzeiger und Wertkante nein: jedes davon
     // behauptet eine Zahl.
     if (!m_hasValue) {
+        // ── Auch OHNE Messwert beleuchtet ────────────────────────────
+        //
+        // Der Betreiber, 2026-08-20: „stehwelle noch dunkel."
+        //
+        // Er hatte recht, und der Grund stand hier: dieser Zweig kehrt
+        // zurueck, BEVOR die Hinterleuchtung drankam. Das S-Meter hatte
+        // einen Wert und leuchtete, die Stehwelle ohne Verbindung
+        // keinen — und blieb schwarz.
+        //
+        // Ein beleuchtetes Instrument ist beleuchtet, ob es gerade
+        // etwas anzeigt oder nicht. Genau das ist der Unterschied
+        // zwischen einer Lampe hinter der Scheibe und einem
+        // leuchtenden Messwert. Matter als mit Wert, damit die
+        // Ruhelage nicht wie eine Messung aussieht.
+        // Die volle Messfarbe, nur etwas gedaempft.
+        //
+        // Erst stand hier measuredDim() mit 0,7 — gedaempfte Farbe MAL
+        // gedaempfter Staerke, davon blieb nichts uebrig, und die
+        // Stehwelle war weiter schwarz. Eine Lampe ist eine Lampe; dass
+        // gerade nichts gemessen wird, sagt der fehlende Zeiger, nicht
+        // die Dunkelheit.
+        paintBacklight(p, pivot, radius, Instrument::measured(), 0.85);
+
         Instrument::paintTrough(p, spine, thresholdF);
         Instrument::paintTicks(p, spine, *d);
         // Ohne Verbindung ruht der Zeiger am Anschlag — matt, damit die
@@ -269,49 +324,10 @@ void NeedleInstrument::paintEvent(QPaintEvent*)
 
     // ── Hinterleuchtung ──────────────────────────────────────────────
     //
-    // Der Betreiber, 2026-08-20: „das design der zeiger koennte man von
-    // hinten leicht beleuchten, mache mir vorschlaege weil relativ
-    // dunkel." Und spaeter, beim Vergleich mit meinen Testbildern: „die
-    // swr anzeige usw. sehe ich im test deutlich heller als dann in der
-    // app."
-    //
-    // Das Testbild log — es lag auf durchsichtigem Grund und wurde vom
-    // Betrachter auf Hell gezeigt. Die Beobachtung dahinter stimmt
-    // trotzdem: auf dem dunklen Panel ist das Zifferblatt zu flau.
-    //
-    // Zwei Stufen, beide zurueckhaltend:
-    //
-    //   1. Die vorhandene Glut von 0,16 auf 0,30. Sie sitzt IN der
-    //      Mulde und hebt den Teil an, der schon einen Wert traegt.
-    //
-    //   2. Eine Lampe DAHINTER: ein breiter Verlauf vom Drehpunkt nach
-    //      oben, in der Messfarbe, sehr schwach. Sie beleuchtet die
-    //      ganze Scheibe, nicht nur den gefuellten Teil — das ist der
-    //      Unterschied zwischen „der Wert leuchtet" und „das
-    //      Instrument ist beleuchtet", und der Betreiber hat um das
-    //      zweite gebeten.
-    //
-    // Beides in der Messfarbe und nicht in Weiss: eine weisse Lampe
-    // hinter einem bernsteinfarbenen Zeiger macht ihn blass.
-    {
-        QRadialGradient lamp(pivot, radius * 1.15);
-        QColor warm = col;
-        warm.setAlphaF(0.13);
-        lamp.setColorAt(0.0, warm);
-        warm.setAlphaF(0.05);
-        lamp.setColorAt(0.55, warm);
-        warm.setAlphaF(0.0);
-        lamp.setColorAt(1.0, warm);
-        p.save();
-        p.setPen(Qt::NoPen);
-        p.setBrush(lamp);
-        // Nur der obere Halbkreis: unter dem Drehpunkt ist keine
-        // Scheibe, die man beleuchten koennte.
-        p.drawPie(QRectF(pivot.x() - radius * 1.15, pivot.y() - radius * 1.15,
-                         radius * 2.3, radius * 2.3),
-                  0, 180 * 16);
-        p.restore();
-    }
+    // Siehe paintBacklight: eine Lampe hinter der Scheibe, in der
+    // Messfarbe. Mit Messwert voll, ohne Messwert matter (der Aufruf
+    // im Zweig darueber).
+    paintBacklight(p, pivot, radius, col, 1.0);
 
     // Reihenfolge wie im Entwurf: Glut ganz hinten, dann die Mulde,
     // dann der Sektor, dann Teilung, Zeiger und Kante.

@@ -222,9 +222,26 @@ bool RotorDialWidget::isCompassOnly() const
 QPointF RotorDialWidget::roseCentre() const
 {
     if (isLandscape()) {
-        // Links, mit einem Rand von der Breite des Randabstands. Die
-        // Ablesung bekommt den Rest.
-        return {roseRadius() + 10.0, height() * 0.5};
+        // ── Die GRUPPE mittig, nicht die Rose links ──────────────────
+        //
+        // Zuerst stand die Rose am linken Rand und die Ablesung
+        // daneben; in einem breiten Fenster blieb rechts die halbe
+        // Flaeche leer, und es sah aus, als klebte das Zifferblatt
+        // fest. Der Betreiber: „rotor log veraendert sich nicht
+        // proportional mit dem fenster."
+        //
+        // Rose und Ablesung gehoeren zusammen. Die BEIDEN werden
+        // mittig gesetzt, dann sitzt das Paar in der Flaeche statt an
+        // ihrem Rand.
+        //
+        // Die Breite der Ablesung ist beim Rechnen der Geometrie noch
+        // nicht bekannt (sie haengt an Zustand und Schriftgroesse).
+        // Geschaetzt wird sie mit dem Radius: die laengste Zeile ist
+        // „-> 310° NW", und die passt in etwa einen Radius.
+        const double r = roseRadius();
+        const double groupW = 2.0 * r + 22.0 + r;   // Rose + Luft + Text
+        const double left = qMax(6.0, (width() - groupW) / 2.0);
+        return {left + r, height() * 0.5};
     }
     return {width() * 0.5, height() * (isCompassOnly() ? 0.5 : 0.42)};
 }
