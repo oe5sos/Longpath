@@ -746,11 +746,34 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // Offline-Punkt der Statuspille. Und die Statuszeile oben links sagt
     // es ohnehin schon im Klartext -- das hier ist die Wiederholung,
     // nicht die Meldung.
+    // ── Und es legt sich auch nicht ueber alles ──────────────────────
+    //
+    // Hier stand `background-color: rgba(10, 12, 20, 200)` auf einem
+    // Kindwidget, das ueber die GANZE Flaeche des Panadapters gelegt
+    // wird (setGeometry(0, 0, width(), height())). Eine zu 78 %
+    // deckende schwarze Decke.
+    //
+    // Der Betreiber, 2026-08-21, zweimal: „beim start war das
+    // hintergrundbild kurz perfekt, hat sich dann aber wieder
+    // abgedunkelt" und „die ersten 10 sekunden bild perfekt da und
+    // danach verschwindet es". Genau das war es: die Decke erscheint,
+    // sobald der Verbindungsversuch aufgibt — davor ist sie versteckt.
+    // Sie verdeckte damit das Hintergrundbild UND die Einblendungen
+    // (Kompass, Stehwelle), die darunter ins Spektrum gemalt werden.
+    //
+    // Der Kommentar darueber sagt schon, dass Getrenntsein ein Zustand
+    // ist und keine Gefahr, und dass die Statuszeile es ohnehin im
+    // Klartext meldet. Dann darf es auch nicht das ganze Bild
+    // ausloeschen. Der Schriftzug bleibt — als Schrift, nicht als
+    // Vorhang.
     m_disconnectLabel->setStyleSheet(QStringLiteral(
-        "QLabel { background-color: rgba(10, 12, 20, 200);"
+        "QLabel { background-color: transparent;"
         " color: %1; font-size: 36pt; font-weight: bold;"
         " letter-spacing: 8px; }")
         .arg(QLatin1String(Style::kTextScale)));
+    // Klicks gehen hindurch: ein Schriftzug, der das Abstimmen
+    // blockiert, waere die Decke in anderer Form.
+    m_disconnectLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_disconnectLabel->hide();
     m_disconnectLabel->installEventFilter(this);
 
