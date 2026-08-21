@@ -139,6 +139,29 @@ private:
     void buildModeGroup(QHBoxLayout* row);
     void buildStepGroup(QHBoxLayout* row);
 
+    // ── Filter und Rauschminderung, 2026-08-21 ───────────────────────
+    //
+    // Auf Ansage: „bitte folgende sachen in die leiste oben!
+    // bandbreite (3 Anzeigen, den 4 Punkt oeffnen um mehr zu sehen
+    // individuell) eingeben. NR1-NR4 eben so." Mit Bildschirmfoto der
+    // Vorlage: FILTER 2.7k · 2.9k · 3.3k · …
+    //
+    // Dasselbe Muster wie Modus und Schrittweite, kein neues.
+    void buildFilterGroup(QHBoxLayout* row);
+    void buildNrGroup(QHBoxLayout* row);
+
+    /// Die Filterbreiten haengen am Modus — CW hat andere als SSB.
+    /// Deshalb werden die drei Pillen NEU BESCHRIFTET statt neu
+    /// gebaut: Widgets wegzuwerfen und anzulegen laesst die Leiste bei
+    /// jedem Moduswechsel zucken, und die Faltung muesste jedes Mal
+    /// neu rechnen.
+    void relabelFilterPills();
+    void pushFilterToModel(int low, int high);
+    void pushNrToModel(Longpath::NrSlot slot);
+    void askForCustomFilter();
+    /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
+    static QString filterLabel(int low, int high);
+
     void pushModeToModel(DSPMode m);
     void pushStepToModel(int hz);
     void pullFromModel();
@@ -157,6 +180,7 @@ private:
     // Der vollständige Rest, den das „…" anbietet.
     QVector<QPair<QString, DSPMode>> m_allModes;
     QVector<QPair<QString, int>> m_allSteps;
+    QVector<QPair<QString, Longpath::NrSlot>> m_allNr;
 };
 
 } // namespace Longpath
