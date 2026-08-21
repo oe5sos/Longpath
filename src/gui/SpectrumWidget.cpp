@@ -9769,6 +9769,24 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 drawImdOverlay(p, specRect);
             }
             drawBandPlan(p, specRect);
+
+            // ── Auch HIER, nicht nur im CPU-Weg ──────────────────────
+            //
+            // Die Einblendungen (Kompass, Stehwelle) standen zuerst nur
+            // im QPainter-Weg oben bei drawBandPlan. Der laeuft aber
+            // nur als Rueckfallebene ohne GPU — im normalen Betrieb
+            // baut dieser Block die Ueberlagerungsflaeche, und dort
+            // fehlten sie.
+            //
+            // Der Betreiber am 2026-08-21: „einblenden kann ich noch
+            // immer nichts im pandapter". Die Bilder waren richtig und
+            // durchsichtig (nachgemessen: Alpha 0 am Rand, 2-6 %
+            // Tinte) — sie wurden nur nie in DIESE Flaeche gemalt.
+            //
+            // Zwei Zeichenwege sind zwei Orte, an denen etwas fehlen
+            // kann. Wer den einen aendert, muss den anderen mitnehmen.
+            drawCompassOverlay(p, specRect);
+
             // Sub-epic E: time-scale + LIVE button on the right edge of the
             // waterfall area. Same FULL-WIDTH wfRect contract as the QPainter
             // path — the clipped `wfRect` local at line 3079 cannot be reused
