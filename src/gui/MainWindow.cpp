@@ -3594,6 +3594,21 @@ void MainWindow::buildUI()
     // Säule: Leiste oben, Splitter darunter. Der Splitter bleibt sonst
     // unangetastet — alle 900 Zeilen darunter kennen ihn unverändert.
     m_commandBar = new CommandBar(this);
+
+    // ── Bandwechsel aus der Leiste ──────────────────────────────────
+    //
+    // Der Betreiber am 2026-08-22: "bandwechsel sollte auch mit
+    // buttons möglich sein, am besten in der leiste oben."
+    //
+    // Die Leiste kennt nur die Scheibe; ein Bandwechsel geht ueber
+    // RadioModel::onBandButtonClicked, weil daran Bandplan,
+    // Antennenwahl und die je Band gespeicherte Frequenz haengen.
+    // Deshalb ein Signal statt eines zweiten Modellzeigers in der
+    // Leiste.
+    connect(m_commandBar, &CommandBar::bandRequested, this,
+            [this](Longpath::Band band) {
+        if (m_radioModel) { m_radioModel->onBandButtonClicked(band); }
+    });
     auto* centre = new QWidget(this);
 
     // Profilschiene ganz links über die volle Höhe, wie bei Zeus.
@@ -7160,6 +7175,47 @@ void MainWindow::buildMenuBar()
             if (m_panStack && m_radioModel) {
                 m_radioModel->addSliceOnPan(m_panStack->activePanId());
             }
+        });
+    }
+
+    {
+        // ── Das fehlende Gegenstueck zu "Add slice" ──────────────────
+        //
+        // Der Betreiber am 2026-08-22: "40 meter hört sich an, als ich
+        // 2 frequenzen gleichzeitig höre und ggf 2 bänder."
+        //
+        // Genau so war es: seine Kopfleiste zeigte A 7.144.100 und
+        // B 14.225.000 — zwei Empfaenger, 40 m und 20 m, und der
+        // Mischer nimmt JEDE Scheibe, die nicht stumm ist. Anlegen ging
+        // (Strg+R), SCHLIESSEN ging nicht. Das steht sogar als Luecke
+        // im Quelltext: "sechs Signale des Mehrfach-Panadapters
+        // (Scheibe schliessen, ... Scheibe entfernen) — sie gehoeren zu
+        // Phase 3F". Wer einen zweiten Empfaenger aufmacht, hoert ihn
+        // seither fuer immer.
+        //
+        // Der letzte Empfaenger bleibt: eine App ohne Empfaenger ist
+        // kein Zustand, den man versehentlich herstellen koennen soll.
+        QAction* removeSliceAct = viewMenu->addAction(
+            QStringLiteral("&Remove active slice"));
+        removeSliceAct->setShortcut(
+            QKeySequence(QStringLiteral("Ctrl+Shift+R")));
+        removeSliceAct->setToolTip(QStringLiteral(
+            "Close the active receiver. Its audio stops immediately."));
+        connect(removeSliceAct, &QAction::triggered, this, [this]() {
+            if (!m_radioModel) { return; }
+            const QList<SliceModel*> list = m_radioModel->slices();
+            if (list.size() <= 1) {
+                showToast(tr("Der letzte Empfänger bleibt — sonst gäbe es "
+                             "nichts mehr zu hören."),
+                          ToastSeverity::Info, 4000);
+                return;
+            }
+            SliceModel* s = m_radioModel->activeSlice();
+            if (!s) { return; }
+            const QString letter = QString(s->sliceLetter());
+            m_radioModel->removeSlice(s->sliceIndex());
+            showToast(tr("Empfänger %1 geschlossen.").arg(letter),
+                      ToastSeverity::Info, 3000);
         });
     }
 

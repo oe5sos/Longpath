@@ -47,13 +47,13 @@ private slots:
         pane.setSpan(9520);
         pane.setFilter(-2900, -100);
         pane.setTrace(fakeTrace(340, 9520));
-        pane.resize(520, 200);
+        pane.resize(760, 230);   // wie das breite Feld oben
 
         QImage img(pane.size(), QImage::Format_ARGB32);
         img.fill(QColor(Style::kAppBg));
         pane.render(&img);
 
-        const QString out = QStringLiteral("/tmp/bandfilter_flaeche.png");
+        const QString out = QStringLiteral("/tmp/bandfilter_neu.png");
         QVERIFY2(img.save(out), qPrintable(out));
         qInfo().noquote() << "Blatt:" << out;
     }

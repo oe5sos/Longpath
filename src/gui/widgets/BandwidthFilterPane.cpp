@@ -18,6 +18,7 @@
 #include <QLinearGradient>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 
 #include <algorithm>
 #include <cmath>
@@ -257,39 +258,129 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             }
         }
 
-        // ── Die Kurve ───────────────────────────────────────────────
+        // ── Nur der Durchlass ist GEFUELLT ──────────────────────────
         //
-        // Eigener Ton, NICHT der Akzent des Empfaengers: der gehoert
-        // dem Durchlass. Vorher waren beide blau, und man sah nicht,
-        // was im Filter liegt und was daneben — genau das ist die
-        // Frage, fuer die man dieses Fenster aufmacht.
+        // Vorbild OpenHPSDR Zeus 2.0, vom Betreiber am 2026-08-22
+        // gezeigt: dort ist die Kurve INNERHALB des Filters flaechig
+        // gefuellt, ausserhalb nur eine duenne Linie. Das ist der
+        // Griff, der das Fenster lesbar macht — man sieht auf einen
+        // Blick, was durchkommt und was die Kante abschneidet.
+        //
+        // Er hatte es so beschrieben: "beim bandfilter geht es darum,
+        // dass eigentlich alles gleich aussieht ... gut gefallen hat
+        // mir openhpsdr."
+        const int xlF = qBound(r.left(), hzToX(m_low),  r.right());
+        const int xhF = qBound(r.left(), hzToX(m_high), r.right());
+
         QColor traceLine(Style::role("trace", "#c8a06a"));
-        QColor fill(traceLine);
-        fill.setAlpha(40);
-        p.setPen(Qt::NoPen);
-        p.setBrush(fill);
-        p.drawPolygon(poly);
+        {
+            QPainterPath inside;
+            inside.addRect(QRectF(xlF, top, xhF - xlF, bot - top));
+            QPainterPath area;
+            area.addPolygon(poly);
+            p.setPen(Qt::NoPen);
+            // Kraeftig, nicht zaghaft: bei Zeus ist der Durchlass eine
+            // satte Flaeche, und genau daran erkennt man ihn von
+            // weitem. Halbdurchsichtig ueber dem blauen Grund wurde
+            // daraus ein stumpfes Oliv (erster Entwurf).
+            QColor fill(traceLine);
+            fill.setAlpha(215);
+            p.setBrush(fill);
+            p.drawPath(area.intersected(inside));
+        }
 
         p.setPen(QPen(traceLine, 1.2));
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);
 
-        // ── Was AUSSERHALB liegt, tritt zurueck ─────────────────────
+        // ── Was liegt DRIN? Ablage und Pegel ────────────────────────
         //
-        // Nicht den Durchlass hervorheben, sondern die Umgebung
-        // daempfen: das liest sich sofort und ohne eine weitere Farbe.
-        {
-            const int xl2 = hzToX(m_low);
-            const int xh2 = hzToX(m_high);
-            QColor veil(Style::role("app-bg", Style::kAppBg));
-            veil.setAlpha(120);
-            p.setPen(Qt::NoPen);
-            p.setBrush(veil);
-            if (xl2 > r.left()) {
-                p.drawRect(QRect(r.left(), top, xl2 - r.left(), bot - top));
+        // OpenHPSDR Zeus zeigt unter dem Durchlass eine Reihe Zellen:
+        // "+324 / 14dB", "+777 / 11dB", "+1.5k / 12dB". Das ist die
+        // Antwort auf die Frage, fuer die man dieses Fenster aufmacht —
+        // welche Anteile kommen durch, und wie stark.
+        //
+        // Wir nehmen die vier staerksten Spitzen im Durchlass, die
+        // mindestens 6 dB ueber dem leisesten Punkt darin liegen (sonst
+        // benennt man Rauschen), und mit Mindestabstand, damit nicht
+        // viermal derselbe Buckel gezaehlt wird.
+        if (xhF - xlF > 60 && bot - top > 40) {
+            const int n = m_trace.size();
+            auto hzAt = [&](int i) {
+                return -m_spanHz / 2.0 + m_spanHz * double(i) / (n - 1);
+            };
+            const int i0 = qBound(0, int((m_low  + m_spanHz / 2.0)
+                                         / m_spanHz * (n - 1)), n - 1);
+            const int i1 = qBound(0, int((m_high + m_spanHz / 2.0)
+                                         / m_spanHz * (n - 1)), n - 1);
+            float floorDb = m_trace[qMin(i0, i1)];
+            for (int i = qMin(i0, i1); i <= qMax(i0, i1); ++i) {
+                floorDb = qMin(floorDb, m_trace[i]);
             }
-            if (xh2 < r.right()) {
-                p.drawRect(QRect(xh2, top, r.right() - xh2, bot - top));
+
+            struct Peak { int i; float db; };
+            QVector<Peak> peaks;
+            // Mindestabstand ein FUENFTEL des Durchlasses: sonst
+            // zaehlt man viermal denselben Buckel, wie im ersten
+            // Entwurf (-1.9k, -1.7k, -1.4k, -1.2k lagen alle auf einer
+            // Sprechspitze).
+            const int minGap = qMax(6, (qMax(i0, i1) - qMin(i0, i1)) / 5);
+            for (int i = qMin(i0, i1) + 1; i < qMax(i0, i1); ++i) {
+                if (m_trace[i] < m_trace[i - 1] || m_trace[i] < m_trace[i + 1]) {
+                    continue;
+                }
+                if (m_trace[i] - floorDb < 6.0f) { continue; }
+                bool near = false;
+                for (const Peak& q : peaks) {
+                    if (qAbs(q.i - i) < minGap) {
+                        near = true;
+                        if (m_trace[i] > q.db) {
+                            const_cast<Peak&>(q).i  = i;
+                            const_cast<Peak&>(q).db = m_trace[i];
+                        }
+                        break;
+                    }
+                }
+                if (!near) { peaks.append({i, m_trace[i]}); }
+            }
+            std::sort(peaks.begin(), peaks.end(),
+                      [](const Peak& a, const Peak& b) { return a.db > b.db; });
+            if (peaks.size() > 4) { peaks.resize(4); }
+            std::sort(peaks.begin(), peaks.end(),
+                      [](const Peak& a, const Peak& b) { return a.i < b.i; });
+
+            if (!peaks.isEmpty()) {
+                QFont cell = font();
+                cell.setPointSizeF(std::max(6.0, cell.pointSizeF() - 3.5));
+                p.setFont(cell);
+                const int cw = (xhF - xlF) / peaks.size();
+                const int cy = bot - 32;
+                for (int k = 0; k < peaks.size(); ++k) {
+                    const QRect box(xlF + k * cw, cy, cw - 1, 28);
+                    p.setPen(Qt::NoPen);
+                    p.setBrush(QColor(0, 0, 0, 110));
+                    p.drawRect(box);
+
+                    const double offHz = hzAt(peaks[k].i);
+                    const QString offTxt = (qAbs(offHz) >= 1000.0)
+                        ? QStringLiteral("%1%2k")
+                              .arg(offHz < 0 ? QStringLiteral("-")
+                                             : QStringLiteral("+"))
+                              .arg(qAbs(offHz) / 1000.0, 0, 'f', 1)
+                        : QStringLiteral("%1%2")
+                              .arg(offHz < 0 ? QStringLiteral("-")
+                                             : QStringLiteral("+"))
+                              .arg(int(qAbs(offHz)));
+                    p.setPen(QColor(Style::role("text", Style::kTextPrimary)));
+                    p.drawText(QRect(box.x(), box.y() + 1, box.width(), 13),
+                               Qt::AlignCenter, offTxt);
+                    p.setPen(QColor(Style::role("text-scale",
+                                                Style::kTextScale)));
+                    p.drawText(QRect(box.x(), box.y() + 14, box.width(), 13),
+                               Qt::AlignCenter,
+                               QStringLiteral("%1dB")
+                                   .arg(int(std::lround(peaks[k].db - floorDb))));
+                }
             }
         }
     }
@@ -382,12 +473,15 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // Unten an der jeweiligen Kante ist ohnehin der bessere Platz:
         // die Zahl steht dort, wo sie gilt, und muss nicht sagen,
         // wozu sie gehoert.
+        // Oben AN DEN KANTEN, wie bei OpenHPSDR Zeus — dort steht
+        // "LOW CUT +100 Hz" links und "HIGH CUT +2.44 kHz" rechts vom
+        // Breitenkaestchen. Unten ist kein Platz mehr: dort stehen
+        // jetzt die Anteilszellen.
         p.setFont(value);
         p.setPen(ink);
-        const int yNum = r.bottom() - 15;
-        p.drawText(QRect(xl + 4, yNum, 74, 13),
+        p.drawText(QRect(xl + 4, 3, 74, 13),
                    Qt::AlignLeft | Qt::AlignVCenter, cutLabel(m_low));
-        p.drawText(QRect(xh - 78, yNum, 74, 13),
+        p.drawText(QRect(xh - 78, 3, 74, 13),
                    Qt::AlignRight | Qt::AlignVCenter, cutLabel(m_high));
     }
 

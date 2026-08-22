@@ -45,13 +45,19 @@ private slots:
         // Filter steht neben Modus, weil beide dasselbe Signal
         // beschreiben; NR ans Ende, weil sie eine Behandlung ist und
         // keine Eigenschaft.
+        // BAND kam am 2026-08-22 dazu, auf Ansage des Betreibers
+        // ("bandwechsel sollte auch mit buttons möglich sein, am
+        // besten in der leiste oben") und ganz vorne, weil das Band
+        // die groebste Wahl ist: erst das Band, dann Betriebsart,
+        // Filter, Schrittweite. OpenHPSDR Zeus ordnet es genauso.
         CommandBar bar;
         const QStringList g = bar.groups();
-        QCOMPARE(g.size(), 4);
-        QCOMPARE(g.at(0), QStringLiteral("Mode"));
-        QCOMPARE(g.at(1), QStringLiteral("Filter"));
-        QCOMPARE(g.at(2), QStringLiteral("Step"));
-        QCOMPARE(g.at(3), QStringLiteral("NR"));
+        QCOMPARE(g.size(), 5);
+        QCOMPARE(g.at(0), QStringLiteral("Band"));
+        QCOMPARE(g.at(1), QStringLiteral("Mode"));
+        QCOMPARE(g.at(2), QStringLiteral("Filter"));
+        QCOMPARE(g.at(3), QStringLiteral("Step"));
+        QCOMPARE(g.at(4), QStringLiteral("NR"));
     }
 
     void threeVisibleEntriesNotThirteen()

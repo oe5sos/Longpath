@@ -55,6 +55,7 @@
 // =================================================================
 
 #include "core/WdspTypes.h"
+#include "models/Band.h"
 
 #include <QList>
 #include <QPointer>
@@ -72,6 +73,14 @@ class SliceModel;
 class CommandBar : public QWidget {
     Q_OBJECT
 signals:
+    /// Bandwechsel gewuenscht.
+    ///
+    /// Die Leiste kennt nur die Scheibe, ein Bandwechsel geht aber
+    /// ueber RadioModel::onBandButtonClicked (Bandplan, Antennenwahl,
+    /// gespeicherte Frequenz je Band). Deshalb ein Signal statt eines
+    /// zweiten Modellzeigers — MainWindow verdrahtet es.
+    void bandRequested(Longpath::Band band);
+
     /// Aus dem Schnellregler heraus: die Einstellungsseite dieser
     /// Rauschminderung oeffnen. Wird vom MainWindow verdrahtet.
     void openNrSetupRequested(Longpath::NrSlot slot);
@@ -154,6 +163,7 @@ private:
     // Dasselbe Muster wie Modus und Schrittweite, kein neues.
     void buildFilterGroup(QHBoxLayout* row);
     void buildNrGroup(QHBoxLayout* row);
+    void buildBandGroup(QHBoxLayout* row);
 
     /// Die Filterbreiten haengen am Modus — CW hat andere als SSB.
     /// Deshalb werden die drei Pillen NEU BESCHRIFTET statt neu
@@ -190,6 +200,7 @@ private:
     // Der vollständige Rest, den das „…" anbietet.
     QVector<QPair<QString, DSPMode>> m_allModes;
     QVector<QPair<QString, int>> m_allSteps;
+    QVector<QPair<QString, Longpath::Band>> m_allBands;
     QVector<QPair<QString, Longpath::NrSlot>> m_allNr;
 };
 

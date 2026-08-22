@@ -89,6 +89,15 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     row->setSpacing(22);
 
     m_row = row;
+    // ── BAND zuerst ─────────────────────────────────────────────────
+    //
+    // Der Betreiber am 2026-08-22: "bandwechsel sollte auch mit
+    // buttons möglich sein, am besten in der leiste oben."
+    //
+    // Ganz links, weil das Band die groebste Wahl ist: erst das Band,
+    // dann Betriebsart, Filter, Schrittweite. Dieselbe Reihenfolge wie
+    // bei Zeus und Thetis.
+    buildBandGroup(row);
     buildModeGroup(row);
     buildFilterGroup(row);
     buildStepGroup(row);
@@ -179,6 +188,44 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     // Leiste würde lügen.
     addOverflow(g, m_allModes,
                 [this](DSPMode m) { pushModeToModel(m); });
+}
+
+void CommandBar::buildBandGroup(QHBoxLayout* row)
+{
+    // Vorne 40, 20, 15 — auf Ansage des Betreibers (2026-08-22):
+    // "bänder sollten 40,20,15 ersichtlich sein, rest dann mit einem
+    // fenster mit punkten ... 160, 80, 60, 30, 10, 6".
+    //
+    // Die Reihenfolge dahinter ist seine: erst die sechs, die er
+    // genannt hat, dann der Rest. Was vorne steht, ist ohne Umweg
+    // erreichbar; alles Weitere liegt hinter dem "…".
+    m_allBands = {
+        {QStringLiteral("40m"),  Band::Band40m},
+        {QStringLiteral("20m"),  Band::Band20m},
+        {QStringLiteral("15m"),  Band::Band15m},
+        {QStringLiteral("160m"), Band::Band160m},
+        {QStringLiteral("80m"),  Band::Band80m},
+        {QStringLiteral("60m"),  Band::Band60m},
+        {QStringLiteral("30m"),  Band::Band30m},
+        {QStringLiteral("10m"),  Band::Band10m},
+        {QStringLiteral("6m"),   Band::Band6m},
+        {QStringLiteral("17m"),  Band::Band17m},
+        {QStringLiteral("12m"),  Band::Band12m},
+        {QStringLiteral("GEN"),  Band::GEN},
+        {QStringLiteral("WWV"),  Band::WWV},
+    };
+
+    Group& g = addGroup(QStringLiteral("Band"), row);
+    for (int i = 0; i < kVisiblePerGroup && i < m_allBands.size(); ++i) {
+        const auto entry = m_allBands.at(i);
+        QPushButton* b = addPill(g, entry.first);
+        b->setProperty("bandValue", static_cast<int>(entry.second));
+        connect(b, &QPushButton::clicked, this, [this, entry]() {
+            emit bandRequested(entry.second);
+        });
+    }
+    addOverflow(g, m_allBands,
+                [this](Band b) { emit bandRequested(b); });
 }
 
 void CommandBar::buildStepGroup(QHBoxLayout* row)
@@ -512,6 +559,36 @@ void CommandBar::pushStepToModel(int hz)
 void CommandBar::pullFromModel()
 {
     if (!m_slice) { return; }
+
+    // ── Das eingeschaltete Band leuchtet ────────────────────────────
+    //
+    // Die Hausregel (tst_command_bar): in jeder Gruppe ist GENAU EINE
+    // Pille an. Ohne das haette die Bandgruppe drei dunkle Knoepfe —
+    // und die Leiste sagte nicht, wo man steht.
+    //
+    // Das Band kommt aus der FREQUENZ, nicht aus einem eigenen Feld:
+    // so stimmt die Anzeige auch nach einem Klick in den Panadapter,
+    // nach CAT oder nach einem Speicheraufruf.
+    if (Group* g = group(QStringLiteral("Band"))) {
+        const Band cur = bandFromFrequency(m_slice->frequency());
+        QString label;
+        for (const auto& e : m_allBands) {
+            if (e.second == cur) { label = e.first; break; }
+        }
+        if (!label.isEmpty()) {
+            bool visible = false;
+            for (QPushButton* b : g->pills) {
+                if (b->text() == label) { visible = true; break; }
+            }
+            // Wie bei Mode: ein Band ausserhalb der ersten drei rueckt
+            // an die letzte sichtbare Stelle, sonst zeigt die Leiste
+            // drei Pillen, von denen keine an ist.
+            if (!visible && !g->pills.isEmpty()) {
+                g->pills.last()->setText(label);
+            }
+            setActive(*g, label);
+        }
+    }
 
     if (Group* g = group(QStringLiteral("Mode"))) {
         const DSPMode cur = m_slice->dspMode();
