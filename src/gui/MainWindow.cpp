@@ -10104,6 +10104,37 @@ void MainWindow::wireSliceToSpectrum()
     // In CTUN mode (SmartSDR-style): pan stays fixed, VFO moves within it.
     // In traditional mode: pan follows VFO (auto-scroll handled in setVfoFrequency).
     // Band changes (large jumps) always recenter regardless of mode.
+    //
+    // ── Die Ueberschrift stand hier, die Verbindung NICHT ────────────
+    //
+    // Gefunden am 2026-08-22, und sie erklaert mehrere Befunde des
+    // Betreibers auf einmal:
+    //
+    //   "balken spring nicht dort hin"  — ein Klick aenderte die
+    //   Scheibe, aber niemand sagte es dem Panadapter; der tuerkise
+    //   Balken blieb, wo er war.
+    //
+    //   "cursor tastatur sollte auch die frequenz ändern" — die
+    //   Pfeiltaste rechnet vom VFO des WIDGETS. Der stand noch auf dem
+    //   Vorgabewert. Gemessen: nach setFrequency(7,1 MHz) ergab ein
+    //   Tastendruck 14.225.100 Hz statt 7.100.100 — also ein Schritt
+    //   von 14,225 MHz, dem Startwert, den das Widget nie verlassen
+    //   hatte.
+    //
+    // Dasselbe galt fuer jede andere Abstimmquelle: Bandknoepfe,
+    // CAT, Speicher. Der Balken folgte nur dem, was man DIREKT an ihm
+    // zog.
+    connect(slice, &SliceModel::frequencyChanged, this,
+            [this, slice](double hz) {
+        if (!slice) { return; }
+        SpectrumWidget* sw = nullptr;
+        const QString panKey = slice->panKey();
+        if (m_panStack && !panKey.isEmpty()) {
+            sw = m_panStack->spectrum(panKey);
+        }
+        if (!sw) { sw = activeSpectrumWidget(); }
+        if (sw) { sw->setVfoFrequency(hz); }
+    });
 
 
     // Task 42 (Phase 3P-II): reconfigure the Max Bin detector whenever the

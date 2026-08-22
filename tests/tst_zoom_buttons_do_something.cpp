@@ -254,6 +254,43 @@ private slots:
                      .arg(before).arg(s->frequency())));
     }
 
+    void theArrowKeysReallyChangeTheFrequency()
+    {
+        // Der Betreiber am 2026-08-22: "cursor tastatur sollte auch
+        // die frequenz ändern."
+        //
+        // Der bestehende Fall prueft, dass das SIGNAL ausgeht. Das ist
+        // die halbe Kette. Hier wird das andere Ende gemessen: die
+        // Frequenz der Scheibe — das, was der Bediener sieht und hoert.
+        RadioModel* model = m_mw->findChild<RadioModel*>();
+        if (!model) { QSKIP("Kein RadioModel"); }
+        if (model->slices().isEmpty()) {
+            model->addSlice();
+            for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        }
+        if (model->slices().isEmpty()) { QSKIP("Keine Scheibe"); }
+        SliceModel* s = model->slices().first();
+
+        m_sw->setStepSize(100);
+        s->setFrequency(7'100'000.0);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        QTest::keyClick(m_sw, Qt::Key_Right);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        QCOMPARE(s->frequency(), 7'100'100.0);
+
+        QTest::keyClick(m_sw, Qt::Key_Left);
+        QTest::keyClick(m_sw, Qt::Key_Left);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        QCOMPARE(s->frequency(), 7'099'900.0);
+
+        // Mit Umschalt zehnfach — damit man ueber ein Band kommt, ohne
+        // die Taste festzuhalten.
+        QTest::keyClick(m_sw, Qt::Key_Right, Qt::ShiftModifier);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        QCOMPARE(s->frequency(), 7'100'900.0);
+    }
+
     void cleanupTestCase()
     {
         // Bewusst NICHT geloescht. Ein echtes Hauptfenster mit
