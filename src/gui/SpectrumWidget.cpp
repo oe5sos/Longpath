@@ -520,7 +520,10 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // the final native surface.
 #ifdef Q_OS_MAC
     setApi(QRhiWidget::Api::Metal);
-    setAttribute(Qt::WA_NativeWindow);
+    // Seit 2026-08-22 als PAAR mit der Ancestor-Isolation — siehe
+    // applyNativeWindowIsolationPolicy(); die nackte Setzung liess auf
+    // macOS die Vorfahren mit-nativieren (upstream #4339).
+    applyNativeWindowIsolationPolicy();
     setAttribute(Qt::WA_Hover);  // Ensure HoverMove events are delivered
 #elif defined(Q_OS_WIN)
     setApi(QRhiWidget::Api::Direct3D11);
@@ -7634,6 +7637,75 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 // der Code, den er prueft. Zwei Rechnungen fuer dieselbe Flaeche sind
 // zwei Orte, an denen sie auseinanderlaufen; hier ist es die dritte
 // Wiederholung desselben Musters an einem Tag.
+// From AetherSDR SpectrumWidget.cpp:2264-2306 + 1857-1871 + 7138-7156
+// [@0cd4559] — verbatim wo moeglich; NEREUS_GPU_SPECTRUM statt
+// AETHER_GPU_SPECTRUM, und der Frequency-Preview-Zweig entfaellt, weil
+// NereusSDR dieses Feature (noch) nicht traegt.
+void SpectrumWidget::prepareForTopLevelChange()
+{
+#ifdef NEREUS_GPU_SPECTRUM
+    // QRhiWidget registers a cleanup callback with the current top-level
+    // backing-store QRhi. Direct splitter/floating-window reparenting can miss
+    // Qt's internal notification, leaving the old QRhi with a stale callback;
+    // when that QRhi is later torn down, runCleanup() fires against a stale
+    // QRhiWidgetPrivate and crashes during deferred event delivery (#2495).
+    //   [original comment from AetherSDR SpectrumWidget.cpp:2266-2271]
+    QEvent event(QEvent::WindowAboutToChangeInternal);
+    QCoreApplication::sendEvent(this, &event);
+#endif
+}
+
+void SpectrumWidget::resetGpuResources()
+{
+#ifdef NEREUS_GPU_SPECTRUM
+    // On macOS/Windows, the GPU surface doesn't survive reparenting — tear
+    // down old pipelines so initialize() rebuilds them for the new window.
+    // On Linux (OpenGL), a simple update() is sufficient (#1240).
+    //   [original comment from AetherSDR SpectrumWidget.cpp:7146-7148]
+#ifndef Q_OS_LINUX
+    releaseResources();
+#endif
+#endif
+    if (!m_shutdownPrepared) {
+        update();
+    }
+}
+
+void SpectrumWidget::prepareForShutdown()
+{
+    if (m_shutdownPrepared) {
+        return;
+    }
+    m_shutdownPrepared = true;
+
+    prepareForTopLevelChange();
+    setUpdatesEnabled(false);
+    hide();
+
+#ifdef NEREUS_GPU_SPECTRUM
+    releaseResources();
+#ifdef Q_OS_MAC
+    // Drop the native child window while its parent backing store is still
+    // alive, so any remaining platform resources are gone before QWidgetWindow
+    // destruction runs on app exit.
+    //   [original comment from AetherSDR SpectrumWidget.cpp:2299-2301]
+    destroy(true, true);
+#endif
+#endif
+}
+
+void SpectrumWidget::applyNativeWindowIsolationPolicy()
+{
+#if defined(NEREUS_GPU_SPECTRUM) && defined(Q_OS_MAC)
+    // Order matters: block ancestor promotion *before* requesting the native
+    // window, so realizing the leaf's NSView can't drag its QWidget tree
+    // native (redundant window-sized Core Animation backing stores, #4339).
+    //   [original comment from AetherSDR SpectrumWidget.cpp:1861-1866]
+    setAttribute(Qt::WA_DontCreateNativeAncestors);
+    setAttribute(Qt::WA_NativeWindow);
+#endif
+}
+
 int SpectrumWidget::freqScaleYForTest() const
 {
     return specHFromHeight(height(), m_spectrumFrac,

@@ -182,10 +182,8 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kAccent)));
     headLay->addWidget(m_btnFloat);
     connect(m_btnFloat, &QPushButton::clicked, this, [this]() {
-        if (m_floating) { emit dockRequested(m_panId); return; }
-        // Gesperrt — siehe floatLockReason(). Der Waechter steht hier
-        // zusaetzlich zum grauen Knopf: eine Tastenkombination oder ein
-        // Menue koennte den Knopf umgehen.
+        if (m_floating) { emit dockRequested(m_panId); }
+        else            { emit floatRequested(m_panId); }
     });
     setFloatingIndicator(false);
 
@@ -473,7 +471,6 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
         emit addSliceRequested(panId());
     });
     QAction* floatAct = menu->addAction(tr("Float this pan"));
-    floatAct->setEnabled(false);
     floatAct->setToolTip(floatLockReason());
     connect(floatAct, &QAction::triggered, this, [this]() {
         emit floatRequested(panId());
@@ -594,36 +591,23 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
 }
 
 // ↗ heisst „ablösen", ↙ heisst „zurueck in die Anordnung".
-// ── Warum das Abloesen gesperrt ist ─────────────────────────────────
+// ── Die Abloese-Sperre ist Geschichte (2026-08-21 bis 2026-08-22) ────
 //
-// Es stuerzt ab. Panadapter abloesen, Fenster schliessen — SIGSEGV,
-// nachgestellt und mit Stapel belegt (2026-08-21):
+// Einen Tag lang war das Abloesen gesperrt: es stuerzte beim Beenden
+// ab (SIGSEGV in QRhiWidgetPrivate::ensureRhi, upstream #2495). Die
+// Ursache waren VIER bei der Portierung verlorene Schutzmethoden aus
+// AetherSDR (prepareForTopLevelChange / resetGpuResources /
+// prepareForShutdown / applyNativeWindowIsolationPolicy). Seit dem
+// Rueckport ueberlebt der frühere Absturz-Repro (tst_real_pan_float_
+// state beendet mit abgeloestem Panadapter) — die Sperre fiel.
 //
-//   QRhiWidgetPrivate::ensureRhi()::$_0 — EXC_BAD_ACCESS
-//
-// Qts eigener Aufraeum-Rueckruf am Zeichenkontext ueberlebt das
-// Widget. Die Spur endet in Qt; lldb liefert nach dem obersten Rahmen
-// keine verwertbare Kette. Drei Kuren versucht, alle durch Messung
-// verworfen (siehe cd6e83f5).
-//
-// Gesperrt wird, weil der Grund WEGGEFALLEN ist, aus dem der Betreiber
-// es ueberhaupt benutzt hat: er loeste ab, um den Panadapter groesser
-// zu ziehen — und das ging nur deshalb nicht direkt, weil die
-// Griffleisten drei Pixel breit waren (eaeec343). Seit die sechs
-// Pixel haben, zieht man den Rand.
-//
-// Es bleibt SICHTBAR und erklaert sich selbst, statt zu verschwinden.
-// Ein Knopf, der spurlos weg ist, laesst den Bediener suchen; einer,
-// der grau ist und sagt warum, beantwortet die Frage vorher.
-//
-// Der Rueckweg bleibt IMMER offen: steht ein Panadapter noch
-// abgeloest — etwa aus einer gespeicherten Anordnung —, muss man ihn
-// zurueckholen koennen.
+// floatLockReason() bleibt als Huelle stehen, weil Pruefungen und
+// aeltere Anordnungen den Namen kennen; sie beschreibt jetzt den
+// Normalzustand.
 QString PanadapterApplet::floatLockReason()
 {
-    return tr("Ablösen ist vorübergehend gesperrt: es stürzt beim "
-              "Beenden ab.\n\nDie Größe ändern Sie direkt — ziehen Sie "
-              "am Rand zwischen Panadapter und den Feldern daneben.");
+    return tr("In ein eigenes Fenster ablösen — frei beweglich und "
+              "frei skalierbar. Der Pfeil im Fenster holt es zurück.");
 }
 
 void PanadapterApplet::setFloatingIndicator(bool floating)
@@ -633,11 +617,10 @@ void PanadapterApplet::setFloatingIndicator(bool floating)
     m_btnFloat->setText(floating ? QStringLiteral("\u2199")
                                  : QStringLiteral("\u2197"));
 
-    // Zurueckholen immer erlaubt, Abloesen gesperrt.
-    m_btnFloat->setEnabled(floating);
+    m_btnFloat->setEnabled(true);
     m_btnFloat->setToolTip(floating
         ? QStringLiteral("Back into the layout")
-        : floatLockReason());
+        : QStringLiteral("Detach into its own window"));
 }
 
 } // namespace Longpath

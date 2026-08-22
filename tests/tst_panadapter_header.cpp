@@ -118,22 +118,21 @@ private slots:
     // Der Fall bleibt stehen und dreht sich um: er bewacht jetzt, dass
     // die Sperre haelt UND sich erklaert. Die ausfuehrliche Fassung
     // steht in tst_pan_float_locked.
-    void theSwitchIsLockedAndSaysWhy()
+    // Die Sperre vom 2026-08-21 ist Geschichte: die vier verlorenen
+    // AetherSDR-Schutzmethoden sind rueckportiert, der Absturz-Repro
+    // ueberlebt (tst_real_pan_float_state), der Schalter loest wieder
+    // ab. Dieser Fall hiess einen Tag lang theSwitchIsLockedAndSaysWhy.
+    void theSwitchAsksToDetach()
     {
         PanadapterApplet pan(QStringLiteral("pan-0"));
         QSignalSpy spy(&pan, &PanadapterApplet::floatRequested);
 
         QPushButton* b = floatButtonOf(pan);
         QVERIFY(b);
-        QVERIFY2(!b->isEnabled(), "Der Schalter loest noch ab");
+        QVERIFY2(b->isEnabled(), "Die Sperre ist zurueckgekommen");
         b->click();
-        QCOMPARE(spy.count(), 0);
-
-        QVERIFY2(!b->toolTip().isEmpty()
-                     && b->toolTip().contains(QString::fromUtf8("gesperrt")),
-                 qPrintable(QStringLiteral(
-                     "Ein grauer Schalter ohne Begruendung laesst den "
-                     "Bediener raten: '%1'").arg(b->toolTip())));
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.takeFirst().at(0).toString(), QStringLiteral("pan-0"));
     }
 
     // DER FALL, DER VORHER FEHLTE: derselbe Schalter muss zurueckfuehren.

@@ -23,11 +23,14 @@
 
 
 #include "gui/PanadapterApplet.h"
+#include "gui/SpectrumWidget.h"
 #include "gui/StyleConstants.h"
 #include "gui/PanFloatingWindow.h"
 #include "core/AppSettings.h"
 #include <QVBoxLayout>
 #include <QSplitter>
+#include <QTimer>
+#include <QWindow>
 #include <QSet>
 #include <QStringList>
 
@@ -304,6 +307,37 @@ void PanadapterStack::moveSliceToPan(int sliceId, const QString& destPanId)
     dest->addSlice(sliceId);
 }
 
+// After moving a QRhiWidget between top-level windows, force a fresh initialize()
+// cycle so Metal binds to the new NSView. The backing-store notification is sent
+// before the actual reparent; sending it again here can make QRhiWidget remove a
+// stale cleanup callback from the wrong QRhi during startup floating restore.
+//   [From AetherSDR PanadapterStack.cpp:18-43 [@0cd4559], verbatim bis auf
+//    den Makronamen. Bei der Portierung verlorengegangen und am 2026-08-22
+//    rueckportiert — ohne diesen Zyklus blieb das Fenster nach dem
+//    Umhaengen schwarz.]
+static void refreshAfterReparent(Longpath::SpectrumWidget* sw)
+{
+    if (!sw) { return; }
+#if defined(Q_OS_MAC) && defined(NEREUS_GPU_SPECTRUM)
+    const bool wasVisible = sw->isVisible();
+    sw->hide();
+    sw->resetGpuResources();
+    if (QWindow* windowHandle = sw->windowHandle()) {
+        windowHandle->destroy();
+    }
+    // Re-realize the native leaf with its ancestor isolation intact — the helper
+    // reasserts WA_NativeWindow *and* WA_DontCreateNativeAncestors as a pair, so a
+    // reparent can't promote ancestors to native (redundant backing stores, #4339).
+    sw->applyNativeWindowIsolationPolicy();
+    if (wasVisible) {
+        sw->show();
+    }
+    QTimer::singleShot(50, sw, [sw]() { sw->update(); });
+#else
+    sw->resetGpuResources();
+#endif
+}
+
 void PanadapterStack::floatPanadapter(const QString& panId)
 {
     // Sub-Epic D Task 8: detach the pan into a top-level PanFloatingWindow
@@ -338,6 +372,15 @@ void PanadapterStack::floatPanadapter(const QString& panId)
 
     applet->hide();
 
+    // From AetherSDR PanadapterStack.cpp:793-801 [@0cd4559]: GPU-Schutz
+    // VOR dem Umhaengen — Rueckruf abmelden (#2495), Ressourcen
+    // freigeben, damit initialize() gegen das neue Fenster neu bindet.
+    if (SpectrumWidget* sw = applet->spectrumWidget()) {
+        sw->hide();
+        sw->prepareForTopLevelChange();
+        sw->resetGpuResources();
+    }
+
     // Mit Elternfenster: ein Qt::Tool ohne Elternteil ist kein
     // Hilfsfenster, sondern ein weiteres Hauptfenster — und faellt in
     // die Vollbildflaeche zurueck, die es gerade vermeiden soll.
@@ -348,6 +391,16 @@ void PanadapterStack::floatPanadapter(const QString& panId)
         auto* taken = m_floating.take(panId);
         if (!taken) { return; }
         emit panFloatStateChanged(panId, false);
+        // From AetherSDR PanadapterStack.cpp:840-852 [@0cd4559]: erst den
+        // GPU-Schutz, DANN das Umhaengen — sonst bricht der doppelte
+        // NSView-Lebenszyklus die NSResponder-Kette (#1344).
+        if (PanadapterApplet* fa = m_pans.value(panId, nullptr)) {
+            if (SpectrumWidget* sw = fa->spectrumWidget()) {
+                sw->hide();
+                sw->prepareForTopLevelChange();
+                sw->resetGpuResources();
+            }
+        }
         if (PanadapterApplet* a = m_pans.value(panId, nullptr)) {
             a->setFloatingIndicator(false);
         }
@@ -358,12 +411,28 @@ void PanadapterStack::floatPanadapter(const QString& panId)
         // is pulled out of the window's layout cleanly before we delete it.
         applyLayout(m_currentLayoutId, m_pans.keys());
         taken->deleteLater();
+        if (PanadapterApplet* fa = m_pans.value(panId, nullptr)) {
+            if (SpectrumWidget* sw = fa->spectrumWidget()) {
+                QTimer::singleShot(0, sw, [sw]() {
+                    refreshAfterReparent(sw);
+                    sw->show();
+                });
+            }
+        }
     });
 
     floater->show();
     // Now that the floating window exists and is mapped, bring the pan back up
     // so its QRhiWidget initializes against that window's surface.
     applet->show();
+    if (SpectrumWidget* sw = applet->spectrumWidget()) {
+        // From AetherSDR PanadapterStack.cpp:823-830 [@0cd4559]: Metal erst
+        // an die neue NSView binden lassen, dann zeigen.
+        QTimer::singleShot(0, sw, [sw]() {
+            refreshAfterReparent(sw);
+            sw->show();
+        });
+    }
     // Erst JETZT die Groesse setzen: solange das Applet versteckt war,
     // verlangte die Anordnung fast nichts, und jede vorher gesetzte
     // Zahl wird von der Mindestgroesse des Inhalts ueberschrieben.
@@ -473,6 +542,20 @@ void PanadapterStack::floatPanadapter(const QString& panId)
 void PanadapterStack::dockAllFloating()
 {
     if (m_floating.isEmpty()) { return; }
+
+    // From AetherSDR SpectrumWidget.cpp:2286-2306 [@0cd4559]
+    // (prepareForShutdown): beim Beenden wird NICHT mehr umgehaengt,
+    // sondern jedes abgeloeste Spektrum kontrolliert stillgelegt — den
+    // stalen QRhi-Rueckruf abmelden, Ressourcen freigeben, native View
+    // fallen lassen, solange der Elternteil noch lebt. Genau der
+    // fehlende Schritt hinter dem SIGSEGV in ensureRhi (#2495).
+    for (auto it = m_floating.cbegin(); it != m_floating.cend(); ++it) {
+        if (!it.value()) { continue; }
+        for (SpectrumWidget* sw :
+                 it.value()->findChildren<SpectrumWidget*>()) {
+            sw->prepareForShutdown();
+        }
+    }
 
     const QStringList ids = m_floating.keys();
     QVector<PanFloatingWindow*> windows;

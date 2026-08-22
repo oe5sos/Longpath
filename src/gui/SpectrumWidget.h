@@ -1562,6 +1562,20 @@ public:
     /// Oberkante der Frequenzskala — fuer Pruefungen, die die bewusste
     /// Verschiebe-Geste dort ansetzen muessen.
     int freqScaleYForTest() const;
+
+    // ── Umzugs- und Abbau-Schutz, rueckportiert 2026-08-22 ───────────
+    //
+    // Diese vier Methoden standen im AetherSDR-Original
+    // (SpectrumWidget.cpp [@0cd4559]) und sind bei der Portierung
+    // verlorengegangen. Ohne sie: SIGSEGV beim Beenden mit abgeloestem
+    // Panadapter (upstream #2495 — exakt unser Stapel in
+    // QRhiWidgetPrivate::ensureRhi), eingefrorene NSResponder-Ketten
+    // (#1344), doppelte Backing-Stores (#4339), schwarze Fenster nach
+    // dem Umhaengen.
+    void prepareForTopLevelChange();
+    void resetGpuResources();
+    void prepareForShutdown();
+    void applyNativeWindowIsolationPolicy();
     float refLevelForTest() const { return m_refLevel; }
     float dynamicRangeForTest() const { return m_dynamicRange; }
     QColor fillColorForTest() const { return m_fillColor; }
@@ -2901,6 +2915,7 @@ private:
 
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};
+    bool   m_shutdownPrepared{false};
     bool   m_overlayNeedsUpload{true};
 
     // 2026-05-26 KG4VCF dual-layer overlay split.

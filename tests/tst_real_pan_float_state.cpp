@@ -247,8 +247,11 @@ private slots:
 
         mw->close();
         for (int i=0;i<6;++i) QCoreApplication::processEvents();
-        // Bewusst NICHT abgeraeumt: der Abbau stuerzt ab (siehe Kopf),
-        // und der Absturz wuerde die Messung oben verdecken.
+        // Seit dem Rueckport der AetherSDR-Schutzmethoden (2026-08-22)
+        // ist der Abbau der ABSTURZ-REPRO: vorher starb genau dieses
+        // delete mit SIGSEGV in QRhiWidgetPrivate::ensureRhi (#2495).
+        // Ueberlebt es, ist der Rueckport wirksam.
+        delete mw;
     }
 };
 QTEST_MAIN(TstRealPanFloat)
