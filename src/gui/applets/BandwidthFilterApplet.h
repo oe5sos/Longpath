@@ -106,6 +106,9 @@ private:
     QList<QPushButton*> m_varBtns;
     QPushButton* m_resetBtn{nullptr};
     QPushButton* m_spanBtn{nullptr};
+    /// Die Verbindungen jeder Flaeche zu ihrer Scheibe. Werden bei
+    /// jedem Neubau geloest und neu geknuepft — siehe rebuildPanes().
+    QList<QMetaObject::Connection> m_paneConns;
     QList<QLabel*> m_shrinkableLabels;
     /// Die Bedienzeile. Eng bricht sie in zwei Reihen um — siehe
     /// resizeEvent().

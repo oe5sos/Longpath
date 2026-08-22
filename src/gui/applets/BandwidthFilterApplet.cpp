@@ -287,6 +287,29 @@ void BandwidthFilterApplet::rebuildPanes()
         wirePane(pane, i);
     }
 
+    // ── IMMER neu verdrahten, nicht nur bei neuer Flaechenzahl ──────
+    //
+    // Der Fehler, den der Betreiber am 2026-08-22 fotografiert hat:
+    // sein Bandfilter stand auf 14,22 MHz, waehrend das Geraet auf
+    // 7,1156 empfing.
+    //
+    // Ursache: ohne Geraet gibt es keine Scheibe, aber trotzdem EINE
+    // Flaeche (max(1, ...) oben — damit das Applet nicht leer
+    // dasteht). wirePane() lief dafuer, fand keine Scheibe und knuepfte
+    // KEINE Verbindung. Kam das Geraet dazu, blieb die gewuenschte
+    // Flaechenzahl bei 1, beide Schleifen taten nichts — und
+    // nachverdrahtet wurde nie. Die Achse blieb auf dem Vorgabewert
+    // stehen (14,225 MHz, die 20-m-Vorgabe) und bewegte sich nie
+    // wieder.
+    //
+    // Gemessen: nach setFrequency(7,1156 MHz) stand die Flaeche auf
+    // 14,225; ein erzwungenes syncFromModel() lieferte sofort den
+    // richtigen Wert. Also war nicht die Auffrischung kaputt, sondern
+    // der Signalweg gar nicht vorhanden.
+    for (const QMetaObject::Connection& c : m_paneConns) { disconnect(c); }
+    m_paneConns.clear();
+    for (int i = 0; i < m_panes.size(); ++i) { wirePane(m_panes[i], i); }
+
     for (int i = 0; i < m_panes.size(); ++i) { refreshPane(i); }
     refreshNumbers();
 }
@@ -309,18 +332,18 @@ void BandwidthFilterApplet::wirePane(BandwidthFilterPane* pane, int sliceIndex)
     });
 
     if (SliceModel* s = sliceAt(sliceIndex)) {
-        connect(s, &SliceModel::filterChanged, this,
+        m_paneConns.append(connect(s, &SliceModel::filterChanged, this,
                 [this, sliceIndex](int, int) {
             refreshPane(sliceIndex);
             refreshNumbers();
-        });
-        connect(s, &SliceModel::frequencyChanged, this,
-                [this, sliceIndex](double) { refreshPane(sliceIndex); });
-        connect(s, &SliceModel::dspModeChanged, this,
+        }));
+        m_paneConns.append(connect(s, &SliceModel::frequencyChanged, this,
+                [this, sliceIndex](double) { refreshPane(sliceIndex); }));
+        m_paneConns.append(connect(s, &SliceModel::dspModeChanged, this,
                 [this, sliceIndex](DSPMode) {
             refreshPane(sliceIndex);
             refreshNumbers();
-        });
+        }));
     }
 }
 

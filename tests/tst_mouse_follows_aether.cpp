@@ -227,7 +227,7 @@ private slots:
         // in der Flaeche.
         SpectrumWidget w;
         arm(w);
-        w.setFilterEdges(-2900, -100);      // LSB, 2,8 kHz
+        w.setFilterOffset(-2900, -100);      // LSB, 2,8 kHz
         QCoreApplication::processEvents();
 
         const int xVfo = w.vfoXForTest();
