@@ -287,9 +287,29 @@ constexpr auto kRedBorder       = "#a86b6d";
 //
 // Der Glimmton ist absichtlich keiner, den man benennen würde. Sobald
 // man ihn „olivgrün" nennen kann, ist er zu kräftig.
-constexpr auto kInstrumentFace    = "#c8c8c0";  // Bogen, Zeiger, Teilung
-constexpr auto kInstrumentGlowHi  = "#5c5842";  // Mitte des Glimmens
-constexpr auto kInstrumentGlowLo  = "#33322a";  // Rand des Glimmens
+// ── Heller, auf Wunsch des Betreibers (2026-08-22, +40 %) ───────────
+//
+// "mir kommt auch vor, dass beim testen die swr und stehellenanzeigen
+// mehr bleuctet sind, als dann später in der app" — und nach einem
+// Vergleichsblatt mit vier Stufen: "plus 40 % probieren wir mal bei
+// swr und stehwelle".
+//
+// Gerechnet wurde auf der Helligkeit (HSL), nicht multiplikativ auf
+// RGB — dieselbe Lehre wie bei den Flaechenverlaeufen: auf dunklem
+// Grund tut lighter() fast nichts.
+//
+// EHRLICH ZUM BOGEN: #c8c8c0 lag schon bei 76 % Helligkeit, +40 %
+// laeuft also in reines Weiss. Das ist genau das, was im
+// Vergleichsblatt zu sehen war und ausgewaehlt wurde — aber es nimmt
+// dem Bogen den warmen Stich. Deshalb steht er hier auf #f2f2ec statt
+// #ffffff: praktisch die volle Aufhellung, mit einem Rest Farbe. Wer
+// das reine Weiss will, setzt die Zeile auf #ffffff.
+//
+// Das GLIMMEN traegt den groesseren Teil des Eindrucks; dort greift
+// die Aufhellung voll.
+constexpr auto kInstrumentFace    = "#f2f2ec";  // Bogen, Zeiger, Teilung
+constexpr auto kInstrumentGlowHi  = "#817b5c";  // Mitte des Glimmens
+constexpr auto kInstrumentGlowLo  = "#47463b";  // Rand des Glimmens
 constexpr auto kInstrumentLimit   = "#a86b6d";  // wo es zu viel wird
 
 // ── Spektrum und Gitter ───────────────────────────────────────────────
