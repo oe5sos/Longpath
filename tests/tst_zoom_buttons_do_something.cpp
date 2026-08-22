@@ -291,6 +291,55 @@ private slots:
         QCOMPARE(s->frequency(), 7'100'900.0);
     }
 
+    void theBandAndSegmentButtonsBehave()
+    {
+        // Der "S"-Knopf (Segment) hat am 2026-08-21 das Fenster
+        // SCHWARZ gemacht — reproduzierbar, Prozess am Leben. Seit dem
+        // 2026-08-22 ist er ueberhaupt erst verdrahtet; geprueft war
+        // er nie. Das wird hier nachgeholt, bevor der Betreiber ihn
+        // findet.
+        //
+        // Erwartung: beide veraendern die Ansicht ODER lassen sie in
+        // Ruhe (wenn die Frequenz in keinem Segment liegt) — aber sie
+        // duerfen sie nie in einen unbrauchbaren Zustand bringen.
+        QVERIFY(m_sw);
+        m_sw->setSampleRate(384000.0);
+        m_sw->setFrequencyRange(7'100'000.0, 100'000.0);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        for (const QString& name : {QStringLiteral("panZoomBandBtn"),
+                                    QStringLiteral("panZoomSegBtn")}) {
+            QPushButton* b = m_mw->findChild<QPushButton*>(name);
+            QVERIFY2(b, qPrintable(name));
+            b->click();
+            for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+            const double bw = m_sw->bandwidth();
+            QVERIFY2(bw >= 1000.0 && bw <= m_sw->sampleRate() + 1.0,
+                     qPrintable(QStringLiteral(
+                         "%1 hinterlaesst eine Bandbreite von %2 Hz")
+                         .arg(name).arg(bw)));
+            QVERIFY2(m_sw->centerFrequency() > 1'000'000.0,
+                     qPrintable(QStringLiteral(
+                         "%1 hinterlaesst die Mitte bei %2 Hz")
+                         .arg(name).arg(m_sw->centerFrequency())));
+            // Und das Bild muss noch etwas zeigen, nicht nur Schwarz.
+            const QImage img = m_sw->grabFramebuffer();
+            int lit = 0;
+            for (int y = 0; y < img.height(); y += 4) {
+                for (int x = 0; x < img.width(); x += 4) {
+                    const QColor c = img.pixelColor(x, y);
+                    if ((c.red() + c.green() + c.blue()) / 3 > 30) { ++lit; }
+                }
+            }
+            QVERIFY2(lit > 100,
+                     qPrintable(QStringLiteral(
+                         "Nach %1 ist das Bild praktisch schwarz (%2 helle "
+                         "Punkte) — genau der Befund vom 2026-08-21")
+                         .arg(name).arg(lit)));
+        }
+    }
+
     void cleanupTestCase()
     {
         // Bewusst NICHT geloescht. Ein echtes Hauptfenster mit

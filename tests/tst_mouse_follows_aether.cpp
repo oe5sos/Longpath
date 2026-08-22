@@ -351,6 +351,43 @@ private slots:
                  "Getrennt laesst sich die Ansicht nicht verschieben");
     }
 
+    void aPannedViewStaysWhereItWasPut()
+    {
+        // NACHPRUEFUNG EINER EIGENEN BEHAUPTUNG (2026-08-22).
+        //
+        // Ich hatte dem Betreiber mehrfach gesagt, die Ansicht ziehe
+        // sich "immer wieder auf den VFO zurueck", und daraus einen
+        // Schalter abgeleitet, den AetherSDR hat ("Pan Follows VFO").
+        // Bevor ich den nachbaue, wird die Behauptung gemessen — sie
+        // war nie geprueft.
+        //
+        // setVfoFrequency() rollt nur nach, wenn der VFO den sichtbaren
+        // Bereich VERLASSEN wuerde (mit Rand). Bleibt er drin, darf
+        // sich nichts bewegen.
+        SpectrumWidget w;
+        arm(w);
+        w.setFrequencyRange(7'100'000.0, 100'000.0);
+        w.setVfoFrequency(7'100'000.0);
+        QCoreApplication::processEvents();
+
+        // Ansicht ein Stueck verschieben — der VFO bleibt im Bild.
+        drag(&w, QPoint(800, 60), QPoint(700, 60));
+        const double afterPan = w.centerFrequency();
+        QVERIFY2(!qFuzzyCompare(afterPan, 7'100'000.0),
+                 "Der Zug hat gar nicht verschoben");
+
+        // Jetzt eine kleine Abstimmung, VFO bleibt im sichtbaren
+        // Bereich.
+        w.setVfoFrequency(7'101'000.0);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(qFuzzyCompare(w.centerFrequency(), afterPan),
+                 qPrintable(QStringLiteral(
+                     "Die Ansicht ist von %1 auf %2 zurueckgesprungen — "
+                     "dann braucht es den Folgeschalter wirklich")
+                     .arg(afterPan).arg(w.centerFrequency())));
+    }
+
     void draggingTheVfoBarStaysProportional()
     {
         // Der Kern des Ausreissers: frueher rechnete der VFO-Zug
