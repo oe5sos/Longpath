@@ -62,6 +62,50 @@ private slots:
                      "14222000 — genau das Bild vom 2026-08-22")
                      .arg(paneFreq())));
     }
+    void theSpanFollowsTheChosenWidth()
+    {
+        // Der Betreiber am 2026-08-22: "der bandfilter sollte auch
+        // genau den bereich zeigen, den man ausgewählt hat, siehe
+        // zeus" — und dazu: "kann auch danach ein größerer bereich
+        // sein".
+        //
+        // Zeus zeigt bei 2,9 kHz Filter rund 10 kHz Fenster. Also
+        // folgt die Spanne der Wahl, mit Umgebung drumherum.
+        RadioModel model;
+        BandwidthFilterApplet applet(&model);
+        applet.resize(600, 260);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        if (model.slices().isEmpty()) { model.addSlice(); }
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        SliceModel* s = model.slices().first();
+
+        auto span = [&]() {
+            const auto panes = applet.findChildren<BandwidthFilterPane*>();
+            return panes.isEmpty() ? -1 : panes.first()->spanHz();
+        };
+
+        s->setFilterByHand(-2900, -100);      // 2,8 kHz
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        const int narrow = span();
+
+        s->setFilterByHand(-6000, -100);      // 5,9 kHz
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        const int wide = span();
+
+        qInfo() << "Spanne bei 2,8 kHz:" << narrow << "bei 5,9 kHz:" << wide;
+        QVERIFY2(wide > narrow,
+                 qPrintable(QStringLiteral(
+                     "Die Spanne folgt der Wahl nicht: %1 -> %2")
+                     .arg(narrow).arg(wide)));
+        // Der Durchlass soll ein gutes Drittel fuellen, nicht die
+        // Briefmarke im Riesenfenster sein.
+        QVERIFY2(narrow < 2800 * 5,
+                 qPrintable(QStringLiteral(
+                     "Bei 2,8 kHz Filter zeigt der Bandfilter %1 Hz — "
+                     "viel zu weit").arg(narrow)));
+    }
+
     void theSignalShowsUpInThePane()
     {
         // "er sollte mir ja auch das signal zeigen" (Betreiber,

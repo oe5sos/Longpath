@@ -291,7 +291,13 @@ private slots:
         QCoreApplication::sendEvent(&w, &rel);
         QCoreApplication::processEvents();
 
-        QVERIFY2(w.hasFocus(),
+        // focusWidget() DES FENSTERS, nicht hasFocus(): letzteres
+        // verlangt ein AKTIVES Fenster, und unter Last hat der
+        // Pruefstand keins. Der Fall war deshalb unstet — er mass die
+        // Fensteraktivierung, nicht unseren Fokus. (Derselbe Fehler
+        // steckte schon in tst_zoom_buttons_do_something und wurde
+        // dort am 2026-08-22 aus demselben Grund korrigiert.)
+        QVERIFY2(w.window() && w.window()->focusWidget() == &w,
                  "Ein Klick ins Spektrum gibt ihm keinen Fokus — dann "
                  "kommt keine Pfeiltaste an");
 

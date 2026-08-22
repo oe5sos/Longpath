@@ -183,7 +183,7 @@ void BandwidthFilterApplet::buildUI()
 
         row->addStretch(1);
 
-        m_spanBtn = styledButton(QStringLiteral("10 kHz"), 62);
+        m_spanBtn = styledButton(QStringLiteral("AUTO"), 62);
         m_spanBtn->setToolTip(QStringLiteral(
             "How much band the panes show. Click to cycle."));
         row->addWidget(m_spanBtn);
@@ -228,15 +228,32 @@ void BandwidthFilterApplet::buildUI()
             if (SliceModel* s = activeSlice()) { s->resetFilterCenter(); }
         });
         connect(m_spanBtn, &QPushButton::clicked, this, [this]() {
-            // Vier Stufen reichen: eng genug fuer CW, weit genug fuer AM.
+            // ── AUTO zuerst, dann die festen Stufen ─────────────────
+            //
+            // Der Betreiber am 2026-08-22 nach der Zeus-Vorfuehrung:
+            // "der bandfilter sollte auch genau den bereich zeigen,
+            // den man ausgewählt hat" — und gleich dazu: "kann auch
+            // danach ein größerer bereich sein".
+            //
+            // Also beides, in dieser Reihenfolge: AUTO ist die
+            // Vorgabe und richtet sich nach der GEWAEHLTEN Breite;
+            // wer mehr Umgebung will, klickt weiter.
             static const int kSpans[] = {4000, 10000, 20000, 40000};
-            int next = 0;
-            for (int i = 0; i < 4; ++i) {
-                if (kSpans[i] == m_spanHz) { next = (i + 1) % 4; break; }
+            if (m_spanAuto) {
+                m_spanAuto = false;
+                m_spanHz = kSpans[0];
+            } else {
+                int next = -1;
+                for (int i = 0; i < 4; ++i) {
+                    if (kSpans[i] == m_spanHz) { next = i + 1; break; }
+                }
+                if (next < 0 || next >= 4) { m_spanAuto = true; }
+                else { m_spanHz = kSpans[next]; }
             }
-            m_spanHz = kSpans[next];
-            m_spanBtn->setText(QStringLiteral("%1 kHz").arg(m_spanHz / 1000));
-            for (BandwidthFilterPane* p : m_panes) { p->setSpan(m_spanHz); }
+            m_spanBtn->setText(m_spanAuto
+                ? QStringLiteral("AUTO")
+                : QStringLiteral("%1 kHz").arg(m_spanHz / 1000));
+            for (int i = 0; i < m_panes.size(); ++i) { refreshPane(i); }
         });
     }
 
@@ -362,6 +379,21 @@ void BandwidthFilterApplet::refreshPane(int i)
     }
 
     pane->setFilter(s->filterLow(), s->filterHigh());
+
+    // ── AUTO: die Spanne folgt der gewaehlten Breite ────────────────
+    //
+    // Zeus zeigt bei 2,9 kHz Filter rund 10 kHz Fenster — der Durchlass
+    // fuellt also etwa ein Drittel und hat Umgebung, in der man sieht,
+    // ob das Signal daneben liegt. Faktor 3,4, untere Grenze 2 kHz
+    // (sonst wird CW zur Briefmarke), obere 40 kHz wie die feste
+    // Stufenreihe.
+    if (m_spanAuto) {
+        const int wHz = qAbs(s->filterHigh() - s->filterLow());
+        const int span = qBound(2000, static_cast<int>(wHz * 3.4), 40000);
+        pane->setSpan(span);
+    } else {
+        pane->setSpan(m_spanHz);
+    }
     pane->setVfoFrequency(s->frequency());
 
     // Ohne Frequenz keine Achse. Eine erfundene waere eine Behauptung.

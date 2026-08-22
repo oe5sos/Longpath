@@ -120,6 +120,8 @@ private:
     QPushButton* m_spanBtn{nullptr};
     /// Die Verbindungen jeder Flaeche zu ihrer Scheibe. Werden bei
     /// jedem Neubau geloest und neu geknuepft — siehe rebuildPanes().
+    /// Folgt die Spanne dem gewaehlten Filter? Vorgabe: ja.
+    bool           m_spanAuto{true};
     SpectrumSource m_spectrumSource;
     class QTimer*  m_traceTimer{nullptr};
     QList<QMetaObject::Connection> m_paneConns;

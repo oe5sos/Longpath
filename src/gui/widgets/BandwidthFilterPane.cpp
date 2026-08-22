@@ -232,16 +232,66 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         }
         poly << QPointF(r.right(), bot);
 
-        QColor fill(m_accent);
-        fill.setAlpha(46);
+        // ── Pegelraster ─────────────────────────────────────────────
+        //
+        // Drei waagrechte Linien mit dBm-Marke. Ohne sie ist die Kurve
+        // eine Form ohne Massstab: man sieht, DASS da etwas ist, aber
+        // nicht, wie stark. Zeus zeigt an derselben Stelle einen
+        // Pegelwert im Durchlass.
+        {
+            QFont tiny = font();
+            tiny.setPointSizeF(std::max(6.0, tiny.pointSizeF() - 3.5));
+            p.setFont(tiny);
+            const QColor gridLine(0x1c, 0x1c, 0x22);
+            const QColor gridText(Style::role("text-scale", Style::kTextScale));
+            for (int k = 1; k <= 3; ++k) {
+                const double frac = k / 4.0;
+                const int y = static_cast<int>(bot - (bot - top) * frac);
+                p.setPen(gridLine);
+                p.drawLine(r.left() + 1, y, r.right() - 1, y);
+                const int dbm = static_cast<int>(std::lround(lo + (hi - lo) * frac));
+                p.setPen(gridText);
+                p.drawText(QRect(r.right() - 46, y - 7, 42, 12),
+                           Qt::AlignRight | Qt::AlignVCenter,
+                           QStringLiteral("%1").arg(dbm));
+            }
+        }
+
+        // ── Die Kurve ───────────────────────────────────────────────
+        //
+        // Eigener Ton, NICHT der Akzent des Empfaengers: der gehoert
+        // dem Durchlass. Vorher waren beide blau, und man sah nicht,
+        // was im Filter liegt und was daneben — genau das ist die
+        // Frage, fuer die man dieses Fenster aufmacht.
+        QColor traceLine(Style::role("trace", "#c8a06a"));
+        QColor fill(traceLine);
+        fill.setAlpha(40);
         p.setPen(Qt::NoPen);
         p.setBrush(fill);
         p.drawPolygon(poly);
 
-        QColor line(Style::role("text-scale", Style::kTextScale));
-        p.setPen(QPen(line, 1.0));
+        p.setPen(QPen(traceLine, 1.2));
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);
+
+        // ── Was AUSSERHALB liegt, tritt zurueck ─────────────────────
+        //
+        // Nicht den Durchlass hervorheben, sondern die Umgebung
+        // daempfen: das liest sich sofort und ohne eine weitere Farbe.
+        {
+            const int xl2 = hzToX(m_low);
+            const int xh2 = hzToX(m_high);
+            QColor veil(Style::role("app-bg", Style::kAppBg));
+            veil.setAlpha(120);
+            p.setPen(Qt::NoPen);
+            p.setBrush(veil);
+            if (xl2 > r.left()) {
+                p.drawRect(QRect(r.left(), top, xl2 - r.left(), bot - top));
+            }
+            if (xh2 < r.right()) {
+                p.drawRect(QRect(xh2, top, r.right() - xh2, bot - top));
+            }
+        }
     }
 
     // Die Nulllinie ist die VFO-Frequenz. Sie traegt einen eigenen Ton,
@@ -313,22 +363,31 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     const bool wordMarks = labelRoom >= 190;
     const bool numbers   = labelRoom >= 110;
 
-    if (wordMarks) {
-        p.setFont(small);
-        p.setPen(faint);
-        p.drawText(QRect(xl + 3, 2, 90, 12), Qt::AlignLeft | Qt::AlignVCenter,
-                   QStringLiteral("LOW CUT"));
-        p.drawText(QRect(xh - 93, 2, 90, 12), Qt::AlignRight | Qt::AlignVCenter,
-                   QStringLiteral("HIGH CUT"));
-    }
+    // Die Wortmarken "LOW CUT"/"HIGH CUT" sind ersatzlos entfallen.
+    //
+    // Sie sagten, was ohnehin an der Stelle steht, an der sie klebten,
+    // und waren die Haelfte des Gedraenges oben. Seit die Zahlen unten
+    // an ihren Kanten stehen, braucht es sie nicht mehr. (wordMarks
+    // bleibt als Groessenmass fuer die Zahlen erhalten.)
+    Q_UNUSED(small);
+    Q_UNUSED(faint);
 
     if (numbers) {
+        // ── Die Kantenwerte AN DIE KANTEN, unten ────────────────────
+        //
+        // Sie standen oben und stiessen dort mit dem Breitenkaestchen
+        // zusammen — auf dem Bild des Betreibers vom 2026-08-22 lagen
+        // "LOW CUT", "HIGH CUT" und "2.9 kHz" uebereinander.
+        //
+        // Unten an der jeweiligen Kante ist ohnehin der bessere Platz:
+        // die Zahl steht dort, wo sie gilt, und muss nicht sagen,
+        // wozu sie gehoert.
         p.setFont(value);
         p.setPen(ink);
-        const int yNum = wordMarks ? 13 : 2;
-        p.drawText(QRect(xl + 3, yNum, 90, 14),
+        const int yNum = r.bottom() - 15;
+        p.drawText(QRect(xl + 4, yNum, 74, 13),
                    Qt::AlignLeft | Qt::AlignVCenter, cutLabel(m_low));
-        p.drawText(QRect(xh - 93, yNum, 90, 14),
+        p.drawText(QRect(xh - 78, yNum, 74, 13),
                    Qt::AlignRight | Qt::AlignVCenter, cutLabel(m_high));
     }
 
@@ -376,14 +435,31 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         return;
     }
 
-    for (int hz = -m_spanHz / 2; hz <= m_spanHz / 2; hz += 2000) {
+    // ── Abstand statt Abschnitt am Rand ─────────────────────────────
+    //
+    // Die Zahlen standen mittig unter ihrer Linie, auch wenn die Linie
+    // am Bildrand lag — die aeusseren wurden dadurch angeschnitten
+    // (".111" statt "7.111"). Eine halb gelesene Frequenz ist
+    // schlimmer als keine.
+    //
+    // Schrittweite richtet sich nach der Spanne: bei 2 kHz Fenster
+    // waeren 2-kHz-Schritte eine einzige Marke.
+    const int stepHz = (m_spanHz <= 6000) ? 1000
+                     : (m_spanHz <= 24000) ? 2000 : 5000;
+    for (int hz = -(m_spanHz / 2 / stepHz) * stepHz;
+         hz <= m_spanHz / 2; hz += stepHz) {
         const int x = hzToX(hz);
         const bool isCentre = (hz == 0);
+        const QString t = axisLabel(m_vfoHz + hz);
+        const int tw = p.fontMetrics().horizontalAdvance(t) + 8;
+        int left = x - tw / 2;
+        if (left < 1) { left = 1; }
+        if (left + tw > width() - 1) { left = width() - 1 - tw; }
         p.setPen(isCentre ? QColor(Style::role("text-secondary",
                                                Style::kTextSecondary))
                           : faint);
-        p.drawText(QRect(x - 34, height() - kPadBottom + 2, 68, 13),
-                   Qt::AlignCenter, axisLabel(m_vfoHz + hz));
+        p.drawText(QRect(left, height() - kPadBottom + 2, tw, 13),
+                   Qt::AlignCenter, t);
     }
 }
 
