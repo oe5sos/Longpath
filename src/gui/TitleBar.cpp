@@ -125,6 +125,21 @@ ConnectionSegment::ConnectionSegment(QWidget* parent)
 
 void ConnectionSegment::setState(ConnectionState s)
 {
+    // ── Beim Verbindungswechsel keinen FREMDEN Wert stehenlassen ─────
+    //
+    // Die Anzeige haelt bewusst den schlechtesten Wert der letzten
+    // Minute — sonst sieht man im ruhigen Moment 0,0 und glaubt, es
+    // sei alles gut. Ueber einen GERAETEWECHSEL hinweg ist dasselbe
+    // Verhalten aber eine Luege: der Betreiber sah am 2026-08-22 am
+    // ANAN-10/100 den Verlustwert des Anvelina, weil Protokoll 1
+    // damals gar nicht mass. Es misst jetzt — aber der Uebergang
+    // gehoert trotzdem geloescht.
+    if (s != m_state) {
+        m_lossPct      = -1.0;
+        m_lossWorstPct = -1.0;
+        m_lossWorstMs  = 0;
+    }
+
     if (m_state == s) {
         return;
     }

@@ -483,6 +483,18 @@ private:
     // 2000 -> 6000, gleiche Begruendung wie in P2RadioConnection.h.
     static constexpr int kConnectTimeoutMs     = 6000;
 
+    // ── Verlustmessung im ep6-Strom (2026-08-22) ─────────────────────
+    // Dieselbe 5-Sekunden-Fensterlogik wie in P2RadioConnection, damit
+    // die Kopfleiste an BEIDEN Protokollen dieselbe Zahl zeigt. Vorher
+    // gab es sie nur bei Protokoll 2 — am ANAN-10/100 stand deshalb
+    // der letzte Wert des ANDEREN Geraets, was schlimmer ist als gar
+    // keiner.
+    quint32 m_ep6LastSeq{0};
+    bool    m_ep6HaveSeq{false};
+    quint32 m_ep6WndPkts{0};
+    quint32 m_ep6WndLost{0};
+    qint64  m_ep6WndStartMs{0};
+
 public:
     /// Siehe P2RadioConnection::connectTimeoutMsForTest().
     static constexpr int connectTimeoutMsForTest() { return kConnectTimeoutMs; }

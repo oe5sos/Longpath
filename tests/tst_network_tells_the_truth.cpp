@@ -69,6 +69,43 @@ private slots:
                  "Problems");
     }
 
+    void aNewConnectionStartsWithACleanSlate()
+    {
+        // Der Betreiber am 2026-08-22 sah am ANAN-10/100 den
+        // Verlustwert des ANDEREN Geraets. Ein fremder Messwert ist
+        // schlimmer als gar keiner: er behauptet etwas ueber eine
+        // Strecke, die nie gemessen wurde.
+        ConnectionSegment seg;
+        seg.setState(ConnectionState::Connected);
+        seg.setPacketLoss(2.4);
+
+        seg.resize(600, 30);
+        auto redPixels = [&]() {
+            QImage img(seg.size(), QImage::Format_ARGB32);
+            img.fill(Qt::black);
+            seg.render(&img);
+            const QColor want(Style::kRedText);
+            int n = 0;
+            for (int y = 0; y < img.height(); ++y) {
+                for (int x = 0; x < img.width(); ++x) {
+                    const QColor c = img.pixelColor(x, y);
+                    if (qAbs(c.red()   - want.red())   < 24
+                        && qAbs(c.green() - want.green()) < 24
+                        && qAbs(c.blue()  - want.blue())  < 24) { ++n; }
+                }
+            }
+            return n;
+        };
+        QVERIFY2(redPixels() > 0, "Der Wert steht gar nicht erst da");
+
+        // Geraetewechsel: trennen und neu verbinden.
+        seg.setState(ConnectionState::Disconnected);
+        seg.setState(ConnectionState::Connected);
+        QVERIFY2(redPixels() == 0,
+                 "Nach dem Wechsel steht der Verlustwert des vorigen "
+                 "Geraets noch da");
+    }
+
     void aFailedConnectSaysWhy()
     {
         // Der Waechter darf nicht mehr stumm sein, und er darf nicht

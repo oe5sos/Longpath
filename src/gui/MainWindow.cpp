@@ -2538,7 +2538,30 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
     // Click on the spectrum tunes this pan's slice.
     connect(sw, &SpectrumWidget::frequencyClicked, this,
             [this, panId](double hz) {
-        if (SliceModel* s = sliceForPan(panId)) { s->setFrequency(hz); }
+        SliceModel* s = sliceForPan(panId);
+        if (!s) { return; }
+
+        // ── Eine Sperre muss sich melden ────────────────────────────
+        //
+        // SliceModel::setFrequency() beginnt mit "if (m_locked)
+        // return;" — wortlos. Der Betreiber am 2026-08-22: "balken
+        // spring nicht dort hin." Im Quelltext und im echten Fenster
+        // stimmt der Klick nachweislich ab (gemessen: 7,100 ->
+        // 7,128 MHz), live tut er es nicht — und eine gesperrte
+        // Scheibe ist der einzige Weg, auf dem das schweigend
+        // passieren kann.
+        //
+        // Ob es diesmal die Ursache war, weiss ich nicht. Aber ein
+        // Bedienelement, das ohne ein Wort nichts tut, hat uns heute
+        // schon Stunden gekostet — und wenn es nicht die Ursache ist,
+        // erscheint der Hinweis nie und wir haben sie ausgeschlossen.
+        if (s->locked()) {
+            showToast(tr("Die Frequenz dieser Scheibe ist gesperrt — "
+                         "das Schloss in der VFO-Leiste gibt sie frei."),
+                      ToastSeverity::Info, 5000);
+            return;
+        }
+        s->setFrequency(hz);
     });
 
     // Drag a filter edge on this pan.

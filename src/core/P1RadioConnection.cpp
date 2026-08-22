@@ -685,6 +685,12 @@ void P1RadioConnection::connectToRadio(const RadioInfo& info)
     m_intentionalDisconnect = false;
     m_epSendSeq = 0;
     m_epRecvSeqExpected = 0;
+    // Verlustfenster mit zuruecksetzen — sonst zaehlt der erste Rahmen
+    // nach einem Neuverbinden eine riesige Luecke.
+    m_ep6HaveSeq    = false;
+    m_ep6WndPkts    = 0;
+    m_ep6WndLost    = 0;
+    m_ep6WndStartMs = 0;
     m_ccRoundRobinIdx = 0;
 
     // Thetis hardcodes nddc=4 for plain Hermes/ANAN10/ANAN100 and nddc=2 for
@@ -2646,6 +2652,42 @@ void P1RadioConnection::onReadyRead()
             // Shell-chrome sub-PR-2 B.1: record ingress bytes for ▼ Mbps readout.
             recordBytesReceived(static_cast<qint64>(data.size()));
 
+            // ── Paketverlust zaehlen ────────────────────────────────
+            //
+            // Der Metis-Kopf traegt die Folgenummer in [4..7]. Eine
+            // Luecke heisst: der Kern hat uns Pakete nie gegeben.
+            // Protokoll 1 wiederholt so wenig wie Protokoll 2 — jedes
+            // fehlende Paket ist ein Loch im Ton.
+            if (data.size() >= 8) {
+                const auto* raw =
+                    reinterpret_cast<const quint8*>(data.constData());
+                const quint32 seq = (quint32(raw[4]) << 24)
+                                  | (quint32(raw[5]) << 16)
+                                  | (quint32(raw[6]) << 8)
+                                  |  quint32(raw[7]);
+                if (m_ep6HaveSeq && seq > m_ep6LastSeq + 1) {
+                    m_ep6WndLost += seq - m_ep6LastSeq - 1;
+                }
+                m_ep6LastSeq = seq;
+                m_ep6HaveSeq = true;
+                ++m_ep6WndPkts;
+
+                const qint64 now = QDateTime::currentMSecsSinceEpoch();
+                if (m_ep6WndStartMs == 0) {
+                    m_ep6WndStartMs = now;
+                } else if (now - m_ep6WndStartMs >= 5000) {
+                    const double tot =
+                        static_cast<double>(m_ep6WndPkts + m_ep6WndLost);
+                    emit iqPacketLoss(tot > 0.0
+                                          ? 100.0 * m_ep6WndLost / tot
+                                          : 0.0,
+                                      m_ep6WndLost, m_ep6WndPkts);
+                    m_ep6WndPkts = 0;
+                    m_ep6WndLost = 0;
+                    m_ep6WndStartMs = now;
+                }
+            }
+
             parseEp6Frame(data);
         }
     }
@@ -2862,10 +2904,24 @@ void P1RadioConnection::onConnectTimeout()
     if (m_socket) { m_socket->close(); }
     setState(ConnectionState::Disconnected);
 
+    // Derselbe Klartext wie im Protokoll-2-Weg (P2RadioConnection).
+    //
+    // Der Betreiber sah am 2026-08-22 am ANAN-10/100 noch den alten
+    // englischen Text, waehrend der Anvelina laengst die deutsche
+    // Fassung zeigte — zwei Wege, eine Sache, zwei Antworten. Der
+    // entscheidende Umstand ist derselbe: das Geraet WURDE gefunden
+    // (sonst staende es nicht in der Liste), es liefert nur keinen
+    // Datenstrom.
     emit connectFailed(ConnectFailure::Timeout,
-                       QStringLiteral("No response from radio within %1 ms — "
-                                      "check IP address, radio power, and network")
-                           .arg(kConnectTimeoutMs));
+                       QStringLiteral(
+                           "Das Gerät wurde gefunden, liefert aber binnen "
+                           "%1 s keinen Datenstrom.\n\n"
+                           "Das ist fast immer die Netzwerkstrecke, nicht "
+                           "das Gerät: über WLAN kommen die Pakete oft "
+                           "nicht durch, auch wenn die Suche es anzeigt "
+                           "(die läuft per Rundruf). Am zuverlässigsten "
+                           "ist eine Kabelverbindung.")
+                           .arg(kConnectTimeoutMs / 1000));
 }
 
 // ---------------------------------------------------------------------------

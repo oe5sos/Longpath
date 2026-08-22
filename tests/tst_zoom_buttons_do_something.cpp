@@ -213,6 +213,47 @@ private slots:
         QCOMPARE(m_sw->filterLowHz(), -3800);
     }
 
+    void aClickInTheSpectrumMovesTheBar()
+    {
+        // Der Betreiber am 2026-08-22: "balken spring nicht dort hin."
+        //
+        // Im nackten Widget kommt das Signal an (tst_mouse_follows_
+        // aether). Geprueft wird deshalb hier: kommt es bis zur
+        // SCHEIBE — also bis zu dem, was der Balken anzeigt.
+        RadioModel* model = m_mw->findChild<RadioModel*>();
+        if (!model) { QSKIP("Kein RadioModel"); }
+        if (model->slices().isEmpty()) {
+            model->addSlice();
+            for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        }
+        if (model->slices().isEmpty()) { QSKIP("Keine Scheibe"); }
+        SliceModel* s = model->slices().first();
+
+        m_sw->setConnectionState(ConnectionState::Connected);
+        m_sw->setSampleRate(192'000.0);
+        m_sw->setDdcCenterFrequency(7'100'000.0);
+        m_sw->setFrequencyRange(7'100'000.0, 100'000.0);
+        s->setFrequency(7'100'000.0);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        const double before = s->frequency();
+        const QPoint p(m_sw->width() * 3 / 4, m_sw->height() / 4);
+        QMouseEvent press(QEvent::MouseButtonPress, p, m_sw->mapToGlobal(p),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(m_sw, &press);
+        QMouseEvent rel(QEvent::MouseButtonRelease, p, m_sw->mapToGlobal(p),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(m_sw, &rel);
+        for (int i = 0; i < 8; ++i) { QCoreApplication::processEvents(); }
+
+        qInfo() << "Scheibe vorher:" << before << "nachher:" << s->frequency()
+                ;
+        QVERIFY2(!qFuzzyCompare(s->frequency(), before),
+                 qPrintable(QStringLiteral(
+                     "Der Klick bewegt die Scheibe nicht: %1 -> %2")
+                     .arg(before).arg(s->frequency())));
+    }
+
     void cleanupTestCase()
     {
         // Bewusst NICHT geloescht. Ein echtes Hauptfenster mit
