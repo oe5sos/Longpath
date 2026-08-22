@@ -2934,6 +2934,7 @@ private:
     // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
     // Warum, steht am Auswertepunkt in mouseMoveEvent.
     int    m_panDragLastX{0};
+    bool   m_panDragArmed{false};
     int    m_vfoDragStartX{0};
     double m_vfoDragStartHz{0.0};
     double m_vfoDragHzPerPx{0.0};

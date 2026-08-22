@@ -178,6 +178,42 @@ private slots:
                      "Doppelklick auf 7,2 MHz landet bei %1 Hz").arg(got)));
     }
 
+    void aDoubleClickDoesNotSlideTheView()
+    {
+        // Der Betreiber am 2026-08-22: "bei doppelklick im padadapter
+        // ruscht er herum, anstatt den balken dort hinzubringen."
+        //
+        // Ursache: der erste Klick begann SOFORT ein Verschieben, und
+        // die winzige Handbewegung zwischen den beiden Klicks rutschte
+        // die Ansicht weg — der Doppelklick landete dann woanders, als
+        // man gezielt hatte. Jetzt beginnt das Verschieben erst ab
+        // vier Punkten Weg, derselben Schwelle, die das Loslassen fuer
+        // den Klick benutzt.
+        SpectrumWidget w;
+        arm(w);
+        const double centerBefore = w.centerFrequency();
+
+        // Druck, zwei Punkte Zittern, Loslassen — wie bei einer Hand.
+        const QPoint p0(700, 150);
+        const QPoint p1(702, 150);
+        QMouseEvent press(QEvent::MouseButtonPress, p0, w.mapToGlobal(p0),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &press);
+        QMouseEvent move(QEvent::MouseMove, p1, w.mapToGlobal(p1),
+                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &move);
+        QMouseEvent rel(QEvent::MouseButtonRelease, p1, w.mapToGlobal(p1),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &rel);
+        QCoreApplication::processEvents();
+
+        QVERIFY2(qFuzzyCompare(w.centerFrequency(), centerBefore),
+                 qPrintable(QStringLiteral(
+                     "Zwei Punkte Zittern haben die Ansicht um %1 Hz "
+                     "verrutscht — dann trifft kein Doppelklick mehr")
+                     .arg(std::abs(w.centerFrequency() - centerBefore))));
+    }
+
     void theArrowKeysTuneByOneStep()
     {
         // "oder auch mit dem rechten und linken Cursortaste muss das

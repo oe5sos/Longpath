@@ -8615,8 +8615,25 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     m_panDragStartX = mx;
     m_panDragLastX  = mx;
     m_panDragStartCenter = m_centerHz;
-    m_draggingPan = true;
-    setCursor(Qt::ClosedHandCursor);
+
+    // NICHT sofort verschieben, sondern erst ab einer Schwelle.
+    //
+    // Der Betreiber am 2026-08-22: "bei doppelklick im padadapter
+    // ruscht er herum, anstatt den balken dort hinzubringen." Genau
+    // so: der erste Klick eines Doppelklicks begann sofort ein
+    // Verschieben, und die winzige Handbewegung zwischen den beiden
+    // Klicks rutschte die Ansicht weg — der Doppelklick landete dann
+    // woanders, als man gezielt hatte. Gemessen: ZWEI Punkte Zittern
+    // reichten fuer 207 Hz.
+    //
+    // Dieselbe Schwelle, die das Loslassen schon fuer den Klick
+    // benutzt (4 Punkte). Darunter ist eine Geste ein Klick, kein
+    // Zug; darueber beginnt das Verschieben in mouseMoveEvent.
+    //
+    // Die Frequenzskala oben behaelt ihr sofortiges Verschieben: dort
+    // gibt es nichts anzuklicken, die Geste ist eindeutig.
+    m_draggingPan  = false;
+    m_panDragArmed = true;
 
     QWidget::mousePressEvent(event);
 }
@@ -8802,6 +8819,15 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         update();
 #endif
         return;
+    }
+
+    // Aus der Bereitschaft wird ein Zug, sobald die Schwelle
+    // ueberschritten ist — siehe mousePressEvent.
+    if (m_panDragArmed && !m_draggingPan
+        && std::abs(mx - m_panDragStartX) > 4) {
+        m_draggingPan  = true;
+        m_panDragLastX = mx;
+        setCursor(Qt::ClosedHandCursor);
     }
 
     if (m_draggingPan) {
@@ -9199,7 +9225,8 @@ void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
             // Ein etwaiges Verschieben, das der erste Klick begonnen
             // hat, hier beenden — sonst zieht die Ansicht beim
             // Loslassen noch hinterher.
-            m_draggingPan = false;
+            m_draggingPan  = false;
+            m_panDragArmed = false;
             unsetCursor();
             const double hz = std::round(xToHz(dp.x(), specRect) / m_stepHz)
                               * m_stepHz;
@@ -9316,7 +9343,8 @@ void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
         m_draggingFilter = FilterEdge::None;
         m_draggingVfo = false;
         m_draggingDivider = false;
-        m_draggingPan = false;
+        m_draggingPan  = false;
+        m_panDragArmed = false;
         m_draggingBandwidth = false;
         // Ends the notch gesture; hover resumes writing the selection.
         if (m_notchGrab != NotchGrab::None) {

@@ -16,6 +16,7 @@
 #include <QtTest>
 #include <QLabel>
 
+#include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/BandwidthFilterApplet.h"
 #include "models/RadioModel.h"
 
@@ -43,6 +44,33 @@ private slots:
                      "Das Bandfilter verlangt mindestens %1 Punkte "
                      "Breite — darunter wird der Inhalt abgeschnitten "
                      "statt verkleinert").arg(floorW)));
+    }
+
+    void theFloatingWindowShrinksToo()
+    {
+        // Der Betreiber am 2026-08-22, nach der ersten Behebung: "das
+        // fenster des bandfilter passt noch immer nicht."
+        //
+        // Das Applet allein zu verkleinern reicht nicht — geprueft
+        // wird, was der Bediener anfasst: das SCHWEBEFENSTER.
+        RadioModel model;
+        auto* applet = new BandwidthFilterApplet(&model);
+        AppletFloatingWindow win(applet, QStringLiteral("test"), 0);
+        win.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        win.resize(340, 240);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        QTest::qWait(50);
+        qInfo() << "Fenster nach dem Verkleinern:"
+                << win.width() << "x" << win.height();
+
+        QVERIFY2(win.width() <= 380,
+                 qPrintable(QStringLiteral(
+                     "Das Bandfilter-FENSTER bleibt bei %1 Punkten "
+                     "stehen, obwohl 340 verlangt waren")
+                     .arg(win.width())));
     }
 
     void theWordLabelsGiveWayFirst()
