@@ -1563,6 +1563,14 @@ public:
     /// Verschiebe-Geste dort ansetzen muessen.
     int freqScaleYForTest() const;
 
+    /// Bildpunkt-Spalte des VFO-Strichs. Wie freqScaleYForTest() nur
+    /// fuer Pruefungen da: die Abbildung Frequenz->Punkt haengt an der
+    /// Nutzbreite (Fenster minus Randstreifen), und eine Pruefung, die
+    /// sie nachrechnet, rechnet frueher oder falsch — erlebt am
+    /// 2026-08-22, als der Zug am Balken den Griff um 18 Punkte
+    /// verfehlte und der Test das Verhalten faelschlich anklagte.
+    int vfoXForTest() const;
+
     // ── Umzugs- und Abbau-Schutz, rueckportiert 2026-08-22 ───────────
     //
     // Diese vier Methoden standen im AetherSDR-Original
@@ -2920,6 +2928,13 @@ private:
     QImage m_overlayStatic;
     bool   m_overlayStaticDirty{true};
     bool   m_shutdownPrepared{false};
+
+    // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
+    // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
+    // Warum, steht am Auswertepunkt in mouseMoveEvent.
+    int    m_vfoDragStartX{0};
+    double m_vfoDragStartHz{0.0};
+    double m_vfoDragHzPerPx{0.0};
     bool   m_overlayNeedsUpload{true};
 
     // 2026-05-26 KG4VCF dual-layer overlay split.

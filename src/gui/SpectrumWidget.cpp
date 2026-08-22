@@ -7736,6 +7736,14 @@ void SpectrumWidget::applyNativeWindowIsolationPolicy()
 #endif
 }
 
+int SpectrumWidget::vfoXForTest() const
+{
+    const int specH = specHFromHeight(height(), m_spectrumFrac,
+                                      kFreqScaleH + kDividerH);
+    const QRect specRect(0, 0, width() - effectiveStripW(), specH);
+    return hzToX(m_vfoHz, specRect);
+}
+
 int SpectrumWidget::freqScaleYForTest() const
 {
     return specHFromHeight(height(), m_spectrumFrac,
@@ -8462,6 +8470,44 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     int xHi = hzToX(hiHz, specRect);
     if (xLo > xHi) { std::swap(xLo, xHi); }
 
+    // ── 2b. Schmaler Durchlass: der VFO hat Vorrang ─────────────────
+    //
+    // Bei 2,9 kHz Filterbreite und 100 kHz Ansicht ist der Durchlass
+    // rund FUENFZEHN Punkte breit. Davon gehen zweimal kFilterGrab fuer
+    // die Filterkanten ab — uebrig bleibt ein Griff von wenigen
+    // Punkten, den kein Mensch zuverlaessig trifft.
+    //
+    // Der Betreiber am 2026-08-22, woertlich: "Du klickst auf den
+    // Balken, möchtest ein bisschen nach rechts und nach links ... und
+    // dann ist der Cursor irgendwo." Genau das ist die Folge: wer
+    // danebentrifft, zieht eine Filterkante oder stimmt per Klick auf
+    // die getroffene Stelle ab. Nachgemessen am Geraet — Druck bei
+    // x=440 und x=409 im sichtbaren tuerkisen Balken, beide Male
+    // passierte NICHTS, weil die Innenzone dazwischen lag.
+    //
+    // Also: ist der Durchlass zu schmal fuer drei Griffe, bekommt der
+    // haeufigste den Vorrang. Abstimmen macht man dauernd,
+    // Filterkanten zieht man selten — und fuer die gibt es die
+    // Filterleiste und das Menue.
+    const int xVfoNow  = hzToX(m_vfoHz, specRect);
+    const int passWide = std::abs(xHi - xLo);
+    //
+    // Schwelle in BILDPUNKTEN, nicht in Vielfachen von kFilterGrab:
+    // massgeblich ist, ob drei Griffe nebeneinander passen, und das
+    // haengt an der Darstellung. 2,9 kHz auf 100 kHz Ansicht sind rund
+    // 28 Punkte — zu wenig fuer drei. Auf einer 10-kHz-Ansicht sind es
+    // 280, da bleiben die Filterkanten normal greifbar.
+    if (passWide < 40 && std::abs(mx - xVfoNow) <= 12) {
+        m_draggingVfo    = true;
+        m_vfoDragStartX  = mx;
+        m_vfoDragStartHz = m_vfoHz;
+        m_vfoDragHzPerPx = specRect.width() > 0
+            ? m_bandwidthHz / static_cast<double>(specRect.width())
+            : 0.0;
+        setCursor(Qt::SizeHorCursor);
+        return;
+    }
+
     // 3. Filter edge grab — ±5px from edge
     // From AetherSDR SpectrumWidget.cpp:1080-1109
     bool loHit = std::abs(mx - xLo) <= kFilterGrab;
@@ -8487,6 +8533,12 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     int right = std::max(xLo, xHi);
     if (mx > left + kFilterGrab && mx < right - kFilterGrab) {
         m_draggingVfo = true;
+        // Den Bezug JETZT festhalten — siehe mouseMoveEvent.
+        m_vfoDragStartX  = mx;
+        m_vfoDragStartHz = m_vfoHz;
+        m_vfoDragHzPerPx = specRect.width() > 0
+            ? m_bandwidthHz / static_cast<double>(specRect.width())
+            : 0.0;
         setCursor(Qt::SizeHorCursor);
         return;
     }
@@ -8526,18 +8578,37 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     // zurueck: „einmal unabsichtlich klick und alles verrueckt sich…
     // das anklicken und verschieben ist das problem."
     //
-    // Jetzt wie bei Zeus/Thetis: die Ansicht steht. Verschieben ist
-    // eine BEWUSSTE Geste an der Frequenzskala (dem Zahlenstreifen);
-    // im Spektrum bleibt der Klick dem Abstimmen vorbehalten — das
-    // Loslassen unten prueft dafuer weiter die 4-Pixel-Schwelle.
-    // m_panDragStartX wird auch ohne Verschieb-Modus gemerkt, weil
-    // die Klick-Erkennung beim Loslassen daran misst.
-    // Skala-Druecke kommen hier nie an (der Zweig oben nimmt sie und
-    // verschiebt). Im Spektrum gilt: kurzer Druck wird beim Loslassen
-    // zum Abstimmklick, eine Bewegung verpufft folgenlos.
+    // ── Ziehen im Spektrum verschiebt die Ansicht (wie im Original) ──
+    //
+    // Am Vormittag des 2026-08-22 habe ich das ABGESCHALTET, weil der
+    // Betreiber meldete, ein unabsichtlicher Klick verrücke alles um
+    // Megahertz. Die Abschaltung war die falsche Antwort auf einen
+    // richtigen Befund: schuld war nicht das Verschieben, sondern die
+    // absolute Rechnung im VFO-Zug (siehe mouseMoveEvent) — die
+    // schaukelte sich mit der Nachzentrierung auf.
+    //
+    // Der Preis der Abschaltung zeigte sich am selben Abend: "wenn man
+    // den balken verloren hat kann man nicht mit klick and hold den
+    // bereich verändern." Genau so ist es — ohne Verschieben gibt es
+    // keinen Weg zurueck zu einem VFO, der aus dem Bild gelaufen ist.
+    //
+    // AetherSDR sagt es an seiner Stelle woertlich
+    // (SpectrumWidget.cpp:10063 [@0cd4559]):
+    //
+    //     // Click in FFT area → start pan drag
+    //
+    // und behaelt daneben das Abstimmen per Klick, mit einer
+    // Bewegungsschwelle beim Loslassen (dort "single-click-to-tune
+    // drag threshold", Zeile 9324). BEIDES zusammen ist die richtige
+    // Aufteilung, und genau die stellen wir wieder her:
+    //
+    //   ziehen  -> Ansicht verschieben
+    //   klicken -> abstimmen (unter 4 Punkten Bewegung)
+    //   ziehen auf dem tuerkisen Balken -> abstimmen (relativ)
     m_panDragStartX = mx;
     m_panDragStartCenter = m_centerHz;
-    m_draggingPan = false;
+    m_draggingPan = true;
+    setCursor(Qt::ClosedHandCursor);
 
     QWidget::mousePressEvent(event);
 }
@@ -8657,10 +8728,34 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
     }
 
     if (m_draggingVfo) {
-        // Slide-to-tune: real-time frequency update
-        // From AetherSDR SpectrumWidget.cpp:1222-1228
-        double hz = xToHz(mx, specRect);
-        hz = std::round(hz / m_stepHz) * m_stepHz;
+        // ── Slide-to-tune, RELATIV gerechnet ────────────────────────
+        //
+        // Frueher stand hier die Fassung aus AetherSDR
+        // (SpectrumWidget.cpp:1222-1228 [@0cd4559]):
+        //
+        //     double hz = xToHz(mx, specRect);
+        //
+        // Also absolut: "Zeiger bei x heisst diese Frequenz". Das ist
+        // richtig, SOLANGE DIE ANSICHT STEHT. Unsere steht nicht — sie
+        // zentriert sich nach jeder Frequenzaenderung neu auf den VFO.
+        // Damit rutscht die Skala unter dem Zeiger weg, der naechste
+        // Schritt misst wieder den vollen Abstand zur NEUEN Mitte, und
+        // die Sache schaukelt sich auf: aus einer Handbewegung von
+        // zwei Zentimetern wird ein Sprung ueber Hunderte Kilohertz.
+        //
+        // Der Betreiber hat das seit Tagen gemeldet — "einmal
+        // unabsichtlich klick auf die frequenz und alles verrückt sich
+        // auf 6 mhz" (2026-08-21) und wieder am 2026-08-22, als es
+        // beim Probieren prompt auf 7,82 MHz davonlief. Es war nie ein
+        // zu empfindlicher Klick; es war diese Rueckkopplung.
+        //
+        // Relativ zum Bezug beim Druck ist sie ausgeschlossen: der
+        // Zeigerweg bestimmt den Frequenzweg, und was die Ansicht
+        // darunter tut, spielt keine Rolle mehr.
+        const double hz = std::round(
+            (m_vfoDragStartHz
+             + (mx - m_vfoDragStartX) * m_vfoDragHzPerPx) / m_stepHz)
+            * m_stepHz;
         emit frequencyClicked(hz);
         return;
     }
@@ -9076,7 +9171,12 @@ void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
         // Abstimmklick im Spektrum muss weiter funktionieren.
         {
             int dx = std::abs(static_cast<int>(event->position().x()) - m_panDragStartX);
-            if (dx <= 4 && !m_draggingPan) {
+            // Nur die Bewegungsschwelle entscheidet, nicht der
+            // Verschieb-Modus: seit dem 2026-08-22 ist Ziehen im
+            // Spektrum wieder ein Verschieben (Aether-Verhalten), und
+            // waere die Bedingung noch an m_draggingPan gebunden,
+            // koennte man ueberhaupt nicht mehr per Klick abstimmen.
+            if (dx <= 4) {
                 int w = width();
                 int specH = static_cast<int>(height() * m_spectrumFrac);
                 QRect specRect(0, 0, w - effectiveStripW(), specH);
