@@ -302,6 +302,49 @@ private slots:
                  "Die Pfeiltaste kommt nach einem Klick nicht an");
     }
 
+    void everythingWorksWhileDisconnected()
+    {
+        // Der Betreiber am 2026-08-22: "test selbst, gar nichts
+        // funktioniert." Gemessen: beide Geraete antworteten in dem
+        // Moment nicht — und GETRENNT schluckte der Panadapter jeden
+        // Linksklick und jede Taste (Phase 3Q-8). Alle meine Messungen
+        // davor liefen verbunden oder ohne Oberflaeche; deshalb war bei
+        // mir alles gruen und bei ihm nichts brauchbar.
+        //
+        // Die Ansicht gehoert dem Rechner: Frequenz, Zoom, Ausschnitt
+        // und Filterkanten sind Werte im Modell.
+        SpectrumWidget w;
+        w.resize(1000, 600);
+        w.setDdcCenterFrequency(7'100'000.0);
+        w.setSampleRate(192'000.0);
+        w.setFrequencyRange(7'100'000.0, 100'000.0);
+        w.setVfoFrequency(7'100'000.0);
+        w.setStepSize(100);
+        w.setConnectionState(ConnectionState::Disconnected);   // <-- Kern
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        // Klick abseits des DISCONNECTED-Schilds (das liegt mittig).
+        QSignalSpy tuned(&w, &SpectrumWidget::frequencyClicked);
+        drag(&w, QPoint(700, 60), QPoint(701, 60));
+        QVERIFY2(tuned.count() > 0,
+                 "Getrennt stimmt ein Klick nicht ab");
+
+        // Pfeiltaste
+        QSignalSpy tuned2(&w, &SpectrumWidget::frequencyClicked);
+        QTest::keyClick(&w, Qt::Key_Right);
+        QCoreApplication::processEvents();
+        QVERIFY2(tuned2.count() > 0,
+                 "Getrennt bewegt die Pfeiltaste nichts");
+
+        // Verschieben
+        const double c0 = w.centerFrequency();
+        drag(&w, QPoint(800, 60), QPoint(600, 60));
+        QVERIFY2(!qFuzzyCompare(w.centerFrequency(), c0),
+                 "Getrennt laesst sich die Ansicht nicht verschieben");
+    }
+
     void draggingTheVfoBarStaysProportional()
     {
         // Der Kern des Ausreissers: frueher rechnete der VFO-Zug

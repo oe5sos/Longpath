@@ -8113,12 +8113,35 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         setFocus(Qt::MouseFocusReason);
     }
 
-    // Phase 3Q-8: while disconnected, swallow all left-clicks and signal
-    // MainWindow to open the ConnectionPanel instead.
+    // ── Getrennt heisst nicht tot ───────────────────────────────────
+    //
+    // Hier stand (Phase 3Q-8): getrennt JEDEN Linksklick schlucken und
+    // stattdessen den Verbindungsdialog oeffnen. Gut gemeint, aber es
+    // legt den ganzen Panadapter stumm — Abstimmen, Verschieben,
+    // Zoomen, Pfeiltasten, alles.
+    //
+    // Der Betreiber am 2026-08-22: "test selbst, gar nichts
+    // funktioniert." Nachgesehen und nachgemessen: beide Geraete
+    // antworteten in dem Moment nicht, und getrennt reagierte
+    // erwartungsgemaess NICHTS. Jede meiner Messungen davor lief
+    // verbunden oder ohne Oberflaeche — deshalb war bei mir alles
+    // gruen und bei ihm nichts brauchbar.
+    //
+    // Die Ansicht gehoert dem Rechner, nicht dem Geraet: Frequenz,
+    // Zoom, Ausschnitt und Filterkanten sind Werte im Modell und
+    // duerfen ohne Funkgeraet bedient werden. Thetis und AetherSDR
+    // halten es genauso.
+    //
+    // Was bleibt: ein Klick auf das DISCONNECTED-Schild selbst oeffnet
+    // weiter den Verbindungsdialog. Das war der eigentliche Zweck.
     if (m_connState != ConnectionState::Connected
-        && event->button() == Qt::LeftButton) {
-        emit disconnectedClickRequest();
-        return;
+        && event->button() == Qt::LeftButton
+        && m_disconnectLabel && m_disconnectLabel->isVisible()) {
+        const QRect banner(0, height() / 2 - 60, width(), 120);
+        if (banner.contains(event->position().toPoint())) {
+            emit disconnectedClickRequest();
+            return;
+        }
     }
 
     int w = width();
@@ -9279,8 +9302,7 @@ void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
     // only)"). Bisher fiel der Doppelklick bei uns nur auf
     // mousePressEvent durch — und seit das Ziehen wieder verschiebt,
     // hiess das: er begann ein Verschieben und stimmte NICHT ab.
-    if (event->button() == Qt::LeftButton
-        && m_connState == ConnectionState::Connected) {
+    if (event->button() == Qt::LeftButton) {
         const int w = width();
         const int h = height();
         const int specH = specHFromHeight(h, m_spectrumFrac,
@@ -9317,8 +9339,9 @@ void SpectrumWidget::keyPressEvent(QKeyEvent* event)
     // Schrittweite ist die eingestellte (STEP in der Befehlsleiste),
     // damit Tastatur und Mausrad dasselbe tun. Mit Umschalt zehnfach —
     // so kommt man ueber ein Band, ohne die Taste festzuhalten.
-    if (m_connState == ConnectionState::Connected
-        && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right)) {
+    // Auch getrennt bedienbar — siehe die Begruendung in
+    // mousePressEvent.
+    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
         const double mult = (event->modifiers() & Qt::ShiftModifier) ? 10.0 : 1.0;
         const double delta = (event->key() == Qt::Key_Right ? 1.0 : -1.0)
                              * m_stepHz * mult;

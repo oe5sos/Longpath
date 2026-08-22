@@ -13349,6 +13349,34 @@ void MainWindow::closeEvent(QCloseEvent* event)
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
     m_floatingApplets.clear();
     if (m_rotorWindow) { delete m_rotorWindow; m_rotorWindow = nullptr; }
+
+    // ── UND ALLES ANDERE, WAS NOCH AM SCHREIBTISCH STEHT ────────────
+    //
+    // Der Betreiber am 2026-08-22: "test selbst, gar nichts
+    // funktioniert." Nachgesehen: Longpath lief, das Menue stand da —
+    // aber das HAUPTFENSTER war weg. Uebrig war ein abgeloestes
+    // Container-Fenster ("RX1 Main Panel"), und genau das hielt die
+    // App am Leben: Qt beendet erst, wenn das LETZTE Fenster faellt.
+    // Der Bediener hatte damit eine laufende App ohne Panadapter, ohne
+    // Wasserfall, ohne irgendetwas zu bedienen — und keinen Weg
+    // zurueck.
+    //
+    // Die Liste oben kannte nur zwei Sorten (AppletFloatingWindow und
+    // das Rotorfenster). Container-Fenster stehen in einer anderen
+    // Verwaltung und wurden nie mitgeraeumt. Statt die dritte Liste
+    // nachzupflegen — und beim naechsten Fenstertyp die vierte vergessen
+    // — wird hier nach TATSACHEN aufgeraeumt: was noch als eigenes
+    // Fenster dasteht und nicht dieses hier ist, geht mit.
+    //
+    // Dialoge sind oben schon geschlossen; was hier ankommt, sind
+    // Werkzeugfenster.
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (w == this) { continue; }
+        if (!w->isWindow()) { continue; }
+        if (qobject_cast<QDialog*>(w)) { continue; }   // oben erledigt
+        w->hide();
+        w->deleteLater();
+    }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 
     event->accept();
