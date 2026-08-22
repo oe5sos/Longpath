@@ -1559,6 +1559,9 @@ public:
     void setSelectedNotchIdForTest(int id) { m_selectedNotchId = id; }
     int renderedPixelCountForTest() const { return m_renderedPixels.size(); }
     int visibleBinCountForTest() const { return m_visibleBinCount; }
+    /// Oberkante der Frequenzskala — fuer Pruefungen, die die bewusste
+    /// Verschiebe-Geste dort ansetzen muessen.
+    int freqScaleYForTest() const;
     float refLevelForTest() const { return m_refLevel; }
     float dynamicRangeForTest() const { return m_dynamicRange; }
     QColor fillColorForTest() const { return m_fillColor; }
@@ -2219,7 +2222,7 @@ private:
     //   α = exp(-1 / (fps × τ))  [specHPSDR.cs:358 / :374, v2.10.3.13]
     // Defaults match Thetis (setup.cs udDisplayAVGTime_ValueChanged = 30 ms,
     // udDisplayAVTimeWF_ValueChanged = 120 ms).
-    int         m_spectrumAverageTimeMs{30};
+    int         m_spectrumAverageTimeMs{350};
     int         m_waterfallAverageTimeMs{120};
     // Recomputed by recomputeAverageAlphas() whenever fps or time changes.
     float       m_spectrumAverageAlpha{0.0f};

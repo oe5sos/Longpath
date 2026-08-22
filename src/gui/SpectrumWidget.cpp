@@ -930,7 +930,7 @@ void SpectrumWidget::loadSettings()
     // udDisplayAVGTime = 30 ms, udDisplayAVTimeWF = 120 ms). Range matches
     // Thetis: 1..9999 ms, but we clamp at 10 ms to keep the UI step sane.
     m_spectrumAverageTimeMs = qBound(10,
-        readInt(QStringLiteral("DisplaySpectrumAverageTimeMs"), 30), 9999);
+        readInt(QStringLiteral("DisplaySpectrumAverageTimeMs"), 350), 9999);
     m_waterfallAverageTimeMs = qBound(10,
         readInt(QStringLiteral("DisplayWaterfallAverageTimeMs"), 120), 9999);
     recomputeAverageAlphas();
@@ -944,6 +944,19 @@ void SpectrumWidget::loadSettings()
         m_spectrumDetector = static_cast<SpectrumDetector>(
             qBound(0, detRaw, static_cast<int>(SpectrumDetector::Count) - 1));
 
+        // ── Ruhige Kurve als Vorgabe (2026-08-22) ────────────────────
+        //
+        // Der Betreiber, live am Geraet: „die kurve oben ist so
+        // nervoes, eine katastrophe, sollte viel ruhiger sein" — und
+        // dann ausdruecklich: „aendere alles so, dass die kurven
+        // brauchbar sind, kannst gerne alles optimieren."
+        //
+        // Thetis' Vorgabe waere 30 ms (setup.designer.cs
+        // udDisplayAVGTime.Value = 30 [v2.10.3.15]) — das ergibt bei
+        // 30 fps ein Alpha von 0,33 und genau das Zappeln, das er
+        // beanstandet hat. Auf seine ausdrueckliche Ansage weichen wir
+        // hier von der Thetis-Vorgabe ab: 350 ms, Alpha etwa 0,91.
+        // Glatt genug zum Ablesen, schnell genug fuer CW.
         const int avgNewRaw = readInt(QStringLiteral("DisplaySpectrumAveraging"),
                                       static_cast<int>(SpectrumAveraging::LogRecursive));
         m_spectrumAveraging = static_cast<SpectrumAveraging>(
@@ -7621,6 +7634,12 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 // der Code, den er prueft. Zwei Rechnungen fuer dieselbe Flaeche sind
 // zwei Orte, an denen sie auseinanderlaufen; hier ist es die dritte
 // Wiederholung desselben Musters an einem Tag.
+int SpectrumWidget::freqScaleYForTest() const
+{
+    return specHFromHeight(height(), m_spectrumFrac,
+                           kFreqScaleH + kDividerH) + kDividerH;
+}
+
 QRect SpectrumWidget::spectrumRect() const
 {
     return QRect(0, 0, width() - effectiveStripW(),
@@ -8382,13 +8401,31 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         }
     }
 
-    // 5. Pan drag — click in spectrum/waterfall area and drag to pan the view
-    // From AetherSDR SpectrumWidget.cpp:879-887
-    m_draggingPan = true;
+    // ── 5. Verschieben NUR an der Frequenzskala (2026-08-22) ─────────
+    //
+    // AetherSDR machte jeden Druck ins Spektrum zum Ansicht-Verschieben
+    // (SpectrumWidget.cpp:879-887). Der Betreiber ist damit live von
+    // 7,07 auf 6,38 MHz gerutscht, der VFO blieb ausserhalb des Bilds
+    // zurueck: „einmal unabsichtlich klick und alles verrueckt sich…
+    // das anklicken und verschieben ist das problem."
+    //
+    // Jetzt wie bei Zeus/Thetis: die Ansicht steht. Verschieben ist
+    // eine BEWUSSTE Geste an der Frequenzskala (dem Zahlenstreifen);
+    // im Spektrum bleibt der Klick dem Abstimmen vorbehalten — das
+    // Loslassen unten prueft dafuer weiter die 4-Pixel-Schwelle.
+    // m_panDragStartX wird auch ohne Verschieb-Modus gemerkt, weil
+    // die Klick-Erkennung beim Loslassen daran misst.
+    const bool onFreqScale = (my >= freqBarY && my < freqBarY + kFreqScaleH);
     m_panDragStartX = mx;
     m_panDragStartCenter = m_centerHz;
-    setCursor(Qt::ClosedHandCursor);
-    // Don't emit click-to-tune — the release event handles that if drag distance is small
+    if (onFreqScale) {
+        m_draggingPan = true;
+        setCursor(Qt::ClosedHandCursor);
+    } else {
+        // Kein Modus: ein kurzer Druck wird beim Loslassen zum
+        // Abstimmklick, eine Bewegung verpufft folgenlos.
+        m_draggingPan = false;
+    }
 
     QWidget::mousePressEvent(event);
 }
@@ -8922,9 +8959,12 @@ void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         // If pan drag was short (click, not real drag), treat as click-to-tune
         // From AetherSDR SpectrumWidget.cpp:1427-1457 — 4px Manhattan threshold
-        if (m_draggingPan) {
+        // Nicht mehr an m_draggingPan gebunden: seit dem Umbau vom
+        // 2026-08-22 verschiebt nur noch die Frequenzskala, aber der
+        // Abstimmklick im Spektrum muss weiter funktionieren.
+        {
             int dx = std::abs(static_cast<int>(event->position().x()) - m_panDragStartX);
-            if (dx <= 4) {
+            if (dx <= 4 && !m_draggingPan) {
                 int w = width();
                 int specH = static_cast<int>(height() * m_spectrumFrac);
                 QRect specRect(0, 0, w - effectiveStripW(), specH);
