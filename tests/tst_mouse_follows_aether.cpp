@@ -89,6 +89,38 @@ private slots:
                  "nicht mehr heran");
         QVERIFY2(qFuzzyCompare(w.bandwidth(), bwBefore),
                  "Der Zug zoomt, statt zu verschieben");
+
+        // Und der WEG muss stimmen. 200 Punkte auf 1000 Punkte Breite
+        // sind ein Fuenftel der Ansicht — bei 100 kHz also rund
+        // 20 kHz, nicht mehr.
+        //
+        // Am Geraet gemessen (2026-08-22): 100 Punkte ergaben 64 kHz
+        // statt 18 — Faktor dreieinhalb, weil gegen einen Startwert
+        // gerechnet wurde, den die Nachzentrierung laengst ueberholt
+        // hatte. Der Betreiber sah davon nur: "ich clicke und fahre
+        // nach rechts, bildschirm geht nach links."
+        const double moved = std::abs(w.centerFrequency() - centerBefore);
+        const double expect = 0.2 * bwBefore;
+        QVERIFY2(moved < expect * 1.6,
+                 qPrintable(QStringLiteral(
+                     "Die Ansicht wandert %1 Hz, erwartet sind rund "
+                     "%2 Hz — sie laeuft der Hand davon")
+                     .arg(moved).arg(expect)));
+        QVERIFY2(moved > expect * 0.5,
+                 qPrintable(QStringLiteral(
+                     "Die Ansicht wandert nur %1 Hz statt rund %2 Hz")
+                     .arg(moved).arg(expect)));
+
+        // Richtung: nach rechts ziehen holt TIEFERE Frequenzen ins
+        // Bild — der Inhalt folgt der Hand (AetherSDR: "Dragging right
+        // moves the view right → center shifts left").
+        SpectrumWidget w2;
+        arm(w2);
+        const double c0 = w2.centerFrequency();
+        drag(&w2, QPoint(400, 150), QPoint(600, 150));
+        QVERIFY2(w2.centerFrequency() < c0,
+                 "Nach rechts ziehen erhoeht die Mitte — die Ansicht "
+                 "laeuft der Hand entgegen");
     }
 
     void aShortClickStillTunes()

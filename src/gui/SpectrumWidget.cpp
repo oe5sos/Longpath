@@ -8606,6 +8606,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     //   klicken -> abstimmen (unter 4 Punkten Bewegung)
     //   ziehen auf dem tuerkisen Balken -> abstimmen (relativ)
     m_panDragStartX = mx;
+    m_panDragLastX  = mx;
     m_panDragStartCenter = m_centerHz;
     m_draggingPan = true;
     setCursor(Qt::ClosedHandCursor);
@@ -8797,11 +8798,34 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
     }
 
     if (m_draggingPan) {
-        // Pan the view — drag changes center, not VFO
-        // From AetherSDR SpectrumWidget.cpp:1230-1237
-        double deltaPx = mx - m_panDragStartX;
-        double deltaHz = -(deltaPx / static_cast<double>(specRect.width())) * m_bandwidthHz;
-        m_centerHz = m_panDragStartCenter + deltaHz;
+        // ── Schrittweise rechnen, nicht gegen den Startpunkt ─────────
+        //
+        // Das Original rechnet gegen den Druckpunkt
+        // (AetherSDR SpectrumWidget.cpp:10611-10614 [@0cd4559]):
+        //
+        //     dx = x - m_panDragStartX;  center = startCenter + delta;
+        //
+        // Das setzt voraus, dass die Ansicht waehrend des Zuges nur
+        // durch den Zug selbst wandert. Bei uns wandert sie auch
+        // anders: centerChanged geht ins Hauptfenster, dort setzt es
+        // ohne CTUN die Slice-Frequenz — der VFO zieht mit, die
+        // Ansicht zentriert nach, und der naechste Schritt misst
+        // gegen einen Startwert, der nicht mehr gilt.
+        //
+        // Gemessen am Geraet (2026-08-22, ANAN-10/100): 100 Punkte Zug
+        // ergaben 64 kHz statt der erwarteten 18 — Faktor dreieinhalb.
+        // Der Betreiber sah davon nur das Ergebnis: "ich clicke und
+        // fahre nach rechts, bildschirm geht nach links."
+        //
+        // Schrittweise ist es dagegen dicht: jeder Mausschritt bewegt
+        // die Ansicht um genau seinen eigenen Weg, ausgehend davon, wo
+        // sie JETZT steht. Was sonst noch an ihr zieht, geht in den
+        // naechsten Schritt ein, statt sich aufzuaddieren.
+        const double deltaPx = mx - m_panDragLastX;
+        m_panDragLastX = mx;
+        const double deltaHz =
+            -(deltaPx / static_cast<double>(specRect.width())) * m_bandwidthHz;
+        m_centerHz += deltaHz;
         emit centerChanged(m_centerHz);
         updateVfoPositions();
 #ifdef NEREUS_GPU_SPECTRUM

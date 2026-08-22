@@ -2932,6 +2932,7 @@ private:
     // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
     // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
     // Warum, steht am Auswertepunkt in mouseMoveEvent.
+    int    m_panDragLastX{0};
     int    m_vfoDragStartX{0};
     double m_vfoDragStartHz{0.0};
     double m_vfoDragHzPerPx{0.0};
