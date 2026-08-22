@@ -10099,6 +10099,31 @@ void MainWindow::wireSliceToSpectrum()
     // the detector is set up with disp=0 (single display channel).
     // Frame rate: primaryFftEngine()->outputFps() * 1.1 matches Thetis
     //   console.cs:51150 [@501e3f5]: (int)Math.Max(1, _display_fps * 1.1f).
+    // ── Die neue Breite auch ZEIGEN ─────────────────────────────────
+    //
+    // Der Betreiber am 2026-08-22: "auch wenn ich die bandbreite oben
+    // ändere sehe ich keine änderung im diagramm."
+    //
+    // Stimmt: setFilterOffset() wurde nur an ZWEI Stellen gerufen —
+    // beim Anlegen einer Scheibe und beim Wechsel der aktiven. Bei
+    // einer Aenderung der Breite nirgends. Der Wert im Modell stimmte,
+    // die DSP bekam ihn (der Zeitgeber unten), nur der tuerkise Balken
+    // im Panadapter blieb, wie er war.
+    //
+    // Sofort, nicht verzoegert: der Balken ist Anzeige, kein
+    // Geraetebefehl. Die 100 ms unten sind fuer WDSP da.
+    connect(slice, &SliceModel::filterChanged, this,
+            [this, slice](int low, int high) {
+        if (!slice) { return; }
+        SpectrumWidget* sw = nullptr;
+        const QString panKey = slice->panKey();
+        if (m_panStack && !panKey.isEmpty()) {
+            sw = m_panStack->spectrum(panKey);
+        }
+        if (!sw) { sw = activeSpectrumWidget(); }
+        if (sw) { sw->setFilterOffset(low, high); }
+    });
+
     connect(slice, &SliceModel::filterChanged, this, [this, slice](int low, int high) {
         QTimer::singleShot(100, this, [this, slice, low, high]() {
             FFTEngine* fft = primaryFftEngine();

@@ -268,6 +268,40 @@ private slots:
         QCOMPARE(tuned.last().at(0).toDouble(), 7'099'900.0);
     }
 
+    void theArrowKeysWorkAfterClickingTheWidget()
+    {
+        // Der Betreiber am 2026-08-22: "mit dem cursor auf der
+        // tastatur kann ich auch nicht nach rechts und links fahren."
+        //
+        // Der bestehende Fall schickt die Taste DIREKT an das Widget
+        // und beweist damit nur, dass der Handler rechnet. Der Weg des
+        // Bedieners ist ein anderer: klicken, dann tippen — und dabei
+        // entscheidet der FOKUS, wer die Taste bekommt. Genau das wird
+        // hier geprueft.
+        SpectrumWidget w;
+        arm(w);
+        w.setStepSize(100);
+
+        const QPoint p(700, 150);
+        QMouseEvent press(QEvent::MouseButtonPress, p, w.mapToGlobal(p),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &press);
+        QMouseEvent rel(QEvent::MouseButtonRelease, p, w.mapToGlobal(p),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &rel);
+        QCoreApplication::processEvents();
+
+        QVERIFY2(w.hasFocus(),
+                 "Ein Klick ins Spektrum gibt ihm keinen Fokus — dann "
+                 "kommt keine Pfeiltaste an");
+
+        QSignalSpy tuned(&w, &SpectrumWidget::frequencyClicked);
+        QTest::keyClick(&w, Qt::Key_Right);
+        QCoreApplication::processEvents();
+        QVERIFY2(tuned.count() > 0,
+                 "Die Pfeiltaste kommt nach einem Klick nicht an");
+    }
+
     void draggingTheVfoBarStaysProportional()
     {
         // Der Kern des Ausreissers: frueher rechnete der VFO-Zug

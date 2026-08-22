@@ -8096,6 +8096,23 @@ void SpectrumWidget::openNotchEditor(int id, const QPoint& globalPos)
 
 void SpectrumWidget::mousePressEvent(QMouseEvent* event)
 {
+    // ── Fokus AUSDRUECKLICH holen ───────────────────────────────────
+    //
+    // Der Betreiber am 2026-08-22: "mit dem cursor auf der tastatur
+    // kann ich auch nicht nach rechts und links fahren."
+    //
+    // Qt::ClickFocus allein reicht nicht. Im nackten Widget klappte es
+    // (dort ist es selbst das Fenster und hat den Fokus ohnehin) — im
+    // vollen Hauptfenster hatte nach einem Klick ins Spektrum NIEMAND
+    // den Fokus, gemessen mit QApplication::focusWidget(). Ohne
+    // Fokus geht keine Taste an den Panadapter.
+    //
+    // setFocus() hier ist die eine Zeile, die nicht davon abhaengt,
+    // auf welchem Weg der Druck ankommt.
+    if (event->button() == Qt::LeftButton) {
+        setFocus(Qt::MouseFocusReason);
+    }
+
     // Phase 3Q-8: while disconnected, swallow all left-clicks and signal
     // MainWindow to open the ConnectionPanel instead.
     if (m_connState != ConnectionState::Connected

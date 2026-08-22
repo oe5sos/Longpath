@@ -17,9 +17,13 @@
 
 #include <QtTest>
 #include <QPushButton>
+#include <QMouseEvent>
+#include <QSignalSpy>
 
 #include "gui/MainWindow.h"
 #include "gui/SpectrumWidget.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
 #include "gui/SpectrumOverlayPanel.h"
 
 using namespace Longpath;
@@ -128,6 +132,85 @@ private slots:
                      "Ein echter Klick auf '+' bewirkt nichts (%1 -> %2). "
                      "Steht der Streifen wieder auf WA_NativeWindow?")
                      .arg(before).arg(m_sw->bandwidth())));
+    }
+
+    void theArrowKeysReachThePanadapterInTheRealWindow()
+    {
+        // Der Betreiber am 2026-08-22: "mit dem cursor auf der
+        // tastatur kann ich auch nicht nach rechts und links fahren."
+        //
+        // Im NACKTEN Widget geht es (tst_mouse_follows_aether). Also
+        // muss der Unterschied im vollen Fenster liegen — dort gibt es
+        // Eingabefelder, Ereignisfilter und eine Tabulator-Reihenfolge,
+        // die dem Panadapter den Fokus wegnehmen koennen.
+        m_sw->setStepSize(100);
+        m_sw->setConnectionState(ConnectionState::Connected);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        const QPoint p(m_sw->width() / 2, m_sw->height() / 4);
+        QMouseEvent press(QEvent::MouseButtonPress, p, m_sw->mapToGlobal(p),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(m_sw, &press);
+        QMouseEvent rel(QEvent::MouseButtonRelease, p, m_sw->mapToGlobal(p),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(m_sw, &rel);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        // focusWidget() DES FENSTERS, nicht hasFocus(): letzteres
+        // verlangt ein aktives Fenster, und im Pruefstand ist keins
+        // aktiv. Qt merkt sich den Fokus trotzdem je Fenster — genau
+        // das wird hier gelesen. (Erste Fassung fragte hasFocus() und
+        // meldete "niemand", obwohl der Fokus richtig gesetzt war.)
+        QWidget* f = m_mw->focusWidget();
+        qInfo() << "Fokus nach dem Klick:"
+                << (f ? f->metaObject()->className() : "keiner");
+        QVERIFY2(f == m_sw,
+                 qPrintable(QStringLiteral(
+                     "Nach einem Klick ins Spektrum hat '%1' den Fokus, "
+                     "nicht der Panadapter — dann kommt keine "
+                     "Pfeiltaste an")
+                     .arg(f ? QString::fromLatin1(f->metaObject()->className())
+                            : QStringLiteral("niemand"))));
+
+        QSignalSpy tuned(m_sw, &SpectrumWidget::frequencyClicked);
+        QTest::keyClick(m_sw, Qt::Key_Right);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY2(tuned.count() > 0, "Die Pfeiltaste kommt nicht an");
+    }
+
+    void changingTheWidthShowsUpInTheDiagram()
+    {
+        // Der Betreiber am 2026-08-22: "auch wenn ich die bandbreite
+        // oben ändere sehe ich keine änderung im diagramm."
+        //
+        // setFilterOffset() wurde nur beim Anlegen einer Scheibe und
+        // beim Wechsel der aktiven gerufen — bei einer Aenderung der
+        // BREITE nirgends. Der Wert im Modell stimmte, die DSP bekam
+        // ihn, nur der tuerkise Balken blieb stehen.
+        RadioModel* model = m_mw->findChild<RadioModel*>();
+        if (!model) { QSKIP("Kein RadioModel im Fenster"); }
+        if (model->slices().isEmpty()) {
+            model->addSlice();
+            for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        }
+        if (model->slices().isEmpty()) { QSKIP("Keine Scheibe"); }
+        SliceModel* s = model->slices().first();
+
+        s->setFilterByHand(-2900, -100);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        const int lowBefore  = m_sw->filterLowHz();
+        const int highBefore = m_sw->filterHighHz();
+
+        s->setFilterByHand(-3800, -100);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(m_sw->filterLowHz() != lowBefore
+                     || m_sw->filterHighHz() != highBefore,
+                 qPrintable(QStringLiteral(
+                     "Der Panadapter zeigt weiter %1..%2 Hz, obwohl die "
+                     "Scheibe auf -3800..-100 steht")
+                     .arg(lowBefore).arg(highBefore)));
+        QCOMPARE(m_sw->filterLowHz(), -3800);
     }
 
     void cleanupTestCase()

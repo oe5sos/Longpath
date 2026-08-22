@@ -1191,6 +1191,10 @@ public slots:
     // ---- VFO / filter overlay ----
     void setVfoFrequency(double hz);
     void setFilterOffset(int lowHz, int highHz);  // updates filter passband overlay
+    /// Die gezeigten Filterkanten. Fuer Pruefungen: was am Modell
+    /// steht, muss auch im Bild stehen.
+    int  filterLowHz()  const { return m_filterLowHz; }
+    int  filterHighHz() const { return m_filterHighHz; }
 
     // ---- CTUN mode (SmartSDR-style independent pan) ----
     void setCtunEnabled(bool enabled);
