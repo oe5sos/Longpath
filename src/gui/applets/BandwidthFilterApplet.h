@@ -60,6 +60,21 @@ public:
     QString appletTitle() const override { return QStringLiteral("Bandwidth Filter"); }
     void    syncFromModel() override;
 
+protected:
+    /// Blendet die Wortmarken der Zahlenfelder aus, sobald die Zeile
+    /// eng wird — siehe Begruendung an der Umsetzung.
+    void resizeEvent(QResizeEvent* event) override;
+
+public:
+    /// Sagt Qt ausdruecklich, wie schmal dieses Applet werden darf.
+    ///
+    /// Ohne die Ueberschreibung rechnet Qt die Untergrenze aus der
+    /// BREITEN Anordnung (rund 600 Punkte) — und weil das Fenster dann
+    /// gar nicht schmaler werden KANN, kommt der Umbruch in
+    /// resizeEvent() nie zum Zug. Henne und Ei; gemessen am
+    /// 2026-08-22.
+    QSize minimumSizeHint() const override;
+
     // Fuer Tests: die Flaechen, in der Reihenfolge der Scheiben.
     QList<BandwidthFilterPane*> panes() const { return m_panes; }
 
@@ -91,6 +106,13 @@ private:
     QList<QPushButton*> m_varBtns;
     QPushButton* m_resetBtn{nullptr};
     QPushButton* m_spanBtn{nullptr};
+    QList<QLabel*> m_shrinkableLabels;
+    /// Die Bedienzeile. Eng bricht sie in zwei Reihen um — siehe
+    /// resizeEvent().
+    class QHBoxLayout* m_ctrlRow{nullptr};
+    class QHBoxLayout* m_ctrlRow2{nullptr};
+    QList<QWidget*>    m_tier2;
+    bool               m_ctrlWrapped{false};
     QLabel*      m_modeLbl{nullptr};
 
     bool m_updatingFromModel{false};

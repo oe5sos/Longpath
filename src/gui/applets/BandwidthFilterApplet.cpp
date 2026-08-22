@@ -22,6 +22,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QResizeEvent>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -100,7 +101,14 @@ void BandwidthFilterApplet::buildUI()
             sb->setRange(lo, hi);
             sb->setSingleStep(50);
             sb->setSuffix(QStringLiteral(" Hz"));
-            sb->setFixedWidth(92);
+            // Nachgiebig statt fest: 92 Punkte sind die Wunschbreite,
+            // 62 die Schmerzgrenze. Vorher war es setFixedWidth(92) —
+            // damit hatte die Bedienzeile einen harten Boden von rund
+            // 700 Punkten, und wer das Fenster kleiner zog, bekam
+            // einen Rollbalken statt eines kleineren Inhalts.
+            sb->setMinimumWidth(62);
+            sb->setMaximumWidth(92);
+            sb->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
             sb->setStyleSheet(Style::spinBoxStyle());
             sb->setKeyboardTracking(false);   // erst bei Enter/Verlassen
             return sb;
@@ -112,13 +120,19 @@ void BandwidthFilterApplet::buildUI()
             .arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_modeLbl);
 
-        row->addWidget(label(QStringLiteral("LOW")));
+        auto addShrinkableLabel = [&](const QString& t) {
+            QLabel* l = label(t);
+            m_shrinkableLabels.append(l);
+            row->addWidget(l);
+        };
+
+        addShrinkableLabel(QStringLiteral("LOW"));
         m_lowBox = box(-SliceModel::kMaxFilterWidthHz,
                         SliceModel::kMaxFilterWidthHz);
         m_lowBox->setObjectName(QStringLiteral("bwFilterLow"));
         row->addWidget(m_lowBox);
 
-        row->addWidget(label(QStringLiteral("WIDTH")));
+        addShrinkableLabel(QStringLiteral("WIDTH"));
         m_widthBox = box(10, 2 * SliceModel::kMaxFilterWidthHz);
         m_widthBox->setObjectName(QStringLiteral("bwFilterWidth"));
         m_widthBox->setToolTip(QStringLiteral(
@@ -127,7 +141,7 @@ void BandwidthFilterApplet::buildUI()
             "cut, AM symmetric around zero."));
         row->addWidget(m_widthBox);
 
-        row->addWidget(label(QStringLiteral("HIGH")));
+        addShrinkableLabel(QStringLiteral("HIGH"));
         m_highBox = box(-SliceModel::kMaxFilterWidthHz,
                          SliceModel::kMaxFilterWidthHz);
         m_highBox->setObjectName(QStringLiteral("bwFilterHigh"));
@@ -173,7 +187,27 @@ void BandwidthFilterApplet::buildUI()
             "How much band the panes show. Click to cycle."));
         row->addWidget(m_spanBtn);
 
+        m_ctrlRow = row;
         col->addLayout(row);
+
+        // Zweite Reihe, zunaechst leer. Sie fuellt sich erst, wenn es
+        // eng wird (resizeEvent) — breit bleibt alles wie bisher.
+        m_ctrlRow2 = new QHBoxLayout;
+        m_ctrlRow2->setSpacing(6);
+        col->addLayout(m_ctrlRow2);
+    }
+
+    {
+        // Ausdruecklich erlauben, schmal zu werden.
+        //
+        // minimumSizeHint() allein reicht NICHT: bei einem Widget mit
+        // Anordnung erzwingt Qt zusaetzlich die Untergrenze der
+        // Anordnung selbst, und die kommt aus den Kindern. Gemessen am
+        // 2026-08-22: resize(360) liess das Applet bei 608 stehen,
+        // also feuerte resizeEvent nie unter der Umbruchschwelle, also
+        // brach nie etwas um. Ein ausdruecklich gesetztes Mindestmass
+        // sticht die Anordnung.
+        setMinimumWidth(300);
 
         // ── Verdrahtung ──────────────────────────────────────────────
         connect(m_lowBox, &QSpinBox::valueChanged, this, [this](int v) {
@@ -365,5 +399,73 @@ void BandwidthFilterApplet::syncFromModel()
 {
     rebuildPanes();
 }
+
+// ── Eng wird weniger, nicht abgeschnitten ───────────────────────────
+//
+// Der Betreiber am 2026-08-22: "weiters verändert sich das fenster
+// bandfilter und der inhalt nicht automatisch, sobald ich die größe
+// verändere" — und nachgeschoben: "vor allem verkleinert!"
+//
+// Genau so war es. Die Bedienzeile stand in EINER Reihe: drei
+// Wortmarken, drei Zahlenfelder mit fester Breite, dazu VAR1, VAR2
+// und Zentrieren. Zusammen ein harter Boden von rund 700 Punkten.
+// Wurde das Fenster schmaler, sprang ein Rollbalken an und schnitt
+// den Rest ab — der Inhalt passte sich nicht an, er verschwand.
+//
+// Zwei Massnahmen, in dieser Reihenfolge: die Zahlenfelder duerfen
+// jetzt bis 62 Punkte schrumpfen (oben), und darunter fallen die
+// Wortmarken weg. Sie sind Beschriftungen, keine Information — die
+// Einheit steht im Feld selbst ("2900 Hz"), und die Reihenfolge
+// tief/breit/hoch ist dieselbe wie im Bild darueber.
+QSize BandwidthFilterApplet::minimumSizeHint() const
+{
+    const QSize base = AppletWidget::minimumSizeHint();
+    // 300 Punkte: darunter wird selbst die umgebrochene Fassung eng.
+    return QSize(qMin(300, base.width()), base.height());
+}
+
+void BandwidthFilterApplet::resizeEvent(QResizeEvent* event)
+{
+    AppletWidget::resizeEvent(event);
+    if (!m_ctrlRow || !m_ctrlRow2) { return; }
+
+    // Erste Stufe: die Wortmarken. Sie sind Beschriftung, keine
+    // Information — die Einheit steht im Feld selbst ("2900 Hz"), und
+    // die Reihenfolge tief/breit/hoch ist dieselbe wie im Bild
+    // darueber.
+    const bool roomy = width() >= 470;
+    for (QLabel* l : m_shrinkableLabels) {
+        if (l) { l->setVisible(roomy); }
+    }
+
+    // Zweite Stufe: die Knopfgruppe rutscht in eine eigene Reihe.
+    //
+    // Ohne sie blieb ein harter Boden von rund 600 Punkten, und
+    // darunter schnitt ein Rollbalken den Inhalt ab, statt ihn zu
+    // verkleinern — genau der Befund des Betreibers ("vor allem
+    // verkleinert!"). Breit bleibt alles, wie es war: umgebrochen
+    // wird erst unterhalb der Schwelle.
+    const bool wrap = width() < 470;
+    if (wrap == m_ctrlWrapped) { return; }
+    m_ctrlWrapped = wrap;
+
+    QList<QWidget*> movers;
+    for (QPushButton* b : m_varBtns) { if (b) { movers.append(b); } }
+    if (m_resetBtn) { movers.append(m_resetBtn); }
+    if (m_spanBtn)  { movers.append(m_spanBtn); }
+
+    for (QWidget* wgt : movers) {
+        if (wrap) {
+            m_ctrlRow->removeWidget(wgt);
+            m_ctrlRow2->addWidget(wgt);
+        } else {
+            m_ctrlRow2->removeWidget(wgt);
+            m_ctrlRow->addWidget(wgt);
+        }
+    }
+    if (wrap) { m_ctrlRow2->addStretch(1); }
+    updateGeometry();
+}
+
 
 } // namespace Longpath
