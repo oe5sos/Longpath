@@ -1208,6 +1208,8 @@ add_custom_command(TARGET Longpath POST_BUILD
             "${_nereus_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/resources/themes/kreide.json"
+            "${CMAKE_SOURCE_DIR}/resources/themes/flach.json"
+            "${CMAKE_SOURCE_DIR}/resources/themes/tief.json"
             "${_nereus_theme_dest}/"
     COMMENT "Farbpaletten mitliefern")
 if(NEREUSSDR_LTO_AVAILABLE)

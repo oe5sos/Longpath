@@ -122,7 +122,18 @@ public:
 
     QString name() const { return m_name; }
     QString loadedFrom() const { return m_path; }
-    bool isActive() const { return !m_byRole.isEmpty() || !m_byHex.isEmpty(); }
+    // Auch ein Thema, das NUR die Form aendert, ist aktiv.
+    //
+    // Bis zum 2026-08-22 zaehlten hier nur Farben. Die Fassungen
+    // „Flach" und „Tief" tragen absichtlich KEINE Farben — sie sollen
+    // die Palette in Ruhe lassen und nur Ecken, Luft und Tiefe
+    // umstellen. Ohne m_byForm haette das Programm sie als „kein Thema
+    // aktiv" gemeldet, obwohl sichtbar etwas anders aussieht.
+    bool isActive() const
+    {
+        return !m_byRole.isEmpty() || !m_byHex.isEmpty()
+               || !m_byForm.isEmpty();
+    }
 
     /// What this theme wants for a role, or an empty string when it has
     /// no opinion.

@@ -1,99 +1,73 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Kein Test — ein Werkzeug. Es malt unsere echten Bedienelemente in ein
-// Blatt und daneben denselben Satz mit dem Vorschlag, damit ueber
-// Gestaltung an Bildern entschieden wird und nicht an Eindruecken.
+// Kein Test — ein Werkzeug. Es malt DREI Fassungen derselben
+// Oberflaeche nebeneinander, damit ueber Gestaltung an einem Bild
+// entschieden wird und nicht an Eindruecken.
 //
-// Anlass: „das design von zeus hat teilweise mehr stil, was koennen wir
-// tun? ich glaube die farblichen verlaeufe machen es" (2026-08-21).
-// Die Verlaeufe sind seit zwei Tagen drin und nachgemessen. Der
-// Unterschied liegt woanders, und das Blatt soll zeigen, wo.
+// Vorgeschichte: der Betreiber bekam am 2026-08-21 ein Entwurfsblatt
+// mit Verlaufs-Vorschlaegen und sagte „sehe keinen unterschied beim
+// den pdf." Die Unterschiede waren zu klein zum Sehen. Deshalb hier
+// drei Fassungen, die sich WEIT auseinander bewegen, und die Zahlen
+// stehen darunter.
+//
+// Gebaut wird mit echten Themendateien ueber die Form-Regler, die seit
+// 0bae4d6a in der Themendatei stehen — es ist also genau das, was die
+// gewaehlte Fassung spaeter tut, nicht eine Nachahmung davon.
 
 #include <QtTest>
+#include <QCheckBox>
+#include <QDir>
+#include <QFile>
 #include <QImage>
+#include <QLineEdit>
 #include <QPainter>
 #include <QPushButton>
-#include <QLabel>
+#include <QTemporaryDir>
 
 #include "gui/StyleConstants.h"
+#include "gui/styles/Theme.h"
 
 using namespace Longpath;
 
 namespace {
 
+struct Fassung {
+    const char* name;
+    const char* satz;      // was sie sein will
+    int radius, luftV, luftH, relief, mulde;
+};
+
+const Fassung kFassungen[] = {
+    {"FLACH", "ruhig, fast ohne Tiefe",        5, 3,  8,  6,  4},
+    {"WEICH", "wie heute — nah an Zeus",       7, 4, 10, 16, 10},
+    {"TIEF",  "deutlich plastisch",            9, 6, 14, 26, 18},
+};
+
 QImage shot(QWidget* w, QSize size)
 {
     w->resize(size);
-    QImage img(size, QImage::Format_ARGB32);
+    QImage img(size * 2, QImage::Format_ARGB32);
+    img.setDevicePixelRatio(2.0);
     img.fill(Qt::transparent);
     w->render(&img);
     return img;
 }
 
-/// Ein Knopf, wie ihn das Programm heute malt.
-QImage buttonNow(const QString& text, bool active)
+/// Eine Themendatei mit genau diesen Form-Reglern.
+QString schreibeThema(const QDir& dir, const Fassung& f)
 {
-    QPushButton b(text);
-    b.setStyleSheet(active ? Style::blueCheckedStyle()
-                           : Style::buttonBaseStyle());
-    b.setCheckable(active);
-    b.setChecked(active);
-    return shot(&b, QSize(84, 30));
-}
-
-/// Derselbe Knopf mit dem Vorschlag: gesaettigter Akzent, mehr Luft.
-QImage buttonProposed(const QString& text, bool active)
-{
-    QPushButton b(text);
-    if (active) {
-        b.setStyleSheet(QStringLiteral(
-            "QPushButton {"
-            "  background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
-            "    stop:0 #4f90ff, stop:1 #2f6fdd);"
-            "  border: 1px solid #2a5fbe; border-radius: 7px;"
-            "  color: #ffffff; font-size: 11px; font-weight: bold;"
-            "  padding: 4px 10px;"
-            "}"));
-    } else {
-        b.setStyleSheet(QStringLiteral(
-            "QPushButton {"
-            "  background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
-            "    stop:0 #23232b, stop:1 #16161b);"
-            "  border: 1px solid #303038; border-radius: 7px;"
-            "  color: #c8ccd4; font-size: 11px; font-weight: bold;"
-            "  padding: 4px 10px;"
-            "}"));
-    }
-    b.setCheckable(active);
-    b.setChecked(active);
-    return shot(&b, QSize(84, 30));
-}
-
-void row(QPainter& p, int y, const QString& caption,
-         const QImage& a, const QImage& b)
-{
-    p.setPen(QColor(0x9a, 0xa0, 0xaa));
-    QFont f = p.font();
-    f.setPointSize(10);
-    p.setFont(f);
-    p.drawText(QRect(24, y, 200, 30), Qt::AlignVCenter | Qt::AlignLeft,
-               caption);
-    p.drawImage(QPoint(240, y), a);
-    p.drawImage(QPoint(460, y), b);
-}
-
-int saturationOf(const QImage& img)
-{
-    // Die kraeftigste Farbe im Bild — das ist der Akzent.
-    int best = 0;
-    for (int y = 0; y < img.height(); ++y) {
-        for (int x = 0; x < img.width(); ++x) {
-            const QColor c(img.pixel(x, y));
-            if (qAlpha(img.pixel(x, y)) < 200) { continue; }
-            best = qMax(best, c.hslSaturation());
-        }
-    }
-    return best * 100 / 255;
+    const QString path = dir.filePath(QStringLiteral("%1.json")
+                                          .arg(QLatin1String(f.name)));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) { return {}; }
+    file.write(QStringLiteral(
+        "{\n  \"name\": \"%1\",\n"
+        "  \"formen\": { \"radius\": %2, \"luft-v\": %3, \"luft-h\": %4,\n"
+        "                \"relief\": %5, \"mulde\": %6 }\n}\n")
+        .arg(QLatin1String(f.name))
+        .arg(f.radius).arg(f.luftV).arg(f.luftH)
+        .arg(f.relief).arg(f.mulde).toUtf8());
+    return path;
 }
 
 } // namespace
@@ -105,47 +79,106 @@ class TstStilblatt : public QObject
 private slots:
     void drawTheSheet()
     {
-        const int W = 700, H = 300;
-        QImage sheet(W, H, QImage::Format_ARGB32);
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QDir dir(tmp.path());
+
+        const int spalte = 300;
+        const int W = spalte * 3 + 60;
+        const int H = 470;
+
+        QImage sheet(W * 2, H * 2, QImage::Format_ARGB32);
+        sheet.setDevicePixelRatio(2.0);
         sheet.fill(QColor(Style::kAppBg));
 
         QPainter p(&sheet);
         p.setRenderHint(QPainter::Antialiasing);
 
-        QFont title = p.font();
-        title.setPointSize(12);
-        title.setBold(true);
-        p.setFont(title);
-        p.setPen(QColor(0xe0, 0xe4, 0xea));
-        p.drawText(QRect(24, 16, 300, 24), Qt::AlignLeft, "JETZT");
-        p.drawText(QRect(460, 16, 300, 24), Qt::AlignLeft, "VORSCHLAG");
-        p.setPen(QColor(0x30, 0x30, 0x38));
-        p.drawLine(24, 44, W - 24, 44);
+        QFont kopf = p.font();
+        kopf.setPointSize(13);
+        kopf.setBold(true);
 
-        const QImage aOff = buttonNow(QStringLiteral("USB"), false);
-        const QImage bOff = buttonProposed(QStringLiteral("USB"), false);
-        const QImage aOn  = buttonNow(QStringLiteral("LSB"), true);
-        const QImage bOn  = buttonProposed(QStringLiteral("LSB"), true);
+        QFont klein = p.font();
+        klein.setPointSize(10);
 
-        row(p, 70,  QStringLiteral("Knopf, nicht aktiv"), aOff, bOff);
-        row(p, 120, QStringLiteral("Knopf, AKTIV"),       aOn,  bOn);
+        for (int i = 0; i < 3; ++i) {
+            const Fassung& f = kFassungen[i];
+            const QString path = schreibeThema(dir, f);
+            QVERIFY(!path.isEmpty());
 
-        p.setPen(QColor(0x9a, 0xa0, 0xaa));
-        QFont s = p.font();
-        s.setPointSize(10);
-        s.setBold(false);
-        p.setFont(s);
-        p.drawText(QRect(24, 180, W - 48, 90), Qt::TextWordWrap,
-            QStringLiteral(
-                "Der Unterschied ist die Sättigung des Akzents, nicht der "
-                "Verlauf. Beide Seiten tragen denselben Verlauf.\n"
-                "Aktiv jetzt: %1 %  ·  Vorschlag: %2 %")
-                .arg(saturationOf(aOn)).arg(saturationOf(bOn)));
+            QString err;
+            QVERIFY2(Style::Theme::instance().loadFile(path, &err),
+                     qPrintable(err));
+
+            const int x = 30 + i * spalte;
+
+            p.setFont(kopf);
+            p.setPen(QColor(0xe4, 0xe6, 0xea));
+            p.drawText(QRect(x, 22, spalte - 20, 26), Qt::AlignLeft,
+                       QString::fromLatin1(f.name));
+
+            p.setFont(klein);
+            p.setPen(QColor(0x8e, 0x92, 0x9a));
+            p.drawText(QRect(x, 48, spalte - 20, 22), Qt::AlignLeft,
+                       QString::fromLatin1(f.satz));
+
+            p.setPen(QColor(0x30, 0x32, 0x38));
+            p.drawLine(x, 74, x + spalte - 26, 74);
+
+            int y = 96;
+
+            // Knopf, ruhend
+            {
+                QPushButton b(QStringLiteral("USB"));
+                b.setStyleSheet(Style::buttonBaseStyle());
+                p.drawImage(QPoint(x, y), shot(&b, QSize(96, 34)));
+            }
+            // Knopf, aktiv
+            {
+                QPushButton b(QStringLiteral("LSB"));
+                b.setCheckable(true);
+                b.setChecked(true);
+                b.setStyleSheet(Style::buttonBaseStyle()
+                                + Style::blueCheckedStyle());
+                p.drawImage(QPoint(x + 110, y), shot(&b, QSize(96, 34)));
+            }
+            y += 52;
+
+            // Eingabefeld — das, worauf der Betreiber gezeigt hat
+            {
+                QLineEdit e(QStringLiteral("2850"));
+                e.setStyleSheet(Style::lineEditStyle());
+                p.drawImage(QPoint(x, y), shot(&e, QSize(206, 32)));
+            }
+            y += 50;
+
+            // Eine Platte mit einer Mulde darin — der Kern des Ganzen
+            {
+                QWidget card;
+                card.setStyleSheet(QStringLiteral(
+                    "QWidget { background: %1; border: 1px solid %2;"
+                    " border-radius: %3px; }")
+                    .arg(Style::raisedFill(Style::kPanelBg),
+                         Style::hexRole(Style::kBorder))
+                    .arg(Style::formInt("radius", 7)));
+                p.drawImage(QPoint(x, y), shot(&card, QSize(206, 76)));
+            }
+            y += 92;
+
+            p.setFont(klein);
+            p.setPen(QColor(0x9a, 0x9e, 0xa6));
+            p.drawText(QRect(x, y, spalte - 24, 90), Qt::TextWordWrap,
+                       QStringLiteral(
+                           "Ecken %1 · Luft %2/%3\nRelief %4 · Mulde %5")
+                           .arg(f.radius).arg(f.luftV).arg(f.luftH)
+                           .arg(f.relief).arg(f.mulde));
+        }
+
+        Style::Theme::instance().clear();
         p.end();
 
         QVERIFY(sheet.save(QStringLiteral("/tmp/longpath-stilblatt.png")));
-        qInfo() << "Saettigung aktiv jetzt:" << saturationOf(aOn) << "%"
-                << " Vorschlag:" << saturationOf(bOn) << "%";
+        qInfo() << "Blatt geschrieben:" << sheet.size();
     }
 };
 
