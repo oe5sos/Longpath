@@ -41,6 +41,7 @@
 #include <QString>
 #include <QList>
 #include <QMap>
+#include <QPointer>
 
 class QSplitter;
 
@@ -201,6 +202,20 @@ public:
     /// Hauptfenster setzt sie GANZ FRUEH in closeEvent(), damit ein
     /// Cmd+Q die Fenster nicht noch zurueckhaengen laesst.
     void setShuttingDown(bool on);
+
+private:
+    /// JEDES je angelegte Schwebefenster, auch wenn es aus m_floating
+    /// schon herausgenommen wurde.
+    ///
+    /// Grund ist ein Wettlauf beim Beenden: schliesst Qt zuerst das
+    /// Schwebefenster, nimmt der Zurueckdocken-Weg es aus m_floating
+    /// und reicht das Loeschen per deleteLater nach. shutDownFloating()
+    /// findet es dann nicht mehr — und beim Beenden laeuft keine Runde
+    /// mehr, in der ein Nachgereichtes ankaeme. Das Fenster ueberlebt.
+    /// Genau das Bild, das der Betreiber am 2026-08-22 fotografiert
+    /// hat, nur ueber eine zweite Tuer.
+    QList<QPointer<PanFloatingWindow>> m_floatEver;
+public:
 
     QStringList panIdsForTesting() const { return m_pans.keys(); }
     int floatingCountForTesting() const

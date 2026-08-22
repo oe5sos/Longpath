@@ -21,6 +21,7 @@
 #include <QtTest>
 #include <QApplication>
 #include <QPointer>
+#include <QDialog>
 
 #include "gui/MainWindow.h"
 #include "gui/PanadapterStack.h"
@@ -69,20 +70,58 @@ private slots:
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
         QCOMPARE(floatsOnScreen().count(), 1);
 
-        // Genau das, was Qt bei Cmd+Q tut.
-        QApplication::closeAllWindows();
-
-        // UND DANN NICHTS MEHR. Keine processEvents-Schleife: beim
-        // echten Beenden laeuft keine Runde mehr, in der ein
-        // nachgereichtes deleteLater ankaeme. Genau diese Zeile
-        // trennt die Pruefung vom Selbstbetrug — mit einer
-        // Ereignisrunde besteht sie auch OHNE die Abbau-Fahne
-        // (nachgemessen 2026-08-22), weil das Zurueckdocken das
-        // Fenster dann noch rechtzeitig abraeumt.
+        // ── Der WEG DES BEDIENERS: das Hauptfenster schliessen ──────
+        //
+        // Hier stand QApplication::closeAllWindows(), und der Fall war
+        // unstet. Die Messung hat gezeigt, warum — und dass er die
+        // falsche Sache prueft:
+        //
+        //   Qts closeAllWindows() ueberspringt Fenster MIT Elternteil
+        //   (!w->parentWidget()). Unser Schwebefenster haengt am
+        //   Hauptfenster, wird also gar nicht angefasst. Und ob das
+        //   Hauptfenster selbst drankommt, haengt am modalen Zustand:
+        //   in den Fehllaeufen blieb es SELBST sichtbar, mitsamt einem
+        //   Erststart-Dialog.
+        //
+        // Damit mass der Fall Qts Aufzaehlregeln statt unseren Abbau.
+        // Der rote Knopf und Cmd+Q laufen beide ueber
+        // MainWindow::closeEvent — genau das wird jetzt ausgeloest.
+        mw->close();
 
         QVERIFY2(floatsOnScreen().isEmpty(),
                  "Nach dem Beenden steht der abgeloeste Panadapter noch "
                  "am Schreibtisch — genau das Bild vom 2026-08-22");
+    }
+
+    void dockingAndQuittingInOneBreathLeavesNothing()
+    {
+        // Der Fall, fuer den das Sicherungsnetz gedacht ist — und ohne
+        // ihn bliebe es eine unbelegte Behauptung.
+        //
+        // Wer den Zurueck-Pfeil drueckt und SOFORT beendet: der
+        // Dock-Weg nimmt das Fenster aus m_floating und reicht das
+        // Loeschen per deleteLater nach. shutDownFloating() findet es
+        // dann nicht mehr, und beim Beenden laeuft keine Runde mehr,
+        // in der ein Nachgereichtes ankaeme. Ohne m_floatEver bleibt
+        // es stehen.
+        auto* mw = new MainWindow();
+        mw->resize(1200, 800);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+
+        PanadapterStack* stack = mw->findChild<PanadapterStack*>();
+        QVERIFY(stack);
+        stack->floatPanadapter(QStringLiteral("pan-0"));
+        for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
+        QCOMPARE(floatsOnScreen().count(), 1);
+
+        // Zurueckdocken anstossen — und KEINE Ereignisrunde danach.
+        stack->dockPanadapter(QStringLiteral("pan-0"));
+        mw->close();
+
+        QVERIFY2(floatsOnScreen().isEmpty(),
+                 "Zurueckdocken und sofort beenden laesst das Fenster "
+                 "stehen — das Loeschen wurde nachgereicht und kam nie an");
     }
 
     void theTeardownLeavesNothingBehind()

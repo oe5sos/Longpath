@@ -386,6 +386,7 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // die Vollbildflaeche zurueck, die es gerade vermeiden soll.
     auto* floater = new PanFloatingWindow(applet, window());
     m_floating[panId] = floater;
+    m_floatEver.append(floater);
 
     connect(floater, &PanFloatingWindow::dockRequested, this, [this, panId]() {
         auto* taken = m_floating.take(panId);
@@ -544,12 +545,22 @@ void PanadapterStack::setShuttingDown(bool on)
     for (PanFloatingWindow* fw : m_floating) {
         if (fw) { fw->setShuttingDown(on); }
     }
+    // Auch die schon Herausgenommenen — sonst bittet eines davon
+    // mitten im Abbau noch ums Zurueckhaengen.
+    for (QPointer<PanFloatingWindow>& w : m_floatEver) {
+        if (w) { w->setShuttingDown(on); }
+    }
 }
 
 void PanadapterStack::shutDownFloating()
 {
     setShuttingDown(true);
-    if (m_floating.isEmpty()) { return; }
+    // KEIN vorzeitiges Umkehren bei leerer Liste: genau dann liegt der
+    // Fall vor, fuer den das Netz unten da ist — wer zurueckdockt und
+    // sofort beendet, hat m_floating geleert, aber das Fenster lebt
+    // noch (deleteLater kommt beim Beenden nicht mehr an). Gemessen am
+    // 2026-08-22: mit dem alten "return" blieb es stehen, obwohl das
+    // Netz eingebaut war.
 
     // Beim Beenden wird NICHT zurueckgehaengt. Das ist der Kern, und er
     // hat mich heute zwei Abstuerze gekostet:
@@ -585,6 +596,21 @@ void PanadapterStack::shutDownFloating()
         // Geist am Schreibtisch, den der Betreiber fotografiert hat.
         delete w;
     }
+
+    // Und die zweite Tuer zu: was der Zurueckdocken-Weg schon aus
+    // m_floating genommen, aber nur per deleteLater zum Loeschen
+    // vorgemerkt hat, steht sonst weiter am Schreibtisch. Siehe
+    // m_floatEver.
+    for (QPointer<PanFloatingWindow>& w : m_floatEver) {
+        if (w) {
+            w->setShuttingDown(true);
+            for (SpectrumWidget* sw : w->findChildren<SpectrumWidget*>()) {
+                sw->prepareForShutdown();
+            }
+            delete w.data();
+        }
+    }
+    m_floatEver.clear();
 }
 
 void PanadapterStack::dockPanadapter(const QString& panId)
