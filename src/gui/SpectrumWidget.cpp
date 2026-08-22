@@ -3047,6 +3047,10 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
                                           double windowEnb,
                                           double dbmOffset)
 {
+    // Ankunft stempeln: der Wasserfall entscheidet daran, ob er noch
+    // etwas zu zeigen hat (siehe pushWaterfallRow).
+    m_lastSpectrumArrivalMs = QDateTime::currentMSecsSinceEpoch();
+
     Q_UNUSED(receiverId);
     if (binsLinear.isEmpty()) { return; }
 
@@ -5702,6 +5706,32 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 
     // Task 2.8: Stop-on-TX -- skip if TX active and feature enabled.
     if (m_wfStopOnTx && m_activePeakHold.txActive()) {
+        return;
+    }
+
+    // ── Kein Strom, keine Zeilen ────────────────────────────────────
+    //
+    // Der Antrieb hier ist ein ZEITGEBER (m_wfPushTimer), bewusst
+    // entkoppelt von der Ankunft der FFT — das haelt den Bildlauf
+    // gleichmaessig. Der Preis: reisst der Strom ab, schiebt der
+    // Zeitgeber denselben alten Puffer unbegrenzt weiter. Die
+    // Wasserfall-Automatik sieht dann ein voellig flaches Spektrum,
+    // ihre Spanne faellt in sich zusammen, und JEDER Punkt landet auf
+    // der obersten Palettenstufe. Das ist das Magenta.
+    //
+    // Der Betreiber am 2026-08-22: "die farbe magenta und das problem
+    // hatten wir schon einmal ganz am anfang." Stimmt — zweimal, und
+    // beide Male war die Ursache eine andere (eingefallenes
+    // dB-Fenster, verdrehte Palette). Beide Behebungen stehen noch.
+    // Dies ist die dritte Ursache desselben Bildes, und die einzige,
+    // die man nur sieht, wenn das Geraet WEGFAELLT statt zu schweigen.
+    //
+    // Richtig ist einfrieren, nicht weiterschieben: ein stehender
+    // Wasserfall sagt "hier endet der Empfang", eine magenta Flaeche
+    // sagt gar nichts. Zwei Sekunden Nachlauf, damit ein Aussetzer im
+    // Netz keinen Sprung ins Bild reisst.
+    if (m_lastSpectrumArrivalMs > 0
+        && QDateTime::currentMSecsSinceEpoch() - m_lastSpectrumArrivalMs > 2000) {
         return;
     }
 
@@ -9823,6 +9853,13 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 QPainter sp(&rgba);
                 sp.drawImage(0, 0, m_waterfall);
             }
+            if (kWfDebug) {
+                qDebug().noquote() << QStringLiteral(
+                    "WF VOLLUPLOAD %1x%2 -> tex %3x%4 (null=%5)")
+                    .arg(rgba.width()).arg(rgba.height())
+                    .arg(m_wfGpuTexW).arg(m_wfGpuTexH)
+                    .arg(rgba.isNull());
+            }
             batch->uploadTexture(m_wfGpuTex, QRhiTextureUploadEntry(0, 0,
                 QRhiTextureSubresourceUploadDescription(rgba)));
             m_wfLastUploadedRow = m_wfWriteRow;
@@ -10647,6 +10684,59 @@ void SpectrumWidget::releaseResources()
     delete m_fftPeakVbo;       m_fftPeakVbo = nullptr;
 
     m_rhiInitialized = false;
+
+    // ── Und die Wegmarken der Wasserfall-Textur zuruecksetzen ────────
+    //
+    // Ohne diese zwei Zeilen kostet jeder Umzug des Fensters (abloesen,
+    // zurueckdocken) die GPU-Textur ihren Inhalt: sie wird oben
+    // geloescht und beim naechsten initialize() NEU angelegt — aber der
+    // Erstbefuellungs-Pfad laeuft nur, wenn m_wfTexFullUpload steht.
+    // Stand er auf false, bekommt die frische Textur nie ein Byte
+    // geschrieben und zeigt, was Metal gerade in dem Speicher liegen
+    // hatte.
+    //
+    // Live gemessen am 2026-08-22: Panadapter abloesen -> die ganze
+    // Flaeche magenta; zurueckdocken -> bleibt magenta. Der Betreiber
+    // hatte am selben Tag ein Bild geschickt, auf dem dasselbe in Rot
+    // stand. Der Erstbefuellungs-Pfad selbst war laengst richtig (der
+    // Saat-Block bei "waterfall seed image") — er wurde nur nicht mehr
+    // angesteuert.
+    //
+    // m_wfLastUploadedRow muss mit: es ist die zweite Wegmarke, und
+    // eine stehengebliebene Zeilennummer laesst den Zeilen-Pfad an der
+    // falschen Stelle weitermachen.
+    m_wfTexFullUpload   = true;
+    m_wfLastUploadedRow = -1;
+
+    // ── Und dasselbe fuer die BEIDEN Overlay-Schichten ──────────────
+    //
+    // Derselbe Fehler, drei Texturen. Der Neuaufbau der Chrome-Textur
+    // haengt an einem GROESSENVERGLEICH:
+    //
+    //     if (m_overlayStatic.size() != QSize(pw, ph)) { ... }
+    //
+    // Nach einem Umzug ist die GPU-Textur frisch und leer, das
+    // CPU-Bild daneben aber unveraendert — die Groessen stimmen also
+    // ueberein, der Zweig laeuft nicht, und die leere Textur wird ueber
+    // die GANZE Flaeche gezogen. Deshalb war nach dem Abloesen alles
+    // magenta, auch der Kurvenbereich: nicht der Wasserfall, sondern
+    // die Chrome-Schicht darueber.
+    //
+    // Die Bilder wegzuwerfen ist die ehrliche Loesung: ein Nullbild hat
+    // eine andere Groesse als jede gueltige, der Vergleich schlaegt an,
+    // Textur und Bild werden gemeinsam neu angelegt und gefuellt.
+    //
+    // Der Betreiber am 2026-08-22: "die farbe magenta und das problem
+    // hatten wir schon einmal ganz am anfang." Richtig — und die zwei
+    // damaligen Ursachen (eingefallenes dB-Fenster, verdrehte
+    // Palette) sind beide noch behoben. Das hier ist die dritte Tuer
+    // zum selben Symptom, und sie geht erst auf, seit ein Panadapter
+    // ueberhaupt umziehen kann.
+    m_overlayStatic       = QImage();
+    m_overlayStaticDirty  = true;
+    m_overlayDynamic      = QImage();
+    m_overlayDynamicDirty = true;
+
 }
 
 #endif // NEREUS_GPU_SPECTRUM

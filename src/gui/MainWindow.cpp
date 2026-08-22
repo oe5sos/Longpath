@@ -13078,6 +13078,12 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // ConnectionPanel on Disconnect" slot below doesn't re-trigger
     // discovery via ConnectionPanel's ctor while teardown runs.
     m_shuttingDown = true;
+    // Die Schwebefenster SOFORT informieren — nicht erst unten bei
+    // shutDownFloating(). Bei Cmd+Q schickt Qt jedem Fenster ein
+    // Schliessereignis; ohne diese Zeile bittet das Schwebefenster
+    // mitten im Abbau ums Zurueckhaengen und stirbt daran.
+    // (AetherSDR MainWindow.cpp:2653 [@0cd4559])
+    if (m_panStack) { m_panStack->setShuttingDown(true); }
 
     // Force-run any pending coalesced slice save BEFORE we tear anything
     // down. The 500 ms debounce in RadioModel::scheduleSettingsSave can't
@@ -13172,7 +13178,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // ersten Anlauf (c8d8161a) uebersehen wurde. Eine Probe im echten
     // Hauptfenster hat den Absturz dann geliefert: abloesen, schliessen,
     // SIGSEGV.
-    if (m_panStack) { m_panStack->dockAllFloating(); }
+    if (m_panStack) { m_panStack->shutDownFloating(); }
 
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
     m_floatingApplets.clear();

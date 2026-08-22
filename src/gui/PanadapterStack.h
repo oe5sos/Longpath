@@ -191,7 +191,16 @@ public:
     /// Alle abgeloesten Panadapter zurueckholen. Beim Beenden noetig:
     /// ein schwebendes Fenster, das das Schliessen ueberlebt, stuerzt
     /// beim Abbau ab.
-    void dockAllFloating();
+    /// Beenden: legt jedes abgeloeste Spektrum still und loescht sein
+    /// Fenster SAMT Applet. Haengt bewusst NICHT zurueck — siehe die
+    /// Begruendung an der Definition.
+    void shutDownFloating();
+
+    /// Reicht die Abbau-Fahne an alle Schwebefenster weiter
+    /// (AetherSDR PanadapterStack.cpp:916-921 [@0cd4559]). Das
+    /// Hauptfenster setzt sie GANZ FRUEH in closeEvent(), damit ein
+    /// Cmd+Q die Fenster nicht noch zurueckhaengen laesst.
+    void setShuttingDown(bool on);
 
     QStringList panIdsForTesting() const { return m_pans.keys(); }
     int floatingCountForTesting() const

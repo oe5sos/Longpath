@@ -539,40 +539,52 @@ void PanadapterStack::floatPanadapter(const QString& panId)
 // dann applyLayout (das holt das Applet aus dem Fenster zurueck unter
 // den Stapel), erst dann das Fenster loeschen. Andersherum naehme das
 // Fenster das Applet mit ins Grab.
-void PanadapterStack::dockAllFloating()
+void PanadapterStack::setShuttingDown(bool on)
 {
+    for (PanFloatingWindow* fw : m_floating) {
+        if (fw) { fw->setShuttingDown(on); }
+    }
+}
+
+void PanadapterStack::shutDownFloating()
+{
+    setShuttingDown(true);
     if (m_floating.isEmpty()) { return; }
 
-    // From AetherSDR SpectrumWidget.cpp:2286-2306 [@0cd4559]
-    // (prepareForShutdown): beim Beenden wird NICHT mehr umgehaengt,
-    // sondern jedes abgeloeste Spektrum kontrolliert stillgelegt — den
-    // stalen QRhi-Rueckruf abmelden, Ressourcen freigeben, native View
-    // fallen lassen, solange der Elternteil noch lebt. Genau der
-    // fehlende Schritt hinter dem SIGSEGV in ensureRhi (#2495).
-    for (auto it = m_floating.cbegin(); it != m_floating.cend(); ++it) {
-        if (!it.value()) { continue; }
-        for (SpectrumWidget* sw :
-                 it.value()->findChildren<SpectrumWidget*>()) {
+    // Beim Beenden wird NICHT zurueckgehaengt. Das ist der Kern, und er
+    // hat mich heute zwei Abstuerze gekostet:
+    //
+    //   Anlauf 1: stilllegen, DANN applyLayout()  -> die Anordnung
+    //             haengt ein Widget zurueck, dessen native View gerade
+    //             abgerissen wurde. Absturz.
+    //   Anlauf 2: umhaengen, DANN stilllegen      -> das
+    //             QRhi-Abmeldeereignis geht ZWEIMAL raus. Beim zweiten
+    //             Mal ist der QRhi tot. Derselbe Absturz, andere Tuer:
+    //               QHash<void const*, function<void(QRhi*)>>::removeImpl
+    //
+    // AetherSDR sagt es woertlich (SpectrumWidget.cpp:2278-2280
+    // [@0cd4559]): "The send must happen exactly once, before the
+    // reparent." Beim Beenden gibt es kein Danach, in dem ein
+    // zurueckgehaengtes Applet noch gebraucht wuerde — also faellt das
+    // Umhaengen weg, prepareForShutdown() sendet das eine Ereignis, und
+    // das Fenster nimmt sein Applet mit ins Grab.
+    //
+    // Der Eintrag in m_pans muss dabei WEG: das Applet gehoert dem
+    // Fenster und stirbt mit ihm. Bliebe der Zeiger stehen, liefe der
+    // restliche Abbau in eine Leiche.
+    const QStringList ids = m_floating.keys();
+    for (const QString& id : ids) {
+        PanFloatingWindow* w = m_floating.take(id);
+        if (!w) { continue; }
+        for (SpectrumWidget* sw : w->findChildren<SpectrumWidget*>()) {
             sw->prepareForShutdown();
         }
+        m_pans.remove(id);
+        // Sofort, nicht nachgereicht: beim Beenden laeuft keine Runde
+        // mehr, in der ein deleteLater ankaeme — genau daran hing der
+        // Geist am Schreibtisch, den der Betreiber fotografiert hat.
+        delete w;
     }
-
-    const QStringList ids = m_floating.keys();
-    QVector<PanFloatingWindow*> windows;
-    for (const QString& id : ids) {
-        if (auto* w = m_floating.take(id)) { windows.append(w); }
-        emit panFloatStateChanged(id, false);
-        if (auto* a = m_pans.value(id, nullptr)) {
-            a->setFloatingIndicator(false);
-        }
-    }
-
-    applyLayout(m_currentLayoutId, m_pans.keys());
-
-    // Sofort loeschen, nicht nachreichen: beim Beenden laeuft keine
-    // Runde mehr, in der ein deleteLater ankaeme. Genau daran ist der
-    // Absturz von heute Vormittag gehangen.
-    for (PanFloatingWindow* w : windows) { delete w; }
 }
 
 void PanadapterStack::dockPanadapter(const QString& panId)

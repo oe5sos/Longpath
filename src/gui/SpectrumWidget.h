@@ -2880,6 +2880,10 @@ private:
     int  m_wfGpuTexH{0};
     bool m_wfTexFullUpload{true};
     int  m_wfLastUploadedRow{-1};
+    /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
+    /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
+    /// pushWaterfallRow().
+    qint64 m_lastSpectrumArrivalMs{0};
 
     // ---- Overlay GPU resources ----
     QRhiGraphicsPipeline*       m_ovPipeline{nullptr};

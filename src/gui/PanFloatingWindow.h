@@ -63,6 +63,12 @@ public:
     /// dockRequested without needing the user to close the window.
     void requestDock();
 
+    /// Beim Beenden gesetzt (AetherSDR PanFloatingWindow.h:26
+    /// [@0cd4559]). Danach nimmt closeEvent() das Schliessen HIN,
+    /// statt zurueckhaengen zu wollen — ein Umhaengen mitten im
+    /// Abbau greift auf einen toten Zeichenkontext zu.
+    void setShuttingDown(bool on) { m_shuttingDown = on; }
+
     /// Die Vorgabegroesse setzen. Vom Stack aufgerufen, NACHDEM das
     /// Applet wieder sichtbar ist — vorher verlangt die Anordnung fast
     /// nichts, und die Zahl haelt nicht. Wirkt nur beim ersten Mal.
@@ -83,6 +89,7 @@ private:
     // Die Groesse wird nur beim ERSTEN Anzeigen gesetzt. Wer das
     // Fenster nachher zieht, soll es behalten duerfen.
     bool m_sizedOnce{false};
+    bool m_shuttingDown{false};
     WindowTitleBar* m_titleBar{nullptr};
 };
 

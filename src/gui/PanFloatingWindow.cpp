@@ -151,8 +151,25 @@ void PanFloatingWindow::requestDock()
 
 void PanFloatingWindow::closeEvent(QCloseEvent* event)
 {
+    // From AetherSDR PanFloatingWindow.cpp:84-95 [@0cd4559].
+    //
+    // Beim Beenden: hinnehmen und still sein. Der Betreiber sah am
+    // 2026-08-22, was die alte Fassung anrichtete — sie bat AUCH beim
+    // Beenden ums Zurueckhaengen, und das Umhaengen eines
+    // GPU-Spektrums mitten im Abbau greift auf einen toten
+    // Zeichenkontext zu. Sein Bild: der Panadapter stand allein ueber
+    // dem Schreibtisch, der Wasserfall roter Schrott.
+    if (m_shuttingDown) {
+        event->accept();
+        return;
+    }
+
+    // Sonst: NICHT schliessen, sondern zurueckdocken. Das Ignorieren
+    // ist Absicht (Aether ebenso) — wer das Fenster schliesst UND
+    // gleichzeitig zurueckhaengt, laesst zwei Abbauten um dasselbe
+    // Widget rennen.
     requestDock();
-    event->accept();
+    event->ignore();
 }
 
 void PanFloatingWindow::moveEvent(QMoveEvent*)
