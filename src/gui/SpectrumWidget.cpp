@@ -9685,6 +9685,27 @@ void SpectrumWidget::initOverlayPipeline()
     // garbage, most visibly right after init or a resize.  Codex review,
     // PR #291.
     m_overlayDynamic.fill(Qt::transparent);
+
+    // ── Die Zusage gilt ab HIER, nicht erst ab dem naechsten
+    //    Groessenwechsel ─────────────────────────────────────────────
+    //
+    // Die Teilaktualisierung weiter unten schreibt nur das Spektrumband
+    // und verlaesst sich darauf, dass der Wasserfallteil dieser Textur
+    // EINMAL beschrieben wurde. Gesetzt wurde diese Fahne bisher nur im
+    // Groessen-Zweig (11.08.2026, „the magenta waterfall, cause number
+    // six"). Eine frisch ANGELEGTE Textur kam darin nicht vor — und
+    // seit der Panadapter umziehen kann, ist genau das der Normalfall:
+    // resetGpuResources() gibt alles frei, initialize() legt neu an,
+    // und der Wasserfallteil blieb undefinierter Metal-Speicher.
+    // Deckendes Magenta, ueber einen voellig gesunden Wasserfall
+    // geblendet.
+    //
+    // Der Betreiber hat es wiedererkannt: "wir hatten diese problem
+    // schon einmal. schaue ganz am anfang. ob da nicht ein schicht
+    // darüber gelegen ist." Genau die Schicht, genau dieselbe Ursache,
+    // ein anderer Weg hinein.
+    m_ovDynNeedsFullUpload = true;
+    m_overlayDynamicDirty  = true;
 }
 
 void SpectrumWidget::initSpectrumPipeline()
@@ -10923,8 +10944,12 @@ void SpectrumWidget::releaseResources()
     // ueberhaupt umziehen kann.
     m_overlayStatic       = QImage();
     m_overlayStaticDirty  = true;
-    m_overlayDynamic      = QImage();
-    m_overlayDynamicDirty = true;
+    m_overlayDynamic       = QImage();
+    m_overlayDynamicDirty  = true;
+    // Ohne diese Zeile bleibt die frisch angelegte Textur beim
+    // naechsten Rahmen nur TEILWEISE beschrieben — siehe
+    // initOverlayPipeline().
+    m_ovDynNeedsFullUpload = true;
 
 }
 
