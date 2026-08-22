@@ -74,6 +74,7 @@ public:
     // Wo der Empfaenger steht. Die Achse wird darum herum gezeichnet.
     void setVfoFrequency(double hz);
     double vfoFrequency() const { return m_vfoHz; }
+    int    spanHz() const { return m_spanHz; }
 
     // Wie viel Band die Flaeche zeigt. Die Vorlage zeigt rund 10 kHz.
     void setSpan(int hz);
@@ -87,6 +88,16 @@ public:
     // erfundene waere eine Behauptung — dieselbe Regel wie beim
     // Panadapter-Kopf und beim Rotorzeiger.
     void setHasFrequency(bool on);
+
+    /// Der Spektrumausschnitt hinter dem Durchlass, in dBm, von der
+    /// linken bis zur rechten Kante der angezeigten Spanne.
+    ///
+    /// Vorbild ist Zeus Link (vorgefuehrt am 2026-08-22): dort zeigt
+    /// der Bandfilter das ECHTE Signal, und erst dadurch sieht man,
+    /// ob die Kante an der richtigen Stelle sitzt. AetherSDR hat das
+    /// nicht — sein FilterPassbandWidget ist ein reiner Kanteneditor.
+    /// Nachgesehen, bevor gebaut wurde.
+    void setTrace(const QVector<float>& dbm);
 
 signals:
     // Beim Ziehen einer Kante. Die Breite darf sich aendern.
@@ -118,6 +129,7 @@ private:
     QString m_label{QStringLiteral("RX1")};
     QColor  m_accent;
     double  m_vfoHz{0.0};
+    QVector<float> m_trace;
     int     m_spanHz{10000};
     int     m_low{-2850};
     int     m_high{-150};

@@ -1571,6 +1571,21 @@ public:
     /// verfehlte und der Test das Verhalten faelschlich anklagte.
     int vfoXForTest() const;
 
+    /// Das Spektrum in dBm ueber einen Frequenzbereich, gleichmaessig
+    /// auf `points` Stuetzstellen abgetastet. Leer, solange keine
+    /// Daten da sind.
+    ///
+    /// Gebaut fuer den Bandfilter (2026-08-22): der soll das Signal im
+    /// Durchlass zeigen, wie es Zeus Link tut. Statt Abbildung und
+    /// Kalibrierung ein zweites Mal zu bauen — mit der Aussicht, dass
+    /// beide auseinanderlaufen — fragt der Bandfilter hier nach. Diese
+    /// Klasse hat die Bins, die DDC-Mitte, die Abtastrate und den
+    /// dBm-Versatz, und alles davon ist geprueft.
+    ///
+    /// Erkennung ist SPITZENWERT, wie im Panadapter: ein schmaler
+    /// Traeger darf zwischen zwei Stuetzstellen nicht verschwinden.
+    QVector<float> dbmOverRange(double loHz, double hiHz, int points) const;
+
     // ── Umzugs- und Abbau-Schutz, rueckportiert 2026-08-22 ───────────
     //
     // Diese vier Methoden standen im AetherSDR-Original
@@ -2094,6 +2109,7 @@ private:
     // the detector's invEnb scaling stays in lock-step with the bins it
     // just received.  No setter coordination needed.
     double m_fftWindowEnb{1.0};
+    double m_lastDbmOffset{0.0};
 
     // Per-channel WDSP-style frame averagers.  See SpectrumAvenger.h for
     // the av_mode wire-format mapping (-1 peak / 0 none / 1 recursive /

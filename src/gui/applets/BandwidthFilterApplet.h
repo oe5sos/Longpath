@@ -40,6 +40,7 @@
 #include "AppletWidget.h"
 
 #include <QList>
+#include <functional>
 
 class QLabel;
 class QPushButton;
@@ -75,6 +76,17 @@ public:
     /// 2026-08-22.
     QSize minimumSizeHint() const override;
 
+    /// Woher der Spektrumausschnitt kommt.
+    ///
+    /// Das Applet kennt den Panadapter nicht und soll ihn auch nicht
+    /// kennen — MainWindow reicht eine Abfrage herein, wie schon beim
+    /// Scheiben-Aufloeser der Overlay-Leiste. Rueckgabe: dBm-Werte von
+    /// loHz bis hiHz, gleichmaessig auf `points` Stuetzstellen.
+    using SpectrumSource =
+        std::function<QVector<float>(int sliceIndex, double loHz,
+                                     double hiHz, int points)>;
+    void setSpectrumSource(SpectrumSource src);
+
     // Fuer Tests: die Flaechen, in der Reihenfolge der Scheiben.
     QList<BandwidthFilterPane*> panes() const { return m_panes; }
 
@@ -108,6 +120,8 @@ private:
     QPushButton* m_spanBtn{nullptr};
     /// Die Verbindungen jeder Flaeche zu ihrer Scheibe. Werden bei
     /// jedem Neubau geloest und neu geknuepft — siehe rebuildPanes().
+    SpectrumSource m_spectrumSource;
+    class QTimer*  m_traceTimer{nullptr};
     QList<QMetaObject::Connection> m_paneConns;
     QList<QLabel*> m_shrinkableLabels;
     /// Die Bedienzeile. Eng bricht sie in zwei Reihen um — siehe

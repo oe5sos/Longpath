@@ -23,6 +23,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QResizeEvent>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -440,6 +441,35 @@ void BandwidthFilterApplet::syncFromModel()
 // Wortmarken weg. Sie sind Beschriftungen, keine Information — die
 // Einheit steht im Feld selbst ("2900 Hz"), und die Reihenfolge
 // tief/breit/hoch ist dieselbe wie im Bild darueber.
+void BandwidthFilterApplet::setSpectrumSource(SpectrumSource src)
+{
+    m_spectrumSource = std::move(src);
+    if (!m_traceTimer) {
+        // 20 Hz. Schneller waere Verschwendung: die Kurve dient dem
+        // Augenmass beim Kantenziehen, nicht der Signalsuche — dafuer
+        // ist der Panadapter da.
+        m_traceTimer = new QTimer(this);
+        m_traceTimer->setInterval(50);
+        connect(m_traceTimer, &QTimer::timeout, this, [this]() {
+            if (!m_spectrumSource) { return; }
+            for (int i = 0; i < m_panes.size(); ++i) {
+                BandwidthFilterPane* pane = m_panes.at(i);
+                SliceModel* s = sliceAt(i);
+                if (!pane || !s || !pane->isVisible()) { continue; }
+                const double f  = s->frequency();
+                if (f <= 0.0) { pane->setTrace({}); continue; }
+                const double half = pane->spanHz() / 2.0;
+                // Eine Stuetzstelle je zwei Bildpunkte reicht; mehr
+                // sieht man nicht, kostet aber jede Runde.
+                const int pts = qBound(64, pane->width() / 2, 512);
+                pane->setTrace(
+                    m_spectrumSource(i, f - half, f + half, pts));
+            }
+        });
+    }
+    m_traceTimer->start();
+}
+
 QSize BandwidthFilterApplet::minimumSizeHint() const
 {
     const QSize base = AppletWidget::minimumSizeHint();

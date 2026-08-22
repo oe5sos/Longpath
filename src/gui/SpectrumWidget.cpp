@@ -3054,6 +3054,10 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
                                           double windowEnb,
                                           double dbmOffset)
 {
+    // Fuer dbmOverRange() gemerkt: die Umrechnung linear -> dBm
+    // braucht denselben Versatz, den der Panadapter selbst benutzt.
+    m_lastDbmOffset = dbmOffset;
+
     // Ankunft stempeln: der Wasserfall entscheidet daran, ob er noch
     // etwas zu zeigen hat (siehe pushWaterfallRow).
     m_lastSpectrumArrivalMs = QDateTime::currentMSecsSinceEpoch();
@@ -7741,6 +7745,37 @@ void SpectrumWidget::applyNativeWindowIsolationPolicy()
     setAttribute(Qt::WA_DontCreateNativeAncestors);
     setAttribute(Qt::WA_NativeWindow);
 #endif
+}
+
+QVector<float> SpectrumWidget::dbmOverRange(double loHz, double hiHz,
+                                            int points) const
+{
+    if (points <= 1 || hiHz <= loHz || m_sampleRateHz <= 0.0) { return {}; }
+    const int binCount = m_fullLinearBins.size();
+    if (binCount <= 0) { return {}; }
+
+    const double binWidth = m_sampleRateHz / binCount;
+    const double fftLowHz = m_ddcCenterHz - m_sampleRateHz / 2.0;
+    const double step     = (hiHz - loHz) / (points - 1);
+
+    QVector<float> out(points, -200.0f);
+    for (int i = 0; i < points; ++i) {
+        const double f0 = loHz + step * (i - 0.5);
+        const double f1 = loHz + step * (i + 0.5);
+        int b0 = static_cast<int>(std::floor((f0 - fftLowHz) / binWidth));
+        int b1 = static_cast<int>(std::ceil((f1 - fftLowHz) / binWidth));
+        b0 = std::clamp(b0, 0, binCount - 1);
+        b1 = std::clamp(b1, 0, binCount - 1);
+        if (b1 < b0) { std::swap(b0, b1); }
+
+        float peak = 0.0f;
+        for (int b = b0; b <= b1; ++b) { peak = std::max(peak, m_fullLinearBins[b]); }
+        out[i] = (peak > 0.0f)
+            ? static_cast<float>(10.0 * std::log10(static_cast<double>(peak))
+                                 + m_lastDbmOffset + m_dbmCalOffset)
+            : -200.0f;
+    }
+    return out;
 }
 
 int SpectrumWidget::vfoXForTest() const

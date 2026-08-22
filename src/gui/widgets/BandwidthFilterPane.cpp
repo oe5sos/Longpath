@@ -91,6 +91,13 @@ void BandwidthFilterPane::setVfoFrequency(double hz)
     update();
 }
 
+void BandwidthFilterPane::setTrace(const QVector<float>& dbm)
+{
+    if (m_trace == dbm) { return; }
+    m_trace = dbm;
+    update();
+}
+
 void BandwidthFilterPane::setSpan(int hz)
 {
     // Unter 2 kHz wird die Achse unlesbar, ueber 40 kHz verschwindet
@@ -184,6 +191,57 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     for (int hz = -m_spanHz / 2; hz <= m_spanHz / 2; hz += 2000) {
         const int x = hzToX(hz);
         p.drawLine(x, r.top(), x, r.bottom());
+    }
+
+    // ── Das Signal ──────────────────────────────────────────────────
+    //
+    // Vorbild Zeus Link, vorgefuehrt am 2026-08-22: der Bandfilter
+    // zeigt dort das ECHTE Spektrum, und erst dadurch sieht man, ob
+    // die Kante an der richtigen Stelle sitzt. Ohne Kurve ist das
+    // Fenster ein Zahlenformular.
+    //
+    // Der Ausschnitt kommt vom Panadapter (SpectrumWidget::
+    // dbmOverRange) — dieselbe Abbildung, dieselbe Kalibrierung. Eine
+    // zweite eigene waere ein zweiter Ort, an dem sie falsch sein
+    // kann.
+    //
+    // Massstab: der Kopf des Fensters gehoert den Beschriftungen, also
+    // beginnt die Kurve darunter. Der Pegelbereich richtet sich nach
+    // dem, was da ist (mit Mindestspanne), sonst klebt eine leise
+    // Band-Mitte am Boden und man sieht nichts.
+    if (m_trace.size() >= 2) {
+        float lo = m_trace.first(), hi = m_trace.first();
+        for (float v : m_trace) { lo = qMin(lo, v); hi = qMax(hi, v); }
+        if (hi - lo < 12.0f) {
+            const float mid = 0.5f * (lo + hi);
+            lo = mid - 6.0f;
+            hi = mid + 6.0f;
+        }
+        const int top = r.top() + 30;          // Platz fuer die Marken
+        const int bot = r.bottom() - 2;
+        const double yScale = (bot - top) / static_cast<double>(hi - lo);
+
+        QPolygonF poly;
+        poly.reserve(m_trace.size() + 2);
+        poly << QPointF(r.left(), bot);
+        for (int i = 0; i < m_trace.size(); ++i) {
+            const double x = r.left()
+                + (r.width() - 1.0) * i / (m_trace.size() - 1.0);
+            const double y = bot - (m_trace[i] - lo) * yScale;
+            poly << QPointF(x, qBound<double>(top, y, bot));
+        }
+        poly << QPointF(r.right(), bot);
+
+        QColor fill(m_accent);
+        fill.setAlpha(46);
+        p.setPen(Qt::NoPen);
+        p.setBrush(fill);
+        p.drawPolygon(poly);
+
+        QColor line(Style::role("text-scale", Style::kTextScale));
+        p.setPen(QPen(line, 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawPolyline(poly.constData() + 1, poly.size() - 2);
     }
 
     // Die Nulllinie ist die VFO-Frequenz. Sie traegt einen eigenen Ton,

@@ -5800,6 +5800,38 @@ void MainWindow::populateDefaultMeter()
     // entfernt, dort steht jetzt dieselbe BandwidthFilterPane, nur
     // kleiner. Eine Umsetzung, zwei Plaetze.
     m_bwFilterApplet = new BandwidthFilterApplet(m_radioModel, nullptr);
+
+    // ── Das Signal in den Bandfilter ────────────────────────────────
+    //
+    // Der Betreiber am 2026-08-22, nach einer Vorfuehrung von Zeus
+    // Link: "er sollte mir ja auch das signal zeigen" und "genau wo
+    // ich im panadapter bin soll auch der bandwith filter sein."
+    //
+    // Geholt wird der Ausschnitt beim PANADAPTER derselben Scheibe:
+    // dort sind Bins, DDC-Mitte, Abtastrate und dBm-Versatz beisammen
+    // und geprueft. Eine eigene Abbildung im Bandfilter waere ein
+    // zweiter Ort, an dem sie falsch sein kann — und genau davon
+    // hatten wir heute genug.
+    //
+    // AetherSDR hat das nicht (sein FilterPassbandWidget ist ein
+    // reiner Kanteneditor); nachgesehen, bevor gebaut wurde.
+    m_bwFilterApplet->setSpectrumSource(
+        [this](int sliceIndex, double loHz, double hiHz, int points)
+            -> QVector<float> {
+        if (!m_radioModel || !m_panStack) { return {}; }
+        const QList<SliceModel*> slices = m_radioModel->slices();
+        if (sliceIndex < 0 || sliceIndex >= slices.size()) { return {}; }
+        SliceModel* s = slices.at(sliceIndex);
+        if (!s) { return {}; }
+
+        // Der Panadapter, der diese Scheibe zeigt — sonst der aktive.
+        SpectrumWidget* sw = nullptr;
+        const QString panId = s->panKey();
+        if (!panId.isEmpty()) { sw = m_panStack->spectrum(panId); }
+        if (!sw) { sw = activeSpectrumWidget(); }
+        if (!sw) { return {}; }
+        return sw->dbmOverRange(loHz, hiHz, points);
+    });
     panel->addApplet(m_bwFilterApplet);
 
     // Phase 3M-4 Task 13 — PureSignalApplet quick-access surface.
