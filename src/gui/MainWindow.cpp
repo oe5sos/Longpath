@@ -4817,6 +4817,77 @@ void MainWindow::buildUI()
                 static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
         });
 
+        // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
+        //
+        // Sie waren seit jeher TOT. Der Betreiber am 2026-08-22: "test
+        // auch mal, ob das plus und minus funktioniert" — gemessen an
+        // der Frequenzskala vor und nach dem Druck: Punkt fuer Punkt
+        // identisch. Grund: zoomIn/zoomOut/zoomBand/zoomSegment sind
+        // Signale OHNE EMPFAENGER. Genau der Fehlertyp, der hier schon
+        // einmal auffiel ("B8 Task 20: wire Display-flyout orphaned
+        // signals") — die vier hat man dabei uebersehen.
+        //
+        // Faktor 1.5 je Druck — AetherSDRs Wert
+        // (SpectrumWidget.cpp:2205-2206 [@0cd4559]), nicht mein
+        // geratener. Zwei fuehlt sich am Geraet grob an; anderthalb
+        // laesst einen die Bandkante noch finden. Untergrenze
+        // 2 kHz (darunter sieht man nur noch die eigene Bandbreite),
+        // Obergrenze die Abtastrate (mehr liefert der Empfaenger nicht).
+        auto zoomBy = [this](double factor) {
+            SpectrumWidget* sw = activeSpectrumWidget();
+            if (!sw) { return; }
+            const double maxBw = sw->sampleRate() > 0.0 ? sw->sampleRate() : 384000.0;
+            const double bw = qBound(2000.0, sw->bandwidth() * factor, maxBw);
+            sw->setFrequencyRange(sw->centerFrequency(), bw);
+        };
+        connect(m_overlayPanel, &SpectrumOverlayPanel::zoomIn,  this,
+                [zoomBy]() { zoomBy(1.0 / 1.5); });
+        connect(m_overlayPanel, &SpectrumOverlayPanel::zoomOut, this,
+                [zoomBy]() { zoomBy(1.5); });
+
+        // B und S nehmen ihre Kanten aus dem BandPlanManager — derselben
+        // Quelle, aus der der farbige Balken unter der Kurve gezeichnet
+        // wird. Keine zweite Tabelle, die auseinanderlaufen kann.
+        auto fitSegments = [this](bool wholeBand) {
+            SpectrumWidget* sw = activeSpectrumWidget();
+            if (!sw || !m_radioModel) { return; }
+            const double fMhz = sw->centerFrequency() / 1e6;
+            const auto& segs =
+                m_radioModel->bandPlanManagerMutable().segments();
+
+            double lo = 0.0, hi = 0.0;
+            for (const BandSegment& seg : segs) {
+                if (fMhz < seg.lowMhz || fMhz > seg.highMhz) { continue; }
+                if (!wholeBand) { lo = seg.lowMhz; hi = seg.highMhz; break; }
+                // Ganzes Band: alle Segmente einsammeln, die mit diesem
+                // zusammenhaengen (Kante an Kante, 1 kHz Toleranz).
+                lo = seg.lowMhz; hi = seg.highMhz;
+                bool grew = true;
+                while (grew) {
+                    grew = false;
+                    for (const BandSegment& o : segs) {
+                        if (o.highMhz < lo - 0.001 || o.lowMhz > hi + 0.001) {
+                            continue;
+                        }
+                        if (o.lowMhz  < lo) { lo = o.lowMhz;  grew = true; }
+                        if (o.highMhz > hi) { hi = o.highMhz; grew = true; }
+                    }
+                }
+                break;
+            }
+            if (hi <= lo) { return; }   // Frequenz liegt in keinem Segment
+
+            const double maxBw = sw->sampleRate() > 0.0 ? sw->sampleRate() : 384000.0;
+            // 10 % Luft an den Raendern, damit die Bandkante SICHTBAR
+            // bleibt statt genau auf dem Bildrand zu liegen.
+            const double span = qBound(2000.0, (hi - lo) * 1e6 * 1.1, maxBw);
+            sw->setFrequencyRange((lo + hi) * 0.5 * 1e6, span);
+        };
+        connect(m_overlayPanel, &SpectrumOverlayPanel::zoomBand, this,
+                [fitSegments]() { fitSegments(true); });
+        connect(m_overlayPanel, &SpectrumOverlayPanel::zoomSegment, this,
+                [fitSegments]() { fitSegments(false); });
+
         // B8 Task 21: wire Cursor Freq toggle to SpectrumWidget visibility guard.
         connect(m_overlayPanel, &SpectrumOverlayPanel::cursorFreqVisibleChanged,
                 activeSpectrumWidget(), &SpectrumWidget::setCursorFreqVisible);

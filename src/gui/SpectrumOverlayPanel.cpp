@@ -1516,22 +1516,32 @@ void SpectrumOverlayPanel::buildZoomButtons()
     m_zoomStrip = new QWidget(parentWidget());
     m_zoomStrip->setAttribute(Qt::WA_TransparentForMouseEvents, false);
     m_zoomStrip->setAttribute(Qt::WA_NoSystemBackground, true);
-    // Nativ, sonst unsichtbar.
+    // NICHT nativ — und das ist seit dem 2026-08-22 wieder moeglich.
     //
-    // Der Panadapter ist ein QRhiWidget mit WA_NativeWindow. Unser
-    // eigener Vermerk in SpectrumWidget.cpp:551 sagt, was das heisst:
-    // „QRhiWidget with WA_NativeWindow on macOS does not support child
-    // widget overlays". Ein natives NSView zeichnet ueber allen
-    // NICHT-nativen Geschwistern, und kein raise() aendert das.
+    // Vorgeschichte: am 2026-08-20 war der Streifen unsichtbar (der
+    // Panadapter ist ein QRhiWidget mit WA_NativeWindow, und ein
+    // natives NSView zeichnet ueber allen nicht-nativen Geschwistern).
+    // Der Notbehelf war, den Streifen ebenfalls nativ zu machen —
+    // native Geschwister sortieren sich untereinander, raise() greift
+    // wieder, sichtbar war er.
     //
-    // Der Betreiber am 2026-08-20: der Zoom sei im Panadapter „nicht
-    // einfach zu finden". Er war nicht schwer zu finden — er war nicht
-    // zu sehen. Gemessen: Streifen bei (4,544), 106x24, sichtbar laut
-    // Qt, Elternteil SpectrumWidget, selbst nicht nativ.
+    // Nur: KLICKBAR war er nicht mehr. Gemessen am 2026-08-22, weil der
+    // Betreiber fragte, ob Plus und Minus ueberhaupt etwas tun: der
+    // Knopf leuchtete beim Ueberfahren NICHT, und im Protokoll kam kein
+    // einziger Druck an. Sichtbar und taub — die schlechteste aller
+    // Kombinationen, weil nichts darauf hinweist.
     //
-    // Native Geschwister sortieren sich untereinander; damit greift
-    // raise() wieder.
-    m_zoomStrip->setAttribute(Qt::WA_NativeWindow);
+    // Weg damit. Moeglich wurde das durch den Rueckport von
+    // applyNativeWindowIsolationPolicy() am selben Tag: seither steht
+    // WA_DontCreateNativeAncestors immer gepaart mit WA_NativeWindow
+    // (AetherSDR #4339), die Vorfahren werden nicht mehr
+    // mit-nativiert, und ein gewoehnliches Kind ist wieder sichtbar.
+    //
+    // AetherSDR macht es genauso: seine Zoomknoepfe sind schlichte
+    // Kinder des SpectrumWidget (SpectrumWidget.cpp:2125-2154
+    // [@0cd4559]), ohne eigenen nativen Streifen.
+    //
+    // WER DAS WIEDER EINSCHALTET, macht die Knoepfe erneut taub.
 
     static constexpr int kZBtnW = 24;
     static constexpr int kZBtnH = 20;
@@ -1552,12 +1562,25 @@ void SpectrumOverlayPanel::buildZoomButtons()
         return btn;
     };
 
+    // Namen wie im Original (AetherSDR SpectrumWidget.cpp:2151-2154
+    // [@0cd4559]) — damit Pruefungen und Barrierefreiheit den richtigen
+    // Knopf finden. Es gibt mehrere "+" im Fenster; ohne Namen greift
+    // eine Pruefung zuverlaessig daneben (erlebt am 2026-08-22).
     m_zoomSegBtn  = makeZBtn(QStringLiteral("S"));
     m_zoomBandBtn = makeZBtn(QStringLiteral("B"));
     m_zoomOutBtn  = makeZBtn(QStringLiteral("-"));
     m_zoomInBtn   = makeZBtn(QStringLiteral("+"));
 
     m_zoomSegBtn->setToolTip(QStringLiteral("Segment zoom — fit visible slice passband"));
+    m_zoomSegBtn->setObjectName(QStringLiteral("panZoomSegBtn"));
+    m_zoomBandBtn->setObjectName(QStringLiteral("panZoomBandBtn"));
+    m_zoomOutBtn->setObjectName(QStringLiteral("panZoomOutBtn"));
+    m_zoomInBtn->setObjectName(QStringLiteral("panZoomInBtn"));
+    m_zoomSegBtn->setAccessibleName(QStringLiteral("Zoom to segment"));
+    m_zoomBandBtn->setAccessibleName(QStringLiteral("Zoom to band"));
+    m_zoomOutBtn->setAccessibleName(QStringLiteral("Zoom out"));
+    m_zoomInBtn->setAccessibleName(QStringLiteral("Zoom in"));
+
     m_zoomBandBtn->setToolTip(QStringLiteral("Band zoom — fit entire amateur band"));
     m_zoomOutBtn->setToolTip(QStringLiteral("Zoom out — increase visible bandwidth"));
     m_zoomInBtn->setToolTip(QStringLiteral("Zoom in — decrease visible bandwidth"));
