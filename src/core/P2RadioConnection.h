@@ -464,7 +464,32 @@ private:
     QTimer* m_connectWatchdog{nullptr};
 
     // Connect watchdog budget — 2 s matches P1.
-    static constexpr int kConnectTimeoutMs = 2000;
+    // 2000 -> 6000 am 2026-08-22, nach einer Messung beim Betreiber.
+    //
+    // Sein Anvelina Pro 3 haengt am WLAN. Der Waechter schlug zu, die
+    // App sagte "Disconnected", und drei Tage lang war die Vermutung,
+    // die App sei schuld. Gemessen war es die ARP-Aufloesung: der
+    // Eintrag fuer das Geraet stand auf (incomplete) — die Funkerkennung
+    // fand es per Rundruf, aber gezielte Pakete kamen nie an. Sobald
+    // ARP stand, lief alles sauber (9,4 Mbit/s, 32 ms).
+    //
+    // Zwei Sekunden reichen fuer eine Kabelstrecke und sind auf einem
+    // belegten 2,4-GHz-Kanal zu knapp: ARP, der erste Rundruf und der
+    // Anlauf des Geraets liegen zusammen leicht darueber. Die Rechnung
+    // ist einseitig — vier Sekunden laenger warten kostet Geduld, zu
+    // frueh aufgeben kostet den Bediener die Verbindung UND schickt ihn
+    // auf die falsche Faehrte.
+    //
+    // AetherSDR hat gar keinen solchen Waechter; er ist unsere Zutat.
+    // Sie bleibt, weil ein Haenger ohne Rueckmeldung schlimmer waere —
+    // aber sie meldet sich jetzt im Klartext (onConnectTimeout).
+    static constexpr int kConnectTimeoutMs = 6000;
+
+public:
+    /// Damit Pruefungen ihre Wartezeit AN DEN WAECHTER haengen koennen
+    /// statt an eine geratene Zahl (siehe tst_radio_connection_failure).
+    static constexpr int connectTimeoutMsForTest() { return kConnectTimeoutMs; }
+private:
 
     // Periodic protocol heartbeat: fires every 100 ms while connected and
     // dispatches HighPri / RX-spec / TX-spec / General on the cycling cadence

@@ -111,6 +111,11 @@ public:
     void setState(ConnectionState s);
     void setRates(double rxMbps, double txMbps);
     void setRttMs(int ms);
+
+    /// Paketverlust im I/Q-Strom (Prozent des jeweils letzten
+    /// 5-Sekunden-Fensters). Negativ = unbekannt, dann wird nichts
+    /// gezeigt.
+    void setPacketLoss(double lossPercent);
     void setAudioFlowState(AudioEngine::FlowState s);
 
     ConnectionState          state() const noexcept { return m_state; }
@@ -152,6 +157,13 @@ private:
     double                  m_rxMbps{0.0};
     double                  m_txMbps{0.0};
     int                     m_rttMs{-1};
+    double                  m_lossPct{-1.0};
+    /// Der schlimmste Wert der letzten Minute. Ein Verlust von 0,8 %
+    /// verschwindet nach fuenf Sekunden wieder — und genau der ist es,
+    /// der das Rucken macht. Die Anzeige haelt ihn fest, sonst schaut
+    /// der Bediener immer in dem Moment hin, in dem es gerade gut geht.
+    double                  m_lossWorstPct{-1.0};
+    qint64                  m_lossWorstMs{0};
     AudioEngine::FlowState  m_audioFlow{AudioEngine::FlowState::Dead};
     QTimer                  m_pulseTimer;
     bool                    m_pulseOn{false};

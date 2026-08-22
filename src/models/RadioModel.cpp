@@ -8829,7 +8829,8 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // does not re-trigger this path.
     connect(m_connection, &RadioConnection::connectFailed,
             this, [this](Longpath::ConnectFailure reason, const QString& detail) {
-        Q_UNUSED(detail);
+        // Immer melden, mit Begruendung — siehe connectAttemptFailed().
+        emit connectAttemptFailed(reason, detail);
         if (m_autoConnectInProgress) {
             const QString mac = m_autoConnectChosenMac;
             m_autoConnectInProgress = false;

@@ -148,6 +148,17 @@ void ConnectionSegment::setRates(double rxMbps, double txMbps)
     update();
 }
 
+void ConnectionSegment::setPacketLoss(double lossPercent)
+{
+    m_lossPct = lossPercent;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (lossPercent > m_lossWorstPct || now - m_lossWorstMs > 60000) {
+        m_lossWorstPct = lossPercent;
+        m_lossWorstMs  = now;
+    }
+    update();
+}
+
 void ConnectionSegment::setRttMs(int ms)
 {
     // Track the latest raw value so callers can read it back for
@@ -360,6 +371,40 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     const QString rx = QChar(0x25BC) + QString::asprintf(" %.1f Mbps", m_rxMbps);
     p.drawText(x, textY, rx);
     x += p.fontMetrics().horizontalAdvance(rx) + 10;
+
+    // ── 4b. Paketverlust im I/Q-Strom ────────────────────────────────
+    //
+    // Die Zahl, die dem Betreiber drei Tage gefehlt hat. Sie stand die
+    // ganze Zeit im Protokoll (P2RadioConnection: "IQ seq audit"), nur
+    // sah sie nie jemand — also blieb "es ruckt" eine Frage ohne
+    // Messung, und der Verdacht fiel auf die App statt auf das WLAN.
+    //
+    // Gezeigt wird der SCHLECHTESTE Wert der letzten Minute, nicht der
+    // augenblickliche: Verlust kommt in Stoessen, und wer im ruhigen
+    // Moment hinsieht, sieht 0,0 und glaubt, es sei alles gut.
+    //
+    // Schwellen, absichtlich streng: Protokoll 2 wiederholt NICHTS.
+    // Jedes verlorene Paket ist ein Loch im Ton — 0,1 % sind schon
+    // hoerbar, 1 % ist unbrauchbar.
+    if (m_lossWorstPct >= 0.0 && m_state == ConnectionState::Connected) {
+        const double v = m_lossWorstPct;
+        QColor c;
+        if (v < 0.01)      { c = QColor("#4a5a52"); }   // still, unauffaellig
+        else if (v < 0.10) { c = QColor("#6fa384"); }
+        else if (v < 1.00) { c = QColor(Style::kAmberText); }
+        else               { c = QColor(Style::kRedText); }
+        p.setPen(c);
+        // Das WORT traegt die Warnung, nicht die Farbe. Der Hausstil
+        // haelt Farbe knapp (2 %), und gesaettigtes Rot ist der
+        // Bandkante und dem SWR vorbehalten — beides Dinge, bei denen
+        // es um die Endstufe geht. Ein nacktes "1.40 %" neben den
+        // Mbit/s waere ausserdem mehrdeutig: Verlust wovon?
+        const QString loss = (v < 0.01)
+            ? QStringLiteral("LOSS 0 %")
+            : QString::asprintf("LOSS %.2f %%", v);
+        p.drawText(x, textY, loss);
+        x += p.fontMetrics().horizontalAdvance(loss) + 10;
+    }
 
     // ── 5. ● audio pip ────────────────────────────────────────────────────
     // Was: vertical separator "|" + ♪ (U+266A). ♪ is absent in Menlo (the

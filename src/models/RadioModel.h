@@ -2452,6 +2452,18 @@ signals:
     // `mac`    — the saved-radio MAC key that was attempted.
     // `reason` — typed failure code (Timeout is the most common: radio unreachable).
     // MainWindow reacts by opening the ConnectionPanel and posting a status-bar message.
+    /// Ein Verbindungsversuch ist gescheitert — EGAL auf welchem Weg,
+    /// mit der Begruendung im Klartext.
+    ///
+    /// Bis zum 2026-08-22 gab es das nicht: connectFailed trug einen
+    /// erklaerenden Text, und das Modell warf ihn mit Q_UNUSED(detail)
+    /// weg. Gemeldet wurde nur der Auto-Verbinden-Weg. Wer von Hand
+    /// verband und scheiterte, sah "Disconnected" und sonst nichts —
+    /// der Betreiber hat daraufhin drei Tage die App verdaechtigt,
+    /// waehrend es die Netzwerkstrecke war.
+    void connectAttemptFailed(Longpath::ConnectFailure reason,
+                              const QString& detail);
+
     void autoConnectFailed(const QString& mac, Longpath::ConnectFailure reason);
 
     // autoConnectAmbiguous — emitted when tryAutoReconnect finds more than one

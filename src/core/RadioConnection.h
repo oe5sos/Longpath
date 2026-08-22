@@ -513,6 +513,16 @@ signals:
     // Drives the ConnectionSegment "X ms" latency readout (sub-PR-2).
     void pingRttMeasured(int rttMs);
 
+    /// Paketverlust im I/Q-Strom, einmal je Messfenster (5 s).
+    /// lossPercent = verlorene / (empfangene + verlorene) * 100.
+    ///
+    /// Gemessen wurde das schon lange — es stand nur im Protokoll, das
+    /// niemand sieht. Der Betreiber hat drei Tage lang geraten, ob sein
+    /// Rucken an der App oder am Netz liegt; die Antwort lag die ganze
+    /// Zeit in einer Zeile, die nie auf den Bildschirm kam. Seit dem
+    /// 2026-08-22 traegt die Kopfleiste sie.
+    void iqPacketLoss(double lossPercent, quint32 lost, quint32 received);
+
     // PSU supply voltage (V) from supply_volts (P1 AIN6 / P2 bytes 45-46).
     // Converted via Hermes DC-volts formula (console.cs computeHermesDCVoltage()
     // [v2.10.3.13]). Emitted at most once per 50 mV change.

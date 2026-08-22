@@ -642,6 +642,14 @@ MainWindow::MainWindow(QWidget* parent)
                 connect(conn, &RadioConnection::pingRttMeasured,
                         seg, &ConnectionSegment::setRttMs,
                         Qt::UniqueConnection);
+                // Paketverlust auf demselben Weg — dieselbe Neuverdrahtung
+                // bei jedem Verbindungsversuch, weil RadioModel das
+                // Verbindungsobjekt jedes Mal neu anlegt.
+                connect(conn, &RadioConnection::iqPacketLoss, seg,
+                        [seg](double pct, quint32, quint32) {
+                            seg->setPacketLoss(pct);
+                        },
+                        Qt::UniqueConnection);
             }
         };
         wireRtt();
@@ -738,6 +746,15 @@ MainWindow::MainWindow(QWidget* parent)
             QStringLiteral("Auto-connect target %1 %2. Pick a different radio or update the address.")
                 .arg(name, reasonText),
             ToastSeverity::Warning, 8000);
+    });
+
+    // Jeder gescheiterte Verbindungsversuch sagt jetzt, WARUM — auch der
+    // von Hand angestossene. 14 Sekunden, weil der Text zwei Saetze hat
+    // und der Bediener in dem Moment ohnehin ratlos ist.
+    connect(m_radioModel, &RadioModel::connectAttemptFailed,
+            this, [this](Longpath::ConnectFailure, const QString& detail) {
+        if (detail.isEmpty()) { return; }
+        showToast(detail, ToastSeverity::Warning, 14000);
     });
 
     // autoConnectAmbiguous — multiple radios have AutoConnect = true.

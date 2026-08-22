@@ -7,6 +7,16 @@
 #include <QHostAddress>
 #include "core/P1RadioConnection.h"
 #include "core/RadioConnection.h"
+
+// Warten wird aus der Waechter-Konstante abgeleitet, nicht geraten.
+//
+// Am 2026-08-22 wurde kConnectTimeoutMs von 2000 auf 6000 ms angehoben
+// (WLAN-Strecke beim Betreiber; die Begruendung steht an der
+// Konstante). Diese Pruefung wartete fest 3000 ms und fiel prompt um —
+// sie mass nicht den Waechter, sondern eine Zahl, die zufaellig
+// darueber lag. Jetzt folgt sie ihm mit Reserve.
+static constexpr int kWaitMs =
+    Longpath::P1RadioConnection::connectTimeoutMsForTest() + 3000;
 #include "core/RadioDiscovery.h"
 #include "core/HpsdrModel.h"
 
@@ -42,7 +52,7 @@ private slots:
 
         conn.connectToRadio(unreachableInfo());
 
-        QVERIFY(spy.wait(3000));
+        QVERIFY(spy.wait(kWaitMs));
         QCOMPARE(spy.count(), 1);
 
         const auto reason = spy.takeFirst().at(0).value<ConnectFailure>();
@@ -92,7 +102,7 @@ private slots:
 
         conn.connectToRadio(unreachableInfo());
 
-        QVERIFY(failSpy.wait(3000));
+        QVERIFY(failSpy.wait(kWaitMs));
         QCOMPARE(failSpy.count(), 1);
 
         // Watchdog teardown is queued behind the connectFailed emission;

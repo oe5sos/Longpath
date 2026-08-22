@@ -480,7 +480,13 @@ private:
     static constexpr int kWatchdogTickMs       = 25;            // watchdog silence-detection cadence
     // Connect watchdog: fires this many ms after connectToRadio() if no first
     // ep6 frame arrives → emits connectFailed(Timeout, ...). Design §4.1.
-    static constexpr int kConnectTimeoutMs     = 2000;
+    // 2000 -> 6000, gleiche Begruendung wie in P2RadioConnection.h.
+    static constexpr int kConnectTimeoutMs     = 6000;
+
+public:
+    /// Siehe P2RadioConnection::connectTimeoutMsForTest().
+    static constexpr int connectTimeoutMsForTest() { return kConnectTimeoutMs; }
+private:
     // Mic-frame LOS timeout — after this long without a successful mic16
     // dispatch, inject a zero block into TxMicSource so the worker keeps
     // ticking through silence.  Matches Thetis network.c:656 [v2.10.3.13]:

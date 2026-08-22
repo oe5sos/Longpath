@@ -3038,6 +3038,14 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
         } else if (now - m_iqSeqWndStartMs >= 5000) {
             const double secs =
                 static_cast<double>(now - m_iqSeqWndStartMs) / 1000.0;
+            {
+                const double tot = static_cast<double>(m_iqSeqWndPkts
+                                                        + m_iqSeqWndLost);
+                emit iqPacketLoss(tot > 0.0
+                                      ? 100.0 * m_iqSeqWndLost / tot
+                                      : 0.0,
+                                  m_iqSeqWndLost, m_iqSeqWndPkts);
+            }
             if (m_iqSeqWndLost > 0 || m_iqSeqWndEvents > 0) {
                 const double total = static_cast<double>(m_iqSeqWndPkts
                                                          + m_iqSeqWndLost);
@@ -3254,10 +3262,22 @@ void P2RadioConnection::onConnectTimeout()
     if (m_socket) { m_socket->close(); }
     setState(ConnectionState::Disconnected);
 
+    // Klartext statt Ratespiel. Der alte Text ("check IP address, radio
+    // power, and network") nannte drei Moeglichkeiten und half bei
+    // keiner. Der entscheidende Umstand ist: das Geraet wurde GEFUNDEN
+    // (sonst staende es gar nicht in der Liste), aber es kommt kein
+    // Datenstrom — und genau das trennt "Geraet aus" von "Netz laesst
+    // die Pakete nicht durch".
     emit connectFailed(ConnectFailure::Timeout,
-                       QStringLiteral("No response from radio within %1 ms — "
-                                      "check IP address, radio power, and network")
-                           .arg(kConnectTimeoutMs));
+                       QStringLiteral(
+                           "Das Gerät wurde gefunden, liefert aber binnen "
+                           "%1 s keinen Datenstrom.\n\n"
+                           "Das ist fast immer die Netzwerkstrecke, nicht "
+                           "das Gerät: über WLAN kommen die Pakete oft "
+                           "nicht durch, auch wenn die Suche es anzeigt "
+                           "(die läuft per Rundruf). Am zuverlässigsten "
+                           "ist eine Kabelverbindung.")
+                           .arg(kConnectTimeoutMs / 1000));
 }
 
 // Porting from Thetis ReadUDPFrame:519-532 — High Priority C&C status
