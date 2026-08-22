@@ -30,6 +30,7 @@
 #include "gui/SpectrumWidget.h"
 
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QSignalSpy>
 
 namespace {
@@ -131,6 +132,72 @@ private slots:
         drag(&w, QPoint(700, 150), QPoint(701, 150));
         QVERIFY2(tuned.count() > 0,
                  "Ein kurzer Klick stimmt nicht mehr ab");
+    }
+
+    void aDoubleClickJumpsThereAtOnce()
+    {
+        // Das Beispiel des Betreibers, 2026-08-22, woertlich: "wenn ich
+        // auf sieben Komma fünf stehe und ich gehe auf sieben Komma
+        // zwei und mache einen Doppelklick auf sieben Komma zwei,
+        // sollte auch meine Frequenz sofort auf sieben Komma zwei
+        // hüpfen."
+        //
+        // Bis dahin fiel der Doppelklick nur auf mousePressEvent
+        // durch — und seit das Ziehen wieder verschiebt, begann er
+        // also ein Verschieben, statt abzustimmen.
+        SpectrumWidget w;
+        w.resize(1000, 600);
+        w.setDdcCenterFrequency(7'350'000.0);
+        w.setSampleRate(768'000.0);
+        w.setFrequencyRange(7'350'000.0, 700'000.0);   // 7,0 .. 7,7
+        w.setVfoFrequency(7'500'000.0);
+        w.setConnectionState(ConnectionState::Connected);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        // Bildpunkt fuer 7,2 MHz aus der Abbildung des Widgets holen,
+        // nicht nachrechnen.
+        w.setVfoFrequency(7'200'000.0);
+        QCoreApplication::processEvents();
+        const int x72 = w.vfoXForTest();
+        w.setVfoFrequency(7'500'000.0);
+        QCoreApplication::processEvents();
+
+        QSignalSpy tuned(&w, &SpectrumWidget::frequencyClicked);
+        const QPoint p(x72, 150);
+        QMouseEvent dbl(QEvent::MouseButtonDblClick, p, w.mapToGlobal(p),
+                        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &dbl);
+        QCoreApplication::processEvents();
+
+        QVERIFY2(tuned.count() > 0, "Der Doppelklick stimmt nicht ab");
+        const double got = tuned.last().at(0).toDouble();
+        QVERIFY2(std::abs(got - 7'200'000.0) < 2000.0,
+                 qPrintable(QStringLiteral(
+                     "Doppelklick auf 7,2 MHz landet bei %1 Hz").arg(got)));
+    }
+
+    void theArrowKeysTuneByOneStep()
+    {
+        // "oder auch mit dem rechten und linken Cursortaste muss das
+        // automatisch rübergezogen werden."
+        SpectrumWidget w;
+        arm(w);
+        w.setStepSize(100);
+        QCoreApplication::processEvents();
+
+        QSignalSpy tuned(&w, &SpectrumWidget::frequencyClicked);
+        QKeyEvent right(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &right);
+        QCoreApplication::processEvents();
+        QVERIFY2(tuned.count() > 0, "Die Pfeiltaste bewegt nichts");
+        QCOMPARE(tuned.last().at(0).toDouble(), 7'100'100.0);
+
+        QKeyEvent left(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+        QCoreApplication::sendEvent(&w, &left);
+        QCoreApplication::processEvents();
+        QCOMPARE(tuned.last().at(0).toDouble(), 7'099'900.0);
     }
 
     void draggingTheVfoBarStaysProportional()

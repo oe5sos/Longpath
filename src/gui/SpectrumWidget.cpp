@@ -167,6 +167,7 @@
 #include <QPainterPath>
 #include <QResizeEvent>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QWheelEvent>
 #include <QFile>
 #include <QLibraryInfo>
@@ -514,6 +515,12 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
 
 #ifdef NEREUS_GPU_SPECTRUM
     // Platform-specific QRhi backend selection.
+    // Tastenbedienung braucht Fokus. ClickFocus, nicht StrongFocus:
+    // wer ins Spektrum klickt, will dort auch mit den Pfeiltasten
+    // arbeiten — aber die Tabulator-Reihenfolge der Eingabefelder
+    // soll nicht durch den Panadapter laufen.
+    setFocusPolicy(Qt::ClickFocus);
+
     // Order matters: setApi() first, then WA_NativeWindow, then setMouseTracking().
     // WA_NativeWindow creates a dedicated native surface (NSView on macOS, HWND on
     // Windows); setMouseTracking() must come AFTER so tracking is configured on
@@ -9166,10 +9173,68 @@ void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
         }
     }
 
-    // Nichts getroffen: weiter wie vor 2026-08-19, als der Filter den
-    // Doppelklick unbesehen als Druck weitergab. Ohne diesen Rueckfall
-    // verlore der zweite Klick auf freier Flaeche seine Wirkung.
+    // ── Doppelklick auf freie Flaeche: SOFORT dorthin abstimmen ─────
+    //
+    // Der Betreiber am 2026-08-22: "wenn ich einen Doppelklick im
+    // Display im Panadapter mache, dass dort automatisch die Frequenz
+    // auch hinhüpft. Das heißt, wenn ich auf sieben Komma fünf stehe
+    // und ich gehe auf sieben Komma zwei und mache einen Doppelklick
+    // auf sieben Komma zwei, sollte auch meine Frequenz sofort auf
+    // sieben Komma zwei hüpfen."
+    //
+    // AetherSDR haelt es genauso (SpectrumWidget.cpp:10063 [@0cd4559]:
+    // "Click in FFT area → start pan drag (tune on double-click
+    // only)"). Bisher fiel der Doppelklick bei uns nur auf
+    // mousePressEvent durch — und seit das Ziehen wieder verschiebt,
+    // hiess das: er begann ein Verschieben und stimmte NICHT ab.
+    if (event->button() == Qt::LeftButton
+        && m_connState == ConnectionState::Connected) {
+        const int w = width();
+        const int h = height();
+        const int specH = specHFromHeight(h, m_spectrumFrac,
+                                          kFreqScaleH + kDividerH);
+        const QRect specRect(0, 0, w - effectiveStripW(), specH);
+        const QPoint dp = event->position().toPoint();
+        if (specRect.contains(dp)) {
+            // Ein etwaiges Verschieben, das der erste Klick begonnen
+            // hat, hier beenden — sonst zieht die Ansicht beim
+            // Loslassen noch hinterher.
+            m_draggingPan = false;
+            unsetCursor();
+            const double hz = std::round(xToHz(dp.x(), specRect) / m_stepHz)
+                              * m_stepHz;
+            emit frequencyClicked(hz);
+            event->accept();
+            return;
+        }
+    }
+
+    // Sonst weiter wie vor 2026-08-19, als der Filter den Doppelklick
+    // unbesehen als Druck weitergab.
     mousePressEvent(event);
+}
+
+void SpectrumWidget::keyPressEvent(QKeyEvent* event)
+{
+    // ── Links/Rechts stimmen um einen Schritt ───────────────────────
+    //
+    // "oder auch mit dem rechten und linken Cursortaste muss das
+    // automatisch rübergezogen werden" (Betreiber, 2026-08-22).
+    //
+    // Schrittweite ist die eingestellte (STEP in der Befehlsleiste),
+    // damit Tastatur und Mausrad dasselbe tun. Mit Umschalt zehnfach —
+    // so kommt man ueber ein Band, ohne die Taste festzuhalten.
+    if (m_connState == ConnectionState::Connected
+        && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right)) {
+        const double mult = (event->modifiers() & Qt::ShiftModifier) ? 10.0 : 1.0;
+        const double delta = (event->key() == Qt::Key_Right ? 1.0 : -1.0)
+                             * m_stepHz * mult;
+        emit frequencyClicked(std::round((m_vfoHz + delta) / m_stepHz)
+                              * m_stepHz);
+        event->accept();
+        return;
+    }
+    QWidget::keyPressEvent(event);
 }
 
 void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
