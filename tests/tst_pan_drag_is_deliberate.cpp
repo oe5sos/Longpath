@@ -85,11 +85,20 @@ private slots:
         const double before = w->centerFrequency();
         // Die Skala liegt zwischen Spektrum und Wasserfall.
         const int scaleY = w->freqScaleYForTest() + 8;
+        const double bwBefore = w->bandwidth();
         drag(w.data(), QPoint(500, scaleY), QPoint(300, scaleY));
 
         QVERIFY2(w->centerFrequency() != before,
                  "Auch die Skala verschiebt nicht mehr — dann gibt es "
                  "gar keinen Weg mehr, die Ansicht zu bewegen");
+
+        // UND die Bandbreite bleibt. Die erste Fassung dieser Pruefung
+        // war gruen aus dem falschen Grund: an der Skala hing noch
+        // AetherSDRs Bandbreiten-Zug, der um den Zeiger re-zentriert —
+        // 'Mitte geaendert' stimmte, nur eben durch ZOOM statt durch
+        // Verschieben. Live fiel es sofort auf.
+        QVERIFY2(qFuzzyCompare(w->bandwidth(), bwBefore),
+                 "Die Skala zoomt noch, statt zu verschieben");
     }
 
     /// Und der kurze Klick im Spektrum stimmt weiter ab.

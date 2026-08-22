@@ -8291,10 +8291,25 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
             return;
         }
 
-        m_draggingBandwidth = true;
-        m_bwDragStartX = mx;
-        m_bwDragStartBw = m_bandwidthHz;
-        setCursor(Qt::SizeHorCursor);
+        // ── Skala ziehen = ANSICHT verschieben (2026-08-22) ──────────
+        //
+        // Hier stand AetherSDRs Bandbreiten-Zug (Skala ziehen aendert
+        // den Zoom). Der Betreiber will die Zeus-Aufteilung, und sie
+        // ist die bessere: Zoom liegt bereits auf −/+, dem Rad und den
+        // S/B-Knoepfen — die Skala ist damit frei fuer das, was ihr
+        // Aussehen verspricht: anfassen und die Ansicht schieben.
+        //
+        // Der Verschiebe-Zug sass zuerst als Rueckfall WEITER UNTEN im
+        // Handler und war totes Holz: dieser Zweig hier hat jeden
+        // Skala-Druck vorher gefressen. Der Test dazu war gruen AUS
+        // DEM FALSCHEN GRUND — der Bandbreiten-Zug re-zentriert um den
+        // Zeiger, und die Pruefung sah 'Mitte hat sich geaendert'.
+        // Deshalb prueft tst_pan_drag_is_deliberate jetzt beides:
+        // Mitte wandert, Bandbreite bleibt.
+        m_draggingPan = true;
+        m_panDragStartX = mx;
+        m_panDragStartCenter = m_centerHz;
+        setCursor(Qt::ClosedHandCursor);
         return;
     }
 
@@ -8415,17 +8430,12 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     // Loslassen unten prueft dafuer weiter die 4-Pixel-Schwelle.
     // m_panDragStartX wird auch ohne Verschieb-Modus gemerkt, weil
     // die Klick-Erkennung beim Loslassen daran misst.
-    const bool onFreqScale = (my >= freqBarY && my < freqBarY + kFreqScaleH);
+    // Skala-Druecke kommen hier nie an (der Zweig oben nimmt sie und
+    // verschiebt). Im Spektrum gilt: kurzer Druck wird beim Loslassen
+    // zum Abstimmklick, eine Bewegung verpufft folgenlos.
     m_panDragStartX = mx;
     m_panDragStartCenter = m_centerHz;
-    if (onFreqScale) {
-        m_draggingPan = true;
-        setCursor(Qt::ClosedHandCursor);
-    } else {
-        // Kein Modus: ein kurzer Druck wird beim Loslassen zum
-        // Abstimmklick, eine Bewegung verpufft folgenlos.
-        m_draggingPan = false;
-    }
+    m_draggingPan = false;
 
     QWidget::mousePressEvent(event);
 }
