@@ -4690,6 +4690,8 @@ nereus_add_test(tst_real_container_move)
 nereus_add_test(tst_real_zoom_visible)
 nereus_add_test(tst_disconnect_label_transparent)
 nereus_add_test(tst_both_paint_paths)
+nereus_add_test(tst_spectrum_trace_visible)
+set_tests_properties(tst_spectrum_trace_visible PROPERTIES RUN_SERIAL TRUE)
 nereus_add_test(tst_form_variants)
 set_tests_properties(tst_form_variants PROPERTIES
     ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

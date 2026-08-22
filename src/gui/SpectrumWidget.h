@@ -1557,6 +1557,11 @@ public:
     // section 7.4); these also give the render tests a writer for the
     // Chartreuse highlight branch.
     void setSelectedNotchIdForTest(int id) { m_selectedNotchId = id; }
+    int renderedPixelCountForTest() const { return m_renderedPixels.size(); }
+    int visibleBinCountForTest() const { return m_visibleBinCount; }
+    float refLevelForTest() const { return m_refLevel; }
+    float dynamicRangeForTest() const { return m_dynamicRange; }
+    QColor fillColorForTest() const { return m_fillColor; }
 
     class NotchEditPopup* m_notchEditor {nullptr};
     void setHoveredNotchIdForTest(int id)  { m_hoveredNotchId = id; }

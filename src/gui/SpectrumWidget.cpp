@@ -10386,6 +10386,37 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         cb->draw(4);
     }
 
+    // ── Die Chrome-Schicht liegt UNTER der Kurve ─────────────────────
+    //
+    // Gefunden am 2026-08-22, live am Geraet: der Wasserfall lief, die
+    // Kurve fehlte — seit Tagen, auf jedem Build, mit Werks- wie mit
+    // Betreiber-Einstellungen. Vertices gesund (964 Punkte, Zyan,
+    // Deckkraft 0.9), Zeichenbefehl lief, nichts zu sehen.
+    //
+    // Ursache: die Behebung von „hintergrundbild funktioniert auch
+    // nicht im pandapter" (2026-08-20) malt paintBackgroundLayer in
+    // die statische Overlay-Textur — und dieses Quad wurde NACH der
+    // Kurve gezeichnet. Ein deckender Grund ueber der Kurve: das
+    // Raster aus derselben Textur blieb sichtbar, die Kurve darunter
+    // verschwand. tst_both_paint_paths hat den Zustand seither sogar
+    // ERZWUNGEN — der Test verlangte paintBackgroundLayer in beiden
+    // Wegen, sagte aber nichts ueber die Reihenfolge.
+    //
+    // AetherSDR begruendet die richtige Ordnung selbst (Zitat an der
+    // Baustelle der Textur): „die Rasterzellen muessen HINTER den
+    // Signalspitzen liegen." Also: Chrome zuerst, dann die Kurve,
+    // dann NUR die dynamische Schicht (Peak-Hold, Rauschflur) obenauf.
+    if (m_ovPipeline) {
+        cb->setGraphicsPipeline(m_ovPipeline);
+        cb->setViewport({0, 0,
+            static_cast<float>(outputSize.width()),
+            static_cast<float>(outputSize.height())});
+        const QRhiCommandBuffer::VertexInput ovVbuf(m_ovVbo, 0);
+        cb->setVertexInput(0, 1, &ovVbuf);
+        cb->setShaderResources(m_ovSrb);
+        cb->draw(4);
+    }
+
     // Draw FFT spectrum
     if (m_fftFillPipeline && m_fftLinePipeline && m_visibleBinCount > 0) {
         float specVpX = static_cast<float>(specRect.x()) * dpr;
@@ -10429,22 +10460,18 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // freq/dBm/time scales which need to read clean from the
     // spectrum; dynamic overlays (peak blobs / peak hold / NF) sit
     // on top of chrome.
-    if (m_ovPipeline) {
+    // Nur noch die DYNAMISCHE Schicht (Peak-Hold, Blobs, Rauschflur):
+    // das Chrome-Quad ist nach oben vor die Kurve gewandert — siehe die
+    // Notiz dort (2026-08-22).
+    if (m_ovPipeline && m_ovDynSrb) {
         cb->setGraphicsPipeline(m_ovPipeline);
         cb->setViewport({0, 0,
             static_cast<float>(outputSize.width()),
             static_cast<float>(outputSize.height())});
         const QRhiCommandBuffer::VertexInput vbuf(m_ovVbo, 0);
         cb->setVertexInput(0, 1, &vbuf);
-        // Chrome layer.
-        cb->setShaderResources(m_ovSrb);
+        cb->setShaderResources(m_ovDynSrb);
         cb->draw(4);
-        // Dynamic layer (peak hold / peak blobs / noise floor).
-        // 2026-05-26 KG4VCF dual-layer overlay split.
-        if (m_ovDynSrb) {
-            cb->setShaderResources(m_ovDynSrb);
-            cb->draw(4);
-        }
     }
 
     cb->endPass();
