@@ -645,10 +645,8 @@ MainWindow::MainWindow(QWidget* parent)
                 // Paketverlust auf demselben Weg — dieselbe Neuverdrahtung
                 // bei jedem Verbindungsversuch, weil RadioModel das
                 // Verbindungsobjekt jedes Mal neu anlegt.
-                connect(conn, &RadioConnection::iqPacketLoss, seg,
-                        [seg](double pct, quint32, quint32) {
-                            seg->setPacketLoss(pct);
-                        },
+                connect(conn, &RadioConnection::iqPacketLoss,
+                        seg, &ConnectionSegment::onIqPacketLoss,
                         Qt::UniqueConnection);
             }
         };

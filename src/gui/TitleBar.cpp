@@ -102,7 +102,13 @@ ConnectionSegment::ConnectionSegment(QWidget* parent)
     : QWidget(parent)
 {
     setFixedHeight(30);
-    setMinimumWidth(200);
+    // 200 -> 330 am 2026-08-22: mit der Verlustanzeige hinter den
+    // Mbit/s reichten 200 Punkte nicht mehr, und der neue Text wurde
+    // WORTLOS abgeschnitten. Das ist die zweite Falle desselben Tages —
+    // erst kam die Verbindung wegen Qt::UniqueConnection an einem
+    // Lambda nicht zustande, dann war das Ergebnis zu breit fuer die
+    // Leiste. Beide Male sah der Betreiber schlicht nichts.
+    setMinimumWidth(330);
     setCursor(Qt::PointingHandCursor);
     setMouseTracking(true);
     setAttribute(Qt::WA_StyledBackground, true);
@@ -157,6 +163,11 @@ void ConnectionSegment::setPacketLoss(double lossPercent)
         m_lossWorstMs  = now;
     }
     update();
+}
+
+void ConnectionSegment::onIqPacketLoss(double lossPercent, quint32, quint32)
+{
+    setPacketLoss(lossPercent);
 }
 
 void ConnectionSegment::setRttMs(int ms)

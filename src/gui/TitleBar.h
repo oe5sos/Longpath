@@ -134,6 +134,15 @@ public:
     QRect audioPipRect() const;
 
 public slots:
+    /// Empfaengt RadioConnection::iqPacketLoss.
+    ///
+    /// Eigener Slot statt Lambda, und das ist kein Geschmack: mit einem
+    /// Lambda ist Qt::UniqueConnection WIRKUNGSLOS — Qt braucht dafuer
+    /// einen Zeiger auf eine Member-Funktion. Am 2026-08-22 kam die
+    /// Verbindung deshalb gar nicht zustande, die Anzeige blieb leer,
+    /// und beim Betreiber ruckte der Ton weiter unerklaert.
+    void onIqPacketLoss(double lossPercent, quint32 lost, quint32 received);
+
     // Throttled activity tick — nudges a repaint so the pulse looks "live".
     // The pulse timer in the ctor already drives the animation; this slot
     // exists for future per-frame visual cues.
