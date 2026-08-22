@@ -237,19 +237,42 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     const QColor faint(Style::role("text-scale", Style::kTextScale));
     const QColor ink(Style::role("text", Style::kTextPrimary));
 
-    p.setFont(small);
-    p.setPen(faint);
-    p.drawText(QRect(xl + 3, 2, 90, 12), Qt::AlignLeft | Qt::AlignVCenter,
-               QStringLiteral("LOW CUT"));
-    p.drawText(QRect(xh - 93, 2, 90, 12), Qt::AlignRight | Qt::AlignVCenter,
-               QStringLiteral("HIGH CUT"));
+    // ── Eng: die Wortmarken weichen, die Zahlen bleiben ─────────────
+    //
+    // Der Betreiber hat es am 2026-08-22 fotografiert: beim
+    // Verkleinern schoben sich "LOW CUT" und "HIGH CUT" ineinander und
+    // ueber das Kaestchen mit der Breite. Drei Beschriftungen wollen
+    // Platz, den es nicht mehr gibt.
+    //
+    // Rangfolge, wie ueberall sonst in diesem Fenster: zuerst faellt
+    // das WORT, dann die Zahl. Die Zahl traegt die Information; das
+    // Wort sagt nur, was ohnehin an der Kante steht, an der es klebt.
+    //
+    // Gemessen wird gegen den tatsaechlichen Platz zwischen den beiden
+    // Griffen, nicht gegen die Fensterbreite: bei schmalem Durchlass
+    // ist es auch in einem breiten Fenster eng.
+    const int labelRoom = xh - xl;
+    const bool wordMarks = labelRoom >= 190;
+    const bool numbers   = labelRoom >= 110;
 
-    p.setFont(value);
-    p.setPen(ink);
-    p.drawText(QRect(xl + 3, 13, 90, 14), Qt::AlignLeft | Qt::AlignVCenter,
-               cutLabel(m_low));
-    p.drawText(QRect(xh - 93, 13, 90, 14), Qt::AlignRight | Qt::AlignVCenter,
-               cutLabel(m_high));
+    if (wordMarks) {
+        p.setFont(small);
+        p.setPen(faint);
+        p.drawText(QRect(xl + 3, 2, 90, 12), Qt::AlignLeft | Qt::AlignVCenter,
+                   QStringLiteral("LOW CUT"));
+        p.drawText(QRect(xh - 93, 2, 90, 12), Qt::AlignRight | Qt::AlignVCenter,
+                   QStringLiteral("HIGH CUT"));
+    }
+
+    if (numbers) {
+        p.setFont(value);
+        p.setPen(ink);
+        const int yNum = wordMarks ? 13 : 2;
+        p.drawText(QRect(xl + 3, yNum, 90, 14),
+                   Qt::AlignLeft | Qt::AlignVCenter, cutLabel(m_low));
+        p.drawText(QRect(xh - 93, yNum, 90, 14),
+                   Qt::AlignRight | Qt::AlignVCenter, cutLabel(m_high));
+    }
 
     // Die Breite in der Mitte, in einem eigenen Kaestchen: sie ist die
     // Zahl, nach der man den Filter benennt.

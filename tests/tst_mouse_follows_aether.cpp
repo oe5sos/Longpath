@@ -214,6 +214,38 @@ private slots:
                      .arg(std::abs(w.centerFrequency() - centerBefore))));
     }
 
+    void theWholeListeningBandIsAGrip()
+    {
+        // "ich möchte, wenn ich meinen bereich von 2,7 k, sprich meinen
+        // bereich wo ich höre, mit click und click hold verschieben
+        // können." (Betreiber, 2026-08-22)
+        //
+        // Bei LSB liegt der Durchlass LINKS vom VFO-Strich. Die erste
+        // Fassung griff nur um den Strich — wer auf die tuerkise
+        // Flaeche zielte, traf daneben und verschob die Ansicht. Hier
+        // wird genau dort gefasst, wo der Bediener hinschaut: MITTEN
+        // in der Flaeche.
+        SpectrumWidget w;
+        arm(w);
+        w.setFilterEdges(-2900, -100);      // LSB, 2,8 kHz
+        QCoreApplication::processEvents();
+
+        const int xVfo = w.vfoXForTest();
+        // Mitte des Durchlasses liegt bei LSB links vom Strich.
+        const double hzPerPx = w.bandwidth() / 964.0;
+        const int xBand = xVfo - static_cast<int>(1500.0 / hzPerPx);
+
+        const double centerBefore = w.centerFrequency();
+        QSignalSpy tuned(&w, &SpectrumWidget::frequencyClicked);
+        drag(&w, QPoint(xBand, 150), QPoint(xBand + 30, 150));
+
+        QVERIFY2(tuned.count() > 0,
+                 "Ein Zug MITTEN im Hoerbereich stimmt nicht ab");
+        QVERIFY2(qFuzzyCompare(w.centerFrequency(), centerBefore),
+                 "Der Zug im Hoerbereich hat die ANSICHT verschoben, "
+                 "statt den Bereich zu bewegen");
+    }
+
     void theArrowKeysTuneByOneStep()
     {
         // "oder auch mit dem rechten und linken Cursortaste muss das

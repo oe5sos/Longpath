@@ -8504,7 +8504,21 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     // haengt an der Darstellung. 2,9 kHz auf 100 kHz Ansicht sind rund
     // 28 Punkte — zu wenig fuer drei. Auf einer 10-kHz-Ansicht sind es
     // 280, da bleiben die Filterkanten normal greifbar.
-    if (passWide < 40 && std::abs(mx - xVfoNow) <= 12) {
+    // Gegriffen wird das BAND, nicht der Strich.
+    //
+    // Der Betreiber am 2026-08-22: "ich möchte, wenn ich meinen
+    // bereich von 2,7 k, sprich meinen bereich wo ich höre, mit click
+    // und click hold verschieben können."
+    //
+    // Die erste Fassung nahm einen Radius um den VFO-STRICH. Bei LSB
+    // liegt der Durchlass aber LINKS davon, bei USB rechts — wer auf
+    // die tuerkise Flaeche zielt, traf also je nach Betriebsart
+    // daneben und begann stattdessen ein Verschieben. Jetzt zaehlt die
+    // Flaeche selbst, mit acht Punkten Rand aussen herum, damit man
+    // sie auch bei schmaler Ansicht bequem fasst.
+    const int grabL = qMin(xLo, xVfoNow) - 8;
+    const int grabR = qMax(xHi, xVfoNow) + 8;
+    if (passWide < 40 && mx >= grabL && mx <= grabR) {
         m_draggingVfo    = true;
         m_vfoDragStartX  = mx;
         m_vfoDragStartHz = m_vfoHz;
