@@ -860,6 +860,7 @@ set(GUI_SOURCES
     src/gui/FreeDVReporterDialog.cpp
     src/gui/FreeDVReporterDialog.h
     src/gui/applets/KiwiSdrApplet.cpp
+    src/gui/MainWindow_KiwiSdr.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h

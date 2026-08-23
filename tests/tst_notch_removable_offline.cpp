@@ -38,11 +38,7 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
-        // acht Oberflaechentests um den Fenstermanager, und dieser Test
-        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
-        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
-        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -66,16 +62,36 @@ private slots:
                          "prueft der Rest dieses Tests nichts");
         const int y = 80;
 
+        // Das Fenster muss AKTIV sein, nicht bloss sichtbar. Ein
+        // popup() auf einem inaktiven Fenster kommt unter Last nicht
+        // zuverlaessig hoch; nach dem QTRY_VERIFY unten blieb ein Rest
+        // von rund einem Ausfall auf sechs Durchlaeufe uebrig.
+        QVERIFY(QTest::qWaitForWindowActive(&w));
+
         QSignalSpy gone(&w, &SpectrumWidget::notchRemoveRequested);
         QTest::mouseClick(&w, Qt::RightButton, Qt::NoModifier, QPoint(x, y));
         QCoreApplication::processEvents();
 
         // Das Menue oeffnet mit popup(), nicht exec() — es haengt also
         // als Kind am Widget und laesst sich hier befragen.
-        QMenu* menu = w.findChild<QMenu*>();
-        QVERIFY2(menu, "Rechtsklick auf einen Notch oeffnet kein Menue — "
-                       "im getrennten Zustand kaeme man dann nicht mehr an "
-                       "seine Filter heran");
+        //
+        // ABER: nicht sofort. Unter "ctest -j8" fiel dieser Test am
+        // 2026-08-23 rund jedes dritte Mal aus, weil EIN
+        // processEvents() nach dem Rechtsklick nicht reicht — das
+        // Menue entsteht erst eine Runde spaeter.
+        //
+        // Ich habe das zuerst der Fensterwartezeit angelastet und sie
+        // von 5 auf 15 Sekunden gehoben. Das war falsch: die
+        // Fehlermeldung sagt "oeffnet kein Menue", nicht "Fenster nicht
+        // sichtbar". Die drei gruenen Durchlaeufe danach waren Zufall,
+        // kein Beleg — genau die Art Bestaetigung, auf die man in
+        // dieser Sitzung schon mehrfach hereingefallen ist. Die
+        // Wartezeit steht wieder auf ihrem Vorgabewert.
+        QMenu* menu = nullptr;
+        QTRY_VERIFY2((menu = w.findChild<QMenu*>()) != nullptr,
+                     "Rechtsklick auf einen Notch oeffnet kein Menue — "
+                     "im getrennten Zustand kaeme man dann nicht mehr an "
+                     "seine Filter heran");
 
         QAction* remove = nullptr;
         for (QAction* a : menu->actions()) {
@@ -103,11 +119,7 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
-        // acht Oberflaechentests um den Fenstermanager, und dieser Test
-        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
-        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
-        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -144,11 +156,7 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
-        // acht Oberflaechentests um den Fenstermanager, und dieser Test
-        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
-        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
-        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -197,11 +205,7 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
-        // acht Oberflaechentests um den Fenstermanager, und dieser Test
-        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
-        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
-        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;

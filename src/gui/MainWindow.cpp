@@ -254,6 +254,7 @@ warren@wpratt.com
 #include "PanLayoutDialog.h"
 
 #include <QColorDialog>
+#include "core/KiwiSdrManager.h"
 #include "core/FFTRouter.h"
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
@@ -359,6 +360,7 @@ warren@wpratt.com
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
 #include "applets/QsoRecorderApplet.h"
+#include "applets/KiwiSdrApplet.h"
 #include "applets/BandwidthFilterApplet.h"
 #include "applets/CatApplet.h"
 #include "applets/TunerApplet.h"
@@ -5824,6 +5826,21 @@ void MainWindow::populateDefaultMeter()
     // sie bleiben beide Spuren still und der Kopf sagt „no radio".
     m_qsoRecorderApplet = new QsoRecorderApplet(m_radioModel, nullptr);
     panel->addApplet(m_qsoRecorderApplet);
+
+    // ── KiwiSDR (Stufe 4, 2026-08-23) ───────────────────────────────
+    //
+    // Der Betreiber am 2026-08-22: "kiwi sdr wäre auch eine tolle
+    // sache. das bitte für die nachtschicht."
+    //
+    // Was hier ankommt, ist die ANZEIGE: welche Empfaenger eingerichtet
+    // sind, wie es um ihre Verbindung steht und welche Scheibe an
+    // welchem haengt. Ton und Wasserfall folgen; die Grenze ist am Kopf
+    // von MainWindow_KiwiSdr.cpp ausdruecklich aufgeschrieben, damit
+    // sie niemand fuer erledigt haelt.
+    m_kiwiSdrManager = new KiwiSdrManager(this);
+    m_kiwiSdrApplet  = new KiwiSdrApplet(m_radioModel, nullptr);
+    panel->addApplet(m_kiwiSdrApplet);
+    wireKiwiSdr();
 
     // BandwidthFilterApplet — die Durchlassflaeche (2026-08-20).
     //

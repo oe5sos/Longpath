@@ -896,6 +896,10 @@ private:
     // modeless dialog instance owned by the TxApplet.
     void wireSetupDialog(class SetupDialog* dialog);
 
+    // KiwiSDR — siehe MainWindow_KiwiSdr.cpp.
+    void wireKiwiSdr();
+    void refreshKiwiSdrAppletReceivers();
+
     // Phase 3O Sub-Phase 11 Task 11b — first-launch / startup rescan
     // hook. Scheduled via QTimer::singleShot(0, ...) from the
     // constructor so it runs after the event loop starts and the UI
@@ -1279,6 +1283,16 @@ private:
     class CwxApplet*        m_cwxApplet{nullptr};
     class DvkApplet*        m_dvkApplet{nullptr};
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
+
+    // ── KiwiSDR (Stufe 4, 2026-08-23) ──────────────────────────────
+    //
+    // Der Manager lebt am MainWindow, damit er die Anwendung ueberdauert
+    // und nicht am Applet haengt, das der Betreiber jederzeit
+    // wegschalten kann. Die Bruecke zwischen beiden steht in
+    // MainWindow_KiwiSdr.cpp; was dort NOCH NICHT steht, ist am Kopf
+    // jener Datei aufgezaehlt.
+    class KiwiSdrManager* m_kiwiSdrManager{nullptr};
+    class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class BandwidthFilterApplet* m_bwFilterApplet{nullptr};
     class CatApplet*        m_catApplet{nullptr};
     class TunerApplet*      m_tunerApplet{nullptr};
