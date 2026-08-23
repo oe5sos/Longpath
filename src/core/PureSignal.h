@@ -144,6 +144,17 @@ public:
     // aussen — man soll SEHEN koennen, was sie tut, bevor man ihr
     // glaubt.
     void setStabilityEnabled(bool on);
+
+    /// Die drei Schwellen. Sie stehen in den Einstellungen, weil ihre
+    /// Zahlen eine SCHAETZUNG sind — die Idee stammt von Yuri EU2AV,
+    /// dessen Quelltext unter Verschluss bleibt, und belegen kann sie
+    /// nur ein Messplatz. Wer einen hat, soll nachstellen koennen.
+    void setStabilityThresholds(int minCalibrations, int holdMs,
+                                int resumeMs);
+    void loadStabilitySettings();
+    int stabilityMinCalibrations() const { return m_stability.minCalibrations; }
+    int stabilityHoldMs() const { return m_stability.holdAfterBadMs; }
+    int stabilityResumeMs() const { return m_stability.resumeAfterGoodMs; }
     bool isStabilityEnabled() const noexcept { return m_stability.enabled; }
     PsCorrectionAction stabilityAction() const noexcept { return m_stabilityAction; }
 

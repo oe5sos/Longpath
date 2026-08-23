@@ -19,6 +19,7 @@
 
 #include "PureSignal.h"
 
+#include "AppSettings.h"
 #include "LogCategories.h"
 #include "MoxController.h"
 #include "PsFeedbackChannel.h"
@@ -64,6 +65,11 @@ PureSignal::PureSignal(WdspEngine* engine,
     // setEnabled(true); we don't start them in the ctor so a freshly-
     // constructed PureSignal sitting idle (e.g. before any user enables
     // PS-A) doesn't burn CPU on the main thread.
+    // Die Schwellen der Stabilitaetsregel aus den Einstellungen holen.
+    // Hier und nicht erst beim Einschalten: sie sollen auch dann
+    // stimmen, wenn jemand nur den Zustand abfragt.
+    loadStabilitySettings();
+
     m_pollTimer.setInterval(kPollIntervalMs);
     m_pollTimer.setTimerType(Qt::CoarseTimer);
     connect(&m_pollTimer, &QTimer::timeout, this, &PureSignal::pollTimerTick);
@@ -168,10 +174,73 @@ void PureSignal::applyStabilityAction(PsCorrectionAction action)
     emit stabilityActionChanged(action);
 }
 
+// ── Die Schwellen aus den Einstellungen ──────────────────────────────
+//
+// Sie stehen NICHT fest im Programm, und das hat einen Grund, den der
+// Betreiber am 2026-08-23 selbst geliefert hat: "yuri gibt keinen code
+// raus!" Die Idee zu dieser Regel stammt von ihm, die Zahlen darin
+// sind meine Schaetzung, und es wird nie eine Vorlage geben, gegen die
+// sich das pruefen liesse.
+//
+// Belegen kann sie nur ein Messplatz. Also muss der, der einen hat,
+// nachstellen koennen, ohne mich zu fragen.
+//
+// Die Grenzen sind grosszuegig, aber nicht offen: eine
+// Kalibrierungszahl von null hiesse "kein Kaltstartschutz" — dafuer
+// gibt es den Schalter —, und Wartezeiten ueber ein paar Sekunden
+// machten aus dem Einfrieren ein Abschalten.
+void PureSignal::loadStabilitySettings()
+{
+    auto& st = AppSettings::instance();
+    m_stability.enabled =
+        st.value(QStringLiteral("PsStabilityEnabled"),
+                 QStringLiteral("True")).toString() == QStringLiteral("True");
+    m_stability.minCalibrations = qBound(
+        1, st.value(QStringLiteral("PsStabilityMinCalibrations"),
+                    QStringLiteral("2")).toInt(), 20);
+    m_stability.holdAfterBadMs = qBound(
+        0, st.value(QStringLiteral("PsStabilityHoldAfterBadMs"),
+                    QStringLiteral("120")).toInt(), 5000);
+    m_stability.resumeAfterGoodMs = qBound(
+        0, st.value(QStringLiteral("PsStabilityResumeAfterGoodMs"),
+                    QStringLiteral("400")).toInt(), 5000);
+
+    qCInfo(lcDsp).nospace()
+        << "PureSignal-Stabilitaet: "
+        << (m_stability.enabled ? "an" : "aus")
+        << ", Kaltstart nach " << m_stability.minCalibrations
+        << " Kalibrierungen, einfrieren nach " << m_stability.holdAfterBadMs
+        << " ms, auftauen nach " << m_stability.resumeAfterGoodMs << " ms";
+}
+
+void PureSignal::setStabilityThresholds(int minCalibrations, int holdMs,
+                                        int resumeMs)
+{
+    m_stability.minCalibrations  = qBound(1, minCalibrations, 20);
+    m_stability.holdAfterBadMs   = qBound(0, holdMs, 5000);
+    m_stability.resumeAfterGoodMs = qBound(0, resumeMs, 5000);
+
+    auto& st = AppSettings::instance();
+    st.setValue(QStringLiteral("PsStabilityMinCalibrations"),
+                QString::number(m_stability.minCalibrations));
+    st.setValue(QStringLiteral("PsStabilityHoldAfterBadMs"),
+                QString::number(m_stability.holdAfterBadMs));
+    st.setValue(QStringLiteral("PsStabilityResumeAfterGoodMs"),
+                QString::number(m_stability.resumeAfterGoodMs));
+
+    // Der Kaltstart gilt wieder: wer an den Schwellen dreht, will die
+    // neue Einstellung von vorn erleben, nicht ab der Mitte.
+    m_stability.onCorrectionsCleared();
+    applyStabilityAction(PsCorrectionAction::Run);
+}
+
 void PureSignal::setStabilityEnabled(bool on)
 {
     if (m_stability.enabled == on) { return; }
     m_stability.enabled = on;
+    AppSettings::instance().setValue(
+        QStringLiteral("PsStabilityEnabled"),
+        on ? QStringLiteral("True") : QStringLiteral("False"));
     // Beim Abschalten alles freigeben, was die Regel gesetzt hat. Eine
     // abgeschaltete Regel, die noch einen Schalter haelt, waere die
     // schlimmste Fassung von allen.
