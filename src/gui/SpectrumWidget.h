@@ -2115,6 +2115,32 @@ public:
 
     /// dBm auf 0..255 in die Farbtabelle. Enthält die Schieberegler,
     /// den Mindestabstand der Schwellen und die NaN-Behandlung.
+    // ── Fliesskomma-Fassungen gegen das Banding (2026-08-23) ────────
+    //
+    // Der Betreiber am 2026-08-23: "anan 10e hat glaube ich nur 14 bit,
+    // avelina hat mehr." Er hat damit den Finger auf die richtige
+    // Stelle gelegt — je mehr Dynamikumfang das Geraet liefert, desto
+    // eher sieht man STUFEN im Wasserfall, wo ein Verlauf sein sollte.
+    //
+    // Die Ursache lag bei uns: waterfallIntensity quantelt auf
+    // quint8 — 256 Stufen ueber die ganze Spanne. Bei 100 dB Fenster
+    // sind das 0,4 dB je Stufe, und in einem weichen Verlauf sieht man
+    // die Kanten.
+    //
+    // Yuri EU2AV geht dasselbe Problem mit einem 16-Bit-Renderziel an.
+    // Das passt zu SEINEM Aufbau, wo das Tone-Mapping auf der
+    // Grafikkarte NACH dem Rendern laeuft. Bei uns entsteht die Farbe
+    // auf der CPU und geht als RGBA8 zur Grafikkarte — ein breiteres
+    // Renderziel wuerde daran nichts aendern, weil die Quantelung
+    // davor passiert.
+    //
+    // Also an derselben Stelle ansetzen: in Fliesskomma rechnen und
+    // beim Schreiben in 8 Bit DITHERN. Das ist der uebliche Weg und
+    // kostet eine Addition je Bildpunkt.
+    static float waterfallIntensityF(float dbm, float lowDbm, float highDbm,
+                                     int blackLevel, int colorGain);
+    static QRgb waterfallColorForIntensityF(float level, WfColorScheme scheme);
+
     static quint8 waterfallIntensity(float dbm, float lowDbm, float highDbm,
                                      int blackLevel, int colorGain);
 

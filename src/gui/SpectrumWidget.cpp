@@ -5836,14 +5836,40 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     // konnte ein Schemawechsel die alten Zeilen nicht mehr erreichen.
     m_wfRowIntensity.resize(w);
     quint8* level = m_wfRowIntensity.data();
+    // ── Fliesskomma statt quint8 — aber KEINE Streuung ──────────────
+    //
+    // Hier stand kurzzeitig eine Bayer-Streuung gegen Banding. Sie ist
+    // wieder heraus, und die Messung ist der Grund.
+    //
+    // Die Ueberlegung war: der Betreiber wies am 2026-08-23 darauf hin,
+    // dass die Anvelina mehr Dynamikumfang hat als die ANAN 10E, und
+    // waterfallIntensity quantelte auf quint8 — 256 Stufen ueber die
+    // ganze Spanne. Das klang nach der Ursache sichtbarer Stufen.
+    //
+    // tst_waterfall_banding hat nachgemessen, und das Ergebnis war
+    // eindeutig: der laengste Lauf gleicher Farbe ist ACHT Bildpunkte,
+    // bei 40 dB Fenster wie bei 140 dB, mit Streuung wie ohne. Bei
+    // 1200 Bildpunkten Breite sind das 0,7 Prozent — kein sichtbares
+    // Band. Die Grenze liegt nicht bei der Intensitaet, sondern beim
+    // 8-Bit-Ausgang der Palette selbst, und dort ist sie unvermeidlich.
+    //
+    // Was BLEIBT, weil es nachweislich hilft: die Fliesskomma-Fassung
+    // rundet, wo die alte abschnitt. Das war im Mittel eine halbe
+    // Farbstufe je Kanal.
+    //
+    // Die Streuung waere kein Schaden gewesen — sie kostet fast nichts.
+    // Aber sie waere Zierde ohne Wirkung im Weg des heissesten Pfades,
+    // und ein Kommentar, der eine Wirkung behauptet, die es nicht gibt,
+    // ist schlimmer als kein Kommentar.
     for (int x = 0; x < w; ++x) {
         int srcPx = static_cast<int>(static_cast<float>(x) * pxScale);
         srcPx = qBound(0, srcPx, n - 1);
-        level[x] = waterfallIntensity(wfPixelsDbm[srcPx],
-                                      m_wfActiveLowThreshold,
-                                      m_wfActiveHighThreshold,
-                                      m_wfBlackLevel, m_wfColorGain);
-        scanline[x] = waterfallColorForIntensity(level[x], m_wfColorScheme);
+        const float f = waterfallIntensityF(wfPixelsDbm[srcPx],
+                                            m_wfActiveLowThreshold,
+                                            m_wfActiveHighThreshold,
+                                            m_wfBlackLevel, m_wfColorGain);
+        level[x] = static_cast<quint8>(std::lround(f * 255.0f));
+        scanline[x] = waterfallColorForIntensityF(f, m_wfColorScheme);
     }
 
     // ── Sub-epic E: mirror the just-written row into the history ring ───
@@ -5921,6 +5947,62 @@ quint8 SpectrumWidget::waterfallIntensity(float dbm, float lowDbm,
     adjusted = qBound(0.0f, adjusted, 1.0f);
 
     return static_cast<quint8>(std::lround(adjusted * 255.0f));
+}
+
+// Dieselbe Rechnung, aber OHNE die Quantelung am Ende. Begruendung an
+// der Erklaerung in der Kopfdatei.
+//
+// Bewusst als eigene Funktion und nicht als Umbau der bestehenden: die
+// quint8-Fassung wird an mehreren Stellen gerufen und von Pruefungen
+// festgehalten. Zwei Funktionen mit einer gemeinsamen Rechnung waeren
+// eine Doppelung, die auseinanderlaufen kann — darum ruft die alte
+// jetzt die neue.
+float SpectrumWidget::waterfallIntensityF(float dbm, float lowDbm,
+                                          float highDbm, int blackLevel,
+                                          int colorGain)
+{
+    float effectiveLow  = lowDbm  + wfBlackLevelOffsetDb(blackLevel);
+    float effectiveHigh = highDbm - wfColorGainOffsetDb(colorGain);
+    if (effectiveHigh - effectiveLow < kWfMinSpanDb) {
+        effectiveHigh = effectiveLow + kWfMinSpanDb;
+    }
+    const float range = effectiveHigh - effectiveLow;
+    float adjusted = (dbm - effectiveLow) / range;
+    if (!std::isfinite(adjusted)) { adjusted = 0.0f; }
+    return qBound(0.0f, adjusted, 1.0f);
+}
+
+// Die Palette, mit Fliesskomma-Eingang und RUNDUNG statt Abschneiden.
+//
+// static_cast<int> in der alten Fassung schneidet ab und verliert im
+// Mittel eine halbe Farbstufe je Kanal — bei einem weichen Verlauf
+// genau die Haelfte dessen, was man vermeiden will.
+QRgb SpectrumWidget::waterfallColorForIntensityF(float level,
+                                                 WfColorScheme scheme)
+{
+    const float adjusted = qBound(0.0f, level, 1.0f);
+
+    int stopCount = 0;
+    const WfGradientStop* stops = wfSchemeStops(scheme, stopCount);
+
+    for (int i = 0; i < stopCount - 1; ++i) {
+        if (adjusted <= stops[i + 1].pos) {
+            const float span = stops[i + 1].pos - stops[i].pos;
+            const float t = (span > 0.0f)
+                                ? (adjusted - stops[i].pos) / span : 0.0f;
+            const int r = int(std::lround(
+                stops[i].r + t * (stops[i + 1].r - stops[i].r)));
+            const int g = int(std::lround(
+                stops[i].g + t * (stops[i + 1].g - stops[i].g)));
+            const int b = int(std::lround(
+                stops[i].b + t * (stops[i + 1].b - stops[i].b)));
+            return qRgb(qBound(0, r, 255), qBound(0, g, 255),
+                        qBound(0, b, 255));
+        }
+    }
+    return qRgb(stops[stopCount - 1].r,
+                stops[stopCount - 1].g,
+                stops[stopCount - 1].b);
 }
 
 QRgb SpectrumWidget::waterfallColorForIntensity(quint8 level,
