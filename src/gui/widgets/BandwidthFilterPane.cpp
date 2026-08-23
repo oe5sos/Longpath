@@ -330,6 +330,45 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         }
         poly << QPointF(r.right(), bot);
 
+        // ── Ein WEICHER Zug durch die Punkte ────────────────────────
+        //
+        // Der Betreiber am 2026-08-23, nach dem direkten Vergleich:
+        // "das sind 2 welten."
+        //
+        // Er hat recht, und ein Teil davon ist wirklich die
+        // Zeichnung: OpenHPSDR fuehrt einen runden Zug durch die
+        // Punkte, wir setzen gerade Striche aneinander. Bei einer
+        // Stuetzstelle je zwei Bildpunkte gibt das ein zackiges Band,
+        // waehrend dort eine ruhige Welle steht.
+        //
+        // WICHTIG, und das unterscheidet es von der Glaettung, die ich
+        // gestern wieder ausbauen musste: hier wird NICHTS gemittelt.
+        // Die Punkte bleiben, wo sie sind — nur der Weg dazwischen
+        // wird gerundet (Catmull-Rom in Bezier ueberfuehrt). Ein
+        // Traeger verliert dabei kein einziges Dezibel.
+        auto smoothPath = [](const QPolygonF& pts) {
+            QPainterPath path;
+            if (pts.size() < 3) {
+                if (!pts.isEmpty()) {
+                    path.moveTo(pts.first());
+                    for (int i = 1; i < pts.size(); ++i) { path.lineTo(pts[i]); }
+                }
+                return path;
+            }
+            path.moveTo(pts.first());
+            for (int i = 0; i < pts.size() - 1; ++i) {
+                const QPointF p0 = pts[qMax(0, i - 1)];
+                const QPointF p1 = pts[i];
+                const QPointF p2 = pts[i + 1];
+                const QPointF p3 = pts[qMin(pts.size() - 1, i + 2)];
+                const QPointF c1 = p1 + (p2 - p0) / 6.0;
+                const QPointF c2 = p2 - (p3 - p1) / 6.0;
+                path.cubicTo(c1, c2, p2);
+            }
+            return path;
+        };
+        const QPainterPath tracePath = smoothPath(poly);
+
         // ── Pegelraster ─────────────────────────────────────────────
         //
         // Drei waagrechte Linien mit dBm-Marke. Ohne sie ist die Kurve
@@ -395,7 +434,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 glowPen.setJoinStyle(Qt::RoundJoin);
                 glowPen.setCapStyle(Qt::RoundCap);
                 p.setPen(glowPen);
-                p.drawPolyline(poly.constData() + 1, poly.size() - 2);
+                p.drawPath(tracePath);
             }
         }
 
@@ -420,14 +459,14 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             grad.setColorAt(1.0, c1);
             p.setPen(Qt::NoPen);
             p.setBrush(grad);
-            p.drawPolygon(poly);
+            p.drawPath(tracePath);
         }
 
         // Zarte Linie, wie in der Vorlage. 1,2 war fuer eine Flaeche
         // dieser Groesse zu fett.
         p.setPen(QPen(traceLine, 1.0));
         p.setBrush(Qt::NoBrush);
-        p.drawPolyline(poly.constData() + 1, poly.size() - 2);
+        p.drawPath(tracePath);
 
         // ── Die blasse Bezugslinie ──────────────────────────────────
         //

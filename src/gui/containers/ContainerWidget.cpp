@@ -139,7 +139,31 @@ void ContainerWidget::buildUI()
     // dass zehn Fenster nicht nur aus Koepfen bestehen.
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(kTitleBarHeight);
-    m_titleBar->setVisible(false);
+    // ── Angedockt bleibt die Leiste STEHEN ──────────────────────────
+    //
+    // Zwei Befunde des Betreibers am 2026-08-23, und beide gehen auf
+    // dieselbe Sache zurueck:
+    //
+    //   "das öffnen und zittern im rx1 panel"  — die Leiste lag in der
+    //   Anordnung und schob beim Aufklappen alles nach unten.
+    //   "das anklicken für das ablösen ist schwierig, das zeichen
+    //   verschwindet sobald man auf die leiste klickt" — nachdem ich
+    //   sie zur Ueberlagerung gemacht hatte, DECKTE sie den
+    //   Trennen-Pfeil des Applets zu.
+    //
+    // Ich hatte also ein Problem gegen ein anderes getauscht. Die
+    // Vorlage loest es anders und einfacher: bei OpenHPSDR ist die
+    // Titelleiste eines angedockten Feldes IMMER da ("⠿ BANDWIDTH
+    // FILTER ... 🔒 ✕"). Dann schiebt nichts, dann deckt nichts, und
+    // der Griff zum Verschieben ist jederzeit greifbar.
+    //
+    // Der Preis sind 22 Punkte Hoehe, dauerhaft. Das ist der richtige
+    // Preis: ein Bedienelement, das man nur durch Herumfahren findet,
+    // ist keines.
+    //
+    // Geloest (Overlay/Floating) bleibt es beim bisherigen Verhalten —
+    // dort ist die Leiste ohnehin der einzige Griff.
+    m_titleBar->setVisible(isPanelDocked());
     // Derselbe Verlauf wie jede andere Kopfleiste (WindowChrome,
     // GridCellWidget). Hier stand eine flache Flaeche aus
     // kTitleGradBot — der unterste Ton DESSELBEN Verlaufs, also
@@ -245,9 +269,13 @@ void ContainerWidget::buildUI()
     // Nachgestellt am laufenden Programm: vor dem Klick keine Leiste,
     // danach "RX1 Main Panel" und alles zwoelf Punkte tiefer.
     //
-    // Als Ueberlagerung nimmt sie keinen Platz. Das ist auch die
-    // Absicht des Vorbilds — das raise() unten stand schon immer da.
-    m_titleBar->raise();
+    // Angedockt: in der Anordnung (steht immer, verdeckt nichts).
+    // Geloest: Ueberlagerung (klappt auf, nimmt keinen Platz).
+    if (isPanelDocked()) {
+        mainLayout->addWidget(m_titleBar);
+    } else {
+        m_titleBar->raise();
+    }
 
     // Content holder — layout slot for setContent()
     m_contentHolder = new QWidget(this);
@@ -742,7 +770,7 @@ void ContainerWidget::resizeEvent(QResizeEvent* event)
     QWidget::resizeEvent(event);
     // Die Leiste sitzt oben und ueber dem Inhalt — siehe die
     // Begruendung im Aufbau.
-    if (m_titleBar) {
+    if (m_titleBar && !isPanelDocked()) {
         m_titleBar->setGeometry(0, 0, width(), kTitleBarHeight);
         m_titleBar->raise();
     }
