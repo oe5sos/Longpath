@@ -27,6 +27,7 @@
 #include "TxChannel.h"
 #include "WdspEngine.h"
 
+#include <QDateTime>
 #include <QLoggingCategory>
 
 #include <cmath>
@@ -113,6 +114,68 @@ PureSignal::~PureSignal()
                            /*automode=*/0, /*turnon=*/0);
         m_tx->setPSMox(false);
     }
+}
+
+
+// ── Die Stabilitaetsregel anwenden ───────────────────────────────────
+//
+// Begruendung vollstaendig in PureSignalStabilityPolicy.h. Hier nur,
+// womit sie wirkt und warum gerade damit:
+//
+//   Withhold -> setPSTurnon(false). Das ist der Schalter, mit dem
+//               calcc die Korrektur ueberhaupt anwendet
+//               (wdsp/calcc.c:958). Aus heisst: der Sender laeuft
+//               unkorrigiert — so gut, wie die Endstufe von sich aus
+//               ist. Das ist besser als eine Korrektur, die auf einer
+//               nicht eingeschwungenen Rechnung beruht.
+//
+//   Hold     -> setPSRunCal(false). Das haelt die ANPASSUNG an
+//               (wdsp/calcc.c:899), nicht die Anwendung. Genau das
+//               will man bei einem Aussetzer: die letzte gute
+//               Korrektur bleibt stehen, sie wird nur nicht mehr auf
+//               unsinnigen Daten fortgeschrieben.
+//
+// Die beiden Schalter sind bewusst NICHT ueber setPSControl gefahren.
+// Das setzt alle vier Werte auf einmal und wuerde beim Einfrieren
+// auch automode und mancal mitziehen — dann waere aus dem Einfrieren
+// ein Zustandswechsel geworden, den der Betreiber nicht bestellt hat.
+void PureSignal::applyStabilityAction(PsCorrectionAction action)
+{
+    if (action == m_stabilityAction) { return; }
+    const PsCorrectionAction prev = m_stabilityAction;
+    m_stabilityAction = action;
+
+    if (m_tx) {
+        // Beim Verlassen eines Zustands den jeweiligen Schalter wieder
+        // freigeben — sonst bliebe die Anpassung nach einem Aussetzer
+        // fuer immer stehen.
+        if (prev == PsCorrectionAction::Hold)     { m_tx->setPSRunCal(1); }
+        if (prev == PsCorrectionAction::Withhold) { m_tx->setPSTurnon(true); }
+
+        switch (action) {
+        case PsCorrectionAction::Withhold: m_tx->setPSTurnon(false); break;
+        case PsCorrectionAction::Hold:     m_tx->setPSRunCal(0);     break;
+        case PsCorrectionAction::Run:      break;
+        }
+    }
+
+    qCInfo(lcDsp) << "PureSignal-Stabilitaet:"
+                         << (action == PsCorrectionAction::Withhold
+                                 ? "haelt zurueck (Kaltstart)"
+                             : action == PsCorrectionAction::Hold
+                                 ? "eingefroren (Aussetzer)"
+                                 : "laeuft");
+    emit stabilityActionChanged(action);
+}
+
+void PureSignal::setStabilityEnabled(bool on)
+{
+    if (m_stability.enabled == on) { return; }
+    m_stability.enabled = on;
+    // Beim Abschalten alles freigeben, was die Regel gesetzt hat. Eine
+    // abgeschaltete Regel, die noch einen Schalter haelt, waere die
+    // schlimmste Fassung von allen.
+    if (!on) { applyStabilityAction(PsCorrectionAction::Run); }
 }
 
 void PureSignal::setTxChannel(TxChannel* tx)
@@ -1008,6 +1071,13 @@ void PureSignal::processNewInfo(const int newInfo[16])
         if (newCal != m_calCount.exchange(newCal)) {
             emit calibrationCountChanged(newCal);
         }
+
+        // Die Stabilitaetsregel sieht dieselben zwei Zahlen wie die
+        // Anzeige. Sie hier auszuwerten und nicht in einem eigenen
+        // Zeitgeber hat einen Grund: so entscheidet sie auf GENAU dem
+        // Zustand, den der Betreiber gleichzeitig im Bild sieht.
+        applyStabilityAction(m_stability.decide(
+            newCal, newFb, QDateTime::currentMSecsSinceEpoch()));
     }
 
     // Step 3: CorrectionsBeingApplied flag — info[14] == 1 per

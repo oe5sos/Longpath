@@ -53,6 +53,8 @@
 
 #pragma once
 
+#include "core/PureSignalStabilityPolicy.h"
+
 #include <QColor>
 #include <QObject>
 #include <QString>
@@ -125,7 +127,31 @@ public:
     // AFTER PureSignal is constructed.  RadioModel calls these setters as
     // soon as the relevant pointers go live.  Pass nullptr to clear on
     // teardown (so a late timer tick after disconnect is a no-op).
+    // ── Stabilitaetsregel (2026-08-23) ───────────────────────────────
+    //
+    // Kaltstart-Schutz und Einfrieren bei Aussetzern. Die Begruendung
+    // steht vollstaendig in PureSignalStabilityPolicy.h; hier nur die
+    // beiden Schalter, mit denen sie wirkt:
+    //
+    //   Withhold -> setPSTurnon(false)  — die Korrektur wird nicht
+    //               angewandt. Gesendet wird unkorrigiert; das ist
+    //               besser als falsch korrigiert.
+    //   Hold     -> setPSRunCal(false)  — nicht mehr nachrechnen, die
+    //               vorhandene Korrektur aber weiter anwenden.
+    //
+    // NICHT gegen Hardware geprueft: ich habe keinen Sender. Darum
+    // abschaltbar, und darum steht die Entscheidung als Signal nach
+    // aussen — man soll SEHEN koennen, was sie tut, bevor man ihr
+    // glaubt.
+    void setStabilityEnabled(bool on);
+    bool isStabilityEnabled() const noexcept { return m_stability.enabled; }
+    PsCorrectionAction stabilityAction() const noexcept { return m_stabilityAction; }
+
     void setTxChannel(TxChannel* tx);
+
+private:
+    void applyStabilityAction(PsCorrectionAction action);
+public:
     void setPsFeedbackChannel(PsFeedbackChannel* fb);
 
     // ── Cal lifecycle ──────────────────────────────────────────────────────
@@ -497,6 +523,9 @@ signals:
     void correctingChanged(bool);
     void correctionsBeingAppliedChanged(bool);
     void feedbackLevelChanged(int);
+    /// Die Stabilitaetsregel hat umgeschaltet.
+    void stabilityActionChanged(Longpath::PsCorrectionAction action);
+
     void calibrationCountChanged(int);
     void feedbackColourChanged(QColor);
     void invertRedBlueChanged(bool);
@@ -692,6 +721,8 @@ private:
     std::atomic<int>  m_feedbackLevel{0};
     std::atomic<bool> m_correctionsApplied{false};
     std::atomic<bool> m_correcting{false};
+    PureSignalStabilityPolicy m_stability;
+    PsCorrectionAction m_stabilityAction{PsCorrectionAction::Run};
     std::atomic<int>  m_calCount{0};
 
     // UI mirror state
