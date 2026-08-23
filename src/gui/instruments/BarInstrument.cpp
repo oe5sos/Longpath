@@ -232,9 +232,29 @@ void BarInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
     // (Das war NICHT die Ursache des Fehlers unten — der Zeichenweg
     // fuer die Einblendung ruft mit bare=true und zog sie ohnehin
     // nicht ab. Die Zeile ist trotzdem falsch gewesen.)
+    // ── Zu kurz fuer eine Fusszeile? Dann keine ─────────────────────
+    //
+    // Hier hing es bis zum 2026-08-23 daran, dass jeder Aufrufer
+    // setCompact(true) sagt. Das ist die falsche Stelle: der Betreiber
+    // sah die Ueberlappung nacheinander im Frequenz-Widget und im
+    // SWR/Leistung-Applet, und ein Prueflauf ueber ALLE Balken fand
+    // dann noch zwei weitere — die Instrumente Stehwelle und S-Meter,
+    // wenn man sie auf Balkenform stellt.
+    //
+    // Drei Fundstellen fuer dieselbe Sache heisst: die Regel gehoert
+    // nicht zum Aufrufer, sondern hierher. Wer weniger Platz hat, als
+    // Mulde und Fusszeile zusammen brauchen, bekommt keine Fusszeile —
+    // ohne dass irgendwer daran denken muss.
+    //
+    // setCompact bleibt als ausdrueckliche Wahl bestehen: es blendet
+    // die Zeile auch dann aus, wenn Platz waere.
+    const int naturalFooterH = (m_footer && !m_footer->isHidden())
+                                   ? m_footer->height() : 0;
+    const bool tooShortForFooter =
+        forSize.height() < int(kTroughHeight) + naturalFooterH + 18;
     const int footerH = (bare || !m_footer || m_compact
-                         || m_footer->isHidden())
-                            ? 0 : m_footer->height();
+                         || m_footer->isHidden() || tooShortForFooter)
+                            ? 0 : naturalFooterH;
 
     // ── Die Raender richten sich nach der Hoehe ─────────────────────
     //

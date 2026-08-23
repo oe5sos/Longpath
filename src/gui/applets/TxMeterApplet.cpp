@@ -36,6 +36,19 @@ TxMeterApplet::TxMeterApplet(RadioModel* model, QWidget* parent)
     lay->setSpacing(1);
 
     m_bar = new BarInstrument(this);
+    // ── Knapp, weil eine Zeile im Panel kurz ist ────────────────────
+    //
+    // Ohne das legt sich die Fusszeile ("Spitze — · Grenze 2.50") ueber
+    // die Skalenzahlen. Auf dem Bildschirmfoto des Betreibers vom
+    // 2026-08-23 steht dort "Spitze — 1.5Grenze 2.50 2 2.5 3"
+    // uebereinander.
+    //
+    // Derselbe Fehler wie bei den Zusatzzeilen im Frequenz-Widget,
+    // und ich habe ihn dort behoben und hier vergessen — das Applet
+    // hat seinen eigenen Balken. Ein Fehler, der zweimal in
+    // verschiedenen Dateien wohnt, wird beim ersten Mal nur halb
+    // behoben.
+    m_bar->setCompact(true);
     lay->addWidget(m_bar);
 
     // Eine kleine Zeile, die sagt, WELCHE Groesse gerade steht. Ohne

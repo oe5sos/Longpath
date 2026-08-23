@@ -27,6 +27,7 @@
 #include <QPainter>
 
 #include "gui/StyleConstants.h"
+#include "gui/MainWindow.h"
 #include "gui/instruments/BarInstrument.h"
 #include "gui/meters/MeterPoller.h"
 
@@ -90,6 +91,57 @@ private slots:
                  qPrintable(QStringLiteral(
                      "Bei %1 px Hoehe wurden nur %2 Bildpunkte gezeichnet — "
                      "die knappe Fassung bleibt leer").arg(h).arg(n)));
+    }
+
+    void jederBalkenImPanelZeichnet()
+    {
+        // ── Die Regel, nicht die Stelle ─────────────────────────────
+        //
+        // Der Fehler "Fusszeile ueber den Skalenzahlen" ist am
+        // 2026-08-23 an DREI Stellen aufgetreten: Frequenz-Widget,
+        // SWR/Leistung-Applet, und die Instrumente Stehwelle und
+        // S-Meter in Balkenform. Ich habe ihn zweimal einzeln behoben,
+        // bis dieser Prueflauf zeigte, dass es eine dritte gibt.
+        //
+        // Die erste Fassung hier forderte "jeder kurze Balken muss
+        // knapp GESETZT sein" — also dass jeder Aufrufer daran denkt.
+        // Das war dieselbe falsche Stelle noch einmal. Jetzt entscheidet
+        // BarInstrument::paintInto selbst, und diese Pruefung fragt nach
+        // dem, worauf es ankommt: kommt bei der wirklichen Hoehe ein
+        // Bild heraus?
+        auto* mw = new MainWindow();
+        mw->resize(1300, 900);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+
+        QStringList blank;
+        const auto bars = mw->findChildren<BarInstrument*>();
+        QVERIFY2(!bars.isEmpty(), "Keine Balken gefunden");
+        int checked = 0;
+        for (BarInstrument* b : bars) {
+            if (!b || b->width() < 60 || b->height() < 8) { continue; }
+            ++checked;
+            const QSize sz = b->size();
+            QImage img(sz, QImage::Format_ARGB32);
+            img.fill(QColor(Style::kAppBg));
+            QPainter p(&img);
+            b->paintInto(p, sz, true);
+            p.end();
+            if (nonBackgroundPixels(img) < 200) {
+                blank << QStringLiteral("%1x%2 (Bindung %3)")
+                             .arg(sz.width()).arg(sz.height()).arg(b->primary());
+            }
+        }
+        if (!blank.isEmpty()) {
+            qWarning().noquote() << "zeichnen nichts:"
+                                 << blank.join(QStringLiteral(", "));
+        } else {
+            qInfo() << checked << "Balken im Fenster, alle zeichnen";
+        }
+        QVERIFY2(blank.isEmpty(),
+                 qPrintable(QStringLiteral("Diese Balken bleiben leer: %1")
+                                .arg(blank.join(QStringLiteral(", ")))));
+        mw->close();
     }
 
     void dieVolleFassungBleibtWieSieWar()
