@@ -18,7 +18,14 @@
 //
 // Sein Quelltext ist NICHT veroeffentlicht (nur ein Installer), also
 // ist hier nichts abgeschrieben. Uebernommen ist der Gedanke, und der
-// ist gut begruendbar:
+// ist gut begruendbar.
+//
+// Der Betreiber hat es am 2026-08-23 bestaetigt, nachdem er sich in
+// Yuris Forum angemeldet hatte: "yuri gibt keinen code raus!" Damit
+// ist die Frage erledigt — es wird nie eine Vorlage geben, gegen die
+// sich die Zahlen hier pruefen liessen. Sie sind und bleiben eine
+// begruendete Schaetzung. Wer sie belegen will, braucht einen
+// Messplatz, kein Repository.
 //
 // ── Warum ein Kaltstart schadet ─────────────────────────────────────
 //
