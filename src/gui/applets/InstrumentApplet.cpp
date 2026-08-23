@@ -136,6 +136,17 @@ bool InstrumentApplet::isSegmented() const
     return m_bar && m_bar->isSegmented();
 }
 
+void InstrumentApplet::setTube(bool on)
+{
+    if (m_bar) { m_bar->setTube(on); }
+    saveState();
+}
+
+bool InstrumentApplet::isTube() const
+{
+    return m_bar && m_bar->isTube();
+}
+
 // ── Merken ──────────────────────────────────────────────────────────
 //
 // Ein Schluessel je Instrument: „SwrInstrument" und „SignalInstrument"
@@ -147,6 +158,12 @@ QString formKey(const QString& id) {
 QString segKey(const QString& id) {
     return QStringLiteral("Instrument_%1_BarSegments").arg(id);
 }
+// Eigener Schluessel, nicht in segKey mit hineingepackt: Roehre und
+// Segmente sind unabhaengig, und wer sie in EINEN Wert legt, kann
+// spaeter nicht die eine ohne die andere aendern.
+QString tubeKey(const QString& id) {
+    return QStringLiteral("Instrument_%1_BarTube").arg(id);
+}
 } // namespace
 
 void InstrumentApplet::saveState() const
@@ -157,6 +174,8 @@ void InstrumentApplet::saveState() const
                                    : QStringLiteral("Needle"));
     st.setValue(segKey(m_id), isSegmented() ? QStringLiteral("True")
                                             : QStringLiteral("False"));
+    st.setValue(tubeKey(m_id), isTube() ? QStringLiteral("True")
+                                        : QStringLiteral("False"));
 }
 
 void InstrumentApplet::restoreState()
@@ -165,6 +184,9 @@ void InstrumentApplet::restoreState()
     if (m_bar) {
         m_bar->setSegmented(
             st.value(segKey(m_id), QStringLiteral("False")).toString()
+            == QStringLiteral("True"));
+        m_bar->setTube(
+            st.value(tubeKey(m_id), QStringLiteral("False")).toString()
             == QStringLiteral("True"));
     }
     // setForm zuletzt: es ruft saveState, und das soll den eben
@@ -291,6 +313,20 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
                 setSegmented(seg);
             });
         }
+
+        // ── Die Roehre ───────────────────────────────────────────────
+        //
+        // Ein Haken, kein zweiter Satz Punkte: sie ist unabhaengig von
+        // Durchgehend/Segmente und laesst sich mit beiden verbinden.
+        // Der Betreiber hat sie am 2026-08-23 als "D5" aus sechs
+        // Tiefenbehandlungen gewaehlt.
+        styleMenu->addSeparator();
+        QAction* tube = styleMenu->addAction(tr("Roehre (3D)"));
+        tube->setCheckable(true);
+        tube->setChecked(m_bar->isTube());
+        connect(tube, &QAction::triggered, this, [this](bool on) {
+            setTube(on);
+        });
     }
 
     // ── Spitzenhaltung ───────────────────────────────────────────────

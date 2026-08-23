@@ -63,6 +63,24 @@ void paintTrough(QPainter& p, const Spine& s,
                  double thresholdFraction = -1.0);
 
 /// Der auslaufende Verlauf bis zum Anteil f.
+// ── Die Mulde als ROEHRE ─────────────────────────────────────────────
+//
+// Dieselbe Mulde, aber mit einem Querverlauf: dunkel an den Raendern,
+// hell in der Mitte. Sie woelbt sich dem Auge entgegen, statt sich
+// einzugraben.
+//
+// Der Betreiber hat sie am 2026-08-23 aus sechs Tiefenbehandlungen
+// gewaehlt ("D5") — nachdem er an Zeus Link bemerkt hatte: "Zeus hat
+// einen übergang im hintergrund, schaut oder wirkt teilweise wie 3d."
+//
+// Nur auf einer Geraden. Auf einem Bogen laeuft der Querverlauf nicht
+// mit der Kruemmung, und man saehe eine Roehre, die sich verdreht —
+// dort faellt die Funktion auf paintTrough zurueck. Dasselbe Verfahren
+// wie bei paintSegments, aus demselben Grund: nichts zu tun ist
+// ehrlicher als etwas Schiefes.
+void paintTroughTube(QPainter& p, const Spine& s,
+                     double thresholdFraction = -1.0);
+
 void paintFade(QPainter& p, const Spine& s, double f, const QColor& c);
 
 // ── Segmente statt Verlauf ───────────────────────────────────────────

@@ -90,6 +90,8 @@ public:
 
     void setSegmented(bool on);
     bool isSegmented() const;
+    void setTube(bool on);
+    bool isTube() const;
 
     // ── Gemerkt wird es auch ─────────────────────────────────────────
     //

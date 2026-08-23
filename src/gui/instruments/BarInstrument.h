@@ -89,6 +89,23 @@ public:
     void setSegmented(bool on);
     bool isSegmented() const { return m_segmented; }
 
+    // ── Die Roehre ───────────────────────────────────────────────────
+    //
+    // Der Betreiber am 2026-08-23, nach sechs Tiefenbehandlungen auf
+    // einem Vergleichsblatt: "baue D5 einmal mit SWR und mit
+    // Stehwelle. danach als option bei den einzelnen widget hinzu."
+    //
+    // D5 war die Roehre: die Mulde traegt einen Querverlauf und
+    // woelbt sich dem Auge entgegen, statt sich einzugraben. Sie ist
+    // UNABHAENGIG von der Segmentierung — beides laesst sich
+    // kombinieren, und die Kette in der Roehre ist die Fassung, die
+    // Zeus am naechsten kommt.
+    //
+    // Wie die Segmentierung steht die Wahl im Rechtsklickmenue und
+    // wird dort gemerkt.
+    void setTube(bool on);
+    bool isTube() const { return m_tube; }
+
     PeakHold&       peakHold()       { return m_peak; }
     const PeakHold& peakHold() const { return m_peak; }
     void resetPeak() { m_peak.reset(m_value); update(); }
@@ -118,6 +135,7 @@ private:
     double m_value{0.0};
     double m_secondValue{0.0};
     bool m_segmented{false};
+    bool m_tube{false};
     PeakHold m_peak;
 
     /// Ohne gültige Messung: kein Verlauf, keine Glut, keine Wertkante,

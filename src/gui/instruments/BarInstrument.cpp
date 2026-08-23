@@ -118,6 +118,13 @@ void BarInstrument::setSegmented(bool on)
     update();
 }
 
+void BarInstrument::setTube(bool on)
+{
+    if (m_tube == on) { return; }
+    m_tube = on;
+    update();
+}
+
 void BarInstrument::paintOne(QPainter& p, const QRectF& area,
                              const ReadingDescriptor& d, double value,
                              bool withGlow, bool hasValue)
@@ -134,12 +141,21 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
 
     // Ohne Messung nur Mulde und Teilung — kein Verlauf, keine Glut,
     // keine Wertkante. Sie behaupten jede eine Zahl.
+    // Die Mulde: flach oder als Roehre. Beide Aufrufe muessen
+    // mitgehen — die leere Mulde und die gefuellte sind dasselbe
+    // Instrument, und eine Roehre, die erst beim ersten Messwert
+    // erscheint, waere ein Fehler, den man nur im Betrieb sieht.
+    auto trough = [&] {
+        if (m_tube) { Instrument::paintTroughTube(p, spine, thresholdF); }
+        else        { Instrument::paintTrough(p, spine, thresholdF); }
+    };
+
     if (!hasValue) {
-        Instrument::paintTrough(p, spine, thresholdF);
+        trough();
         Instrument::paintTicks(p, spine, d);
     } else {
         if (withGlow) { Instrument::paintGlow(p, spine, col); }
-        Instrument::paintTrough(p, spine, thresholdF);
+        trough();
         if (m_segmented) {
             // Segmente tragen ihre Kante selbst — eine zusaetzliche
             // Wertkante am Ende saehe aus wie ein halbes Feld.

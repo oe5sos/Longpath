@@ -156,6 +156,67 @@ void paintTrough(QPainter& p, const Spine& s, double thresholdFraction)
     p.restore();
 }
 
+// ── Die Mulde als Roehre ─────────────────────────────────────────────
+//
+// Begruendung in der Kopfdatei. Zur Umsetzung nur so viel: der Verlauf
+// laeuft QUER zur Mulde, nicht laengs. Er hat vier Stuetzstellen statt
+// zwei, weil eine Roehre oben schneller aufhellt als sie unten
+// abdunkelt — mit einem geraden Verlauf sieht sie aus wie eine schiefe
+// Ebene.
+void paintTroughTube(QPainter& p, const Spine& s, double thresholdFraction)
+{
+    const auto* lin = dynamic_cast<const LinearSpine*>(&s);
+    if (!lin) { paintTrough(p, s, thresholdFraction); return; }
+
+    const QRectF r = lin->troughRect();
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QColor base(Style::role("button", Style::kButtonBg));
+    QLinearGradient g(r.left(), r.top(), r.left(), r.bottom());
+    g.setColorAt(0.00, base.darker(165));
+    g.setColorAt(0.40, base.lighter(126));
+    g.setColorAt(0.60, base.lighter(112));
+    g.setColorAt(1.00, base.darker(180));
+    p.setPen(Qt::NoPen);
+    p.setBrush(g);
+    p.drawRect(r);
+
+    // Der rote Abschnitt liegt IN der Roehre und behaelt ihren Verlauf
+    // — sonst saehe die kritische Zone flach aus, waehrend der Rest
+    // sich woelbt.
+    if (thresholdFraction >= 0.0 && thresholdFraction <= 1.0) {
+        const QRectF hot(r.left() + r.width() * thresholdFraction, r.top(),
+                         r.width() * (1.0 - thresholdFraction), r.height());
+        QColor d = danger();
+        QLinearGradient dg(hot.left(), hot.top(), hot.left(), hot.bottom());
+        QColor d0 = d.darker(190); d0.setAlphaF(kThresholdOpacity);
+        QColor d1 = d.lighter(105); d1.setAlphaF(kThresholdOpacity);
+        QColor d2 = d.darker(210); d2.setAlphaF(kThresholdOpacity);
+        dg.setColorAt(0.00, d0);
+        dg.setColorAt(0.45, d1);
+        dg.setColorAt(1.00, d2);
+        p.setBrush(dg);
+        p.drawRect(hot);
+    }
+
+    // Die harte Lichtkante ganz oben und der Schatten ganz unten — sie
+    // schliessen die Woelbung ab. Ohne sie franst die Roehre in den
+    // Panelgrund aus.
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(QColor(255, 255, 255, 26), 1.0));
+    p.drawLine(r.topLeft() + QPointF(0.5, 0.5), r.topRight() + QPointF(-0.5, 0.5));
+    p.setPen(QPen(QColor(0, 0, 0, 170), 1.0));
+    p.drawLine(r.bottomLeft() + QPointF(0.5, -0.5),
+               r.bottomRight() + QPointF(-0.5, -0.5));
+
+    p.setPen(QPen(QColor(Style::role("border", Style::kBorder)),
+                  pen(kOutlineOfUnit, s)));
+    p.drawRect(r);
+
+    p.restore();
+}
+
 // ── Verlauf ──────────────────────────────────────────────────────────
 
 void paintFade(QPainter& p, const Spine& s, double f, const QColor& c)
