@@ -225,7 +225,14 @@ void BandwidthFilterApplet::buildUI()
             if (SliceModel* s = activeSlice()) { s->setFilterWidth(v); }
         });
         connect(m_resetBtn, &QPushButton::clicked, this, [this]() {
-            if (SliceModel* s = activeSlice()) { s->resetFilterCenter(); }
+            // resetFilter, nicht resetFilterCenter: hier stand bis zum
+            // 2026-08-23 nur das Zentrieren, und genau daran ist der
+            // Betreiber auf 40 m haengengeblieben — seine Bandbreite
+            // begann bei 2000 Hz, Sprache war praktisch weg, und der
+            // Knopf, der danach aussieht, als hole er einen da heraus,
+            // tat es nicht. Ein Knopf mit der Aufschrift "zurueck"
+            // muss den ganzen Durchlass zuruecknehmen.
+            if (SliceModel* s = activeSlice()) { s->resetFilter(); }
         });
         connect(m_spanBtn, &QPushButton::clicked, this, [this]() {
             // ── AUTO zuerst, dann die festen Stufen ─────────────────

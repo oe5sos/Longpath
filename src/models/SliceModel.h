@@ -571,6 +571,14 @@ public:
     /// Zurueck auf die Vorgabe-Mitte der Betriebsart.
     void resetFilterCenter();
 
+    /// Zurueck auf VORGABEBREITE UND Vorgabelage der Betriebsart.
+    ///
+    /// Der Unterschied zu resetFilterCenter ist der, an dem sich der
+    /// Betreiber am 2026-08-23 auf 40 m aufgehalten hat: eine
+    /// verrutschte Kante gibt eine falsche BREITE, und die bekommt man
+    /// durch Zentrieren nicht zurueck.
+    void resetFilter();
+
     int filterWidth()  const { return m_filterHigh - m_filterLow; }
     int filterCenter() const { return (m_filterLow + m_filterHigh) / 2; }
 

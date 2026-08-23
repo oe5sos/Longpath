@@ -3840,6 +3840,12 @@ void MainWindow::buildUI()
             [this](int bindingId, double value) {
         if (m_swrInstrument)    { m_swrInstrument->onReading(bindingId, value); }
         if (m_signalInstrument) { m_signalInstrument->onReading(bindingId, value); }
+        // Das Frequenz-Widget kann seit dem 2026-08-23 zwei Zusatzzeilen
+        // fuehren (Stehwelle, SWR). Sie haengen an derselben Quelle wie
+        // die eigenstaendigen Anzeigen, damit beide dieselbe Zahl zum
+        // selben Zeitpunkt zeigen — der Grund, aus dem diese Verteilung
+        // ueberhaupt an EINER Stelle steht.
+        if (m_frequencyApplet)  { m_frequencyApplet->onReading(bindingId, value); }
     });
 
     // Task 3.1: expose MeterPoller via RadioModel so MultimeterPage can
@@ -5924,6 +5930,7 @@ void MainWindow::populateDefaultMeter()
     // haeufigsten sieht, und sie muss dastehen, bevor die VFO-Flagge
     // ausgeblendet werden darf.
     m_frequencyApplet = new FrequencyApplet(m_radioModel, nullptr);
+    m_frequencyApplet->restoreState();
     panel->addApplet(m_frequencyApplet);
 
     m_swrInstrument = new InstrumentApplet(QStringLiteral("SwrInstrument"),

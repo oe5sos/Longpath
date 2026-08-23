@@ -683,6 +683,57 @@ int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
     }
 }
 
+// ── Der ganze Durchlass zurueck auf die Vorgabe ──────────────────────
+//
+// Der Betreiber am 2026-08-23, nachdem auf 40 m nichts zu verstehen
+// war: "es funktioniert, die bandweite war komplett falsch, start bei
+// 2000."
+//
+// Wie er dort hingekommen ist, laesst sich nicht mehr feststellen —
+// wahrscheinlich durch ein unabsichtliches Ziehen an der Filterkante
+// im Panadapter, die seit dieser Woche ziehbar ist. Das geschieht
+// lautlos: es gibt keine Meldung, und ein Durchlass von 2000 bis 2800
+// sieht auf dem Bild nicht falsch aus, er klingt nur so.
+//
+// Der Rueckstellknopf half nicht, denn er rief resetFilterCenter() —
+// der ZENTRIERT und behaelt die Breite. Wer eine kaputte BREITE hat,
+// kommt damit nicht heraus.
+//
+// resetFilter() stellt beides her: die uebliche Breite der
+// Betriebsart und deren Vorgabelage. Die Breiten stammen aus Thetis'
+// Voreinstellungen (console.cs setupFilters) und sind genau die, die
+// ein Funker erwartet, wenn er "zurueck auf Anfang" drueckt.
+void SliceModel::resetFilter()
+{
+    int width = 2800;   // SSB
+    switch (m_dspMode) {
+    case DSPMode::CWL:
+    case DSPMode::CWU:
+        width = 500;
+        break;
+    case DSPMode::DIGL:
+    case DSPMode::DIGU:
+        width = 3000;
+        break;
+    case DSPMode::AM:
+    case DSPMode::SAM:
+    case DSPMode::DSB:
+        width = 6000;
+        break;
+    case DSPMode::FM:
+        width = 12000;
+        break;
+    default:
+        break;   // LSB, USB, RADE_*, SPEC, DRM: 2800
+    }
+
+    int low = 0;
+    int high = 0;
+    widthToEdges(width, m_dspMode, defaultFilterCenter(m_dspMode, width),
+                 low, high);
+    setFilter(low, high);
+}
+
 // ── VAR1 und VAR2 ────────────────────────────────────────────────────
 //
 // From Thetis console.cs:7237-7249 [@852bf0e]. Begruendung

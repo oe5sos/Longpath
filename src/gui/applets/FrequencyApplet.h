@@ -23,6 +23,7 @@
 // =================================================================
 
 #include "gui/applets/AppletWidget.h"
+#include "gui/instruments/BarInstrument.h"
 #include "gui/instruments/FrequencyInstrument.h"
 
 namespace Longpath {
@@ -45,8 +46,45 @@ public:
     /// Die Scheibe, deren Frequenz gezeigt und gestellt wird.
     void bindSlice(SliceModel* slice);
 
+    // ── Zusatzbalken unter der Frequenz ──────────────────────────────
+    //
+    // Der Betreiber am 2026-08-23: "optional sollte man auch beim
+    // widget frequenz den unteren balken als stehwelle auswählen
+    // können, und auch als swr dazu, sprich frequenz widget als option
+    // mit stehwelle und auch swr zusätzlich."
+    //
+    // Der Gedanke dahinter ist Platz: wer am Notebook sitzt, will
+    // Frequenz, Stehwelle und SWR sehen, ohne dafuer drei Applets
+    // uebereinanderzustapeln — jedes mit eigener Titelleiste und
+    // eigenem Rand. Ein Widget mit zwei angehaengten Zeilen kostet
+    // deutlich weniger Hoehe als drei Widgets.
+    //
+    // Beide Zeilen sind EINZELN schaltbar, nicht als Paar: wer nur das
+    // SWR will, soll nicht die Leistung mitnehmen muessen.
+    void setShowPower(bool on);
+    void setShowSwr(bool on);
+    bool showsPower() const { return m_showPower; }
+    bool showsSwr() const   { return m_showSwr; }
+
+    /// Messwerte durchreichen — dieselbe Rolle wie
+    /// InstrumentApplet::onReading, damit MainWindow beide gleich
+    /// bedienen kann.
+    void onReading(int bindingId, double value);
+
+    void saveState() const;
+    void restoreState();
+
+protected:
+    void contextMenuEvent(QContextMenuEvent* ev) override;
+
 private:
+    void applyRowVisibility();
+
     FrequencyInstrument* m_instrument{nullptr};
+    BarInstrument*       m_powerBar{nullptr};
+    BarInstrument*       m_swrBar{nullptr};
+    bool                 m_showPower{false};
+    bool                 m_showSwr{false};
     QPointer<SliceModel> m_slice;
 };
 
