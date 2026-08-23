@@ -48,6 +48,25 @@ static QByteArray findRequest(const QList<QByteArray>& reqs, const QByteArray& p
     return {};
 }
 
+
+// ── Warten BIS, nicht warten FUER ───────────────────────────────────
+//
+// Hier stand fuenfmal QTest::qWait(200) beziehungsweise (300): ein
+// FESTER Zeitraum fuer einen HTTP-Umlauf zum oertlichen Pruefserver.
+// Auf einer ruhigen Maschine reicht das; unter "ctest -j8" nicht
+// immer, und dann faellt der Test aus einem Grund, der mit dem
+// Geprueften nichts zu tun hat.
+//
+// Beobachtet am 2026-08-23, zweimal in etwa fuenfzehn Gate-Laeufen.
+//
+// QTRY_VERIFY_WITH_TIMEOUT wartet, BIS die Bedingung stimmt, hoechstens
+// aber die genannte Zeit. Im Gutfall ist es SCHNELLER als das feste
+// Warten (es kehrt zurueck, sobald die Anfrage da ist), im schlechten
+// gibt es fuenf Sekunden statt zweihundert Millisekunden Luft.
+//
+// Die Pruefung selbst ist unveraendert: es geht weiter darum, ob die
+// richtige Anfrage mit dem richtigen Rumpf auf der Leitung landet.
+
 void Rf2ksConnectionControlTest::putAntennasActive() {
     RecordingAmpServer server;
     Rf2ksConnection conn;
@@ -55,10 +74,9 @@ void Rf2ksConnectionControlTest::putAntennasActive() {
     conn.setPollIntervalMs(5000);
     conn.connectToAmp("127.0.0.1", server.port());
     conn.setActiveAntenna(RfKitAntenna::Type::Internal, 2);
-    QTest::qWait(200);
-    QVERIFY(!server.requests().isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(
+        !findRequest(server.requests(), "PUT /antennas/active ").isEmpty(), 5000);
     const QByteArray req = findRequest(server.requests(), "PUT /antennas/active ");
-    QVERIFY2(!req.isEmpty(), "No PUT /antennas/active request captured");
     // QJsonObject sorts keys alphabetically: "number" < "type"
     QVERIFY(req.contains(R"("number":2)"));
     QVERIFY(req.contains(R"("type":"INTERNAL")"));
@@ -70,10 +88,9 @@ void Rf2ksConnectionControlTest::putOperateMode() {
     conn.setPollIntervalMs(5000);
     conn.connectToAmp("127.0.0.1", server.port());
     conn.setOperateMode("OPERATE");
-    QTest::qWait(200);
-    QVERIFY(!server.requests().isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(
+        !findRequest(server.requests(), "PUT /operate-mode ").isEmpty(), 5000);
     const QByteArray req = findRequest(server.requests(), "PUT /operate-mode ");
-    QVERIFY2(!req.isEmpty(), "No PUT /operate-mode request captured");
     QVERIFY(req.contains(R"("operate_mode":"OPERATE")"));
 }
 
@@ -83,10 +100,9 @@ void Rf2ksConnectionControlTest::putOperationalInterface() {
     conn.setPollIntervalMs(5000);
     conn.connectToAmp("127.0.0.1", server.port());
     conn.setOperationalInterface("TCI");
-    QTest::qWait(200);
-    QVERIFY(!server.requests().isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(
+        !findRequest(server.requests(), "PUT /operational-interface ").isEmpty(), 5000);
     const QByteArray req = findRequest(server.requests(), "PUT /operational-interface ");
-    QVERIFY2(!req.isEmpty(), "No PUT /operational-interface request captured");
     QVERIFY(req.contains(R"("operational_interface":"TCI")"));
 }
 
@@ -96,10 +112,9 @@ void Rf2ksConnectionControlTest::postErrorReset() {
     conn.setPollIntervalMs(5000);
     conn.connectToAmp("127.0.0.1", server.port());
     conn.resetError();
-    QTest::qWait(200);
-    QVERIFY(!server.requests().isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(
+        !findRequest(server.requests(), "POST /error/reset ").isEmpty(), 5000);
     const QByteArray req = findRequest(server.requests(), "POST /error/reset ");
-    QVERIFY2(!req.isEmpty(), "No POST /error/reset request captured");
 }
 
 // Review blocker [P2] on PR #291: successful write acknowledgements were
@@ -122,13 +137,16 @@ void Rf2ksConnectionControlTest::writeAcksAreNotParsedAsState() {
 
     conn.setOperateMode(QStringLiteral("operate"));
     conn.setActiveAntenna(RfKitAntenna::Type::Internal, 2);
-    QTest::qWait(300);
+    // Auf BEIDE Schreibvorgaenge warten, nicht auf eine feste Zeit.
+    QTRY_VERIFY_WITH_TIMEOUT(
+        !findRequest(server.requests(), "PUT /operate-mode ").isEmpty(), 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        !findRequest(server.requests(), "PUT /antennas/active ").isEmpty(), 5000);
 
-    // The writes must have reached the wire...
-    QVERIFY2(!findRequest(server.requests(), "PUT /operate-mode ").isEmpty(),
-             "PUT /operate-mode never sent");
-    QVERIFY2(!findRequest(server.requests(), "PUT /antennas/active ").isEmpty(),
-             "PUT /antennas/active never sent");
+    // Danach noch eine kurze Runde, damit eine faelschlich ausgeloeste
+    // Meldung Zeit haette anzukommen. Ohne die bestuende die Pruefung
+    // unten auch dann, wenn das Fehlverhalten nur langsam ist.
+    QTest::qWait(100);
 
     // ...without their empty-bodied acks being mistaken for state.
     QVERIFY2(modeSpy.isEmpty(),

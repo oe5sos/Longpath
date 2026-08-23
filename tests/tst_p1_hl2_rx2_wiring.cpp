@@ -323,8 +323,15 @@ private slots:
         // the panadapters want; it is not all PureSignal needs.
         conn.setActiveReceiverCount(1);
 
-        QTest::qWait(200);
-        QCOMPARE(conn.activeRxCountForTest(), 4);
+    // Warten BIS, nicht warten FUER: ein fester Zeitraum fuer etwas,
+    // das kommen SOLL, faellt unter Last aus einem Grund aus, der mit
+    // dem Geprueften nichts zu tun hat. Siehe die ausfuehrliche
+    // Begruendung in tst_rf2ks_connection_control (2026-08-23).
+    //
+    // Die uebrigen festen Wartezeiten in dieser Datei bleiben: dort
+    // wird geprueft, dass etwas NICHT passiert, und da waere
+    // "warten bis" gerade verkehrt — es wartete bis zum Fehlerfall.
+        QTRY_COMPARE_WITH_TIMEOUT(conn.activeRxCountForTest(), 4, 5000);
     }
 
     // The other direction. More panadapters than the DDC configuration asks

@@ -65,8 +65,15 @@ void TestTxInhibitMonitor::userIo01_assertedActiveLow_emitsWithSourceUserIo01()
 {
     QSignalSpy spy(m_mon, &TxInhibitMonitor::txInhibitedChanged);
     m_pinAsserted = true;
-    QTest::qWait(150);
-    QVERIFY(!spy.isEmpty());
+    // Warten BIS, nicht warten FUER: ein fester Zeitraum fuer etwas,
+    // das kommen SOLL, faellt unter Last aus einem Grund aus, der mit
+    // dem Geprueften nichts zu tun hat. Siehe die ausfuehrliche
+    // Begruendung in tst_rf2ks_connection_control (2026-08-23).
+    //
+    // Die uebrigen festen Wartezeiten in dieser Datei bleiben: dort
+    // wird geprueft, dass etwas NICHT passiert, und da waere
+    // "warten bis" gerade verkehrt — es wartete bis zum Fehlerfall.
+    QTRY_VERIFY_WITH_TIMEOUT(!spy.isEmpty(), 5000);
     QVERIFY(m_mon->inhibited());
     QCOMPARE(m_mon->lastSource(), TxInhibitMonitor::Source::UserIo01);
     auto args = spy.first();
