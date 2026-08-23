@@ -36,6 +36,31 @@ class TestCommandBar : public QObject
     Q_OBJECT
 
 private slots:
+    void noPillIsNarrowerThanItsText()
+    {
+        // Der Betreiber sah am 2026-08-23 live "I0 Hz" statt "10 Hz"
+        // und "00 H" statt "100 Hz": mit der neuen BAND-Gruppe fehlte
+        // der Platz, und die Anordnung quetschte die Pillen unter ihre
+        // eigene Schrift.
+        //
+        // Gemessen wird an der Schriftmetrik, nicht am Augenschein.
+        CommandBar bar;
+        bar.resize(700, 60);          // absichtlich eng
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (b->text().isEmpty()) { continue; }
+            const int need = b->fontMetrics().horizontalAdvance(b->text());
+            QVERIFY2(b->width() >= need,
+                     qPrintable(QStringLiteral(
+                         "Pille \"%1\" ist %2 Punkte breit, die Schrift "
+                         "braucht %3 — sie wird abgeschnitten")
+                         .arg(b->text()).arg(b->width()).arg(need)));
+        }
+    }
+
     void theGroupsAreNamedAndInOrder()
     {
         // Filter und NR kamen am 2026-08-21 dazu, auf Ansage mit

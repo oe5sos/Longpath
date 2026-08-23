@@ -141,6 +141,19 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     b->setCheckable(true);
     b->setStyleSheet(pillStyle());
     b->setCursor(Qt::PointingHandCursor);
+
+    // ── Keine Pille schmaler als ihre Schrift ───────────────────────
+    //
+    // Am 2026-08-23 live gesehen, nachdem die BAND-Gruppe dazukam:
+    // aus "10 Hz" wurde "I0 Hz", aus "100 Hz" wurde "00 H". Die
+    // Anordnung hatte keinen Platz mehr und hat die Pillen unter ihre
+    // eigene Schrift gequetscht — eine halb gelesene Schrittweite ist
+    // schlimmer als keine.
+    //
+    // Mindestbreite aus der Schriftmetrik plus Innenabstand: darunter
+    // darf die Anordnung nicht. Wird es zu eng, muss sich etwas
+    // anderes ruehren (die Leiste rollt), nicht die Beschriftung.
+    b->setMinimumWidth(b->fontMetrics().horizontalAdvance(label) + 20);
     g.pills.append(b);
     if (g.row) { g.row->addWidget(b); }
     return b;

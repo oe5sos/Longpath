@@ -152,6 +152,53 @@ private slots:
                      .arg(afterFall)));
     }
 
+    void theNoiseFloorKeepsItsTexture()
+    {
+        // Der Betreiber am 2026-08-23: "wo kein signal ist, ist alles
+        // flach" — und unmittelbar danach: "so will ich es haben."
+        //
+        // ICH HATTE DEN ERSTEN SATZ ALS BESCHWERDE GELESEN und war
+        // dabei, die Glaettung umzustellen. Die Messung kam zuerst und
+        // hat die Aenderung verhindert: 1,0 dB Streuung — ruhig, aber
+        // nicht tot. Genau der Zustand, den er wollte.
+        //
+        // Dieser Fall bewacht deshalb NICHT "viel Struktur", sondern
+        // nur den Ausartungsfall: eine Kurve, die exakt zur Geraden
+        // wird, zeigt ein totes Geraet statt eines leisen Bandes.
+        // "Schnell hoch, langsam runter" zieht den Rauschflur auf
+        // seine Spitzenwerte; ohne Untergrenze koennte daraus eine
+        // Linie werden.
+        BandwidthFilterPane pane;
+        pane.setSpan(10000);
+        pane.setFilter(-2900, -100);
+        pane.resize(600, 200);
+
+        const int n = 240;
+        for (int f = 0; f < 60; ++f) {
+            QVector<float> v(n);
+            for (int i = 0; i < n; ++i) {
+                const double r = std::sin(i * 12.9898 + f * 4.1414) * 43758.5453;
+                v[i] = -120.0f + static_cast<float>((r - std::floor(r)) * 8.0);
+            }
+            pane.setTrace(v);
+        }
+
+        const QVector<float>& t = pane.traceForTest();
+        double mean = 0.0;
+        for (float v : t) { mean += v; }
+        mean /= t.size();
+        double var = 0.0;
+        for (float v : t) { var += (v - mean) * (v - mean); }
+        const double sd = std::sqrt(var / t.size());
+        qInfo() << "Streuung des Rauschflurs:" << sd << "dB";
+
+        QVERIFY2(sd > 0.8,
+                 qPrintable(QStringLiteral(
+                     "Der Rauschflur ist mit %1 dB Streuung praktisch "
+                     "flach — genau der Befund des Betreibers")
+                     .arg(sd)));
+    }
+
     void theSignalShowsUpInThePane()
     {
         // "er sollte mir ja auch das signal zeigen" (Betreiber,
