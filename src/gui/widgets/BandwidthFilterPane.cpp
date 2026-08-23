@@ -370,26 +370,61 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         const int xhF = qBound(r.left(), hzToX(m_high), r.right());
 
         QColor traceLine(Style::role("trace", "#c8a06a"));
+        // ── Hof, Verlauf, Linie — in dieser Reihenfolge ─────────────
+        //
+        // Der Betreiber hat das OpenHPSDR-Bild vergroessern lassen,
+        // damit ich den Filterbereich genau sehe (2026-08-23). Der
+        // auffaelligste Unterschied ist nicht Farbe und nicht
+        // Strichstaerke, sondern ein HOF um die Kurve: ein breiter,
+        // weicher Schein, der nach aussen ausblendet. Daraus entsteht
+        // der Eindruck, den er mit "wirkt eher 3D" beschrieben hat.
+        //
+        // EIN breiter Strich waere falsch — der gibt einen Balken.
+        // Drei Durchgaenge von breit und blass nach schmal und
+        // kraeftig geben den Verlauf.
         {
-            QPainterPath inside;
-            inside.addRect(QRectF(xlF, top, xhF - xlF, bot - top));
-            QPainterPath area;
-            area.addPolygon(poly);
-            p.setPen(Qt::NoPen);
-            // Kraeftig, nicht zaghaft: bei Zeus ist der Durchlass eine
-            // satte Flaeche, und genau daran erkennt man ihn von
-            // weitem. Halbdurchsichtig ueber dem blauen Grund wurde
-            // daraus ein stumpfes Oliv (erster Entwurf).
-            QColor fill(traceLine);
-            fill.setAlpha(215);
-            p.setBrush(fill);
-            p.drawPath(area.intersected(inside));
+            struct GlowPass { double width; int alpha; };
+            static const GlowPass kGlow[] = {
+                {11.0, 10}, {7.0, 16}, {3.5, 30},
+            };
+            p.setBrush(Qt::NoBrush);
+            for (const GlowPass& g : kGlow) {
+                QColor glow(traceLine);
+                glow.setAlpha(g.alpha);
+                QPen glowPen(glow, g.width);
+                glowPen.setJoinStyle(Qt::RoundJoin);
+                glowPen.setCapStyle(Qt::RoundCap);
+                p.setPen(glowPen);
+                p.drawPolyline(poly.constData() + 1, poly.size() - 2);
+            }
         }
 
-        // Duenn, wie bei OpenHPSDR. 1,2 war fuer eine Flaeche dieser
-        // Groesse zu fett — die Linie erschlug die Feinheit, die sie
-        // zeigen soll.
-        // Zarte Linie, wie in der Vorlage.
+        // ── Weicher Verlauf unter der GANZEN Kurve ──────────────────
+        //
+        // So macht es die Vorlage: eine duenne Linie, darunter ein
+        // Verlauf, der nach unten ausblendet — ueber die ganze Breite,
+        // nicht nur im Durchlass. Der Durchlass wird durch seinen
+        // Umriss kenntlich, nicht durch eine zweite Fuellung.
+        //
+        // Hier stand eine DECKENDE Fuellung, auf den Durchlass
+        // beschnitten. Sie sollte am 2026-08-23 schon zweimal weichen
+        // — beide Ersetzungen sind stillschweigend danebengegangen,
+        // und die Festschreibungen behaupteten die Aenderung trotzdem.
+        // Aufgefallen ist es erst, als der Schein im Bild fehlte und
+        // ein grep nach dem neuen Namen NULL Treffer lieferte.
+        {
+            QLinearGradient grad(0, top, 0, bot);
+            QColor c0(traceLine); c0.setAlpha(130);
+            QColor c1(traceLine); c1.setAlpha(10);
+            grad.setColorAt(0.0, c0);
+            grad.setColorAt(1.0, c1);
+            p.setPen(Qt::NoPen);
+            p.setBrush(grad);
+            p.drawPolygon(poly);
+        }
+
+        // Zarte Linie, wie in der Vorlage. 1,2 war fuer eine Flaeche
+        // dieser Groesse zu fett.
         p.setPen(QPen(traceLine, 1.0));
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);
