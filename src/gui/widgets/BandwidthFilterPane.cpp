@@ -275,13 +275,32 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     // dem, was da ist (mit Mindestspanne), sonst klebt eine leise
     // Band-Mitte am Boden und man sieht nichts.
     if (m_trace.size() >= 2) {
-        float lo = m_trace.first(), hi = m_trace.first();
-        for (float v : m_trace) { lo = qMin(lo, v); hi = qMax(hi, v); }
-        if (hi - lo < 12.0f) {
-            const float mid = 0.5f * (lo + hi);
-            lo = mid - 6.0f;
-            hi = mid + 6.0f;
-        }
+        // ── FESTER Massstab ueber dem Rauschflur ────────────────────
+        //
+        // Der Betreiber am 2026-08-23, mit drei Bildern von OpenHPSDR
+        // Zeus: "wo kein signal ist, ist die linie am boden" und
+        // "wenn kein signal ist, linie bei 0, auch bei den
+        // sprechpausen".
+        //
+        // Genau daran lag der Unterschied — nicht an Farbe oder
+        // Strichstaerke. Wir dehnten bisher IMMER auf Minimum bis
+        // Maximum der sichtbaren Werte. Ist nur Rauschen da, wird
+        // dessen Zappeln von ein paar Dezibel auf die volle Hoehe
+        // gezogen: die Flaeche sieht belebt aus, wo nichts ist. In den
+        // Sprechpausen sprang die Kurve deshalb jedes Mal auf.
+        //
+        // Die Vorlage haelt einen FESTEN Bereich: der Rauschflur liegt
+        // unten am Boden, und nur was wirklich darueber ist, ragt
+        // heraus. Sechzig Dezibel — dieselbe Groessenordnung, die auch
+        // der Panadapter zeigt, und genug fuer den staerksten Traeger.
+        //
+        // Der Boden ist ein UNTERES PERZENTIL, kein Minimum: ein
+        // einzelner Ausreisser nach unten (eine Luecke, ein
+        // Nulldurchgang) wuerde sonst die ganze Skala verschieben.
+        QVector<float> sorted = m_trace;
+        std::sort(sorted.begin(), sorted.end());
+        const float lo = sorted.at(sorted.size() / 10);   // 10. Perzentil
+        const float hi = lo + 60.0f;
         const int top = r.top() + 30;          // Platz fuer die Marken
         const int bot = r.bottom() - 2;
         const double yScale = (bot - top) / static_cast<double>(hi - lo);
@@ -356,6 +375,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // Duenn, wie bei OpenHPSDR. 1,2 war fuer eine Flaeche dieser
         // Groesse zu fett — die Linie erschlug die Feinheit, die sie
         // zeigen soll.
+        // Zarte Linie, wie in der Vorlage.
         p.setPen(QPen(traceLine, 1.0));
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);

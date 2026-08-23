@@ -14,6 +14,7 @@
 
 #include "gui/applets/BandwidthFilterApplet.h"
 #include "gui/widgets/BandwidthFilterPane.h"
+#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -197,6 +198,64 @@ private slots:
                      "Der Rauschflur ist mit %1 dB Streuung praktisch "
                      "flach — genau der Befund des Betreibers")
                      .arg(sd)));
+    }
+
+    void withoutSignalTheLineSitsAtTheBottom()
+    {
+        // Der Betreiber am 2026-08-23, mit drei Bildern von OpenHPSDR
+        // Zeus: "wo kein signal ist, ist die linie am boden" und
+        // "wenn kein signal ist, linie bei 0, auch bei den
+        // sprechpausen".
+        //
+        // Vorher dehnte die Flaeche IMMER auf Minimum bis Maximum: ist
+        // nur Rauschen da, wurde dessen Zappeln von ein paar Dezibel
+        // auf die volle Hoehe gezogen. In jeder Sprechpause sprang die
+        // Kurve auf, und die Flaeche sah belebt aus, wo nichts war.
+        //
+        // Gemessen wird AM BILD: wie weit oben steht der hoechste
+        // Punkt der Kurve, wenn nur Rauschen anliegt.
+        BandwidthFilterPane pane;
+        pane.setLabel(QStringLiteral("RX1"));
+        pane.setVfoFrequency(7'100'000.0);
+        pane.setHasFrequency(true);
+        pane.setSpan(10000);
+        pane.setFilter(-2900, -100);
+        pane.resize(600, 200);
+
+        const int n = 240;
+        for (int f = 0; f < 40; ++f) {
+            QVector<float> v(n);
+            for (int i = 0; i < n; ++i) {
+                const double r = std::sin(i * 12.9898 + f * 4.1414) * 43758.5453;
+                v[i] = -120.0f + static_cast<float>((r - std::floor(r)) * 6.0);
+            }
+            pane.setTrace(v);
+        }
+
+        QImage img(pane.size(), QImage::Format_ARGB32);
+        img.fill(QColor(Style::kAppBg));
+        pane.render(&img);
+
+        // Der Kurvenzug ist warm getoent; der Rest ist Grau und Blau.
+        int topMost = img.height();
+        for (int y = 0; y < img.height(); ++y) {
+            for (int x = 4; x < img.width() - 60; x += 2) {
+                const QColor c = img.pixelColor(x, y);
+                if (c.red() > c.blue() + 24 && c.red() > 90) {
+                    topMost = qMin(topMost, y);
+                    break;
+                }
+            }
+            if (topMost < img.height()) { break; }
+        }
+        const double frac = double(topMost) / img.height();
+        qInfo() << "Hoechster Kurvenpunkt bei" << (frac * 100.0) << "% Hoehe";
+
+        QVERIFY2(frac > 0.62,
+                 qPrintable(QStringLiteral(
+                     "Ohne Signal steigt die Kurve bis auf %1 %% der "
+                     "Hoehe — sie gehoert an den Boden")
+                     .arg(frac * 100.0, 0, 'f', 1)));
     }
 
     void theSignalShowsUpInThePane()

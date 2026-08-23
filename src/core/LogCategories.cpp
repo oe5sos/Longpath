@@ -12,6 +12,8 @@ namespace Longpath {
 // --- Category Definitions ---
 Q_LOGGING_CATEGORY(lcDiscovery,  "nereus.discovery")
 Q_LOGGING_CATEGORY(lcConnection, "nereus.connection")
+Q_LOGGING_CATEGORY(lcKiwiSdr, "nereus.kiwisdr")
+Q_LOGGING_CATEGORY(lcKiwiSdrAudio, "nereus.kiwi.sdr.audio")
 Q_LOGGING_CATEGORY(lcProtocol,   "nereus.protocol")
 Q_LOGGING_CATEGORY(lcReceiver,   "nereus.receiver")
 Q_LOGGING_CATEGORY(lcAudio,      "nereus.audio",  QtInfoMsg)

@@ -10,6 +10,13 @@ namespace Longpath {
 // Logging categories for NereusSDR.
 // Usage: qCDebug(lcDiscovery) << "message";
 Q_DECLARE_LOGGING_CATEGORY(lcDiscovery)
+
+// KiwiSDR (2026-08-23, portiert aus AetherSDR). Eigene Kategorie, weil
+// ein fremder Empfaenger im Netz eine eigene Fehlersuche verlangt: er
+// kann besetzt sein, umleiten, ein Passwort verlangen oder mitten im
+// Empfang verschwinden.
+Q_DECLARE_LOGGING_CATEGORY(lcKiwiSdr)
+Q_DECLARE_LOGGING_CATEGORY(lcKiwiSdrAudio)
 Q_DECLARE_LOGGING_CATEGORY(lcConnection)
 Q_DECLARE_LOGGING_CATEGORY(lcProtocol)
 Q_DECLARE_LOGGING_CATEGORY(lcReceiver)

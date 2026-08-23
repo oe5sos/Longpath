@@ -540,6 +540,15 @@ set(CORE_SOURCES
     src/core/P2RadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp
+    # ── KiwiSDR (2026-08-23, Nachtschicht) ───────────────────────────
+    # Portiert aus AetherSDR [@31b29583]. Stufenweise: erst das
+    # Protokoll (reine Logik, vollstaendig pruefbar), dann Verbindung,
+    # Verzeichnis, Bedienflaeche.
+    src/core/KiwiSdrProtocol.cpp
+    src/core/KiwiSdrClient.cpp
+    src/core/KiwiPublicDirectory.cpp
+    src/core/KiwiSdrRedirectPolicy.cpp
+    src/core/KiwiSdrCredentialStore.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp
     src/core/TxChannel.cpp

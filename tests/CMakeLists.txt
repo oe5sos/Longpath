@@ -6732,3 +6732,36 @@ if(_label_names)
     endforeach()
     message(STATUS "NereusSDR: per-label test targets: ${_label_names}")
 endif()
+
+# ── KiwiSDR-Protokoll (2026-08-23) ──────────────────────────────────
+#
+# Kein nereus_add_test(): dieser Pruefstand ist zeichengetreu aus
+# AetherSDR uebernommen und ein einfaches main() statt QTest. Bei
+# einem FREMDEN Protokoll ist Treue wichtiger als Hausstil — jede
+# Umformulierung koennte eine Erwartung unbemerkt verschieben.
+add_executable(kiwi_sdr_protocol_test EXCLUDE_FROM_ALL
+               kiwi_sdr_protocol_test.cpp)
+target_link_libraries(kiwi_sdr_protocol_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_sdr_protocol_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_sdr_protocol_test COMMAND kiwi_sdr_protocol_test)
+add_dependencies(all_tests kiwi_sdr_protocol_test)
+
+add_executable(kiwi_public_directory_test EXCLUDE_FROM_ALL kiwi_public_directory_test.cpp)
+target_link_libraries(kiwi_public_directory_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_public_directory_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_public_directory_test COMMAND kiwi_public_directory_test)
+add_dependencies(all_tests kiwi_public_directory_test)
+
+add_executable(kiwi_sdr_redirect_policy_test EXCLUDE_FROM_ALL kiwi_sdr_redirect_policy_test.cpp)
+target_link_libraries(kiwi_sdr_redirect_policy_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_sdr_redirect_policy_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_sdr_redirect_policy_test COMMAND kiwi_sdr_redirect_policy_test)
+add_dependencies(all_tests kiwi_sdr_redirect_policy_test)
+
+
+
+# Zwei weitere Kiwi-Pruefstaende (tx_mute_policy, trace_math) warten auf
+# Stufe 3: sie brauchen ReceivePresentationSync und KiwiSdrTraceMath,
+# die zur Bedienflaeche gehoeren. Sie liegen bei AetherSDR bereit und
+# werden mitportiert, sobald die Stufe dran ist — hier nur notiert,
+# damit sie nicht vergessen werden.
