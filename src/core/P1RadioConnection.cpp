@@ -616,6 +616,39 @@ void P1RadioConnection::init()
     m_socket->setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption,
                               QVariant(0x400000));  // 4 MB requested; kernel may cap
 
+    // ── NACHLESEN, was der Kern wirklich gegeben hat ────────────────
+    //
+    // Bis zum 2026-08-23 wurde die Groesse gesetzt und nie geprueft.
+    // Der Kern darf still kuerzen, und dann steht im Quelltext eine
+    // Zahl, die mit der Wirklichkeit nichts zu tun hat.
+    //
+    // Das ist keine Formsache: der Betreiber sah auf seiner Anvelina
+    // ueber das Netz zwischen 0,17 % und 2,87 % Paketverlust, und
+    // jedes verlorene Paket ist ein Loch im Ton — weder Protokoll 1
+    // noch 2 senden etwas nach. Ohne diese Zeile laesst sich nicht
+    // einmal sagen, ob der Puffer daran beteiligt ist.
+    //
+    // Der Kommentar oben nahm an, macOS kappe bei 2 MB. Auf der
+    // Maschine des Betreibers steht kern.ipc.maxsockbuf auf 8 MB —
+    // die Annahme war also schon falsch, als sie geschrieben wurde.
+    // Nachgelesen wird darum, statt angenommen.
+    {
+        const int got =
+            m_socket->socketOption(
+                QAbstractSocket::ReceiveBufferSizeSocketOption).toInt();
+        constexpr int kWanted = 0x400000;
+        if (got >= kWanted) {
+            qCInfo(lcConnection).nospace()
+                << "P1: Empfangspuffer " << (got / 1024) << " kB";
+        } else {
+            qCWarning(lcConnection).nospace()
+                << "P1: Empfangspuffer nur " << (got / 1024) << " kB statt "
+                << (kWanted / 1024) << " kB — der Kern hat gekuerzt. "
+                << "Bei Paketverlust ist das der erste Verdaechtige "
+                << "(sysctl kern.ipc.maxsockbuf).";
+        }
+    }
+
     connect(m_socket, &QUdpSocket::readyRead, this, &P1RadioConnection::onReadyRead);
 
     // Watchdog timer — polls every kWatchdogTickMs ms; started in connectToRadio.
