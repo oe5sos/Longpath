@@ -6770,6 +6770,38 @@ target_include_directories(kiwi_sdr_redirect_policy_test PRIVATE ${CMAKE_SOURCE_
 add_test(NAME kiwi_sdr_redirect_policy_test COMMAND kiwi_sdr_redirect_policy_test)
 add_dependencies(all_tests kiwi_sdr_redirect_policy_test)
 
+# Kennwortverwaltung und CSV-Ein-/Ausgabe. Beide brauchten
+# TestSettingsProfile.h, das am 2026-08-23 nachportiert wurde: sie
+# richten sich einen eigenen Einstellungsordner ein, damit ein Lauf
+# nicht die Ablage des Betreibers anfasst. Das ist bei einem
+# Pruefstand, der KENNWOERTER schreibt, keine Formsache.
+add_executable(kiwi_sdr_manager_password_test EXCLUDE_FROM_ALL
+               kiwi_sdr_manager_password_test.cpp)
+# Qt6::Test nur wegen QSignalSpy — die Vorlage benutzt es, obwohl sie
+# sonst kein QTest verwendet. Zeichengetreu bleiben heisst hier: die
+# Abhaengigkeit mitnehmen, nicht die Pruefung umschreiben.
+target_link_libraries(kiwi_sdr_manager_password_test PRIVATE LongpathObjs Qt6::Core Qt6::Test)
+target_include_directories(kiwi_sdr_manager_password_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_sdr_manager_password_test COMMAND kiwi_sdr_manager_password_test)
+add_dependencies(all_tests kiwi_sdr_manager_password_test)
+
+add_executable(kiwi_sdr_manager_csv_test EXCLUDE_FROM_ALL
+               kiwi_sdr_manager_csv_test.cpp)
+target_link_libraries(kiwi_sdr_manager_csv_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_sdr_manager_csv_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_sdr_manager_csv_test COMMAND kiwi_sdr_manager_csv_test)
+add_dependencies(all_tests kiwi_sdr_manager_csv_test)
+
+# Reiner Zustandsautomat fuer den Bandrueckruf (Stufe 7). Die Pruefung
+# laeuft schon jetzt, obwohl noch nichts den Automaten ruft: das Wissen
+# darin stammt aus dem Betrieb, nicht aus dem Code.
+add_executable(kiwi_rebind_tracker_test EXCLUDE_FROM_ALL
+               kiwi_rebind_tracker_test.cpp)
+target_link_libraries(kiwi_rebind_tracker_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_rebind_tracker_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_rebind_tracker_test COMMAND kiwi_rebind_tracker_test)
+add_dependencies(all_tests kiwi_rebind_tracker_test)
+
 
 
 # Zwei weitere Kiwi-Pruefstaende (tx_mute_policy, trace_math) warten auf
