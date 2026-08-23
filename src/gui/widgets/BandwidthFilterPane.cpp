@@ -330,44 +330,21 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         }
         poly << QPointF(r.right(), bot);
 
-        // ── Ein WEICHER Zug durch die Punkte ────────────────────────
+        // ── GERADE Striche, so wie die Vorlage ──────────────
         //
-        // Der Betreiber am 2026-08-23, nach dem direkten Vergleich:
-        // "das sind 2 welten."
+        // Hier lag einen Tag lang ein Catmull-Rom-Zug, weil ich den
+        // Satz "das sind 2 welten" als "die Vorlage rundet" gelesen
+        // habe. Die Bilder vom 2026-08-23 sagen das Gegenteil: auf
+        // dem Ausschnitt 14.127–14.135 hat der Zug SCHARFE Ecken,
+        // Ecke an Ecke, ohne jede Rundung.
         //
-        // Er hat recht, und ein Teil davon ist wirklich die
-        // Zeichnung: OpenHPSDR fuehrt einen runden Zug durch die
-        // Punkte, wir setzen gerade Striche aneinander. Bei einer
-        // Stuetzstelle je zwei Bildpunkte gibt das ein zackiges Band,
-        // waehrend dort eine ruhige Welle steht.
-        //
-        // WICHTIG, und das unterscheidet es von der Glaettung, die ich
-        // gestern wieder ausbauen musste: hier wird NICHTS gemittelt.
-        // Die Punkte bleiben, wo sie sind — nur der Weg dazwischen
-        // wird gerundet (Catmull-Rom in Bezier ueberfuehrt). Ein
-        // Traeger verliert dabei kein einziges Dezibel.
-        auto smoothPath = [](const QPolygonF& pts) {
-            QPainterPath path;
-            if (pts.size() < 3) {
-                if (!pts.isEmpty()) {
-                    path.moveTo(pts.first());
-                    for (int i = 1; i < pts.size(); ++i) { path.lineTo(pts[i]); }
-                }
-                return path;
-            }
-            path.moveTo(pts.first());
-            for (int i = 0; i < pts.size() - 1; ++i) {
-                const QPointF p0 = pts[qMax(0, i - 1)];
-                const QPointF p1 = pts[i];
-                const QPointF p2 = pts[i + 1];
-                const QPointF p3 = pts[qMin(pts.size() - 1, i + 2)];
-                const QPointF c1 = p1 + (p2 - p0) / 6.0;
-                const QPointF c2 = p2 - (p3 - p1) / 6.0;
-                path.cubicTo(c1, c2, p2);
-            }
-            return path;
-        };
-        const QPainterPath tracePath = smoothPath(poly);
+        // Der ruhige Eindruck kommt nicht vom Weg zwischen den
+        // Punkten, sondern von ihrer Zahl — die Vorlage setzt sie
+        // rund zwoelf Bildpunkte auseinander. Das ist jetzt in
+        // BandwidthFilterApplet geregelt; hier wird wieder schlicht
+        // verbunden.
+        QPainterPath tracePath;
+        tracePath.addPolygon(poly);
 
         // ── Pegelraster ─────────────────────────────────────────────
         //
@@ -409,6 +386,13 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         const int xhF = qBound(r.left(), hzToX(m_high), r.right());
 
         QColor traceLine(Style::role("trace", "#c8a06a"));
+        // Die Vorlage traegt ein deutlich kraeftigeres Bernstein als
+        // unser gedaempftes #c8a06a. Ohne diesen Schritt bleibt die
+        // Kurve neben dem tuerkisen Durchlass blass.
+        traceLine = traceLine.lighter(118);
+        traceLine.setHsv(traceLine.hue(),
+                         qMin(255, int(traceLine.saturation() * 1.35)),
+                         traceLine.value());
         // ── Hof, Verlauf, Linie — in dieser Reihenfolge ─────────────
         //
         // Der Betreiber hat das OpenHPSDR-Bild vergroessern lassen,
@@ -423,8 +407,11 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // kraeftig geben den Verlauf.
         {
             struct GlowPass { double width; int alpha; };
+            // Zwei Durchgaenge, nicht drei: mit den grob gesetzten
+            // Stuetzstellen traegt die Linie selbst wieder, und der
+            // dritte Durchgang machte aus jeder Zacke einen Klumpen.
             static const GlowPass kGlow[] = {
-                {11.0, 10}, {7.0, 16}, {3.5, 30},
+                {7.0, 12}, {3.0, 22},
             };
             p.setBrush(Qt::NoBrush);
             for (const GlowPass& g : kGlow) {
@@ -545,38 +532,41 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 floorDb = qMin(floorDb, m_trace[i]);
             }
 
+            // ── FESTE Eimer, nicht die fuenf hoechsten Spitzen ──
+            //
+            // Hier stand eine Spitzensuche: sie fand die fuenf
+            // staerksten Buckel und beschriftete nur die. Stand ein
+            // einziger Traeger im Durchlass, blieb genau EINE Zelle
+            // uebrig — das Blatt vom 2026-08-23 zeigt das.
+            //
+            // Die Vorlage macht es anders. Auf dem Bild mit dem
+            // ruhigen Durchlass stehen ACHT Zellen nebeneinander
+            // (+377, +755, +939, +1.4k, +1.8k, +1.9k, +2.3k, +2.4k)
+            // und fast alle melden 0 dB. Die Abstaende sind
+            // unregelmaessig, die Zahl der Zellen nicht: der
+            // Durchlass wird in gleich breite Eimer geteilt, und jede
+            // Zelle nennt die Lage IHRES groessten Wertes. Die Reihe
+            // steht damit immer, auch wenn nichts zu hoeren ist.
             struct Peak { int i; float db; };
             QVector<Peak> peaks;
-            // Mindestabstand ein FUENFTEL des Durchlasses: sonst
-            // zaehlt man viermal denselben Buckel, wie im ersten
-            // Entwurf (-1.9k, -1.7k, -1.4k, -1.2k lagen alle auf einer
-            // Sprechspitze).
-            const int minGap = qMax(5, (qMax(i0, i1) - qMin(i0, i1)) / 7);
-            for (int i = qMin(i0, i1) + 1; i < qMax(i0, i1); ++i) {
-                if (m_trace[i] < m_trace[i - 1] || m_trace[i] < m_trace[i + 1]) {
-                    continue;
-                }
-                if (m_trace[i] - floorDb < 6.0f) { continue; }
-                bool near = false;
-                for (const Peak& q : peaks) {
-                    if (qAbs(q.i - i) < minGap) {
-                        near = true;
-                        if (m_trace[i] > q.db) {
-                            const_cast<Peak&>(q).i  = i;
-                            const_cast<Peak&>(q).db = m_trace[i];
-                        }
-                        break;
+            {
+                const int lo = qMin(i0, i1);
+                const int hi = qMax(i0, i1);
+                const int pxWide = qAbs(hzToX(m_high) - hzToX(m_low));
+                // Rund 46 px je Zelle — schmaler, und "+1.4k" passt
+                // nicht mehr hinein.
+                const int cells = qBound(1, qMin(pxWide / 46, hi - lo), 8);
+                for (int k = 0; k < cells; ++k) {
+                    const int s0 = lo + (hi - lo) * k / cells;
+                    const int s1 = lo + (hi - lo) * (k + 1) / cells;
+                    if (s1 <= s0) { continue; }
+                    int best = s0;
+                    for (int i = s0; i < s1; ++i) {
+                        if (m_trace[i] > m_trace[best]) { best = i; }
                     }
+                    peaks.append({best, m_trace[best]});
                 }
-                if (!near) { peaks.append({i, m_trace[i]}); }
             }
-            std::sort(peaks.begin(), peaks.end(),
-                      [](const Peak& a, const Peak& b) { return a.db > b.db; });
-            // Fuenf, wie in der Vorlage (dort standen +536, +897,
-            // +1.8k, +2.3k, +2.8k nebeneinander).
-            if (peaks.size() > 5) { peaks.resize(5); }
-            std::sort(peaks.begin(), peaks.end(),
-                      [](const Peak& a, const Peak& b) { return a.i < b.i; });
 
             if (!peaks.isEmpty()) {
                 QFont cell = font();
@@ -632,7 +622,9 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     const int xh = hzToX(m_high);
 
     QColor fill = m_accent;
-    fill.setAlphaF(0.10f);
+    // 0,10 war auf dem Vergleichsblatt kaum zu sehen; die Vorlage
+    // legt eine deutlich erkennbare Tuenche ueber den Durchlass.
+    fill.setAlphaF(0.14f);
     p.fillRect(QRect(xl, r.top(), std::max(1, xh - xl), r.height()), fill);
 
     QColor topEdge = m_accent;

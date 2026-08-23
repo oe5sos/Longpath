@@ -58,10 +58,16 @@ private slots:
         pane.setFilter(-2900, -100);
         // Dreissig Bilder, wie im Betrieb — erst dann wirkt die
         // zeitliche Glaettung.
-        for (int f = 0; f < 30; ++f) {
-            pane.setTrace(fakeTrace(340, 9520, f));
-        }
         pane.resize(760, 230);   // wie das breite Feld oben
+        // GENAU so viele Stuetzstellen wie im Betrieb: eine je zwoelf
+        // Bildpunkte. Das Blatt hat bis zum 2026-08-23 mit 340
+        // Punkten gezeichnet und darum eine Dichte gezeigt, die es in
+        // der App nie gab — ein Blatt, das nicht das Ausgelieferte
+        // zeigt, ist als Vergleichsgrundlage wertlos.
+        const int pts = qBound(48, pane.width() / 12, 200);
+        for (int f = 0; f < 30; ++f) {
+            pane.setTrace(fakeTrace(pts, 9520, f));
+        }
 
         QImage img(pane.size(), QImage::Format_ARGB32);
         img.fill(QColor(Style::kAppBg));

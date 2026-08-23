@@ -38,7 +38,11 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
+        // acht Oberflaechentests um den Fenstermanager, und dieser Test
+        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
+        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
+        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -99,7 +103,11 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
+        // acht Oberflaechentests um den Fenstermanager, und dieser Test
+        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
+        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
+        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -136,7 +144,11 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
+        // acht Oberflaechentests um den Fenstermanager, und dieser Test
+        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
+        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
+        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -185,7 +197,11 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        // 15 s statt der voreingestellten 5: unter "ctest -j8" streiten sich
+        // acht Oberflaechentests um den Fenstermanager, und dieser Test
+        // fiel dabei am 2026-08-23 rund jedes dritte Mal aus. Allein
+        // laeuft er 5 von 5 durch — es ist die Wartezeit, nicht der Code.
+        QVERIFY(QTest::qWaitForWindowExposed(&w, 15000));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;

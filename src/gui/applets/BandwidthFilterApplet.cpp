@@ -515,9 +515,25 @@ void BandwidthFilterApplet::setSpectrumSource(SpectrumSource src)
                 const double f  = s->frequency();
                 if (f <= 0.0) { pane->setTrace({}); continue; }
                 const double half = pane->spanHz() / 2.0;
-                // Eine Stuetzstelle je zwei Bildpunkte reicht; mehr
-                // sieht man nicht, kostet aber jede Runde.
-                const int pts = qBound(64, pane->width() / 2, 512);
+                // ── Eine Stuetzstelle je ZWOELF Bildpunkte ────────
+                //
+                // Hier stand "je zwei Bildpunkte" — und genau daraus
+                // kam die Unruhe, die der Betreiber mit "extrem
+                // unruhig" beschrieben hat.
+                //
+                // Auf seinen OpenHPSDR-Bildern vom 2026-08-23 zaehlt
+                // man im Rauschbereich Zacken von rund zwoelf
+                // Bildpunkten Abstand: die Vorlage tastet GROB ab und
+                // verbindet die Punkte gerade. Bei uns lagen die
+                // Punkte sechsmal dichter, also lag zwischen zwei
+                // Zacken kaum ein Pixel — aus der Kurve wurde ein
+                // flimmerndes Band.
+                //
+                // Die Spitzen gehen dabei nicht verloren: die Quelle
+                // nimmt je Eimer das MAXIMUM, ein Traeger bleibt also
+                // in voller Hoehe stehen, nur eben als eine Zacke
+                // statt als sechs.
+                const int pts = qBound(48, pane->width() / 12, 200);
                 pane->setTrace(
                     m_spectrumSource(i, f - half, f + half, pts));
             }
