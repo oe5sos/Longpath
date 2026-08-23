@@ -69,6 +69,7 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+#include <memory>
 #include <QMainWindow>
 #include <QLabel>
 #include <QAction>
@@ -915,6 +916,7 @@ private:
     void refreshKiwiSdrAppletReceivers();
     void addKiwiSdrReceiver(const QString& name, const QString& endpoint);
     void syncKiwiSdrTransmitMute();
+    void setAsrEnabled(bool on);
 
     // Phase 3O Sub-Phase 11 Task 11b — first-launch / startup rescan
     // hook. Scheduled via QTimer::singleShot(0, ...) from the
@@ -1310,6 +1312,22 @@ private:
     class KiwiSdrManager* m_kiwiSdrManager{nullptr};
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
+
+    // ── Spracherkennung (2026-08-23) ────────────────────────────────
+    //
+    // Der Betreiber hat den OERTLICHEN Weg gewaehlt: ein
+    // Whisper-Dienst auf seinem eigenen Rechner, der Ton verlaesst die
+    // Maschine nicht. Was hier liegt, ist die Verbindung dorthin —
+    // Abgriff, Dienst, Anzeige.
+    //
+    // Der Abgriffring gehoert dem MainWindow und nicht dem Dienst: die
+    // Tonmaschine schreibt hinein, und ein Ring, der unter dem
+    // Tonfaden verschwindet, weil jemand den Dienst wechselt, waere
+    // ein Absturz mit Ansage.
+    std::unique_ptr<class AudioTapRing> m_asrTapRing;
+    class AsrService*     m_asrService{nullptr};
+    class AsrApplet*      m_asrApplet{nullptr};
+    int                   m_asrTapSlice{-1};
     class BandwidthFilterApplet* m_bwFilterApplet{nullptr};
     class CatApplet*        m_catApplet{nullptr};
     class TunerApplet*      m_tunerApplet{nullptr};

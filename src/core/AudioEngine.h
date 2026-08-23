@@ -207,6 +207,8 @@ public:
     // liest den Zeiger bei jedem Block neu, damit Abschalten sofort
     // wirkt.
     std::atomic<AudioTapRing*> m_qsoTap{nullptr};
+    std::atomic<AudioTapRing*> m_asrTap{nullptr};
+    std::atomic<int>           m_asrTapSlice{-1};
     std::atomic<int>           m_qsoTapSlice{-1};
 
     // Non-owning back-pointer so rxBlockReady can look up the active
@@ -398,6 +400,18 @@ public:
     /// Zwischenspeicher weg — der Audio-Faden liest den Zeiger bei
     /// jedem Block neu.
     void setQsoTap(AudioTapRing* ring, int sliceId);
+
+    /// ── Zweiter Abgriff, fuer die Spracherkennung (2026-08-23) ──────
+    ///
+    /// Genau derselbe Bau wie der QSO-Abgriff, und aus demselben Grund
+    /// ein EIGENER: die Aufnahme und die Erkennung sollen gleichzeitig
+    /// laufen koennen. Ein geteilter Ring haette einen Leser zu wenig —
+    /// wer zuerst liest, nimmt dem anderen die Daten weg.
+    ///
+    /// Kein Signal, kein Schloss, keine Speicheranforderung im
+    /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
+    /// der Abgriff; zum Abschalten nullptr uebergeben.
+    void setAsrTap(AudioTapRing* ring, int sliceId);
 
     void rxBlockReady(int sliceId, const float* samples, int frames);
 

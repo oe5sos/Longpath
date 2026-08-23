@@ -1080,6 +1080,20 @@ void AudioEngine::setQsoTap(AudioTapRing* ring, int sliceId)
     }
 }
 
+void AudioEngine::setAsrTap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie beim QSO-Abgriff: beim EINSCHALTEN erst die
+    // Scheibe, dann der Ring — sonst koennte der Tonfaden den neuen
+    // Ring mit der alten Scheibe sehen. Beim Abschalten umgekehrt.
+    if (ring) {
+        m_asrTapSlice.store(sliceId, std::memory_order_release);
+        m_asrTap.store(ring, std::memory_order_release);
+    } else {
+        m_asrTap.store(nullptr, std::memory_order_release);
+        m_asrTapSlice.store(-1, std::memory_order_release);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1280,6 +1294,15 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // Ueberlauf verwirft und zaehlt — siehe AudioTapRing::dropped().
     if (AudioTapRing* tap = m_qsoTap.load(std::memory_order_acquire)) {
         if (sliceId == m_qsoTapSlice.load(std::memory_order_acquire)) {
+            tap->write(samples, frames * 2);
+        }
+    }
+
+    // Der Abgriff fuer die Spracherkennung. Getrennt vom QSO-Abgriff,
+    // damit Aufnahme und Erkennung nebeneinander laufen koennen — ein
+    // geteilter Ring haette einen Leser zu wenig.
+    if (AudioTapRing* tap = m_asrTap.load(std::memory_order_acquire)) {
+        if (sliceId == m_asrTapSlice.load(std::memory_order_acquire)) {
             tap->write(samples, frames * 2);
         }
     }

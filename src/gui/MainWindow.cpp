@@ -362,6 +362,10 @@ warren@wpratt.com
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "applets/TxMeterApplet.h"
+#include "applets/AsrApplet.h"
+#include "asr/AsrService.h"
+#include "asr/RemoteAsrBackend.h"
+#include "core/audio/AudioTapRing.h"
 #include "KiwiPublicReceiverPicker.h"
 #include "applets/BandwidthFilterApplet.h"
 #include "applets/CatApplet.h"
@@ -6015,6 +6019,18 @@ void MainWindow::populateDefaultMeter()
     m_txMeterApplet = new TxMeterApplet(m_radioModel, nullptr);
     m_txMeterApplet->restoreState();
     panel->addApplet(m_txMeterApplet);
+
+    // ── Spracherkennung (2026-08-23) ────────────────────────────────
+    //
+    // Der Betreiber hat den OERTLICHEN Weg gewaehlt: ein
+    // Whisper-Dienst auf seinem eigenen Rechner. Nichts davon laeuft
+    // von selbst an — Adresse und Sprache stehen in den Einstellungen,
+    // und ohne laufenden Dienst bleibt der Haken schlicht wirkungslos.
+    // Genau darum ist die Rueckmeldung im Applet so ausfuehrlich.
+    m_asrApplet = new AsrApplet(m_radioModel, nullptr);
+    panel->addApplet(m_asrApplet);
+    connect(m_asrApplet, &AsrApplet::enableRequested,
+            this, &MainWindow::setAsrEnabled);
 
     // Phase 23: TCI applets — live in Container #0 below the existing applets.
     // Visibility is now managed by AppletVisibilityController below
