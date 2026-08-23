@@ -27,7 +27,19 @@ namespace Longpath {
 namespace {
 
 #ifdef HAVE_KEYCHAIN
-constexpr const char* kKeychainService = "AetherSDR";
+// ── Der Name im Schluesselbund ──────────────────────────────────────
+//
+// Hier stand "AetherSDR" — aus der Portierung uebernommen. Unter
+// diesem Namen legt macOS die KiwiSDR-Kennwoerter ab, und der
+// Betreiber saehe im Schluesselbund Eintraege eines Programms, das er
+// nicht benutzt.
+//
+// Geaendert wird das JETZT und nicht spaeter: der Name ist der
+// Suchschluessel. Wer ihn aendert, macht bereits abgelegte Kennwoerter
+// unauffindbar. KiwiSDR ist erst heute in Betrieb gegangen, es gibt
+// also noch keine — das ist der einzige Zeitpunkt, an dem die
+// Aenderung nichts kostet.
+constexpr const char* kKeychainService = "Longpath";
 
 KiwiSdrCredentialResult resultForJob(QKeychain::Job* job)
 {

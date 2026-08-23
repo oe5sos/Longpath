@@ -36,12 +36,25 @@ QByteArray KiwiPublicDirectory::userAgent()
 {
     // Honest identity — we are AetherSDR, not a browser.  If an operator
     // chooses to block this, that is their answer and we honor it.  The version
-    // comes from the build (AETHERSDR_VERSION) so the identity can't go stale.
-#ifdef AETHERSDR_VERSION
-    return QByteArrayLiteral("AetherSDR/" AETHERSDR_VERSION
-                             " (+https://github.com/aethersdr/AetherSDR)");
+    // ── Wir sind Longpath, nicht AetherSDR ──────────────────────────
+    //
+    // Hier stand AETHERSDR_VERSION und ein Verweis auf Aethers
+    // Repository — beides aus der Portierung uebernommen und beides
+    // falsch. Diese Kennung geht an die Server FREMDER Leute: die
+    // Betreiber oeffentlicher KiwiSDRs sehen daran, wer sich verbindet.
+    // Sich dort als ein anderes Programm auszugeben ist keine
+    // Formsache, sondern eine falsche Angabe gegenueber jemandem, der
+    // seinen Empfaenger freiwillig zur Verfuegung stellt.
+    //
+    // Aufgefallen ist es erst beim gemeinsamen Lauf aller Bausteine am
+    // 2026-08-23 — die Einzelpruefungen sehen die Meldungen nicht an.
+    // Das Programmpaket setzt NEREUSSDR_VERSION (der Name stammt noch
+    // aus der Zeit vor der Umbenennung, der Wert ist der richtige).
+#ifdef NEREUSSDR_VERSION
+    return QByteArrayLiteral("Longpath/" NEREUSSDR_VERSION
+                             " (+https://github.com/OE5SOS/NereusSDR)");
 #else
-    return QByteArrayLiteral("AetherSDR (+https://github.com/aethersdr/AetherSDR)");
+    return QByteArrayLiteral("Longpath (+https://github.com/OE5SOS/NereusSDR)");
 #endif
 }
 

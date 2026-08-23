@@ -19,7 +19,7 @@
 
 #include "core/KiwiSdrRedirectPolicy.h"
 #include "core/KiwiSdrProtocol.h"
-#include "core/LogCategories.h"   // AetherSDR: LogManager.h
+#include "core/LogCategories.h"   // Longpath: LogManager.h
 #include "core/Resampler.h"
 #include "core/WaterfallRate.h"
 
@@ -117,7 +117,7 @@ QString statusPreflightFailureMessage(int firstHttpStatus,
         !firstError.isEmpty() ? firstError : finalError;
     if (usefulStatus == 401 || usefulStatus == 403) {
         return trKiwiSdrClient("This KiwiSDR denied access to its status page "
-                               "(HTTP %1), so AetherSDR won't connect. The server "
+                               "(HTTP %1), so Longpath won't connect. The server "
                                "or proxy may be blocking this IP address, which can "
                                "happen after a per-IP time limit is reached, or it "
                                "may be denying public access for another reason.")
@@ -125,18 +125,18 @@ QString statusPreflightFailureMessage(int firstHttpStatus,
     }
     if (usefulStatus >= 400) {
         return trKiwiSdrClient("This KiwiSDR's status page returned HTTP %1, so "
-                               "AetherSDR couldn't verify its access policy and "
+                               "Longpath couldn't verify its access policy and "
                                "won't connect.")
             .arg(usefulStatus);
     }
     if (!usefulError.isEmpty()) {
         return trKiwiSdrClient("Couldn't verify this KiwiSDR's access policy "
-                               "(status page error: %1), so AetherSDR won't "
+                               "(status page error: %1), so Longpath won't "
                                "connect. Try again later.")
             .arg(usefulError);
     }
     return trKiwiSdrClient("Couldn't verify this KiwiSDR's access policy (its "
-                           "status page is unreachable), so AetherSDR won't "
+                           "status page is unreachable), so Longpath won't "
                            "connect. Try again later.");
 }
 
@@ -372,7 +372,7 @@ QNetworkRequest kiwiWebSocketRequest(const QString& url,
 {
     QNetworkRequest request{QUrl(url)};
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("AetherSDR"));
+                      QStringLiteral("Longpath"));
     request.setRawHeader("Origin", origin.toUtf8());
     return request;
 }
@@ -589,7 +589,7 @@ void KiwiSdrClient::startStatusPreflight(const QUrl& url)
 
     QNetworkRequest request{url};
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("AetherSDR"));
+                      QStringLiteral("Longpath"));
     request.setTransferTimeout(kStatusPreflightTimeoutMs);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::ManualRedirectPolicy);
@@ -634,7 +634,7 @@ void KiwiSdrClient::handleStatusPreflightFinished(QNetworkReply* reply)
         if (redirectUrl.isEmpty()) {
             setState(
                 State::Error,
-                tr("This KiwiSDR's status page returned unsupported HTTP %1 without a redirect target, so AetherSDR won't connect.")
+                tr("This KiwiSDR's status page returned unsupported HTTP %1 without a redirect target, so Longpath won't connect.")
                     .arg(httpStatus));
             cleanupSockets();
             return;
@@ -662,7 +662,7 @@ void KiwiSdrClient::handleStatusPreflightFinished(QNetworkReply* reply)
                 << "reason=" << redirectDetail;
             setState(
                 State::Error,
-                tr("This KiwiSDR's status page redirected outside its trusted KiwiSDR proxy host, so AetherSDR won't connect."));
+                tr("This KiwiSDR's status page redirected outside its trusted KiwiSDR proxy host, so Longpath won't connect."));
             cleanupSockets();
             return;
         }
@@ -711,7 +711,7 @@ void KiwiSdrClient::handleStatusPreflightFinished(QNetworkReply* reply)
             if (extApiChannels == 0) {
                 setState(
                     State::Error,
-                    tr("This KiwiSDR operator does not allow external API clients such as AetherSDR."));
+                    tr("This KiwiSDR operator does not allow external API clients such as Longpath."));
                 cleanupSockets();
                 return;
             }
@@ -1359,7 +1359,7 @@ void KiwiSdrClient::sendSoundSampleRateCommands()
 
     m_soundSampleRatePending = false;
     m_soundSampleRateCommandsSent = true;
-    sendSoundCommand(QStringLiteral("SERVER DE CLIENT AetherSDR SND"));
+    sendSoundCommand(QStringLiteral("SERVER DE CLIENT Longpath SND"));
     const KiwiSdrReceiverControls c = normalizedControls(m_receiverControls);
     sendSoundCommand(KiwiSdrProtocol::formatSquelchCommand(
         c.squelchEnabled, c.squelchThresholdDb));
@@ -1376,7 +1376,7 @@ void KiwiSdrClient::sendWaterfallSetupCommands()
 {
     sendWaterfallCommand(KiwiSdrProtocol::formatAuthCommand(m_password));
     sendWaterfallIdentityToServer();
-    sendWaterfallCommand(QStringLiteral("SERVER DE CLIENT AetherSDR W/F"));
+    sendWaterfallCommand(QStringLiteral("SERVER DE CLIENT Longpath W/F"));
     sendWaterfallCommand(KiwiSdrProtocol::formatWaterfallCompressionCommand(
         diagnosticWaterfallCompressionRequested()));
     sendWaterfallCommand(QStringLiteral("SET send_dB=1"));
@@ -2414,7 +2414,7 @@ void KiwiSdrClient::handleTextMessage(StreamKind stream, const QString& text)
             if (busyOk && busyValue == 0) {
                 setState(State::Error,
                          tr("This KiwiSDR operator does not allow external API "
-                            "clients such as AetherSDR."));
+                            "clients such as Longpath."));
             } else {
                 setState(State::Busy,
                          busyOk && busyValue > 0
@@ -2721,14 +2721,14 @@ bool KiwiSdrClient::updateCampStatusFromMetadata(
         QString detail;
         if (metadata.hasCampQueueReloadRecommended
             && metadata.campQueueReloadRecommended) {
-            detail = tr("A KiwiSDR receiver slot is free. AetherSDR is "
+            detail = tr("A KiwiSDR receiver slot is free. Longpath is "
                         "reconnecting for normal receiver control; the "
                         "temporary monitor session does not provide a "
                         "controllable waterfall.");
         } else if (metadata.hasCampQueuePosition
                    && metadata.hasCampQueueWaiters) {
             detail = tr("Waiting for a free KiwiSDR receiver slot "
-                        "(position %1 of %2). AetherSDR will reconnect "
+                        "(position %1 of %2). Longpath will reconnect "
                         "automatically when the server reports one is "
                         "available. The monitor session does not provide a "
                         "controllable waterfall.")
@@ -2743,7 +2743,7 @@ bool KiwiSdrClient::updateCampStatusFromMetadata(
                         "controllable waterfall.")
                          .arg(channel);
         } else {
-            detail = tr("All KiwiSDR receiver slots are busy. AetherSDR is "
+            detail = tr("All KiwiSDR receiver slots are busy. Longpath is "
                         "waiting for an available slot and will reconnect "
                         "automatically; the temporary monitor session does not "
                         "provide a controllable waterfall.");
@@ -2767,7 +2767,7 @@ bool KiwiSdrClient::updateCampStatusFromMetadata(
         setMonitorWaterfallUnavailable();
         setState(State::Waiting,
                  tr("All KiwiSDR receiver channels are busy. Waiting for a "
-                    "free receiver slot; AetherSDR will reconnect "
+                    "free receiver slot; Longpath will reconnect "
                     "automatically when the server reports one is available. "
                     "Monitoring/camping does not allow normal tuning or mode "
                     "control."));
@@ -2788,7 +2788,7 @@ bool KiwiSdrClient::updateCampStatusFromMetadata(
         if (metadata.hasCampQueuePosition && metadata.hasCampQueueWaiters) {
             setState(State::Waiting,
                      tr("Waiting for a free KiwiSDR receiver slot "
-                        "(position %1 of %2). AetherSDR will reconnect "
+                        "(position %1 of %2). Longpath will reconnect "
                         "automatically; normal tuning is disabled while "
                         "waiting.")
                          .arg(metadata.campQueuePosition)
@@ -2796,7 +2796,7 @@ bool KiwiSdrClient::updateCampStatusFromMetadata(
             return false;
         }
         setState(State::Waiting,
-                 tr("Waiting for a free KiwiSDR receiver slot. AetherSDR "
+                 tr("Waiting for a free KiwiSDR receiver slot. Longpath "
                     "will reconnect automatically; normal tuning is disabled "
                     "while waiting."));
         return false;
@@ -3295,7 +3295,7 @@ void KiwiSdrClient::traceConnectionInfo(const QString& scheme,
                                         const QString& waterfallUrl)
 {
     traceProtocolEvent(QStringLiteral("CONNECT scheme=%1 port=%2 origin=%3 "
-                                      "user_agent=AetherSDR client_ip=unknown "
+                                      "user_agent=Longpath client_ip=unknown "
                                       "timestamp=%4 same_timestamp=yes "
                                       "path_style=/ws/kiwi/TIMESTAMP/STREAM")
         .arg(scheme)
