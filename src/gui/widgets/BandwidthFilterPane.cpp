@@ -300,7 +300,21 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         QVector<float> sorted = m_trace;
         std::sort(sorted.begin(), sorted.end());
         const float lo = sorted.at(sorted.size() / 10);   // 10. Perzentil
-        const float hi = lo + 60.0f;
+        // ── 40 dB, nicht 60 ─────────────────────────────────────────
+        //
+        // Der Betreiber am 2026-08-23: "der eigentliche filterbereich
+        // sollte natürlich stark nach oben gehen wie bei open."
+        //
+        // Auf seinen Bildern reichen die Signale fast bis an den
+        // oberen Rand, waehrend der Rauschflur unten klebt. Mit 60 dB
+        // Spanne blieb bei uns ein Traeger von 30 dB ueber dem Flur
+        // auf HALBER Hoehe stehen — richtig gerechnet, aber kraftlos.
+        //
+        // Vierzig Dezibel: ein starkes Signal fuellt die Flaeche, ein
+        // sehr starkes stoesst oben an. Genau das tut die Vorlage
+        // auch — auf einem seiner Bilder laeuft die rechte Spitze in
+        // den Rand.
+        const float hi = lo + 40.0f;
         const int top = r.top() + 30;          // Platz fuer die Marken
         const int bot = r.bottom() - 2;
         const double yScale = (bot - top) / static_cast<double>(hi - lo);
@@ -499,7 +513,10 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 for (int k = 0; k < peaks.size(); ++k) {
                     const QRect box(xlF + k * cw, cy, cw - 1, 28);
                     p.setPen(Qt::NoPen);
-                    p.setBrush(QColor(0, 0, 0, 110));
+                    // Leiser als vorher (110 -> 150 auf dunklem Grund
+                    // heisst: weniger Kontrast zur Flaeche). Die Zellen
+                    // sind Beiwerk, nicht die Hauptsache.
+                    p.setBrush(QColor(0, 0, 0, 150));
                     p.drawRect(box);
 
                     const double offHz = hzAt(peaks[k].i);
@@ -512,7 +529,9 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                               .arg(offHz < 0 ? QStringLiteral("-")
                                              : QStringLiteral("+"))
                               .arg(int(qAbs(offHz)));
-                    p.setPen(QColor(Style::role("text", Style::kTextPrimary)));
+                    QColor cellInk(Style::role("text", Style::kTextPrimary));
+                    cellInk.setAlpha(190);
+                    p.setPen(cellInk);
                     p.drawText(QRect(box.x(), box.y() + 1, box.width(), 13),
                                Qt::AlignCenter, offTxt);
                     p.setPen(QColor(Style::role("text-scale",

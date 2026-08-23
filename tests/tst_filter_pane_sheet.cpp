@@ -37,7 +37,11 @@ private:
             // wiederholbar bleiben.
             const double n1 = std::sin(i * 12.9898 + frame * 4.1414) * 43758.5453;
             const double noise = (n1 - std::floor(n1)) * 7.0 - 3.5;
-            v[i] = static_cast<float>(-118.0 + 46.0 * a + 34.0 * b + noise);
+            // Lebensecht: ein Sprechsignal rund 30 dB ueber dem Flur, ein
+            // schmaler Stoerer daneben. 46 dB waren fuer den neuen
+            // 40-dB-Massstab zu stark — das Prueffbild lief oben an und
+            // taugte nicht mehr zur Beurteilung.
+            v[i] = static_cast<float>(-118.0 + 30.0 * a + 26.0 * b + noise);
         }
         return v;
     }
