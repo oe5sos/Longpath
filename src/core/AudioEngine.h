@@ -119,7 +119,10 @@
 // Forward-declare only — AudioEngine.h must not drag in libpipewire types.
 // The full type is available in AudioEngine.cpp via
 // #include "core/audio/PipeWireThreadLoop.h".
-namespace Longpath { class PipeWireThreadLoop; }
+namespace Longpath {
+
+class PipeWireThreadLoop;
+}
 #endif
 
 #include <QObject>
@@ -128,12 +131,15 @@ namespace Longpath { class PipeWireThreadLoop; }
 #include <array>
 #include <atomic>
 #include <functional>
+#include <map>
 #include <memory>
+#include <set>
 #include <mutex>
 
 namespace Longpath {
 
 class AudioTapRing;
+class Resampler;
 
 
 class RadioModel;
@@ -394,6 +400,40 @@ public:
     void setQsoTap(AudioTapRing* ring, int sliceId);
 
     void rxBlockReady(int sliceId, const float* samples, int frames);
+
+    // ── KiwiSDR-Ton (Stufe 5, 2026-08-23) ───────────────────────────
+    //
+    // Ein KiwiSDR liefert fertig entschluesselten Ton mit 24 kHz,
+    // verschraenkt Stereo, float32 — nicht I/Q. Er tritt darum NICHT
+    // in die DSP-Kette ein, sondern genau dort, wo deren Ergebnis
+    // sonst ankommt: an der Spur SEINER Scheibe im MasterMixer.
+    //
+    // Der Gewinn daraus ist der eigentliche Grund fuer diesen
+    // Zuschnitt: Lautstaerke, Stummschaltung, Schwenk, Anti-VOX, der
+    // VAX-Abgriff, die QSO-Aufnahme und die MOX-Sperre gelten fuer
+    // Kiwi-Ton, ohne dass davon irgendetwas noch einmal geschrieben
+    // werden muesste. feedKiwiSdrAudioData tastet um und ruft dann
+    // rxBlockReady — mehr ist es nicht.
+    //
+    // AetherSDR fuehrt dafuer einen eigenen Pfad mit eigener
+    // Rauschminderung je Quelle (m_kiwiSdrNr2, m_kiwiSdrRxBuffer und
+    // ein Dutzend weiterer Felder). Das ist maechtiger und kostet ein
+    // zweites Regelwerk daneben. Wir nehmen zuerst den Weg, bei dem
+    // eine Kiwi-Scheibe sich wie jede andere Scheibe verhaelt.
+    //
+    // ── EINE Bedingung, und sie ist nicht verhandelbar ──────────────
+    //
+    // Die Spur einer Scheibe hat GENAU EINEN Erzeuger. Speist ein
+    // KiwiSDR sie, darf der DDC desselben Geraets es nicht auch tun —
+    // sonst schreiben zwei Faeden in denselben Ring. Darum schaltet
+    // setKiwiSdrAudioSourceEnabled die Scheibe zugleich auf
+    // "opportunistisch": sie ist dann kein Mitglied der Bereitschafts-
+    // schranke mehr und kann bei einem Netzaussetzer nicht den ganzen
+    // Mix anhalten.
+    void feedKiwiSdrAudioData(int sliceId, const QByteArray& pcm24kStereoFloat);
+    void setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled);
+    void removeKiwiSdrAudioSource(int sliceId);
+    bool kiwiSdrAudioEnabled(int sliceId) const;
 
     /// TX-monitor block consumer. Called via Qt::DirectConnection from
     /// TxChannel::sip1OutputReady on the audio thread. When monitor is
@@ -828,6 +868,14 @@ private:
     std::unique_ptr<IAudioBus> m_vaxTxBus;
     std::array<std::unique_ptr<IAudioBus>, 4> m_vaxBus;
     MasterMixer m_masterMix;
+
+    // KiwiSDR-Ton: je Scheibe ein Wandler von 24 kHz auf die
+    // Betriebsrate, dazu der Satz der eingeschalteten Scheiben. Beide
+    // werden NUR vom Steuerfaden angefasst; der Ton-Faden liest hier
+    // nichts.
+    std::map<int, std::unique_ptr<Resampler>> m_kiwiResamplers;
+    std::set<int> m_kiwiEnabledSlices;
+    std::vector<float> m_kiwiScratch;
 
     // Second mixer whose output is the anti-VOX reference, not the speakers.
     //

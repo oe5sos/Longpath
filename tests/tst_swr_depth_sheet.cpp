@@ -395,6 +395,79 @@ class TstSwrDepthSheet : public QObject
     Q_OBJECT
 
 private slots:
+    // ── Und JEDE Gruppe noch einmal einzeln, gross ──────────────────
+    //
+    // Der Betreiber am 2026-08-23: "am pdf kann man keinen unterschied
+    // erkennen, bitte jeweils 1 pro gruppe, dann entscheide ich."
+    //
+    // Er hat recht: sechs Entwuerfe nebeneinander werden im Versand so
+    // klein, dass genau die Feinheiten verschwinden, um die es hier
+    // geht. Ein Blatt je Gruppe, vierfach vergroessert.
+    void drawEachOnItsOwn()
+    {
+        const QStringList names = {
+            QStringLiteral("D1_schimmer_quer"),
+            QStringLiteral("D2_glaskante"),
+            QStringLiteral("D3_schlagschatten"),
+            QStringLiteral("D4_zonengrund"),
+            QStringLiteral("D5_roehre"),
+            QStringLiteral("D6_kette_zonenfarbe"),
+        };
+        const QStringList titles = {
+            QStringLiteral("D1 · Schimmer quer — der Trog ist in der Mitte heller (Zeus' Griff)"),
+            QStringLiteral("D2 · Glaskante — Lichtreflex ueber der oberen Haelfte"),
+            QStringLiteral("D3 · Schlagschatten — die Striche stehen VOR dem Trog"),
+            QStringLiteral("D4 · Zonengrund — die kritische Zone ist schon im leeren Trog da"),
+            QStringLiteral("D5 · Roehre — dunkel am Rand, hell in der Mitte, woelbt sich vor"),
+            QStringLiteral("D6 · Kette in Zonenfarbe — der Trog ist selbst schon eine Skala"),
+        };
+        struct Row { QString caption; double swr; double pwr; };
+        const QVector<Row> rows = {
+            {QStringLiteral("gut  ·  SWR 1,15"),         1.15,  95.0},
+            {QStringLiteral("grenzwertig  ·  SWR 2,40"), 2.40,  70.0},
+            {QStringLiteral("schlecht  ·  SWR 2,90"),    2.90,  25.0},
+        };
+
+        const int zoom = 4;
+        const int pad  = 18;
+        const int cw   = kW * zoom;
+        const int chH  = kH * zoom;
+
+        for (int v = 0; v < names.size(); ++v) {
+            QImage img(cw + pad * 2,
+                       46 + rows.size() * (chH + 30) + pad,
+                       QImage::Format_ARGB32);
+            img.fill(QColor(Style::kAppBg));
+            QPainter p(&img);
+            p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+
+            QFont hf = p.font();
+            hf.setPointSizeF(13.0);
+            hf.setBold(true);
+            p.setFont(hf);
+            p.setPen(QColor(Style::kTextPrimary));
+            p.drawText(QRect(pad, 12, cw, 22), Qt::AlignLeft, titles[v]);
+
+            for (int r = 0; r < rows.size(); ++r) {
+                const int y = 46 + r * (chH + 30);
+                QFont cf = p.font();
+                cf.setPointSizeF(10.0);
+                cf.setBold(false);
+                p.setFont(cf);
+                p.setPen(QColor(Style::kTextScale));
+                p.drawText(QRect(pad, y - 16, cw, 14),
+                           Qt::AlignLeft, rows[r].caption);
+                p.drawImage(QRect(pad, y, cw, chH),
+                            draft(v + 1, rows[r].swr, rows[r].pwr));
+            }
+            p.end();
+
+            const QString out = QStringLiteral("/tmp/swr_%1.png").arg(names[v]);
+            QVERIFY2(img.save(out), qPrintable(out));
+            qInfo().noquote() << "Einzelblatt:" << out;
+        }
+    }
+
     void drawTheSheet()
     {
         struct Row { QString caption; double swr; double pwr; };

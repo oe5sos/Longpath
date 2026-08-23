@@ -115,6 +115,7 @@
 
 #include "AudioEngine.h"
 #include "core/audio/AudioTapRing.h"
+#include "core/Resampler.h"   // KiwiSDR-Ton: 24 kHz -> 48 kHz
 
 #include "AppSettings.h"
 #include "LogCategories.h"
@@ -1948,6 +1949,89 @@ float AudioEngine::pcMicInputLevel() const
 
 // Sub-Phase 12 Task 12.4 — DSP sample-rate / block-size persistence.
 // ---------------------------------------------------------------------------
+
+
+// ─────────────────────────────────────────────────────────────────────
+//  KiwiSDR-Ton (Stufe 5, 2026-08-23)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Die Begruendung des Zuschnitts steht an der Erklaerung in
+// AudioEngine.h. Hier nur, was beim Lesen sonst als Auslassung
+// erscheinen koennte:
+//
+// 24 000 Hz ist KEINE Annahme, sondern das, was der KiwiSDR liefert —
+// KiwiSdrClient::decodedAudioReady traegt es im Namen des Arguments
+// (pcm24kStereoFloat), und KiwiSdrProtocol legt die Rate beim
+// Verbindungsaufbau fest.
+
+void AudioEngine::setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled)
+{
+    if (enabled) {
+        if (m_kiwiEnabledSlices.insert(sliceId).second) {
+            // Opportunistisch: die Scheibe wird eingemischt, wann immer
+            // sie Ton hat, ist aber KEIN Mitglied der Bereitschafts-
+            // schranke. Ohne das wuerde ein Netzaussetzer beim KiwiSDR
+            // den gesamten Mix anhalten — also auch das Funkgeraet
+            // stumm schalten, das damit nichts zu tun hat.
+            m_masterMix.setSliceOpportunistic(sliceId, true);
+            m_antiVoxMix.setSliceOpportunistic(sliceId, true);
+            qCInfo(lcAudio) << "KiwiSDR-Ton eingeschaltet fuer Scheibe"
+                            << sliceId << "(opportunistisch im Mix)";
+        }
+        return;
+    }
+    if (m_kiwiEnabledSlices.erase(sliceId) > 0) {
+        m_masterMix.setSliceOpportunistic(sliceId, false);
+        m_antiVoxMix.setSliceOpportunistic(sliceId, false);
+        qCInfo(lcAudio) << "KiwiSDR-Ton abgeschaltet fuer Scheibe" << sliceId;
+    }
+}
+
+bool AudioEngine::kiwiSdrAudioEnabled(int sliceId) const
+{
+    return m_kiwiEnabledSlices.count(sliceId) > 0;
+}
+
+void AudioEngine::removeKiwiSdrAudioSource(int sliceId)
+{
+    setKiwiSdrAudioSourceEnabled(sliceId, false);
+    // Den Wandler mit wegwerfen: er traegt einen Filterzustand, und ein
+    // alter Zustand auf einem neuen Empfaenger gibt beim ersten Block
+    // ein Knacken.
+    m_kiwiResamplers.erase(sliceId);
+}
+
+void AudioEngine::feedKiwiSdrAudioData(int sliceId,
+                                       const QByteArray& pcm24kStereoFloat)
+{
+    if (!kiwiSdrAudioEnabled(sliceId)) {
+        return;
+    }
+    const int bytes = pcm24kStereoFloat.size();
+    if (bytes < int(sizeof(float)) * 2) {
+        return;
+    }
+    const int frames = bytes / int(sizeof(float) * 2);
+    const auto* in =
+        reinterpret_cast<const float*>(pcm24kStereoFloat.constData());
+
+    auto it = m_kiwiResamplers.find(sliceId);
+    if (it == m_kiwiResamplers.end()) {
+        it = m_kiwiResamplers
+                 .emplace(sliceId,
+                          std::make_unique<Resampler>(24000.0, 48000.0, 8192))
+                 .first;
+    }
+
+    const QByteArray out = it->second->processStereoToStereo(in, frames);
+    if (out.isEmpty()) {
+        return;   // der Wandler haelt noch zurueck; das ist normal
+    }
+    const int outFrames = out.size() / int(sizeof(float) * 2);
+    rxBlockReady(sliceId,
+                 reinterpret_cast<const float*>(out.constData()),
+                 outFrames);
+}
 
 void AudioEngine::setDspSampleRate(int rate)
 {
