@@ -134,6 +134,8 @@ private:
     QColor  m_accent;
     double  m_vfoHz{0.0};
     QVector<float> m_trace;
+    /// Traeger Mittelwert — die blasse Bezugslinie, siehe paintEvent.
+    QVector<float> m_avgLine;
     int     m_spanHz{10000};
     int     m_low{-2850};
     int     m_high{-150};

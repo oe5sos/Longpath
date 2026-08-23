@@ -380,6 +380,40 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);
 
+        // ── Die blasse Bezugslinie ──────────────────────────────────
+        //
+        // Auf den Bildern von OpenHPSDR laeuft quer durchs Bild eine
+        // zweite, viel blassere Linie — deutlich ueber dem Rauschflur
+        // und ruhig. Das ist der GEGLAETTETE Mittelwert: er sagt, wo
+        // der Empfaenger im Mittel steht, und macht damit sichtbar, ob
+        // eine Spitze wirklich heraussticht oder nur der Flur atmet.
+        //
+        // Traeges Gleiten (alpha 0,02), damit sie sich nicht mit der
+        // Kurve mitbewegt — eine Bezugslinie, die zappelt, ist keine.
+        {
+            if (m_avgLine.size() != m_trace.size()) {
+                m_avgLine = m_trace;
+            } else {
+                constexpr float aa = 0.02f;
+                for (int i = 0; i < m_trace.size(); ++i) {
+                    m_avgLine[i] = m_avgLine[i] * (1.0f - aa) + m_trace[i] * aa;
+                }
+            }
+            QColor avg(Style::role("text-scale", Style::kTextScale));
+            avg.setAlpha(70);
+            p.setPen(QPen(avg, 1.0));
+            QPolygonF ap;
+            ap.reserve(m_avgLine.size());
+            for (int i = 0; i < m_avgLine.size(); ++i) {
+                const double x = r.left()
+                    + (r.width() - 1.0) * i / (m_avgLine.size() - 1.0);
+                const double y = bot - (m_avgLine[i] - lo) * yScale;
+                ap << QPointF(x, qBound<double>(top, y, bot));
+            }
+            p.setBrush(Qt::NoBrush);
+            p.drawPolyline(ap);
+        }
+
         // ── Feinskala oben im Durchlass ─────────────────────────────
         //
         // In der Vorlage laeuft am oberen Rand des Durchlasses eine
@@ -561,7 +595,29 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     const bool wordMarks = labelRoom >= 190;
     const bool numbers   = labelRoom >= 110;
 
-    // Die Wortmarken "LOW CUT"/"HIGH CUT" sind ersatzlos entfallen.
+    // ── Wortmarken wieder da, ueber den Zahlen ──────────────────────
+    //
+    // Sie waren am 2026-08-22 entfallen, weil sie oben mit dem
+    // Breitenkaestchen kollidierten. Auf den Bildern des Betreibers
+    // vom 2026-08-23 stehen sie aber sehr wohl — als kleine,
+    // gesperrte Grossbuchstaben UEBER dem Wert, nicht daneben. So
+    // gedraengt wird nichts, und die Zahl bekommt ihre Ueberschrift
+    // zurueck.
+    if (wordMarks) {
+        QFont mark = font();
+        mark.setPointSizeF(std::max(5.5, mark.pointSizeF() - 4.0));
+        mark.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
+        p.setFont(mark);
+        p.setPen(faint);
+        p.drawText(QRect(xl + 4, 1, 74, 10),
+                   Qt::AlignLeft | Qt::AlignVCenter,
+                   QStringLiteral("LOW CUT"));
+        p.drawText(QRect(xh - 78, 1, 74, 10),
+                   Qt::AlignRight | Qt::AlignVCenter,
+                   QStringLiteral("HIGH CUT"));
+    }
+
+    // Frueherer Vermerk (2026-08-22), zur Geschichte:
     //
     // Sie sagten, was ohnehin an der Stelle steht, an der sie klebten,
     // und waren die Haelfte des Gedraenges oben. Seit die Zahlen unten
@@ -586,9 +642,10 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // jetzt die Anteilszellen.
         p.setFont(value);
         p.setPen(ink);
-        p.drawText(QRect(xl + 4, 3, 74, 13),
+        const int yVal = wordMarks ? 11 : 3;
+        p.drawText(QRect(xl + 4, yVal, 74, 13),
                    Qt::AlignLeft | Qt::AlignVCenter, cutLabel(m_low));
-        p.drawText(QRect(xh - 78, 3, 74, 13),
+        p.drawText(QRect(xh - 78, yVal, 74, 13),
                    Qt::AlignRight | Qt::AlignVCenter, cutLabel(m_high));
     }
 
