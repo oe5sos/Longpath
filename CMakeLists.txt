@@ -1803,3 +1803,15 @@ option(NEREUSSDR_BUILD_HAL_PLUGIN "Build macOS CoreAudio HAL Audio Server plug-i
 if(APPLE AND NEREUSSDR_BUILD_HAL_PLUGIN)
     add_subdirectory(hal-plugin)
 endif()
+
+# ── TCI-Sonde (2026-08-23) ────────────────────────────────────────────
+#
+# WERKZEUG, kein Programmteil. Beantwortet die eine Frage, an der der
+# SunSDR-QRP-Weg haengt: gibt ExpertSDR3 ueber TCI auch Spektrum und
+# Ton heraus, oder nur Steuerbefehle?
+#
+# EXCLUDE_FROM_ALL: sie wird nicht mitgebaut und nicht ausgeliefert.
+#   cmake --build build --target tci_probe
+#   ./build/tci_probe ws://127.0.0.1:40001 12
+add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
+target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)

@@ -4755,6 +4755,7 @@ nereus_add_test(tst_ps_thresholds_persist)
 nereus_add_test(tst_todays_work_together)
 nereus_add_test(tst_every_applet_is_reachable)
 nereus_add_test(tst_settings_are_remembered)
+nereus_add_test(tst_tci_probe_reads_header)
 nereus_add_test(tst_asr_end_to_end)
 nereus_add_test(tst_asr_against_live_server)
 
