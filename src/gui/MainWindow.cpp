@@ -362,6 +362,7 @@ warren@wpratt.com
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "applets/TxMeterApplet.h"
+#include "KiwiPublicReceiverPicker.h"
 #include "applets/BandwidthFilterApplet.h"
 #include "applets/CatApplet.h"
 #include "applets/TunerApplet.h"
@@ -7105,6 +7106,55 @@ void MainWindow::buildMenuBar()
         QAction* transvertersAction = radioMenu->addAction(QStringLiteral("Trans&verters…"));
         transvertersAction->setEnabled(false);
         transvertersAction->setToolTip(QStringLiteral("NYI — Phase X"));
+    }
+
+    radioMenu->addSeparator();
+
+    // ── KiwiSDR (Stufe 6b, 2026-08-23) ───────────────────────────────
+    //
+    // Bis hierher war der KiwiSDR vollstaendig gebaut und vollstaendig
+    // UNERREICHBAR: Protokoll, Verzeichnis, Verwaltung, Anzeige, Ton
+    // und Wasserfall standen, aber es gab in der Oberflaeche keinen
+    // Weg, einen Empfaenger auszuwaehlen. Das ist die kleinste Luecke
+    // mit dem groessten Ausmass — gebaut und nicht erreichbar ist so
+    // gut wie nicht gebaut.
+    //
+    // Der Eintrag steht im Radio-Menue und nicht unter Werkzeuge: ein
+    // KiwiSDR IST ein Empfaenger, kein Hilfsmittel.
+    {
+        QMenu* kiwiMenu = radioMenu->addMenu(QStringLiteral("&KiwiSDR"));
+
+        kiwiMenu->addAction(QStringLiteral("Öffentliche Empfänger…"),
+            this, [this]() {
+                auto* picker = new KiwiPublicReceiverPicker(this);
+                picker->setAttribute(Qt::WA_DeleteOnClose);
+                connect(picker, &QDialog::accepted, this, [this, picker]() {
+                    addKiwiSdrReceiver(picker->selectedName(),
+                                       picker->selectedEndpoint());
+                });
+                picker->show();
+            });
+
+        kiwiMenu->addAction(QStringLiteral("Empfänger von Hand hinzufügen…"),
+            this, [this]() {
+                // Fuer den eigenen Kiwi im Heimnetz. Er steht in keinem
+                // oeffentlichen Verzeichnis, und genau der ist fuer
+                // einen Funker der interessanteste.
+                bool ok = false;
+                const QString ep = QInputDialog::getText(
+                    this, QStringLiteral("KiwiSDR hinzufügen"),
+                    QStringLiteral("Adresse (Rechnername oder IP, "
+                                   "wahlweise mit :Port):"),
+                    QLineEdit::Normal, QStringLiteral("kiwisdr.local:8073"),
+                    &ok);
+                if (!ok || ep.trimmed().isEmpty()) { return; }
+                addKiwiSdrReceiver(QString(), ep.trimmed());
+            });
+
+        kiwiMenu->addSeparator();
+        kiwiMenu->addAction(QStringLiteral("Alle trennen"), this, [this]() {
+            if (m_kiwiSdrManager) { m_kiwiSdrManager->disconnectAll(); }
+        });
     }
 
     radioMenu->addSeparator();

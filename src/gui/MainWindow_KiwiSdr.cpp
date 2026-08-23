@@ -34,6 +34,7 @@
 #include "gui/MainWindow.h"
 
 #include "core/AppSettings.h"
+#include "core/LogCategories.h"
 #include "core/KiwiSdrManager.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/SpectrumWidget.h"
@@ -267,6 +268,55 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
     }
 
     m_kiwiSdrApplet->setReceivers(receivers);
+}
+
+
+// ── Einen Empfaenger aufnehmen, verbinden und zuordnen ───────────────
+//
+// Drei Schritte, die zusammengehoeren und die der Betreiber sonst
+// einzeln machen muesste: anlegen, verbinden, an eine Scheibe haengen.
+// Wer im Menue "Oeffentliche Empfaenger" waehlt, will hoeren — nicht
+// eine Zeile in einer Liste.
+//
+// Die Zuordnung geht an die AKTIVE Scheibe. Das ist die einzige, bei
+// der man sagen kann, was der Betreiber gemeint hat.
+void MainWindow::addKiwiSdrReceiver(const QString& name,
+                                    const QString& endpoint)
+{
+    if (!m_kiwiSdrManager || endpoint.trimmed().isEmpty()) {
+        return;
+    }
+
+    const QString label = name.trimmed().isEmpty()
+                              ? endpoint.trimmed()
+                              : name.trimmed();
+    const QString id = m_kiwiSdrManager->addProfile(label, endpoint.trimmed());
+    if (id.isEmpty()) {
+        qCWarning(lcKiwiSdr) << "KiwiSDR konnte nicht angelegt werden:"
+                             << endpoint;
+        return;
+    }
+
+    SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+    if (slice) {
+        m_kiwiSdrManager->assignSliceToProfile(
+            slice->sliceIndex(), id,
+            slice->frequency() / 1.0e6,
+            SliceModel::modeName(slice->dspMode()),
+            slice->filterLow(), slice->filterHigh(),
+            slice->panKey(),
+            QString(),   // Bandname: der Kiwi braucht ihn nur fuer den
+                         // Bandrueckruf, und der ist Stufe 7.
+            0);
+    }
+
+    m_kiwiSdrManager->connectProfile(id);
+    refreshKiwiSdrAppletReceivers();
+
+    qCInfo(lcKiwiSdr).nospace()
+        << "KiwiSDR aufgenommen: " << label << " (" << endpoint << ")"
+        << (slice ? QStringLiteral(" -> Scheibe %1").arg(slice->sliceIndex())
+                  : QStringLiteral(" ohne Scheibe"));
 }
 
 // ── Die Verdrahtung ─────────────────────────────────────────────────

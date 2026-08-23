@@ -193,6 +193,19 @@ public:
     // Narrow composition seams used by deletion-gap regressions. Runtime
     // call sites use these same helpers so stable-ID lookup cannot diverge
     // between the test and the UI signal path.
+    // ── Pruefzugaenge fuer den KiwiSDR ───────────────────────────────
+    //
+    // addKiwiSdrReceiver ist der Weg, den der Menuepunkt geht. Eine
+    // Pruefung, die ihn nicht erreicht, koennte nur die API testen —
+    // und genau das haette in dieser Sitzung schon dreimal nichts
+    // gefunden (Zoomknoepfe ohne Empfaenger, Frequenz erreichte den
+    // Panadapter nicht, Kiwi vollstaendig gebaut und unerreichbar).
+    void addKiwiSdrReceiverForTest(const QString& name,
+                                   const QString& endpoint)
+    { addKiwiSdrReceiver(name, endpoint); }
+    class KiwiSdrManager* kiwiSdrManagerForTest() const
+    { return m_kiwiSdrManager; }
+
     static SliceModel* sliceForAddedIdForTest(RadioModel* model, int sliceId);
     static void applyAntennaChangeForTest(RadioModel* model, int sliceId,
                                           const QString& antennaName);
@@ -899,6 +912,7 @@ private:
     // KiwiSDR — siehe MainWindow_KiwiSdr.cpp.
     void wireKiwiSdr();
     void refreshKiwiSdrAppletReceivers();
+    void addKiwiSdrReceiver(const QString& name, const QString& endpoint);
 
     // Phase 3O Sub-Phase 11 Task 11b — first-launch / startup rescan
     // hook. Scheduled via QTimer::singleShot(0, ...) from the
