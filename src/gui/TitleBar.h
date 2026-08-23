@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/RadioLinkKind.h"
+
 // =================================================================
 // src/gui/TitleBar.h  (NereusSDR)
 // =================================================================
@@ -115,6 +117,18 @@ public:
     /// Paketverlust im I/Q-Strom (Prozent des jeweils letzten
     /// 5-Sekunden-Fensters). Negativ = unbekannt, dann wird nichts
     /// gezeigt.
+    // ── Woran haengt das Geraet? (2026-08-23) ───────────────────────
+    //
+    // Steht neben der Verlustanzeige, weil es genau deren Frage
+    // beantwortet. Der Betreiber sah 0,17 % bis 2,87 % Verlust; die
+    // Messung ergab, dass der Kern KEIN Paket wegen vollen Puffers
+    // verworfen hat (netstat: "0 dropped due to full socket buffers")
+    // und der Weg zum Geraet ueber WLAN laeuft.
+    //
+    // Ohne diesen Hinweis sucht man den Fehler im Programm — so, wie
+    // ich ihn eine Stunde lang gesucht habe.
+    void setRadioLinkKind(Longpath::RadioLinkKind kind);
+
     void setPacketLoss(double lossPercent);
     void setAudioFlowState(AudioEngine::FlowState s);
 
@@ -167,6 +181,7 @@ private:
     double                  m_txMbps{0.0};
     int                     m_rttMs{-1};
     double                  m_lossPct{-1.0};
+    Longpath::RadioLinkKind m_linkKind{Longpath::RadioLinkKind::Unknown};
     /// Der schlimmste Wert der letzten Minute. Ein Verlust von 0,8 %
     /// verschwindet nach fuenf Sekunden wieder — und genau der ist es,
     /// der das Rucken macht. Die Anzeige haelt ihn fest, sonst schaut

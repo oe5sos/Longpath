@@ -169,6 +169,14 @@ void ConnectionSegment::setRates(double rxMbps, double txMbps)
     update();
 }
 
+
+void ConnectionSegment::setRadioLinkKind(RadioLinkKind kind)
+{
+    if (m_linkKind == kind) { return; }
+    m_linkKind = kind;
+    update();
+}
+
 void ConnectionSegment::setPacketLoss(double lossPercent)
 {
     m_lossPct = lossPercent;
@@ -425,9 +433,23 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
         // Bandkante und dem SWR vorbehalten — beides Dinge, bei denen
         // es um die Endstufe geht. Ein nacktes "1.40 %" neben den
         // Mbit/s waere ausserdem mehrdeutig: Verlust wovon?
-        const QString loss = (v < 0.01)
+        QString loss = (v < 0.01)
             ? QStringLiteral("LOSS 0 %")
             : QString::asprintf("LOSS %.2f %%", v);
+
+        // ── Woher der Verlust kommt, gleich daneben ─────────────────
+        //
+        // Nur wenn ueberhaupt etwas verloren geht UND der Weg
+        // verlustanfaellig ist. Ein "WLAN" neben "LOSS 0 %" waere eine
+        // Belehrung ohne Anlass; steht dort aber eine Zahl, ist es die
+        // Antwort auf die Frage, die der Betreiber gerade stellt.
+        if (v >= 0.01) {
+            if (m_linkKind == RadioLinkKind::Wireless) {
+                loss += QStringLiteral(" \u00b7 WLAN");
+            } else if (m_linkKind == RadioLinkKind::Virtual) {
+                loss += QStringLiteral(" \u00b7 Tunnel");
+            }
+        }
         p.drawText(x, textY, loss);
         x += p.fontMetrics().horizontalAdvance(loss) + 10;
     }

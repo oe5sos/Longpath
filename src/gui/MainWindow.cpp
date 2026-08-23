@@ -393,6 +393,9 @@ warren@wpratt.com
 #include "gui/chrome/ChromeBarItems.h"
 #include "gui/chrome/TxSwitchBar.h"
 #include "core/AudioDeviceConfig.h"
+#include "core/RadioLinkKind.h"
+
+#include <QNetworkInterface>
 #include "core/AudioEngine.h"
 #include "core/ClientPuduMonitor.h"
 #include "core/TxWorkerThread.h"
@@ -614,6 +617,33 @@ MainWindow::MainWindow(QWidget* parent)
         // 1. State dot + pulse: driven by connectionStateChanged.
         connect(m_radioModel, &RadioModel::connectionStateChanged,
                 seg, &ConnectionSegment::setState);
+
+        // ── Woran haengt das Geraet? (2026-08-23) ────────────────────
+        //
+        // Bestimmt beim Verbinden, weil erst dann die Adresse feststeht.
+        // Der Hinweis steht neben der Verlustanzeige und beantwortet
+        // genau deren Frage: der Betreiber sah 0,17 % bis 2,87 %
+        // Verlust, der Kern hatte KEIN Paket wegen vollen Puffers
+        // verworfen, und der Weg lief ueber WLAN. Ohne den Hinweis
+        // sucht man den Fehler im Programm.
+        connect(m_radioModel, &RadioModel::connectionStateChanged, this,
+                [this, seg](ConnectionState st) {
+            if (st != ConnectionState::Connected) {
+                seg->setRadioLinkKind(RadioLinkKind::Unknown);
+                return;
+            }
+            const QHostAddress ip =
+                m_radioModel->connection()
+                    ? m_radioModel->connection()->radioInfo().address
+                    : QHostAddress();
+            const RadioLinkKind kind =
+                radioLinkKindFor(ip, QNetworkInterface::allInterfaces());
+            seg->setRadioLinkKind(kind);
+            const QString warn = radioLinkWarning(kind);
+            if (!warn.isEmpty()) {
+                qCInfo(lcConnection).noquote() << warn;
+            }
+        });
 
         // 2. frameTick: forwarded from RadioModel so we never need to
         //    re-wire when m_connection is recreated.
