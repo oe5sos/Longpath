@@ -361,6 +361,7 @@ warren@wpratt.com
 #include "applets/DvkApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
+#include "applets/TxMeterApplet.h"
 #include "applets/BandwidthFilterApplet.h"
 #include "applets/CatApplet.h"
 #include "applets/TunerApplet.h"
@@ -3846,6 +3847,7 @@ void MainWindow::buildUI()
         // selben Zeitpunkt zeigen — der Grund, aus dem diese Verteilung
         // ueberhaupt an EINER Stelle steht.
         if (m_frequencyApplet)  { m_frequencyApplet->onReading(bindingId, value); }
+        if (m_txMeterApplet)    { m_txMeterApplet->onReading(bindingId, value); }
     });
 
     // Task 3.1: expose MeterPoller via RadioModel so MultimeterPage can
@@ -5949,6 +5951,21 @@ void MainWindow::populateDefaultMeter()
     // Notiz an InstrumentApplet::restoreState.
     m_signalInstrument->restoreState();
     panel->addApplet(m_signalInstrument);
+
+    // ── SWR / Leistung in EINER Flaeche ──────────────────────────────
+    //
+    // Der Betreiber am 2026-08-23: "ein widget, wo SWR und Stehwelle
+    // in einem Diagramm sind. wenn ich tune stellt es auf das diagramm
+    // SWR um, beim senden habe ich Stehwelle. dann würde ich mir auch
+    // einen platz sparen."
+    //
+    // Es steht NEBEN den beiden Einzelanzeigen, nicht statt ihnen: wer
+    // Platz hat, will beide gleichzeitig sehen. Sichtbar ist es
+    // anfangs nicht — das entscheidet der Betreiber ueber den
+    // Applet-Auswaehler.
+    m_txMeterApplet = new TxMeterApplet(m_radioModel, nullptr);
+    m_txMeterApplet->restoreState();
+    panel->addApplet(m_txMeterApplet);
 
     // Phase 23: TCI applets — live in Container #0 below the existing applets.
     // Visibility is now managed by AppletVisibilityController below

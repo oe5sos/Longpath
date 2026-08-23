@@ -1293,6 +1293,7 @@ private:
     // jener Datei aufgezaehlt.
     class KiwiSdrManager* m_kiwiSdrManager{nullptr};
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
+    class TxMeterApplet*  m_txMeterApplet{nullptr};
     class BandwidthFilterApplet* m_bwFilterApplet{nullptr};
     class CatApplet*        m_catApplet{nullptr};
     class TunerApplet*      m_tunerApplet{nullptr};
