@@ -240,8 +240,13 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     bg.setColorAt(1.0, QColor(Style::role("inset-bg", Style::kInsetBg)));
     p.fillRect(rect(), bg);
 
-    p.setPen(QColor(Style::role("border-subtle", Style::kBorderSubtle)));
-    p.drawRect(0, 0, width() - 1, height() - 1);
+    // Kein Rahmenkasten mehr.
+    //
+    // OpenHPSDR zeichnet die Flaeche randlos — das Bild steht fuer
+    // sich, statt in einem Kaestchen zu sitzen. Auf dem Foto des
+    // Betreibers (2026-08-23) ist das einer der auffaelligsten
+    // Unterschiede: bei uns rahmte eine Linie jede Flaeche ein, dort
+    // trennen nur die Zwischenraeume.
 
     // Senkrechte Hilfslinien alle 2 kHz — dieselbe Teilung wie die
     // Beschriftungen darunter, damit die Zahlen etwas zum Festhalten
@@ -355,6 +360,24 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);
 
+        // ── Feinskala oben im Durchlass ─────────────────────────────
+        //
+        // In der Vorlage laeuft am oberen Rand des Durchlasses eine
+        // duenne Linie mit drei Teilstrichen. Sie sagt nichts Neues —
+        // sie gibt dem Rechteck einen Boden und macht auf einen Blick
+        // klar, dass es ein MASS ist und keine Markierung.
+        if (xhF - xlF > 40) {
+            QColor tick(m_accent);
+            tick.setAlpha(150);
+            p.setPen(tick);
+            const int yT = top + 8;
+            p.drawLine(xlF + 6, yT, xhF - 6, yT);
+            for (int k = 1; k <= 3; ++k) {
+                const int x = xlF + (xhF - xlF) * k / 4;
+                p.drawLine(x, yT - 3, x, yT + 3);
+            }
+        }
+
         // ── Was liegt DRIN? Ablage und Pegel ────────────────────────
         //
         // OpenHPSDR Zeus zeigt unter dem Durchlass eine Reihe Zellen:
@@ -386,7 +409,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             // zaehlt man viermal denselben Buckel, wie im ersten
             // Entwurf (-1.9k, -1.7k, -1.4k, -1.2k lagen alle auf einer
             // Sprechspitze).
-            const int minGap = qMax(6, (qMax(i0, i1) - qMin(i0, i1)) / 5);
+            const int minGap = qMax(5, (qMax(i0, i1) - qMin(i0, i1)) / 7);
             for (int i = qMin(i0, i1) + 1; i < qMax(i0, i1); ++i) {
                 if (m_trace[i] < m_trace[i - 1] || m_trace[i] < m_trace[i + 1]) {
                     continue;
@@ -407,7 +430,9 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             }
             std::sort(peaks.begin(), peaks.end(),
                       [](const Peak& a, const Peak& b) { return a.db > b.db; });
-            if (peaks.size() > 4) { peaks.resize(4); }
+            // Fuenf, wie in der Vorlage (dort standen +536, +897,
+            // +1.8k, +2.3k, +2.8k nebeneinander).
+            if (peaks.size() > 5) { peaks.resize(5); }
             std::sort(peaks.begin(), peaks.end(),
                       [](const Peak& a, const Peak& b) { return a.i < b.i; });
 
