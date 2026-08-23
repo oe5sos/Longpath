@@ -5936,6 +5936,24 @@ void MainWindow::populateDefaultMeter()
     m_frequencyApplet->restoreState();
     panel->addApplet(m_frequencyApplet);
 
+    // ── Die KIWI-Kachel an den richtigen Panadapter ──────────────────
+    //
+    // Die Kachel meldet nur, DASS sie gedrueckt wurde, und nennt ihre
+    // Scheibe. Welcher Panadapter dazugehoert, weiss allein das
+    // MainWindow — und spectrumForSlice ist der eine Ort, an dem diese
+    // Zuordnung steht. Haette das Applet sie selbst nachgebildet,
+    // gaebe es zwei Antworten auf dieselbe Frage.
+    connect(m_frequencyApplet, &FrequencyApplet::kiwiDisplayToggleRequested,
+            this, [this](SliceModel* slice) {
+        if (!slice) { return; }
+        SpectrumWidget* sw = spectrumForSlice(slice);
+        if (!sw) { return; }
+        sw->setKiwiDisplaySource(!sw->kiwiDisplaySource());
+        if (m_frequencyApplet) {
+            m_frequencyApplet->setKiwiState(sw->kiwiDisplaySource());
+        }
+    });
+
     m_swrInstrument = new InstrumentApplet(QStringLiteral("SwrInstrument"),
                                            QStringLiteral("Stehwelle"),
                                            m_radioModel, nullptr);

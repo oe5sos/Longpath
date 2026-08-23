@@ -25,6 +25,7 @@
 #include "gui/applets/AppletWidget.h"
 #include "gui/instruments/BarInstrument.h"
 #include "gui/instruments/FrequencyInstrument.h"
+#include "gui/widgets/VfoTileRow.h"
 
 namespace Longpath {
 
@@ -61,6 +62,15 @@ public:
     //
     // Beide Zeilen sind EINZELN schaltbar, nicht als Paar: wer nur das
     // SWR will, soll nicht die Leistung mitnehmen muessen.
+    /// Die Kachelreihe ueber der Ziffernanzeige, nach der Vorlage des
+    /// Betreibers vom 2026-08-23 (Bildschirmfoto Zeus Link).
+    void setShowTiles(bool on);
+    bool showsTiles() const { return m_showTiles; }
+
+    /// Zustand der KIWI-Kachel. Setzt MainWindow, weil nur es den
+    /// Panadapter kennt.
+    void setKiwiState(bool on) { if (m_tiles) { m_tiles->setKiwiOn(on); } }
+
     void setShowPower(bool on);
     void setShowSwr(bool on);
     bool showsPower() const { return m_showPower; }
@@ -77,12 +87,25 @@ public:
 protected:
     void contextMenuEvent(QContextMenuEvent* ev) override;
 
+signals:
+    /// Weitergereicht an MainWindow, das als einziges weiss, welcher
+    /// Panadapter zu dieser Scheibe gehoert.
+    void kiwiDisplayToggleRequested(SliceModel* slice);
+
+private slots:
+    /// Die KIWI-Kachel wurde gedrueckt. Das Applet kennt seine Scheibe
+    /// und ueber sie den Panadapter — die Kachelreihe kennt beides
+    /// nicht und soll es auch nicht.
+    void toggleKiwiDisplay();
+
 private:
     void applyRowVisibility();
 
+    VfoTileRow*          m_tiles{nullptr};
     FrequencyInstrument* m_instrument{nullptr};
     BarInstrument*       m_powerBar{nullptr};
     BarInstrument*       m_swrBar{nullptr};
+    bool                 m_showTiles{true};
     bool                 m_showPower{false};
     bool                 m_showSwr{false};
     QPointer<SliceModel> m_slice;

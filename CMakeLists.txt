@@ -861,6 +861,7 @@ set(GUI_SOURCES
     src/gui/FreeDVReporterDialog.h
     src/gui/applets/KiwiSdrApplet.cpp
     src/gui/applets/TxMeterApplet.cpp
+    src/gui/widgets/VfoTileRow.cpp
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp

@@ -25,6 +25,17 @@ FrequencyApplet::FrequencyApplet(RadioModel* model, QWidget* parent)
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(0);
+    // ── Die Kachelreihe steht OBEN ───────────────────────────────────
+    //
+    // So wie auf der Vorlage des Betreibers: erst die Uebersicht ueber
+    // alle Empfaenger, darunter gross der eine, den er gerade bedient.
+    // Umgekehrt waere die grosse Zahl der Kopf und die Reihe eine
+    // Fussnote — sie ist aber der Wegweiser.
+    m_tiles = new VfoTileRow(model, this);
+    lay->addWidget(m_tiles);
+    connect(m_tiles, &VfoTileRow::kiwiToggleRequested,
+            this, &FrequencyApplet::toggleKiwiDisplay);
+
     m_instrument = new FrequencyInstrument(this);
     lay->addWidget(m_instrument);
 
@@ -90,8 +101,17 @@ void FrequencyApplet::syncFromModel()
 
 
 
+void FrequencyApplet::setShowTiles(bool on)
+{
+    if (m_showTiles == on) { return; }
+    m_showTiles = on;
+    applyRowVisibility();
+    saveState();
+}
+
 void FrequencyApplet::applyRowVisibility()
 {
+    if (m_tiles) { m_tiles->setVisible(m_showTiles); }
     if (m_powerBar) { m_powerBar->setVisible(m_showPower); }
     if (m_swrBar)   { m_swrBar->setVisible(m_showSwr); }
 }
@@ -123,6 +143,7 @@ void FrequencyApplet::onReading(int bindingId, double value)
 }
 
 namespace {
+QString tilesKey() { return QStringLiteral("FrequencyApplet_ShowTiles"); }
 QString powerKey() { return QStringLiteral("FrequencyApplet_ShowPower"); }
 QString swrKey()   { return QStringLiteral("FrequencyApplet_ShowSwr"); }
 } // namespace
@@ -130,6 +151,8 @@ QString swrKey()   { return QStringLiteral("FrequencyApplet_ShowSwr"); }
 void FrequencyApplet::saveState() const
 {
     auto& st = AppSettings::instance();
+    st.setValue(tilesKey(), m_showTiles ? QStringLiteral("True")
+                                        : QStringLiteral("False"));
     st.setValue(powerKey(), m_showPower ? QStringLiteral("True")
                                         : QStringLiteral("False"));
     st.setValue(swrKey(), m_showSwr ? QStringLiteral("True")
@@ -139,11 +162,31 @@ void FrequencyApplet::saveState() const
 void FrequencyApplet::restoreState()
 {
     auto& st = AppSettings::instance();
+    m_showTiles = st.value(tilesKey(), QStringLiteral("True")).toString()
+                  == QStringLiteral("True");
     m_showPower = st.value(powerKey(), QStringLiteral("False")).toString()
                   == QStringLiteral("True");
     m_showSwr = st.value(swrKey(), QStringLiteral("False")).toString()
                 == QStringLiteral("True");
     applyRowVisibility();
+}
+
+
+void FrequencyApplet::toggleKiwiDisplay()
+{
+    // Der Weg zum Panadapter fuehrt ueber die Scheibe. Er ist bewusst
+    // NICHT abgekuerzt: nimmt man den aktiven Panadapter, schaltet die
+    // Kachel bei mehreren Empfaengern den falschen um — und zwar
+    // stillschweigend, denn beide sehen gleich aus.
+    if (!m_slice) { return; }
+    auto* mw = qobject_cast<QWidget*>(window());
+    Q_UNUSED(mw);
+
+    // Das Applet kennt den Panadapter nicht selbst. Statt hier eine
+    // Abhaengigkeit auf MainWindow aufzubauen, wird das Ereignis nach
+    // aussen gemeldet — MainWindow verdrahtet es dort, wo auch die
+    // uebrige Panadapter-Zuordnung liegt.
+    emit kiwiDisplayToggleRequested(m_slice.data());
 }
 
 void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
@@ -154,6 +197,13 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Auswahlkranz aus "keine / Stehwelle / SWR / beide" waere
     // dieselbe Information in vier Zeilen statt zwei und liesse sich
     // schlechter erweitern.
+    QAction* tiles = menu.addAction(tr("Empfängerkacheln anzeigen"));
+    tiles->setCheckable(true);
+    tiles->setChecked(m_showTiles);
+    connect(tiles, &QAction::triggered, this,
+            [this](bool on) { setShowTiles(on); });
+    menu.addSeparator();
+
     QAction* pwr = menu.addAction(tr("Stehwelle anzeigen"));
     pwr->setCheckable(true);
     pwr->setChecked(m_showPower);
