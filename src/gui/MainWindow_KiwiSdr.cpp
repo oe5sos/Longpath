@@ -34,6 +34,7 @@
 #include "gui/MainWindow.h"
 
 #include "core/AppSettings.h"
+#include "core/AudioEngine.h"
 #include "core/LogCategories.h"
 #include "core/KiwiSdrManager.h"
 #include "gui/applets/AppletPanelWidget.h"
@@ -41,12 +42,22 @@
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/TransmitModel.h"
+
+#include <QTimer>
 
 #include <QStringList>
 
 namespace Longpath {
 
 namespace {
+
+// Wie lange das Aufheben der Sendesperre wartet. 1,2 s deckt die
+// uebliche Strecke zu einem KiwiSDR im Netz samt dessen eigener
+// Pufferung ab. Kein Einstellwert: wer das feiner braucht, merkt es an
+// einem hoerbaren Nachklang und meldet sich — ein Regler, den niemand
+// versteht, ist schlechter als eine Zahl mit Begruendung.
+constexpr int kKiwiResumeDelayMs = 1200;
 
 // Die vier Zusammenfassungen sind zeichengetreu aus Aether uebernommen
 // (dort im anonymen Namensraum von MainWindow_KiwiSdr.cpp). Sie haengen
@@ -271,6 +282,81 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
 }
 
 
+
+// ── Stufe 7a: die Sendesperre ────────────────────────────────────────
+//
+// Waehrend wir senden, muss der Ton des KiwiSDR aus. Der Grund ist
+// nicht Rueckkopplung — der Kiwi steht ja irgendwo im Netz —, sondern
+// dass ein Empfaenger in Reichweite die eigene Aussendung hoert und
+// sie einem mit ein bis zwei Sekunden Verzug ins Ohr legt. Wer so
+// arbeitet, hoert sich selbst nachplappern.
+//
+// ── Und warum das Aufheben WARTET ───────────────────────────────────
+//
+// Genau derselbe Verzug macht das Wiedereinschalten heikel. Beim
+// Loslassen der Taste ist der Ton, der gerade unterwegs ist, noch die
+// eigene Aussendung. Schaltet man sofort auf, hoert man deren Ende —
+// also genau das, was die Sperre verhindern sollte.
+//
+// Aethers Profil hat dafuer zwei Felder, die wir mitportiert haben:
+// keepAudioDuringTx (dieser Empfaenger bleibt hoerbar) und
+// resumeAudioAfterTxDelay (das Aufheben wartet die Streckenlaufzeit
+// ab). Beide werden hier zum ersten Mal beachtet.
+//
+// ── Was hier NICHT steht ────────────────────────────────────────────
+//
+// Aethers KiwiSdrTxMuteLatch unterscheidet Aussendungen, die DIESER
+// Rechner ausgeloest hat, von fremden (VOX, CAT, ein anderer Client) —
+// weil bei FLEX mehrere Clients an einem Geraet haengen koennen und
+// nur die gemeldete Verriegelung von fremden Aussendungen weiss.
+//
+// Bei HPSDR gibt es diesen Fall nicht: wir sind der einzige Client,
+// und MOX beziehungsweise TUNE IST der Sendezustand. Die Verriegelung
+// hat keine zweite Quelle, die der Riegel gegeneinander abwaegen
+// koennte. Er ist darum portiert und geprueft, aber hier bewusst
+// nicht verdrahtet — ein Mechanismus ohne zweite Eingangsgroesse
+// waere eine Verkomplizierung ohne Wirkung.
+void MainWindow::syncKiwiSdrTransmitMute()
+{
+    if (!m_kiwiSdrManager || !m_radioModel) { return; }
+    AudioEngine* audio = m_radioModel->audioEngine();
+    if (!audio) { return; }
+
+    const TransmitModel& tx = m_radioModel->transmitModel();
+    const bool sending = tx.isMox() || tx.isTune();
+
+    for (const KiwiSdrAntennaProfile& profile : m_kiwiSdrManager->profiles()) {
+        const int sliceId =
+            m_kiwiSdrManager->assignedSliceForProfile(profile.id);
+        if (sliceId < 0) { continue; }
+
+        if (sending) {
+            if (profile.keepAudioDuringTx) { continue; }
+            audio->setKiwiSdrAudioSourceEnabled(sliceId, false);
+            continue;
+        }
+
+        // Nicht mehr am Senden. Aufheben — sofort oder verzoegert.
+        if (!profile.resumeAudioAfterTxDelay) {
+            audio->setKiwiSdrAudioSourceEnabled(sliceId, true);
+            continue;
+        }
+        const QString id = profile.id;
+        QTimer::singleShot(kKiwiResumeDelayMs, this, [this, id, sliceId]() {
+            // Beim Ablauf noch einmal pruefen: in der Wartezeit kann
+            // laengst wieder gesendet werden, und dann waere das
+            // Aufheben genau falsch. Ebenso kann das Profil weg sein.
+            if (!m_kiwiSdrManager || !m_radioModel) { return; }
+            if (!m_kiwiSdrManager->hasProfile(id)) { return; }
+            const TransmitModel& t = m_radioModel->transmitModel();
+            if (t.isMox() || t.isTune()) { return; }
+            if (AudioEngine* a = m_radioModel->audioEngine()) {
+                a->setKiwiSdrAudioSourceEnabled(sliceId, true);
+            }
+        });
+    }
+}
+
 // ── Einen Empfaenger aufnehmen, verbinden und zuordnen ───────────────
 //
 // Drei Schritte, die zusammengehoeren und die der Betreiber sonst
@@ -297,7 +383,42 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
         return;
     }
 
+    // ── Welche Scheibe? ─────────────────────────────────────────────
+    //
+    // Die aktive, wenn es eine gibt. Gibt es keine — und das ist der
+    // Normalfall OHNE verbundenes Funkgeraet —, dann die erste.
+    //
+    // Der Rueckfall ist nicht Bequemlichkeit, sondern der halbe Zweck
+    // der Sache: ein KiwiSDR ist gerade dann interessant, wenn kein
+    // eigenes Geraet laeuft. Ohne ihn landete der Empfaenger bei
+    // niemandem, und der Ton haette keinen Weg in die Mischung —
+    // stillschweigend, denn verbinden wuerde er trotzdem. Genau das
+    // hat die Pruefung tst_kiwi_tx_mute im ersten Lauf gezeigt.
     SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+    if (!slice && m_radioModel) {
+        const QList<SliceModel*> slices = m_radioModel->slices();
+        if (!slices.isEmpty()) {
+            slice = slices.first();
+        } else {
+            // ── Ohne Funkgeraet gibt es GAR KEINE Scheibe ───────────
+            //
+            // Nachgemessen am 2026-08-23: ein frisches Hauptfenster
+            // ohne Verbindung hat null Scheiben — sie entstehen erst
+            // beim Verbinden. Der Rueckfall auf "die erste" lief also
+            // ins Leere, und der Empfaenger verband sich, ohne dass
+            // sein Ton je irgendwo ankam. Stillschweigend, denn die
+            // Verbindung selbst gelang ja.
+            //
+            // Ein KiwiSDR IST ein Empfaenger, und ein Empfaenger
+            // braucht einen Platz. Also wird einer angelegt. Das ist
+            // gerade der Fall, um den es geht: ein Kiwi ist dann am
+            // interessantesten, wenn kein eigenes Geraet laeuft.
+            const int id = m_radioModel->addSlice();
+            slice = m_radioModel->sliceById(id);
+            qCInfo(lcKiwiSdr) << "Keine Scheibe vorhanden — fuer den "
+                                 "KiwiSDR eine angelegt, Kennung" << id;
+        }
+    }
     if (slice) {
         m_kiwiSdrManager->assignSliceToProfile(
             slice->sliceIndex(), id,
@@ -316,7 +437,8 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
     qCInfo(lcKiwiSdr).nospace()
         << "KiwiSDR aufgenommen: " << label << " (" << endpoint << ")"
         << (slice ? QStringLiteral(" -> Scheibe %1").arg(slice->sliceIndex())
-                  : QStringLiteral(" ohne Scheibe"));
+                  : QStringLiteral(" OHNE SCHEIBE — sein Ton hat keinen "
+                                   "Weg in die Mischung"));
 }
 
 // ── Die Verdrahtung ─────────────────────────────────────────────────
@@ -391,6 +513,13 @@ void MainWindow::wireKiwiSdr()
         sw->updateKiwiSpectrumDbm(binsDbm,
                                   lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
     });
+
+    // Die Sendesperre haengt an denselben zwei Signalen wie alles
+    // andere Sendebezogene.
+    connect(&m_radioModel->transmitModel(), &TransmitModel::moxChanged,
+            this, [this](bool) { syncKiwiSdrTransmitMute(); });
+    connect(&m_radioModel->transmitModel(), &TransmitModel::tuneChanged,
+            this, [this](bool) { syncKiwiSdrTransmitMute(); });
 
     refreshKiwiSdrAppletReceivers();
 }

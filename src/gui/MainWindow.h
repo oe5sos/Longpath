@@ -205,6 +205,7 @@ public:
     { addKiwiSdrReceiver(name, endpoint); }
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
+    RadioModel* radioModelForTest() const { return m_radioModel; }
 
     static SliceModel* sliceForAddedIdForTest(RadioModel* model, int sliceId);
     static void applyAntennaChangeForTest(RadioModel* model, int sliceId,
@@ -913,6 +914,7 @@ private:
     void wireKiwiSdr();
     void refreshKiwiSdrAppletReceivers();
     void addKiwiSdrReceiver(const QString& name, const QString& endpoint);
+    void syncKiwiSdrTransmitMute();
 
     // Phase 3O Sub-Phase 11 Task 11b — first-launch / startup rescan
     // hook. Scheduled via QTimer::singleShot(0, ...) from the
