@@ -367,6 +367,9 @@ public:
 
 protected:
     void mouseMoveEvent(QMouseEvent* event) override;
+    /// Legt die Titelleiste ueber den Inhalt, statt Platz zu nehmen —
+    /// siehe die Begruendung an der Umsetzung.
+    void resizeEvent(QResizeEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
     void leaveEvent(QEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;

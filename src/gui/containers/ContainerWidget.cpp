@@ -228,7 +228,26 @@ void ContainerWidget::buildUI()
     m_btnSettings->setStyleSheet(btnStyle);
     barLayout->addWidget(m_btnSettings);
 
-    mainLayout->addWidget(m_titleBar);
+    // ── Die Titelleiste liegt UEBER dem Inhalt, nicht darin ─────────
+    //
+    // Hier stand mainLayout->addWidget(m_titleBar). Sie erscheint aber
+    // beim Ueberfahren (mouseMoveEvent, Thetis-Vorbild) — und wer in
+    // einer Anordnung liegt, schiebt beim Erscheinen alles darunter
+    // nach unten.
+    //
+    // Der Betreiber am 2026-08-23: "das öffnen und zittern im rx1
+    // panel ist noch nicht behoben ... ist nur beim ersten mal trennen
+    // des filter." Genau so: der Zeiger faehrt zum Trennen-Pfeil, der
+    // ganz oben sitzt, die Leiste klappt auf, und die ganze Spalte
+    // rutscht um ihre Hoehe nach unten. Beim ERSTEN Mal faellt es auf,
+    // danach ist die Leiste schon da.
+    //
+    // Nachgestellt am laufenden Programm: vor dem Klick keine Leiste,
+    // danach "RX1 Main Panel" und alles zwoelf Punkte tiefer.
+    //
+    // Als Ueberlagerung nimmt sie keinen Platz. Das ist auch die
+    // Absicht des Vorbilds — das raise() unten stand schon immer da.
+    m_titleBar->raise();
 
     // Content holder — layout slot for setContent()
     m_contentHolder = new QWidget(this);
@@ -716,6 +735,17 @@ void ContainerWidget::setNotes(const QString& notes)
     m_notes = scrubbed;
     updateTitle();
     emit notesChanged(m_notes);
+}
+
+void ContainerWidget::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    // Die Leiste sitzt oben und ueber dem Inhalt — siehe die
+    // Begruendung im Aufbau.
+    if (m_titleBar) {
+        m_titleBar->setGeometry(0, 0, width(), kTitleBarHeight);
+        m_titleBar->raise();
+    }
 }
 
 void ContainerWidget::setNoControls(bool noControls) { m_noControls = noControls; }
