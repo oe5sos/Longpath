@@ -153,7 +153,7 @@ Q_LOGGING_CATEGORY(lcSetupTiming, "nereus.setup.timing")
 SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     : QDialog(parent), m_model(model)
 {
-    setWindowTitle("NereusSDR Settings");
+    setWindowTitle("Longpath Settings");
     setMinimumSize(820, 600);
     resize(900, 650);
     setStyleSheet(Style::themed("QDialog { background: #0f0f1a; }"));

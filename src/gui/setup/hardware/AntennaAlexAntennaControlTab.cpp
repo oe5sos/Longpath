@@ -559,7 +559,7 @@ void AntennaAlexAntennaControlTab::buildConflictPolicyGroup(QVBoxLayout* outerLa
     layout->setSpacing(4);
 
     auto* hint = new QLabel(
-        tr("How NereusSDR handles antenna conflicts when adding a slice "
+        tr("How Longpath handles antenna conflicts when adding a slice "
            "that needs an antenna currently in use by another slice's chain:"),
         group);
     hint->setWordWrap(true);

@@ -1292,6 +1292,11 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     }
 
     m_server = new QWebSocketServer(
+        // Der alte Name bleibt mit Absicht: DIES meldet sich bei
+        // WSJT-X und anderen TCI-Gegenstellen. Wer ihn aendert, bricht
+        // deren gespeicherte Einstellungen — der Nutzer sieht dort
+        // dann ein unbekanntes Geraet. Ein kosmetischer Gewinn ist das
+        // nicht wert. (2026-08-23, beinahe blind mitgeaendert.)
         QStringLiteral("NereusSDR-TCI"),
         QWebSocketServer::NonSecureMode, this);
 

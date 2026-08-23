@@ -234,7 +234,18 @@ void FloatingContainer::updateTitle()
 {
     // From Thetis frmMeterDisplay.cs:140-144 [v2.10.3.13] — unique title for OBS/streaming
     uint hash = qHash(m_id) % 100000;
-    setWindowTitle(QStringLiteral("NereusSDR Meter [%1]").arg(hash, 5, 10, QLatin1Char('0')));
+    // ── Umbenannt am 2026-08-23, mit einer Folge ────────────────────
+    //
+    // Hier stand "NereusSDR Meter [...]". Das Programm heisst seit dem
+    // 2026-08-20 Longpath, und ein Fenstertitel mit dem alten Namen
+    // steht sichtbar auf dem Bildschirm.
+    //
+    // ABER: der Titel ist laut dem Vermerk darueber die Kennung, mit
+    // der OBS dieses Fenster erfasst. Wer eine Szene darauf eingerichtet
+    // hat, muss sie nach dieser Aenderung EINMAL neu auswaehlen. Das
+    // ist der Preis, und er ist genannt statt stillschweigend in Kauf
+    // genommen.
+    setWindowTitle(QStringLiteral("Longpath Meter [%1]").arg(hash, 5, 10, QLatin1Char('0')));
 }
 
 void FloatingContainer::setContainerMinimises(bool minimises) { m_containerMinimises = minimises; }

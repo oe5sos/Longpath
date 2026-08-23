@@ -10742,7 +10742,7 @@ void MainWindow::onCpuMenuRequested(const QPoint& localPos)
     QAction* sysAct = menu.addAction(tr("System"));
     sysAct->setCheckable(true);
     sysAct->setChecked(m_cpuShowSystem);
-    QAction* appAct = menu.addAction(tr("App (NereusSDR)"));
+    QAction* appAct = menu.addAction(tr("App (Longpath)"));
     appAct->setCheckable(true);
     appAct->setChecked(!m_cpuShowSystem);
 

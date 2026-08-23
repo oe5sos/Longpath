@@ -182,7 +182,7 @@ void VaxLinuxFirstRunDialog::buildUi()
 
         // Intro paragraph
         auto* intro = new QLabel(
-            tr("NereusSDR could not connect to a Linux audio daemon."),
+            tr("Longpath could not connect to a Linux audio daemon."),
             bodyFrame);
         intro->setWordWrap(true);
         intro->setStyleSheet(sectionLabelStyle());
@@ -298,7 +298,7 @@ void VaxLinuxFirstRunDialog::buildUi()
 
         // Closing note
         auto* note = new QLabel(
-            tr("NereusSDR will run without audio routing in the meantime."),
+            tr("Longpath will run without audio routing in the meantime."),
             bodyFrame);
         note->setWordWrap(true);
         note->setStyleSheet(QStringLiteral(

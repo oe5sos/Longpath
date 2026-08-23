@@ -41,6 +41,20 @@ constexpr int kSecurityTimeoutMs = 5000;
 // operator can find and delete it without going through this app.
 QString serviceName(const QString& key)
 {
+    // ── Der alte Name bleibt, und das ist Absicht ───────────────────
+    //
+    // Das Programm heisst seit dem 2026-08-20 Longpath, aber DIES ist
+    // der Dienstname im Schluesselbund, also der SUCHSCHLUESSEL fuer
+    // alles, was dort schon liegt — QRZ-Zugang, SpotHub und was sonst
+    // gespeichert wurde.
+    //
+    // Wer ihn umbenennt, macht vorhandene Zugangsdaten unauffindbar.
+    // Nicht kaputt, nur unerreichbar: sie liegen weiter im
+    // Schluesselbund und niemand findet sie. Am 2026-08-23 war das in
+    // einem Durchgang ueber alle Meldungstexte fast passiert.
+    //
+    // Wenn das je geaendert wird, dann MIT Umzug: unter dem alten
+    // Namen lesen, unter dem neuen schreiben, alten Eintrag loeschen.
     return QStringLiteral("NereusSDR: %1").arg(key);
 }
 

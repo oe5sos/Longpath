@@ -210,7 +210,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         m_enableChk = new QCheckBox(tr("On"), this);
         m_enableChk->setStyleSheet(QLatin1String(kEnableChkStyle));
         m_enableChk->setChecked(false);  // loadFromSettings() will set real value
-        m_enableChk->setToolTip(tr("Enable this VAX channel. When on, NereusSDR "
+        m_enableChk->setToolTip(tr("Enable this VAX channel. When on, Longpath "
                                    "exposes the channel as a PipeWire source that "
                                    "consumer apps (WSJT-X, FLDIGI, etc.) can "
                                    "select as an audio input device."));
