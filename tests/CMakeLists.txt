@@ -4703,6 +4703,27 @@ nereus_add_test(tst_logbook_import)
 nereus_add_test(tst_overlay_render_is_harmless)
 nereus_add_test(tst_quit_leaves_no_pending_deletes)
 nereus_add_test(tst_notch_removable_offline)
+# ── Braucht ein AKTIVES Fenster, also allein ─────────────────────────
+#
+# Gemessen am 2026-08-23, nach drei falschen Reparaturen an diesem
+# Prueflauf. Zwei Sonden zusammen ergaben:
+#
+#   Gutfall:    Fenster aktiv: true  · Menues jetzt: 2
+#   Fehlerfall: Fenster aktiv: false · Menues jetzt: 0
+#
+# Der Notch wird in beiden Faellen gefunden, die Geometrie stimmt. Der
+# Ablauf im Fehlerfall: new QMenu(this) -> popup() -> das Fenster ist
+# nicht aktiv -> das Aufklappmenue verliert sofort den Fokus -> es
+# schliesst -> WA_DeleteOnClose -> es ist weg, ehe der Test hinsieht.
+#
+# Das ist keine Schwaeche unseres Codes, sondern eine Eigenschaft
+# DIESER PRUEFUNG: sie braucht ein aktives Fenster. Unter "ctest -j8"
+# streiten acht Oberflaechentests darum, und einer verliert.
+#
+# RUN_SERIAL nimmt ihm die Gegner. Das ist die richtige Antwort auf
+# "der Test braucht etwas Exklusives" — und nicht die vierte Runde
+# Symptombehandlung im Testcode.
+set_tests_properties(tst_notch_removable_offline PROPERTIES RUN_SERIAL TRUE)
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
 nereus_add_test(tst_pan_float_unlocked)
 nereus_add_test(tst_closing_takes_the_float_along)

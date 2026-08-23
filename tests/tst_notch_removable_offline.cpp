@@ -16,6 +16,8 @@
 // bedenken. Also festgenagelt.
 
 #include <QtTest>
+#include <QChildEvent>
+#include <QMouseEvent>
 #include <QMenu>
 
 #include "gui/SpectrumWidget.h"
@@ -25,6 +27,47 @@
 #include <QSpinBox>
 
 using namespace Longpath;
+
+
+namespace {
+
+// ── Warum hier nicht QTest::mouseClick steht ────────────────────────
+//
+// Gemessen am 2026-08-23, nach zwei falschen Reparaturen. Eine Sonde
+// im Fehlerfall zeigte:
+//
+//   Klick bei x = 581 · Notch dort: 4 · Fenster aktiv: FALSE
+//                                     · Menues jetzt: 0
+//
+// und im Gutfall dasselbe mit "Fenster aktiv: true · Menues jetzt: 2".
+// Der Notch wird also gefunden, die Geometrie stimmt — der Klick
+// erreicht den Handler nur dann nicht, wenn das Fenster nicht aktiv
+// ist. Unter "ctest -j8" streiten sich acht Oberflaechentests um die
+// Aktivierung, und einmal ist sogar qWaitForWindowActive selbst
+// gescheitert.
+//
+// Ob ein synthetischer Klick ein INAKTIVES Fenster erreicht, ist Qts
+// Sache und nicht unsere. Diese Pruefung will wissen, ob UNSER
+// mousePressEvent bei einem Rechtsklick auf einen Notch das Menue
+// oeffnet — also wird genau das Ereignis zugestellt, das ein
+// Rechtsklick erzeugt, ohne Umweg ueber den Fenstermanager.
+//
+// Meine beiden vorigen Reparaturen (Wartezeit auf 15 s, dann
+// QTRY_VERIFY aufs Menue) haben die Haeufigkeit gesenkt und die
+// Ursache verfehlt. Beide sind zurueckgenommen, wo sie nur Symptome
+// verdeckten.
+void sendPress(QWidget* w, const QPoint& pos, Qt::MouseButton button,
+               QEvent::Type type = QEvent::MouseButtonPress)
+{
+    const QPointF local(pos);
+    const QPointF global = w->mapToGlobal(pos);
+    QMouseEvent ev(type, local, local, global, button, button,
+                   Qt::NoModifier, Qt::MouseEventSynthesizedByApplication);
+    QCoreApplication::sendEvent(w, &ev);
+}
+
+} // namespace
+
 
 class TstNotchRemovableOffline : public QObject
 {
@@ -62,14 +105,8 @@ private slots:
                          "prueft der Rest dieses Tests nichts");
         const int y = 80;
 
-        // Das Fenster muss AKTIV sein, nicht bloss sichtbar. Ein
-        // popup() auf einem inaktiven Fenster kommt unter Last nicht
-        // zuverlaessig hoch; nach dem QTRY_VERIFY unten blieb ein Rest
-        // von rund einem Ausfall auf sechs Durchlaeufe uebrig.
-        QVERIFY(QTest::qWaitForWindowActive(&w));
-
         QSignalSpy gone(&w, &SpectrumWidget::notchRemoveRequested);
-        QTest::mouseClick(&w, Qt::RightButton, Qt::NoModifier, QPoint(x, y));
+        sendPress(&w, QPoint(x, y), Qt::RightButton);
         QCoreApplication::processEvents();
 
         // Das Menue oeffnet mit popup(), nicht exec() — es haengt also
@@ -87,11 +124,11 @@ private slots:
         // kein Beleg — genau die Art Bestaetigung, auf die man in
         // dieser Sitzung schon mehrfach hereingefallen ist. Die
         // Wartezeit steht wieder auf ihrem Vorgabewert.
-        QMenu* menu = nullptr;
-        QTRY_VERIFY2((menu = w.findChild<QMenu*>()) != nullptr,
-                     "Rechtsklick auf einen Notch oeffnet kein Menue — "
-                     "im getrennten Zustand kaeme man dann nicht mehr an "
-                     "seine Filter heran");
+        QMenu* menu = w.findChild<QMenu*>();
+        QVERIFY2(menu != nullptr,
+                 "Rechtsklick auf einen Notch oeffnet kein Menue — "
+                 "im getrennten Zustand kaeme man dann nicht mehr an "
+                 "seine Filter heran");
 
         QAction* remove = nullptr;
         for (QAction* a : menu->actions()) {
@@ -134,7 +171,11 @@ private slots:
         }
         QVERIFY(x >= 0);
 
-        QTest::mouseDClick(&w, Qt::LeftButton, Qt::NoModifier, QPoint(x, 80));
+        // Ein Doppelklick ist Druck, Loslassen, Doppelklick — und aus
+        // demselben Grund wie oben direkt zugestellt.
+        sendPress(&w, QPoint(x, 80), Qt::LeftButton);
+        sendPress(&w, QPoint(x, 80), Qt::LeftButton, QEvent::MouseButtonRelease);
+        sendPress(&w, QPoint(x, 80), Qt::LeftButton, QEvent::MouseButtonDblClick);
         QCoreApplication::processEvents();
 
         auto* ed = w.findChild<NotchEditPopup*>();
@@ -173,9 +214,11 @@ private slots:
 
         auto* wid = ed->findChild<QSpinBox*>();
         QVERIFY(wid);
+        qInfo() << "Editor beim Oeffnen:" << wid->value() << "(erwartet 400)";
         QCOMPARE(wid->value(), 400);          // zeigt den Ist-Zustand
         wid->setValue(50);                    // zu schmal, absichtlich
         QCoreApplication::processEvents();
+        qInfo() << "nach setValue(50):" << width.count() << "Wuensche";
         QCOMPARE(width.count(), 1);
         QCOMPARE(width.at(0).at(1).toDouble(), 50.0);
 
@@ -193,6 +236,9 @@ private slots:
         w.setNotchMarkers(notches);
         QCoreApplication::processEvents();
 
+        qInfo() << "Editorwerte:" << wid->value()
+                << "· Breitenwuensche:" << width.count()
+                << "· Abschaltwuensche:" << off.count();
         QCOMPARE(wid->value(), 100);
         QCOMPARE(width.count(), 1);           // kein Echo
         QCOMPARE(off.count(), 1);
