@@ -36,6 +36,7 @@
 #include "core/AppSettings.h"
 #include "core/KiwiSdrManager.h"
 #include "gui/applets/AppletPanelWidget.h"
+#include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -310,6 +311,35 @@ void MainWindow::wireKiwiSdr()
     connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
             [this](int, const QString&) {
         refreshKiwiSdrAppletReceivers();
+    });
+
+    // ── Stufe 6: die Wasserfallzeilen auf den Panadapter ─────────────
+    //
+    // Aether faedelt das ueber ReceivePresentationSync ein, um Geraet
+    // und Kiwi im selben Takt zu zeigen. Das ist richtig, sobald BEIDE
+    // gleichzeitig laufen — bei uns tut derzeit immer nur eine Quelle
+    // etwas, denn der Panadapter verwirft die andere (siehe die Sperre
+    // in updateSpectrumLinear). Solange das so ist, waere der
+    // Gleichtakt ein Mechanismus ohne Aufgabe.
+    //
+    // Zugestellt wird an den Panadapter DER SCHEIBE, der dieses Profil
+    // zugeordnet ist — nicht an den aktiven. Sonst landete der Kiwi im
+    // Bild, sobald der Betreiber auf eine andere Scheibe klickt.
+    connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallRowReady, this,
+            [this](const QString& profileId, const QString&,
+                   const QVector<float>& binsDbm,
+                   double lowFreqMhz, double highFreqMhz, quint32) {
+        if (!m_kiwiSdrManager || profileId.isEmpty() || binsDbm.isEmpty()) {
+            return;
+        }
+        const int sliceId = m_kiwiSdrManager->assignedSliceForProfile(profileId);
+        SliceModel* slice = m_radioModel ? m_radioModel->sliceById(sliceId)
+                                         : nullptr;
+        if (!slice) { return; }
+        SpectrumWidget* sw = spectrumForSlice(slice);
+        if (!sw || !sw->kiwiDisplaySource()) { return; }
+        sw->updateKiwiSpectrumDbm(binsDbm,
+                                  lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
     });
 
     refreshKiwiSdrAppletReceivers();

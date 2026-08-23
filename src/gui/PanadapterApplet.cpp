@@ -477,6 +477,32 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
     });
     menu->addSeparator();
 
+    // ── Anzeigequelle: Geraet oder KiwiSDR (Stufe 6, 2026-08-23) ────
+    //
+    // Der Haken steht hier und nicht im KiwiSDR-Applet, weil er eine
+    // Eigenschaft DIESES Panadapters ist: bei mehreren Panadaptern
+    // darf jeder eine andere Quelle zeigen. Ein Schalter im
+    // Kiwi-Applet muesste erst fragen, welchen er meint.
+    //
+    // Er ist bewusst nicht ausgegraut, wenn kein Kiwi verbunden ist:
+    // wer ihn umlegt und ein leeres Bild bekommt, hat eine Antwort
+    // ("da kommt nichts"); wer einen ausgegrauten Punkt sieht, hat
+    // keine.
+    if (SpectrumWidget* sw = spectrumWidget()) {
+        QAction* kiwiAct = menu->addAction(tr("Anzeige vom KiwiSDR"));
+        kiwiAct->setCheckable(true);
+        kiwiAct->setChecked(sw->kiwiDisplaySource());
+        kiwiAct->setToolTip(
+            tr("Zeigt statt des Geraets den Wasserfall des KiwiSDR, "
+               "der dieser Scheibe zugeordnet ist."));
+        connect(kiwiAct, &QAction::triggered, this, [this](bool on) {
+            if (SpectrumWidget* w = spectrumWidget()) {
+                w->setKiwiDisplaySource(on);
+            }
+        });
+        menu->addSeparator();
+    }
+
     QAction* extAct = menu->addAction(tr("Extended view (wideband wings)"));
     extAct->setCheckable(true);
     extAct->setChecked(m_extendedViewEnabled);

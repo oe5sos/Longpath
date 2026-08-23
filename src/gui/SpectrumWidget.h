@@ -1284,6 +1284,32 @@ public slots:
     void updateSpectrumLinear(int receiverId, const QVector<float>& binsLinear,
                               double windowEnb, double dbmOffset);
 
+    // ── KiwiSDR als Anzeigequelle (Stufe 6, 2026-08-23) ──────────────
+    //
+    // Ein KiwiSDR liefert seinen Wasserfall als fertige dBm-Werte ueber
+    // einen eigenen Frequenzausschnitt — nicht als I/Q um eine
+    // DDC-Mitte. Trotzdem braucht es dafuer KEINE zweite Rohrleitung.
+    //
+    // Der Grund steht in updateSpectrumLinear: die Zuordnung Bin ->
+    // Frequenz laeuft dort ueber m_ddcCenterHz und m_sampleRateHz.
+    // Setzt man beide auf den Kiwi-Ausschnitt, ist der Kiwi einfach
+    // eine weitere Quelle von Bins — und Zoom, CTUN, Detektor,
+    // Mittelung, Wasserfall und Ruecklauf arbeiten unveraendert
+    // weiter. Nichts davon muss ein zweites Mal geschrieben werden.
+    //
+    // Die Umrechnung dBm -> "linear" geschieht mit Versatz null: der
+    // Kiwi hat seine Pegel schon geeicht, ein zweiter Versatz waere
+    // eine Verfaelschung.
+    void updateKiwiSpectrumDbm(const QVector<float>& binsDbm,
+                               double lowHz, double highHz);
+
+    // Zeigt dieser Panadapter das Geraet oder den KiwiSDR? Solange er
+    // auf KiwiSDR steht, werden Bins vom Geraet VERWORFEN — sonst
+    // uebermalten sich zwei Quellen gegenseitig, und man saehe ein
+    // Flackern statt eines Bildes.
+    void setKiwiDisplaySource(bool kiwi);
+    bool kiwiDisplaySource() const { return m_kiwiDisplaySource; }
+
     // NF-aware grid slot — wired to ClarityController::noiseFloorChanged in MainWindow.
     // From Thetis console.cs:46074-46086 [v2.10.3.13] tmrAutoAGC_Tick NF grid block.
     // Range delta uses std::abs() — abs incase //MW0LGE [2.9.0.7] [original inline comment from console.cs:46081]
@@ -2127,6 +2153,11 @@ private:
     double m_bandwidthHz{192000.0};   // 192 kHz default (P1 base sample rate)
     double m_ddcCenterHz{14225000.0};   // DDC hardware center frequency
     double m_sampleRateHz{768000.0};    // DDC sample rate
+    bool   m_kiwiDisplaySource{false};  // Stufe 6: Geraet oder KiwiSDR
+    // Nur waehrend updateKiwiSpectrumDbm gesetzt. Ohne dieses
+    // Merkmal wuerde die Sperre gegen fremde Bins auch den
+    // Kiwi selbst abweisen — er geht ja durch dieselbe Tuer.
+    bool   m_feedingFromKiwi{false};
 
     // ---- Display range ----
     // From Thetis display.cs:1743-1754. Init values must match the

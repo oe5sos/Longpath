@@ -3049,6 +3049,51 @@ void SpectrumWidget::setBandEdgeColor(const QColor& c)
 // fftReady (full-bin dBm) via independent connects in MainWindow --
 // they're band-wide noise estimators by design and migrating them to
 // visible-window pixels would lose information when the user zooms in.
+// ── KiwiSDR als Anzeigequelle (Stufe 6, 2026-08-23) ─────────────────
+//
+// Begruendung des Zuschnitts steht an der Erklaerung in der Kopfdatei.
+// Hier nur die zwei Stellen, an denen man beim Lesen stolpern koennte.
+void SpectrumWidget::setKiwiDisplaySource(bool kiwi)
+{
+    if (m_kiwiDisplaySource == kiwi) { return; }
+    m_kiwiDisplaySource = kiwi;
+
+    // Beim Wechsel wird der Wasserfall geleert. Sonst stuenden im Bild
+    // zwei Empfaenger untereinander, mit einer unsichtbaren Naht dort,
+    // wo umgeschaltet wurde — und wer spaeter zurueckrollt, liest
+    // Zeilen des einen Geraets unter der Beschriftung des anderen.
+    clearWaterfallHistory();
+    m_spectrumAvenger.clear();
+    m_waterfallAvenger.clear();
+    update();
+}
+
+void SpectrumWidget::updateKiwiSpectrumDbm(const QVector<float>& binsDbm,
+                                           double lowHz, double highHz)
+{
+    if (!m_kiwiDisplaySource) { return; }
+    if (binsDbm.isEmpty() || highHz <= lowHz) { return; }
+
+    // Der Kiwi-Ausschnitt tritt an die Stelle des DDC-Fensters. Damit
+    // rechnet visibleBinRange() genau wie zuvor, und der Betreiber
+    // behaelt Zoom und CTUN.
+    setDdcCenterFrequency((lowHz + highHz) * 0.5);
+    setSampleRate(highHz - lowHz);
+
+    // dBm -> Leistung. Der Versatz ist NULL, nicht m_lastDbmOffset: der
+    // Kiwi liefert bereits geeichte Pegel, ein zweiter Versatz waere
+    // eine Verfaelschung. updateSpectrumLinear rechnet gleich wieder
+    // zurueck; der Umweg kostet einen Durchlauf und erspart eine
+    // zweite Rohrleitung durch Detektor, Mittelung und Wasserfall.
+    QVector<float> linear(binsDbm.size());
+    for (int i = 0; i < binsDbm.size(); ++i) {
+        linear[i] = std::pow(10.0f, binsDbm[i] * 0.1f);
+    }
+    m_feedingFromKiwi = true;
+    updateSpectrumLinear(-1, linear, 1.0, 0.0);
+    m_feedingFromKiwi = false;
+}
+
 void SpectrumWidget::updateSpectrumLinear(int receiverId,
                                           const QVector<float>& binsLinear,
                                           double windowEnb,
@@ -3064,6 +3109,16 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
 
     Q_UNUSED(receiverId);
     if (binsLinear.isEmpty()) { return; }
+
+    // ── Die Sperre gegen die zweite Quelle ──────────────────────────
+    //
+    // Steht dieser Panadapter auf KiwiSDR, wird alles verworfen, was
+    // NICHT vom Kiwi kommt. Ohne das schriebe der DDC des Geraets
+    // weiter in dieselben Puffer, und man saehe ein Flackern zwischen
+    // zwei Baendern statt eines Bildes — dasselbe Muster, das den
+    // Betreiber auf 40 m an zwei gleichzeitige Frequenzen denken
+    // liess.
+    if (m_kiwiDisplaySource && !m_feedingFromKiwi) { return; }
 
     // FFT size change detection.  When the FFTEngine replans (e.g. via
     // auto-zoom on bandwidth change), the per-pixel resolution shifts:
