@@ -24,6 +24,7 @@
 // Groesse, um die es geht.
 
 #include <QtTest>
+#include <QMouseEvent>
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QVBoxLayout>
@@ -48,6 +49,29 @@ protected:
         e->accept();
     }
 };
+
+} // namespace
+
+
+namespace {
+
+// Dieselbe Begruendung wie in tst_notch_removable_offline, dort
+// ausfuehrlich: unter "ctest -j8" wird das Fenster nicht aktiv, das
+// Aufklappmenue verliert sofort den Fokus, schliesst sich und ist
+// wegen WA_DeleteOnClose verschwunden, ehe der Test hinsieht.
+//
+// Ob ein synthetischer Klick ein inaktives Fenster erreicht, ist Qts
+// Sache. Diese Pruefung will wissen, ob UNSER mousePressEvent das
+// richtige Menue oeffnet — also wird genau das Ereignis zugestellt.
+void sendPress(QWidget* w, const QPoint& pos, Qt::MouseButton button)
+{
+    const QPointF local(pos);
+    const QPointF global = w->mapToGlobal(pos);
+    QMouseEvent ev(QEvent::MouseButtonPress, local, local, global,
+                   button, button, Qt::NoModifier,
+                   Qt::MouseEventSynthesizedByApplication);
+    QCoreApplication::sendEvent(w, &ev);
+}
 
 } // namespace
 
@@ -148,8 +172,7 @@ private slots:
         QCoreApplication::processEvents();
 
         m_host.reached = 0;
-        QTest::mouseClick(m_pan, Qt::RightButton, Qt::NoModifier,
-                          QPoint(m_notchX, 80));
+        sendPress(m_pan, QPoint(m_notchX, 80), Qt::RightButton);
         QCoreApplication::processEvents();
 
         QMenu* mine = m_pan->findChild<QMenu*>();

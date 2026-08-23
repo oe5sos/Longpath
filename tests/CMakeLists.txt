@@ -4725,6 +4725,9 @@ nereus_add_test(tst_notch_removable_offline)
 # Symptombehandlung im Testcode.
 set_tests_properties(tst_notch_removable_offline PROPERTIES RUN_SERIAL TRUE)
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
+# Braucht ein aktives Fenster, aus demselben Grund wie
+# tst_notch_removable_offline — dort ausfuehrlich begruendet.
+set_tests_properties(tst_notch_menu_wins_over_pan_menu PROPERTIES RUN_SERIAL TRUE)
 nereus_add_test(tst_pan_float_unlocked)
 nereus_add_test(tst_closing_takes_the_float_along)
 nereus_add_test(tst_network_tells_the_truth)
@@ -4751,6 +4754,7 @@ nereus_add_test(tst_radio_link_kind)
 nereus_add_test(tst_ps_thresholds_persist)
 nereus_add_test(tst_todays_work_together)
 nereus_add_test(tst_every_applet_is_reachable)
+nereus_add_test(tst_settings_are_remembered)
 nereus_add_test(tst_asr_end_to_end)
 nereus_add_test(tst_asr_against_live_server)
 

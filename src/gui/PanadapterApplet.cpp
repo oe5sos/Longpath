@@ -45,6 +45,23 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     , m_panId(panId)
     , m_spectrum(new SpectrumWidget(this))
 {
+    // ── Die gemerkte Anzeigequelle wiederherstellen ─────────────────
+    //
+    // Gegenstueck zum Speichern im Kontextmenue. Hier und nicht
+    // spaeter: sonst zeigte der Panadapter beim Start kurz das Geraet,
+    // bevor er auf den KiwiSDR umspringt — ein Flackern, das wie ein
+    // Fehler aussieht.
+    const QString persistKey = QStringLiteral("Pan_%1").arg(panId);
+    if (AppSettings::instance()
+            .value(persistKey + QStringLiteral("_KiwiDisplay"),
+                   QStringLiteral("False")).toString()
+        == QStringLiteral("True")) {
+        m_spectrum->setKiwiDisplaySource(true);
+    }
+    // Schluessel ZULETZT: das Wiederherstellen oben soll nicht sofort
+    // wieder speichern, was es gerade gelesen hat.
+    m_spectrum->setPersistKey(persistKey);
+
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
@@ -497,6 +514,12 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
                "der dieser Scheibe zugeordnet ist."));
         connect(kiwiAct, &QAction::triggered, this, [this](bool on) {
             if (SpectrumWidget* w = spectrumWidget()) {
+                // Kein Speichern hier: das erledigt SpectrumWidget
+                // selbst ueber seinen Schluessel. Stuende es an diesem
+                // Bedienweg, vergaesse es die KIWI-Kachel im
+                // Frequenz-Widget — der Fehler, den
+                // tst_settings_are_remembered am 2026-08-23 gefunden
+                // hat.
                 w->setKiwiDisplaySource(on);
             }
         });

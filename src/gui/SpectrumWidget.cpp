@@ -3066,6 +3066,15 @@ void SpectrumWidget::setKiwiDisplaySource(bool kiwi)
     m_spectrumAvenger.clear();
     m_waterfallAvenger.clear();
     update();
+
+    // Gemerkt, sobald dieser Panadapter einen Schluessel hat. Hier und
+    // nicht beim Aufrufer: es gibt mehrere Bedienwege, und jeder
+    // einzelne haette es sonst wissen muessen.
+    if (!m_persistKey.isEmpty()) {
+        AppSettings::instance().setValue(
+            m_persistKey + QStringLiteral("_KiwiDisplay"),
+            kiwi ? QStringLiteral("True") : QStringLiteral("False"));
+    }
 }
 
 void SpectrumWidget::updateKiwiSpectrumDbm(const QVector<float>& binsDbm,

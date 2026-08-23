@@ -1307,6 +1307,16 @@ public slots:
     // auf KiwiSDR steht, werden Bins vom Geraet VERWORFEN — sonst
     // uebermalten sich zwei Quellen gegenseitig, und man saehe ein
     // Flackern statt eines Bildes.
+    /// Unter welchem Schluessel dieser Panadapter seine Wahl merkt.
+    /// Leer = nichts merken (Pruefstaende, Einblendungen).
+    ///
+    /// Der Schluessel sitzt HIER und nicht beim Bedienweg, weil es
+    /// mehrere gibt: das Kontextmenue des Panadapters und die
+    /// KIWI-Kachel im Frequenz-Widget. Lag das Speichern beim Menue,
+    /// vergaess die Kachel es — und genau das war am 2026-08-23 der
+    /// Fall, gefunden von tst_settings_are_remembered.
+    void setPersistKey(const QString& key) { m_persistKey = key; }
+
     void setKiwiDisplaySource(bool kiwi);
     bool kiwiDisplaySource() const { return m_kiwiDisplaySource; }
 
@@ -2180,6 +2190,7 @@ private:
     double m_ddcCenterHz{14225000.0};   // DDC hardware center frequency
     double m_sampleRateHz{768000.0};    // DDC sample rate
     bool   m_kiwiDisplaySource{false};  // Stufe 6: Geraet oder KiwiSDR
+    QString m_persistKey;               // leer = nichts merken
     // Nur waehrend updateKiwiSpectrumDbm gesetzt. Ohne dieses
     // Merkmal wuerde die Sperre gegen fremde Bins auch den
     // Kiwi selbst abweisen — er geht ja durch dieselbe Tuer.
