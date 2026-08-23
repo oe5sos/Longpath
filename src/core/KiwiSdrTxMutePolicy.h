@@ -4,9 +4,12 @@
 //   Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //       per https://github.com/ten9876/AetherSDR (GPLv3)
 //
-// Modification history (NereusSDR):
-//   2026-08-23 — Portiert (Nachtschicht, KiwiSDR). Namensraum und
-//                Kopfdatei-Pfade angepasst, sonst zeichengetreu.
+// Das KiwiSDR-Protokoll stammt von John Seamons (ZL/KF6VO),
+// http://kiwisdr.com.
+//
+//   2026-08-23 — Portiert (Nachtschicht, Stufe 3: Bedienflaeche).
+//                Namensraum und Kopfdatei-Pfade angepasst, sonst
+//                zeichengetreu.
 
 #pragma once
 

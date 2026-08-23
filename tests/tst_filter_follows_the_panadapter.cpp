@@ -86,11 +86,34 @@ private slots:
             return panes.isEmpty() ? -1 : panes.first()->spanHz();
         };
 
+        // ── ZITTERN: gleiche Klasse, gleiche Spanne ─────────────────
+        //
+        // Der Betreiber am 2026-08-23: "das zittern beim abdrehen des
+        // filters aus dem menü ist nervig." Eine stufenlose Spanne
+        // verschiebt bei JEDEM Schritt den Massstab; wer die Breite
+        // durchdreht, sieht das ganze Bild wandern.
+        //
+        // Alle ueblichen Sprechfilter muessen dieselbe Spanne ergeben.
+        s->setFilterByHand(-2700, -100);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        const int at27 = span();
+        s->setFilterByHand(-3200, -100);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        const int at32 = span();
+        s->setFilterByHand(-3500, -100);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        const int at35 = span();
+        qInfo() << "Spanne bei 2,6 / 3,1 / 3,4 kHz:" << at27 << at32 << at35;
+        QVERIFY2(at27 == at32 && at32 == at35,
+                 qPrintable(QStringLiteral(
+                     "Die Spanne springt beim Durchdrehen: %1 / %2 / %3")
+                     .arg(at27).arg(at32).arg(at35)));
+
         s->setFilterByHand(-2900, -100);      // 2,8 kHz
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
         const int narrow = span();
 
-        s->setFilterByHand(-6000, -100);      // 5,9 kHz
+        s->setFilterByHand(-12000, -100);     // 11,9 kHz — andere Klasse
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
         const int wide = span();
 

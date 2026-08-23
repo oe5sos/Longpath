@@ -549,6 +549,8 @@ set(CORE_SOURCES
     src/core/KiwiPublicDirectory.cpp
     src/core/KiwiSdrRedirectPolicy.cpp
     src/core/KiwiSdrCredentialStore.cpp
+    src/core/KiwiSdrManager.cpp
+    src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp
     src/core/TxChannel.cpp

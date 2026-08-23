@@ -6765,3 +6765,18 @@ add_dependencies(all_tests kiwi_sdr_redirect_policy_test)
 # die zur Bedienflaeche gehoeren. Sie liegen bei AetherSDR bereit und
 # werden mitportiert, sobald die Stufe dran ist — hier nur notiert,
 # damit sie nicht vergessen werden.
+
+add_executable(kiwi_sdr_tx_mute_policy_test EXCLUDE_FROM_ALL kiwi_sdr_tx_mute_policy_test.cpp)
+target_link_libraries(kiwi_sdr_tx_mute_policy_test PRIVATE LongpathObjs Qt6::Core Qt6::Widgets)
+target_include_directories(kiwi_sdr_tx_mute_policy_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_sdr_tx_mute_policy_test COMMAND kiwi_sdr_tx_mute_policy_test)
+add_dependencies(all_tests kiwi_sdr_tx_mute_policy_test)
+
+add_executable(kiwi_sdr_trace_math_test EXCLUDE_FROM_ALL kiwi_sdr_trace_math_test.cpp)
+target_link_libraries(kiwi_sdr_trace_math_test PRIVATE LongpathObjs Qt6::Core Qt6::Widgets)
+target_include_directories(kiwi_sdr_trace_math_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME kiwi_sdr_trace_math_test COMMAND kiwi_sdr_trace_math_test)
+add_dependencies(all_tests kiwi_sdr_trace_math_test)
+
+
+

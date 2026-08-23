@@ -388,8 +388,32 @@ void BandwidthFilterApplet::refreshPane(int i)
     // (sonst wird CW zur Briefmarke), obere 40 kHz wie die feste
     // Stufenreihe.
     if (m_spanAuto) {
+        // ── STUFIG, nicht stufenlos ─────────────────────────────────
+        //
+        // Der Betreiber am 2026-08-23: "das zittern beim abdrehen des
+        // filters aus dem menü ist nervig."
+        //
+        // Die erste Fassung rechnete Breite mal 3,4 — stufenlos. Damit
+        // verschob sich bei JEDEM Schritt der Massstab, und wer die
+        // Breite durchdreht, sieht das ganze Bild wandern. Genau das
+        // Zittern.
+        //
+        // Die Vorlage macht es anders, und man sieht es auf seinen
+        // Bildern: bei OpenHPSDR blieb die Achse auf 14.158-14.168
+        // stehen, WAEHREND der Filter von 2,4 auf 3,3 kHz wechselte.
+        // Die Spanne haengt dort an der Groessenklasse, nicht am
+        // genauen Wert.
+        //
+        // Also Stufen. Alle ueblichen Sprechfilter (2,7 / 2,9 / 3,2 /
+        // 3,3 / 3,5) fallen in dieselbe — beim Durchdrehen bewegt sich
+        // nichts.
         const int wHz = qAbs(s->filterHigh() - s->filterLow());
-        const int span = qBound(2000, static_cast<int>(wHz * 3.4), 40000);
+        int span = 40000;
+        if      (wHz <=   700) { span =  3000; }   // CW eng
+        else if (wHz <=  1600) { span =  6000; }   // CW weit, RTTY
+        else if (wHz <=  4000) { span = 10000; }   // SSB, alle Breiten
+        else if (wHz <=  7000) { span = 16000; }   // eSSB
+        else if (wHz <= 12000) { span = 25000; }   // AM
         pane->setSpan(span);
     } else {
         pane->setSpan(m_spanHz);
