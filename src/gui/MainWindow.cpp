@@ -8920,6 +8920,22 @@ void MainWindow::buildStatusBar()
                 });
         connect(ps, &PureSignal::autoCalEnabledChanged,
                 this, &MainWindow::updatePsaIndicatorVisibility);
+
+        // ── Die Stabilitaetsregel sichtbar machen (2026-08-23) ──────
+        //
+        // Ohne diese Verbindung waere die Regel eine Behauptung: sie
+        // haelt die Korrektur zurueck oder friert sie ein, und die
+        // Anzeige sagt weiter "Correcting". Das ist die Art stiller
+        // Falschaussage, die man erst am Messplatz bemerkt — und ich
+        // konnte die Regel nicht gegen Hardware pruefen, also muss sie
+        // wenigstens sichtbar sein.
+        connect(ps, &PureSignal::stabilityActionChanged, this,
+                [this](PsCorrectionAction action) {
+            if (m_psaIndicator) { m_psaIndicator->setStabilityAction(action); }
+        });
+        if (m_psaIndicator) {
+            m_psaIndicator->setStabilityAction(ps->stabilityAction());
+        }
     };
     wirePsaCoordinator(m_radioModel->pureSignal());
     connect(m_radioModel, &RadioModel::pureSignalCoordinatorReady,

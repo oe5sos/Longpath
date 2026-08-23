@@ -119,6 +119,8 @@ mw0lge@grange-lane.co.uk
 
 #pragma once
 
+#include "core/PureSignalStabilityPolicy.h"
+
 #include <QColor>
 #include <QString>
 #include <QWidget>
@@ -157,6 +159,18 @@ public:
     void setFeedbackLevel(int level);     // 0..255
     void setInvertRedBlue(bool on);
     void setHideFeedback(bool on);
+
+    // ── Der Zustand der Stabilitaetsregel (2026-08-23) ───────────────
+    //
+    // Die Regel aus PureSignalStabilityPolicy.h haelt die Korrektur
+    // beim Kaltstart zurueck und friert sie bei Aussetzern ein. Ohne
+    // Anzeige waere das eine Behauptung: der Betreiber saehe "Pure
+    // Signal2" und wuesste nicht, ob korrigiert wird oder nicht.
+    //
+    // Das ist mir wichtiger als sonst, weil ich die Regel NICHT gegen
+    // Hardware pruefen konnte. Wer ihr nicht glaubt, soll wenigstens
+    // sehen, was sie tut — und sie abschalten koennen.
+    void setStabilityAction(Longpath::PsCorrectionAction action);
 
     // Phase 3M-4 bench-fix Round 2: byte-for-byte port of Thetis
     // ucInfoBar.PSInfo (ucInfoBar.cs:808-825 [v2.10.3.13]).  Updates all 5
@@ -247,6 +261,8 @@ private:
     int  m_feedbackLevel{0};
     bool m_invertRedBlue{false};
     bool m_hideFeedback{false};
+    Longpath::PsCorrectionAction m_stabilityAction{
+        Longpath::PsCorrectionAction::Run};
     bool m_useSmallFonts{false};
 };
 

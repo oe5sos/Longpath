@@ -442,6 +442,14 @@ void PsaIndicatorWidget::setInvertRedBlue(bool on)
     updateTooltip();
 }
 
+
+void PsaIndicatorWidget::setStabilityAction(PsCorrectionAction action)
+{
+    if (m_stabilityAction == action) { return; }
+    m_stabilityAction = action;
+    updateDisplay();
+}
+
 void PsaIndicatorWidget::setHideFeedback(bool on)
 {
     if (on == m_hideFeedback) {
@@ -585,7 +593,26 @@ void PsaIndicatorWidget::updateDisplay()
         // PSForm.cs:1106-1108 [v2.10.3.13], but that property is consumed
         // by PSForm.timer1code's PSInfo CO indicator at PSForm.cs:577-585
         // — NOT by ucInfoBar.PSInfo).
-        if (m_correctionsApplied) {
+        // ── Die Stabilitaetsregel geht VOR ──────────────────────────
+        //
+        // Haelt sie zurueck oder friert sie ein, dann stimmt "Correcting"
+        // nicht mehr — und eine Anzeige, die "korrigiert" sagt, waehrend
+        // die Korrektur zurueckgehalten wird, ist schlimmer als gar
+        // keine. Sie waere genau die Art stiller Falschaussage, die man
+        // erst am Messplatz bemerkt.
+        //
+        // Die Farben sind bewusst NICHT neu: Gelb ist im Haus die Farbe
+        // fuer "greift ein, aber ist kein Fehler" (dieselbe wie an der
+        // Schwellenmarke der Instrumente).
+        if (m_stabilityAction == PsCorrectionAction::Withhold) {
+            m_lblPs->setText(m_useSmallFonts ? tr("Wartet")
+                                             : tr("PS wartet"));
+            applyBackground(m_lblPs, QColor(0xd4, 0xa2, 0x3c));
+        } else if (m_stabilityAction == PsCorrectionAction::Hold) {
+            m_lblPs->setText(m_useSmallFonts ? tr("Halt")
+                                             : tr("PS eingefroren"));
+            applyBackground(m_lblPs, QColor(0xd4, 0xa2, 0x3c));
+        } else if (m_correctionsApplied) {
             m_lblPs->setText(m_useSmallFonts ? tr("Correct")
                                              : tr("Correcting"));
             applyBackground(m_lblPs, kLime());
