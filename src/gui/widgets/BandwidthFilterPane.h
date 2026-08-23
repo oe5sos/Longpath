@@ -75,6 +75,10 @@ public:
     void setVfoFrequency(double hz);
     double vfoFrequency() const { return m_vfoHz; }
     int    spanHz() const { return m_spanHz; }
+    /// Die geglaettete Kurve. Nur fuer Pruefungen: die Glaettung ist
+    /// das, was der Bediener als "ruhig" oder "verzoegert" erlebt, und
+    /// eine Behauptung darueber gehoert gemessen.
+    const QVector<float>& traceForTest() const { return m_trace; }
 
     // Wie viel Band die Flaeche zeigt. Die Vorlage zeigt rund 10 kHz.
     void setSpan(int hz);

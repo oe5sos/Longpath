@@ -106,6 +106,52 @@ private slots:
                      "viel zu weit").arg(narrow)));
     }
 
+    void aNewCarrierAppearsAtOnceButNoiseStaysCalm()
+    {
+        // Der Betreiber am 2026-08-23, nach der ersten Glaettung: "die
+        // form bleibt auch immer leicht zu sehen, zeitversetzt" — ein
+        // blasses Nachbild, das der Kurve hinterherlaeuft. Genau das
+        // macht eine SYMMETRISCHE Glaettung: sie verzoegert das
+        // Steigen ebenso wie das Fallen.
+        //
+        // Richtig ist ungleich: steigen sofort, fallen gemaechlich.
+        // Beides wird hier gemessen — die Behauptung "jetzt ist es
+        // schnell" ist sonst nur eine Behauptung.
+        BandwidthFilterPane pane;
+        pane.setSpan(10000);
+        pane.setFilter(-2900, -100);
+        pane.resize(600, 200);
+
+        const int n = 200;
+        QVector<float> quiet(n, -120.0f);
+        for (int f = 0; f < 40; ++f) { pane.setTrace(quiet); }
+        const float restingMid = pane.traceForTest().at(n / 2);
+        QVERIFY2(qAbs(restingMid + 120.0f) < 0.5f,
+                 "Die Ruhelage stimmt nicht");
+
+        // Ein Traeger geht auf — EIN Bild.
+        QVector<float> carrier = quiet;
+        carrier[n / 2] = -60.0f;
+        pane.setTrace(carrier);
+        const float afterOne = pane.traceForTest().at(n / 2);
+        qInfo() << "Nach EINEM Bild:" << afterOne << "dBm (Ziel -60)";
+        QVERIFY2(afterOne > -80.0f,
+                 qPrintable(QStringLiteral(
+                     "Der Traeger steht nach einem Bild erst bei %1 dBm "
+                     "— das ist das Nachbild, das der Betreiber sieht")
+                     .arg(afterOne)));
+
+        // Und wieder weg: das darf gemaechlich gehen, aber nicht
+        // ewig.
+        for (int f = 0; f < 25; ++f) { pane.setTrace(quiet); }
+        const float afterFall = pane.traceForTest().at(n / 2);
+        qInfo() << "Nach 25 Bildern Stille:" << afterFall;
+        QVERIFY2(afterFall < -115.0f,
+                 qPrintable(QStringLiteral(
+                     "Nach 25 Bildern steht der Traeger noch bei %1 dBm")
+                     .arg(afterFall)));
+    }
+
     void theSignalShowsUpInThePane()
     {
         // "er sollte mir ja auch das signal zeigen" (Betreiber,

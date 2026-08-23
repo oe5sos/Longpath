@@ -112,29 +112,46 @@ void BandwidthFilterPane::setTrace(const QVector<float>& dbm)
     //      Ein Traeger steigt damit in rund einer Zehntelsekunde auf,
     //      das Zappeln verschwindet.
     //
-    //   2. OERTLICH: ein Fenster ueber drei Stuetzstellen. Nimmt der
-    //      Kurve die Zacken, ohne einen echten Traeger zu verschlucken
-    //      (der ist breiter als drei Punkte, sobald man ihn ueberhaupt
-    //      sieht).
+    // ÖRTLICH wird NICHT geglaettet, und das ist eine Korrektur:
+    //
+    // Die erste Fassung mittelte ueber drei Stuetzstellen, mit dem
+    // Kommentar, das verschlucke keinen echten Traeger — "der ist
+    // breiter als drei Punkte". GEMESSEN war das falsch: ein Traeger
+    // auf EINER Stuetzstelle, -60 dBm im -120er Rauschen, kam nach dem
+    // Fenster bei -100 an. VIERZIG Dezibel weg, durch eine Zeile, die
+    // ich fuer harmlos erklaert hatte.
+    //
+    // Zeitliches Gleiten allein genuegt: Rauschen ist von Bild zu Bild
+    // zufaellig und mittelt sich damit ohnehin weg, ein Traeger steht
+    // still und bleibt stehen.
     if (dbm.isEmpty()) {
         if (!m_trace.isEmpty()) { m_trace.clear(); update(); }
         return;
     }
 
-    QVector<float> in = dbm;
-    if (in.size() >= 3) {
-        QVector<float> sm = in;
-        for (int i = 1; i < in.size() - 1; ++i) {
-            sm[i] = (in[i - 1] + in[i] + in[i + 1]) / 3.0f;
-        }
-        in = sm;
-    }
+    const QVector<float>& in = dbm;
 
     if (m_trace.size() != in.size()) {
         m_trace = in;                      // Groesse gewechselt: neu setzen
     } else {
-        constexpr float a = 0.22f;
+        // ── Schnell hoch, gemaechlich runter ────────────────────────
+        //
+        // Die erste Fassung glich in BEIDE Richtungen gleich schnell
+        // (alpha 0,22). Der Betreiber sah daraufhin: "die form bleibt
+        // auch immer leicht zu sehen, zeitversetzt" — ein blasses
+        // Nachbild, das der Kurve hinterherlaeuft. Genau das macht
+        // eine symmetrische Glaettung: sie verzoegert das Steigen
+        // ebenso wie das Fallen.
+        //
+        // Richtig ist ungleich: STEIGEN sofort (ein Traeger, der
+        // aufgeht, soll da sein, wenn er da ist), FALLEN gemaechlich
+        // (dann beruhigt sich das Rauschen). Dieselbe Bauart wie ein
+        // Spitzenwertzeiger mit Ruecklauf — und das ist auch, was
+        // OpenHPSDR und Thetis an dieser Stelle zeigen.
+        constexpr float aUp   = 0.75f;   // fast sofort
+        constexpr float aDown = 0.16f;   // ruhiger Ruecklauf
         for (int i = 0; i < in.size(); ++i) {
+            const float a = (in[i] > m_trace[i]) ? aUp : aDown;
             m_trace[i] = m_trace[i] * (1.0f - a) + in[i] * a;
         }
     }
