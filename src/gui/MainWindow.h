@@ -208,6 +208,19 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
 
+    /// Ist dieses Applet ueber den Auswaehler erreichbar?
+    ///
+    /// Fuer tst_every_applet_is_reachable. Gebaut und nicht erreichbar
+    /// ist so gut wie nicht gebaut, und genau das ist am 2026-08-23
+    /// dreimal passiert.
+    bool appletIsRegisteredForTest(const class AppletWidget* a) const
+    {
+        for (auto it = m_appletsById.cbegin(); it != m_appletsById.cend(); ++it) {
+            if (it.value() == a) { return true; }
+        }
+        return false;
+    }
+
     static SliceModel* sliceForAddedIdForTest(RadioModel* model, int sliceId);
     static void applyAntennaChangeForTest(RadioModel* model, int sliceId,
                                           const QString& antennaName);

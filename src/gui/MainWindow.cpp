@@ -6293,6 +6293,21 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
+
+    // ── Die vier vom 2026-08-23 ─────────────────────────────────────
+    //
+    // Sie waren gebaut, ins Panel gehaengt und trotzdem UNSICHTBAR:
+    // ohne Eintrag hier kennt sie der Auswaehler nicht, und ohne
+    // registerApplet weiter unten steht kein Punkt im Menue. Der
+    // Betreiber fragte am selben Tag: "wo ist die applet mitschrift".
+    //
+    // Dieselbe Art Fehler wie beim KiwiSDR, der vollstaendig gebaut
+    // und vollstaendig unerreichbar war: gebaut und nicht erreichbar
+    // ist so gut wie nicht gebaut, und keine Einzelpruefung sieht es,
+    // weil jeder Baustein fuer sich in Ordnung ist.
+    m_appletsById[QStringLiteral("TxMeter")] = m_txMeterApplet;
+    m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
+    m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletsById[QStringLiteral("Tci")]        = m_tciApplet;
@@ -6355,6 +6370,12 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Stehwelle"),    true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
                                 QStringLiteral("S-Meter"),      true);
+    m_appletVis->registerApplet(QStringLiteral("TxMeter"),
+                                QStringLiteral("SWR / Leistung"), true);
+    m_appletVis->registerApplet(QStringLiteral("KiwiSdr"),
+                                QStringLiteral("KiwiSDR"),      true);
+    m_appletVis->registerApplet(QStringLiteral("Asr"),
+                                QStringLiteral("Mitschrift"),   true);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
