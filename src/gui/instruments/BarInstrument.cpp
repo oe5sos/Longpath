@@ -130,6 +130,15 @@ void BarInstrument::setCompact(bool on)
     if (m_compact == on) { return; }
     m_compact = on;
     if (m_footer) { m_footer->setVisible(!m_compact); }
+
+    // Eine Untergrenze, damit die Zeile im Layout nicht plattgedrueckt
+    // wird. 30 Punkte tragen Mulde und Skalenzahlen; darunter faellt
+    // die Flaeche wieder unter die Mulde und es wird gar nichts mehr
+    // gezeichnet — genau der Fehler vom 2026-08-23. Die Raender
+    // schrumpfen zwar inzwischen mit, aber eine Zeile von zehn Punkten
+    // waere auch mit Rand null noch unlesbar.
+    setMinimumHeight(m_compact ? 30 : 0);
+
     updateGeometry();
     update();
 }
@@ -218,9 +227,34 @@ void BarInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
     const ReadingDescriptor* d = readingFor(m_primary);
     if (!d || !d->hasScale) { return; }
 
-    const int footerH = (bare || !m_footer) ? 0 : m_footer->height();
-    const QRectF box(10.0, 8.0, qMax(0.0, forSize.width() - 24.0),
-                     qMax(0.0, forSize.height() - footerH - 18.0));
+    // Eine VERBORGENE Fusszeile belegt keinen Platz. Ein verborgenes
+    // Widget behaelt seine Hoehe, und die wurde weiter abgezogen.
+    // (Das war NICHT die Ursache des Fehlers unten — der Zeichenweg
+    // fuer die Einblendung ruft mit bare=true und zog sie ohnehin
+    // nicht ab. Die Zeile ist trotzdem falsch gewesen.)
+    const int footerH = (bare || !m_footer || m_compact
+                         || m_footer->isHidden())
+                            ? 0 : m_footer->height();
+
+    // ── Die Raender richten sich nach der Hoehe ─────────────────────
+    //
+    // Hier standen 8 oben und 10 unten, fest. Zusammen mit
+    // kTroughHeight (20) heisst das: unter 38 Punkten Hoehe faellt die
+    // Zeichenflaeche unter die Mulde, und die Zeile darunter kehrt
+    // OHNE EINEN STRICH zurueck.
+    //
+    // Der Betreiber am 2026-08-23: "stehwelle und swr wird nicht im
+    // frequenz widget angezeigt." Genau das war es — die Zusatzzeilen
+    // dort sind rund 30 Punkte hoch. Lautlos, wie so oft bei dieser
+    // Art Fehler: kein Absturz, keine Meldung, nur ein leeres Feld.
+    //
+    // Die Raender schrumpfen jetzt mit. Sie ganz wegzulassen waere
+    // falsch — die Skalenzahlen brauchen unten Platz —, aber sie
+    // duerfen nicht mehr kosten, als da ist.
+    const double padTop = qMin(8.0, forSize.height() * 0.12);
+    const double padBottom = qMin(10.0, forSize.height() * 0.16);
+    const QRectF box(10.0, padTop, qMax(0.0, forSize.width() - 24.0),
+                     qMax(0.0, forSize.height() - footerH - padTop - padBottom));
     if (box.width() < 40.0 || box.height() < kTroughHeight) { return; }
 
     QPainter& p = painter;
