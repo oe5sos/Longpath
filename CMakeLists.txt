@@ -859,6 +859,8 @@ set(GUI_SOURCES
     src/gui/SpotHubDialog.h
     src/gui/FreeDVReporterDialog.cpp
     src/gui/FreeDVReporterDialog.h
+    src/gui/applets/KiwiSdrApplet.cpp
+    src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
     src/gui/PgxlSaveRebootDialog.cpp
