@@ -94,8 +94,50 @@ void BandwidthFilterPane::setVfoFrequency(double hz)
 
 void BandwidthFilterPane::setTrace(const QVector<float>& dbm)
 {
-    if (m_trace == dbm) { return; }
-    m_trace = dbm;
+    // ── Beruhigen, wie es OpenHPSDR zeigt ───────────────────────────
+    //
+    // Der Betreiber am 2026-08-23: "extrem unruhig, linie zu dick!
+    // baue es genau wie bei openhpsdr."
+    //
+    // Die Rohwerte kommen mit 20 Bildern je Sekunde und sind
+    // Spitzenwerte — jede Stuetzstelle springt bei jedem Bild. Bei
+    // OpenHPSDR steht dort eine ruhige, duenne Kurve.
+    //
+    // Zwei Mittel, in dieser Reihenfolge:
+    //
+    //   1. ZEITLICH: exponentiell gleiten mit alpha = 0,22. Das ist
+    //      dieselbe Familie wie die Glaettung im Panadapter
+    //      (LogRecursive), nur ohne dessen Parameterwerk — hier geht
+    //      es ums Augenmass beim Kantenziehen, nicht um Messtechnik.
+    //      Ein Traeger steigt damit in rund einer Zehntelsekunde auf,
+    //      das Zappeln verschwindet.
+    //
+    //   2. OERTLICH: ein Fenster ueber drei Stuetzstellen. Nimmt der
+    //      Kurve die Zacken, ohne einen echten Traeger zu verschlucken
+    //      (der ist breiter als drei Punkte, sobald man ihn ueberhaupt
+    //      sieht).
+    if (dbm.isEmpty()) {
+        if (!m_trace.isEmpty()) { m_trace.clear(); update(); }
+        return;
+    }
+
+    QVector<float> in = dbm;
+    if (in.size() >= 3) {
+        QVector<float> sm = in;
+        for (int i = 1; i < in.size() - 1; ++i) {
+            sm[i] = (in[i - 1] + in[i] + in[i + 1]) / 3.0f;
+        }
+        in = sm;
+    }
+
+    if (m_trace.size() != in.size()) {
+        m_trace = in;                      // Groesse gewechselt: neu setzen
+    } else {
+        constexpr float a = 0.22f;
+        for (int i = 0; i < in.size(); ++i) {
+            m_trace[i] = m_trace[i] * (1.0f - a) + in[i] * a;
+        }
+    }
     update();
 }
 
@@ -289,7 +331,10 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             p.drawPath(area.intersected(inside));
         }
 
-        p.setPen(QPen(traceLine, 1.2));
+        // Duenn, wie bei OpenHPSDR. 1,2 war fuer eine Flaeche dieser
+        // Groesse zu fett — die Linie erschlug die Feinheit, die sie
+        // zeigen soll.
+        p.setPen(QPen(traceLine, 1.0));
         p.setBrush(Qt::NoBrush);
         p.drawPolyline(poly.constData() + 1, poly.size() - 2);
 

@@ -22,16 +22,22 @@ class TstFilterPaneSheet : public QObject
     Q_OBJECT
 
 private:
-    static QVector<float> fakeTrace(int n, int spanHz)
+    // Ein Bild aus dem laufenden Empfang: Signal plus RAUSCHEN, das
+    // sich von Bild zu Bild aendert. Genau daran entscheidet sich, ob
+    // die Kurve ruhig ist — ein stehendes Muster wuerde jede Glaettung
+    // gut aussehen lassen.
+    static QVector<float> fakeTrace(int n, int spanHz, int frame)
     {
         QVector<float> v(n, -118.0f);
         for (int i = 0; i < n; ++i) {
             const double hz = -spanHz / 2.0 + spanHz * double(i) / (n - 1);
-            // Ein Sprechsignal im Durchlass und ein Stoerer daneben.
             const double a = std::exp(-std::pow((hz + 1500.0) / 900.0, 2.0));
             const double b = std::exp(-std::pow((hz - 3200.0) / 220.0, 2.0));
-            v[i] = static_cast<float>(-118.0 + 46.0 * a + 34.0 * b
-                                      + 3.0 * std::sin(i * 0.7));
+            // Pseudozufall ohne Zufallsquelle: der Pruefstand muss
+            // wiederholbar bleiben.
+            const double n1 = std::sin(i * 12.9898 + frame * 4.1414) * 43758.5453;
+            const double noise = (n1 - std::floor(n1)) * 7.0 - 3.5;
+            v[i] = static_cast<float>(-118.0 + 46.0 * a + 34.0 * b + noise);
         }
         return v;
     }
@@ -46,7 +52,11 @@ private slots:
         pane.setHasFrequency(true);
         pane.setSpan(9520);
         pane.setFilter(-2900, -100);
-        pane.setTrace(fakeTrace(340, 9520));
+        // Dreissig Bilder, wie im Betrieb — erst dann wirkt die
+        // zeitliche Glaettung.
+        for (int f = 0; f < 30; ++f) {
+            pane.setTrace(fakeTrace(340, 9520, f));
+        }
         pane.resize(760, 230);   // wie das breite Feld oben
 
         QImage img(pane.size(), QImage::Format_ARGB32);
