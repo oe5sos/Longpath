@@ -4729,6 +4729,7 @@ nereus_add_test(tst_waterfall_banding)
 nereus_add_test(tst_radio_link_kind)
 nereus_add_test(tst_ps_thresholds_persist)
 nereus_add_test(tst_todays_work_together)
+
 nereus_add_test(tst_filter_follows_the_panadapter)
 nereus_add_test(tst_filter_pane_sheet)
 nereus_add_test(tst_band_buttons)
@@ -6811,6 +6812,30 @@ target_link_libraries(kiwi_rebind_tracker_test PRIVATE LongpathObjs Qt6::Core)
 target_include_directories(kiwi_rebind_tracker_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME kiwi_rebind_tracker_test COMMAND kiwi_rebind_tracker_test)
 add_dependencies(all_tests kiwi_rebind_tracker_test)
+
+# ── ASR: der abhaengigkeitsfreie Teil (2026-08-23) ────────────────────
+#
+# Zeichengetreu aus AetherSDR, mit einfachem main() statt QTest — wie
+# die portierten Kiwi-Pruefstaende und aus demselben Grund: bei fremder
+# Logik koennte jede Umformulierung eine Erwartung unbemerkt
+# verschieben.
+add_executable(asr_segmenter_test EXCLUDE_FROM_ALL asr_segmenter_test.cpp)
+target_link_libraries(asr_segmenter_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(asr_segmenter_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME asr_segmenter_test COMMAND asr_segmenter_test)
+add_dependencies(all_tests asr_segmenter_test)
+
+add_executable(asr_remote_backend_test EXCLUDE_FROM_ALL asr_remote_backend_test.cpp)
+target_link_libraries(asr_remote_backend_test PRIVATE LongpathObjs Qt6::Core Qt6::Network)
+target_include_directories(asr_remote_backend_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME asr_remote_backend_test COMMAND asr_remote_backend_test)
+add_dependencies(all_tests asr_remote_backend_test)
+
+add_executable(asr_tap_policy_test EXCLUDE_FROM_ALL asr_tap_policy_test.cpp)
+target_link_libraries(asr_tap_policy_test PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(asr_tap_policy_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME asr_tap_policy_test COMMAND asr_tap_policy_test)
+add_dependencies(all_tests asr_tap_policy_test)
 
 
 
