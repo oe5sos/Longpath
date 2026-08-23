@@ -66,6 +66,32 @@ void SystemTile::setCpuPercent(double percent)
     m_cpuRow->setValue(QString::asprintf("%.0f%%", percent));
 }
 
+// ── Woher die Zahl kommt, muss dranstehen ────────────────────────────
+//
+// Am 2026-08-23 meldete der Betreiber 97 % CPU, und ich habe eine
+// Stunde in die falsche Richtung gesucht: Zeichenkosten der Instrumente
+// und des Bandfilters vermessen (Ergebnis: 2,3 % eines Kerns
+// zusammen), Aufrufbaum der laufenden App gezogen, Verdacht auf die
+// QPainter-Flaechen formuliert.
+//
+// Die Zahl zeigt in der Vorgabe die GANZE MASCHINE, nicht Longpath —
+// so macht es Thetis, und so steht es im Code. Auf dem Rechner liefen
+// zu der Zeit ausser Longpath auch Zeus Link, OpenHPSDR, ein Browser
+// und meine eigenen Uebersetzungslaeufe mit acht Faeden. Die 97 %
+// waren mit einiger Wahrscheinlichkeit ich selbst.
+//
+// Der Kurzhinweis sagt jetzt, welche der beiden Quellen gerade
+// gemeint ist. Das kostet eine Zeile und haette diese Stunde erspart.
+void SystemTile::setCpuSource(bool wholeMachine)
+{
+    m_cpuRow->setToolTip(
+        wholeMachine
+            ? tr("CPU der GANZEN Maschine, nicht nur von Longpath.\n"
+                 "Rechtsklick, um auf „nur diese Anwendung“ umzustellen.")
+            : tr("CPU nur dieser Anwendung.\n"
+                 "Rechtsklick, um auf „ganze Maschine“ umzustellen."));
+}
+
 void SystemTile::setPaLabel(const QString& label)
 {
     m_paRow->setLabel(label);

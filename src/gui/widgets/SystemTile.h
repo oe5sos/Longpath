@@ -30,6 +30,10 @@ public:
     void clearPaTemp();
     void setCpuPercent(double percent);
 
+    /// Welche der beiden Quellen die Zahl zeigt — sie steht danach im
+    /// Kurzhinweis. Begruendung in der Quelldatei.
+    void setCpuSource(bool wholeMachine);
+
     /// "PA" on most boards, "PSU" on the ANAN-G2E supply_volts path.
     void setPaLabel(const QString& label);
     QString paLabel() const;

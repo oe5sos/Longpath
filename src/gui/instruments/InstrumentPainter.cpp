@@ -33,7 +33,10 @@ namespace {
 constexpr double kShadowOpacity = 0.75;
 
 /// Der rote Abschnitt oberhalb der Schwelle. Entwurf: opacity ".42".
-constexpr double kThresholdOpacity = 0.42;
+// kThresholdOpacity ist mit dem eingefaerbten Schwellenbereich
+// entfallen (2026-08-23). Nicht auskommentiert stehengelassen:
+// ein unbenutzter Wert mit gutem Namen wird beim naechsten Mal
+// wieder verdrahtet, ohne dass jemand die Begruendung liest.
 
 /// Die helle Kante am Wert. Entwurf: stroke-width 1.4, opacity ".75".
 constexpr double kValueEdgeOpacity = 0.75;
@@ -132,14 +135,33 @@ void paintTrough(QPainter& p, const Spine& s, double thresholdFraction)
                   s.troughWidth(), Qt::SolidLine, Qt::FlatCap));
     p.drawPath(s.troughPath());
 
-    // Der rote Abschnitt liegt IN der Mulde, vor dem Innenschatten —
-    // sonst überdeckte er die Kante, die über die ganze Rille läuft.
-    if (thresholdFraction >= 0.0 && thresholdFraction <= 1.0) {
-        QColor d = danger();
-        d.setAlphaF(kThresholdOpacity);
-        p.setPen(QPen(d, s.troughWidth(), Qt::SolidLine, Qt::FlatCap));
-        p.drawPath(s.troughSpan(thresholdFraction, 1.0));
-    }
+    // ── Der Bereich ab der Schwelle ist WEG ─────────────────────────
+    //
+    // Er hat drei Fassungen gebraucht, bis klar war, dass er gar nicht
+    // hingehoert. Der Betreiber am 2026-08-23, der Reihe nach:
+    //   "die grafik ganz rechts, diese pille gefällt mir nicht, bitte
+    //    weglöschen. farbe in weinrot oder so. den bereich ab 2,5"
+    //   "bei beiden grafiken"
+    //   "bereich bis 2,5 passt, ab 2,5 gefällt nicht. bis 95 watt passt
+    //    gut, danach auch wieder nicht. dieses jeweilige ende bitte
+    //    immer weg"
+    //
+    // Erst war es eine Pille (ein Zeichenfehler: der Abschnitt wurde
+    // als Pfad mit muldenbreiter Feder GESTRICHEN statt gefuellt),
+    // dann eine saubere weinrote Flaeche — und auch die stoert. Zu
+    // Recht: die Flaeche steht STAENDIG im Bild, auch wenn alles in
+    // Ordnung ist, und faerbt damit dauerhaft ein Viertel der Anzeige
+    // ein, ohne je etwas zu melden.
+    //
+    // Was warnt, ist der ZEIGER, wenn er dort ankommt — und die duenne
+    // Schwellenmarke, die weiter unten gezeichnet wird und stehen
+    // bleibt. Die sagt dasselbe mit einem Strich statt mit einer
+    // Flaeche.
+    //
+    // thresholdFraction bleibt im Vertrag: paintTroughTube braucht ihn
+    // weiterhin nicht, aber die Aufrufer sollen nicht umgebaut werden,
+    // falls jemand die Zone je wieder will.
+    Q_UNUSED(thresholdFraction);
 
     // Innenschatten an der oberen bzw. äusseren Kante
     QColor shadow(0, 0, 0);
@@ -182,23 +204,10 @@ void paintTroughTube(QPainter& p, const Spine& s, double thresholdFraction)
     p.setBrush(g);
     p.drawRect(r);
 
-    // Der rote Abschnitt liegt IN der Roehre und behaelt ihren Verlauf
-    // — sonst saehe die kritische Zone flach aus, waehrend der Rest
-    // sich woelbt.
-    if (thresholdFraction >= 0.0 && thresholdFraction <= 1.0) {
-        const QRectF hot(r.left() + r.width() * thresholdFraction, r.top(),
-                         r.width() * (1.0 - thresholdFraction), r.height());
-        QColor d = danger();
-        QLinearGradient dg(hot.left(), hot.top(), hot.left(), hot.bottom());
-        QColor d0 = d.darker(190); d0.setAlphaF(kThresholdOpacity);
-        QColor d1 = d.lighter(105); d1.setAlphaF(kThresholdOpacity);
-        QColor d2 = d.darker(210); d2.setAlphaF(kThresholdOpacity);
-        dg.setColorAt(0.00, d0);
-        dg.setColorAt(0.45, d1);
-        dg.setColorAt(1.00, d2);
-        p.setBrush(dg);
-        p.drawRect(hot);
-    }
+    // Der eingefaerbte Abschnitt ab der Schwelle entfaellt auch hier —
+    // siehe die Begruendung in paintTrough. Eine Roehre, deren letztes
+    // Viertel staendig rot ist, meldet nichts und stoert dauernd.
+    Q_UNUSED(thresholdFraction);
 
     // Die harte Lichtkante ganz oben und der Schatten ganz unten — sie
     // schliessen die Woelbung ab. Ohne sie franst die Roehre in den

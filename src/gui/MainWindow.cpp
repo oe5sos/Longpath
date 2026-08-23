@@ -9452,6 +9452,7 @@ void MainWindow::buildStatusBar()
                           .value(QStringLiteral("CpuShowSystem"),
                                  QStringLiteral("True"))
                           .toString() == QStringLiteral("True"));
+    if (m_systemTile) { m_systemTile->setCpuSource(m_cpuShowSystem); }
 
     m_cpuTimer = new QTimer(this);
     connect(m_cpuTimer, &QTimer::timeout, this, [this]() {
@@ -10706,6 +10707,7 @@ void MainWindow::onCpuMenuRequested(const QPoint& localPos)
     if (newSys == m_cpuShowSystem) { return; }
 
     m_cpuShowSystem = newSys;
+    if (m_systemTile) { m_systemTile->setCpuSource(newSys); }
     AppSettings::instance().setValue(
         QStringLiteral("CpuShowSystem"),
         newSys ? QStringLiteral("True") : QStringLiteral("False"));

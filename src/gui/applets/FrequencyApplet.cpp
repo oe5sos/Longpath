@@ -51,10 +51,12 @@ FrequencyApplet::FrequencyApplet(RadioModel* model, QWidget* parent)
     // dieselben Formen wie fuer die eigenstaendigen Anzeigen: Segmente
     // und die Roehre lassen sich hier genauso einstellen.
     m_powerBar = new BarInstrument(this);
+    m_powerBar->setCompact(true);
     m_powerBar->setPrimary(MeterBinding::TxPower);
     lay->addWidget(m_powerBar);
 
     m_swrBar = new BarInstrument(this);
+    m_swrBar->setCompact(true);
     m_swrBar->setPrimary(MeterBinding::TxSwr);
     lay->addWidget(m_swrBar);
 

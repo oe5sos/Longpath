@@ -106,6 +106,21 @@ public:
     void setTube(bool on);
     bool isTube() const { return m_tube; }
 
+    // ── Knappe Fassung ───────────────────────────────────────────────
+    //
+    // Fuer Balken, die als ZUSATZZEILE unter etwas anderem stehen —
+    // etwa im Frequenz-Widget. Dort ist die Zeile rund 30 Punkte hoch,
+    // und die Fusszeile ("Spitze 5 · Grenze 100") legt sich dann ueber
+    // die Skalenzahlen. Auf dem Bildschirmfoto des Betreibers vom
+    // 2026-08-23 ist das gut zu sehen: "Grenze 100" steht quer ueber
+    // der 30 und der 60.
+    //
+    // Knapp heisst: keine Fusszeile. Die Zahl selbst steht ohnehin
+    // rechts, und Spitze und Grenze liest man in einer Zusatzzeile
+    // nicht — dafuer gibt es die eigenstaendige Anzeige.
+    void setCompact(bool on);
+    bool isCompact() const { return m_compact; }
+
     PeakHold&       peakHold()       { return m_peak; }
     const PeakHold& peakHold() const { return m_peak; }
     void resetPeak() { m_peak.reset(m_value); update(); }
@@ -136,6 +151,7 @@ private:
     double m_secondValue{0.0};
     bool m_segmented{false};
     bool m_tube{false};
+    bool m_compact{false};
     PeakHold m_peak;
 
     /// Ohne gültige Messung: kein Verlauf, keine Glut, keine Wertkante,

@@ -125,6 +125,15 @@ void BarInstrument::setTube(bool on)
     update();
 }
 
+void BarInstrument::setCompact(bool on)
+{
+    if (m_compact == on) { return; }
+    m_compact = on;
+    if (m_footer) { m_footer->setVisible(!m_compact); }
+    updateGeometry();
+    update();
+}
+
 void BarInstrument::paintOne(QPainter& p, const QRectF& area,
                              const ReadingDescriptor& d, double value,
                              bool withGlow, bool hasValue)
