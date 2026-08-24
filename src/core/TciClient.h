@@ -37,6 +37,7 @@
 #include "core/TciBinaryFrame.h"
 
 #include <QAbstractSocket>
+#include <QMap>
 #include <QObject>
 #include <QString>
 
@@ -101,6 +102,16 @@ public:
     bool isReceiverRunning() const { return m_trxRunning; }
     bool isReceiverStateKnown() const { return m_sawRunState; }
 
+    // Die tatsaechliche Mittenfrequenz des I/Q-Stroms, aus dem Textkanal
+    // gelernt ("dds:<receiver>,<hz>", gemessen 2026-08-24 gegen
+    // ExpertSDR2). NICHT dasselbe wie die VFO-Anzeige("vfo:R,V,hz"):
+    // vfo ist die Stimme des Betreibers innerhalb der ZF-Durchlassbreite,
+    // dds ist die Mitte, um die der I/Q-Strom selbst liegt -- genau das,
+    // was ein Panadapter als Mittenfrequenz braucht. 0, solange das
+    // Geraet sie noch nicht genannt hat.
+    qint64 ddcCenterHz(int receiver) const
+    { return m_ddcCenterHz.value(receiver, 0); }
+
 signals:
     void stateChanged(Longpath::TciClient::State state, const QString& detail);
 
@@ -114,6 +125,9 @@ signals:
                           const std::vector<float>& interleaved);
 
     void receiverRunStateChanged(bool running);
+    // Siehe ddcCenterHz() -- feuert bei jeder "dds:"-Zeile, auch nach
+    // dem Verbindungsaufbau, falls der Betreiber in ExpertSDR2 retunt.
+    void ddcCenterChanged(int receiver, qint64 hz);
     // Einmalig, wenn die Selbstauskunft zu Ende ist (Uebergang nach
     // Connected). deviceName kann leer sein, wenn das Geraet sich
     // nicht per "device:" vorstellt.
@@ -139,6 +153,8 @@ private:
     bool m_trxRunning  = false;
     bool m_sawRunState = false;
     bool m_sawReady    = false;
+
+    QMap<int, qint64> m_ddcCenterHz;   // Empfaenger -> letzte "dds:"-Mitte
 };
 
 } // namespace Longpath

@@ -5406,6 +5406,11 @@ if(Qt6WebSockets_FOUND)
     nereus_add_test(tst_tci_client_edge_cases)
     target_link_libraries(tst_tci_client_edge_cases PRIVATE Qt6::WebSockets)
 
+    # 2026-08-24, Schritt "Bild": dds:/vfo:/if: unterscheiden -- siehe
+    # Kommentarkopf der Testdatei.
+    nereus_add_test(tst_tci_client_ddc_center)
+    target_link_libraries(tst_tci_client_ddc_center PRIVATE Qt6::WebSockets)
+
     # 2026-08-24: die Verdrahtung MainWindow -> TciClient -> AudioEngine
     # ueber den tatsaechlichen Weg des Menuepunkts (connectSunSdr), nicht
     # nur die einzelnen Bausteine (die haben ihre eigenen Pruefungen).

@@ -1016,6 +1016,41 @@ SpectrumWidget* MainWindow::spectrumForSlice(SliceModel* s) const
     return activeSpectrumWidget();  // fallback to active pan
 }
 
+// Herausgezogen aus rebuildFftRouting() (2026-08-24), damit der SunSDR-Weg
+// (MainWindow_SunSdr.cpp) dieselbe Suche verwenden kann statt sie zu
+// verdoppeln -- reine Verschiebung, kein Verhaltensunterschied.
+//
+// Resolving the pan is not just slice->panKey(). Slice A never has
+// one: RadioModel::addSlice stamps panKey only when it is given one
+// and connectToRadio calls the no-argument overload
+// (RadioModel.cpp:4137), so Slice A's panKey is permanently empty.
+// Skipping empties (as the Task 9 spec had it) would leave pan 0
+// with no subscription and no trace at all.
+//
+// Fall back to the pan that actually hosts the slice, recorded by
+// the sliceAdded handler through PanadapterApplet::addSlice. That
+// record is stable; activePanId() is not, and using it alone would
+// migrate Slice A's subscription (and darken pan 0) the moment the
+// operator made another pan active. activePanId() stays as the last
+// resort, matching spectrumForSlice (MainWindow.cpp:880).
+QString MainWindow::panIdForSlice(SliceModel* slice) const
+{
+    if (!slice || !m_panStack) { return QString(); }
+    QString panId = slice->panKey();
+    if (panId.isEmpty() || !m_panStack->panadapter(panId)) {
+        panId.clear();
+        for (auto* applet : m_panStack->allApplets()) {
+            if (applet
+                && applet->associatedSlices().contains(slice->sliceIndex())) {
+                panId = applet->panId();
+                break;
+            }
+        }
+    }
+    if (panId.isEmpty()) { panId = m_panStack->activePanId(); }
+    return panId;
+}
+
 SliceModel* MainWindow::sliceForAddedIdForTest(RadioModel* model, int sliceId)
 {
     return model ? model->sliceById(sliceId) : nullptr;
@@ -3127,32 +3162,8 @@ void MainWindow::rebuildFftRouting()
         const int stream = slice->streamIndex();
         if (stream < 0) { continue; }          // unbound slice feeds nothing
 
-        // Resolving the pan is not just slice->panKey(). Slice A never has
-        // one: RadioModel::addSlice stamps panKey only when it is given one
-        // and connectToRadio calls the no-argument overload
-        // (RadioModel.cpp:4137), so Slice A's panKey is permanently empty.
-        // Skipping empties (as the Task 9 spec had it) would leave pan 0
-        // with no subscription and no trace at all.
-        //
-        // Fall back to the pan that actually hosts the slice, recorded by
-        // the sliceAdded handler through PanadapterApplet::addSlice. That
-        // record is stable; activePanId() is not, and using it alone would
-        // migrate Slice A's subscription (and darken pan 0) the moment the
-        // operator made another pan active. activePanId() stays as the last
-        // resort, matching spectrumForSlice (MainWindow.cpp:880).
         if (!m_panStack) { continue; }
-        QString panId = slice->panKey();
-        if (panId.isEmpty() || !m_panStack->panadapter(panId)) {
-            panId.clear();
-            for (auto* applet : m_panStack->allApplets()) {
-                if (applet
-                    && applet->associatedSlices().contains(slice->sliceIndex())) {
-                    panId = applet->panId();
-                    break;
-                }
-            }
-        }
-        if (panId.isEmpty()) { panId = m_panStack->activePanId(); }
+        const QString panId = panIdForSlice(slice);
         if (panId.isEmpty()) { continue; }
 
         const bool isNewSubscription = !before.value(panId).contains(stream);

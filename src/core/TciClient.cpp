@@ -67,6 +67,7 @@ void TciClient::resetSessionState()
     m_trxRunning  = false;
     m_sawRunState = false;
     m_sawReady    = false;
+    m_ddcCenterHz.clear();
 }
 
 void TciClient::setState(State state, const QString& detail)
@@ -242,6 +243,31 @@ void TciClient::handleTextLine(const QString& line)
         bool ok = false;
         const int rate = line.section(QLatin1Char(':'), 1).trimmed().toInt(&ok);
         if (ok && rate > 0) { m_audioRateFromText = rate; }
+        return;
+    }
+
+    // Die wahre Mittenfrequenz des I/Q-Stroms. Siehe TciClient.h,
+    // ddcCenterHz(). Gemessen gegen ExpertSDR2 (2026-08-24):
+    // "vfo:R,V,hz" sind die beiden VFO-Anzeigen INNERHALB der
+    // ZF-Durchlassbreite, "if:R,V,offsetHz" ist ihr Versatz dazu
+    // (nachgerechnet und bestaetigt: dds 1910670 + if 9830 = vfo
+    // 1920500). "dds:" allein ist die Mitte, um die der I/Q-Strom
+    // selbst liegt -- vfo/if werden hier bewusst NICHT gelesen, diese
+    // erste Stufe braucht nur die eine Zahl, die ein Panadapter als
+    // Mittenfrequenz erwartet.
+    if (line.startsWith(QStringLiteral("dds:"))) {
+        const QStringList parts =
+            line.section(QLatin1Char(':'), 1).split(QLatin1Char(','));
+        if (parts.size() == 2) {
+            bool okReceiver = false;
+            bool okHz = false;
+            const int receiver = parts.at(0).trimmed().toInt(&okReceiver);
+            const qint64 hz = parts.at(1).trimmed().toLongLong(&okHz);
+            if (okReceiver && okHz) {
+                m_ddcCenterHz[receiver] = hz;
+                emit ddcCenterChanged(receiver, hz);
+            }
+        }
         return;
     }
 

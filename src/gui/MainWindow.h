@@ -186,6 +186,11 @@ public:
     /// flag routing hub; mirrors AetherSDR MainWindow::spectrumForSlice
     /// (MainWindow.cpp:14856 [@6a142807]).
     SpectrumWidget* spectrumForSlice(SliceModel* s) const;
+    // Herausgezogen aus rebuildFftRouting() (2026-08-24) -- welcher Pan
+    // zeigt diese Scheibe tatsaechlich. Siehe Umsetzung in MainWindow.cpp
+    // fuer die Rueckfall-Reihenfolge (panKey, dann Scheiben-Zugehoerigkeit,
+    // dann der aktive Pan).
+    QString panIdForSlice(SliceModel* slice) const;
 
     /// The pan-id list a layout template implies. Sole owner of the
     /// template-to-pan-count table, which previously had three copies.
