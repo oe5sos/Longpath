@@ -5424,6 +5424,16 @@ if(Qt6WebSockets_FOUND)
     # Trennen. Siehe Kommentarkopf der Testdatei.
     nereus_add_test(tst_sunsdr_spectrum_wiring)
     target_link_libraries(tst_sunsdr_spectrum_wiring PRIVATE Qt6::WebSockets)
+
+    # 2026-08-24, Schritt "Steuerung": vfo:/modulation: eingehend UND
+    # ausgehend, Empfaenger-/Kanal-Filter (derselbe Bench-Fund wie beim
+    # Panadapter), Echo-Schutz, Sicherheitsschranke gegen eine echte,
+    # DDC-gebundene Scheibe. Siehe Kommentarkopf der Testdatei.
+    nereus_add_test(tst_tci_client_vfo_and_modulation)
+    target_link_libraries(tst_tci_client_vfo_and_modulation PRIVATE Qt6::WebSockets)
+
+    nereus_add_test(tst_sunsdr_control_wiring)
+    target_link_libraries(tst_sunsdr_control_wiring PRIVATE Qt6::WebSockets)
 endif()
 
 # ── Phase 3J-1 Task 16.3 (sub-commit a): TciBinaryFrame encode ───────────────

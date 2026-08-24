@@ -1394,6 +1394,34 @@ private:
     // ("dds:", siehe TciClient.h). 0 = noch keine Zeile gesehen; dann
     // faellt applySunSdrStreamWindow() auf die Scheibenfrequenz zurueck.
     qint64 m_sunSdrDdcCenterHz{0};
+
+    // ── SunSDR-Steuerung (2026-08-24) ─────────────────────────────────
+    //
+    // Zwei-Wege: eingehende vfo:/modulation:-Zeilen uebernehmen die
+    // Scheibenfrequenz/-betriebsart (applyRemoteSunSdrFrequency/
+    // -Modulation), eine Bedieneraenderung an der Scheibe sendet
+    // umgekehrt vfo:/modulation: an ExpertSDR2 (wireSunSdrOutboundControl,
+    // pro Verbindungsaufbau neu gesetzt, siehe connectSunSdr).
+    //
+    // m_sunSdrApplyingRemoteState ist der Echo-Wachposten: waehrend eine
+    // eingehende Zeile die Scheibe schreibt, muss die Ausgangsseite still
+    // bleiben, sonst schickt Longpath denselben Wert postwendend zurueck
+    // an das Geraet, von dem er gerade kam (dasselbe Bool-Wachposten-Muster
+    // wie RadioModel::m_rollingBackFrequency; siehe RadioModel.cpp).
+    bool m_sunSdrApplyingRemoteState{false};
+    // Verbindungen zur AKTUELLEN Ziel-Scheibe -- werden bei jedem
+    // connectSunSdr()-Aufruf zuerst getrennt und neu gesetzt, weil sich
+    // die Ziel-Scheibe zwischen zwei "Verbinden…"-Klicks aendern kann
+    // (derselbe Rueckfall wie bei m_sunSdrTargetSliceId). Ohne das
+    // wuerde die Ausgangsseite nach einem zweiten Verbindungsaufbau auf
+    // eine moeglicherweise nicht mehr existierende oder falsche Scheibe
+    // zeigen.
+    QMetaObject::Connection m_sunSdrFreqOutConn;
+    QMetaObject::Connection m_sunSdrModeOutConn;
+    void applyRemoteSunSdrFrequency(qint64 hz);
+    void applyRemoteSunSdrModulation(const QString& mode);
+    void wireSunSdrOutboundControl(class SliceModel* slice);
+
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
 

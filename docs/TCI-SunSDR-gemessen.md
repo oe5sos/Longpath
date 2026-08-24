@@ -125,6 +125,32 @@ Panadapter zählt ausschließlich die `dds:`-Zeile des Empfängers, dessen
 I/Q-Strom tatsächlich angefordert wurde (`iq_start:<index>`) — jede
 andere muss verworfen werden.
 
+## Steuerung — vfo: statt dds:, Modus klein geschrieben
+
+Für die Scheibenfrequenz (nicht den Panadapter, siehe oben) zählt
+`vfo:<Empfänger>,<Kanal>,<Hz>` — Kanal 0 ist VFO A, 1 ist VFO B.
+Longpath spricht ausschließlich Kanal A an, dieselbe „einfach
+gehalten"-Entscheidung wie beim Rest der SunSDR-Anbindung.
+
+Eine Umstimmung *irgendeines* Empfängers in ExpertSDR2 löst sofort eine
+frische `vfo:`-Zeile aus, unaufgefordert, mitten in der Sitzung — genau
+wie bei `dds:` (siehe oben) gilt: die Zeile trägt nur den Index des
+tatsächlich betroffenen Empfängers, und derselbe Zwei-Empfänger-Filter
+ist nötig, sonst schlägt Empfänger 1s VFO wieder durch.
+
+Betriebsart kommt als `modulation:<Empfänger>,<Modus>`, klein
+geschrieben (`modulation:0,lsb`, `modulation:0,usb` — gemessen mit
+laufender Longpath-Sitzung, tci_probe parallel, 2026-08-24). Das deckt
+sich mit der Selbstauskunft: `modulations_list:am,sam,dsb,lsb,usb,cw,
+nfm,digl,digu,wfm,drm` — ebenfalls klein. Longpath sendet ausgehende
+Modus-Befehle darum ebenfalls klein geschrieben, `cwl`/`cwu` statt dem
+allgemeinen `cw` (ExpertSDR2s eigene Selbstauskunft nennt nur `cw`,
+aber `TciProtocol.cpp`s eigener Einlese-Zweig erkennt `cwl`/`cwu`
+zusätzlich als eigene Werte — noch nicht am echten SunSDR2 gegen­
+geprüft, ob ExpertSDR2 die Seitenbandwahl bei CW-Empfang darüber
+tatsächlich unterscheidet oder beide auf dieselbe interne Einstellung
+abbildet).
+
 ## Was noch offen ist
 
 - TX-Ton (`streamType` 2) wurde nicht angefordert; für ein
@@ -132,3 +158,6 @@ andere muss verworfen werden.
 - Der Empfänger muss in ExpertSDR2 **laufen**. Steht er, kommt kein
   einziger Rahmen — egal was man anfordert. Die Sonde erkennt das an
   `< stop` und verweigert dann ein Urteil.
+- `cwl`/`cwu` als ausgehender Modus-Befehl (statt dem allgemeinen `cw`
+  aus der Selbstauskunft): noch nicht am echten Gerät geprüft, ob
+  ExpertSDR2 das als zwei verschiedene CW-Seitenbänder versteht.

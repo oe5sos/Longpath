@@ -47,6 +47,8 @@
 #include <QMessageBox>
 #include <QMetaObject>
 
+#include <cmath>
+
 namespace Longpath {
 
 namespace {
@@ -106,6 +108,60 @@ bool parseSunSdrEndpoint(const QString& endpoint, QString* host, quint16* port)
     if (host) { *host = parsedHost; }
     if (port) { *port = static_cast<quint16>(parsedPort); }
     return true;
+}
+
+// DSPMode -> TCI-Wortlaut, klein geschrieben wie am Draht gemessen
+// ("modulations_list:am,sam,dsb,lsb,usb,cw,nfm,digl,digu,wfm,drm",
+// tci_probe gegen ExpertSDR2, 2026-08-24). cwl/cwu extra (nicht in der
+// Liste, aber von handleModulationCommand erkannt, siehe TciProtocol.cpp)
+// -- damit bleibt die Seitenbandwahl bei CW erhalten, statt beide auf
+// das allgemeine "cw" zu verflachen. SPEC/RADE_U/RADE_L haben keine
+// TCI-Entsprechung -- leerer String, der Aufrufer verwirft dann statt
+// zu senden (siehe wireSunSdrOutboundControl).
+QString tciModeStringForDspMode(Longpath::DSPMode mode)
+{
+    switch (mode) {
+    case Longpath::DSPMode::LSB:  return QStringLiteral("lsb");
+    case Longpath::DSPMode::USB:  return QStringLiteral("usb");
+    case Longpath::DSPMode::DSB:  return QStringLiteral("dsb");
+    case Longpath::DSPMode::CWL:  return QStringLiteral("cwl");
+    case Longpath::DSPMode::CWU:  return QStringLiteral("cwu");
+    case Longpath::DSPMode::FM:   return QStringLiteral("nfm");
+    case Longpath::DSPMode::AM:   return QStringLiteral("am");
+    case Longpath::DSPMode::DIGU: return QStringLiteral("digu");
+    case Longpath::DSPMode::DIGL: return QStringLiteral("digl");
+    case Longpath::DSPMode::SAM:  return QStringLiteral("sam");
+    case Longpath::DSPMode::DRM:  return QStringLiteral("drm");
+    case Longpath::DSPMode::SPEC:
+    case Longpath::DSPMode::RADE_U:
+    case Longpath::DSPMode::RADE_L:
+        return QString();
+    }
+    return QString();
+}
+
+// Kehrfunktion, klein -> DSPMode. "cw" (ohne L/U) kommt von ExpertSDR2
+// selbst nie -- das ist nur ein TCI-Eingangsformat anderer Geraete
+// (siehe TciProtocol.cpp handleModulationCommand) -- trotzdem mit
+// abgedeckt, auf CWL abgebildet, aus demselben Grund wie dort.
+Longpath::DSPMode dspModeForTciModeString(const QString& mode, bool* ok)
+{
+    if (ok) { *ok = true; }
+    if (mode == QStringLiteral("lsb"))  { return Longpath::DSPMode::LSB; }
+    if (mode == QStringLiteral("usb"))  { return Longpath::DSPMode::USB; }
+    if (mode == QStringLiteral("dsb"))  { return Longpath::DSPMode::DSB; }
+    if (mode == QStringLiteral("cw"))   { return Longpath::DSPMode::CWL; }
+    if (mode == QStringLiteral("cwl"))  { return Longpath::DSPMode::CWL; }
+    if (mode == QStringLiteral("cwu"))  { return Longpath::DSPMode::CWU; }
+    if (mode == QStringLiteral("nfm")
+        || mode == QStringLiteral("fm")) { return Longpath::DSPMode::FM; }
+    if (mode == QStringLiteral("am"))   { return Longpath::DSPMode::AM; }
+    if (mode == QStringLiteral("sam"))  { return Longpath::DSPMode::SAM; }
+    if (mode == QStringLiteral("digu")) { return Longpath::DSPMode::DIGU; }
+    if (mode == QStringLiteral("digl")) { return Longpath::DSPMode::DIGL; }
+    if (mode == QStringLiteral("drm"))  { return Longpath::DSPMode::DRM; }
+    if (ok) { *ok = false; }
+    return Longpath::DSPMode::USB;
 }
 
 // Nicht-blockierend (2026-08-24, nach einem Testabsturz): QMessageBox::
@@ -181,6 +237,12 @@ void MainWindow::connectSunSdr(const QString& endpoint)
         wireSunSdr();
     }
 
+    // Schritt "Steuerung": die Ausgangsseite haengt an der KONKRETEN
+    // Scheibe, nicht am Client -- muss darum bei jedem Verbindungsaufbau
+    // neu gesetzt werden, weil sich die Ziel-Scheibe zwischen zwei
+    // "Verbinden…"-Klicks aendern kann (siehe wireSunSdrOutboundControl).
+    wireSunSdrOutboundControl(slice);
+
     qCInfo(lcTci).nospace() << "SunSDR: verbinde mit " << host << ":" << port
                             << " -> Scheibe " << m_sunSdrTargetSliceId;
     m_sunSdrClient->connectToEndpoint(host, port);
@@ -196,6 +258,86 @@ void MainWindow::disconnectSunSdr()
             audio->removeSunSdrAudioSource(m_sunSdrTargetSliceId);
         }
     }
+    disconnect(m_sunSdrFreqOutConn);
+    disconnect(m_sunSdrModeOutConn);
+}
+
+void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
+{
+    disconnect(m_sunSdrFreqOutConn);
+    disconnect(m_sunSdrModeOutConn);
+    if (!slice) { return; }
+
+    // Sicherheitsschranke (gegengeprueft 2026-08-24 vor dem Bau, siehe
+    // Recherche zur Frequenz-/Modusweiche in RadioModel.cpp): eine
+    // Scheibe MIT echter DDC-Bindung (streamIndex() >= 0) gehoert einem
+    // ECHTEN, moeglicherweise sendefaehigen Funkgeraet. Wuerde diese
+    // Verdrahtung auch dort greifen, koennte ein fremdes TCI-Geraet
+    // (SunSDR/ExpertSDR2) das echte Funkgeraet stumm umstimmen, sobald
+    // dessen Scheibe zufaellig die "aktive" war und darum als SunSDR-
+    // Ziel uebernommen wurde (siehe connectSunSdr, Scheiben-Rueckfall).
+    // "Technik Nereus, Design ich" ist eine Gestaltungsregel -- diese
+    // hier ist keine, sie ist die Sicherheitsgrenze aus CLAUDE.local.md:
+    // "Wo Zurueckhaltung und Sicherheit sich widersprechen, gewinnt die
+    // Sicherheit." Also: nur eine ungebundene Scheibe darf hierueber
+    // gesteuert werden, nie eine echte.
+    if (slice->streamIndex() >= 0) {
+        qCInfo(lcTci) << "SunSDR: Ziel-Scheibe hat eine echte DDC-Bindung "
+                         "-- Ausgangssteuerung bleibt aus, um kein echtes "
+                         "Funkgeraet stumm mitzusteuern";
+        return;
+    }
+
+    m_sunSdrFreqOutConn = connect(slice, &SliceModel::frequencyChanged, this,
+                                  [this](double hz) {
+        if (m_sunSdrApplyingRemoteState || !m_sunSdrClient) { return; }
+        m_sunSdrClient->setVfoFrequency(
+            kSunSdrReceiverIndex, 0, qint64(std::llround(hz)));
+    });
+    m_sunSdrModeOutConn = connect(slice, &SliceModel::dspModeChanged, this,
+                                  [this](Longpath::DSPMode mode) {
+        if (m_sunSdrApplyingRemoteState || !m_sunSdrClient) { return; }
+        const QString tciMode = tciModeStringForDspMode(mode);
+        if (tciMode.isEmpty()) {
+            qCWarning(lcTci) << "SunSDR: Modus" << int(mode)
+                             << "hat keine TCI-Entsprechung, nicht gesendet";
+            return;
+        }
+        m_sunSdrClient->setModulation(kSunSdrReceiverIndex, tciMode);
+    });
+}
+
+void MainWindow::applyRemoteSunSdrFrequency(qint64 hz)
+{
+    if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return; }
+    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
+    // Dieselbe Sicherheitsschranke wie beim Ausgang (siehe
+    // wireSunSdrOutboundControl) -- eine echte Scheibe darf niemals von
+    // einem fremden TCI-Geraet umgestimmt werden, egal ob es dieselbe
+    // Verdrahtung ist oder eine zweite. Kommt praktisch nur vor, wenn
+    // spaeter ein echtes Funkgeraet dieselbe Scheibe uebernimmt, die
+    // gerade noch das SunSDR-Ziel war.
+    if (!slice || slice->streamIndex() >= 0) { return; }
+    m_sunSdrApplyingRemoteState = true;
+    slice->setFrequency(static_cast<double>(hz));
+    m_sunSdrApplyingRemoteState = false;
+}
+
+void MainWindow::applyRemoteSunSdrModulation(const QString& mode)
+{
+    if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return; }
+    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
+    if (!slice || slice->streamIndex() >= 0) { return; }
+    bool ok = false;
+    const Longpath::DSPMode dspMode = dspModeForTciModeString(mode, &ok);
+    if (!ok) {
+        qCWarning(lcTci) << "SunSDR: unbekannte Betriebsart" << mode
+                         << "-- Scheibe unveraendert";
+        return;
+    }
+    m_sunSdrApplyingRemoteState = true;
+    slice->setDspMode(dspMode);
+    m_sunSdrApplyingRemoteState = false;
 }
 
 // ── Die Verdrahtung ─────────────────────────────────────────────────
@@ -409,6 +551,31 @@ void MainWindow::wireSunSdr()
             reassertSunSdrRouterMapping();
         }
     }
+
+    // ── Steuerung: eingehend ─────────────────────────────────────────
+    //
+    // "vfo:R,V,hz" ist die tatsaechliche VFO-Anzeige, anders als "dds:"
+    // oben (das ist die DDC-Mitte fuer den Panadapter, siehe TciClient.h)
+    // -- vfo: gibt her, wo der Bediener in ExpertSDR2 tatsaechlich steht,
+    // und ist damit der richtige Wert fuer die Scheibenfrequenz. Nur
+    // VFO-Kanal 0 (A): dieselbe "einfach gehalten"-Entscheidung wie beim
+    // Rest des SunSDR-Zweigs, kein Split-Betrieb ueber VFO B.
+    //
+    // Derselbe Empfaenger-Filter wie oben bei dds: (Bench-Fund
+    // 2026-08-24: ExpertSDR2 hat zwei Empfaenger-Plaetze, jeder mit
+    // eigenen vfo:/modulation:-Zeilen) -- ohne ihn wuerde Empfaenger 1s
+    // Frequenz/Modus genauso in die Scheibe durchschlagen wie es beim
+    // Panadapter geschah, bevor der Filter dort ergaenzt wurde.
+    connect(m_sunSdrClient, &TciClient::vfoChanged, this,
+            [this](int receiver, int channel, qint64 hz) {
+        if (receiver != kSunSdrReceiverIndex || channel != 0) { return; }
+        applyRemoteSunSdrFrequency(hz);
+    });
+    connect(m_sunSdrClient, &TciClient::modulationChanged, this,
+            [this](int receiver, const QString& mode) {
+        if (receiver != kSunSdrReceiverIndex) { return; }
+        applyRemoteSunSdrModulation(mode);
+    });
 }
 
 void MainWindow::applySunSdrStreamWindow()

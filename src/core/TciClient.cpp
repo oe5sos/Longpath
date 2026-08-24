@@ -68,6 +68,8 @@ void TciClient::resetSessionState()
     m_sawRunState = false;
     m_sawReady    = false;
     m_ddcCenterHz.clear();
+    m_vfoHz.clear();
+    m_modulation.clear();
 }
 
 void TciClient::setState(State state, const QString& detail)
@@ -214,6 +216,27 @@ void TciClient::stopAudioStream(int receiver)
     sendCommand(QStringLiteral("audio_stop:%1").arg(receiver));
 }
 
+void TciClient::setVfoFrequency(int receiver, int channel, qint64 hz)
+{
+    if (m_state != State::Connected) {
+        qCWarning(lcTci) << "TciClient: vfo ignoriert, Selbstauskunft "
+                             "noch nicht zu Ende (Empfaenger" << receiver
+                          << ", Kanal" << channel << ")";
+        return;
+    }
+    sendCommand(QStringLiteral("vfo:%1,%2,%3").arg(receiver).arg(channel).arg(hz));
+}
+
+void TciClient::setModulation(int receiver, const QString& mode)
+{
+    if (m_state != State::Connected) {
+        qCWarning(lcTci) << "TciClient: modulation ignoriert, Selbstauskunft "
+                             "noch nicht zu Ende (Empfaenger" << receiver << ")";
+        return;
+    }
+    sendCommand(QStringLiteral("modulation:%1,%2").arg(receiver).arg(mode));
+}
+
 void TciClient::handleTextMessage(const QString& message)
 {
     for (const QString& part : message.split(QLatin1Char(';'), Qt::SkipEmptyParts)) {
@@ -252,9 +275,10 @@ void TciClient::handleTextLine(const QString& line)
     // ZF-Durchlassbreite, "if:R,V,offsetHz" ist ihr Versatz dazu
     // (nachgerechnet und bestaetigt: dds 1910670 + if 9830 = vfo
     // 1920500). "dds:" allein ist die Mitte, um die der I/Q-Strom
-    // selbst liegt -- vfo/if werden hier bewusst NICHT gelesen, diese
-    // erste Stufe braucht nur die eine Zahl, die ein Panadapter als
-    // Mittenfrequenz erwartet.
+    // selbst liegt -- fuer den Panadapter (Schritt "Bild") ist nur
+    // diese eine Zahl noetig. "if:" bleibt ungelesen (aus dds:+vfo:
+    // ableitbar, kein eigener Bedarf); "vfo:" wird seit Schritt
+    // "Steuerung" unten separat gelesen, siehe dort.
     if (line.startsWith(QStringLiteral("dds:"))) {
         const QStringList parts =
             line.section(QLatin1Char(':'), 1).split(QLatin1Char(','));
@@ -266,6 +290,45 @@ void TciClient::handleTextLine(const QString& line)
             if (okReceiver && okHz) {
                 m_ddcCenterHz[receiver] = hz;
                 emit ddcCenterChanged(receiver, hz);
+            }
+        }
+        return;
+    }
+
+    // Schritt "Steuerung" (2026-08-24): die tatsaechliche VFO-Anzeige --
+    // wo der Bediener innerhalb der ZF-Durchlassbreite steht, siehe
+    // vfoHz() in TciClient.h. Drei Felder, anders als dds: (zwei):
+    // Empfaenger, VFO-Kanal (0=A, 1=B), Hz.
+    if (line.startsWith(QStringLiteral("vfo:"))) {
+        const QStringList parts =
+            line.section(QLatin1Char(':'), 1).split(QLatin1Char(','));
+        if (parts.size() == 3) {
+            bool okReceiver = false;
+            bool okChannel = false;
+            bool okHz = false;
+            const int receiver = parts.at(0).trimmed().toInt(&okReceiver);
+            const int channel = parts.at(1).trimmed().toInt(&okChannel);
+            const qint64 hz = parts.at(2).trimmed().toLongLong(&okHz);
+            if (okReceiver && okChannel && okHz) {
+                m_vfoHz[receiver][channel] = hz;
+                emit vfoChanged(receiver, channel, hz);
+            }
+        }
+        return;
+    }
+
+    // Betriebsart, klein geschrieben wie am Draht gemessen
+    // ("modulation:0,lsb"), siehe modulation() in TciClient.h.
+    if (line.startsWith(QStringLiteral("modulation:"))) {
+        const QStringList parts =
+            line.section(QLatin1Char(':'), 1).split(QLatin1Char(','));
+        if (parts.size() == 2) {
+            bool okReceiver = false;
+            const int receiver = parts.at(0).trimmed().toInt(&okReceiver);
+            const QString mode = parts.at(1).trimmed().toLower();
+            if (okReceiver && !mode.isEmpty()) {
+                m_modulation[receiver] = mode;
+                emit modulationChanged(receiver, mode);
             }
         }
         return;

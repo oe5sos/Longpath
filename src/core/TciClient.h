@@ -112,6 +112,29 @@ public:
     qint64 ddcCenterHz(int receiver) const
     { return m_ddcCenterHz.value(receiver, 0); }
 
+    // Schritt "Steuerung", 2026-08-24 — Frequenz/Modus AUSGEHEND senden.
+    // Wie startIqStream/startAudioStream: nur wirksam in State::Connected,
+    // sonst verworfen mit Warnung (siehe .cpp). channel: 0 = VFO A,
+    // 1 = VFO B. mode ist der TCI-Wortlaut klein geschrieben ("usb",
+    // "cwl", ...) -- die Umwandlung aus SliceModel::DSPMode sitzt beim
+    // Aufrufer (MainWindow_SunSdr.cpp), TciClient kennt DSPMode nicht.
+    void setVfoFrequency(int receiver, int channel, qint64 hz);
+    void setModulation(int receiver, const QString& mode);
+
+    // Die tatsaechliche VFO-Anzeige -- wo der Bediener INNERHALB der
+    // ZF-Durchlassbreite steht, anders als ddcCenterHz() (die Mitte, um
+    // die der I/Q-Strom selbst liegt, siehe dort). "vfo:R,V,hz",
+    // gemessen 2026-08-24. channel: 0 = VFO A, 1 = VFO B. 0, solange
+    // keine Zeile fuer diesen Empfaenger/Kanal kam.
+    qint64 vfoHz(int receiver, int channel) const
+    { return m_vfoHz.value(receiver).value(channel, 0); }
+
+    // Die Betriebsart, klein geschrieben wie am Draht gemessen
+    // ("modulation:0,lsb"). Leer, solange keine Zeile fuer diesen
+    // Empfaenger kam.
+    QString modulation(int receiver) const
+    { return m_modulation.value(receiver); }
+
 signals:
     void stateChanged(Longpath::TciClient::State state, const QString& detail);
 
@@ -128,6 +151,12 @@ signals:
     // Siehe ddcCenterHz() -- feuert bei jeder "dds:"-Zeile, auch nach
     // dem Verbindungsaufbau, falls der Betreiber in ExpertSDR2 retunt.
     void ddcCenterChanged(int receiver, qint64 hz);
+    // Siehe vfoHz()/modulation() -- feuern bei jeder "vfo:"/
+    // "modulation:"-Zeile, auch mitten in der Sitzung (Schritt
+    // "Steuerung"). Gemessen 2026-08-24: eine Umstimmung in ExpertSDR2
+    // loest sofort eine frische Zeile aus, unaufgefordert.
+    void vfoChanged(int receiver, int channel, qint64 hz);
+    void modulationChanged(int receiver, const QString& mode);
     // Einmalig, wenn die Selbstauskunft zu Ende ist (Uebergang nach
     // Connected). deviceName kann leer sein, wenn das Geraet sich
     // nicht per "device:" vorstellt.
@@ -155,6 +184,8 @@ private:
     bool m_sawReady    = false;
 
     QMap<int, qint64> m_ddcCenterHz;   // Empfaenger -> letzte "dds:"-Mitte
+    QMap<int, QMap<int, qint64>> m_vfoHz;   // Empfaenger -> VFO-Kanal -> Hz
+    QMap<int, QString> m_modulation;   // Empfaenger -> Modus (klein)
 };
 
 } // namespace Longpath
