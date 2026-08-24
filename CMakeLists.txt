@@ -1818,3 +1818,17 @@ endif()
 #   ./build/tci_probe ws://127.0.0.1:40001 12
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
+
+# ── SunSDR2-QRP-native-Sonde (2026-08-24) ──────────────────────────────
+#
+# WERKZEUG, kein Programmteil. Beantwortet die eine Frage, die vor jedem
+# nativen SunSDR-Treibercode steht: antwortet die echte QRP-Hardware auf
+# das Draht-Protokoll, das docs/architecture/2026-08-24-sunsdr-native-
+# driver-design.md aus ArtemisSDR (GPLv2-or-later) als Referenz fuer
+# SunSDR2 DX/PRO dokumentiert -- fuer den QRP selbst nie bestaetigt.
+#
+# EXCLUDE_FROM_ALL: sie wird nicht mitgebaut und nicht ausgeliefert.
+#   cmake --build build --target sunsdr_probe
+#   ./build/sunsdr_probe 192.168.1.100 5
+add_executable(sunsdr_probe EXCLUDE_FROM_ALL tools/sunsdr_probe.cpp)
+target_link_libraries(sunsdr_probe PRIVATE Qt6::Core Qt6::Network)
