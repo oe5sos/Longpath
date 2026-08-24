@@ -82,6 +82,23 @@ bool parseSunSdrEndpoint(const QString& endpoint, QString* host, quint16* port)
     return true;
 }
 
+// Nicht-blockierend (2026-08-24, nach einem Testabsturz): QMessageBox::
+// information/warning sind bequeme Aufrufe um exec(), das die ganze
+// Anwendung anhaelt, bis jemand klickt. Im automatisierten Testlauf klickt
+// niemand -- tst_sunsdr_connect_wiring lief deshalb in eine 486-Sekunden-
+// Zeitueberschreitung: genau diese Meldung ging mitten im Verbindungs-
+// aufbau auf und wartete auf einen Klick, der nie kam. Eine Statusmeldung
+// sollte ausserdem auch fuer einen echten Bediener nicht die ganze
+// Anwendung einfrieren.
+void showSunSdrNotice(QWidget* parent, QMessageBox::Icon icon,
+                      const QString& title, const QString& text)
+{
+    auto* box = new QMessageBox(icon, title, text, QMessageBox::Ok, parent);
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->setModal(false);
+    box->show();
+}
+
 } // namespace
 
 void MainWindow::connectSunSdr(const QString& endpoint)
@@ -89,8 +106,8 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     QString host;
     quint16 port = 0;
     if (!parseSunSdrEndpoint(endpoint, &host, &port)) {
-        QMessageBox::warning(
-            this, QStringLiteral("SunSDR verbinden"),
+        showSunSdrNotice(
+            this, QMessageBox::Warning, QStringLiteral("SunSDR verbinden"),
             QStringLiteral("Adresse unlesbar: „%1“\n\n"
                            "Erwartet wird eine IP-Adresse oder ein "
                            "Rechnername, wahlweise mit :Port.")
@@ -120,8 +137,8 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     if (!slice) {
         qCWarning(lcTci) << "SunSDR: keine Scheibe zu bekommen -- der Ton "
                             "haette keinen Weg in die Mischung";
-        QMessageBox::warning(
-            this, QStringLiteral("SunSDR verbinden"),
+        showSunSdrNotice(
+            this, QMessageBox::Warning, QStringLiteral("SunSDR verbinden"),
             QStringLiteral("Es konnte keine Scheibe angelegt werden. "
                            "Der SunSDR wird nicht verbunden."));
         return;
@@ -195,8 +212,8 @@ void MainWindow::wireSunSdr()
         // nur gab es NICHTS im Fenster, das das gezeigt haette). Kein
         // laestiges Wiederholen: deviceDescribed feuert genau einmal je
         // "Verbinden…"-Klick, TciClient baut nicht von selbst neu auf.
-        QMessageBox::information(
-            this, QStringLiteral("SunSDR verbunden"),
+        showSunSdrNotice(
+            this, QMessageBox::Information, QStringLiteral("SunSDR verbunden"),
             deviceName.isEmpty()
                 ? QStringLiteral("Verbunden. Sobald der Empfaenger in "
                                  "ExpertSDR2 laeuft, kommt Ton.")
@@ -243,8 +260,8 @@ void MainWindow::wireSunSdr()
             // erneut "Verbinden…" waehlt (siehe TciClient.cpp) -- diese
             // Meldung feuert darum je Fehlversuch genau einmal, nicht in
             // einer Schleife.
-            QMessageBox::warning(
-                this, QStringLiteral("SunSDR"),
+            showSunSdrNotice(
+                this, QMessageBox::Warning, QStringLiteral("SunSDR"),
                 QStringLiteral("Verbindung fehlgeschlagen: %1")
                     .arg(detail.isEmpty()
                              ? QStringLiteral("(keine weitere Angabe)")
