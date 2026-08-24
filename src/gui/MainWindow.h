@@ -956,6 +956,24 @@ private:
     void refreshKiwiSdrAppletReceivers();
     void addKiwiSdrReceiver(const QString& name, const QString& endpoint);
     void syncKiwiSdrTransmitMute();
+    // Sicherheitsschranke (2026-08-24, uebertragen aus der SunSDR-
+    // Durchsicht -- siehe docs/architecture/2026-08-24-sunsdr-tci-
+    // client-design.md): die EINE Stelle, die "gibt es diese Scheibe
+    // und darf sie gerade von einem Kiwi gefuettert werden" beantwortet.
+    // Liefert nullptr, wenn die Scheibe nicht existiert ODER eine echte
+    // DDC-Bindung hat (streamIndex() >= 0 -- ein ECHTES, moeglicherweise
+    // sendefaehiges Funkgeraet). Jeder Verbraucher (Ton, Panadapter) geht
+    // darueber, statt sliceById() von Hand zu wiederholen.
+    class SliceModel* kiwiControllableSlice(int sliceId) const;
+    // Gibt EINE Kiwi-Scheiben-Zuordnung vollstaendig frei -- Ton UND die
+    // Manager-Zuordnung selbst -- wenn die Scheibe geloescht wird oder
+    // spaeter von einem echten Funkgeraet uebernommen wird. Anders als
+    // SunSDR (ein Geraet, eine Zielscheibe) kann ein KiwiSDR mehrere
+    // Scheiben gleichzeitig speisen; darum nimmt diese Funktion die
+    // konkrete sliceId/profileId statt eines einzigen gespeicherten
+    // Ziels.
+    void releaseKiwiSdrSlice(int sliceId, const QString& profileId,
+                              const QString& reason);
     void setAsrEnabled(bool on);
 
     // SunSDR — siehe MainWindow_SunSdr.cpp.

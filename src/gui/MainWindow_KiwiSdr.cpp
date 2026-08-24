@@ -329,6 +329,11 @@ void MainWindow::syncKiwiSdrTransmitMute()
         const int sliceId =
             m_kiwiSdrManager->assignedSliceForProfile(profile.id);
         if (sliceId < 0) { continue; }
+        // Sicherheitsschranke (siehe kiwiControllableSlice): eine
+        // Scheibe, die inzwischen ein echtes Funkgeraet uebernommen hat,
+        // darf ihre Sendesperre nicht mehr von einem KiwiSDR-Profil
+        // bekommen.
+        if (!kiwiControllableSlice(sliceId)) { continue; }
 
         if (sending) {
             if (profile.keepAudioDuringTx) { continue; }
@@ -348,6 +353,7 @@ void MainWindow::syncKiwiSdrTransmitMute()
             // Aufheben genau falsch. Ebenso kann das Profil weg sein.
             if (!m_kiwiSdrManager || !m_radioModel) { return; }
             if (!m_kiwiSdrManager->hasProfile(id)) { return; }
+            if (!kiwiControllableSlice(sliceId)) { return; }
             const TransmitModel& t = m_radioModel->transmitModel();
             if (t.isMox() || t.isTune()) { return; }
             if (AudioEngine* a = m_radioModel->audioEngine()) {
@@ -394,12 +400,26 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
     // niemandem, und der Ton haette keinen Weg in die Mischung —
     // stillschweigend, denn verbinden wuerde er trotzdem. Genau das
     // hat die Pruefung tst_kiwi_tx_mute im ersten Lauf gezeigt.
+    //
+    // Bench-gefunden (2026-08-24, uebertragen aus der SunSDR-
+    // Sicherheitsdurchsicht -- siehe docs/architecture/2026-08-24-
+    // sunsdr-tci-client-design.md): die aktive Scheibe war bis hierher
+    // ungeprueft genommen worden, auch wenn sie eine echte DDC-Bindung
+    // hatte (streamIndex() >= 0 -- ein ECHTES, moeglicherweise
+    // sendefaehiges Funkgeraet). Ein gebundene Scheibe wird darum
+    // uebersprungen: dieselbe Regel wie bei SunSDR, aus demselben
+    // Grund -- ein fremder KiwiSDR-Empfaenger darf nie den Ton oder
+    // Panadapter eines echten Funkgeraets stumm ueberschreiben.
     SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+    if (slice && slice->streamIndex() >= 0) { slice = nullptr; }
     if (!slice && m_radioModel) {
-        const QList<SliceModel*> slices = m_radioModel->slices();
-        if (!slices.isEmpty()) {
-            slice = slices.first();
-        } else {
+        for (SliceModel* candidate : m_radioModel->slices()) {
+            if (candidate && candidate->streamIndex() < 0) {
+                slice = candidate;
+                break;
+            }
+        }
+        if (!slice) {
             // ── Ohne Funkgeraet gibt es GAR KEINE Scheibe ───────────
             //
             // Nachgemessen am 2026-08-23: ein frisches Hauptfenster
@@ -439,6 +459,35 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
         << (slice ? QStringLiteral(" -> Scheibe %1").arg(slice->sliceIndex())
                   : QStringLiteral(" OHNE SCHEIBE — sein Ton hat keinen "
                                    "Weg in die Mischung"));
+}
+
+// Siehe MainWindow.h. Sicherheitsschranke, uebertragen aus der SunSDR-
+// Durchsicht (2026-08-24): jeder Verbraucher (Ton, Panadapter) muss
+// hierueber gehen statt sliceById() von Hand zu wiederholen -- genau
+// das Auseinanderlaufen (Ton- und Panadapter-Pfad hatten gar keine
+// Pruefung) war der urspruengliche SunSDR-Fund.
+SliceModel* MainWindow::kiwiControllableSlice(int sliceId) const
+{
+    if (!m_radioModel || sliceId < 0) { return nullptr; }
+    SliceModel* slice = m_radioModel->sliceById(sliceId);
+    if (!slice || slice->streamIndex() >= 0) { return nullptr; }
+    return slice;
+}
+
+// Siehe MainWindow.h.
+void MainWindow::releaseKiwiSdrSlice(int sliceId, const QString& profileId,
+                                     const QString& reason)
+{
+    if (!m_kiwiSdrManager) { return; }
+    qCWarning(lcKiwiSdr) << "KiwiSDR: Zuordnung Scheibe" << sliceId
+                         << "<->" << profileId << "wird aufgehoben --"
+                         << reason;
+    if (m_radioModel) {
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            audio->removeKiwiSdrAudioSource(sliceId);
+        }
+    }
+    m_kiwiSdrManager->clearSliceAssignment(sliceId);
 }
 
 // ── Die Verdrahtung ─────────────────────────────────────────────────
@@ -505,8 +554,10 @@ void MainWindow::wireKiwiSdr()
             return;
         }
         const int sliceId = m_kiwiSdrManager->assignedSliceForProfile(profileId);
-        SliceModel* slice = m_radioModel ? m_radioModel->sliceById(sliceId)
-                                         : nullptr;
+        // Sicherheitsschranke (siehe kiwiControllableSlice): eine echte,
+        // DDC-gebundene Scheibe darf ihren Panadapter nicht mehr von
+        // einem KiwiSDR-Profil bekommen.
+        SliceModel* slice = kiwiControllableSlice(sliceId);
         if (!slice) { return; }
         SpectrumWidget* sw = spectrumForSlice(slice);
         if (!sw || !sw->kiwiDisplaySource()) { return; }
@@ -520,6 +571,53 @@ void MainWindow::wireKiwiSdr()
             this, [this](bool) { syncKiwiSdrTransmitMute(); });
     connect(&m_radioModel->transmitModel(), &TransmitModel::tuneChanged,
             this, [this](bool) { syncKiwiSdrTransmitMute(); });
+
+    // ── Sicherheitsschranke: die Zuordnung wieder loesen ─────────────
+    // (2026-08-24, uebertragen aus der SunSDR-Durchsicht -- siehe
+    // docs/architecture/2026-08-24-sunsdr-tci-client-design.md)
+    //
+    // Anders als SunSDR (eine feste Zielscheibe) kann ein KiwiSDR
+    // mehrere Scheiben gleichzeitig speisen, darum reicht hier kein
+    // einzelner Wachposten -- beide Verbindungen wirken auf JEDE
+    // aktuell zugeordnete Scheibe.
+    //
+    // Wird eine zugeordnete Scheibe geloescht, muss die Zuordnung
+    // sofort weg -- sonst bliebe sie auf einer Kennung stehen, die
+    // RadioModel::addSlice() (niedrigste freie Kennung zuerst) einer
+    // VOELLIG ANDEREN, spaeter angelegten Scheibe wiedergeben koennte;
+    // diese neue Scheibe wuerde dann stillschweigend KiwiSDR-Ton/
+    // -Panadapter erben, obwohl niemand sie je damit verbunden hat.
+    connect(m_radioModel, &RadioModel::sliceRemoved, this,
+            [this](int sliceIndex) {
+        if (!m_kiwiSdrManager) { return; }
+        const QString profileId =
+            m_kiwiSdrManager->assignedProfileForSlice(sliceIndex);
+        if (profileId.isEmpty()) { return; }
+        releaseKiwiSdrSlice(sliceIndex, profileId, "sie wurde geloescht");
+    });
+
+    // Uebernimmt spaeter ein echtes Funkgeraet eine zugeordnete Scheibe
+    // (RadioModel::bindUnboundSlices() beim naechsten Verbinden eines
+    // echten Funkgeraets bindet JEDE noch ungebundene Scheibe, ohne von
+    // KiwiSdrManager zu wissen), muss der KiwiSDR sie GANZ freigeben --
+    // nicht nur stumm weiterlaufen mit einer Scheibe, die jetzt zwei
+    // Herren hat. streamBindingsChanged feuert bei jeder erfolgreichen
+    // Bindung (RadioModel.cpp bindSliceToStream) mit der vollstaendigen
+    // Scheibenliste des betroffenen Streams -- hier reicht darum EINE
+    // Verbindung fuer alle jemals zugeordneten Scheiben, statt fuer
+    // jede einzeln auf streamIndexChanged zu lauschen.
+    connect(m_radioModel, &RadioModel::streamBindingsChanged, this,
+            [this](int, const QVector<int>& sliceIndices) {
+        if (!m_kiwiSdrManager) { return; }
+        for (int sliceIndex : sliceIndices) {
+            const QString profileId =
+                m_kiwiSdrManager->assignedProfileForSlice(sliceIndex);
+            if (profileId.isEmpty()) { continue; }
+            releaseKiwiSdrSlice(
+                sliceIndex, profileId,
+                "ein echtes Funkgeraet hat sie inzwischen uebernommen");
+        }
+    });
 
     refreshKiwiSdrAppletReceivers();
 }
