@@ -173,6 +173,20 @@ void MainWindow::wireSunSdr()
         m_sunSdrClient->startAudioStream(kSunSdrReceiverIndex);
         if (m_radioModel && m_sunSdrTargetSliceId >= 0) {
             if (AudioEngine* audio = m_radioModel->audioEngine()) {
+                // AudioEngine::start() (Lautsprecher-Ausgang oeffnen, den
+                // Abfluss aus MasterMixer anlaufen lassen) wird im ganzen
+                // Programm nur an EINER Stelle aufgerufen: nach dem
+                // erfolgreichen Verbinden mit einem ECHTEN Funkgeraet
+                // (RadioModel.cpp, WDSP-Init-Rueckruf). Ohne verbundenes
+                // Funkgeraet laeuft der Ausgang also nie an -- der
+                // SunSDR-Ton wuerde korrekt in die Mischung geschrieben,
+                // aber nie abgeholt. Genau der Fall, fuer den SunSDR (und
+                // KiwiSDR) gebaut sind: interessant gerade OHNE eigenes
+                // Geraet. start() schuetzt sich selbst gegen doppeltes
+                // Anlaufen (if (m_running) { return; }), darum gefahrlos
+                // hier zusaetzlich aufgerufen -- ist der Ausgang schon
+                // durch ein echtes Funkgeraet gestartet, passiert nichts.
+                audio->start();
                 audio->setSunSdrAudioSourceEnabled(m_sunSdrTargetSliceId, true);
             }
         }
