@@ -227,6 +227,13 @@ public:
     void disconnectSunSdrForTest() { disconnectSunSdr(); }
     class TciClient* sunSdrClientForTest() const { return m_sunSdrClient; }
     int sunSdrTargetSliceForTest() const { return m_sunSdrTargetSliceId; }
+    // Der reservierte Pseudo-Stream-Index lebt als anonymes-Namespace-
+    // Konstante in MainWindow_SunSdr.cpp (siehe dort, "Rechercheergebnis
+    // 2026-08-24") -- diese Funktion ist der einzige Weg fuer eine
+    // Pruefung, denselben Wert zu bekommen, ohne ihn ein zweites Mal
+    // abzuschreiben (und damit stillschweigend auseinanderlaufen zu
+    // koennen).
+    static int sunSdrPseudoStreamIndexForTest();
 
     /// Ist dieses Applet ueber den Auswaehler erreichbar?
     ///
@@ -955,6 +962,14 @@ private:
     void wireSunSdr();
     void connectSunSdr(const QString& endpoint);
     void disconnectSunSdr();
+    // Setzt m_streamWindows fuer den reservierten SunSDR-Pseudostrom und
+    // schiebt es zum Pan durch (applyStreamWindowToPan) -- aufgerufen,
+    // wann immer TciClient eine neue Rate oder Mittenfrequenz meldet.
+    void applySunSdrStreamWindow();
+    // Traegt die Router-Zuordnung erneut ein. Selbstheilend gegen
+    // rebuildFftRouting(), das bei jedem Aufruf JEDEN Pan loescht und nur
+    // aus echten, gebundenen Scheiben neu aufbaut (siehe Umsetzung).
+    void reassertSunSdrRouterMapping();
 
     // Phase 3O Sub-Phase 11 Task 11b — first-launch / startup rescan
     // hook. Scheduled via QTimer::singleShot(0, ...) from the
@@ -1367,6 +1382,18 @@ private:
     // bleibt aber an der Scheibe, mit der er verbunden wurde.
     class TciClient* m_sunSdrClient{nullptr};
     int m_sunSdrTargetSliceId{-1};
+
+    // ── SunSDR-Bild (2026-08-24) ──────────────────────────────────────
+    //
+    // Letzte an den FFTEngine gemeldete I/Q-Rate, um QMetaObject::
+    // invokeMethod nicht auf jedem einzelnen Rahmen erneut aufzurufen,
+    // wenn sich nichts geaendert hat -- nur bei einer echten Umstellung
+    // (siehe TciClient.h: TCI erlaubt iq_samplerate jederzeit zu aendern).
+    int m_sunSdrLastAppliedIqRateHz{0};
+    // Letzte von TciClient::ddcCenterChanged gemeldete Mittenfrequenz
+    // ("dds:", siehe TciClient.h). 0 = noch keine Zeile gesehen; dann
+    // faellt applySunSdrStreamWindow() auf die Scheibenfrequenz zurueck.
+    qint64 m_sunSdrDdcCenterHz{0};
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
 

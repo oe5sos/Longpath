@@ -5416,6 +5416,14 @@ if(Qt6WebSockets_FOUND)
     # nur die einzelnen Bausteine (die haben ihre eigenen Pruefungen).
     nereus_add_test(tst_sunsdr_connect_wiring)
     target_link_libraries(tst_sunsdr_connect_wiring PRIVATE Qt6::WebSockets)
+
+    # 2026-08-24, Schritt "Bild": FFTEngine/FFTRouter-Verdrahtung fuer den
+    # SunSDR-Panadapter -- Router-Zuordnung sofort bei connectSunSdr,
+    # Mittenfrequenz/Rate aus dds:/iq_samplerate: statt Scheiben-Default,
+    # Selbstheilung nach einem router->removePan()-Umbau, Abbau beim
+    # Trennen. Siehe Kommentarkopf der Testdatei.
+    nereus_add_test(tst_sunsdr_spectrum_wiring)
+    target_link_libraries(tst_sunsdr_spectrum_wiring PRIVATE Qt6::WebSockets)
 endif()
 
 # ── Phase 3J-1 Task 16.3 (sub-commit a): TciBinaryFrame encode ───────────────

@@ -72,6 +72,30 @@ Feld 28 schwankt zusätzlich zwischen Durchläufen (0, 1229, oder ein
 Fließkomma-Bitmuster). Verlässlich sind allein Empfänger (0),
 Abtasttyp (8), Wertzahl (20) und Stromtyp (24).
 
+## Mittenfrequenz — dds:, nicht vfo:
+
+Für den Panadapter zählt, um welche Frequenz der I/Q-Strom selbst
+liegt — das ist **nicht** dasselbe wie die VFO-Anzeige. Gemessen
+gegen ExpertSDR2, ein einzelner Empfänger, VFO A auf 1.920.500 Hz,
+VFO B auf 1.900.000 Hz, ZF-Durchlassmitte 1.910.670 Hz:
+
+```
+vfo:0,0,1920500     VFO-Anzeige A — innerhalb der ZF-Durchlassbreite
+vfo:0,1,1900000      VFO-Anzeige B — dito
+if:0,0,9830          Versatz A zur ZF-Mitte  (1920500 − 1910670)
+if:0,1,-10670        Versatz B zur ZF-Mitte  (1900000 − 1910670)
+dds:0,1910670         die Mitte selbst — um DIESE liegt der I/Q-Strom
+```
+
+Gegenprobe: `dds` + `if` ergibt immer wieder `vfo` (1910670 + 9830 =
+1920500, 1910670 − 10670 = 1900000). `dds:` kommt in der
+Selbstauskunft VOR den `vfo:`/`if:`-Zeilen, nicht danach — die
+Reihenfolge ist nicht die "logische". Für Longpaths Panadapter ist
+darum ausschließlich `dds:` relevant: `vfo:`/`if:` beschreiben, wo
+der *Bediener* innerhalb der Durchlassbreite steht, nicht wo der
+I/Q-Strom zentriert ist. `TciClient::ddcCenterHz()` liest deshalb nur
+`dds:`, siehe `src/core/TciClient.h`.
+
 ## Was noch offen ist
 
 - TX-Ton (`streamType` 2) wurde nicht angefordert; für ein

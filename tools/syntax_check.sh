@@ -166,8 +166,20 @@ compile() {
     # <QAudio> sich nicht -- jede Datei, die core/ClientPuduMonitor.h
     # erreicht (also auch MainWindow.cpp), scheiterte mit einem
     # "file not found", das wie ein Fehler im Code aussah und keiner war.
+    # HAVE_WEBSOCKETS and NEREUS_GPU_SPECTRUM: both unconditional in the
+    # real build (CMakeLists.txt: Qt6::WebSockets is REQUIRED, so
+    # HAVE_WEBSOCKETS is always defined; NEREUS_GPU_SPECTRUM defaults ON).
+    # Missing them here does not fail loudly -- it silently strips every
+    # #ifdef HAVE_WEBSOCKETS / #ifdef NEREUS_GPU_SPECTRUM block, so a class
+    # body written entirely inside one (TciClient, TciServer, half of
+    # SpectrumWidget) parses as empty and every use of it downstream
+    # reports "incomplete type" / "undeclared identifier" -- errors that
+    # look exactly like real syntax errors and are not (found 2026-08-24,
+    # checking the SunSDR/TCI spectrum-wiring change against a checker run
+    # that had never seen these two files build clean).
     g++ -std=c++20 -fsyntax-only -fPIC \
         -DNEREUSSDR_VERSION='"0.0.0-syntaxcheck"' \
+        -DHAVE_WEBSOCKETS -DNEREUS_GPU_SPECTRUM \
         -I"$QTINC" -I"$QTINC/QtCore" -I"$QTINC/QtGui" -I"$QTINC/QtWidgets" \
         -I"$QTINC/QtNetwork" -I"$QTINC/QtTest" -I"$QTINC/rhi" \
         -I"$QTINC/QtMultimedia" -I"$QTINC/QtSvg" -I"$QTINC/QtWebSockets" \

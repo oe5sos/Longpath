@@ -37,12 +37,15 @@
 
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
+#include "core/FFTEngine.h"
+#include "core/FFTRouter.h"
 #include "core/LogCategories.h"
 #include "core/TciClient.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
 #include <QMessageBox>
+#include <QMetaObject>
 
 namespace Longpath {
 
@@ -53,6 +56,29 @@ constexpr quint16 kDefaultSunSdrPort = 40001;
 // einen. Kein Feld dafuer in den Einstellungen: es gibt hier nichts zu
 // waehlen.
 constexpr int kSunSdrReceiverIndex = 0;
+
+// Der Pseudo-"Stream-Index" fuer den SunSDR-Panadapter -- bewusst
+// ausserhalb jedes realen DDC-Pools reserviert (Rechercheergebnis
+// 2026-08-24). m_fftEngines, m_streamWindows, m_streamNoiseFloors und
+// FFTRouter sind alle ueber denselben int indiziert wie echte
+// DDC-Streams (0..userDdcCount-1, real hoechstens im niedrigen
+// zweistelligen Bereich -- n1gp-Anvelina_PROIII Orion.v:958, NR bis 14
+// -- und alle als QMap/QHash gefuehrt, kein Feld mit fester Groesse,
+// darum ist ein grosser Wert hier unbedenklich). Wuerde SunSDR
+// versehentlich einen Index nehmen, den ein spaeter verbundenes echtes
+// Funkgeraet ebenfalls beansprucht, koennten sich zwei voellig
+// unabhaengige I/Q-Quellen denselben FFTEngine/Panadapter teilen.
+//
+// Bewusst NICHT der Weg, der SunSDR-Scheibe selbst einen streamIndex
+// zu geben, damit sie im bestehenden Router-Umbau (rebuildFftRouting)
+// einfach mitlaeuft: SliceModel::streamIndex() >= 0 wird an mindestens
+// neun Stellen in RadioModel.cpp als "diese Scheibe hat einen echten
+// WDSP-Kanal" gelesen. Der SunSDR-Scheibe diesen Wert zu geben haette
+// an all diesen Stellen unbekannte Nebenwirkungen ausloesen koennen,
+// ohne jede einzelne zu pruefen. Die Scheibe bleibt darum bei -1
+// (unveraendert), und reassertSunSdrRouterMapping() haelt die
+// Router-Zuordnung von aussen am Leben (siehe dort).
+constexpr int kSunSdrPseudoStreamIndex = 100000;
 
 // Anders als KiwiSdrClient::parseEndpoint (privat, und verlangt einen
 // Port) hat TCI einen bekannten Standardport -- eine blosse Adresse
@@ -100,6 +126,11 @@ void showSunSdrNotice(QWidget* parent, QMessageBox::Icon icon,
 }
 
 } // namespace
+
+int MainWindow::sunSdrPseudoStreamIndexForTest()
+{
+    return kSunSdrPseudoStreamIndex;
+}
 
 void MainWindow::connectSunSdr(const QString& endpoint)
 {
@@ -273,9 +304,124 @@ void MainWindow::wireSunSdr()
                 if (AudioEngine* audio = m_radioModel->audioEngine()) {
                     audio->removeSunSdrAudioSource(m_sunSdrTargetSliceId);
                 }
+                // Spiegelbild zum Ton: der Panadapter darf nicht auf
+                // einer Zuordnung stehen bleiben, die niemand mehr
+                // speist -- sonst wuerde reassertSunSdrRouterMapping()
+                // (unten) sie bei jedem echten VFO-Tick munter wieder
+                // herstellen, obwohl TciClient laengst getrennt ist.
+                if (auto* router = m_radioModel->fftRouter()) {
+                    router->removeReceiver(kSunSdrPseudoStreamIndex);
+                }
             }
         }
     });
+
+    // ── Bild: Panadapter/Wasserfall aus dem I/Q-Strom ────────────────
+    //
+    // TciClient liefert echtes, verschraenktes Roh-I/Q (anders als
+    // KiwiSDR, das fertige dBm-Bins schickt und darum SpectrumWidget::
+    // updateKiwiSpectrumDbm umgeht, siehe dort). Fuer SunSDR ist der
+    // reale FFTEngine-Weg darum richtig: dieselbe Infrastruktur, die
+    // auch ein echter Empfaenger benutzt (Fenster, Mittelung, Zoom),
+    // statt einen zweiten Pfad nachzubauen (Rechercheergebnis
+    // 2026-08-24).
+    if (m_radioModel) {
+        if (FFTEngine* engine = createFftEngineForStream(kSunSdrPseudoStreamIndex)) {
+            // Kontextobjekt ist der Engine, nicht MainWindow -- dasselbe
+            // Muster, das createFftEngineForStream selbst fuer
+            // rawIqDataForStream benutzt (siehe dort). TciClient laeuft
+            // auf dem Hauptfaden, der Engine auf m_fftThread; weil beide
+            // Faeden verschieden sind, loest Qt das automatisch als
+            // Warteschlangen-Verbindung auf. Ein roher engine->feedIQ()-
+            // Aufruf direkt aus einer TciClient-Lambda waere dagegen ein
+            // Datenwettlauf: er liefe synchron auf dem Hauptfaden und
+            // griffe parallel zum FFT-Faden auf denselben Ringpuffer zu.
+            connect(m_sunSdrClient, &TciClient::iqFrameReady, engine,
+                    [engine](int /*receiver*/, int /*sampleRate*/, int channels,
+                            const std::vector<float>& interleaved) {
+                if (channels != 2) { return; }
+                const QVector<float> iq(interleaved.begin(), interleaved.end());
+                engine->feedIQ(iq);
+            });
+
+            // Rate propagieren, aber nur bei einer echten Umstellung --
+            // TCI erlaubt iq_samplerate jederzeit zu aendern (siehe
+            // TciClient.h), doch das kommt selten vor, nicht auf jedem
+            // Rahmen.
+            connect(m_sunSdrClient, &TciClient::iqFrameReady, this,
+                    [this, engine](int, int sampleRate, int,
+                                   const std::vector<float>&) {
+                if (sampleRate <= 0 || sampleRate == m_sunSdrLastAppliedIqRateHz) {
+                    return;
+                }
+                m_sunSdrLastAppliedIqRateHz = sampleRate;
+                QMetaObject::invokeMethod(engine, [engine, sampleRate]() {
+                    engine->setSampleRate(static_cast<double>(sampleRate));
+                }, Qt::QueuedConnection);
+                applySunSdrStreamWindow();
+            });
+
+            connect(m_sunSdrClient, &TciClient::ddcCenterChanged, this,
+                    [this](int /*receiver*/, qint64 hz) {
+                m_sunSdrDdcCenterHz = hz;
+                applySunSdrStreamWindow();
+            });
+
+            // Selbstheilend: rebuildFftRouting() (ausgeloest von
+            // streamBindingsChanged, das laut eigenem Kommentar "auf
+            // jedem VFO-Tick" einer echten Scheibe feuert) loescht bei
+            // jedem Aufruf die Router-Zuordnung fuer JEDEN Panadapter
+            // und baut sie nur aus echten, gebundenen Scheiben neu auf
+            // (streamIndex() >= 0) -- die SunSDR-Pseudoscheibe bleibt
+            // dabei bewusst aussen vor (siehe kSunSdrPseudoStreamIndex)
+            // und wuerde also bei jedem solchen Umbau stumm verschwinden.
+            //
+            // Diese Verbindung wird HIER angeschlossen, lange NACH der
+            // eingebauten (die in buildUI() steht, beim Programmstart) --
+            // Qt ruft Empfaenger desselben Signals in Anschlussreihenfolge
+            // auf, meine Zuordnung wird also bei jedem Umbau IMMER danach
+            // erneut gesetzt, nie davor ueberschrieben.
+            connect(m_radioModel, &RadioModel::streamBindingsChanged,
+                    this, [this](int, const QVector<int>&) {
+                reassertSunSdrRouterMapping();
+            });
+
+            reassertSunSdrRouterMapping();
+        }
+    }
+}
+
+void MainWindow::applySunSdrStreamWindow()
+{
+    if (m_sunSdrTargetSliceId < 0 || !m_radioModel) { return; }
+    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
+    const QString panId = panIdForSlice(slice);
+    if (panId.isEmpty()) { return; }
+
+    // dds: ist die wahre Mittenfrequenz (siehe TciClient.h) -- solange
+    // sie noch nicht bekannt ist, die Scheibenfrequenz als Notloesung,
+    // besser als 0 Hz oder der SliceModel-Konstruktor-Default.
+    const double centreHz = m_sunSdrDdcCenterHz > 0
+        ? static_cast<double>(m_sunSdrDdcCenterHz)
+        : (slice ? slice->frequency() : 0.0);
+
+    m_streamWindows.insert(kSunSdrPseudoStreamIndex,
+                           StreamWindow{centreHz, m_sunSdrLastAppliedIqRateHz});
+    applyStreamWindowToPan(panId, kSunSdrPseudoStreamIndex);
+}
+
+void MainWindow::reassertSunSdrRouterMapping()
+{
+    if (m_sunSdrTargetSliceId < 0 || !m_radioModel) { return; }
+    auto* router = m_radioModel->fftRouter();
+    if (!router) { return; }
+    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
+    const QString panId = panIdForSlice(slice);
+    if (panId.isEmpty()) { return; }
+    // mapPanToReceiver de-dupliziert selbst (FFTRouter.cpp:17) -- ein
+    // wiederholter Aufruf hier ist folgenlos, wenn die Zuordnung schon
+    // steht.
+    router->mapPanToReceiver(panId, kSunSdrPseudoStreamIndex);
 }
 
 } // namespace Longpath
