@@ -133,6 +133,13 @@ int main(int argc, char** argv)
     QMap<quint32, int> frameCounts;
     bool sawReady = false;
     bool connected = false;
+    // Ob der Dienst die Strombefehle BESTAETIGT hat. Das ist der
+    // Unterschied zwischen "kennt sie nicht" und "kennt sie, hat
+    // aber nichts zu senden" — und den hat die erste Fassung
+    // dieser Sonde am 2026-08-24 verwischt.
+    bool ackAudioStart = false;
+    bool ackIqStart = false;
+    bool sawStreamRates = false;
 
     QObject::connect(&sock, &QWebSocket::connected, [&]() {
         connected = true;
@@ -151,6 +158,12 @@ int main(int argc, char** argv)
             if (t.isEmpty()) { continue; }
             textLines << t;
             out() << "  < " << t << "\n";
+            if (t.startsWith(QStringLiteral("audio_start"))) { ackAudioStart = true; }
+            if (t.startsWith(QStringLiteral("iq_start")))    { ackIqStart = true; }
+            if (t.startsWith(QStringLiteral("iq_samplerate"))
+                || t.startsWith(QStringLiteral("audio_samplerate"))) {
+                sawStreamRates = true;
+            }
             if (t.compare(QStringLiteral("ready"), Qt::CaseInsensitive) == 0) {
                 sawReady = true;
                 out() << "\n  -- Selbstauskunft zu Ende. Jetzt Stroeme "
@@ -209,11 +222,41 @@ int main(int argc, char** argv)
               << "\n\n";
 
         if (frameCounts.isEmpty()) {
-            out() << "  Stroeme:         KEINE.\n\n"
-                  << "  Das ist die entscheidende Zeile. Dieses TCI liefert\n"
-                  << "  offenbar nur Steuerbefehle — Longpath koennte damit\n"
-                  << "  das Geraet BEDIENEN, aber kein Spektrum und keinen\n"
-                  << "  Ton zeigen.\n";
+            // ── Zwei sehr verschiedene Faelle, nicht einer ──────────
+            //
+            // Die erste Fassung dieser Sonde schrieb hier pauschal
+            // "liefert nur Steuerbefehle". Das war zu weit gegriffen
+            // und haette den Betreiber am 2026-08-24 beinahe in die
+            // Irre gefuehrt: sein ExpertSDR2 hat audio_start und
+            // iq_start BESTAETIGT und die Abtastraten genannt — es
+            // kennt die Stroeme also sehr wohl. Es lief nur ohne
+            // angeschlossenes Geraet, und dann gibt es nichts zu
+            // senden.
+            //
+            // Ein Werkzeug, das aus "keine Daten" auf "kann es nicht"
+            // schliesst, beantwortet die Frage falsch.
+            out() << "  Stroeme:         keine Daten angekommen.\n\n";
+            if (ackAudioStart || ackIqStart || sawStreamRates) {
+                out() << "  ABER: der Dienst hat die Strombefehle BESTAETIGT\n";
+                if (ackAudioStart) { out() << "        - audio_start\n"; }
+                if (ackIqStart)    { out() << "        - iq_start\n"; }
+                if (sawStreamRates) {
+                    out() << "        - und nennt Abtastraten fuer beide\n";
+                }
+                out() << "\n  Er KENNT die Stroeme also. Dass nichts kam, hat\n"
+                      << "  vermutlich einen einfacheren Grund:\n\n"
+                      << "   - ist das Funkgeraet angeschlossen und in Betrieb?\n"
+                      << "   - laeuft der Empfang (nicht nur das Programm)?\n"
+                      << "   - steht rx_enable auf true?\n\n"
+                      << "  Bitte mit angeschlossenem Geraet wiederholen. Erst\n"
+                      << "  dann ist die Frage beantwortet.\n";
+            } else {
+                out() << "  Der Dienst hat die Strombefehle NICHT bestaetigt und\n"
+                      << "  keine Abtastraten genannt. Das spricht dafuer, dass\n"
+                      << "  dieses TCI wirklich nur Steuerbefehle kann —\n"
+                      << "  Longpath koennte das Geraet dann BEDIENEN, aber\n"
+                      << "  kein Spektrum und keinen Ton zeigen.\n";
+            }
         } else {
             out() << "  Stroeme:\n";
             for (auto it = frameCounts.cbegin(); it != frameCounts.cend(); ++it) {
