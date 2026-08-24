@@ -80,7 +80,7 @@
 >
 > J.J. Boyd ~ KG4VCF
 
-[![CI](https://github.com/boydsoftprez/NereusSDR/actions/workflows/ci.yml/badge.svg)](https://github.com/boydsoftprez/NereusSDR/actions/workflows/ci.yml)
+[![CI](https://github.com/OE5SOS/NereusSDR/actions/workflows/ci.yml/badge.svg)](https://github.com/OE5SOS/NereusSDR/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Qt6](https://img.shields.io/badge/Qt-6-green.svg)](https://www.qt.io/)
@@ -108,7 +108,7 @@ Pre-built binaries for Linux (AppImage, x86_64 + aarch64), macOS (DMG +
 PKG, Apple Silicon + Intel), and Windows (NSIS installer + portable ZIP,
 x64) are published as GitHub Releases:
 
-**<https://github.com/boydsoftprez/NereusSDR/releases>**
+**<https://github.com/OE5SOS/NereusSDR/releases>**
 
 All artifacts are GPG-signed (`KG4VCF`) via `SHA256SUMS.txt.asc`. To verify:
 
@@ -329,14 +329,14 @@ No manual setup required. CMake auto-downloads [`fftw-3.3.5-dll64.zip`](https://
 ### Build & Run
 
 ```bash
-git clone https://github.com/boydsoftprez/NereusSDR.git
+git clone https://github.com/OE5SOS/NereusSDR.git
 cd NereusSDR
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j$(nproc)
-./build/NereusSDR
+./build/Longpath
 ```
 
-On first run, NereusSDR generates FFTW wisdom (optimized FFT plans). This takes ~15 minutes and shows a progress dialog. The wisdom file is cached for subsequent launches.
+On first run, Longpath generates FFTW wisdom (optimized FFT plans). This takes ~15 minutes and shows a progress dialog. The wisdom file is cached for subsequent launches.
 
 See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) for the full implementation plan and [docs/project-brief.md](docs/project-brief.md) for the project brief.
 
@@ -346,7 +346,7 @@ See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) for the full implementation plan 
 
 PRs, bug reports, and feature requests welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Development environment:** NereusSDR is developed using [Claude Code](https://claude.com/claude-code) as the primary development tool. We encourage contributors to use Claude Code for consistency. PRs must follow project conventions, pass CI, and include GPG-signed commits.
+**Development environment:** Longpath is developed using [Claude Code](https://claude.com/claude-code) as the primary development tool. We encourage contributors to use Claude Code for consistency. PRs must follow project conventions, pass CI, and include GPG-signed commits.
 
 ---
 
