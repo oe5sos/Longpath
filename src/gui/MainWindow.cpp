@@ -7252,7 +7252,7 @@ void MainWindow::buildMenuBar()
     // Aequivalent dazu. Nur "Verbinden" und "Trennen", siehe
     // MainWindow_SunSdr.cpp fuer die Verdrahtung.
     {
-        QMenu* sunSdrMenu = radioMenu->addMenu(QStringLiteral("Sun&SDR (TCI)"));
+        QMenu* sunSdrMenu = radioMenu->addMenu(QStringLiteral("&SunSDR (TCI)"));
 
         sunSdrMenu->addAction(QStringLiteral("&Verbinden…"), this, [this]() {
             auto& s = AppSettings::instance();
