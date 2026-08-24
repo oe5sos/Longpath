@@ -560,6 +560,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [ctun-zoom-design.md](docs/architecture/ctun-zoom-design.md) | CTUN zoom bin subsetting: visibleBinRange(), hybrid FFT replan, DDC center tracking |
 | [2026-08-11-tx-monitor-audio-path.md](docs/architecture/2026-08-11-tx-monitor-audio-path.md) | TX self-monitor path: DUC-rate decimation, headphones bus, adaptive jitter cushion + seam fades in MasterMixer, latency budget, cadence-simulation verification |
 | [2026-08-24-sunsdr-tci-client-design.md](docs/architecture/2026-08-24-sunsdr-tci-client-design.md) | SunSDR2 QRP via TCI 1.4 client: signal path (Ton/Bild/Steuerung reusing existing AudioEngine/FFTEngine/FFTRouter infra, no parallel path), the one safety invariant (never feed/control a `streamIndex() >= 0` slice) and the three-piece design that enforces it, four real defects found against live hardware in order |
+| [2026-08-24-sunsdr-native-driver-design.md](docs/architecture/2026-08-24-sunsdr-native-driver-design.md) | SunSDR2 QRP native driver (no ExpertSDR2 middleman, full RX+TX): why TCI isn't enough, the source-first problem (no vendor spec) resolved via citing [ArtemisSDR](https://github.com/kk68/ArtemisSDR) (GPLv2-or-later Thetis fork, black-box reverse-engineered), full opcode/wire-format reference, and the one hard gate before any code — the QRP has never been confirmed against either reference implementation, both cover only DX/PRO |
 
 ### Implementation Plans (`docs/architecture/phase*-plan.md`)
 
