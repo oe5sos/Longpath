@@ -528,6 +528,7 @@ set(CORE_SOURCES
     src/core/TciVfoCoalescer.cpp
     src/core/TciBinaryFrame.cpp
     src/core/TciServer.cpp
+    src/core/TciClient.cpp
     src/core/codec/AlexFilterMap.cpp
     src/core/codec/P1CodecStandard.cpp
     src/core/codec/P1CodecAnvelinaPro3.cpp

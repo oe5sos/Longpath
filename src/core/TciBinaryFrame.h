@@ -85,8 +85,53 @@ enum class TciStreamType : int {
     LineoutStream = 4,
 };
 
+// ── Gelesener Kopf eines eingehenden TCI-Binaerrahmens ───────────────────────
+//
+// Der Aufbau steht unten bei buildStreamPayload als BAUANLEITUNG. Hier
+// wird er gelesen. Beides in einer Datei, damit es nicht auseinander
+// laeuft.
+//
+// WARNUNG, gemessen am SunSDR2 QRP mit ExpertSDR2 (TCI 1.4) am
+// 2026-08-24 -- siehe docs/TCI-SunSDR-gemessen.md:
+//
+//   sampleRate (Offset 4)  ist BEIM EMPFANG UNBRAUCHBAR. ExpertSDR2
+//       laesst dort 48000 stehen, auch wenn nach iq_samplerate:192000
+//       tatsaechlich 192 kHz fliessen. Die wahre Rate kommt aus dem
+//       Textkanal (iq_samplerate: / audio_samplerate:).
+//   channels (Offset 28)   ist BEIM EMPFANG UNBRAUCHBAR. Beobachtet
+//       wurden 0, 1229 und das Bitmuster einer Fliesskommazahl --
+//       offenbar ein wiederverwendeter Puffer. Die Kanalzahl ergibt
+//       sich aus dem Stromtyp (I/Q und RX-Ton sind beide 2).
+//
+// Verlaesslich sind: receiver (0), sampleType (8), length (20),
+// streamType (24). Beim SENDEN fuellt unser eigener TciServer alle
+// Felder korrekt -- die Warnung gilt nur fuer Fremdrahmen.
+struct TciStreamHeader {
+    int receiver   = 0;
+    int sampleRate = 0;   // nicht glauben, siehe oben
+    int sampleType = 0;
+    int length     = 0;   // ALLE Werte des Rahmens, nicht je Kanal
+    int streamType = 0;
+    int channels   = 0;   // nicht glauben, siehe oben
+    int frameBytes = 0;   // ganzer Rahmen, Kopf eingerechnet
+    bool valid     = false;
+
+    // Nutzlast in Byte (0, wenn der Rahmen nur aus dem Kopf besteht).
+    int payloadBytes() const { return valid ? frameBytes - 64 : 0; }
+};
+
 class TciBinaryFrame {
 public:
+    // Liest den 64-Byte-Kopf. valid bleibt false, wenn der Rahmen zu
+    // kurz ist -- dann ist NICHTS aus den Feldern zu entnehmen.
+    static TciStreamHeader parseStreamHeader(const QByteArray& frame);
+
+    // Prueft, ob Nutzlaenge und Wertzahl zusammenpassen:
+    // payloadBytes == length * bytesPerSample. Stimmt das nicht, ist
+    // der Rahmen nicht so aufgebaut, wie wir denken, und darf nicht
+    // entpackt werden.
+    static bool headerMatchesPayload(const TciStreamHeader& h);
+
     // From Thetis TCIServer.cs:5240-5262 [v2.10.3.13] — buildStreamPayload.
     //
     // Constructs a TCI binary frame with a 64-byte LE header (16 × uint32)

@@ -4757,6 +4757,7 @@ nereus_add_test(tst_every_applet_is_reachable)
 nereus_add_test(tst_asr_settings_page)
 nereus_add_test(tst_settings_are_remembered)
 nereus_add_test(tst_tci_probe_reads_header)
+nereus_add_test(tst_tci_binary_frame_roundtrip)
 nereus_add_test(tst_asr_end_to_end)
 nereus_add_test(tst_asr_against_live_server)
 
@@ -5384,6 +5385,24 @@ if(Qt6WebSockets_FOUND)
     # Phase 3J-1 Task 3.2: silent-error invariant
     nereus_add_test(tst_tci_silent_error_invariant)
     target_link_libraries(tst_tci_silent_error_invariant PRIVATE Qt6::WebSockets)
+
+    # 2026-08-24: TciClient — Longpath als TCI-CLIENT auf ExpertSDR2/
+    # SunSDR2 QRP (siehe docs/TCI-SunSDR-gemessen.md). Erster Test geht
+    # gegen das echte, gerade laufende Geraet (uebersprungen, wenn
+    # nichts auf Port 40001 horcht); zweiter stellt die gemessene
+    # Kopf-Luege deterministisch mit einem eigenen Testsender nach, egal
+    # ob Hardware angeschlossen ist.
+    nereus_add_test(tst_tci_client_against_live_device)
+    target_link_libraries(tst_tci_client_against_live_device PRIVATE Qt6::WebSockets Qt6::Network)
+
+    nereus_add_test(tst_tci_client_ignores_lying_header)
+    target_link_libraries(tst_tci_client_ignores_lying_header PRIVATE Qt6::WebSockets)
+
+    # 2026-08-24: drei Luecken aus der unabhaengigen Durchsicht des
+    # Grundgeruests, alle mit einem Skeptiker gegengeprueft, bevor sie als
+    # echt galten (siehe Kommentarkopf der Testdatei fuer den Anlass).
+    nereus_add_test(tst_tci_client_edge_cases)
+    target_link_libraries(tst_tci_client_edge_cases PRIVATE Qt6::WebSockets)
 endif()
 
 # ── Phase 3J-1 Task 16.3 (sub-commit a): TciBinaryFrame encode ───────────────

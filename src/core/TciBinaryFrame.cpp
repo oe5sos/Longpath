@@ -357,4 +357,47 @@ std::vector<float> TciBinaryFrame::decodeSamples(const QByteArray& payload,
     return samples;
 }
 
+// ── parseStreamHeader ─────────────────────────────────────────────────────────
+//
+// Der Gegenpart zu buildStreamPayload: gleiche Offsets, gelesen statt
+// geschrieben. Siehe die Warnung an TciStreamHeader -- sampleRate und
+// channels sind bei Fremdrahmen nicht zu gebrauchen; gelesen werden sie
+// trotzdem, damit man sie zur Diagnose sehen kann.
+TciStreamHeader TciBinaryFrame::parseStreamHeader(const QByteArray& frame)
+{
+    TciStreamHeader h;
+    if (frame.size() < 64) { return h; }
+
+    const auto* buf = reinterpret_cast<const uchar*>(frame.constData());
+    auto u32 = [buf](int offset) -> quint32 {
+        quint32 le = 0;
+        std::memcpy(&le, buf + offset, sizeof(le));
+        return qFromLittleEndian(le);
+    };
+
+    h.receiver   = int(u32(0));
+    h.sampleRate = int(u32(4));    // unbrauchbar bei Fremdrahmen
+    h.sampleType = int(u32(8));
+    h.length     = int(u32(20));
+    h.streamType = int(u32(24));
+    h.channels   = int(u32(28));   // unbrauchbar bei Fremdrahmen
+    h.frameBytes = int(frame.size());
+    h.valid      = true;
+    return h;
+}
+
+// ── headerMatchesPayload ──────────────────────────────────────────────────────
+//
+// Die einzige Selbstprobe, die der Rahmen zulaesst: die Wertzahl muss
+// die Nutzlast genau ausfuellen. Passt das nicht, ist entweder der Kopf
+// anders aufgebaut als angenommen oder der Rahmen abgeschnitten -- in
+// beiden Faellen waere Entpacken geraten.
+bool TciBinaryFrame::headerMatchesPayload(const TciStreamHeader& h)
+{
+    if (!h.valid || h.length <= 0) { return false; }
+    const int width = bytesPerSample(h.sampleType);
+    if (width <= 0) { return false; }
+    return h.payloadBytes() == h.length * width;
+}
+
 } // namespace Longpath

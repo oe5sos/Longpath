@@ -10,6 +10,26 @@
 > absichtlich NICHT umbenannt: sie berichten von damals.
 >
 > Der C++-Namensraum heißt seit dem 2026-08-20 `Longpath`.
+>
+> **Wo „Nereus"/„nereus" trotzdem noch steht — und warum das kein
+> Versehen ist:**
+>
+> | Stelle | Bleibt „Nereus", weil |
+> | --- | --- |
+> | Repo-Ordnername `NereusSDR` auf der Platte | nie umbenannt, nur der Inhalt — rein kosmetisch, keine Funktion daran geknüpft |
+> | Build-interne Namen (`nereus_add_test`, `NEREUS_TEST_SHARDS`, `NEREUS_BUILD_TESTS`, Log-Kategorien wie `nereus.tci`) | Entwickler-intern, kein Aushängeschild, keine Außenwirkung |
+> | Schlüsselbund-Diensteintrag (`CredentialStore` "NereusSDR: %1") | macOS Keychain sucht Einträge über den exakten Dienstnamen — ein blindes Umbenennen würde jedem Nutzer die gespeicherten Zugangsdaten verlieren |
+> | TCI-Serveridentität (`TciServer` meldet sich als "NereusSDR-TCI") | andere Software (WSJT-X u.a.) identifiziert uns über diesen String |
+> | VAX-Gerätenamen ("NereusSDR VAX N") | vom Betriebssystem als Audiogerät registrierte Namen; andere Apps binden sich daran |
+>
+> **Es gab bereits einen Versuch**, alles per Suchen-und-Ersetzen auf
+> „Longpath" umzustellen — bewusst wieder verworfen, weil er genau
+> diese drei externen Bindungen (Schlüsselbund, TCI-Identität,
+> VAX-Gerätenamen) gebrochen hätte. Eine Umstellung dieser Strings
+> braucht eine echte Übergangslösung (alten Namen weiter erkennen,
+> neuen zusätzlich anbieten), kein Textersatz. Bis das ansteht, ist das
+> Nebeneinander beabsichtigt — nicht nachträglich aufräumen, ohne die
+> Migration mitzudenken.
 
 
 ## Project Goal
