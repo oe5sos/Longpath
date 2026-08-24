@@ -92,6 +92,15 @@ StreamHeader parseHeader(const QByteArray& frame)
     return h;
 }
 
+// Die wahre Rate: Textkanal wenn vorhanden, sonst notgedrungen der Kopf.
+quint32 effectiveRate(quint32 streamType, quint32 headerRate,
+                      quint32 iqRate, quint32 audioRate)
+{
+    if (streamType == 0 && iqRate > 0)    { return iqRate; }
+    if (streamType != 0 && audioRate > 0) { return audioRate; }
+    return headerRate;
+}
+
 int sampleWidthBytes(quint32 sampleType)
 {
     switch (sampleType) {
@@ -135,6 +144,7 @@ int main(int argc, char** argv)
     const QString url = (argc > 1) ? QString::fromLocal8Bit(argv[1])
                                    : QStringLiteral("ws://127.0.0.1:40001");
     const int seconds = (argc > 2) ? QString::fromLocal8Bit(argv[2]).toInt() : 12;
+    const QString extraCmds = (argc > 3) ? QString::fromLocal8Bit(argv[3]) : QString();
 
     out() << "TCI-Sonde — " << url << ", " << seconds << " Sekunden\n";
     out() << "------------------------------------------------------------\n";
@@ -142,6 +152,13 @@ int main(int argc, char** argv)
 
     QWebSocket sock;
     QStringList textLines;
+    // Die Raten kommen aus dem Textkanal. Das Ratenfeld im Binaerkopf
+    // folgt einer Umstellung NICHT: nach iq_samplerate:96000 steht dort
+    // weiter 48000, waehrend doppelt so viele Rahmen kommen. Wer den
+    // Kopf glaubt, bekommt die halbe Spanne und Ton in halber
+    // Geschwindigkeit.
+    quint32 iqRateFromText = 0;
+    quint32 audioRateFromText = 0;
     QMap<quint32, StreamHeader> streams;   // je Stromart der letzte Kopf
     QMap<quint32, int> frameCounts;
     bool sawReady = false;
@@ -182,6 +199,12 @@ int main(int argc, char** argv)
             if (t == QStringLiteral("stop"))  { trxRunning = false; sawRunState = true; }
             if (t.startsWith(QStringLiteral("audio_start"))) { ackAudioStart = true; }
             if (t.startsWith(QStringLiteral("iq_start")))    { ackIqStart = true; }
+            if (t.startsWith(QStringLiteral("iq_samplerate:"))) {
+                iqRateFromText = t.section(QLatin1Char(':'), 1).trimmed().toUInt();
+            }
+            if (t.startsWith(QStringLiteral("audio_samplerate:"))) {
+                audioRateFromText = t.section(QLatin1Char(':'), 1).trimmed().toUInt();
+            }
             if (t.startsWith(QStringLiteral("iq_samplerate"))
                 || t.startsWith(QStringLiteral("audio_samplerate"))) {
                 sawStreamRates = true;
@@ -193,10 +216,19 @@ int main(int argc, char** argv)
                 out().flush();
                 // Genau die Befehle, die auch unser eigener TciServer
                 // versteht — siehe TciServer.cpp.
-                for (const QString& cmd : {
-                         QStringLiteral("audio_samplerate:48000;"),
-                         QStringLiteral("audio_start:0;"),
-                         QStringLiteral("iq_start:0;") }) {
+                // Optional per Aufrufparameter 3: zusaetzliche Befehle,
+                // durch Semikolon getrennt. Damit kann man ausprobieren,
+                // was das Geraet annimmt, ohne die Sonde neu zu bauen.
+                QStringList cmds{ QStringLiteral("audio_samplerate:48000;") };
+                if (!extraCmds.isEmpty()) {
+                    for (const QString& e : extraCmds.split(QLatin1Char(';'),
+                                                            Qt::SkipEmptyParts)) {
+                        cmds << (e.trimmed() + QLatin1Char(';'));
+                    }
+                }
+                cmds << QStringLiteral("audio_start:0;")
+                     << QStringLiteral("iq_start:0;");
+                for (const QString& cmd : cmds) {
                     out() << "  > " << cmd << "\n";
                     sock.sendTextMessage(cmd);
                 }
@@ -316,7 +348,13 @@ int main(int argc, char** argv)
                 out() << "    " << streamName(it.key()).leftJustified(10)
                       << it.value() << " Rahmen"
                       << ", Empfaenger " << h.receiver
-                      << ", " << h.sampleRate << " Hz"
+                      << ", " << effectiveRate(it.key(), h.sampleRate,
+                                               iqRateFromText, audioRateFromText)
+                      << " Hz"
+                      << (h.sampleRate != effectiveRate(it.key(), h.sampleRate,
+                                                        iqRateFromText, audioRateFromText)
+                              ? QStringLiteral(" (Kopf sagt %1 -- falsch)").arg(h.sampleRate)
+                              : QString())
                       << ", " << sampleName(h.sampleType)
                       ;
                 // Feld 28 (Kanaele) ist bei ExpertSDR2 NICHT gesetzt: im
@@ -327,11 +365,13 @@ int main(int argc, char** argv)
                 // die Kanaele hinweg (nachgeprueft: Byte == Feld20 * 4).
                 const int width = sampleWidthBytes(h.sampleType);
                 const int payload = h.frameBytes - 64;
-                if (width > 0 && h.length > 0 && h.sampleRate > 0
+                const quint32 rate = effectiveRate(it.key(), h.sampleRate,
+                                                   iqRateFromText, audioRateFromText);
+                if (width > 0 && h.length > 0 && rate > 0
                     && seconds > 0 && payload == int(h.length) * width) {
                     const double valuesPerSec =
                         double(it.value()) * double(h.length) / double(seconds);
-                    const double ch = valuesPerSec / double(h.sampleRate);
+                    const double ch = valuesPerSec / double(rate);
                     out() << ", " << qRound(ch) << " Kanaele (gemessen "
                           << QString::number(ch, 'f', 2) << ")";
                 } else {

@@ -47,6 +47,31 @@ Zwei unabhängige Ströme, beide 2 — das ist belastbar. Für Longpath
 heißt das: Kanalzahl aus dem Stromtyp ableiten (IQ = 2 verschränkt,
 RX-Ton = 2 Stereo), nicht aus dem Kopf.
 
+## Abtastraten — bis 192 kHz
+
+`iq_samplerate:` ist umstellbar und wird bestätigt. Gemessen, jeweils
+14 Sekunden, Kanalzahl als Gegenprobe:
+
+| iq_samplerate | Rahmen/14 s | Kanäle gemessen |
+|---------------|-------------|-----------------|
+| 48000         | 324         | 1,97            |
+| 96000         | 664         | 2,02            |
+| 192000        | 1298        | 1,98            |
+
+Die Panadapter-Spanne ist also **nicht** auf 48 kHz begrenzt. Der
+RX-Ton bleibt davon unberührt bei 48 kHz.
+
+**Das Ratenfeld im Binärkopf (Offset 4) folgt der Umstellung NICHT.**
+Es steht immer auf 48000, auch wenn tatsächlich 192 kHz fließen. Wer
+den Kopf glaubt, bekommt ein Viertel der Spanne und Ton in einem
+Viertel der Geschwindigkeit. Die wahre Rate steht im **Textkanal**
+(`iq_samplerate:` / `audio_samplerate:`) — nur dort.
+
+Damit sind drei Kopf-Felder unbrauchbar: Rate (4), Kanäle (28), und
+Feld 28 schwankt zusätzlich zwischen Durchläufen (0, 1229, oder ein
+Fließkomma-Bitmuster). Verlässlich sind allein Empfänger (0),
+Abtasttyp (8), Wertzahl (20) und Stromtyp (24).
+
 ## Was noch offen ist
 
 - TX-Ton (`streamType` 2) wurde nicht angefordert; für ein
