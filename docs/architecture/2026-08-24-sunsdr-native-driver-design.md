@@ -92,14 +92,163 @@ Nothing in this document should be read as "ready to port." It's the
 reference to port *from*, once step 1 confirms the QRP actually matches
 it.
 
+## Confirmed from real QRP capture (2026-08-24)
+
+Step 1 of the gate above has now been done for real, not just built.
+OE5SOS captured genuine ExpertSDR2 ↔ QRP traffic on the bench —
+`sudo tcpdump -i any -w /tmp/sunsdr-capture.pcap 'host 192.168.16.200'`
+while power-cycling the radio and operating normally in ExpertSDR2 —
+21,720 packets. (A first attempt to parse the capture with a
+hand-rolled PCAP-NG walker found zero matching packets: macOS's `any`
+interface prepends PKTAP framing before the IP header, which the
+walker's offset-scan never located. The reliable path was parsing
+`tcpdump -r ... -x`'s own text+hex dump, since tcpdump already strips
+PKTAP before printing.)
+
+This directly answers the standing question of why `sunsdr_probe`
+(built against the DX profile) got no reply on the bench twice, even
+once `ping` was working: **wrong magic byte, not a network or
+busy-radio problem.**
+
+### Confirmed: ports and magic byte
+
+| Model | Control port | Stream port | Magic byte `[0]` |
+|---|---|---|---|
+| SunSDR2 QRP | **50001 (confirmed)** | **50002 (confirmed)** | **`0x03` (confirmed)** |
+
+Matches the DX port assignment exactly (50001/50002, not PRO's
+50002/50003) but **not** the DX magic byte (`0x32`). Confirmed on
+21,716 of 21,718 decoded control- and stream-channel packets — the two
+exceptions are the `0x33` anomaly documented below. Byte `[1]` confirmed
+`0xFF` universally, matching the documented header. The "unconfirmed"
+placeholder row two sections up is superseded by this one.
+
+### Confirmed: both header formats, byte-for-byte, once the magic byte is corrected
+
+Every one of the 92 control-channel packets (port 50001, the single
+boot/session sequence captured) decodes cleanly against the documented
+18-byte header — field positions, sizes, and byte order all match
+ArtemisSDR's DX layout exactly, only `[0]` differs. Example, a typical
+request/ack pair from the boot sequence:
+
+```
+H->R  03 ff 1a 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00  payload=00000000
+R->H  03 ff 1a 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00  payload=(none)
+```
+
+The IQ stream (port 50002) is dominated by 1210-byte packets (20,751
+of 21,626 total) — 10-byte header + 1200-byte I/Q payload, confirming
+the documented layout down to the magic byte:
+
+```
+03 ff fe ff b0 04 c4 e3 01 00 | <1200 bytes I/Q>
+```
+
+`[2]=0xFE` matches the documented RX-idle opcode. Two more frame
+shapes share port 50002, both new observations beyond the DX write-up
+below: **865 packets of 77 bytes**, radio→host, opcode `0x00`/`b3=0x1f`
+— a periodic telemetry/meter-looking frame (floating-point-shaped
+payload), not yet attributed — and a handful of **10-byte host→radio
+frames** using the same IQ header with zero payload: a stream
+keepalive distinct from the documented `0xFE` idle-data frames.
+
+### New finding: the QRP's real opcode set is richer than ArtemisSDR's documented DX subset
+
+Confirmed present, matching the DX table above: `0x01`, `0x05`, `0x06`,
+`0x07`, `0x08`, `0x10`, `0x15`, `0x17`, `0x18`, `0x1a`.
+
+Also present in the same 92-packet boot sequence, **not in ArtemisSDR's
+DX opcode table at all**:
+
+| Opcode | Direction | decl_len | Example payload | Notes |
+|---|---|---|---|---|
+| `0x03` | H→R | 4 | `01000000` | |
+| `0x04` | H→R | 4 | `00000000` | |
+| `0x0c` | H→R | 0 | — | |
+| `0x0d` | H→R | 0 | — | |
+| `0x0f` | H→R | 4 | `00000000` | |
+| `0x11` | H→R | 4 | `fe000000` | |
+| `0x12` | H→R then R→H | 0 then 20 | reply: `0300070000004119000041c27c0001000100` | reply reuses the `4119…7c00` byte pattern seen in the boot-announce frame below — possibly identity/capability-shaped, not attributed |
+| `0x13` | H→R | 4 | `01000000` | |
+| `0x16` | H→R | 36 | `010000000100000000000000010000006400…` | |
+| `0x1c` | H→R | 16 | `13370c041449040114ae47013b4f5200` | |
+
+None of these are guessed at further here — that would be exactly the
+kind of inference this document's own gate exists to forbid on a
+transmit-adjacent protocol. Attributing them safely needs a follow-up
+capture that isolates one ExpertSDR2 action at a time (preamp toggle,
+antenna change, frequency change, PTT) and diffs which opcode fires —
+future work, not tonight's.
+
+### Unresolved: the one-off "board announce" frame, and two `0x33`-magic outliers
+
+The very first packet in the capture, radio→host, sent once
+immediately after connection:
+
+```
+03 ff 01 1a 7c 00 00 00 41 19 c0 a8 10 c8 c0 a8 10 c8 51 c3 00 00 49 28
+```
+
+24 bytes total. Bytes `[10:14]` and `[14:18]` are both `c0 a8 10 c8` =
+`192.168.16.200` — the QRP's own IP, appearing twice back to back. Read
+against the general header, `[4:5]` decodes as a declared length of 124
+that doesn't match the packet's actual 6 trailing bytes — this frame
+does **not** use the general envelope at all; it only happens to share
+its first three bytes (magic / `0xFF` / opcode `0x01`) with it. This is
+**not** the documented 68-byte DX STATE_SYNC template — no packet of
+that size or shape appears anywhere in the capture. Whether the QRP has
+a STATE_SYNC-equivalent, and what it looks like, is open.
+
+Two more packets, ~21 seconds apart, both host→radio, both identical:
+
+```
+33 ff 05 00 00 00 00 00 00 00 00 00 5f 1d 9b 9c 00 ff 00 00 00 ff 00 00 00 …
+```
+
+1218 bytes total — magic byte `0x33` (not `0x03`), opcode-position
+byte `0x05` (the DX PREAMP/START_IQ slot), far larger than any `0x05`
+payload the DX table documents. After a 16-byte-ish prefix, the rest is
+a regular `ff 00 00 00` repeat. Both occurrences land early in the
+boot sequence, before steady IQ streaming begins, so a receiver-init or
+buffer-clear command is plausible — but that is a guess, stated as one,
+not a finding. Flagged unresolved rather than papered over.
+
+### What this changes for the next step
+
+- `tools/sunsdr_probe.cpp` only tries the DX (`0x32`) and PRO (`0x01`)
+  magic bytes today — against this QRP it will never get a reply as
+  written, which is now understood, not mysterious. The fix (add a QRP
+  profile: ctrl 50001 / stream 50002 / magic `0x03`) is mechanical but
+  deliberately not made tonight without a live re-test; a magic-`0x03`
+  `0x1a` identity query, matching the exact bytes confirmed above, is
+  the safest next live test on the bench.
+- The confirmed header formats and magic byte are enough to build and
+  test further **read-only** probes. They are **not** enough to safely
+  open a live session: several of the ~20 opcodes in the real boot
+  sequence have no attributed meaning yet, and replaying that sequence
+  to open a session would mean sending commands of unknown effect —
+  exactly what the gate above exists to prevent. **No session/RX/TX
+  code should be written from tonight's findings alone.**
+- Concretely still needed first: one or more targeted follow-up
+  captures, each isolating a single ExpertSDR2 action, to attribute the
+  unknown opcodes above one at a time.
+
+Raw evidence (all 92 decoded control-channel packets, the IQ-header
+histogram, and the parsing scripts used) lives in this session's
+scratch analysis. The pcap itself is at `/tmp/sunsdr-capture.pcap` on
+the operator's bench Mac — not part of the repo.
+
 ## Protocol reference (ArtemisSDR `sunsdr.c` / `sunsdr.h`, DX profile)
 
 Everything in this section is cited to ArtemisSDR source, read in full
 (`sunsdr.c`, 5024 lines; `sunsdr.h`, 302 lines) — not sampled, not
 paraphrased from the project's own README. `grep -ni "qrp"` over both
 files: zero matches. There is no QRP-specific code anywhere in ArtemisSDR
-to read even if we wanted to — this whole section is the DX/PRO behaviour,
-pending the confirmation step above.
+to read even if we wanted to — this whole section is the DX/PRO behaviour.
+Ports, magic byte, and both header formats are now confirmed for the QRP
+too (see "Confirmed from real QRP capture" above); the per-opcode meanings
+below remain DX-sourced and only partially cross-checked — read each
+opcode row against that section before trusting it on the QRP.
 
 ### Sockets
 
@@ -112,11 +261,12 @@ a native Longpath implementation must not hardcode:
 |---|---|---|---|
 | SunSDR2 DX | 50001 | 50002 | `0x32` |
 | SunSDR2 PRO | 50002 | 50003 | `0x01` |
-| SunSDR2 QRP | **unconfirmed** | **unconfirmed** | **unconfirmed** |
+| SunSDR2 QRP | 50001 **(confirmed)** | 50002 **(confirmed)** | `0x03` **(confirmed)** |
 
 (`sunsdr.c:2728-2742`, the `sunsdr_profile_dx` / `sunsdr_profile_pro`
-tables) — QRP row added here as a placeholder for the probe step, not a
-claim.
+tables) — the QRP row is now confirmed from a real bench capture, not a
+placeholder; see "Confirmed from real QRP capture" above for the
+evidence and the parts of the protocol still open.
 
 No broadcast/discovery packet exists in this protocol; the radio's IP is
 supplied out-of-band (matches SunSDR's own TCI client, which likewise
@@ -355,10 +505,22 @@ this project holds Thetis ports to.
   License-preservation rule as a Thetis port (`CLAUDE.md`): copyright
   line, GPL permission block, and a PROVENANCE-equivalent record, in the
   same commit as the port.
-- The QRP-unconfirmed status is not a formality to skip past — it is the
-  entire reason this document stops at "reference," not "implementation
-  plan with a start date."
+- The QRP-unconfirmed status was not a formality to skip past — it is
+  why this document stopped at "reference," not "implementation plan
+  with a start date." Ports, magic byte, and both header formats are
+  now confirmed (see "Confirmed from real QRP capture" above); the
+  opcode-by-opcode meanings are still DX-sourced and only partially
+  cross-checked. Do not treat the whole protocol as QRP-confirmed just
+  because the header framing is — re-read that section's "richer opcode
+  set" and "unresolved" tables before trusting any specific opcode.
 - `0x17` is drive, not mode, and this was a real, shipped bug in the
   reference implementation before it was caught — a Longpath port
   re-deriving this from scratch would be reasonable to make the exact
   same mistake without this note.
+- The real QRP capture behind the confirmed section is a live artifact
+  on the operator's bench Mac (`/tmp/sunsdr-capture.pcap`, 21,720
+  packets, not in the repo) plus a set of scratch parsing scripts
+  (`parse_dump.py` over `tcpdump -x` text output — the PCAP-NG route was
+  tried first and abandoned, see that section for why). A future
+  targeted re-capture to attribute the unknown opcodes should reuse
+  that parsing approach rather than re-solving the PKTAP problem.
