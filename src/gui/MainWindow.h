@@ -146,6 +146,10 @@ class QsoUploader;
 class TciServer;
 class TciApplet;
 class ClientChainApplet;
+// 2026-08-24: TciClient — Longpath als TCI-CLIENT auf ExpertSDR2/SunSDR2 QRP
+// (siehe docs/TCI-SunSDR-gemessen.md). Unabhaengig vom TciServer oben, der
+// Longpath in der Gegenrichtung als TCI-Server spielen laesst.
+class TciClient;
 // Phase 3J-1 closeout Item 2 (2026-05-12): TciLogWindow viewer.
 class TciLogWindow;
 
@@ -207,6 +211,17 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+
+    // ── Pruefzugaenge fuer den SunSDR ────────────────────────────────
+    //
+    // connectSunSdr ist der Weg, den der Menuepunkt geht — derselbe
+    // Grund wie bei addKiwiSdrReceiverForTest oben: eine Pruefung, die
+    // nur die TciClient-API anspricht, koennte "gebaut und unerreichbar"
+    // nicht aufdecken.
+    void connectSunSdrForTest(const QString& endpoint) { connectSunSdr(endpoint); }
+    void disconnectSunSdrForTest() { disconnectSunSdr(); }
+    class TciClient* sunSdrClientForTest() const { return m_sunSdrClient; }
+    int sunSdrTargetSliceForTest() const { return m_sunSdrTargetSliceId; }
 
     /// Ist dieses Applet ueber den Auswaehler erreichbar?
     ///
@@ -931,6 +946,11 @@ private:
     void syncKiwiSdrTransmitMute();
     void setAsrEnabled(bool on);
 
+    // SunSDR — siehe MainWindow_SunSdr.cpp.
+    void wireSunSdr();
+    void connectSunSdr(const QString& endpoint);
+    void disconnectSunSdr();
+
     // Phase 3O Sub-Phase 11 Task 11b — first-launch / startup rescan
     // hook. Scheduled via QTimer::singleShot(0, ...) from the
     // constructor so it runs after the event loop starts and the UI
@@ -1323,6 +1343,25 @@ private:
     // MainWindow_KiwiSdr.cpp; was dort NOCH NICHT steht, ist am Kopf
     // jener Datei aufgezaehlt.
     class KiwiSdrManager* m_kiwiSdrManager{nullptr};
+
+    // ── SunSDR (TCI-Client, 2026-08-24) ──────────────────────────────
+    //
+    // Bewusst KEIN Manager wie bei KiwiSDR: der Betreiber hat EIN
+    // SunSDR2 QRP, fest angeschlossen — eine Profilverwaltung fuer
+    // mehrere Geraete waere hier Ueberbau (siehe CLAUDE.md, "Feature
+    // scope"). m_sunSdrClient lebt trotzdem am MainWindow, aus
+    // demselben Grund wie m_kiwiSdrManager: er soll die Anwendung
+    // ueberdauern, nicht an einem Dialog haengen, der jederzeit
+    // geschlossen werden kann.
+    //
+    // m_sunSdrTargetSliceId ist die Scheibe, deren Spur der SunSDR-Ton
+    // speist — festgelegt beim Verbinden (derselbe Rueckfall wie bei
+    // KiwiSDR: aktive Scheibe, sonst die erste, sonst eine anlegen,
+    // siehe connectSunSdr), NICHT bei jedem Rahmen neu ermittelt: die
+    // aktive Scheibe koennte sich waehrenddessen aendern, der SunSDR
+    // bleibt aber an der Scheibe, mit der er verbunden wurde.
+    class TciClient* m_sunSdrClient{nullptr};
+    int m_sunSdrTargetSliceId{-1};
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
 

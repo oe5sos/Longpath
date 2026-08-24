@@ -39,7 +39,19 @@ int assumedChannelsForStream(TciStreamType type)
 
 } // namespace
 
-TciClient::TciClient(QObject* parent) : QObject(parent) {}
+TciClient::TciClient(QObject* parent) : QObject(parent)
+{
+    // Vorsorglich, nicht weil hier heute eine Warteschlangen-Verbindung
+    // besteht (es gibt keine — TciClient laeuft ausschliesslich auf dem
+    // Hauptfaden, siehe Klassenkopf). Aber genau dieses Fehlen einer
+    // Registrierung hat in diesem Projekt schon zweimal ein Signal still
+    // verschluckt (AsrService.cpp, KiwiSdrManager.cpp) — beide Male erst
+    // bemerkt, als spaeter eine Warteschlangen-Verbindung dazukam. Billige
+    // Absicherung gegen einen bekannten, hier schon zweimal getretenen
+    // Stolperstein, bevor er ein drittes Mal noetig wird.
+    qRegisterMetaType<std::vector<float>>("std::vector<float>");
+    qRegisterMetaType<Longpath::TciClient::State>("Longpath::TciClient::State");
+}
 
 TciClient::~TciClient()
 {

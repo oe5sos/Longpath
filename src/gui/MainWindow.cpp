@@ -7242,6 +7242,37 @@ void MainWindow::buildMenuBar()
         });
     }
 
+    // ── SunSDR (TCI-Client, 2026-08-24) ───────────────────────────────
+    //
+    // Derselbe Grund wie beim KiwiSDR-Eintrag direkt darueber: ein
+    // SunSDR IST ein Empfaenger, kein Hilfsmittel, darum im Radio-Menue.
+    //
+    // Bewusst kein Verzeichnis-Eintrag wie "Oeffentliche Empfaenger" bei
+    // Kiwi -- fuer ein privates SunSDR2 QRP im eigenen Netz gibt es kein
+    // Aequivalent dazu. Nur "Verbinden" und "Trennen", siehe
+    // MainWindow_SunSdr.cpp fuer die Verdrahtung.
+    {
+        QMenu* sunSdrMenu = radioMenu->addMenu(QStringLiteral("Sun&SDR (TCI)"));
+
+        sunSdrMenu->addAction(QStringLiteral("&Verbinden…"), this, [this]() {
+            auto& s = AppSettings::instance();
+            const QString lastEndpoint = s.value(
+                QStringLiteral("SunSdrEndpoint"), QString()).toString();
+            bool ok = false;
+            const QString ep = QInputDialog::getText(
+                this, QStringLiteral("SunSDR verbinden"),
+                QStringLiteral("Adresse von ExpertSDR2 (IP oder Rechnername, "
+                               "wahlweise mit :Port -- Voreinstellung 40001):"),
+                QLineEdit::Normal, lastEndpoint, &ok);
+            if (!ok || ep.trimmed().isEmpty()) { return; }
+            connectSunSdr(ep.trimmed());
+        });
+
+        sunSdrMenu->addAction(QStringLiteral("&Trennen"), this, [this]() {
+            disconnectSunSdr();
+        });
+    }
+
     radioMenu->addSeparator();
 
     // Protocol Info — disabled while disconnected; shows a QMessageBox with

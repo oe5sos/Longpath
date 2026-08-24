@@ -4747,6 +4747,7 @@ nereus_add_test(tst_vfo_tiles)
 nereus_add_test(tst_paint_cost)
 nereus_add_test(tst_kiwi_tx_mute)
 nereus_add_test(tst_sunsdr_audio_feed)
+nereus_add_test(tst_sunsdr_is_reachable)
 nereus_add_test(tst_compact_bar_draws)
 nereus_add_test(tst_puresignal_stability)
 nereus_add_test(tst_ps_stability_visible)
@@ -5404,6 +5405,12 @@ if(Qt6WebSockets_FOUND)
     # echt galten (siehe Kommentarkopf der Testdatei fuer den Anlass).
     nereus_add_test(tst_tci_client_edge_cases)
     target_link_libraries(tst_tci_client_edge_cases PRIVATE Qt6::WebSockets)
+
+    # 2026-08-24: die Verdrahtung MainWindow -> TciClient -> AudioEngine
+    # ueber den tatsaechlichen Weg des Menuepunkts (connectSunSdr), nicht
+    # nur die einzelnen Bausteine (die haben ihre eigenen Pruefungen).
+    nereus_add_test(tst_sunsdr_connect_wiring)
+    target_link_libraries(tst_sunsdr_connect_wiring PRIVATE Qt6::WebSockets)
 endif()
 
 # ── Phase 3J-1 Task 16.3 (sub-commit a): TciBinaryFrame encode ───────────────

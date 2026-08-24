@@ -869,6 +869,7 @@ set(GUI_SOURCES
     src/asr/RemoteAsrBackend.cpp
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/MainWindow_Asr.cpp
+    src/gui/MainWindow_SunSdr.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
