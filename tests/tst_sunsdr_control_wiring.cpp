@@ -455,12 +455,22 @@ private slots:
         // Und die Ausgangssteuerung ist ganz stumm -- eine weitere
         // Frequenzaenderung an der jetzt echten Scheibe darf nichts mehr
         // an ExpertSDR2 senden.
+        //
+        // Erst zur Ruhe kommen lassen: setStreamIndex() oben loest ueber
+        // releaseSunSdrSlice() selbst schon Aufraeumarbeiten aus (Ton
+        // abschalten, Router-Zuordnung entfernen), und ob dabei am
+        // echten Socket noch etwas unterwegs war, soll HIER nicht
+        // mitgezaehlt werden -- nur was NACH der Freigabe NEU passiert.
         QVERIFY(client);
+        QTest::qWait(300);
         received.clear();
         slice->setFrequency(7100000.0);
         QTest::qWait(300);
         QVERIFY2(received.isEmpty(),
-                 "Ausgangssteuerung sendete noch nach der Uebernahme");
+                 qPrintable(QStringLiteral(
+                     "Ausgangssteuerung sendete noch nach der "
+                     "Uebernahme -- empfangen: %1")
+                                .arg(received.join(QStringLiteral(" | ")))));
 
         mw->close();
     }
@@ -514,6 +524,18 @@ private slots:
         QVERIFY2(!model->sliceById(sunSdrId),
                  "Testannahme verletzt: Scheibe wurde nicht geloescht");
 
+        // removeSlice() loest selbst einiges aus (DDC-Neuzuordnung,
+        // TX-Arbiter-Sync, ein moeglicher activeSliceChanged-Wechsel auf
+        // die verbliebene Scheibe) -- QTRY_VERIFY oben kann durchlaufen,
+        // sobald m_sunSdrTargetSliceId auf -1 steht, OHNE dass ein
+        // dadurch angestossener Netzwerkschreibvorgang (echter Socket,
+        // nicht bloss ein Qt-Signal) schon zugestellt wurde. Erst
+        // absichtlich zur Ruhe kommen lassen, DANN "received" leeren --
+        // sonst zaehlt eine verspaetet ankommende, harmlose Restmeldung
+        // aus dem Loeschen selbst faelschlich als Befehl der
+        // wiederverwendeten Scheibe.
+        QTest::qWait(300);
+
         // Eine neue Scheibe kann jetzt dieselbe Kennung wiederbekommen
         // (niedrigste freie zuerst) -- gegenpruefen, dass das tatsaechlich
         // passiert, sonst prueft der Rest hier den falschen Fall.
@@ -537,8 +559,11 @@ private slots:
         reusedSlice->setFrequency(7100000.0);
         QTest::qWait(300);
         QVERIFY2(received.isEmpty(),
-                 "die wiederverwendete Scheibe hat einen TCI-Befehl "
-                 "ausgeloest, obwohl sie nie mit SunSDR verbunden wurde");
+                 qPrintable(QStringLiteral(
+                     "die wiederverwendete Scheibe hat einen TCI-Befehl "
+                     "ausgeloest, obwohl sie nie mit SunSDR verbunden "
+                     "wurde -- empfangen: %1")
+                                .arg(received.join(QStringLiteral(" | ")))));
 
         mw->close();
     }
