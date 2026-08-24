@@ -177,14 +177,81 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(slice->frequency(), 14164070.0, kWaitMs);
         received.clear();
 
-        // Der Bediener dreht am VFO und schaltet den Modus um.
+        // Der Bediener dreht am VFO und schaltet den Modus um. CWU statt
+        // CWL absichtlich: Bench-Fund 2026-08-24, ExpertSDR2 kennt am
+        // Draht nur das allgemeine "cw", nicht "cwl"/"cwu" -- beide
+        // muessen darum auf "cw" abbilden (siehe
+        // tciModeStringForDspMode), nicht nur CWL zufaellig richtig
+        // aussehen, weil es der einzige hier geprobte Wert war.
         slice->setFrequency(7100000.0);
-        slice->setDspMode(DSPMode::CWL);
+        slice->setDspMode(DSPMode::CWU);
 
         QTRY_VERIFY_WITH_TIMEOUT(
             received.contains(QStringLiteral("vfo:0,0,7100000;")), kWaitMs);
-        QVERIFY2(received.contains(QStringLiteral("modulation:0,cwl;")),
-                 "modulation-Ausgangsbefehl fehlt");
+        QVERIFY2(received.contains(QStringLiteral("modulation:0,cw;")),
+                 "modulation-Ausgangsbefehl fehlt oder noch \"cwu\" statt "
+                 "des von ExpertSDR2 verstandenen \"cw\"");
+
+        mw->close();
+    }
+
+    void cwZurueckmeldungDrehtEineStehendeCwuWahlNichtAufCwlZurueck()
+    {
+        // Bench-Fund 2026-08-24: ExpertSDR2 versteht "cwl"/"cwu" nicht,
+        // Longpath sendet darum fuer beide das allgemeine "cw" (siehe
+        // tciModeStringForDspMode). Meldet ExpertSDR2 daraufhin -- wie
+        // jede TCI-Aenderung -- eine frische "modulation:0,cw;" zurueck,
+        // darf applyRemoteSunSdrModulation() das NICHT naiv auf CWL
+        // abbilden: die eigene CWU-Wahl wuerde sonst bei der naechsten
+        // Rueckmeldung still verschwinden, obwohl der Bediener sie nie
+        // geaendert hat. Nur ein "cw" auf eine Scheibe, die noch NICHT
+        // in CW ist, darf tatsaechlich (auf CWL) umschalten.
+        QWebSocketServer server(QStringLiteral("Testgeraet"),
+                                 QWebSocketServer::NonSecureMode);
+        QVERIFY2(server.listen(QHostAddress::LocalHost, 0),
+                 "Testserver konnte nicht aufmachen");
+        QWebSocket* remote = nullptr;
+        connect(&server, &QWebSocketServer::newConnection, this, [&]() {
+            remote = server.nextPendingConnection();
+            QVERIFY(remote);
+            remote->sendTextMessage(kReadyLine);
+        });
+
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+
+        RadioModel* model = mw->radioModelForTest();
+        mw->connectSunSdrForTest(
+            QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
+
+        const int sliceId = mw->sunSdrTargetSliceForTest();
+        SliceModel* slice = model->sliceById(sliceId);
+        QVERIFY(slice);
+
+        TciClient* client = mw->sunSdrClientForTest();
+        QTRY_COMPARE_WITH_TIMEOUT(client->state(), TciClient::State::Connected,
+                                  kWaitMs);
+        QTRY_COMPARE_WITH_TIMEOUT(slice->frequency(), 14164070.0, kWaitMs);
+
+        // Bediener waehlt CWU an der Scheibe (nicht ueber TCI -- das
+        // Ausgangsecho selbst ist hier nicht der Pruefgegenstand).
+        slice->setDspMode(DSPMode::CWU);
+        QCOMPARE(slice->dspMode(), DSPMode::CWU);
+
+        // ExpertSDR2 meldet "cw" zurueck -- genau das erwartete Echo
+        // eines Geraets, das die Seitenbandwahl gar nicht kennt.
+        QVERIFY(remote);
+        remote->sendTextMessage(QStringLiteral("modulation:0,cw;"));
+        QTest::qWait(300);
+        QCOMPARE(slice->dspMode(), DSPMode::CWU);
+
+        // Gegenprobe: eine Scheibe, die NICHT schon in CW ist, wechselt
+        // bei "cw" tatsaechlich (auf CWL, der Thetis-faehige Normalfall).
+        remote->sendTextMessage(QStringLiteral("modulation:0,usb;"));
+        QTRY_COMPARE_WITH_TIMEOUT(slice->dspMode(), DSPMode::USB, kWaitMs);
+        remote->sendTextMessage(QStringLiteral("modulation:0,cw;"));
+        QTRY_COMPARE_WITH_TIMEOUT(slice->dspMode(), DSPMode::CWL, kWaitMs);
 
         mw->close();
     }

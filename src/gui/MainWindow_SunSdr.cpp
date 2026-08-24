@@ -112,20 +112,27 @@ bool parseSunSdrEndpoint(const QString& endpoint, QString* host, quint16* port)
 
 // DSPMode -> TCI-Wortlaut, klein geschrieben wie am Draht gemessen
 // ("modulations_list:am,sam,dsb,lsb,usb,cw,nfm,digl,digu,wfm,drm",
-// tci_probe gegen ExpertSDR2, 2026-08-24). cwl/cwu extra (nicht in der
-// Liste, aber von handleModulationCommand erkannt, siehe TciProtocol.cpp)
-// -- damit bleibt die Seitenbandwahl bei CW erhalten, statt beide auf
-// das allgemeine "cw" zu verflachen. SPEC/RADE_U/RADE_L haben keine
-// TCI-Entsprechung -- leerer String, der Aufrufer verwirft dann statt
-// zu senden (siehe wireSunSdrOutboundControl).
+// tci_probe gegen ExpertSDR2, 2026-08-24).
+//
+// Bench-gefunden (OE5SOS, 2026-08-24): eine erste Fassung sendete
+// "cwl"/"cwu" statt dem allgemeinen "cw" -- genau der Wortlaut, den die
+// Selbstauskunft NICHT als eigenen Wert kennt (nur "cw" steht in der
+// Liste). ExpertSDR2 hat den Modus darum nicht uebernommen, obwohl der
+// Befehl korrekt am Draht ankam. CWL und CWU bilden darum beide auf das
+// allgemeine "cw" ab -- ExpertSDR2 unterscheidet die Seitenbandwahl bei
+// CW ueberhaupt nicht ueber TCI (siehe dspModeForTciModeString unten
+// fuer die Kehrseite dieser Vereinfachung). SPEC/RADE_U/RADE_L haben
+// keine TCI-Entsprechung -- leerer String, der Aufrufer verwirft dann
+// statt zu senden (siehe wireSunSdrOutboundControl).
 QString tciModeStringForDspMode(Longpath::DSPMode mode)
 {
     switch (mode) {
     case Longpath::DSPMode::LSB:  return QStringLiteral("lsb");
     case Longpath::DSPMode::USB:  return QStringLiteral("usb");
     case Longpath::DSPMode::DSB:  return QStringLiteral("dsb");
-    case Longpath::DSPMode::CWL:  return QStringLiteral("cwl");
-    case Longpath::DSPMode::CWU:  return QStringLiteral("cwu");
+    case Longpath::DSPMode::CWL:
+    case Longpath::DSPMode::CWU:
+        return QStringLiteral("cw");
     case Longpath::DSPMode::FM:   return QStringLiteral("nfm");
     case Longpath::DSPMode::AM:   return QStringLiteral("am");
     case Longpath::DSPMode::DIGU: return QStringLiteral("digu");
@@ -140,10 +147,13 @@ QString tciModeStringForDspMode(Longpath::DSPMode mode)
     return QString();
 }
 
-// Kehrfunktion, klein -> DSPMode. "cw" (ohne L/U) kommt von ExpertSDR2
-// selbst nie -- das ist nur ein TCI-Eingangsformat anderer Geraete
-// (siehe TciProtocol.cpp handleModulationCommand) -- trotzdem mit
-// abgedeckt, auf CWL abgebildet, aus demselben Grund wie dort.
+// Kehrfunktion, klein -> DSPMode. "cwl"/"cwu" bleiben erkannt (falls sie
+// je von einem ANDEREN TCI-Geraet als ExpertSDR2 kommen, siehe
+// TciProtocol.cpp handleModulationCommand), aber das allgemeine "cw"
+// braucht besondere Behandlung -- siehe applyRemoteSunSdrModulation:
+// naiv immer auf CWL abzubilden wuerde nach dem oben verflachten
+// ausgehenden "cw" die eigene CWU-Wahl bei jeder Rueckmeldung von
+// ExpertSDR2 still auf CWL zurueckdrehen.
 Longpath::DSPMode dspModeForTciModeString(const QString& mode, bool* ok)
 {
     if (ok) { *ok = true; }
@@ -328,6 +338,23 @@ void MainWindow::applyRemoteSunSdrModulation(const QString& mode)
     if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return; }
     SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
     if (!slice || slice->streamIndex() >= 0) { return; }
+
+    // ExpertSDR2 kennt am Draht nur das allgemeine "cw", nicht cwl/cwu
+    // (siehe tciModeStringForDspMode) -- ein zurueckgemeldetes "cw" nach
+    // dem eigenen ausgehenden CWU-Befehl waere sonst genau das
+    // Echo-Problem, das m_sunSdrApplyingRemoteState eigentlich verhindern
+    // soll, nur eine Stufe subtiler: nicht derselbe Wert kommt zurueck,
+    // sondern ein VERALLGEMEINERTER, der die eigene Seitenbandwahl
+    // verwaesserte. Steht die Scheibe schon auf CWL/CWU, bleibt sie das
+    // bei einem eingehenden "cw" -- nur ein FRISCHES cwl/cwu (von einem
+    // TCI-Geraet, das die Unterscheidung tatsaechlich sendet) oder ein
+    // "cw" auf eine Scheibe, die noch nicht in CW ist, aendert etwas.
+    if (mode == QStringLiteral("cw")
+        && (slice->dspMode() == Longpath::DSPMode::CWL
+            || slice->dspMode() == Longpath::DSPMode::CWU)) {
+        return;
+    }
+
     bool ok = false;
     const Longpath::DSPMode dspMode = dspModeForTciModeString(mode, &ok);
     if (!ok) {

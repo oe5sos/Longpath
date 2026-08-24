@@ -142,14 +142,24 @@ Betriebsart kommt als `modulation:<Empfänger>,<Modus>`, klein
 geschrieben (`modulation:0,lsb`, `modulation:0,usb` — gemessen mit
 laufender Longpath-Sitzung, tci_probe parallel, 2026-08-24). Das deckt
 sich mit der Selbstauskunft: `modulations_list:am,sam,dsb,lsb,usb,cw,
-nfm,digl,digu,wfm,drm` — ebenfalls klein. Longpath sendet ausgehende
-Modus-Befehle darum ebenfalls klein geschrieben, `cwl`/`cwu` statt dem
-allgemeinen `cw` (ExpertSDR2s eigene Selbstauskunft nennt nur `cw`,
-aber `TciProtocol.cpp`s eigener Einlese-Zweig erkennt `cwl`/`cwu`
-zusätzlich als eigene Werte — noch nicht am echten SunSDR2 gegen­
-geprüft, ob ExpertSDR2 die Seitenbandwahl bei CW-Empfang darüber
-tatsächlich unterscheidet oder beide auf dieselbe interne Einstellung
-abbildet).
+nfm,digl,digu,wfm,drm` — ebenfalls klein.
+
+**Bench-bestätigt (OE5SOS, 2026-08-24): `cwl`/`cwu` als AUSGEHENDER
+Befehl wird von ExpertSDR2 nicht übernommen.** Eine erste Fassung sandte
+Longpaths eigene, feinere Unterscheidung (`cwl`/`cwu`, wie
+`TciProtocol.cpp`s Einlese-Zweig sie zusätzlich zum allgemeinen `cw`
+erkennt) — genau der Wortlaut, der in der Selbstauskunft NICHT steht
+(nur `cw`, keine `cwl`/`cwu`-Einträge in `modulations_list`). Der Befehl
+kam korrekt am Draht an, ExpertSDR2 hat den Modus aber nicht
+gewechselt. Fix: Longpath sendet für beide (`DSPMode::CWL` und
+`DSPMode::CWU`) ausgehend das allgemeine `cw` — ExpertSDR2 unterscheidet
+die CW-Seitenbandwahl über TCI offenbar überhaupt nicht. Die
+EINGEHENDE Seite behält `cwl`/`cwu` als erkannte Werte (falls je ein
+anderes TCI-Gerät sie sendet), behandelt ein eingehendes generisches
+`cw` aber nur dann als „auf CWL wechseln", wenn die Scheibe noch nicht
+in CWL/CWU steht — sonst hätte das eigene ausgehende `cw` (als Antwort
+auf eine gewählte CWU) die eigene Seitenbandwahl bei der nächsten
+ExpertSDR2-Rückmeldung still auf CWL zurückgedreht.
 
 ## Was noch offen ist
 
@@ -158,6 +168,3 @@ abbildet).
 - Der Empfänger muss in ExpertSDR2 **laufen**. Steht er, kommt kein
   einziger Rahmen — egal was man anfordert. Die Sonde erkennt das an
   `< stop` und verweigert dann ein Urteil.
-- `cwl`/`cwu` als ausgehender Modus-Befehl (statt dem allgemeinen `cw`
-  aus der Selbstauskunft): noch nicht am echten Gerät geprüft, ob
-  ExpertSDR2 das als zwei verschiedene CW-Seitenbänder versteht.
