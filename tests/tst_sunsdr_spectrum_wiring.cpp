@@ -24,6 +24,17 @@
 //      naechsten VFO-Tick eines echten Empfaengers stumm.
 //   4. Trennen (Fehler oder regulaer) entfernt die Router-Zuordnung
 //      wieder -- Spiegelbild zum Ton-Abbau in connect_wiring.
+//
+// Bench-gefunden, 2026-08-24 (nach dieser ersten Fassung): Ton kam an,
+// der Panadapter blieb schwarz -- startIqStream() fehlte in wireSunSdr(),
+// nur startAudioStream() stand da. Die Mittenfrequenz stimmte trotzdem
+// (dds: kommt unabhaengig vom Stream-Status), was den fehlenden Aufruf
+// beim ersten Blick verdeckte. Test 5 unten prueft seither direkt am
+// Draht, dass "iq_start:0;" tatsaechlich rausgeht -- nicht nur, dass der
+// Router-Kram dahinter richtig verdrahtet ist. Eine Pruefung, die nur
+// die FFTEngine/FFTRouter-Seite abdeckt, haette genau diesen Fehler
+// nicht gefunden: die Router-Zuordnung stand ja richtig, es kam nur nie
+// ein Rahmen an, den sie haette weiterleiten koennen.
 
 #include <QtTest>
 #include <QSignalSpy>
@@ -234,6 +245,50 @@ private slots:
         mw->disconnectSunSdrForTest();
         QTRY_VERIFY_WITH_TIMEOUT(router->pansForReceiver(pseudoIndex).isEmpty(),
                                  kWaitMs);
+
+        mw->close();
+    }
+
+    void verbindenFordertDenIqStromAmDrahtTatsaechlichAn()
+    {
+        // Gegenprobe zum Bench-Fund oben: nicht nur pruefen, dass die
+        // Router-Zuordnung steht (die stand schon, als der Panadapter
+        // schwarz blieb) -- sondern dass "iq_start:0;" tatsaechlich beim
+        // Testgeraet ankommt, genau wie "audio_start:0;" es fuer den Ton
+        // schon tut.
+        QWebSocketServer server(QStringLiteral("Testgeraet"),
+                                 QWebSocketServer::NonSecureMode);
+        QVERIFY2(server.listen(QHostAddress::LocalHost, 0),
+                 "Testserver konnte nicht aufmachen");
+
+        QStringList received;
+        connect(&server, &QWebSocketServer::newConnection, this, [&]() {
+            QWebSocket* remote = server.nextPendingConnection();
+            QVERIFY(remote);
+            connect(remote, &QWebSocket::textMessageReceived, this,
+                    [&received](const QString& msg) { received << msg; });
+            remote->sendTextMessage(kReadyLine);
+        });
+
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+
+        mw->connectSunSdrForTest(
+            QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
+
+        TciClient* client = mw->sunSdrClientForTest();
+        QVERIFY(client);
+        QTRY_COMPARE_WITH_TIMEOUT(client->state(), TciClient::State::Connected,
+                                  kWaitMs);
+
+        // TciClient::sendCommand haengt ein abschliessendes ";" an, wenn
+        // der Aufrufer keins mitgibt (siehe dort) -- der Draht traegt
+        // darum "iq_start:0;", nicht "iq_start:0".
+        QTRY_VERIFY_WITH_TIMEOUT(
+            received.contains(QStringLiteral("iq_start:0;")), kWaitMs);
+        QVERIFY2(received.contains(QStringLiteral("audio_start:0;")),
+                 "Ton-Anforderung fehlt -- Testannahme verletzt");
 
         mw->close();
     }

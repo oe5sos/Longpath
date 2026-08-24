@@ -208,17 +208,26 @@ void MainWindow::wireSunSdr()
 {
     if (!m_sunSdrClient) { return; }
 
-    // Die Selbstauskunft ist zu Ende: jetzt den Ton anfordern und die
-    // Scheibe fuer SunSDR-Ton freischalten. TciClient::startAudioStream
-    // sendet den Befehl unabhaengig davon, ob der Empfaenger in
+    // Die Selbstauskunft ist zu Ende: jetzt Ton UND I/Q anfordern und die
+    // Scheibe fuer SunSDR-Ton freischalten. TciClient::start{Audio,Iq}
+    // Stream senden den Befehl unabhaengig davon, ob der Empfaenger in
     // ExpertSDR2 gerade laeuft (docs/TCI-SunSDR-gemessen.md) -- solange
-    // er steht, kommt einfach kein Rahmen, und feedSunSdrAudioData wird
-    // schlicht nicht aufgerufen. Kein Sonderfall noetig.
+    // er steht, kommt einfach kein Rahmen, und weder feedSunSdrAudioData
+    // noch die FFTEngine (siehe Bild-Verdrahtung unten) werden aufgerufen.
+    // Kein Sonderfall noetig.
+    //
+    // Bench-gefunden, 2026-08-24: dieser startIqStream()-Aufruf fehlte
+    // in der ersten Fassung -- Ton kam an (startAudioStream stand schon
+    // da), der Panadapter aber blieb schwarz. Die Mittenfrequenz stimmte
+    // trotzdem, weil "dds:" unabhaengig vom Stream-Status aus der
+    // Selbstauskunft kommt -- das verdeckte den fehlenden Aufruf beim
+    // ersten Blick auf den Bediener-Bildschirm.
     connect(m_sunSdrClient, &TciClient::deviceDescribed, this,
             [this](const QString& deviceName) {
         qCInfo(lcTci) << "SunSDR beschrieben:" << deviceName;
         if (!m_sunSdrClient) { return; }
         m_sunSdrClient->startAudioStream(kSunSdrReceiverIndex);
+        m_sunSdrClient->startIqStream(kSunSdrReceiverIndex);
         if (m_radioModel && m_sunSdrTargetSliceId >= 0) {
             if (AudioEngine* audio = m_radioModel->audioEngine()) {
                 // AudioEngine::start() (Lautsprecher-Ausgang oeffnen, den
