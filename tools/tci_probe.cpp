@@ -67,6 +67,7 @@ struct StreamHeader {
     quint32 length = 0;
     quint32 streamType = 0;
     quint32 channels = 0;
+    int     frameBytes = 0;   // ganzer Rahmen, Kopf eingerechnet
     bool valid = false;
 };
 
@@ -86,8 +87,20 @@ StreamHeader parseHeader(const QByteArray& frame)
     h.length     = u32(20);
     h.streamType = u32(24);
     h.channels   = u32(28);
+    h.frameBytes = frame.size();
     h.valid = true;
     return h;
+}
+
+int sampleWidthBytes(quint32 sampleType)
+{
+    switch (sampleType) {
+    case 0: return 2;   // Int16
+    case 1: return 4;   // Int24 laeuft bei TCI als 4-Byte-Wort
+    case 2: return 4;   // Int32
+    case 3: return 4;   // Float32
+    default: return 0;
+    }
 }
 
 QString streamName(quint32 t)
@@ -198,6 +211,15 @@ int main(int argc, char** argv)
         const StreamHeader h = parseHeader(frame);
         if (!h.valid) { return; }
         frameCounts[h.streamType]++;
+        // Die ersten drei Rahmen je Strom im Rohzustand: Bytes und
+        // Abtastzahl. Alles andere waere Deutung.
+        if (frameCounts[h.streamType] <= 3) {
+            out() << "  [roh] " << streamName(h.streamType)
+                  << " Rahmen " << frameCounts[h.streamType]
+                  << ": " << h.frameBytes << " Byte gesamt, Feld20="
+                  << h.length << ", Feld28=" << h.channels << "\n";
+            out().flush();
+        }
         streams[h.streamType] = h;
     });
 
@@ -296,7 +318,26 @@ int main(int argc, char** argv)
                       << ", Empfaenger " << h.receiver
                       << ", " << h.sampleRate << " Hz"
                       << ", " << sampleName(h.sampleType)
-                      << ", " << h.channels << " Kanaele\n";
+                      ;
+                // Feld 28 (Kanaele) ist bei ExpertSDR2 NICHT gesetzt: im
+                // IQ-Rahmen steht 0, im Tonrahmen das Bitmuster einer
+                // Fliesskommazahl. Also nicht lesen, sondern messen --
+                // aus dem Durchsatz ergibt sich die Kanalzahl zwingend.
+                // Feld 20 zaehlt dabei ALLE Werte eines Rahmens, ueber
+                // die Kanaele hinweg (nachgeprueft: Byte == Feld20 * 4).
+                const int width = sampleWidthBytes(h.sampleType);
+                const int payload = h.frameBytes - 64;
+                if (width > 0 && h.length > 0 && h.sampleRate > 0
+                    && seconds > 0 && payload == int(h.length) * width) {
+                    const double valuesPerSec =
+                        double(it.value()) * double(h.length) / double(seconds);
+                    const double ch = valuesPerSec / double(h.sampleRate);
+                    out() << ", " << qRound(ch) << " Kanaele (gemessen "
+                          << QString::number(ch, 'f', 2) << ")";
+                } else {
+                    out() << ", Kanalzahl nicht messbar";
+                }
+                out() << "\n";
             }
             out() << "\n  Das traegt. Longpath koennte damit Spektrum und Ton\n"
                      "  des SunSDR zeigen.\n";
