@@ -559,6 +559,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [adc-ddc-panadapter-mapping.md](docs/architecture/adc-ddc-panadapter-mapping.md) | ADC->DDC->Receiver->FFT->Pan signal chain, Thetis UpdateDDCs() analysis, per-board DDC assignment, bandwidth limits |
 | [ctun-zoom-design.md](docs/architecture/ctun-zoom-design.md) | CTUN zoom bin subsetting: visibleBinRange(), hybrid FFT replan, DDC center tracking |
 | [2026-08-11-tx-monitor-audio-path.md](docs/architecture/2026-08-11-tx-monitor-audio-path.md) | TX self-monitor path: DUC-rate decimation, headphones bus, adaptive jitter cushion + seam fades in MasterMixer, latency budget, cadence-simulation verification |
+| [2026-08-24-sunsdr-tci-client-design.md](docs/architecture/2026-08-24-sunsdr-tci-client-design.md) | SunSDR2 QRP via TCI 1.4 client: signal path (Ton/Bild/Steuerung reusing existing AudioEngine/FFTEngine/FFTRouter infra, no parallel path), the one safety invariant (never feed/control a `streamIndex() >= 0` slice) and the three-piece design that enforces it, four real defects found against live hardware in order |
 
 ### Implementation Plans (`docs/architecture/phase*-plan.md`)
 
@@ -588,6 +589,8 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [2026-08-02-bottom-banner-and-pan-menu-plan.md](docs/architecture/2026-08-02-bottom-banner-and-pan-menu-plan.md) | Bottom Banner Cleanup + Pan Menu: 14-task implementation plan (Phase A ChromeBarController + fold ladder, Phase B pan-menu thumbnail grid) plus a final fix wave closing the merge-blocking audit findings | **Complete (14/14 tasks + fix wave; pending PR merge)** |
 | [2026-08-02-bottom-banner-and-pan-menu-verification/README.md](docs/architecture/2026-08-02-bottom-banner-and-pan-menu-verification/README.md) | Bottom Banner + Pan Menu: 7-row bench verification matrix | Matrix drafted (pending live G2 + HL2 hardware) |
 | [2026-08-11-rotor-logbook-verification/README.md](docs/architecture/2026-08-11-rotor-logbook-verification/README.md) | Rotor comfort (taught presets / park / LP / spot→rotor) + logbook regression sweep: 23-row bench matrix | Matrix drafted (pending bench) |
+| [2026-08-24-sunsdr-tci-client-design.md](docs/architecture/2026-08-24-sunsdr-tci-client-design.md) | SunSDR2 QRP via TCI 1.4 client design spec: Verbindung/Ton/Bild/Steuerung, the safety invariant, four defects found against live hardware | **Complete (shipped, bench-verified 2026-08-24)** |
+| [2026-08-24-sunsdr-verification/README.md](docs/architecture/2026-08-24-sunsdr-verification/README.md) | SunSDR2 QRP: 10-row bench verification matrix | Matrix verified rows 1-7 (2026-08-24, OE5SOS); rows 8-10 (dual-radio safety, reconnect cycle, ExpertSDR2-side crash recovery) pending |
 
 ### Protocol Reference (`docs/protocols/`)
 
