@@ -176,6 +176,19 @@ void MainWindow::wireSunSdr()
                 audio->setSunSdrAudioSourceEnabled(m_sunSdrTargetSliceId, true);
             }
         }
+        // Erste sichtbare Rueckmeldung ueberhaupt (2026-08-24, nach OE5SOS'
+        // "verbindet nicht" -- die Verbindung stand da tatsaechlich schon,
+        // nur gab es NICHTS im Fenster, das das gezeigt haette). Kein
+        // laestiges Wiederholen: deviceDescribed feuert genau einmal je
+        // "Verbinden…"-Klick, TciClient baut nicht von selbst neu auf.
+        QMessageBox::information(
+            this, QStringLiteral("SunSDR verbunden"),
+            deviceName.isEmpty()
+                ? QStringLiteral("Verbunden. Sobald der Empfaenger in "
+                                 "ExpertSDR2 laeuft, kommt Ton.")
+                : QStringLiteral("Verbunden mit „%1“.\n\nSobald der "
+                                 "Empfaenger in ExpertSDR2 laeuft, kommt Ton.")
+                      .arg(deviceName));
     });
 
     connect(m_sunSdrClient, &TciClient::audioFrameReady, this,
@@ -210,6 +223,18 @@ void MainWindow::wireSunSdr()
             [this](TciClient::State state, const QString& detail) {
         if (state == TciClient::State::Error) {
             qCWarning(lcTci) << "SunSDR:" << detail;
+            // Derselbe Grund wie bei der Erfolgsmeldung oben: sonst gibt
+            // es GAR KEIN Zeichen im Fenster, dass etwas schiefging.
+            // TciClient bleibt in State::Error stehen, bis der Betreiber
+            // erneut "Verbinden…" waehlt (siehe TciClient.cpp) -- diese
+            // Meldung feuert darum je Fehlversuch genau einmal, nicht in
+            // einer Schleife.
+            QMessageBox::warning(
+                this, QStringLiteral("SunSDR"),
+                QStringLiteral("Verbindung fehlgeschlagen: %1")
+                    .arg(detail.isEmpty()
+                             ? QStringLiteral("(keine weitere Angabe)")
+                             : detail));
         }
         if (state == TciClient::State::Error
             || state == TciClient::State::Disconnected) {
