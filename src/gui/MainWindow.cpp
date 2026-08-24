@@ -1969,6 +1969,26 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     engine->moveToThread(m_fftThread);
     connect(m_fftThread, &QThread::finished, engine, &QObject::deleteLater);
 
+    // Absturz gegengepruefte Korrektur (2026-08-24, "kein SunSDR-Ton"-
+    // Nebenbefund): m_fftEngines wurde nirgends geleert, wenn ein Engine
+    // tatsaechlich zerstoert wird. Ein spaeterer Aufruf mit demselben
+    // streamIndex traf dann auf `if (FFTEngine* existing = m_fftEngines.
+    // value(streamIndex, nullptr))` -- die Abfrage sah einen nicht-Null-
+    // Zeiger auf laengst freigegebenen Speicher und gab ihn zurueck, statt
+    // einen frischen Engine anzulegen. Der naechste QMetaObject::
+    // invokeMethod(engine, ...) las darauf engine->thread() auf
+    // freigegebenem Speicher -- SIGSEGV, absturzbericht Longpath-2026-08-
+    // 24-093116.ips, ausgeloest durch einen Panadapter-Klick nach einer
+    // per addSlice() ohne echtes Funkgeraet angelegten Scheibe.
+    //
+    // destroyed() feuert unabhaengig davon, WARUM der Engine stirbt
+    // (deleteLater oben, oder jeder andere Weg) -- die Abbildung raeumt
+    // sich damit immer korrekt selbst auf, bevor ein zweiter Aufruf mit
+    // demselben Index eine Chance hat, den alten Zeiger noch zu sehen.
+    connect(engine, &QObject::destroyed, this, [this, streamIndex]() {
+        m_fftEngines.remove(streamIndex);
+    });
+
     // Raw I/Q for this stream -> this engine.  The context object is the
     // ENGINE, not MainWindow, deliberately: RadioModel emits
     // rawIqDataForStream from the Connection thread (Lever 2, 2026-05-24,
