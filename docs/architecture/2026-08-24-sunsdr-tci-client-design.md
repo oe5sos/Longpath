@@ -176,7 +176,9 @@ building on the last.
 - **VFO channel B / split.** Longpath speaks only VFO channel A
   (`vfo:<rx>,0,…`) in both directions — the "kept simple" scope
   decision the operator made at the outset (one SunSDR, no profile
-  manager, no split). Revisit only on explicit request.
+  manager, no split). **Confirmed again 2026-08-24 (OE5SOS): not
+  needed for current operation.** Left here as the backlog entry —
+  revisit only on explicit future request, do not build speculatively.
 - **Multi-device / profile management.** One SunSDR, fixed
   connection, no `KiwiSdrManager`-style list. Same decision as above.
 
