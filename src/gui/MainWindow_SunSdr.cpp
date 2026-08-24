@@ -241,7 +241,15 @@ void MainWindow::connectSunSdr(const QString& endpoint)
         }
     }
     if (!slice) {
-        const int id = m_radioModel->addSlice();
+        // suppressAutoStreamBinding=true: this slice is about to be fed by
+        // SunSDR's mirrored VFO, not an operator retuning a real radio --
+        // see RadioModel::addSlice's parameter doc and
+        // SliceModel::m_suppressAutoStreamBinding for the bug this avoids
+        // (bench-found 2026-08-24: the very first applyRemoteSunSdrFrequency
+        // call otherwise handed the fresh slice a real streamIndex(), and
+        // the streamIndexChanged watch below evicted SunSDR from it within
+        // the same event).
+        const int id = m_radioModel->addSlice(QString(), true);
         slice = m_radioModel->sliceById(id);
         qCInfo(lcTci) << "SunSDR: keine ungebundene Scheibe vorhanden -- "
                          "eine angelegt, Kennung" << id;
@@ -255,6 +263,14 @@ void MainWindow::connectSunSdr(const QString& endpoint)
                            "Der SunSDR wird nicht verbunden."));
         return;
     }
+    // Auch fuer die beiden Rueckfall-Zweige oben (wiederverwendete aktive
+    // oder erste ungebundene Scheibe) -- addSlice()s Parameter deckt nur
+    // den dritten, neu angelegten Fall ab. Ohne dies wuerde jede
+    // wiederverwendete, bereits vorhandene Scheibe (der haeufigere Fall:
+    // die schon vorhandene, nie mit einem echten Funkgeraet verbundene
+    // Scheibe A) beim ersten applyRemoteSunSdrFrequency()-Aufruf immer noch
+    // in den echten Platzierungspfad laufen.
+    slice->setSuppressAutoStreamBinding(true);
     m_sunSdrTargetSliceId = slice->sliceIndex();
 
     if (!m_sunSdrClient) {
@@ -315,6 +331,16 @@ void MainWindow::releaseSunSdrSlice(const QString& reason)
         }
         if (auto* router = m_radioModel->fftRouter()) {
             router->removeReceiver(kSunSdrPseudoStreamIndex);
+        }
+        // Explicit-disconnect path: bindUnboundSlices() already cleared
+        // this when a real radio triggered the release (streamIndexChanged
+        // fires from inside it, before this function runs), so this is a
+        // harmless no-op there. Needed here for the other release reasons
+        // -- an outright "Trennen" -- where the slice survives, unbound,
+        // and must go back to answering an operator's own retune with a
+        // real placement like any other slice, not stay silently suppressed.
+        if (SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId)) {
+            slice->setSuppressAutoStreamBinding(false);
         }
     }
     disconnect(m_sunSdrFreqOutConn);

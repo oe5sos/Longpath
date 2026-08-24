@@ -433,13 +433,25 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
             // braucht einen Platz. Also wird einer angelegt. Das ist
             // gerade der Fall, um den es geht: ein Kiwi ist dann am
             // interessantesten, wenn kein eigenes Geraet laeuft.
-            const int id = m_radioModel->addSlice();
+            // suppressAutoStreamBinding=true: derselbe Fund wie bei SunSDR
+            // (2026-08-24) -- ohne das haette der erste Frequenz-Mitschrieb
+            // aus dem KiwiSDR-Empfaenger die frische Scheibe auf einen
+            // echten Stream gelegt und die eigene Sicherheitsschranke
+            // (kiwiControllableSlice) haette das Ergebnis als "echtes
+            // Funkgeraet hat uebernommen" gelesen -- Sekundenbruchteile
+            // nach dem Verbinden.
+            const int id = m_radioModel->addSlice(QString(), true);
             slice = m_radioModel->sliceById(id);
             qCInfo(lcKiwiSdr) << "Keine Scheibe vorhanden — fuer den "
                                  "KiwiSDR eine angelegt, Kennung" << id;
         }
     }
     if (slice) {
+        // Auch fuer die beiden Rueckfall-Zweige oben (wiederverwendete
+        // aktive oder erste ungebundene Scheibe) -- addSlice()s Parameter
+        // deckt nur den neu angelegten Fall ab, aber der wiederverwendete
+        // ist der haeufigere.
+        slice->setSuppressAutoStreamBinding(true);
         m_kiwiSdrManager->assignSliceToProfile(
             slice->sliceIndex(), id,
             slice->frequency() / 1.0e6,
@@ -485,6 +497,14 @@ void MainWindow::releaseKiwiSdrSlice(int sliceId, const QString& profileId,
     if (m_radioModel) {
         if (AudioEngine* audio = m_radioModel->audioEngine()) {
             audio->removeKiwiSdrAudioSource(sliceId);
+        }
+        // See the matching comment in MainWindow::releaseSunSdrSlice --
+        // harmless no-op when a real radio triggered this release
+        // (bindUnboundSlices() already cleared it), needed for every other
+        // release reason so the slice answers a later operator retune with
+        // a real placement again instead of staying silently suppressed.
+        if (SliceModel* slice = m_radioModel->sliceById(sliceId)) {
+            slice->setSuppressAutoStreamBinding(false);
         }
     }
     m_kiwiSdrManager->clearSliceAssignment(sliceId);

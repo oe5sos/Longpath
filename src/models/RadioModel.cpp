@@ -3667,6 +3667,13 @@ void RadioModel::bindUnboundSlices()
 {
     for (SliceModel* s : std::as_const(m_slices)) {
         if (s && s->streamIndex() < 0) {
+            // A real radio is exactly what suppressAutoStreamBinding exists
+            // to wait for (see SliceModel::m_suppressAutoStreamBinding):
+            // this IS the genuine takeover the accessory's own
+            // streamIndexChanged watch is designed to react to. Clear it
+            // first so the slice resumes ordinary operator-retune placement
+            // from here on, same as any other real slice.
+            s->setSuppressAutoStreamBinding(false);
             bindSliceToStream(s, s->frequency());
         }
     }
@@ -4656,9 +4663,10 @@ bool RadioModel::requestTxHandoffToSlice(int sliceId)
     return m_txSliceArbiter->requestHandoff(sliceId);
 }
 
-int RadioModel::addSlice(const QString& initialPanId)
+int RadioModel::addSlice(const QString& initialPanId, bool suppressAutoStreamBinding)
 {
     auto* slice = new SliceModel(this);
+    slice->setSuppressAutoStreamBinding(suppressAutoStreamBinding);
 
     // Phase 3F Sub-Epic I closeout, defect C3: lowest id not currently in
     // use, NOT m_slices.size().
@@ -4776,8 +4784,14 @@ int RadioModel::addSlice(const QString& initialPanId)
     const bool openingANewPan =
         !initialPanId.isEmpty() && slicesOnPan(initialPanId, slice).isEmpty();
 
+    // suppressAutoStreamBinding: this slice belongs to a foreign accessory,
+    // not an operator pan -- see the parameter doc in the header. Skip the
+    // placement attempt entirely rather than let it run and be rejected;
+    // "unbound" is this slice's normal, intended resting state, the same
+    // one Slice A starts every cold launch in.
     const bool poolReady = m_streamAllocator.streamCount() > 0;
-    if (!bindSliceToStream(slice, slice->frequency(), openingANewPan)
+    if (!suppressAutoStreamBinding
+        && !bindSliceToStream(slice, slice->frequency(), openingANewPan)
         && poolReady) {
         // bindSliceToStream already emitted sliceAddRejected with the
         // allocator's reason for this first-bind case, so the operator has
@@ -4826,6 +4840,14 @@ int RadioModel::addSlice(const QString& initialPanId)
         // must see it -- that is the point -- but re-running the allocator
         // on it would be a pointless second placement.
         if (m_rollingBackFrequency) { return; }
+        // See SliceModel::m_suppressAutoStreamBinding: a foreign accessory
+        // mirroring its own VFO onto this slice must not be answered with a
+        // real DDC placement -- that IS the bug this flag exists to close
+        // (bench-confirmed 2026-08-24, SunSDR: the placement it triggered
+        // set a real streamIndex(), which the accessory's own safety watch
+        // on that field then read as a real radio taking over and evicted
+        // it, seconds after every connect).
+        if (slice->suppressAutoStreamBinding()) { return; }
 
         const int    previousStream = slice->streamIndex();
         const double previousShift  = slice->shiftOffsetHz();

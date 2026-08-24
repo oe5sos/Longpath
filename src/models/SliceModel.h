@@ -697,6 +697,12 @@ public:
 
     int  streamIndex() const { return m_streamIndex; }
     void setStreamIndex(int idx);
+
+    // See m_suppressAutoStreamBinding above. Plain C++ coordination flag,
+    // not a Q_PROPERTY -- nothing outside RadioModel/addSlice's own callers
+    // needs to observe or bind to it.
+    bool suppressAutoStreamBinding() const { return m_suppressAutoStreamBinding; }
+    void setSuppressAutoStreamBinding(bool v) { m_suppressAutoStreamBinding = v; }
     double shiftOffsetHz() const { return m_shiftOffsetHz; }
     void setShiftOffsetHz(double hz);
 
@@ -1267,6 +1273,21 @@ private:
     int     m_chainIndex{0};     // Phase 3F: 0 or 1 on 2-ADC boards; always 0 on 1-ADC
     int     m_ddcIndex{-1};      // Phase 3F: codec-assigned DDC; -1 = unassigned sentinel
     int    m_streamIndex{-1};     // Phase 3F Sub-Epic I: -1 = unbound
+    // 2026-08-24 bench fix: a foreign accessory (SunSDR, KiwiSDR) mirrors
+    // its own real-world VFO onto this slice's frequency to keep the flag
+    // honest -- but RadioModel::addSlice() wires every slice's
+    // frequencyChanged straight into bindSliceToStream(), which was written
+    // for an operator retuning a real, connected radio. That mirrored
+    // setFrequency() call triggered the same real-DDC placement a live
+    // retune would, handing the slice a genuine streamIndex() >= 0 a
+    // heartbeat after the accessory connected -- which the safety code that
+    // watches exactly that field then read as "a real radio took over" and
+    // correctly, but wrongly, evicted the accessory it was protecting
+    // against. Set true for the one slice a SunSDR/KiwiSDR connection
+    // creates for itself (RadioModel::addSlice's suppressAutoStreamBinding
+    // parameter); cleared the moment bindUnboundSlices() places a real
+    // radio there, so a genuine later takeover resumes normal placement.
+    bool   m_suppressAutoStreamBinding{false};
     double m_shiftOffsetHz{0.0};  // offset from stream centre
     int     m_sampleRateHz{kDefaultSampleRate};  // Phase 3F: per-slice DDC sample rate; default 192 kHz (Longpath::kDefaultSampleRate)
     bool    m_diversityEnabled{false};  // Phase 3F: Slice-A-only diversity mode; gated on BoardCapabilities.hasDiversityReceiver

@@ -720,7 +720,18 @@ public:
     /// is a host and sharing it is the point. It was briefly a caller-
     /// supplied flag; every caller that forgot it silently reintroduced the
     /// coupled-pan defect, so the decision lives with the data it depends on.
-    int addSlice(const QString& initialPanId = QString());
+    /// suppressAutoStreamBinding: for a slice a foreign accessory (SunSDR,
+    /// KiwiSDR) creates for itself, not for an operator-facing pan. Skips
+    /// the initial bindSliceToStream() attempt below and marks the slice so
+    /// its own frequencyChanged→bindSliceToStream wiring (also below) stays
+    /// off too -- both would otherwise hand the slice a real streamIndex()
+    /// the moment the accessory mirrors its own VFO onto it, which the
+    /// safety code watching that field reads as "a real radio took over"
+    /// (see SliceModel::m_suppressAutoStreamBinding). Cleared automatically
+    /// the moment a real radio actually does claim the slice via
+    /// bindUnboundSlices().
+    int addSlice(const QString& initialPanId = QString(),
+                 bool suppressAutoStreamBinding = false);
 
     /// Takes a slice ID (see sliceById), not a list position. sliceRemoved
     /// carries the same id.
