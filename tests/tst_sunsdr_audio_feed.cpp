@@ -40,6 +40,23 @@ std::vector<float> makeInterleavedStereo(int frames, float value)
     return std::vector<float>(static_cast<size_t>(frames) * 2, value);
 }
 
+// Gegengepruefter Fehler im ersten Lauf dieser Datei (2026-08-24, bei
+// OE5SOS): ein frisches MainWindow OHNE verbundenes Funkgeraet hat NULL
+// Scheiben -- sie entstehen erst beim Verbinden. activeSlice() liefert
+// dann nullptr, und alle vier Pruefungen sind sofort durchgefallen.
+// Dieselbe Lehre steht schon in MainWindow_KiwiSdr.cpp::addKiwiSdrReceiver
+// ("Ohne Funkgeraet gibt es GAR KEINE Scheibe") -- derselbe Rueckfall gilt
+// darum auch hier: aktive Scheibe, sonst die erste, sonst eine anlegen.
+SliceModel* resolveOrCreateSlice(RadioModel* model)
+{
+    if (!model) { return nullptr; }
+    if (SliceModel* active = model->activeSlice()) { return active; }
+    const QList<SliceModel*> slices = model->slices();
+    if (!slices.isEmpty()) { return slices.first(); }
+    const int id = model->addSlice();
+    return model->sliceById(id);
+}
+
 } // namespace
 
 class TstSunSdrAudioFeed : public QObject
@@ -57,8 +74,9 @@ private slots:
         QVERIFY(model);
         AudioEngine* audio = model->audioEngine();
         QVERIFY(audio);
-        SliceModel* slice = model->activeSlice();
-        QVERIFY2(slice, "keine aktive Scheibe -- der Rest der Pruefung prueft nichts");
+        SliceModel* slice = resolveOrCreateSlice(model);
+        QVERIFY2(slice, "keine Scheibe zu bekommen, auch nicht angelegt -- "
+                        "der Rest der Pruefung prueft nichts");
         const int sliceId = slice->sliceIndex();
 
         QVERIFY2(!audio->sunSdrAudioEnabled(sliceId),
@@ -98,7 +116,7 @@ private slots:
         QVERIFY(model);
         AudioEngine* audio = model->audioEngine();
         QVERIFY(audio);
-        SliceModel* slice = model->activeSlice();
+        SliceModel* slice = resolveOrCreateSlice(model);
         QVERIFY(slice);
         const int sliceId = slice->sliceIndex();
 
@@ -140,7 +158,7 @@ private slots:
         QVERIFY(model);
         AudioEngine* audio = model->audioEngine();
         QVERIFY(audio);
-        SliceModel* slice = model->activeSlice();
+        SliceModel* slice = resolveOrCreateSlice(model);
         QVERIFY(slice);
         const int sliceId = slice->sliceIndex();
 
@@ -182,7 +200,7 @@ private slots:
         QVERIFY(model);
         AudioEngine* audio = model->audioEngine();
         QVERIFY(audio);
-        SliceModel* slice = model->activeSlice();
+        SliceModel* slice = resolveOrCreateSlice(model);
         QVERIFY(slice);
         const int sliceId = slice->sliceIndex();
 
