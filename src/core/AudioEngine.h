@@ -449,6 +449,33 @@ public:
     void removeKiwiSdrAudioSource(int sliceId);
     bool kiwiSdrAudioEnabled(int sliceId) const;
 
+    // ── SunSDR-Ton (TCI-Client, 2026-08-24) ──────────────────────────
+    //
+    // Derselbe Zuschnitt wie KiwiSDR oben — ein SunSDR2 QRP liefert
+    // ueber ExpertSDR2/TCI ebenfalls fertig entschluesselten RX-Ton,
+    // nicht I/Q, und tritt darum genau wie Kiwi-Ton nicht in die
+    // DSP-Kette ein, sondern an rxBlockReady.
+    //
+    // EIN Unterschied zu Kiwi: die Quellrate ist NICHT fest. TCI erlaubt
+    // audio_samplerate jederzeit umzustellen (der IQ-Strom lief in der
+    // Messung bis 192 kHz, siehe docs/TCI-SunSDR-gemessen.md — der Ton
+    // blieb dort zwar durchgaengig bei 48 kHz, aber das Protokoll
+    // erzwingt das nicht). feedSunSdrAudioData nimmt die Rate deshalb
+    // als Parameter statt sie wie bei Kiwi im Wandler fest anzunehmen;
+    // aendert sie sich seit dem letzten Ruf, wird der Wandler verworfen
+    // und neu angelegt — sonst traegt der alte Wandler einen
+    // Filterzustand fuer eine Rate, die nicht mehr stimmt, und das
+    // Ergebnis knackt beim ersten Block danach.
+    //
+    // Dieselbe Bedingung wie bei Kiwi gilt unveraendert: die Spur einer
+    // Scheibe hat GENAU EINEN Erzeuger. setSunSdrAudioSourceEnabled
+    // schaltet die Scheibe darum ebenso auf "opportunistisch".
+    void feedSunSdrAudioData(int sliceId, const float* interleavedStereo,
+                             int frames, int sourceRateHz);
+    void setSunSdrAudioSourceEnabled(int sliceId, bool enabled);
+    void removeSunSdrAudioSource(int sliceId);
+    bool sunSdrAudioEnabled(int sliceId) const;
+
     /// TX-monitor block consumer. Called via Qt::DirectConnection from
     /// TxChannel::sip1OutputReady on the audio thread. When monitor is
     /// enabled, expands the mono TXA samples to interleaved stereo (L=R),
@@ -890,6 +917,18 @@ private:
     std::map<int, std::unique_ptr<Resampler>> m_kiwiResamplers;
     std::set<int> m_kiwiEnabledSlices;
     std::vector<float> m_kiwiScratch;
+
+    // SunSDR-Ton (TCI-Client): wie oben bei Kiwi, aber die Quellrate ist
+    // nicht fest (siehe feedSunSdrAudioData) — der Wandler traegt darum
+    // die Rate, fuer die er gebaut wurde, mit sich, statt sie separat in
+    // einer zweiten Abbildung zu fuehren, die aus dem Takt geraten
+    // koennte. NUR vom Steuerfaden angefasst, wie bei Kiwi.
+    struct SunSdrResamplerSlot {
+        std::unique_ptr<Resampler> resampler;
+        int rateHz = 0;
+    };
+    std::map<int, SunSdrResamplerSlot> m_sunSdrResamplers;
+    std::set<int> m_sunSdrEnabledSlices;
 
     // Second mixer whose output is the anti-VOX reference, not the speakers.
     //

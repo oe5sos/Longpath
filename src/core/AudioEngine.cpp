@@ -2056,6 +2056,79 @@ void AudioEngine::feedKiwiSdrAudioData(int sliceId,
                  outFrames);
 }
 
+void AudioEngine::setSunSdrAudioSourceEnabled(int sliceId, bool enabled)
+{
+    if (enabled) {
+        if (m_sunSdrEnabledSlices.insert(sliceId).second) {
+            // Opportunistisch, aus demselben Grund wie bei Kiwi: ein
+            // Netzaussetzer zum SunSDR darf nicht den gesamten Mix
+            // anhalten.
+            m_masterMix.setSliceOpportunistic(sliceId, true);
+            m_antiVoxMix.setSliceOpportunistic(sliceId, true);
+            qCInfo(lcAudio) << "SunSDR-Ton eingeschaltet fuer Scheibe"
+                            << sliceId << "(opportunistisch im Mix)";
+        }
+        return;
+    }
+    if (m_sunSdrEnabledSlices.erase(sliceId) > 0) {
+        m_masterMix.setSliceOpportunistic(sliceId, false);
+        m_antiVoxMix.setSliceOpportunistic(sliceId, false);
+        qCInfo(lcAudio) << "SunSDR-Ton abgeschaltet fuer Scheibe" << sliceId;
+    }
+}
+
+bool AudioEngine::sunSdrAudioEnabled(int sliceId) const
+{
+    return m_sunSdrEnabledSlices.count(sliceId) > 0;
+}
+
+void AudioEngine::removeSunSdrAudioSource(int sliceId)
+{
+    setSunSdrAudioSourceEnabled(sliceId, false);
+    // Den Wandler mit wegwerfen: er traegt einen Filterzustand, und ein
+    // alter Zustand auf einem neuen Empfaenger (oder einer neuen Rate)
+    // gibt beim ersten Block ein Knacken.
+    m_sunSdrResamplers.erase(sliceId);
+}
+
+void AudioEngine::feedSunSdrAudioData(int sliceId, const float* interleavedStereo,
+                                      int frames, int sourceRateHz)
+{
+    if (!sunSdrAudioEnabled(sliceId)) {
+        return;
+    }
+    if (!interleavedStereo || frames <= 0 || sourceRateHz <= 0) {
+        // sourceRateHz <= 0 heisst: der Aufrufer kennt die wahre Rate
+        // noch nicht (TciClient::iqSampleRate()/audioSampleRate() liest
+        // 0, bevor die Selbstauskunft sie genannt hat). Ohne eine echte
+        // Rate darf kein Wandler gebaut werden -- der wuerde sonst mit
+        // 0 Hz initialisiert und liefert Unsinn oder stuerzt ab.
+        return;
+    }
+
+    auto it = m_sunSdrResamplers.find(sliceId);
+    if (it == m_sunSdrResamplers.end() || it->second.rateHz != sourceRateHz) {
+        // Neu, oder die Rate hat sich seit dem letzten Ruf geaendert --
+        // TCI erlaubt audio_samplerate jederzeit umzustellen (siehe
+        // AudioEngine.h). Ein alter Wandler fuer die falsche Rate bliebe
+        // sonst unbemerkt im Einsatz.
+        SunSdrResamplerSlot slot;
+        slot.resampler = std::make_unique<Resampler>(double(sourceRateHz), 48000.0, 8192);
+        slot.rateHz = sourceRateHz;
+        it = m_sunSdrResamplers.insert_or_assign(sliceId, std::move(slot)).first;
+    }
+
+    const QByteArray out =
+        it->second.resampler->processStereoToStereo(interleavedStereo, frames);
+    if (out.isEmpty()) {
+        return;   // der Wandler haelt noch zurueck; das ist normal
+    }
+    const int outFrames = out.size() / int(sizeof(float) * 2);
+    rxBlockReady(sliceId,
+                 reinterpret_cast<const float*>(out.constData()),
+                 outFrames);
+}
+
 void AudioEngine::setDspSampleRate(int rate)
 {
     AppSettings::instance().setValue(QStringLiteral("audio/DspRate"),
