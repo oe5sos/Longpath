@@ -215,13 +215,19 @@ not a finding. Flagged unresolved rather than papered over.
 
 ### What this changes for the next step
 
-- `tools/sunsdr_probe.cpp` only tries the DX (`0x32`) and PRO (`0x01`)
-  magic bytes today — against this QRP it will never get a reply as
-  written, which is now understood, not mysterious. The fix (add a QRP
-  profile: ctrl 50001 / stream 50002 / magic `0x03`) is mechanical but
-  deliberately not made tonight without a live re-test; a magic-`0x03`
-  `0x1a` identity query, matching the exact bytes confirmed above, is
-  the safest next live test on the bench.
+- `tools/sunsdr_probe.cpp` tried only the DX (`0x32`) and PRO (`0x01`)
+  magic bytes — against this QRP it could never get a reply as written,
+  which is now understood, not mysterious. A third profile (`QRP`:
+  ctrl 50001 / stream 50002 / magic `0x03`) has been added to the
+  tool's profile table tonight — mechanical, additive, still read-only,
+  same zero-payload `0x1A` query as before. **Not yet run against the
+  real hardware** — that's the next live bench step, not something to
+  claim from a source change alone. One caveat already visible in the
+  capture: the real boot sequence's own `0x1a` exchange carried a
+  4-byte zero payload, not the empty payload this probe sends (which
+  mirrors ArtemisSDR's own identity-query usage) — if the corrected
+  magic byte still gets no reply, that mismatch is one plausible reason
+  to check next, not a settled explanation.
 - The confirmed header formats and magic byte are enough to build and
   test further **read-only** probes. They are **not** enough to safely
   open a live session: several of the ~20 opcodes in the real boot

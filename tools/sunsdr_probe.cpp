@@ -41,15 +41,29 @@
 //   sunsdr_probe <IP-Adresse> [sekunden]
 //
 // Probiert nacheinander das DX-Profil (Steuerport 50001, Kennbyte
-// 0x32) und das PRO-Profil (Steuerport 50002, Kennbyte 0x01) -- siehe
-// docs/architecture/2026-08-24-sunsdr-native-driver-design.md,
-// Abschnitt "Sockets". Welches (wenn ueberhaupt eines) der QRP
-// beantwortet, ist Teil der Antwort, die diese Sonde sucht.
+// 0x32), das PRO-Profil (Steuerport 50002, Kennbyte 0x01) und -- seit
+// dem echten Mitschnitt vom 2026-08-24 -- das QRP-Profil (Steuerport
+// 50001, Kennbyte 0x03) -- siehe docs/architecture/
+// 2026-08-24-sunsdr-native-driver-design.md, Abschnitt "Confirmed
+// from real QRP capture". Genau DAS ist der Grund, warum diese Sonde
+// beim ersten Versuch (mit dem DX-Kennbyte 0x32) keine Antwort bekam,
+// obwohl ping schon lief: falsches Kennbyte, kein Netzwerkproblem.
+//
+// Ein Vorbehalt aus demselben Mitschnitt: die dortige 0x1A-Abfrage im
+// echten Bootablauf trug eine 4-Byte-Nutzlast aus Nullen, nicht die
+// leere Nutzlast, die diese Sonde (nach ArtemisSDR's eigener
+// Selbstauskunfts-Verwendung) sendet. Bleibt die QRP-Antwort auch mit
+// korrigiertem Kennbyte aus, ist das ein moeglicher Grund -- keine
+// Gewissheit, siehe Design-Dokument.
 //
 // =================================================================
 // Modification history (Longpath):
 //   2026-08-24 — Angelegt fuer Longpath von Martin Fischer,
 //                KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-08-24 — QRP-Profil (Kennbyte 0x03) ergaenzt, nach Auswertung
+//                eines echten tcpdump-Mitschnitts (21720 Pakete) auf
+//                der Werkbank. KI-gestuetzt ueber Anthropic Claude
+//                (Cowork).
 // =================================================================
 
 #include <QCoreApplication>
@@ -93,12 +107,15 @@ struct SunSdrProfile {
     quint8  magic0;
 };
 
-// ArtemisSDR sunsdr.c:2728-2742 (sunsdr_profile_dx / sunsdr_profile_pro).
-// Der QRP-Fall fehlt dort -- das ist genau die Luecke, die diese Sonde
-// schliessen soll, nicht raten.
+// DX/PRO: ArtemisSDR sunsdr.c:2728-2742 (sunsdr_profile_dx /
+// sunsdr_profile_pro). QRP: docs/architecture/
+// 2026-08-24-sunsdr-native-driver-design.md, "Confirmed from real QRP
+// capture" -- Ports wie DX, Kennbyte 0x03, aus einem echten
+// tcpdump-Mitschnitt (21720 Pakete, 2026-08-24), nicht geraten.
 const SunSdrProfile kProfiles[] = {
     { QStringLiteral("DX"),  50001, 50002, 0x32 },
     { QStringLiteral("PRO"), 50002, 50003, 0x01 },
+    { QStringLiteral("QRP"), 50001, 50002, 0x03 },
 };
 
 QString hexDump(const QByteArray& data)
@@ -234,7 +251,7 @@ int main(int argc, char** argv)
 
         out() << "\n";
         if (!anyReply) {
-            out() << "  Keine Antwort auf keinem der beiden Profile.\n\n"
+            out() << "  Keine Antwort auf keinem der Profile.\n\n"
                      "  Zu pruefen, bevor daraus \"spricht das Protokoll\n"
                      "  nicht\" wird:\n"
                      "   - ist die IP-Adresse richtig und die QRP erreichbar\n"
