@@ -596,6 +596,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [openhpsdr-protocol1.md](docs/protocols/openhpsdr-protocol1.md) | P1 summary + pointer to capture reference; Thetis P1 source map |
 | [openhpsdr-protocol1-capture-reference.md](docs/protocols/openhpsdr-protocol1-capture-reference.md) | Annotated HL2↔Thetis capture: discovery, start/stop, EP6/EP2 frames, C0 maps, cadence, band/TX traces, HL2 quirks, Phase 3L checklist |
 | [openhpsdr-protocol2.md](docs/protocols/openhpsdr-protocol2.md) | P2 UDP multi-port, command packets, per-DDC I/Q streams |
+| [TCI-SunSDR-gemessen.md](docs/TCI-SunSDR-gemessen.md) | TCI 1.4 against a SunSDR2 QRP / ExpertSDR2, measured with `tools/tci_probe.cpp` — binary header fields that lie (rate, channel count), `dds:`/`vfo:`/`if:` semantics, the two-receiver `dds:`/`vfo:`/`modulation:` gotcha, and why outgoing CW mode collapses `cwl`/`cwu` to `cw` |
 
 ### Phase 1 Analysis Docs (`docs/phase1/`)
 
