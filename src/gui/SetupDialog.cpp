@@ -70,6 +70,7 @@
 #include "setup/AudioDevicesPage.h"
 #include "setup/AudioTxInputPage.h"
 #include "setup/AudioVaxPage.h"
+#include "setup/AsrPage.h"
 #include "setup/AudioTciPage.h"
 #include "setup/AudioAdvancedPage.h"
 // DSP
@@ -582,6 +583,10 @@ void SetupDialog::buildTree()
             m_model ? m_model->micProfileManager() : nullptr,
             m_model ? &m_model->transmitModel() : nullptr);
     });
+
+    // Spracherkennung: sitzt bei Audio, weil sie am Tonweg haengt.
+    registerPage(audio, "Spracherkennung",
+                 [this] { return new AsrPage(m_model); });
 
     tick("Audio");
 
