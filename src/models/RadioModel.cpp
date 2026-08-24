@@ -12213,6 +12213,27 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         if (m_swrSweep) {
             m_swrSweep->abortSweep(QStringLiteral("Verbindung getrennt"));
         }
+        // Same gap as the Sub-Epic I closeout defect F1 comment in
+        // teardownConnection() (see releaseStreamBindings() there) — just
+        // reached from a different door. A connect attempt that never
+        // finishes (P1/P2 connect-watchdog timeout: found on the bench
+        // 2026-08-24, an auto-reconnect to an unreachable Anvelina) places
+        // Slice A onto a stream during connectToRadio()'s early setup,
+        // *before* the first I/Q frame is required to prove the radio is
+        // actually there. The watchdog tears the socket down and lands us
+        // here — a state signal, not the explicit-disconnect call chain
+        // that runs teardownConnection() and its own releaseStreamBindings()
+        // — so that placement survived, leaving Slice A permanently
+        // "streamIndex() >= 0" with nothing behind it. Every foreign-
+        // accessory safety gate in this codebase (SunSDR, KiwiSDR) reads
+        // exactly that field to mean "a real, possibly TX-capable radio is
+        // here" and correctly refuses to touch it — so the phantom binding
+        // silently pushes every accessory connect onto a second, invisible
+        // slice instead of the one pan actually on screen. Idempotent
+        // against the explicit-disconnect call already making this same
+        // call: every field it touches is reset to its already-cleared
+        // value on a real disconnect.
+        releaseStreamBindings();
         // Per-radio peripherals refactor (2026-05-26): tear down RF-Kit /
         // 4O3A listener / PGXL / TGXL so they're not still attached to the
         // previous radio's scope when the user reconnects to a different
