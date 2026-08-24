@@ -1110,7 +1110,7 @@ public:
     // Wired by 3M-1a Task G.1 (bench fix: TUNE carrier now reaches the radio).
     TxChannel* txChannel() const { return m_txChannel; }
 
-    /// Nereus Audio Channel Strip — the client-side transmit chain.
+    /// Longpath Audio Channel Strip — the client-side transmit chain.
     ///
     /// Lives for as long as the connection does, because the strip's
     /// stages hold prepared delay lines sized to the sample rate.

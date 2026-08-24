@@ -129,7 +129,7 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
     : QDialog(parent)
     , m_radio(radio)
 {
-    setWindowTitle(QStringLiteral("Nereus Audio Channel Strip"));
+    setWindowTitle(QStringLiteral("Longpath Audio Channel Strip"));
     setModal(false);
     // Restore before the panels are built, so every control opens
     // showing what the chain actually holds rather than a default it

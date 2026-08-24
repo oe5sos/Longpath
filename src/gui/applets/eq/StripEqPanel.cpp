@@ -185,7 +185,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     : QWidget(parent)
     , m_audio(engine)
 {
-    setWindowTitle("Nereus Parametric EQ");
+    setWindowTitle("Longpath Parametric EQ");
     setStyleSheet(windowStyle());
     resize(kDefaultWidth, kDefaultHeight);
 
@@ -678,8 +678,8 @@ void StripEqPanel::showForPath(ClientEqApplet::Path path)
     // almost certainly doesn't correspond to the other path's bands.
     syncSelection(-1);
     const QString title = path == ClientEqApplet::Path::Rx
-        ? QStringLiteral("Nereus Parametric EQ — RX")
-        : QStringLiteral("Nereus Parametric EQ — TX");
+        ? QStringLiteral("Longpath Parametric EQ — RX")
+        : QStringLiteral("Longpath Parametric EQ — TX");
     // No title bar when embedded; see the note at construction.
     // m_titleBar is always an EditorFramelessTitleBar* — kept as
     // QWidget* in the header so the inline class stays cpp-only.

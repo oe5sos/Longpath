@@ -145,7 +145,7 @@ private:
     int                        m_savedSmoothingFraction{96};
     QString                    m_savedReferenceCurvePreset;
     // The frameless title bar carries the active path label (e.g.
-    // "Nereus Parametric EQ — TX").  Held as a void* + cast at use
+    // "Longpath Parametric EQ — TX").  Held as a void* + cast at use
     // site to keep the inline EditorFramelessTitleBar class out of the
     // public header.
     QWidget*                   m_titleBar{nullptr};
