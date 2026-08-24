@@ -140,6 +140,13 @@ int main(int argc, char** argv)
     bool ackAudioStart = false;
     bool ackIqStart = false;
     bool sawStreamRates = false;
+    // Laeuft der Empfaenger ueberhaupt? TCI meldet das als nackte
+    // Zeile "start" oder "stop". Ohne laufenden Empfaenger gibt
+    // es nichts zu senden, und die Frage nach den Stroemen ist
+    // gar nicht gestellt — das hat mich am 2026-08-24 einen
+    // zweiten Fehlbefund gekostet.
+    bool trxRunning = false;
+    bool sawRunState = false;
 
     QObject::connect(&sock, &QWebSocket::connected, [&]() {
         connected = true;
@@ -158,6 +165,8 @@ int main(int argc, char** argv)
             if (t.isEmpty()) { continue; }
             textLines << t;
             out() << "  < " << t << "\n";
+            if (t == QStringLiteral("start")) { trxRunning = true;  sawRunState = true; }
+            if (t == QStringLiteral("stop"))  { trxRunning = false; sawRunState = true; }
             if (t.startsWith(QStringLiteral("audio_start"))) { ackAudioStart = true; }
             if (t.startsWith(QStringLiteral("iq_start")))    { ackIqStart = true; }
             if (t.startsWith(QStringLiteral("iq_samplerate"))
@@ -236,6 +245,27 @@ int main(int argc, char** argv)
             // Ein Werkzeug, das aus "keine Daten" auf "kann es nicht"
             // schliesst, beantwortet die Frage falsch.
             out() << "  Stroeme:         keine Daten angekommen.\n\n";
+
+            // ── Zuerst: laeuft der Empfaenger ueberhaupt? ────────────
+            //
+            // Diese Frage geht allen anderen vor. Steht der Empfaenger,
+            // gibt es nichts zu senden, und aus dem Ausbleiben der
+            // Rahmen laesst sich GAR NICHTS schliessen.
+            if (sawRunState && !trxRunning) {
+                out() << "  ACHTUNG: der Empfaenger steht (TCI meldet \"stop\").\n\n"
+                      << "  Ohne laufenden Empfaenger gibt es kein I/Q und keinen\n"
+                      << "  Ton — egal, was man anfordert. Die Frage nach den\n"
+                      << "  Stroemen ist damit NICHT beantwortet.\n\n"
+                      << "  In ExpertSDR den Start-Knopf druecken und diese\n"
+                      << "  Sonde noch einmal laufen lassen.\n";
+                out().flush();
+                app.exit(2);
+                return;
+            }
+            if (sawRunState && trxRunning) {
+                out() << "  Empfaenger:      laeuft (TCI meldet \"start\")\n\n";
+            }
+
             if (ackAudioStart || ackIqStart || sawStreamRates) {
                 out() << "  ABER: der Dienst hat die Strombefehle BESTAETIGT\n";
                 if (ackAudioStart) { out() << "        - audio_start\n"; }
