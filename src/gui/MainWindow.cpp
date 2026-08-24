@@ -7256,13 +7256,26 @@ void MainWindow::buildMenuBar()
 
         sunSdrMenu->addAction(QStringLiteral("&Verbinden…"), this, [this]() {
             auto& s = AppSettings::instance();
+            // Vorschlag 127.0.0.1, NICHT die Adresse der SunSDR-Hardware:
+            // TCI ist ein Dienst von ExpertSDR2 (der Software), die in
+            // aller Regel auf demselben Rechner laeuft wie Longpath.
+            // Gemessen bei OE5SOS am 2026-08-24 (docs/TCI-SunSDR-gemessen.md,
+            // tools/tci_probe.cpp lief durchgehend gegen 127.0.0.1) -- der
+            // erste Verbindungsversuch schlug fehl, weil die Hardware-
+            // Adresse (192.168.16.200, aus dem "Add Custom Radio"-Dialog
+            // uebernommen) hier eingetragen war. Falscher Ort fuer diese
+            // Adresse: die spricht nur mit der Hardware, nicht mit TCI.
             const QString lastEndpoint = s.value(
-                QStringLiteral("SunSdrEndpoint"), QString()).toString();
+                QStringLiteral("SunSdrEndpoint"),
+                QStringLiteral("127.0.0.1:40001")).toString();
             bool ok = false;
             const QString ep = QInputDialog::getText(
                 this, QStringLiteral("SunSDR verbinden"),
                 QStringLiteral("Adresse von ExpertSDR2 (IP oder Rechnername, "
-                               "wahlweise mit :Port -- Voreinstellung 40001):"),
+                               "wahlweise mit :Port -- Voreinstellung 40001).\n"
+                               "Meist 127.0.0.1, wenn ExpertSDR2 auf diesem "
+                               "Rechner laeuft -- NICHT die Adresse der "
+                               "SunSDR-Hardware selbst."),
                 QLineEdit::Normal, lastEndpoint, &ok);
             if (!ok || ep.trimmed().isEmpty()) { return; }
             connectSunSdr(ep.trimmed());
