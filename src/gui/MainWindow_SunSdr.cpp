@@ -370,8 +370,19 @@ void MainWindow::wireSunSdr()
                 applySunSdrStreamWindow();
             });
 
+            // Bench-gefunden, 2026-08-24: ExpertSDR2 hat ZWEI Empfaenger-
+            // Plaetze (trx_count:2) und meldet fuer BEIDE eine eigene
+            // dds:-Zeile -- "dds:0,..." in der Selbstauskunft immer vor
+            // "dds:1,...". Ohne den receiver-Filter hier gewann Empfaenger
+            // 1s Wert (z.B. eine zweite, unbewegte 80m-Scheibe) jedes Mal
+            // gegen Empfaenger 0s echten Wert, obwohl Longpath ausschliesslich
+            // Empfaenger kSunSdrReceiverIndex (0) als I/Q-Strom abonniert
+            // hat (siehe startIqStream-Aufruf oben). Der Panadapter blieb
+            // dadurch auf RX1s Frequenz haengen, ganz gleich wohin RX0
+            // umgestimmt wurde.
             connect(m_sunSdrClient, &TciClient::ddcCenterChanged, this,
-                    [this](int /*receiver*/, qint64 hz) {
+                    [this](int receiver, qint64 hz) {
+                if (receiver != kSunSdrReceiverIndex) { return; }
                 m_sunSdrDdcCenterHz = hz;
                 applySunSdrStreamWindow();
             });

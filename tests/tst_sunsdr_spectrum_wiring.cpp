@@ -159,6 +159,81 @@ private slots:
         mw->close();
     }
 
+    void ddsVonEinemAnderenEmpfaengerWirdIgnoriert()
+    {
+        // Bench-Fund am echten SunSDR2 QRP (OE5SOS, 2026-08-24, per
+        // tci_probe gegengeprueft): ExpertSDR2 hat trx_count:2 -- ZWEI
+        // Empfaenger-Plaetze -- und meldet fuer BEIDE eine eigene
+        // dds:-Zeile, "dds:0,..." immer VOR "dds:1,...". Longpath
+        // abonniert ausschliesslich Empfaenger kSunSdrReceiverIndex (0)
+        // als I/Q-Strom (siehe startIqStream-Aufruf in wireSunSdr()) --
+        // Empfaenger 1s dds: darf die Panadapter-Mitte darum NICHT
+        // beeinflussen, weder in der Selbstauskunft noch bei einer
+        // spaeteren Umstimmung.
+        //
+        // Reale gemessene Werte: RX0 auf 20m (14164070 Hz), RX1 auf 80m
+        // (1905000 Hz) -- exakt die Reihenfolge und die Werte aus dem
+        // tci_probe-Mitschnitt, der den urspruenglichen Fehler entdeckt
+        // hat (Panadapter blieb bei RX1s Frequenz haengen, ganz gleich
+        // wohin RX0 umgestimmt wurde).
+        const QString readyLine = QStringLiteral(
+            "device:Testgeraet;iq_samplerate:48000;audio_samplerate:48000;"
+            "dds:0,14164070;dds:1,1905000;start;ready;");
+
+        QWebSocketServer server(QStringLiteral("Testgeraet"),
+                                 QWebSocketServer::NonSecureMode);
+        QVERIFY2(server.listen(QHostAddress::LocalHost, 0),
+                 "Testserver konnte nicht aufmachen");
+
+        QWebSocket* remote = nullptr;
+        connect(&server, &QWebSocketServer::newConnection, this, [&]() {
+            remote = server.nextPendingConnection();
+            QVERIFY(remote);
+            remote->sendTextMessage(readyLine);
+        });
+
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+
+        RadioModel* model = mw->radioModelForTest();
+        QVERIFY(model);
+
+        mw->connectSunSdrForTest(
+            QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
+
+        const int sliceId = mw->sunSdrTargetSliceForTest();
+        SliceModel* slice = model->sliceById(sliceId);
+        QVERIFY(slice);
+
+        TciClient* client = mw->sunSdrClientForTest();
+        QVERIFY(client);
+        QTRY_COMPARE_WITH_TIMEOUT(client->state(), TciClient::State::Connected,
+                                  kWaitMs);
+        QTRY_VERIFY_WITH_TIMEOUT(remote != nullptr, kWaitMs);
+
+        SpectrumWidget* sw = mw->spectrumForSlice(slice);
+        QVERIFY2(sw, "SunSDR-Scheibe hat keinen SpectrumWidget");
+
+        // RX0s Wert muss stehen bleiben, nicht RX1s -- obwohl RX1s Zeile
+        // in der Selbstauskunft ZULETZT kam.
+        QTRY_COMPARE_WITH_TIMEOUT(sw->ddcCenterFrequency(), 14164070.0, kWaitMs);
+
+        // Gegenprobe fuer eine spaetere Umstimmung waehrend der Sitzung:
+        // RX1 retunt (wie ein zweiter, unbewegter Empfaenger es taete),
+        // RX0 bleibt stehen -- der Panadapter darf sich davon nicht
+        // beeindrucken lassen.
+        remote->sendTextMessage(QStringLiteral("dds:1,3573000;"));
+        QTest::qWait(300);
+        QCOMPARE(sw->ddcCenterFrequency(), 14164070.0);
+
+        // Erst eine RX0-Umstimmung darf die Mitte tatsaechlich bewegen.
+        remote->sendTextMessage(QStringLiteral("dds:0,7100000;"));
+        QTRY_COMPARE_WITH_TIMEOUT(sw->ddcCenterFrequency(), 7100000.0, kWaitMs);
+
+        mw->close();
+    }
+
     void routerUmbauWirdSelbstheilendWiederhergestellt()
     {
         QWebSocketServer server(QStringLiteral("Testgeraet"),

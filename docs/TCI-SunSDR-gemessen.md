@@ -96,6 +96,35 @@ der *Bediener* innerhalb der Durchlassbreite steht, nicht wo der
 I/Q-Strom zentriert ist. `TciClient::ddcCenterHz()` liest deshalb nur
 `dds:`, siehe `src/core/TciClient.h`.
 
+## Zwei Empfänger, zwei dds:-Zeilen
+
+`trx_count:2` — das SunSDR2 QRP meldet über ExpertSDR2 **zwei**
+Empfänger-Plätze, nicht einen, und jeder hat seine eigene
+Mittenfrequenz:
+
+```
+dds:0,14164070     Empfänger 0 — 20m
+dds:1,1905000      Empfänger 1 — 80m
+```
+
+Gemessen am 2026-08-24 mit einer laufenden Longpath-Sitzung parallel
+zur Sonde: eine Umstimmung *irgendeines* Empfängers löst sofort eine
+frische `dds:`-Zeile aus, unaufgefordert, mitten in der Sitzung — nicht
+nur in der Selbstauskunft. Die Zeile trägt aber **nur den Index des
+tatsächlich umgestimmten Empfängers**, nie beide. `dds:0,...` kommt in
+der Selbstauskunft immer vor `dds:1,...`, unabhängig davon welcher
+Empfänger seit wann auf welcher Frequenz steht.
+
+Bench-Fund: eine erste Fassung des Panadapter-Codes ignorierte den
+Empfänger-Index in dieser Zeile komplett und übernahm einfach die
+zuletzt gesehene `dds:` — die von Empfänger 1, weil dessen Zeile in der
+Selbstauskunft zuletzt kommt. Der Panadapter blieb dadurch auf
+Empfänger 1s Frequenz hängen, ganz gleich wohin Empfänger 0 (der
+tatsächlich als I/Q-Strom abonnierte) umgestimmt wurde. Für Longpaths
+Panadapter zählt ausschließlich die `dds:`-Zeile des Empfängers, dessen
+I/Q-Strom tatsächlich angefordert wurde (`iq_start:<index>`) — jede
+andere muss verworfen werden.
+
 ## Was noch offen ist
 
 - TX-Ton (`streamType` 2) wurde nicht angefordert; für ein
