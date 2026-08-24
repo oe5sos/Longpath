@@ -16,7 +16,7 @@
 #      the next command and nothing happened at all.
 #
 # So: kill any running copy, build, print which commit is about to run,
-# and launch by explicit path. Never `open -a NereusSDR`, which finds
+# and launch by explicit path. Never `open -a Longpath`, which finds
 # whichever copy Launch Services prefers.
 #
 # =================================================================
@@ -29,10 +29,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-BIN="./build/NereusSDR.app/Contents/MacOS/NereusSDR"
+BIN="./build/Longpath.app/Contents/MacOS/Longpath"
 
 # An old instance holds the terminal and, worse, looks like the new one.
-pkill -x NereusSDR 2>/dev/null || true
+pkill -x Longpath 2>/dev/null || true
 
 if [ ! -d build ]; then
     echo "No build directory — configuring first."
