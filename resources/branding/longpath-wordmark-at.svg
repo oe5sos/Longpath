@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Longpath.at — Schriftzug, T-Shirt-Fassung.
+
+  Wie longpath-wordmark.svg (siehe dort fuer die Erklaerung des O),
+  nur mit angehaengtem ".AT" in derselben Schrift/Farbe/Laufweite.
+  Passt ohne Vergrößerung in denselben viewBox-Rahmen -- "NGPATH.AT"
+  misst mit Barlow Condensed SemiBold 70px rund 301px, der Rahmen ist
+  480px breit.
+
+  Schrift: Barlow Condensed SemiBold — dieselbe, die im Programm die
+  Fensternamen traegt. Die Buchstaben stehen hier als <text>; fuer
+  Verwendungen ohne installierte Schrift (z.B. beim Druck) muessen sie
+  in Pfade umgewandelt werden.
+
+  © 2026 Martin Fischer (OE5SOS). GPL.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 92"
+     width="960" height="184" role="img" aria-label="Longpath.at">
+  <text x="0" y="66" font-family="Barlow Condensed, sans-serif" font-size="70"
+        font-weight="600" letter-spacing="4" fill="#e6e6ea">L</text>
+  <circle cx="66" cy="44" r="21" fill="none" stroke="#e6e6ea" stroke-width="6.5"/>
+  <path d="M51 32 A 25 25 0 0 1 81 32" fill="none" stroke="#5c5c60"
+        stroke-width="2.4" stroke-dasharray="3 3" stroke-linecap="round"/>
+  <path d="M51 32 A 21 21 0 0 0 66 65 A 21 21 0 0 0 81 32" fill="none"
+        stroke="#c2924f" stroke-width="4.5" stroke-linecap="round"/>
+  <text x="94" y="66" font-family="Barlow Condensed, sans-serif" font-size="70"
+        font-weight="600" letter-spacing="4" fill="#e6e6ea">NGPATH.AT</text>
+</svg>
