@@ -33,6 +33,7 @@
 // nicht ueber eine einzelne gespeicherte Kennung.
 
 #include <QtTest>
+#include <QScopeGuard>
 
 #include "core/AudioEngine.h"
 #include "core/KiwiSdrManager.h"
@@ -69,6 +70,13 @@ private slots:
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        // Laeuft auch bei einem fruehen QVERIFY-Abbruch weiter unten --
+        // sonst bleibt dieses MainWindow mit laufendem SpectrumThread
+        // stehen, und ein SPAETERER Test in dieser Datei stuerzt beim
+        // eigenen close() ab (dessen "verirrte Fenster"-Aufraeumschleife
+        // findet es und reisst es ohne closeEvent nieder). Siehe
+        // tests/tst_real_notch_rightclick.cpp fuer denselben Fund.
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
 
         KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
         QVERIFY(mgr);
@@ -106,8 +114,6 @@ private slots:
         QVERIFY2(mgr->assignedProfileForSlice(realId).isEmpty(),
                  "der echten Scheibe wurde trotzdem ein KiwiSDR-Profil "
                  "zugeordnet");
-
-        mw->close();
     }
 
     void zugeordneteScheibeWirdBeiEchterDdcBindungSpaeterFreigegeben()
@@ -115,6 +121,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
 
         KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
         QVERIFY(mgr);
@@ -137,17 +144,27 @@ private slots:
         audio->setKiwiSdrAudioSourceEnabled(sliceId, true);
         QVERIFY(audio->kiwiSdrAudioEnabled(sliceId));
 
-        // Ein echtes Funkgeraet uebernimmt die Scheibe -- ohne echte
-        // Hardware ist setStreamIndex() der einzige Weg, genau den
-        // Zustandswechsel herzustellen, den bindUnboundSlices() ausloest.
-        slice->setStreamIndex(0);
+        // Ein echtes Funkgeraet uebernimmt die Scheibe: das muss ueber
+        // RadioModel::bindUnboundSlices() laufen, dem echten Weg, den ein
+        // verbindendes Funkgeraet nimmt -- ein blosser setStreamIndex()-
+        // Aufruf auf der Scheibe (wie zuvor hier) loest RadioModel::
+        // streamBindingsChanged NICHT aus (SliceModel::setStreamIndex() ist
+        // ein reiner Property-Setter, keine Ruecksprache mit RadioModel),
+        // und genau auf dieses Signal hoert wireKiwiSdr() -- anders als
+        // SunSDR, das mit einer einzigen festen Zielscheibe auskommt und
+        // sich stattdessen direkt an deren SliceModel::streamIndexChanged
+        // haengen kann. Ohne echtes Funkgeraet braucht bindUnboundSlices()
+        // erst einen dimensionierten Strompool, sonst bricht
+        // bindSliceToStream() folgenlos ab (m_streamAllocator.streamCount()
+        // == 0).
+        model->configureStreamPool(/*userDdcCount*/ 1, /*maxSlices*/ 1,
+                                   /*defaultRateHz*/ 192000);
+        model->bindUnboundSlices();
 
         QVERIFY2(mgr->assignedProfileForSlice(sliceId).isEmpty(),
                  "die Zuordnung blieb nach der Uebernahme stehen");
         QVERIFY2(!audio->kiwiSdrAudioEnabled(sliceId),
                  "KiwiSDR-Ton lief nach der Uebernahme weiter");
-
-        mw->close();
     }
 
     void scheibeLoeschenGibtDieZuordnungFreiUndVerhindertKennungsWiederverwendung()
@@ -155,6 +172,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
 
         KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
         QVERIFY(mgr);
@@ -205,8 +223,6 @@ private slots:
                  "geerbt, obwohl sie nie damit verbunden wurde");
         QVERIFY2(!audio->kiwiSdrAudioEnabled(reusedId),
                  "die wiederverwendete Scheibe hat KiwiSDR-Ton geerbt");
-
-        mw->close();
     }
 };
 
