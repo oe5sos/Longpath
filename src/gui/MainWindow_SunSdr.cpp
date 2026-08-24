@@ -219,17 +219,32 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     if (!m_radioModel) { return; }
 
     // ── Welche Scheibe? Siehe Kopf dieser Datei. ─────────────────────
+    //
+    // Bench-gefunden (Grundgeruest-Durchsicht 2026-08-24, nach Bau von
+    // "Steuerung"): der Rueckfall nahm die aktive Scheibe blind, auch
+    // wenn sie eine echte DDC-Bindung hatte (streamIndex() >= 0 -- ein
+    // ECHTES, moeglicherweise sendefaehiges Funkgeraet). Waere ein
+    // solches Funkgeraet gerade aktiv verbunden, haette SunSDR dessen
+    // Ton UND Panadapter still ueberschrieben -- die Steuerungsrichtung
+    // war schon durch wireSunSdrOutboundControl abgesichert, Ton/Bild
+    // aber nicht. Der Rueckfall ueberspringt darum jede echte Scheibe:
+    // aktive Scheibe NUR wenn ungebunden, sonst die erste ungebundene,
+    // sonst eine neue anlegen.
     SliceModel* slice = m_radioModel->activeSlice();
+    if (slice && slice->streamIndex() >= 0) { slice = nullptr; }
     if (!slice) {
-        const QList<SliceModel*> slices = m_radioModel->slices();
-        if (!slices.isEmpty()) {
-            slice = slices.first();
-        } else {
-            const int id = m_radioModel->addSlice();
-            slice = m_radioModel->sliceById(id);
-            qCInfo(lcTci) << "SunSDR: keine Scheibe vorhanden -- eine "
-                             "angelegt, Kennung" << id;
+        for (SliceModel* candidate : m_radioModel->slices()) {
+            if (candidate && candidate->streamIndex() < 0) {
+                slice = candidate;
+                break;
+            }
         }
+    }
+    if (!slice) {
+        const int id = m_radioModel->addSlice();
+        slice = m_radioModel->sliceById(id);
+        qCInfo(lcTci) << "SunSDR: keine ungebundene Scheibe vorhanden -- "
+                         "eine angelegt, Kennung" << id;
     }
     if (!slice) {
         qCWarning(lcTci) << "SunSDR: keine Scheibe zu bekommen -- der Ton "
@@ -270,12 +285,49 @@ void MainWindow::disconnectSunSdr()
     }
     disconnect(m_sunSdrFreqOutConn);
     disconnect(m_sunSdrModeOutConn);
+    disconnect(m_sunSdrStreamIndexWatchConn);
+}
+
+// Siehe MainWindow.h fuer den Zweck: die EINE Stelle, die "gibt es eine
+// SunSDR-Zielscheibe und darf sie gerade gesteuert werden" beantwortet.
+// Vorher pruefte jeder Verbraucher das von Hand -- Ton- und Panadapter-
+// Pfad hatten die streamIndex()-Schranke schlicht vergessen (Bench-Fund
+// 2026-08-24, Grundgeruest-Durchsicht). Ein neuer Verbraucher kann diesen
+// Fehler jetzt nicht mehr machen, weil er keine Wahl hat.
+SliceModel* MainWindow::sunSdrControllableSlice() const
+{
+    if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return nullptr; }
+    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
+    if (!slice || slice->streamIndex() >= 0) { return nullptr; }
+    return slice;
+}
+
+void MainWindow::releaseSunSdrSlice(const QString& reason)
+{
+    if (m_sunSdrTargetSliceId < 0) { return; }
+    qCWarning(lcTci) << "SunSDR: Scheibe" << m_sunSdrTargetSliceId
+                     << "wird freigegeben --" << reason
+                     << "-- erneut \"Verbinden…\" waehlen fuer eine neue "
+                        "Zielscheibe.";
+    if (m_radioModel) {
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            audio->removeSunSdrAudioSource(m_sunSdrTargetSliceId);
+        }
+        if (auto* router = m_radioModel->fftRouter()) {
+            router->removeReceiver(kSunSdrPseudoStreamIndex);
+        }
+    }
+    disconnect(m_sunSdrFreqOutConn);
+    disconnect(m_sunSdrModeOutConn);
+    disconnect(m_sunSdrStreamIndexWatchConn);
+    m_sunSdrTargetSliceId = -1;
 }
 
 void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
 {
     disconnect(m_sunSdrFreqOutConn);
     disconnect(m_sunSdrModeOutConn);
+    disconnect(m_sunSdrStreamIndexWatchConn);
     if (!slice) { return; }
 
     // Sicherheitsschranke (gegengeprueft 2026-08-24 vor dem Bau, siehe
@@ -283,14 +335,13 @@ void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
     // Scheibe MIT echter DDC-Bindung (streamIndex() >= 0) gehoert einem
     // ECHTEN, moeglicherweise sendefaehigen Funkgeraet. Wuerde diese
     // Verdrahtung auch dort greifen, koennte ein fremdes TCI-Geraet
-    // (SunSDR/ExpertSDR2) das echte Funkgeraet stumm umstimmen, sobald
-    // dessen Scheibe zufaellig die "aktive" war und darum als SunSDR-
-    // Ziel uebernommen wurde (siehe connectSunSdr, Scheiben-Rueckfall).
-    // "Technik Nereus, Design ich" ist eine Gestaltungsregel -- diese
-    // hier ist keine, sie ist die Sicherheitsgrenze aus CLAUDE.local.md:
-    // "Wo Zurueckhaltung und Sicherheit sich widersprechen, gewinnt die
-    // Sicherheit." Also: nur eine ungebundene Scheibe darf hierueber
-    // gesteuert werden, nie eine echte.
+    // (SunSDR/ExpertSDR2) das echte Funkgeraet stumm umstimmen. Seit dem
+    // Rueckfall in connectSunSdr() (siehe dort) sollte das hier nie mehr
+    // zutreffen -- die Pruefung bleibt trotzdem als zweite, unabhaengige
+    // Schranke stehen. "Technik Nereus, Design ich" ist eine
+    // Gestaltungsregel -- diese hier ist keine, sie ist die
+    // Sicherheitsgrenze aus CLAUDE.local.md: "Wo Zurueckhaltung und
+    // Sicherheit sich widersprechen, gewinnt die Sicherheit."
     if (slice->streamIndex() >= 0) {
         qCInfo(lcTci) << "SunSDR: Ziel-Scheibe hat eine echte DDC-Bindung "
                          "-- Ausgangssteuerung bleibt aus, um kein echtes "
@@ -299,14 +350,25 @@ void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
     }
 
     m_sunSdrFreqOutConn = connect(slice, &SliceModel::frequencyChanged, this,
-                                  [this](double hz) {
+                                  [this, slice](double hz) {
         if (m_sunSdrApplyingRemoteState || !m_sunSdrClient) { return; }
+        // Erneut gepruefte Schranke, nicht nur beim Anschliessen (Bench-
+        // Fund 2026-08-24): eine anfangs ungebundene Scheibe kann SPAETER
+        // eine echte DDC-Bindung bekommen (bindUnboundSlices() beim
+        // naechsten Verbinden eines echten Funkgeraets, RadioModel.cpp).
+        // Der streamIndexChanged-Wachposten unten faengt das eigentlich
+        // sofort ab und trennt diese Verbindung ganz -- diese Zeile ist
+        // die zweite, unabhaengige Schranke fuer den Fall, dass beide
+        // Signale in derselben Runde feuern und die Reihenfolge nicht
+        // garantiert ist.
+        if (slice->streamIndex() >= 0) { return; }
         m_sunSdrClient->setVfoFrequency(
             kSunSdrReceiverIndex, 0, qint64(std::llround(hz)));
     });
     m_sunSdrModeOutConn = connect(slice, &SliceModel::dspModeChanged, this,
-                                  [this](Longpath::DSPMode mode) {
+                                  [this, slice](Longpath::DSPMode mode) {
         if (m_sunSdrApplyingRemoteState || !m_sunSdrClient) { return; }
+        if (slice->streamIndex() >= 0) { return; }
         const QString tciMode = tciModeStringForDspMode(mode);
         if (tciMode.isEmpty()) {
             qCWarning(lcTci) << "SunSDR: Modus" << int(mode)
@@ -315,19 +377,26 @@ void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
         }
         m_sunSdrClient->setModulation(kSunSdrReceiverIndex, tciMode);
     });
+
+    // Uebernimmt spaeter ein echtes Funkgeraet diese Scheibe
+    // (bindUnboundSlices() beim naechsten Verbinden), muss SunSDR sie
+    // GANZ freigeben -- nicht nur die Steuerung stumm schalten, sondern
+    // auch Ton und Panadapter (siehe releaseSunSdrSlice). Ohne diesen
+    // Wachposten haette nur die Steuerungsrichtung eine Bremse gehabt;
+    // Ton und Panadapter liefen an der jetzt echten Scheibe unbemerkt
+    // weiter (Bench-Fund 2026-08-24, Grundgeruest-Durchsicht).
+    m_sunSdrStreamIndexWatchConn = connect(
+        slice, &SliceModel::streamIndexChanged, this, [this](int newIndex) {
+        if (newIndex < 0) { return; }
+        releaseSunSdrSlice(QStringLiteral(
+            "ein echtes Funkgeraet hat sie inzwischen uebernommen"));
+    });
 }
 
 void MainWindow::applyRemoteSunSdrFrequency(qint64 hz)
 {
-    if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return; }
-    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
-    // Dieselbe Sicherheitsschranke wie beim Ausgang (siehe
-    // wireSunSdrOutboundControl) -- eine echte Scheibe darf niemals von
-    // einem fremden TCI-Geraet umgestimmt werden, egal ob es dieselbe
-    // Verdrahtung ist oder eine zweite. Kommt praktisch nur vor, wenn
-    // spaeter ein echtes Funkgeraet dieselbe Scheibe uebernimmt, die
-    // gerade noch das SunSDR-Ziel war.
-    if (!slice || slice->streamIndex() >= 0) { return; }
+    SliceModel* slice = sunSdrControllableSlice();
+    if (!slice) { return; }
     m_sunSdrApplyingRemoteState = true;
     slice->setFrequency(static_cast<double>(hz));
     m_sunSdrApplyingRemoteState = false;
@@ -335,9 +404,8 @@ void MainWindow::applyRemoteSunSdrFrequency(qint64 hz)
 
 void MainWindow::applyRemoteSunSdrModulation(const QString& mode)
 {
-    if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return; }
-    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
-    if (!slice || slice->streamIndex() >= 0) { return; }
+    SliceModel* slice = sunSdrControllableSlice();
+    if (!slice) { return; }
 
     // ExpertSDR2 kennt am Draht nur das allgemeine "cw", nicht cwl/cwu
     // (siehe tciModeStringForDspMode) -- ein zurueckgemeldetes "cw" nach
@@ -377,6 +445,26 @@ void MainWindow::wireSunSdr()
 {
     if (!m_sunSdrClient) { return; }
 
+    // Wird die Ziel-Scheibe geloescht, waehrend SunSDR verbunden ist,
+    // muss die Zuordnung sofort weg -- sonst bliebe m_sunSdrTargetSliceId
+    // auf einer Kennung stehen, die addSlice() (niedrigste freie Kennung
+    // zuerst, siehe dort) einer voellig ANDEREN, spaeter angelegten
+    // Scheibe wiedergeben koennte. Diese neue Scheibe wuerde dann
+    // stillschweigend SunSDR-Ton/-Panadapter/-Steuerung bekommen, obwohl
+    // niemand sie je damit verbunden hat (Bench-Fund 2026-08-24,
+    // Grundgeruest-Durchsicht). Einmalig hier angeschlossen (wireSunSdr
+    // laeuft nur beim allerersten Verbinden), liest m_sunSdrTargetSliceId
+    // aber bei jedem Aufruf frisch -- deckt also auch spaetere
+    // Wiederverbindungen ab, nicht nur die erste.
+    if (m_radioModel) {
+        connect(m_radioModel, &RadioModel::sliceRemoved, this,
+                [this](int index) {
+            if (index != m_sunSdrTargetSliceId) { return; }
+            releaseSunSdrSlice(QStringLiteral(
+                "sie wurde geloescht"));
+        });
+    }
+
     // Die Selbstauskunft ist zu Ende: jetzt Ton UND I/Q anfordern und die
     // Scheibe fuer SunSDR-Ton freischalten. TciClient::start{Audio,Iq}
     // Stream senden den Befehl unabhaengig davon, ob der Empfaenger in
@@ -397,7 +485,12 @@ void MainWindow::wireSunSdr()
         if (!m_sunSdrClient) { return; }
         m_sunSdrClient->startAudioStream(kSunSdrReceiverIndex);
         m_sunSdrClient->startIqStream(kSunSdrReceiverIndex);
-        if (m_radioModel && m_sunSdrTargetSliceId >= 0) {
+        // sunSdrControllableSlice() statt der Kennung roh zu pruefen (Bench-
+        // Fund 2026-08-24): eine Scheibe, die inzwischen ein echtes
+        // Funkgeraet uebernommen hat, darf keinen SunSDR-Ton bekommen --
+        // vorher fehlte diese Schranke hier komplett, obwohl sie fuer die
+        // Steuerungsrichtung schon stand.
+        if (sunSdrControllableSlice()) {
             if (AudioEngine* audio = m_radioModel->audioEngine()) {
                 // AudioEngine::start() (Lautsprecher-Ausgang oeffnen, den
                 // Abfluss aus MasterMixer anlaufen lassen) wird im ganzen
@@ -432,9 +525,19 @@ void MainWindow::wireSunSdr()
     });
 
     connect(m_sunSdrClient, &TciClient::audioFrameReady, this,
-            [this](int /*receiver*/, int sampleRate, int channels,
+            [this](int receiver, int sampleRate, int channels,
                    const std::vector<float>& interleaved) {
-        if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return; }
+        // Derselbe Empfaenger-Filter wie beim Panadapter (siehe dort) --
+        // ExpertSDR2 sendet Binaerrahmen zwar nur fuer tatsaechlich
+        // angeforderte Stroeme (gemessen: nie Empfaenger-1-Rahmen ohne
+        // eigenen iq_start:1/audio_start:1), aber TCI ist ein
+        // Rundruf-Protokoll -- ein ANDERER, gleichzeitig verbundener
+        // TCI-Client (z.B. WSJT-X an Empfaenger 1), der seinerseits
+        // Stroeme anfordert, wuerde dessen Rahmen ebenso an Longpath
+        // liefern. Ohne Filter mischte sich dessen Ton in den SunSDR-
+        // Lautsprecherausgang.
+        if (receiver != kSunSdrReceiverIndex) { return; }
+        if (!sunSdrControllableSlice()) { return; }
         if (channels != 2) {
             // feedSunSdrAudioData setzt verschraenktes Stereo voraus
             // (siehe AudioEngine.h). TciClient leitet die Kanalzahl aus
@@ -514,9 +617,15 @@ void MainWindow::wireSunSdr()
             // Aufruf direkt aus einer TciClient-Lambda waere dagegen ein
             // Datenwettlauf: er liefe synchron auf dem Hauptfaden und
             // griffe parallel zum FFT-Faden auf denselben Ringpuffer zu.
+            // receiver-Filter: dieselbe Rundruf-Ueberlegung wie beim Ton
+            // (siehe audioFrameReady oben) -- ein anderer, gleichzeitig
+            // verbundener TCI-Client, der Empfaenger 1s I/Q anfordert,
+            // wuerde dessen Rahmen sonst mit in die SunSDR-FFTEngine
+            // mischen.
             connect(m_sunSdrClient, &TciClient::iqFrameReady, engine,
-                    [engine](int /*receiver*/, int /*sampleRate*/, int channels,
+                    [engine](int receiver, int /*sampleRate*/, int channels,
                             const std::vector<float>& interleaved) {
+                if (receiver != kSunSdrReceiverIndex) { return; }
                 if (channels != 2) { return; }
                 const QVector<float> iq(interleaved.begin(), interleaved.end());
                 engine->feedIQ(iq);
@@ -527,8 +636,9 @@ void MainWindow::wireSunSdr()
             // TciClient.h), doch das kommt selten vor, nicht auf jedem
             // Rahmen.
             connect(m_sunSdrClient, &TciClient::iqFrameReady, this,
-                    [this, engine](int, int sampleRate, int,
+                    [this, engine](int receiver, int sampleRate, int,
                                    const std::vector<float>&) {
+                if (receiver != kSunSdrReceiverIndex) { return; }
                 if (sampleRate <= 0 || sampleRate == m_sunSdrLastAppliedIqRateHz) {
                     return;
                 }
@@ -607,8 +717,13 @@ void MainWindow::wireSunSdr()
 
 void MainWindow::applySunSdrStreamWindow()
 {
-    if (m_sunSdrTargetSliceId < 0 || !m_radioModel) { return; }
-    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
+    // sunSdrControllableSlice() statt sliceById() roh (Bench-Fund
+    // 2026-08-24): eine Scheibe mit echter DDC-Bindung darf ihren
+    // Panadapter nicht mehr vom SunSDR-Pseudostrom bekommen -- diese
+    // Schranke fehlte hier komplett, obwohl sie fuer die Steuerung schon
+    // stand.
+    SliceModel* slice = sunSdrControllableSlice();
+    if (!slice) { return; }
     const QString panId = panIdForSlice(slice);
     if (panId.isEmpty()) { return; }
 
@@ -617,7 +732,7 @@ void MainWindow::applySunSdrStreamWindow()
     // besser als 0 Hz oder der SliceModel-Konstruktor-Default.
     const double centreHz = m_sunSdrDdcCenterHz > 0
         ? static_cast<double>(m_sunSdrDdcCenterHz)
-        : (slice ? slice->frequency() : 0.0);
+        : slice->frequency();
 
     m_streamWindows.insert(kSunSdrPseudoStreamIndex,
                            StreamWindow{centreHz, m_sunSdrLastAppliedIqRateHz});
@@ -626,10 +741,10 @@ void MainWindow::applySunSdrStreamWindow()
 
 void MainWindow::reassertSunSdrRouterMapping()
 {
-    if (m_sunSdrTargetSliceId < 0 || !m_radioModel) { return; }
+    SliceModel* slice = sunSdrControllableSlice();
+    if (!slice) { return; }
     auto* router = m_radioModel->fftRouter();
     if (!router) { return; }
-    SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
     const QString panId = panIdForSlice(slice);
     if (panId.isEmpty()) { return; }
     // mapPanToReceiver de-dupliziert selbst (FFTRouter.cpp:17) -- ein

@@ -5,7 +5,7 @@
 // Panadapter-Mitte (Schritt "Bild", siehe tst_sunsdr_spectrum_wiring.cpp).
 //
 // Diese Pruefung geht durch den tatsaechlichen Weg (connectSunSdr) und
-// deckt vier Stellen ab:
+// deckt sieben Stellen ab:
 //
 //   1. Eingehend: "vfo:0,0,hz" (VFO-Kanal A von Empfaenger 0) uebernimmt
 //      die Scheibenfrequenz, "modulation:0,mode" die Betriebsart.
@@ -17,18 +17,33 @@
 //      an ExpertSDR2 -- und eine EINGEHENDE Aenderung darf NICHT
 //      postwendend als Ausgangsbefehl zurueckgehen (Echo-Schutz,
 //      m_sunSdrApplyingRemoteState).
-//   4. Sicherheitsschranke: eine Scheibe mit echter DDC-Bindung
-//      (streamIndex() >= 0 -- ein ECHTES Funkgeraet) wird in KEINER
-//      Richtung von SunSDR gesteuert, weder eingehend noch ausgehend.
-//      Siehe wireSunSdrOutboundControl()/applyRemoteSunSdrFrequency()
-//      fuer die Begruendung (CLAUDE.local.md: "Wo Zurueckhaltung und
-//      Sicherheit sich widersprechen, gewinnt die Sicherheit").
+//   4. Sicherheitsschranke, Wurzel: connectSunSdr()'s Scheiben-Rueckfall
+//      ueberspringt jede Scheibe mit echter DDC-Bindung von vornherein --
+//      legt lieber eine neue an, statt eine echte, moeglicherweise
+//      sendefaehige Scheibe zu kapern (auch fuer Ton/Panadapter, nicht
+//      nur Steuerung -- Bench-Fund 2026-08-24, Grundgeruest-Durchsicht).
+//   5. Sicherheitsschranke, spaeter: bindet ein ECHTES Funkgeraet die
+//      anfangs ungebundene SunSDR-Zielscheibe NACHTRAEGLICH (bind
+//      UnboundSlices() beim naechsten echten Verbindungsaufbau), gibt
+//      SunSDR sie GANZ frei -- Ton, Panadapter UND Steuerung, nicht nur
+//      eine Richtung (releaseSunSdrSlice(), ausgeloest von SliceModel::
+//      streamIndexChanged).
+//   6. Wird die Zielscheibe geloescht, waehrend SunSDR verbunden ist,
+//      gibt SunSDR sie ebenso frei -- und eine SPAETER angelegte Scheibe,
+//      die dieselbe (wiederverwendete) Kennung bekommt, erbt NICHTS davon
+//      (releaseSunSdrSlice(), ausgeloest von RadioModel::sliceRemoved).
+//   7. Siehe wireSunSdrOutboundControl()/applyRemoteSunSdrFrequency() fuer
+//      die Begruendung der Sicherheitsschranke insgesamt (CLAUDE.local.md:
+//      "Wo Zurueckhaltung und Sicherheit sich widersprechen, gewinnt die
+//      Sicherheit").
 
 #include <QtTest>
 #include <QSignalSpy>
 #include <QWebSocketServer>
 #include <QWebSocket>
 
+#include "core/AudioEngine.h"
+#include "core/FFTRouter.h"
 #include "core/TciClient.h"
 #include "core/WdspTypes.h"
 #include "gui/MainWindow.h"
@@ -309,13 +324,157 @@ private slots:
         mw->close();
     }
 
-    void echteScheibeMitDdcBindungWirdInKeinerRichtungGesteuert()
+    void verbindenUeberspringtEineEchteScheibeUndLegtEineNeueAn()
     {
-        // Sicherheitsschranke: eine Scheibe mit streamIndex() >= 0 gehoert
-        // einem ECHTEN Funkgeraet. connectSunSdr()'s Rueckfall (aktive
-        // Scheibe, sonst die erste) koennte theoretisch genau so eine
-        // Scheibe treffen -- weder eingehend noch ausgehend darf sie
-        // dann von SunSDR/ExpertSDR2 mitgesteuert werden.
+        // Bench-Fund (Grundgeruest-Durchsicht 2026-08-24, nach Bau von
+        // "Steuerung"): der Scheiben-Rueckfall in connectSunSdr() nahm die
+        // aktive Scheibe blind, auch mit echter DDC-Bindung (streamIndex()
+        // >= 0 -- ein ECHTES, moeglicherweise sendefaehiges Funkgeraet).
+        // Die Steuerungsrichtung war dagegen schon abgesichert
+        // (wireSunSdrOutboundControl weigerte sich zu verdrahten) -- Ton
+        // und Panadapter liefen an der echten Scheibe aber unbemerkt
+        // weiter. Fix: der Rueckfall ueberspringt jede gebundene Scheibe
+        // von vornherein. Diese Pruefung deckt die Wurzel ab, nicht nur
+        // die zweite Schranke weiter unten in wireSunSdrOutboundControl.
+        QWebSocketServer server(QStringLiteral("Testgeraet"),
+                                 QWebSocketServer::NonSecureMode);
+        QVERIFY2(server.listen(QHostAddress::LocalHost, 0),
+                 "Testserver konnte nicht aufmachen");
+        connect(&server, &QWebSocketServer::newConnection, this, [&]() {
+            QWebSocket* remote = server.nextPendingConnection();
+            QVERIFY(remote);
+            remote->sendTextMessage(kReadyLine);
+        });
+
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+
+        RadioModel* model = mw->radioModelForTest();
+        QVERIFY(model);
+        // Einzige vorhandene Scheibe: wird automatisch aktiv (addSlice(),
+        // erste Scheibe ueberhaupt) UND bekommt eine nachgestellte echte
+        // DDC-Bindung.
+        const int realId = model->addSlice();
+        SliceModel* realSlice = model->sliceById(realId);
+        QVERIFY(realSlice);
+        realSlice->setStreamIndex(0);
+        const double realFreqBefore = realSlice->frequency();
+
+        mw->connectSunSdrForTest(
+            QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
+
+        const int sunSdrId = mw->sunSdrTargetSliceForTest();
+        QVERIFY2(sunSdrId != realId,
+                 "SunSDR hat die echte, gebundene Scheibe als Ziel genommen");
+        QVERIFY2(sunSdrId >= 0, "SunSDR hat gar keine Zielscheibe bekommen");
+        SliceModel* sunSdrSlice = model->sliceById(sunSdrId);
+        QVERIFY(sunSdrSlice);
+        QVERIFY2(sunSdrSlice->streamIndex() < 0,
+                 "die neu angelegte SunSDR-Scheibe hat selbst eine "
+                 "DDC-Bindung -- Testannahme verletzt");
+
+        TciClient* client = mw->sunSdrClientForTest();
+        QTRY_COMPARE_WITH_TIMEOUT(client->state(), TciClient::State::Connected,
+                                  kWaitMs);
+        QTest::qWait(300);
+
+        // Die echte Scheibe ist unberuehrt -- weder ihre Frequenz noch
+        // ihr Ton wurden von SunSDR uebernommen.
+        QCOMPARE(realSlice->frequency(), realFreqBefore);
+        AudioEngine* audio = model->audioEngine();
+        QVERIFY(audio);
+        QVERIFY2(!audio->sunSdrAudioEnabled(realId),
+                 "SunSDR-Ton lief in die echte Scheibe statt in die neue");
+
+        mw->close();
+    }
+
+    void zielscheibeWirdBeiEchterDdcBindungSpaeterGanzFreigegeben()
+    {
+        // Bench-Fund (Grundgeruest-Durchsicht 2026-08-24): der Rueckfall
+        // oben verhindert, dass SunSDR eine SCHON gebundene Scheibe
+        // uebernimmt -- aber eine anfangs UNGEBUNDENE Zielscheibe kann
+        // SPAETER doch noch gebunden werden, wenn der Betreiber danach
+        // ein echtes Funkgeraet verbindet (RadioModel::bindUnboundSlices(),
+        // aufgerufen bei jedem RadioModel::connectToRadio()). Ohne einen
+        // eigenen Wachposten haette in diesem Fall nur die
+        // Steuerungsrichtung angehalten -- Ton und Panadapter waeren an
+        // der jetzt echten Scheibe unbemerkt weitergelaufen. Fix:
+        // releaseSunSdrSlice() (ausgeloest von SliceModel::
+        // streamIndexChanged) gibt bei einer solchen Umwidmung ALLES frei.
+        QWebSocketServer server(QStringLiteral("Testgeraet"),
+                                 QWebSocketServer::NonSecureMode);
+        QVERIFY2(server.listen(QHostAddress::LocalHost, 0),
+                 "Testserver konnte nicht aufmachen");
+        QStringList received;
+        connect(&server, &QWebSocketServer::newConnection, this, [&]() {
+            QWebSocket* remote = server.nextPendingConnection();
+            QVERIFY(remote);
+            connect(remote, &QWebSocket::textMessageReceived, this,
+                    [&received](const QString& msg) { received << msg; });
+            remote->sendTextMessage(kReadyLine);
+        });
+
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+
+        RadioModel* model = mw->radioModelForTest();
+        QVERIFY(model);
+        mw->connectSunSdrForTest(
+            QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
+
+        const int sliceId = mw->sunSdrTargetSliceForTest();
+        SliceModel* slice = model->sliceById(sliceId);
+        QVERIFY(slice);
+
+        TciClient* client = mw->sunSdrClientForTest();
+        QTRY_COMPARE_WITH_TIMEOUT(client->state(), TciClient::State::Connected,
+                                  kWaitMs);
+        QTRY_COMPARE_WITH_TIMEOUT(slice->frequency(), 14164070.0, kWaitMs);
+        AudioEngine* audio = model->audioEngine();
+        QVERIFY(audio);
+        QTRY_VERIFY_WITH_TIMEOUT(audio->sunSdrAudioEnabled(sliceId), kWaitMs);
+        auto* router = model->fftRouter();
+        QVERIFY(router);
+        const int pseudoIndex = MainWindow::sunSdrPseudoStreamIndexForTest();
+        QVERIFY(!router->pansForReceiver(pseudoIndex).isEmpty());
+
+        // Ein echtes Funkgeraet uebernimmt die Scheibe -- ohne echte
+        // Hardware ist setStreamIndex() der einzige Weg, genau den
+        // Zustandswechsel herzustellen, den bindUnboundSlices() ausloest.
+        slice->setStreamIndex(0);
+
+        QTRY_VERIFY_WITH_TIMEOUT(mw->sunSdrTargetSliceForTest() < 0, kWaitMs);
+        QVERIFY2(!audio->sunSdrAudioEnabled(sliceId),
+                 "SunSDR-Ton lief nach der Uebernahme weiter");
+        QVERIFY2(router->pansForReceiver(pseudoIndex).isEmpty(),
+                 "Panadapter-Zuordnung blieb nach der Uebernahme stehen");
+
+        // Und die Ausgangssteuerung ist ganz stumm -- eine weitere
+        // Frequenzaenderung an der jetzt echten Scheibe darf nichts mehr
+        // an ExpertSDR2 senden.
+        QVERIFY(client);
+        received.clear();
+        slice->setFrequency(7100000.0);
+        QTest::qWait(300);
+        QVERIFY2(received.isEmpty(),
+                 "Ausgangssteuerung sendete noch nach der Uebernahme");
+
+        mw->close();
+    }
+
+    void scheibeLoeschenGibtDasZielFreiUndVerhindertKennungsWiederverwendung()
+    {
+        // Bench-Fund (Grundgeruest-Durchsicht 2026-08-24): RadioModel::
+        // addSlice() vergibt die NIEDRIGSTE freie Kennung (siehe dort,
+        // "Lowest-free also keeps the slice-letter contract"). Wird die
+        // SunSDR-Zielscheibe geloescht und danach eine neue Scheibe
+        // angelegt, kann die neue Scheibe dieselbe Kennung bekommen, die
+        // m_sunSdrTargetSliceId noch traegt -- ohne releaseSunSdrSlice()
+        // wuerde diese voellig unbeteiligte neue Scheibe stillschweigend
+        // SunSDR-Ton/-Steuerung erben.
         QWebSocketServer server(QStringLiteral("Testgeraet"),
                                  QWebSocketServer::NonSecureMode);
         QVERIFY2(server.listen(QHostAddress::LocalHost, 0),
@@ -336,36 +495,50 @@ private slots:
 
         RadioModel* model = mw->radioModelForTest();
         QVERIFY(model);
-        const int existingId = model->addSlice();
-        SliceModel* slice = model->sliceById(existingId);
-        QVERIFY(slice);
-        // Nachgestellte echte DDC-Bindung -- ohne echtes Funkgeraet ist
-        // das der einzige Weg, den Zustand herzustellen, den
-        // wireSunSdrOutboundControl()/applyRemoteSunSdrFrequency() prueft.
-        slice->setStreamIndex(0);
-        const double originalFreq = slice->frequency();
-
         mw->connectSunSdrForTest(
             QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
-        QCOMPARE(mw->sunSdrTargetSliceForTest(), existingId);
 
+        const int sunSdrId = mw->sunSdrTargetSliceForTest();
+        QVERIFY(sunSdrId >= 0);
         TciClient* client = mw->sunSdrClientForTest();
         QTRY_COMPARE_WITH_TIMEOUT(client->state(), TciClient::State::Connected,
                                   kWaitMs);
-        QTest::qWait(300);
 
-        // Eingehend: die Selbstauskunft (vfo:0,0,14164070) darf die
-        // echte Scheibe NICHT umgestimmt haben.
-        QCOMPARE(slice->frequency(), originalFreq);
+        // removeSlice() weigert sich, die letzte Scheibe zu loeschen --
+        // eine zweite anlegen, damit die SunSDR-Scheibe wirklich weg kann.
+        const int otherId = model->addSlice();
+        QVERIFY(model->sliceById(otherId));
 
-        // Ausgehend: eine Bedieneraenderung an der echten Scheibe darf
-        // NICHT an ExpertSDR2 gesendet werden.
+        model->removeSlice(sunSdrId);
+        QTRY_VERIFY_WITH_TIMEOUT(mw->sunSdrTargetSliceForTest() < 0, kWaitMs);
+        QVERIFY2(!model->sliceById(sunSdrId),
+                 "Testannahme verletzt: Scheibe wurde nicht geloescht");
+
+        // Eine neue Scheibe kann jetzt dieselbe Kennung wiederbekommen
+        // (niedrigste freie zuerst) -- gegenpruefen, dass das tatsaechlich
+        // passiert, sonst prueft der Rest hier den falschen Fall.
+        const int reusedId = model->addSlice();
+        SliceModel* reusedSlice = model->sliceById(reusedId);
+        QVERIFY(reusedSlice);
+        if (reusedId != sunSdrId) {
+            QSKIP("Kennung wurde nicht wiederverwendet -- Testvoraussetzung "
+                  "diesmal nicht gegeben, nichts zu pruefen");
+        }
+
+        // Die wiederverwendete Scheibe darf NICHT von SunSDR gesteuert
+        // werden -- weder eingehend noch ausgehend.
         QVERIFY(remote);
         received.clear();
-        slice->setFrequency(7100000.0);
+        const double freqBefore = reusedSlice->frequency();
+        remote->sendTextMessage(QStringLiteral("vfo:0,0,3500000;"));
+        QTest::qWait(300);
+        QCOMPARE(reusedSlice->frequency(), freqBefore);
+
+        reusedSlice->setFrequency(7100000.0);
         QTest::qWait(300);
         QVERIFY2(received.isEmpty(),
-                 "echte Scheibe hat trotz DDC-Bindung einen TCI-Befehl ausgeloest");
+                 "die wiederverwendete Scheibe hat einen TCI-Befehl "
+                 "ausgeloest, obwohl sie nie mit SunSDR verbunden wurde");
 
         mw->close();
     }

@@ -1418,9 +1418,29 @@ private:
     // zeigen.
     QMetaObject::Connection m_sunSdrFreqOutConn;
     QMetaObject::Connection m_sunSdrModeOutConn;
+    // Meldet, wenn die Ziel-Scheibe NACH dem Verbinden noch eine echte
+    // DDC-Bindung bekommt (bindUnboundSlices() beim naechsten Verbinden
+    // eines echten Funkgeraets) -- ohne das blieben Ton-/Steuerungs-
+    // Verdrahtung auf einer inzwischen echten Scheibe stehen (gegen-
+    // geprueft 2026-08-24, siehe releaseSunSdrSlice).
+    QMetaObject::Connection m_sunSdrStreamIndexWatchConn;
     void applyRemoteSunSdrFrequency(qint64 hz);
     void applyRemoteSunSdrModulation(const QString& mode);
     void wireSunSdrOutboundControl(class SliceModel* slice);
+    // Der EINZIGE Weg, an die aktuelle SunSDR-Zielscheibe zu kommen --
+    // liefert nullptr, wenn es keine gibt ODER sie inzwischen eine echte
+    // DDC-Bindung hat. Jeder Verbraucher (Ton, Panadapter, Steuerung)
+    // muss darueber gehen, nicht m_sunSdrTargetSliceId+sliceById() von
+    // Hand wiederholen -- genau das Auseinanderlaufen kostete vorher die
+    // Sicherheitsschranke an mehreren, aber nicht allen Verbrauchern.
+    class SliceModel* sunSdrControllableSlice() const;
+    // Gibt die aktuelle Zielscheibe vollstaendig frei -- Ton, Panadapter-
+    // Zuordnung, Ausgangssteuerung -- und setzt m_sunSdrTargetSliceId auf
+    // -1 zurueck. Aufgerufen, wenn die Scheibe geloescht wird oder eine
+    // echte DDC-Bindung bekommt; der Betreiber muss danach erneut
+    // "Verbinden…" waehlen, um eine neue Zielscheibe zu bekommen (keine
+    // stille Automatik).
+    void releaseSunSdrSlice(const QString& reason);
 
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
