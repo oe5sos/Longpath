@@ -241,6 +241,20 @@ not a finding. Flagged unresolved rather than papered over.
   holding the control channel exclusively is still on the table, and
   so is the payload-shape caveat above), but it does rule out "the
   device just wasn't there."
+
+  Checked ArtemisSDR's own source for how it handles a radio already
+  claimed by another client (an `ExpertSDR2` instance, in our case):
+  no such handling exists — `grep`-ing `sunsdr.c` for anything
+  session/exclusivity-shaped (busy, in-use, already-connected, etc.)
+  finds nothing. Silence, not a confirmed all-clear: ArtemisSDR is
+  built as a *replacement* for ExpertSDR2, so its author most likely
+  never ran the two side by side to hit this case either. **The
+  cleanest next bench test isolates this variable directly: run
+  `sunsdr_probe` with ExpertSDR2 fully quit (not just idle/backgrounded)
+  while the QRP is powered and reachable.** If it replies with
+  ExpertSDR2 closed but not while ExpertSDR2 holds the session, that
+  confirms exclusive-hold as the explanation for tonight's null result
+  and rules out a QRP-specific protocol difference in the same step.
 - The confirmed header formats and magic byte are enough to build and
   test further **read-only** probes. They are **not** enough to safely
   open a live session: several of the ~20 opcodes in the real boot
