@@ -4892,11 +4892,26 @@ void MainWindow::buildUI()
         });
     }
 
-    // When Clarity pauses or is disabled, let legacy AGC resume.
+    // When Clarity pauses (TX, or an explicit pause), let legacy AGC
+    // hold the display in the meantime -- and when it resumes, hand
+    // control back. Before this else branch existed, m_clarityActive
+    // only ever went one direction: any MOX pulse (including a bare
+    // TUNE/SWR sweep) parked the waterfall on legacy AGC for the rest
+    // of the session, since nothing else re-enabled it except the
+    // cadence+deadband-gated waterfallThresholdsChanged path below --
+    // which only fires once the noise floor has actually drifted, so
+    // on a quiet band it could stay stuck black indefinitely. Live on
+    // the bench 2026-08-25 (OE5SOS): the waterfall would recover
+    // color only when something else happened to recreate the
+    // SpectrumWidget (a responsive-layout window resize), which reset
+    // m_clarityActive to its construction default -- coincidence, not
+    // a fix.
     connect(m_clarityController, &ClarityController::pausedChanged,
             activeSpectrumWidget(), [this](bool paused) {
         if (paused) {
             activeSpectrumWidget()->setClarityActive(false);
+        } else if (m_clarityController->isEnabled()) {
+            activeSpectrumWidget()->setClarityActive(true);
         }
     });
 
