@@ -1420,7 +1420,16 @@ void ConnectionPanel::onContextMenuRequested(const QPoint& pos)
     QAction* actForget     = menu.addAction(QStringLiteral("Forget"));
     actForget->setEnabled(!info.macAddress.isEmpty());
 
-    actConnect->setEnabled(!info.macAddress.isEmpty() && !connected);
+    // Was `&& !connected`: blocked switching to a different radio while
+    // one was already connected -- the whole reason this menu opens with
+    // "even when connected, so user can switch radios" documented as the
+    // intent (2026-04-30-shell-chrome-redesign-design.md:209), and never
+    // actually reachable because of this gate. connectToRadio() already
+    // tears down any existing connection before opening the new one
+    // (RadioModel.cpp:5952-5954), so this button/action only ever needed
+    // to stop blocking -- the model-layer work was already done and
+    // hardened -- this gate only ever needed to stop blocking.
+    actConnect->setEnabled(!info.macAddress.isEmpty());
     actDisconnect->setEnabled(connected);
     actCopyMac->setEnabled(!info.macAddress.isEmpty());
 
@@ -1448,7 +1457,6 @@ void ConnectionPanel::onContextMenuRequested(const QPoint& pos)
 void ConnectionPanel::updateButtonStates()
 {
     bool hasSelection = (m_radioTable->currentRow() >= 0);
-    bool connected    = m_radioModel->isConnected();
 
     // Selected row must not be an "offline" row to allow connect
     bool canConnect = false;
@@ -1460,7 +1468,9 @@ void ConnectionPanel::updateButtonStates()
         }
     }
 
-    m_connectBtn->setEnabled(canConnect && !connected);
+    // Was `&& !connected` -- see the identical fix + rationale on
+    // actConnect above (context-menu Connect action, same gate, same bug).
+    m_connectBtn->setEnabled(canConnect);
     // Phase 3Q Task 5: m_disconnectBtn removed from bottom strip.
     // Disconnect lives in the status strip (m_stripDisconnectBtn).
     // Forget + Edit: enabled when a row with a MAC is selected.
