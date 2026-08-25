@@ -219,15 +219,28 @@ not a finding. Flagged unresolved rather than papered over.
   magic bytes — against this QRP it could never get a reply as written,
   which is now understood, not mysterious. A third profile (`QRP`:
   ctrl 50001 / stream 50002 / magic `0x03`) has been added to the
-  tool's profile table tonight — mechanical, additive, still read-only,
-  same zero-payload `0x1A` query as before. **Not yet run against the
-  real hardware** — that's the next live bench step, not something to
-  claim from a source change alone. One caveat already visible in the
-  capture: the real boot sequence's own `0x1a` exchange carried a
-  4-byte zero payload, not the empty payload this probe sends (which
-  mirrors ArtemisSDR's own identity-query usage) — if the corrected
-  magic byte still gets no reply, that mismatch is one plausible reason
-  to check next, not a settled explanation.
+  tool's profile table — mechanical, additive, still read-only,
+  same zero-payload `0x1A` query as before, plus a second QRP-only
+  query (`0x12`, also confirmed empty-payload in the real capture,
+  also got a real reply there — see the opcode table above). One
+  caveat already visible in the capture: the real boot sequence's own
+  `0x1a` exchange carried a 4-byte zero payload, not the empty payload
+  this probe sends (which mirrors ArtemisSDR's own identity-query
+  usage) — if the corrected magic byte still gets no reply, that
+  mismatch is one plausible reason to check next, not a settled
+  explanation.
+  **Run several times on the bench tonight (2026-08-25) with the QRP
+  profile in place — no reply on any profile, any time.** At least one
+  of those runs happened while the QRP was confirmed genuinely
+  reachable and in active use — Longpath's existing TCI client was
+  connected through ExpertSDR2 at the time, with live audio and
+  panadapter both confirmed working — so this specific run is a real,
+  if still narrow, negative result: a live, reachable, actively-used
+  QRP did not answer either the `0x1A` or `0x12` empty-payload query on
+  the corrected magic byte. Doesn't settle the question (ExpertSDR2
+  holding the control channel exclusively is still on the table, and
+  so is the payload-shape caveat above), but it does rule out "the
+  device just wasn't there."
 - The confirmed header formats and magic byte are enough to build and
   test further **read-only** probes. They are **not** enough to safely
   open a live session: several of the ~20 opcodes in the real boot
