@@ -246,13 +246,18 @@ void ColorsThemePage::buildUI()
     wfForm->setSpacing(6);
 
     // Low Level Color — moved from Display → Waterfall Defaults "Levels" group (W10).
-    // SpectrumWidget uses gradient tables; the custom colour is persisted for future
-    // Custom-scheme wiring but does not rebuild the gradient live yet.
-    m_wfLowColorBtn = new ColorSwatchButton(QColor(Qt::black), wfGroup);
+    // 2026-08-25: was persisted but never fed back into rendering ("does
+    // not rebuild the gradient live yet") -- confirmed dead on the bench
+    // (OE5SOS: picked a colour, waterfall didn't change). Now wired live
+    // through the same makeBtn() path every other swatch on this page
+    // uses; see SpectrumWidget::setWfLowColor for the scope (Enhanced
+    // scheme only, matching Thetis).
+    m_wfLowColorBtn = makeBtn(wfGroup,
+        QColor(Qt::black),
+        [](SpectrumWidget* w){ return w->wfLowColor(); },
+        &SpectrumWidget::setWfLowColor);
     // Thetis: setup.designer.cs:34176 (clrbtnWaterfallLow)
     m_wfLowColorBtn->setToolTip(QStringLiteral("The Color to use when the signal level is at or below the low level set above."));
-    connect(m_wfLowColorBtn, &ColorSwatchButton::colorChanged,
-            this, [](const QColor&) { /* stored via AppSettings on save */ });
     wfForm->addRow(QStringLiteral("Low Level Color:"), m_wfLowColorBtn);
 
     contentLayout()->addWidget(wfGroup);

@@ -903,6 +903,13 @@ public:
     // display.cs:1941 BandEdgeColor.
     void setGridColor(const QColor& c);
     QColor gridColor() const { return m_gridColor; }
+    // From Thetis display.cs:2516-2521 (waterfall_low_color) — the colour
+    // used at/near the bottom of the waterfall gradient. Thetis wires this
+    // into the "enhanced" scheme only (display.cs:6764-6787); the other
+    // schemes there hardcode their own floor colour and don't read it.
+    // Same scope here: only WfColorScheme::Enhanced honours this.
+    void setWfLowColor(const QColor& c);
+    QColor wfLowColor() const { return m_wfLowColor; }
     void setGridFineColor(const QColor& c);
     QColor gridFineColor() const { return m_gridFineColor; }
     void setHGridColor(const QColor& c);
@@ -2159,13 +2166,19 @@ public:
     // kostet eine Addition je Bildpunkt.
     static float waterfallIntensityF(float dbm, float lowDbm, float highDbm,
                                      int blackLevel, int colorGain);
-    static QRgb waterfallColorForIntensityF(float level, WfColorScheme scheme);
+    // lowColor: Thetis display.cs:2516/6764-6787 waterfall_low_color,
+    // honoured for WfColorScheme::Enhanced only (see .cpp). A default
+    // parameter, not an instance read, so this stays the pure function
+    // tst_waterfall_banding.cpp already calls without a live SpectrumWidget.
+    static QRgb waterfallColorForIntensityF(float level, WfColorScheme scheme,
+                                            QColor lowColor = Qt::black);
 
     static quint8 waterfallIntensity(float dbm, float lowDbm, float highDbm,
                                      int blackLevel, int colorGain);
 
     /// 0..255 auf eine Farbe des gewählten Schemas.
-    static QRgb waterfallColorForIntensity(quint8 level, WfColorScheme scheme);
+    static QRgb waterfallColorForIntensity(quint8 level, WfColorScheme scheme,
+                                           QColor lowColor = Qt::black);
 
 private:
 
@@ -2530,6 +2543,7 @@ private:
     bool                         m_tuneGuideShowing{false};
     class QTimer*                m_tuneGuideHideTimer{nullptr};
 
+    QColor m_wfLowColor{Qt::black};              // Thetis display.cs:2516 default
     QColor m_gridColor{255, 255, 255, 40};       // vertical freq grid
     QColor m_gridFineColor{255, 255, 255, 20};   // 1/5 step fine grid
     QColor m_hGridColor{255, 255, 255, 40};      // horizontal dBm grid

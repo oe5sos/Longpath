@@ -1183,6 +1183,8 @@ void SpectrumWidget::loadSettings()
         m_gridTextColor = readColor(QStringLiteral("DisplayGridTextColor"),
                                     QColor(Style::role(
                                         "grid-text", Style::kSpectrumGridText)));
+        m_wfLowColor    = readColor(QStringLiteral("DisplayWfLowColor"),
+                                    QColor(Qt::black));
     }
     // Plan 4 D9c-1: old single key "DisplayZeroLineColor" dropped (branch not
     // yet on main — no migration burden).  Load the split RX/TX keys.
@@ -1407,6 +1409,7 @@ void SpectrumWidget::saveSettings()
     writeColor(QStringLiteral("DisplayGridFineColor"), m_gridFineColor);
     writeColor(QStringLiteral("DisplayHGridColor"),    m_hGridColor);
     writeColor(QStringLiteral("DisplayGridTextColor"), m_gridTextColor);
+    writeColor(QStringLiteral("DisplayWfLowColor"),    m_wfLowColor);
     // Plan 4 D9c-1: split zero-line color — write RX + TX keys.
     writeColor(QStringLiteral("DisplayRxZeroLineColor"), m_rxZeroLineColor);
     writeColor(QStringLiteral("DisplayTxZeroLineColor"), m_txZeroLineColor);
@@ -2896,6 +2899,14 @@ void SpectrumWidget::setFreqLabelAlign(FreqLabelAlign a)
 {
     if (m_freqLabelAlign == a) { return; }
     m_freqLabelAlign = a;
+    scheduleSettingsSave();
+    markOverlayDirty();
+}
+
+void SpectrumWidget::setWfLowColor(const QColor& c)
+{
+    if (!c.isValid() || m_wfLowColor == c) { return; }
+    m_wfLowColor = c;
     scheduleSettingsSave();
     markOverlayDirty();
 }
@@ -5360,7 +5371,7 @@ void SpectrumWidget::rebuildWaterfallViewport()
         if (!src) { continue; }
         auto* dst = reinterpret_cast<QRgb*>(m_waterfall.scanLine(y));
         for (int x = 0; x < w; ++x) {
-            dst[x] = waterfallColorForIntensity(src[x], m_wfColorScheme);
+            dst[x] = waterfallColorForIntensity(src[x], m_wfColorScheme, m_wfLowColor);
         }
     }
 
@@ -5897,7 +5908,7 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
                                             m_wfActiveHighThreshold,
                                             m_wfBlackLevel, m_wfColorGain);
         level[x] = static_cast<quint8>(std::lround(f * 255.0f));
-        scanline[x] = waterfallColorForIntensityF(f, m_wfColorScheme);
+        scanline[x] = waterfallColorForIntensityF(f, m_wfColorScheme, m_wfLowColor);
     }
 
     // ── Sub-epic E: mirror the just-written row into the history ring ───
@@ -6006,24 +6017,34 @@ float SpectrumWidget::waterfallIntensityF(float dbm, float lowDbm,
 // Mittel eine halbe Farbstufe je Kanal — bei einem weichen Verlauf
 // genau die Haelfte dessen, was man vermeiden will.
 QRgb SpectrumWidget::waterfallColorForIntensityF(float level,
-                                                 WfColorScheme scheme)
+                                                 WfColorScheme scheme,
+                                                 QColor lowColor)
 {
     const float adjusted = qBound(0.0f, level, 1.0f);
 
     int stopCount = 0;
     const WfGradientStop* stops = wfSchemeStops(scheme, stopCount);
 
+    // Thetis display.cs:2516/6764-6787 — waterfall_low_color replaces the
+    // floor colour in the "enhanced" scheme only; every other scheme there
+    // hardcodes its own floor and never reads it.
+    WfGradientStop stop0 = stops[0];
+    if (scheme == WfColorScheme::Enhanced) {
+        stop0.r = lowColor.red();
+        stop0.g = lowColor.green();
+        stop0.b = lowColor.blue();
+    }
+
     for (int i = 0; i < stopCount - 1; ++i) {
-        if (adjusted <= stops[i + 1].pos) {
-            const float span = stops[i + 1].pos - stops[i].pos;
+        const WfGradientStop& lo = (i == 0) ? stop0 : stops[i];
+        const WfGradientStop& hi = stops[i + 1];
+        if (adjusted <= hi.pos) {
+            const float span = hi.pos - lo.pos;
             const float t = (span > 0.0f)
-                                ? (adjusted - stops[i].pos) / span : 0.0f;
-            const int r = int(std::lround(
-                stops[i].r + t * (stops[i + 1].r - stops[i].r)));
-            const int g = int(std::lround(
-                stops[i].g + t * (stops[i + 1].g - stops[i].g)));
-            const int b = int(std::lround(
-                stops[i].b + t * (stops[i + 1].b - stops[i].b)));
+                                ? (adjusted - lo.pos) / span : 0.0f;
+            const int r = int(std::lround(lo.r + t * (hi.r - lo.r)));
+            const int g = int(std::lround(lo.g + t * (hi.g - lo.g)));
+            const int b = int(std::lround(lo.b + t * (hi.b - lo.b)));
             return qRgb(qBound(0, r, 255), qBound(0, g, 255),
                         qBound(0, b, 255));
         }
@@ -6034,23 +6055,32 @@ QRgb SpectrumWidget::waterfallColorForIntensityF(float level,
 }
 
 QRgb SpectrumWidget::waterfallColorForIntensity(quint8 level,
-                                                WfColorScheme scheme)
+                                                WfColorScheme scheme,
+                                                QColor lowColor)
 {
     const float adjusted = static_cast<float>(level) / 255.0f;
 
     int stopCount = 0;
     const WfGradientStop* stops = wfSchemeStops(scheme, stopCount);
 
+    // Same low-colour substitution as waterfallColorForIntensityF() above
+    // — kept in sync deliberately rather than delegating, matching how
+    // this pair already duplicated the interpolation before this change.
+    WfGradientStop stop0 = stops[0];
+    if (scheme == WfColorScheme::Enhanced) {
+        stop0.r = lowColor.red();
+        stop0.g = lowColor.green();
+        stop0.b = lowColor.blue();
+    }
+
     for (int i = 0; i < stopCount - 1; ++i) {
-        if (adjusted <= stops[i + 1].pos) {
-            const float t = (adjusted - stops[i].pos)
-                          / (stops[i + 1].pos - stops[i].pos);
-            const int r = static_cast<int>(
-                stops[i].r + t * (stops[i + 1].r - stops[i].r));
-            const int g = static_cast<int>(
-                stops[i].g + t * (stops[i + 1].g - stops[i].g));
-            const int b = static_cast<int>(
-                stops[i].b + t * (stops[i + 1].b - stops[i].b));
+        const WfGradientStop& lo = (i == 0) ? stop0 : stops[i];
+        const WfGradientStop& hi = stops[i + 1];
+        if (adjusted <= hi.pos) {
+            const float t = (adjusted - lo.pos) / (hi.pos - lo.pos);
+            const int r = static_cast<int>(lo.r + t * (hi.r - lo.r));
+            const int g = static_cast<int>(lo.g + t * (hi.g - lo.g));
+            const int b = static_cast<int>(lo.b + t * (hi.b - lo.b));
             return qRgb(r, g, b);
         }
     }
