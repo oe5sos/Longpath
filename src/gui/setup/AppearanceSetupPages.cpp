@@ -260,6 +260,24 @@ void ColorsThemePage::buildUI()
     m_wfLowColorBtn->setToolTip(QStringLiteral("The Color to use when the signal level is at or below the low level set above."));
     wfForm->addRow(QStringLiteral("Low Level Color:"), m_wfLowColorBtn);
 
+    // Background Color — the empty/idle waterfall (no rows painted yet:
+    // fresh launch, just after connecting, or not connected at all).
+    // Was fixed to the app theme's "app-bg" role with no way to change
+    // it; OE5SOS, 2026-08-25, after the panadapter's own equivalent
+    // ("Hintergrund" on Spectrum Defaults) already existed: "eine
+    // andere Farbe sollte man auch aendern koennen ... den Hintergrund,
+    // oben und unten." This is unten. Defaults to the same theme role
+    // as before, so nobody sees a change until they pick one.
+    m_wfBgColorBtn = makeBtn(wfGroup,
+        QColor(Style::kAppBg),
+        [](SpectrumWidget* w){ return w->waterfallBackgroundFillColor(); },
+        &SpectrumWidget::setWaterfallBackgroundFillColor);
+    m_wfBgColorBtn->setToolTip(QStringLiteral(
+        "Background colour of the waterfall before any data has been drawn "
+        "into it -- on first launch, just after connecting, or while "
+        "disconnected."));
+    wfForm->addRow(QStringLiteral("Background Color:"), m_wfBgColorBtn);
+
     contentLayout()->addWidget(wfGroup);
 
     // Reset all colors to defaults — broadened from the Plan 4 D9c-3 button
@@ -296,6 +314,8 @@ void ColorsThemePage::buildUI()
         m_rxFilterColorBtn->setColor(w->rxFilterColor());
         m_txFilterColorBtn->setColor(w->txFilterColor());
         m_wfLowColorBtn->setColor(QColor(Qt::black));   // waterfall low default
+        w->resetWaterfallBackgroundFillColor();
+        m_wfBgColorBtn->setColor(w->waterfallBackgroundFillColor());
     });
     resetRow->addWidget(resetBtn);
     resetRow->addStretch(1);

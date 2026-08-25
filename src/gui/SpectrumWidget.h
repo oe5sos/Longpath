@@ -737,6 +737,18 @@ public:
     /// Die eigene Grundfarbe vergessen und wieder dem Thema folgen.
     void resetBackgroundFillColor();
     void loadBackgroundSettings();
+
+    // Dieselbe Idee wie setBackgroundFillColor(), aber fuer den
+    // Wasserfall statt den Panadapter -- die Grundflaeche, die man
+    // sieht, solange (noch) keine Zeile hineingemalt wurde: beim
+    // ersten Start, direkt nach dem Verbinden, oder ganz ohne
+    // Verbindung. War bisher an "app-bg" aus dem Thema gebunden, nicht
+    // eigens waehlbar -- OE5SOS, 2026-08-25: "eine andere Farbe sollte
+    // man auch aendern koennen, sprich den Hintergrund, oben und
+    // unten." Oben (Panadapter) gab es schon; das hier ist unten.
+    void setWaterfallBackgroundFillColor(const QColor& c);
+    QColor waterfallBackgroundFillColor() const { return m_wfBgFillColor; }
+    void resetWaterfallBackgroundFillColor();
     void paintBackgroundLayer(QPainter& p, const QRect& specRect);
 
     void setDbmScaleVisible(bool on);
@@ -3032,6 +3044,7 @@ private:
     QString m_bgImagePath;
     int     m_bgOpacity{80};
     QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
+    QColor  m_wfBgFillColor{QColor(Style::kAppBg)};
     int     m_bgBrightnessPct{100};
     /// Lage der Einblendungen als Anteil der Spektrumsflaeche.
     /// Vorgabe: links unten, rechts unten, Mitte unten — ueber dem

@@ -3649,7 +3649,7 @@ void SpectrumWidget::applyResizeSettled()
     if (wfW > 0 && wfH > 0 && (m_waterfall.isNull() ||
         m_waterfall.width() != wfW || m_waterfall.height() != wfH)) {
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
-        m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
+        m_waterfall.fill(m_wfBgFillColor);
         m_wfWriteRow = 0;
 #ifdef NEREUS_GPU_SPECTRUM
         m_wfTexFullUpload = true;
@@ -4486,6 +4486,37 @@ void SpectrumWidget::setBackgroundFillColor(const QColor& c)
     update();
 }
 
+// Mirrors setBackgroundFillColor()/resetBackgroundFillColor() above --
+// same "own choice in AppSettings beats the theme role" precedence,
+// same persisted-key-removal-not-value reset so a later theme change
+// still reaches an operator who never customised this.
+void SpectrumWidget::setWaterfallBackgroundFillColor(const QColor& c)
+{
+    if (!c.isValid() || c == m_wfBgFillColor) { return; }
+    m_wfBgFillColor = c;
+    auto& st = AppSettings::instance();
+    st.setValue("WaterfallBackgroundFill", m_wfBgFillColor.name(QColor::HexArgb));
+    st.save();
+    m_waterfall.fill(m_wfBgFillColor);
+    m_wfTexFullUpload = true;
+    update();
+}
+
+void SpectrumWidget::resetWaterfallBackgroundFillColor()
+{
+    auto& st = AppSettings::instance();
+    st.remove(QStringLiteral("WaterfallBackgroundFill"));
+    st.save();
+
+    m_wfBgFillColor = QColor(roleColor("app-bg", Style::kAppBg));
+    if (!m_wfBgFillColor.isValid()) {
+        m_wfBgFillColor = QColor(Style::kAppBg);
+    }
+    m_waterfall.fill(m_wfBgFillColor);
+    m_wfTexFullUpload = true;
+    update();
+}
+
 void SpectrumWidget::loadBackgroundSettings()
 {
     auto& st = AppSettings::instance();
@@ -4507,6 +4538,11 @@ void SpectrumWidget::loadBackgroundSettings()
                                Style::role("panadapter-bg",
                                            Style::kPanadapterBg)).toString());
     if (fill.isValid()) { m_bgFillColor = fill; }
+
+    const QColor wfFill(st.value("WaterfallBackgroundFill",
+                                 Style::role("app-bg",
+                                             Style::kAppBg)).toString());
+    if (wfFill.isValid()) { m_wfBgFillColor = wfFill; }
 
     m_bgBrightnessPct = qBound(100,
         st.value("PanadapterBackgroundBrightness", "100").toInt(), 300);
@@ -5346,7 +5382,7 @@ void SpectrumWidget::rebuildWaterfallViewport()
     // Derselbe Ton wie die Erstfüllung. Reines Schwarz war nicht
     // blaustichig und fiel darum bei der Naht nicht auf — aber ein
     // leerer Wasserfall hätte je nach Weg zwei Gründe gehabt.
-    m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
+    m_waterfall.fill(m_wfBgFillColor);
     m_wfWriteRow = 0;
 
     if (!m_waterfallHistory.isConfigured()) {
@@ -5457,7 +5493,7 @@ void SpectrumWidget::clearWaterfallHistory()
     // disconnect path (MainWindow → connectionStateChanged) had no
     // preceding reset.
     if (!m_waterfall.isNull()) {
-        m_waterfall.fill(roleColor("app-bg", Style::kAppBg));
+        m_waterfall.fill(m_wfBgFillColor);
     }
     m_wfWriteRow = 0;
     std::fill(m_wfHistoryTimestamps.begin(), m_wfHistoryTimestamps.end(), 0);

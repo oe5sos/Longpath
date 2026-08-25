@@ -43,6 +43,7 @@ private:
 
     // Section: Waterfall
     ColorSwatchButton* m_wfLowColorBtn{nullptr};       // → waterfall low colour (W10)
+    ColorSwatchButton* m_wfBgColorBtn{nullptr};        // → waterfall idle/empty background colour
 };
 
 // ---------------------------------------------------------------------------
