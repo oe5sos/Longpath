@@ -184,6 +184,7 @@ private:
 
     void pushModeToModel(DSPMode m);
     void pushStepToModel(int hz);
+    void pushBandToModel(Longpath::Band band);
     void pullFromModel();
 
     // Zeiger, nicht Werte. addGroup() gibt eine Referenz zurueck, und

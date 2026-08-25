@@ -234,11 +234,11 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
         QPushButton* b = addPill(g, entry.first);
         b->setProperty("bandValue", static_cast<int>(entry.second));
         connect(b, &QPushButton::clicked, this, [this, entry]() {
-            emit bandRequested(entry.second);
+            pushBandToModel(entry.second);
         });
     }
     addOverflow(g, m_allBands,
-                [this](Band b) { emit bandRequested(b); });
+                [this](Band b) { pushBandToModel(b); });
 }
 
 void CommandBar::buildStepGroup(QHBoxLayout* row)
@@ -312,6 +312,8 @@ void CommandBar::attach(SliceModel* slice)
                        this, [this](int, int) { pullFromModel(); });
     m_links << connect(slice, &SliceModel::activeNrChanged,
                        this, [this](NrSlot) { pullFromModel(); });
+    m_links << connect(slice, &SliceModel::bandChanged,
+                       this, [this](Longpath::Band) { pullFromModel(); });
     pullFromModel();
 }
 
@@ -566,6 +568,19 @@ void CommandBar::pushModeToModel(DSPMode m)
 void CommandBar::pushStepToModel(int hz)
 {
     if (m_slice) { m_slice->setStepHz(hz); }
+    pullFromModel();
+}
+
+void CommandBar::pushBandToModel(Band band)
+{
+    // Anders als Mode/Step: der eigentliche Bandwechsel (Sperr-Check,
+    // Speichern/Wiederherstellen der Slice-Einstellungen) lebt in
+    // RadioModel::onBandButtonClicked, nicht hier -- die Leiste kennt
+    // die Regeln dafuer nicht und soll sie nicht duplizieren. Nur
+    // durchreichen. bandRequested->onBandButtonClicked ist eine
+    // Direktverbindung (selber Thread), das Modell steht also schon,
+    // wenn pullFromModel() unten laeuft.
+    emit bandRequested(band);
     pullFromModel();
 }
 
