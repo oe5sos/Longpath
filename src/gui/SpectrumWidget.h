@@ -2105,11 +2105,21 @@ public:
     // Span the AGC must leave after the sliders have taken their cut.
     static constexpr float kWfAgcPaletteSpanDb = 20.0f;
 
-    // How far into the loud end of the real dynamic range the
-    // colour-gain slider may pull the high threshold. Peaks reaching
-    // the top colour is correct; the top colour swallowing the picture
-    // is not.
-    static constexpr float kWfMaxClipDb = 6.0f;
+    // How far into the loud/quiet end of the real dynamic range the
+    // colour-gain / black-level sliders may pull the high/low
+    // threshold. Peaks reaching the top colour (or the floor going
+    // fully dark) is correct; the palette swallowing the whole picture
+    // is not — this is the cap that keeps that from happening, shared
+    // by both sliders (mirrors the AGC margin's own symmetry).
+    //
+    // Was 6.0f. Raised 2026-08-25 on OE5SOS's explicit request
+    // ("bitte lockern") after live testing on a real 20m band showed
+    // both sliders pinned against the old cap at their commonly-used
+    // settings (~55-94 black level, ~64-80 colour gain out of range) —
+    // past the cap each slider had no further visible effect at all.
+    // A deliberate default change, not something to keep re-tuning
+    // silently: touch again only on another explicit ask.
+    static constexpr float kWfMaxClipDb = 20.0f;
 
     // dBm to colour, given already-composed thresholds. No widget state.
     static QRgb waterfallColor(float dbm, float lowDbm, float highDbm,

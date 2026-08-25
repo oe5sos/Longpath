@@ -5667,14 +5667,33 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
         // for, and peaks reaching the top colour is correct. What is
         // not correct is the palette top swallowing everything. So the
         // colour-gain slider may pull the high threshold down into the
-        // loud end of the real dynamic range, but no further than a
-        // quarter of it (and never more than 6 dB).
+        // loud end of the real dynamic range, capped at clipAllowance
+        // below.
+        //
+        // 2026-08-25, OE5SOS bench: at the black-level/colour-gain
+        // values actually used on a live 20m band (~55-94 / ~64-80 out
+        // of range), both sliders sat past this cap and had no visible
+        // effect at all -- not a bug in the cap/proportional-response
+        // math itself (verified: below the cap each slider moves its
+        // threshold in direct proportion, exactly as intended), just a
+        // cap set tight enough that ordinary slider positions land past
+        // it. Loosened on his explicit request ("bitte lockern"), not a
+        // default changed on our own judgement.
+        //
+        // The black-level side additionally had NO cap at all: it read
+        // `m_wfAgcRunMin - 1.0f - blackCut` uncapped, so for any
+        // blackCut past ~11 dB (nearly the whole 0-125 slider range)
+        // the +blackCut re-application in waterfallIntensityF() cancels
+        // it back to a constant runMin-1 -- black level was very close
+        // to a no-op across its whole usable range, worse than colour
+        // gain's partial cap. Given a matching clipAllowance cap here
+        // too, mirroring the high side instead of leaving it uncapped.
         const float blackCut = wfBlackLevelOffsetDb(m_wfBlackLevel);
         const float gainCut  = wfColorGainOffsetDb(m_wfColorGain);
 
         const float dataSpan = std::max(0.0f, m_wfAgcRunMax - m_wfAgcRunMin);
         const float clipAllowance = std::min(kWfMaxClipDb, 0.25f * dataSpan);
-        low  = std::min(low,  m_wfAgcRunMin - 1.0f - blackCut);
+        low  = std::min(low,  m_wfAgcRunMin + clipAllowance - blackCut);
         high = std::max(high, m_wfAgcRunMax - clipAllowance + gainCut);
 
         // On a flat spectrum the allowance is zero, which would put
