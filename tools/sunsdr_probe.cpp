@@ -29,12 +29,21 @@
 // das dokumentierte Kopf-Format, und wenn ja, stimmen die Bytes mit
 // dem ueberein, was ArtemisSDR fuer DX/PRO aufgezeichnet hat?
 //
-// Sie baut nichts, sie aendert nichts am Geraetezustand. Es wird
-// GENAU EIN Befehlstyp gesendet: die reine Selbstauskunfts-Abfrage
+// Sie baut nichts, sie aendert nichts am Geraetezustand. Fuer DX/PRO
+// wird GENAU EIN Befehlstyp gesendet: die reine Selbstauskunfts-Abfrage
 // (Opcode 0x1A, Nutzlast leer) -- bei ArtemisSDR selbst nur zum
 // Auslesen von Firmware/Seriennummer verwendet, nie zur Steuerung
 // (sunsdr_probe_identity_query, ArtemisSDR sunsdr.c:4871-4872). Kein
 // Einschalten, keine Frequenz, kein PTT, kein Antennenwechsel.
+//
+// Fuer das QRP-Profil kommt eine zweite, ebenso leere Anfrage dazu:
+// Opcode 0x12. Im echten Mitschnitt vom 2026-08-24 war das eine
+// Host->Radio-Abfrage ganz ohne Nutzlast, die eine echte 20-Byte-
+// Antwort bekam (siehe Design-Dokument, Abschnitt "richer opcode
+// set") -- Bedeutung nicht bestaetigt, aber Form und Zeitpunkt (frueh
+// im Bootablauf, vor jeglicher IQ-Uebertragung) passen zu einer
+// zweiten Selbstauskunfts-Abfrage wie 0x1A, nicht zu einem
+// Steuerbefehl. Auch das bleibt rein lesend.
 //
 // ── Aufruf ──────────────────────────────────────────────────────────
 //
@@ -64,6 +73,11 @@
 //                eines echten tcpdump-Mitschnitts (21720 Pakete) auf
 //                der Werkbank. KI-gestuetzt ueber Anthropic Claude
 //                (Cowork).
+//   2026-08-25 — Zweite Abfrage (Opcode 0x12) fuer das QRP-Profil
+//                ergaenzt, ebenfalls aus dem echten Mitschnitt
+//                bestaetigt. Mehrere Antworten je Profil werden jetzt
+//                alle protokolliert statt nur der ersten. KI-gestuetzt
+//                ueber Anthropic Claude (Cowork).
 // =================================================================
 
 #include <QCoreApplication>
@@ -105,17 +119,24 @@ struct SunSdrProfile {
     quint16 ctrlPort;
     quint16 streamPort;
     quint8  magic0;
+    QVector<quint8> queries;  // opcodes to try, in order, all empty-payload
 };
 
 // DX/PRO: ArtemisSDR sunsdr.c:2728-2742 (sunsdr_profile_dx /
-// sunsdr_profile_pro). QRP: docs/architecture/
-// 2026-08-24-sunsdr-native-driver-design.md, "Confirmed from real QRP
-// capture" -- Ports wie DX, Kennbyte 0x03, aus einem echten
-// tcpdump-Mitschnitt (21720 Pakete, 2026-08-24), nicht geraten.
+// sunsdr_profile_pro), query 0x1A only -- ArtemisSDR's own documented
+// identity query, never verified for a QRP magic byte.
+//
+// QRP: docs/architecture/2026-08-24-sunsdr-native-driver-design.md,
+// "Confirmed from real QRP capture" -- ports match DX, magic byte
+// 0x03, from a real tcpdump capture (21720 packets, 2026-08-24), not
+// guessed. Queries 0x1A (same as DX/PRO, cross-checking the shared
+// opcode) and 0x12 (QRP-only, real capture showed a genuine 20-byte
+// reply to this exact empty-payload frame -- see the header comment
+// above for why this is trusted as read-only).
 const SunSdrProfile kProfiles[] = {
-    { QStringLiteral("DX"),  50001, 50002, 0x32 },
-    { QStringLiteral("PRO"), 50002, 50003, 0x01 },
-    { QStringLiteral("QRP"), 50001, 50002, 0x03 },
+    { QStringLiteral("DX"),  50001, 50002, 0x32, {0x1A} },
+    { QStringLiteral("PRO"), 50002, 50003, 0x01, {0x1A} },
+    { QStringLiteral("QRP"), 50001, 50002, 0x03, {0x1A, 0x12} },
 };
 
 QString hexDump(const QByteArray& data)
@@ -170,15 +191,14 @@ int main(int argc, char** argv)
     out() << "SunSDR-Sonde -- " << hostStr << ", " << seconds
           << " Sekunden je Profil\n";
     out() << "------------------------------------------------------------\n";
-    out() << "Sendet NUR die reine Selbstauskunfts-Abfrage (Opcode 0x1A,\n";
-    out() << "leere Nutzlast) -- kein Einschalten, keine Frequenz, kein\n";
-    out() << "PTT, keine Antenne. Siehe Kopfkommentar dieser Datei.\n\n";
+    out() << "Sendet NUR leere Selbstauskunfts-Abfragen (siehe Kopfkommentar\n";
+    out() << "dieser Datei fuer die Opcodes je Profil) -- kein Einschalten,\n";
+    out() << "keine Frequenz, kein PTT, keine Antenne.\n\n";
     out().flush();
 
     struct ProfileResult {
         QString profileName;
-        bool gotReply = false;
-        QByteArray reply;
+        int repliesSeen = 0;
     };
     auto results = std::make_shared<QVector<ProfileResult>>();
     auto sockets = std::make_shared<QVector<QUdpSocket*>>();
@@ -197,19 +217,27 @@ int main(int argc, char** argv)
             out() << "   FEHLER: konnte keinen lokalen Port oeffnen: "
                   << sock->errorString() << "\n\n";
             out().flush();
-            results->append({profile.name, false, {}});
+            results->append({profile.name, 0});
             ++profileIndex;
             continue;
         }
 
-        const QByteArray query = buildQueryFrame(profile.magic0, 0x1A);
-        out() << "   > 0x1A Selbstauskunft ("  << query.size()
-              << " Byte): " << hexDump(query) << "\n";
-        out().flush();
-        sock->writeDatagram(query, host, profile.ctrlPort);
+        // Alle Abfragen dieses Profils direkt hintereinander raus -- die
+        // Sonde ordnet Antworten nicht einer bestimmten Abfrage zu, sie
+        // protokolliert nur, was auf diesem Sockel zurueckkommt. Bei einem
+        // einzelnen Geraet und wenigen Abfragen reicht das zur Auswertung
+        // von Hand.
+        for (quint8 opcode : profile.queries) {
+            const QByteArray query = buildQueryFrame(profile.magic0, opcode);
+            out() << "   > 0x" << QString::number(opcode, 16).rightJustified(2, QLatin1Char('0'))
+                  << " Selbstauskunft (" << query.size()
+                  << " Byte): " << hexDump(query) << "\n";
+            out().flush();
+            sock->writeDatagram(query, host, profile.ctrlPort);
+        }
 
         const int idx = profileIndex;
-        results->append({profile.name, false, {}});
+        results->append({profile.name, 0});
 
         QObject::connect(sock, &QUdpSocket::readyRead, [sock, idx, results]() {
             while (sock->hasPendingDatagrams()) {
@@ -218,15 +246,12 @@ int main(int argc, char** argv)
                 QHostAddress sender;
                 quint16 senderPort = 0;
                 sock->readDatagram(buf.data(), buf.size(), &sender, &senderPort);
-                if (!(*results)[idx].gotReply) {
-                    out() << "   < Antwort von " << sender.toString() << ":"
-                          << senderPort << " (" << buf.size() << " Byte): "
-                          << hexDump(buf) << "\n";
-                    tryDecodeIdentityReply(buf);
-                    out().flush();
-                    (*results)[idx].gotReply = true;
-                    (*results)[idx].reply = buf;
-                }
+                out() << "   < Antwort von " << sender.toString() << ":"
+                      << senderPort << " (" << buf.size() << " Byte): "
+                      << hexDump(buf) << "\n";
+                tryDecodeIdentityReply(buf);
+                out().flush();
+                ++(*results)[idx].repliesSeen;
             }
         });
 
@@ -239,10 +264,10 @@ int main(int argc, char** argv)
 
         bool anyReply = false;
         for (const auto& r : *results) {
-            if (r.gotReply) {
+            if (r.repliesSeen > 0) {
                 anyReply = true;
-                out() << "  Profil " << r.profileName << ": ANTWORT erhalten ("
-                      << r.reply.size() << " Byte) -- das Geraet spricht "
+                out() << "  Profil " << r.profileName << ": " << r.repliesSeen
+                      << " Antwort(en) erhalten -- das Geraet spricht "
                          "zumindest den 18-Byte-Kopf dieses Profils.\n";
             } else {
                 out() << "  Profil " << r.profileName << ": keine Antwort.\n";
