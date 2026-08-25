@@ -129,13 +129,24 @@ if [ -z "$QTINC" ]; then
             ln -sfn "$fw/Headers" "$shim/$(basename "$fw" .framework)"
         done
         # Qt's private rhi headers, when this Qt ships them. Homebrew
-        # does not, which is why this is conditional rather than an
+        # does not always put them directly under Headers/rhi — this
+        # build (qtbase 6.11.1) nests them one level deeper, under the
+        # version-numbered subdir Homebrew's Headers symlink also
+        # exposes: Headers/<version>/QtGui/rhi. Try both rather than
+        # picking one, since which layout a given Qt release uses isn't
+        # something to hardcode. This is conditional rather than an
         # unconditional link: a dangling one would put an -I on the
         # command line that silently resolves nothing, and the first
         # symptom would be a confusing error in a file that includes
         # <rhi/qrhi.h>.
-        if [ -d "$libdir/QtGui.framework/Headers/rhi" ]; then
-            ln -sfn "$libdir/QtGui.framework/Headers/rhi" "$shim/rhi"
+        rhi_dir="$libdir/QtGui.framework/Headers/rhi"
+        if [ ! -d "$rhi_dir" ]; then
+            # -L: Headers itself is a symlink (-> Versions/Current/Headers)
+            # find won't descend into a symlinked starting point without it.
+            rhi_dir="$(find -L "$libdir/QtGui.framework/Headers" -mindepth 3 -maxdepth 3 -type d -name rhi -print -quit 2>/dev/null)"
+        fi
+        if [ -n "$rhi_dir" ] && [ -d "$rhi_dir" ]; then
+            ln -sfn "$rhi_dir" "$shim/rhi"
         fi
 
         if [ -d "$shim/QtCore" ]; then
