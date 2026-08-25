@@ -242,6 +242,50 @@ not a finding. Flagged unresolved rather than papered over.
   so is the payload-shape caveat above), but it does rule out "the
   device just wasn't there."
 
+### New finding, 2026-08-25 (later bench session): the network path itself may need an active companion session
+
+A different, more basic failure mode showed up this time, upstream of
+the protocol question entirely: plain ICMP `ping` to the QRP alternated
+between "No route to host" and silent timeout across the session, with
+no code change or reachability fix on either end explaining the
+flips. OE5SOS noticed the pattern directly: *"das passiert dann, wenn
+die Software SunSDR nicht läuft"* (this happens specifically when the
+[ExpertSDR2] software isn't running). Tested it directly, twice:
+
+1. QRP powered off, `sunsdr_probe` run — no reply on any profile (the
+   pre-existing checklist item; not surprising on its own).
+2. QRP powered on, ExpertSDR2 confirmed **not** running (process check
+   empty, not just window-closed) — `ping` still "No route to host" or
+   timeout, `sunsdr_probe` still no reply on any profile, including the
+   corrected QRP magic byte and the `0x12` query that got a real reply
+   in the passive capture.
+
+Both times, powering the QRP on by itself was **not** sufficient for
+the Mac to reach it at the network layer at all — not a protocol-level
+non-reply, a routing-level non-reachability, the same failure ICMP
+itself hits. The one config not yet tested tonight is QRP-on
++ ExpertSDR2 actively connected + `sunsdr_probe` run alongside it,
+which OE5SOS declined for tonight since running ExpertSDR2 at all, even
+briefly as a diagnostic, cuts against the point of this whole document
+(*"das will ich ja umgehen, dass ich nur eine Software benötige"* —
+avoiding needing more than one piece of software is the goal).
+
+**Working hypothesis, clearly labelled as one:** the QRP's network
+interface may only fully come up, or only answer non-broadcast/unicast
+traffic, once an active ExpertSDR2 session has spoken to it —
+matching the *"beacon"* first packet documented above (the QRP
+announcing its own IP on connection) and the `0x18` keepalive opcode
+already in the reference table. If true, a native `SunSdrRadioConnection`
+would need to replicate whatever wakes this path — not just send the
+right bytes once reachable, but establish reachability in the first
+place. **Not confirmed** — the alternative explanation (WLAN/AP-side
+instability unrelated to ExpertSDR2, the same class of problem hit
+independently with the Anvelina on the same WLAN tonight) hasn't been
+ruled out, and both QRP and Anvelina share the same access point.
+Confirming this needs exactly the one untested config above, on a
+future bench session when running ExpertSDR2 briefly as a pure
+diagnostic is acceptable.
+
   Checked ArtemisSDR's own source for how it handles a radio already
   claimed by another client (an `ExpertSDR2` instance, in our case):
   no such handling exists — `grep`-ing `sunsdr.c` for anything
