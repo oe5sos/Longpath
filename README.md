@@ -80,14 +80,14 @@
 >
 > J.J. Boyd ~ KG4VCF
 
-[![CI](https://github.com/OE5SOS/NereusSDR/actions/workflows/ci.yml/badge.svg)](https://github.com/OE5SOS/NereusSDR/actions/workflows/ci.yml)
+[![CI](https://github.com/OE5SOS/Longpath/actions/workflows/ci.yml/badge.svg)](https://github.com/OE5SOS/Longpath/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Qt6](https://img.shields.io/badge/Qt-6-green.svg)](https://www.qt.io/)
 
-NereusSDR is a C++20/Qt6 port of [Thetis](https://github.com/ramdor/Thetis) — the canonical OpenHPSDR / Apache Labs SDR console, itself descended from FlexRadio PowerSDR — carrying its radio logic, DSP integration, and feature set forward to a native cross-platform codebase (macOS, Linux, Windows) with a Qt-based GUI. The Thetis contributor lineage (FlexRadio Systems, Doug Wigley W5WC, Richard Samphire MW0LGE, and the wider OpenHPSDR community) is preserved per-file in source headers and summarized in [docs/attribution/THETIS-PROVENANCE.md](docs/attribution/THETIS-PROVENANCE.md). Distributed under GPLv3 (root [LICENSE](LICENSE)), elected under the "or later" grant in upstream Thetis source-file headers (Thetis is GPLv2-or-later). A verbatim copy of GPLv2 ships at [docs/attribution/LICENSE-GPLv2](docs/attribution/LICENSE-GPLv2) for reference, since several WDSP and ChannelMaster source files explicitly reference v2.
+Longpath is a C++20/Qt6 port of [Thetis](https://github.com/ramdor/Thetis) — the canonical OpenHPSDR / Apache Labs SDR console, itself descended from FlexRadio PowerSDR — carrying its radio logic, DSP integration, and feature set forward to a native cross-platform codebase (macOS, Linux, Windows) with a Qt-based GUI. The Thetis contributor lineage (FlexRadio Systems, Doug Wigley W5WC, Richard Samphire MW0LGE, and the wider OpenHPSDR community) is preserved per-file in source headers and summarized in [docs/attribution/THETIS-PROVENANCE.md](docs/attribution/THETIS-PROVENANCE.md). Distributed under GPLv3 (root [LICENSE](LICENSE)), elected under the "or later" grant in upstream Thetis source-file headers (Thetis is GPLv2-or-later). A verbatim copy of GPLv2 ships at [docs/attribution/LICENSE-GPLv2](docs/attribution/LICENSE-GPLv2) for reference, since several WDSP and ChannelMaster source files explicitly reference v2.
 
-![NereusSDR v0.1.6 — ANAN-G2 on 40m LSB](docs/images/nereussdr-v016-screenshot.jpg)
+![Longpath v0.1.6 — ANAN-G2 on 40m LSB](docs/images/nereussdr-v016-screenshot.jpg)
 
 ---
 
@@ -108,7 +108,7 @@ Pre-built binaries for Linux (AppImage, x86_64 + aarch64), macOS (DMG +
 PKG, Apple Silicon + Intel), and Windows (NSIS installer + portable ZIP,
 x64) are published as GitHub Releases:
 
-**<https://github.com/OE5SOS/NereusSDR/releases>**
+**<https://github.com/OE5SOS/Longpath/releases>**
 
 All artifacts are GPG-signed (`KG4VCF`) via `SHA256SUMS.txt.asc`. To verify:
 
@@ -134,7 +134,7 @@ sha256sum -c SHA256SUMS.txt
 
 **Current release: v0.5.2** (2026-05-24). Substantial release on top of v0.5.1 (and v0.5.0 underneath). One major epic plus a new SKU port, a new UI subsystem, and a polish tail: **Phase 3P-II External RF accessories** (AetherSDR 1:1 PGXL + TGXL baseline, Thetis analog S-Meter port with 4 RX modes, connection robustness with exponential auto-reconnect / keepalive / RTT-correlated ping / full PGXL pairing flow, advanced UI with Fault Log / Tune Memory / TX Interlock Policy / power-cap toast); **ANAN-G2E (HermesC10) SKU port** (new board enum, hardware profile verified against Thetis v2.10.3.15, codec wrappers, BPF1 algorithm, PA telemetry, P2 RX unblock + crash fix); **Applet visibility controller** (hamburger menu on AppletPanel banner, View → Containers → Applets show/hide, capability-gated availability, persistence); **polish tail** (4O3A integration cleanup, TCI live-state fixes + 5 review issues, PS-A persistence, PA profile / quit handling). v0.5.2's 3P-II bench-verification matrix (36 rows) is pending live PGXL + TGXL hardware; the ANAN-G2E matrix (12 rows) is pending live G2E hardware. **v0.5.1** (2026-05-15) was the patch before: three ship-blocking release-artifact fixes (Windows `rade.dll`, macOS x86_64 `Qt6::WebSockets`, HL2 + Win11 waterfall slider persistence), three correctness fixes (orphan `.bak` recovery, connect-state-stuck-green, VOX prime-on-connect), and two CodeQL pipeline maintenance fixes. v0.5.0 detail below.
 
-**Phase 3J-1: TCI v2.0 WebSocket server.** External programs (WSJT-X, JTDX, FreeDV, Quisk, ESDR3, N1MM, Log4OM, contest software) can now drive NereusSDR over Thetis-compatible TCI. Setup > CAT/Network > TCI Server configures bind interface, port, and sensor intervals; Tools > TCI Server opens the log viewer; the bottom-bar TCI indicator shows live state. The audio pipeline negotiates 8 / 12 / 16 / 44.1 / 48 kHz with per-stream resampling, so FreeDV 8 kHz, Quisk, and JTDX 12 kHz all work end-to-end. 15 closeout items shipped after the initial port stabilized the on-bench behaviour against real clients.
+**Phase 3J-1: TCI v2.0 WebSocket server.** External programs (WSJT-X, JTDX, FreeDV, Quisk, ESDR3, N1MM, Log4OM, contest software) can now drive Longpath over Thetis-compatible TCI. Setup > CAT/Network > TCI Server configures bind interface, port, and sensor intervals; Tools > TCI Server opens the log viewer; the bottom-bar TCI indicator shows live state. The audio pipeline negotiates 8 / 12 / 16 / 44.1 / 48 kHz with per-stream resampling, so FreeDV 8 kHz, Quisk, and JTDX 12 kHz all work end-to-end. 15 closeout items shipped after the initial port stabilized the on-bench behaviour against real clients.
 
 **Phase 3J-2: Spot system, FreeDV Reporter, PSK Reporter.** Seven spot-source clients in one place: DX cluster, RBN, WSJT-X UDP, SpotCollector / DXLab UDP, POTA HTTPS, FreeDV Reporter Socket.IO, PSK Reporter IPFIX. Tools > Spot Hub (Ctrl+Shift+S) opens a 10-tab modeless dialog; Tools > FreeDV Reporter (Ctrl+Shift+R) opens the 14-column live station view with TX/RX highlights, QSY support, and 2-hour idle auto-removal. Spots render on the panadapter with collision-avoidance stacking and click-to-tune, coloured by a DXCC 4-tier resolver against cty.dat plus the operator's ADIF log.
 
@@ -155,12 +155,12 @@ sha256sum -c SHA256SUMS.txt
 - **Auto AGC-T** — `NoiseFloorTracker` feeds the Auto-threshold timer with MOX guard and `agcCalOffset`; AUTO button toggles auto-mode; right-click the AGC-T slider opens Setup directly on the AGC/ALC page.
 - **Step attenuator + ADC overload** — `StepAttenuatorController` with Classic + Adaptive auto-attenuation modes, hysteresis, per-MAC persistence. P1/P2 `adcOverflow` signal from frame parsers, OVL status badge in RxApplet, per-model preamp items from Thetis `SetComboPreampForHPSDR`.
 - **Container / meter system** — GPU-rendered meter engine (QRhi 3-pipeline), 31 `MeterItem` types, 38+ ItemGroup presets (S-Meter, Power/SWR, ALC, ANANMM 7-needle, CrossNeedle, Magic Eye, History, SignalText, TX bar meters), full Thetis-parity Container Settings Dialog (3-column layout, per-item property editors), MMIO external-data subsystem (UDP / TCP-listen / TCP-client / Serial transports; JSON / XML / RAW formats).
-- **VAX audio routing** — NereusSDR-native multi-channel audio bus. `IAudioBus` abstraction with 5 platform backends (CoreAudio HAL plugin on macOS, PulseAudio pipes / pactl on Linux, PortAudio on Windows). First-run VAX dialog auto-detects Windows virtual-cable families (VB-Audio / VAC / Voicemeeter / Dante / FlexRadio DAX); `MasterOutputWidget` in the menu bar; Setup → Audio sub-tabs (Devices / VAX / TCI / Advanced); per-slice VAX channel assignment on the VFO Flag, persisted under `Slice<N>/`.
+- **VAX audio routing** — Longpath-native multi-channel audio bus. `IAudioBus` abstraction with 5 platform backends (CoreAudio HAL plugin on macOS, PulseAudio pipes / pactl on Linux, PortAudio on Windows). First-run VAX dialog auto-detects Windows virtual-cable families (VB-Audio / VAC / Voicemeeter / Dante / FlexRadio DAX); `MasterOutputWidget` in the menu bar; Setup → Audio sub-tabs (Devices / VAX / TCI / Advanced); per-slice VAX channel assignment on the VFO Flag, persisted under `Slice<N>/`.
 - **SSB voice transmit on every supported board, including Hermes Lite 2** — TxChannel, mic input pipeline (Pc / Radio / Composite sources), MOX state machine, I/Q output on Protocol 1 and Protocol 2. **TX speech processing chain**: 10-band parametric TX EQ, TX Leveler, TX ALC (3M-3a-i); CFC multi-band compressor, CPDR companding/drive ratio, CESSB controlled-envelope SSB, Phase Rotator (3M-3a-ii). **Per-profile TX bandwidth** (FilterLow/FilterHigh on every mic profile, TxApplet TX BW spinboxes, debounced WDSP path). 21 factory mic profiles ported verbatim from Thetis; profile manager with Save / Save-As / Delete; two-tone IMD test mode; VOX / DEXP / Anti-VOX. The HL2 ATT/filter safety audit closed in v0.3.1.
 - **Connection workflow (Phase 3Q)** — single state-machine-driven `Disconnected → Probing → Connecting → Connected → (LinkLost | Disconnected)`. **Unicast probe** reaches radios across Layer-3 VPN tunnels (WireGuard / ZeroTier / Tailscale). 16-SKU model picker organized by silicon family in the Add Radio dialog. Auto-connect-on-launch with per-radio toggle. Spectrum disconnect overlay (fade + click-to-recover) replaces the v0.2.x "frozen spectrum" mystery state.
 - **Status-bar chrome** — title-bar `ConnectionSegment` shows `[state dot] [▲ tx Mbps] [RTT ms] [▼ rx Mbps] [♪ audio]` with hover tooltip and right-click menu. Receive-info `BadgePair` ladder drops in priority order on narrow windows (mode + filter never drop). `StationBlock` clickable radio-name anchor. `AdcOverloadBadge` (yellow > 0, red > 3, 2 s auto-hide). CPU System / App right-click toggle. SVG icon system on `StatusBadge`. Min-filtered RTT for accurate sub-millisecond LAN ping readout.
 - **Hermes Lite 2 configuration surface** — new Hermes Lite Options tab (I2C control, I/O pin state), N2ADR HERCULES toggle writing all 13 SWL pin-7 entries, signed −28..+32 dB step-attenuator range, 13 SWL bands × 7 pins matrix, full per-MAC persistence. Bigger gaps elsewhere in the app remain; this expands a previously-thin HL2 surface.
-- **App polish** — Help → About NereusSDR (version / Qt / WDSP / GPG fingerprint / heritage credits), 💡 AI-assisted issue reporter in the menu bar corner (structured prompts, submits to the `bug_report.yml` / `feature_request.yml` GitHub templates), radio-model override persistence, P1 full 17-bank C&C round-robin, `NetworkDiagnosticsDialog` 4-section health grid.
+- **App polish** — Help → About Longpath (version / Qt / WDSP / GPG fingerprint / heritage credits), 💡 AI-assisted issue reporter in the menu bar corner (structured prompts, submits to the `bug_report.yml` / `feature_request.yml` GitHub templates), radio-model override persistence, P1 full 17-bank C&C round-robin, `NetworkDiagnosticsDialog` 4-section health grid.
 - **Packaging** — `release.yml` prepare → build×3 → sign-and-publish pipeline. **macOS DMG and PKG are now Apple Developer ID-signed and notarized** in v0.3.0+; Windows installer remains unsigned (Authenticode certificate pending). All artifacts GPG-signed via `SHA256SUMS.txt.asc`. Per-platform artifacts: Linux AppImage (x86_64 + aarch64), macOS DMG + PKG (Apple Silicon + Intel), Windows portable ZIP + NSIS installer.
 
 ### Deferred / not yet implemented
@@ -172,7 +172,7 @@ sha256sum -c SHA256SUMS.txt
 - **TX pipeline 3M-2 (CW TX)** — sidetone, firmware keyer, QSK / break-in. Next major epic.
 - **TX pipeline 3M-3b (FM-mode pre-emphasis)** — de-scoped from 3M-3a-ii to FM-mode follow-up.
 - **Multi-panadapter** (Phase 3F) — DDC assignment, FFTRouter, PanadapterStack, RX2 enable. Anti-VOX aamix path also waits on this.
-- ~~**HL2 `IoBoardHl2`** (Phase 3L)~~ — completed via Phase 3P-E: I2C TLV queue + 12-step state machine + bandwidth-monitor two-pointer byte-rate compute + NereusSDR throttle-detection layer; `P1CodecHl2` now intercepts C&C frames to inject I2C TLV payloads.
+- ~~**HL2 `IoBoardHl2`** (Phase 3L)~~ — completed via Phase 3P-E: I2C TLV queue + 12-step state machine + bandwidth-monitor two-pointer byte-rate compute + Longpath throttle-detection layer; `P1CodecHl2` now intercepts C&C frames to inject I2C TLV payloads.
 - **Skin system** (Phase 3H), **TCI + Spots** (Phase 3J), **CAT/rigctld** (Phase 3K), **WAV/IQ recording** (Phase 3M-recording).
 
 ---
@@ -269,14 +269,14 @@ sha256sum -c SHA256SUMS.txt
 | **3G-13: Step Attenuator & ADC Overload** | `StepAttenuatorController` (Classic + Adaptive), P1/P2 `adcOverflow` emission, OVL status badge, Setup→General→Options page, RxApplet ATT/S-ATT row, per-model preamp items | **Complete** |
 | **3G-14: About + AI Issue Reporter** | Help → About dialog, 💡 menu-bar issue reporter with structured prompts submitting to `bug_report.yml` / `feature_request.yml` | **Complete** |
 | **3N: Packaging** | Consolidated `release.yml`, `/release` skill, GPG-signed alpha builds: Linux AppImage ×2 archs, macOS Apple Silicon DMG, Windows portable ZIP + NSIS installer | **Complete** |
-| **3O: VAX Audio Routing** | NereusSDR-native multi-channel audio bus — 5 platform backends + first-run virtual-cable auto-detect (VB-Audio / VAC / Voicemeeter / Dante / DAX) + `MasterOutputWidget` + Setup → Audio sub-tabs + per-slice VAX channel persistence | **Complete** |
-| **3P: All-Board Radio-Control Parity** | 8 stacked sub-phases (A-H) delivering: HL2 BPF + S-ATT bug fixes, per-board P1/P2 codec subclasses, Alex-1/2 Filters live-LED sub-sub-tabs, OC Outputs matrix page, Calibration page (incl. freq-correction factor), Antenna Control per-band grid, HL2 I/O (closes Phase 3L), Accessories (Alex/Apollo/Penny), Diagnostics → Radio Status dashboard + 4 sibling sub-tabs, attribution enforcement pipeline. After merge: NereusSDR's **hardware / radio-plumbing / status-readout surfaces are userland-complete vs Thetis** — DSP-parameter / Transmit / CAT / Appearance / Keyboard Setup pages are still page shells with disabled controls pending later phases (see the [alpha-tester guide](docs/debugging/alpha-tester-hl2-smoke-test.md) for the honest wired-vs-stub breakdown). | **Complete** |
+| **3O: VAX Audio Routing** | Longpath-native multi-channel audio bus — 5 platform backends + first-run virtual-cable auto-detect (VB-Audio / VAC / Voicemeeter / Dante / DAX) + `MasterOutputWidget` + Setup → Audio sub-tabs + per-slice VAX channel persistence | **Complete** |
+| **3P: All-Board Radio-Control Parity** | 8 stacked sub-phases (A-H) delivering: HL2 BPF + S-ATT bug fixes, per-board P1/P2 codec subclasses, Alex-1/2 Filters live-LED sub-sub-tabs, OC Outputs matrix page, Calibration page (incl. freq-correction factor), Antenna Control per-band grid, HL2 I/O (closes Phase 3L), Accessories (Alex/Apollo/Penny), Diagnostics → Radio Status dashboard + 4 sibling sub-tabs, attribution enforcement pipeline. After merge: Longpath's **hardware / radio-plumbing / status-readout surfaces are userland-complete vs Thetis** — DSP-parameter / Transmit / CAT / Appearance / Keyboard Setup pages are still page shells with disabled controls pending later phases (see the [alpha-tester guide](docs/debugging/alpha-tester-hl2-smoke-test.md) for the honest wired-vs-stub breakdown). | **Complete** |
 | **3M-1: Basic SSB TX** | TxChannel, mic input, MOX state machine, I/Q output. Sub-phases 3M-1a TUNE-only first RF (PR #144) → 3M-1b SSB voice + mic-jack family (PR #149) → 3M-1c polish + Thetis-faithful semaphore-wake TX pump v3 + HL2 setTxDrive triage + Codex P1/P2 fixes (PR #152). | **Complete (shipped in v0.3.0)** |
 | **3Q: Connection Workflow Refactor** | Single ConnectionState state machine + unicast probe (works through Layer-3 VPNs) + Add Radio dialog rebuild (16-SKU model picker) + ConnectionPanel polish + auto-connect-on-launch + spectrum disconnect overlay + status-bar chrome layer (ConnectionSegment / RxDashboard / StationBlock / AdcOverloadBadge / SVG icon system / CPU toggle / min-filtered RTT) + PA voltage formula correction + macOS Developer ID signing + notarization. | **Complete (shipped in v0.3.0)** |
 | **3M-3a-i: TX Speech Processor I** | TX EQ (10-band parametric) + TX Leveler + TX ALC. TxChannel WDSP wrappers, TransmitModel schema, MicProfileManager bundles 27 EQ/Lev/ALC keys, 20 Thetis factory mic profiles ported verbatim, AgcAlcSetupPage TX sections, TxApplet `[LEV] [EQ] [PROC]` toggle row, TxEqDialog modeless editor, SpeechProcessorPage rewrite as TX dashboard. | **Complete (shipped in v0.3.0)** |
 | **3M-3a-ii: TX Speech Processor II** | CFC (Continuous Frequency Compressor) + CPDR (Compander Pre-Distortion / drive ratio) + CESSB (Controlled-Envelope SSB) + Phase Rotator. TxChannel wrappers, TransmitModel +15 properties, MicProfileManager +41 keys, 21st mic profile, CfcSetupPage rewrite, TxCfcDialog modeless editor, full ParametricEqWidget Qt6 port (~3160 LOC, used by TxEq + TxCfc dialogs), ParaEqEnvelope (gzip + base64url helper). | **Complete (shipped in v0.3.0)** |
 | **3M-3a-iii: TX Speech Processor III** | DEXP/VOX + AM-Squelch (AMSQ) WDSP setters + dialogs. | **Complete (shipped in v0.3.2)** |
-| **3M-3a-iv: Anti-VOX Cancellation Feed** | Closes the 3M-3a-iii gap so the anti-VOX gain control actually works. 4 WDSP wrappers, RxDspWorker → TxWorkerThread → TxChannel pump, full grpAntiVOX trio (Enable + Gain + Tau) on Setup → Transmit → DEXP/VOX. Source-selector dropped (NereusSDR-architectural divergence: VAX is a digital-mode app bus with no mic-feedback path). | **Complete (shipped in v0.4.0)** |
+| **3M-3a-iv: Anti-VOX Cancellation Feed** | Closes the 3M-3a-iii gap so the anti-VOX gain control actually works. 4 WDSP wrappers, RxDspWorker → TxWorkerThread → TxChannel pump, full grpAntiVOX trio (Enable + Gain + Tau) on Setup → Transmit → DEXP/VOX. Source-selector dropped (Longpath-architectural divergence: VAX is a digital-mode app bus with no mic-feedback path). | **Complete (shipped in v0.4.0)** |
 | **3M-3b: FM-mode TX work** | Pre-emphasis (de-scoped from 3M-3a-ii to FM-mode follow-up). | Planned |
 | 3M-2: CW TX | Sidetone, firmware keyer, QSK/break-in. Absorbs the HL2 CWX bit-3 follow-up. Next major epic after v0.4.0. | Planned |
 | **3M-4: PureSignal** | Feedback DDC plumbing on P1 and P2. `calcc.c` + `iqc.c` vendored verbatim from Thetis. PureSignal coordinator class. PsccPump driver. Per-board PsDdcConfig. PsForm modeless dialog (Tools → PureSignal). AmpView modeless dialog. Two-tone IMD overlay on the spectrum. PsaIndicatorWidget bottom-banner FB+PS pair. Enabled on every supported P1 and P2 SKU including HL2 (with HL2-specific negative-ATT support, AutoAtt convergence, ATT-on-TX master force-enable, psSampleRate=0 sentinel resolution) and plain Hermes. | **Complete (shipped in v0.4.0)** |
@@ -329,8 +329,8 @@ No manual setup required. CMake auto-downloads [`fftw-3.3.5-dll64.zip`](https://
 ### Build & Run
 
 ```bash
-git clone https://github.com/OE5SOS/NereusSDR.git
-cd NereusSDR
+git clone https://github.com/OE5SOS/Longpath.git
+cd Longpath
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j$(nproc)
 ./build/Longpath
@@ -352,10 +352,10 @@ PRs, bug reports, and feature requests welcome! See [CONTRIBUTING.md](CONTRIBUTI
 
 ## Heritage
 
-NereusSDR stands on the shoulders of these projects:
+Longpath stands on the shoulders of these projects:
 
-- **[Thetis](https://github.com/ramdor/Thetis)** — The canonical Apache Labs / OpenHPSDR SDR console (C# / WinForms). NereusSDR's feature source.
-- **[AetherSDR](https://github.com/ten9876/AetherSDR)** — Native FlexRadio client (C++20 / Qt6). NereusSDR's architectural template.
+- **[Thetis](https://github.com/ramdor/Thetis)** — The canonical Apache Labs / OpenHPSDR SDR console (C# / WinForms). Longpath's feature source.
+- **[AetherSDR](https://github.com/ten9876/AetherSDR)** — Native FlexRadio client (C++20 / Qt6). Longpath's architectural template.
 - **[WDSP](https://github.com/TAPR/OpenHPSDR-wdsp)** — Warren Pratt NR0V's DSP library. The signal processing engine.
 - **[OpenHPSDR](https://openhpsdr.org/)** — The open-source high-performance SDR project and protocol specifications.
 
@@ -363,6 +363,6 @@ NereusSDR stands on the shoulders of these projects:
 
 ## License
 
-NereusSDR is free and open-source software licensed under the [GNU General Public License v3](LICENSE).
+Longpath is free and open-source software licensed under the [GNU General Public License v3](LICENSE).
 
-*NereusSDR is a derivative work of Thetis licensed under the GNU General Public License. It is not affiliated with or endorsed by Apache Labs, FlexRadio Systems, ramdor/Thetis, or the OpenHPSDR project.*
+*Longpath is a derivative work of Thetis licensed under the GNU General Public License. It is not affiliated with or endorsed by Apache Labs, FlexRadio Systems, ramdor/Thetis, or the OpenHPSDR project.*

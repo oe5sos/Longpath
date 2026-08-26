@@ -2,11 +2,11 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in NereusSDR, please report it
+If you discover a security vulnerability in Longpath, please report it
 **privately** rather than opening a public issue.
 
 **Email:** Send details to the repository owner via GitHub private messaging,
-or use [GitHub's private vulnerability reporting](https://github.com/boydsoftprez/NereusSDR/security/advisories/new).
+or use [GitHub's private vulnerability reporting](https://github.com/OE5SOS/Longpath/security/advisories/new).
 
 Please include:
 - A description of the vulnerability
@@ -18,7 +18,7 @@ before any public disclosure.
 
 ## Scope
 
-NereusSDR communicates with OpenHPSDR-compatible radios over local network
+Longpath communicates with OpenHPSDR-compatible radios over local network
 protocols (UDP for Protocol 1, UDP multi-port for Protocol 2). Security concerns
 include:
 

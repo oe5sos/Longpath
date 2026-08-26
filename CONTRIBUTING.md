@@ -7,7 +7,7 @@ SDR console for OpenHPSDR radios. Community contributions are welcome.
 
 ## Quick Start
 
-1. Browse [open issues](https://github.com/boydsoftprez/NereusSDR/issues) —
+1. Browse [open issues](https://github.com/OE5SOS/Longpath/issues) —
    issues labeled `good first issue` are great starting points.
 2. Fork the repo and create a feature branch from `main`.
 3. Implement the fix or feature (one issue per PR).
@@ -17,7 +17,7 @@ SDR console for OpenHPSDR radios. Community contributions are welcome.
 
 ## Reporting Bugs
 
-- Open a [GitHub issue](https://github.com/boydsoftprez/NereusSDR/issues/new) directly.
+- Open a [GitHub issue](https://github.com/OE5SOS/Longpath/issues/new) directly.
 - Include: OS, Longpath version, radio model, protocol version (P1 or P2), firmware version.
 - Attach logs (`~/.config/Longpath/nereussdr.log`) if available.
 - Check existing issues first to avoid duplicates.
