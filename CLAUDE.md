@@ -560,7 +560,7 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [ctun-zoom-design.md](docs/architecture/ctun-zoom-design.md) | CTUN zoom bin subsetting: visibleBinRange(), hybrid FFT replan, DDC center tracking |
 | [2026-08-11-tx-monitor-audio-path.md](docs/architecture/2026-08-11-tx-monitor-audio-path.md) | TX self-monitor path: DUC-rate decimation, headphones bus, adaptive jitter cushion + seam fades in MasterMixer, latency budget, cadence-simulation verification |
 | [2026-08-24-sunsdr-tci-client-design.md](docs/architecture/2026-08-24-sunsdr-tci-client-design.md) | SunSDR2 QRP via TCI 1.4 client: signal path (Ton/Bild/Steuerung reusing existing AudioEngine/FFTEngine/FFTRouter infra, no parallel path), the one safety invariant (never feed/control a `streamIndex() >= 0` slice) and the three-piece design that enforces it, four real defects found against live hardware in order |
-| [2026-08-24-sunsdr-native-driver-design.md](docs/architecture/2026-08-24-sunsdr-native-driver-design.md) | SunSDR2 QRP native driver (no ExpertSDR2 middleman, full RX+TX): why TCI isn't enough, the source-first problem (no vendor spec) resolved via citing [ArtemisSDR](https://github.com/kk68/ArtemisSDR) (GPLv2-or-later Thetis fork, black-box reverse-engineered), full opcode/wire-format reference, and the one hard gate before any code — the QRP has never been confirmed against either reference implementation, both cover only DX/PRO |
+| [2026-08-24-sunsdr-native-driver-design.md](docs/architecture/2026-08-24-sunsdr-native-driver-design.md) | SunSDR2 QRP native driver (no ExpertSDR2 middleman): why TCI isn't enough, the source-first problem (no vendor spec) resolved via citing [ArtemisSDR](https://github.com/kk68/ArtemisSDR) (GPLv2-or-later Thetis fork, black-box reverse-engineered, DX/PRO only — never run against a QRP), full opcode/wire-format reference, and the bench-capture work that found and confirmed the QRP's own minimal RX-start sequence (broadcast discovery + one state-sync frame) — see [2026-08-26-sunsdr-connection-plan.md](docs/architecture/2026-08-26-sunsdr-connection-plan.md) for the implementation that ships it, RX-only, TX still out of scope |
 
 ### Implementation Plans (`docs/architecture/phase*-plan.md`)
 
@@ -591,8 +591,10 @@ preferences. OpenHPSDR radios don't store per-slice state.
 | [2026-08-02-bottom-banner-and-pan-menu-verification/README.md](docs/architecture/2026-08-02-bottom-banner-and-pan-menu-verification/README.md) | Bottom Banner + Pan Menu: 7-row bench verification matrix | Matrix drafted (pending live G2 + HL2 hardware) |
 | [2026-08-11-rotor-logbook-verification/README.md](docs/architecture/2026-08-11-rotor-logbook-verification/README.md) | Rotor comfort (taught presets / park / LP / spot→rotor) + logbook regression sweep: 23-row bench matrix | Matrix drafted (pending bench) |
 | [2026-08-24-sunsdr-tci-client-design.md](docs/architecture/2026-08-24-sunsdr-tci-client-design.md) | SunSDR2 QRP via TCI 1.4 client design spec: Verbindung/Ton/Bild/Steuerung, the safety invariant, four defects found against live hardware | **Complete (shipped, bench-verified 2026-08-24)** |
-| [2026-08-24-sunsdr-verification/README.md](docs/architecture/2026-08-24-sunsdr-verification/README.md) | SunSDR2 QRP: 10-row bench verification matrix | Matrix verified rows 1-7 (2026-08-24, OE5SOS); rows 8-10 (dual-radio safety, reconnect cycle, ExpertSDR2-side crash recovery) pending |
+| [2026-08-24-sunsdr-verification/README.md](docs/architecture/2026-08-24-sunsdr-verification/README.md) | SunSDR2 QRP (TCI client, via ExpertSDR2): 10-row bench verification matrix | Matrix verified rows 1-7 (2026-08-24, OE5SOS); rows 8-10 (dual-radio safety, reconnect cycle, ExpertSDR2-side crash recovery) pending |
+| [2026-08-26-sunsdr-connection-plan.md](docs/architecture/2026-08-26-sunsdr-connection-plan.md) | SunSDR2 QRP native driver (`SunSdrRadioConnection`, no ExpertSDR2 at all) implementation plan: Phase A-F task tables, the C.1 reachability-gate breakthrough (broadcast discovery + state-sync opcode `0x01`), two real socket-binding bugs found and fixed against live hardware | **RX+audio bench-confirmed end to end 2026-08-26 (OE5SOS); frequency control and TX remain out of scope, not yet committed to git** |
 | [2026-08-27-kiwisdr-design.md](docs/architecture/2026-08-27-kiwisdr-design.md) | KiwiSDR receive client (ported from AetherSDR): the profile→slice bridge pattern (audio/waterfall/TX-mute all through `assignedSliceForProfile` + the `kiwiControllableSlice` safety gate), why the TX-mute latch and Aether's per-source NR/history buffering were deliberately not carried over, `ext_api`-aware public directory, and Stufe 7 (band recall / virtual antennas / diversity) held open as a scope decision rather than a gap | **Shipped (stages 1-6, 7a); audio-to-mix wiring closed 2026-08-27; Stufe 7 not started, pending decision** |
+| [2026-08-26-sunsdr-native-verification/README.md](docs/architecture/2026-08-26-sunsdr-native-verification/README.md) | SunSDR2 QRP (native driver, no ExpertSDR2): 10-row bench verification matrix | Matrix verified rows 1-3 (2026-08-26, OE5SOS); rows 4-10 (frequency-limitation safety, client-side mode/filter, reconnect cycle, dead-radio detection, ExpertSDR2-coexistence, TX-inertness, dual-radio coexistence) pending |
 
 ### Protocol Reference (`docs/protocols/`)
 
@@ -746,6 +748,19 @@ preferences. OpenHPSDR radios don't store per-slice state.
      (shipped as 2, 4, 7 and 8 at different times on the same board). No static
      per-board DDC count can be correct across firmware versions — see the
      Radio-Authoritative Settings Policy.
+8. **ArtemisSDR** — `https://github.com/kk68/ArtemisSDR`
+   * **Clone to `../ArtemisSDR/` relative to Longpath root.** Cloned 2026-08-26
+     at commit `f8b01d2`. Re-pull and note the new commit if re-syncing.
+   * Kosta Kanchev (K0KOZ), GPLv2-or-later, a Thetis fork that drives SunSDR2
+     DX/PRO natively (RX+TX) via black-box reverse-engineered protocol —
+     the only citable source for the undocumented SunSDR2 native wire
+     protocol (Expert Electronics publishes only TCI). Full rationale,
+     citation grammar, and the reverse-engineering provenance quote:
+     `docs/architecture/2026-08-24-sunsdr-native-driver-design.md`.
+   * **Has never run against a SunSDR2 QRP** — only DX/PRO. Cite it as a
+     reference shape for the QRP native driver work, never as confirmed
+     QRP behavior; opcodes/sequences need bench confirmation against the
+     actual QRP before any session-opening code may send them.
 
 ### Gateware citations — cite facts, don't port logic
 
