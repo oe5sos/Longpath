@@ -26,7 +26,6 @@ private:
                               const QString& name,
                               const QString& ip,
                               quint16 port,
-                              bool autoConnect,
                               bool pinToMac)
     {
         RadioInfo info;
@@ -36,14 +35,14 @@ private:
         // macAddress intentionally blank — as it would be for an offline save
         info.boardType  = HPSDRHW::Unknown;
         info.protocol   = ProtocolVersion::Protocol1;
-        s.saveRadio(info, pinToMac, autoConnect);
+        s.saveRadio(info, pinToMac);
         // Confirm the key was written under the expected synthetic path
         QVERIFY(s.savedRadio(manualKey).has_value());
     }
 
 private slots:
     // ─────────────────────────────────────────────────────────────────────
-    // Core migration: name + autoConnect move to real MAC; old key gone
+    // Core migration: name moves to real MAC; old key gone
     // ─────────────────────────────────────────────────────────────────────
     void migratesManualKeyToRealMac()
     {
@@ -58,7 +57,6 @@ private slots:
                             QStringLiteral("Beach HL2"),
                             QStringLiteral("192.168.8.3"),
                             1024,
-                            /*autoConnect=*/true,
                             /*pinToMac=*/false);
 
         s.migrateRadioKey(manualKey, realMac);
@@ -67,9 +65,6 @@ private slots:
         auto migrated = s.savedRadio(realMac);
         QVERIFY2(migrated.has_value(), "Expected real-MAC entry after migration");
         QCOMPARE(migrated->info.name, QStringLiteral("Beach HL2"));
-
-        // autoConnect flag is preserved
-        QVERIFY(migrated->autoConnect);
 
         // info.macAddress is updated to the real MAC
         QCOMPARE(migrated->info.macAddress, realMac);
@@ -95,7 +90,6 @@ private slots:
                             QStringLiteral("Office ANAN"),
                             QStringLiteral("10.0.0.1"),
                             1024,
-                            /*autoConnect=*/false,
                             /*pinToMac=*/true);
 
         s.migrateRadioKey(manualKey, realMac);
@@ -103,7 +97,6 @@ private slots:
         auto migrated = s.savedRadio(realMac);
         QVERIFY(migrated.has_value());
         QVERIFY(migrated->pinToMac);
-        QVERIFY(!migrated->autoConnect);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -122,7 +115,7 @@ private slots:
         info.macAddress = mac;
         info.address    = QHostAddress(QStringLiteral("192.168.1.1"));
         info.port       = 1024;
-        s.saveRadio(info, false, false);
+        s.saveRadio(info, false);
 
         s.migrateRadioKey(mac, mac); // same → no-op
 
@@ -164,7 +157,7 @@ private slots:
                             QStringLiteral("VPN Radio"),
                             QStringLiteral("192.168.50.10"),
                             1024,
-                            false, false);
+                            false);
 
         s.migrateRadioKey(manualKey, realMac);
 
@@ -191,7 +184,7 @@ private slots:
                             QStringLiteral("Remote Station"),
                             QStringLiteral("172.16.0.1"),
                             1024,
-                            true, true);
+                            true);
 
         s.migrateRadioKey(manualKey, realMac);
 

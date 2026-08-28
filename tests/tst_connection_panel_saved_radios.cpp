@@ -61,7 +61,7 @@ private slots:
         settings.clearSavedRadios();
 
         RadioInfo info = makeHl2Info();
-        settings.saveRadio(info, /*pinToMac=*/true, /*autoConnect=*/false);
+        settings.saveRadio(info, /*pinToMac=*/true);
 
         QList<SavedRadio> list = settings.savedRadios();
         QCOMPARE(list.size(), 1);
@@ -71,14 +71,13 @@ private slots:
         QCOMPARE(saved.info.boardType,  HPSDRHW::HermesLite);
         QCOMPARE(saved.info.protocol,   ProtocolVersion::Protocol1);
         QCOMPARE(saved.pinToMac,        true);
-        QCOMPARE(saved.autoConnect,     false);
     }
 
     void saveMultipleAndRoundTrip() {
         AppSettings settings = makeSettings();
         settings.clearSavedRadios();
-        settings.saveRadio(makeHl2Info(),    true,  false);
-        settings.saveRadio(makeSaturnInfo(), true,  true);
+        settings.saveRadio(makeHl2Info(),    true);
+        settings.saveRadio(makeSaturnInfo(), true);
 
         QList<SavedRadio> list = settings.savedRadios();
         QCOMPARE(list.size(), 2);
@@ -91,14 +90,13 @@ private slots:
         std::optional<SavedRadio> g2 = settings.savedRadio(QStringLiteral("aa:bb:cc:44:55:66"));
         QVERIFY(g2.has_value());
         QCOMPARE(g2->info.name,     QStringLiteral("Shack G2"));
-        QCOMPARE(g2->autoConnect,   true);
     }
 
     void forgetRadio() {
         AppSettings settings = makeSettings();
         settings.clearSavedRadios();
-        settings.saveRadio(makeHl2Info(),    true, false);
-        settings.saveRadio(makeSaturnInfo(), true, true);
+        settings.saveRadio(makeHl2Info(),    true);
+        settings.saveRadio(makeSaturnInfo(), true);
         QCOMPARE(settings.savedRadios().size(), 2);
 
         settings.forgetRadio(QStringLiteral("aa:bb:cc:11:22:33"));
@@ -129,16 +127,15 @@ private slots:
         AppSettings settings = makeSettings();
         settings.clearSavedRadios();
         RadioInfo info = makeHl2Info();
-        settings.saveRadio(info, true, false);
+        settings.saveRadio(info, true);
 
         // Simulate a reconnect that bumps firmware version
         info.firmwareVersion = 73;
-        settings.saveRadio(info, true, true);  // now autoConnect=true
+        settings.saveRadio(info, true);
 
         QList<SavedRadio> list = settings.savedRadios();
         QCOMPARE(list.size(), 1);  // still one entry, not duplicated
         QCOMPARE(list.first().info.firmwareVersion, 73);
-        QCOMPARE(list.first().autoConnect,          true);
     }
 
     // -------------------------------------------------------------------------

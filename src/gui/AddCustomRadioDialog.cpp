@@ -164,8 +164,7 @@ AddCustomRadioDialog::AddCustomRadioDialog(QWidget* parent)
 AddCustomRadioDialog::~AddCustomRadioDialog() = default;
 
 void AddCustomRadioDialog::setEditTarget(const RadioInfo& info,
-                                         bool pinToMac,
-                                         bool autoConnect)
+                                         bool pinToMac)
 {
     setWindowTitle(QStringLiteral("Edit Radio — %1").arg(info.name.isEmpty()
         ? info.address.toString() : info.name));
@@ -201,7 +200,6 @@ void AddCustomRadioDialog::setEditTarget(const RadioInfo& info,
     }
 
     m_pinToMacCheck->setChecked(pinToMac);
-    m_autoConnectCheck->setChecked(autoConnect);
 
     // Seed m_probedInfo with the existing entry so result() reuses the
     // same MAC on save — otherwise an edit of a probe-verified entry
@@ -325,12 +323,6 @@ void AddCustomRadioDialog::buildUi()
         QStringLiteral("Pin to MAC  (skip radios at this IP with a different MAC)"), this);
     m_pinToMacCheck->setStyleSheet(kCheckStyle);
     optLayout->addWidget(m_pinToMacCheck);
-
-    // Auto-connect — AppSettings::saveRadio autoConnect flag
-    m_autoConnectCheck = new QCheckBox(
-        QStringLiteral("Auto-connect on launch"), this);
-    m_autoConnectCheck->setStyleSheet(kCheckStyle);
-    optLayout->addWidget(m_autoConnectCheck);
 
     outerLayout->addWidget(optGroup);
 
@@ -892,11 +884,6 @@ RadioInfo AddCustomRadioDialog::result() const
 bool AddCustomRadioDialog::pinToMac() const
 {
     return m_pinToMacCheck->isChecked();
-}
-
-bool AddCustomRadioDialog::autoConnect() const
-{
-    return m_autoConnectCheck->isChecked();
 }
 
 } // namespace Longpath

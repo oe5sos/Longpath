@@ -79,7 +79,6 @@ namespace Longpath {
 struct SavedRadio {
     RadioInfo info;
     bool      pinToMac{false};
-    bool      autoConnect{false};
     QDateTime lastSeen;
 };
 
@@ -94,7 +93,7 @@ struct SavedRadio {
 //
 // Usage (direct construction — for tests only):
 //   AppSettings s("/tmp/testdir/NereusSDR.settings");
-//   s.saveRadio(info, true, false);
+//   s.saveRadio(info, true);
 //
 // Per-station settings:
 //   s.setStationValue("AnalogRXMeterSelection", "S-Meter");
@@ -220,7 +219,6 @@ public:
     //   radios/<macKey>/protocol        (int — ProtocolVersion value)
     //   radios/<macKey>/firmwareVersion (int)
     //   radios/<macKey>/pinToMac        (bool as "True"/"False")
-    //   radios/<macKey>/autoConnect     (bool as "True"/"False")
     //   radios/<macKey>/lastSeen        (ISO 8601 UTC string)
     //   radios/lastConnected            (macKey string)
     //   radios/discoveryProfile         (int — DiscoveryProfile value)
@@ -230,7 +228,7 @@ public:
 
     // Save (or update) a radio entry. Overwrites if macKey already exists.
     // Does NOT call save() — caller must save() or rely on shutdown flush.
-    void saveRadio(const RadioInfo& info, bool pinToMac, bool autoConnect);
+    void saveRadio(const RadioInfo& info, bool pinToMac);
 
     // Remove the entry for macKey. No-op if not found.
     void forgetRadio(const QString& macKey);
@@ -259,8 +257,8 @@ public:
     // Migrate all fields stored under oldKey to newKey (Phase 3Q Task 12).
     // Intended for the "saved offline → probed successfully → real MAC known"
     // transition: moves a synthetic "manual-<ip>-<port>" entry to the real
-    // MAC address key so user customisations (name, autoConnect, pinToMac, etc.)
-    // survive the first successful probe.
+    // MAC address key so user customisations (name, pinToMac, etc.) survive
+    // the first successful probe.
     //
     // No-op when oldKey == newKey or oldKey has no stored entry.
     // After migration the oldKey entry is fully removed; newKey entry reflects

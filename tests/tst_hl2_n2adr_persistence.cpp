@@ -38,7 +38,7 @@ void saveTestRadio(AppSettings& s, const QString& mac, HPSDRHW board)
     info.boardType  = board;
     info.protocol   = ProtocolVersion::Protocol1;
     info.name       = QStringLiteral("Test Radio");
-    s.saveRadio(info, /*pinToMac=*/false, /*autoConnect=*/false);
+    s.saveRadio(info, /*pinToMac=*/false);
 }
 
 }  // namespace
