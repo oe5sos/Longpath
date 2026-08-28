@@ -7065,6 +7065,27 @@ void MainWindow::populateDefaultMeter()
                     // kann Widgets nennen, die es nicht mehr gibt.
                 }
 
+                // Betreiber 2026-08-28: dieselbe Vorher-verstecken-Regel
+                // trifft auch die abgeloesten APPLET-Fenster (Stehwelle,
+                // wenn per Klick aus dem Panel geloest) -- ein dritter,
+                // von ContainerManager und vom Rotor-Dock UNABHAENGIGER
+                // Mechanismus (m_floatingApplets), den der erste und
+                // zweite Anlauf beide uebersehen hatten. Muss HIER
+                // stehen, nicht bei der ContainerManager-Schleife weiter
+                // oben im Konstruktor: erst der Restore-Block direkt
+                // darueber legt diese Fenster ueberhaupt an.
+                if (!m_radioModel
+                    || m_radioModel->connectionState()
+                           != ConnectionState::Connected) {
+                    for (AppletFloatingWindow* w
+                         : std::as_const(m_floatingApplets)) {
+                        if (w && w->isVisible()) {
+                            w->hide();
+                            m_floatingContainersHiddenPreConnect.append(w);
+                        }
+                    }
+                }
+
                 if (m_appletPanel) {
                     QList<AppletWidget*> order;
                     for (const QVariant& v :
