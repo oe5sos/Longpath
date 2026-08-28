@@ -716,6 +716,7 @@ void P1RadioConnection::connectToRadio(const RadioInfo& info)
     m_reconnectedLogged = false;
 
     m_intentionalDisconnect = false;
+    m_userInitiatedDisconnect = false;
     m_epSendSeq = 0;
     m_epRecvSeqExpected = 0;
     // Verlustfenster mit zuruecksetzen — sonst zaehlt der erste Rahmen
@@ -826,6 +827,7 @@ void P1RadioConnection::connectToRadio(const RadioInfo& info)
 void P1RadioConnection::disconnect()
 {
     m_intentionalDisconnect = true;
+    m_userInitiatedDisconnect = true;
 
     if (m_watchdogTimer) {
         m_watchdogTimer->stop();
@@ -2856,7 +2858,7 @@ void P1RadioConnection::onEp2PacerTick()
 void P1RadioConnection::onReconnectTimeout()
 {
     // Guard: don't retry after an intentional disconnect.
-    if (m_intentionalDisconnect) { return; }
+    if (m_userInitiatedDisconnect) { return; }
 
     if (m_reconnectAttempts >= kMaxReconnectAttempts) {
         qCWarning(lcConnection) << "P1: Reconnect — bounded retries exhausted after"
@@ -2936,6 +2938,16 @@ void P1RadioConnection::onConnectTimeout()
     if (m_reconnectTimer) { m_reconnectTimer->stop(); }
     if (m_socket) { m_socket->close(); }
     setState(ConnectionState::Disconnected);
+
+    // Automatischer Wiederholversuch (Betreiberwunsch, 2026-08-27) —
+    // dieselbe Begruendung wie im Protokoll-2-Weg. m_userInitiatedDisconnect
+    // bleibt hier false, darum greift onReconnectTimeout() von selbst.
+    // m_reconnectAttempts wird zurueckgesetzt: der bestehende
+    // Drei-Versuche-Zaehler ist fuer "Verbindung stand, wurde still"
+    // gedacht, nicht fuer "kam von Anfang an nie durch" — mit dem Reset
+    // bekommt jeder neue Anlauf wieder seine volle Kulanz.
+    m_reconnectAttempts = 0;
+    if (m_reconnectTimer) { m_reconnectTimer->start(m_reconnectIntervalMs); }
 
     // Derselbe Klartext wie im Protokoll-2-Weg (P2RadioConnection).
     //

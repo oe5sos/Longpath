@@ -466,6 +466,13 @@ private:
 
     bool        m_running{false};
     bool        m_intentionalDisconnect{false};
+    // Separate from m_intentionalDisconnect on purpose — see the identical
+    // field in P2RadioConnection.h for the full reasoning. Only disconnect()
+    // sets this one; onReconnectTimeout() checks it instead of
+    // m_intentionalDisconnect so an onConnectTimeout() teardown (which still
+    // sets m_intentionalDisconnect, for the datagram-drain guard) can
+    // auto-reconnect.
+    bool        m_userInitiatedDisconnect{false};
 
     // --- Reconnect state machine (§3.6) ---
     // Timing constants are NereusSDR policy (documented in design doc §3.6),
