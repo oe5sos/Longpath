@@ -190,6 +190,12 @@ void LayoutProfiles::captureIntoCurrent()
     if (Profile* p = find(m_current)) { p->state = m_capture(); }
 }
 
+void LayoutProfiles::applyCurrent()
+{
+    if (m_current.isEmpty() || !m_apply) { return; }
+    if (const Profile* p = find(m_current)) { m_apply(p->state); }
+}
+
 QVariantMap LayoutProfiles::snapshot(const QString& name) const
 {
     const Profile* p = find(name);
@@ -278,6 +284,17 @@ void LayoutProfiles::save() const
     AppSettings::instance().setValue(
         settingsKey(),
         QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact)));
+    // setValue() only updates the in-memory map -- AppSettings needs an
+    // explicit save() to flush to disk (same two-step pattern every other
+    // AppSettings writer in this codebase follows, e.g.
+    // SpectrumWidget::setBackgroundFillColor()). Without it, a profile
+    // create/rename/duplicate/remove survived only until something ELSE
+    // happened to trigger a full settings flush (a VFO change, etc.) --
+    // quit shortly after deleting profiles, and the deletion never made
+    // it to disk, so the next launch reloaded the stale list (Betreiber,
+    // 2026-08-27: "bis auf eines alle geloescht, dann app geschlossen,
+    // dann app geoeffnet und wieder alle da").
+    AppSettings::instance().save();
 }
 
 void LayoutProfiles::load()

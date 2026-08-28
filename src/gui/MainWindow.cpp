@@ -361,6 +361,7 @@ warren@wpratt.com
 #include "applets/DvkApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
+#include "KiwiWaterfallPanel.h"
 #include "applets/TxMeterApplet.h"
 #include "applets/AsrApplet.h"
 #include "asr/AsrService.h"
@@ -760,30 +761,6 @@ MainWindow::MainWindow(QWidget* parent)
         showToast(reason, ToastSeverity::Warning, 3000);
     });
 
-    // Phase 3Q Task 10: auto-connect failure / ambiguity surface.
-    //
-    // autoConnectFailed — the probe timed out or the radio rejected the
-    // handshake. Open the ConnectionPanel, highlight the failed target,
-    // and post an 8-second status-bar explanation.
-    connect(m_radioModel, &RadioModel::autoConnectFailed,
-            this, [this](const QString& mac, Longpath::ConnectFailure reason) {
-        showConnectionPanel();
-        if (m_connectionPanel) {
-            m_connectionPanel->highlightMac(mac);
-        }
-        const auto saved = AppSettings::instance().savedRadio(mac);
-        const QString name = (saved.has_value() && !saved->info.name.isEmpty())
-            ? saved->info.name : mac;
-        const QString reasonText =
-            (reason == Longpath::ConnectFailure::Timeout)
-                ? QStringLiteral("isn't reachable from this network")
-                : QStringLiteral("returned an error");
-        showToast(
-            QStringLiteral("Auto-connect target %1 %2. Pick a different radio or update the address.")
-                .arg(name, reasonText),
-            ToastSeverity::Warning, 8000);
-    });
-
     // Jeder gescheiterte Verbindungsversuch sagt jetzt, WARUM — auch der
     // von Hand angestossene. 14 Sekunden, weil der Text zwei Saetze hat
     // und der Bediener in dem Moment ohnehin ratlos ist.
@@ -791,21 +768,6 @@ MainWindow::MainWindow(QWidget* parent)
             this, [this](Longpath::ConnectFailure, const QString& detail) {
         if (detail.isEmpty()) { return; }
         showToast(detail, ToastSeverity::Warning, 14000);
-    });
-
-    // autoConnectAmbiguous — multiple radios have AutoConnect = true.
-    // The most-recently-connected MAC was chosen; post a 6-second advisory
-    // pointing the user at Manage Radios for cleanup.
-    connect(m_radioModel, &RadioModel::autoConnectAmbiguous,
-            this, [this](int count, const QString& chosenMac) {
-        const auto saved = AppSettings::instance().savedRadio(chosenMac);
-        const QString name = (saved.has_value() && !saved->info.name.isEmpty())
-            ? saved->info.name : chosenMac;
-        showToast(
-            QStringLiteral("%1 radios marked Auto-connect on launch. Using %2 (most recent). "
-                           "Adjust in Manage Radios.")
-                .arg(count).arg(name),
-            ToastSeverity::Info, 6000);
     });
 
     // WDSP wisdom progress dialog — shown as a modal window during first-run
@@ -863,12 +825,16 @@ MainWindow::MainWindow(QWidget* parent)
     // Start discovery in background so radios are found before the user opens the panel
     m_radioModel->discovery()->startDiscovery();
 
-    // Auto-reconnect to last radio — deferred so the event loop is running
+    // Open the Connect-to-Radio panel — deferred so the event loop is running
     // before any signal/slot activity (e.g. discovery radioDiscovered).
-    QTimer::singleShot(0, this, &MainWindow::tryAutoReconnect);
+    // No longer attempts an automatic connection first: that feature was
+    // removed 2026-08-27 (operator decision, OE5SOS — it kept silently
+    // re-arming itself and auto-connecting was actively unwanted, not just
+    // unreliable over a flaky WLAN link).
+    QTimer::singleShot(0, this, &MainWindow::openConnectionPanelOnLaunch);
 
     // Phase 3J-2 + 3R M3: restore each spot client's auto-connect /
-    // auto-start state. Sibling to tryAutoReconnect above; deferred via
+    // auto-start state. Sibling to the panel-open call above; deferred via
     // singleShot(0, ...) so the QTcpSocket / QUdpSocket / QWebSocket
     // owned by each client see a fully-spun event loop before any
     // network I/O fires. Each client guards against double-start so
@@ -1159,13 +1125,12 @@ void MainWindow::showTileTabMenu(const QString& tileId)
 
     // Aus seiner eigenen Kachel heraus, in diese hinein.
     const QString otherTileId = m_canvasApplets.take(otherId);
-    if (!otherTileId.isEmpty()) {
-        if (ContainerWidget* other = m_containerManager->container(otherTileId)) {
-            // Erst herausnehmen, dann abraeumen — sonst nimmt
-            // destroyContainer das Applet als Kind mit ins Grab.
-            a->setParent(nullptr);
-            m_containerManager->destroyContainer(otherTileId);
-        }
+    if (!otherTileId.isEmpty()
+        && m_containerManager->container(otherTileId)) {
+        // Erst herausnehmen, dann abraeumen — sonst nimmt
+        // destroyContainer das Applet als Kind mit ins Grab.
+        a->setParent(nullptr);
+        m_containerManager->destroyContainer(otherTileId);
     }
     tile->addTab(a, m_appletVis->displayName(otherId));
     a->show();
@@ -1702,6 +1667,17 @@ QVariantMap MainWindow::blankLayoutState() const
     // Fenster. Der fehlende Schlüssel IST die Aussage — beim Anwenden
     // kehrt jedes abgelöste Applet in die Spalte zurück, statt über
     // einem Profil stehen zu bleiben, das es nicht kennt.
+    //
+    // "containerGeometry" dagegen MUSS als leere Karte dastehen, nicht
+    // fehlen — anders als bei floatingApplets prüft die Anwendung hier
+    // nur s.contains("containerGeometry"), bevor sie
+    // ContainerManager::applyFloatingGeometries() ueberhaupt aufruft
+    // (MainWindow's Profil-Anwenden-Hook). Ohne den Schluessel bliebe
+    // ein Container, der beim Sichern des vorigen Profils zufaellig
+    // freistand ("RX1 Main Panel", der Panel-Container), auch in diesem
+    // absichtlich leeren Profil weiter freistehend -- die leere Karte
+    // ist das Signal, das applyFloatingGeometries() braucht, um jeden
+    // floatenden Container zurueck in die Spalte zu holen.
     QVariantMap s;
 
     QVariantMap vis;
@@ -1712,6 +1688,10 @@ QVariantMap MainWindow::blankLayoutState() const
     }
     s.insert(QStringLiteral("visible"), vis);
     s.insert(QStringLiteral("order"), QStringList{});
+    s.insert(QStringLiteral("containerGeometry"), QVariantMap{});
+    // Rotor / Log ist ein QDockWidget, kein Applet -- siehe die eigene
+    // Begruendung an der Erfassungsstelle (Profil-Hook, "rotorDockVisible").
+    s.insert(QStringLiteral("rotorDockVisible"), false);
 
     if (m_mainSplitter) {
         QVariantList sizes;
@@ -1795,6 +1775,18 @@ void MainWindow::wireProfileRail()
         m_layoutProfiles->save();
     });
 
+    // Betreiber 2026-08-28: "vielleicht sollte es ein profil speichern
+    // auch geben" -- dieselben zwei Aufrufe wie beim Beenden
+    // (closeEvent(), siehe dessen Kommentar), nur von Hand ausloesbar,
+    // fuer wer ohne Verbindung gestaltet und sofort wissen will, dass
+    // es sitzt, statt der Beenden-Sequenz zu vertrauen.
+    connect(m_profileRail, &ProfileRail::saveRequested, this,
+            [this](const QString&) {
+        if (!m_layoutProfiles) { return; }
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
+    });
+
     connect(m_profileRail, &ProfileRail::renameRequested, this,
             [this, askName, complain](const QString& old) {
         const QString name = askName(QStringLiteral("Profil umbenennen"), old);
@@ -1832,7 +1824,20 @@ void MainWindow::wireProfileRail()
     // Beim Beenden den jetzigen Stand ins aktive Profil. Ohne das
     // verlöre man alles, was seit dem letzten Umschalten gebaut wurde —
     // activate() sichert, ein Programmende bisher nicht.
+    //
+    // 2026-08-27: der eigentliche Aufruf ist jetzt an den Anfang von
+    // MainWindow::closeEvent() gewandert (siehe dessen eigener
+    // Kommentar) -- dort laeuft er GARANTIERT vor jedem Abbau, statt
+    // reentrant mittendrin, wie es dieser Handler tat, als
+    // aboutToQuit ueber die Cocoa-Terminate-Kaskade noch INNERHALB von
+    // closeEvent feuerte (Absturzbericht 2026-08-27 23:10). Auf dem
+    // ⌘Q-Pfad hat closeEvent m_shuttingDown also schon gesetzt, wenn
+    // dieser Handler drankommt, und tut hier nichts mehr. Er bleibt nur
+    // noch fuer den Signal-Pfad (SIGTERM/Kill/Debugger-Trennen)
+    // zustaendig, auf dem closeEvent nie laeuft -- dort ist er weiterhin
+    // der einzige Ort, der den Stand sichert.
     connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
+        if (m_shuttingDown) { return; }
         m_layoutProfiles->captureIntoCurrent();
         m_layoutProfiles->save();
     });
@@ -3943,6 +3948,42 @@ void MainWindow::buildUI()
     if (m_containerManager->containerCount() == 0) {
         createDefaultContainers();
     }
+
+    // Betreiber 2026-08-28: dieselbe "vor der ersten Verbindung bedeutungslos"
+    // -Regel wie beim Rotor/Log gilt fuer jedes Meter/Applet-Fenster -- S-
+    // Meter, Stehwelle, Mitschrift und Co. zeigen ohne Radio nichts
+    // Sinnvolles (kein Signal, keine SWR, nichts zu transkribieren).
+    // restoreState() hat sie gerade eben unconditional wieder gezeigt.
+    //
+    // ZWEI Faelle, nicht nur einer: ein Container ist entweder isFloating()
+    // (eigenes FloatingContainer-Top-Level-Fenster -- c->window() ist das
+    // Richtige zum Verstecken) ODER isOverlayDocked() (direkt ins
+    // Hauptfenster eingeblendet, ueber m_dockParent, KEIN eigenes Fenster --
+    // window() waere hier `this`, das Hauptfenster selbst, und das Verstecken
+    // muss am Container ansetzen). Der erste Anlauf traf nur isFloating();
+    // Stehwelle/Frequenz/S-Meter liefen als OverlayDocked durch und blieben
+    // sichtbar -- am Bildschirm nachgesehen, nicht geraten. Nur die, die
+    // dadurch tatsaechlich zugingen, landen in der Liste, die mit der
+    // ersten Verbindung wieder aufgeht (siehe die connectionStateChanged-
+    // Bindung bei der Profil-Wiederherstellung weiter unten).
+    if (!m_radioModel
+        || m_radioModel->connectionState() != ConnectionState::Connected) {
+        for (ContainerWidget* c : m_containerManager->allContainers()) {
+            if (!c) { continue; }
+            if (c->isFloating()) {
+                QWidget* win = c->window();
+                if (win && win != this && win->isVisible()) {
+                    win->hide();
+                    m_floatingContainersHiddenPreConnect.append(win);
+                }
+            } else if (c->isOverlayDocked()) {
+                if (c->isVisible()) {
+                    c->hide();
+                    m_floatingContainersHiddenPreConnect.append(c);
+                }
+            }
+        }
+    }
     // Always populate the panel container's content (meters + applets).
     // On first run, createDefaultContainers() creates the shell; on restore,
     // restoreState() recreates the shell but content is lost. This ensures
@@ -3977,6 +4018,33 @@ void MainWindow::buildUI()
                                       QStringLiteral("False")).toString()
             == QStringLiteral("True")) {
         setRotorPanelBelow(true);
+    } else if (AppSettings::instance().value(QStringLiteral("RotorFloating"),
+                                             QStringLiteral("True")).toString()
+                   == QStringLiteral("True")) {
+        // Betreiber, 2026-08-28: Rotor/Log soll von sich aus ein eigenes
+        // Fenster sein (Titelleiste, Schloss, Anfasser unten rechts) statt
+        // rechts im schmalen, native-chromen QDockWidget zu haengen. Vorgabe
+        // "True", nicht nur bei explizitem Wunsch: das trifft auch jede
+        // Installation, die die Einstellung noch nie gesetzt hat.
+        detachRotorPanel();
+    }
+
+    // Betreiber, 2026-08-28: "das ist bevor ich mich einlogge - das rotor
+    // fenster gehört weg" -- der Kompass ist ohne Verbindung ohnehin
+    // bedeutungslos (000°, kein Ziel). Egal, welche der drei Formen oben
+    // gerade aktiv wurde (Dock, unter dem Panadapter, oder das eigene
+    // schwebende Fenster von detachRotorPanel()) -- die sichtbaren zwei
+    // (Dock und schwebendes Fenster) werden hier versteckt und kommen erst
+    // mit der ERSTEN Verbindung dieser Sitzung wieder, siehe die
+    // connectionStateChanged-Bindung bei der Profil-Wiederherstellung
+    // weiter unten. Erster Fund war nur der halbe Fix: er traf ausschliesslich
+    // m_rotorDock, aber RotorFloating ist der Standardfall und haengt am
+    // eigenen m_rotorWindow -- genau das blieb sichtbar ("ist auch noch
+    // immer da").
+    if (!m_radioModel
+        || m_radioModel->connectionState() != ConnectionState::Connected) {
+        if (m_rotorDock)   { m_rotorDock->hide(); }
+        if (m_rotorWindow) { m_rotorWindow->hide(); }
     }
 
     // Wire spectrum display to SliceModel (values come from persisted state,
@@ -5928,7 +5996,10 @@ void MainWindow::populateDefaultMeter()
     // sie niemand fuer erledigt haelt.
     m_kiwiSdrManager = new KiwiSdrManager(this);
     m_kiwiSdrApplet  = new KiwiSdrApplet(m_radioModel, nullptr);
+    m_kiwiSdrApplet->setKiwiSdrManager(m_kiwiSdrManager);
     panel->addApplet(m_kiwiSdrApplet);
+    m_kiwiWaterfallPanel = new KiwiWaterfallPanel(m_radioModel, nullptr);
+    panel->addApplet(m_kiwiWaterfallPanel);
     wireKiwiSdr();
 
     // BandwidthFilterApplet — die Durchlassflaeche (2026-08-20).
@@ -6353,6 +6424,7 @@ void MainWindow::populateDefaultMeter()
     // weil jeder Baustein fuer sich in Ordnung ist.
     m_appletsById[QStringLiteral("TxMeter")] = m_txMeterApplet;
     m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
+    m_appletsById[QStringLiteral("KiwiWaterfalls")] = m_kiwiWaterfallPanel;
     m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
@@ -6420,6 +6492,12 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("SWR / Leistung"), true);
     m_appletVis->registerApplet(QStringLiteral("KiwiSdr"),
                                 QStringLiteral("KiwiSDR"),      true);
+    // defaultVisible=false, bewusst anders als KiwiSdr: ein leeres Panel
+    // ("kein Wasserfall eingeschaltet") fuer alle, die keine Vorschau
+    // nutzen, waere Ballast. Ueber das "+" wie jedes andere Widget
+    // einblendbar, sobald man will.
+    m_appletVis->registerApplet(QStringLiteral("KiwiWaterfalls"),
+                                QStringLiteral("KIWI-WASSERFÄLLE"), false);
     m_appletVis->registerApplet(QStringLiteral("Asr"),
                                 QStringLiteral("Mitschrift"),   true);
 
@@ -6863,6 +6941,21 @@ void MainWindow::populateDefaultMeter()
                              m_containerManager->floatingGeometries());
                 }
 
+                // ── Rotor / Log ──────────────────────────────────────
+                //
+                // Ein QDockWidget, nicht Teil von m_appletVis und nicht
+                // Teil von ContainerManager -- vierter Mechanismus, den
+                // kein Profil bislang kannte. "WinRotorLog" schaltet nur
+                // zwischen angedockt und abgeloest um, nie zwischen
+                // sichtbar und unsichtbar; ohne diesen Schluessel blieb
+                // Rotor/Log in JEDEM Profil stehen, auch einem
+                // absichtlich leeren (Betreiber, 2026-08-27: "hier muss
+                // alles raus").
+                if (m_rotorDock) {
+                    s.insert(QStringLiteral("rotorDockVisible"),
+                             m_rotorDock->isVisible());
+                }
+
                 if (m_mainSplitter) {
                     QVariantList sizes;
                     for (int v : m_mainSplitter->sizes()) { sizes << v; }
@@ -6989,6 +7082,29 @@ void MainWindow::populateDefaultMeter()
                         s.value(QStringLiteral("containerGeometry")).toMap());
                 }
 
+                // Rotor / Log -- see the capture side's own comment.
+                // Missing key (a snapshot from before this fix) means
+                // "unknown", not "hide": default to visible so an
+                // existing profile's dock doesn't vanish just because it
+                // predates this key.
+                //
+                // Betreiber 2026-08-28: "das ist bevor ich mich einlogge
+                // - das rotor fenster gehört weg" -- am Start, solange
+                // noch kein Funkgeraet verbunden ist, ist der Rotor/Log-
+                // Kompass ohnehin bedeutungslos (000°, kein Ziel). Der
+                // gespeicherte Wunsch bleibt gemerkt, kommt aber erst mit
+                // der ersten Verbindung zur Geltung -- siehe die
+                // connectionStateChanged-Bindung weiter unten.
+                m_rotorDockWantedVisible =
+                    s.value(QStringLiteral("rotorDockVisible"), true).toBool();
+                if (m_rotorDock) {
+                    m_rotorDock->setVisible(
+                        m_radioModel
+                        && m_radioModel->connectionState()
+                               == ConnectionState::Connected
+                        && m_rotorDockWantedVisible);
+                }
+
                 const QVariantList sizes =
                     s.value(QStringLiteral("splitter")).toList();
                 if (m_mainSplitter && !sizes.isEmpty()) {
@@ -7006,9 +7122,56 @@ void MainWindow::populateDefaultMeter()
             // etwas an" — dabei hat der Betreiber schon ein Fenster.
             m_layoutProfiles->create(QStringLiteral("Standard"));
         } else if (!m_layoutProfiles->current().isEmpty()) {
-            m_layoutProfiles->activate(m_layoutProfiles->current());
+            // NICHT activate(current()): dessen Namensgleich-Wache
+            // ("schon aktiv? nichts tun") gibt hier sofort zurück, weil
+            // load() m_current bereits auf denselben Namen gesetzt hat —
+            // die gespeicherte Umgestaltung käme nie an. applyCurrent()
+            // löst m_apply ohne diese Wache aus. Bug + Fix 2026-08-28.
+            m_layoutProfiles->applyCurrent();
         }
         wireProfileRail();
+
+        // Der Rotor/Log-Dock kommt erst mit der ERSTEN Verbindung nach
+        // diesem Start auf den vom Profil gewuenschten Sichtbarkeitsstand
+        // (siehe m_rotorDockWantedVisible oben) -- danach entscheidet der
+        // Betreiber selbst wieder per Klick/Menue, darum trennt sich die
+        // Bindung nach dem ersten Treffer.
+        auto rotorShowConn = std::make_shared<QMetaObject::Connection>();
+        *rotorShowConn = connect(m_radioModel,
+            &RadioModel::connectionStateChanged, this,
+            [this, rotorShowConn](Longpath::ConnectionState state) {
+                if (state == Longpath::ConnectionState::Connected) {
+                    // Welche der drei Formen (Dock, unter dem Panadapter,
+                    // eigenes Fenster) gerade aktiv ist, wurde beim Start
+                    // schon entschieden (RotorPanelBelow/RotorFloating) --
+                    // hier nur wieder zeigen, was zuvor versteckt wurde.
+                    // m_rotorWindow zuerst: RotorFloating ist der
+                    // Standardfall, und ein sichtbares m_rotorWindow lässt
+                    // ein daneben existierendes, aber leeres m_rotorDock
+                    // ohnehin unbeachtet.
+                    if (m_rotorWindow) {
+                        if (m_rotorDockWantedVisible) {
+                            m_rotorWindow->show();
+                            m_rotorWindow->raise();
+                        }
+                    } else if (m_rotorDock) {
+                        m_rotorDock->setVisible(m_rotorDockWantedVisible);
+                    }
+
+                    // Dieselbe Freigabe fuer die schwebenden Meter/Applet-
+                    // Fenster, die restoreState() versteckt hatte (siehe
+                    // dort). QPointer haelt fest, ob eines inzwischen ganz
+                    // geschlossen (nicht nur versteckt) wurde -- dann bleibt
+                    // es aus, statt aus dem Nichts wiederzukommen.
+                    for (const QPointer<QWidget>& w
+                         : std::as_const(m_floatingContainersHiddenPreConnect)) {
+                        if (w) { w->show(); w->raise(); }
+                    }
+                    m_floatingContainersHiddenPreConnect.clear();
+
+                    QObject::disconnect(*rotorShowConn);
+                }
+            });
     }
 
     // ── Das Plus ─────────────────────────────────────────────────────
@@ -11833,6 +11996,15 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         m_rotorDock = new QDockWidget(QStringLiteral("Rotor / Log"), this);
         m_rotorDock->setObjectName(QStringLiteral("rotorLogDock"));
         m_rotorDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+        // Kein natives Schweben: Qt's eigenes Los-Ziehen macht daraus ein
+        // Betriebssystem-Fenster ohne unsere Titelleiste, ohne Schloss und
+        // ohne Anfasser -- genau das Bild, das der Betreiber wiederholt als
+        // "altes Format, laesst sich nicht veraendern" gemeldet hat, zuletzt
+        // beim Start ueber dem Verbinden-Dialog haengend und nur ueber die
+        // Taskleiste erreichbar. Der richtige Weg nach draussen bleibt
+        // detachRotorPanel() -> ToolWindow, das dieselbe Titelleiste +
+        // Anfasser + Schloss traegt wie jedes andere Fenster im Programm.
+        m_rotorDock->setFeatures(QDockWidget::DockWidgetClosable);
         auto* panel = new RotorLogbookPanel(m_radioModel, m_qrzClient,
                                             m_qrzUploader, m_rotorDock);
         // Live logging still goes to QRZ alone; the extra destinations
@@ -11895,6 +12067,12 @@ void MainWindow::detachRotorPanel()
         pickedUpAt.isValid() ? pickedUpAt.size() : QSize(900, 420));
     if (pickedUpAt.isValid()) { m_rotorWindow->move(pickedUpAt.topLeft()); }
     m_rotorWindow->raise();
+
+    // Gemerkt, damit es beim naechsten Start wieder frei schwebt --
+    // der Betreiber, 2026-08-28: soll standardmaessig ein eigenes
+    // Fenster mit Titelleiste, Schloss und Anfasser sein, kein Dock.
+    AppSettings::instance().setValue(QStringLiteral("RotorFloating"),
+                                     QStringLiteral("True"));
 }
 
 void MainWindow::dockRotorPanel()
@@ -11904,10 +12082,17 @@ void MainWindow::dockRotorPanel()
     m_rotorWindow->deleteLater();
     m_rotorWindow = nullptr;
     if (!panel) { return; }
-    // Zurueck an den Ort, den die Einstellung nennt.
+    AppSettings::instance().setValue(QStringLiteral("RotorFloating"),
+                                     QStringLiteral("False"));
+    // Zurueck an den Ort, den die Einstellung nennt. Vorgabe "False"
+    // wie beim Programmstart (MainWindow-Konstruktor) -- "unten" ist
+    // ein bewusst gewaehlter Zustand, kein Standard. Stand hier bis
+    // 2026-08-28 auf "True": ein noch nie gesetztes RotorPanelBelow
+    // haette das Andocken auf einen ANDEREN Platz gelegt als das, wo
+    // der Programmstart es hingesetzt haette.
     const bool below = AppSettings::instance()
                            .value(QStringLiteral("RotorPanelBelow"),
-                                  QStringLiteral("True"))
+                                  QStringLiteral("False"))
                            .toString() == QStringLiteral("True");
     setRotorPanelBelow(below);
 }
@@ -12036,8 +12221,18 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
     auto closeIf = [](QWidget* w) { if (w) { w->hide(); } };
 
     if (id == QLatin1String("WinLogbook")) {
-        if (on) { openLogbookWindow(); }
-        return;                       // das Logbuch schliesst sich selbst
+        // 2026-08-27: "schliesst sich selbst" only held for the operator
+        // clicking the window's own close button. A profile switch that
+        // turns this off (e.g. activating a deliberately empty new
+        // profile while the logbook is open from the previous one) needs
+        // an actual hide -- otherwise the window keeps showing on top of
+        // a profile that never opened it.
+        if (on) {
+            openLogbookWindow();
+        } else if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+            panel->hideLogbook();
+        }
+        return;
     }
     if (id == QLatin1String("WinRotorLog")) {
         if (on) { detachRotorPanel(); } else { dockRotorPanel(); }
@@ -12460,6 +12655,19 @@ void MainWindow::openSpotHub()
                         m_rotorDock->show();
                         m_rotorDock->raise();
                         panel->workSpot(dxCall);
+                    }
+                });
+        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Spot List right-click → "Take Spot: <call>". Same takeSpot()
+        // path as the panadapter's spotLogRequested double-click above
+        // -- prefills the panel for the operator to review and log
+        // themselves, does not turn the rotor or write a log entry.
+        connect(m_spotHubDialog.data(), &SpotHubDialog::logSpotRequested,
+                this, [this](const QString& dxCall) {
+                    if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+                        m_rotorDock->show();
+                        m_rotorDock->raise();
+                        panel->takeSpot(dxCall);
                     }
                 });
         // Phase 3J-2 + 3R M2: Display tab knob round-trip.
@@ -13259,15 +13467,14 @@ void MainWindow::onConnectionStateChanged()
 
         // Phase 3Q Task 5 — auto-open: on disconnect (after having been connected),
         // open the ConnectionPanel so the user can reconnect.
-        // Guard: m_autoReconnectInProgress suppresses the panel during background
-        // auto-reconnect (Task 17); m_shuttingDown suppresses it during ⌘Q so
-        // ConnectionPanel's ctor doesn't restart discovery mid-close (would
-        // beach-ball the close path for the full SafeDefault scan window — see
+        // Guard: m_shuttingDown suppresses it during ⌘Q so ConnectionPanel's
+        // ctor doesn't restart discovery mid-close (would beach-ball the
+        // close path for the full SafeDefault scan window — see
         // [shutdown-trace] log analysis 2026-05-02). The very first state read
         // at startup is Disconnected which should not open the panel either —
         // the radio-name check below handles that case.
         // The panel itself is non-modal (show/raise), matching the current pattern.
-        if (!m_autoReconnectInProgress && !m_shuttingDown) {
+        if (!m_shuttingDown) {
             // Only open if we were previously connected (transition from Connected,
             // not the initial Disconnected state at startup). We detect this by
             // checking if the model has ever reported a radio name — set on connect.
@@ -13303,170 +13510,21 @@ void MainWindow::onConnectionStateChanged()
     }
 }
 
-// Phase 3I Task 17 / Phase 3Q Task 10 — auto-reconnect on launch.
+// Phase 3I Task 17 / Phase 3Q Task 10 — was auto-reconnect-on-launch.
 //
-// Logic:
-//   1. Collect ALL saved radios with autoConnect = true. If none, open the
-//      ConnectionPanel (Phase 3Q polish — design §6.1 cold-launch flow) so
-//      the user has a one-click path to a saved radio or to Add Manually.
-//   2. Pick the target MAC:
-//      - Single autoConnect entry → use it directly.
-//      - Multiple entries → most-recently-connected MAC wins (radios/lastConnected);
-//        a one-time status-bar warning is posted via RadioModel::autoConnectAmbiguous.
-//   3a. pinToMac=true  → run a Fast-profile discovery, connect when the same MAC
-//      is seen. A 3-second kill timer fires if the MAC never appears; on timeout
-//      the ConnectionPanel opens with the target row highlighted and a status-bar
-//      message explains why.  RadioModel's m_autoConnectInProgress flag ensures
-//      the RadioConnection::connectFailed signal (if the radio replies but fails)
-//      also surfaces via RadioModel::autoConnectFailed → MainWindow lambdas.
-//   3b. pinToMac=false → direct connect to saved IP. Arm m_autoConnectInProgress
-//      so RadioConnection::connectFailed is forwarded as autoConnectFailed.
-//
-// m_autoReconnectInProgress gates the disconnect auto-open in onConnectionStateChanged
-// so the background probe does not flash the ConnectionPanel while in flight.
-void MainWindow::tryAutoReconnect()
+// The whole auto-connect-on-launch feature (the "Auto-connect to this radio
+// on launch" checkbox, the SavedRadio::autoConnect flag, the pinToMac
+// discovery-and-connect dance, all of it) was removed 2026-08-27 — operator
+// decision (OE5SOS): the flag kept getting re-armed by the plain Connect
+// button (ConnectionPanel::onConnectClicked used to hardcode autoConnect=true
+// on every connect), so it silently reconnected to the Anvelina on every
+// launch over a flaky WLAN link — actively unwanted, not just unreliable.
+// What's left is just the cold-launch convenience this always also did:
+// open the Connect-to-Radio panel so the user has a one-click path to a
+// saved radio or Add Manually (design §6.1).
+void MainWindow::openConnectionPanelOnLaunch()
 {
-    AppSettings& s = AppSettings::instance();
-
-    // --- Step 1: Collect all autoConnect-flagged saved radios ---
-    const QList<SavedRadio> allSaved = s.savedRadios();
-    QStringList autoMacs;
-    for (const SavedRadio& sr : allSaved) {
-        if (sr.autoConnect) {
-            autoMacs << sr.info.macAddress;
-        }
-    }
-    if (autoMacs.isEmpty()) {
-        // Phase 3Q polish: cold-launch panel auto-open. Design §6.1 — when
-        // there's no auto-connect target, surface the radio list so the
-        // user has a one-click path to either connect (saved radio shown)
-        // or add one (empty list). Non-modal so the app remains usable
-        // around the panel. Skipped when an auto-connect attempt is in
-        // flight (the auto-reconnect path handles its own panel open via
-        // the failure handler in Task 10).
-        showConnectionPanel();
-        return;
-    }
-
-    // --- Step 2: Pick the target MAC (most-recently-connected wins) ---
-    const QString lastMac = s.lastConnected();
-    QString chosenMac = autoMacs.first();
-    if (autoMacs.size() > 1) {
-        if (autoMacs.contains(lastMac)) {
-            chosenMac = lastMac;
-        }
-        // Warn once — notifyAutoConnectAmbiguous emits the signal; the
-        // MainWindow lambda wired in buildUI surfaces it as a status-bar message.
-        m_radioModel->notifyAutoConnectAmbiguous(autoMacs.size(), chosenMac);
-    } else if (chosenMac != lastMac && !lastMac.isEmpty()) {
-        // Single autoConnect entry but it's not the most recently connected.
-        // Still proceed — the user may have switched their autoConnect flag.
-    }
-
-    const auto saved = s.savedRadio(chosenMac);
-    if (!saved.has_value()) {
-        return;  // Shouldn't happen — entry disappeared between the two reads.
-    }
-
-    qCInfo(lcConnection) << "Auto-reconnect: attempting" << chosenMac
-                         << "at" << saved->info.address.toString()
-                         << "(pinToMac=" << saved->pinToMac << ")";
-
-    if (saved->pinToMac) {
-        // Use Fast profile — ~480ms per NIC, shorter than the SafeDefault
-        // that the user's manual Start Discovery uses.
-        RadioDiscovery* disc = m_radioModel->discovery();
-        disc->setProfile(DiscoveryProfile::Fast);
-        m_autoReconnectInProgress = true;
-
-        // Arm the RadioModel flag so RadioConnection::connectFailed (which fires
-        // if the radio replies but fails the handshake) is forwarded as
-        // RadioModel::autoConnectFailed. This covers the pinToMac discovery-found
-        // but connect-failed path; the timeout path below handles unreachable.
-        m_radioModel->setAutoConnectInProgress(true, chosenMac);
-
-        // Listen for a radio that matches our chosen MAC
-        QMetaObject::Connection* connPtr = new QMetaObject::Connection;
-        *connPtr = connect(disc, &RadioDiscovery::radioDiscovered,
-            this, [this, chosenMac, connPtr](const RadioInfo& found) {
-            if (found.macAddress != chosenMac) {
-                return;
-            }
-            if (m_radioModel->isConnected()) {
-                return; // User beat us to it
-            }
-            qCInfo(lcConnection) << "Auto-reconnect: MAC found —"
-                                 << found.displayName()
-                                 << found.address.toString();
-            QObject::disconnect(*connPtr);
-            delete connPtr;
-            m_autoReconnectInProgress = false;
-            // Note: do NOT disarm m_radioModel->setAutoConnectInProgress here —
-            // connectToRadio runs asynchronously and we want connectFailed to
-            // still be forwarded if the handshake itself fails. RadioModel's
-            // onConnectionStateChanged(Connected) disarms on success;
-            // wireConnectionSignals' connectFailed handler disarms on failure.
-            RadioInfo ri = found;
-            HPSDRModel mo = AppSettings::instance().modelOverride(ri.macAddress);
-            if (mo != HPSDRModel::FIRST) {
-                ri.modelOverride = mo;
-            }
-            m_radioModel->connectToRadio(ri);
-        });
-
-        // Kick off the Fast-profile discovery
-        disc->startDiscovery();
-
-        // 3-second hard timeout — if the MAC never appears, the radio is
-        // unreachable on this network. Open the panel + post a status message.
-        QTimer::singleShot(3000, this, [this, chosenMac, connPtr]() {
-            if (!m_autoReconnectInProgress) {
-                // Already connected (discovery lambda cleaned up) — nothing to do.
-                return;
-            }
-            qCInfo(lcConnection) << "Auto-reconnect: 3-second timeout — radio not found";
-            // Disconnect the listener so it doesn't fire on later scans
-            QObject::disconnect(*connPtr);
-            delete connPtr;
-            m_autoReconnectInProgress = false;
-            // Disarm RadioModel flag — the Timeout path is surfaced here directly
-            // (not via connectFailed, which only fires after a reply is received).
-            m_radioModel->setAutoConnectInProgress(false);
-            // Stop the discovery pass we started; restore SafeDefault profile
-            // so the user's next manual scan uses the full timing.
-            m_radioModel->discovery()->stopDiscovery();
-            m_radioModel->discovery()->setProfile(DiscoveryProfile::SafeDefault);
-            // Phase 3Q Task 10: surface the failure — open panel + toast.
-            const QString name = AppSettings::instance()
-                .savedRadio(chosenMac)
-                .value_or(SavedRadio{})
-                .info.name;
-            const QString displayName = name.isEmpty() ? chosenMac : name;
-            showConnectionPanel();
-            if (m_connectionPanel) {
-                m_connectionPanel->highlightMac(chosenMac);
-            }
-            showToast(
-                QStringLiteral("Auto-connect target %1 isn't reachable from this network. "
-                               "Pick a different radio or update the address.")
-                    .arg(displayName),
-                ToastSeverity::Warning, 8000);
-        });
-    } else {
-        // No MAC pinning — direct connect to saved IP address.
-        // Arm m_autoConnectInProgress so that RadioConnection::connectFailed
-        // is forwarded as RadioModel::autoConnectFailed → MainWindow lambdas.
-        if (!m_radioModel->isConnected()) {
-            m_radioModel->setAutoConnectInProgress(true, chosenMac);
-            // Load persisted model override for auto-reconnect (Phase 3I-RP)
-            RadioInfo ri = saved->info;
-            HPSDRModel mo = AppSettings::instance().modelOverride(ri.macAddress);
-            if (mo != HPSDRModel::FIRST) {
-                ri.modelOverride = mo;
-            }
-            m_radioModel->connectToRadio(ri);
-        }
-    }
+    showConnectionPanel();
 }
 
 // =============================================================================
@@ -13615,6 +13673,27 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // ConnectionPanel on Disconnect" slot below doesn't re-trigger
     // discovery via ConnectionPanel's ctor while teardown runs.
     m_shuttingDown = true;
+
+    // ── Profil-Stand sichern, SOFORT, nicht ueber aboutToQuit ────────
+    //
+    // Absturzbericht 2026-08-27 23:10 (Segfault beim Beenden, nach
+    // erfolgreicher Verbindung und sauberem Trennen). Stack: dieses
+    // closeEvent loest ueber die Cocoa-Terminate-Kaskade REENTRANT ein
+    // qApp::aboutToQuit aus, waehrend dieses closeEvent noch auf dem
+    // Stapel steht -- und wireProfileRail()'s aboutToQuit-Handler
+    // („Beim Beenden den jetzigen Stand ins aktive Profil") lief dann
+    // mitten im eigenen Abbau, mit Zeigern, die dieses closeEvent
+    // gerade erst zur Haelfte aufgeraeumt hatte. Der Zeitpunkt hier,
+    // ganz am Anfang, ist der einzige, an dem garantiert noch alles
+    // lebt, was captureIntoCurrent() anfasst. Der aboutToQuit-Handler
+    // selbst prueft jetzt m_shuttingDown und tut auf diesem Weg nichts
+    // mehr -- er bleibt nur noch fuer den SIGTERM/Kill-Pfad zustaendig,
+    // auf dem dieses closeEvent nie laeuft.
+    if (m_layoutProfiles) {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
+    }
+
     // Die Schwebefenster SOFORT informieren — nicht erst unten bei
     // shutDownFloating(). Bei Cmd+Q schickt Qt jedem Fenster ein
     // Schliessereignis; ohne diese Zeile bittet das Schwebefenster
@@ -13749,6 +13828,27 @@ void MainWindow::closeEvent(QCloseEvent* event)
         w->deleteLater();
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    // TEMP DIAGNOSTIC (2026-08-28) — tracking down a report that the
+    // process survives quit() with no visible window (same family as
+    // the 2026-08-22 incident documented above, different trigger).
+    // If a survivor shows up here, THAT class is what's still holding
+    // the event loop open; remove this block once identified.
+    {
+        int survivors = 0;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (w == this) { continue; }
+            ++survivors;
+            qWarning().noquote() << QStringLiteral(
+                "closeEvent: surviving top-level widget class=%1 "
+                "isWindow=%2 isVisible=%3 objectName=%4")
+                .arg(QString::fromUtf8(w->metaObject()->className()))
+                .arg(w->isWindow()).arg(w->isVisible()).arg(w->objectName());
+        }
+        qWarning().noquote() << QStringLiteral(
+            "closeEvent: %1 surviving top-level widget(s) besides this, "
+            "just before quit()").arg(survivors);
+    }
 
     event->accept();
 

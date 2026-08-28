@@ -598,6 +598,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
 
     m_radioInfo = info;
     m_intentionalDisconnect = false;
+    m_userInitiatedDisconnect = false;
     m_totalIqPackets = 0;
 
     // Use HardwareProfile for capability lookup (Phase 3I-RP).
@@ -717,6 +718,11 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
             m_tx[0].frequency / 1.0e6);
     }
 
+    // Fresh session: invalidate any timestamp left over from a previous
+    // connect so onKeepAliveTick()'s silence check can't fire against a
+    // stale value before the first frame of the new session arrives.
+    m_lastFrameAt = QDateTime();
+
     setState(ConnectionState::Connecting);
 
     qCDebug(lcConnection) << "P2: Connecting to" << info.displayName()
@@ -780,6 +786,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
 void P2RadioConnection::disconnect()
 {
     m_intentionalDisconnect = true;
+    m_userInitiatedDisconnect = true;
 
     if (m_keepAliveTimer) {
         m_keepAliveTimer->stop();
@@ -845,6 +852,9 @@ void P2RadioConnection::disconnect()
     if (m_socket) {
         m_socket->close();
     }
+
+    // User-initiated stop: no more silence to detect.
+    m_lastFrameAt = QDateTime();
 
     setState(ConnectionState::Disconnected);
     qCDebug(lcConnection) << "P2: Disconnected. I/Q packets:" << m_totalIqPackets;
@@ -2171,11 +2181,33 @@ void P2RadioConnection::onKeepAliveTick()
             m_lastMicAt = QDateTime::currentDateTimeUtc();
         }
     }
+
+    // Mid-session link-loss detection — see m_lastFrameAt (P2RadioConnection.h).
+    // Only applies once Connected: the dedicated m_connectWatchdog already
+    // covers the initial-connect timeout while state is Connecting, and
+    // firing both for the same silence would race two different teardown
+    // paths against each other.
+    if (state() == ConnectionState::Connected && m_lastFrameAt.isValid()) {
+        const qint64 silenceMs = m_lastFrameAt.msecsTo(QDateTime::currentDateTimeUtc());
+        if (silenceMs > kLinkLostSilenceMs) {
+            qCWarning(lcConnection) << "P2: No I/Q or status frame for" << silenceMs
+                                    << "ms; transitioning to LinkLost and scheduling reconnect";
+            m_keepAliveTimer->stop();
+            if (m_txIqTimer) { m_txIqTimer->stop(); }
+            if (m_p2HeartbeatTimer) { m_p2HeartbeatTimer->stop(); }
+            setState(ConnectionState::LinkLost);
+            emit errorOccurred(RadioConnectionError::NoDataTimeout,
+                               QStringLiteral("Radio stopped responding"));
+            if (!m_userInitiatedDisconnect && m_reconnectTimer) {
+                m_reconnectTimer->start();
+            }
+        }
+    }
 }
 
 void P2RadioConnection::onReconnectTimeout()
 {
-    if (!m_intentionalDisconnect && !m_radioInfo.address.isNull()) {
+    if (!m_userInitiatedDisconnect && !m_radioInfo.address.isNull()) {
         qCDebug(lcConnection) << "P2: Reconnecting to" << m_radioInfo.displayName();
         connectToRadio(m_radioInfo);
     }
@@ -2971,7 +3003,25 @@ void P2RadioConnection::sendCmdGeneral()
     // From Thetis network.c:910 [v2.10.3.13]
     // sendPacket(listenSock, packetbuf, sizeof(packetbuf), prn->base_outbound_port);
     QByteArray pkt(buf, sizeof(buf));
-    m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort);
+    // 2026-08-28: same one-shot retry as sendCmdHighPriority() below
+    // (2026-08-27 fix) -- the transient WLAN transmit-queue failure on
+    // the first send of a freshly opened socket isn't unique to the
+    // high-priority frame. Bench evidence (OE5SOS, ANVELINA PRO 3 over
+    // WLAN+router): a 6 s connect-watchdog timeout with ZERO inbound
+    // packets of any kind, which points at one of the FOUR SendStart
+    // frames failing outright rather than the radio ignoring a
+    // malformed one -- and CmdGeneral goes out first.
+    qint64 written = m_socket->writeDatagram(pkt, m_radioInfo.address,
+                                             m_baseOutboundPort);
+    if (written != pkt.size()) {
+        written = m_socket->writeDatagram(pkt, m_radioInfo.address,
+                                          m_baseOutboundPort);
+    }
+    if (written != pkt.size()) {
+        qCWarning(lcConnection)
+            << "P2: CmdGeneral send failed — wrote" << written
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+    }
 }
 
 void P2RadioConnection::sendCmdHighPriority()
@@ -2987,8 +3037,24 @@ void P2RadioConnection::sendCmdHighPriority()
     // so disconnect() logged "SendStop complete" whether or not the run=0 frame
     // ever reached the wire — three rounds of ANAN-G2E lockup debugging trusted
     // that line as evidence the stop had been sent.  It was not evidence.
-    const qint64 written =
+    qint64 written =
         m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
+    // 2026-08-27: one immediate retry on failure.  Bench-observed twice in a
+    // row (OE5SOS, radio reached over WLAN+router) failing this exact write
+    // with "Unable to send a message" on the very first send of a freshly
+    // opened socket, while a plain ping to the same host succeeded cleanly
+    // immediately before and after — consistent with a transient WLAN
+    // transmit-queue/buffer condition (four datagrams fired back-to-back in
+    // SendStart(), not a dead link. This is the send that matters most: if
+    // this specific CmdHighPriority frame is the one that never reaches the
+    // radio, no DDC I/Q frame follows and the connect watchdog times out
+    // 6000ms later even though the network recovered within milliseconds.
+    // A single synchronous retry costs nothing on the common success path
+    // and directly addresses the observed failure mode without changing the
+    // SendStart() sequencing or timing Thetis's network.c defines.
+    if (written != pkt.size()) {
+        written = m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
+    }
     if (written != pkt.size()) {
         qCWarning(lcConnection)
             << "P2: CmdHighPriority send failed — wrote" << written
@@ -3010,7 +3076,19 @@ void P2RadioConnection::sendCmdRx()
     composeCmdRx(buf);
     // From Thetis network.c:1178 [v2.10.3.13]
     QByteArray pkt(buf, sizeof(buf));
-    m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 1);
+    // 2026-08-28: same one-shot retry as sendCmdHighPriority() -- see
+    // the comment there for why.
+    qint64 written = m_socket->writeDatagram(pkt, m_radioInfo.address,
+                                             m_baseOutboundPort + 1);
+    if (written != pkt.size()) {
+        written = m_socket->writeDatagram(pkt, m_radioInfo.address,
+                                          m_baseOutboundPort + 1);
+    }
+    if (written != pkt.size()) {
+        qCWarning(lcConnection)
+            << "P2: CmdRx send failed — wrote" << written
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+    }
 }
 
 void P2RadioConnection::sendCmdTx()
@@ -3021,7 +3099,19 @@ void P2RadioConnection::sendCmdTx()
     composeCmdTx(buf);
     // From Thetis network.c:1247 [v2.10.3.13]
     QByteArray pkt(buf, sizeof(buf));
-    m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 2);
+    // 2026-08-28: same one-shot retry as sendCmdHighPriority() -- see
+    // the comment there for why.
+    qint64 written = m_socket->writeDatagram(pkt, m_radioInfo.address,
+                                             m_baseOutboundPort + 2);
+    if (written != pkt.size()) {
+        written = m_socket->writeDatagram(pkt, m_radioInfo.address,
+                                          m_baseOutboundPort + 2);
+    }
+    if (written != pkt.size()) {
+        qCWarning(lcConnection)
+            << "P2: CmdTx send failed — wrote" << written
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+    }
 }
 
 // --- Data Parsing ---
@@ -3032,6 +3122,9 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
     if (ddcIndex < 0 || ddcIndex >= kMaxDdc) {
         return;
     }
+
+    // Proves the link is alive — see m_lastFrameAt (P2RadioConnection.h).
+    m_lastFrameAt = QDateTime::currentDateTimeUtc();
 
     const auto* raw = reinterpret_cast<const unsigned char*>(data.constData());
 
@@ -3295,6 +3388,16 @@ void P2RadioConnection::onConnectTimeout()
     if (m_socket) { m_socket->close(); }
     setState(ConnectionState::Disconnected);
 
+    // Automatischer Wiederholversuch (Betreiberwunsch, 2026-08-27, nach
+    // einer WLAN-Strecke mit 11-12% Verlust, die mehrere manuelle
+    // Connect-Klicks brauchte, bis einer durchkam). m_userInitiatedDisconnect
+    // bleibt hier false — nur disconnect() (der Betreiber selbst) setzt es
+    // — darum greift onReconnectTimeout() drei Sekunden spaeter von selbst.
+    // Kein Versuchslimit: ein schlechter WLAN-Abschnitt kann Minuten dauern
+    // (heute rund 40), und fruehzeitig aufgeben waere wieder ein Klick, den
+    // der Betreiber genau deswegen nicht mehr machen wollte.
+    if (m_reconnectTimer) { m_reconnectTimer->start(); }
+
     // Klartext statt Ratespiel. Der alte Text ("check IP address, radio
     // power, and network") nannte drei Moeglichkeiten und half bei
     // keiner. Der entscheidende Umstand ist: das Geraet wurde GEFUNDEN
@@ -3316,6 +3419,9 @@ void P2RadioConnection::onConnectTimeout()
 // Porting from Thetis ReadUDPFrame:519-532 — High Priority C&C status
 void P2RadioConnection::processHighPriorityStatus(const QByteArray& data)
 {
+    // Proves the link is alive — see m_lastFrameAt (P2RadioConnection.h).
+    m_lastFrameAt = QDateTime::currentDateTimeUtc();
+
     const auto* raw = reinterpret_cast<const unsigned char*>(data.constData());
 
     // From Thetis ReadUDPFrame:522-530

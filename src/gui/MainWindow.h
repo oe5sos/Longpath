@@ -702,7 +702,7 @@ private:
     QVector<QsoUploader*> qsoUploaders();
     void buildStatusBar();
     void applyDarkTheme();
-    void tryAutoReconnect();
+    void openConnectionPanelOnLaunch();
     void wireSliceToSpectrum();
 
     /// Stream 0's engine. Back-compat accessor for call sites that still
@@ -1188,10 +1188,6 @@ private:
     // forceHardwareFrequency while frequencyChanged is already retuning the DDC
     bool m_handlingBandJump{false};
 
-    // Task 17: auto-reconnect guard — prevents the background attempt from
-    // interfering with a subsequent user-initiated Start Discovery.
-    bool m_autoReconnectInProgress{false};
-
     // Set true at the top of closeEvent (and aboutToQuit). Gates the
     // "auto-open ConnectionPanel on Disconnect" slot — without this,
     // closeEvent's disconnectFromRadio fires connectionStateChanged →
@@ -1461,6 +1457,7 @@ private:
     void releaseSunSdrSlice(const QString& reason);
 
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
+    class KiwiWaterfallPanel* m_kiwiWaterfallPanel{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
 
     // ── Spracherkennung (2026-08-23) ────────────────────────────────
@@ -1560,6 +1557,18 @@ private:
     // Constructed in the layout-build path after the panel is wired.
     // Rotor + logbook dock (Tools > Rotor...). Lazy; owned by `this`.
     QDockWidget*     m_rotorDock{nullptr};
+    // Ob das Profil den Rotor/Log-Dock sichtbar haben will -- gesetzt
+    // beim Laden, aber erst mit der ersten Verbindung angewandt (siehe
+    // die connectionStateChanged-Bindung neben der Profil-Wiederherstellung):
+    // vor dem Verbinden ist der Kompass ohne Ziel bedeutungslos.
+    bool             m_rotorDockWantedVisible{true};
+    // Betreiber 2026-08-28: dieselbe Vorher-verstecken-Regel gilt auch fuer
+    // jedes andere schwebende Meter/Applet-Fenster (S-Meter, Stehwelle,
+    // Mitschrift, ...) -- restoreState() zeigt sie sonst unconditional beim
+    // Start, egal ob eine Verbindung steht. Nur die Fenster gemerkt, die
+    // deswegen tatsaechlich versteckt wurden, damit die erste Verbindung
+    // genau die wieder zeigt und nichts, was ohnehin schon zu war.
+    QList<QPointer<QWidget>> m_floatingContainersHiddenPreConnect;
     /// Fuehrt die Windrose im Spektrum nach, solange sie zu
     class WindowTitleBar* m_rotorHeader{nullptr};
     class ToolWindow*     m_rotorWindow{nullptr};

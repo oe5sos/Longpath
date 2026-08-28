@@ -134,6 +134,16 @@ public:
     /// wechseln.
     void captureIntoCurrent();
 
+    /// m_apply für das aktuell gesetzte Profil auslösen, auch wenn es
+    /// schon "aktiv" ist. Für den Start gedacht: load() setzt m_current
+    /// direkt (ohne m_apply aufzurufen), und activate(current()) würde
+    /// an der Namensgleich-Wache in activate() sofort zurückkehren —
+    /// die Umgestaltung (schwebende Fenster, Splitter, Rotor-Sichtbarkeit,
+    /// Container-Geometrie) käme nie an. Bug gefunden 2026-08-28
+    /// (Betreiber: "und schon wieder hat er mein layout nicht
+    /// gespeichert" — es wurde gespeichert, nur nie wieder angewandt).
+    void applyCurrent();
+
     QVariantMap snapshot(const QString& name) const;
 
     // ── Bindung ──────────────────────────────────────────────────────

@@ -86,6 +86,12 @@ signals:
     void renameRequested(const QString& name);
     void duplicateRequested(const QString& name);
     void removeRequested(const QString& name);
+    /// Betreiber 2026-08-28: "vielleicht sollte es ein profil speichern
+    /// auch geben" -- der jetzige Stand sichert sich sonst nur beim
+    /// Umschalten oder Beenden. Wer ohne Verbindung gestaltet und gleich
+    /// wissen will, dass es sitzt, statt der Beenden-Sequenz zu
+    /// vertrauen, kann hier von Hand nachhelfen.
+    void saveRequested(const QString& name);
 
 private:
     void showMenuFor(const QString& name, const QPoint& globalPos);

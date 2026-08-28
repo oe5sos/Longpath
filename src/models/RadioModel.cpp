@@ -8843,22 +8843,10 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
         qCWarning(lcConnection) << "Connection error:" << msg;
     });
 
-    // Phase 3Q Task 10: auto-connect failure path.
-    // When tryAutoReconnect() arms m_autoConnectInProgress, forward the
-    // first connectFailed() emission as autoConnectFailed() so MainWindow
-    // can open the ConnectionPanel and surface a status-bar message.
-    // The flag is cleared immediately so a later user-initiated Connect
-    // does not re-trigger this path.
     connect(m_connection, &RadioConnection::connectFailed,
             this, [this](Longpath::ConnectFailure reason, const QString& detail) {
         // Immer melden, mit Begruendung — siehe connectAttemptFailed().
         emit connectAttemptFailed(reason, detail);
-        if (m_autoConnectInProgress) {
-            const QString mac = m_autoConnectChosenMac;
-            m_autoConnectInProgress = false;
-            m_autoConnectChosenMac.clear();
-            emit autoConnectFailed(mac, reason);
-        }
     });
 
     // ReceiverManager → RadioConnection (hardware updates)
@@ -11601,7 +11589,24 @@ void RadioModel::flushPendingSettingsSave()
 void RadioModel::saveSliceState(SliceModel* slice)
 {
     if (slice) {
-        slice->saveToSettings(m_lastBand);
+        // Compute the band fresh from THIS slice's own current frequency,
+        // never from m_lastBand -- that field is shared across every
+        // slice's frequencyChanged handler (wireSliceSignals connects it
+        // "for every slice", see that comment) and updated independently
+        // of which slice is actually being saved here. The 500ms coalesce
+        // in scheduleSettingsSave() means saveSliceState(m_activeSlice)
+        // can fire well after a DIFFERENT slice's band crossing last
+        // touched m_lastBand -- or after the active slice changed --
+        // pairing this slice's current mode with the wrong band's saved
+        // slot. Bug found 2026-08-26 (OE5SOS): a stale FM landed in
+        // Band40m's persisted DspMode after an unrelated band crossing
+        // elsewhere, confirmed by the leftover Band40m/ModeFM/Filter*
+        // keys in the operator's own settings file. onBandButtonClicked's
+        // own synchronous save already gets this right (RadioModel.cpp:
+        // ~5880/5912, both compute the band from the slice's frequency
+        // directly) -- this brings the deferred path to the same
+        // discipline instead of trusting the shared field.
+        slice->saveToSettings(bandFromFrequency(slice->frequency()));
     }
 
     // Flush AlexController if any per-band antenna or block-TX toggle
@@ -12109,12 +12114,6 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
     switch (state) {
     case ConnectionState::Connected:
         qCDebug(lcConnection) << "Connected to" << m_name;
-        // Phase 3Q Task 10: auto-connect succeeded — disarm the in-progress
-        // flag so a later user-initiated Connect does not trip the failure path.
-        if (m_autoConnectInProgress) {
-            m_autoConnectInProgress = false;
-            m_autoConnectChosenMac.clear();
-        }
         // ── 3M-1c Phase L.2: TwoToneController power-on gate ─────────────────
         // The controller's setActive(true) refuses to engage unless powerOn
         // is true (mirrors !console.PowerOn at setup.cs:11063 [v2.10.3.13]).
@@ -12225,6 +12224,29 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // the worst possible moment for a marginal link). One
         // request here makes the wire agree with the configuration
         // from the first second, and MOX stops being a rate change.
+        //
+        // Bug found 2026-08-28 (Betreiber: "jetzt wieder kein wasserfall
+        // und ton"): bindUnboundSlices() BEFORE requestDdcAssignment().
+        // A connect-watchdog timeout on the FIRST attempt sends this
+        // handler through the Disconnected case first, and that one
+        // calls releaseStreamBindings() (see its own comment on the
+        // phantom-binding fix, 2026-08-24) -- every slice's streamIndex
+        // drops to -1. The automatic reconnect that follows is entirely
+        // internal to P2RadioConnection (onReconnectTimeout ->
+        // connectToRadio()); it never revisits RadioModel's top-level
+        // connect path, which is the ONLY other place that binds slices
+        // to streams (bindUnboundSlices() at RadioModel.cpp:~6255,
+        // inside the pool-sizing block that only runs once per operator
+        // -initiated connect). So the reconnect's own Connected fires
+        // here with every slice still unbound: requestDdcAssignment()
+        // published ddcEnable=0 against an empty stream, and whatever
+        // I/Q the radio still sent got dropped in ReceiverManager for
+        // want of a hw->logical entry -- silent waterfall, silent
+        // audio, radio "connected" in name only. bindUnboundSlices()
+        // is a no-op for any slice already bound (the ordinary connect
+        // path bound it well before Connected fires), so this only
+        // engages for exactly the case above.
+        bindUnboundSlices();
         requestDdcAssignment();
         break;
     case ConnectionState::Disconnected:

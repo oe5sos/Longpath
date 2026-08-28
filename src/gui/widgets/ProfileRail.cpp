@@ -15,6 +15,7 @@
 #include "gui/LayoutProfiles.h"
 #include "gui/StyleConstants.h"
 
+#include <QEvent>
 #include <QMenu>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -200,6 +201,13 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     title->setEnabled(false);
     menu.addSeparator();
 
+    QAction* save = menu.addAction(QStringLiteral("Jetzt sichern"));
+    // captureIntoCurrent() sichert immer das AKTIVE Profil, gleich, auf
+    // welches Abzeichen man rechtsklickt -- der Menuepunkt darf also nur
+    // dort erscheinen, sonst waere "Jetzt sichern" auf einem anderen
+    // Abzeichen ein Versprechen, das der Aufruf gar nicht einloest.
+    save->setEnabled(m_profiles && m_profiles->current() == name);
+    menu.addSeparator();
     QAction* ren = menu.addAction(QStringLiteral("Umbenennen…"));
     QAction* dup = menu.addAction(QStringLiteral("Duplizieren…"));
     menu.addSeparator();
@@ -209,9 +217,10 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     del->setEnabled(m_profiles && m_profiles->names().size() > 1);
 
     QAction* chosen = menu.exec(globalPos);
-    if (chosen == ren)      { emit renameRequested(name); }
-    else if (chosen == dup) { emit duplicateRequested(name); }
-    else if (chosen == del) { emit removeRequested(name); }
+    if (chosen == save)      { emit saveRequested(name); }
+    else if (chosen == ren)  { emit renameRequested(name); }
+    else if (chosen == dup)  { emit duplicateRequested(name); }
+    else if (chosen == del)  { emit removeRequested(name); }
 }
 
 QStringList ProfileRail::badges() const { return m_order; }
