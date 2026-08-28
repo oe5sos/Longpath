@@ -76,6 +76,14 @@ protected:
     void closeEvent(QCloseEvent* ev) override;
 
 private:
+    // Lage/Groesse merken -- ohne das reisst jedes Andocken/Abloesen die
+    // Position wieder auf die Qt-Standardplatzierung zurueck, mitten im
+    // Bildschirm, oft genau ueber dem Verbinden-Dialog (Betreiber,
+    // 2026-08-28: "wieder hier"). Dasselbe Muster wie LogbookWindow /
+    // AntennaWindow / SpotHubDialog.
+    void saveGeometryState();
+    void restoreGeometryState();
+
     QPointer<QWidget> m_content;
     QString           m_id;
     WindowTitleBar*   m_titleBar{nullptr};

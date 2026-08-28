@@ -8,6 +8,7 @@
 
 #include "gui/ToolWindow.h"
 
+#include "core/AppSettings.h"
 #include "gui/FramelessResizer.h"
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
@@ -51,6 +52,8 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     // laesst sich nicht mehr bewegen (AetherSDR #4266).
     FramelessResizer::install(this, 6, m_titleBar->height());
     attachResizeGrip(this);
+
+    restoreGeometryState();
 }
 
 ToolWindow::~ToolWindow() = default;
@@ -59,6 +62,12 @@ QWidget* ToolWindow::releaseContent()
 {
     QWidget* c = m_content.data();
     if (!c) { return nullptr; }
+    // Vor dem Loesen sichern: sowohl das Andocken (Titelleiste, ↙) als
+    // auch das Schliessen (closeEvent emittiert dockRequested) laufen
+    // beide hier durch, bevor MainWindow das Fenster wegwirft -- der
+    // letzte Punkt, an dem geometry() noch die echte, zuletzt gezogene
+    // Lage zeigt.
+    saveGeometryState();
     // Aus dem Layout UND aus der Elternschaft. Nur removeWidget zu
     // rufen liesse den Inhalt Kind dieses Fensters — er stuerbe mit
     // ihm, und der Aufrufer haette einen baumelnden Zeiger auf etwas,
@@ -67,6 +76,28 @@ QWidget* ToolWindow::releaseContent()
     c->setParent(nullptr);
     m_content.clear();
     return c;
+}
+
+void ToolWindow::saveGeometryState()
+{
+    AppSettings::instance().setValue(
+        QStringLiteral("ToolWindowGeometry_%1").arg(m_id), saveGeometry());
+}
+
+void ToolWindow::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("ToolWindowGeometry_%1").arg(m_id))
+        .toByteArray();
+    // Leer beim ersten Mal -- dann entscheidet der Aufrufer per
+    // applyDefaultSize()/move(), genau wie bisher.
+    if (st.isEmpty()) { return; }
+    restoreGeometry(st);
+    // Verhindert, dass der Aufrufer applyDefaultSize() gleich danach die
+    // gerade wiederhergestellte Groesse ueberschreibt -- dieselbe
+    // "wer nachher zieht, darf es behalten"-Regel wie dort, nur dass
+    // hier schon VOR dem ersten Zug ein gueltiger Zustand da ist.
+    m_sizedOnce = true;
 }
 
 void ToolWindow::applyDefaultSize(const QSize& want)

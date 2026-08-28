@@ -84,6 +84,12 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
 
 private:
+    // Lage/Groesse je Panadapter merken -- ohne das reisst jedes
+    // Ablösen/Andocken auf die Vorgabegroesse zurueck (2026-08-28,
+    // dieselbe Luecke wie beim Rotor/Log-ToolWindow, siehe dort).
+    void saveGeometryState();
+    void restoreGeometryState();
+
     QPointer<PanadapterApplet> m_applet;
 
     // Die Groesse wird nur beim ERSTEN Anzeigen gesetzt. Wer das

@@ -20,6 +20,7 @@
 
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterApplet.h"
+#include "core/AppSettings.h"
 #include "gui/FramelessResizer.h"
 #include "gui/WindowChrome.h"
 
@@ -99,6 +100,8 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     // Arbeitsplatz zustellt.
     setMinimumSize(420, 240);
     resize(900, 460);
+
+    restoreGeometryState();
 }
 
 // Die Groesse setzen, NACHDEM der Inhalt sichtbar ist.
@@ -175,11 +178,35 @@ void PanFloatingWindow::closeEvent(QCloseEvent* event)
 void PanFloatingWindow::moveEvent(QMoveEvent*)
 {
     emit geometryChanged(panId(), saveGeometry());
+    saveGeometryState();
 }
 
 void PanFloatingWindow::resizeEvent(QResizeEvent*)
 {
     emit geometryChanged(panId(), saveGeometry());
+    saveGeometryState();
+}
+
+void PanFloatingWindow::saveGeometryState()
+{
+    // Je Panadapter ein eigener Schluessel, wie beim Schloss oben --
+    // zwei abgeloeste Panadapter duerfen sich nicht gegenseitig
+    // ueberschreiben.
+    AppSettings::instance().setValue(
+        QStringLiteral("PanFloatGeometry_%1").arg(panId()), saveGeometry());
+}
+
+void PanFloatingWindow::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("PanFloatGeometry_%1").arg(panId()))
+        .toByteArray();
+    if (st.isEmpty()) { return; }   // erstes Mal -- applyDefaultSize() entscheidet
+    restoreGeometry(st);
+    // Verhindert, dass das nachtraegliche applyDefaultSize() (vom
+    // Stack aufgerufen, NACHDEM das Applet wieder sichtbar ist) die
+    // gerade wiederhergestellte Groesse ueberschreibt.
+    m_sizedOnce = true;
 }
 
 } // namespace Longpath
