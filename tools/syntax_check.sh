@@ -32,8 +32,8 @@
 # Usage:  tools/syntax_check.sh src/core/Foo.cpp [more...]
 #         tools/syntax_check.sh --all-changed
 #
-# Modification history (NereusSDR):
-#   2026-08-10 — Created for NereusSDR by Martin Fischer, AI-assisted
+# Modification history (Longpath):
+#   2026-08-10 — Created for NereusSDR (heute Longpath) by Martin Fischer, AI-assisted
 #                 via Anthropic Claude (Cowork).
 #   2026-08-15 — Find Qt without being told: qmake -query, then a flat
 #                 include tree, then macOS frameworks (for which a flat
@@ -166,6 +166,45 @@ if [ -z "$QTINC" ] || [ ! -d "$QTINC/QtCore" ]; then
     exit 2
 fi
 
+# ── PortAudio ─────────────────────────────────────────────────────────
+#
+# CMakeLists.txt pulls PortAudio in via FetchContent — there is no
+# system package to point at, only whatever landed under a build
+# directory's _deps/ the last time cmake actually configured. The
+# build-dir name is not fixed (build/, build-tests/, whatever the
+# operator chose), so this looks for the one landmark that is fixed —
+# <build-dir>/_deps/portaudio-src/include, four levels under $ROOT —
+# rather than hardcoding the build-dir name. Conditional, like the
+# rhi lookup above:
+# a dangling -I here would turn "AudioEngine.cpp includes portaudio.h"
+# into a "file not found" that reads exactly like a real bug in the
+# code and is not one. If no build has ever been run, this simply
+# finds nothing and AudioEngine.cpp (and anything else that reaches
+# <portaudio.h>) reports that one missing header — an honest result,
+# not a silent lie.
+PA_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/portaudio-src/include' -print -quit 2>/dev/null)"
+
+# third_party/wdsp/CMakeLists.txt adds third_party/wdsp/src PUBLIC to
+# wdsp_static, which LongpathObjs links -- so in the real build, any file
+# reaching a bare `#include "resample.h"` (or another WDSP header included
+# the same way, e.g. TciServer.cpp's RESAMPLEF wrapper) resolves it via
+# that transitive include path. Unlike PA_INC this path is static -- always
+# present in the tree, not something a build creates -- so no find/fallback
+# is needed.
+WDSP_INC="$ROOT/third_party/wdsp/src"
+
+# ── rnnoise / libspecbleach (WDSP NR3/NR4 backends) ─────────────────────
+#
+# Same story as PortAudio: both are FetchContent'd, not vendored, so their
+# headers only exist under a build directory's _deps/ once cmake has
+# actually configured. third_party/wdsp/src/rnnr.h (NR3) and sbnr.c (NR4)
+# reach these bare-name includes only when HAVE_WDSP is defined -- so this
+# gap stayed invisible until HAVE_WDSP was added to the flags below
+# (2026-08-26). Same conditional-find, same honest-absence rationale as
+# PA_INC.
+RNNOISE_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/rnnoise_upstream-src/include' -print -quit 2>/dev/null)"
+SPECBLEACH_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/libspecbleach_upstream-src/include' -print -quit 2>/dev/null)"
+
 compile() {
     # NEREUSSDR_VERSION setzt sonst CMake. Ohne sie scheitert jede Datei,
     # die QStringLiteral(NEREUSSDR_VERSION) benutzt, mit "expected ')'" --
@@ -177,23 +216,45 @@ compile() {
     # <QAudio> sich nicht -- jede Datei, die core/ClientPuduMonitor.h
     # erreicht (also auch MainWindow.cpp), scheiterte mit einem
     # "file not found", das wie ein Fehler im Code aussah und keiner war.
-    # HAVE_WEBSOCKETS and NEREUS_GPU_SPECTRUM: both unconditional in the
-    # real build (CMakeLists.txt: Qt6::WebSockets is REQUIRED, so
-    # HAVE_WEBSOCKETS is always defined; NEREUS_GPU_SPECTRUM defaults ON).
+    # HAVE_WEBSOCKETS, NEREUS_GPU_SPECTRUM, and HAVE_WDSP: all three
+    # unconditional in the real build (CMakeLists.txt: Qt6::WebSockets is
+    # REQUIRED, so HAVE_WEBSOCKETS is always defined; NEREUS_GPU_SPECTRUM
+    # defaults ON; HAVE_WDSP is gated on WDSP_FOUND, which is true whenever
+    # third_party/wdsp/src/comm.h exists -- i.e. always, since WDSP is
+    # vendored in-tree, not fetched).
     # Missing them here does not fail loudly -- it silently strips every
-    # #ifdef HAVE_WEBSOCKETS / #ifdef NEREUS_GPU_SPECTRUM block, so a class
-    # body written entirely inside one (TciClient, TciServer, half of
-    # SpectrumWidget) parses as empty and every use of it downstream
-    # reports "incomplete type" / "undeclared identifier" -- errors that
-    # look exactly like real syntax errors and are not (found 2026-08-24,
-    # checking the SunSDR/TCI spectrum-wiring change against a checker run
-    # that had never seen these two files build clean).
+    # #ifdef HAVE_WEBSOCKETS / #ifdef NEREUS_GPU_SPECTRUM / #ifdef HAVE_WDSP
+    # block, so a class body written entirely inside one (TciClient,
+    # TciServer, half of SpectrumWidget, wdsp_api.h's real declarations)
+    # parses as empty and every use of it downstream reports "incomplete
+    # type" / "undeclared identifier" -- errors that look exactly like real
+    # syntax errors and are not (HAVE_WEBSOCKETS/NEREUS_GPU_SPECTRUM found
+    # 2026-08-24, checking the SunSDR/TCI spectrum-wiring change against a
+    # checker run that had never seen these two files build clean;
+    # HAVE_WDSP found 2026-08-26, checking a one-line TciServer.cpp fix
+    # against wdsp_api.h's GetTXAMeter, a real declaration this script had
+    # never actually exercised before).
+    #
+    # NEREUS_BUILD_TESTS: same story, found the same day. tools/run_tests.sh
+    # always configures with -DNEREUS_BUILD_TESTS=ON (it's the whole point
+    # of that build dir -- tests are opt-in so the normal build stays fast,
+    # per CLAUDE.md), so every "...ForTest()" hook gated behind
+    # #ifdef NEREUS_BUILD_TESTS in a production header (P1RadioConnection.h's
+    # setBoardForTest/captureBank10ForTest, RadioModel's
+    # injectConnectionForTest, etc.) is real, reachable code in the build
+    # that actually runs the test suite -- just invisible to a checker that
+    # never defines the macro. A real ctest run confirmed
+    # tst_p1_alex_lpf_word_source.cpp compiles and mostly passes; this
+    # script reported 15 "no member named ..." errors for methods that
+    # exist and work, because they'd all been silently stripped.
     g++ -std=c++20 -fsyntax-only -fPIC \
         -DNEREUSSDR_VERSION='"0.0.0-syntaxcheck"' \
-        -DHAVE_WEBSOCKETS -DNEREUS_GPU_SPECTRUM \
+        -DHAVE_WEBSOCKETS -DNEREUS_GPU_SPECTRUM -DHAVE_WDSP -DNEREUS_BUILD_TESTS \
         -I"$QTINC" -I"$QTINC/QtCore" -I"$QTINC/QtGui" -I"$QTINC/QtWidgets" \
         -I"$QTINC/QtNetwork" -I"$QTINC/QtTest" -I"$QTINC/rhi" \
         -I"$QTINC/QtMultimedia" -I"$QTINC/QtSvg" -I"$QTINC/QtWebSockets" \
+        ${PA_INC:+-I"$PA_INC"} -I"$WDSP_INC" \
+        ${RNNOISE_INC:+-I"$RNNOISE_INC"} ${SPECBLEACH_INC:+-I"$SPECBLEACH_INC"} \
         -I"$ROOT/src" -I"$ROOT" "$1" 2>&1
 }
 

@@ -117,6 +117,25 @@ private slots:
 
         const QVector<float> bins = makeSyntheticBins();
 
+        // displayWidth (updateSpectrumLinear's internal qMax(width() -
+        // strip, 800), now also scaled by devicePixelRatioF() as of
+        // 2026-08-26 -- see that change's own comment for why) is not
+        // something this test should hardcode. It used to reliably
+        // equal exactly 800 because an un-shown widget's logical width
+        // was small enough that the 800 floor always won; a real
+        // (non-1.0) devicePixelRatioF() in the environment this test
+        // actually runs in can now push the true value above that floor
+        // -- which is not a bug, just this test's old assumption
+        // meeting a real HiDPI test runner for the first time. Probe
+        // the real value from one reference widget instead of guessing
+        // at it; every combination below uses the identical (never
+        // resized/shown) widget setup, so they must all agree with it.
+        SpectrumWidget probe;
+        probe.setSpectrumDetector(SpectrumDetector::Peak);
+        probe.setSpectrumAveraging(SpectrumAveraging::None);
+        feedFrames(probe, bins, 4);
+        const int expectedSize = probe.renderedPixels().size();
+
         for (const auto det : detectors) {
             for (const auto avg : averagings) {
                 SpectrumWidget w;
@@ -125,10 +144,7 @@ private slots:
                 // Feed enough frames so window-averaging mode populates.
                 feedFrames(w, bins, 4);
 
-                const int expected = qMax(w.width() - 0, 800);  // matches updateSpectrumLinear's qMax(width()-strip, 800)
-                Q_UNUSED(expected);
-                // Headless width() is 0 so displayWidth falls back to 800.
-                assertFiniteAndSized(w.renderedPixels(), 800,
+                assertFiniteAndSized(w.renderedPixels(), expectedSize,
                                      "spectrum");
             }
         }
@@ -153,6 +169,16 @@ private slots:
 
         const QVector<float> bins = makeSyntheticBins();
 
+        // Same reasoning as the spectrum probe above -- the waterfall
+        // plane is sized from the same displayWidth computation, so it
+        // needs the same self-referential probe rather than a
+        // hardcoded 800.
+        SpectrumWidget probe;
+        probe.setWaterfallDetector(SpectrumDetector::Peak);
+        probe.setWaterfallAveraging(SpectrumAveraging::None);
+        feedFrames(probe, bins, 4);
+        const int expectedSize = probe.wfRenderedPixels().size();
+
         for (const auto det : detectors) {
             for (const auto avg : averagings) {
                 SpectrumWidget w;
@@ -160,7 +186,7 @@ private slots:
                 w.setWaterfallAveraging(avg);
                 feedFrames(w, bins, 4);
 
-                assertFiniteAndSized(w.wfRenderedPixels(), 800,
+                assertFiniteAndSized(w.wfRenderedPixels(), expectedSize,
                                      "waterfall");
             }
         }
@@ -172,6 +198,20 @@ private slots:
     void spectrum_mode_switch_midstream_does_not_crash()
     {
         const QVector<float> bins = makeSyntheticBins();
+
+        // See spectrum_all_detector_x_averaging_combinations()'s probe
+        // comment -- displayWidth isn't a hardcodable 800 once
+        // devicePixelRatioF() is folded into it (2026-08-26). A
+        // self-comparison (w.renderedPixels().size() against itself)
+        // would silently pass even if the mid-stream switching below
+        // left the vector empty, so this needs its own independent
+        // reference widget, not a tautology.
+        SpectrumWidget probe;
+        probe.setSpectrumDetector(SpectrumDetector::Peak);
+        probe.setSpectrumAveraging(SpectrumAveraging::None);
+        feedFrames(probe, bins, 4);
+        const int expectedSize = probe.renderedPixels().size();
+
         SpectrumWidget w;
         w.setSpectrumAveraging(SpectrumAveraging::Recursive);
 
@@ -188,7 +228,7 @@ private slots:
         w.setSpectrumDetector(SpectrumDetector::RMS);
         feedFrames(w, bins, 2);
 
-        assertFiniteAndSized(w.renderedPixels(), 800, "post-switch");
+        assertFiniteAndSized(w.renderedPixels(), expectedSize, "post-switch");
     }
 
     // Averaging mode switch should clear the avenger (per setSpectrumAveraging
@@ -198,6 +238,15 @@ private slots:
     void spectrum_averaging_switch_resets_cleanly()
     {
         const QVector<float> bins = makeSyntheticBins();
+
+        // See spectrum_mode_switch_midstream_does_not_crash()'s probe
+        // comment just above.
+        SpectrumWidget probe;
+        probe.setSpectrumDetector(SpectrumDetector::Peak);
+        probe.setSpectrumAveraging(SpectrumAveraging::None);
+        feedFrames(probe, bins, 4);
+        const int expectedSize = probe.renderedPixels().size();
+
         SpectrumWidget w;
         w.setSpectrumDetector(SpectrumDetector::Peak);
 
@@ -210,7 +259,7 @@ private slots:
         w.setSpectrumAveraging(SpectrumAveraging::LogRecursive);
         feedFrames(w, bins, 2);
 
-        assertFiniteAndSized(w.renderedPixels(), 800, "post-avg-switch");
+        assertFiniteAndSized(w.renderedPixels(), expectedSize, "post-avg-switch");
     }
 
     // Empty input must not crash and must leave outputs untouched (no

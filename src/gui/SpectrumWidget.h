@@ -1618,6 +1618,19 @@ public:
     void setSelectedNotchIdForTest(int id) { m_selectedNotchId = id; }
     int renderedPixelCountForTest() const { return m_renderedPixels.size(); }
     int visibleBinCountForTest() const { return m_visibleBinCount; }
+
+    // Pins updateSpectrumLinear()'s internal displayWidth (normally
+    // qMax((width() - effectiveStripW()) * devicePixelRatioF(), 800))
+    // to an exact value, bypassing both the real widget geometry and
+    // the real screen's devicePixelRatioF() -- neither of which a test
+    // can control for a never-shown widget. Added 2026-08-26 alongside
+    // the devicePixelRatioF() fix: a fixture built on "800 display
+    // pixels == 800 Hz span, so 1.0 Hz per pixel" needs displayWidth to
+    // actually BE 800 to keep its hardcoded pixel indices meaningful,
+    // and a real (non-1.0) device pixel ratio in the test environment
+    // can no longer be relied on to leave that floor alone. 0 (default)
+    // means "no override, use the real computation."
+    void setDisplayWidthOverrideForTest(int w) { m_displayWidthOverrideForTest = w; }
     /// Oberkante der Frequenzskala — fuer Pruefungen, die die bewusste
     /// Verschiebe-Geste dort ansetzen muessen.
     int freqScaleYForTest() const;
@@ -2204,6 +2217,7 @@ private:
     QVector<float> m_renderedPixels;       // spectrum avenger output (dBm)
     QVector<float> m_wfDisplayLinearPixels; // waterfall detector output (linear)
     QVector<float> m_wfRenderedPixels;     // waterfall avenger output (dBm)
+    int m_displayWidthOverrideForTest{0};  // 0 = off; see setDisplayWidthOverrideForTest()
 
     // Equivalent Noise Bandwidth of the current FFT window, in bins.
     // Refreshed every frame via the windowEnb arg on fftReadyLinear so
@@ -2433,7 +2447,11 @@ private:
     QPainterPath m_specFillPathScratch;
     QPainterPath m_specPeakPathScratch;
 
-    float       m_lineWidth{1.6f};
+    // 1.0f: operator decision (Martin, 2026-08-26), after live-testing the
+    // GPU ribbon-line fix -- matches the Setup slider's own minimum (1-3 px,
+    // DisplaySetupPages.cpp), which the old 1.6f default couldn't even
+    // reach (the slider casts to int).
+    float       m_lineWidth{1.0f};
     // ── Warum das zwei Fahnen sind und nicht eine ────────────────────
     //
     // Es war eine, und sie bedeutete auf den beiden Malwegen etwas

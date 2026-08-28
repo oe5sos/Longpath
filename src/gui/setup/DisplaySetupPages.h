@@ -159,6 +159,16 @@ private:
     QCheckBox* m_fillToggle{nullptr};        // Fill under spectrum trace
     QSlider*   m_fillAlphaSlider{nullptr};   // 0–100
     QSlider*   m_lineWidthSlider{nullptr};   // 1–3
+    // Defensive secondary reference, same rationale as m_fpSpin above:
+    // loadFromRenderer() wraps m_lineWidthSlider->setValue() in a
+    // QSignalBlocker, which suppresses the slider->spin sync makeSliderRow
+    // wires internally, so the spin readout was found stuck at the
+    // makeSliderRow constructor default (1) even when the slider itself
+    // correctly showed the persisted value (bench-caught 2026-08-26,
+    // OE5SOS: spin read "1 px" while the slider handle sat at the far
+    // right/3px position -- the persisted 3px never actually got noticed
+    // or changed because the readout lied).
+    QSpinBox*  m_lineWidthSpin{nullptr};
     QCheckBox* m_gradientToggle{nullptr};    // S14 gradient enabled
 
     // Section: Colors moved to Setup → Appearance → Colors & Theme (S11/S12/S13).

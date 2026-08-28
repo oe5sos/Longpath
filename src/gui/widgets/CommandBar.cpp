@@ -445,7 +445,19 @@ void CommandBar::relabelFilterPills()
         QPushButton* b = g->pills.at(i);
         if (i < front.size()) {
             const QPair<int, int> e = edgesForWidth(front.at(i));
-            b->setText(filterLabel(e.first, e.second));
+            const QString label = filterLabel(e.first, e.second);
+            b->setText(label);
+            // Dieselbe Mindestbreite wie addPill() beim Anlegen -- nur
+            // dort neu berechnet, weil diese Pille mit dem einzelnen
+            // Platzhalterzeichen "—" angelegt wird (buildFilterGroup)
+            // und addPill()'s Mindestbreite sich an GENAU diesem
+            // schmalen Text festgelegt hat. Ohne diese Zeile blieb die
+            // Pille auf "—"-Breite gequetscht, sobald hier "2.9k"
+            // hineingeschrieben wurde -- derselbe Fehler, den der
+            // 2026-08-23-Kommentar in addPill() fuer BAND schon einmal
+            // beschreibt ("aus '10 Hz' wurde 'I0 Hz'"), nur an der
+            // Stelle, wo die Beschriftung sich NACH dem Anlegen aendert.
+            b->setMinimumWidth(b->fontMetrics().horizontalAdvance(label) + 20);
             b->setProperty("loHz", e.first);
             b->setProperty("hiHz", e.second);
             b->setEnabled(true);
@@ -679,6 +691,13 @@ void CommandBar::pullFromModel()
         if (!visible && !g->pills.isEmpty()) {
             QPushButton* last = g->pills.last();
             last->setText(label);
+            // Siehe relabelFilterPills(): dieselbe Pille kann von "—"
+            // oder einer schmaleren Breite hierher gelangt sein; ohne
+            // Neuberechnung bleibt sie auf der alten Mindestbreite
+            // haengen und die neue, breitere Beschriftung wird an
+            // beiden Raendern abgeschnitten.
+            last->setMinimumWidth(
+                last->fontMetrics().horizontalAdvance(label) + 20);
             last->setProperty("loHz", lo);
             last->setProperty("hiHz", hi);
             last->setEnabled(true);

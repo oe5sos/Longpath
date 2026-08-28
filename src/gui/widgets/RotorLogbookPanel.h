@@ -89,6 +89,17 @@ public:
     // file.
     void showLogbook();
 
+    // Hide the logbook window without destroying it -- counterpart to
+    // showLogbook(). 2026-08-27: applyWindowVisibility("WinLogbook", false)
+    // used to be a no-op ("the logbook closes itself"), which is true
+    // only for the operator clicking the window's own close button. A
+    // layout profile switch that turns WinLogbook's visibility off (e.g.
+    // activating a fresh, deliberately empty profile while the logbook
+    // is open from a previous one) needs an actual hide to call, or the
+    // window keeps showing on top of a profile that never opened it.
+    // No-op if the window was never created.
+    void hideLogbook();
+
     // Open the rotator setup dialog. Public for the same reason as
     // showLogbook(): an operator whose rotator is not working yet
     // should not have to discover the dock in order to find the place

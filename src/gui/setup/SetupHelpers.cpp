@@ -40,17 +40,31 @@ SliderRow makeSliderRow(int min, int max, int initial,
     spin->setFixedWidth(kSetupSpinWidth);
     spin->setAlignment(Qt::AlignRight);
 
-    // Bidirectional sync. QSignalBlocker on the opposite widget prevents the
-    // receiver from re-emitting and creating an infinite loop. Consumers of
-    // the row should connect to slider->valueChanged as the single source of
-    // truth for model updates.
+    // Bidirectional sync. Consumers of the row connect to slider->valueChanged
+    // as the single source of truth for model updates -- so a spin->slider
+    // edit must let slider->setValue() re-emit valueChanged (NOT blocked)
+    // or that edit never reaches the model at all. The slider->spin
+    // direction below still blocks spin, which is what actually prevents
+    // the infinite loop: spin's own setValue call in that handler is a
+    // silent no-op besides (Qt skips the signal when the value doesn't
+    // change), and even if it weren't, blocking it there stops it from
+    // bouncing straight back into this handler.
+    //
+    // Found 2026-08-26 (OE5SOS bench report): the Setup > Display > Spectrum
+    // Defaults "Line Width" spinbox arrows visibly moved the slider and its
+    // own readout, but the persisted/rendered value never changed --
+    // because the old code blocked the slider's valueChanged on every
+    // spin-originated edit, so the model-update connection wired to
+    // slider->valueChanged (DisplaySetupPages.cpp) never fired. Same defect
+    // for every other makeSliderRow/makeDoubleSliderRow control in Setup,
+    // any time the operator uses the spinbox instead of dragging the
+    // slider -- fixed here at the root rather than per call site.
     QObject::connect(slider, &QSlider::valueChanged, spin, [spin](int v) {
         QSignalBlocker block(spin);
         spin->setValue(v);
     });
     QObject::connect(spin, qOverload<int>(&QSpinBox::valueChanged),
                      slider, [slider](int v) {
-        QSignalBlocker block(slider);
         slider->setValue(v);
     });
 
@@ -86,13 +100,16 @@ SliderRowD makeDoubleSliderRow(double min, double max, double initial,
     spin->setFixedWidth(kSetupSpinWidthD);
     spin->setAlignment(Qt::AlignRight);
 
+    // See makeSliderRow's comment above -- same defect, same fix: the
+    // spin->slider direction must NOT block the slider, or a spinbox-
+    // originated edit never re-emits slider->valueChanged and the model
+    // update wired to it never fires.
     QObject::connect(slider, &QSlider::valueChanged, spin, [spin, scale](int v) {
         QSignalBlocker block(spin);
         spin->setValue(static_cast<double>(v) / scale);
     });
     QObject::connect(spin, qOverload<double>(&QDoubleSpinBox::valueChanged),
                      slider, [slider, scale](double v) {
-        QSignalBlocker block(slider);
         slider->setValue(static_cast<int>(v * scale));
     });
 

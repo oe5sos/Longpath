@@ -12,9 +12,6 @@ StartupPrefsPage::StartupPrefsPage(RadioModel* model, QWidget* parent)
     // Section: Startup
     addSection(QStringLiteral("Startup"));
 
-    auto* autoConnect = addLabeledToggle(QStringLiteral("Auto-connect to last radio"));
-    markNyi(autoConnect, QStringLiteral("Phase 3A"));
-
     auto* restoreFreq = addLabeledToggle(QStringLiteral("Restore last frequency on connect"));
     markNyi(restoreFreq, QStringLiteral("Phase 3E"));
 
