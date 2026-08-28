@@ -24,6 +24,39 @@
 //                                    spy on `spotReceived(DxSpot)` rather
 //                                    than calling a parser seam
 //                                    synchronously).
+//   2026-08-26  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (SpotHub POTA improvement pass, no
+//                                    upstream equivalent). Added
+//                                    `reference` and `entity` so
+//                                    activation-style sources (POTA
+//                                    today; SOTA is scoped but not yet
+//                                    connected — see PotaClient.h) don't
+//                                    have to flatten their park/summit
+//                                    reference into the free-text
+//                                    `comment` string. `entity` is the
+//                                    reference's location prefix (POTA
+//                                    "US-4558" -> "US"), giving
+//                                    SpotTableModel/BandFilterProxy a
+//                                    clean column to filter on
+//                                    (mirrors DX-cluster's DXCC concept
+//                                    for activation spots). Both are
+//                                    empty for sources that have no
+//                                    such reference (Cluster, RBN,
+//                                    WSJT-X, SpotCollector, FreeDV,
+//                                    PSK).
+//   2026-08-27  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (operator-requested follow-up).
+//                                    Added `grid` (Maidenhead locator
+//                                    of the spotted park, "grid6" from
+//                                    the POTA API -- already present
+//                                    in every live spot, no extra
+//                                    lookup needed) so SpotTableModel
+//                                    can show distance/bearing from
+//                                    the operator's own grid using the
+//                                    existing Maidenhead.h helpers
+//                                    (same maths FreeDVReporterDialog
+//                                    already uses for station
+//                                    distance/heading).
 
 #pragma once
 
@@ -44,6 +77,9 @@ struct DxSpot {
     QString color;           // #AARRGGBB for radio spot color (optional)
     int     snr{0};          // signal-to-noise ratio (dB)
     int     lifetimeSec{0};  // 0 = use source default from AppSettings
+    QString reference;       // park/summit reference, e.g. "US-4558" (empty if source has none)
+    QString entity;          // reference's location prefix, e.g. "US" (empty if source has none)
+    QString grid;            // Maidenhead locator of the spot, e.g. "DM52ph" (empty if source has none)
 };
 
 }  // namespace Longpath

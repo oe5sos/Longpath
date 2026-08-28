@@ -19,6 +19,7 @@ private slots:
     void parsesPotaJsonResponse();
     void dedupsAcrossPolls();
     void rejectsMalformedJson();
+    void fallsBackToParkNameWhenCommentsEmpty();
 };
 
 void TestPotaClient::parsesPotaJsonResponse() {
@@ -31,7 +32,8 @@ void TestPotaClient::parsesPotaJsonResponse() {
         "name": "Acadia NP",
         "spotTime": "2026-05-10T17:08:00Z",
         "spotter": "W1AW",
-        "comments": "POTA K-1234"
+        "comments": "POTA K-1234",
+        "grid6": "FN31pr"
     }])";
 
     PotaClient client;
@@ -40,6 +42,42 @@ void TestPotaClient::parsesPotaJsonResponse() {
     QCOMPARE(spots[0].dxCall, QStringLiteral("K3POTA"));
     QCOMPARE(spots[0].freqMhz, 14.260);
     QCOMPARE(spots[0].source, QStringLiteral("POTA"));
+    // 2026-08-26 (SpotHub POTA improvement pass, no upstream
+    // equivalent): reference/entity are now structured fields instead
+    // of being folded into `comment` -- see DxSpot.h.
+    QCOMPARE(spots[0].reference, QStringLiteral("K-1234"));
+    QCOMPARE(spots[0].entity, QStringLiteral("K"));
+    // 2026-08-27 (operator-requested follow-up): grid6 feeds
+    // SpotTableModel's distance/bearing columns, no extra lookup.
+    QCOMPARE(spots[0].grid, QStringLiteral("FN31pr"));
+    // `comment` carries the real operator note (API's `comments`
+    // field) plus the mode suffix that SpotTableModel::extractMode
+    // relies on -- no longer a synthesized "ref park mode" string.
+    QCOMPARE(spots[0].comment, QStringLiteral("POTA K-1234 SSB"));
+}
+
+void TestPotaClient::fallsBackToParkNameWhenCommentsEmpty() {
+    // 2026-08-26: when the API's `comments` field is empty, `comment`
+    // falls back to the park name (still with the mode suffix) rather
+    // than being left blank.
+    QByteArray json = R"([{
+        "spotId": 99,
+        "activator": "KB9LBE",
+        "frequency": "14283.0",
+        "mode": "SSB",
+        "reference": "US-1772",
+        "name": "Mark Twain State Park",
+        "spotTime": "2026-08-26T20:07:22",
+        "spotter": "KC1VIO",
+        "comments": ""
+    }])";
+
+    PotaClient client;
+    auto spots = client.parseJsonForTest(json);
+    QCOMPARE(spots.size(), 1);
+    QCOMPARE(spots[0].reference, QStringLiteral("US-1772"));
+    QCOMPARE(spots[0].entity, QStringLiteral("US"));
+    QCOMPARE(spots[0].comment, QStringLiteral("Mark Twain State Park SSB"));
 }
 
 void TestPotaClient::dedupsAcrossPolls() {

@@ -104,7 +104,10 @@ private slots:
         auto* dlg = makeDialog();
         auto* tabs = dlg->findChild<QTabWidget*>();
         QVERIFY(tabs != nullptr);
-        QCOMPARE(tabs->count(), 10);
+        // 11, not 10: the POTA improvement pass (2026-08-26/27) added
+        // an "Alerts" tab -- see tst_spothub_dialog_smoke.cpp's
+        // tabOrderMatchesAetherSdr() for the full updated order.
+        QCOMPARE(tabs->count(), 11);
         delete dlg;
     }
 

@@ -134,7 +134,10 @@ void TestSpotHubDialogSmoke::hasTenTabs() {
     auto* dlg = makeDialog();
     auto* tabs = dlg->findChild<QTabWidget*>();
     QVERIFY(tabs != nullptr);
-    QCOMPARE(tabs->count(), 10);
+    // 11, not 10: the POTA improvement pass (2026-08-26/27) added an
+    // "Alerts" tab right after POTA -- see tabOrderMatchesAetherSdr()
+    // for the full updated order.
+    QCOMPARE(tabs->count(), 11);
     delete dlg;
 }
 
@@ -144,17 +147,21 @@ void TestSpotHubDialogSmoke::tabOrderMatchesAetherSdr() {
     QVERIFY(tabs != nullptr);
     // NereusSDR-native Settings tab is in position 0; the AetherSDR
     // upstream order (Cluster, RBN, WSJT, SpotCollector, POTA, FreeDV,
-    // PSK, Spot List, Display) is preserved starting at index 1.
+    // PSK, Spot List, Display) is preserved starting at index 1, with
+    // one NereusSDR-native insertion: "Alerts" (POTA Alerts client,
+    // 2026-08-26/27 follow-up) sits right after POTA and before FreeDV,
+    // shifting everything from FreeDV onward back by one.
     QVERIFY(tabs->tabText(0).contains("Settings", Qt::CaseInsensitive));
     QVERIFY(tabs->tabText(1).contains("Cluster", Qt::CaseInsensitive));
     QVERIFY(tabs->tabText(2).contains("RBN", Qt::CaseInsensitive));
     QVERIFY(tabs->tabText(3).contains("WSJT", Qt::CaseInsensitive));
     QVERIFY(tabs->tabText(4).contains("SpotCollector", Qt::CaseInsensitive));
     QVERIFY(tabs->tabText(5).contains("POTA", Qt::CaseInsensitive));
-    QVERIFY(tabs->tabText(6).contains("FreeDV", Qt::CaseInsensitive));
-    QVERIFY(tabs->tabText(7).contains("PSK", Qt::CaseInsensitive));
-    QVERIFY(tabs->tabText(8).contains("Spot List", Qt::CaseInsensitive));
-    QVERIFY(tabs->tabText(9).contains("Display", Qt::CaseInsensitive));
+    QVERIFY(tabs->tabText(6).contains("Alerts", Qt::CaseInsensitive));
+    QVERIFY(tabs->tabText(7).contains("FreeDV", Qt::CaseInsensitive));
+    QVERIFY(tabs->tabText(8).contains("PSK", Qt::CaseInsensitive));
+    QVERIFY(tabs->tabText(9).contains("Spot List", Qt::CaseInsensitive));
+    QVERIFY(tabs->tabText(10).contains("Display", Qt::CaseInsensitive));
     delete dlg;
 }
 
@@ -332,16 +339,22 @@ void TestSpotHubDialogSmoke::spotListBandPillTogglesProxyFilter() {
     auto* pill20 = dlg->findChild<QPushButton*>("spotListBandPill_20m");
     QVERIFY(pill20 != nullptr);
     QVERIFY(pill20->isCheckable());
-    // Default state - all bands visible
+    // Solo-click, not independent toggle (2026-08-27 follow-up, see
+    // SpotHubDialog.cpp's band-row wiring comment): a click on one pill
+    // isolates the list to that band; the same click again restores
+    // every band. setChecked()+toggled() alone no longer drives the
+    // proxy -- the handler listens for clicked(), so exercise it via
+    // click() the way a real user press would.
     QVERIFY(proxy->isBandVisible("20m"));
-    // Toggle off
-    pill20->setChecked(false);
-    emit pill20->toggled(false);
-    QVERIFY(!proxy->isBandVisible("20m"));
-    // Toggle back on
-    pill20->setChecked(true);
-    emit pill20->toggled(true);
+    QVERIFY(proxy->isBandVisible("40m"));
+    // Solo to 20m
+    pill20->click();
     QVERIFY(proxy->isBandVisible("20m"));
+    QVERIFY(!proxy->isBandVisible("40m"));
+    // Same pill again: restores every band
+    pill20->click();
+    QVERIFY(proxy->isBandVisible("20m"));
+    QVERIFY(proxy->isBandVisible("40m"));
     delete dlg;
 }
 
