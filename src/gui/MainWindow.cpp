@@ -764,9 +764,17 @@ MainWindow::MainWindow(QWidget* parent)
     // Jeder gescheiterte Verbindungsversuch sagt jetzt, WARUM — auch der
     // von Hand angestossene. 14 Sekunden, weil der Text zwei Saetze hat
     // und der Bediener in dem Moment ohnehin ratlos ist.
+    //
+    // Review-Fund 2026-08-28: eigene Wache, unabhaengig von der beim
+    // Verbinden-Dialog (m_connectionPanelAutoOpenedThisEpisode) -- ohne
+    // sie stapelt ein unbegrenzter automatischer Wiederholversuch
+    // (P2-Stillewaechter) einen 14-Sekunden-Hinweis nach dem anderen,
+    // solange die Stoerung anhaelt. Einmal je Ausfall reicht.
     connect(m_radioModel, &RadioModel::connectAttemptFailed,
             this, [this](Longpath::ConnectFailure, const QString& detail) {
         if (detail.isEmpty()) { return; }
+        if (m_connectFailedToastShownThisEpisode) { return; }
+        m_connectFailedToastShownThisEpisode = true;
         showToast(detail, ToastSeverity::Warning, 14000);
     });
 
@@ -2540,8 +2548,7 @@ void MainWindow::wireSpectrumForPan(SpectrumWidget* sw, const QString& panId)
     connect(sw, &SpectrumWidget::spotRotorRequested,
             this, [this](const QString& dxCall) {
         if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-            m_rotorDock->show();
-            m_rotorDock->raise();
+            raiseRotorPanel();
             panel->workSpot(dxCall);
         }
     });
@@ -2558,8 +2565,7 @@ void MainWindow::wireSpectrumForPan(SpectrumWidget* sw, const QString& panId)
     connect(sw, &SpectrumWidget::spotLogRequested,
             this, [this](const QString& dxCall) {
         if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-            m_rotorDock->show();
-            m_rotorDock->raise();
+            raiseRotorPanel();
             panel->takeSpot(dxCall);
         }
     });
@@ -3622,8 +3628,7 @@ void MainWindow::buildUI()
         connect(activeSpectrumWidget(), &SpectrumWidget::spotRotorRequested,
                 this, [this](const QString& dxCall) {
             if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-                m_rotorDock->show();
-                m_rotorDock->raise();
+                raiseRotorPanel();
                 panel->workSpot(dxCall);
             }
         });
@@ -3633,8 +3638,7 @@ void MainWindow::buildUI()
         connect(activeSpectrumWidget(), &SpectrumWidget::spotLogRequested,
                 this, [this](const QString& dxCall) {
             if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-                m_rotorDock->show();
-                m_rotorDock->raise();
+                raiseRotorPanel();
                 panel->takeSpot(dxCall);
             }
         });
@@ -12025,6 +12029,20 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         // Taskleiste erreichbar. Der richtige Weg nach draussen bleibt
         // detachRotorPanel() -> ToolWindow, das dieselbe Titelleiste +
         // Anfasser + Schloss traegt wie jedes andere Fenster im Programm.
+        // Review-Fund 2026-08-28, live geprueft und WIEDER verworfen:
+        // DockWidgetClosable allein nimmt zwar auch DockWidgetMovable mit
+        // (setFeatures() ERSETZT die ganze Menge statt nur ein Bit zu
+        // loeschen) -- das sieht nach einem Versehen aus, und
+        // DockWidgetClosable | DockWidgetMovable schien der richtige Fix.
+        // Am laufenden Programm gezeigt: mit Movable gesetzt erzeugt ein
+        // Zug am Titel trotz FEHLENDEM DockWidgetFloatable ein natives,
+        // schlossloses Betriebssystem-Fenster -- genau das Bild, das der
+        // Betreiber weiter oben als "altes Format, laesst sich nicht
+        // veraendern" gemeldet hat. Qt erlaubt das Los-Ziehen auf macOS
+        // offenbar schon mit Movable allein, nicht erst mit Floatable.
+        // Unbeweglich ist der kleinere Fehler gegenueber dem groesseren:
+        // zurueck auf Closable allein, bis ein Fix gefunden ist, der
+        // wirklich nur innerhalb des Fensters umsetzt.
         m_rotorDock->setFeatures(QDockWidget::DockWidgetClosable);
         auto* panel = new RotorLogbookPanel(m_radioModel, m_qrzClient,
                                             m_qrzUploader, m_rotorDock);
@@ -12041,6 +12059,22 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
     // Frueher stand hier genau das — und der naechste Aufruf haette ein
     // ZWEITES Panel gebaut, mit eigener QRZ-Abfrage und eigenem Logbuch.
     return m_rotorPanel;
+}
+
+void MainWindow::raiseRotorPanel()
+{
+    ensureRotorPanel();
+    // m_rotorWindow zuerst: RotorFloating ist der Standardfall, und ein
+    // sichtbares m_rotorWindow laesst ein daneben existierendes, aber
+    // leeres m_rotorDock ohnehin unbeachtet (derselbe Vorrang wie in der
+    // connectionStateChanged-Bindung weiter unten).
+    if (m_rotorWindow) {
+        m_rotorWindow->show();
+        m_rotorWindow->raise();
+    } else if (m_rotorDock) {
+        m_rotorDock->show();
+        m_rotorDock->raise();
+    }
 }
 
 // ── Rotor/Log als eigenes Fenster ────────────────────────────────────
@@ -12230,9 +12264,7 @@ void MainWindow::setAppletPanelBelow(bool below)
 
 void MainWindow::openRotorDial()
 {
-    ensureRotorPanel();
-    m_rotorDock->show();
-    m_rotorDock->raise();
+    raiseRotorPanel();
 }
 
 // Ein Eintrag der Auswahl, der ein Fenster meint. Einschalten oeffnet,
@@ -12250,8 +12282,16 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
         // a profile that never opened it.
         if (on) {
             openLogbookWindow();
-        } else if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-            panel->hideLogbook();
+        } else if (m_rotorDock || m_rotorWindow) {
+            // Nur zumachen, was schon existiert. ensureRotorPanel() legt
+            // das (sichtbare!) Rotor/Log-Dock bei Bedarf neu an -- ohne
+            // diese Wache haette ein Profilwechsel, der WinLogbook als
+            // ERSTES in der Sitzung abschaltet, das Dock allein durch
+            // diesen Aufruf aus dem Nichts erscheinen lassen (Review-Fund
+            // 2026-08-28).
+            if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+                panel->hideLogbook();
+            }
         }
         return;
     }
@@ -12673,8 +12713,7 @@ void MainWindow::openSpotHub()
         connect(m_spotHubDialog.data(), &SpotHubDialog::rotorRequested,
                 this, [this](const QString& dxCall) {
                     if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-                        m_rotorDock->show();
-                        m_rotorDock->raise();
+                        raiseRotorPanel();
                         panel->workSpot(dxCall);
                     }
                 });
@@ -12686,8 +12725,7 @@ void MainWindow::openSpotHub()
         connect(m_spotHubDialog.data(), &SpotHubDialog::logSpotRequested,
                 this, [this](const QString& dxCall) {
                     if (RotorLogbookPanel* panel = ensureRotorPanel()) {
-                        m_rotorDock->show();
-                        m_rotorDock->raise();
+                        raiseRotorPanel();
                         panel->takeSpot(dxCall);
                     }
                 });
@@ -13151,6 +13189,10 @@ void MainWindow::onConnectionStateChanged()
     updateAddPanButtonState();
 
     if (m_radioModel->isConnected()) {
+        // Neuer Ausfall darf wieder einmal gemeldet werden.
+        m_connectionPanelAutoOpenedThisEpisode = false;
+        m_connectFailedToastShownThisEpisode = false;
+
         // Board code ("Saturn") not marketing name ("ANAN-G2 (Saturn)") —
         // the marketing name truncates at status-bar widths. boardCodeName()
         // returns the HPSDRHW enum label which is short and unambiguous.
@@ -13499,7 +13541,19 @@ void MainWindow::onConnectionStateChanged()
             // Only open if we were previously connected (transition from Connected,
             // not the initial Disconnected state at startup). We detect this by
             // checking if the model has ever reported a radio name — set on connect.
-            if (!m_radioModel->name().isEmpty()) {
+            //
+            // Review-Fund 2026-08-28: seit P2 (wie P1 schon vorher) bei
+            // Funkstille automatisch und unbegrenzt neu verbindet, durchlaeuft
+            // eine anhaltende Stoerung diesen Zweig immer wieder (LinkLost ->
+            // Connecting -> LinkLost -> ...). Ohne die Wache hier waere der
+            // Dialog bei jedem Durchlauf erneut nach vorn gekommen und haette
+            // dem Bediener den Fokus geraubt -- genau die Art staendiger
+            // Unterbrechung, die der automatische Wiederholversuch eigentlich
+            // vermeiden sollte. Einmal je Ausfall genuegt; zurueckgesetzt,
+            // sobald Connected wieder eintrifft (weiter oben in dieser Funktion).
+            if (!m_radioModel->name().isEmpty()
+                && !m_connectionPanelAutoOpenedThisEpisode) {
+                m_connectionPanelAutoOpenedThisEpisode = true;
                 showConnectionPanel();
             }
         }
@@ -13849,27 +13903,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
         w->deleteLater();
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-
-    // TEMP DIAGNOSTIC (2026-08-28) — tracking down a report that the
-    // process survives quit() with no visible window (same family as
-    // the 2026-08-22 incident documented above, different trigger).
-    // If a survivor shows up here, THAT class is what's still holding
-    // the event loop open; remove this block once identified.
-    {
-        int survivors = 0;
-        for (QWidget* w : QApplication::topLevelWidgets()) {
-            if (w == this) { continue; }
-            ++survivors;
-            qWarning().noquote() << QStringLiteral(
-                "closeEvent: surviving top-level widget class=%1 "
-                "isWindow=%2 isVisible=%3 objectName=%4")
-                .arg(QString::fromUtf8(w->metaObject()->className()))
-                .arg(w->isWindow()).arg(w->isVisible()).arg(w->objectName());
-        }
-        qWarning().noquote() << QStringLiteral(
-            "closeEvent: %1 surviving top-level widget(s) besides this, "
-            "just before quit()").arg(survivors);
-    }
 
     event->accept();
 

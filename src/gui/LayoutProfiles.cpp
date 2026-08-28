@@ -17,6 +17,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTimer>
 
 namespace Longpath {
 
@@ -193,7 +194,18 @@ void LayoutProfiles::captureIntoCurrent()
 void LayoutProfiles::applyCurrent()
 {
     if (m_current.isEmpty() || !m_apply) { return; }
-    if (const Profile* p = find(m_current)) { m_apply(p->state); }
+    if (const Profile* p = find(m_current)) {
+        m_apply(p->state);
+        // Review-Fund 2026-08-28: activate() emits currentChanged after
+        // applying; this sibling had silently dropped that. Harmless
+        // today (load() already emits it before this runs at startup),
+        // but restoring it keeps the contract the same for whichever
+        // caller reaches this next -- no captureIntoCurrent() call here
+        // on purpose, unlike activate(): this re-applies the ALREADY
+        // current profile onto itself, there is no other profile being
+        // switched away from to capture into.
+        emit currentChanged(m_current);
+    }
 }
 
 QVariantMap LayoutProfiles::snapshot(const QString& name) const
@@ -294,7 +306,32 @@ void LayoutProfiles::save() const
     // it to disk, so the next launch reloaded the stale list (Betreiber,
     // 2026-08-27: "bis auf eines alle geloescht, dann app geschlossen,
     // dann app geoeffnet und wieder alle da").
-    AppSettings::instance().save();
+    //
+    // The flush itself is COALESCED (Review-Fund 2026-08-28): save() is
+    // called from ~13 places in MainWindow.cpp, several on ordinary
+    // interactive gestures (e.g. AppletFloatingWindow::geometrySettled,
+    // 400 ms after a drag/resize ends) -- an unconditional
+    // AppSettings::save() there did a full settings-tree XML
+    // re-serialize + backup-rotate + fsync on every such gesture,
+    // stalling the GUI thread on every drag release. setValue() above is
+    // synchronous and cheap (in-memory only), so the data is already
+    // safe from this call's point of view; only the disk COMMIT is
+    // deferred, the same bool-guard + QTimer::singleShot idiom
+    // RadioModel::scheduleSettingsSave() already uses for the same
+    // reason. MainWindow::closeEvent's own unconditional
+    // AppSettings::instance().save() at quit is the backstop that
+    // guarantees this reaches disk even if the 500 ms debounce hasn't
+    // fired yet -- so the original bug this save() call fixed (a
+    // deletion lost on quit) stays fixed; only a crash within that
+    // 500 ms window could still lose it, versus the unbounded window
+    // before this method had any explicit save() at all.
+    if (!m_diskFlushScheduled) {
+        m_diskFlushScheduled = true;
+        QTimer::singleShot(500, this, [this]() {
+            m_diskFlushScheduled = false;
+            AppSettings::instance().save();
+        });
+    }
 }
 
 void LayoutProfiles::load()

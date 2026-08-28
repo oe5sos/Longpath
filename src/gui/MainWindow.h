@@ -660,6 +660,16 @@ private:
     void openChannelStrip();
     class RotorLogbookPanel* ensureRotorPanel();
 
+    /// Rotor/Log anzeigen, gleich in welcher der drei Formen (Dock,
+    /// unten, eigenes Fenster) es gerade lebt. Review-Fund 2026-08-28:
+    /// mehrere Aufrufer (Spot-Rechtsklick, Doppelklick, "Take Spot")
+    /// zeigten bisher immer m_rotorDock direkt -- seit RotorFloating
+    /// standardmaessig "True" ist, ist das dann eine leere, versteckte
+    /// Huelle, waehrend das echte Panel unsichtbar in m_rotorWindow
+    /// steckt. Derselbe Vorrang wie in der connectionStateChanged-
+    /// Bindung: m_rotorWindow zuerst.
+    void raiseRotorPanel();
+
     /// Rotor/Log in ein eigenes Fenster — mit Leiste, Schloss und
     /// Anfasser wie jedes andere Feld. Bis 2026-08-20 lag das Panel
     /// nackt im Splitter: keine Marke, kein ↗, kein Schloss. Es war
@@ -1000,6 +1010,21 @@ private:
     RadioModel* m_radioModel{nullptr};
     ConnectionPanel* m_connectionPanel{nullptr};
     SupportDialog* m_supportDialog{nullptr};
+
+    // Review-Fund 2026-08-28: seit der P2-Stillewaechter unbegrenzt
+    // wiederholt (Betreiberwunsch, kein Versuchslimit), durchlaeuft eine
+    // anhaltende Funkstille LinkLost->Connecting->LinkLost... immer wieder
+    // -- ohne diese Wachen haette jeder Durchlauf den Verbinden-Dialog
+    // erneut nach vorn geholt (Fokusraub) und/oder einen weiteren
+    // 14-Sekunden-Hinweis gestapelt. Zwei getrennte Flaggen, weil beide
+    // Ereignisse auf unterschiedlichen Signalen mit unterschiedlichem
+    // Timing haengen (siehe onConnectionStateChanged vs. der
+    // connectAttemptFailed-Anschluss) -- eine gemeinsame Flagge haette
+    // beim ersten Ausfall eines der beiden unterdrueckt, je nachdem
+    // welches Signal zuerst kam. Einmal je Ausfall reicht fuer jedes;
+    // beide zurueck auf false, sobald Connected wieder eintrifft.
+    bool m_connectionPanelAutoOpenedThisEpisode{false};
+    bool m_connectFailedToastShownThisEpisode{false};
 
     // Phase 3M-4 Task 8: PsForm modeless dialog (Tools > PureSignal...).
     // Lazy-constructed on first openPureSignalDialog() call; lives for the

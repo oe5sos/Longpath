@@ -525,7 +525,18 @@ private:
     // forever (2026-08-28, reported by operator). Updated on every inbound
     // frame that proves liveness (processIqPacket, processHighPriorityStatus);
     // checked in onKeepAliveTick() against kLinkLostSilenceMs.
-    QDateTime m_lastFrameAt;
+    //
+    // qint64 epoch-ms, not QDateTime (Review-Fund 2026-08-28): this is
+    // stamped on every inbound I/Q or status datagram -- hundreds of
+    // times per second per active DDC, two to three orders of magnitude
+    // more often than the 500 ms tick that reads it. QDateTime::
+    // currentDateTimeUtc() heap-allocates its shared private data on
+    // every call; QDateTime::currentMSecsSinceEpoch() (already used a
+    // few lines below in processIqPacket() for the window-report logic)
+    // does not. 0 means "no frame seen yet" -- Connecting always sets
+    // this before Connected can be reached, so a real timestamp is never
+    // legitimately 0.
+    qint64 m_lastFrameAtMs{0};
 
     // --- Mic-stream sequence audit (network investigation 2026-08-11) ---
     //
@@ -566,7 +577,7 @@ private:
     Longpath::MicReorderBuffer m_micReorder;
     static constexpr int kMicLosTimeoutMs = 3000;  // network.c:656 [v2.10.3.13]
 
-    // Silence budget for m_lastFrameAt before we call the link lost.
+    // Silence budget for m_lastFrameAtMs before we call the link lost.
     // 2000 ms matches P1's m_watchdogSilenceMs default (P1RadioConnection.h,
     // kWatchdogSilenceMs) — same reasoning applies to both protocols: this
     // is Longpath-original, not a Thetis value.

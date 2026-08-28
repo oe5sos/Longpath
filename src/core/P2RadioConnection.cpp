@@ -721,7 +721,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
     // Fresh session: invalidate any timestamp left over from a previous
     // connect so onKeepAliveTick()'s silence check can't fire against a
     // stale value before the first frame of the new session arrives.
-    m_lastFrameAt = QDateTime();
+    m_lastFrameAtMs = 0;
 
     setState(ConnectionState::Connecting);
 
@@ -854,7 +854,7 @@ void P2RadioConnection::disconnect()
     }
 
     // User-initiated stop: no more silence to detect.
-    m_lastFrameAt = QDateTime();
+    m_lastFrameAtMs = 0;
 
     setState(ConnectionState::Disconnected);
     qCDebug(lcConnection) << "P2: Disconnected. I/Q packets:" << m_totalIqPackets;
@@ -2182,19 +2182,26 @@ void P2RadioConnection::onKeepAliveTick()
         }
     }
 
-    // Mid-session link-loss detection — see m_lastFrameAt (P2RadioConnection.h).
+    // Mid-session link-loss detection — see m_lastFrameAtMs (P2RadioConnection.h).
     // Only applies once Connected: the dedicated m_connectWatchdog already
     // covers the initial-connect timeout while state is Connecting, and
     // firing both for the same silence would race two different teardown
     // paths against each other.
-    if (state() == ConnectionState::Connected && m_lastFrameAt.isValid()) {
-        const qint64 silenceMs = m_lastFrameAt.msecsTo(QDateTime::currentDateTimeUtc());
+    if (state() == ConnectionState::Connected && m_lastFrameAtMs != 0) {
+        const qint64 silenceMs = QDateTime::currentMSecsSinceEpoch() - m_lastFrameAtMs;
         if (silenceMs > kLinkLostSilenceMs) {
             qCWarning(lcConnection) << "P2: No I/Q or status frame for" << silenceMs
                                     << "ms; transitioning to LinkLost and scheduling reconnect";
             m_keepAliveTimer->stop();
             if (m_txIqTimer) { m_txIqTimer->stop(); }
             if (m_p2HeartbeatTimer) { m_p2HeartbeatTimer->stop(); }
+            // Review-Fund 2026-08-28: ohne dies bleibt m_running wahr, und
+            // connectToRadio() (aufgerufen vom folgenden Reconnect-Timer)
+            // faehrt bei "if (m_running) disconnect()" den vollen
+            // Abmelde-Weg -- blockierende Wartezeiten plus ein "SendStop"
+            // auf eine bereits tote Strecke -- statt eines einfachen
+            // Zustandswechsels. Mirrors onConnectTimeout()'s teardown.
+            m_running = false;
             setState(ConnectionState::LinkLost);
             emit errorOccurred(RadioConnectionError::NoDataTimeout,
                                QStringLiteral("Radio stopped responding"));
@@ -3123,8 +3130,8 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
         return;
     }
 
-    // Proves the link is alive — see m_lastFrameAt (P2RadioConnection.h).
-    m_lastFrameAt = QDateTime::currentDateTimeUtc();
+    // Proves the link is alive — see m_lastFrameAtMs (P2RadioConnection.h).
+    m_lastFrameAtMs = QDateTime::currentMSecsSinceEpoch();
 
     const auto* raw = reinterpret_cast<const unsigned char*>(data.constData());
 
@@ -3419,8 +3426,8 @@ void P2RadioConnection::onConnectTimeout()
 // Porting from Thetis ReadUDPFrame:519-532 — High Priority C&C status
 void P2RadioConnection::processHighPriorityStatus(const QByteArray& data)
 {
-    // Proves the link is alive — see m_lastFrameAt (P2RadioConnection.h).
-    m_lastFrameAt = QDateTime::currentDateTimeUtc();
+    // Proves the link is alive — see m_lastFrameAtMs (P2RadioConnection.h).
+    m_lastFrameAtMs = QDateTime::currentMSecsSinceEpoch();
 
     const auto* raw = reinterpret_cast<const unsigned char*>(data.constData());
 
