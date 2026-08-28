@@ -240,6 +240,7 @@ private slots:
     void onStreamReadyRead();
     void onConnectTimeout();
     void onKeepaliveTimeout();
+    void onDataWatchdogTick();
 
 private:
     // The DX/PRO/QRP profile table this connection uses for magic byte
@@ -307,6 +308,27 @@ private:
     QTimer*     m_connectWatchdog{nullptr};
 
     static constexpr int kConnectTimeoutMs = 3000;
+
+    // Post-connect silence detection — found missing entirely during
+    // review, 2026-08-28: nothing in this class re-armed after the
+    // initial connect watchdog stopped (see processStreamDatagram()'s
+    // Connecting->Connected promotion), so a QRP powered off or
+    // unplugged mid-session left ConnectionState stuck at Connected
+    // forever — the UI kept showing a live connection against dead
+    // air (verification README Row 7's exact scenario). Mirrors
+    // P1RadioConnection's own onWatchdogTick() silence-detection
+    // pattern (P1RadioConnection.cpp, kWatchdogTickMs periodic tick
+    // checking elapsed-since-last-frame), but simpler: this class has
+    // no reconnect timer of its own (a fresh RadioConnection is always
+    // created per connect attempt — see onConnectTimeout()'s own
+    // comment), so a tripped watchdog here fully tears down to
+    // LinkLost rather than arming a retry. kDataSilenceTimeoutMs
+    // matches ConnectionState::LinkLost's own doc comment in
+    // ConnectionState.h ("Was Connected; no frames for >5s") exactly.
+    QTimer* m_dataWatchdog{nullptr};
+    QElapsedTimer m_lastStreamPacketAt;
+    static constexpr int kDataWatchdogTickMs = 1000;
+    static constexpr int kDataSilenceTimeoutMs = 5000;
 
     const SunSdr::Profile* m_profile{nullptr};
     const BoardCapabilities* m_caps{nullptr};

@@ -190,6 +190,14 @@ void SunSdrRadioConnection::init()
     connect(m_keepaliveTimer, &QTimer::timeout,
             this, &SunSdrRadioConnection::onKeepaliveTimeout);
 
+    // Same start/stop lifecycle as m_keepaliveTimer — armed once the RX
+    // gate opens (processControlDatagram()), stopped on disconnect()/
+    // onConnectTimeout()/its own trip. See the header's m_dataWatchdog
+    // comment for why this exists.
+    m_dataWatchdog = new QTimer(this);
+    connect(m_dataWatchdog, &QTimer::timeout,
+            this, &SunSdrRadioConnection::onDataWatchdogTick);
+
     qCDebug(lcSunSdr) << "SunSdr: init() control port"
                       << m_controlSocket->localPort() << "stream port"
                       << m_streamSocket->localPort();
@@ -311,6 +319,8 @@ void SunSdrRadioConnection::onConnectTimeout()
     m_awaitingBeacon = false;
     setRxReady(false);
     if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
+    if (m_dataWatchdog) { m_dataWatchdog->stop(); }
+    m_lastStreamPacketAt.invalidate();
     if (m_controlSocket) { m_controlSocket->close(); }
     if (m_streamSocket) { m_streamSocket->close(); }
 
@@ -338,6 +348,10 @@ void SunSdrRadioConnection::disconnect()
     if (m_keepaliveTimer) {
         m_keepaliveTimer->stop();
     }
+    if (m_dataWatchdog) {
+        m_dataWatchdog->stop();
+    }
+    m_lastStreamPacketAt.invalidate();
 
     setState(ConnectionState::Disconnected);
 }
@@ -535,6 +549,16 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
     if (m_keepaliveTimer) {
         m_keepaliveTimer->start(kKeepaliveIntervalMs);
     }
+
+    // Baseline the silence clock here too, same reasoning as the
+    // keepalive above — arm it from when the session is considered
+    // live, not from whenever the first I/Q packet happens to land, so
+    // a genuinely slow stream start doesn't eat into the silence
+    // budget it hasn't earned yet.
+    m_lastStreamPacketAt.restart();
+    if (m_dataWatchdog) {
+        m_dataWatchdog->start(kDataWatchdogTickMs);
+    }
 }
 
 void SunSdrRadioConnection::onStreamReadyRead()
@@ -543,6 +567,12 @@ void SunSdrRadioConnection::onStreamReadyRead()
 
     while (m_streamSocket->hasPendingDatagrams()) {
         const QNetworkDatagram dgram = m_streamSocket->receiveDatagram();
+        // Any datagram at all on this socket proves the radio is still
+        // there and talking to us — restart the silence clock before
+        // processStreamDatagram()'s own content checks (rxReady gate,
+        // opcode filter), so onDataWatchdogTick() reflects real link
+        // liveness rather than only "decoded valid I/Q" liveness.
+        m_lastStreamPacketAt.restart();
         processStreamDatagram(dgram.data());
     }
 }
@@ -601,6 +631,39 @@ void SunSdrRadioConnection::onKeepaliveTimeout()
                                            m_txSeq++, /*byte8=*/0, /*byte9=*/0);
     pkt.append(SunSdr::kIqPayloadSize, char(0));
     m_streamSocket->writeDatagram(pkt, m_radioAddr, m_profile->defaultStreamPort);
+}
+
+void SunSdrRadioConnection::onDataWatchdogTick()
+{
+    if (!m_running || state() != ConnectionState::Connected) { return; }
+    if (!m_lastStreamPacketAt.isValid()) { return; }
+    if (m_lastStreamPacketAt.elapsed() <= kDataSilenceTimeoutMs) { return; }
+
+    // Full teardown, not just a state flip — same discipline as
+    // onConnectTimeout()'s own precedent in this file: this class has
+    // no reconnect timer to hand off to (see that function's comment),
+    // so leaving the sockets bound and rxReady open after declaring
+    // the link lost would let a late, spurious packet keep flowing
+    // into the DSP/audio/spectrum pipeline while the UI says the link
+    // is down. The operator reconnects via a brand-new instance
+    // (RadioModel's normal connect path), same as after any other
+    // disconnect.
+    qCWarning(lcSunSdr) << "SunSdr: no I/Q data for"
+                        << m_lastStreamPacketAt.elapsed()
+                        << "ms - radio unreachable, powered off, or "
+                           "network path lost; declaring link lost";
+    m_running = false;
+    m_awaitingBeacon = false;
+    setRxReady(false);
+    if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
+    if (m_dataWatchdog) { m_dataWatchdog->stop(); }
+    m_lastStreamPacketAt.invalidate();
+    if (m_controlSocket) { m_controlSocket->close(); }
+    if (m_streamSocket) { m_streamSocket->close(); }
+
+    setState(ConnectionState::LinkLost);
+    emit errorOccurred(RadioConnectionError::NoDataTimeout,
+                       QStringLiteral("SunSDR: radio stopped responding"));
 }
 
 // ── Safe no-ops: receive-only, see header ───────────────────────────

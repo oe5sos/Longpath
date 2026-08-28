@@ -272,30 +272,26 @@ void decodeIqSamples(const quint8* payload, int payloadLen,
 
 // ── Frequency-set payload (opcode 0x08/0x09): candidate encoding ────
 //
-// NOT BENCH-CONFIRMED. Design doc, "candidate frequency-encoding
-// formula found — source-grounded, band-plausible, but NOT
-// bench-confirmed" (2026-08-27): derived from ArtemisSDR's real
-// sunsdr_send_freq_pkt() (sunsdr.c:2259-2277 [@f8b01d25c5]) —
-// `scaled = freqHz * SUNSDR_FREQ_SCALE` (SUNSDR_FREQ_SCALE=10,
-// sunsdr.h:123 [@f8b01d25c5]), an 8-byte little-endian integer at
-// payload offset 0. Applied to the one exact QRP-captured frame this
-// project has in code (SunSdrRadioConnection::replayedFrequencyFrameForTest()),
-// this formula's inverse lands cleanly in the 20m amateur band
-// (~14.2139 MHz) with a clean 100 Hz step between three observed
-// tuning-knob positions — internally consistent and plausible, but
-// still just a hypothesis: no capture at one exact, KNOWN frequency
-// has confirmed it. See the design doc section for the full
-// derivation and the one-capture confirmation step that would settle
-// it either way.
+// CONFIRMED 2026-08-27. Design doc, "candidate frequency-encoding
+// formula found — source-grounded, band-plausible" (2026-08-26),
+// upgraded from hypothesis to confirmed the next day against a live,
+// exact, known-frequency bench test — see
+// SunSdrRadioConnection::setReceiverFrequency()'s implementation
+// comment for the numbers (ExpertSDR2 at 7,099,904 Hz vs. this
+// formula's 7,099,204 Hz from the same real captured frame, 700 Hz
+// apart out of 7.1 MHz, consistent with VFO scroll-settling lag, not a
+// formula error). Derived from ArtemisSDR's real sunsdr_send_freq_pkt()
+// (sunsdr.c:2259-2277 [@f8b01d25c5]) — `scaled = freqHz *
+// SUNSDR_FREQ_SCALE` (SUNSDR_FREQ_SCALE=10, sunsdr.h:123
+// [@f8b01d25c5]), an 8-byte little-endian integer at payload offset 0.
 //
-// Deliberately NOT wired into SunSdrRadioConnection::setReceiverFrequency()
-// — this project's standing discipline for this connection is
-// exact-byte replay of already-bench-confirmed frames only, and a
-// computed value from an unconfirmed formula is exactly the guess that
-// discipline exists to keep off the wire against real hardware. These
-// functions exist so the math can be tested now, safely, with zero
-// wire risk, and wired in the moment a bench capture confirms (or
-// refines) the formula.
+// Wired into SunSdrRadioConnection::setReceiverFrequency() since
+// 2026-08-27 — that function reuses the exact 18-byte header prefix
+// from the one bench-confirmed-accepted frequency-set frame and
+// appends this payload for the requested Hz value. The one caveat
+// that remains genuinely open (not this formula): the header's bytes
+// 14-17 carry a varying, not-fully-understood value in every real
+// captured frame — see that function's own comment.
 //
 // Only the low 4 bytes are populated (32-bit range, ~429 MHz headroom
 // at this scale) because that's all any observed real frame ever used
