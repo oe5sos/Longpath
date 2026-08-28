@@ -1094,6 +1094,18 @@ void AudioEngine::setAsrTap(AudioTapRing* ring, int sliceId)
     }
 }
 
+void AudioEngine::setWavRecordTap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie bei den beiden anderen Abgriffen.
+    if (ring) {
+        m_wavRecordTapSlice.store(sliceId, std::memory_order_release);
+        m_wavRecordTap.store(ring, std::memory_order_release);
+    } else {
+        m_wavRecordTap.store(nullptr, std::memory_order_release);
+        m_wavRecordTapSlice.store(-1, std::memory_order_release);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1303,6 +1315,15 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // geteilter Ring haette einen Leser zu wenig.
     if (AudioTapRing* tap = m_asrTap.load(std::memory_order_acquire)) {
         if (sliceId == m_asrTapSlice.load(std::memory_order_acquire)) {
+            tap->write(samples, frames * 2);
+        }
+    }
+
+    // Der Abgriff fuer die "off the air"-WAV-Aufnahme (Phase 3M).
+    // Wieder ein eigener Ring, aus demselben Grund wie beim
+    // ASR-Abgriff. Design doc: phase3m-recording-design.md §7.1.
+    if (AudioTapRing* tap = m_wavRecordTap.load(std::memory_order_acquire)) {
+        if (sliceId == m_wavRecordTapSlice.load(std::memory_order_acquire)) {
             tap->write(samples, frames * 2);
         }
     }

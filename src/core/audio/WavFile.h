@@ -90,10 +90,22 @@ mw0lge@grange-lane.co.uk
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-08-25 — WavStreamWriter ergaenzt (Phase 3M Recording): die
+//                 obigen writeWav*-Funktionen brauchen die ganze
+//                 Aufnahme im Speicher, bevor sie schreiben koennen.
+//                 Eine "off the air"-Aufnahme soll aber laufen
+//                 duerfen, ohne vorher zu wissen wie lange — daher
+//                 ein Schreiber, der Block fuer Block direkt auf die
+//                 Platte schreibt und den WAV-Kopf beim Schliessen
+//                 nachtraegt. Von Martin Fischer, KI-gestuetzt ueber
+//                 Anthropic Claude (Cowork).
 // =================================================================
 
+#include <QFile>
 #include <QString>
 #include <QVector>
+
+#include <random>
 
 namespace Longpath {
 
@@ -106,6 +118,22 @@ struct WavData {
 // Liest eine WAV-Datei als einkanalige float-Folge.
 // Bei Fehlern ist ok == false und *error (falls gegeben) gesetzt.
 WavData readWavMono(const QString& path, QString* error = nullptr);
+
+// Zweikanalig, verschachtelt (L,R,L,R…), OHNE zu mitteln — Gegenstueck
+// zu writeWavStereo(). readWavMono() waere hier falsch: es mittelt die
+// Kanaele zusammen, und das zerstoert das Signal, wenn die beiden
+// Kanaele UNTERSCHIEDLICHE Dinge tragen statt derselben Stimme von
+// zwei Mikrofonen — z.B. rohes I/Q (IqRecorder, Phase 3M-B: links = I,
+// rechts = Q) oder die QSO-Aufnahme (links = Gehoertes, rechts =
+// Gesagtes). Eine einkanalige Datei wird verdoppelt (L=R) zurueckgegeben,
+// damit ein Aufrufer nicht zwischen ein- und zweikanalig unterscheiden
+// muss.
+struct WavStereoData {
+    QVector<float> interleaved;  // L,R,L,R… (oder I,Q,I,Q…), -1..+1
+    int            sampleRate{0};
+    bool           ok{false};
+};
+WavStereoData readWavStereo(const QString& path, QString* error = nullptr);
 
 // Schreibt einkanaliges float32-WAV. Dasselbe Format, das
 // TxAudioRecorder::saveWav erzeugt — wer eine Aufnahme von dort
@@ -142,5 +170,58 @@ bool writeWavStereo16(const QString& path, const QVector<float>& interleaved,
 // Dauer in Sekunden, ohne die Datei ganz zu lesen wenn moeglich.
 // Gibt 0 zurueck, wenn die Datei nicht lesbar ist.
 double wavDurationSeconds(const QString& path);
+
+// Zweikanaliges WAV, Block fuer Block auf die Platte geschrieben statt
+// im Speicher gesammelt. Fuer Aufnahmen ohne bekannte Laenge im
+// Voraus — siehe Begruendung oben in der Aenderungsgeschichte.
+//
+// Ablauf: open(), dann writeInterleaved() beliebig oft, dann close().
+// Der RIFF- und der data-Blockkopf tragen beim Schreiben noch die
+// Laenge 0; close() traegt die wahren Groessen nach. Bricht das
+// Programm vorher ab, bleibt eine WAV-Datei mit Laenge 0 im Kopf
+// stehen — von den meisten Abspielprogrammen dennoch lesbar, weil sie
+// selbst bis zum Dateiende lesen, aber technisch nicht spezifikations-
+// treu. Das ist der Preis fuer "kann beliebig lange laufen"; wer eine
+// robustere Loesung braucht, muss den Kopf periodisch nachtragen.
+class WavStreamWriter {
+public:
+    enum class Format {
+        Float32Stereo,  // 32-Bit IEEE-Float, verschachtelt, wie writeWavStereo()
+        Pcm16Stereo,    // 16-Bit PCM mit Dither, wie writeWavStereo16()
+    };
+
+    WavStreamWriter() = default;
+    ~WavStreamWriter();
+
+    // Nicht kopierbar — der Dateizugriff gehoert genau einer Stelle.
+    WavStreamWriter(const WavStreamWriter&) = delete;
+    WavStreamWriter& operator=(const WavStreamWriter&) = delete;
+
+    bool open(const QString& path, int sampleRate, Format format,
+             bool dither = true, QString* error = nullptr);
+
+    // `interleaved` hat frames*2 Werte (L,R,L,R…). Gibt false zurueck,
+    // wenn die Datei nicht offen ist oder das Schreiben fehlschlaegt —
+    // der Aufrufer soll das als Aufnahmeabbruch behandeln, nicht als
+    // stillen Datenverlust.
+    bool writeInterleaved(const float* interleaved, int frames);
+
+    // Traegt RIFF- und data-Groesse nach und schliesst die Datei.
+    // Gefahrlos mehrfach aufzurufen; nach dem ersten Mal ist isOpen()
+    // false und weitere Aufrufe tun nichts.
+    void close();
+
+    bool  isOpen() const { return m_file.isOpen(); }
+    qint64 framesWritten() const { return m_framesWritten; }
+
+private:
+    QFile          m_file;
+    Format         m_format{Format::Pcm16Stereo};
+    int            m_sampleRate{0};
+    bool           m_dither{true};
+    qint64         m_dataBytes{0};
+    qint64         m_framesWritten{0};
+    std::mt19937   m_rng;
+};
 
 } // namespace Longpath

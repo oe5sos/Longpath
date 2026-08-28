@@ -1657,6 +1657,10 @@ nereus_add_test(tst_alex_tx_lpf_source)
 # NereusSDR-original: no Thetis port.
 nereus_add_test(tst_p1_alex_lpf_word_source)
 
+# Regression test for the 2026-08-26 band/mode persistence race (OE5SOS
+# live bug report). See the test file's own header for the full story.
+nereus_add_test(tst_radio_model_band_save_uses_slice_frequency)
+
 # ── A band change must retune the DDC even while CTUN holds it ───────────────
 # CTUN pins the DDC via ReceiverManager::m_ddcFreqLocked so a VFO nudge inside
 # the pinned window moves the slice shift instead of retuning hardware. A band
@@ -5085,6 +5089,16 @@ set_tests_properties(tst_settings_migration_longpath PROPERTIES
 nereus_add_test(tst_wav_file)
 nereus_add_test(tst_voice_keyer)
 nereus_add_test(tst_qso_recorder)
+nereus_add_test(tst_wav_recorder)
+nereus_add_test(tst_wav_recorder_controller)
+nereus_add_test(tst_iq_recorder)
+nereus_add_test(tst_iq_recorder_controller)
+nereus_add_test(tst_recording_scheduler)
+
+# Phase 3M-C (docs/architecture/phase3m-recording-plan.md):
+# PlaybackRadioConnection. See the test file's own header for what it
+# pins and why.
+nereus_add_test(tst_playback_radio_connection)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still
@@ -5598,6 +5612,20 @@ nereus_add_test(tst_spot_collector_parser)
 # parsesPotaJsonResponse, dedupsAcrossPolls, rejectsMalformedJson.
 # Source: AetherSDR src/core/PotaClient.cpp [@0cd4559].
 nereus_add_test(tst_pota_client)
+
+# ── SpotHub POTA improvement pass: PotaParkInfoClient JSON parser ───────────
+# NereusSDR-native, no upstream equivalent (operator-requested follow-up,
+# 2026-08-27). Pins the contract that PotaParkInfoClient parses
+# api.pota.app/park/{reference} JSON responses. 3 tests:
+# parsesParkInfoResponse, rejectsMalformedJson, rejectsResponseWithoutReference.
+nereus_add_test(tst_pota_park_info_client)
+
+# ── SpotHub POTA improvement pass: PotaAlertsClient JSON parser ─────────────
+# NereusSDR-native, no upstream equivalent (operator-requested follow-up,
+# 2026-08-27). Pins the contract that PotaAlertsClient parses
+# api.pota.app/activation JSON responses. 3 tests: parsesAlertsResponse,
+# rejectsMalformedJson, skipsRowsMissingActivatorOrReference.
+nereus_add_test(tst_pota_alerts_client)
 
 # ── Phase 3J-2 Task B3: DxClusterClient telnet parser ───────────────────────
 # Pins the contract that DxClusterClient parses the standard DX cluster

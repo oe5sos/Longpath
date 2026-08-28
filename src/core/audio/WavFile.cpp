@@ -137,6 +137,80 @@ float sampleAt(const char* data, int byteOffset, quint16 format, quint16 bits)
     }
 }
 
+// Gemeinsamer Kopf-Durchlauf fuer readWavMono() und readWavStereo() --
+// vorher war das Ganze allein in readWavMono() eingebettet; ausgelagert,
+// als readWavStereo() dazukam (Phase 3M-C, PlaybackRadioConnection),
+// damit beide denselben RIFF-Parser benutzen statt ihn zweimal zu
+// pflegen. Verhalten von readWavMono() bewusst byteidentisch gehalten.
+struct WavHeader {
+    quint16     format{0};
+    quint16     channels{0};
+    quint16     bits{0};
+    quint32     rate{0};
+    const char* dataPtr{nullptr};
+    quint32     dataLen{0};
+    bool        ok{false};
+};
+
+WavHeader parseWavHeader(const QByteArray& blob, QString* error)
+{
+    WavHeader h;
+
+    if (blob.size() < 12
+        || std::memcmp(blob.constData(), "RIFF", 4) != 0
+        || std::memcmp(blob.constData() + 8, "WAVE", 4) != 0) {
+        fail(error, QStringLiteral("not a WAV file"));
+        return h;
+    }
+
+    // Bloecke der Reihe nach durchgehen statt Byte 44 zu glauben: viele
+    // Werkzeuge schieben LIST- oder fact-Bloecke zwischen fmt und data,
+    // und ein Leser mit fester Kopfgroesse liest dann Text als Ton.
+    int pos = 12;
+    while (pos + kChunkHeaderBytes <= blob.size()) {
+        const char* id = blob.constData() + pos;
+        const quint32 len = readU32(blob.constData() + pos + 4);
+        const int body = pos + kChunkHeaderBytes;
+        if (body + static_cast<int>(len) > blob.size()) { break; }
+
+        if (std::memcmp(id, "fmt ", 4) == 0 && len >= 16) {
+            h.format   = readU16(blob.constData() + body);
+            h.channels = readU16(blob.constData() + body + 2);
+            h.rate     = readU32(blob.constData() + body + 4);
+            h.bits     = readU16(blob.constData() + body + 14);
+
+            // WAVE_FORMAT_EXTENSIBLE versteckt das eigentliche Format in
+            // einer GUID; deren erste zwei Bytes sind die Kennung.
+            if (h.format == kFormatExtensible && len >= 40) {
+                h.format = readU16(blob.constData() + body + 24);
+            }
+        } else if (std::memcmp(id, "data", 4) == 0) {
+            h.dataPtr = blob.constData() + body;
+            h.dataLen = len;
+        }
+
+        // Bloecke ungerader Laenge sind auf gerade aufgefuellt.
+        pos = body + static_cast<int>(len) + (len & 1u);
+    }
+
+    if (h.dataPtr == nullptr || h.rate == 0 || h.channels == 0 || h.bits == 0) {
+        fail(error, QStringLiteral("WAV without usable fmt/data chunk"));
+        return h;
+    }
+    if (h.format != kFormatPcm && h.format != kFormatIeeeFloat) {
+        fail(error, QStringLiteral("unsupported WAV format 0x%1")
+                        .arg(h.format, 4, 16, QLatin1Char('0')));
+        return h;
+    }
+    if (h.bits != 8 && h.bits != 16 && h.bits != 24 && h.bits != 32) {
+        fail(error, QStringLiteral("unsupported bit depth %1").arg(h.bits));
+        return h;
+    }
+
+    h.ok = true;
+    return h;
+}
+
 } // namespace
 
 WavData readWavMono(const QString& path, QString* error)
@@ -151,69 +225,16 @@ WavData readWavMono(const QString& path, QString* error)
     const QByteArray blob = f.readAll();
     f.close();
 
-    if (blob.size() < 12
-        || std::memcmp(blob.constData(), "RIFF", 4) != 0
-        || std::memcmp(blob.constData() + 8, "WAVE", 4) != 0) {
-        fail(error, QStringLiteral("not a WAV file"));
-        return out;
-    }
+    const WavHeader h = parseWavHeader(blob, error);
+    if (!h.ok) { return out; }
 
-    quint16 format = 0, channels = 0, bits = 0;
-    quint32 rate = 0;
-    const char* dataPtr = nullptr;
-    quint32 dataLen = 0;
-
-    // Bloecke der Reihe nach durchgehen statt Byte 44 zu glauben: viele
-    // Werkzeuge schieben LIST- oder fact-Bloecke zwischen fmt und data,
-    // und ein Leser mit fester Kopfgroesse liest dann Text als Ton.
-    int pos = 12;
-    while (pos + kChunkHeaderBytes <= blob.size()) {
-        const char* id = blob.constData() + pos;
-        const quint32 len = readU32(blob.constData() + pos + 4);
-        const int body = pos + kChunkHeaderBytes;
-        if (body + static_cast<int>(len) > blob.size()) { break; }
-
-        if (std::memcmp(id, "fmt ", 4) == 0 && len >= 16) {
-            format   = readU16(blob.constData() + body);
-            channels = readU16(blob.constData() + body + 2);
-            rate     = readU32(blob.constData() + body + 4);
-            bits     = readU16(blob.constData() + body + 14);
-
-            // WAVE_FORMAT_EXTENSIBLE versteckt das eigentliche Format in
-            // einer GUID; deren erste zwei Bytes sind die Kennung.
-            if (format == kFormatExtensible && len >= 40) {
-                format = readU16(blob.constData() + body + 24);
-            }
-        } else if (std::memcmp(id, "data", 4) == 0) {
-            dataPtr = blob.constData() + body;
-            dataLen = len;
-        }
-
-        // Bloecke ungerader Laenge sind auf gerade aufgefuellt.
-        pos = body + static_cast<int>(len) + (len & 1u);
-    }
-
-    if (dataPtr == nullptr || rate == 0 || channels == 0 || bits == 0) {
-        fail(error, QStringLiteral("WAV without usable fmt/data chunk"));
-        return out;
-    }
-    if (format != kFormatPcm && format != kFormatIeeeFloat) {
-        fail(error, QStringLiteral("unsupported WAV format 0x%1")
-                        .arg(format, 4, 16, QLatin1Char('0')));
-        return out;
-    }
-    if (bits != 8 && bits != 16 && bits != 24 && bits != 32) {
-        fail(error, QStringLiteral("unsupported bit depth %1").arg(bits));
-        return out;
-    }
-
-    const int bytesPerSample = bits / 8;
-    const int frameBytes     = bytesPerSample * channels;
+    const int bytesPerSample = h.bits / 8;
+    const int frameBytes     = bytesPerSample * h.channels;
     if (frameBytes <= 0) {
         fail(error, QStringLiteral("WAV with zero-size frames"));
         return out;
     }
-    const int frames = static_cast<int>(dataLen) / frameBytes;
+    const int frames = static_cast<int>(h.dataLen) / frameBytes;
 
     out.samples.resize(frames);
     for (int i = 0; i < frames; ++i) {
@@ -221,14 +242,54 @@ WavData readWavMono(const QString& path, QString* error)
         // linken zu nehmen verliert alles, was jemand rechts
         // eingesprochen hat.
         float sum = 0.0f;
-        for (int c = 0; c < channels; ++c) {
-            sum += sampleAt(dataPtr, i * frameBytes + c * bytesPerSample,
-                            format, bits);
+        for (int c = 0; c < h.channels; ++c) {
+            sum += sampleAt(h.dataPtr, i * frameBytes + c * bytesPerSample,
+                            h.format, h.bits);
         }
-        out.samples[i] = sum / static_cast<float>(channels);
+        out.samples[i] = sum / static_cast<float>(h.channels);
     }
 
-    out.sampleRate = static_cast<int>(rate);
+    out.sampleRate = static_cast<int>(h.rate);
+    out.ok = true;
+    return out;
+}
+
+WavStereoData readWavStereo(const QString& path, QString* error)
+{
+    WavStereoData out;
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        fail(error, QStringLiteral("cannot open %1").arg(path));
+        return out;
+    }
+    const QByteArray blob = f.readAll();
+    f.close();
+
+    const WavHeader h = parseWavHeader(blob, error);
+    if (!h.ok) { return out; }
+
+    const int bytesPerSample = h.bits / 8;
+    const int frameBytes     = bytesPerSample * h.channels;
+    if (frameBytes <= 0) {
+        fail(error, QStringLiteral("WAV with zero-size frames"));
+        return out;
+    }
+    const int frames = static_cast<int>(h.dataLen) / frameBytes;
+
+    out.interleaved.resize(frames * 2);
+    for (int i = 0; i < frames; ++i) {
+        const float left = sampleAt(h.dataPtr, i * frameBytes, h.format, h.bits);
+        // Einkanalige Datei: rechten Kanal verdoppeln (L=R), statt den
+        // Aufrufer zwischen ein- und zweikanalig unterscheiden zu lassen.
+        const float right = (h.channels >= 2)
+            ? sampleAt(h.dataPtr, i * frameBytes + bytesPerSample, h.format, h.bits)
+            : left;
+        out.interleaved[i * 2]     = left;
+        out.interleaved[i * 2 + 1] = right;
+    }
+
+    out.sampleRate = static_cast<int>(h.rate);
     out.ok = true;
     return out;
 }
@@ -406,6 +467,143 @@ double wavDurationSeconds(const QString& path)
     const WavData d = readWavMono(path, nullptr);
     if (!d.ok || d.sampleRate <= 0) { return 0.0; }
     return static_cast<double>(d.samples.size()) / d.sampleRate;
+}
+
+namespace {
+
+void putU32At(QFile& f, qint64 pos, quint32 v)
+{
+    uchar b[4];
+    qToLittleEndian(v, b);
+    const qint64 saved = f.pos();
+    f.seek(pos);
+    f.write(reinterpret_cast<const char*>(b), 4);
+    f.seek(saved);
+}
+
+} // namespace
+
+WavStreamWriter::~WavStreamWriter()
+{
+    close();
+}
+
+bool WavStreamWriter::open(const QString& path, int sampleRate, Format format,
+                           bool dither, QString* error)
+{
+    if (m_file.isOpen()) { close(); }
+
+    if (sampleRate <= 0) {
+        fail(error, QStringLiteral("sample rate must be positive"));
+        return false;
+    }
+
+    m_file.setFileName(path);
+    if (!m_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        fail(error, QStringLiteral("cannot write %1").arg(path));
+        return false;
+    }
+
+    m_format        = format;
+    m_sampleRate    = sampleRate;
+    m_dither        = dither;
+    m_dataBytes     = 0;
+    m_framesWritten = 0;
+    // Fester Startwert wie writeWavStereo16(): siehe Begruendung dort.
+    // Fuer einen echten Live-Mitschnitt ist die Wiederholbarkeit selbst
+    // nicht das Ziel — wichtig ist nur ein GLEICHBLEIBENDER Erzeuger
+    // ueber den ganzen Stream, damit das Rauschen nicht periodisch
+    // wird, und dafuer reicht ein fester Startwert genauso gut wie ein
+    // zufaelliger.
+    m_rng.seed(20260819u);
+
+    const quint16 formatTag  = (m_format == Format::Float32Stereo)
+                                   ? kFormatIeeeFloat : kFormatPcm;
+    const quint16 bits       = (m_format == Format::Float32Stereo) ? 32 : 16;
+    const quint16 blockAlign = static_cast<quint16>(2 * (bits / 8));
+
+    auto putU32 = [this](quint32 v) {
+        uchar b[4]; qToLittleEndian(v, b);
+        m_file.write(reinterpret_cast<const char*>(b), 4);
+    };
+    auto putU16 = [this](quint16 v) {
+        uchar b[2]; qToLittleEndian(v, b);
+        m_file.write(reinterpret_cast<const char*>(b), 2);
+    };
+
+    m_file.write("RIFF", 4);
+    putU32(0);                    // Platzhalter, close() traegt es nach
+    m_file.write("WAVE", 4);
+
+    m_file.write("fmt ", 4);
+    putU32(16);
+    putU16(formatTag);
+    putU16(2);                                        // zwei Kanaele
+    putU32(static_cast<quint32>(sampleRate));
+    putU32(static_cast<quint32>(sampleRate) * blockAlign);
+    putU16(blockAlign);
+    putU16(bits);
+
+    m_file.write("data", 4);
+    putU32(0);                    // Platzhalter, close() traegt es nach
+
+    return true;
+}
+
+bool WavStreamWriter::writeInterleaved(const float* interleaved, int frames)
+{
+    if (!m_file.isOpen() || interleaved == nullptr || frames <= 0) {
+        return false;
+    }
+
+    const int sampleCount = frames * 2;
+
+    if (m_format == Format::Float32Stereo) {
+        QByteArray block;
+        block.reserve(sampleCount * 4);
+        for (int i = 0; i < sampleCount; ++i) {
+            uchar b[4];
+            std::memcpy(b, &interleaved[i], 4);
+            block.append(reinterpret_cast<const char*>(b), 4);
+        }
+        if (m_file.write(block) != block.size()) { return false; }
+        m_dataBytes += block.size();
+    } else {
+        // Dreieckverteilt, wie writeWavStereo16() — Begruendung dort.
+        std::uniform_real_distribution<float> half(-0.5f, 0.5f);
+        QByteArray block;
+        block.reserve(sampleCount * 2);
+        for (int i = 0; i < sampleCount; ++i) {
+            float x = interleaved[i] * 32767.0f;
+            if (m_dither) { x += half(m_rng) + half(m_rng); }
+            const int r = static_cast<int>(std::lround(x));
+            const qint16 s16 = static_cast<qint16>(std::clamp(r, -32768, 32767));
+            uchar b[2];
+            qToLittleEndian(s16, b);
+            block.append(reinterpret_cast<const char*>(b), 2);
+        }
+        if (m_file.write(block) != block.size()) { return false; }
+        m_dataBytes += block.size();
+    }
+
+    m_framesWritten += frames;
+    return true;
+}
+
+void WavStreamWriter::close()
+{
+    if (!m_file.isOpen()) { return; }
+
+    // RIFF-Groesse: alles nach den ersten 8 Bytes (Kennung + Feld
+    // selbst). data-Groesse: Blockkopf 'data' + Laenge (8 Bytes)
+    // sitzt am Ende des 44-Byte-Kopfes, also bei Offset 36; das
+    // Laengenfeld selbst bei Offset 40.
+    const quint32 dataBytes = static_cast<quint32>(m_dataBytes);
+    const quint32 riffBytes = 36u + dataBytes;
+    putU32At(m_file, 4, riffBytes);
+    putU32At(m_file, 40, dataBytes);
+
+    m_file.close();
 }
 
 } // namespace Longpath

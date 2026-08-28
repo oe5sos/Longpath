@@ -329,6 +329,117 @@ private slots:
                                 .arg(b).arg(s)));
     }
 
+    // ── WavStreamWriter (Phase 3M Recording) ─────────────────────────
+    //
+    // Anders als writeWavStereo*: die Datei wird beim Schreiben schon
+    // angelegt, der Kopf traegt erst 0 als Groesse und wird bei
+    // close() nachgetragen. Der Rundgang muss trotzdem stimmen — sonst
+    // hat eine lange Aufnahme am Ende einen falschen Kopf und jedes
+    // Abspielprogramm haelt sie fuer leer oder abgeschnitten.
+
+    void streamWriterRoundTripsFloat32()
+    {
+        const QString p = pathFor(QStringLiteral("stream-f32.wav"));
+        WavStreamWriter w;
+        QString err;
+        QVERIFY2(w.open(p, 48000, WavStreamWriter::Format::Float32Stereo,
+                        /*dither=*/true, &err),
+                 qPrintable(err));
+
+        // In mehreren Bloecken schreiben, wie es der Zeitgeber-Abholer
+        // tut — nicht alles auf einmal.
+        const QVector<float> block1 = {0.5f, -0.5f, 0.25f, -0.25f};
+        const QVector<float> block2 = {0.1f, -0.1f};
+        QVERIFY(w.writeInterleaved(block1.constData(), 2));
+        QVERIFY(w.writeInterleaved(block2.constData(), 1));
+        QCOMPARE(w.framesWritten(), 3);
+        w.close();
+        QVERIFY(!w.isOpen());
+
+        const WavData back = readWavMono(p);
+        QVERIFY(back.ok);
+        QCOMPARE(back.sampleRate, 48000);
+        QCOMPARE(back.samples.size(), 3);   // readWavMono mittelt L/R
+        QCOMPARE(back.samples[0], 0.0f);    // (0,5 + -0,5) / 2
+        QVERIFY(qAbs(back.samples[1] - 0.0f) < 1e-6f);
+        QVERIFY(qAbs(back.samples[2] - 0.0f) < 1e-6f);
+    }
+
+    void streamWriterRoundTripsPcm16WithinOneBit()
+    {
+        const QString p = pathFor(QStringLiteral("stream-pcm16.wav"));
+        WavStreamWriter w;
+        QVERIFY(w.open(p, 8000, WavStreamWriter::Format::Pcm16Stereo, true));
+
+        for (int i = 0; i < 10; ++i) {
+            const QVector<float> block = {0.5f, -0.25f};
+            QVERIFY(w.writeInterleaved(block.constData(), 1));
+        }
+        w.close();
+
+        const WavData back = readWavMono(p);
+        QVERIFY(back.ok);
+        QCOMPARE(back.samples.size(), 10);
+        for (float v : back.samples) {
+            QVERIFY2(qAbs(v - 0.125f) < 1e-4f,
+                     "16-Bit-Rundung darf hoechstens ein Bit kosten");
+        }
+    }
+
+    // Die Groesse im RIFF- und im data-Blockkopf muss die WAHRE
+    // Laenge tragen, nicht die 0 vom Anlegen — sonst liest z. B. ein
+    // Werkzeug, das die Groesse statt bis zum Dateiende glaubt, gar
+    // nichts.
+    void streamWriterPatchesTheHeaderSizesOnClose()
+    {
+        const QString p = pathFor(QStringLiteral("stream-sizes.wav"));
+        WavStreamWriter w;
+        QVERIFY(w.open(p, 44100, WavStreamWriter::Format::Pcm16Stereo, false));
+
+        const QVector<float> block(2 * 500, 0.1f);   // 500 Rahmen
+        QVERIFY(w.writeInterleaved(block.constData(), 500));
+        w.close();
+
+        QFile f(p);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray blob = f.readAll();
+        f.close();
+
+        // data-Groesse bei Offset 40: 500 Rahmen * 2 Kanaele * 2 Byte.
+        const quint32 dataBytes = qFromLittleEndian<quint32>(
+            reinterpret_cast<const uchar*>(blob.constData() + 40));
+        QCOMPARE(dataBytes, static_cast<quint32>(500 * 2 * 2));
+
+        // RIFF-Groesse bei Offset 4: alles nach den ersten 8 Byte.
+        const quint32 riffBytes = qFromLittleEndian<quint32>(
+            reinterpret_cast<const uchar*>(blob.constData() + 4));
+        QCOMPARE(riffBytes, static_cast<quint32>(36 + dataBytes));
+
+        // Und die Datei ist wirklich so lang, wie der Kopf behauptet —
+        // sonst waere das Nachtragen nur Kosmetik am Kopf gewesen.
+        QCOMPARE(static_cast<quint32>(blob.size()), 44u + dataBytes);
+    }
+
+    void streamWriterClosingTwiceIsHarmless()
+    {
+        const QString p = pathFor(QStringLiteral("stream-double-close.wav"));
+        WavStreamWriter w;
+        QVERIFY(w.open(p, 8000, WavStreamWriter::Format::Pcm16Stereo));
+        const QVector<float> block = {0.2f, 0.2f};
+        QVERIFY(w.writeInterleaved(block.constData(), 1));
+        w.close();
+        w.close();   // darf nicht abstuerzen und nichts mehr aendern
+        QVERIFY(!w.isOpen());
+    }
+
+    void writingWithoutOpeningIsRefused()
+    {
+        WavStreamWriter w;
+        const QVector<float> block = {0.1f, 0.1f};
+        QVERIFY2(!w.writeInterleaved(block.constData(), 1),
+                 "ohne open() gibt es nichts zu schreiben in");
+    }
+
 };
 
 QTEST_MAIN(TestWavFile)

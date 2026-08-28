@@ -210,6 +210,9 @@ public:
     std::atomic<AudioTapRing*> m_asrTap{nullptr};
     std::atomic<int>           m_asrTapSlice{-1};
     std::atomic<int>           m_qsoTapSlice{-1};
+    // Dritter Abgriff, fuer die "off the air"-WAV-Aufnahme (Phase 3M).
+    std::atomic<AudioTapRing*> m_wavRecordTap{nullptr};
+    std::atomic<int>           m_wavRecordTapSlice{-1};
 
     // Non-owning back-pointer so rxBlockReady can look up the active
     // SliceModel to read mute / VAX-channel state. Null is safe (unit
@@ -412,6 +415,19 @@ public:
     /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
     /// der Abgriff; zum Abschalten nullptr uebergeben.
     void setAsrTap(AudioTapRing* ring, int sliceId);
+
+    /// ── Dritter Abgriff, fuer die "off the air"-WAV-Aufnahme (Phase 3M) ──
+    ///
+    /// Genau derselbe Bau wie die beiden anderen Abgriffe, wieder ein
+    /// EIGENER Ring: Aufnahme, ASR und Spracherkennung sollen
+    /// gleichzeitig laufen koennen, ohne sich beim Lesen zu stoeren.
+    ///
+    /// Design doc: docs/architecture/phase3m-recording-design.md §7.1.
+    ///
+    /// Kein Signal, kein Schloss, keine Speicheranforderung im
+    /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
+    /// der Abgriff; zum Abschalten nullptr uebergeben.
+    void setWavRecordTap(AudioTapRing* ring, int sliceId);
 
     void rxBlockReady(int sliceId, const float* samples, int frames);
 
