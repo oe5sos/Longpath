@@ -911,12 +911,21 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
         case HPSDRHW::SaturnMKII:        boardStr = QStringLiteral("Saturn MkII"); break;
         case HPSDRHW::HermesC10:         boardStr = QStringLiteral("HermesC10");   break;  // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10) — within ±5 of cite: //MI0BOT (network.h:422 HermesLite) and //G8NJJ (network.h:423 Saturn) preserved per inline-tag-preservation rule
         case HPSDRHW::Andromeda:         boardStr = QStringLiteral("Andromeda");   break;
+        case HPSDRHW::SunSdr2Qrp:        boardStr = QStringLiteral("SunSDR2 QRP"); break;
         default:                         boardStr = QStringLiteral("Unknown");     break;
     }
 
-    // Protocol string — ucRadioList.cs:1342 "Protocol-1" / "Protocol-2"
-    const QString protoStr = (info.protocol == ProtocolVersion::Protocol2)
-                             ? QStringLiteral("P2") : QStringLiteral("P1");
+    // Protocol string — ucRadioList.cs:1342 "Protocol-1" / "Protocol-2".
+    // SunSdr isn't an OpenHPSDR protocol at all (design doc
+    // docs/architecture/2026-08-24-sunsdr-native-driver-design.md); shown
+    // as its own label rather than folded into the P1/P2 pair.
+    QString protoStr;
+    switch (info.protocol) {
+        case ProtocolVersion::Protocol2: protoStr = QStringLiteral("P2"); break;
+        case ProtocolVersion::SunSdr:    protoStr = QStringLiteral("SunSDR"); break;
+        case ProtocolVersion::Protocol1:
+        default:                         protoStr = QStringLiteral("P1"); break;
+    }
 
     // In-use string — ucRadioList.cs:101 RadioIsBusy
     const QString inUseStr = info.inUse
@@ -1496,8 +1505,21 @@ void ConnectionPanel::updateDetailPanel()
     m_detailBoardLabel->setText(QStringLiteral("Board: %1 (0x%2)")
         .arg(boardName)
         .arg(static_cast<int>(info.boardType), 2, 16, QLatin1Char('0')));
-    m_detailProtoLabel->setText(QStringLiteral("Protocol: P%1")
-        .arg(info.protocol == ProtocolVersion::Protocol2 ? 2 : 1));
+    // Same three-way distinction as populateRow()'s protoStr switch above
+    // (:945-951) — SunSdr isn't P1 or P2 at all. This label used to fall
+    // through a binary ternary straight to "P1" for anything that wasn't
+    // literally Protocol2, so every SunSDR2 QRP entry showed "Protocol:
+    // P1" here despite the table column correctly showing "SunSDR" a few
+    // lines above it (found live, 2026-08-26, first real SunSDR connect
+    // attempt through this dialog).
+    QString detailProtoStr;
+    switch (info.protocol) {
+        case ProtocolVersion::Protocol2: detailProtoStr = QStringLiteral("P2");     break;
+        case ProtocolVersion::SunSdr:    detailProtoStr = QStringLiteral("SunSDR"); break;
+        case ProtocolVersion::Protocol1:
+        default:                         detailProtoStr = QStringLiteral("P1");    break;
+    }
+    m_detailProtoLabel->setText(QStringLiteral("Protocol: %1").arg(detailProtoStr));
     m_detailFwLabel->setText(QStringLiteral("Firmware: %1").arg(info.firmwareVersion));
     m_detailIpLabel->setText(QStringLiteral("IP: %1").arg(info.address.toString()));
     m_detailMacLabel->setText(QStringLiteral("MAC: %1").arg(info.macAddress));
@@ -1506,29 +1528,49 @@ void ConnectionPanel::updateDetailPanel()
     m_modelCombo->blockSignals(true);
     m_modelCombo->clear();
     QList<HPSDRModel> models = compatibleModels(info.boardType);
-    HPSDRModel defaultModel = defaultModelForBoard(info.boardType);
 
-    HPSDRModel persisted = AppSettings::instance().modelOverride(info.macAddress);
-    HPSDRModel selected = (persisted != HPSDRModel::FIRST) ? persisted : defaultModel;
-
-    int selectIdx = 0;
-    for (int i = 0; i < models.size(); ++i) {
-        m_modelCombo->addItem(
-            QString::fromLatin1(displayName(models[i])),
-            static_cast<int>(models[i]));
-        if (models[i] == selected) {
-            selectIdx = i;
-        }
-    }
-    m_modelCombo->setCurrentIndex(selectIdx);
-    m_modelCombo->blockSignals(false);
-
-    if (selected != defaultModel) {
-        m_modelHintLabel->setText(QStringLiteral("Board reports \"%1\" -- model override applied")
-            .arg(boardName));
-        m_modelHintLabel->setVisible(true);
-    } else {
+    // SunSDR2 QRP (and any other board with no HPSDRModel entry at all —
+    // by design, per AddCustomRadioDialog.cpp's own comment: "no
+    // HPSDRModel entry exists for this board") makes compatibleModels()
+    // return empty and defaultModelForBoard() silently fall through to
+    // its final HERMES fallback — a real board's model, meaningless
+    // here. Selecting a saved SunSDR row used to render an empty,
+    // apparently-broken combo with no explanation. Found live,
+    // 2026-08-26. A single disabled placeholder is honest about there
+    // being nothing to pick, instead of leaving the field looking wrong.
+    if (models.isEmpty()) {
+        m_modelCombo->addItem(QStringLiteral("N/A — no model selection for this protocol"));
+        m_modelCombo->setCurrentIndex(0);
+        m_modelCombo->setEnabled(false);
+        m_modelCombo->blockSignals(false);
         m_modelHintLabel->setVisible(false);
+    } else {
+        m_modelCombo->setEnabled(true);
+
+        HPSDRModel defaultModel = defaultModelForBoard(info.boardType);
+
+        HPSDRModel persisted = AppSettings::instance().modelOverride(info.macAddress);
+        HPSDRModel selected = (persisted != HPSDRModel::FIRST) ? persisted : defaultModel;
+
+        int selectIdx = 0;
+        for (int i = 0; i < models.size(); ++i) {
+            m_modelCombo->addItem(
+                QString::fromLatin1(displayName(models[i])),
+                static_cast<int>(models[i]));
+            if (models[i] == selected) {
+                selectIdx = i;
+            }
+        }
+        m_modelCombo->setCurrentIndex(selectIdx);
+        m_modelCombo->blockSignals(false);
+
+        if (selected != defaultModel) {
+            m_modelHintLabel->setText(QStringLiteral("Board reports \"%1\" -- model override applied")
+                .arg(boardName));
+            m_modelHintLabel->setVisible(true);
+        } else {
+            m_modelHintLabel->setVisible(false);
+        }
     }
 
 }

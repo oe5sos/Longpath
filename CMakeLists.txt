@@ -540,6 +540,7 @@ set(CORE_SOURCES
     src/core/P1RadioConnection.cpp
     src/core/P2RadioConnection.cpp
     src/core/PlaybackRadioConnection.cpp
+    src/core/SunSdrRadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp
     # ── KiwiSDR (2026-08-23, Nachtschicht) ───────────────────────────
@@ -639,6 +640,7 @@ set(CORE_SOURCES
     src/core/audio/IqRecorder.cpp
     src/core/audio/IqRecorderController.cpp
     src/core/audio/RecordingScheduler.cpp
+    src/core/sunsdr/SunSdrProtocol.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp

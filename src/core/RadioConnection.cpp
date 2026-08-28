@@ -7,6 +7,7 @@
 #include "RadioConnection.h"
 #include "P1RadioConnection.h"
 #include "P2RadioConnection.h"
+#include "SunSdrRadioConnection.h"
 #include "LogCategories.h"
 
 namespace Longpath {
@@ -27,6 +28,8 @@ std::unique_ptr<RadioConnection> RadioConnection::create(const RadioInfo& info)
     }
     case ProtocolVersion::Protocol1:
         return std::make_unique<P1RadioConnection>();
+    case ProtocolVersion::SunSdr:
+        return std::make_unique<SunSdrRadioConnection>();
     }
     qCWarning(lcConnection) << "Unknown protocol version:" << static_cast<int>(info.protocol);
     return nullptr;

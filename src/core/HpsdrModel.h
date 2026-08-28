@@ -130,7 +130,15 @@ enum class HPSDRHW : int {
     // NereusSDR-original SKU slots — NOT on the Thetis wire; integers chosen
     // above the Thetis-defined range (0-11) and below Unknown(999).
     HermesLiteRxOnly = 12, // HL2 RX-only kit (no TX driver). Phase 3M-0.
-    // 13..19 available for future NereusSDR-original SKU slots.
+    // Not an OpenHPSDR board at all — SunSDR2's own native wire protocol
+    // (ProtocolVersion::SunSdr), not P1/P2. Keyed here anyway because
+    // RadioInfo::boardType and BoardCapabilities both dispatch on
+    // HPSDRHW regardless of protocol family — same precedent as
+    // Andromeda below, which also isn't an OpenHPSDR radio. See
+    // docs/architecture/2026-08-24-sunsdr-native-driver-design.md and
+    // docs/architecture/2026-08-26-sunsdr-connection-plan.md §Phase A.
+    SunSdr2Qrp       = 13, // SunSDR2 QRP, native driver (no ExpertSDR2)
+    // 14..19 available for future NereusSDR-original SKU slots.
     // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10)
     HermesC10        = 20, // ANAN-G2E (formerly G1) single-ADC HERMES-class RX + OrionMKII TX
     // NereusSDR-native; relocated from 20 to 21 on 2026-05-21 (G2E port) to free Thetis byte 20.
@@ -422,6 +430,7 @@ constexpr const char* boardCodeName(HPSDRHW hw) noexcept {
         case HPSDRHW::HermesLiteRxOnly: return "HL2-RX";
         case HPSDRHW::HermesC10:       return "HermesC10";  // //N1GP G2E added (HermesC10)
         case HPSDRHW::Andromeda:        return "Andromeda";
+        case HPSDRHW::SunSdr2Qrp:       return "SunSDR2 QRP";
         case HPSDRHW::Unknown:          return "Unknown";
     }
     return "Unknown";

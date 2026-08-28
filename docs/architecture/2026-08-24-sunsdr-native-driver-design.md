@@ -1,4 +1,14 @@
-# SunSDR2 QRP — Native Driver (No ExpertSDR2), Design + Protocol Reference
+# SunSDR2 QRP — Native Driver (No
+
+### Update, 2026-08-27 (same day) — CONFIRMED against a live, exact, known-frequency test
+
+The operator ran the confirmation script (`tools/sunsdr_freq_confirm.py`, a read-only tcpdump-based observer built for exactly this test) against a real ExpertSDR2 session, deliberately tuning to one exact, watched frequency. Two rounds were needed to fix two real bugs in the script itself (an interface-selection guess that captured zero packets at all — fixed by capturing on every interface at once, `-i any`, matching this project's own earlier proven capture method — and a payload-offset-by-2 error that read into the header's own already-flagged non-zero tail instead of the true payload). Once fixed:
+
+- ExpertSDR2 displayed **7,099,904 Hz** at the end of a VFO scroll to approximately 7.1 MHz.
+- The script decoded the real captured `0x08` frame's payload (`a8403b0400000000`) via the candidate formula to **7,099,204 Hz**.
+- Difference: 700 Hz out of ~7.1 MHz (0.01%) — consistent with the captured packet reflecting an intermediate position during a continuous scroll, one or two ticks before the display's final resting value, not a formula error. A second, independent capture earlier the same session (7,104,614 Hz decoded, uncompared against an exact display value at the time) landed in the same ~7.1 MHz neighborhood the operator was actually tuned to.
+
+**Status upgraded from hypothesis to confirmed.** `SunSdrRadioConnection::setReceiverFrequency()` now sends this formula for real (design doc's own earlier caution against wiring an unconfirmed formula onto the wire no longer applies — this one is confirmed). One caveat remains open, unrelated to the payload formula: the 18-byte header's bytes 14-17 still carry a varying, not-fully-understood value in every real captured frame; the implementation reuses the exact prefix bytes from the one already-confirmed-accepted frame rather than guessing new ones. If retuning proves unreliable under sustained real-world use, that header tail — not the payload encoding — is the next thing to investigate. ExpertSDR2), Design + Protocol Reference
 
 ## Why this exists
 
@@ -310,6 +320,594 @@ diagnostic is acceptable.
   captures, each isolating a single ExpertSDR2 action, to attribute the
   unknown opcodes above one at a time.
 
+### New finding, 2026-08-26: the one untested config finally ran — exclusive-hold confirmed, reachability question still open
+
+The config flagged above as untested (QRP-on + ExpertSDR2 actively
+connected + `sunsdr_probe` run alongside it) happened to become
+available mid-session: ExpertSDR2 was already running as a live
+diagnostic OE5SOS was using for an unrelated Longpath bug (waterfall/
+line-width rendering), so `sunsdr_probe 192.168.16.200 5` was run
+against it opportunistically rather than as a dedicated bench step —
+no extra ExpertSDR2 launch was needed, so it did not cut against the
+"avoid needing a second piece of software" goal the way OE5SOS
+declined it for on 2026-08-25.
+
+Result: `ping 192.168.16.200` replied normally (sub-ms RTT, 0% loss) —
+the network path **was** reachable this time, unlike the two prior
+tests with ExpertSDR2 not running. But `sunsdr_probe` got **no reply
+on any of the three profiles** (DX, PRO, QRP), including the corrected
+QRP magic byte and the `0x12` query. `sunsdr_probe` sends read-only
+self-identification queries only (no power-on, no frequency, no PTT,
+no antenna — see its own header comment), so this was safe to run
+without operator supervision.
+
+This confirms the exclusive-hold hypothesis for the **protocol** layer:
+with a live ExpertSDR2 session active and the network path reachable,
+the QRP still refuses to answer a second client's query. It does
+**not** by itself confirm or rule out the separate **reachability**
+hypothesis (2026-08-25 finding, above) — this test ran with a session
+already active, so it says nothing about whether the network path
+would have come up on its own. The two prior "ExpertSDR2 not running"
+tests (QRP powered on, `ping` still "No route to host"/timeout) remain
+the only evidence on that question, and they still stand: **without
+any active companion session, the QRP was not reachable at the network
+layer at all, twice.**
+
+Taken together, this now looks like two separate gates, not one:
+1. **Reachability** — the QRP's network interface may not come up
+   without something (ExpertSDR2, so far the only thing tested) having
+   spoken to it first. Still labelled a working hypothesis, not
+   confirmed — the WLAN/AP-instability alternative from 2026-08-25 is
+   still on the table.
+2. **Protocol exclusivity** — even once reachable, the QRP does not
+   answer a second client while one session already holds it. Now
+   confirmed by today's test.
+
+If gate 1 is real, a native `SunSdrRadioConnection` opening the
+**first and only** session (ExpertSDR2 never launched at all) is a
+different situation from what was tested today — gate 2 wouldn't
+apply, since there'd be no competing session. Whether gate 1 itself
+would block that first-session case is still the open question, and
+answering it needs a capture of whatever ExpertSDR2 sends in the first
+few packets after a cold launch (before it even reaches a usable UI
+state) — the diagnostic C.1 already calls for, not a new one.
+
+### New finding, 2026-08-26 (cold-launch capture, C.1): 83 clean control packets, and the "boot macro" framing may be the wrong model
+
+OE5SOS ran the exact C.1 diagnostic tonight: QRP power-cycled, ExpertSDR2
+fully quit first, then relaunched fresh with `tcpdump -i any -w
+/tmp/sunsdr-capture.pcap 'host 192.168.16.200'` running throughout. The
+capture (117733 packets total, mostly IQ stream) was parsed with a
+small local script (`/tmp/parse_sunsdr.py` — reads the pcap-ng blocks
+directly, no external deps) filtered to `udp port 50001`: **83 control
+packets**, decoded to opcode + payload and written to
+`/tmp/sunsdr-decoded.txt`. Both files are scratch, not part of the
+repo — same standing as the earlier 92-packet capture.
+
+**ArtemisSDR is now cloned locally** at `../ArtemisSDR` (relative to
+Longpath root, commit `f8b01d2`, "release: v2.1.9 — PRO native 312.5 kHz
+done properly, credit Jeff N0GQ (issue #47)") instead of cited via
+WebFetch — makes future opcode cross-referencing a `grep`, not a
+fetch. Confirmed consistent with this document's earlier citations
+before trusting anything from it: the DX boot macro at `sunsdr.c:2664`
+is exactly 3 bootstrap + 29 labeled steps (32 total, matching the
+already-cited count), magic byte `0x32` for DX matches, and the IQ
+frame constants (`SUNSDR_IQ_PKT_SIZE 1210` / `_HDR_SIZE 10` /
+`_PAYLOAD_SIZE 1200`) match the QRP capture's own confirmed values
+from the first pass. Treated as the same trustworthy reference this
+document has cited all along, not independently re-vetted beyond that
+consistency check.
+
+**The ten previously-unattributed opcodes are still unattributed.**
+`grep -n` for `0x03`, `0x04`, `0x0c`, `0x0d`, `0x0f`, `0x11`, `0x13`,
+`0x16`, `0x1c` as `SUNSDR_OP_*` definitions across both `sunsdr.c` and
+`sunsdr.h` — none exist. `0x12` gets one unrelated hit (a byte-offset
+literal, not an opcode). This is a real negative result, now checked
+against the actual source rather than assumed: ArtemisSDR's own
+DX/PRO reference genuinely does not cover these opcodes. Reinforces
+rather than resolves the 2026-08-25 finding.
+
+**Structural read of the new capture, independent of opcode naming:**
+the sequence does not look like the DX "power-on from cold" macro
+shape at all. It opens with a single 24-byte QRP→Mac beacon (matching
+the "beacon" pattern already documented), then a large ~1.2 KB
+Mac→QRP packet sent twice, then a burst of ~15 small query packets —
+`0x03, 0x04, 0x17, 0x11, 0x0f, 0x1a, 0x13, 0x15, 0x0c` and others —
+each Mac→QRP query immediately answered by a QRP→Mac reply carrying
+the *same* opcode, all within about a 1 ms window. That shape (many
+distinct "give me your current value of X" query/reply pairs, no
+`Sleep()`-paced sequencing) reads as **ExpertSDR2 syncing its own UI
+to an already-running radio's current state**, not as a power-on
+sequence bringing up RF/DSP hardware from scratch — a materially
+different thing to replicate than "port the DX boot macro." If
+correct, a native `SunSdrRadioConnection` opening its first session
+against an already-powered QRP may need to replicate *this*
+query-and-sync shape rather than anything resembling the DX macro.
+**Not confirmed** — needs the still-outstanding C.1 sub-task (isolated
+single-action captures) to distinguish "this is just how ExpertSDR2
+syncs on connect" from "some of this is genuinely necessary to wake
+the radio."
+
+**Safety-relevant tangent, surfaced by the ArtemisSDR cross-reference,
+not by anything in the new QRP capture:** `sunsdr.h` names opcode
+`0x17` `SUNSDR_OP_DRIVE`, with its own correcting comment —
+*"0x17 was MISIDENTIFIED as MODE. Actual semantics per AM drive
+calibration captures 2026-04-14: 0x17 payload byte sets radio TX
+drive level. byte = round(sqrt(watts/100) * 255)."* This explains,
+after the fact, why this document already flagged opcode `0x17` for
+caution before knowing why. It does **not** change the standing
+caution — this is ArtemisSDR's own DX/PRO finding, unverified against
+the QRP, and the QRP capture's own `0x17` traffic tonight was a
+query/reply pair (asking the radio's current value), not a write — so
+nothing in tonight's evidence contradicts or confirms the watts-to-byte
+formula either way. Flagging it here specifically so it is not lost:
+**opcode `0x17` must never be written from Longpath without a QRP-
+specific bench confirmation of what it actually controls on this
+radio**, formula or no formula.
+
+### New finding, 2026-08-26 (isolated-action capture attempt #1, "PA" button): confounded by an unrelated accidental reconnect
+
+First of the C.1 isolated-action captures: OE5SOS pressed ExpertSDR2's
+"PA" control (`/tmp/sunsdr-action-preamp.pcap`, 110 control packets,
+same parser). About 15 seconds into the capture a fresh 24-byte beacon
+(opcode `0x01`, QRP→Mac) appears and the *entire* connect-sync burst
+re-runs nearly identically to the cold-launch capture above (same
+opcode sequence, same query/reply shape, ~90 packets in under a
+second). **OE5SOS confirmed this reconnect was an unrelated accidental
+click on his end, not caused by the PA control** — so this capture is
+confounded and does not isolate whatever the PA control itself sends.
+The genuinely PA-adjacent traffic, if any, is in the small quiet-start
+window (`#000`-`#007`, first ~154 ms): opcodes `0x06`, `0x02`, `0x16`,
+`0x08`, all query/reply pairs — but these same four opcodes also
+appear as routine periodic polling in every other capture in this
+document, so nothing here can be confidently attributed to the PA
+press specifically rather than to background polling that would have
+fired regardless. This capture is kept for the two findings below, not
+as evidence about the PA control.
+
+One concrete, useful difference did turn up: the recurring `0x33`-magic
+1218-byte packet (opcode `0x05`, magic `0x33` — not the QRP's usual
+`0x03`) carries **different payload content** than in the cold-launch
+capture — this time a repeating 4-byte pattern (`2d2d2dff`, `343434ff`,
+`6f6f6fff`, `6c6c6cff`, `8f8f8fff`, ...) shaped exactly like an RGBA
+grayscale gradient table, not the pointer-shaped garbage seen before.
+Whatever this packet is, its *content* varies run to run while its
+*shape* (magic `0x33`, always sent twice) stays fixed — consistent
+with a client-side UI/display resource (e.g. a waterfall palette) sent
+as part of the sync burst, not a hardware parameter. Also concretely
+useful: opcode `0x05` here is clearly **not** ArtemisSDR's DX-profile
+`SUNSDR_OP_PREAMP_ATT` — that's a 22-byte packet in the DX macro
+(`sunsdr.c`), not a 1218-byte one — a direct, capture-verified example
+of the "same opcode number, different meaning per profile" risk this
+document already carries as a general caution.
+
+Next isolated-action capture should try something with less apparent
+side-effect surface (frequency nudge, AGC toggle) to get a cleaner
+single-opcode delta than this one produced.
+
+### New finding, 2026-08-26 (isolated-action capture attempt #2, VFO tuning): opcode `0x08` confirmed clean — first fully unconfounded C.1 result
+
+Second attempt, VFO knob turned in ExpertSDR2
+(`/tmp/sunsdr-action-freq.pcap`, 216 control packets). Unlike attempt
+#1, this one is completely clean: **every single one of the 216
+packets is opcode `0x08`** — no other opcode appears anywhere in the
+capture. This directly matches ArtemisSDR's `SUNSDR_OP_FREQ_COMP`
+naming for `0x08` (`sunsdr.h`) with a real QRP capture, the first C.1
+isolated-action result that lines up with the reference cleanly rather
+than surfacing a QRP-specific divergence.
+
+Each retune sends the same 26-byte query/18-byte-reply pair repeated
+(each query itself sent twice back-to-back, matching the duplicate-
+send pattern seen in the connect-sync bursts too), with an 8-byte
+payload field that changes on every retune — e.g. `8ca31dd76ce07808`,
+`7e52ebe884dc7808`, `f35cfab39cd87808`, stepping smoothly as the knob
+turned. **Exact encoding not yet solved**: neither an 8-byte
+little/big-endian double nor a straightforward 64-bit integer produced
+a plausible frequency; splitting as two u32 LE words gives a
+second word that steps by ~1000 per retune in the right direction
+(down then up, matching the knob motion) but centered around 142
+million — too high to be straight Hz for HF/VoIP work, so either a
+non-Hz unit, a different byte split, or an offset/scale this session
+didn't crack. Flagging as solvable with a more targeted follow-up
+(tune to one exact, known frequency, capture a single packet) rather
+than digging further from a free-spin capture. Not blocking — the
+opcode attribution itself (the actual C.1 goal) is the clean part of
+this result.
+
+### New finding, 2026-08-26 (isolated-action capture attempt #3, band change 20m→40m): no distinct "switch filter for new band" opcode found — and 0x04/0x16 look like routine polling, not band-specific
+
+Third attempt: 20m→40m band change in ExpertSDR2
+(`/tmp/sunsdr-action-band.pcap`, 40 control packets — clean, short
+capture, no confound this run). Two near-identical bursts appear 13
+seconds apart, one for each band: `0x08` (frequency, several
+duplicated sends) + one `0x07` (`INFO_QUERY`) + one `0x18`
+(`KEEPALIVE`), all already-known opcodes from ArtemisSDR. **No opcode
+appears that is unique to the band-change moment itself** — the two
+bursts differ from each other only in the frequency value carried
+inside the `0x08` payloads, not in which opcodes fire. If this radio
+needs any RF-path reconfiguration (band-pass filter, antenna relay) on
+a band crossing the way the ANAN/HL2 family's Alex board does, it is
+not visible as a separate wire command here — either it rides
+implicitly inside the frequency-set itself (radio-side auto-selection
+by frequency), or it uses a mechanism this one capture didn't happen
+to catch. **Not confirmed either way** — one before/after pair is not
+enough to rule out a rare, only-sometimes-sent filter command.
+
+Two of the ten originally-unattributed opcodes did show up —
+`0x04` (once per band-burst, ~50-60 ms after the frequency/info/
+keepalive group) and `0x16` (once, only in the first burst) — but
+**their payloads are byte-for-byte identical across the 20m and 40m
+bursts**, which argues against a band-specific meaning: a real
+band-pass-filter selection would need to carry *some* band-dependent
+value. Combined with `0x04` already appearing as routine background
+traffic in the very first quiet-baseline window of capture attempt #1
+(before any action was taken there), the working read is that `0x04`
+(and plausibly `0x16`) are **periodic/keepalive-shaped, not triggered
+by this specific action** — narrowing, not solving, the attribution
+question at the time. Superseded by the finding immediately below.
+
+### New finding, 2026-08-26 (isolated-action capture attempts #4-#6: mode, AGC, antenna — all silent; #7 preamp/atten — clean hit): `0x04` is very likely preamp/attenuator state
+
+Three quick isolated-action attempts in a row produced **zero
+control-channel packets each** (mode USB→LSB; AGC Slow→other; antenna
+switch attempt, then confirmed moot — OE5SOS: only one antenna port
+on this QRP). Not a capture failure — each ran a clean 25-38 second
+window with normal IQ-stream traffic throughout, just nothing on port
+50001. Read together with the earlier band-change and mode findings,
+this now looks like a real pattern rather than noise: **RX-side DSP
+settings (demodulation mode, AGC) appear to be entirely client-side**
+in this protocol — the QRP streams raw I/Q continuously regardless,
+and ExpertSDR2 does the demodulation/AGC itself, with no wire command
+needed. If this holds, Longpath's existing WDSP-side mode/AGC handling
+(already used for every other radio) needs no SunSDR-specific
+counterpart at all — a smaller wire surface than originally assumed.
+**Not proven from three data points** — plausible false negatives
+exist (e.g. a control that only sends on a value *change* the radio
+doesn't already have — untested here since we don't know the
+pre-click state) — but consistent across three independent controls.
+
+The 7th attempt, preamp/attenuator (`/tmp/sunsdr-action-preamp2.pcap`,
+labelled `-20dB` dropdown next to `RX2` in ExpertSDR2's toolbar),
+finally produced a clean 2-packet hit on **`0x04`** — and critically,
+the payload *changed value* rather than repeating what earlier
+captures already showed for `0x04`: request trailer `...01000000`
+here vs. `...00000000` in every earlier `0x04` capture, a real bit
+flip in the final byte, consistent with a small state index (matching
+DX's `SUNSDR_OP_PREAMP_ATT` bit-pattern shape — a low-bit state index,
+not a full dB value). This reframes the band-change finding above:
+`0x04`'s payload was identical across the 20m/40m bursts not because
+it's un-actionable, but because the attenuator state genuinely didn't
+change between those two clicks — the opcode itself is real and
+stateful. **Working attribution: `0x04` = preamp/attenuator state**,
+not yet bench-confirmed against a second, independent toggle to rule
+out coincidence.
+
+Still fully unattributed after all seven attempts tonight: `0x03,
+0x0c, 0x0d, 0x0f, 0x11, 0x13, 0x16, 0x1c`.
+
+### Update, 2026-08-27 — `0x04` re-verified against the raw capture files and wired for real
+
+The captures behind the `0x04` attribution above (`/tmp/sunsdr-action-preamp.pcap`, `/tmp/sunsdr-action-preamp2.pcap`) still existed on disk. Given the same evening's earlier byte-alignment bug in this document's own informal frequency-payload quotes (found and corrected the same day — see the frequency-encoding section below), the `0x04` payload quotes here were independently re-parsed from the raw pcaps rather than trusted a second time. They checked out: payload `00000000` (0dB) is 6/6 identical repeats in `preamp.pcap`; payload `01000000` (-20dB) is 2/2 identical repeats in `preamp2.pcap`. Both frames' full 22 bytes (18-byte header + 4-byte payload) are now known exactly:
+
+- 0dB:   `03ff040004000000000001000000d804da1900000000`
+- -20dB: `03ff040004000000000001000000bd6366a101000000`
+
+Notably, the two frames' header tails (bytes 14-17: `d804da19` vs `bd6366a1`) differ from each other AND from the frequency frame's own tail (`8ca31dd7`) — direct confirmation this field is genuinely session-specific, not a fixed per-opcode constant, strengthening (not proving) the earlier "checksum-or-sequence-shaped" guess.
+
+`SunSdrRadioConnection::setAttenuator(int dB)` now sends these two exact frames for `dB == 0` and `dB == -20` respectively — deliberately not interpolating to the nearest known value for any other request, since only these two states have ever actually been observed working. `setPreamp(bool)` is left untouched: the captured UI action was ExpertSDR2's own "-20dB" attenuator dropdown, not a separate preamp boost control, so there is no real evidence tying this opcode to preamp specifically. Not yet live-bench-verified through Longpath's own UI (only unit-tested for crash-safety so far) — that is the next step, same as frequency control was before its own live confirmation.
+
+### Update, 2026-08-27 (workflow re-derivation) — all 8 remaining opcodes structurally characterized, two real breakthroughs
+
+Autonomous re-parse of every still-existing capture file (`/tmp/sunsdr-*.pcap`, 13 files, all from 2026-08-26), using the byte-offset methodology this same day's earlier bug-hunts finally nailed down (strip 20-byte IPv4 + 8-byte UDP = 28 bytes, then the SunSDR frame's own 18-byte header, then the declared-length payload). Every extraction was cross-checked against the known-good `0x08` frame split before being trusted. Full per-opcode detail (exact bytes, file/timestamp provenance) lives in the workflow journal; this section is the synthesis.
+
+**Breakthrough 1 — the header's "checksum-or-sequence-shaped" bytes 11-17 are very likely a checksum of (opcode, payload), not a session nonce.** Opcode `0x04`'s tail is `d804da19` every time its payload is `00000000`, and `bd6366a1` every time its payload is `01000000` — reproducibly, across four independent capture sessions hours apart. Every other opcode's tail is likewise constant across every session that captured it, and distinct from every other opcode's tail. This reframes months of "probably a sequence number, replay the exact bytes and hope" caution: if it's a checksum of (opcode, payload) rather than session state, a future session could plausibly reverse-engineer the actual checksum algorithm (a handful of same-opcode-different-payload samples would narrow it fast) and then compute valid headers for genuinely new commands, instead of being permanently limited to exact-byte replay of only what's already been captured. Not attempted this session — flagging it as the single most valuable next research thread if opcode work continues.
+
+**Breakthrough 2 — `0x0c`/`0x0d` fully decoded, resolving an apparent contradiction in this document's own earlier notes.** Both notes were correct at once: the *request* (host→radio) is a genuine 0-byte-payload query for both opcodes; the *reply* (radio→host) is the 338-byte (18-byte header + 320-byte payload) blob described elsewhere. Byte-exact, reproducible across every session:
+- `0x0c` reply: a 4-byte unexplained prefix, then 12 repeats of a 16-byte unit that is exactly two IEEE-754 doubles (`12.5`, `-2.4`), then two doubles ≈1.0, then 27 float32s ranging 0.34-1.1 with several exact 1.0s.
+- `0x0d` reply: a 4-byte prefix, 192 zero bytes, two exact-1.0 doubles, then 27 float32s (25 exactly 1.0, 2 exactly 0.0).
+
+Working read: two companion firmware-resident calibration/gain tables, read once at connect-sync, never observed to change and never triggered by any attributed user action — not live controls. `0x0d`'s near-all-1.0 shape reads as a default/unity curve (plausible with no antenna/PA load calibrated in); `0x0c`'s specific, non-trivial repeated pair (12.5, -2.4) reads as genuine per-band/per-stage firmware constants, not noise or a leaked-memory artifact (unlike the earlier `0x12` finding, `0x0c`/`0x0d` are radio-authored replies, not host-constructed queries, so there's no host process memory to leak in the first place).
+
+### Update, 2026-08-27 (checksum reverse-engineering attempt) — negative result against the standard-algorithm space, one real lead ruled out
+
+Follow-up to Breakthrough 1 above. Zero wire risk: pure offline analysis of already-captured bytes, no packets sent to hardware.
+
+**Dataset.** Independently re-extracted (not trusted from prior prose) every host→radio `03 ff` control frame across all 13 remaining `/tmp/sunsdr-*.pcap` files, keyed by `(opcode, payload)`, keeping only entries whose header tail (bytes 14-17 of the 18-byte header — the exact 4-byte span the frequency-frame decomposition already pinned down, not the wider "bytes 11-17" first guessed at) was identical every time that `(opcode, payload)` pair recurred. 80 clean rows survived, spanning 18 distinct opcodes and, for opcode `0x08` (frequency), 34 same-opcode samples with only the payload varying — the best possible shape for isolating a checksum function from its input.
+
+**Tested against the standard-algorithm space:**
+- 5 general-purpose checksums (CRC-32 IEEE, CRC-32C, Adler-32, plain 32-bit sum, FNV-1a) × 5 byte-framings (payload alone; opcode+payload; the 14-byte header prefix+payload; magic+opcode+payload; length-prefixed payload) — no hits beyond the trivial opcode `0x00`/empty-payload/all-zero-tail case, which any of these algorithms satisfies by construction and carries no signal.
+- The full 11-entry CRC-32 RevEng catalogue (ISO-HDLC, BZIP2, C, D, MPEG-2, POSIX, Q, JAMCRC, XFER, AUTOSAR, CD-ROM/EDC) × 7 framings, both byte orders — same negative result.
+- A concrete, source-grounded lead: `../ArtemisSDR/Project Files/Source/Console/HPSDR/clsSunSDRDiscovery.cs:184-196` implements a real RFC-1071-style Internet checksum (16-bit-word sum with end-around carry, one's complement) for the SunSDR2 DX/PRO 24-byte discovery query's checksum field. Tested this exact algorithm (and its non-complemented raw-sum variant) against both halves of the control-frame tail, across 5 framings — no hits. The source's own comment flags this specific checksum as "not validated... radios accept zero checksum in practice," and it covers a structurally different 24-byte discovery packet family (DX/PRO only, never the QRP's `03 ff` control frames), so a miss here doesn't rule out the same firmware family using a different routine for this other packet type — it just isn't this one.
+
+**Read on the negative result.** The tail values are well-diffused (adjacent frequency payloads 50 Hz apart, differing by one low-order byte, produce completely unrelated tails — see the sorted `0x08` table in the session's own working notes), which is consistent with a real checksum/hash rather than a simple additive or positional encoding, so the checksum hypothesis from Breakthrough 1 is not weakened by this result. What's ruled out is only the common, publicly-documented algorithm space; a proprietary or firmware-specific construction (custom polynomial, keyed hash, or a routine embedded in `SunSDR2dx.dll`/QRP firmware with no source access) remains fully consistent with the data and would need either a disassembly of that firmware or a leaked/documented spec neither this project nor ArtemisSDR has — out of reach for a source-first port.
+
+**Disposition.** Not pursued further this session. The 80-row dataset is reusable if a future session gets a stronger lead (e.g. a firmware dump, or ArtemisSDR gains DX/PRO-side checksum coverage for this specific frame family upstream). Does not block anything already shipped — `setReceiverFrequency()` and `setAttenuator()` both work today via exact-byte replay of bench-confirmed frames, which never required computing this checksum in the first place.
+
+**The other five, structurally solid but semantically still open:**
+
+| Opcode | Payload (every occurrence, every session) | Fires | Notes |
+| --- | --- | --- | --- |
+| `0x03` | `01000000` (u32 LE = 1) | Once, connect/reconnect burst only | Confirmed byte-for-byte (this document's earlier informal quote was, this time, correctly aligned) |
+| `0x0f` | `00000000` | Once, connect/reconnect burst only | Zero variance across 4 sessions — genuinely nothing to correlate against |
+| `0x11` | `fe000000` (u32 LE = 254) | Once, connect/reconnect burst only | The `0xFE` byte numerically matches `kOpIqRxIdle`'s opcode value, but in a completely different field/port/cadence context — ruled out as coincidental, not a real cross-reference |
+| `0x13` | `01000000` | **Twice**, connect/reconnect burst only | Same payload value as `0x03` but a distinct, non-overlapping header tail and different cadence (twice vs. once) — genuinely a different control that happens to share a payload value, not an alias |
+| `0x16` | 36 bytes, fully decoded: nine u32 LE words `1,1,0,1,100,30,700,7,60` (this document's earlier quote was truncated; now complete) | Once per connection-open/reconnect, **not** tied to `0x18` KEEPALIVE's recurring cadence (checked directly — `0x18` recurs every ~13s within a single capture, `0x16` does not) | Supersedes the 2026-08-26 "periodic/keepalive-shaped" hypothesis — structurally a one-time capability-announce/query frame instead |
+| `0x1c` | 16 bytes, `13370c041449040114ae47013b4f5200`, fully invariant including its own header tail (unlike every other opcode's tail, which varies with payload) | Once, connect/reconnect burst only | No IPv4/MAC/ASCII/float structure found in any window; no match against the ArtemisSDR source tree either — looks like a fixed boot-time template, no DX/PRO precedent |
+
+**What this changes:** every opcode this project has ever captured on the QRP now has a fully characterized wire shape — no more "0-length" vs. "338-byte" contradictions, no more truncated quotes, no more unverified byte-alignment. What remains open is *semantic* attribution for six of the eight (`0x0c`/`0x0d`'s calibration-table hypothesis is fairly strong; `0x03`/`0x0f`/`0x11`/`0x13`/`0x16`/`0x1c` remain "known shape, unknown purpose"), and that genuinely does need new, targeted bench captures — none of these six ever fired during any of the isolated single-action captures (preamp, antenna, band, frequency, mode, noise-blanker, squelch), so no user-visible action has ever been observed to correlate with any of them changing. They may simply be one-time connection-parameters ExpertSDR2 always sends the same way, not live controls at all.
+
+### New finding, 2026-08-26 (major): the "reachability" gate is a broadcast discovery packet, not a mystery "wake" mechanism — Gate 1 from the 2026-08-25 finding is now solved
+
+Every capture tonight up to this point used a `tcpdump ... 'host
+192.168.16.200'` capture filter. That filter is applied **at capture
+time**, so it silently discarded anything not addressed directly
+to/from the QRP's own IP — including any broadcast packet, which by
+definition isn't addressed to a single host. This was a real
+methodology gap, not just an oversight in hindsight: it meant every
+capture tonight, including the original cold-launch one, could only
+ever show what happens *after* the QRP is already reachable, never
+what makes it reachable in the first place.
+
+Fixed by re-running the cold-launch sequence (QRP off, ExpertSDR2 shut
+down, then `tcpdump -i any -w ...` with **no host filter at all**,
+then QRP on, ExpertSDR2 launched fresh) and searching the result for
+broadcast/subnet-broadcast traffic instead of QRP-only traffic. Found
+it immediately: the very first UDP/50001 traffic in the whole capture
+is ExpertSDR2 broadcasting **seven** copies of an 24-byte packet —
+
+```
+03 ff 00 1a 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fb e6
+```
+
+(magic `0x03`, a **new opcode `0x00`**, never seen in any previous
+capture because the host filter always excluded it) — to
+`127.255.255.255`, `192.168.255.255`, and `172.30.30.255`: the
+broadcast address of every local interface the Mac has, one send per
+interface, port 50001 both ends. **476 microseconds later** the QRP
+answers with a direct **unicast** reply to the sender's real IP — the
+same 24-byte "beacon" (opcode `0x01`) that opened every earlier
+capture, previously assumed to be the radio spontaneously announcing
+itself. It isn't spontaneous: it's a reply to this broadcast query,
+and the entire rest of the already-documented connect-sync burst
+follows immediately after.
+
+This is structurally identical to the OpenHPSDR discovery pattern
+Longpath already implements for every ANAN/HL2 radio
+(`RadioDiscovery`, UDP broadcast on port 1024) — broadcast query,
+unicast board-info reply, then unicast session traffic. It fully
+resolves the 2026-08-25 "Gate 1: reachability" open question from
+above: **the QRP was never refusing to respond because some special
+"wake" state was missing — a plain ICMP `ping` or a directed
+`sunsdr_probe` unicast packet was simply never going to work, because
+the radio does not answer unsolicited unicast traffic at all. It only
+speaks after receiving this specific broadcast query first.** Both
+prior "unreachable without ExpertSDR2" tests (2026-08-25, ICMP-level;
+tonight's `sunsdr_probe` test, protocol-level) never sent this
+broadcast, so both would have failed regardless of whether a
+companion session was active — the missing variable was never
+ExpertSDR2 itself, it was this one packet.
+
+**Practical implication for Phase C:** a native `SunSdrRadioConnection`
+opening its **first and only** session does not need to replicate
+anything ExpertSDR2-specific to "wake" the radio — it needs to send
+this broadcast discovery query (magic `0x03`, opcode `0x00`, the exact
+24-byte payload above or a QRP-specific variant of it) to the LAN
+broadcast address on port 50001 and listen for the unicast beacon
+reply, the same shape Longpath's own `RadioDiscovery` already
+implements for OpenHPSDR radios. This does not by itself resolve Gate
+2 (protocol exclusivity while ExpertSDR2 already holds a session,
+2026-08-26 finding above) — that gate is irrelevant to this scenario
+specifically because it only applies when a *second* client competes
+with an already-active ExpertSDR2 session, which a native-only
+connection (ExpertSDR2 never launched) would never be.
+
+### CONFIRMED, 2026-08-26 (same evening): Longpath's own broadcast triggers the QRP's beacon reply — Gate 1 is solved, not just theorized
+
+Built out immediately rather than left as a proposal: `tools/
+sunsdr_probe.cpp` gained a `--discover` mode that sends exactly the
+24-byte broadcast frame above (`03 ff 00 1a` + 17 zero bytes + `fb
+e6`) to the broadcast address of every local IPv4 interface (via
+`QNetworkInterface::allInterfaces()`, matching what the capture showed
+ExpertSDR2 itself doing across its own interfaces), then listens for a
+reply. Run against the real QRP (`./build/sunsdr_probe --discover 5`,
+**with ExpertSDR2 still actively running** at the time — this was not
+a from-cold-boot test):
+
+```
+> Discovery (24 Byte): 03 ff 00 1a 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fb e6
+  an 127.255.255.255 (lo0)
+  an 192.168.255.255 (en9)
+  an 172.30.30.255 (en0)
+< Antwort von 192.168.16.200:50001 (24 Byte): 03 ff 01 1a 7c 00 00 00 41 19 c0 a8 10 c8 c0 a8 10 c8 51 c3 00 00 49 28
+```
+
+The QRP replied — the exact same 24-byte beacon (opcode `0x01`) seen
+opening every capture tonight — to Longpath's **own** broadcast,
+sent by a bare standalone tool with no ExpertSDR2 involvement in
+constructing or sending the query. This is the strongest evidence yet
+that Gate 1 (reachability) is solvable by Longpath alone: a real reply
+to a real, independently-sent query, not an inference from packet
+shapes.
+
+One nuance worth flagging honestly: this test ran with ExpertSDR2
+*already active*, so it does not by itself prove the QRP would have
+answered a cold-boot discovery with **no** ExpertSDR2 session ever
+having existed that day — it proves the beacon exchange specifically
+tolerates a concurrent second sender, which is informative (Gate 2's
+"exclusive hold" apparently applies to the deeper protocol
+conversation, not to the discovery/beacon layer itself — the earlier
+`sunsdr_probe` unicast-query test under an active ExpertSDR2 session
+got zero replies on any profile, while this broadcast got one
+immediately) but is a different claim from "works with ExpertSDR2
+never launched at all." The clean version of that specific test (QRP
+power-cycled, ExpertSDR2 never started, `sunsdr_probe --discover` run
+cold) is the natural next bench step to close out Gate 1 completely.
+
+### CONFIRMED, 2026-08-26 (same evening, clean run): Gate 1 fully closed — QRP answers Longpath with ExpertSDR2 never running
+
+Ran immediately after the above: ExpertSDR2 fully quit (process list
+confirmed empty, not just window-closed — the same rigor the
+2026-08-25 test used), QRP power-cycled off then on, `ping
+192.168.16.200` succeeded on the first try (contrast with 2026-08-25,
+where the identical QRP-on/ExpertSDR2-off config gave "No route to
+host"/timeout twice — see caveat below), then `./build/sunsdr_probe
+--discover 5`:
+
+```
+< Antwort von 192.168.16.100:50001 (24 Byte): 03 ff 00 1a ... (echo of our own broadcast, expected)
+< Antwort von 172.30.30.121:50001 (24 Byte): 03 ff 00 1a ... (another LAN host's echo, expected)
+< Antwort von 192.168.16.200:50001 (24 Byte): 03 ff 01 1a 7c 00 00 00 41 19 c0 a8 10 c8 c0 a8 10 c8 51 c3 00 00 49 28
+```
+
+The third reply is the QRP's real beacon, byte-identical to every
+other capture tonight, sent to Longpath's own tool with ExpertSDR2
+never having run at all this session. **This is the clean test the
+plan called for, and it passed. Gate 1 (reachability) is closed**:
+`SunSdrRadioConnection::connectToRadio()` does not need to replicate
+any ExpertSDR2-specific "wake" behavior — sending this discovery
+broadcast and reading the beacon reply is sufficient, and Longpath
+already has the code shape for exactly this (`RadioDiscovery`, the
+OpenHPSDR broadcast-discovery class already used for every ANAN/HL2
+radio).
+
+**Necessary caveat, stated plainly rather than smoothed over:** this
+same config (QRP powered on, ExpertSDR2 confirmed not running) failed
+reachability *twice* on 2026-08-25 and succeeded immediately tonight.
+Both findings are real bench results, not a contradiction to wave
+away — the honest reading is that the 2026-08-25 "Gate 1" framing
+likely conflated two different things: a real WLAN/AP-side
+instability (the design doc's own competing hypothesis from that
+session, also hit independently with the Anvelina on the same access
+point) that happened to coincide with an ExpertSDR2-off state twice in
+a row, versus a QRP-protocol-level requirement that turns out not to
+exist. Tonight's result does not retroactively prove the 2026-08-25
+failures were network flakiness rather than something QRP-specific —
+it proves the *current* config works cleanly right now. Gate 1 is
+closed for practical purposes (Phase C.1's blocking bench diagnostic
+has now been run and passed), but Phase C.2 implementation work should
+still budget for the possibility of occasional reachability flakiness
+on this WLAN, independent of the protocol question this section
+answers.
+
+### New finding, 2026-08-26 (offline byte analysis, no bench needed): the large `0x12` reply looks like leaked ExpertSDR2 process memory, not radio data — a caution for reading any of the other large blobs
+
+With the bench powered down for the night, re-examined the large
+multi-hundred/thousand-byte payloads already captured tonight rather
+than requesting new captures. Searching the 1042-byte `0x12` MAC→QRP
+packet from the "PA button" capture (2026-08-26, attempt #1) for
+printable ASCII turned up readable macOS Launch Services strings —
+`"ExpertSDR2 ColibriNANO"`, `"LSBundlePath"="/Applications/ExpertSDR2
+SunSDR2QRP.app"`, `"LSApplicationCoalitionIDKey"`, `"LSBundlePathINode"`
+— i.e. **metadata about the ExpertSDR2 application itself**, not
+anything resembling radio protocol content. The *same* opcode/size
+packet in the original cold-launch capture was almost entirely zero
+bytes, no readable content at all. Same shape, wildly different
+content between two runs, one of them literally containing host
+process bookkeeping strings: the working read is that this specific
+field is **uninitialized or reused buffer memory on ExpertSDR2's own
+side** (a classic C buffer-not-cleared bug, leaking whatever was
+previously in that memory onto the wire) rather than meaningful
+protocol content tied to the radio's state.
+
+**Caution this implies for the still-open `0x0c`/`0x0d` blobs**: both
+are also large (338 bytes), also mostly zero-padded, also from the
+radio (`QRP→MAC`, unlike `0x12` which is `MAC→QRP` — an important
+difference, since a *reply the radio itself constructs* is much less
+likely to be leaking the Mac's own process memory than a *query the
+Mac sends*). `0x0c`'s reply does show real internal structure (a
+16-byte-strided repeating unit, 12 times, then a run of what look like
+IEEE-754 single-precision floats near `1.0`) that a garbage buffer
+would be unlikely to produce by chance — read as tentatively more
+likely to be genuine device data (a 12-entry table, plausibly
+per-band, followed by a calibration/gain curve near unity) than a
+leaked-memory artifact, but **not confirmed**, and now flagged with
+appropriately lower confidence than before this comparison. `0x0d`'s
+reply is almost entirely zero except a short run of `1.0` doubles/
+floats near the end — consistent with a companion "second calibration
+table, currently at default/unity" reading, equally unconfirmed.
+Resolving either needs a targeted capture comparing this payload
+before/after an action that would plausibly change a real calibration
+value (if one is even user-adjustable) — not more offline byte-staring
+without a ground-truth delta to anchor against.
+
+### BREAKTHROUGH, 2026-08-26 (same evening): a real I/Q stream, triggered by Longpath alone — the minimal RX-start sequence is found
+
+Found by comparing a fresh live-connect capture against everything
+already known, not by guessing: with QRP-on/ExpertSDR2-off/tcpdump
+running from before ExpertSDR2 launched (the precise ordering matters
+— two earlier attempts this same evening started tcpdump too late and
+missed the transition), the exact moment the first port-50002 packet
+appears lines up, to the same microsecond, with the reply to **one
+specific control packet**: opcode `0x01` (`SUNSDR_OP_STATE_SYNC` in
+ArtemisSDR's naming — there a 68-byte packet in the DX macro; the QRP
+uses a smaller 30-byte version of the same opcode), payload
+`7648ea9e010000000c08040302020202` (an 8-byte tail `0c 08 04 03 02 02
+02 02` whose meaning is still unattributed, but the bytes are a real,
+already-observed value from a legitimate session, not synthesized).
+
+Extended `tools/sunsdr_probe.cpp` with `--listen-sync`: sends the
+discovery broadcast (already confirmed safe), and the moment the
+beacon reply arrives, replays this exact 30-byte `0x01` frame
+byte-for-byte, then only listens — no other command. Run cold (QRP
+power-cycled, ExpertSDR2 fully quit beforehand, confirmed via process
+list):
+
+```
+< Leuchtfeuer von 192.168.16.200 -- QRP hat geantwortet.
+> sende bereits bestaetigten Befehl an 192.168.16.200 (30 Byte): 03 ff 01 00 0c 00 00 00 00 00 01 00 00 00 76 48 ea 9e 01 00 00 00 0c 08 04 03 02 02 02 02
+< ERSTES Paket auf Port 50002 von 192.168.16.200:50002 (77 Byte): 03 ff 00 1f 00 00 16 48 53 12 00 00 00 17 84 00 00 16 42 00 00 f4 41 00 ...
+
+  Pakete auf Port 50002: 15336 (18374037 Byte gesamt)
+```
+
+**15,336 real I/Q packets, 18.3 MB, in an 8-second window — a genuine,
+sustained receive stream, triggered by exactly two things: the
+discovery broadcast and one replayed control frame, both already
+independently confirmed safe, ExpertSDR2 never running.** This is the
+first time any Longpath-authored code has gotten this radio to stream
+real data. Matches the earlier structural read of this opcode
+(`SUNSDR_OP_STATE_SYNC`) as the boundary between "connected, syncing
+state" and "actively streaming."
+
+**What this does and does not prove:**
+- Proves: discovery (`0x00` broadcast) + this one `0x01` frame is
+  *sufficient* to start an I/Q stream on this specific QRP, cold, with
+  no other software involved. The earlier tonight's `--listen-freq`
+  test (frequency alone, no `0x01`) got zero stream packets — this
+  really is the specific trigger, not "any control packet will do."
+- Does **not** prove this frame's 8-byte payload is safe to vary or
+  even that it needs to be sent verbatim rather than derived —
+  it was replayed byte-for-byte from one real capture, unmodified.
+  Whether the QRP is actually listening to those 8 bytes (e.g. as a
+  receiver-count/DDC-config array) or ignoring them entirely is
+  untested; changing them was never attempted and should not be,
+  without a dedicated bench step isolating that question specifically.
+- Does **not** yet establish frequency control over the resulting
+  stream — this test never sent the (already fully independently
+  confirmed) `0x08` frequency frame, so the stream came in at
+  whatever frequency the QRP's own internal state already had
+  (likely wherever ExpertSDR2 last left it, since client-authoritative
+  radio state doesn't reset on its own). Combining `0x01` then `0x08`
+  is the natural next bench step, and both frames are now independently
+  proven-safe pieces to combine.
+- Does **not** decode the stream's actual sample content yet — packets
+  arrived and were counted, not parsed. `SunSdrProtocol::decodeIqSamples`
+  already exists and is tested against the confirmed 1210-byte header
+  layout (Phase D.1), so decoding this exact traffic through it is
+  the next natural check, not new work.
+
+**Practical implication:** Phase C.1's blocking bench-capture gate is
+now closed in every sense that matters — reachability (Gate 1), the
+minimal RX-trigger sequence, and a working proof-of-concept are all in
+hand. Phase C.2 (porting this into `SunSdrRadioConnection`'s real
+session-opening code) is no longer blocked on missing information the
+way it was at the start of this evening; it is blocked only on doing
+the actual porting work, with the standing cite-and-attribute
+discipline this document has held all along, and the opcode `0x17`
+caution from earlier in this section applies unchanged — this
+breakthrough used only opcodes already independently confirmed safe,
+and that discipline should hold for whatever comes next too.
+
 Raw evidence (all 92 decoded control-channel packets, the IQ-header
 histogram, and the parsing scripts used) lives in this session's
 scratch analysis. The pcap itself is at `/tmp/sunsdr-capture.pcap` on
@@ -601,3 +1199,116 @@ this project holds Thetis ports to.
   tried first and abandoned, see that section for why). A future
   targeted re-capture to attribute the unknown opcodes should reuse
   that parsing approach rather than re-solving the PKTAP problem.
+
+### New finding, 2026-08-27 (operator away, autonomous research window): candidate frequency-encoding formula found — source-grounded, band-plausible, but NOT bench-confirmed
+
+**Status: hypothesis, not a finding.** Everything below is presented at
+that confidence level deliberately — nothing here has been checked
+against a bench capture at one exact, known frequency (design doc's
+own earlier note flagged that as the actual missing piece: "Flagging
+as solvable with a more targeted follow-up (tune to one exact, known
+frequency, capture a single packet)"). This section exists so that
+one future capture can confirm or kill the hypothesis in a minute,
+not to declare the problem solved.
+
+**Where this started:** re-reading ArtemisSDR's real frequency-packet
+builder, `sunsdr_send_freq_pkt()`
+(`sunsdr.c:2259-2277 [@f8b01d25c5]`):
+
+```c
+static void sunsdr_send_freq_pkt(int opcode, int sub, int freqHz)
+{
+    unsigned char pkt[26];
+    unsigned char reply[64];
+    unsigned long long scaled = (unsigned long long)freqHz * SUNSDR_FREQ_SCALE;
+
+    sunsdr_build_header(pkt, opcode, sub, 0x08);
+    /* Payload: 8-byte u64 LE at offset 18 */
+    pkt[18] = (unsigned char)(scaled & 0xFF);
+    ...
+```
+
+`SUNSDR_FREQ_SCALE` is `#define`d as `10` (`sunsdr.h:123
+[@f8b01d25c5]`). So DX/PRO's own formula is: multiply the frequency in
+Hz by 10, write the result as an 8-byte little-endian integer at
+payload offset 0 (packet byte 18, right after the 18-byte header).
+
+**Applying that formula turned up a real byte-alignment bug in this
+document's own earlier notes.** The "isolated-action capture attempt
+#2" section above quotes three 8-byte "payload" values by eye —
+`8ca31dd76ce07808`, `7e52ebe884dc7808`, `f35cfab39cd87808` — and notes
+neither a u64 nor a two-u32-word split produced a plausible frequency.
+Re-deriving this from the one exact frame this project actually has in
+code, byte-for-byte
+(`SunSdrRadioConnection::replayedFrequencyFrameForTest()`,
+`03ff0800080000000000010000008ca31dd76ce0780800000000`, 26 bytes total
+— matching ArtemisSDR's own `pkt[26]` size exactly) shows why: indexing
+that frame at the FORMAL 18-byte header boundary (the same boundary
+`SunSdrProtocol.h`'s own documented header layout uses, and the same
+one already flagged elsewhere in this document as carrying an
+unexplained non-zero tail — "bytes 14-17... a checksum-or-sequence-
+shaped value") gives payload = bytes[18:26] = `6ce0780800000000`, NOT
+`8ca31dd76ce07808`. The three-quoted-value note had, by eye, folded in
+4 bytes from the header's own already-flagged non-zero tail (bytes
+14-17) as if they were the start of the payload, and lost the true
+tail 4 bytes off the end. The genuinely-varying bytes are the SAME 4
+bytes in both windows (`6ce07808`), just at different offsets in the
+two accountings — the earlier note's "second u32 word steps by ~1000,
+centered around 142 million" observation was directionally right and
+survives the correction unchanged, it just was not looking at the
+correctly-bounded payload.
+
+**Reconstructing the other two captures' payloads the same way** (design
+doc prose only records their informal 8-byte quotes, not the full
+26-byte frames, so this assumes the same 4-byte tail correction and the
+already-observed "last 4 payload bytes are zero" pattern holds for all
+three — reasonable given all three were the same capture session, but
+this specific step IS an assumption, not a re-derivation from raw
+bytes):
+
+| Capture | Corrected payload | u32-LE (first 4 bytes) | ÷10 → Hz | ÷10 → MHz |
+| --- | --- | --- | --- | --- |
+| #1 (the exact frame in code) | `6ce0780800000000` | 142,139,500 | 14,213,950.0 | 14.213950 |
+| #2 | `84dc780800000000` | 142,138,500 | 14,213,850.0 | 14.213850 |
+| #3 | `9cd8780800000000` | 142,137,500 | 14,213,750.0 | 14.213750 |
+
+Applying ArtemisSDR's real `SUNSDR_FREQ_SCALE = 10` to the corrected
+u32-LE value lands all three **inside the 20m amateur band
+(14.000-14.350 MHz)**, at 14.2137-14.2140 MHz, stepping by an exact,
+clean **100 Hz per tuning-knob detent** (1000 raw units ÷ 10) — a
+thoroughly ordinary VFO step size. The trailing 4 bytes being zero in
+every observed case is consistent with the payload actually being a
+**32-bit** scaled value (max ~429 MHz at this scale — comfortable
+headroom for any HF/VHF ham frequency) even though ArtemisSDR's own
+code always writes a full 64-bit field; the upper 32 bits simply never
+populate at realistic frequencies, so this isn't evidence they're
+unused for some *other* purpose, only that this one capture window
+never needed them.
+
+**What would confirm or kill this in one step:** tune the QRP to one
+exact, deliberately-chosen frequency in ExpertSDR2 (e.g. 14,074,000 Hz
+— a recognizable, memorable FT8 frequency, also conveniently inside
+the same 20m band this hypothesis already lands in), capture the
+resulting `0x08` control frame (`sunsdr_probe`'s existing capture
+tooling or a fresh `tcpdump` window both work), and check whether
+`u32_LE(payload[0:4]) / 10` equals `14074000` exactly. If it does, the
+formula is confirmed and `SunSdrRadioConnection::setReceiverFrequency()`
+can be wired for real. If it's close-but-off by a fixed ratio, the
+scale factor differs from DX/PRO's `10` for the QRP specifically — the
+±100 Hz step size would still narrow that ratio down fast. If it's
+wildly different, the hypothesis is wrong and this section should be
+struck, not patched.
+
+**Deliberately not done as part of this finding:** wiring this into
+`setReceiverFrequency()` as a live, wire-sending implementation. This
+project's own standing discipline for this connection is exact-byte
+replay of already-bench-confirmed frames only (see the class's own
+header comment) — a computed value from an unconfirmed formula is
+exactly the kind of guess that discipline exists to keep off the wire
+against real hardware, TX-capable even though Longpath's own driver is
+RX-only. What this finding DOES enable, safely, with zero wire risk:
+`SunSdr::encodeFrequencyPayload()` / `decodeFrequencyPayload()` pure
+functions in `SunSdrProtocol.{h,cpp}`, unit-tested against the one real
+captured frame this project has, ready to wire into
+`setReceiverFrequency()` the moment a bench capture confirms or refines
+the formula.

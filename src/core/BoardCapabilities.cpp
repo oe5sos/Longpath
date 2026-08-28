@@ -1225,6 +1225,109 @@ const BoardCapabilities kAndromeda = {
     .sourceCitation   = "NereusSDR-original Phase 3M-0; based on kSaturn; Andromeda.cs:914-920 [v2.10.3.13]",
 };
 
+// ─── SunSDR2 QRP (native driver, no ExpertSDR2) ────────────────────────────
+//
+// Not an OpenHPSDR board at all — SunSDR2's own native wire protocol
+// (ProtocolVersion::SunSdr). Same non-HPSDR-wire standing as kAndromeda
+// above: most fields here are NOT Thetis facts (Thetis has no concept of
+// this radio whatsoever), they're either confirmed from a real QRP bench
+// capture, confirmed from the ArtemisSDR reference source, or an explicit
+// NereusSDR/Longpath judgement flagged as such — never silently guessed.
+//
+// Design doc: docs/architecture/2026-08-24-sunsdr-native-driver-design.md
+// Plan doc:   docs/architecture/2026-08-26-sunsdr-connection-plan.md
+//
+// Many BoardCapabilities fields model OpenHPSDR-specific hardware concepts
+// (Alex filter board, Penny/OC control, HL2 I/O board, wire-encoded step
+// attenuator) that SunSDR2 simply does not have — for those, this row sets
+// the "doesn't have it" value (false/0) rather than force-fitting SunSDR's
+// different mechanism into a struct shaped for a different radio family.
+// Fields omitted below keep their in-class default (see BoardCapabilities.h),
+// same convention kUnknown below uses.
+const BoardCapabilities kSunSdr2Qrp = {
+    .board            = HPSDRHW::SunSdr2Qrp,
+    .protocol         = ProtocolVersion::SunSdr,
+    // Single receiver assumed — NOT confirmed. The boot macro sets
+    // RX2_ENABLE=0 (design doc "Confirmed from real QRP capture" /
+    // sunsdr.c opcode 0x1B), which at minimum means RX2 starts disabled;
+    // whether the QRP hardware supports a second receiver at all is open.
+    // Revisit if/when a second-receiver capability is confirmed on the
+    // bench.
+    .adcCount         = 1,
+    .maxReceivers     = 1,
+    .maxSlices        = 1,
+    .userDdcCount     = 1,
+    .widebandAdcs     = 0,   // no wideband/panadapter-bypass stream documented
+    // Native rate 312,500 Hz — confirmed, design doc "IQ stream" section.
+    // Not negotiated; this is the only rate the wire protocol produces.
+    .sampleRates      = {312500, 0, 0, 0, 0, 0},
+    .maxSampleRate    = 312500,
+    // No OpenHPSDR-style wire-encoded step attenuator exists on this
+    // protocol. SunSDR has its own, structurally different mechanism: a
+    // single opcode (0x05) selecting one of 4 discrete preamp/atten
+    // states (-20/-10/0/+10 dB) — confirmed from ArtemisSDR sunsdr.h:33-47
+    // (SUNSDR_PREAMP_ATT_M20..P10), not a continuous dB range with a
+    // mask/enable-bit wire encoding. Marking `present=false` here is
+    // honest about "this struct's attenuator model doesn't apply", not a
+    // claim that SunSDR has no gain control at all.
+    .attenuator       = {0, 0, 0, false, 0x00, 0x00, false},
+    .preamp           = {false, false},
+    .ocOutputCount    = 0,     // no Penny/OC control board on this protocol
+    .hasAlexFilters   = false,
+    .hasAlexTxRouting = false,
+    .xvtrJackCount    = 0,
+    // Three fixed physical ports (A1 2m-VHF-only, A2/A3 HF-only, mutually
+    // exclusive with A1 by band) — confirmed, design doc "Antenna model"
+    // section, ArtemisSDR HPSDR/SunSdrAntenna.cs. Materially narrower than
+    // the Alex antenna matrix; hence every hasAlex*/rxOnlyAntennaCount
+    // field below is false/0, matching the design doc's own instruction
+    // to gate these off explicitly rather than leave them silently
+    // non-functional.
+    .antennaInputCount = 3,
+    .hasAlex2         = false,
+    .hasRxBypassRelay = false,
+    .rxOnlyAntennaCount = 0,
+    // This SKU does have TX hardware on the real radio (opcode 0x17
+    // drive byte, PA enable opcode 0x24 both exist in the protocol) —
+    // isRxOnlySku describes the hardware, not Longpath's current
+    // software support. TX simply isn't implemented yet
+    // (SunSdrRadioConnection is receive-only by explicit design-doc gate,
+    // not because the hardware lacks a transmitter).
+    .isRxOnlySku      = false,
+    .canDriveGanymede = false,
+    // Confirmed explicitly unsupported by ArtemisSDR itself, design doc
+    // "What ArtemisSDR itself doesn't have": PS-A pre-distortion, full
+    // duplex ("MOX on SunSDR shuts down the RX LO"), and diversity RX are
+    // all actively hidden by ApplySunSDRSpecificUI() (console.cs:6657-6757),
+    // not merely left non-functional.
+    .hasPureSignal    = false,
+    .hasDiversityReceiver = false,
+    .hasStepAttenuatorCal = false,
+    .hasPaProfile     = false,   // no PA calibration profile concept documented
+    .hasBandwidthMonitor = false,
+    .hasIoBoardHl2    = false,
+    .hasSidetoneGenerator = false,  // TX/CW not implemented yet either way
+    // A mic-source opcode (0x21, MIC_SOURCE) exists in the confirmed boot
+    // macro, implying a real mic input concept on this radio — but exact
+    // hardware jack details (gain range, jack type) are not confirmed.
+    // Mic gain range left at the Thetis runtime-default fallback
+    // (-40/+10) rather than guessed differently; harmless while TX is
+    // unimplemented.
+    .hasMicJack       = true,
+    .hasApollo        = false,
+    .hasAlex          = false,
+    .hasPennyLane     = false,
+    .hasPaVoltsTelemetry = false,   // not confirmed/documented
+    .hasPaAmpsTelemetry  = false,   // not confirmed/documented
+    .minFirmwareVersion = 0,
+    .knownGoodFirmware  = 0,
+    .displayName      = "SunSDR2 QRP",
+    .sourceCitation   = "docs/architecture/2026-08-24-sunsdr-native-driver-design.md "
+                        "(\"Confirmed from real QRP capture\", \"Antenna model\", "
+                        "\"What ArtemisSDR itself doesn't have\"); ArtemisSDR "
+                        "sunsdr.h/.c [@f8b01d25c5]",
+};
+
 // ─── Unknown (fallback) ─────────────────────────────────────────────────────
 // Safe defaults for unrecognised boards. Used as forBoard() fallback.
 const BoardCapabilities kUnknown = {
@@ -1272,11 +1375,12 @@ const BoardCapabilities kUnknown = {
 // which is not constexpr-compatible.  Introduced in Phase 3P-B Task 6.
 // Size bumped from 10 → 12 in Phase 3M-0 Task 1 (added kHermesLiteRxOnly,
 // kAndromeda). Bumped 12 → 13 in ANAN-G2E port (added kHermesC10). //N1GP G2E added
+// Bumped 13 → 14 for the SunSDR native driver (added kSunSdr2Qrp), 2026-08-26.
 // kUnknown remains last as the forBoard() fallback.
-const std::array<BoardCapabilities, 13> kTable = {
+const std::array<BoardCapabilities, 14> kTable = {
     kAtlas, kHermes, kHermesII, kAngelia, kOrion,
     kOrionMKII, kHermesC10, kHermesLite, kHermesLiteRxOnly,
-    kSaturn, kSaturnMKII, kAndromeda, kUnknown
+    kSaturn, kSaturnMKII, kAndromeda, kSunSdr2Qrp, kUnknown
 };
 
 } // anonymous namespace

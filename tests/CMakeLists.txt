@@ -5121,6 +5121,16 @@ nereus_add_test(tst_recording_scheduler)
 # PlaybackRadioConnection. See the test file's own header for what it
 # pins and why.
 nereus_add_test(tst_playback_radio_connection)
+nereus_add_test(tst_sunsdr_protocol)
+nereus_add_test(tst_sunsdr_radio_connection)
+
+# Connection-plan Phase A.1-A.3 (docs/architecture/2026-08-26-sunsdr-
+# connection-plan.md): enum/board-id/factory-dispatch coverage that
+# doesn't need bench hardware. See each file's own header for what it
+# pins and why.
+nereus_add_test(tst_protocol_version_sunsdr)
+nereus_add_test(tst_board_id_sunsdr)
+nereus_add_test(tst_radio_connection_factory_sunsdr)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still

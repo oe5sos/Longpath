@@ -74,9 +74,19 @@ mw0lge@grange-lane.co.uk
 namespace Longpath {
 
 // Protocol version supported by the radio.
+//
+// SunSdr is not an OpenHPSDR protocol at all — it is SunSDR2's own
+// native UDP wire protocol (design doc
+// docs/architecture/2026-08-24-sunsdr-native-driver-design.md). It sits
+// in this enum because RadioConnection::create() and BoardCapabilities
+// both key off it as "which wire format", and there is no broadcast
+// discovery for this protocol (the radio's IP is supplied out-of-band,
+// same design doc) — see AddCustomRadioDialog's manual-entry path,
+// plan docs/architecture/2026-08-26-sunsdr-connection-plan.md §Phase A.
 enum class ProtocolVersion : int {
     Protocol1 = 1,
-    Protocol2 = 2
+    Protocol2 = 2,
+    SunSdr    = 3
 };
 
 // Information about a discovered OpenHPSDR radio.
@@ -85,7 +95,7 @@ struct RadioInfo {
     QString name;                        // User-friendly name, e.g. "ANAN-G2"
     QString macAddress;                  // MAC as "AA:BB:CC:DD:EE:FF" (primary key)
     QHostAddress address;                // IP address on local network
-    quint16 port{1024};                  // Always 1024 for OpenHPSDR
+    quint16 port{1024};                  // 1024 for OpenHPSDR (P1/P2); SunSdr uses 50001 (control)
 
     // Hardware
     HPSDRHW boardType{HPSDRHW::Unknown};
