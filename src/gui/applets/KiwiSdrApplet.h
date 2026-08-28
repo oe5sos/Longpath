@@ -41,6 +41,7 @@ class QListWidget;
 namespace Longpath {
 
 class SliceModel;
+class KiwiSdrManager;
 
 struct KiwiSdrReceiverStatus {
     QString id;
@@ -65,6 +66,7 @@ public:
     void syncFromModel() override {}
 
     void setReceivers(const QVector<KiwiSdrReceiverStatus>& receivers);
+    void setKiwiSdrManager(KiwiSdrManager* manager);
 
 private:
     void rebuildReceiverList();
@@ -76,6 +78,7 @@ private:
     QListWidget* m_receiverList{nullptr};
     QVector<KiwiSdrReceiverStatus> m_receivers;
     QList<QMetaObject::Connection> m_sliceConnections;
+    QPointer<KiwiSdrManager> m_kiwiSdrManager;
 };
 
 } // namespace Longpath

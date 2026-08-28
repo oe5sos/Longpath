@@ -9,6 +9,7 @@
 
 #include "gui/applets/KiwiSdrApplet.h"
 
+#include "core/KiwiSdrManager.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/SliceColors.h"
 #include "models/SliceModel.h"
@@ -17,6 +18,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QPushButton>
 #include <QStringList>
 #include <QVBoxLayout>
 
@@ -237,6 +239,11 @@ void KiwiSdrApplet::setReceivers(const QVector<KiwiSdrReceiverStatus>& receivers
     rebuildReceiverList();
 }
 
+void KiwiSdrApplet::setKiwiSdrManager(KiwiSdrManager* manager)
+{
+    m_kiwiSdrManager = manager;
+}
+
 void KiwiSdrApplet::rebuildReceiverList()
 {
     if (!m_receiverList || !m_emptyLabel) {
@@ -287,6 +294,26 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     status->setStyleSheet(statusStyle(receiver.state));
     status->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     topRow->addWidget(status, 0, Qt::AlignRight);
+
+    // Wasserfall-Vorschau im eigenstaendigen KIWI-WASSERFAELLE-Panel —
+    // unabhaengig davon, ob dieses Profil einer Scheibe zugeordnet ist.
+    auto* waterfallToggle = blueToggle(tr("WF"), 32, 20);
+    waterfallToggle->setCheckable(true);
+    waterfallToggle->setAccessibleName(
+        tr("Wasserfall-Vorschau fuer %1").arg(receiver.name));
+    if (m_kiwiSdrManager) {
+        waterfallToggle->setChecked(
+            m_kiwiSdrManager->waterfallPreviewEnabled(receiver.id));
+    }
+    const QString receiverId = receiver.id;
+    connect(waterfallToggle, &QPushButton::toggled, this,
+            [this, receiverId](bool checked) {
+        if (m_kiwiSdrManager) {
+            m_kiwiSdrManager->setWaterfallPreviewEnabled(receiverId, checked);
+        }
+    });
+    topRow->addWidget(waterfallToggle, 0, Qt::AlignRight);
+
     layout->addLayout(topRow);
 
     QStringList detailLines;

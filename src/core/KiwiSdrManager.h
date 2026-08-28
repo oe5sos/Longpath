@@ -50,6 +50,11 @@ struct KiwiSdrAntennaProfile {
     int waterfallMinDbm{-110};
     int waterfallMaxDbm{-10};
     int waterfallRate{0};
+    // Show this receiver's waterfall in the standalone "KIWI-WASSERFÄLLE"
+    // panel, independent of any slice assignment. For a profile with no
+    // slice assignment, this is what keeps it connected at all — see
+    // KiwiSdrManager::connectProfile and shouldMaintainProfileConnection.
+    bool waterfallPreviewEnabled{false};
 };
 
 struct KiwiSdrWaterfallDisplayRange {
@@ -120,6 +125,7 @@ public:
         const QString& id) const;
     bool isConnected(const QString& id) const;
     bool reconnectRecommended(const QString& id) const;
+    bool waterfallPreviewEnabled(const QString& id) const;
 
     QString assignedProfileForSlice(int sliceId) const;
     int assignedSliceForProfile(const QString& id) const;
@@ -164,6 +170,13 @@ public slots:
                                          int maxDbm, bool autoScale,
                                          int rate);
     void requestProfileWaterfallAutoScale(const QString& id);
+    // Toggles the standalone waterfall preview (Radio -> KiwiSDR panel
+    // "KIWI-WASSERFÄLLE"). Enabling it connects the profile if nothing else
+    // has (see connectProfile()'s waterfallPreviewEnabled branch); disabling
+    // it disconnects the profile again, but only if nothing else still needs
+    // the connection (shouldMaintainProfileConnection) — a profile that is
+    // also assigned to a slice, or has autoConnect set, stays connected.
+    void setWaterfallPreviewEnabled(const QString& id, bool enabled);
 
 signals:
     void profilesChanged();
@@ -197,6 +210,7 @@ signals:
         const QString& id,
         const Longpath::KiwiSdrProtocol::MeterReading& reading);
     void profileNeedsInitialTracking(const QString& id);
+    void waterfallPreviewEnabledChanged(const QString& id, bool enabled);
 
 private:
     KiwiSdrClient* ensureClient(const QString& id);

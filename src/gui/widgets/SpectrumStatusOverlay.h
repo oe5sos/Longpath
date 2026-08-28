@@ -86,8 +86,22 @@ public:
     void setPsPaused(bool paused);
     bool psPaused() const { return m_psPaused; }
 
+    /// 2026-08-27: the panadapter's "Anzeige vom KiwiSDR" toggle
+    /// (SpectrumWidget::kiwiDisplaySource) lived only in a right-click
+    /// menu with no on-screen trace once set -- an operator who set it
+    /// during Kiwi testing had no way to notice it was still on later,
+    /// and while it is on the panadapter silently discards every real
+    /// frame from the connected radio (SpectrumWidget::updateSpectrumLinear's
+    /// "Sperre gegen die zweite Quelle"). Betreiber, 2026-08-27: "kiwi
+    /// sollte sich klar ein und ausschalten lassen." A pill here, same
+    /// visual language as CH/TX/WIDE, gives it the visible state and a
+    /// one-click way off that PanadapterApplet's context-menu checkbox
+    /// alone did not.
+    void setKiwiActive(bool active);
+    bool kiwiActive() const { return m_kiwiActive; }
+
     /// The clickable badges, in the order paintEvent lays them out.
-    enum class Badge { ChainTag, Tx, Wide };
+    enum class Badge { ChainTag, Tx, Wide, Kiwi };
 
     /// Hit region of `badge` in widget coordinates, or an invalid QRect when
     /// the badge is not currently clickable.
@@ -110,6 +124,7 @@ signals:
     void txBadgeClicked();
     void wideBadgeClicked();
     void chainTagClicked(int chainIdx);
+    void kiwiBadgeClicked();
 
 public:
     /// Valid size for the strip, so a parent can place it.
@@ -141,6 +156,7 @@ private:
     QString  m_wideReason;
     bool     m_diversityActive {false};
     bool     m_psPaused {false};
+    bool     m_kiwiActive {false};
 };
 
 } // namespace Longpath

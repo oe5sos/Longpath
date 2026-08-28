@@ -13,23 +13,29 @@
 //
 // Aethers Fassung hat 2429 Zeilen und rund dreissig
 // MainWindow-Methoden. Der grosse Teil davon haengt an Dingen, die es
-// bei uns noch nicht gibt: Tonwege in die Mischung
-// (feedKiwiSdrAudioData), Wasserfallzeilen in den Panadapter
-// (setKiwiSdrWaterfallProfile), virtuelle Antennen je Scheibe,
-// Bandrueckruf, Sendesperre, Diversity.
+// bei uns noch nicht gibt: virtuelle Antennen je Scheibe, Bandrueckruf,
+// Diversity.
 //
-// Hier steht die BRUECKE und sonst nichts: der Manager meldet einen
-// Zustand, das Applet zeigt ihn. Damit sieht der Betreiber seine
-// Empfaenger, ihren Verbindungszustand und die zugeordnete Scheibe —
-// mehr nicht, aber das richtig.
+// Hier steht die BRUECKE und mittlerweile mehr als das: der Manager
+// meldet einen Zustand, das Applet zeigt ihn, Ton und Wasserfall
+// laufen in die Mischung beziehungsweise den Panadapter, und die
+// Sendesperre haengt am MOX-Zustand.
 //
 // Was fehlt, steht ausdruecklich hier, damit es niemand fuer erledigt
 // haelt:
-//   Stufe 5 — Ton: decodedAudioReady in die Mischung.
-//   Stufe 6 — Wasserfall: waterfallRowReady auf den Panadapter, dazu
-//             der Umschalter Geraet <-> KiwiSDR je Panadapter.
-//   Stufe 7 — Sendesperre (syncKiwiSdrTransmitMute), virtuelle
-//             Antennen, Bandrueckruf.
+//   Stufe 7 — virtuelle Antennen, Bandrueckruf (KiwiRebindTracker ist
+//             fertig portiert und geprueft, aber noch nirgends
+//             eingehaengt).
+//
+// Erledigt:
+//   Stufe 5 — Ton: decodedAudioReady in die Mischung (2026-08-27).
+//   Stufe 6 — Wasserfall: waterfallRowReady auf den Panadapter.
+//   Stufe 7a — Sendesperre (syncKiwiSdrTransmitMute).
+//   KIWI-WASSERFÄLLE-Panel (2026-08-27, Longpath-eigen, kein Aether-Feld
+//   — siehe docs/architecture/2026-08-27-kiwisdr-self-report-concept.md,
+//   Variante C): ein Mini-Wasserfall je Profil, einzeln schaltbar über
+//   den WF-Knopf im KiwiSDR-Applet, unabhängig von jeder
+//   Scheiben-Zuordnung.
 
 #include "gui/MainWindow.h"
 
@@ -37,6 +43,7 @@
 #include "core/AudioEngine.h"
 #include "core/LogCategories.h"
 #include "core/KiwiSdrManager.h"
+#include "gui/KiwiWaterfallPanel.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
@@ -554,6 +561,83 @@ void MainWindow::wireKiwiSdr()
         refreshKiwiSdrAppletReceivers();
     });
 
+    // ── Stufe 5: der Ton in die Mischung ──────────────────────────────
+    //
+    // AudioEngine::feedKiwiSdrAudioData tastet um und ruft dann
+    // rxBlockReady -- ab da laeuft Kiwi-Ton wie jeder andere Scheiben-
+    // Ton durch Lautstaerke, Stummschaltung, Schwenk, VAX-Abgriff und
+    // MOX-Sperre (siehe AudioEngine.h). Dieser Block liefert nur den
+    // fehlenden letzten Schritt: die entschluesselten Bytes vom Profil
+    // (m_kiwiSdrManager kennt nur Profile) zur zugeordneten Scheibe
+    // (AudioEngine kennt nur Scheiben) tragen.
+    //
+    // Dieselbe Sicherheitsschranke wie beim Wasserfall gleich darunter:
+    // eine Scheibe, die inzwischen ein echtes Funkgeraet uebernommen
+    // hat, darf ihren Ton nicht mehr von einem KiwiSDR-Profil bekommen.
+    connect(m_kiwiSdrManager, &KiwiSdrManager::decodedAudioReady, this,
+            [this](const QString& profileId, const QByteArray& pcm) {
+        if (!m_kiwiSdrManager || !m_radioModel || profileId.isEmpty()) {
+            return;
+        }
+        const int sliceId =
+            m_kiwiSdrManager->assignedSliceForProfile(profileId);
+        if (!kiwiControllableSlice(sliceId)) { return; }
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            audio->feedKiwiSdrAudioData(sliceId, pcm);
+        }
+    });
+
+    // ── Die Quelle scharf schalten ────────────────────────────────────
+    //
+    // feedKiwiSdrAudioData() oben schreibt nur, solange
+    // AudioEngine::kiwiSdrAudioEnabled(sliceId) zustimmt -- und das tut
+    // es erst, wenn setKiwiSdrAudioSourceEnabled(sliceId, true) gelaufen
+    // ist. Vor diesem Block gab es dafuer nur den TX-Sperre-Pfad
+    // (syncKiwiSdrTransmitMute), der ausschliesslich beim ENDE einer
+    // Aussendung "true" setzt. Ohne einen einzigen Sendezyklus nach dem
+    // Verbinden blieb die Quelle also fuer immer stumm geschaltet --
+    // gefunden, weil ein frisch verbundener Kiwi Wasserfall zeigte, aber
+    // keinen Ton hatte.
+    //
+    // Der Manager selbst weiss schon genau, wann eine Quelle bereit ist
+    // (audioSourceEnabledChanged) -- das fehlte war nur die Bruecke zur
+    // AudioEngine. Waehrend einer eigenen Aussendung hat die Sendesperre
+    // Vorrang, es sei denn das Profil will waehrend TX hoerbar bleiben;
+    // syncKiwiSdrTransmitMute uebernimmt in dem Fall das Aufheben nach
+    // dem Senden.
+    connect(m_kiwiSdrManager, &KiwiSdrManager::audioSourceEnabledChanged,
+            this, [this](const QString& profileId, bool enabled) {
+        if (!m_kiwiSdrManager || !m_radioModel || profileId.isEmpty()) {
+            return;
+        }
+        const int sliceId =
+            m_kiwiSdrManager->assignedSliceForProfile(profileId);
+        if (!kiwiControllableSlice(sliceId)) { return; }
+        AudioEngine* audio = m_radioModel->audioEngine();
+        if (!audio) { return; }
+        if (enabled) {
+            const TransmitModel& tx = m_radioModel->transmitModel();
+            const bool sending = tx.isMox() || tx.isTune();
+            if (sending &&
+                !m_kiwiSdrManager->profile(profileId).keepAudioDuringTx) {
+                return;
+            }
+        }
+        audio->setKiwiSdrAudioSourceEnabled(sliceId, enabled);
+    });
+    connect(m_kiwiSdrManager, &KiwiSdrManager::audioSourceRemoved, this,
+            [this](const QString& profileId) {
+        if (!m_kiwiSdrManager || !m_radioModel || profileId.isEmpty()) {
+            return;
+        }
+        const int sliceId =
+            m_kiwiSdrManager->assignedSliceForProfile(profileId);
+        if (sliceId < 0) { return; }
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            audio->removeKiwiSdrAudioSource(sliceId);
+        }
+    });
+
     // ── Stufe 6: die Wasserfallzeilen auf den Panadapter ─────────────
     //
     // Aether faedelt das ueber ReceivePresentationSync ein, um Geraet
@@ -583,6 +667,33 @@ void MainWindow::wireKiwiSdr()
         if (!sw || !sw->kiwiDisplaySource()) { return; }
         sw->updateKiwiSpectrumDbm(binsDbm,
                                   lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
+    });
+
+    // ── KIWI-WASSERFÄLLE: die Vorschau, unabhängig von einer Scheibe ──
+    //
+    // Anders als der Block oben (Zuordnung + Sicherheitsschranke noetig)
+    // bekommt dieses Panel jede Wasserfallzeile jedes Profils direkt —
+    // es zeigt nur die Profile an, deren Vorschau eingeschaltet ist
+    // (KiwiWaterfallPanel::pushRow ignoriert alles andere von selbst).
+    connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallRowReady, this,
+            [this](const QString& profileId, const QString&,
+                   const QVector<float>& binsDbm, double, double, quint32) {
+        if (m_kiwiWaterfallPanel) {
+            m_kiwiWaterfallPanel->pushRow(profileId, binsDbm);
+        }
+    });
+    connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged,
+            this, [this](const QString& profileId, bool enabled) {
+        if (m_kiwiWaterfallPanel) {
+            m_kiwiWaterfallPanel->setStripEnabled(
+                profileId, enabled, m_kiwiSdrManager->displayName(profileId));
+        }
+    });
+    connect(m_kiwiSdrManager, &KiwiSdrManager::profileStreamReset, this,
+            [this](const QString& profileId) {
+        if (m_kiwiWaterfallPanel) {
+            m_kiwiWaterfallPanel->resetStrip(profileId);
+        }
     });
 
     // Die Sendesperre haengt an denselben zwei Signalen wie alles
