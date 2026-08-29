@@ -29,7 +29,15 @@ build-tests/
 
 # Persoenliche Theme-Dateien. Design gehoert dem Betreiber, nicht dem Repo.
 # Siehe docs/design/ROADMAP.md.
-themes/
+#
+# Nur am Wurzelverzeichnis verankert (2026-08-29): ein bloßes "themes/"
+# traf ohne fuehrenden Schraegstrich JEDES gleichnamige Verzeichnis, auch
+# resources/themes/ -- die dort mitgelieferten Paletten (Kreide/Flach/
+# Tief) waren dadurch seit ihrem Anlegen (2026-08-20/22) unsichtbar fuer
+# git, obwohl sie laengst auf der Platte lagen. Root-Ursache fuer main's
+# rote Builds seit dem 26.08.: der POST_BUILD-Kopierschritt in
+# CMakeLists.txt bricht hart ab, wenn diese Dateien fehlen.
+/themes/
 
 # Persoenliche Claude-Anweisungen des Betreibers (Leitsatz, Hausstil-Pflicht,
 # Arbeitsregeln). Wird zusaetzlich zur versionierten CLAUDE.md gelesen.
