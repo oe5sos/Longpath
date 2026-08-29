@@ -108,6 +108,19 @@ public:
     // via this accessor).
     bool isRxReadyForTest() const { return m_rxReady.load(std::memory_order_acquire); }
 
+    // True once a beacon reply has set m_radioAddr and not since cleared
+    // by disconnect()/onConnectTimeout()/onDataWatchdogTick(). Tests use
+    // this to confirm every teardown path actually clears it — a real
+    // gap found in review, 2026-08-28: two of the three teardown paths
+    // didn't, which let setReceiverFrequency()/setAttenuator() keep
+    // sending to a torn-down session's address (m_radioAddr.isNull() is
+    // their only "is there an open session" gate).
+    bool hasRadioAddrForTest() const { return !m_radioAddr.isNull(); }
+
+    // Exposes the private data-watchdog silence threshold, same
+    // rationale as connectTimeoutMsForTest() above.
+    static constexpr int dataSilenceTimeoutMsForTest() { return kDataSilenceTimeoutMs; }
+
     // Test-only hook for the same reason: nothing wires the real
     // rxWdspReady-equivalent gate yet (that's Phase C/D's job, once the
     // downstream DSP-readiness signal exists to drive it from). Until
@@ -115,11 +128,21 @@ public:
     // tests.
     void setRxReadyForTest(bool ready) { setRxReady(ready); }
 
-    // Test-only hook: feed a raw stream-socket datagram through the
-    // exact same decode path onStreamReadyRead() uses, without needing
-    // a real bound UDP socket and a loopback send. Production code
-    // never calls this — the real path is the readyRead signal.
+    // Test-only hook: feed a raw stream-socket datagram, as if from the
+    // connected radio itself, through the exact same decode path
+    // onStreamReadyRead() uses, without needing a real bound UDP socket
+    // and a loopback send. Production code never calls this — the real
+    // path is the readyRead signal.
     void feedStreamDatagramForTest(const QByteArray& datagram);
+
+    // Same idea, but with an explicit sender address — for testing the
+    // fixed-port-sharing foreign-sender rejection in
+    // processStreamDatagram() (found in review, 2026-08-28: this class
+    // shares its well-known stream port with any prior session's
+    // still-streaming QRP, so a real defense against that had to exist
+    // and had to be testable without a real second UDP source).
+    void feedStreamDatagramFromSenderForTest(const QByteArray& datagram,
+                                              const QHostAddress& sender);
 
     // Same idea for the control channel — feeds a raw datagram (as if
     // from `sender`) through the exact same beacon-detection/state-sync-
@@ -248,9 +271,12 @@ private:
     static const SunSdr::Profile& resolveProfile(HPSDRHW board);
 
     // Shared by onStreamReadyRead() (real socket data) and
-    // feedStreamDatagramForTest() (synthetic test data) — one decode
-    // path, two ways in.
-    void processStreamDatagram(const QByteArray& datagram);
+    // feedStreamDatagramForTest()/feedStreamDatagramFromSenderForTest()
+    // (synthetic test data) — one decode path, three ways in. Takes the
+    // sender address so the fixed-port-sharing foreign-sender rejection
+    // (found in review, 2026-08-28) lives in one place, testable without
+    // a real socket — same shape as processControlDatagram() below.
+    void processStreamDatagram(const QByteArray& datagram, const QHostAddress& sender);
 
     // Shared by onControlReadyRead() (real socket data) and
     // feedControlDatagramForTest() (synthetic test data) — same split as
@@ -332,7 +358,6 @@ private:
     const SunSdr::Profile* m_profile{nullptr};
 
     bool m_running{false};
-    bool m_intentionalDisconnect{false};
     quint16 m_txSeq{0};   // control-channel-independent; used only for the
                           // periodic silent IQ-stream keepalive (design doc:
                           // "the host must keep sending silent 0xFE packets")

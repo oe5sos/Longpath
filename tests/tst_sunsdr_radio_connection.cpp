@@ -587,6 +587,105 @@ private slots:
 
         QCOMPARE(conn.state(), ConnectionState::Disconnected);
     }
+
+    // ── The dead-link watchdog (added 2026-08-28) ───────────────────────
+    //
+    // Found missing entirely in the first self-review: nothing in this
+    // class re-armed after the initial connect watchdog stopped, so a
+    // QRP powered off or unplugged mid-session left ConnectionState
+    // stuck at Connected forever. The three tests below pin the fix and
+    // two further bugs a second review pass found in it the same
+    // evening: the stream socket has no sender check (foreign traffic
+    // on the shared, ShareAddress-bound well-known port both gets
+    // decoded and keeps the watchdog's silence clock alive), and two of
+    // the three teardown paths never cleared m_radioAddr, leaving
+    // setReceiverFrequency()/setAttenuator() free to keep sending to a
+    // torn-down session.
+
+    // A still-streaming prior session's QRP (or any other sender on the
+    // shared stream port) must not be decoded as this session's I/Q —
+    // found in review, 2026-08-28; see processStreamDatagram()'s comment.
+    void foreignSenderStreamPacketIsIgnored()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        const QHostAddress stranger(QStringLiteral("192.0.2.201"));
+        QSignalSpy iqSpy(&conn, &RadioConnection::iqDataReceived);
+        conn.feedStreamDatagramFromSenderForTest(silentIqPacket(), stranger);
+
+        QTest::qWait(50);
+        QCOMPARE(iqSpy.count(), 0);
+
+        // The real radio's own packet, identical content, must still
+        // decode — this isn't a content problem, only a sender one.
+        conn.feedStreamDatagramFromSenderForTest(silentIqPacket(), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(iqSpy.count(), 1, 500);
+    }
+
+    // onConnectTimeout()'s gotBeacon=true branch (a beacon replied, the
+    // stream never started) left m_radioAddr set — found in review,
+    // 2026-08-28. disconnect() already cleared it; this path didn't.
+    void connectTimeoutAfterBeaconClearsRadioAddr()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            QHostAddress(QStringLiteral("192.0.2.200")));
+        QVERIFY(conn.hasRadioAddrForTest());
+
+        // No stream packet ever follows — the connect watchdog is still
+        // running (D.3's promotion to Connected only happens on a real
+        // decoded I/Q frame) and fires at kConnectTimeoutMs.
+        QSignalSpy failSpy(&conn, &RadioConnection::connectFailed);
+        QVERIFY(failSpy.wait(kWaitMs));
+        QVERIFY(!conn.hasRadioAddrForTest());
+    }
+
+    // The data watchdog itself: connect, real beacon, no stream data
+    // ever follows (same shape SunSDR2 mid-session power-off would
+    // produce once a stream had actually started) — must transition to
+    // LinkLost and clear m_radioAddr, not stay stuck Connected.
+    void dataWatchdogTripTransitionsToLinkLostAndClearsRadioAddr()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            QHostAddress(QStringLiteral("192.0.2.200")));
+        QVERIFY(conn.isRxReadyForTest());
+        QVERIFY(conn.hasRadioAddrForTest());
+
+        // One real decoded frame promotes to Connected and stops the
+        // connect watchdog — after this, only the data watchdog is
+        // still running, so a real trip is unambiguous.
+        conn.feedStreamDatagramForTest(silentIqPacket());
+        QTRY_COMPARE_WITH_TIMEOUT(conn.state(), ConnectionState::Connected, 500);
+
+        QTRY_COMPARE_WITH_TIMEOUT(
+            conn.state(), ConnectionState::LinkLost,
+            SunSdrRadioConnection::dataSilenceTimeoutMsForTest() + 2000);
+        QVERIFY(!conn.hasRadioAddrForTest());
+        QVERIFY(!conn.isRxReadyForTest());
+    }
 };
 
 QTEST_MAIN(TestSunSdrRadioConnection)

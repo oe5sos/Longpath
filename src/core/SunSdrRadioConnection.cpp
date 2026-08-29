@@ -212,7 +212,6 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_radioInfo = info;
     m_profile = &resolveProfile(info.boardType);
 
-    m_intentionalDisconnect = false;
     m_running = true;
     m_txSeq = 0;
     m_awaitingBeacon = true;
@@ -273,6 +272,7 @@ void SunSdrRadioConnection::sendDiscoveryBroadcast()
             const QHostAddress bcast = entry.broadcast();
             if (bcast.isNull()) { continue; }
             m_controlSocket->writeDatagram(query, bcast, ctrlPort);
+            recordBytesSent(static_cast<qint64>(query.size()));
         }
     }
 }
@@ -312,8 +312,8 @@ void SunSdrRadioConnection::onConnectTimeout()
     // creates one per connect via RadioConnection::create()), so there
     // is no "reopen after close" case this needs to also handle.
     m_running = false;
-    m_intentionalDisconnect = true;
     m_awaitingBeacon = false;
+    m_radioAddr.clear();
     setRxReady(false);
     if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
     if (m_dataWatchdog) { m_dataWatchdog->stop(); }
@@ -332,7 +332,6 @@ void SunSdrRadioConnection::onConnectTimeout()
 
 void SunSdrRadioConnection::disconnect()
 {
-    m_intentionalDisconnect = true;
     m_running = false;
     m_awaitingBeacon = false;  // a late beacon reply after this must not
                                // reopen the RX gate — see onControlReadyRead()
@@ -401,6 +400,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     frame += SunSdr::encodeFrequencyPayloadCandidate(frequencyHz);
 
     m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
+    recordBytesSent(static_cast<qint64>(frame.size()));
     qCInfo(lcSunSdr) << "SunSdr: setReceiverFrequency() ->" << frequencyHz << "Hz";
 }
 
@@ -459,6 +459,7 @@ void SunSdrRadioConnection::setAttenuator(int dB)
     }
 
     m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
+    recordBytesSent(static_cast<qint64>(frame.size()));
     qCInfo(lcSunSdr) << "SunSdr: setAttenuator() ->" << dB << "dB";
 }
 
@@ -484,6 +485,7 @@ void SunSdrRadioConnection::onControlReadyRead()
 
     while (m_controlSocket->hasPendingDatagrams()) {
         const QNetworkDatagram dgram = m_controlSocket->receiveDatagram();
+        recordBytesReceived(static_cast<qint64>(dgram.data().size()));
         processControlDatagram(dgram.data(), dgram.senderAddress());
     }
 }
@@ -523,8 +525,10 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
     m_awaitingBeacon = false;
 
     if (m_controlSocket) {
-        m_controlSocket->writeDatagram(stateSyncFrameForTest(), m_radioAddr,
+        const QByteArray stateSync = stateSyncFrameForTest();
+        m_controlSocket->writeDatagram(stateSync, m_radioAddr,
                                         m_profile->defaultCtrlPort);
+        recordBytesSent(static_cast<qint64>(stateSync.size()));
     }
 
     // No downstream DSP-readiness signal exists yet to gate this on
@@ -564,23 +568,50 @@ void SunSdrRadioConnection::onStreamReadyRead()
 
     while (m_streamSocket->hasPendingDatagrams()) {
         const QNetworkDatagram dgram = m_streamSocket->receiveDatagram();
-        // Any datagram at all on this socket proves the radio is still
-        // there and talking to us — restart the silence clock before
-        // processStreamDatagram()'s own content checks (rxReady gate,
-        // opcode filter), so onDataWatchdogTick() reflects real link
-        // liveness rather than only "decoded valid I/Q" liveness.
-        m_lastStreamPacketAt.restart();
-        processStreamDatagram(dgram.data());
+        processStreamDatagram(dgram.data(), dgram.senderAddress());
     }
 }
 
 void SunSdrRadioConnection::feedStreamDatagramForTest(const QByteArray& datagram)
 {
-    processStreamDatagram(datagram);
+    // Simulates a packet from the connected radio itself — the sender
+    // check in processStreamDatagram() passes trivially. Existing tests
+    // built on this hook are exercising "the radio sent us this," which
+    // is what they always meant; see
+    // feedStreamDatagramFromSenderForTest() for the foreign-sender case.
+    processStreamDatagram(datagram, m_radioAddr);
 }
 
-void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data)
+void SunSdrRadioConnection::feedStreamDatagramFromSenderForTest(
+    const QByteArray& datagram, const QHostAddress& sender)
 {
+    processStreamDatagram(datagram, sender);
+}
+
+void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
+                                                    const QHostAddress& sender)
+{
+    // The stream socket binds the protocol's fixed, well-known port
+    // (50002) with ShareAddress — deliberately, so a still-streaming
+    // QRP from a just-ended prior session stays reachable (see init()'s
+    // own comment, and setFixedPortBindingEnabledForTest()'s comment,
+    // which records exactly that happening: 85 real leftover I/Q
+    // packets from a QRP that kept streaming after the app had already
+    // closed). Without this sender check, that stale traffic would both
+    // get decoded as this session's I/Q and keep the dead-link
+    // watchdog's silence clock alive, defeating the point of that
+    // watchdog entirely. Found in review, 2026-08-28.
+    if (sender != m_radioAddr) {
+        return;
+    }
+
+    // Any datagram at all from the connected radio proves the link is
+    // still there and talking to us — restart the silence clock ahead
+    // of the content checks below, so onDataWatchdogTick() reflects
+    // real link liveness rather than only "decoded valid I/Q" liveness.
+    m_lastStreamPacketAt.restart();
+    recordBytesReceived(static_cast<qint64>(data.size()));
+
     if (!m_rxReady.load(std::memory_order_acquire)) {
         return;  // discarded, not buffered — see header rationale
     }
@@ -628,6 +659,7 @@ void SunSdrRadioConnection::onKeepaliveTimeout()
                                            m_txSeq++, /*byte8=*/0, /*byte9=*/0);
     pkt.append(SunSdr::kIqPayloadSize, char(0));
     m_streamSocket->writeDatagram(pkt, m_radioAddr, m_profile->defaultStreamPort);
+    recordBytesSent(static_cast<qint64>(pkt.size()));
 }
 
 void SunSdrRadioConnection::onDataWatchdogTick()
@@ -651,6 +683,7 @@ void SunSdrRadioConnection::onDataWatchdogTick()
                            "network path lost; declaring link lost";
     m_running = false;
     m_awaitingBeacon = false;
+    m_radioAddr.clear();
     setRxReady(false);
     if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
     if (m_dataWatchdog) { m_dataWatchdog->stop(); }
