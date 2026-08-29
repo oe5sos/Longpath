@@ -228,6 +228,23 @@ promise).
 
 **Status:** [ ] Untested
 
+**Update 2026-08-28, code-level check (not the live reproducer above):**
+`BoardCapabilities`' `isRxOnlySku` field — the mechanism that hides the
+PA/TX Setup category for other RX-only boards (`SetupDialog.cpp`,
+`GeneralOptionsPage.cpp`) — is deliberately `false` on the SunSDR2 QRP
+row, per that row's own comment: the QRP genuinely has TX hardware
+(opcode `0x17` drive byte, PA enable `0x24` both exist in the
+protocol), `isRxOnlySku` describes hardware, not this driver's current
+software support. So MOX/PTT/TUNE controls are **not** hidden by that
+gate — they stay reachable in the UI and land on
+`SunSdrRadioConnection`'s no-op overrides
+(`everyTxShapedSetterIsANoOp`, already unit-tested). The PA Setup page
+specifically stays hidden regardless, via the independent
+`hasPaProfile=false` field. This is a real, intentional design choice,
+not a gap — but the row's actual reproducer (click MOX/TUNE live,
+confirm zero wire traffic through the real GUI dispatch path) is still
+untested.
+
 ---
 
 ## Row 10: Coexistence with a real OpenHPSDR radio
