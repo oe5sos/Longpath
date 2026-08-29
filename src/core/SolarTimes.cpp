@@ -12,8 +12,6 @@
 
 #include "SolarTimes.h"
 
-#include <QTimeZone>
-
 #include <algorithm>
 #include <cmath>
 
@@ -35,8 +33,10 @@ double julianDate(const QDateTime& utc)
 QDateTime fromJulian(double jd)
 {
     const double ms = (jd - kUnixEpochJd) * 86400000.0;
+    // Qt::UTC (not QTimeZone::UTC, which is Qt 6.7+) so this keeps
+    // compiling on the ubuntu-24.04-arm release runner's system Qt 6.4.2.
     return QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(std::llround(ms)),
-                                          QTimeZone::UTC);
+                                          Qt::UTC);
 }
 
 double normDeg(double d)
