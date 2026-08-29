@@ -3032,6 +3032,31 @@ private:
     // members -- it lives here rather than inside the GPU-only block below.
     int m_visibleBinCount{0};
 
+    // A second wave of the same stranding bug as the background block
+    // above: these are plain widget/interaction state used from CPU-path
+    // (and shared GPU+CPU) code -- overlay dirty flags, the waterfall
+    // stale-data timestamp, shutdown/drag state -- not GPU resources, but
+    // they were declared inside #ifdef NEREUS_GPU_SPECTRUM below anyway.
+    // Found via a systematic sweep of every member in that block against
+    // its actual (non-comment) usage sites in SpectrumWidget.cpp, after
+    // the ubuntu-24.04-arm CPU-only build (-DNEREUS_GPU_SPECTRUM=OFF) hit
+    // several of these one compile error at a time.
+    bool   m_wfTexFullUpload{true};
+    /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
+    /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
+    /// pushWaterfallRow().
+    qint64 m_lastSpectrumArrivalMs{0};
+    bool   m_overlayStaticDirty{true};
+    bool   m_shutdownPrepared{false};
+    // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
+    // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
+    // Warum, steht am Auswertepunkt in mouseMoveEvent.
+    int    m_panDragLastX{0};
+    bool   m_panDragArmed{false};
+    int    m_vfoDragStartX{0};
+    double m_vfoDragStartHz{0.0};
+    double m_vfoDragHzPerPx{0.0};
+
 #ifdef NEREUS_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
@@ -3064,12 +3089,7 @@ private:
 
     int  m_wfGpuTexW{0};
     int  m_wfGpuTexH{0};
-    bool m_wfTexFullUpload{true};
     int  m_wfLastUploadedRow{-1};
-    /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
-    /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
-    /// pushWaterfallRow().
-    qint64 m_lastSpectrumArrivalMs{0};
 
     // ---- Overlay GPU resources ----
     QRhiGraphicsPipeline*       m_ovPipeline{nullptr};
@@ -3083,17 +3103,6 @@ private:
     /// Welche Einblendung gerade gezogen wird (-1 = keine).
 
     QImage m_overlayStatic;
-    bool   m_overlayStaticDirty{true};
-    bool   m_shutdownPrepared{false};
-
-    // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
-    // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
-    // Warum, steht am Auswertepunkt in mouseMoveEvent.
-    int    m_panDragLastX{0};
-    bool   m_panDragArmed{false};
-    int    m_vfoDragStartX{0};
-    double m_vfoDragStartHz{0.0};
-    double m_vfoDragHzPerPx{0.0};
     bool   m_overlayNeedsUpload{true};
 
     // 2026-05-26 KG4VCF dual-layer overlay split.
