@@ -177,6 +177,18 @@ it's a different code path than P1/P2.
 
 **Status:** [ ] Untested
 
+**Update 2026-08-28:** a self-review pass over the just-landed native
+driver found this row was not just untested but genuinely unimplemented
+— nothing in `SunSdrRadioConnection` re-armed after the initial connect
+watchdog stopped, so `ConnectionState` would have stayed stuck at
+`Connected` forever against a dead radio. Fixed: a periodic silence
+watchdog (`m_dataWatchdog`, 1s tick, 5s threshold — matching
+`ConnectionState::LinkLost`'s own doc comment "no frames for >5s"),
+mirroring `P1RadioConnection::onWatchdogTick()`'s pattern, full teardown
+on trip since this class has no reconnect timer of its own. Code-level
+only — this row's actual reproducer (power off a live QRP, watch the
+transition happen) is still the real test and remains untested.
+
 ---
 
 ## Row 8: Connect attempt while ExpertSDR2 IS running
