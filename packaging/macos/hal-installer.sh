@@ -22,7 +22,7 @@ PKG_DIR="${BUILD_DIR}/pkg-staging"
 # This was the root cause of the v0.3.1-rc1 build failure (run 25267007020):
 # productbuild wrote build/NereusSDR-0.3.1-macOS.pkg, but the notarize step
 # looked for build/NereusSDR-0.3.1-rc1-macOS.pkg and failed with exit 64.
-VERSION="${VERSION:-$(grep 'project(NereusSDR' CMakeLists.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")}"
+VERSION="${VERSION:-$(grep 'project(Longpath' CMakeLists.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")}"
 
 # PKG_SUFFIX selects the arch-tagged segment of the output filename. The
 # matrix-driven release pipeline sets this per matrix row to one of
@@ -34,11 +34,11 @@ PKG_SUFFIX="${PKG_SUFFIX:-macOS}"
 echo "=== Building NereusSDR macOS installer v${VERSION} (${PKG_SUFFIX}) ==="
 
 # 1. Build app — skip if already built (preserves pre-existing signatures from CI).
-if [ ! -d "${BUILD_DIR}/NereusSDR.app" ]; then
+if [ ! -d "${BUILD_DIR}/Longpath.app" ]; then
     cmake -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
     cmake --build "${BUILD_DIR}" -j$(sysctl -n hw.ncpu)
 else
-    echo "--- Reusing existing ${BUILD_DIR}/NereusSDR.app ---"
+    echo "--- Reusing existing ${BUILD_DIR}/Longpath.app ---"
 fi
 
 # 1b. Build HAL plugin — skip if already built (preserves pre-existing signatures from CI).
@@ -58,7 +58,7 @@ rm -rf "${PKG_DIR}"
 mkdir -p "${PKG_DIR}/app" "${PKG_DIR}/hal" "${PKG_DIR}/scripts"
 
 # Copy app bundle
-cp -R "${BUILD_DIR}/NereusSDR.app" "${PKG_DIR}/app/"
+cp -R "${BUILD_DIR}/Longpath.app" "${PKG_DIR}/app/"
 
 # Copy HAL plugin (check both possible build locations)
 if [ -d "${HAL_BUILD}/NereusSDRVAX.driver" ]; then
