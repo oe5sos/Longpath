@@ -37,7 +37,6 @@
 #include <QSaveFile>
 #include <QStringConverter>
 #include <QTextStream>
-#include <QTimeZone>
 
 #include <cmath>
 
@@ -62,7 +61,9 @@ QDateTime combine(const QString& date, const QString& time)
     }
     if (!t.isValid()) { t = QTime(0, 0); }
 
-    return QDateTime(d, t, QTimeZone::UTC);
+    // Qt::UTC (not QTimeZone::UTC, which is Qt 6.7+) so this keeps
+    // compiling on the ubuntu-24.04-arm release runner's system Qt 6.4.2.
+    return QDateTime(d, t, Qt::UTC);
 }
 
 // A field value, as text. Strict UTF-8 first; when the bytes are not
