@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - Phase 3F multi-pan multi-slice
+## [0.6.0] - 2026-08-29
 
 ### Added
 
@@ -99,6 +99,22 @@ Stand von heute ist dieser:
 - **MOX snapped the DDC rate to the configured 192 kHz on a wire idling at the 48 kHz connect default (2026-08-11, bench verification pending).** Root cause: the restore path moved the stream allocator to the persisted per-band rate, but the wire push is gated on `isConnected()` and nothing re-ran it once the connection went live — so the radio idled on the connection's constructor default until the first MOX toggle applied the configured rate mid-TX (quadrupling the DDC stream on a marginal remote link, measured 3-9% loss both directions). The Connected transition now re-runs `requestDdcAssignment()` beside the Alex/BPF/TX-LPF pushes that exist for the identical reason; two supporting hygiene rounds keep the PS-orchestration rate store in sync (silent mirrors at `setReceiverSampleRate` and `publishDdcAssignment`). Full narrative: `docs/architecture/2026-08-11-tx-monitor-audio-path.md`.
 - Source-first audit caught a wire-format bug in Sub-Epic F Task 1 plan: the wideband enable mask belongs in CmdGeneral byte 23 (Thetis network.c:879), not CmdRx byte 23 (which is rx[1].rx_adc per Thetis network.c:1118). Following the plan as written would have silently broken RX1 ADC routing the moment any user enabled an alternate ADC. Caught + fixed before implementation landed.
 - **Bottom banner + pan menu final audit fix wave.** Two of `ChromeBarController`'s width inputs were wrong: the per-ADC BPF chain indicator (idle to `BYPASS (multi-band: 160m + 80m + 40m + 20m + 10m)`, up to ~170 px) and the StationBlock disconnect transition both mutated their widget without reporting the new width, so the budget could quietly go stale and the bar could overflow again on routine band changes or a disconnect. `PanLayoutDialog` was gating its layout grid on raw `maxSlices` instead of `qMin(maxSlices, userDdcCount)`. Opening a new pan always claims its own DDC, so a board like HL2 (5 slices, only 2 DDCs) could paint five layout tiles it could only ever fill two of. All three fixed; the overflow chip and the RX dashboard's own non-pill residual (slice tag + mode + filter badges) are now also counted in the width budget, closing the remaining under-reporting the audit found.
+
+### Added (2026-08-28/29, on top of the Phase 3F work above)
+
+- **Recording (Phase 3M).** WavRecorder + WavRecorderController (off-the-air WAV capture via a third AudioEngine tap), IqRecorder + IqRecorderController (raw I/Q capture, pre-demodulation), RecordingScheduler (timed start/stop), and PlaybackRadioConnection — a fourth RadioConnection subclass that replays a captured file through the existing RX pipeline with no hardware attached.
+- **POTA Alerts + Park Info.** PotaAlertsClient + AlertsTableModel (upcoming activation alerts) and PotaParkInfoClient + ParkInfoDialog (park lookup from a right-click), both wired into Spot Hub as a new "Alerts" tab (11 tabs total, was 10). Spot List gains entity/mode/free-text filters and a band-pill solo-click model (click isolates to one band, click again restores all).
+- **KiwiSDR waterfall panel + status pill.** KiwiWaterfallPanel + KiwiWaterfallStripWidget (receive-only companion display), a KIWI status pill on the spectrum overlay, and the audio-to-mix wiring that closed out the stages-1-6/7a work.
+
+### Fixed (2026-08-28/29)
+
+- **P2 (and P1) link-loss detection + automatic reconnect.** A radio that goes silent mid-session (or times out on initial connect) now transitions to LinkLost and retries on its own instead of staying stuck showing "Connected" with a dead link.
+- **Layout-profile persistence.** Profiles now actually restore on next launch (`applyCurrent()` bypassing `activate()`'s identity guard, which previously no-op'd the startup restore); an explicit "Jetzt sichern" action lets the operator save a profile without waiting for a switch or quit; floating meter/applet windows and Rotor/Log stay hidden until first connect across all three independent windowing mechanisms (dock, container, floating applet) instead of flashing meaningless pre-connect state.
+- **Follow-up review pass on the above:** suppressed focus-stealing/toast-spam during an extended automatic reconnect (P2's retry has no attempt limit by design); `LayoutProfiles::save()`'s disk flush is now debounced instead of blocking the GUI thread on every window drag/resize; fixed several dock-vs-floating-window visibility bugs (Rotor dock losing drag-to-reposition, an unrelated dock spawning when hiding the logbook, Spot Hub actions showing an empty dock instead of the real floating panel).
+- **Broken auto-connect-on-launch removed.** Kept silently re-arming and connecting when actively unwanted; removed end to end rather than patched.
+- **Window-geometry persistence** for AntennaWindow, LogbookWindow, and the generic ToolWindow/PanFloatingWindow shells.
+- **TCI binary IQ-rate header** was hardcoded to 192000 Hz regardless of the radio's actual configured rate; now reads the same live value the text channel already reports.
+- **Two CI infrastructure bugs, unrelated to any of the above, found while preparing this release** (both had left every Linux/macOS build red since 2026-08-26): `tests/CMakeLists.txt`'s test-sharding logic called `set_tests_properties()` on tests a given shard had excluded, aborting CMake's configure step outright; and an overbroad `.gitignore` pattern (`themes/` with no leading slash) silently excluded `resources/themes/` at any depth, hiding the operator's own Kreide/Flach/Tief palette files (authored 2026-08-20/22) from git the entire time — the build's theme-copy step failed the moment sharding stopped masking it. Both root-caused and fixed; the palette files were recovered unchanged from disk, no theme content invented.
 
 ## [0.5.2] - 2026-05-24
 
