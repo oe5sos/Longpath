@@ -465,6 +465,15 @@ private slots:
             int(HPSDRHW::HermesLiteRxOnly), int(HPSDRHW::Saturn),
             int(HPSDRHW::SaturnMKII), int(HPSDRHW::Andromeda),
             int(HPSDRHW::Unknown),
+            // SunSDR2 QRP is not an OpenHPSDR board at all — no Alex
+            // filter board (hasAlexFilters=false, hasAlex=false), never
+            // runs through P1RadioConnection's Alex LPF selection at all
+            // (its own SunSdrRadioConnection class, separate protocol).
+            // rx2PreampPresent staying at its default is correct here,
+            // same standing as the Atlas row above ("absent from the
+            // switch, so the field initializer holds") — not an
+            // oversight to fix, a board this switch was never for.
+            int(HPSDRHW::SunSdr2Qrp),
         };
         for (const BoardCapabilities& caps : BoardCapsTable::all()) {
             QVERIFY2(covered.contains(int(caps.board)),

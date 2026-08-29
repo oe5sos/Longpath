@@ -50,7 +50,16 @@ private slots:
 
     void sampleRatesAreSaneForEveryBoard() {
         for (const auto& caps : BoardCapsTable::all()) {
-            QVERIFY(caps.sampleRates[0] == 48000);
+            // 48000-as-the-floor is an OpenHPSDR convention (every real
+            // P1/P2 board offers a 48 kHz-multiple ladder) — not a
+            // universal one. SunSDR2 QRP isn't an OpenHPSDR board at all;
+            // its native wire protocol fixes the rate at 312,500 Hz
+            // (design doc "IQ stream" section), confirmed, not guessed.
+            // The ascending/within-max invariant below still applies to
+            // it same as every other row.
+            if (caps.protocol != ProtocolVersion::SunSdr) {
+                QVERIFY(caps.sampleRates[0] == 48000);
+            }
             int prev = 0;
             for (int sr : caps.sampleRates) {
                 if (sr == 0) { break; }
