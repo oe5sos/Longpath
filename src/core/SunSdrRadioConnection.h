@@ -75,7 +75,6 @@
 // =================================================================
 
 #include "RadioConnection.h"
-#include "BoardCapabilities.h"
 #include "core/sunsdr/SunSdrProtocol.h"
 
 #include <QElapsedTimer>
@@ -331,7 +330,6 @@ private:
     static constexpr int kDataSilenceTimeoutMs = 5000;
 
     const SunSdr::Profile* m_profile{nullptr};
-    const BoardCapabilities* m_caps{nullptr};
 
     bool m_running{false};
     bool m_intentionalDisconnect{false};

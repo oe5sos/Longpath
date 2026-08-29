@@ -211,9 +211,6 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
 
     m_radioInfo = info;
     m_profile = &resolveProfile(info.boardType);
-    m_caps = m_hardwareProfile.caps
-             ? m_hardwareProfile.caps
-             : &BoardCapsTable::forBoard(info.boardType);
 
     m_intentionalDisconnect = false;
     m_running = true;
