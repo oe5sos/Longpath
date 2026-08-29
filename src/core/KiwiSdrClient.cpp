@@ -901,16 +901,25 @@ void KiwiSdrClient::openWebSockets()
             }
         }
     });
-    connect(m_soundSocket, &QWebSocket::errorOccurred, this,
-            [this](QAbstractSocket::SocketError) {
-                const QString error =
-                    m_soundSocket ? m_soundSocket->errorString() : QString();
-                handleSocketError(error.isEmpty()
-                                      ? tr("KiwiSDR sound socket error.")
-                                      : tr("KiwiSDR sound socket error: %1")
-                                            .arg(error),
-                                  m_soundSocketConnected);
-            });
+    // QWebSocket::errorOccurred() only exists from Qt 6.5 on; the
+    // ubuntu-24.04-arm release runner's system package is Qt 6.4.2, so
+    // this needs the pre-6.5 deprecated signal as a fallback (same
+    // pattern as FreeDVReporterClient::connectSockets()).
+    auto handleSoundSocketError = [this](QAbstractSocket::SocketError) {
+        const QString error =
+            m_soundSocket ? m_soundSocket->errorString() : QString();
+        handleSocketError(error.isEmpty()
+                              ? tr("KiwiSDR sound socket error.")
+                              : tr("KiwiSDR sound socket error: %1")
+                                    .arg(error),
+                          m_soundSocketConnected);
+    };
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    connect(m_soundSocket, &QWebSocket::errorOccurred, this, handleSoundSocketError);
+#else
+    connect(m_soundSocket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
+            this, handleSoundSocketError);
+#endif
     qCInfo(lcKiwiSdr).noquote()
         << "KiwiSDR SND URL"
         << QStringLiteral("endpoint=%1").arg(logEndpoint())
@@ -962,17 +971,24 @@ void KiwiSdrClient::openWebSockets()
             }
         }
     });
-    connect(m_waterfallSocket, &QWebSocket::errorOccurred, this,
-            [this](QAbstractSocket::SocketError) {
-                const QString error = m_waterfallSocket
-                    ? m_waterfallSocket->errorString()
-                    : QString();
-                handleSocketError(error.isEmpty()
-                                      ? tr("KiwiSDR waterfall socket error.")
-                                      : tr("KiwiSDR waterfall socket error: %1")
-                                            .arg(error),
-                                  m_waterfallSocketConnected);
-            });
+    // Same pre-6.5 QWebSocket::errorOccurred() fallback as the sound
+    // socket connect() above.
+    auto handleWaterfallSocketError = [this](QAbstractSocket::SocketError) {
+        const QString error = m_waterfallSocket
+            ? m_waterfallSocket->errorString()
+            : QString();
+        handleSocketError(error.isEmpty()
+                              ? tr("KiwiSDR waterfall socket error.")
+                              : tr("KiwiSDR waterfall socket error: %1")
+                                    .arg(error),
+                          m_waterfallSocketConnected);
+    };
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    connect(m_waterfallSocket, &QWebSocket::errorOccurred, this, handleWaterfallSocketError);
+#else
+    connect(m_waterfallSocket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
+            this, handleWaterfallSocketError);
+#endif
     qCInfo(lcKiwiSdr).noquote()
         << "KiwiSDR W/F URL"
         << QStringLiteral("endpoint=%1").arg(logEndpoint())

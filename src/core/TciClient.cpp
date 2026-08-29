@@ -113,8 +113,16 @@ void TciClient::connectToEndpoint(const QString& host, quint16 port)
             setState(State::Disconnected, tr("Verbindung beendet"));
         }
     });
+    // QWebSocket::errorOccurred() only exists from Qt 6.5 on; the
+    // ubuntu-24.04-arm release runner's system package is Qt 6.4.2, so
+    // this needs the pre-6.5 deprecated signal as a fallback.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(m_socket, &QWebSocket::errorOccurred,
             this, &TciClient::handleSocketError);
+#else
+    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
+            this, &TciClient::handleSocketError);
+#endif
 
     setState(State::Connecting, tr("verbinde ..."));
     const QUrl url(QStringLiteral("ws://%1:%2").arg(trimmedHost).arg(port));
