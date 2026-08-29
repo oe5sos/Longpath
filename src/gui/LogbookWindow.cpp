@@ -1181,7 +1181,15 @@ void LogbookWindow::editSelected()
     // The stored time is UTC and stays UTC. A widget that silently
     // showed local time would rewrite every edited contact by the
     // offset, and nothing would look wrong until someone compared logs.
+    //
+    // QDateTimeEdit::setTimeZone() is Qt 6.7+ (the ubuntu-24.04-arm
+    // release runner's system package is Qt 6.4.2); pre-6.7 there is no
+    // way to lock the edit's zone explicitly, so this falls back to the
+    // UTC-constructed QDateTime passed to the constructor above, which
+    // is the best available approximation on that Qt version.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     when->setTimeZone(QTimeZone::UTC);
+#endif
 
     auto* band    = new QLineEdit(e.band, &dlg);
     auto* mode    = new QLineEdit(e.mode, &dlg);
