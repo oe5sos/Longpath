@@ -4696,10 +4696,14 @@ nereus_add_test(tst_disconnect_label_transparent)
 nereus_add_test(tst_both_paint_paths)
 nereus_add_test(tst_mouse_follows_aether)
 nereus_add_test(tst_spectrum_trace_visible)
-set_tests_properties(tst_spectrum_trace_visible PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_spectrum_trace_visible)
+    set_tests_properties(tst_spectrum_trace_visible PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_form_variants)
-set_tests_properties(tst_form_variants PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_form_variants)
+    set_tests_properties(tst_form_variants PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 nereus_add_test(tst_theme_form_knobs)
 nereus_add_test(tst_surface_gradients)
 nereus_add_test(tst_stilblatt)
@@ -4727,11 +4731,15 @@ nereus_add_test(tst_notch_removable_offline)
 # RUN_SERIAL nimmt ihm die Gegner. Das ist die richtige Antwort auf
 # "der Test braucht etwas Exklusives" — und nicht die vierte Runde
 # Symptombehandlung im Testcode.
-set_tests_properties(tst_notch_removable_offline PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_notch_removable_offline)
+    set_tests_properties(tst_notch_removable_offline PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
 # Braucht ein aktives Fenster, aus demselben Grund wie
 # tst_notch_removable_offline — dort ausfuehrlich begruendet.
-set_tests_properties(tst_notch_menu_wins_over_pan_menu PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_notch_menu_wins_over_pan_menu)
+    set_tests_properties(tst_notch_menu_wins_over_pan_menu PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_pan_float_unlocked)
 nereus_add_test(tst_closing_takes_the_float_along)
 nereus_add_test(tst_network_tells_the_truth)
@@ -4781,14 +4789,20 @@ nereus_add_test(tst_instrument_brightness_sheet)
 nereus_add_test(tst_zoom_buttons_do_something)
 nereus_add_test(tst_waterfall_survives_the_move)
 nereus_add_test(tst_splitter_handles_grabbable)
-set_tests_properties(tst_splitter_handles_grabbable PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_splitter_handles_grabbable)
+    set_tests_properties(tst_splitter_handles_grabbable PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_rotor_aim_menu)
 nereus_add_test(tst_reachability_audit)
-set_tests_properties(tst_reachability_audit PROPERTIES RUN_SERIAL TRUE)
-set_tests_properties(tst_reachability_audit PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_reachability_audit)
+    set_tests_properties(tst_reachability_audit PROPERTIES RUN_SERIAL TRUE)
+    set_tests_properties(tst_reachability_audit PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 nereus_add_test(tst_real_pan_float_state)
-set_tests_properties(tst_real_pan_float_state PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_real_pan_float_state)
+    set_tests_properties(tst_real_pan_float_state PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_real_notch_rightclick)
 # ── Laeuft allein ────────────────────────────────────────────────────
 #
@@ -4798,17 +4812,23 @@ nereus_add_test(tst_real_notch_rightclick)
 # ohne Beanstandung. Dieselbe Ursache wie bei
 # tst_settings_migration_longpath: nicht der Test ist falsch, sondern
 # die Annahme, er habe die Maschine fuer sich.
-set_tests_properties(tst_real_notch_rightclick PROPERTIES
-    RUN_SERIAL TRUE)
+if(TEST tst_real_notch_rightclick)
+    set_tests_properties(tst_real_notch_rightclick PROPERTIES
+        RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_panadapter_base_colour_reset)
-set_tests_properties(tst_both_paint_paths PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_both_paint_paths)
+    set_tests_properties(tst_both_paint_paths PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 nereus_add_test(tst_native_overlay_audit)
 nereus_add_test(tst_needle_fits)
 nereus_add_test(tst_rotor_dial_paint)
 nereus_add_test(tst_design_consistency)
-set_tests_properties(tst_design_consistency PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_design_consistency)
+    set_tests_properties(tst_design_consistency PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 # -- AppletVisibilityController: state, persistence, signal emission --
 nereus_add_test(tst_applet_visibility_controller)
@@ -5084,8 +5104,10 @@ nereus_add_test(tst_settings_migration_longpath)
 # nachdem neue Tests hinzukamen, die MainWindow wirklich bauen. Nicht
 # der Test ist falsch, sondern die Annahme, er habe den Ordner fuer
 # sich. RUN_SERIAL sagt genau das.
-set_tests_properties(tst_settings_migration_longpath PROPERTIES
-    RUN_SERIAL TRUE)
+if(TEST tst_settings_migration_longpath)
+    set_tests_properties(tst_settings_migration_longpath PROPERTIES
+        RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_wav_file)
 nereus_add_test(tst_voice_keyer)
 nereus_add_test(tst_qso_recorder)
