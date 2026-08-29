@@ -2997,6 +2997,41 @@ private:
     // Default matches Style::kRxFilterOverlayFill = "rgba(0, 180, 216, 80)".
     QColor  m_rxFilterColor{0x00, 0xb4, 0xd8, 80};
 
+    // ── Frei waehlbarer Hintergrund ──────────────────────────────────
+    //
+    // Port aus AetherSDR SpectrumWidget: setBackgroundImage /
+    // setBackgroundOpacity / setBackgroundFillColor
+    // (SpectrumWidget.cpp:11161-11187 [@0cd4559]) samt der Komposition
+    // bei :13730. Die Reihenfolge ist AetherSDRs, nicht neu erfunden:
+    //
+    //     Fuellfarbe   volle Deckkraft
+    //     Bild         Deckkraft 1 - opacity/100
+    //
+    // m_bgOpacity sagt also, wie stark die FUELLFARBE durchkommt, nicht
+    // wie stark das Bild deckt. Der Name stammt aus AetherSDR und
+    // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
+    // Umbenennung scheitert.
+    //
+    // Unconditional (not inside #ifdef NEREUS_GPU_SPECTRUM): both the
+    // GPU and the CPU-only paint path call paintBackgroundLayer(), and
+    // its setters/getters above are declared unconditionally too -- these
+    // members were stranded inside the GPU-only block below, which broke
+    // every CPU-only build (e.g. release.yml's ubuntu-24.04-arm job,
+    // which sets -DNEREUS_GPU_SPECTRUM=OFF because that runner's Qt is
+    // older than the 6.7 QRhiWidget needs).
+    QImage  m_bgImage;
+    QImage  m_bgScaled;
+    QSize   m_bgScaledSize;
+    QString m_bgImagePath;
+    int     m_bgOpacity{80};
+    QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
+    QColor  m_wfBgFillColor{QColor(Style::kAppBg)};
+    int     m_bgBrightnessPct{100};
+    // Bins rendered this frame (GPU draw-call count). visibleBinCountForTest()
+    // above reads it unconditionally, so -- same reason as the background
+    // members -- it lives here rather than inside the GPU-only block below.
+    int m_visibleBinCount{0};
+
 #ifdef NEREUS_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
@@ -3042,28 +3077,6 @@ private:
     QRhiBuffer*                 m_ovVbo{nullptr};
     QRhiTexture*                m_ovGpuTex{nullptr};
     QRhiSampler*                m_ovSampler{nullptr};
-    // ── Frei waehlbarer Hintergrund ──────────────────────────────────
-    //
-    // Port aus AetherSDR SpectrumWidget: setBackgroundImage /
-    // setBackgroundOpacity / setBackgroundFillColor
-    // (SpectrumWidget.cpp:11161-11187 [@0cd4559]) samt der Komposition
-    // bei :13730. Die Reihenfolge ist AetherSDRs, nicht neu erfunden:
-    //
-    //     Fuellfarbe   volle Deckkraft
-    //     Bild         Deckkraft 1 - opacity/100
-    //
-    // m_bgOpacity sagt also, wie stark die FUELLFARBE durchkommt, nicht
-    // wie stark das Bild deckt. Der Name stammt aus AetherSDR und
-    // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
-    // Umbenennung scheitert.
-    QImage  m_bgImage;
-    QImage  m_bgScaled;
-    QSize   m_bgScaledSize;
-    QString m_bgImagePath;
-    int     m_bgOpacity{80};
-    QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
-    QColor  m_wfBgFillColor{QColor(Style::kAppBg)};
-    int     m_bgBrightnessPct{100};
     /// Lage der Einblendungen als Anteil der Spektrumsflaeche.
     /// Vorgabe: links unten, rechts unten, Mitte unten — ueber dem
     /// Bandplan, wo beim Abstimmen nichts steht.
@@ -3149,7 +3162,6 @@ private:
     // From AetherSDR: kMaxFftBins = 8192, kFftVertStride = 6
     static constexpr int kMaxFftBins = 65536;
     static constexpr int kFftVertStride = 6;  // x, y, r, g, b, a
-    int m_visibleBinCount{0};  // bins rendered this frame (for draw call count)
 
 #endif
 

@@ -44,12 +44,12 @@ fi
 # 1b. Build HAL plugin — skip if already built (preserves pre-existing signatures from CI).
 HAL_BUILD="${BUILD_DIR}-hal"
 if [ -f "hal-plugin/CMakeLists.txt" ]; then
-    if [ ! -d "${HAL_BUILD}/NereusSDRVAX.driver" ]; then
+    if [ ! -d "${HAL_BUILD}/LongpathVAX.driver" ]; then
         echo "--- Building HAL plugin ---"
         cmake -B "${HAL_BUILD}" -S hal-plugin -DCMAKE_BUILD_TYPE=RelWithDebInfo
         cmake --build "${HAL_BUILD}" -j$(sysctl -n hw.ncpu)
     else
-        echo "--- Reusing existing ${HAL_BUILD}/NereusSDRVAX.driver ---"
+        echo "--- Reusing existing ${HAL_BUILD}/LongpathVAX.driver ---"
     fi
 fi
 
@@ -61,12 +61,12 @@ mkdir -p "${PKG_DIR}/app" "${PKG_DIR}/hal" "${PKG_DIR}/scripts"
 cp -R "${BUILD_DIR}/Longpath.app" "${PKG_DIR}/app/"
 
 # Copy HAL plugin (check both possible build locations)
-if [ -d "${HAL_BUILD}/NereusSDRVAX.driver" ]; then
-    cp -R "${HAL_BUILD}/NereusSDRVAX.driver" "${PKG_DIR}/hal/"
-elif [ -d "${BUILD_DIR}/NereusSDRVAX.driver" ]; then
-    cp -R "${BUILD_DIR}/NereusSDRVAX.driver" "${PKG_DIR}/hal/"
+if [ -d "${HAL_BUILD}/LongpathVAX.driver" ]; then
+    cp -R "${HAL_BUILD}/LongpathVAX.driver" "${PKG_DIR}/hal/"
+elif [ -d "${BUILD_DIR}/LongpathVAX.driver" ]; then
+    cp -R "${BUILD_DIR}/LongpathVAX.driver" "${PKG_DIR}/hal/"
 else
-    echo "ERROR: HAL plugin not found at ${HAL_BUILD}/NereusSDRVAX.driver" >&2
+    echo "ERROR: HAL plugin not found at ${HAL_BUILD}/LongpathVAX.driver" >&2
     echo "The HAL plugin must be built before packaging. Check that hal-plugin/ exists and builds cleanly." >&2
     exit 1
 fi
@@ -83,7 +83,7 @@ pkgbuild \
     --version "${VERSION}" \
     "${PKG_DIR}/NereusSDR-app.pkg"
 
-if [ -d "${PKG_DIR}/hal/NereusSDRVAX.driver" ]; then
+if [ -d "${PKG_DIR}/hal/LongpathVAX.driver" ]; then
     pkgbuild \
         --root "${PKG_DIR}/hal" \
         --install-location "/Library/Audio/Plug-Ins/HAL" \
@@ -103,11 +103,11 @@ cat > "${PKG_DIR}/Distribution.xml" << DISTXML
 
     <script>
     function vaxDriverInstalled() {
-        return system.files.fileExistsAtPath('/Library/Audio/Plug-Ins/HAL/NereusSDRVAX.driver');
+        return system.files.fileExistsAtPath('/Library/Audio/Plug-Ins/HAL/LongpathVAX.driver');
     }
     function vaxDriverNeedsUpdate() {
         // Always offer update if installed version differs
-        var plist = system.files.plistAtPath('/Library/Audio/Plug-Ins/HAL/NereusSDRVAX.driver/Contents/Info.plist');
+        var plist = system.files.plistAtPath('/Library/Audio/Plug-Ins/HAL/LongpathVAX.driver/Contents/Info.plist');
         if (plist) {
             var installed = plist['CFBundleShortVersionString'] || '0';
             return (installed !== '${VERSION}');
