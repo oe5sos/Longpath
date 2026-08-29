@@ -158,6 +158,17 @@ without restarting Longpath). Repeat 2-3 times.
 
 **Status:** [ ] Untested
 
+**Update 2026-08-28, code-level fix relevant to this row:** a review
+pass found the stream socket had no sender check, and it shares the
+protocol's fixed, well-known port (50002, `ShareAddress`-bound) —
+exactly what makes a reconnect risky: a fresh instance's stream socket
+could receive leftover packets from the just-ended prior session
+before its own new beacon handshake completes. Fixed —
+`processStreamDatagram()` now rejects anything not from the current
+`m_radioAddr` (unit-tested: `foreignSenderStreamPacketIsIgnored` in
+`tst_sunsdr_radio_connection.cpp`). Improves confidence for this row;
+the actual reconnect-cycle reproducer above is still untested.
+
 ---
 
 ## Row 7: QRP powered off / unreachable mid-session
@@ -188,6 +199,17 @@ mirroring `P1RadioConnection::onWatchdogTick()`'s pattern, full teardown
 on trip since this class has no reconnect timer of its own. Code-level
 only — this row's actual reproducer (power off a live QRP, watch the
 transition happen) is still the real test and remains untested.
+
+**Update 2026-08-28, second pass:** a second, more skeptical review of
+the watchdog above found it could be defeated by exactly the kind of
+traffic Row 6 worries about — a foreign sender on the shared stream
+port restarting the silence clock without being the actual radio.
+Fixed alongside Row 6's note above (same commit,
+`processStreamDatagram()`'s sender check). Build- and test-verified
+this time (`cmake --build`, `ctest`), not just read — `tst_sunsdr_radio_connection`
+green including three new regression tests, full `core`/`models`/`gui`
+build clean. Still code-level only; the live power-off reproducer
+remains the real test.
 
 ---
 
