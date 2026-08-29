@@ -134,6 +134,24 @@ public:
     /// wechseln.
     void captureIntoCurrent();
 
+    /// m_apply für das aktuell gesetzte Profil auslösen, auch wenn es
+    /// schon "aktiv" ist. Für den Start gedacht: load() setzt m_current
+    /// direkt (ohne m_apply aufzurufen), und activate(current()) würde
+    /// an der Namensgleich-Wache in activate() sofort zurückkehren —
+    /// die Umgestaltung (schwebende Fenster, Splitter, Rotor-Sichtbarkeit,
+    /// Container-Geometrie) käme nie an. Bug gefunden 2026-08-28
+    /// (Betreiber: "und schon wieder hat er mein layout nicht
+    /// gespeichert" — es wurde gespeichert, nur nie wieder angewandt).
+    ///
+    /// NUR für diesen Start-Fall gedacht, nicht als allgemeiner Ersatz
+    /// für activate(): es fehlt absichtlich captureIntoCurrent() (kein
+    /// ANDERES Profil wird verlassen, es gibt nichts zu sichern) —
+    /// wer diese Methode fuer einen Fall aufruft, in dem tatsaechlich
+    /// ungespeicherte Aenderungen an einem WECHSELNDEN Profil haengen,
+    /// verliert sie stillschweigend. Für einen echten Wechsel activate()
+    /// verwenden.
+    void applyCurrent();
+
     QVariantMap snapshot(const QString& name) const;
 
     // ── Bindung ──────────────────────────────────────────────────────
@@ -184,6 +202,13 @@ private:
     QString m_current;
     Capture m_capture;
     Apply m_apply;
+
+    // Coalesces the disk flush inside save() (Review-Fund 2026-08-28) --
+    // same bool-guard + QTimer::singleShot(500, ...) idiom as
+    // RadioModel::scheduleSettingsSave(). See save()'s definition for why
+    // this is safe: MainWindow::closeEvent's own unconditional
+    // AppSettings::instance().save() at quit is the backstop.
+    mutable bool m_diskFlushScheduled{false};
 };
 
 } // namespace Longpath

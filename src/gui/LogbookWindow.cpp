@@ -26,6 +26,7 @@
 
 #include <QAction>
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDateEdit>
 #include <QDateTimeEdit>
@@ -103,7 +104,32 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     buildUi();
     restoreHeaderState();
     restoreSplitState();
+    restoreGeometryState();
     reload();
+}
+
+void LogbookWindow::closeEvent(QCloseEvent* event)
+{
+    // Persist position/size on close so the next open restores it,
+    // instead of Qt's default QDialog(parent) placement.
+    saveGeometryState();
+    QDialog::closeEvent(event);
+}
+
+void LogbookWindow::saveGeometryState()
+{
+    AppSettings::instance().setValue(
+        QStringLiteral("LogbookGeometryState"), saveGeometry());
+}
+
+void LogbookWindow::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("LogbookGeometryState")).toByteArray();
+    // Empty on a first run, or a saved state from before this window
+    // had a screen of its own to remember -- the resize(1240, 620)
+    // above already set a sane default in that case.
+    if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
 void LogbookWindow::restoreSplitState()

@@ -2203,6 +2203,11 @@ void RotorLogbookPanel::openLogbookWindow()
     m_logWindow->activateWindow();
 }
 
+void RotorLogbookPanel::hideLogbook()
+{
+    if (m_logWindow) { m_logWindow->hide(); }
+}
+
 void RotorLogbookPanel::setStatus(const QString& text, bool warn)
 {
     m_status->setText(text);

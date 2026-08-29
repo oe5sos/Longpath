@@ -226,6 +226,10 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // above the SpectrumWidget's QRhi surface without becoming a child of it.
     m_statusOverlay = new SpectrumStatusOverlay(this);
     m_statusOverlay->raise();
+    // Initial state for the KIWI pill (see its own header comment) --
+    // m_spectrum may already have been switched to the KiwiSDR source by
+    // the persisted-key restore above, before this overlay existed.
+    m_statusOverlay->setKiwiActive(m_spectrum->kiwiDisplaySource());
 
     // Phase 3F: clicking anywhere in this pan makes it the active pan.
     //
@@ -253,6 +257,15 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
             [this]() { emit wideBadgeClicked(m_panId); });
     connect(m_statusOverlay, &SpectrumStatusOverlay::chainTagClicked, this,
             [this](int chainIdx) { emit chainTagClicked(m_panId, chainIdx); });
+    // Clicking the KIWI pill switches straight back to the device -- the
+    // one-click "off" half of "kiwi sollte sich klar ein und ausschalten
+    // lassen" (Betreiber, 2026-08-27). Turning it back on stays a
+    // deliberate right-click menu action, not a click on an absent pill.
+    connect(m_statusOverlay, &SpectrumStatusOverlay::kiwiBadgeClicked, this,
+            [this]() {
+        m_spectrum->setKiwiDisplaySource(false);
+        m_statusOverlay->setKiwiActive(false);
+    });
 
     // Phase 3F Sub-Epic F Task 13: restore persisted extended-view
     // toggle (default true) and apply it to the embedded spectrum immediately.
@@ -521,6 +534,7 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
                 // tst_settings_are_remembered am 2026-08-23 gefunden
                 // hat.
                 w->setKiwiDisplaySource(on);
+                if (m_statusOverlay) { m_statusOverlay->setKiwiActive(on); }
             }
         });
         menu->addSeparator();

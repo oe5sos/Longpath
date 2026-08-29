@@ -207,7 +207,6 @@ private:
     QLabel*      m_detailMacLabel{nullptr};
     QComboBox*   m_modelCombo{nullptr};
     QLabel*      m_modelHintLabel{nullptr};
-    QCheckBox*   m_autoConnectCheck{nullptr};   // Phase 3Q Task 5 — auto-connect-on-launch
 
     // Track discovered radios by MAC (row data role = MAC string)
     QMap<QString, RadioInfo> m_discoveredRadios;

@@ -1657,6 +1657,10 @@ nereus_add_test(tst_alex_tx_lpf_source)
 # NereusSDR-original: no Thetis port.
 nereus_add_test(tst_p1_alex_lpf_word_source)
 
+# Regression test for the 2026-08-26 band/mode persistence race (OE5SOS
+# live bug report). See the test file's own header for the full story.
+nereus_add_test(tst_radio_model_band_save_uses_slice_frequency)
+
 # ── A band change must retune the DDC even while CTUN holds it ───────────────
 # CTUN pins the DDC via ReceiverManager::m_ddcFreqLocked so a VFO nudge inside
 # the pinned window moves the slice shift instead of retuning hardware. A band
@@ -4692,10 +4696,14 @@ nereus_add_test(tst_disconnect_label_transparent)
 nereus_add_test(tst_both_paint_paths)
 nereus_add_test(tst_mouse_follows_aether)
 nereus_add_test(tst_spectrum_trace_visible)
-set_tests_properties(tst_spectrum_trace_visible PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_spectrum_trace_visible)
+    set_tests_properties(tst_spectrum_trace_visible PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_form_variants)
-set_tests_properties(tst_form_variants PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_form_variants)
+    set_tests_properties(tst_form_variants PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 nereus_add_test(tst_theme_form_knobs)
 nereus_add_test(tst_surface_gradients)
 nereus_add_test(tst_stilblatt)
@@ -4723,11 +4731,15 @@ nereus_add_test(tst_notch_removable_offline)
 # RUN_SERIAL nimmt ihm die Gegner. Das ist die richtige Antwort auf
 # "der Test braucht etwas Exklusives" — und nicht die vierte Runde
 # Symptombehandlung im Testcode.
-set_tests_properties(tst_notch_removable_offline PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_notch_removable_offline)
+    set_tests_properties(tst_notch_removable_offline PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_notch_menu_wins_over_pan_menu)
 # Braucht ein aktives Fenster, aus demselben Grund wie
 # tst_notch_removable_offline — dort ausfuehrlich begruendet.
-set_tests_properties(tst_notch_menu_wins_over_pan_menu PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_notch_menu_wins_over_pan_menu)
+    set_tests_properties(tst_notch_menu_wins_over_pan_menu PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_pan_float_unlocked)
 nereus_add_test(tst_closing_takes_the_float_along)
 nereus_add_test(tst_network_tells_the_truth)
@@ -4777,14 +4789,20 @@ nereus_add_test(tst_instrument_brightness_sheet)
 nereus_add_test(tst_zoom_buttons_do_something)
 nereus_add_test(tst_waterfall_survives_the_move)
 nereus_add_test(tst_splitter_handles_grabbable)
-set_tests_properties(tst_splitter_handles_grabbable PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_splitter_handles_grabbable)
+    set_tests_properties(tst_splitter_handles_grabbable PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_rotor_aim_menu)
 nereus_add_test(tst_reachability_audit)
-set_tests_properties(tst_reachability_audit PROPERTIES RUN_SERIAL TRUE)
-set_tests_properties(tst_reachability_audit PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_reachability_audit)
+    set_tests_properties(tst_reachability_audit PROPERTIES RUN_SERIAL TRUE)
+    set_tests_properties(tst_reachability_audit PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 nereus_add_test(tst_real_pan_float_state)
-set_tests_properties(tst_real_pan_float_state PROPERTIES RUN_SERIAL TRUE)
+if(TEST tst_real_pan_float_state)
+    set_tests_properties(tst_real_pan_float_state PROPERTIES RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_real_notch_rightclick)
 # ── Laeuft allein ────────────────────────────────────────────────────
 #
@@ -4794,17 +4812,23 @@ nereus_add_test(tst_real_notch_rightclick)
 # ohne Beanstandung. Dieselbe Ursache wie bei
 # tst_settings_migration_longpath: nicht der Test ist falsch, sondern
 # die Annahme, er habe die Maschine fuer sich.
-set_tests_properties(tst_real_notch_rightclick PROPERTIES
-    RUN_SERIAL TRUE)
+if(TEST tst_real_notch_rightclick)
+    set_tests_properties(tst_real_notch_rightclick PROPERTIES
+        RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_panadapter_base_colour_reset)
-set_tests_properties(tst_both_paint_paths PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_both_paint_paths)
+    set_tests_properties(tst_both_paint_paths PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 nereus_add_test(tst_native_overlay_audit)
 nereus_add_test(tst_needle_fits)
 nereus_add_test(tst_rotor_dial_paint)
 nereus_add_test(tst_design_consistency)
-set_tests_properties(tst_design_consistency PROPERTIES
-    ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+if(TEST tst_design_consistency)
+    set_tests_properties(tst_design_consistency PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 # -- AppletVisibilityController: state, persistence, signal emission --
 nereus_add_test(tst_applet_visibility_controller)
@@ -5080,11 +5104,23 @@ nereus_add_test(tst_settings_migration_longpath)
 # nachdem neue Tests hinzukamen, die MainWindow wirklich bauen. Nicht
 # der Test ist falsch, sondern die Annahme, er habe den Ordner fuer
 # sich. RUN_SERIAL sagt genau das.
-set_tests_properties(tst_settings_migration_longpath PROPERTIES
-    RUN_SERIAL TRUE)
+if(TEST tst_settings_migration_longpath)
+    set_tests_properties(tst_settings_migration_longpath PROPERTIES
+        RUN_SERIAL TRUE)
+endif()
 nereus_add_test(tst_wav_file)
 nereus_add_test(tst_voice_keyer)
 nereus_add_test(tst_qso_recorder)
+nereus_add_test(tst_wav_recorder)
+nereus_add_test(tst_wav_recorder_controller)
+nereus_add_test(tst_iq_recorder)
+nereus_add_test(tst_iq_recorder_controller)
+nereus_add_test(tst_recording_scheduler)
+
+# Phase 3M-C (docs/architecture/phase3m-recording-plan.md):
+# PlaybackRadioConnection. See the test file's own header for what it
+# pins and why.
+nereus_add_test(tst_playback_radio_connection)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still
@@ -5598,6 +5634,20 @@ nereus_add_test(tst_spot_collector_parser)
 # parsesPotaJsonResponse, dedupsAcrossPolls, rejectsMalformedJson.
 # Source: AetherSDR src/core/PotaClient.cpp [@0cd4559].
 nereus_add_test(tst_pota_client)
+
+# ── SpotHub POTA improvement pass: PotaParkInfoClient JSON parser ───────────
+# NereusSDR-native, no upstream equivalent (operator-requested follow-up,
+# 2026-08-27). Pins the contract that PotaParkInfoClient parses
+# api.pota.app/park/{reference} JSON responses. 3 tests:
+# parsesParkInfoResponse, rejectsMalformedJson, rejectsResponseWithoutReference.
+nereus_add_test(tst_pota_park_info_client)
+
+# ── SpotHub POTA improvement pass: PotaAlertsClient JSON parser ─────────────
+# NereusSDR-native, no upstream equivalent (operator-requested follow-up,
+# 2026-08-27). Pins the contract that PotaAlertsClient parses
+# api.pota.app/activation JSON responses. 3 tests: parsesAlertsResponse,
+# rejectsMalformedJson, skipsRowsMissingActivatorOrReference.
+nereus_add_test(tst_pota_alerts_client)
 
 # ── Phase 3J-2 Task B3: DxClusterClient telnet parser ───────────────────────
 # Pins the contract that DxClusterClient parses the standard DX cluster

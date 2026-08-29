@@ -477,29 +477,6 @@ void ConnectionPanel::buildUI()
     m_modelHintLabel->setVisible(false);
     detailLayout->addWidget(m_modelHintLabel);
 
-    // Phase 3Q Task 5 — Auto-connect-on-launch checkbox
-    // Reads from AppSettings when a row is selected, writes on toggle.
-    m_autoConnectCheck = new QCheckBox(
-        QStringLiteral("Auto-connect to this radio on launch"), m_detailGroup);
-    m_autoConnectCheck->setStyleSheet(Style::themed(QStringLiteral(
-        "QCheckBox { color: #c8d8e8; font-size: 13px; }"
-        "QCheckBox::indicator { width: 14px; height: 14px; }")));
-    connect(m_autoConnectCheck, &QCheckBox::toggled, this, [this](bool checked) {
-        RadioInfo info = selectedRadio();
-        if (info.macAddress.isEmpty()) {
-            return;
-        }
-        // Use QSignalBlocker to prevent echo if we're populating from settings
-        AppSettings& s = AppSettings::instance();
-        bool pinToMac = false;
-        if (auto existing = s.savedRadio(info.macAddress)) {
-            pinToMac = existing->pinToMac;
-        }
-        s.saveRadio(info, pinToMac, checked);
-        s.save();
-    });
-    detailLayout->addWidget(m_autoConnectCheck);
-
     mainLayout->addWidget(m_detailGroup);
 
     // --- Bottom strip buttons (plan §5.2 + Thetis layout) ---
@@ -1192,10 +1169,12 @@ void ConnectionPanel::onConnectClicked()
     }
     m_connectBtn->setEnabled(false);
 
-    // Phase 3I Task 17 — persist as auto-reconnect target.
+    // Phase 3I Task 17 — remember this as the last-connected radio (no
+    // longer as an auto-reconnect target — that feature was removed
+    // 2026-08-27, operator decision: it kept re-arming itself from this
+    // exact call, silently auto-connecting on launch when that was
+    // actively unwanted, not just unreliable over a flaky WLAN link).
     // Compute the same macKey saveRadio uses (MAC if present, else "manual-ip-port").
-    // saveRadio updates the autoConnect flag to true for this entry, then
-    // setLastConnected records which entry to reconnect to on next launch.
     const QString macKey = info.macAddress.isEmpty()
         ? QStringLiteral("manual-%1-%2").arg(info.address.toString()).arg(info.port)
         : info.macAddress;
@@ -1205,7 +1184,7 @@ void ConnectionPanel::onConnectClicked()
     if (auto existing = s.savedRadio(macKey)) {
         pinToMac = existing->pinToMac;
     }
-    s.saveRadio(info, pinToMac, /*autoConnect=*/true);
+    s.saveRadio(info, pinToMac);
     s.setLastConnected(macKey);
     s.save();
 
@@ -1235,7 +1214,7 @@ void ConnectionPanel::onAddManuallyClicked()
         return;
     }
 
-    AppSettings::instance().saveRadio(info, dlg.pinToMac(), dlg.autoConnect());
+    AppSettings::instance().saveRadio(info, dlg.pinToMac());
     AppSettings::instance().save();
 
     // Design §7.4: tell RadioDiscovery this MAC is now saved so it is
@@ -1285,11 +1264,10 @@ void ConnectionPanel::onEditClicked()
 
     AppSettings& s = AppSettings::instance();
     const auto saved = s.savedRadio(current.macAddress);
-    const bool wasPinned = saved.has_value() ? saved->pinToMac    : false;
-    const bool wasAuto   = saved.has_value() ? saved->autoConnect : false;
+    const bool wasPinned = saved.has_value() ? saved->pinToMac : false;
 
     AddCustomRadioDialog dlg(this);
-    dlg.setEditTarget(current, wasPinned, wasAuto);
+    dlg.setEditTarget(current, wasPinned);
     if (dlg.exec() != QDialog::Accepted) {
         return;
     }
@@ -1312,7 +1290,7 @@ void ConnectionPanel::onEditClicked()
         m_discoveredRadios.remove(current.macAddress);
     }
 
-    s.saveRadio(updated, dlg.pinToMac(), dlg.autoConnect());
+    s.saveRadio(updated, dlg.pinToMac());
     s.save();
 
     if (!updated.macAddress.isEmpty()) {
@@ -1553,16 +1531,6 @@ void ConnectionPanel::updateDetailPanel()
         m_modelHintLabel->setVisible(false);
     }
 
-    // Phase 3Q Task 5: populate auto-connect checkbox from AppSettings.
-    // Use QSignalBlocker to prevent the toggled() handler from echoing back.
-    if (m_autoConnectCheck) {
-        QSignalBlocker blocker(m_autoConnectCheck);
-        bool autoConn = false;
-        if (auto saved = AppSettings::instance().savedRadio(info.macAddress)) {
-            autoConn = saved->autoConnect;
-        }
-        m_autoConnectCheck->setChecked(autoConn);
-    }
 }
 
 void ConnectionPanel::onModelComboChanged(int index)

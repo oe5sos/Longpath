@@ -195,7 +195,10 @@
 #pragma once
 
 #include <QDialog>
+#include <QMap>
+#include <QString>
 
+class QCloseEvent;
 class QTabWidget;
 class QLineEdit;
 class QSpinBox;
@@ -204,6 +207,9 @@ class QLabel;
 class QCheckBox;
 class QPlainTextEdit;
 class QTableView;
+class QToolButton;
+class QMenu;
+class QAction;
 
 namespace Longpath {
 
@@ -217,6 +223,11 @@ class SpotModel;
 class SpotTableModel;
 class BandFilterProxy;
 class DxccColorProvider;
+class PotaParkInfoClient;
+struct PotaParkInfo;
+class ParkInfoDialog;
+class PotaAlertsClient;
+class AlertsTableModel;
 
 // From AetherSDR src/gui/DxClusterDialog.h:79-215 [@0cd4559]
 //
@@ -301,6 +312,14 @@ signals:
     // maths (prefix → entity centre, QRZ locator) and the rotator link,
     // and MainWindow does the routing.
     void rotorRequested(const QString& dxCall);
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Spot List right-click → "Take Spot: <call>" -- mirrors the
+    // panadapter double-click's spotLogRequested (SpectrumWidget) /
+    // RotorLogbookPanel::takeSpot() path. Prefills the panel's
+    // callsign field (country/flag, worked-before, QRZ lookup) for the
+    // operator to review and log themselves; does NOT write a log
+    // entry or turn the rotor on its own.
+    void logSpotRequested(const QString& dxCall);
     // Forwarded from the Display tab's "Clear All Spots" button.
     void spotsClearedAll();
 
@@ -315,7 +334,18 @@ signals:
                        const QString& gridSquare,
                        const QString& message);
 
+protected:
+    // 2026-08-27: like every plain QDialog window in this app (see
+    // LogbookWindow's own note), this one never saved or restored its
+    // own position/size -- it always reopened at the fixed 760x640
+    // resize() in the constructor. Same idiom: capture on close, apply
+    // on construction.
+    void closeEvent(QCloseEvent* event) override;
+
 private:
+    void saveGeometryState();
+    void restoreGeometryState();
+
     // NereusSDR-native Settings tab (first position) for central
     // operator identity. Post-3J-2 UX fix.
     void buildSettingsTab(QTabWidget* tabs);
@@ -330,6 +360,29 @@ private:
     void buildPskTab(QTabWidget* tabs);
     void buildSpotListTab(QTabWidget* tabs);
     void buildDisplayTab(QTabWidget* tabs);
+
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // POTA "Scheduled Activations" tab (SOTA calls the equivalent
+    // concept "Announcements"). No upstream equivalent.
+    void buildAlertsTab(QTabWidget* tabs);
+    void refreshAlerts();
+
+    // NereusSDR-native (2026-08-26, no upstream equivalent). Helpers for
+    // the Spot List tab's entity filter + watchlist (see
+    // buildSpotListTab() and the member declarations below).
+    void ensureEntityFilterAction(const QString& entity);
+    void ensureModeFilterAction(const QString& mode);
+    void checkNewSpotsForWatchlistMatch(int first, int last);
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // speaks a watchlist match aloud via macOS's `say` command. No-op
+    // on other platforms -- see m_watchlistSpeakBtn's declaration.
+    void speakWatchlistMatch(const QString& call, const QString& reference);
+
+    // NereusSDR-native (2026-08-27, operator-requested follow-up): Spot
+    // List right-click "Park Info: <ref>" -- lazily creates
+    // m_parkInfoClient/m_parkInfoDialog on first use, shows the
+    // dialog's loading state immediately, then fires the lookup.
+    void requestParkInfo(const QString& reference);
 
     // Held by pointer; ownership stays with the caller (RadioModel /
     // MainWindow in production, the test fixture in unit tests).
@@ -444,6 +497,49 @@ private:
     // the dialog-owned proxy + view here.
     BandFilterProxy* m_spotProxyModel{nullptr};
     QTableView*     m_spotTable{nullptr};
+
+    // NereusSDR-native (2026-08-26, no upstream equivalent). Entity
+    // filter: a checkable menu populated dynamically as new
+    // DxSpot::entity values are seen (entities are open-ended, unlike
+    // the fixed band/source pill rows above), and a chaser watchlist
+    // (callsigns and/or park/summit references) that tints matching
+    // rows via SpotTableModel::setWatchTerms()/setWatchColor() and
+    // optionally beeps on a new match. See buildSpotListTab().
+    QToolButton*    m_entityFilterBtn{nullptr};
+    QMenu*          m_entityFilterMenu{nullptr};
+    QMap<QString, QAction*> m_entityFilterActions;
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Mode filter, same dynamic-menu treatment as the entity filter.
+    QToolButton*    m_modeFilterBtn{nullptr};
+    QMenu*          m_modeFilterMenu{nullptr};
+    QMap<QString, QAction*> m_modeFilterActions;
+    QLineEdit*      m_watchlistEdit{nullptr};
+    QPushButton*    m_watchlistSoundBtn{nullptr};
+    // NereusSDR-native (2026-08-27, operator-requested follow-up,
+    // pattern taken from the community sota2voice tool): speaks the
+    // matched call via macOS's built-in `say` command, alongside (not
+    // instead of) the beep toggle. macOS-only by operator decision --
+    // cross-platform TTS would need a new Qt6::TextToSpeech dependency
+    // (new system packages on Linux), which crosses into "new
+    // dependency" territory this session deliberately avoided. On
+    // other platforms this toggle is simply inert.
+    QPushButton*    m_watchlistSpeakBtn{nullptr};
+    QPushButton*    m_watchlistColorBtn{nullptr};
+
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // "Park Info" lookup, lazily constructed on first right-click use.
+    // A single client/dialog pair is reused across lookups (see
+    // requestParkInfo()).
+    PotaParkInfoClient* m_parkInfoClient{nullptr};
+    ParkInfoDialog*      m_parkInfoDialog{nullptr};
+
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Alerts (Scheduled Activations) tab.
+    PotaAlertsClient*  m_alertsClient{nullptr};
+    AlertsTableModel*  m_alertsModel{nullptr};
+    QTableView*        m_alertsTable{nullptr};
+    QLabel*            m_alertsStatusLabel{nullptr};
+    QPushButton*       m_alertsRefreshBtn{nullptr};
 
     // Display tab (F4). LEFT-column stat blocks are NereusSDR-native
     // additions; RIGHT-column knobs port verbatim from AetherSDR

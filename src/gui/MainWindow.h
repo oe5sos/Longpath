@@ -660,6 +660,16 @@ private:
     void openChannelStrip();
     class RotorLogbookPanel* ensureRotorPanel();
 
+    /// Rotor/Log anzeigen, gleich in welcher der drei Formen (Dock,
+    /// unten, eigenes Fenster) es gerade lebt. Review-Fund 2026-08-28:
+    /// mehrere Aufrufer (Spot-Rechtsklick, Doppelklick, "Take Spot")
+    /// zeigten bisher immer m_rotorDock direkt -- seit RotorFloating
+    /// standardmaessig "True" ist, ist das dann eine leere, versteckte
+    /// Huelle, waehrend das echte Panel unsichtbar in m_rotorWindow
+    /// steckt. Derselbe Vorrang wie in der connectionStateChanged-
+    /// Bindung: m_rotorWindow zuerst.
+    void raiseRotorPanel();
+
     /// Rotor/Log in ein eigenes Fenster — mit Leiste, Schloss und
     /// Anfasser wie jedes andere Feld. Bis 2026-08-20 lag das Panel
     /// nackt im Splitter: keine Marke, kein ↗, kein Schloss. Es war
@@ -702,7 +712,7 @@ private:
     QVector<QsoUploader*> qsoUploaders();
     void buildStatusBar();
     void applyDarkTheme();
-    void tryAutoReconnect();
+    void openConnectionPanelOnLaunch();
     void wireSliceToSpectrum();
 
     /// Stream 0's engine. Back-compat accessor for call sites that still
@@ -1001,6 +1011,21 @@ private:
     ConnectionPanel* m_connectionPanel{nullptr};
     SupportDialog* m_supportDialog{nullptr};
 
+    // Review-Fund 2026-08-28: seit der P2-Stillewaechter unbegrenzt
+    // wiederholt (Betreiberwunsch, kein Versuchslimit), durchlaeuft eine
+    // anhaltende Funkstille LinkLost->Connecting->LinkLost... immer wieder
+    // -- ohne diese Wachen haette jeder Durchlauf den Verbinden-Dialog
+    // erneut nach vorn geholt (Fokusraub) und/oder einen weiteren
+    // 14-Sekunden-Hinweis gestapelt. Zwei getrennte Flaggen, weil beide
+    // Ereignisse auf unterschiedlichen Signalen mit unterschiedlichem
+    // Timing haengen (siehe onConnectionStateChanged vs. der
+    // connectAttemptFailed-Anschluss) -- eine gemeinsame Flagge haette
+    // beim ersten Ausfall eines der beiden unterdrueckt, je nachdem
+    // welches Signal zuerst kam. Einmal je Ausfall reicht fuer jedes;
+    // beide zurueck auf false, sobald Connected wieder eintrifft.
+    bool m_connectionPanelAutoOpenedThisEpisode{false};
+    bool m_connectFailedToastShownThisEpisode{false};
+
     // Phase 3M-4 Task 8: PsForm modeless dialog (Tools > PureSignal...).
     // Lazy-constructed on first openPureSignalDialog() call; lives for the
     // lifetime of MainWindow.  Hidden on close, never destroyed.
@@ -1187,10 +1212,6 @@ private:
     // Re-entrancy guard: prevents centerChanged from firing a second
     // forceHardwareFrequency while frequencyChanged is already retuning the DDC
     bool m_handlingBandJump{false};
-
-    // Task 17: auto-reconnect guard — prevents the background attempt from
-    // interfering with a subsequent user-initiated Start Discovery.
-    bool m_autoReconnectInProgress{false};
 
     // Set true at the top of closeEvent (and aboutToQuit). Gates the
     // "auto-open ConnectionPanel on Disconnect" slot — without this,
@@ -1461,6 +1482,7 @@ private:
     void releaseSunSdrSlice(const QString& reason);
 
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
+    class KiwiWaterfallPanel* m_kiwiWaterfallPanel{nullptr};
     class TxMeterApplet*  m_txMeterApplet{nullptr};
 
     // ── Spracherkennung (2026-08-23) ────────────────────────────────
@@ -1560,6 +1582,18 @@ private:
     // Constructed in the layout-build path after the panel is wired.
     // Rotor + logbook dock (Tools > Rotor...). Lazy; owned by `this`.
     QDockWidget*     m_rotorDock{nullptr};
+    // Ob das Profil den Rotor/Log-Dock sichtbar haben will -- gesetzt
+    // beim Laden, aber erst mit der ersten Verbindung angewandt (siehe
+    // die connectionStateChanged-Bindung neben der Profil-Wiederherstellung):
+    // vor dem Verbinden ist der Kompass ohne Ziel bedeutungslos.
+    bool             m_rotorDockWantedVisible{true};
+    // Betreiber 2026-08-28: dieselbe Vorher-verstecken-Regel gilt auch fuer
+    // jedes andere schwebende Meter/Applet-Fenster (S-Meter, Stehwelle,
+    // Mitschrift, ...) -- restoreState() zeigt sie sonst unconditional beim
+    // Start, egal ob eine Verbindung steht. Nur die Fenster gemerkt, die
+    // deswegen tatsaechlich versteckt wurden, damit die erste Verbindung
+    // genau die wieder zeigt und nichts, was ohnehin schon zu war.
+    QList<QPointer<QWidget>> m_floatingContainersHiddenPreConnect;
     /// Fuehrt die Windrose im Spektrum nach, solange sie zu
     class WindowTitleBar* m_rotorHeader{nullptr};
     class ToolWindow*     m_rotorWindow{nullptr};

@@ -987,7 +987,9 @@ void SpectrumWidget::loadSettings()
     // collision with the retired key and with DisplayActivePeakHoldDurationMs
     // which belongs to the new ActivePeakHold system introduced in Task 2.5).
     m_peakHoldDelayMs  = readInt(QStringLiteral("DisplayPeakHoldResetMs"), 2000);
-    m_lineWidth        = readFloat(QStringLiteral("DisplayLineWidth"), 1.6f);
+    // 1.0f default: operator decision, 2026-08-26 -- see m_lineWidth's
+    // own declaration comment in SpectrumWidget.h for why.
+    m_lineWidth        = readFloat(QStringLiteral("DisplayLineWidth"), 1.0f);
     m_dbmCalOffset     = readFloat(QStringLiteral("DisplayCalOffset"), 0.0f);
     const bool peakOn = readBool(QStringLiteral("DisplayPeakHoldEnabled"), false);
     const bool gradOn = readBool(QStringLiteral("DisplayGradientEnabled"), true);
@@ -3169,12 +3171,27 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     m_fullLinearBins = binsLinear;
     m_fftWindowEnb   = qMax(windowEnb, 1e-9);
 
-    // Display pixel count -- spectrum panel width minus dBm strip column.
-    // Per Thetis Display.cs:4970 DrawPanadapterDX2D(int W, ...) signature
-    // and :4993 nDecimatedWidth = W / m_nDecimation [v2.10.3.13].  Thetis
-    // S16 display-side decimation (an additional W / N reduction) is a
-    // Phase 2 follow-up; for now we use the full panel width.
-    const int displayWidth = qMax(width() - effectiveStripW(), 800);
+    // Display pixel count -- spectrum panel width minus dBm strip column,
+    // in DEVICE pixels. Per Thetis Display.cs:4970 DrawPanadapterDX2D(int
+    // W, ...) signature and :4993 nDecimatedWidth = W / m_nDecimation
+    // [v2.10.3.13].  Thetis S16 display-side decimation (an additional
+    // W / N reduction) is a Phase 2 follow-up; for now we use the full
+    // panel width. "Full panel width" must mean actual screen dots, not
+    // logical/CSS pixels -- devicePixelRatioF() is already applied this
+    // way elsewhere in this file (renderGpuFrame's viewport math, the
+    // overlay texture size). Without it, on a 2x (Retina) display this
+    // stage decimates down to half as many samples as there are real
+    // pixels to show them on, so every GPU trace segment has to stretch
+    // across 2 device pixels -- one confirmed contributor to the trace
+    // looking coarser/thicker than intended on HiDPI screens (2026-08-26).
+    // Test-only override: bypasses both real widget geometry and the
+    // real screen's devicePixelRatioF() for tests whose fixtures need an
+    // exact, environment-independent displayWidth (see
+    // setDisplayWidthOverrideForTest()'s own comment for why).
+    const int displayWidth = (m_displayWidthOverrideForTest > 0)
+        ? m_displayWidthOverrideForTest
+        : qMax(static_cast<int>(std::lround((width() - effectiveStripW()) * devicePixelRatioF())),
+               800);
 
     // Visible bin slice -- CTUN zoom support.  visibleBinRange() maps the
     // current m_centerHz +/- m_bandwidthHz/2 window against m_ddcCenterHz
@@ -4935,10 +4952,10 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     // Semi-opaque background
     p.fillRect(strip, roleColor("panel", Style::kPanelBg, 220));
 
-    // Left border line
-    p.setPen(QColor(0x30, 0x40, 0x50));
-    p.drawLine(strip.left(), specRect.top(), strip.left(), specRect.bottom());
-
+    // Betreiber, 2026-08-28: dieselbe senkrechte Trennlinie wie im
+    // Wasserfall-Zeitstreifen (drawTimeScale) -- beide zusammen wirkten
+    // wie eine durchgehende Kante von oben bis unten und sollten weg.
+    //
     // ── Up/Down arrows side by side at top ─────────────────────────────
     const int halfW    = kDbmStripW / 2;
     const int upCx     = strip.left() + halfW / 2;          // left half center
@@ -5110,10 +5127,10 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
     // Semi-opaque background so spectrum content underneath dims.
     p.fillRect(strip, roleColor("panel", Style::kPanelBg, 220));
 
-    // Left border line — separates the strip from waterfall content.
-    p.setPen(QColor(0x30, 0x40, 0x50));
-    p.drawLine(stripX, wfRect.top(), stripX, wfRect.bottom());
-
+    // Betreiber, 2026-08-28: die senkrechte Trennlinie zum Wasserfall
+    // sollte weg -- das halbdurchsichtige Feld selbst grenzt den
+    // Zeitstreifen schon ab, die zusaetzliche Linie war ueberfluessig.
+    //
     // LIVE button — grey when live, bright red when paused.
     const QRect liveRect = waterfallLiveButtonRect(wfRect);
     p.setPen(QColor(0x40, 0x50, 0x60));
@@ -10060,17 +10077,26 @@ void SpectrumWidget::initSpectrumPipeline()
 {
     QRhi* r = rhi();
 
+    // 2026-08-26: the trace line and peak-hold line are now drawn as
+    // ribbons (2 vertices per point, TriangleStrip) instead of a native
+    // LineStrip, same "2N vertices" shape the fill VBO already uses below
+    // -- see the topology change on m_fftLinePipeline further down for
+    // why. QRhi's LineStrip topology has no width control at all on this
+    // project's actual GPU backends (Metal has none; the "Line Width"
+    // Setup slider previously only reached the QPainter fallback path,
+    // never the GPU one -- see m_lineWidth's other call sites).
     m_fftLineVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
     if (!rhiCreate(m_fftLineVbo, "spectrum line vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftFillVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
                                  kMaxFftBins * 2 * kFftVertStride * sizeof(float));
     if (!rhiCreate(m_fftFillVbo, "spectrum fill vertex buffer", &m_gpuInitFailure)) { return; }
 
-    // Phase 3G-8 commit 10: peak hold VBO (same layout as line VBO).
+    // Phase 3G-8 commit 10: peak hold VBO (same layout as line VBO --
+    // now the ribbon layout, same reason as m_fftLineVbo above).
     m_fftPeakVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
     if (!rhiCreate(m_fftPeakVbo, "spectrum peak vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftSrb = r->newShaderResourceBindings();
@@ -10111,11 +10137,17 @@ void SpectrumWidget::initSpectrumPipeline()
     m_fftFillPipeline->setTargetBlends({blend});
     if (!rhiCreate(m_fftFillPipeline, "spectrum fill pipeline", &m_gpuInitFailure)) { return; }
 
-    // Line pipeline (line strip)
+    // Line pipeline (triangle strip -- ribbon, not a native LineStrip; see
+    // m_fftLineVbo's comment above for why. Reuses the exact same shader
+    // pair, vertex layout, and blend state as the fill pipeline above --
+    // both are now "2 vertices per point" ribbons, just built from
+    // different per-frame geometry (see renderGpuFrame()'s vertex-gen
+    // block: perpendicular-offset ribbon here vs. down-to-baseline strip
+    // for fill).
     m_fftLinePipeline = r->newGraphicsPipeline();
     m_fftLinePipeline->setShaderStages({{QRhiShaderStage::Vertex, vs}, {QRhiShaderStage::Fragment, fs}});
     m_fftLinePipeline->setVertexInputLayout(layout);
-    m_fftLinePipeline->setTopology(QRhiGraphicsPipeline::LineStrip);
+    m_fftLinePipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
     m_fftLinePipeline->setShaderResourceBindings(m_fftSrb);
     m_fftLinePipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
     m_fftLinePipeline->setTargetBlends({blend});
@@ -10958,6 +10990,16 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     //   - m_panFill (skips fill VBO update when disabled)
     //   - m_fillColor / m_fillAlpha (used for the flat-fill path)
     //   - m_peakHoldEnabled (generates a second line VBO for peak hold)
+    //
+    // outputSize/dpr hoisted up from just before cb->beginPass() (their
+    // original spot, still used there for the viewport math) so the
+    // trace-line ribbon geometry below can convert its device-pixel
+    // half-width to NDC using the EXACT same dpr the viewport itself is
+    // built from -- one source of truth, not two independently-computed
+    // values that could quietly drift apart.
+    const QSize outputSize = renderTarget()->pixelSize();
+    const float dpr = outputSize.width() / static_cast<float>(qMax(1, w));
+
     if (!m_renderedPixels.isEmpty() && m_fftLineVbo && m_fftFillVbo) {
         const int n = qMin(m_renderedPixels.size(), kMaxFftBins);
         m_visibleBinCount = n;
@@ -10974,13 +11016,80 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         const float flatG = m_fillColor.greenF();
         const float flatB = m_fillColor.blueF();
 
-        QVector<float> lineVerts(n * kFftVertStride);
+        // ── Trace-line ribbon geometry, 2026-08-26 ──────────────────────
+        //
+        // The live trace and peak-hold line used to be one vertex per
+        // point, drawn with QRhiGraphicsPipeline::LineStrip. That
+        // topology has no width control on this project's actual GPU
+        // backends (Metal in particular has none at all), so the
+        // "Line Width" Setup slider (m_lineWidth) only ever reached the
+        // QPainter fallback path, never the GPU one every user actually
+        // sees by default -- confirmed against the code, not assumed.
+        //
+        // Fix: build the line as a ribbon -- 2 vertices per point,
+        // offset perpendicular to the local trace direction by a
+        // device-pixel half-width, drawn as a TriangleStrip -- the exact
+        // same "2N vertices, alternating edges" shape the fill strip
+        // below already uses and has shipped correctly for a long time.
+        // No new shader: both edges of a point share ORDINARY Gouraud-
+        // interpolated colour, so this needed no fragment-shader changes
+        // at all.
+        //
+        // Deliberately NOT attempting edge feathering/antialiasing in
+        // this pass (that would need genuinely new geometry/shader work,
+        // e.g. AetherSDR's panscope.frag signed-distance approach) --
+        // a solid, correctly-widthed ribbon already fixes the confirmed
+        // bug (the slider doing nothing); soft edges are a follow-up,
+        // not bundled in here blind.
+        //
+        // vpWpx/vpHpx are the viewport this ribbon is actually
+        // rasterized into (specVp, further down) in DEVICE pixels --
+        // using the same dpr the viewport itself is built from (hoisted
+        // above, see its own comment) keeps this geometry and the
+        // viewport it's drawn into always in agreement.
+        const float vpWpx = static_cast<float>(specRect.width())  * dpr;
+        const float vpHpx = static_cast<float>(specRect.height()) * dpr;
+
+        // m_lineWidth is logical px -- same units the QPainter fallback's
+        // QPen(m_fillColor, m_lineWidth) already uses (drawSpectrum()) --
+        // so scale by dpr to get a device-pixel width, then halve for a
+        // symmetric ribbon (offset applied on both sides of the centre).
+        const float lineHalfWidthPx = (m_lineWidth * dpr) * 0.5f;
+
+        QVector<float> lineVerts(n * 2 * kFftVertStride);
         QVector<float> fillVerts(n * 2 * kFftVertStride);
 
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
             float t = qBound(0.0f, ((m_renderedPixels[j] + cal) - minDbm) / range, 1.0f);
             float y = yBot + t * (yTop - yBot);
+
+            // Ribbon perpendicular offset: central difference of the
+            // neighbouring points for the local tangent (smoother than a
+            // one-sided difference; clamped indices degenerate cleanly
+            // at both ends of the trace instead of reading out of
+            // bounds).
+            const int jPrev = qMax(j - 1, 0);
+            const int jNext = qMin(j + 1, n - 1);
+            const float xPrev = (n > 1) ? 2.0f * jPrev / (n - 1) - 1.0f : 0.0f;
+            const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
+            const float tPrev = qBound(0.0f, ((m_renderedPixels[jPrev] + cal) - minDbm) / range, 1.0f);
+            const float tNext = qBound(0.0f, ((m_renderedPixels[jNext] + cal) - minDbm) / range, 1.0f);
+            const float yPrev = yBot + tPrev * (yTop - yBot);
+            const float yNext = yBot + tNext * (yTop - yBot);
+
+            const float dxPx = (xNext - xPrev) * (vpWpx * 0.5f);
+            const float dyPx = (yNext - yPrev) * (vpHpx * 0.5f);
+            const float segLenPx = std::sqrt(dxPx * dxPx + dyPx * dyPx);
+            // Degenerate (flat run, or n == 1): fall back to a level
+            // ribbon rather than dividing by ~zero.
+            const float uxPx = (segLenPx > 1e-6f) ? dxPx / segLenPx : 1.0f;
+            const float uyPx = (segLenPx > 1e-6f) ? dyPx / segLenPx : 0.0f;
+            // Rotate the unit tangent 90 degrees for the perpendicular,
+            // scale to the half-width, convert back from device px to
+            // NDC using the same vpWpx/vpHpx the tangent itself used.
+            const float offXNdc = (-uyPx * lineHalfWidthPx) / (vpWpx * 0.5f);
+            const float offYNdc = ( uxPx * lineHalfWidthPx) / (vpHpx * 0.5f);
 
             float cr, cg, cb2;
             if (m_heatmapEnabled) {
@@ -11006,14 +11115,26 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 cr = flatR; cg = flatG; cb2 = flatB;
             }
 
-            // Line vertex
-            int li = j * kFftVertStride;
-            lineVerts[li]     = x;
-            lineVerts[li + 1] = y;
+            // Line vertex -- ribbon: two vertices per point (offset +/-
+            // perpendicular from centre), same alternating-edge order
+            // the fill strip below already uses so both form a valid
+            // connected TriangleStrip.  Same alpha on both edges (0.9f,
+            // unchanged from the old single-vertex value) -- a solid
+            // ribbon, no feather in this pass (see the block comment
+            // above the loop).
+            int li = j * 2 * kFftVertStride;
+            lineVerts[li]     = x + offXNdc;
+            lineVerts[li + 1] = y + offYNdc;
             lineVerts[li + 2] = cr;
             lineVerts[li + 3] = cg;
             lineVerts[li + 4] = cb2;
             lineVerts[li + 5] = 0.9f;
+            lineVerts[li + 6] = x - offXNdc;
+            lineVerts[li + 7] = y - offYNdc;
+            lineVerts[li + 8]  = cr;
+            lineVerts[li + 9]  = cg;
+            lineVerts[li + 10] = cb2;
+            lineVerts[li + 11] = 0.9f;
 
             // ── Fuellung: dicht an der Kurve, weg zur Grundlinie ─────
             //
@@ -11047,7 +11168,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         batch->updateDynamicBuffer(m_fftLineVbo, 0,
-            n * kFftVertStride * sizeof(float), lineVerts.constData());
+            n * 2 * kFftVertStride * sizeof(float), lineVerts.constData());
         batch->updateDynamicBuffer(m_fftFillVbo, 0,
             n * 2 * kFftVertStride * sizeof(float), fillVerts.constData());
 
@@ -11059,21 +11180,50 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         m_peakHoldHasData = false;
         if (m_peakHoldEnabled && m_pxPeakHold.size() == m_renderedPixels.size()
             && m_fftPeakVbo) {
-            QVector<float> peakVerts(n * kFftVertStride);
+            // Same ribbon treatment as the live trace above, but
+            // narrower -- 0.75x the line width, matching the CPU/
+            // QPainter fallback's own convention (drawSpectrum():
+            // QPen peakPen(peakCol, qMax(1.0f, m_lineWidth * 0.75f))).
+            const float peakHalfWidthPx = (m_lineWidth * 0.75f * dpr) * 0.5f;
+            QVector<float> peakVerts(n * 2 * kFftVertStride);
             for (int j = 0; j < n; ++j) {
                 float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
                 float t = qBound(0.0f, ((m_pxPeakHold[j] + cal) - minDbm) / range, 1.0f);
                 float y = yBot + t * (yTop - yBot);
-                int li = j * kFftVertStride;
-                peakVerts[li]     = x;
-                peakVerts[li + 1] = y;
+
+                const int jPrev = qMax(j - 1, 0);
+                const int jNext = qMin(j + 1, n - 1);
+                const float xPrev = (n > 1) ? 2.0f * jPrev / (n - 1) - 1.0f : 0.0f;
+                const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
+                const float tPrev = qBound(0.0f, ((m_pxPeakHold[jPrev] + cal) - minDbm) / range, 1.0f);
+                const float tNext = qBound(0.0f, ((m_pxPeakHold[jNext] + cal) - minDbm) / range, 1.0f);
+                const float yPrev = yBot + tPrev * (yTop - yBot);
+                const float yNext = yBot + tNext * (yTop - yBot);
+
+                const float dxPx = (xNext - xPrev) * (vpWpx * 0.5f);
+                const float dyPx = (yNext - yPrev) * (vpHpx * 0.5f);
+                const float segLenPx = std::sqrt(dxPx * dxPx + dyPx * dyPx);
+                const float uxPx = (segLenPx > 1e-6f) ? dxPx / segLenPx : 1.0f;
+                const float uyPx = (segLenPx > 1e-6f) ? dyPx / segLenPx : 0.0f;
+                const float offXNdc = (-uyPx * peakHalfWidthPx) / (vpWpx * 0.5f);
+                const float offYNdc = ( uxPx * peakHalfWidthPx) / (vpHpx * 0.5f);
+
+                int li = j * 2 * kFftVertStride;
+                peakVerts[li]     = x + offXNdc;
+                peakVerts[li + 1] = y + offYNdc;
                 peakVerts[li + 2] = flatR;
                 peakVerts[li + 3] = flatG;
                 peakVerts[li + 4] = flatB;
                 peakVerts[li + 5] = 0.55f;
+                peakVerts[li + 6] = x - offXNdc;
+                peakVerts[li + 7] = y - offYNdc;
+                peakVerts[li + 8]  = flatR;
+                peakVerts[li + 9]  = flatG;
+                peakVerts[li + 10] = flatB;
+                peakVerts[li + 11] = 0.55f;
             }
             batch->updateDynamicBuffer(m_fftPeakVbo, 0,
-                n * kFftVertStride * sizeof(float), peakVerts.constData());
+                n * 2 * kFftVertStride * sizeof(float), peakVerts.constData());
             m_peakHoldHasData = true;
         }
     }
@@ -11086,8 +11236,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     const QColor clearColor = roleColor("app-bg", Style::kAppBg);
     cb->beginPass(renderTarget(), clearColor, {1.0f, 0});
 
-    const QSize outputSize = renderTarget()->pixelSize();
-    const float dpr = outputSize.width() / static_cast<float>(qMax(1, w));
+    // outputSize/dpr: hoisted above the FFT vertex-generation block
+    // earlier in this function (see that comment for why) -- reused
+    // here unchanged.
 
     // Draw waterfall
     if (m_wfPipeline) {
@@ -11159,7 +11310,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             cb->setViewport(specVp);
             const QRhiCommandBuffer::VertexInput peakVbuf(m_fftPeakVbo, 0);
             cb->setVertexInput(0, 1, &peakVbuf);
-            cb->draw(m_visibleBinCount);
+            cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
         }
 
         // Line pass
@@ -11168,7 +11319,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         cb->setViewport(specVp);
         const QRhiCommandBuffer::VertexInput lineVbuf(m_fftLineVbo, 0);
         cb->setVertexInput(0, 1, &lineVbuf);
-        cb->draw(m_visibleBinCount);
+        cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
     }
 
     // Draw overlay -- static chrome layer first, then dynamic

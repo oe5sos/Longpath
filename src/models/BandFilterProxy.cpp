@@ -69,6 +69,41 @@ void BandFilterProxy::setSourceVisible(const QString& source, bool visible)
     invalidateFilterCompat();
 }
 
+// NereusSDR-native (2026-08-26). Mirrors setSourceVisible but populates
+// m_hiddenEntities. The Spot List tab toggles this from a dynamically
+// built checkable menu (entities are open-ended, unlike the fixed
+// band/source lists).
+void BandFilterProxy::setEntityVisible(const QString& entity, bool visible)
+{
+    if (visible)
+        m_hiddenEntities.remove(entity);
+    else
+        m_hiddenEntities.insert(entity);
+    invalidateFilterCompat();
+}
+
+// NereusSDR-native (2026-08-27). Mirrors setEntityVisible but populates
+// m_hiddenModes. The Spot List tab toggles this from a dynamically
+// built checkable menu (modes are open-ended in practice, same
+// treatment as entity).
+void BandFilterProxy::setModeVisible(const QString& mode, bool visible)
+{
+    if (visible)
+        m_hiddenModes.remove(mode);
+    else
+        m_hiddenModes.insert(mode);
+    invalidateFilterCompat();
+}
+
+// NereusSDR-native (2026-08-27). Unlike the hidden-set predicates
+// above, this is a single substring value, not a toggle set -- see
+// BandFilterProxy.h for the ORed-columns / non-persisted rationale.
+void BandFilterProxy::setSearchText(const QString& text)
+{
+    m_searchText = text.trimmed();
+    invalidateFilterCompat();
+}
+
 // From AetherSDR src/gui/DxClusterDialog.cpp:217-226 [@0cd4559] +
 // NereusSDR Task F3 source-filter extension. AetherSDR upstream
 // only checks the band predicate; NereusSDR additionally applies the
@@ -89,6 +124,43 @@ bool BandFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
         QString source = sourceModel()->data(idx, Qt::DisplayRole).toString();
         // unknown source - always show (mirrors band convention)
         if (!source.isEmpty() && m_hiddenSources.contains(source))
+            return false;
+    }
+    // NereusSDR-native (2026-08-26): third predicate over ColEntity,
+    // same AND semantics and same "empty always shows" convention as
+    // band/source above.
+    if (!m_hiddenEntities.isEmpty()) {
+        auto idx = sourceModel()->index(sourceRow, SpotTableModel::ColEntity, sourceParent);
+        QString entity = sourceModel()->data(idx, Qt::DisplayRole).toString();
+        if (!entity.isEmpty() && m_hiddenEntities.contains(entity))
+            return false;
+    }
+    // NereusSDR-native (2026-08-27): fourth predicate over ColMode,
+    // same AND semantics and "empty always shows" convention.
+    if (!m_hiddenModes.isEmpty()) {
+        auto idx = sourceModel()->index(sourceRow, SpotTableModel::ColMode, sourceParent);
+        QString mode = sourceModel()->data(idx, Qt::DisplayRole).toString();
+        if (!mode.isEmpty() && m_hiddenModes.contains(mode))
+            return false;
+    }
+    // NereusSDR-native (2026-08-27): free-text quick search, ORed
+    // across DxCall / Reference / Comment / Spotter rather than ANDed
+    // like the predicates above -- a row matches if ANY of these
+    // columns contains the search text.
+    if (!m_searchText.isEmpty()) {
+        static constexpr int searchColumns[] = {
+            SpotTableModel::ColDxCall, SpotTableModel::ColReference,
+            SpotTableModel::ColComment, SpotTableModel::ColSpotter
+        };
+        bool anyMatch = false;
+        for (int col : searchColumns) {
+            auto idx = sourceModel()->index(sourceRow, col, sourceParent);
+            if (sourceModel()->data(idx, Qt::DisplayRole).toString().contains(m_searchText, Qt::CaseInsensitive)) {
+                anyMatch = true;
+                break;
+            }
+        }
+        if (!anyMatch)
             return false;
     }
     return true;

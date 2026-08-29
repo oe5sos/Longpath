@@ -22,6 +22,7 @@
 
 #include <QTabWidget>
 
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -124,6 +125,28 @@ AntennaWindow::AntennaWindow(QWidget* parent)
     resize(1000, 760);
     buildUi();
     refresh();
+    restoreGeometryState();
+}
+
+void AntennaWindow::closeEvent(QCloseEvent* event)
+{
+    saveGeometryState();
+    QDialog::closeEvent(event);
+}
+
+void AntennaWindow::saveGeometryState()
+{
+    AppSettings::instance().setValue(
+        QStringLiteral("AntennaWindowGeometryState"), saveGeometry());
+}
+
+void AntennaWindow::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("AntennaWindowGeometryState")).toByteArray();
+    // Empty on a first run; the resize(1000, 760) above already set a
+    // sane default in that case.
+    if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
 AntennaTrim::Kind AntennaWindow::currentKind() const

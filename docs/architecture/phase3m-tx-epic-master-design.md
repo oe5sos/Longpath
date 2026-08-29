@@ -554,9 +554,12 @@ full TxApplet for currently-active scope, persistence audit.
 > TX waits until 3M-3 ships AND the HL2 ATT/filter audit closes (so an
 > HL2 can be CW-bench'd safely).
 >
-> 3M-2 also absorbs the HL2 CWX bit-3 follow-up (`networkproto1.c:1247-
-> 1252 [@c26a8a4]` — desk-review B3, "HL2 firmware uses bit 3 of I-low
-> byte for CWX PTT").
+> 3M-2 also absorbs the HL2 CWX bit-3 follow-up (`networkproto1.c:1252-
+> 1261 [@0cef1c9]` — desk-review B3, "HL2 firmware uses bit 3 of I-low
+> byte for CWX PTT"; citation re-verified 2026-08-26 against a current
+> mi0bot-Thetis checkout — the line range had drifted from the original
+> `1247-1252 [@c26a8a4]` pin, see
+> docs/architecture/phase3m-2-cw-tx-design.md §9).
 
 CW splits cleanly into two sub-phases. Different MOX semantics (TXA NOT
 enabled in CW per Thetis special case at `console.cs:29589-29598`),

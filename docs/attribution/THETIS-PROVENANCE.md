@@ -469,3 +469,7 @@ column 2 (not column 1) so the header-verifier script does not scan them.
 | src/core/audio/WavFile.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umsetzung zu WavFile.h; Leser/Schreiber Longpath-original |
 | src/core/audio/WavPlayer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | Umsetzung zu WavPlayer.h; kein Zeilenport |
 | src/gui/applets/QsoRecorderApplet.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Kopf zu QsoRecorderApplet.cpp |
+| src/core/audio/WavRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | "Off the air"-WAV-Aufnahme (Phase 3M) als Vorbild; streamender Schreiber NereusSDR-original, kein Zeilenport |
+| src/core/audio/WavRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu WavRecorder.h; kein Zeilenport |
+| src/core/audio/IqRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | AudioRecordRxSource.ReceiverInputIQ ("pre"-Abgriff vor der Demodulation) als Vorbild fuer den Rohabtastwert-Abgriff; baugleich zu WavRecorder.h, andere Quelle/Vorgabeformat; design doc docs/architecture/phase3m-recording-design.md §4, §7.2 |
+| src/core/audio/IqRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu IqRecorder.h; kein Zeilenport |

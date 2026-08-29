@@ -899,12 +899,22 @@ void KiwiSdrManager::connectProfile(const QString& id)
         client->setWaterfallRateOverride(rate);
     });
     if (assignedSliceForProfile(id) < 0) {
-        m_clientHasTrackedSlice.insert(id, false);
-        invokeClient(id, [](KiwiSdrClient* client) {
-            client->setTrackedSlice(-1, 0.0, QString(), 0, 0, QString(),
-                                    QString(), 0);
-        });
-        emit profileNeedsInitialTracking(id);
+        if (m_profiles[idx].waterfallPreviewEnabled) {
+            // Eine reine Vorschau-Verbindung (kein Scheiben-Bezug) braucht
+            // keine Frequenz-/Modus-Verfolgung — sie zeigt, worauf der
+            // Kiwi ohnehin schon steht. Ohne diesen Zweig blieb
+            // m_clientHasTrackedSlice dauerhaft false, weil
+            // profileNeedsInitialTracking nirgends beantwortet wird (siehe
+            // docs/architecture/2026-08-27-kiwisdr-self-report-concept.md).
+            m_clientHasTrackedSlice.insert(id, true);
+        } else {
+            m_clientHasTrackedSlice.insert(id, false);
+            invokeClient(id, [](KiwiSdrClient* client) {
+                client->setTrackedSlice(-1, 0.0, QString(), 0, 0, QString(),
+                                        QString(), 0);
+            });
+            emit profileNeedsInitialTracking(id);
+        }
     }
     if (!m_clientHasTrackedSlice.value(id, false)) {
         return;
@@ -939,6 +949,28 @@ void KiwiSdrManager::disconnectProfile(const QString& id)
     // are never disconnected here, so their cached history (multi-slice toggle)
     // is preserved. The stream, and its history, rebuild on reconnection.
     emit profileStreamReset(id);
+}
+
+bool KiwiSdrManager::waterfallPreviewEnabled(const QString& id) const
+{
+    const int idx = profileIndex(id);
+    return idx >= 0 && m_profiles[idx].waterfallPreviewEnabled;
+}
+
+void KiwiSdrManager::setWaterfallPreviewEnabled(const QString& id, bool enabled)
+{
+    const int idx = profileIndex(id);
+    if (idx < 0 || m_profiles[idx].waterfallPreviewEnabled == enabled) {
+        return;
+    }
+    m_profiles[idx].waterfallPreviewEnabled = enabled;
+    saveSettings();
+    emit waterfallPreviewEnabledChanged(id, enabled);
+    if (enabled) {
+        connectProfile(id);
+    } else if (!shouldMaintainProfileConnection(id)) {
+        disconnectProfile(id);
+    }
 }
 
 void KiwiSdrManager::disconnectAll()
@@ -1432,6 +1464,8 @@ void KiwiSdrManager::loadSettings()
             obj.value(QStringLiteral("keepAudioDuringTx")).toBool(false);
         p.resumeAudioAfterTxDelay =
             obj.value(QStringLiteral("resumeAudioAfterTxDelay")).toBool(false);
+        p.waterfallPreviewEnabled =
+            obj.value(QStringLiteral("waterfallPreviewEnabled")).toBool(false);
         if (obj.contains(QStringLiteral("waterfallMinDbm"))
             || obj.contains(QStringLiteral("waterfallMaxDbm"))) {
             p.waterfallMinDbm = std::clamp(
@@ -1474,6 +1508,8 @@ void KiwiSdrManager::saveSettings() const
         obj.insert(QStringLiteral("keepAudioDuringTx"), p.keepAudioDuringTx);
         obj.insert(QStringLiteral("resumeAudioAfterTxDelay"),
                    p.resumeAudioAfterTxDelay);
+        obj.insert(QStringLiteral("waterfallPreviewEnabled"),
+                   p.waterfallPreviewEnabled);
         obj.insert(QStringLiteral("waterfallAutoScale"), p.waterfallAutoScale);
         const int waterfallMinDbm = std::clamp(
             p.waterfallMinDbm,
@@ -1649,7 +1685,8 @@ bool KiwiSdrManager::shouldMaintainProfileConnection(const QString& id) const
         return false;
     }
 
-    return m_profiles[idx].autoConnect || assignedSliceForProfile(id) >= 0;
+    return m_profiles[idx].autoConnect || assignedSliceForProfile(id) >= 0
+        || m_profiles[idx].waterfallPreviewEnabled;
 }
 
 void KiwiSdrManager::scheduleReconnect(const QString& id)

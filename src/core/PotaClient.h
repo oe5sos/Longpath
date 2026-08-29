@@ -28,6 +28,35 @@
 //                                    instantiating a QNetworkAccessManager
 //                                    or simulating an HTTPS round-trip.
 //                                    AI tooling: Anthropic Claude Code.
+//   2026-08-26  AI (Anthropic Claude Code)  NereusSDR-native amendment
+//                                    (SpotHub POTA improvement pass, no
+//                                    upstream equivalent). parseAndCollect
+//                                    now populates the new DxSpot::reference
+//                                    ("US-4558") and DxSpot::entity ("US")
+//                                    fields (see DxSpot.h) instead of only
+//                                    folding the park reference into
+//                                    `comment`. `comment` itself now
+//                                    carries the API's real `comments`
+//                                    field (the operator's free-text spot
+//                                    note, e.g. "BOOMING 59+ MA") when
+//                                    present, falling back to the park
+//                                    name when it isn't -- previously this
+//                                    text was silently dropped in favour
+//                                    of a synthesized "ref park mode"
+//                                    string. The mode suffix is still
+//                                    appended so SpotTableModel::extractMode
+//                                    (which reads the first/last word of
+//                                    `comment`) keeps working unchanged.
+//   2026-08-27  AI (Anthropic Claude Code)  NereusSDR-native amendment
+//                                    (operator-requested follow-up).
+//                                    parseAndCollect now also copies the
+//                                    API's `grid6` field into
+//                                    DxSpot::grid -- it was already
+//                                    present in every response and
+//                                    simply unused before. Enables
+//                                    distance/bearing display in
+//                                    SpotTableModel without an extra
+//                                    per-spot lookup.
 
 #pragma once
 

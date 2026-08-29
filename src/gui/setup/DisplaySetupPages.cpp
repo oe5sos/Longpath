@@ -234,6 +234,15 @@ void SpectrumDefaultsPage::loadFromRenderer()
     m_fillToggle->setChecked(sw->panFillEnabled());
     m_fillAlphaSlider->setValue(static_cast<int>(sw->fillAlpha() * 100.0f));
     m_lineWidthSlider->setValue(qBound(1, static_cast<int>(sw->lineWidth()), 3));
+    // Defensive: mirror to spin readout. Same reasoning as m_fpSpin above --
+    // the QSignalBlocker on m_lineWidthSlider blocks the slider->spin sync
+    // makeSliderRow wires internally, so without this the spin box sticks at
+    // its makeSliderRow constructor default (1) forever, showing "1 px" even
+    // while the slider (and the actual persisted/rendered width) sits at 3.
+    if (m_lineWidthSpin) {
+        QSignalBlocker bLw(m_lineWidthSpin);
+        m_lineWidthSpin->setValue(qBound(1, static_cast<int>(sw->lineWidth()), 3));
+    }
     m_gradientToggle->setChecked(sw->gradientEnabled());
     m_calOffsetSpin->setValue(static_cast<double>(sw->dbmCalOffset()));
     m_peakHoldToggle->setChecked(sw->peakHoldEnabled());
@@ -816,6 +825,7 @@ void SpectrumDefaultsPage::buildUI()
     {
         auto row = makeSliderRow(1, 3, 1, QStringLiteral(" px"), renderGroup);
         m_lineWidthSlider = row.slider;
+        m_lineWidthSpin = row.spin;
         // Thetis: setup.designer.cs:3228 (udDisplayLineWidth) — no upstream tooltip; rewritten
         // Thetis original: (none)
         m_lineWidthSlider->setToolTip(QStringLiteral("Spectrum trace line width in pixels (1–3 px)."));

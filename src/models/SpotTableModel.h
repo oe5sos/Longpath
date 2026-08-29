@@ -35,10 +35,56 @@
 //                                    (m_maxSpots{500}) preserved
 //                                    verbatim. AI tooling: Anthropic
 //                                    Claude Code.
+//   2026-08-26  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (SpotHub POTA improvement pass, no
+//                                    upstream equivalent). Appends
+//                                    ColReference / ColEntity (10
+//                                    columns total, was 8) showing the
+//                                    new DxSpot::reference / ::entity
+//                                    fields; empty for sources that
+//                                    don't set them. Inserted before
+//                                    ColSource so ColSource stays the
+//                                    last column (SpotHubDialog's Spot
+//                                    List table stretches the last
+//                                    section). Also adds
+//                                    setWatchTerms()/setWatchColor():
+//                                    a chaser "watchlist" of callsigns
+//                                    and/or park/summit references
+//                                    that, when matched against a
+//                                    row's DxCall or Reference
+//                                    (case-insensitive), tints that
+//                                    row's BackgroundRole with an
+//                                    operator-chosen color (picked via
+//                                    a swatch button in SpotHubDialog,
+//                                    same pattern as the existing
+//                                    per-source spot-color pickers --
+//                                    color choice stays the operator's,
+//                                    not hardcoded here).
+//   2026-08-27  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (operator-requested follow-up).
+//                                    Appends ColDistance / ColBearing,
+//                                    computed from DxSpot::grid and an
+//                                    operator grid square set via
+//                                    setOurGridSquare() -- using the
+//                                    existing Maidenhead.h helpers
+//                                    (already shared with
+//                                    FreeDVStationModel and the rotor
+//                                    dial, see that header). Empty for
+//                                    rows without a grid or before the
+//                                    operator's grid is known. Mirrors
+//                                    the FreeDvReporter/DistanceMiles
+//                                    and FreeDvReporter/
+//                                    DirectionAsCardinal AppSettings
+//                                    keys so both features honor the
+//                                    same unit/format preference
+//                                    rather than introducing a second
+//                                    one.
 
 #pragma once
 
 #include <QAbstractTableModel>
+#include <QColor>
+#include <QStringList>
 #include <QVector>
 
 #include "core/DxSpot.h"
@@ -50,7 +96,7 @@ class SpotTableModel : public QAbstractTableModel {
     Q_OBJECT
 
 public:
-    enum Column { ColTime, ColFreq, ColDxCall, ColComment, ColSpotter, ColBand, ColMode, ColSource, ColCount };
+    enum Column { ColTime, ColFreq, ColDxCall, ColComment, ColSpotter, ColBand, ColMode, ColReference, ColEntity, ColDistance, ColBearing, ColSource, ColCount };
     static QString extractMode(const QString& comment);
 
     explicit SpotTableModel(QObject* parent = nullptr) : QAbstractTableModel(parent) {}
@@ -66,11 +112,33 @@ public:
     void setMaxSpots(int max) { m_maxSpots = max; }
     double freqAtRow(int row) const;
 
+    // NereusSDR-native watchlist highlight (see modification history
+    // above). `terms` is matched case-insensitively against each row's
+    // DxCall and Reference; an invalid `color` (default) disables
+    // highlighting even if terms are set.
+    void setWatchTerms(const QStringList& terms);
+    void setWatchColor(const QColor& color) { m_watchColor = color; }
+
+    // NereusSDR-native (2026-08-27). The operator's own Maidenhead
+    // locator ("User/GridSquare" in AppSettings), needed to compute
+    // ColDistance/ColBearing. Empty (the default) means those columns
+    // stay blank. Set once from AppSettings when the Spot List tab is
+    // built and again whenever the Settings tab saves a new grid --
+    // see SpotHubDialog. Refreshes every already-inserted row so a
+    // grid change updates existing rows, not just future ones.
+    void setOurGridSquare(const QString& grid);
+
 private:
     static QString bandForFreq(double mhz);
+    bool matchesWatchTerms(const DxSpot& spot) const;
+    QString formatDistance(const DxSpot& spot) const;
+    QString formatBearing(const DxSpot& spot) const;
 
     QVector<DxSpot> m_spots;
     int m_maxSpots{500};
+    QStringList m_watchTerms;
+    QColor m_watchColor;
+    QString m_ourGrid;
 };
 
 } // namespace Longpath

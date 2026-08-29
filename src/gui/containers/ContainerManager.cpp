@@ -62,6 +62,7 @@ mw0lge@grange-lane.co.uk
 #include "gui/meters/MeterItem.h"
 #include "gui/meters/MeterWidget.h"
 
+#include <QScreen>
 #include <QSplitter>
 #include <algorithm>
 
@@ -691,6 +692,30 @@ QVariantMap ContainerManager::floatingGeometries() const
 
 void ContainerManager::applyFloatingGeometries(const QVariantMap& geometries)
 {
+    // ── Fehlen heisst angedockt ───────────────────────────────────────
+    //
+    // Wie bei den abgeloesten Applets (MainWindow's floatingApplets-Anwendung,
+    // 2026-08-16-Entscheidung des Betreibers): eine Kennung, die hier steht,
+    // ist abgeloest; eine, die fehlt, gehoert in die Spalte zurueck. Diese
+    // Haelfte fehlte bislang komplett -- applyFloatingGeometries fasste nur
+    // an, was in der Karte stand, und liess jeden Container, der zufaellig
+    // schon freistand, einfach freistehen. Am sichtbarsten bei einem frisch
+    // angelegten, absichtlich LEEREN Profil: floatingGeometries() nimmt nur
+    // floatende Container auf, ein leeres Profil traegt also gar keinen
+    // Schluessel -- und ohne diese Schleife blieb "RX1 Main Panel" (der
+    // Panel-Container) bei jedem Wechsel und sogar bei jedem Neustart
+    // floatend stehen, obwohl das neue Profil nichts davon wusste
+    // (Betreiber, 2026-08-27: "wenn ich ein neues Fenster links aufmache,
+    // muss dieses leer sein" / "das gehoert geloescht").
+    for (auto it = m_containers.constBegin(); it != m_containers.constEnd();
+         ++it) {
+        const QString& id = it.key();
+        ContainerWidget* c = it.value();
+        if (c && c->isFloating() && !geometries.contains(id)) {
+            dockContainer(id);
+        }
+    }
+
     for (auto it = geometries.constBegin(); it != geometries.constEnd(); ++it) {
         FloatingContainer* form = m_floatingForms.value(it.key(), nullptr);
         if (!form) { continue; }

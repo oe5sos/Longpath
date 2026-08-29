@@ -72,6 +72,28 @@ private slots:
         delete row.container;
     }
 
+    // Bug found 2026-08-26 (OE5SOS bench report): the Setup > Display >
+    // Spectrum Defaults Line Width spinbox arrows visibly moved the slider
+    // and its own readout, but the persisted/rendered value never changed.
+    // Root cause: the spin->slider sync used to wrap slider->setValue() in
+    // a QSignalBlocker, so the VALUE updated correctly (sliderRow_
+    // spinboxEntryUpdatesSlider above already covered that) but slider's
+    // own valueChanged never fired -- and every consumer of this row
+    // connects to slider->valueChanged as "the single source of truth for
+    // model updates" (this file's own header comment, SetupHelpers.cpp).
+    // A spin-box-only edit was therefore silently invisible to the model.
+    // This is the signal-emission counterpart the value-only checks above
+    // do not cover, and would have passed against the old buggy code.
+    void sliderRow_spinboxEntryEmitsSliderValueChanged()
+    {
+        SliderRow row = makeSliderRow(0, 100, 50);
+        QSignalSpy sliderSpy(row.slider, &QSlider::valueChanged);
+        row.spin->setValue(65);
+        QCOMPARE(sliderSpy.count(), 1);
+        QCOMPARE(sliderSpy.first().first().toInt(), 65);
+        delete row.container;
+    }
+
     // --- makeDoubleSliderRow -------------------------------------------------
 
     void doubleSliderRow_honorsRangeAndDecimals()
@@ -103,6 +125,17 @@ private slots:
         row.slider->setValue(-75);
         QCOMPARE(row.spin->value(), -7.5);
 
+        delete row.container;
+    }
+
+    // Same bug, double variant -- see sliderRow_spinboxEntryEmitsSliderValueChanged.
+    void doubleSliderRow_spinboxEntryEmitsSliderValueChanged()
+    {
+        SliderRowD row = makeDoubleSliderRow(-30.0, 30.0, 0.0, 1);
+        QSignalSpy sliderSpy(row.slider, &QSlider::valueChanged);
+        row.spin->setValue(6.5);
+        QCOMPARE(sliderSpy.count(), 1);
+        QCOMPARE(sliderSpy.first().first().toInt(), 65);
         delete row.container;
     }
 };

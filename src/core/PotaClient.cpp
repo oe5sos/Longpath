@@ -154,14 +154,30 @@ QVector<DxSpot> PotaClient::parseAndCollect(const QByteArray& data)
         }
         spot.color = potaColor;
 
-        // Build comment: park reference + park name + mode
+        // NereusSDR-native (2026-08-26, no upstream equivalent): the
+        // reference now gets its own structured field instead of being
+        // flattened into `comment` -- see DxSpot.h. `entity` is the
+        // reference's location prefix ("US-4558" -> "US"), mirroring
+        // DX-cluster's DXCC concept for activation spots.
         QString ref  = obj.value("reference").toString();
+        spot.reference = ref;
+        spot.entity = ref.section('-', 0, 0);
+        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // grid6 is more precise than grid4 and is present on every
+        // live spot already -- no extra lookup needed for distance/
+        // bearing (see DxSpot.h).
+        spot.grid = obj.value("grid6").toString();
+
+        // Build comment: the operator's real spot note (API's `comments`
+        // field) when present, else the park name as a fallback so the
+        // column isn't blank -- previously this text was dropped
+        // entirely in favour of a synthesized "ref park mode" string.
+        // Mode is still appended so SpotTableModel::extractMode (reads
+        // the first/last word of `comment`) keeps working unchanged.
         QString park = obj.value("name").toString();
         QString mode = obj.value("mode").toString();
-        spot.comment = ref;
-        if (!park.isEmpty()) {
-            spot.comment += " " + park;
-        }
+        QString note = obj.value("comments").toString().trimmed();
+        spot.comment = note.isEmpty() ? park : note;
         if (!mode.isEmpty()) {
             spot.comment += " " + mode;
         }
@@ -225,14 +241,16 @@ void PotaClient::onPollTimer()
 
         for (const DxSpot& spot : newSpots) {
             // Reconstruct the log line using the same format upstream
-            // emitted: HH:mm  call  freq_kHz  ref  mode. Reference and
-            // mode are recoverable from spot.comment ("ref park mode")
-            // but logging the trimmed `spot.comment` is equivalent for
-            // operator-readable output.
-            QString logLine = QString("%1  %2  %3 kHz  %4")
+            // emitted: HH:mm  call  freq_kHz  ref  mode. NereusSDR-native
+            // (2026-08-26): `spot.comment` no longer carries the
+            // reference (it now lives in spot.reference -- see
+            // parseAndCollect above), so it's added back explicitly here
+            // to keep the log line's information content unchanged.
+            QString logLine = QString("%1  %2  %3 kHz  %4  %5")
                 .arg(spot.utcTime.toString("HH:mm"),
                      spot.dxCall,
                      QString::number(spot.freqMhz * 1000.0, 'f', 1),
+                     spot.reference,
                      spot.comment);
             if (m_logFile.isOpen()) {
                 m_logFile.write((logLine + "\n").toUtf8());

@@ -112,16 +112,23 @@
 #include "core/DxccColorProvider.h"
 #include "core/DxSpot.h"
 #include "core/FreeDVReporterClient.h"
+#include "core/PotaAlertsClient.h"
 #include "core/PotaClient.h"
+#include "core/PotaParkInfoClient.h"
 #include "core/PskReporterClient.h"
 #include "core/SpotCollectorClient.h"
 #include "core/WsjtxClient.h"
 #include "gui/widgets/GuardedSlider.h"
+#include "gui/ParkInfoDialog.h"
+#include "models/AlertsTableModel.h"
 #include "models/BandFilterProxy.h"
 #include "models/SpotModel.h"
 #include "models/SpotTableModel.h"
 
+#include <QAction>
+#include <QApplication>
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
@@ -135,17 +142,22 @@
 #include <QMenu>
 #include <QMetaObject>
 #include <QPlainTextEdit>
+#include <QProcess>
 #include <QPushButton>
 #include <QSet>
 #include <QSlider>
+#include <QSortFilterProxyModel>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTableView>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QVector>
 
 #include <cmath>
+#include <memory>
+#include <utility>
 
 namespace Longpath {
 
@@ -313,12 +325,35 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
     buildWsjtxTab(tabs);
     buildSpotCollectorTab(tabs);
     buildPotaTab(tabs);
+    buildAlertsTab(tabs);
     buildFreeDvTab(tabs);
     buildPskTab(tabs);
     buildSpotListTab(tabs);
     buildDisplayTab(tabs);
 
     root->addWidget(tabs);
+    restoreGeometryState();
+}
+
+void SpotHubDialog::closeEvent(QCloseEvent* event)
+{
+    saveGeometryState();
+    QDialog::closeEvent(event);
+}
+
+void SpotHubDialog::saveGeometryState()
+{
+    AppSettings::instance().setValue(
+        QStringLiteral("SpotHubGeometryState"), saveGeometry());
+}
+
+void SpotHubDialog::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("SpotHubGeometryState")).toByteArray();
+    // Empty on a first run; the resize(760, 640) above already set a
+    // sane default in that case.
+    if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
 // NereusSDR-native (no AetherSDR upstream). Post-3J-2 UX fix: the
@@ -559,6 +594,12 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         // dialog's Distance / Hdg columns stay zeroed because the
         // station model never learns our grid.
         emit identitySaved(call, gridSquare, message);
+
+        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // same fix, same reason, for the Spot List's Dist/Brg columns.
+        if (m_spotTableModel) {
+            m_spotTableModel->setOurGridSquare(gridSquare);
+        }
 
         // Flash "Saved" for 2 seconds.
         m_settingsSavedLabel->setText("Saved");
@@ -1661,6 +1702,97 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     tabs->addTab(page, "POTA");
 }
 
+// NereusSDR-native (2026-08-27, operator-requested follow-up, no
+// upstream equivalent). Alerts tab: POTA's "Scheduled Activations" --
+// future/planned activations, distinct from the live Spot List.
+// Endpoint verified live before writing this (api.pota.app/activation,
+// see PotaAlertsClient.h). Unlike every other tab in this dialog,
+// there's no Start/Stop lifecycle or auto-start toggle: activations
+// are scheduled days to weeks out, so sub-minute freshness has no
+// value, and nothing else in the app consumes this data. A fetch
+// fires once when the tab is built and again on manual Refresh.
+void SpotHubDialog::buildAlertsTab(QTabWidget* tabs)
+{
+    auto* page = new QWidget;
+    auto* layout = new QVBoxLayout(page);
+    layout->setSpacing(8);
+
+    auto* topRow = new QHBoxLayout;
+    auto* label = new QLabel("POTA Scheduled Activations");
+    label->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
+    topRow->addWidget(label);
+    topRow->addStretch();
+
+    m_alertsStatusLabel = new QLabel("Loading...");
+    m_alertsStatusLabel->setObjectName("alertsStatusLabel");
+    m_alertsStatusLabel->setStyleSheet(kStatusIdleStyle);
+    topRow->addWidget(m_alertsStatusLabel);
+
+    m_alertsRefreshBtn = new QPushButton("Refresh");
+    m_alertsRefreshBtn->setObjectName("alertsRefreshBtn");
+    m_alertsRefreshBtn->setFixedWidth(80);
+    m_alertsRefreshBtn->setStyleSheet(kStartBtnStyle);
+    connect(m_alertsRefreshBtn, &QPushButton::clicked, this, &SpotHubDialog::refreshAlerts);
+    topRow->addWidget(m_alertsRefreshBtn);
+    layout->addLayout(topRow);
+
+    m_alertsModel = new AlertsTableModel(this);
+    auto* sortProxy = new QSortFilterProxyModel(this);
+    sortProxy->setSourceModel(m_alertsModel);
+
+    m_alertsTable = new QTableView;
+    m_alertsTable->setObjectName("alertsTable");
+    m_alertsTable->setModel(sortProxy);
+    m_alertsTable->setSortingEnabled(true);
+    m_alertsTable->sortByColumn(AlertsTableModel::ColStart, Qt::AscendingOrder);
+    m_alertsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_alertsTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_alertsTable->setAlternatingRowColors(true);
+    m_alertsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_alertsTable->verticalHeader()->setVisible(false);
+    m_alertsTable->verticalHeader()->setDefaultSectionSize(20);
+    m_alertsTable->horizontalHeader()->setStretchLastSection(true);
+    m_alertsTable->setStyleSheet(kSpotTableStyle);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColActivator, 90);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColReference, 70);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColName, 220);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColLocation, 70);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColStart, 130);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColEnd, 130);
+    m_alertsTable->setColumnWidth(AlertsTableModel::ColFrequencies, 90);
+    layout->addWidget(m_alertsTable, 1);
+
+    m_alertsClient = new PotaAlertsClient(this);
+    connect(m_alertsClient, &PotaAlertsClient::alertsReceived, this,
+            [this](const QVector<PotaAlert>& alerts) {
+        m_alertsModel->setAlerts(alerts);
+        m_alertsStatusLabel->setText(
+            QString("%1 activations \xC2\xB7 updated %2")
+                .arg(alerts.size())
+                .arg(QTime::currentTime().toString("HH:mm:ss")));
+        m_alertsStatusLabel->setStyleSheet(kStatusActiveStyle);
+    });
+    connect(m_alertsClient, &PotaAlertsClient::alertsError, this,
+            [this](const QString& error) {
+        m_alertsStatusLabel->setText(QString("Fetch failed: %1").arg(error));
+        m_alertsStatusLabel->setStyleSheet(
+            "QLabel { color: #c2635a; font-size: 11px; }");
+    });
+
+    tabs->addTab(page, "Alerts");
+    refreshAlerts();
+}
+
+void SpotHubDialog::refreshAlerts()
+{
+    if (!m_alertsClient) {
+        return;
+    }
+    m_alertsStatusLabel->setText("Loading...");
+    m_alertsStatusLabel->setStyleSheet(kStatusIdleStyle);
+    m_alertsClient->fetchAlerts();
+}
+
 // From AetherSDR src/gui/DxClusterDialog.cpp:1482-1596 [@0cd4559].
 // FreeDV tab: server label (qso.freedv.org, WebSocket) + auto-start
 // toggle + start/stop button + status label + raw-event console +
@@ -2235,6 +2367,12 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     m_spotProxyModel->setObjectName("spotListProxyModel");
     if (m_spotTableModel) {
         m_spotProxyModel->setSourceModel(m_spotTableModel);
+        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // seed Dist/Brg from the identity already saved in the
+        // Settings tab; kept in sync afterward by the identitySaved
+        // handler above.
+        m_spotTableModel->setOurGridSquare(
+            s.value("User/GridSquare").toString());
     }
     m_spotProxyModel->setSortRole(Qt::UserRole);
 
@@ -2253,6 +2391,19 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         "160m", "80m", "60m", "40m", "30m", "20m",
         "17m", "15m", "12m", "10m", "6m", "2m"
     };
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // solo-click. A plain click on a band pill now isolates the Spot
+    // List to that one band (all others hidden); clicking the same,
+    // already-soloed pill again restores every band to visible. This
+    // replaces the previous independent per-pill toggle -- ganging all
+    // 12 pills' checked state together is unavoidable to express
+    // "only this one", so the click handler is wired once after every
+    // pill exists (via the shared `bandPills` list) rather than per
+    // pill during creation. Persisted keys (SpotBandFilter_<band>)
+    // and their "True" default are unchanged, so existing settings
+    // still seed the initial per-band visibility on next launch.
+    auto bandPills = std::make_shared<QVector<QPushButton*>>();
+    auto soloBand = std::make_shared<QString>();
     for (const char* band : bands) {
         auto* pill = new QPushButton(band);
         pill->setObjectName(QString("spotListBandPill_%1").arg(band));
@@ -2263,13 +2414,26 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         pill->setChecked(on);
         if (!on)
             m_spotProxyModel->setBandVisible(QString(band), false);
-        connect(pill, &QPushButton::toggled, this, [this, b = QString(band), key](bool checked) {
-            m_spotProxyModel->setBandVisible(b, checked);
+        bandPills->push_back(pill);
+        bandRow->addWidget(pill);
+    }
+    for (auto* pill : *bandPills) {
+        const QString band = pill->text();
+        connect(pill, &QPushButton::clicked, this, [this, band, bandPills, soloBand](bool) {
             auto& settings = AppSettings::instance();
-            settings.setValue(key, checked ? "True" : "False");
+            const bool restoringAll = (*soloBand == band);
+            *soloBand = restoringAll ? QString() : band;
+            for (auto* p : *bandPills) {
+                const QString b = p->text();
+                const bool visible = restoringAll || (b == band);
+                p->blockSignals(true);
+                p->setChecked(visible);
+                p->blockSignals(false);
+                m_spotProxyModel->setBandVisible(b, visible);
+                settings.setValue(QString("SpotBandFilter_%1").arg(b), visible ? "True" : "False");
+            }
             settings.save();
         });
-        bandRow->addWidget(pill);
     }
     bandRow->addStretch();
     layout->addLayout(bandRow);
@@ -2321,6 +2485,199 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     srcRow->addStretch();
     layout->addLayout(srcRow);
 
+    // ── Entity filter + Watchlist row ────────────────────────────────
+    // NereusSDR-native (2026-08-26, no upstream equivalent). Entity
+    // filter is a checkable menu, not a fixed pill row, because
+    // DxSpot::entity values (POTA/SOTA location prefixes like "US",
+    // "DE", "OE") are open-ended and only discovered as spots arrive
+    // (see the rowsInserted wiring below, alongside ensureEntityFilterAction()).
+    // Watchlist tints matching rows via SpotTableModel::setWatchTerms()/
+    // setWatchColor() and can beep on a new match; the highlight color
+    // is operator-chosen through the swatch button -- same pattern as
+    // the per-source color pickers elsewhere in this dialog, so the
+    // actual color decision stays with the operator, not this code.
+    auto* watchRow = new QHBoxLayout;
+    watchRow->setSpacing(3);
+
+    m_entityFilterBtn = new QToolButton;
+    m_entityFilterBtn->setObjectName("spotListEntityFilterBtn");
+    m_entityFilterBtn->setText("Entity ▾");
+    m_entityFilterBtn->setPopupMode(QToolButton::InstantPopup);
+    m_entityFilterBtn->setStyleSheet(
+        "QToolButton { background: #1a1a2a; color: #8090a0; "
+        "border: 1px solid #203040; border-radius: 6px; padding: 2px 8px; "
+        "font-size: 11px; }"
+        "QToolButton:hover { border-color: #c8d8e8; }");
+    m_entityFilterMenu = new QMenu(m_entityFilterBtn);
+    m_entityFilterBtn->setMenu(m_entityFilterMenu);
+    // NereusSDR-native (2026-08-27, operator-requested follow-up,
+    // pattern taken from SOTAwatch3's Mode Filter "Clear"/"Alle" pair):
+    // quick all/none actions ahead of the dynamically-added per-entity
+    // ones. Just flips each existing action's checked state -- the
+    // toggled() handler wired in ensureEntityFilterAction() already
+    // updates the proxy filter and persists, so no duplicate logic
+    // here.
+    {
+        QAction* allAction = m_entityFilterMenu->addAction("All");
+        connect(allAction, &QAction::triggered, this, [this] {
+            for (QAction* a : std::as_const(m_entityFilterActions)) {
+                a->setChecked(true);
+            }
+        });
+        QAction* noneAction = m_entityFilterMenu->addAction("Clear");
+        connect(noneAction, &QAction::triggered, this, [this] {
+            for (QAction* a : std::as_const(m_entityFilterActions)) {
+                a->setChecked(false);
+            }
+        });
+        m_entityFilterMenu->addSeparator();
+    }
+    watchRow->addWidget(m_entityFilterBtn);
+
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // mode filter, same dynamic-menu treatment as the entity filter
+    // above (modes are open-ended in practice -- extractMode()
+    // recognizes 20 tokens -- so a fixed pill row doesn't fit; the
+    // menu instead fills in as modes are actually seen).
+    m_modeFilterBtn = new QToolButton;
+    m_modeFilterBtn->setObjectName("spotListModeFilterBtn");
+    m_modeFilterBtn->setText("Mode ▾");
+    m_modeFilterBtn->setPopupMode(QToolButton::InstantPopup);
+    m_modeFilterBtn->setStyleSheet(
+        "QToolButton { background: #1a1a2a; color: #8090a0; "
+        "border: 1px solid #203040; border-radius: 6px; padding: 2px 8px; "
+        "font-size: 11px; }"
+        "QToolButton:hover { border-color: #c8d8e8; }");
+    m_modeFilterMenu = new QMenu(m_modeFilterBtn);
+    m_modeFilterBtn->setMenu(m_modeFilterMenu);
+    // Same All/Clear pair as the entity menu above.
+    {
+        QAction* allAction = m_modeFilterMenu->addAction("All");
+        connect(allAction, &QAction::triggered, this, [this] {
+            for (QAction* a : std::as_const(m_modeFilterActions)) {
+                a->setChecked(true);
+            }
+        });
+        QAction* noneAction = m_modeFilterMenu->addAction("Clear");
+        connect(noneAction, &QAction::triggered, this, [this] {
+            for (QAction* a : std::as_const(m_modeFilterActions)) {
+                a->setChecked(false);
+            }
+        });
+        m_modeFilterMenu->addSeparator();
+    }
+    watchRow->addWidget(m_modeFilterBtn);
+
+    auto* watchLabel = new QLabel("Watch:");
+    watchLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    watchLabel->setFixedWidth(40);
+    watchRow->addWidget(watchLabel);
+
+    m_watchlistEdit = new QLineEdit;
+    m_watchlistEdit->setObjectName("spotListWatchlistEdit");
+    m_watchlistEdit->setPlaceholderText("Calls / refs, comma-separated, e.g. W1AW, US-1234");
+    m_watchlistEdit->setStyleSheet(Style::lineEditStyle());
+    m_watchlistEdit->setText(s.value("SpotWatchlist", "").toString());
+    watchRow->addWidget(m_watchlistEdit, 1);
+
+    m_watchlistSoundBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x94\x94"));
+    m_watchlistSoundBtn->setObjectName("spotListWatchlistSoundBtn");
+    m_watchlistSoundBtn->setCheckable(true);
+    m_watchlistSoundBtn->setToolTip("Beep on watchlist match");
+    m_watchlistSoundBtn->setStyleSheet(kFilterPillStyle);
+    m_watchlistSoundBtn->setChecked(s.value("SpotWatchlistSound", "False").toString() == "True");
+    connect(m_watchlistSoundBtn, &QPushButton::toggled, this, [](bool on) {
+        auto& settings = AppSettings::instance();
+        settings.setValue("SpotWatchlistSound", on ? "True" : "False");
+        settings.save();
+    });
+    watchRow->addWidget(m_watchlistSoundBtn);
+
+    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // speaks the matched call via macOS's `say` command. See the
+    // member declaration in SpotHubDialog.h for why this is macOS-only
+    // rather than a new Qt6::TextToSpeech dependency.
+    m_watchlistSpeakBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x97\xA3\xEF\xB8\x8F"));
+    m_watchlistSpeakBtn->setObjectName("spotListWatchlistSpeakBtn");
+    m_watchlistSpeakBtn->setCheckable(true);
+#ifdef Q_OS_MAC
+    m_watchlistSpeakBtn->setToolTip("Speak watchlist match aloud (macOS \"say\")");
+#else
+    m_watchlistSpeakBtn->setToolTip("Speak watchlist match aloud (macOS only)");
+    m_watchlistSpeakBtn->setEnabled(false);
+#endif
+    m_watchlistSpeakBtn->setStyleSheet(kFilterPillStyle);
+    m_watchlistSpeakBtn->setChecked(s.value("SpotWatchlistSpeak", "False").toString() == "True");
+    connect(m_watchlistSpeakBtn, &QPushButton::toggled, this, [](bool on) {
+        auto& settings = AppSettings::instance();
+        settings.setValue("SpotWatchlistSpeak", on ? "True" : "False");
+        settings.save();
+    });
+    watchRow->addWidget(m_watchlistSpeakBtn);
+
+    QColor watchColor(s.value("SpotWatchlistColor", "#00b4d8").toString());
+    m_watchlistColorBtn = new QPushButton;
+    m_watchlistColorBtn->setObjectName("spotListWatchlistColorBtn");
+    m_watchlistColorBtn->setFixedSize(18, 18);
+    m_watchlistColorBtn->setToolTip("Watchlist highlight color");
+    m_watchlistColorBtn->setStyleSheet(swatchStyle(watchColor));
+    connect(m_watchlistColorBtn, &QPushButton::clicked, this, [this] {
+        QColor c = QColorDialog::getColor(
+            QColor(AppSettings::instance().value("SpotWatchlistColor", "#00b4d8").toString()),
+            this, "Watchlist Highlight Color");
+        if (c.isValid()) {
+            m_watchlistColorBtn->setStyleSheet(swatchStyle(c));
+            AppSettings::instance().setValue("SpotWatchlistColor", c.name());
+            AppSettings::instance().save();
+            if (m_spotTableModel)
+                m_spotTableModel->setWatchColor(c);
+        }
+    });
+    watchRow->addWidget(m_watchlistColorBtn);
+
+    connect(m_watchlistEdit, &QLineEdit::editingFinished, this, [this] {
+        const QStringList terms = m_watchlistEdit->text().split(',', Qt::SkipEmptyParts);
+        if (m_spotTableModel)
+            m_spotTableModel->setWatchTerms(terms);
+        auto& settings = AppSettings::instance();
+        settings.setValue("SpotWatchlist", m_watchlistEdit->text());
+        settings.save();
+    });
+
+    layout->addLayout(watchRow);
+
+    // Apply persisted watchlist state immediately so highlighting is
+    // live from tab-open time onward, not just after the next edit.
+    if (m_spotTableModel) {
+        m_spotTableModel->setWatchTerms(m_watchlistEdit->text().split(',', Qt::SkipEmptyParts));
+        m_spotTableModel->setWatchColor(watchColor);
+    }
+
+    // ── Free-text search row ────────────────────────────────────────
+    // NereusSDR-native (2026-08-27, operator-requested follow-up,
+    // pattern taken from SOTAwatch3's "FILTER..." box). Live substring
+    // search across DxCall / Reference / Comment / Spotter, loose and
+    // ephemeral by design -- complements rather than replaces the
+    // exact-match, persisted Watchlist above. Not persisted to
+    // AppSettings (see BandFilterProxy::setSearchText rationale).
+    auto* searchRow = new QHBoxLayout;
+    searchRow->setSpacing(3);
+    auto* searchLabel = new QLabel("Search:");
+    searchLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    searchLabel->setFixedWidth(40);
+    searchRow->addWidget(searchLabel);
+    auto* searchEdit = new QLineEdit;
+    searchEdit->setObjectName("spotListSearchEdit");
+    searchEdit->setPlaceholderText("Quick filter: call, ref, comment, or spotter contains...");
+    searchEdit->setStyleSheet(Style::lineEditStyle());
+    connect(searchEdit, &QLineEdit::textChanged, this, [this](const QString& text) {
+        if (m_spotProxyModel) {
+            m_spotProxyModel->setSearchText(text);
+        }
+    });
+    searchRow->addWidget(searchEdit, 1);
+    layout->addLayout(searchRow);
+
     // ── Table view ──────────────────────────────────────────────────
     // From AetherSDR DxClusterDialog.cpp:1643-1696 [@0cd4559].
     m_spotTable = new QTableView;
@@ -2342,6 +2699,10 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     m_spotTable->setColumnWidth(SpotTableModel::ColComment, 200);
     m_spotTable->setColumnWidth(SpotTableModel::ColSpotter, 80);
     m_spotTable->setColumnWidth(SpotTableModel::ColBand, 45);
+    m_spotTable->setColumnWidth(SpotTableModel::ColReference, 70);
+    m_spotTable->setColumnWidth(SpotTableModel::ColEntity, 45);
+    m_spotTable->setColumnWidth(SpotTableModel::ColDistance, 50);
+    m_spotTable->setColumnWidth(SpotTableModel::ColBearing, 78);
     m_spotTable->setColumnWidth(SpotTableModel::ColSource, 55);
 
     // No default sort - insertion order is newest-first.
@@ -2375,17 +2736,44 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         const double freq = m_spotTableModel->freqAtRow(srcIdx.row());
         if (call.isEmpty()) { return; }
 
+        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // "Park Info" entry, only offered for POTA rows (the lookup
+        // hits api.pota.app/park/{ref}, which wouldn't resolve a SOTA
+        // summit reference even once SOTA support lands).
+        const QString reference = m_spotTableModel->data(
+            m_spotTableModel->index(srcIdx.row(), SpotTableModel::ColReference),
+            Qt::DisplayRole).toString().trimmed();
+        const QString rowSource = m_spotTableModel->data(
+            m_spotTableModel->index(srcIdx.row(), SpotTableModel::ColSource),
+            Qt::DisplayRole).toString();
+        const bool offerParkInfo = !reference.isEmpty() && rowSource == QLatin1String("POTA");
+
         QMenu menu(this);
         QAction* tune  = menu.addAction(
             QStringLiteral("Tune to %1").arg(call));
         QAction* rotor = menu.addAction(
             QStringLiteral("Turn rotor to %1").arg(call));
+        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // "Log QSO" via the existing takeSpot() path -- prefills the
+        // Rotor/Log panel for the operator to confirm, never writes a
+        // log entry by itself (a spot is someone ELSE having heard the
+        // station, not a completed contact -- auto-logging here would
+        // fabricate QSOs that never happened).
+        QAction* logSpot = menu.addAction(
+            QStringLiteral("Take Spot: %1").arg(call));
+        QAction* parkInfo = offerParkInfo
+            ? menu.addAction(QStringLiteral("Park Info: %1").arg(reference))
+            : nullptr;
         QAction* chosen =
             menu.exec(m_spotTable->viewport()->mapToGlobal(pos));
         if (chosen == tune && freq > 0.0) {
             emit tuneRequested(freq);
         } else if (chosen == rotor) {
             emit rotorRequested(call);
+        } else if (chosen == logSpot) {
+            emit logSpotRequested(call);
+        } else if (parkInfo && chosen == parkInfo) {
+            requestParkInfo(reference);
         }
     });
 
@@ -2445,6 +2833,28 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
             this, [this, countLabel] {
         countLabel->setText(QString("%1 spots").arg(m_spotTableModel->rowCount()));
     });
+
+    // NereusSDR-native (2026-08-26): populate the entity filter menu as
+    // new entities are seen, and check newly-arrived spots against the
+    // watchlist for an audible alert. Row highlighting itself needs no
+    // wiring here -- it's computed live by SpotTableModel's
+    // BackgroundRole from the terms/color already pushed into it above.
+    connect(m_spotTableModel, &QAbstractTableModel::rowsInserted,
+            this, [this](const QModelIndex&, int first, int last) {
+        for (int row = first; row <= last; ++row) {
+            const QString entity = m_spotTableModel->data(
+                m_spotTableModel->index(row, SpotTableModel::ColEntity),
+                Qt::DisplayRole).toString();
+            if (!entity.isEmpty())
+                ensureEntityFilterAction(entity);
+            const QString mode = m_spotTableModel->data(
+                m_spotTableModel->index(row, SpotTableModel::ColMode),
+                Qt::DisplayRole).toString();
+            if (!mode.isEmpty())
+                ensureModeFilterAction(mode);
+        }
+        checkNewSpotsForWatchlistMatch(first, last);
+    });
     bottomRow->addWidget(countLabel);
     bottomRow->addStretch();
 
@@ -2468,6 +2878,157 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     // repopulate.
 
     tabs->addTab(page, "Spot List");
+}
+
+// NereusSDR-native (2026-08-26, no upstream equivalent). Adds a
+// checkable action for `entity` to the Spot List tab's entity filter
+// menu the first time that entity is seen, defaulting to the
+// AppSettings-persisted visibility (or visible, if never set before).
+// A no-op if the action already exists.
+void SpotHubDialog::ensureEntityFilterAction(const QString& entity)
+{
+    if (!m_entityFilterMenu || m_entityFilterActions.contains(entity)) {
+        return;
+    }
+    auto& s = AppSettings::instance();
+    const QString key = QString("SpotEntityFilter_%1").arg(entity);
+    const bool on = s.value(key, "True").toString() == "True";
+
+    auto* action = m_entityFilterMenu->addAction(entity);
+    action->setCheckable(true);
+    action->setChecked(on);
+    if (!on && m_spotProxyModel) {
+        m_spotProxyModel->setEntityVisible(entity, false);
+    }
+    connect(action, &QAction::toggled, this, [this, entity, key](bool checked) {
+        if (m_spotProxyModel) {
+            m_spotProxyModel->setEntityVisible(entity, checked);
+        }
+        auto& settings = AppSettings::instance();
+        settings.setValue(key, checked ? "True" : "False");
+        settings.save();
+    });
+    m_entityFilterActions.insert(entity, action);
+}
+
+// NereusSDR-native (2026-08-27, operator-requested follow-up). Mirrors
+// ensureEntityFilterAction() but populates the mode filter menu.
+void SpotHubDialog::ensureModeFilterAction(const QString& mode)
+{
+    if (!m_modeFilterMenu || m_modeFilterActions.contains(mode)) {
+        return;
+    }
+    auto& s = AppSettings::instance();
+    const QString key = QString("SpotModeFilter_%1").arg(mode);
+    const bool on = s.value(key, "True").toString() == "True";
+
+    auto* action = m_modeFilterMenu->addAction(mode);
+    action->setCheckable(true);
+    action->setChecked(on);
+    if (!on && m_spotProxyModel) {
+        m_spotProxyModel->setModeVisible(mode, false);
+    }
+    connect(action, &QAction::toggled, this, [this, mode, key](bool checked) {
+        if (m_spotProxyModel) {
+            m_spotProxyModel->setModeVisible(mode, checked);
+        }
+        auto& settings = AppSettings::instance();
+        settings.setValue(key, checked ? "True" : "False");
+        settings.save();
+    });
+    m_modeFilterActions.insert(mode, action);
+}
+
+// NereusSDR-native (2026-08-26/27, no upstream equivalent). Alerts on
+// the first spot in the newly-inserted row range [first, last] that
+// matches a watchlist term (exact, case-insensitive, against DxCall or
+// Reference): beeps if the sound toggle is on, speaks the call aloud
+// (macOS `say`) if the speak toggle is on -- independent of each
+// other, an operator may want either, both, or neither. Row
+// highlighting itself is handled separately by SpotTableModel's
+// BackgroundRole -- this only covers the audible alerts.
+void SpotHubDialog::checkNewSpotsForWatchlistMatch(int first, int last)
+{
+    const bool soundOn = m_watchlistSoundBtn && m_watchlistSoundBtn->isChecked();
+    const bool speakOn = m_watchlistSpeakBtn && m_watchlistSpeakBtn->isChecked();
+    if (!soundOn && !speakOn) {
+        return;
+    }
+    if (!m_spotTableModel || !m_watchlistEdit) {
+        return;
+    }
+    const QStringList terms = m_watchlistEdit->text().split(',', Qt::SkipEmptyParts);
+    if (terms.isEmpty()) {
+        return;
+    }
+    for (int row = first; row <= last; ++row) {
+        const QString call = m_spotTableModel->data(
+            m_spotTableModel->index(row, SpotTableModel::ColDxCall),
+            Qt::DisplayRole).toString();
+        const QString ref = m_spotTableModel->data(
+            m_spotTableModel->index(row, SpotTableModel::ColReference),
+            Qt::DisplayRole).toString();
+        for (const QString& rawTerm : terms) {
+            const QString term = rawTerm.trimmed();
+            if (term.isEmpty()) {
+                continue;
+            }
+            if (call.compare(term, Qt::CaseInsensitive) == 0
+                || (!ref.isEmpty() && ref.compare(term, Qt::CaseInsensitive) == 0)) {
+                if (soundOn) {
+                    QApplication::beep();
+                }
+                if (speakOn) {
+                    speakWatchlistMatch(call, ref);
+                }
+                return;  // one alert per batch is enough
+            }
+        }
+    }
+}
+
+// NereusSDR-native (2026-08-27, operator-requested follow-up, pattern
+// taken from the community sota-oriented sota2voice tool). Hands the
+// matched call (plus reference, if any) to macOS's built-in `say`
+// command. Detached, non-blocking -- speech synthesis can take a
+// couple of seconds and the Spot List must keep receiving new spots
+// while it talks. macOS-only by operator decision (see
+// m_watchlistSpeakBtn's declaration for the cross-platform tradeoff);
+// the button is disabled on other platforms so this is unreachable
+// there, but the #ifdef still guards the call itself.
+void SpotHubDialog::speakWatchlistMatch(const QString& call, const QString& reference)
+{
+#ifdef Q_OS_MAC
+    const QString phrase = reference.isEmpty()
+        ? QStringLiteral("Watch list match, %1").arg(call)
+        : QStringLiteral("Watch list match, %1, %2").arg(call, reference);
+    QProcess::startDetached(QStringLiteral("say"), {phrase});
+#else
+    Q_UNUSED(call);
+    Q_UNUSED(reference);
+#endif
+}
+
+// NereusSDR-native (2026-08-27, operator-requested follow-up). Lazily
+// creates the park-info client + dialog on first use, then reuses
+// both across every subsequent lookup (a fresh QNetworkAccessManager
+// and QDialog per click would be wasteful and would leave orphan
+// windows behind). showLoading() gives instant feedback before the
+// network round-trip completes.
+void SpotHubDialog::requestParkInfo(const QString& reference)
+{
+    if (!m_parkInfoClient) {
+        m_parkInfoClient = new PotaParkInfoClient(this);
+    }
+    if (!m_parkInfoDialog) {
+        m_parkInfoDialog = new ParkInfoDialog(this);
+        connect(m_parkInfoClient, &PotaParkInfoClient::parkInfoReceived,
+                m_parkInfoDialog, &ParkInfoDialog::showInfo);
+        connect(m_parkInfoClient, &PotaParkInfoClient::parkInfoError,
+                m_parkInfoDialog, &ParkInfoDialog::showError);
+    }
+    m_parkInfoDialog->showLoading(reference);
+    m_parkInfoClient->fetchParkInfo(reference);
 }
 
 // Display tab - F4. Two-column layout. LEFT (NereusSDR-native): 8

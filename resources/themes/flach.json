@@ -1,0 +1,11 @@
+{
+  "name": "Flach",
+  "_hinweis": "Ruhig, fast ohne Tiefe. Traegt KEINE Farben — die Palette bleibt, wie sie ist; nur Ecken, Luft und Verlaeufe werden flacher. Gewaehlt am 2026-08-22 als Nachbar von 'Weich'.",
+  "formen": {
+    "radius": 5,
+    "luft-v": 3,
+    "luft-h": 8,
+    "relief": 6,
+    "mulde": 4
+  }
+}

@@ -49,6 +49,58 @@
 //                                    QPushButtons (DX / RBN / JT / COL
 //                                    / POT / FDR / PSK). AI tooling:
 //                                    Anthropic Claude Code.
+//   2026-08-26  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (SpotHub POTA improvement pass, no
+//                                    upstream equivalent). Adds
+//                                    setEntityVisible()/isEntityVisible(),
+//                                    a third predicate mirroring
+//                                    band/source but over
+//                                    SpotTableModel::ColEntity (the
+//                                    location prefix of a POTA/SOTA
+//                                    reference, e.g. "US"). Unlike the
+//                                    fixed band/source lists, entities
+//                                    are open-ended and discovered at
+//                                    runtime, so SpotHubDialog builds
+//                                    the filter UI dynamically as new
+//                                    entities are seen rather than from
+//                                    a fixed pill row. AND semantics
+//                                    with the existing two predicates,
+//                                    same as source joining band.
+//   2026-08-27  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (operator-requested follow-up).
+//                                    Adds setModeVisible()/isModeVisible(),
+//                                    a fourth predicate over
+//                                    SpotTableModel::ColMode, same
+//                                    "empty always shows" / dynamic-
+//                                    discovery treatment as entity
+//                                    (modes are open-ended in practice
+//                                    -- extractMode() recognizes 20
+//                                    tokens -- so SpotHubDialog
+//                                    populates the filter menu as
+//                                    modes are actually seen, same
+//                                    pattern as the entity menu).
+//   2026-08-27  AI (Anthropic Claude Code)  NereusSDR-native extension
+//                                    (operator-requested follow-up,
+//                                    pattern taken from SOTAwatch3's
+//                                    free-text "FILTER..." box). Adds
+//                                    setSearchText(): a single
+//                                    substring predicate (case-
+//                                    insensitive) over DxCall,
+//                                    Reference, Comment, and Spotter,
+//                                    ORed together -- unlike the other
+//                                    four predicates (which are exact-
+//                                    match hidden-sets ANDed with
+//                                    everything else), this is a loose
+//                                    quick-search meant to complement
+//                                    the exact-match watchlist, not
+//                                    replace it. Empty text always
+//                                    shows, same convention as the
+//                                    rest. Deliberately not persisted
+//                                    to AppSettings -- it's a
+//                                    transient quick-filter, not a
+//                                    standing preference, matching
+//                                    SOTAwatch3's own (non-persisted)
+//                                    behavior.
 
 #pragma once
 
@@ -74,6 +126,21 @@ public:
     void setSourceVisible(const QString& source, bool visible);
     bool isSourceVisible(const QString& source) const { return !m_hiddenSources.contains(source); }
 
+    // NereusSDR-native extension, added alongside the ColReference /
+    // ColEntity columns (see modification history above).
+    void setEntityVisible(const QString& entity, bool visible);
+    bool isEntityVisible(const QString& entity) const { return !m_hiddenEntities.contains(entity); }
+
+    // NereusSDR-native extension (2026-08-27), mirrors setEntityVisible.
+    void setModeVisible(const QString& mode, bool visible);
+    bool isModeVisible(const QString& mode) const { return !m_hiddenModes.contains(mode); }
+
+    // NereusSDR-native extension (2026-08-27), see modification history
+    // above. Not an exact-match hidden-set like the other predicates --
+    // a single substring search across several columns.
+    void setSearchText(const QString& text);
+    QString searchText() const { return m_searchText; }
+
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
 
@@ -94,6 +161,9 @@ protected:
 private:
     QSet<QString> m_hiddenBands;
     QSet<QString> m_hiddenSources;
+    QSet<QString> m_hiddenEntities;
+    QSet<QString> m_hiddenModes;
+    QString m_searchText;
 };
 
 } // namespace Longpath

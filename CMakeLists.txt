@@ -539,6 +539,7 @@ set(CORE_SOURCES
     src/core/codec/P2CodecSaturn.cpp
     src/core/P1RadioConnection.cpp
     src/core/P2RadioConnection.cpp
+    src/core/PlaybackRadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp
     # ── KiwiSDR (2026-08-23, Nachtschicht) ───────────────────────────
@@ -617,6 +618,8 @@ set(CORE_SOURCES
     src/core/safety/safety_constants.cpp
     src/core/SpotCollectorClient.cpp
     src/core/PotaClient.cpp
+    src/core/PotaParkInfoClient.cpp
+    src/core/PotaAlertsClient.cpp
     src/core/DxClusterClient.cpp
     src/core/WsjtxClient.cpp
     src/core/FreeDVReporterClient.cpp
@@ -631,6 +634,11 @@ set(CORE_SOURCES
     src/core/audio/WavPlayer.cpp
     src/core/audio/VoiceKeyer.cpp
     src/core/audio/QsoRecorder.cpp
+    src/core/audio/WavRecorder.cpp
+    src/core/audio/WavRecorderController.cpp
+    src/core/audio/IqRecorder.cpp
+    src/core/audio/IqRecorderController.cpp
+    src/core/audio/RecordingScheduler.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp
@@ -709,6 +717,7 @@ set(MODEL_SOURCES
     src/models/SpotModel.cpp
     src/models/SpotTableModel.cpp
     src/models/BandFilterProxy.cpp
+    src/models/AlertsTableModel.cpp
     src/models/FreeDVStationModel.cpp
     src/models/RxDecodeModel.cpp
 )
@@ -858,9 +867,13 @@ set(GUI_SOURCES
     src/gui/DiversityDialog.h
     src/gui/SpotHubDialog.cpp
     src/gui/SpotHubDialog.h
+    src/gui/ParkInfoDialog.cpp
+    src/gui/ParkInfoDialog.h
     src/gui/FreeDVReporterDialog.cpp
     src/gui/FreeDVReporterDialog.h
     src/gui/applets/KiwiSdrApplet.cpp
+    src/gui/KiwiWaterfallStripWidget.cpp
+    src/gui/KiwiWaterfallPanel.cpp
     src/gui/applets/TxMeterApplet.cpp
     src/gui/applets/AsrApplet.cpp
     src/gui/widgets/VfoTileRow.cpp
@@ -1818,17 +1831,3 @@ endif()
 #   ./build/tci_probe ws://127.0.0.1:40001 12
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
-
-# ── SunSDR2-QRP-native-Sonde (2026-08-24) ──────────────────────────────
-#
-# WERKZEUG, kein Programmteil. Beantwortet die eine Frage, die vor jedem
-# nativen SunSDR-Treibercode steht: antwortet die echte QRP-Hardware auf
-# das Draht-Protokoll, das docs/architecture/2026-08-24-sunsdr-native-
-# driver-design.md aus ArtemisSDR (GPLv2-or-later) als Referenz fuer
-# SunSDR2 DX/PRO dokumentiert -- fuer den QRP selbst nie bestaetigt.
-#
-# EXCLUDE_FROM_ALL: sie wird nicht mitgebaut und nicht ausgeliefert.
-#   cmake --build build --target sunsdr_probe
-#   ./build/sunsdr_probe 192.168.1.100 5
-add_executable(sunsdr_probe EXCLUDE_FROM_ALL tools/sunsdr_probe.cpp)
-target_link_libraries(sunsdr_probe PRIVATE Qt6::Core Qt6::Network)

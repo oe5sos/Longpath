@@ -84,6 +84,16 @@ private:
 
     void configure(SpectrumWidget& w) const
     {
+        // Pin displayWidth to exactly kDisplayWidth regardless of the
+        // real screen's devicePixelRatioF() -- this fixture's pixel
+        // indices (kTonePixel etc., see the "Fixture geometry" header
+        // comment) depend on a literal 1.0 Hz-per-pixel ratio that only
+        // holds when displayWidth == kPanSpanHz == 800. Added 2026-08-26
+        // alongside the devicePixelRatioF() fix to updateSpectrumLinear's
+        // own displayWidth calculation, which broke this fixture's old
+        // "headless width() is 0, so the 800 floor always wins" assumption
+        // on a real (non-1.0) device pixel ratio.
+        w.setDisplayWidthOverrideForTest(kDisplayWidth);
         w.setFrequencyRange(kPanCentreHz, kPanSpanHz);
         w.setDdcCenterFrequency(kPanCentreHz);
         w.setSampleRate(kPanSpanHz);

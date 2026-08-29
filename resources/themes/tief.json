@@ -1,0 +1,11 @@
+{
+  "name": "Tief",
+  "_hinweis": "Deutlich plastisch. Traegt KEINE Farben — nur staerkere Verlaeufe, mehr Luft und groessere Ecken. Der andere Nachbar von 'Weich'.",
+  "formen": {
+    "radius": 9,
+    "luft-v": 6,
+    "luft-h": 14,
+    "relief": 26,
+    "mulde": 18
+  }
+}

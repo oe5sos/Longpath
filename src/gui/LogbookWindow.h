@@ -24,6 +24,12 @@
 //                 and the Band column coloured by band so a mixed log
 //                 can be scanned. AI-assisted via Anthropic Claude
 //                 (Cowork), operator Martin Fischer.
+//   2026-08-27 — Window position/size persistence (closeEvent +
+//                 saveGeometryState/restoreGeometryState), matching the
+//                 existing header/splitter-state pattern. Previously the
+//                 window always reopened at Qt's default QDialog(parent)
+//                 placement with no memory of where it was left.
+//                 AI-assisted via Anthropic Claude, operator Martin Fischer.
 // =================================================================
 
 #include "core/CallsignCache.h"
@@ -37,6 +43,7 @@
 #include <functional>
 
 class QCheckBox;
+class QCloseEvent;
 class QComboBox;
 class QDateEdit;
 class QLabel;
@@ -61,8 +68,18 @@ public:
     // views cannot drift apart.
     void reload();
 
+protected:
+    // 2026-08-27: unlike every ContainerWidget-based floating panel,
+    // this window never saved or restored its own position/size — it
+    // always reopened wherever Qt's default QDialog(parent) placement
+    // policy put it. Standard Qt idiom: capture on close, apply on
+    // construction (see restoreGeometryState() call in the constructor).
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     void showRowMenu(const QPoint& pos);
+    void saveGeometryState();
+    void restoreGeometryState();
 
 public:
 

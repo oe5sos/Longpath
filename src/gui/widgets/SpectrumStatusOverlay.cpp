@@ -59,7 +59,8 @@ QSize SpectrumStatusOverlay::sizeHint() const
     // Mirrors paintEvent's and badgeRect's layout; all three must agree.
     int w = kLeftMargin + kChTagWidth;
     const int lit = (m_txBound ? 1 : 0) + (m_wideBpf ? 1 : 0)
-                  + (m_diversityActive ? 1 : 0) + (m_psPaused ? 1 : 0);
+                  + (m_diversityActive ? 1 : 0) + (m_psPaused ? 1 : 0)
+                  + (m_kiwiActive ? 1 : 0);
     w += lit * (kInterPillGap + kPillWidth);
     return QSize(w + kRightPad, kOverlayHeight);
 }
@@ -125,6 +126,16 @@ void SpectrumStatusOverlay::setPsPaused(bool paused)
 {
     if (m_psPaused == paused) { return; }
     m_psPaused = paused;
+    update();
+}
+
+void SpectrumStatusOverlay::setKiwiActive(bool active)
+{
+    if (m_kiwiActive == active) { return; }
+    m_kiwiActive = active;
+    setToolTip(active
+        ? QStringLiteral("Zeigt den KiwiSDR statt des Geraets -- klicken zum Zurueckschalten.")
+        : QString());
     update();
 }
 
@@ -198,6 +209,13 @@ void SpectrumStatusOverlay::paintEvent(QPaintEvent*)
                  QColor(0x60, 0x40, 0x00), QColor(0xff, 0xb8, 0x00),
                  QColor(0x90, 0x60, 0x00));
     }
+    if (m_kiwiActive) {
+        // Same neutral blue-grey as the CH tag, not a warning colour --
+        // this states a source, it does not flag a fault.
+        drawPill(QStringLiteral("KIWI"),
+                 QColor(0x1a, 0x2a, 0x3a), QColor(Style::kTitleText),
+                 QColor(0x30, 0x40, 0x50));
+    }
 
     // NOT setMinimumWidth(x + kRightPad) any more. Growing the minimum here
     // let setGeometry's clamp expand the widget rightward from its fixed x
@@ -241,6 +259,18 @@ QRect SpectrumStatusOverlay::badgeRect(Badge badge) const
     } else if (badge == Badge::Wide) {
         return QRect();
     }
+    // DIV / PS HOLD have no click handler and so no badge case here; both
+    // still occupy paint-order width, which KIWI's hitX must walk past.
+    if (m_diversityActive) { hitX += kPillWidth + kInterPillGap; }
+    if (m_psPaused)        { hitX += kPillWidth + kInterPillGap; }
+    if (m_kiwiActive) {
+        if (badge == Badge::Kiwi) {
+            return QRect(hitX, 0, kPillWidth, height());
+        }
+        hitX += kPillWidth + kInterPillGap;
+    } else if (badge == Badge::Kiwi) {
+        return QRect();
+    }
     return QRect();
 }
 
@@ -263,6 +293,10 @@ void SpectrumStatusOverlay::mousePressEvent(QMouseEvent* event)
     }
     if (hits(badgeRect(Badge::Wide))) {
         emit wideBadgeClicked();
+        return;
+    }
+    if (hits(badgeRect(Badge::Kiwi))) {
+        emit kiwiBadgeClicked();
         return;
     }
     // DIV / PS HOLD currently informational; no click handlers wired.

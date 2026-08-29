@@ -2634,11 +2634,18 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
     const int complexSamples = outBuf.size() / 2;
     const int lengthField    = complexSamples * 2;  // total floats in the IQ frame
 
-    // IQ sample rate: 192000 Hz is the typical HPSDR DDC rate and the default
-    // Thetis negotiates via iq_samplerate:.  Phase 3F multi-pan will pass the
-    // actual per-receiver rate here.  For now, match the Thetis Phase 11 default
-    // of 192000 from TciProtocol.cpp:265 [v2.10.3.13 port].
-    constexpr int iqSampleRate = 192000;
+    // IQ sample rate: read the same live value the text-channel iq_samplerate:
+    // query/set commands already report (RadioModel::iqSampleRate() — prefers
+    // connectionSampleRateHz(), falls back to the cached default only pre-
+    // connect; see RadioModel.cpp's "Review P1 #1 fix" comment). The binary
+    // frame header previously hardcoded 192000 regardless of the radio's
+    // actual configured rate, so a client trusting this header (rather than
+    // separately polling iq_samplerate:) would silently decode a 384 kHz or
+    // 48 kHz stream as if it were 192 kHz. 192000 remains the fallback only
+    // for the m_model-null edge case, matching the class's existing default.
+    // Phase 3F multi-pan will still need to pass the actual per-receiver rate
+    // once more than RX1 streams.
+    const int iqSampleRate = m_model ? m_model->iqSampleRate() : 192000;
 
     for (auto it = m_clients.cbegin(); it != m_clients.cend(); ++it) {
         QWebSocket* ws     = it.key();

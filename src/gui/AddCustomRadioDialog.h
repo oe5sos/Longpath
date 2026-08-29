@@ -91,9 +91,6 @@ public:
     // Returns whether the user ticked "Pin to MAC"
     bool pinToMac() const;
 
-    // Whether the user ticked "Auto-connect on launch"
-    bool autoConnect() const;
-
     // Whether the user used "Save offline" (no probe was attempted).
     // When false the dialog accepted via a successful probe.
     bool savedOffline() const { return m_savedOffline; }
@@ -102,7 +99,7 @@ public:
     // Call before exec(). Switches the title to "Edit Radio" and seeds
     // m_probedInfo so result() returns the same MAC on save (otherwise
     // the synthetic-MAC path would create a duplicate row).
-    void setEditTarget(const RadioInfo& info, bool pinToMac, bool autoConnect);
+    void setEditTarget(const RadioInfo& info, bool pinToMac);
 
 private slots:
     void onProbeClicked();
@@ -132,7 +129,6 @@ private:
     QComboBox*   m_modelCombo{nullptr};   // HPSDRModel SKU picker (objectName: "modelCombo")
     QComboBox*   m_protocolCombo{nullptr};
     QCheckBox*   m_pinToMacCheck{nullptr};
-    QCheckBox*   m_autoConnectCheck{nullptr};
 
     // Phase 3Q Task 4: action buttons replace OK/Cancel
     QPushButton* m_probeButton{nullptr};       // objectName: "probeButton"

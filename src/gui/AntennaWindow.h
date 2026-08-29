@@ -43,6 +43,7 @@
 
 #include <QDialog>
 
+class QCloseEvent;
 class QComboBox;
 class QDragEnterEvent;
 class QDropEvent;
@@ -79,8 +80,17 @@ protected:
     void dragEnterEvent(QDragEnterEvent* e) override;
     void dropEvent(QDropEvent* e) override;
 
+    // 2026-08-27: like every plain QDialog window in this app (see
+    // LogbookWindow's own note), this one never saved or restored its
+    // own position/size -- it always reopened at the fixed 1000x760
+    // resize() below. Same idiom as LogbookWindow/AmpViewWindow:
+    // capture on close, apply on construction.
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     void buildUi();
+    void saveGeometryState();
+    void restoreGeometryState();
     // Recompute everything shown from the sweep and the three inputs.
     // One function, called from every control, so no two readouts can
     // be describing different states.

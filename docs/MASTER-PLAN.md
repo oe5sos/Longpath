@@ -177,7 +177,7 @@ NereusSDR is an independent cross-platform SDR client deeply informed by the wor
 **RxApplet Tier 1 wired:** mode, AGC, AF gain, and filter presets fully wired to SliceModel
 
 ### Up Next (after v0.5.2)
-- **Phase 3M-2 - CW TX** (next up). Sidetone, firmware keyer, QSK / break-in. Absorbs the HL2 CWX bit-3 follow-up (`networkproto1.c:1247-1252 [@c26a8a4]`). Detail in §"Phase 3M-2".
+- **Phase 3M-2 - CW TX** (next up). Sidetone, firmware keyer, QSK / break-in. Absorbs the HL2 CWX bit-3 follow-up (`networkproto1.c:1252-1261 [@0cef1c9]` — re-verified 2026-08-26, see docs/architecture/phase3m-2-cw-tx-design.md §9). Detail in §"Phase 3M-2".
 - **Phase 3M-3b — FM pre-emphasis** (de-scoped from 3M-3a-ii during v0.3.1; runs after 3M-2).
 - **Phase 3F (Multi-panadapter)**, after 3M-2. Re-exposes the Active RX count widget (hidden in v0.4.0 because it was stuck-at-1 in single-RX) and finally exercises `RadioModel::setActiveRxCountLive`. Also lands the aamix anti-VOX path that the v0.4.0 single-RX direct pump deferred. Also unblocks RADE-on-A while SSB-on-B multi-slice scenarios (currently a known limitation per Row 12 of the Phase 3R bench matrix).
 - **HL2 RADE bench follow-up**, gated on closure of the HL2 ATT/filter safety audit. Tracked by Row 9 of `docs/architecture/phase3r-verification/README.md`.
@@ -771,9 +771,11 @@ that 3M-1 just shipped genuinely good (broadcast-grade preprocessing) before
 adding a new state-machine layer.  The HL2 ATT/filter audit closed in v0.3.1,
 so HL2 CW bench-verification is no longer gated.
 
-**Absorbs:** the HL2 CWX bit-3 follow-up (`networkproto1.c:1247-1252
-[@c26a8a4]` — desk-review B3, "HL2 firmware uses bit 3 of I-low byte for
-CWX PTT, non-HL2 boards don't").
+**Absorbs:** the HL2 CWX bit-3 follow-up (`networkproto1.c:1252-1261
+[@0cef1c9]` — desk-review B3, "HL2 firmware uses bit 3 of I-low byte for
+CWX PTT, non-HL2 boards don't"; citation re-verified 2026-08-26 against a
+current mi0bot-Thetis checkout, see
+docs/architecture/phase3m-2-cw-tx-design.md §9).
 
 **BandPlanGuard mode-gate** — until 3M-2 ships, CWL/CWU continue to be
 rejected with the verbatim toast "CW TX coming in Phase 3M-2"

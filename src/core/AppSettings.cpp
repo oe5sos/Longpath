@@ -868,7 +868,7 @@ QString AppSettings::macKeyFromSettingsKey(const QString& settingsKey)
     return rest.left(slashIdx);
 }
 
-void AppSettings::saveRadio(const RadioInfo& info, bool pinToMac, bool autoConnect)
+void AppSettings::saveRadio(const RadioInfo& info, bool pinToMac)
 {
     const QString macKey = info.macAddress.isEmpty()
         ? QStringLiteral("manual-%1-%2")
@@ -887,7 +887,14 @@ void AppSettings::saveRadio(const RadioInfo& info, bool pinToMac, bool autoConne
                       QString::number(static_cast<int>(info.protocol)));
     m_settings.insert(prefix + QStringLiteral("firmwareVersion"), QString::number(info.firmwareVersion));
     m_settings.insert(prefix + QStringLiteral("pinToMac"),        pinToMac   ? QStringLiteral("True") : QStringLiteral("False"));
-    m_settings.insert(prefix + QStringLiteral("autoConnect"),     autoConnect ? QStringLiteral("True") : QStringLiteral("False"));
+    // "autoConnect" is intentionally no longer written here — the feature was
+    // removed 2026-08-27 (operator decision, OE5SOS: it kept re-arming itself
+    // — this saveRadio() call hardcoded true from the Connect button — and
+    // silently auto-connecting to a radio over a flaky WLAN link on launch
+    // was actively unwanted, not just unreliable). forgetRadio() below still
+    // clears any leftover "autoConnect" key from a settings file written by
+    // an older build, so old data can't resurrect the behaviour.
+    m_settings.remove(prefix + QStringLiteral("autoConnect"));
     m_settings.insert(prefix + QStringLiteral("lastSeen"),
                       QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
 
@@ -974,10 +981,8 @@ std::optional<SavedRadio> AppSettings::savedRadio(const QString& macKey) const
                                                QStringLiteral("0")).toInt();
 
     // Saved-only flags
-    sr.pinToMac    = (m_settings.value(prefix + QStringLiteral("pinToMac"),
-                                       QStringLiteral("False")) == QStringLiteral("True"));
-    sr.autoConnect = (m_settings.value(prefix + QStringLiteral("autoConnect"),
-                                       QStringLiteral("False")) == QStringLiteral("True"));
+    sr.pinToMac = (m_settings.value(prefix + QStringLiteral("pinToMac"),
+                                    QStringLiteral("False")) == QStringLiteral("True"));
 
     const QString lastSeenStr = m_settings.value(prefix + QStringLiteral("lastSeen"));
     if (!lastSeenStr.isEmpty()) {
@@ -1121,7 +1126,7 @@ void AppSettings::migrateRadioKey(const QString& oldKey, const QString& newKey)
 
     // Re-persist under the real-MAC key.  saveRadio() overwrites lastSeen with
     // QDateTime::currentDateTimeUtc() — acceptable for a first-probe migration.
-    saveRadio(saved->info, saved->pinToMac, saved->autoConnect);
+    saveRadio(saved->info, saved->pinToMac);
 }
 
 // ---------------------------------------------------------------------------

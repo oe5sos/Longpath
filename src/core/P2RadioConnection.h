@@ -511,6 +511,33 @@ private:
     class TxMicSource* m_txMicSource{nullptr};
     QDateTime m_lastMicAt;
 
+    // Mid-session link-loss detection. Mirrors P1RadioConnection's
+    // m_lastEp6At / onWatchdogTick silence check (P1RadioConnection.h:480,
+    // P1RadioConnection.cpp:2744-2802) — NereusSDR design doc §3.6. Like
+    // the P1 mechanism, this is a Longpath-original robustness addition,
+    // not a Thetis port: Thetis's own network.c watchdog (prn->wdt) is
+    // disabled by default and, even when enabled, only zero-fills audio
+    // on read timeout (network.c:655-666) — it never drives a console-side
+    // connection-state transition. Before this field existed, P2 had no
+    // equivalent of P1's silence check at all: onKeepAliveTick() only
+    // ever *sent* CmdGeneral and handled TX-mic LOS, so a radio that went
+    // silent after a successful connect left the UI frozen on "Connected"
+    // forever (2026-08-28, reported by operator). Updated on every inbound
+    // frame that proves liveness (processIqPacket, processHighPriorityStatus);
+    // checked in onKeepAliveTick() against kLinkLostSilenceMs.
+    //
+    // qint64 epoch-ms, not QDateTime (Review-Fund 2026-08-28): this is
+    // stamped on every inbound I/Q or status datagram -- hundreds of
+    // times per second per active DDC, two to three orders of magnitude
+    // more often than the 500 ms tick that reads it. QDateTime::
+    // currentDateTimeUtc() heap-allocates its shared private data on
+    // every call; QDateTime::currentMSecsSinceEpoch() (already used a
+    // few lines below in processIqPacket() for the window-report logic)
+    // does not. 0 means "no frame seen yet" -- Connecting always sets
+    // this before Connected can be reached, so a real timestamp is never
+    // legitimately 0.
+    qint64 m_lastFrameAtMs{0};
+
     // --- Mic-stream sequence audit (network investigation 2026-08-11) ---
     //
     // The TX-monitor bench measured 3-15% of mic BLOCKS missing from
@@ -550,10 +577,24 @@ private:
     Longpath::MicReorderBuffer m_micReorder;
     static constexpr int kMicLosTimeoutMs = 3000;  // network.c:656 [v2.10.3.13]
 
+    // Silence budget for m_lastFrameAtMs before we call the link lost.
+    // 2000 ms matches P1's m_watchdogSilenceMs default (P1RadioConnection.h,
+    // kWatchdogSilenceMs) — same reasoning applies to both protocols: this
+    // is Longpath-original, not a Thetis value.
+    static constexpr int kLinkLostSilenceMs = 2000;
+
     // --- Run state (from Thetis _radionet, network.h:65-66) ---
     bool m_running{false};           // prn->run
     int m_wdt{0};                    // prn->wdt (watchdog timer, 0=disabled)
     bool m_intentionalDisconnect{false};
+    // Separate from m_intentionalDisconnect on purpose: that flag also
+    // covers the connect-watchdog teardown (onConnectTimeout), which sets
+    // it to drop stray in-flight datagrams safely — but a watchdog
+    // timeout is exactly the case that SHOULD auto-reconnect (transient
+    // WLAN loss), unlike disconnect() (the operator's own choice). Only
+    // disconnect() sets this one; onReconnectTimeout() checks it instead
+    // of m_intentionalDisconnect.
+    bool m_userInitiatedDisconnect{false};
 
     // --- MOX (transmit) state (3M-1a E.7) ---
     // Separate from m_tx[0].pttOut.  pttOut is the rear-panel PTT-out relay
