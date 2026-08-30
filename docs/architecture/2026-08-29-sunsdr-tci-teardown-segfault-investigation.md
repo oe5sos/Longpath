@@ -13,11 +13,17 @@
 `tst_sunsdr_spectrum_wiring` crashed with SIGSEGV during a full,
 10-way-parallel `ctest` run (2026-08-29, ~06:16 CEST), inside
 `ddsUndIqRahmenSetzenDieWahreMittenfrequenzAmPanadapter()`, right after
-`mw->close()`. It has **not** reproduced since — not standalone (3/3
-clean runs), not under a targeted parallel subset alongside other
-GPU/spectrum-heavy tests (30 tests, `-j 10`, 100% pass), and not in the
-full 815-test suite re-run immediately after (100% pass). The one
-concrete artifact is a real macOS crash report macOS itself saved:
+`mw->close()`. It has **not** reproduced since, across roughly 20
+attempts under several conditions (2026-08-29/30): 3 standalone runs,
+a targeted 30-test parallel subset alongside other GPU/spectrum-heavy
+tests (`-j 10`, 100% pass), two full 815-test suite runs (once serial,
+once matching the original's `-j 10` parallelism — both 100% pass), a
+full 294-test `gui`-labelled parallel run (100% pass, run concurrently
+with the lldb loop below), and 14 further standalone runs under `lldb`
+(`-o run -o bt all -o quit` in a loop; the one non-clean iteration was
+`lldb`'s own attach mechanism failing to pause the process, not the
+target crashing — a tooling hiccup, not a repro). The one concrete
+artifact is still the real macOS crash report macOS itself saved:
 
 ```
 ~/Library/Logs/DiagnosticReports/tst_sunsdr_spectrum_wiring-2026-08-29-061622.ips
@@ -107,15 +113,35 @@ being a valid-looking but wrong pointer — and neither has been pinned
 down. Two directions worth trying with real tooling this investigation
 didn't have access to:
 
-1. **Reproduce under a debugger, not by re-running.** Three clean
-   standalone runs and one clean 30-test parallel run all failed to
-   reproduce it — this looks like it needs either the exact same system
-   load as the original 815-test/`-j 10` run, or genuine bad luck. A
-   `lldb -o run -o bt -- ./build/tests/tst_sunsdr_spectrum_wiring`
-   wrapped in a loop, or running under a real 815-test parallel load
-   with a debugger attached to just this test's PID, would catch it
-   live instead of relying on the `.ips` file's one snapshot.
-2. **Check for a leak/multiplication effect across the file's five
+1. ~~**Reproduce under a debugger, not by re-running.**~~ **Tried,
+   2026-08-30 — did not reproduce.** 14 standalone runs under
+   `lldb -o run -o bt all -o quit` in a loop, plus a full 294-test
+   `gui`-labelled parallel run alongside them, plus two full 815-test
+   suite runs (one serial, one at the original's own `-j 10`
+   parallelism) — all clean. This crash genuinely does not reproduce
+   on demand, even under load conditions that should match the
+   original. Ruled out as "just re-run it under a debugger and wait" —
+   whatever triggers this needs either far more attempts than were
+   tried here, or a fundamentally different detection method (below).
+2. **AddressSanitizer — set up 2026-08-30, not yet run against this
+   crash.** `CMakeLists.txt`'s existing `if(CMAKE_BUILD_TYPE STREQUAL
+   "Debug")` block already compiles `LongpathObjs` with
+   `-fsanitize=address`, but test executables never got the matching
+   *link* option (`tests/CMakeLists.txt`), so a Debug test build would
+   have failed to link at all — the sanitizer support existed but was
+   never actually usable for tests. Fixed (mirrors the same Debug-only
+   gate on `nereus_add_test()`'s executables). A fresh `build-asan/`
+   configured `-DCMAKE_BUILD_TYPE=Debug`; building
+   `tst_sunsdr_spectrum_wiring` there and running it — even just once,
+   even if it doesn't crash outright — has a real chance of catching
+   heap corruption or a use-after-free at the exact moment it happens,
+   not just when something later touches the corrupted memory (which
+   is what makes this bug so hard to catch by re-running: the write
+   that corrupts things and the read that crashes on them may be far
+   apart in time, exactly the case ASAN exists for). Whoever picks
+   this up next: check `build-asan/` for a compiled ASAN build before
+   reconfiguring from scratch.
+3. **Check for a leak/multiplication effect across the file's five
    test functions.** As noted below, none of them delete their
    `MainWindow`. If that's intentional (QTest tears the process down
    after the last test regardless), fine — but if `wireSunSdr()`'s

@@ -165,6 +165,22 @@ function(nereus_add_test name)
     target_link_libraries(${name} PRIVATE LongpathObjs Qt6::Test)
     set_property(GLOBAL APPEND PROPERTY NEREUS_ALL_TESTS ${name})
 
+    # CMakeLists.txt's top-level `if(CMAKE_BUILD_TYPE STREQUAL "Debug")`
+    # block already compiles LongpathObjs with -fsanitize=address (its
+    # PUBLIC compile option, so every test executable linking against it
+    # inherits the instrumentation) but only adds the matching LINK
+    # option to the `Longpath` app target, not to test executables —
+    # found 2026-08-30 while investigating a real, non-reproducing
+    # SIGSEGV (docs/architecture/2026-08-29-sunsdr-tci-teardown-segfault-investigation.md):
+    # a Debug-configured test build would have ASAN-instrumented object
+    # code but no ASAN runtime linked in, which fails at link time
+    # (undefined __asan_* symbols), not silently — but that means the
+    # existing sanitizer support was never actually usable for tests at
+    # all, only for the app binary. Mirrors the same Debug-only gate.
+    if(NOT MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_options(${name} PRIVATE -fsanitize=address)
+    endif()
+
     # Reuse the LongpathObjs precompiled header (CMakeLists.txt §PCH).
     # 451 test executables × per-target PCH compile would burn the wins;
     # REUSE_FROM means the PCH is built once on LongpathObjs and shared
