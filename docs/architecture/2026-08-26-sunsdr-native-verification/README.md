@@ -143,7 +143,8 @@ no-op block), every one of these should work exactly like any other
 board's client-side WDSP processing: audio changes accordingly, no
 wire traffic needed, no round-trip lag waiting on the radio.
 
-**Status:** [ ] Untested
+**Status:** [x] Passed 2026-08-30 by OE5SOS — mode switches (LSB/USB/CW)
+and filter/NR changes confirmed working live, no lag or dropouts.
 
 ---
 
