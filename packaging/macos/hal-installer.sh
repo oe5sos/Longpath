@@ -168,8 +168,14 @@ if [ -n "${APPLE_INSTALLER_ID:-}" ]; then
 else
     echo "--- APPLE_INSTALLER_ID not set; producing unsigned .pkg ---"
 fi
-PRODUCTBUILD_ARGS+=("${BUILD_DIR}/NereusSDR-${VERSION}-${PKG_SUFFIX}.pkg")
+# Longpath-*.pkg, not NereusSDR-*.pkg: release.yml's "Upload .pkg artifact"
+# step globs build/Longpath-*.pkg (matching every other release artifact --
+# Longpath-*.dmg, Longpath-*.AppImage, Longpath-*-setup.exe). A NereusSDR-*
+# name here means the glob matches nothing, upload-artifact silently
+# uploads zero files (default if-no-files-found: warn, not error) and the
+# step still reports success -- the .pkg quietly vanishes from the release.
+PRODUCTBUILD_ARGS+=("${BUILD_DIR}/Longpath-${VERSION}-${PKG_SUFFIX}.pkg")
 productbuild "${PRODUCTBUILD_ARGS[@]}"
 
 echo ""
-echo "=== Installer created: ${BUILD_DIR}/NereusSDR-${VERSION}-${PKG_SUFFIX}.pkg ==="
+echo "=== Installer created: ${BUILD_DIR}/Longpath-${VERSION}-${PKG_SUFFIX}.pkg ==="
