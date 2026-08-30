@@ -450,6 +450,7 @@ warren@wpratt.com
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QLineEdit>
 #include <QStandardPaths>
@@ -1793,6 +1794,45 @@ void MainWindow::wireProfileRail()
         if (!m_layoutProfiles) { return; }
         m_layoutProfiles->captureIntoCurrent();
         m_layoutProfiles->save();
+    });
+
+    // Betreiber 2026-08-30: "Das Layout Profil ... sollten auf dem
+    // Desktop zur Sicherheit abspeicherbar zu sein" -- eine Kopie neben
+    // AppSettings' XML, unabhaengig lesbar und fuer ein Backup geeignet.
+    // Beim aktiven Profil erst captureIntoCurrent(), sonst wuerde eine
+    // gerade eben umgebaute, aber noch nicht per "Jetzt sichern" oder
+    // Umschalten gesicherte Ansicht als der VORHERIGE Stand exportiert --
+    // bei einem anderen Profil ist dessen zuletzt gesicherter Zustand
+    // schon das Richtige, da nie aktiv seit dem letzten Umbau.
+    connect(m_profileRail, &ProfileRail::exportRequested, this,
+            [this](const QString& name) {
+        if (!m_layoutProfiles) { return; }
+        if (m_layoutProfiles->current() == name) {
+            m_layoutProfiles->captureIntoCurrent();
+        }
+        const QByteArray json = m_layoutProfiles->exportToJson(name);
+        if (json.isEmpty()) { return; }
+
+        const QString suggested =
+            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
+            + QStringLiteral("/Longpath-Layout-%1-%2.json")
+                .arg(name,
+                     QDateTime::currentDateTime()
+                         .toString(QStringLiteral("yyyy-MM-dd_HHmm")));
+        const QString path = QFileDialog::getSaveFileName(
+            this, QStringLiteral("Layout-Profil auf Schreibtisch sichern"),
+            suggested, QStringLiteral("JSON (*.json)"));
+        if (path.isEmpty()) { return; }
+
+        QFile f(path);
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            QMessageBox::warning(
+                this, QStringLiteral("Profil"),
+                QStringLiteral("„%1“ konnte nicht geschrieben werden.")
+                    .arg(path));
+            return;
+        }
+        f.write(json);
     });
 
     connect(m_profileRail, &ProfileRail::renameRequested, this,
@@ -6053,6 +6093,27 @@ void MainWindow::populateDefaultMeter()
     });
     panel->addApplet(m_bwFilterApplet);
 
+    // Betreiber 2026-08-30: der Bandwidth Filter zeigt die Filterkanten
+    // (ein Einstellungswert), keine Live-Messung wie S-Meter/Stehwelle/SWR
+    // -- er bleibt auch ohne Verbindung sinnvoll und darf nicht in
+    // derselben Vorverbindungs-Versteckung landen wie die Meter (siehe der
+    // isFloating()/isOverlayDocked()-Block weiter oben). Der Block laeuft
+    // aber VOR dieser Zeile, als m_bwFilterApplet noch null war -- ein
+    // direkter Ausschluss dort war deshalb unmoeglich. Stattdessen hier,
+    // sobald das Applet existiert: falls sein eigener (OverlayDocked-)
+    // Container gerade eben mit in die Liste geraten und versteckt wurde,
+    // sofort wieder herausnehmen und zeigen, statt auf die erste Verbindung
+    // zu warten.
+    if (!m_floatingContainersHiddenPreConnect.isEmpty()) {
+        for (ContainerWidget* c : m_containerManager->allContainers()) {
+            if (c && c->content() == m_bwFilterApplet
+                && m_floatingContainersHiddenPreConnect.removeOne(c)) {
+                c->show();
+                break;
+            }
+        }
+    }
+
     // Phase 3M-4 Task 13 — PureSignalApplet quick-access surface.
     //
     // Constructed unconditionally and added to the right panel, but
@@ -8434,6 +8495,17 @@ void MainWindow::buildMenuBar()
 
             connect(act, &QAction::toggled, this, [this, id](bool checked) {
                 if (m_appletVis) { m_appletVis->setVisible(id, checked); }
+                // Betreiber 2026-08-30, ueber einen Regressionstest
+                // gefunden: dieser Weg fehlte im Gegensatz zum
+                // Ausblenden-Kreuz (appletHideRequested oben) das
+                // sofortige captureIntoCurrent()+save() -- ein Haken hier
+                // ueberlebte bislang nur, wenn die App normal ueber
+                // closeEvent() beendet wurde, sonst ging er beim
+                // naechsten Start wieder verloren, lautlos.
+                if (m_layoutProfiles) {
+                    m_layoutProfiles->captureIntoCurrent();
+                    m_layoutProfiles->save();
+                }
             });
             m_topMenuAppletActions.insert(id, act);
         }
@@ -13895,10 +13967,37 @@ void MainWindow::closeEvent(QCloseEvent* event)
     //
     // Dialoge sind oben schon geschlossen; was hier ankommt, sind
     // Werkzeugfenster.
+    //
+    // ── Popups sind KEINE Werkzeugfenster (Absturz 2026-08-30) ───────
+    //
+    // Absturzbericht 2026-08-30 13:58: SIGABRT, "pointer being freed
+    // was not allocated". Der Bediener hatte per Rechtsklick auf ein
+    // ProfileRail-Abzeichen ein Kontextmenue offen (showMenuFor() in
+    // widgets/ProfileRail.cpp — ein STAPEL-lokales `QMenu menu(this)`,
+    // gerade mitten in seinem eigenen menu.exec()) und schloss dabei
+    // das Fenster. Der Klick auf die Ampel lief ueber genau die
+    // verschachtelte Cocoa-Eventschleife, die menu.exec() fuer sich
+    // selbst aufgemacht hatte — deshalb feuerte dieses closeEvent()
+    // REENTRANT, mit dem exec()-Aufruf noch auf dem Stapel darunter.
+    //
+    // Ein QMenu ist trotz `parent = this` ein echtes Top-Level-Fenster
+    // (Qt::Popup) und stand damit in QApplication::topLevelWidgets().
+    // Die Schleife unten hat es also miteingesammelt: hide() +eigenes
+    // deleteLater(), sofort im naechsten Sendpostedevents-Aufruf
+    // zugestellt — "delete this" auf ein QMenu, dessen "this" eine
+    // Stapeladresse ist, nie ein malloc()-Zeiger. Daher exakt dieses
+    // Fehlerbild.
+    //
+    // Popups (Kontextmenues, DspParamPopup, SpectrumOverlayMenu, ...)
+    // sind fluechtig und raeumen sich ueber ihre eigene exec()/hide()
+    // selbst ab — sie gehoeren nicht zu den "Werkzeugfenstern", die
+    // diese Schleife eigentlich sucht, und duerfen hier nicht
+    // angefasst werden, gleich ob sie gerade laufen oder nicht.
     for (QWidget* w : QApplication::topLevelWidgets()) {
         if (w == this) { continue; }
         if (!w->isWindow()) { continue; }
         if (qobject_cast<QDialog*>(w)) { continue; }   // oben erledigt
+        if (w->windowType() == Qt::Popup) { continue; }
         w->hide();
         w->deleteLater();
     }

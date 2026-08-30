@@ -92,6 +92,12 @@ signals:
     /// wissen will, dass es sitzt, statt der Beenden-Sequenz zu
     /// vertrauen, kann hier von Hand nachhelfen.
     void saveRequested(const QString& name);
+    /// Betreiber 2026-08-30: "sollten auf dem Desktop zur Sicherheit
+    /// abspeicherbar sein" -- eine Sicherung neben AppSettings' XML, die
+    /// man sehen, verschieben und einem Backup beilegen kann. Die Schiene
+    /// kennt wie bei saveRequested() keinen Dateidialog; das erledigt der
+    /// Empfaenger.
+    void exportRequested(const QString& name);
 
 private:
     void showMenuFor(const QString& name, const QPoint& globalPos);

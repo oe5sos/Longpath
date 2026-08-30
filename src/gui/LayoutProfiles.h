@@ -154,6 +154,12 @@ public:
 
     QVariantMap snapshot(const QString& name) const;
 
+    /// Ein einzelnes Profil (Name, Zustand, Band-/Modus-Bindung) als
+    /// eigenstaendiges JSON -- dieselbe Feldform wie ein Eintrag in
+    /// save()s Array, nur einzeln herausgeloest, fuer eine manuelle
+    /// Sicherung auf den Schreibtisch. Leeres Array bei unbekanntem Namen.
+    QByteArray exportToJson(const QString& name) const;
+
     // ── Bindung ──────────────────────────────────────────────────────
 
     void bindBand(const QString& name, Band b, bool on);

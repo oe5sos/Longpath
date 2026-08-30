@@ -214,6 +214,27 @@ QVariantMap LayoutProfiles::snapshot(const QString& name) const
     return p ? p->state : QVariantMap{};
 }
 
+QByteArray LayoutProfiles::exportToJson(const QString& name) const
+{
+    const Profile* p = find(name);
+    if (!p) { return {}; }
+
+    // Dieselben vier Felder wie ein Array-Eintrag in save() -- absichtlich
+    // dieselbe Form, damit eine spaetere Wiedereinspielung (createWith()
+    // mit dem "state"-Feld) ohne eigenes zweites Format auskommt.
+    QJsonObject o;
+    o.insert(QStringLiteral("name"), p->name);
+    o.insert(QStringLiteral("state"), QJsonObject::fromVariantMap(p->state));
+    QJsonArray bands;
+    for (int v : p->bands) { bands.append(v); }
+    QJsonArray modes;
+    for (int v : p->modes) { modes.append(v); }
+    o.insert(QStringLiteral("bands"), bands);
+    o.insert(QStringLiteral("modes"), modes);
+
+    return QJsonDocument(o).toJson(QJsonDocument::Indented);
+}
+
 // ── Bindung ──────────────────────────────────────────────────────────
 
 void LayoutProfiles::bindBand(const QString& name, Band b, bool on)

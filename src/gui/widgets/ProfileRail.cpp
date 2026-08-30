@@ -207,6 +207,7 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     // dort erscheinen, sonst waere "Jetzt sichern" auf einem anderen
     // Abzeichen ein Versprechen, das der Aufruf gar nicht einloest.
     save->setEnabled(m_profiles && m_profiles->current() == name);
+    QAction* exportToDesktop = menu.addAction(QStringLiteral("Auf Schreibtisch sichern…"));
     menu.addSeparator();
     QAction* ren = menu.addAction(QStringLiteral("Umbenennen…"));
     QAction* dup = menu.addAction(QStringLiteral("Duplizieren…"));
@@ -218,6 +219,7 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
 
     QAction* chosen = menu.exec(globalPos);
     if (chosen == save)      { emit saveRequested(name); }
+    else if (chosen == exportToDesktop) { emit exportRequested(name); }
     else if (chosen == ren)  { emit renameRequested(name); }
     else if (chosen == dup)  { emit duplicateRequested(name); }
     else if (chosen == del)  { emit removeRequested(name); }

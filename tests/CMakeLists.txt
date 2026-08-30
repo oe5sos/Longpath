@@ -5044,6 +5044,24 @@ nereus_add_test(tst_widget_picker)
 #    herrenlos, die Bindung raet --
 nereus_add_test(tst_layout_profiles)
 
+# -- Der Rundgang durch ein ECHTES MainWindow, nicht durch ein blosses
+#    QVariantMap an Haken (das deckt tst_layout_profiles.cpp bereits ab,
+#    und genau DAS haette den Bandwidth-Filter-Fehler vom 2026-08-30
+#    nicht gefunden -- der Fehler sass nicht in LayoutProfiles selbst,
+#    sondern darin, OB und WANN MainWindow captureIntoCurrent()+save()
+#    ueberhaupt aufruft). Drei Pruefungen: (1) jedes Applet, das die
+#    Spalte beim Start zeigt, ueberlebt Abloesen+Geometrie+Neustart --
+#    die Liste wird zur Testzeit aus dem echten Fenster gelesen, nicht
+#    von Hand gepflegt; (2) der Betriebsfall, der den Fehler ausgeloest
+#    haben koennte: Wiedereinschalten ueber das Containers-Menue bei
+#    aktiver "freier Flaeche" trifft einen Zweig in
+#    applyAppletVisibility() (MainWindow.cpp ~1628-1635), der -- anders
+#    als jeder Geschwisterpfad -- KEIN unmittelbares
+#    captureIntoCurrent()+save() nach dem Abloesen ruft; (3) die fuenf
+#    eigenen Fenster und die zwei Chrome-Eintraege ueberstehen densel-
+#    ben Rundgang in der Sichtbarkeits-Karte --
+nereus_add_test(tst_real_layout_profile_roundtrip)
+
 # -- Widgets im rechten Stapel verschieben. Geprueft wird die eine
 #    Eigenschaft, an der so etwas scheitert: dass die sichtbare Reihen-
 #    folge und die gespeicherte Liste dasselbe sagen. Dazu der Zug, der
