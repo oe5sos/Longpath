@@ -590,6 +590,19 @@ void MainWindow::wireSunSdr()
     // aufgebaut zu werden (siehe removeSunSdrAudioSource).
     connect(m_sunSdrClient, &TciClient::stateChanged, this,
             [this](TciClient::State state, const QString& detail) {
+        // m_shuttingDown guard, same pattern closeEvent() already uses
+        // elsewhere in this class (e.g. the auto-open-ConnectionPanel
+        // slot) — found missing here via a real, ASAN-confirmed
+        // heap-use-after-free, 2026-08-30 (see
+        // docs/architecture/2026-08-29-sunsdr-tci-teardown-segfault-investigation.md).
+        // QObject destroys a parent's children in insertion order, not
+        // a safe one: when MainWindow itself is torn down,
+        // m_radioModel can already be destroyed (freed, not merely
+        // nulled — the `if (m_radioModel ...)` check below does NOT
+        // catch this) by the time m_sunSdrClient's own destructor runs
+        // disconnectFromEndpoint() -> setState() -> this signal,
+        // synchronously, still inside the same teardown cascade.
+        if (m_shuttingDown) { return; }
         if (state == TciClient::State::Error) {
             qCWarning(lcTci) << "SunSDR:" << detail;
             // Derselbe Grund wie bei der Erfolgsmeldung oben: sonst gibt
