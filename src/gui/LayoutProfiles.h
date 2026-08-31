@@ -160,6 +160,30 @@ public:
     /// Sicherung auf den Schreibtisch. Leeres Array bei unbekanntem Namen.
     QByteArray exportToJson(const QString& name) const;
 
+    /// Das Gegenstueck: ein von exportToJson() geschriebenes JSON in ein
+    /// BESTEHENDES Profil einspielen -- ersetzt dessen Zustand samt
+    /// Band-/Modus-Bindung. Der eingebettete Name aus der Datei wird
+    /// dabei ignoriert; welches Profil ueberschrieben wird, entscheidet
+    /// targetProfile (bei Longpath: der Rechtsklick-Ort, nicht die
+    /// Datei).
+    ///
+    /// Betreiber, 2026-08-30: „wenn ich importiere will ich es nicht
+    /// als neues profil importiren" -- ein frueherer Anlauf legte
+    /// stattdessen immer ein neues Profil an ("Buero (2)"), aus Sorge
+    /// vor stillem Datenverlust. Das war die falsche Sorge: ein Import
+    /// IST ein Wiederherstellen, und ein Wiederherstellen, das nichts
+    /// ersetzt, stellt nichts wieder her. Die Absicherung gegen
+    /// versehentliches Ueberschreiben gehoert an die Aufrufstelle (ein
+    /// Rueckfragedialog), nicht in diese Klasse.
+    ///
+    /// Ist targetProfile das gerade AKTIVE Profil, wird der neue
+    /// Zustand sofort angewendet (m_apply) -- sonst erst beim naechsten
+    /// Umschalten dorthin sichtbar. false bei kaputtem/unlesbarem JSON
+    /// oder unbekanntem targetProfile; outError traegt dann eine fuer
+    /// den Betreiber lesbare Begruendung.
+    bool importFromJson(const QString& targetProfile, const QByteArray& json,
+                        QString* outError = nullptr);
+
     // ── Bindung ──────────────────────────────────────────────────────
 
     void bindBand(const QString& name, Band b, bool on);

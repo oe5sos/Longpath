@@ -16,6 +16,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QSpacerItem>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -39,6 +40,30 @@ constexpr int kDimFromIndex = 6;
 
 /// Hoehe der Mulde beim Bandstreifen (Entwurf: H = 14 auf 520 Breite).
 constexpr double kStripHeight = 14.0;
+
+/// Reservierte Hoehe fuer den Streifen im Konstruktor-Layout (root-
+/// >addSpacing) UND fuer die Flaeche, in die paintEvent() ihn malt.
+/// EIN Wert fuer beide Stellen, statt zwei getrennt gepflegter Zahlen:
+/// bis 2026-08-30 berechnete paintEvent() seine Flaeche aus der
+/// GEOMETRIE der (oft ausgeblendeten) A/B-Zeile -- fehleranfaellig,
+/// weil ein verstecktes Widget in einem QBoxLayout nicht zuverlaessig
+/// dieselbe Position traegt, mit der der Konstruktor gerechnet hat.
+/// Jetzt rechnen beide Stellen mit derselben Zahl.
+constexpr int kStripReserve = int(kStripHeight) + 10;
+
+/// Wie viel Hoehe root() fuer eine gegebene Form reserviert -- die
+/// EINZIGE Stelle, die das entscheidet. m_stripSpacer traegt das ins
+/// echte Layout, sizeHint() liest es indirekt ueber layout()->sizeHint()
+/// mit (siehe dort).
+int stripReserveFor(FrequencyInstrument::Form f)
+{
+    switch (f) {
+        case FrequencyInstrument::Form::NumberOnly: return 0;
+        case FrequencyInstrument::Form::FlatArc:    return kStripReserve + 16;
+        case FrequencyInstrument::Form::BandStrip:
+        default:                                     return kStripReserve;
+    }
+}
 
 // ── Zwei Abstaende, nicht einer ──────────────────────────────────────
 //
@@ -80,6 +105,31 @@ constexpr double kGroupGapOfCell = 0.35;
 FrequencyInstrument::FrequencyInstrument(QWidget* parent)
     : QWidget(parent)
 {
+    // ── Nie mehr Hoehe nehmen, als sizeHint() sagt ────────────────────
+    //
+    // Betreiber 2026-08-30, zum wiederholten Mal: der Abstand zwischen
+    // den Ziffern und dem, was darunter haengt (SWR-/Leistungszeilen im
+    // FrequencyApplet), soll klein bleiben UND sich der Groesse
+    // anpassen. Die vorige Reparatur (Stretch ans Ende dieses Layouts)
+    // half nur INNERHALB dieses Widgets — sie sagte nichts darueber,
+    // WIE VIEL Hoehe das AEUSSERE Layout (FrequencyApplet) diesem
+    // Widget ueberhaupt zuteilt.
+    //
+    // Ohne eine eigene Policy ist ein QWidget vertikal "Preferred":
+    // wird das Schwebefenster hoeher gezogen, als die Summe aller
+    // Kinder braucht, verteilt Qt den Rest nach eigenem Ermessen — und
+    // gab ihn bisher bevorzugt HIER hinein, weil dieses Widget durch
+    // seinen eigenen Stretch elastisch wirkt. Sichtbar wurde das genau
+    // als Luecke zwischen Ziffern und Balken, die mit jedem Ziehen
+    // wuchs.
+    //
+    // QSizePolicy::Maximum sagt: sizeHint() ist die OBERGRENZE, kleiner
+    // darf es werden (bis minimumSizeHint()), groesser nie. Wer das
+    // Fenster jetzt hoeher zieht, bekommt die zusaetzliche Hoehe bei
+    // den Balken darunter oder als Rand am Fensterende — nie mehr
+    // hier eingeklemmt.
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(14, 10, 14, 10);
     root->setSpacing(4);
@@ -93,7 +143,6 @@ FrequencyInstrument::FrequencyInstrument(QWidget* parent)
     m_digitLayout->setContentsMargins(0, 0, 0, 0);
     m_digitLayout->setSpacing(0);
     buildDigits();
-    m_digitLayout->addStretch(1);
 
     m_edit = new QLineEdit(m_stack);
     m_edit->setPlaceholderText(QStringLiteral("MHz"));
@@ -109,33 +158,118 @@ FrequencyInstrument::FrequencyInstrument(QWidget* parent)
     m_stack->addWidget(m_edit);
     root->addWidget(m_stack, 0);
 
-    root->addStretch(1);   // hier malt paintEvent Streifen oder Bogen
+    // Hier malt paintEvent Streifen oder Bogen -- WENN die Form ueberhaupt
+    // einen braucht. Betreiber 2026-08-30, zu NumberOnly (seit heute die
+    // Vorgabe): "ziffern sind abgeschnitten". Ursache: die Reservierung
+    // stand hier bis eben als FESTES root->addSpacing(kStripReserve),
+    // unabhaengig von m_form -- sizeHint() zog fuer NumberOnly zwar
+    // kStripReserve wieder ab (formDelta), aber das eigene Layout
+    // (root) reservierte den Platz bei der eigentlichen Auslegung
+    // trotzdem weiter fest. Root bekam dadurch WENIGER Hoehe von aussen
+    // zugeteilt, als es fuer Ziffernzeile + fixe Reservierung selbst
+    // brauchte -- und ein addSpacing()-Posten kann, anders als ein
+    // Stretch, nicht nachgeben. Die Ziffernzeile wich aus, oben
+    // abgeschnitten.
+    //
+    // Der Ausweg: ein ECHTER QSpacerItem*, dessen Groesse setForm()
+    // mitzieht -- root reserviert dann fuer JEDE Form immer genau so
+    // viel, wie sizeHint() dafuer meldet. Keine zwei Zahlen mehr, die
+    // auseinanderlaufen koennen.
+    m_stripSpacer = new QSpacerItem(0, stripReserveFor(m_form));
+    root->addItem(m_stripSpacer);
 
     m_vfoRow = new QLabel(this);
     m_vfoRow->setTextFormat(Qt::RichText);
     m_vfoRow->setFont(Style::monoFont(m_vfoRow->font(), Style::kFontBody));
     root->addWidget(m_vfoRow, 0);
 
+    // Ueberschuss (falls das Fenster hoeher gezogen wird) gehoert ans
+    // ENDE, nicht zwischen die Zeilen.
+    root->addStretch(1);
+
     refreshDigits();
     refreshVfoRow();
 }
 
+QSize FrequencyInstrument::minimumSizeHint() const
+{
+    // War {240, 74}, geraten statt gerechnet -- bei Style::kFontDisplay
+    // (38px) brauchte die Ziffernzeile tatsaechlich naeher an 300px,
+    // und das Fenster liess sich unter das, was die kleinste Stufe
+    // braucht, gar nicht erst ziehen. Jetzt aus derselben Rechnung wie
+    // resizeEvent()/buildDigits(), bei der kleinsten erlaubten Stufe:
+    // das ist die einzige Breite, unter die dieses Widget nie faellt.
+    const int w = digitRowWidthAt(kMinDigitFontPx) + 28;
+
+    // Betreiber 2026-08-30, wieder: "das ist das kleinste Fenster" --
+    // und trotzdem zu viel Abstand. Die 74 hier blieben stehen, auch
+    // wenn die A/B-Zeile ausgeblendet ist -- derselbe Fehler, den
+    // sizeHint() weiter unten fuer die BEVORZUGTE Groesse schon behebt
+    // ("A/B ausblenden" gab bislang nur bei sizeHint() Platz zurueck,
+    // nicht bei der UNTERGRENZE). Damit liess sich das Fenster nie so
+    // weit ziehen, wie das Ausblenden eigentlich erlaubt haette.
+    int h = 74;
+    if (m_vfoRow && !m_vfoRow->isVisible()) {
+        h = qMax(40, h - m_vfoRow->sizeHint().height() - 4);
+    }
+    return {qMax(240, w), h};
+}
+
 QSize FrequencyInstrument::sizeHint() const
 {
-    // Der Bogen braucht mehr Hoehe als der Streifen, und die blosse
-    // Zahl am wenigsten — der Entwurf sagt es genauso.
-    switch (m_form) {
-        case Form::FlatArc:    return {360, 132};
-        case Form::BandStrip:  return {360, 116};
-        case Form::NumberOnly: return {360,  86};
+    // Betreiber 2026-08-30, zum siebenten Mal: der Abstand zwischen
+    // Ziffern und dem, was darunter haengt, sei zu gross -- auch nach
+    // drei vorigen Anlaeufen an dieser Stelle (Stretch ans Ende der
+    // Anordnung, Reservierung fuer den Streifen verkleinert, Ziffern
+    // verkleinert). Jeder davon senkte den tatsaechlichen INHALT, aber
+    // hier stand weiterhin eine GERATENE Zahl (116/132/86 -- fest im
+    // Quelltext, unabhaengig davon, was root (das eigene Layout)
+    // wirklich braucht). Verlangte der echte Inhalt WENIGER, als die
+    // geratene Zahl versprach -- etwa weil die A/B-Zeile ausgeblendet
+    // ist oder die Ziffern jetzt kleiner sind -- schluckte root's
+    // eigener Stretch(1) am Ende genau diese Differenz als Leerraum,
+    // GENAU an der Stelle, an der FrequencyApplet gleich die SWR-/
+    // Leistungszeilen anschliesst. Jede vorige Reparatur hat den Inhalt
+    // kleiner gemacht, ohne dass die geratene Zahl hier mitgezogen
+    // waere -- der Rest wanderte einfach weiter in den Stretch.
+    //
+    // Der Ausweg: nicht mehr raten. layout()->sizeHint() fragt root
+    // selbst, was es braucht -- Ziffernzeile bei der AKTUELLEN
+    // Schriftgroesse (m_digitFontPx), die A/B-Zeile nur wenn sichtbar
+    // (ein verstecktes Widget zaehlt in einem QBoxLayout mit Null),
+    // alle Raender. Stimmt IMMER mit dem ueberein, was tatsaechlich
+    // gezeichnet wird, weil es dieselbe Rechnung ist -- kein zweiter
+    // Ort mehr, der veralten kann.
+    //
+    // m_stripSpacer traegt die Streifen-/Bogen-Reservierung direkt ins
+    // Layout ein (Groesse haengt von m_form ab, siehe setForm() und
+    // stripReserveFor()) -- root->sizeHint() zaehlt sie darum schon
+    // richtig mit, ohne dass es hier noch einen Aufschlag braucht.
+    if (QLayout* lay = layout()) {
+        const QSize fromLayout = lay->sizeHint();
+        return {qMax(360, fromLayout.width()), qMax(40, fromLayout.height())};
     }
-    return {360, 116};
+    return {360, 104};
 }
 
 // ── Die Ziffern ──────────────────────────────────────────────────────
 
 void FrequencyInstrument::buildDigits()
 {
+    // Zweiter Aufruf (aus resizeEvent(), neue Schriftstufe): die alte
+    // Zeile erst abraeumen. Ohne das wuerden Ziffern/Trenner/Einheit
+    // sich hinter den neuen anhaeufen -- Qt loescht Kindwidgets nicht
+    // von selbst, nur weil ein neues addWidget() kommt.
+    if (!m_digits.isEmpty()) {
+        QLayoutItem* item = nullptr;
+        while ((item = m_digitLayout->takeAt(0)) != nullptr) {
+            if (QWidget* w = item->widget()) { w->deleteLater(); }
+            delete item;
+        }
+        m_digits.clear();
+        m_decades.clear();
+    }
+
     // ── Gruppen zu drei, von RECHTS gezaehlt ─────────────────────────
     //
     // Hier stand {0, 3}, und das war um eine Stelle verschoben: die
@@ -156,7 +290,7 @@ void FrequencyInstrument::buildDigits()
     // Abstaende. In Monospace ist sie fuer jedes Zeichen gleich, also
     // genuegt eine Abfrage.
     const QFont digitFont = Style::monoFont(m_digitRow->font(),
-                                            Style::kFontDisplay,
+                                            m_digitFontPx,
                                             QFont::Light);
     const int cell = QFontMetrics(digitFont).horizontalAdvance(
         QStringLiteral("0"));
@@ -214,6 +348,54 @@ void FrequencyInstrument::buildDigits()
         "QLabel { color: %1; }").arg(Style::kTextSecondary)));
     m_digitLayout->addSpacing(10);
     m_digitLayout->addWidget(unit, 0, Qt::AlignBottom);
+    m_digitLayout->addStretch(1);
+}
+
+int FrequencyInstrument::digitRowWidthAt(int px)
+{
+    // Dieselbe Rechnung wie buildDigits(), aber ohne ein einziges
+    // Schild zu bauen -- fuer resizeEvent() (welche Stufe passt?) und
+    // minimumSizeHint() (was braucht die kleinste Stufe wirklich?).
+    // Zwei Stellen, an denen dieselbe Breite entsteht, waeren zwei
+    // Stellen, die auseinanderlaufen koennten; bleibt trotzdem als
+    // eigene Funktion, weil buildDigits() echte Schilder braucht und
+    // hier nur eine Zahl gefragt ist.
+    const QFont f = Style::monoFont(QFont(), px, QFont::Light);
+    const QFontMetrics fm(f);
+    const int cell = fm.horizontalAdvance(QStringLiteral("0"));
+    const int digitPad = qMax(1, qRound(cell * kDigitPadOfCell));
+    const int sepWidth = qMax(2, qRound(cell * kSeparatorOfCell));
+    const int groupGap = qMax(2, qRound(cell * kGroupGapOfCell));
+
+    int w = kDigitCount * (cell + digitPad);
+    w += 2 * (sepWidth + groupGap);   // zwei Trenner, nach Stelle 1 und 4
+
+    const QFont unitFont = Style::capsFont(QFont(), Style::kFontSmall);
+    w += 10 + QFontMetrics(unitFont).horizontalAdvance(QStringLiteral("MHz"));
+    return w;
+}
+
+int FrequencyInstrument::fittingDigitFontPx(int availableWidth)
+{
+    for (int px = kMaxDigitFontPx; px > kMinDigitFontPx; --px) {
+        if (digitRowWidthAt(px) <= availableWidth) { return px; }
+    }
+    return kMinDigitFontPx;
+}
+
+void FrequencyInstrument::resizeEvent(QResizeEvent* ev)
+{
+    QWidget::resizeEvent(ev);
+
+    // 28 = die seitlichen Raender aus dem VBoxLayout-Aufbau (14 je
+    // Seite, siehe der Konstruktor).
+    const int available = qMax(0, width() - 28);
+    const int wanted = fittingDigitFontPx(available);
+    if (wanted == m_digitFontPx) { return; }
+
+    m_digitFontPx = wanted;
+    buildDigits();
+    refreshDigits();
 }
 
 void FrequencyInstrument::refreshDigits()
@@ -447,10 +629,32 @@ void FrequencyInstrument::setActiveIsThis(bool active)
     refreshVfoRow();
 }
 
+void FrequencyInstrument::setVfoRowVisible(bool on)
+{
+    if (!m_vfoRow) { return; }
+    m_vfoRow->setVisible(on);
+    // sizeHint() liest m_vfoRow->isVisible() -- ohne updateGeometry()
+    // fragt das umgebende Layout (FrequencyApplet) nicht neu nach und
+    // der frei gewordene Platz bliebe als Luecke stehen.
+    updateGeometry();
+}
+
+bool FrequencyInstrument::vfoRowVisible() const
+{
+    return m_vfoRow && m_vfoRow->isVisible();
+}
+
 void FrequencyInstrument::setForm(Form f)
 {
     if (m_form == f) { return; }
     m_form = f;
+    // Das echte Layout muss mitziehen, nicht nur sizeHint()s Meldung
+    // darueber -- siehe die Begruendung am m_stripSpacer-Konstruktor-
+    // aufruf.
+    if (m_stripSpacer) {
+        m_stripSpacer->changeSize(0, stripReserveFor(m_form));
+        if (layout()) { layout()->invalidate(); }
+    }
     updateGeometry();
     update();
 }
@@ -472,9 +676,20 @@ void FrequencyInstrument::paintEvent(QPaintEvent*)
     const QColor col = Instrument::measured();
     const double f = bandFraction();
 
-    // Der Bereich unter der Zahl und ueber der VFO-Zeile.
-    const int top = m_stack ? m_stack->geometry().bottom() + 6 : 40;
-    const int bot = m_vfoRow ? m_vfoRow->geometry().top() - 6 : height() - 20;
+    // Der Bereich unter der Zahl. Betreiber 2026-08-30: die Luecke
+    // blieb ueber mehrere Anlaeufe hinweg gleich gross, obwohl jeder
+    // einzelne Wert hier nachweislich kleiner wurde -- der Verdacht
+    // fiel zurecht auf diese Stelle. Ursache: "bot" hing an
+    // m_vfoRow->geometry(), und ein VERSTECKTES Widget in einem
+    // QBoxLayout bekommt keine verlaesslich aktuelle Position
+    // zugewiesen (das Layout ueberspringt seine setGeometry()-Zuteilung
+    // fuer leere Eintraege) -- die Flaeche konnte dadurch auf einer
+    // veralteten, zu grossen Position sitzen, unabhaengig davon, ob
+    // "area.height() < 16.0" je ausloeste. Jetzt kommt "bot" direkt aus
+    // derselben Zahl (kStripReserve), die der Konstruktor reserviert --
+    // keine zweite Quelle mehr, die auseinanderlaufen kann.
+    const int top = m_stack ? m_stack->geometry().bottom() + 3 : 40;
+    const int bot = top + stripReserveFor(m_form) - 6;
     const QRectF area(14, top, qMax(0, width() - 28), qMax(0, bot - top));
 
     if (m_form == Form::NumberOnly) {

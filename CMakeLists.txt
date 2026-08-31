@@ -876,7 +876,6 @@ set(GUI_SOURCES
     src/gui/applets/KiwiSdrApplet.cpp
     src/gui/KiwiWaterfallStripWidget.cpp
     src/gui/KiwiWaterfallPanel.cpp
-    src/gui/applets/TxMeterApplet.cpp
     src/gui/applets/AsrApplet.cpp
     src/gui/widgets/VfoTileRow.cpp
     src/asr/AsrSegmenter.cpp
@@ -1136,6 +1135,17 @@ set(GUI_SOURCES
     src/gui/applets/ClientChainApplet.cpp
 )
 
+# MacFloatingWindowBehavior — Objective-C++ helper that sets
+# NSWindowCollectionBehaviorFullScreenAuxiliary on the schwebenden
+# Qt::Tool windows (AppletFloatingWindow, ToolWindow, FloatingContainer,
+# PanFloatingWindow) so they follow the main window into native macOS
+# fullscreen instead of being left behind on the previous Space.
+# Betreiber, repeatedly reported. See MacFloatingWindowBehavior.h.
+if(APPLE)
+    list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.mm)
+    list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.h)
+endif()
+
 # --------------------------------------------------------------------------
 # Resources
 # --------------------------------------------------------------------------
@@ -1326,6 +1336,13 @@ if(APPLE)
     # AVFoundation provides AVCaptureDevice for the launch-time mic-permission
     # prompt (src/core/MacMicPermission.mm, issue #203).
     target_link_libraries(LongpathObjs PUBLIC "-framework AVFoundation")
+
+    # AppKit provides NSWindow/NSView for the floating-window fullscreen
+    # fix (src/gui/MacFloatingWindowBehavior.mm) -- explicit here even
+    # though Qt's own Cocoa platform plugin links it transitively,
+    # matching this project's practice of declaring the frameworks a
+    # source file directly calls into (see the AVFoundation line above).
+    target_link_libraries(LongpathObjs PUBLIC "-framework AppKit")
 
     # CoreAudio framework for AudioObjectGetPropertyData +
     # kAudioDevicePropertyIOThreadOSWorkgroup used by
@@ -1733,6 +1750,8 @@ option(NEREUS_USE_PCH "Use precompiled headers to speed up builds" ON)
 # without disabling PCH for the whole target.
 if(APPLE)
     set_source_files_properties(src/core/MacMicPermission.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(NEREUS_USE_PCH)

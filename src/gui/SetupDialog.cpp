@@ -257,6 +257,14 @@ void SetupDialog::showEvent(QShowEvent* event)
 {
     QDialog::showEvent(event);
 
+    // Betreiber 2026-08-30: "komme hier nicht zum fenster setup" -- andere
+    // schwebende Fenster (S-Meter, TX, Bandwidth Filter, ...) lagen davor
+    // und blockierten den nicht-modalen Dialog. raise()+activateWindow()
+    // holt ihn bei jedem Oeffnen ueber alle Geschwister-Fenster, unabhaengig
+    // davon, an welcher der ~15 Aufrufstellen er entstanden ist.
+    raise();
+    activateWindow();
+
     // Only default to the first leaf if no page was pre-selected via selectPage()
     if (m_tree->currentItem() == nullptr) {
         QTreeWidgetItem* first = m_tree->topLevelItem(0);

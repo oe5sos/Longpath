@@ -57,6 +57,7 @@ mw0lge@grange-lane.co.uk
 #include "ContainerWidget.h"
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowPlacement.h"
 #include "gui/WindowChrome.h"
 
@@ -87,6 +88,10 @@ FloatingContainer::FloatingContainer(int rxSource, QWidget* parent)
     // Fenstern, und er ist nativ, damit ihn kein QRhiWidget im Inhalt
     // verdeckt (SpectrumWidget.cpp:551).
     attachResizeGrip(this);
+
+    // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
+    // derselbe Grund.
+    enableFullScreenAuxiliaryBehavior(this);
 
     qCDebug(lcContainer) << "FloatingContainer created for RX" << rxSource;
 }

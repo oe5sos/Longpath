@@ -218,9 +218,10 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
 
     setWindowTitle(QStringLiteral("Connect to Radio"));
     setMinimumSize(800, 460);
-    resize(900, 520);
+    resize(900, 520);   // Vorgabe, bevor restoreGeometryState() greift
 
     buildUI();
+    restoreGeometryState();
     const qint64 buildUiMs = ctorTimer.elapsed();
 
     // Wire discovery signals
@@ -308,6 +309,40 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
 ConnectionPanel::~ConnectionPanel()
 {
     // Don't stop discovery here — RadioModel owns it and it keeps running
+}
+
+void ConnectionPanel::closeEvent(QCloseEvent* event)
+{
+    saveGeometryState();
+    QDialog::closeEvent(event);
+}
+
+void ConnectionPanel::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+    raise();
+    activateWindow();
+}
+
+namespace {
+QString connectionPanelGeometryKey()
+{
+    return QStringLiteral("ConnectionPanelGeometryState");
+}
+} // namespace
+
+void ConnectionPanel::saveGeometryState()
+{
+    AppSettings::instance().setValue(connectionPanelGeometryKey(),
+                                     saveGeometry());
+}
+
+void ConnectionPanel::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+                              .value(connectionPanelGeometryKey())
+                              .toByteArray();
+    if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
 // ---------------------------------------------------------------------------

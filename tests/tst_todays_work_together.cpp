@@ -32,8 +32,8 @@
 #include "gui/MainWindow.h"
 #include "gui/PsaIndicatorWidget.h"
 #include "gui/SpectrumWidget.h"
+#include "gui/applets/FrequencyApplet.h"
 #include "gui/applets/KiwiSdrApplet.h"
-#include "gui/applets/TxMeterApplet.h"
 #include "gui/instruments/BarInstrument.h"
 #include "gui/meters/MeterPoller.h"
 #include "gui/widgets/VfoTileRow.h"
@@ -56,8 +56,8 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
 
         // ── 1. Die neuen Applets sind ueberhaupt da ─────────────────
-        QVERIFY2(mw->findChild<TxMeterApplet*>(),
-                 "Das SWR/Leistung-Widget fehlt");
+        QVERIFY2(mw->findChild<FrequencyApplet*>(),
+                 "Das Frequenzfenster fehlt");
         QVERIFY2(mw->findChild<KiwiSdrApplet*>(),
                  "Das KiwiSDR-Applet fehlt");
         QVERIFY2(mw->findChild<VfoTileRow*>(),
@@ -88,15 +88,31 @@ private slots:
         QVERIFY(audio->kiwiSdrAudioEnabled(sliceId));
         qInfo() << "Sendesperre greift";
 
-        // ── 4. Das SWR/Leistung-Widget schaltet um ──────────────────
-        auto* txm = mw->findChild<TxMeterApplet*>();
+        // ── 4. SWR/Leistung im Frequenzfenster ───────────────────────
+        //
+        // Bis 2026-08-30 lebte diese Pruefung im eigenen SWR/Leistung-
+        // Applet (TxMeterApplet). Der Betreiber wollte SWR/Leistung
+        // seither NUR noch als Zusatzzeile im Frequenzfenster, nicht
+        // mehr als eigenes Fenster ("nur zusaetzlich im Bereich des
+        // Frequenzfenster, nicht alle") -- TxMeterApplet ist entfernt.
+        // Was bleibt zu pruefen: die beiden Zeilen schalten sich ein
+        // und bleiben es, waehrend Abstimmen/Senden den Zustand
+        // wechseln.
+        auto* freq = mw->findChild<FrequencyApplet*>();
+        QVERIFY(freq);
+        freq->setShowPower(true);
+        freq->setShowSwr(true);
+        QVERIFY(freq->showsPower());
+        QVERIFY(freq->showsSwr());
         model->transmitModel().setTune(true);
-        QCOMPARE(txm->bar()->primary(), int(MeterBinding::TxSwr));
+        QVERIFY(freq->showsPower());
+        QVERIFY(freq->showsSwr());
         model->transmitModel().setTune(false);
         model->transmitModel().setMox(true);
-        QCOMPARE(txm->bar()->primary(), int(MeterBinding::TxPower));
+        QVERIFY(freq->showsPower());
+        QVERIFY(freq->showsSwr());
         model->transmitModel().setMox(false);
-        qInfo() << "SWR/Leistung schaltet um";
+        qInfo() << "SWR/Leistung im Frequenzfenster bleiben eingeschaltet";
 
         // ── 5. Roehre an und aus, waehrend alles laeuft ─────────────
         for (BarInstrument* b : mw->findChildren<BarInstrument*>()) {
@@ -154,7 +170,7 @@ private slots:
             mw->resize(1200, 800);
             mw->show();
             QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-            QVERIFY(mw->findChild<TxMeterApplet*>());
+            QVERIFY(mw->findChild<FrequencyApplet*>());
             mw->close();
             QCoreApplication::processEvents();
             qInfo() << "Durchgang" << (round + 1) << "in Ordnung";

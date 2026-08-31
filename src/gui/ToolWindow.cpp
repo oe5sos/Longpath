@@ -10,6 +10,7 @@
 
 #include "core/AppSettings.h"
 #include "gui/FramelessResizer.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
 
@@ -54,6 +55,10 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     attachResizeGrip(this);
 
     restoreGeometryState();
+
+    // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
+    // derselbe Grund.
+    enableFullScreenAuxiliaryBehavior(this);
 }
 
 ToolWindow::~ToolWindow() = default;
@@ -116,6 +121,12 @@ void ToolWindow::applyDefaultSize(const QSize& want)
 
 void ToolWindow::closeEvent(QCloseEvent* ev)
 {
+    // Betreiber 2026-08-31: beweist, WANN diese Funktion beim Beenden
+    // per rotem Punkt (nicht Cmd+Q/Menue) laeuft, im Vergleich zu
+    // MainWindow::closeEvent()'s eigener Logzeile -- temporaer, bis der
+    // eigentliche Fund feststeht.
+    qWarning() << "ToolWindow::closeEvent() fuer" << m_id
+               << "-- emittiert dockRequested";
     ev->accept();
     emit dockRequested(m_id);
 }

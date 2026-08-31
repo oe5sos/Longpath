@@ -362,7 +362,6 @@ warren@wpratt.com
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
-#include "applets/TxMeterApplet.h"
 #include "applets/AsrApplet.h"
 #include "asr/AsrService.h"
 #include "asr/RemoteAsrBackend.h"
@@ -953,6 +952,26 @@ MainWindow::MainWindow(QWidget* parent)
         if (m_containerManager) {
             m_containerManager->saveState();
         }
+        // Betreiber 2026-08-31, per Log bewiesen: sein Beenden-Weg
+        // ("roter Punkt") liefert NIE ein QCloseEvent an MainWindow --
+        // in fuenf aufeinanderfolgenden Log-Dateien taucht die
+        // Diagnosezeile aus closeEvent() kein einziges Mal auf, obwohl
+        // der Funkgeraete-Rueckbau (WDSP/TCI/P2, alles unten in diesem
+        // Block) sichtbar sauber laeuft -- dieser aboutToQuit-Zweig ist
+        // fuer ihn also nicht der Rueckfallpfad, sondern der EINZIGE.
+        // captureIntoCurrent()+save() standen bisher nur in
+        // closeEvent() (Annahme im Kommentar oben: "closeEvent is fine
+        // for Cmd+Q" -- stimmte fuer diesen Beenden-Weg nicht). Ohne
+        // diese zwei Zeilen hier wurde der Profilstand beim Beenden nie
+        // aus der laufenden Oberflaeche neu eingesammelt, sondern blieb
+        // auf dem Stand der letzten Stelle, die captureIntoCurrent()
+        // sonst noch traf (Menue-Haken, Applet-Ablösen) -- fuer den
+        // Betreiber sah das aus wie "der gespeicherte Zustand ist nie
+        // der Letztzustand".
+        if (m_layoutProfiles) {
+            m_layoutProfiles->captureIntoCurrent();
+            m_layoutProfiles->save();
+        }
         // Issue #206 — also flush window geometry on signal-based
         // shutdown (SIGTERM / force-quit). Idempotent with the
         // closeEvent path above.
@@ -1492,6 +1511,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // Rechteck gar nicht erst gesetzt: ensureOnVisibleScreen holt es
     // dann auf den Schirm des Hauptfensters, statt es erst hinaus- und
     // dann wieder hereinzuschieben.
+    bool trustedRectApplied = false;
     if (rect.isValid()) {
         bool screenStillHere = screenKey.isEmpty();
         if (!screenStillHere) {
@@ -1502,10 +1522,29 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                 if (key == screenKey) { screenStillHere = true; break; }
             }
         }
-        if (screenStillHere) { win->setGeometry(rect); }
+        if (screenStillHere) {
+            win->setGeometry(rect);
+            trustedRectApplied = true;
+        }
     }
-    ensureOnVisibleScreen(win, this,
-                          QSize(Style::kAppletPanelW, 120));
+    // Betreiber 2026-08-30: "panadapter und filter wieder verrückt" --
+    // Bandwidth Filter, Frequenz und S-Meter landeten nach dem Neustart
+    // trotz gueltiger, bildschirmgeprueften Profil-Geometrie mittig
+    // ueber dem Panadapter statt an ihrer gemerkten Stelle.
+    // ensureOnVisibleScreen() liest win->geometry() und vertraut ihr
+    // nicht (siehe dort, "atOrigin"/Mindestgroesse) -- fuer ein frisch
+    // erzeugtes, noch nie gezeigtes Top-Level-Fenster ist genau dieser
+    // Wert auf macOS unmittelbar nach setGeometry() nicht verlaesslich
+    // dieselbe Zahl, die eben gesetzt wurde (das native Fenster
+    // existiert vor dem ersten show() schlicht noch nicht). Ein Rechteck,
+    // das schon durch die eigene Bildschirm-Pruefung oben kam, braucht
+    // keine zweite, weniger verlaessliche Pruefung mehr -- die galt
+    // ohnehin nur fuer den Fall, dass gar keine brauchbare Geometrie
+    // vorlag.
+    if (!trustedRectApplied) {
+        ensureOnVisibleScreen(win, this,
+                              QSize(Style::kAppletPanelW, 120));
+    }
 
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
@@ -1548,19 +1587,28 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
 
 void MainWindow::dockAppletBack(const QString& appletId)
 {
+    // ── Beim Beenden: NICHTS mehr andocken ───────────────────────────
+    //
+    // DER Grund fuer "profil nicht automatisch gespeichert" (Betreiber,
+    // 2026-08-30, zum wiederholten Mal): Cmd+Q schickt auch jedem
+    // Schwebefenster ein Schliessereignis, dessen closeEvent "Schliessen
+    // heisst andocken" ausloest -- und der Andock-Weg hier unten rief
+    // danach captureIntoCurrent()+save() und UEBERSCHRIEB damit die
+    // korrekte Profilaufnahme vom Anfang von MainWindow::closeEvent()
+    // mit "alles angedockt". Je nach Fensterreihenfolge verlor das
+    // Profil so bei jedem Beenden ein anderes abgeloestes Fenster
+    // (nachweisbar in Longpath.settings: floatingApplets schrumpfte
+    // von Sitzung zu Sitzung). Beim Herunterfahren gibt es nichts mehr
+    // anzudocken -- die Fenster sterben ohnehin mit dem Programm, und
+    // die Aufnahme ist laengst im Kasten.
+    if (m_shuttingDown) { return; }
+
     AppletFloatingWindow* win = m_floatingApplets.take(appletId);
     if (!win) { return; }
 
     const int idx = win->dockIndex();
     AppletWidget* applet = win->releaseApplet();
-    if (m_shuttingDown) {
-        // Beim Herunterfahren gibt es keine Runde mehr, in der ein
-        // nachgereichtes Loeschen ankaeme — siehe die Notiz im
-        // closeEvent. Dann sofort.
-        delete win;
-    } else {
-        win->deleteLater();
-    }
+    win->deleteLater();
 
     if (!applet || !m_appletPanel) { return; }
     m_appletPanel->addApplet(applet);
@@ -1833,6 +1881,52 @@ void MainWindow::wireProfileRail()
             return;
         }
         f.write(json);
+    });
+
+    // Betreiber 2026-08-30: "DIE gespeicherten profile sollte man auch
+    // mit rechter moustaste importiren können" -- das Gegenstueck zum
+    // Export oben. Ersetzt DIESES Profil (Betreiber, selber Tag: "wenn
+    // ich importiere will ich es nicht als neues profil importiren" --
+    // ein frueherer Anlauf legte hier "Buero (2)" an statt zu ersetzen).
+    // Die Rueckfrage steht HIER, nicht in LayoutProfiles::
+    // importFromJson(): die Klasse selbst kennt keine Dialoge, siehe
+    // ihre eigene Begruendung ("kein Selbstzweck").
+    connect(m_profileRail, &ProfileRail::importRequested, this,
+            [this](const QString& name) {
+        if (!m_layoutProfiles) { return; }
+
+        const QString suggested =
+            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+        const QString path = QFileDialog::getOpenFileName(
+            this, QStringLiteral("Layout-Profil vom Schreibtisch laden"),
+            suggested, QStringLiteral("JSON (*.json)"));
+        if (path.isEmpty()) { return; }
+
+        const auto answer = QMessageBox::question(
+            this, QStringLiteral("Profil"),
+            QStringLiteral("„%1“ mit dem Inhalt der Datei ersetzen?")
+                .arg(name),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes) { return; }
+
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly)) {
+            QMessageBox::warning(
+                this, QStringLiteral("Profil"),
+                QStringLiteral("„%1“ konnte nicht gelesen werden.").arg(path));
+            return;
+        }
+        const QByteArray json = f.readAll();
+
+        QString error;
+        if (!m_layoutProfiles->importFromJson(name, json, &error)) {
+            QMessageBox::warning(
+                this, QStringLiteral("Profil"),
+                error.isEmpty()
+                    ? QStringLiteral("„%1“ liess sich nicht als Profil lesen.")
+                          .arg(path)
+                    : error);
+        }
     });
 
     connect(m_profileRail, &ProfileRail::renameRequested, this,
@@ -3960,9 +4054,12 @@ void MainWindow::buildUI()
         // fuehren (Stehwelle, SWR). Sie haengen an derselben Quelle wie
         // die eigenstaendigen Anzeigen, damit beide dieselbe Zahl zum
         // selben Zeitpunkt zeigen — der Grund, aus dem diese Verteilung
-        // ueberhaupt an EINER Stelle steht.
+        // ueberhaupt an EINER Stelle steht. Das eigene SWR/Leistung-
+        // Applet (TxMeterApplet) ist am 2026-08-30 entfernt worden --
+        // Betreiber: "nur zusaetzlich im Bereich des Frequenzfenster,
+        // nicht alle" -- das Frequenz-Widget ist seither die EINZIGE
+        // Stelle dafuer.
         if (m_frequencyApplet)  { m_frequencyApplet->onReading(bindingId, value); }
-        if (m_txMeterApplet)    { m_txMeterApplet->onReading(bindingId, value); }
     });
 
     // Task 3.1: expose MeterPoller via RadioModel so MultimeterPage can
@@ -6187,21 +6284,18 @@ void MainWindow::populateDefaultMeter()
     m_signalInstrument->restoreState();
     panel->addApplet(m_signalInstrument);
 
-    // ── SWR / Leistung in EINER Flaeche ──────────────────────────────
+    // ── SWR / Leistung in EINER Flaeche — entfernt ───────────────────
     //
-    // Der Betreiber am 2026-08-23: "ein widget, wo SWR und Stehwelle
-    // in einem Diagramm sind. wenn ich tune stellt es auf das diagramm
-    // SWR um, beim senden habe ich Stehwelle. dann würde ich mir auch
-    // einen platz sparen."
+    // Stand hier von 2026-08-23 bis 2026-08-30 als eigenes Applet
+    // (TxMeterApplet, "ein widget, wo SWR und Stehwelle in einem
+    // Diagramm sind"). Der Betreiber am 2026-08-30, vor demselben
+    // Fenster wieder: "SWR / Leistungs Fenster soll es nur zusaetzlich
+    // im Bereich des Frequenzfenster geben, nicht alle." Die beiden
+    // Zusatzzeilen im Frequenz-Widget (FrequencyApplet::setShowPower/
+    // setShowSwr, seit 2026-08-23) decken dieselbe Anzeige schon ab —
+    // ein eigenes drittes Fenster dafuer war die Dopplung, die der
+    // Betreiber loswerden wollte.
     //
-    // Es steht NEBEN den beiden Einzelanzeigen, nicht statt ihnen: wer
-    // Platz hat, will beide gleichzeitig sehen. Sichtbar ist es
-    // anfangs nicht — das entscheidet der Betreiber ueber den
-    // Applet-Auswaehler.
-    m_txMeterApplet = new TxMeterApplet(m_radioModel, nullptr);
-    m_txMeterApplet->restoreState();
-    panel->addApplet(m_txMeterApplet);
-
     // ── Spracherkennung (2026-08-23) ────────────────────────────────
     //
     // Der Betreiber hat den OERTLICHEN Weg gewaehlt: ein
@@ -6487,7 +6581,6 @@ void MainWindow::populateDefaultMeter()
     // und vollstaendig unerreichbar war: gebaut und nicht erreichbar
     // ist so gut wie nicht gebaut, und keine Einzelpruefung sieht es,
     // weil jeder Baustein fuer sich in Ordnung ist.
-    m_appletsById[QStringLiteral("TxMeter")] = m_txMeterApplet;
     m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
     m_appletsById[QStringLiteral("KiwiWaterfalls")] = m_kiwiWaterfallPanel;
     m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
@@ -6553,8 +6646,6 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Stehwelle"),    true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
                                 QStringLiteral("S-Meter"),      true);
-    m_appletVis->registerApplet(QStringLiteral("TxMeter"),
-                                QStringLiteral("SWR / Leistung"), true);
     m_appletVis->registerApplet(QStringLiteral("KiwiSdr"),
                                 QStringLiteral("KiwiSDR"),      true);
     // defaultVisible=false, bewusst anders als KiwiSdr: ein leeres Panel
@@ -7039,10 +7130,29 @@ void MainWindow::populateDefaultMeter()
                 // ein Weltbild.
                 s.insert(QStringLiteral("worldImage"),
                          WorldTexture::currentPath());
+
+                // ── Das Hauptfenster selbst ─────────────────────────
+                //
+                // Betreiber 2026-08-30: "wenn ich vollbild habe und nur
+                // das profil ändere muss auch vollbild bleiben" und
+                // "nach dem import ist wieder nicht full screen". Das
+                // widerruft die Ausnahme vom 2026-08-15 ("NICHT dabei:
+                // die Fenstergroesse") fuer den Zustand: Vollbild/
+                // Maximiert gehoert zum Profil. Die Lage in Pixeln
+                // bleibt weiterhin beim globalen MainWindowGeometry-
+                // Schluessel -- hier zaehlt nur der MODUS.
+                QVariantMap mw;
+                mw.insert(QStringLiteral("fullScreen"), isFullScreen());
+                mw.insert(QStringLiteral("maximized"), isMaximized());
+                s.insert(QStringLiteral("mainWindow"), mw);
                 return s;
             },
             // ── herstellen ───────────────────────────────────────────
             [this](const QVariantMap& s) {
+                // Vollbild MERKEN, bevor irgendein Schritt unten es
+                // kippen kann -- am Ende wird es wieder durchgesetzt
+                // (siehe der Block am Schluss dieses Lambdas).
+                const bool wasFullScreen = isFullScreen();
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
                 // zweimal.
@@ -7142,9 +7252,28 @@ void MainWindow::populateDefaultMeter()
                 if (!m_radioModel
                     || m_radioModel->connectionState()
                            != ConnectionState::Connected) {
+                    // Betreiber 2026-08-30: "diese wollte ich wieder
+                    // importieren. dieses sieht aber nicht gleich aus" --
+                    // ein Import (wie jeder Profilwechsel) durchlaeuft
+                    // diese Schleife sofort, und traf bislang JEDES
+                    // abgeloeste Applet-Fenster ungeachtet dessen, was es
+                    // zeigt. Bandwidth Filter und Frequenz zeigen
+                    // Einstellungswerte (Filterbreite, VFO-Frequenz),
+                    // keine Live-Messung wie SWR/Leistung oder S-Meter --
+                    // derselbe Unterschied, aus dem der Bandwidth Filter
+                    // schon einmal (2026-08-30, frueher am Tag) aus dem
+                    // ANDEREN, ContainerManager-gestuetzten Versteck-
+                    // Mechanismus ausgenommen wurde. Dieser hier ist ein
+                    // DRITTER, unabhaengiger Mechanismus (siehe Kommentar
+                    // oben) und hatte dieselbe Ausnahme noch nicht.
+                    static const QSet<QString> kMeaningfulWithoutRadio = {
+                        QStringLiteral("BwFilter"),
+                        QStringLiteral("Frequency"),
+                    };
                     for (AppletFloatingWindow* w
                          : std::as_const(m_floatingApplets)) {
-                        if (w && w->isVisible()) {
+                        if (w && w->isVisible()
+                            && !kMeaningfulWithoutRadio.contains(w->appletId())) {
                             w->hide();
                             m_floatingContainersHiddenPreConnect.append(w);
                         }
@@ -7198,6 +7327,31 @@ void MainWindow::populateDefaultMeter()
                     for (const QVariant& v : sizes) { px << v.toInt(); }
                     m_mainSplitter->setSizes(px);
                 }
+
+                // ── Vollbild bleibt Vollbild ────────────────────────
+                //
+                // Betreiber 2026-08-30: "wenn ich vollbild habe und nur
+                // das profil ändere muss auch vollbild bleiben." Zwei
+                // Faelle: das Profil SAGT Vollbild (mainWindow-Karte,
+                // seit heute erfasst) -- dann herstellen. Oder das
+                // Profil kennt den Schluessel noch nicht (aeltere
+                // Aufnahme, Import einer alten Datei) -- dann gilt der
+                // Zustand von VOR dem Anwenden, festgehalten oben als
+                // wasFullScreen, damit kein Schritt dazwischen ihn
+                // stillschweigend kippen kann.
+                const QVariantMap mw =
+                    s.value(QStringLiteral("mainWindow")).toMap();
+                const bool wantFullScreen =
+                    mw.contains(QStringLiteral("fullScreen"))
+                        ? mw.value(QStringLiteral("fullScreen")).toBool()
+                        : wasFullScreen;
+                if (wantFullScreen && !isFullScreen()) {
+                    showFullScreen();
+                } else if (!wantFullScreen
+                           && mw.value(QStringLiteral("maximized")).toBool()
+                           && !isMaximized() && !isFullScreen()) {
+                    showMaximized();
+                }
             });
 
         m_layoutProfiles->load();
@@ -7235,11 +7389,25 @@ void MainWindow::populateDefaultMeter()
                     // Standardfall, und ein sichtbares m_rotorWindow lässt
                     // ein daneben existierendes, aber leeres m_rotorDock
                     // ohnehin unbeachtet.
+                    //
+                    // Betreiber 2026-08-31, per Log/Einstellungsdatei
+                    // bestaetigt: m_rotorDockWantedVisible durfte hier NIE
+                    // das schwebende Fenster sperren. Der Wert kommt aus
+                    // m_rotorDock->isVisible() zum Sicherungszeitpunkt
+                    // (siehe "rotorDockVisible" Erfassung oben) -- steht
+                    // Rotor/Log gerade schwebend (der dokumentierte
+                    // Normalfall), ist das Dock leer und unbenutzt, seine
+                    // isVisible() also ganz legitim false. Genau dieses
+                    // false unterdrueckte danach auch m_rotorWindow->show(),
+                    // obwohl das schwebende Fenster laengst existierte und
+                    // nur auf die erste Verbindung wartete. Ein
+                    // existierendes m_rotorWindow soll nach der ersten
+                    // Verbindung IMMER wieder erscheinen -- das Flag gilt
+                    // nur noch fuer den m_rotorDock-Zweig, wo es tatsaechlich
+                    // die richtige Frage beantwortet.
                     if (m_rotorWindow) {
-                        if (m_rotorDockWantedVisible) {
-                            m_rotorWindow->show();
-                            m_rotorWindow->raise();
-                        }
+                        m_rotorWindow->show();
+                        m_rotorWindow->raise();
                     } else if (m_rotorDock) {
                         m_rotorDock->setVisible(m_rotorDockWantedVisible);
                     }
@@ -7389,8 +7557,27 @@ void MainWindow::buildMenuBar()
 
     fileMenu->addSeparator();
 
+    // Betreiber 2026-08-30, nach zwei Fehlschlaegen am Rotor/Log-Fix:
+    // "habe ich gemacht, leider nein". Der Grund: Qt garantiert NICHT,
+    // dass MainWindow::closeEvent() (wo m_shuttingDown bisher gesetzt
+    // wurde) vor den Schliessereignissen der schwebenden Fenster
+    // (Rotor/Log, Applets) laeuft -- closeAllWindows() geht die
+    // Top-Level-Fenster in einer Reihenfolge durch, auf die sich kein
+    // Aufrufer verlassen darf. Traf es zuerst ein schwebendes Fenster,
+    // stand m_shuttingDown dort noch auf false, und dessen closeEvent
+    // dockte sich selbst an, bevor MainWindow ueberhaupt zum Zug kam.
+    //
+    // Dieser Cmd+Q-Menuepunkt ist der EINE Ort, an dem das Beenden auf
+    // macOS tatsaechlich beginnt (Qt zieht ihn per Rollen-Erkennung an
+    // "Quit" automatisch ins Anwendungsmenue) -- alles Weitere
+    // (closeAllWindows(), jedes einzelne closeEvent) folgt erst DANACH.
+    // Die Sperre hier zu setzen, bevor qApp->quit() ueberhaupt aufgerufen
+    // wird, macht die Reihenfolge der einzelnen Fenster bedeutungslos.
     fileMenu->addAction(QStringLiteral("&Quit"), QKeySequence(Qt::CTRL | Qt::Key_Q),
-                        qApp, &QApplication::quit);
+                        this, [this]() {
+        m_shuttingDown = true;
+        qApp->quit();
+    });
 
     // =========================================================================
     // RADIO
@@ -11562,7 +11749,27 @@ void MainWindow::openNrSetupPage(Longpath::NrSlot slot)
 
 void MainWindow::applyDarkTheme()
 {
-    setStyleSheet(Style::themed(QStringLiteral(
+    // ── Der Dock-Griff neben Rotor/Log ───────────────────────────────
+    //
+    // Betreiber, 2026-08-30: "roto log ist wieder nicht
+    // größenveränderbar" -- angedockt ist Rotor/Log ein echtes
+    // QDockWidget (ensureRotorPanel()), dessen Ziehgriff Qts eigener,
+    // UNGESTALTETER QMainWindow::separator ist. Gegen das fast
+    // schwarze Hausstil-Grau ist der praktisch unsichtbar und schwer
+    // zu treffen -- derselbe Fehler wie bei den drei Pixel breiten
+    // Splitter-Griffen, den Style::splitterStyle() schon einmal
+    // behoben hat (siehe dort), nur diesmal am QMainWindow selbst statt
+    // an einem QSplitter. Dieselben Masse, damit sich beide Griffe
+    // gleich anfuehlen.
+    const QString separatorStyle = QStringLiteral(
+        "QMainWindow::separator { background: %1; width: %2px; "
+        "  height: %2px; border: none; }"
+        "QMainWindow::separator:hover { background: %3; }")
+            .arg(Style::hexRole(Style::kPanelBg))
+            .arg(Style::kSplitterHandlePx)
+            .arg(Style::hexRole(Style::kAccent));
+
+    setStyleSheet(Style::themed(separatorStyle + QStringLiteral(
         "QMainWindow { background: #0f0f1a; }"
         "QMenuBar {"
         "  background: #1a2a3a;"
@@ -12200,10 +12407,53 @@ void MainWindow::detachRotorPanel()
     // Fenster mit Titelleiste, Schloss und Anfasser sein, kein Dock.
     AppSettings::instance().setValue(QStringLiteral("RotorFloating"),
                                      QStringLiteral("True"));
+
+    // Betreiber 2026-08-30, in der Nacht gefunden: RotorFloating war nie
+    // das einzige "wie steht das Fenster"-Signal. m_appletVis fuehrt
+    // fuer "WinRotorLog" eine EIGENE, persistierte Sichtbarkeit
+    // (AppletWinRotorLogVisible, plus die Kopie in der aktiven
+    // Profil-JSON ueber captureIntoCurrent()'s "visible"-Map) -- und
+    // die wurde von detachRotorPanel()/dockRotorPanel() nie
+    // nachgefuehrt. Ergebnis: das Fenster stand sichtbar offen, aber
+    // der Controller hielt es fuer unsichtbar, und genau DIESEN
+    // veralteten Stand schrieb jeder Quit in die Profil-JSON. Ohne
+    // diese Zeile bleibt "RotorFloating=True" zwar korrekt, aber die
+    // Startreihenfolge in buildUI() liest die Profil-JSON VOR der
+    // RotorFloating-Wiederherstellung -- ein zweiter, unabhaengiger Weg
+    // zu genau demselben Symptom wie der Cmd+Q-Wettlauf oben in
+    // dockRotorPanel(). setVisible() ist ein No-Op, wenn der Wert schon
+    // stimmt, also keine zusaetzliche Arbeit im Normalfall.
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("WinRotorLog"), true);
+    }
 }
 
 void MainWindow::dockRotorPanel()
 {
+    // ── Beim Beenden: NICHTS mehr andocken ───────────────────────────
+    //
+    // Betreiber 2026-08-30, wieder: "Rotor log wieder kein eigenes
+    // Fenster. das hatten wir auch schon mehrmals." DER Grund, derselbe
+    // wie beim Profil-nicht-gespeichert-Fund vom selben Tag: Cmd+Q
+    // schickt auch dem schwebenden Rotor/Log-Fenster ein Schliess-
+    // ereignis, und ToolWindow::closeEvent() behandelt "geschlossen"
+    // als "andocken" -- genau wie AppletFloatingWindow es tat. Dieser
+    // Andock-Weg hier unten schrieb danach RotorFloating=False in die
+    // Einstellungen, JEDES Mal beim Beenden, egal wie das Fenster
+    // gerade stand. Der Fix fuer AppletFloatingWindow/dockAppletBack()
+    // (m_shuttingDown-Sperre) galt nur dort -- diese zweite, aehnlich
+    // gebaute Klasse hatte ihn nie bekommen.
+    //
+    // Betreiber 2026-08-31, per Log geklaert: qApp->quit() (Cmd+Q, ueber
+    // die "&Quit"-Handlung) liefert GAR KEIN QCloseEvent an irgendein
+    // Fenster -- weder an MainWindow noch an dieses ToolWindow. Es
+    // beendet nur die Ereignisschleife (aboutToQuit) und raeumt danach
+    // per normaler QObject-Elternschaft ab. dockRotorPanel() laeuft ueber
+    // diesen Weg also nie, diese Sperre bleibt trotzdem als Schutz fuer
+    // jeden ANDEREN Weg stehen, der tatsaechlich ein QCloseEvent
+    // ausloest (z.B. ein spaeter hinzugefuegter nativer Schliessen-Knopf).
+    if (m_shuttingDown) { return; }
+
     if (!m_rotorWindow) { return; }
     QWidget* panel = m_rotorWindow->releaseContent();
     m_rotorWindow->deleteLater();
@@ -12211,6 +12461,13 @@ void MainWindow::dockRotorPanel()
     if (!panel) { return; }
     AppSettings::instance().setValue(QStringLiteral("RotorFloating"),
                                      QStringLiteral("False"));
+    // Gegenstueck zum Sync in detachRotorPanel() -- siehe dortigen
+    // Kommentar. m_shuttingDown ist hier oben schon abgefangen, also
+    // laeuft diese Zeile nie beim Beenden; sie haelt m_appletVis nur im
+    // normalen Betrieb (Klick auf den Andocken-Pfeil) synchron.
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("WinRotorLog"), false);
+    }
     // Zurueck an den Ort, den die Einstellung nennt. Vorgabe "False"
     // wie beim Programmstart (MainWindow-Konstruktor) -- "unten" ist
     // ein bewusst gewaehlter Zustand, kein Standard. Stand hier bis

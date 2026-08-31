@@ -62,6 +62,7 @@ mw0lge@grange-lane.co.uk
 #include "core/ConnectionState.h"
 
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
@@ -70,6 +71,7 @@ mw0lge@grange-lane.co.uk
 #include <QMap>
 #include <QMenu>
 #include <QPushButton>
+#include <QShowEvent>
 #include <QTableWidget>
 #include <QTimer>
 
@@ -144,6 +146,24 @@ public slots:
     // the offline entry for the saved radio).
     void highlightMac(const QString& mac);
 
+protected:
+    /// Betreiber 2026-08-30: "das connect layout soll so aussehen, wie
+    /// das letzt profil. nicht wieder komplett anders" -- dieses
+    /// Fenster hatte bislang gar keine gemerkte Lage/Groesse, sondern
+    /// immer die feste Vorgabe aus dem Konstruktor (resize(900,520)).
+    /// Dasselbe Muster wie SpotHubDialog: Groesse/Lage in Qts eigenem
+    /// QByteArray-Format sichern, nicht als vier einzelne Zahlen.
+    void closeEvent(QCloseEvent* event) override;
+
+    /// Betreiber 2026-08-31, wiederholt gemeldet: die schwebenden
+    /// Applet-Fenster (Qt::Tool -- siehe AppletFloatingWindow.cpp) liegen
+    /// auf macOS grundsaetzlich vor gewoehnlichen Fenstern der eigenen
+    /// App. Dieser Dialog holte sich beim Erscheinen (auch beim
+    /// automatischen Aufpoppen nach einem Verbindungsabbruch) nie selbst
+    /// nach vorn und verschwand darum hinter Bandwidth Filter/Frequenz/
+    /// etc. Dasselbe Muster wie SetupDialog::showEvent().
+    void showEvent(QShowEvent* event) override;
+
 private slots:
     void onConnectClicked();
     void onDisconnectClicked();
@@ -159,6 +179,8 @@ private slots:
 
 private:
     void buildUI();
+    void saveGeometryState();
+    void restoreGeometryState();
     QWidget* buildStatusStrip();    // Phase 3Q Task 5 — top-of-panel connection status widget
     void setPillIconForRow(int row, const QString& mac);  // Pixmap pill icon (3Q polish)
     void updateButtonStates();

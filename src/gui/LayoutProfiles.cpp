@@ -235,6 +235,50 @@ QByteArray LayoutProfiles::exportToJson(const QString& name) const
     return QJsonDocument(o).toJson(QJsonDocument::Indented);
 }
 
+bool LayoutProfiles::importFromJson(const QString& targetProfile,
+                                    const QByteArray& json, QString* outError)
+{
+    auto fail = [&](const QString& why) {
+        if (outError) { *outError = why; }
+        return false;
+    };
+
+    Profile* p = find(targetProfile);
+    if (!p) {
+        return fail(QStringLiteral("Profil „%1“ gibt es nicht (mehr).")
+                        .arg(targetProfile));
+    }
+
+    QJsonParseError err{};
+    const QJsonDocument doc = QJsonDocument::fromJson(json, &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) {
+        return fail(QStringLiteral("Das ist kein lesbares Profil-JSON (%1).")
+                        .arg(err.errorString()));
+    }
+    const QJsonObject o = doc.object();
+
+    p->state = o.value(QStringLiteral("state")).toObject().toVariantMap();
+    p->bands.clear();
+    for (const QJsonValue& b : o.value(QStringLiteral("bands")).toArray()) {
+        p->bands.insert(b.toInt());
+    }
+    p->modes.clear();
+    for (const QJsonValue& m : o.value(QStringLiteral("modes")).toArray()) {
+        p->modes.insert(m.toInt());
+    }
+
+    // Nur beim AKTIVEN Profil sofort sichtbar machen -- fuer ein
+    // anderes wuerde m_apply() das gerade laufende Fenster umbauen,
+    // obwohl gar nicht dorthin gewechselt wurde.
+    if (targetProfile == m_current && m_apply) {
+        m_apply(p->state);
+    }
+
+    save();
+    emit profilesChanged();
+    return true;
+}
+
 // ── Bindung ──────────────────────────────────────────────────────────
 
 void LayoutProfiles::bindBand(const QString& name, Band b, bool on)

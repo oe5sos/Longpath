@@ -76,6 +76,19 @@ public:
     bool showsPower() const { return m_showPower; }
     bool showsSwr() const   { return m_showSwr; }
 
+    /// Betreiber 2026-08-30: "S-Meter bitte noch bei Frequenz
+    /// hinzufügen" -- dieselbe Zusatzzeile wie Leistung/SWR, nur mit
+    /// derselben Quelle wie die eigenstaendige S-Meter-Anzeige
+    /// (MeterBinding::SignalAvg).
+    void setShowSignal(bool on);
+    bool showsSignal() const { return m_showSignal; }
+
+    /// Betreiber 2026-08-30: "A und B sollte man im Frequenzfeld auch
+    /// anhacken können" -- dieselbe Idee wie showsPower()/showsSwr(),
+    /// nur fuer FrequencyInstrument::m_vfoRow (die "A ... B ..."-Zeile).
+    void setShowVfo(bool on);
+    bool showsVfo() const { return m_showVfo; }
+
     /// Messwerte durchreichen — dieselbe Rolle wie
     /// InstrumentApplet::onReading, damit MainWindow beide gleich
     /// bedienen kann.
@@ -105,9 +118,12 @@ private:
     FrequencyInstrument* m_instrument{nullptr};
     BarInstrument*       m_powerBar{nullptr};
     BarInstrument*       m_swrBar{nullptr};
+    BarInstrument*       m_signalBar{nullptr};
     bool                 m_showTiles{true};
     bool                 m_showPower{false};
     bool                 m_showSwr{false};
+    bool                 m_showSignal{false};
+    bool                 m_showVfo{true};
     QPointer<SliceModel> m_slice;
 };
 

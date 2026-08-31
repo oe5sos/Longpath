@@ -9,6 +9,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/FramelessMoveHelper.h"
 #include "gui/FramelessResizer.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowChrome.h"
 #include "gui/applets/AppletWidget.h"
 
@@ -38,6 +39,7 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
                           : QStringLiteral("Longpath"));
     setStyleSheet(QStringLiteral("AppletFloatingWindow { background: %1; }")
                       .arg(Style::kPanelBg));
+    m_createdAt.start();
 
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(0, 0, 0, 0);
@@ -50,6 +52,27 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     connect(m_titleBar, &WindowTitleBar::closeRequested,
             this, &QWidget::close);
     connect(m_titleBar, &WindowTitleBar::dockRequested, this, [this]() {
+        // ── Der Knopf, der zufaellig genau dort landet ────────────────
+        //
+        // Betreiber 2026-08-30: "frequenzwindow laesst sich nicht
+        // ordentlich abheften, springt immer." Ursache: dieses Fenster
+        // erscheint exakt dort, wo eben noch die Spaltenzeile mit dem
+        // ↗-Knopf stand (detachApplet() setzt es bewusst dorthin, siehe
+        // MainWindow.cpp "pickedUpAt" — Absicht, nicht Zufall). Beide
+        // Kopfleisten reihen ihre Knoepfe rechtsbuendig auf: der ↗ in
+        // der Spalte ist der zweite von rechts (neben ✕), und der ↙
+        // hier im neuen Fenster ist ES AUCH (neben ✕, mit dem
+        // Schloss davor). Beide Fenster sind ungefaehr gleich breit,
+        // also faellt ein zweiter Klick an derselben Bildschirmstelle
+        // — instinktiv, wenn vom Abloesen selbst nichts zu sehen war —
+        // direkt auf diesen Knopf und dockt sofort wieder an.
+        //
+        // Die kurze Sperrfrist aendert am Knopf selbst nichts (Design
+        // bleibt Sache des Betreibers), sie schluckt nur den einen
+        // Klick, der noch zum alten Gestus gehoert.
+        if (m_createdAt.isValid() && m_createdAt.elapsed() < kDockGuardMs) {
+            return;
+        }
         emit dockRequested(appletId());
     });
     m_titleBar->setLockKey(QStringLiteral("Applet_%1").arg(panelId));
@@ -120,6 +143,13 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     connect(m_settleTimer, &QTimer::timeout, this, [this]() {
         emit geometrySettled(appletId());
     });
+
+    // Betreiber, wiederholt gemeldet: dieses Fenster blieb im nativen
+    // Vollbild auf dem alten Space zurueck, statt mit dem Hauptfenster
+    // zu wandern -- der "FullScreenAuxiliary"-Kommentar oben an
+    // Qt::Tool war nie mehr als eine Annahme, siehe
+    // MacFloatingWindowBehavior.h.
+    enableFullScreenAuxiliaryBehavior(this);
 }
 
 void AppletFloatingWindow::applyDefaultSize()

@@ -242,7 +242,10 @@ private slots:
     void theThreeFormsAreSelectable()
     {
         FrequencyInstrument w;
-        QCOMPARE(w.form(), FrequencyInstrument::Form::BandStrip);
+        // War Form::BandStrip. Betreiber 2026-08-30: "MHZ Balken
+        // benätige ich nie, löschen!" -- NumberOnly ist seither die
+        // Vorgabe.
+        QCOMPARE(w.form(), FrequencyInstrument::Form::NumberOnly);
         w.setForm(FrequencyInstrument::Form::FlatArc);
         QCOMPARE(w.form(), FrequencyInstrument::Form::FlatArc);
         w.setForm(FrequencyInstrument::Form::NumberOnly);

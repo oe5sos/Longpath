@@ -22,6 +22,7 @@
 #include "gui/PanadapterApplet.h"
 #include "core/AppSettings.h"
 #include "gui/FramelessResizer.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowChrome.h"
 
 #include <QScreen>
@@ -102,6 +103,11 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     resize(900, 460);
 
     restoreGeometryState();
+
+    // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
+    // derselbe Grund -- der "FullScreenAuxiliary"-Kommentar oben war nie
+    // mehr als eine Annahme.
+    enableFullScreenAuxiliaryBehavior(this);
 }
 
 // Die Groesse setzen, NACHDEM der Inhalt sichtbar ist.

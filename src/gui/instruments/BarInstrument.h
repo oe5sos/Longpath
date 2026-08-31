@@ -125,8 +125,18 @@ public:
     const PeakHold& peakHold() const { return m_peak; }
     void resetPeak() { m_peak.reset(m_value); update(); }
 
-    QSize sizeHint() const override { return {320, 74}; }
-    QSize minimumSizeHint() const override { return {180, 56}; }
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
+
+    // Betreiber, 2026-08-30: das Frequenz-Fenster liess sich nicht so
+    // weit ziehen, wie FrequencyInstrument allein erlaubt haette --
+    // die dort eingebettete SWR-Zusatzzeile (ein gewoehnliches
+    // BarInstrument, siehe FrequencyApplet.cpp) hatte mit 180 einen
+    // hoeheren Bodenwert als die Ziffernzeile selbst und bestimmte
+    // damit die tatsaechliche Grenze des ganzen Fensters. 90 ist die
+    // kleinste Breite, bei der paintInto()s eigene Wache
+    // (box.width() < 40.0) noch nicht zuschlaegt (90 - 24 Rand = 66).
+    static constexpr int kMinWidth = 90;
 
 public:
     /// Malt das Instrument fuer eine verlangte Groesse in einen fremden

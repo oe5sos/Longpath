@@ -21,11 +21,28 @@
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/AsrApplet.h"
 #include "gui/applets/FrequencyApplet.h"
-#include "gui/applets/TxMeterApplet.h"
-#include "gui/instruments/BarInstrument.h"
+#include "gui/applets/InstrumentApplet.h"
 #include "gui/meters/MeterPoller.h"
 
 using namespace Longpath;
+
+namespace {
+// TxMeterApplet ist am 2026-08-30 entfernt worden (Betreiber: das
+// SWR/Leistung-Fenster soll es nur noch als Zusatzzeile im
+// Frequenzfenster geben, nicht mehr als eigenes Applet). Diese Pruefung
+// wollte Roehre/Segmente nur an IRGENDEINEM BarInstrument sehen, das
+// diese beiden Formen kennt und sie speichert -- SwrInstrument (ein
+// InstrumentApplet auf Balkenform) leistet genau das.
+InstrumentApplet* swrInstrument(MainWindow* mw)
+{
+    for (InstrumentApplet* ia : mw->findChildren<InstrumentApplet*>()) {
+        if (ia && ia->appletId() == QStringLiteral("SwrInstrument")) {
+            return ia;
+        }
+    }
+    return nullptr;
+}
+} // namespace
 
 class TstSettingsAreRemembered : public QObject
 {
@@ -38,11 +55,11 @@ private slots:
             auto* mw = new MainWindow();
             mw->show();
             QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-            auto* txm = mw->findChild<TxMeterApplet*>();
-            QVERIFY(txm);
-            txm->bar()->setTube(true);
-            txm->bar()->setSegmented(true);
-            txm->saveState();
+            auto* swr = swrInstrument(mw);
+            QVERIFY(swr);
+            swr->setTube(true);
+            swr->setSegmented(true);
+            swr->saveState();
             mw->close();
             QCoreApplication::processEvents();
         }
@@ -50,12 +67,12 @@ private slots:
             auto* mw = new MainWindow();
             mw->show();
             QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-            auto* txm = mw->findChild<TxMeterApplet*>();
-            QVERIFY(txm);
-            qInfo() << "nach Neustart — Roehre:" << txm->bar()->isTube()
-                    << "Segmente:" << txm->bar()->isSegmented();
-            QVERIFY2(txm->bar()->isTube(), "Die Roehre ist vergessen");
-            QVERIFY2(txm->bar()->isSegmented(), "Die Segmente sind vergessen");
+            auto* swr = swrInstrument(mw);
+            QVERIFY(swr);
+            qInfo() << "nach Neustart — Roehre:" << swr->isTube()
+                    << "Segmente:" << swr->isSegmented();
+            QVERIFY2(swr->isTube(), "Die Roehre ist vergessen");
+            QVERIFY2(swr->isSegmented(), "Die Segmente sind vergessen");
             mw->close();
         }
     }

@@ -98,6 +98,13 @@ signals:
     /// kennt wie bei saveRequested() keinen Dateidialog; das erledigt der
     /// Empfaenger.
     void exportRequested(const QString& name);
+    /// Betreiber 2026-08-30: "DIE gespeicherten profile sollte man auch
+    /// mit rechter moustaste importiren können" -- das Gegenstueck zu
+    /// exportRequested(). Traegt den Namen wie exportRequested(): ein
+    /// Import ERSETZT den Zustand DIESES Profils (Betreiber, selber
+    /// Tag: "wenn ich importiere will ich es nicht als neues profil
+    /// importiren").
+    void importRequested(const QString& name);
 
 private:
     void showMenuFor(const QString& name, const QPoint& globalPos);

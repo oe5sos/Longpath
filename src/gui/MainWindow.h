@@ -1483,7 +1483,6 @@ private:
 
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class KiwiWaterfallPanel* m_kiwiWaterfallPanel{nullptr};
-    class TxMeterApplet*  m_txMeterApplet{nullptr};
 
     // ── Spracherkennung (2026-08-23) ────────────────────────────────
     //

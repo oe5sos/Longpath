@@ -60,6 +60,15 @@ FrequencyApplet::FrequencyApplet(RadioModel* model, QWidget* parent)
     m_swrBar->setPrimary(MeterBinding::TxSwr);
     lay->addWidget(m_swrBar);
 
+    // Betreiber 2026-08-30: "S-Meter bitte noch bei Frequenz
+    // hinzufügen" -- dieselbe Quelle wie die eigenstaendige S-Meter-
+    // Anzeige (m_signalInstrument in MainWindow), nur als knappe
+    // Zusatzzeile hier.
+    m_signalBar = new BarInstrument(this);
+    m_signalBar->setCompact(true);
+    m_signalBar->setPrimary(MeterBinding::SignalAvg);
+    lay->addWidget(m_signalBar);
+
     applyRowVisibility();
 
     // Das Widget schreibt NICHT selbst. Es meldet die gewuenschte
@@ -114,8 +123,18 @@ void FrequencyApplet::setShowTiles(bool on)
 void FrequencyApplet::applyRowVisibility()
 {
     if (m_tiles) { m_tiles->setVisible(m_showTiles); }
-    if (m_powerBar) { m_powerBar->setVisible(m_showPower); }
-    if (m_swrBar)   { m_swrBar->setVisible(m_showSwr); }
+    if (m_powerBar)  { m_powerBar->setVisible(m_showPower); }
+    if (m_swrBar)    { m_swrBar->setVisible(m_showSwr); }
+    if (m_signalBar) { m_signalBar->setVisible(m_showSignal); }
+    if (m_instrument) { m_instrument->setVfoRowVisible(m_showVfo); }
+}
+
+void FrequencyApplet::setShowVfo(bool on)
+{
+    if (m_showVfo == on) { return; }
+    m_showVfo = on;
+    applyRowVisibility();
+    saveState();
 }
 
 void FrequencyApplet::setShowPower(bool on)
@@ -134,20 +153,32 @@ void FrequencyApplet::setShowSwr(bool on)
     saveState();
 }
 
+void FrequencyApplet::setShowSignal(bool on)
+{
+    if (m_showSignal == on) { return; }
+    m_showSignal = on;
+    applyRowVisibility();
+    saveState();
+}
+
 void FrequencyApplet::onReading(int bindingId, double value)
 {
-    // Beide bekommen jeden Wert; BarInstrument sortiert selbst aus, ob
-    // die Kennung seine ist. Auch die unsichtbare Zeile wird gefuettert
-    // — sonst zeigte sie beim Einschalten erst einmal nichts, und der
-    // Betreiber haette einen halben Meterzyklus lang ein leeres Feld.
-    if (m_powerBar) { m_powerBar->onReading(bindingId, value); }
-    if (m_swrBar)   { m_swrBar->onReading(bindingId, value); }
+    // Alle drei bekommen jeden Wert; BarInstrument sortiert selbst aus,
+    // ob die Kennung seine ist. Auch die unsichtbare Zeile wird
+    // gefuettert — sonst zeigte sie beim Einschalten erst einmal
+    // nichts, und der Betreiber haette einen halben Meterzyklus lang
+    // ein leeres Feld.
+    if (m_powerBar)  { m_powerBar->onReading(bindingId, value); }
+    if (m_swrBar)    { m_swrBar->onReading(bindingId, value); }
+    if (m_signalBar) { m_signalBar->onReading(bindingId, value); }
 }
 
 namespace {
-QString tilesKey() { return QStringLiteral("FrequencyApplet_ShowTiles"); }
-QString powerKey() { return QStringLiteral("FrequencyApplet_ShowPower"); }
-QString swrKey()   { return QStringLiteral("FrequencyApplet_ShowSwr"); }
+QString tilesKey()  { return QStringLiteral("FrequencyApplet_ShowTiles"); }
+QString powerKey()  { return QStringLiteral("FrequencyApplet_ShowPower"); }
+QString swrKey()    { return QStringLiteral("FrequencyApplet_ShowSwr"); }
+QString signalKey() { return QStringLiteral("FrequencyApplet_ShowSignal"); }
+QString vfoKey()    { return QStringLiteral("FrequencyApplet_ShowVfo"); }
 } // namespace
 
 void FrequencyApplet::saveState() const
@@ -159,6 +190,10 @@ void FrequencyApplet::saveState() const
                                         : QStringLiteral("False"));
     st.setValue(swrKey(), m_showSwr ? QStringLiteral("True")
                                     : QStringLiteral("False"));
+    st.setValue(signalKey(), m_showSignal ? QStringLiteral("True")
+                                          : QStringLiteral("False"));
+    st.setValue(vfoKey(), m_showVfo ? QStringLiteral("True")
+                                    : QStringLiteral("False"));
 }
 
 void FrequencyApplet::restoreState()
@@ -169,6 +204,10 @@ void FrequencyApplet::restoreState()
     m_showPower = st.value(powerKey(), QStringLiteral("False")).toString()
                   == QStringLiteral("True");
     m_showSwr = st.value(swrKey(), QStringLiteral("False")).toString()
+                == QStringLiteral("True");
+    m_showSignal = st.value(signalKey(), QStringLiteral("False")).toString()
+                   == QStringLiteral("True");
+    m_showVfo = st.value(vfoKey(), QStringLiteral("True")).toString()
                 == QStringLiteral("True");
     applyRowVisibility();
 }
@@ -204,41 +243,56 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     tiles->setChecked(m_showTiles);
     connect(tiles, &QAction::triggered, this,
             [this](bool on) { setShowTiles(on); });
+
+    // Betreiber 2026-08-30: "A und B sollte man im Frequenzfeld auch
+    // anhacken können" -- dieselbe Ein-/Ausblenden-Idee wie die beiden
+    // Zusatzzeilen unten, nur fuer die VFO-Zeile ("A ... B ...").
+    QAction* vfo = menu.addAction(tr("A/B-Zeile anzeigen"));
+    vfo->setCheckable(true);
+    vfo->setChecked(m_showVfo);
+    connect(vfo, &QAction::triggered, this,
+            [this](bool on) { setShowVfo(on); });
     menu.addSeparator();
 
-    QAction* pwr = menu.addAction(tr("Stehwelle anzeigen"));
+    // War "Stehwelle anzeigen" -- falsch beschriftet, obwohl an
+    // setShowPower() haengend. "Stehwelle" und "SWR" sind dasselbe
+    // Wort (derselbe Befund traf am 2026-08-23 schon das inzwischen
+    // entfernte eigene SWR/Leistung-Applet); mit BEIDEN Zeilen im
+    // selben Menue las sich das wie zwei
+    // SWR-Schalter, von denen einer in Wahrheit die Leistung meinte.
+    // Betreiber 2026-08-30 stiess genau darauf ("brauche die Zeile
+    // darunter nicht, soll als Option sein" -- die Option gab es
+    // schon, nur unter dem falschen Namen versteckt).
+    QAction* pwr = menu.addAction(tr("Leistung anzeigen"));
     pwr->setCheckable(true);
     pwr->setChecked(m_showPower);
     connect(pwr, &QAction::triggered, this,
             [this](bool on) { setShowPower(on); });
 
-    QAction* swr = menu.addAction(tr("SWR anzeigen"));
+    // Betreiber 2026-08-30: "Stehwelle bitte auch noch als Option" --
+    // "SWR" und "Stehwelle" sind dasselbe Wort (siehe Begruendung oben
+    // bei "Leistung anzeigen"); die Beschriftung traegt seither beide,
+    // damit niemand mehr danach sucht, ohne es zu finden.
+    QAction* swr = menu.addAction(tr("SWR / Stehwelle anzeigen"));
     swr->setCheckable(true);
     swr->setChecked(m_showSwr);
     connect(swr, &QAction::triggered, this,
             [this](bool on) { setShowSwr(on); });
 
-    // Die Form der Zusatzzeilen — nur anbieten, wenn ueberhaupt eine
-    // steht. Ein Menuepunkt fuer etwas Unsichtbares ist eine Falle.
-    if (m_showPower || m_showSwr) {
-        menu.addSeparator();
-        auto* form = menu.addMenu(tr("Zusatzzeilen"));
-        QAction* seg = form->addAction(tr("Segmente"));
-        seg->setCheckable(true);
-        seg->setChecked(m_powerBar && m_powerBar->isSegmented());
-        connect(seg, &QAction::triggered, this, [this](bool on) {
-            if (m_powerBar) { m_powerBar->setSegmented(on); }
-            if (m_swrBar)   { m_swrBar->setSegmented(on); }
-        });
-        QAction* tube = form->addAction(tr("Roehre (3D)"));
-        tube->setCheckable(true);
-        tube->setChecked(m_powerBar && m_powerBar->isTube());
-        connect(tube, &QAction::triggered, this, [this](bool on) {
-            if (m_powerBar) { m_powerBar->setTube(on); }
-            if (m_swrBar)   { m_swrBar->setTube(on); }
-        });
-    }
+    // Betreiber 2026-08-30: "S-Meter bitte noch bei Frequenz
+    // hinzufügen" -- dieselbe Zusatzzeile wie Leistung/SWR.
+    QAction* sig = menu.addAction(tr("S-Meter anzeigen"));
+    sig->setCheckable(true);
+    sig->setChecked(m_showSignal);
+    connect(sig, &QAction::triggered, this,
+            [this](bool on) { setShowSignal(on); });
 
+    // Betreiber 2026-08-30: "die Zusatzzeilen bitte weg" -- Segmente
+    // und Roehre (3D) galten fuer die alte Mulden-Zeichnung; die
+    // knappe Form (BarInstrument::setCompact) zeichnet seit heute eine
+    // Haarlinie ohne Mulde und liest m_segmented/m_tube gar nicht mehr.
+    // Ein Menuepunkt fuer etwas, das nichts mehr aendert, ist eine
+    // Falle -- weg statt weiter anzubieten.
     menu.exec(ev->globalPos());
     ev->accept();
 }

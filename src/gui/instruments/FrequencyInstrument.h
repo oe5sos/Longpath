@@ -58,6 +58,8 @@
 class QHBoxLayout;
 class QLabel;
 class QLineEdit;
+class QResizeEvent;
+class QSpacerItem;
 class QStackedWidget;
 
 namespace Longpath {
@@ -84,6 +86,15 @@ public:
 
     void setForm(Form f);
     Form form() const { return m_form; }
+
+    /// Betreiber 2026-08-30: "A und B sollte man im Frequenzfeld auch
+    /// anhacken können" -- dieselbe Ein-/Ausblenden-Idee wie schon bei
+    /// den Leistungs-/SWR-Zusatzzeilen (FrequencyApplet::setShowPower/
+    /// setShowSwr), nur fuer die VFO-Zeile selbst. Vorgabe true: bisher
+    /// stand sie immer da, ein stiller Wechsel der Vorgabe waere fuer
+    /// bestehende Profile ein unangekuendigtes Verschwinden.
+    void setVfoRowVisible(bool on);
+    bool vfoRowVisible() const;
 
     // ── Eingetippte Frequenz deuten ──────────────────────────────────
     //
@@ -112,7 +123,7 @@ public:
     QString groupedText() const;
 
     QSize sizeHint() const override;
-    QSize minimumSizeHint() const override { return {240, 74}; }
+    QSize minimumSizeHint() const override;
 
 signals:
     /// Neue Frequenz, vom Rad oder aus dem Eingabefeld. Der Empfaenger
@@ -122,10 +133,19 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent*) override;
+    void resizeEvent(QResizeEvent*) override;
     bool eventFilter(QObject* watched, QEvent* ev) override;
 
 private:
     void buildDigits();
+    /// Wie breit die Ziffernzeile bei einer gegebenen Schriftgroesse
+    /// wird -- dieselbe Rechnung wie buildDigits(), nur ohne Schilder
+    /// zu bauen. Fuer resizeEvent() (welche Stufe passt?) und
+    /// minimumSizeHint() (was braucht die kleinste Stufe wirklich?).
+    static int digitRowWidthAt(int px);
+    /// Die groesste Stufe zwischen kMinDigitFontPx und kMaxDigitFontPx,
+    /// die noch in availableWidth passt.
+    static int fittingDigitFontPx(int availableWidth);
     void refreshDigits();
     void refreshVfoRow();
     void beginEdit();
@@ -137,7 +157,11 @@ private:
     double m_hz{0.0};
     double m_otherHz{0.0};
     bool   m_activeIsThis{true};
-    Form   m_form{Form::BandStrip};
+    // War Form::BandStrip. Betreiber 2026-08-30, zum Streifen unter der
+    // Zahl (der seit heute erst sichtbar wurde): "MHZ Balken benätige
+    // ich nie, löschen!" -- die blosse Zahl ist die Vorgabe, keine
+    // Bandlage-Grafik mehr darunter.
+    Form   m_form{Form::NumberOnly};
 
     QWidget*        m_digitRow{nullptr};
     QHBoxLayout*    m_digitLayout{nullptr};
@@ -146,6 +170,36 @@ private:
     QStackedWidget* m_stack{nullptr};
     QLineEdit*      m_edit{nullptr};
     QLabel*         m_vfoRow{nullptr};
+    /// Reserviert im eigenen Layout (root) den Platz fuer Streifen/
+    /// Bogen -- Groesse haengt von m_form ab, siehe setForm() und
+    /// stripReserveFor() in der .cpp. Eigentum bleibt bei root (Qt-
+    /// Layouts loeschen ihre Items selbst); dieser Zeiger dient nur
+    /// dazu, die Groesse spaeter noch aendern zu koennen.
+    QSpacerItem*    m_stripSpacer{nullptr};
+
+    /// Betreiber, 2026-08-30: „der inhalt im frequenz window sollte
+    /// sich besser anpassen" -- ein abgeloestes Fenster liess sich
+    /// schmaler ziehen, als die Ziffernzeile bei fester Schriftgroesse
+    /// (Style::kFontDisplay) brauchte, und schnitt „MHz" zu „MH" ab.
+    /// Diese Stufe faellt jetzt mit der Fensterbreite, haelt aber nie
+    /// die Lesbarkeit der Uhr-Zone (siehe kMinDigitFontPx) und waechst
+    /// nie ueber die urspruengliche Vorgabe hinaus (kMaxDigitFontPx).
+    int m_digitFontPx{26};   // == kMaxDigitFontPx, siehe dort
+    // Betreiber, 2026-08-30, nach dem ersten Versuch: "das fenster mit
+    // der frequenz sollte man noch kleiner ziehen können." 20px war zu
+    // grosszuegig als Bodenwert -- 12px ist die Grenze, ab der die
+    // Ziffernbreite (kDigitPadOfCell etc.) noch eine positive Zelle
+    // ergibt; darunter reisst die Trefferflaeche pro Ziffer ab
+    // (d->setFixedWidth(cell + digitPad) wuerde auf 0 oder negativ
+    // fallen).
+    static constexpr int kMinDigitFontPx = 12;
+    // War 38 (== Style::kFontDisplay). Betreiber 2026-08-30, per
+    // Entwurfsblatt entschieden ("C -- Ziffern kleiner, Streifen
+    // bleibt" von drei Varianten, siehe FrequencyInstrument::sizeHint):
+    // die Zahl darf kleiner sein als die grosse Kopfzeile eines
+    // eigenstaendigen Zeigerinstruments -- hier steht sie in einem
+    // knappen Schwebefenster, meist neben SWR/Leistung.
+    static constexpr int kMaxDigitFontPx = 26;
 
     /// Acht Ziffern: 7.139.700 — zehn MHz bis Einer-Hertz.
     static constexpr int kDigitCount = 8;

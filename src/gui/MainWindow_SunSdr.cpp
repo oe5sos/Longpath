@@ -312,6 +312,19 @@ void MainWindow::disconnectSunSdr()
 // Fehler jetzt nicht mehr machen, weil er keine Wahl hat.
 SliceModel* MainWindow::sunSdrControllableSlice() const
 {
+    // Betreiber 2026-08-30, in der Nacht: dieselbe Bewachung wie im
+    // TciClient::stateChanged-Handler (ASAN-bestaetigter Heap-UAF, siehe
+    // docs/architecture/2026-08-29-sunsdr-tci-teardown-segfault-investigation.md),
+    // hier zentral statt an jeder Anrufstelle einzeln. "if (!m_radioModel)"
+    // allein schuetzt NICHT: m_radioModel ist ein rohes RadioModel*
+    // (MainWindow.h), kein QPointer, wird beim Abbau also FREIGEGEBEN,
+    // nicht auf nullptr gesetzt. Jeder der sechs Verbraucher dieser
+    // Funktion (deviceDescribed, audioFrameReady, applySunSdrStreamWindow,
+    // applyRemoteSunSdrFrequency, applyRemoteSunSdrModulation) griffe
+    // sonst genau in demselben Reentranz-Fenster auf den freigegebenen
+    // Zeiger zu wie der bereits gefundene Fall -- nur noch nicht mit ASAN
+    // erwischt.
+    if (m_shuttingDown) { return nullptr; }
     if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return nullptr; }
     SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
     if (!slice || slice->streamIndex() >= 0) { return nullptr; }
