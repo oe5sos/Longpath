@@ -13,6 +13,7 @@
 #include "gui/MacFloatingWindowBehavior.h"
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
+#include "gui/WindowPlacement.h"
 
 #include <QCloseEvent>
 #include <QScreen>
@@ -55,6 +56,15 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     attachResizeGrip(this);
 
     restoreGeometryState();
+
+    // Betreiber 2026-08-31: "S-Meter usw. liegen frei am Desktop" --
+    // restoreGeometryState() rief bislang NIE den vorhandenen
+    // Klammer-Helfer auf, obwohl AppletFloatingWindow.h genau das schon
+    // als gegeben behauptet (Dokumentationsfehler, siehe dort). Ohne
+    // diese Zeile blieb eine aus einer breiteren/Vollbild-Sitzung
+    // gespeicherte Position auch dann unangetastet, wenn `parent`
+    // (i.d.R. MainWindow) seither viel kleiner geworden ist.
+    ensureOnVisibleScreen(this, parent, QSize(300, 200));
 
     // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
     // derselbe Grund.

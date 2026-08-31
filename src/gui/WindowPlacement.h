@@ -35,10 +35,18 @@ namespace Longpath {
 
 /// Dafür sorgen, dass `w` auf einem verbundenen Bildschirm zu sehen
 /// ist. Verschoben wird, wenn (a) keine Geometrie gespeichert war,
-/// (b) die gespeicherte bei (0,0) liegt, oder (c) sie ausserhalb jedes
-/// verbundenen Schirms liegt. `anchor` gibt den Zielschirm vor (in der
-/// Regel das Hauptfenster); das Fenster wird auf dessen Schirm
-/// zentriert. Liegt die Geometrie schon richtig, geschieht nichts.
+/// (b) die gespeicherte bei (0,0) liegt, (c) sie ausserhalb jedes
+/// verbundenen Schirms liegt, oder (d) sie das `anchor`-Fenster in
+/// seiner HEUTIGEN Grösse/Lage um weniger als 80×40 Bildpunkte
+/// ueberlappt (Betreiber 2026-08-31: "S-Meter usw. liegen frei am
+/// Desktop" -- eine Position, gespeichert aus einer breiteren/
+/// Vollbild-Sitzung, blieb bislang auch dann unangetastet, wenn das
+/// Hauptfenster seither viel kleiner geworden ist; ein erster, groß-
+/// zuegigerer Anlauf ["beruehrt sich ueberhaupt"] liess noch ein
+/// Fenster durch, das nur mit einem schmalen Rand an der Hauptfenster-
+/// Kante haengenblieb). `anchor` gibt den Zielschirm vor (in der Regel
+/// das Hauptfenster); das Fenster wird auf dessen Schirm zentriert.
+/// Liegt die Geometrie schon richtig, geschieht nichts.
 ///
 /// ── Zwei bekannte Schwächen, bewusst stehen gelassen ────────────────
 ///

@@ -38,15 +38,47 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
         }
     }
     const bool atOrigin = (g.x() == 0 && g.y() == 0);
-    if (onScreen && !atOrigin && g.width() >= minW && g.height() >= minH) {
-        return;
-    }
 
     QScreen* screen = nullptr;
     QRect anchorRect;
     if (anchor && anchor->window()) {
         screen = anchor->window()->screen();
         anchorRect = anchor->window()->geometry();
+    }
+
+    // Betreiber 2026-08-31: "S-Meter usw. liegen frei am Desktop" -- der
+    // reine Schirm-Test oben erklaert das nicht, ein Fenster, das
+    // grossteils auf dem physischen Bildschirm liegt, gilt danach immer
+    // als "in Ordnung", selbst wenn das Hauptfenster laengst kleiner
+    // geworden oder woanders hin verschoben ist und die gespeicherte
+    // Position weit ausserhalb seiner heutigen Flaeche liegt. Gespeichert
+    // wurde die Position ja oft in einer BREITEREN/Vollbild-Sitzung.
+    //
+    // Zusaetzlicher Test, nur wenn ein anchor da ist: die gespeicherte
+    // Geometrie muss das HEUTIGE Hauptfenster in einer nennenswerten
+    // Flaeche ueberlappen -- nicht deckungsgleich (ein Fenster darf
+    // bewusst an der Kante angedockt sein), aber auch nicht nur um ein
+    // paar Bildpunkte. Erster Anlauf hier pruefte nur "beruehrt sich
+    // ueberhaupt" (mit einem um die eigene Fenstergroesse aufgeweiteten
+    // Rand) -- am Betreiber-Fall gemessen liess das ein Fenster durch,
+    // das nur mit 61 von 597 Bildpunkten Breite ueberhaupt noch die
+    // Hauptfenster-Kante beruehrte, der Rest hing frei auf dem
+    // Schreibtisch. kMinOverlap ist dieselbe Groessenordnung, die
+    // WindowPlacement.h fuer die Sichtbarkeitspruefung selbst vorschlaegt
+    // (Schwaeche 2 dort): genug Flaeche, um das Fenster mit der Maus
+    // wieder greifen zu koennen, nicht nur ein Pixel Kontakt.
+    bool nearAnchor = true;
+    if (anchorRect.isValid()) {
+        static constexpr int kMinOverlapW = 80;
+        static constexpr int kMinOverlapH = 40;
+        const QRect overlap = anchorRect.intersected(g);
+        nearAnchor = overlap.width() >= kMinOverlapW
+                  && overlap.height() >= kMinOverlapH;
+    }
+
+    if (onScreen && !atOrigin && nearAnchor
+        && g.width() >= minW && g.height() >= minH) {
+        return;
     }
     if (!screen) {
         screen = QGuiApplication::primaryScreen();

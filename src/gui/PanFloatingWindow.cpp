@@ -24,6 +24,7 @@
 #include "gui/FramelessResizer.h"
 #include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowChrome.h"
+#include "gui/WindowPlacement.h"
 
 #include <QScreen>
 #include <QShowEvent>
@@ -103,6 +104,17 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     resize(900, 460);
 
     restoreGeometryState();
+
+    // Betreiber 2026-08-31: "S-Meter usw. liegen frei am Desktop" --
+    // derselbe Grund wie bei ToolWindow (siehe dort): restoreGeometryState()
+    // rief den vorhandenen Klammer-Helfer nie auf, eine aus einer
+    // breiteren/Vollbild-Sitzung gespeicherte Position blieb also auch
+    // dann stehen, wenn `parent` seither viel kleiner geworden ist. Nach
+    // restoreGeometryState(), vor applyDefaultSize()'s eigener,
+    // unabhaengiger Erstlauf-Groesse -- dieselbe "wer zuerst kommt"-
+    // Reihenfolge, die m_sizedOnce ueberall in dieser Klasse schon
+    // durchhaelt.
+    ensureOnVisibleScreen(this, parent, QSize(420, 240));
 
     // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
     // derselbe Grund -- der "FullScreenAuxiliary"-Kommentar oben war nie
