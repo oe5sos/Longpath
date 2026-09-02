@@ -18,6 +18,9 @@
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-02 — Deckel-Anzeige entfernt (zeitlich unbegrenzt, siehe
+//                 QsoRecorder.h), von Martin Fischer, KI-gestuetzt
+//                 ueber Anthropic Claude (Cowork).
 // =================================================================
 
 // no-port-check: NereusSDR-original test file.
@@ -82,20 +85,22 @@ private slots:
                         "ob das Mikrofon ankommt");
     }
 
-    void theClockShowsItsCeiling()
+    // Der Deckel ist weg (2026-09-02, Ansage des Betreibers: die
+    // Aufnahme soll zeitlich unbegrenzt laufen) — daneben darf keine
+    // Zielmarke "of XX:00" mehr auftauchen. Der Schutz gegen eine
+    // vergessen laufende Aufnahme ist jetzt eine Speicherplatz-Wache im
+    // Hintergrund, keine Uhr zum Anschauen.
+    void theClockHasNoCeilingAnymore()
     {
         RadioModel model;
         QsoRecorderApplet a(&model);
 
-        bool sawCap = false;
+        static const QRegularExpression capPattern(
+            QStringLiteral("^of \\d+:00$"));
         for (QLabel* l : a.findChildren<QLabel*>()) {
-            if (l->text().contains(QStringLiteral("of %1:00")
-                                       .arg(QsoRecorder::kMaxMinutes))) {
-                sawCap = true;
-            }
+            QVERIFY2(!capPattern.match(l->text()).hasMatch(),
+                     "kein Deckel mehr neben der Uhr");
         }
-        QVERIFY2(sawCap,
-                 "der Deckel muss dastehen, bevor er zuschlaegt");
     }
 
     void theButtonStartsAndStopsTheRecording()

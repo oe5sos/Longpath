@@ -58,11 +58,12 @@ mw0lge@grange-lane.co.uk
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-02 — Streamend statt gesammelt (zeitlich unbegrenzt), von
+//                 Martin Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 (Cowork). Begruendung im Header.
 // =================================================================
 
 #include "core/audio/QsoRecorder.h"
-
-#include "core/audio/WavFile.h"
 
 #include <QFile>
 #include <QJsonDocument>
@@ -78,107 +79,50 @@ void QsoRecorder::setSampleRate(int hz)
     if (hz > 0) { m_rate = hz; }
 }
 
-void QsoRecorder::start(const QsoRecordingInfo& info)
+bool QsoRecorder::start(const QString& wavPath, const QsoRecordingInfo& info,
+                        QString* error)
 {
     clear();
+    m_path = wavPath;
     m_info = info;
     m_info.sampleRate = m_rate;
     if (!m_info.utcStart.isValid()) {
         m_info.utcStart = QDateTime::currentDateTimeUtc();
     }
+
+    const auto fmt = m_saveFloat32 ? WavStreamWriter::Format::Float32Stereo
+                                    : WavStreamWriter::Format::Pcm16Stereo;
+    if (!m_writer.open(wavPath, m_rate, fmt, /*dither=*/true, error)) {
+        return false;
+    }
+
     m_recording = true;
+    return true;
 }
 
 void QsoRecorder::stop()
 {
+    if (!m_recording) { return; }
     m_recording = false;
-    // Am Ende die Sprechspur auf die Empfangsspur bringen: sonst ist die
-    // Datei so lang wie die laengere von beiden und die kuerzere endet
-    // vorzeitig, was beim Abspielen wie ein Abbruch klingt.
-    padTxToRx();
+
+    // Am Ende die kuerzere Spur auf die laengere bringen: sonst bricht
+    // die Datei mit der kuerzeren Spur ab, was beim Abspielen wie ein
+    // Abbruch klingt. In der Praxis ist das fast immer die Sprechspur
+    // (siehe Header), aber wer genau beim Loslassen der Taste stoppt,
+    // kann auch kurz die andere Richtung erwischen — finalizeTail()
+    // deckt beide ab.
+    finalizeTail();
     m_info.seconds = recordedSeconds();
-}
 
-void QsoRecorder::clear()
-{
-    m_rx.clear();
-    m_tx.clear();
-    m_info = QsoRecordingInfo{};
-    m_recording = false;
-}
+    const qint64 written = m_writer.framesWritten();
+    m_writer.close();
 
-double QsoRecorder::recordedSeconds() const
-{
-    if (m_rate <= 0) { return 0.0; }
-    return static_cast<double>(std::max(m_rx.size(), m_tx.size())) / m_rate;
-}
-
-void QsoRecorder::padTxToRx()
-{
-    // Der Empfang ist die Uhr: er laeuft dauernd, das Mikrofon nur beim
-    // Senden. Ohne dieses Auffuellen staende die eigene Stimme am
-    // ANFANG der Aufnahme statt an ihrer Stelle im Gespraech.
-    if (m_tx.size() < m_rx.size()) {
-        m_tx.resize(m_rx.size(), 0.0f);
-    }
-}
-
-void QsoRecorder::feedRx(const float* interleavedStereo, int frames)
-{
-    if (!m_recording || interleavedStereo == nullptr || frames <= 0) { return; }
-
-    const int cap = kMaxMinutes * 60 * m_rate;
-    if (m_rx.size() >= cap) { return; }
-
-    const int room = std::min(frames, cap - static_cast<int>(m_rx.size()));
-    const int base = m_rx.size();
-    m_rx.resize(base + room);
-    for (int i = 0; i < room; ++i) {
-        // Zwei Kanaele zu einem: eine QSO-Aufnahme ist keine
-        // Musikproduktion, und der halbe Platz ist es wert.
-        m_rx[base + i] = 0.5f * (interleavedStereo[2 * i]
-                                 + interleavedStereo[2 * i + 1]);
-    }
-}
-
-void QsoRecorder::feedTx(const float* mono, int frames)
-{
-    if (!m_recording || mono == nullptr || frames <= 0) { return; }
-
-    // VOR dem Anhaengen auffuellen — siehe padTxToRx(). Genau hier
-    // entscheidet sich, ob die Aufnahme das Gespraech abbildet oder nur
-    // seine Bestandteile.
-    padTxToRx();
-
-    const int cap = kMaxMinutes * 60 * m_rate;
-    if (m_tx.size() >= cap) { return; }
-
-    const int room = std::min(frames, cap - static_cast<int>(m_tx.size()));
-    const int base = m_tx.size();
-    m_tx.resize(base + room);
-    std::copy_n(mono, room, m_tx.begin() + base);
-}
-
-bool QsoRecorder::save(const QString& wavPath, QString* error) const
-{
-    const int frames = std::max(m_rx.size(), m_tx.size());
-    if (frames == 0) {
-        if (error) { *error = QStringLiteral("nothing recorded"); }
-        return false;
-    }
-
-    // Verschachteln: links Empfang, rechts eigene Stimme.
-    QVector<float> stereo(frames * 2);
-    for (int i = 0; i < frames; ++i) {
-        stereo[2 * i]     = i < m_rx.size() ? m_rx[i] : 0.0f;
-        stereo[2 * i + 1] = i < m_tx.size() ? m_tx[i] : 0.0f;
-    }
-
-    const bool ok = m_saveFloat32
-        ? writeWavStereo(wavPath, stereo, m_rate, error)
-        : writeWavStereo16(wavPath, stereo, m_rate, /*dither=*/true, error);
-    if (!ok) {
-        return false;
+    if (written == 0) {
+        // Kam nichts an, bleibt keine leere Datei liegen — dieselbe
+        // Zusicherung, die frueher save() gab, als es noch nichts zu
+        // schreiben gab.
+        QFile::remove(m_path);
+        return;
     }
 
     // Die Beschreibung daneben, wie Thetis sie fuehrt: eine Aufnahme
@@ -198,12 +142,11 @@ bool QsoRecorder::save(const QString& wavPath, QString* error) const
     j.insert(QStringLiteral("format"),
              m_saveFloat32 ? QStringLiteral("IEEE float32")
                            : QStringLiteral("PCM 16-bit, dithered"));
-    j.insert(QStringLiteral("seconds"),
-             static_cast<double>(frames) / std::max(1, m_rate));
+    j.insert(QStringLiteral("seconds"), m_info.seconds);
     j.insert(QStringLiteral("tracks"),
              QStringLiteral("left = received, right = own microphone"));
 
-    QString jsonPath = wavPath;
+    QString jsonPath = m_path;
     if (jsonPath.endsWith(QStringLiteral(".wav"), Qt::CaseInsensitive)) {
         jsonPath.chop(4);
     }
@@ -216,11 +159,94 @@ bool QsoRecorder::save(const QString& wavPath, QString* error) const
     }
     // Eine fehlende Beschreibung ist kein Grund, die AUFNAHME als
     // gescheitert zu melden: der Ton ist das Wertvolle.
-
-    return true;
 }
 
-// Der Gegenpart zu save(). Siehe Header fuer die Herkunft.
+void QsoRecorder::clear()
+{
+    m_rxPending.clear();
+    m_txPending.clear();
+    m_rxFedTotal = 0;
+    m_txFedTotal = 0;
+    m_info = QsoRecordingInfo{};
+    m_path.clear();
+    m_recording = false;
+    if (m_writer.isOpen()) { m_writer.close(); }
+}
+
+double QsoRecorder::recordedSeconds() const
+{
+    if (m_rate <= 0) { return 0.0; }
+    // Der Empfang ist die Uhr (siehe Header) — er laeuft dauernd, das
+    // Mikrofon nur beim Senden. Was schon auf der Platte liegt, plus
+    // was noch im Zwischenspeicher wartet.
+    return static_cast<double>(m_rxFedTotal) / m_rate;
+}
+
+void QsoRecorder::flushAligned()
+{
+    const int n = std::min(m_rxPending.size(), m_txPending.size());
+    if (n <= 0) { return; }
+
+    // Verschachteln: links Empfang, rechts eigene Stimme.
+    QVector<float> interleaved(n * 2);
+    for (int i = 0; i < n; ++i) {
+        interleaved[2 * i]     = m_rxPending[i];
+        interleaved[2 * i + 1] = m_txPending[i];
+    }
+    m_writer.writeInterleaved(interleaved.constData(), n);
+
+    m_rxPending.remove(0, n);
+    m_txPending.remove(0, n);
+}
+
+void QsoRecorder::finalizeTail()
+{
+    if (m_rxPending.size() < m_txPending.size()) {
+        m_rxPending.resize(m_txPending.size(), 0.0f);
+    } else if (m_txPending.size() < m_rxPending.size()) {
+        m_txPending.resize(m_rxPending.size(), 0.0f);
+    }
+    flushAligned();
+}
+
+void QsoRecorder::feedRx(const float* interleavedStereo, int frames)
+{
+    if (!m_recording || interleavedStereo == nullptr || frames <= 0) { return; }
+
+    const int base = m_rxPending.size();
+    m_rxPending.resize(base + frames);
+    for (int i = 0; i < frames; ++i) {
+        // Zwei Kanaele zu einem: eine QSO-Aufnahme ist keine
+        // Musikproduktion, und der halbe Platz ist es wert.
+        m_rxPending[base + i] = 0.5f * (interleavedStereo[2 * i]
+                                        + interleavedStereo[2 * i + 1]);
+    }
+    m_rxFedTotal += frames;
+
+    flushAligned();
+}
+
+void QsoRecorder::feedTx(const float* mono, int frames)
+{
+    if (!m_recording || mono == nullptr || frames <= 0) { return; }
+
+    // VOR dem Anhaengen auffuellen — dieselbe Ausrichtung wie vor dem
+    // Umbau auf Streamen, nur auf den Zwischenspeicher bezogen statt
+    // auf die ganze Aufnahme: genau hier entscheidet sich, ob die
+    // Aufnahme das Gespraech abbildet oder nur seine Bestandteile.
+    if (m_txPending.size() < m_rxPending.size()) {
+        m_txPending.resize(m_rxPending.size(), 0.0f);
+    }
+
+    const int base = m_txPending.size();
+    m_txPending.resize(base + frames);
+    std::copy_n(mono, frames, m_txPending.begin() + base);
+    m_txFedTotal += frames;
+
+    flushAligned();
+}
+
+// Der Gegenpart zu stop(). Siehe Header fuer die Herkunft.
 QsoRecordingInfo readQsoDescription(const QString& wavPath)
 {
     QsoRecordingInfo info;

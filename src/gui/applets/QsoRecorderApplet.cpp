@@ -75,7 +75,6 @@ mw0lge@grange-lane.co.uk
 #include <QUrl>
 #include <QDesktopServices>
 #include <QMenu>
-#include <QStorageInfo>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -133,6 +132,19 @@ QsoRecorderApplet::QsoRecorderApplet(RadioModel* model, QWidget* parent)
                 m_lossLabel->setVisible(true);
             }
         });
+        connect(&m_model->qsoRecorder(),
+                &QsoRecorderController::diskSpaceLow,
+                this, [this]() {
+            // Die Aufnahme bis hierhin ist vollstaendig auf der Platte
+            // — nur zu Ende ist sie frueher, als jemand gewollt haette.
+            if (m_lossLabel) {
+                m_lossLabel->setText(QStringLiteral(
+                    "⚠ recording stopped — disk space is low"));
+                m_lossLabel->setVisible(true);
+            }
+            refreshState();
+            refreshList();
+        });
     }
 
     refreshState();
@@ -183,14 +195,6 @@ void QsoRecorderApplet::buildUI()
         m_clock->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                    .arg(QLatin1String(Style::kTextPrimary)));
         row->addWidget(m_clock);
-
-        // Der Deckel steht daneben, bevor er zuschlaegt.
-        m_capLabel = new QLabel(
-            QStringLiteral("of %1:00").arg(QsoRecorder::kMaxMinutes), body);
-        m_capLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; }")
-            .arg(QLatin1String(Style::kTextScale)));
-        row->addWidget(m_capLabel);
 
         row->addStretch(1);
 
@@ -402,69 +406,43 @@ void QsoRecorderApplet::onRecordClicked()
     QsoRecorderController& rec = m_model->qsoRecorder();
 
     if (rec.isRecording()) {
+        // Die Aufnahme ist schon auf der Platte (streamend seit
+        // 2026-09-02, siehe QsoRecorder.h) — stop() schliesst die
+        // Datei nur noch und schreibt die Beschreibung daneben. Kam
+        // nichts an, hat QsoRecorder::stop() die leere Datei schon
+        // selbst wieder entfernt.
+        const bool gotAudio = rec.recorder().rxFrames() > 0
+                            || rec.recorder().txFrames() > 0;
         rec.stop();
-
-        const QString stamp = rec.recorder().info().utcStart
-                                  .toString(QStringLiteral("yyyyMMdd-HHmmss"));
-        const QString call = rec.recorder().info().callsign;
-        const QString name = call.isEmpty()
-            ? QStringLiteral("qso-%1.wav").arg(stamp)
-            : QStringLiteral("qso-%1-%2.wav").arg(stamp, call);
-        const QString path = recordingFolder() + QLatin1Char('/') + name;
 
         // Eine leere Aufnahme ist kein Fehler, sondern ein Versehen —
         // jemand hat zweimal geklickt. Ein modaler Kasten dafuer ist
         // zu viel; die Zeile darunter sagt es und geht wieder weg.
-        if (rec.recorder().rxFrames() == 0
-            && rec.recorder().txFrames() == 0) {
-            if (m_lossLabel) {
-                m_lossLabel->setText(QStringLiteral(
-                    "nothing was recorded — no audio arrived"));
-                m_lossLabel->setVisible(true);
-            }
-        } else {
-            QString err;
-            if (!rec.recorder().save(path, &err)) {
-                // Hier SCHON ein Kasten: es lag etwas vor und ist nicht
-                // auf die Platte gekommen. Das darf man nicht uebersehen.
-                QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
-                    QStringLiteral("Nothing was written: %1").arg(err));
-            }
+        if (!gotAudio && m_lossLabel) {
+            m_lossLabel->setText(QStringLiteral(
+                "nothing was recorded — no audio arrived"));
+            m_lossLabel->setVisible(true);
         }
         refreshList();
     } else {
         // ── Passt das ueberhaupt noch? ───────────────────────────
         //
-        // Aus der Thetis-Durchsicht vom 2026-08-19: Thetis prueft mit
-        // OkToRecord() vor dem Start und noch einmal WAEHREND der
-        // Aufnahme auf einem Zeitgeber, und stoppt sich selbst, wenn
-        // der Platz knapp wird (clsAudioRecordPlayback.cs:633 + :662
-        // [@852bf0e]).
-        //
-        // Bei uns reicht die Pruefung VOR dem Start: wir sammeln im
-        // Arbeitsspeicher und schreiben erst am Ende. Der laufende
-        // Zeitgeber waere hier eine Antwort auf eine Frage, die sich
-        // nicht stellt.
-        //
-        // Gerechnet wird gegen die VOLLE halbe Stunde, nicht gegen den
-        // Augenblick. Eine Aufnahme, die nach 25 Minuten am Platz
-        // scheitert, ist schlimmer als eine, die gar nicht erst
-        // anfaengt.
-        {
-            const QStorageInfo disk(recordingFolder());
-            const qint64 needed = static_cast<qint64>(QsoRecorder::kMaxMinutes)
-                                * 60 * 48000 * 4;   // Stereo, 16 Bit
-            if (disk.isValid() && disk.bytesAvailable() > 0
-                && disk.bytesAvailable() < needed) {
-                QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
-                    QStringLiteral(
-                        "Not enough room for a full recording: %1 MB free, "
-                        "%2 MB needed for %3 minutes.")
-                        .arg(disk.bytesAvailable() / (1024 * 1024))
-                        .arg(needed / (1024 * 1024))
-                        .arg(QsoRecorder::kMaxMinutes));
-                return;
-            }
+        // Aus der Thetis-Durchsicht vom 2026-08-19 (erneuert
+        // 2026-09-02): Thetis prueft mit OkToRecord() vor dem Start
+        // und noch einmal WAEHREND der Aufnahme auf einem Zeitgeber,
+        // und stoppt sich selbst, wenn der Platz knapp wird
+        // (clsAudioRecordPlayback.cs:630-692 [@852bf0e]). Seit die
+        // Aufnahme selbst streamend auf die Platte geht (statt im
+        // Arbeitsspeicher zu sammeln) und zeitlich unbegrenzt laeuft,
+        // gilt dieselbe Pruefung wie bei Thetis auch hier — die
+        // laufende Wache ist QsoRecorderController::checkDiskSpace().
+        if (!QsoRecorderController::hasEnoughDiskSpace(recordingFolder())) {
+            QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
+                QStringLiteral(
+                    "Not enough free disk space to start recording "
+                    "(less than %1% free).")
+                    .arg(QsoRecorderController::kFreeSpacePercentFloor));
+            return;
         }
 
         if (m_lossLabel) { m_lossLabel->setVisible(false); }
@@ -484,7 +462,24 @@ void QsoRecorderApplet::onRecordClicked()
             info.mode      = SliceModel::modeName(s->dspMode());
         }
         rec.setSliceId(s ? s->sliceIndex() : 0);
-        rec.start(info);
+
+        // Der Dateiname steht schon fest, bevor die Aufnahme beginnt —
+        // anders als vorher, wo er erst beim Speichern am Ende
+        // gebraucht wurde: QsoRecorder oeffnet die Datei jetzt sofort.
+        const QString stamp = info.utcStart
+                                  .toString(QStringLiteral("yyyyMMdd-HHmmss"));
+        const QString call = info.callsign;
+        const QString name = call.isEmpty()
+            ? QStringLiteral("qso-%1.wav").arg(stamp)
+            : QStringLiteral("qso-%1-%2.wav").arg(stamp, call);
+        const QString path = recordingFolder() + QLatin1Char('/') + name;
+
+        QString err;
+        if (!rec.start(path, info, &err)) {
+            QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
+                QStringLiteral("Could not start recording: %1").arg(err));
+            return;
+        }
     }
     refreshState();
 }

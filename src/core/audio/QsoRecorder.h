@@ -97,15 +97,42 @@ mw0lge@grange-lane.co.uk
 // gereicht und weiss nicht, woher — so laesst sie sich ohne Funkgeraet,
 // ohne Audiogeraet und ohne WDSP pruefen.
 //
+// ── Zeitlich unbegrenzt (2026-09-02) ─────────────────────────────────
+//
+// Bis hierhin sammelte diese Klasse beide Spuren im Arbeitsspeicher und
+// schrieb die Datei erst bei stop(), gedeckelt bei kMaxMinutes (30) —
+// der Deckel war der Schutz gegen eine vergessene Aufnahme, die den
+// Speicher auffrisst. Ansage des Betreibers (2026-09-02): der Recorder
+// soll RX UND TX aufnehmen (das tat er schon) und zeitlich unbegrenzt
+// laufen. Ein Deckel und "unbegrenzt" schliessen sich aus, wenn man
+// weiter im Speicher sammelt.
+//
+// Also schreibt diese Klasse jetzt wie WavRecorder (WavRecorder.h,
+// 2026-08-25 fuer genau dasselbe Problem gebaut) blockweise direkt auf
+// die Platte, ueber denselben WavStreamWriter — der Speicherbedarf
+// bleibt damit UNABHAENGIG von der Aufnahmedauer. Was bleibt, ist ein
+// kleiner Zwischenspeicher je Spur (typisch eine Abholrunde, siehe
+// QsoRecorderController::kDrainMs), der die RX-ist-die-Uhr-Ausrichtung
+// aus dem Header oben umsetzt, bevor ein Block feststeht und auf die
+// Platte geht. Der Schutz gegen "vergessen laufen lassen" ist jetzt
+// QsoRecorderController's Speicherplatz-Wache (Thetis OkToRecord /
+// onRecordSpaceTimer, clsAudioRecordPlayback.cs:630-692 [@852bf0e]) —
+// prozentual zur Plattengroesse, nicht an eine Dauer gebunden.
+//
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-02 — Streamend statt gesammelt (zeitlich unbegrenzt), von
+//                 Martin Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 (Cowork). Begruendung oben.
 // =================================================================
 
 #include <QDateTime>
 #include <QString>
 #include <QVector>
+
+#include "core/audio/WavFile.h"
 
 namespace Longpath {
 
@@ -138,14 +165,18 @@ QsoRecordingInfo readQsoDescription(const QString& wavPath);
 class QsoRecorder
 {
 public:
-    // 30 Minuten bei 48 kHz sind rund 330 MB in float32-Stereo. Das ist
-    // die Grenze, ab der eine vergessene Aufnahme die Platte auffrisst.
-    static constexpr int kMaxMinutes = 30;
-
     void setSampleRate(int hz);
     int  sampleRate() const { return m_rate; }
 
-    void start(const QsoRecordingInfo& info);
+    // Oeffnet die Datei sofort (streamend, siehe Header) und merkt sich
+    // die Beschreibung fuer die JSON-Datei, die stop() schreibt.
+    bool start(const QString& wavPath, const QsoRecordingInfo& info,
+              QString* error = nullptr);
+    // Traegt die Sprechspur auf den letzten Empfangsstand nach (siehe
+    // Header, "die eigentliche Schwierigkeit"), schreibt den Rest,
+    // schliesst die Datei und legt die JSON-Beschreibung daneben. Kam
+    // nichts an, wird die leere Datei wieder geloescht statt eine
+    // Aufnahme ohne Ton zu hinterlassen.
     void stop();
     bool isRecording() const { return m_recording; }
 
@@ -157,34 +188,40 @@ public:
     // Mikrofonton, einkanalig, wie der Sendeabgriff ihn liefert.
     void feedTx(const float* mono, int frames);
 
-    int rxFrames() const { return m_rx.size(); }
-    int txFrames() const { return m_tx.size(); }
+    // Seit Aufnahmebeginn insgesamt hereingekommen — nicht die Groesse
+    // des kleinen Zwischenspeichers, der laufend auf die Platte geht.
+    qint64 rxFrames() const { return m_rxFedTotal; }
+    qint64 txFrames() const { return m_txFedTotal; }
     double recordedSeconds() const;
 
-    // Schreibt die Stereodatei (links Empfang, rechts eigene Stimme)
-    // und daneben eine JSON-Beschreibung, wie Thetis es tut.
-    //
-    // 16 Bit mit Dither, es sei denn jemand will ausdruecklich float32
-    // (siehe setSaveFloat32). Eine halbe Stunde Stereo sind in float32
-    // 690 MB, in PCM16 noch 173 MB — und der Dynamikumfang eines
-    // Sprach-QSOs liegt weit unter dem, was 16 Bit tragen.
-    bool save(const QString& wavPath, QString* error = nullptr) const;
-
     // Fuer den Fall, dass jemand die Aufnahme weiterverarbeiten will
-    // und keine Rundung im Weg haben moechte. Vorgabe ist 16 Bit.
+    // und keine Rundung im Weg haben moechte. Vorgabe ist 16 Bit — der
+    // Dynamikumfang eines Sprach-QSOs liegt weit unter dem, was 16 Bit
+    // tragen, und halbiert nebenbei die Dateigrosse. Vor start() setzen;
+    // eine laufende Aufnahme wechselt das Format nicht mehr.
     void setSaveFloat32(bool on) { m_saveFloat32 = on; }
     bool saveFloat32() const { return m_saveFloat32; }
 
     void clear();
 
     const QsoRecordingInfo& info() const { return m_info; }
+    const QString&          path() const { return m_path; }
 
 private:
-    void padTxToRx();
+    void flushAligned();
+    void finalizeTail();
 
-    QVector<float>   m_rx;
-    QVector<float>   m_tx;
+    // Kleiner Zwischenspeicher: noch nicht auf die Platte geschrieben,
+    // weil die Gegenspur noch nicht so weit ist (siehe Header). Bleibt
+    // in der Praxis bei rund einer Abholrunde — siehe QsoRecorder.cpp.
+    QVector<float>   m_rxPending;
+    QVector<float>   m_txPending;
+    qint64           m_rxFedTotal{0};
+    qint64           m_txFedTotal{0};
+
+    WavStreamWriter  m_writer;
     QsoRecordingInfo m_info;
+    QString          m_path;
     int              m_rate{48000};
     bool             m_recording{false};
     bool             m_saveFloat32{false};

@@ -67,8 +67,11 @@ mw0lge@grange-lane.co.uk
 // Anzeige, in der man Stille nicht von „Mikrofon aus" unterscheiden
 // kann. Das ist der ganze Grund fuer die Aufteilung.
 //
-// Die Uhr zaehlt hoch MIT ZIEL („04:17 von 30:00"), damit der Deckel
-// sichtbar ist, bevor er zuschlaegt.
+// Die Uhr zaehlt einfach hoch — seit 2026-09-02 ohne Ziel, weil die
+// Aufnahme zeitlich unbegrenzt laeuft (siehe QsoRecorder.h). Der
+// Deckel, den es vorher daneben zu sehen gab („04:17 von 30:00"), ist
+// mit ihm verschwunden; was jetzt schuetzt, ist eine Speicherplatz-
+// Wache im Hintergrund (QsoRecorderController), keine Uhr zum Anschauen.
 //
 // Frequenz, Modus und Band stehen im Kopf: dieselben Angaben, die in
 // die Beschreibungsdatei wandern. Was gespeichert wird, soll man sehen.
@@ -119,7 +122,6 @@ private:
 
     QPushButton* m_recBtn{nullptr};
     QLabel*      m_clock{nullptr};
-    QLabel*      m_capLabel{nullptr};
     QLabel*      m_headInfo{nullptr};
     QLabel*      m_lossLabel{nullptr};
 

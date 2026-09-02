@@ -13,10 +13,21 @@
 // die eigene Stimme GANZ AM ANFANG steht — egal wann sie gesprochen
 // wurde. Das faellt beim Hoeren sofort auf und beim Programmieren nie.
 //
+// Seit 2026-09-02 (zeitlich unbegrenzt, siehe QsoRecorder.h) schreibt
+// QsoRecorder streamend: start() braucht den Zielpfad schon vorher,
+// nicht erst ein save() am Ende, und rxFrames()/txFrames() zaehlen
+// seither das INSGESAMT HEREINGEKOMMENE, nicht die Groesse eines
+// Zwischenspeichers — die alten Tests, die auf Auffuell-Nebenwirkungen
+// dieses Zaehlers prueften, pruefen die Ausrichtung jetzt direkt an der
+// geschriebenen Datei, was ohnehin die eigentliche Behauptung ist.
+//
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-02 — An das streamende QsoRecorder angepasst (zeitlich
+//                 unbegrenzt), von Martin Fischer, KI-gestuetzt ueber
+//                 Anthropic Claude (Cowork).
 // =================================================================
 
 // no-port-check: NereusSDR-original test file.
@@ -76,17 +87,17 @@ private slots:
         QsoRecorder r;
         const auto rx = rxBlock(100, 0.5f);
         r.feedRx(rx.constData(), 100);
-        QCOMPARE(r.rxFrames(), 0);
+        QCOMPARE(r.rxFrames(), qint64(0));
         QVERIFY(!r.isRecording());
     }
 
     void receivedAudioIsMixedToOneChannel()
     {
         QsoRecorder r;
-        r.start(someQso());
+        QVERIFY(r.start(path(QStringLiteral("mixed.wav")), someQso()));
         const auto rx = rxBlock(50, 0.4f);
         r.feedRx(rx.constData(), 50);
-        QCOMPARE(r.rxFrames(), 50);
+        QCOMPARE(r.rxFrames(), qint64(50));
     }
 
     // ── Die Ausrichtung ──────────────────────────────────────────────
@@ -97,7 +108,8 @@ private slots:
     {
         QsoRecorder r;
         r.setSampleRate(1000);      // rechnet sich leichter
-        r.start(someQso());
+        const QString p = path(QStringLiteral("qso.wav"));
+        QVERIFY(r.start(p, someQso()));
 
         const auto rx = rxBlock(10000, 0.2f);   // 10 s Empfang
         r.feedRx(rx.constData(), 10000);
@@ -105,18 +117,16 @@ private slots:
         const auto tx = txBlock(1000, 0.9f);    // 1 s Sprechen
         r.feedTx(tx.constData(), 1000);
 
-        QCOMPARE(r.rxFrames(), 10000);
-        QVERIFY2(r.txFrames() == 11000,
-                 "die Sprechspur muss bis Sekunde 10 mit Stille aufgefuellt "
-                 "sein und dann die Stimme tragen");
+        QCOMPARE(r.rxFrames(), qint64(10000));
+        QCOMPARE(r.txFrames(), qint64(1000));   // echt hereingekommen, ohne Auffuellung
 
         r.stop();
-        const QString p = path(QStringLiteral("qso.wav"));
-        QString err;
-        QVERIFY2(r.save(p, &err), qPrintable(err));
 
         // Nachsehen, was wirklich in der Datei steht: der rechte Kanal
-        // muss bis Sekunde 10 still sein und danach laut.
+        // muss bis Sekunde 10 still sein und danach laut. Das ist die
+        // eigentliche Behauptung dieses Tests — die Auffuellung zeigt
+        // sich in der DATEI, nicht mehr im Zaehler.
+        QString err;
         const WavData back = readWavMono(p, &err);
         QVERIFY2(back.ok, qPrintable(err));
         // readWavMono mittelt beide Kanaele: vor der Stimme also nur der
@@ -136,7 +146,8 @@ private slots:
     {
         QsoRecorder r;
         r.setSampleRate(1000);
-        r.start(someQso());
+        const QString p = path(QStringLiteral("speak-first.wav"));
+        QVERIFY(r.start(p, someQso()));
 
         const auto tx = txBlock(2000, 0.8f);
         r.feedTx(tx.constData(), 2000);
@@ -144,16 +155,22 @@ private slots:
         r.feedRx(rx.constData(), 5000);
 
         r.stop();
-        QCOMPARE(r.txFrames(), 5000);   // auf Empfangslaenge gebracht
         QVERIFY2(qAbs(r.recordedSeconds() - 5.0) < 1e-9,
                  "die Aufnahme ist so lang wie das laengere von beiden");
+
+        // Die geschriebene Datei ist auf die Empfangslaenge aufgefuellt
+        // — das ist die eigentliche Zusicherung, nicht ein Zaehlerwert.
+        const WavData back = readWavMono(p);
+        QVERIFY(back.ok);
+        QCOMPARE(back.samples.size(), 5000);
     }
 
     void bothTracksEndUpInOneStereoFile()
     {
         QsoRecorder r;
         r.setSampleRate(8000);
-        r.start(someQso());
+        const QString p = path(QStringLiteral("stereo-qso.wav"));
+        QVERIFY(r.start(p, someQso()));
 
         // ERST sprechen, DANN empfangen — nur so decken sich beide
         // Spuren. Andersherum schiebt die Ausrichtung die Sprechspur
@@ -166,9 +183,6 @@ private slots:
         const auto rx = rxBlock(800, 0.25f);
         r.feedRx(rx.constData(), 800);
         r.stop();
-
-        const QString p = path(QStringLiteral("stereo-qso.wav"));
-        QVERIFY(r.save(p));
 
         // Beide Kanaele heben sich beim Mitteln auf — genau daran
         // erkennt man, dass sie GETRENNT geschrieben wurden und nicht
@@ -203,13 +217,11 @@ private slots:
     void aDescriptionIsWrittenBeside()
     {
         QsoRecorder r;
-        r.start(someQso());
+        const QString wav = path(QStringLiteral("described.wav"));
+        QVERIFY(r.start(wav, someQso()));
         const auto rx = rxBlock(48000, 0.1f);
         r.feedRx(rx.constData(), 48000);
         r.stop();
-
-        const QString wav = path(QStringLiteral("described.wav"));
-        QVERIFY(r.save(wav));
 
         QFile j(path(QStringLiteral("described.json")));
         QVERIFY2(j.exists(), "neben der WAV liegt die Beschreibung");
@@ -222,37 +234,52 @@ private slots:
                  "und sie sagt, welche Spur welche ist");
     }
 
-    void savingNothingIsRefused()
+    // Kam nichts an, bleibt keine Datei liegen — dieselbe Zusicherung,
+    // die vorher save() gab, als es noch nichts zu schreiben gab.
+    void emptyRecordingLeavesNoFile()
     {
         QsoRecorder r;
+        const QString p = path(QStringLiteral("empty.wav"));
         QString err;
-        QVERIFY(!r.save(path(QStringLiteral("empty.wav")), &err));
-        QVERIFY(!err.isEmpty());
+        QVERIFY2(r.start(p, someQso(), &err), qPrintable(err));
+        r.stop();
+        QVERIFY2(!QFile::exists(p),
+                 "eine leere Aufnahme darf keine Datei hinterlassen");
     }
 
     void clearingStartsOver()
     {
         QsoRecorder r;
-        r.start(someQso());
+        QVERIFY(r.start(path(QStringLiteral("cleared.wav")), someQso()));
         const auto rx = rxBlock(100, 0.5f);
         r.feedRx(rx.constData(), 100);
         r.clear();
-        QCOMPARE(r.rxFrames(), 0);
+        QCOMPARE(r.rxFrames(), qint64(0));
         QVERIFY(!r.isRecording());
     }
 
-    // Eine vergessene Aufnahme darf die Platte nicht auffressen.
-    void thereIsACeiling()
+    // Der frueher 30-Minuten-Deckel ist weg (2026-09-02, Ansage des
+    // Betreibers: der Recorder soll zeitlich unbegrenzt laufen). Weit
+    // ueber die alte Grenze hinaus fuettern, und trotzdem kommt alles
+    // an — sowohl gezaehlt als auch tatsaechlich auf der Platte.
+    void unlimitedDurationIsNotCapped()
     {
         QsoRecorder r;
         r.setSampleRate(1000);
-        r.start(someQso());
+        const QString p = path(QStringLiteral("long.wav"));
+        QVERIFY(r.start(p, someQso()));
 
-        const int cap = QsoRecorder::kMaxMinutes * 60 * 1000;
-        const auto rx = rxBlock(cap + 5000, 0.1f);
-        r.feedRx(rx.constData(), cap + 5000);
+        // Der alte Deckel war 30 Minuten bei 1000 Hz = 1.800.000 Rahmen.
+        const qint64 beyondOldCap = 1800000 + 5000;
+        const auto rx = rxBlock(static_cast<int>(beyondOldCap), 0.1f);
+        r.feedRx(rx.constData(), static_cast<int>(beyondOldCap));
 
-        QCOMPARE(r.rxFrames(), cap);
+        QCOMPARE(r.rxFrames(), beyondOldCap);
+        r.stop();
+
+        const WavData back = readWavMono(p);
+        QVERIFY(back.ok);
+        QCOMPARE(static_cast<qint64>(back.samples.size()), beyondOldCap);
     }
 };
 
