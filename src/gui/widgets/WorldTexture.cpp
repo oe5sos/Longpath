@@ -8,6 +8,9 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-09-02 — Photo style (Muted/NightWash/Crisp) added, von Martin
+//                 Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 (Cowork). Begruendung im Header.
 // =================================================================
 
 #include "WorldTexture.h"
@@ -15,6 +18,8 @@
 #include "gui/widgets/WorldMapCatalog.h"
 
 #include "core/AppSettings.h"
+
+#include <algorithm>
 
 namespace Longpath {
 namespace WorldTexture {
@@ -31,6 +36,72 @@ Cache& cache()
 {
     static Cache c;
     return c;
+}
+
+struct StyledCache {
+    QString path;
+    Style   style{Style::Muted};
+    QImage  image;
+    bool    have{false};
+};
+
+StyledCache& styledCache()
+{
+    static StyledCache c;
+    return c;
+}
+
+// Tonwertkurve je Stil: erst Helligkeit (Multiplikator), dann Kontrast
+// (Drehpunkt bei Mittelgrau) -- dieselbe Reihenfolge wie CSS' eigenes
+// filter: brightness() vor contrast(), weil genau diese Werte am
+// gezeigten Entwurf (Blue-Marble-Entwuerfe, 2026-09-02) abgenommen
+// wurden. Kein Thetis-Bezug: reine NereusSDR-Bildoberflaeche, editoriell
+// gewaehlt, nicht gemessen.
+struct Curve {
+    bool   grey;
+    double brightness;
+    double contrast;
+};
+
+Curve curveFor(Style s)
+{
+    switch (s) {
+    case Style::Muted:     return Curve{true,  0.50, 1.20};
+    case Style::NightWash: return Curve{false, 0.62, 1.08};
+    case Style::Crisp:     return Curve{false, 0.84, 1.05};
+    }
+    return Curve{true, 0.50, 1.20};
+}
+
+QImage applyStyle(const QImage& src, Style style)
+{
+    if (src.isNull()) { return src; }
+
+    QImage out = src.convertToFormat(QImage::Format_RGB32);
+    const Curve curve = curveFor(style);
+
+    const auto adjust = [&](int v) {
+        double vv = v * curve.brightness;
+        vv = (vv - 128.0) * curve.contrast + 128.0;
+        return std::clamp(static_cast<int>(vv), 0, 255);
+    };
+
+    const int h = out.height();
+    const int w = out.width();
+    for (int y = 0; y < h; ++y) {
+        auto* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const QRgb px = line[x];
+            int r = qRed(px);
+            int g = qGreen(px);
+            int b = qBlue(px);
+            if (curve.grey) {
+                r = g = b = qGray(px);
+            }
+            line[x] = qRgb(adjust(r), adjust(g), adjust(b));
+        }
+    }
+    return out;
 }
 
 } // namespace
@@ -54,6 +125,7 @@ QString currentPath()
 void reload()
 {
     cache() = Cache{};
+    styledCache() = StyledCache{};
     emit Notifier::instance().changed();
 }
 
@@ -78,6 +150,49 @@ QImage image()
     return c.image;
 }
 
+QString styleSettingsKey()
+{
+    return QStringLiteral("GlobeWorldImageStyle");
+}
+
+Style style()
+{
+    const QString v = AppSettings::instance()
+        .value(styleSettingsKey(), QStringLiteral("Muted")).toString();
+    if (v == QStringLiteral("NightWash")) { return Style::NightWash; }
+    if (v == QStringLiteral("Crisp"))     { return Style::Crisp; }
+    return Style::Muted;
+}
+
+void setStyle(Style s)
+{
+    if (s == style()) { return; }
+
+    const QString v = s == Style::NightWash ? QStringLiteral("NightWash")
+                     : s == Style::Crisp     ? QStringLiteral("Crisp")
+                                              : QStringLiteral("Muted");
+    AppSettings::instance().setValue(styleSettingsKey(), v);
+    emit Notifier::instance().changed();
+}
+
+QImage styledImage()
+{
+    const QImage base = image();
+    if (base.isNull()) { return base; }
+
+    const QString path = currentPath();
+    const Style   want  = style();
+
+    StyledCache& sc = styledCache();
+    if (sc.have && sc.path == path && sc.style == want) { return sc.image; }
+
+    sc.path  = path;
+    sc.style = want;
+    sc.image = applyStyle(base, want);
+    sc.have  = true;
+    return sc.image;
+}
+
 QString requiredAttribution()
 {
     const QString path = currentPath();
@@ -100,6 +215,13 @@ bool setPath(const QString& path)
     c.image = img.convertToFormat(QImage::Format_RGB32);
     emit Notifier::instance().changed();
     return true;
+}
+
+void clearPath()
+{
+    AppSettings::instance().setValue(settingsKey(), QString{});
+    cache() = Cache{};
+    emit Notifier::instance().changed();
 }
 
 } // namespace WorldTexture

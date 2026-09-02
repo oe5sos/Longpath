@@ -4874,6 +4874,11 @@ target_link_libraries(tst_log_entry PRIVATE Qt6::Network)
 #    slerp (the path), both static so no window is needed --
 nereus_add_test(tst_globe_geometry)
 
+# -- WorldTexture photo style (Muted/NightWash/Crisp, 2026-09-02): the
+#    tone-curve maths and that a style change actually invalidates the
+#    styledImage() cache instead of sticking to the previous result --
+nereus_add_test(tst_world_texture_style)
+
 # -- DXCC prefix to flag: known entities, and no guess for the rest --
 nereus_add_test(tst_dxcc_flag)
 

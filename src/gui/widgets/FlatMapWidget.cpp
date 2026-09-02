@@ -373,7 +373,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
 
     const QRectF r = mapRect();
 
-    const QImage tex = WorldTexture::image();
+    const QImage tex = WorldTexture::styledImage();
     if (!tex.isNull()) {
         p.drawImage(r, tex);
     } else {

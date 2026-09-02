@@ -19,10 +19,27 @@
 // out "GlobeWorldImagePath" is a typo away from one of them silently
 // never finding the image.
 //
+// ── Photo style (2026-09-02) ─────────────────────────────────────────
+//
+// Ansage des Betreibers: ein Weltbild soll her, aber "gefällt mir
+// keines" zum unbehandelten Foto direkt im Hausstil-Fenster — Farbe
+// bedeckt dort hoechstens zwei Prozent der Flaeche, ein Satellitenfoto
+// in voller Saettigung bricht das sofort. Drei Entwuerfe wurden gezeigt
+// und alle drei gefielen; also alle drei, waehlbar statt entschieden.
+//
+// Style() ist eine Tonwertkurve auf dem SCHON GECACHTEN Bild, nicht ein
+// zweites Foto -- genau wie beim rohen Bild gilt: einmal je (Pfad,
+// Stil) gerechnet, nicht je Bildschirmzeile. Wer die Kugel oder die
+// flache Karte zeichnet, ruft styledImage() statt image() und weiss
+// von der Auswahl nichts weiter.
+//
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-09-02 — Photo style (Muted/NightWash/Crisp) added, von Martin
+//                 Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 (Cowork). Begruendung oben.
 // =================================================================
 
 #include <QImage>
@@ -44,6 +61,33 @@ QString currentPath();
 // than the whole render.
 QImage image();
 
+// Drei Tonwertkurven fuer ein geladenes Foto, aus vier gezeigten
+// Entwuerfen (Betreiber 2026-09-02: "gefallen mir alle, bitte alle 3
+// Varianten"). Wirkt nur, wenn ein echtes Bild geladen ist -- der
+// schematische Duotone-Ersatz (GlobeWidget ohne Textur) hat sein
+// eigenes, unabhaengiges Glimmen und ist davon nicht betroffen.
+enum class Style {
+    Muted,      // fast Graustufe, stark verdunkelt -- am naehesten am Hausstil
+    NightWash,  // volle Farbe, deutlich verdunkelt
+    Crisp,      // volle Farbe, nur leicht verdunkelt -- am naehesten am Originalfoto
+};
+
+// Settings key holding the chosen style.
+QString styleSettingsKey();
+
+// Der gewaehlte Stil, Vorgabe Muted (siehe styleSettingsKey()).
+Style style();
+
+// Waehlt einen Stil und loest Notifier::changed() aus, auch wenn kein
+// Bild geladen ist -- die Wahl soll stehen, sobald eines geladen wird.
+void setStyle(Style s);
+
+// image(), durch die aktuelle Tonwertkurve gerechnet. Gecacht nach
+// (Pfad, Stil); leer, wenn image() leer ist. Das ist, was jede
+// zeichnende Stelle tatsaechlich aufruft -- image() bleibt fuer den
+// seltenen Fall stehen, dass jemand das unbehandelte Foto braucht.
+QImage styledImage();
+
 /// Der Urhebervermerk des GEWAEHLTEN Bildes, wenn seine Beschreibung
 /// einen verlangt -- sonst leer. Hier und nicht im Katalog, weil die
 /// zeichnenden Widgets nur das aktuelle Bild kennen und nicht den
@@ -54,6 +98,15 @@ QString requiredAttribution();
 // Point at a new file. Returns false and keeps the previous image if it
 // cannot be read — a bad choice should not blank a working map.
 bool setPath(const QString& path);
+
+// Forget the chosen file and go back to whatever fallback each caller
+// draws with no texture (GlobeWidget: the schematic duotone globe).
+// Deliberately separate from setPath(QString{}) — that call is REJECTED
+// on purpose (a bad choice must not blank a working map), whereas this
+// one is the operator explicitly asking for no photo. Betreiber
+// 2026-09-01: "Land colour…" allein liess sich nie erreichen, sobald
+// einmal ein Weltbild gewaehlt war -- kein Weg zurueck.
+void clearPath();
 
 // Drop the cache, e.g. after the file on disk was replaced.
 void reload();
