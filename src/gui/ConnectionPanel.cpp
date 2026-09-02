@@ -247,6 +247,18 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
     connect(m_radioModel, &RadioModel::connectionStateChanged,
             this, &ConnectionPanel::updateStatusStrip);
 
+    // A failed connect attempt gives a reason (RadioModel.h's own
+    // rationale for this signal: "wer von Hand verband und scheiterte,
+    // sah 'Disconnected' und sonst nichts"). That reason previously only
+    // reached a MainWindow toast, which this dialog — the thing the
+    // operator is actually looking at while clicking Connect — can sit
+    // in front of. Show it right in the status strip instead.
+    connect(m_radioModel, &RadioModel::connectAttemptFailed,
+            this, [this](Longpath::ConnectFailure /*reason*/, const QString& detail) {
+        m_lastConnectFailureDetail = detail;
+        updateStatusStrip();
+    });
+
     // Periodic refresh of Last Seen relative times — every 15 s is adequate.
     connect(&m_lastSeenRefreshTimer, &QTimer::timeout,
             this, &ConnectionPanel::refreshLastSeenColumn);
@@ -761,12 +773,17 @@ void ConnectionPanel::updateStatusStrip()
 
         m_stripDisconnectBtn->setVisible(true);
         m_stripReconnectLabel->setVisible(false);
+        m_lastConnectFailureDetail.clear();
     } else {
-        // Show red pill + Disconnected + optional Reconnect hint
+        // Show red pill + Disconnected (+ the reason, if the last thing
+        // that happened was a failed connect attempt) + optional
+        // Reconnect hint
         m_stripPillLabel->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 16px; }").arg(QLatin1String(kPillOfflineColor)));
 
-        m_stripInfoLabel->setText(QStringLiteral("Disconnected"));
+        m_stripInfoLabel->setText(m_lastConnectFailureDetail.isEmpty()
+            ? QStringLiteral("Disconnected")
+            : QStringLiteral("Disconnected — %1").arg(m_lastConnectFailureDetail));
         m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: #8090a0; font-size: 13px; }")));
 
@@ -1212,6 +1229,7 @@ void ConnectionPanel::onConnectClicked()
         setStatusText(QStringLiteral("Connecting to %1...").arg(info.displayName()));
     }
     m_connectBtn->setEnabled(false);
+    m_lastConnectFailureDetail.clear();
 
     // Phase 3I Task 17 — remember this as the last-connected radio (no
     // longer as an auto-reconnect target — that feature was removed

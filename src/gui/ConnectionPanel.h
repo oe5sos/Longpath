@@ -210,6 +210,14 @@ private:
     QPushButton*   m_stripDisconnectBtn{nullptr};
     QLabel*        m_stripReconnectLabel{nullptr};
 
+    // Set from RadioModel::connectAttemptFailed, shown in place of the
+    // plain "Disconnected" text until the next connect attempt starts or
+    // succeeds. Without this, a failed manual connect gave no reason at
+    // all in the dialog the operator was actually looking at — the
+    // detailed text only ever reached a MainWindow toast, which a
+    // still-open Connect dialog can sit in front of.
+    QString        m_lastConnectFailureDetail;
+
     // Widgets
     QTableWidget*  m_radioTable{nullptr};
     QPushButton*   m_scanBtn{nullptr};          // Phase 3Q Task 5 — replaces Start/Stop

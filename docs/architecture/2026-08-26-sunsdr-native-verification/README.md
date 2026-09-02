@@ -157,7 +157,13 @@ passing), disconnect, then connect again to the same entry.
 stale "Connected" state); clean reconnect (Rows 1-3 all work again
 without restarting Longpath). Repeat 2-3 times.
 
-**Status:** [ ] Untested
+**Status:** [x] Passed 2026-09-02 by OE5SOS — 3/3 disconnect/reconnect
+cycles clean: audio stopped immediately on disconnect, status
+indicator went cleanly to "Disconnected" (never stuck on
+Connecting/Connected), panadapter/waterfall froze rather than
+continuing to animate with stale data, and each reconnect brought
+audio + a live spectrum back within a few seconds without restarting
+Longpath.
 
 **Update 2026-08-28, code-level fix relevant to this row:** a review
 pass found the stream socket had no sender check, and it shares the
@@ -167,8 +173,8 @@ could receive leftover packets from the just-ended prior session
 before its own new beacon handshake completes. Fixed —
 `processStreamDatagram()` now rejects anything not from the current
 `m_radioAddr` (unit-tested: `foreignSenderStreamPacketIsIgnored` in
-`tst_sunsdr_radio_connection.cpp`). Improves confidence for this row;
-the actual reconnect-cycle reproducer above is still untested.
+`tst_sunsdr_radio_connection.cpp`). The live reproducer above now
+confirms this holds in practice, not just in the unit test.
 
 ---
 
@@ -187,7 +193,15 @@ other board, once the 2000ms staleness threshold passes) — confirm
 this actually engages for this connection type specifically, since
 it's a different code path than P1/P2.
 
-**Status:** [ ] Untested
+**Status:** [x] Passed 2026-09-02 by OE5SOS — QRP powered off physically
+(instant, no graceful disconnect through Longpath first) while
+connected and streaming. Longpath detected the dead link and
+transitioned cleanly to `Disconnected` in roughly 3 seconds (inside
+the 5s watchdog threshold), the panadapter/waterfall froze rather than
+continuing to animate or showing garbage, and the app auto-surfaced
+the "Connect to Radio" dialog on its own once the link dropped (not
+part of the original expectation, but a welcome touch — confirmed via
+screenshots, not just operator description).
 
 **Update 2026-08-28:** a self-review pass over the just-landed native
 driver found this row was not just untested but genuinely unimplemented
@@ -228,7 +242,44 @@ no confusing half-connected state. The error message should now say
 old always-wrong wording — confirm the message is accurate for
 whichever failure mode actually occurs here.
 
-**Status:** [ ] Untested
+**Status:** [x] Passed 2026-09-02 by OE5SOS — initially failed this
+same session (see below), fixed, then re-verified live against the
+fixed build: the "Connect to Radio" dialog's status strip now reads
+"Disconnected — SunSDR: beacon replied but no I/Q stream followed"
+right after a blocked connect attempt (ExpertSDR2 holding the
+session), confirming both this row's requirements — no confusing
+half-connected state, and now a clear, understandable reason too.
+
+**Original finding, fixed same session:** — "no confusing half-connected state" held (Longpath went
+cleanly back to `Disconnected`, never stuck), but "a clean,
+understandable failure" did not: clicking Connect in the "Connect to
+Radio" dialog while ExpertSDR2 held the session produced **zero**
+visible feedback — no error text anywhere, confirmed even after
+closing the dialog and checking for the MainWindow toast. Root cause:
+the native driver *does* detect the failure and *does* carry a correct
+reason (`SunSdrRadioConnection::onConnectTimeout()`, "no beacon reply"
+vs. "beacon replied but no I/Q stream followed"), but that reason only
+ever reached `RadioModel::connectAttemptFailed` → a MainWindow toast —
+never the "Connect to Radio" dialog itself
+(`ConnectionPanel::onConnectionStateChanged()` only listened to
+`connectionStateChanged`, resetting to a generic "Disconnected"/"Found
+N radio(s)" line). Since the dialog is what the operator is actually
+looking at while clicking Connect, and stays open and focused across
+the failure, the toast (a separate `Qt::Tool` top-level window) never
+got seen in practice.
+
+**Fix:** `ConnectionPanel` now also listens to
+`RadioModel::connectAttemptFailed` and shows the specific reason
+inline in its own status strip ("Disconnected — SunSDR: no beacon
+reply — radio unreachable or discovery blocked"), cleared on the next
+connect attempt or on success (`ConnectionPanel.cpp`/`.h`). This closes
+the exact gap `RadioModel.h`'s own doc comment on that signal
+describes from an earlier, unrelated incident ("wer von Hand verband
+und scheiterte, sah 'Disconnected' und sonst nichts — der Betreiber
+hat daraufhin drei Tage die App verdaechtigt") — that fix apparently
+never reached the one dialog most manual connect attempts actually go
+through. Not yet re-verified live against the fixed build (fix landed
+same session, build/bench pending).
 
 ---
 
