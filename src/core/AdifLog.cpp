@@ -105,11 +105,17 @@ QVector<LogEntry> parse(const QByteArray& bytes)
     QVector<LogEntry> out;
     LogEntry cur;
     QString date, time;
+    // POTA's MY_SIG/MY_SIG_INFO/SIG/SIG_INFO held until a record is
+    // complete — same reason as date/time: the pair can arrive in
+    // either order, and SIG_INFO on its own means nothing without
+    // knowing what SIG said.
+    QString sig, sigInfo, mySig, mySigInfo;
     bool sawField = false;
 
     // Timestamp, distance and bearing — the same completion whether the
     // record ended in <EOR> or the file just stopped.
-    auto finalize = [&date, &time](LogEntry& e) {
+    auto finalize = [&date, &time, &sig, &sigInfo, &mySig, &mySigInfo]
+                    (LogEntry& e) {
         e.timeOn = combine(date, time);
         if (isValidGridSquare(e.myGridSquare)
             && isValidGridSquare(e.gridSquare)) {
@@ -117,6 +123,38 @@ QVector<LogEntry> parse(const QByteArray& bytes)
                 calculateDistanceKm(e.myGridSquare, e.gridSquare);
             e.bearingDeg =
                 calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+        }
+
+        // Claim the SIG pair as a POTA reference only when SIG really
+        // says so. Any other Special Interest Activity (WWFF and
+        // friends use the identical mechanism) goes back into extras
+        // instead of being discarded — the same rule LogEntry.h states
+        // for every field this program does not model.
+        if (mySig.trimmed().compare(QStringLiteral("POTA"),
+                                    Qt::CaseInsensitive) == 0
+            && !mySigInfo.trimmed().isEmpty()) {
+            e.myPotaRef = mySigInfo;
+        } else {
+            if (!mySig.isEmpty()) {
+                e.extras.append(qMakePair(QStringLiteral("MY_SIG"), mySig));
+            }
+            if (!mySigInfo.isEmpty()) {
+                e.extras.append(
+                    qMakePair(QStringLiteral("MY_SIG_INFO"), mySigInfo));
+            }
+        }
+        if (sig.trimmed().compare(QStringLiteral("POTA"),
+                                  Qt::CaseInsensitive) == 0
+            && !sigInfo.trimmed().isEmpty()) {
+            e.potaRef = sigInfo;
+        } else {
+            if (!sig.isEmpty()) {
+                e.extras.append(qMakePair(QStringLiteral("SIG"), sig));
+            }
+            if (!sigInfo.isEmpty()) {
+                e.extras.append(
+                    qMakePair(QStringLiteral("SIG_INFO"), sigInfo));
+            }
         }
     };
 
@@ -148,6 +186,7 @@ QVector<LogEntry> parse(const QByteArray& bytes)
             cur = LogEntry{};
             date.clear();
             time.clear();
+            sig.clear(); sigInfo.clear(); mySig.clear(); mySigInfo.clear();
             sawField = false;
             continue;
         }
@@ -157,6 +196,7 @@ QVector<LogEntry> parse(const QByteArray& bytes)
             cur = LogEntry{};
             date.clear();
             time.clear();
+            sig.clear(); sigInfo.clear(); mySig.clear(); mySigInfo.clear();
             sawField = false;
             continue;
         }
@@ -183,6 +223,16 @@ QVector<LogEntry> parse(const QByteArray& bytes)
         else if (key == QLatin1String("RST_RCVD"))      { cur.rstRcvd = value; }
         else if (key == QLatin1String("GRIDSQUARE"))    { cur.gridSquare = value; }
         else if (key == QLatin1String("MY_GRIDSQUARE")) { cur.myGridSquare = value; }
+        else if (key == QLatin1String("MY_SOTA_REF"))   { cur.mySotaRef = value; }
+        else if (key == QLatin1String("SOTA_REF"))      { cur.sotaRef = value; }
+        // Held, not assigned directly — see the finalize() lambda above:
+        // a SIG value only means POTA once its matching SIG_INFO (or
+        // vice versa) is known too, and ADIF does not guarantee the
+        // order they arrive in.
+        else if (key == QLatin1String("SIG"))           { sig = value; }
+        else if (key == QLatin1String("SIG_INFO"))       { sigInfo = value; }
+        else if (key == QLatin1String("MY_SIG"))        { mySig = value; }
+        else if (key == QLatin1String("MY_SIG_INFO"))    { mySigInfo = value; }
         else if (key == QLatin1String("NAME"))          { cur.name = value; }
         else if (key == QLatin1String("QTH"))           { cur.qth = value; }
         else if (key == QLatin1String("COUNTRY"))       { cur.country = value; }

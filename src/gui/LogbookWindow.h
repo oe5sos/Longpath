@@ -48,7 +48,9 @@ class QComboBox;
 class QDateEdit;
 class QLabel;
 class QLineEdit;
+class QMoveEvent;
 class QPushButton;
+class QResizeEvent;
 class QSplitter;
 class QTableWidget;
 class QVBoxLayout;
@@ -75,6 +77,15 @@ protected:
     // policy put it. Standard Qt idiom: capture on close, apply on
     // construction (see restoreGeometryState() call in the constructor).
     void closeEvent(QCloseEvent* event) override;
+
+    // 2026-08-31: closeEvent() alone only caught a CLEAN close. A crash
+    // or force-quit between a drag/resize and the next clean close lost
+    // that session's move — the same gap found and fixed tonight for
+    // ToolWindow (Rotor/Log), and PanFloatingWindow/AppletFloatingWindow
+    // already avoid it by saving on every move/resize, not just on
+    // close.
+    void moveEvent(QMoveEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     void showRowMenu(const QPoint& pos);
@@ -209,6 +220,12 @@ private:
     QLineEdit*    m_search{nullptr};
     QComboBox*    m_bandBox{nullptr};
     QComboBox*    m_modeBox{nullptr};
+    // Distinct SOTA/POTA activation references found in the log —
+    // "any" plus one entry per summit/park actually logged from.
+    // Filtering to one and exporting is how a single activation leaves
+    // as its own ADIF file (see exportAdif() — it already exports the
+    // filtered view, not the whole log).
+    QComboBox*    m_activationBox{nullptr};
     QLineEdit*    m_gridEdit{nullptr};
     QLineEdit*    m_countryEdit{nullptr};
     QCheckBox*    m_unconfirmedOnly{nullptr};

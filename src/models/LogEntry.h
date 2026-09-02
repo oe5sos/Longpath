@@ -41,6 +41,26 @@ struct LogEntry {
     QString   rstRcvd;       // RST_RCVD
     QString   gridSquare;    // GRIDSQUARE — theirs
     QString   myGridSquare;  // MY_GRIDSQUARE
+
+    // ── SOTA / POTA activation references (2026-09-02) ────────────────
+    //
+    // SOTA has its own ADIF-registered fields. MY_SOTA_REF is the summit
+    // being activated; SOTA_REF is the OTHER station's summit, for a
+    // summit-to-summit contact.
+    QString   mySotaRef;     // MY_SOTA_REF
+    QString   sotaRef;       // SOTA_REF
+
+    // POTA has no dedicated ADIF field of its own — it rides ADIF's
+    // generic Special Interest Activity pair (MY_SIG/MY_SIG_INFO,
+    // SIG/SIG_INFO), with MY_SIG/SIG holding the literal text "POTA".
+    // These two members hold just the park reference; the "POTA" tag
+    // itself is added on write and checked for on read (LogEntry.cpp,
+    // AdifLog.cpp) — see there for why an unrelated SIG activity (WWFF
+    // and friends use the same pair) must never be treated as a park
+    // reference or silently dropped.
+    QString   myPotaRef;     // MY_SIG_INFO, when MY_SIG == "POTA"
+    QString   potaRef;       // SIG_INFO, when SIG == "POTA"
+
     QString   name;          // NAME
     QString   qth;           // QTH
     QString   country;       // COUNTRY

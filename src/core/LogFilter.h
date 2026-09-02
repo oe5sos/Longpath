@@ -56,6 +56,12 @@ struct LogFilter {
     // "United States" and "United Kingdom" rather than nothing.
     QString country;
 
+    // Exact, case-insensitive. Matches either MY_SOTA_REF or the POTA
+    // park reference (myPotaRef) — one box for both, since the operator
+    // picks from a list of what the log actually contains and does not
+    // need to know which of the two schemes a given contact used.
+    QString activation;
+
     // Off by default. A date range that defaults to something would
     // hide contacts the moment the window opened, and an operator who
     // sees an empty log concludes the log is empty.

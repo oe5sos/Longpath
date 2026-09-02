@@ -30,7 +30,8 @@ bool sameIgnoringCase(const QString& a, const QString& b)
 bool LogFilter::isActive() const
 {
     return !blank(text) || !blank(band) || !blank(mode) || !blank(grid)
-           || !blank(country) || useDates || unconfirmedOnly;
+           || !blank(country) || !blank(activation) || useDates
+           || unconfirmedOnly;
 }
 
 bool LogFilter::matches(const LogEntry& e) const
@@ -60,6 +61,12 @@ bool LogFilter::matches(const LogEntry& e) const
         if (!e.country.contains(country.trimmed(), Qt::CaseInsensitive)) {
             return false;
         }
+    }
+
+    if (!blank(activation)
+        && !sameIgnoringCase(e.mySotaRef, activation)
+        && !sameIgnoringCase(e.myPotaRef, activation)) {
+        return false;
     }
 
     if (useDates) {

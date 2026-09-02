@@ -48,6 +48,8 @@ private slots:
     void free_text_reaches_every_field();
     void fields_combine_with_and();
     void whitespace_only_is_not_a_filter();
+    void activation_matches_either_sota_or_pota_ref();
+    void activation_is_exact_and_case_insensitive();
 };
 
 void TstLogFilter::an_empty_filter_matches_everything()
@@ -219,6 +221,45 @@ void TstLogFilter::whitespace_only_is_not_a_filter()
     f.grid = QStringLiteral("  ");
     QVERIFY(!f.isActive());
     QVERIFY(f.matches(entry()));
+}
+
+void TstLogFilter::activation_matches_either_sota_or_pota_ref()
+{
+    // One box for both schemes: the operator picks a value from a list
+    // of what the log actually contains and should not need to know
+    // whether a given contact used SOTA's own field or POTA's SIG pair.
+    LogEntry summit = entry();
+    summit.mySotaRef = QStringLiteral("OE/OO-001");
+
+    LogEntry park = entry();
+    park.myPotaRef = QStringLiteral("OE-1234");
+
+    LogFilter f;
+    f.activation = QStringLiteral("OE/OO-001");
+    QVERIFY(f.matches(summit));
+    QVERIFY(!f.matches(park));
+    QVERIFY(!f.matches(entry()));   // neither field set
+
+    f.activation = QStringLiteral("OE-1234");
+    QVERIFY(f.matches(park));
+    QVERIFY(!f.matches(summit));
+}
+
+void TstLogFilter::activation_is_exact_and_case_insensitive()
+{
+    LogEntry summit = entry();
+    summit.mySotaRef = QStringLiteral("OE/OO-001");
+
+    LogFilter f;
+    f.activation = QStringLiteral("oe/oo-001");
+    QVERIFY(f.matches(summit));
+    f.activation = QStringLiteral("  OE/OO-001 ");
+    QVERIFY(f.matches(summit));
+
+    // Exact, not prefix — a partial reference must not sweep in every
+    // summit that happens to start the same way.
+    f.activation = QStringLiteral("OE/OO-0");
+    QVERIFY(!f.matches(summit));
 }
 
 QTEST_APPLESS_MAIN(TstLogFilter)
