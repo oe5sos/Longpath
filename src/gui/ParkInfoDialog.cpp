@@ -6,6 +6,8 @@
 
 #include "ParkInfoDialog.h"
 
+#include "gui/StyleConstants.h"
+
 #include <QLabel>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -46,7 +48,7 @@ ParkInfoDialog::ParkInfoDialog(QWidget* parent)
 
     m_bodyLabel = new QLabel;
     m_bodyLabel->setObjectName("parkInfoBodyLabel");
-    m_bodyLabel->setStyleSheet("QLabel { color: #c8d8e8; font-size: 12px; }");
+    m_bodyLabel->setStyleSheet("QLabel { color: #c8d8e8; font-size: 13px; }");
     m_bodyLabel->setTextFormat(Qt::RichText);
     m_bodyLabel->setWordWrap(true);
     m_bodyLabel->setOpenExternalLinks(true);
@@ -72,7 +74,9 @@ void ParkInfoDialog::showInfo(const PotaParkInfo& info)
 {
     m_titleLabel->setText(QString("%1 %2%3")
         .arg(escaped(info.reference), escaped(info.name),
-             info.active ? QString() : QString(" <span style='color:#c2635a;'>(inactive)</span>")));
+             info.active ? QString()
+                         : QString(" <span style='color:%1;'>(inactive)</span>")
+                               .arg(QString::fromLatin1(Style::kTxRed))));
 
     QStringList rows;
     if (!info.parktypeDesc.isEmpty()) {
@@ -120,8 +124,8 @@ void ParkInfoDialog::showInfo(const PotaParkInfo& info)
 void ParkInfoDialog::showError(const QString& reference, const QString& error)
 {
     m_titleLabel->setText(escaped(reference));
-    m_bodyLabel->setText(QString("<span style='color:#c2635a;'>Lookup failed: %1</span>")
-        .arg(escaped(error)));
+    m_bodyLabel->setText(QString("<span style='color:%1;'>Lookup failed: %2</span>")
+        .arg(QString::fromLatin1(Style::kTxRed), escaped(error)));
     show();
     raise();
     activateWindow();

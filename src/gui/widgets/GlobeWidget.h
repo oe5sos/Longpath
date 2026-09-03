@@ -21,6 +21,7 @@
 
 #include "MapPoint.h"
 
+#include <QColor>
 #include <QImage>
 #include <QPoint>
 #include <QRectF>
@@ -42,8 +43,11 @@ namespace Longpath {
 //
 // The texture is supplied by the operator, not shipped: any
 // equirectangular world image (2:1, longitude across, latitude down)
-// works. Without one the globe still draws a lit sphere and graticule,
-// so the geometry is usable before anyone downloads anything.
+// works. Without one the globe falls back to a schematic duotone
+// silhouette (near-black ocean, an operator-tintable land colour,
+// right-click "Land colour…") rather than a flat, featureless disc — so the
+// geometry and the shape of the Earth are both usable before anyone
+// downloads anything.
 class GlobeWidget : public QWidget {
     Q_OBJECT
 public:
@@ -53,6 +57,27 @@ public:
     // the globe then keeps whatever it had.
     bool loadTexture(const QString& path);
     bool hasTexture() const;
+
+    // Counterpart to loadTexture(): forget the chosen file and fall back
+    // to the schematic duotone globe. Betreiber 2026-09-02, task 3 of
+    // "1 und 2 [und] 3 und 4" -- consolidated here from the globe's own
+    // right-click menu into the single "World image…" button menu in
+    // RotorLogbookPanel, so there is one place for globe-appearance
+    // choices instead of two.
+    void clearTexture();
+
+    // Betreiber 2026-09-01: "die Kontinente dunkel schwarz einzeichnen
+    // ... oder andere passende Farbe. Durch rechte Maus sollte man
+    // diese aendern koennen." Shown only while no operator-supplied
+    // world image is loaded (hasTexture() == false) -- a schematic
+    // duotone silhouette, not a coastline trace, drawn from a small
+    // built-in continent outline instead of a downloaded photo. The
+    // ocean/base tone stays a fixed HAUSSTIL near-black; only the land
+    // tint is operator-chosen, via the context menu's "Land colour…".
+    // Persisted the same way WorldTexture persists its own path -- by
+    // this widget, under "GlobeLandColour".
+    void setLandColour(const QColor& c);
+    QColor landColour() const { return m_landColour; }
 
     // Home station and the station being worked, in degrees.
     void setHome(double lat, double lon);
@@ -188,6 +213,10 @@ protected:
 private:
     // Render the lit sphere into m_frame at the current view angles.
     void renderSphere();
+    // (Re)draw the schematic continent silhouette used when no operator
+    // texture is loaded, at the current m_landColour. Cached in
+    // m_syntheticMask until the colour changes.
+    void rebuildSyntheticMask();
     // Screen position of a lat/lon, and whether it faces the viewer.
     bool project(double lat, double lon, QPointF& out) const;
     // As project(), but for a point lifted `alt` sphere-radii above the
@@ -212,6 +241,16 @@ private:
                  int steps) const;
 
     QImage m_frame;        // rendered sphere, cached until something moves
+
+    QColor m_landColour;          // schematic-fallback land tint, operator-chosen
+    QImage m_syntheticMask;       // cached duotone equirect, no-texture fallback
+    // Parallel 0/255 land flag, same 720x360 grid as m_syntheticMask --
+    // lets renderSphere() give land its own lighting floor (see there).
+    // Kept separate from the colour image itself so a per-pixel land
+    // test does not depend on antialiased edge pixels matching
+    // m_landColour exactly.
+    QImage m_syntheticLandMask;
+    bool   m_syntheticMaskDirty{true};
 
     double m_viewLat{20.0};   // camera centre
     double m_viewLon{0.0};

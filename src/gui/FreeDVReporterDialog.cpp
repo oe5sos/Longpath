@@ -84,6 +84,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -99,10 +100,12 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QModelIndex>
+#include <QMoveEvent>
 #include <QPainter>
 #include <QPoint>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QResizeEvent>
 #include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
 #include <QTableView>
@@ -833,6 +836,7 @@ FreeDVReporterDialog::FreeDVReporterDialog(FreeDVStationModel* stationModel,
     setAttribute(Qt::WA_DeleteOnClose, false);
     setWindowTitle(QStringLiteral("FreeDV Reporter"));
     buildUi();
+    restoreGeometryState();
 
     if (m_stationModel) {
         connect(m_stationModel, &FreeDVStationModel::stationAdded,
@@ -875,6 +879,41 @@ FreeDVReporterDialog::FreeDVReporterDialog(FreeDVStationModel* stationModel,
 FreeDVReporterDialog::~FreeDVReporterDialog() {
     // m_clearTimers and m_table / delegates are parented to the dialog;
     // Qt's parent ownership reclaims them automatically.
+}
+
+// 2026-08-31: this window never persisted its own position/size at
+// all, unlike every sibling modeless dialog (LogbookWindow,
+// AntennaWindow, SpotHubDialog, AmpViewWindow) -- see closeEvent()'s
+// declaration in the header for the full story. WA_DeleteOnClose is
+// false (constructor above), so closeEvent() here only hides the
+// window; MainWindow keeps the single instance alive for the rest of
+// the run.
+void FreeDVReporterDialog::closeEvent(QCloseEvent* event) {
+    saveGeometryState();
+    event->ignore();
+    hide();
+}
+
+void FreeDVReporterDialog::moveEvent(QMoveEvent* event) {
+    QWidget::moveEvent(event);
+    saveGeometryState();
+}
+
+void FreeDVReporterDialog::resizeEvent(QResizeEvent* event) {
+    QWidget::resizeEvent(event);
+    saveGeometryState();
+}
+
+void FreeDVReporterDialog::saveGeometryState() {
+    AppSettings::instance().setValue(
+        QStringLiteral("FreeDvReporter/GeometryState"), saveGeometry());
+}
+
+void FreeDVReporterDialog::restoreGeometryState() {
+    const QByteArray st = AppSettings::instance()
+        .value(QStringLiteral("FreeDvReporter/GeometryState")).toByteArray();
+    // Empty on a first run -- buildUi()'s natural layout size stands.
+    if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
 void FreeDVReporterDialog::buildUi() {

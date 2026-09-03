@@ -16,6 +16,8 @@
 
 #include "GlobeWidget.h"
 #include "WorldTexture.h"
+#include "core/AppSettings.h"
+#include "gui/ColorSwatchButton.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/PopupMenuStyle.h"
 
@@ -50,6 +52,46 @@ double norm180(double deg)
 // Shortest signed difference a→b, in degrees.
 double angleDelta(double a, double b) { return norm180(b - a); }
 
+QString landColourSettingsKey() { return QStringLiteral("GlobeLandColour"); }
+
+// Grob vereinfachte Kontinentumrisse (Aequirektangular, Grad: x=Laenge
+// -180..180, y=Breite -90..90). Bewusst kein Kuestenverlauf -- eine am
+// Instrument aus der Entfernung erkennbare Form, kein Kartenersatz.
+// Betreiber 2026-09-01, nach drei gerenderten Entwurfsblaettern: "a"
+// (reines Duotone, kein Glimmen) gewaehlt.
+const QVector<QVector<QPointF>>& continentOutlines()
+{
+    static const QVector<QVector<QPointF>> polys = {
+        // Betreiber 2026-09-02: Afrika von Eurasien getrennt (war ein
+        // einziger, an der Landenge zusammenhaengender Umriss) --
+        // "ich wollte schon alle Kontinente sehen", nach dem
+        // Kontrast-Fund unten deutlich schwerer zu uebersehen als vorher.
+        {{-10,36},{0,38},{10,40},{20,42},{35,45},{45,50},{60,55},{80,60},
+         {100,65},{130,62},{140,50},{135,35},{125,25},{120,10},{105,5},
+         {100,15},{95,20},{80,25},{70,20},{60,15},{50,25},{42,30},
+         {35,33},{28,36},{20,38},{10,37},{0,36}},                // Eurasien
+        {{35,32},{45,12},{50,12},{45,5},{40,-5},{35,-15},{30,-25},
+         {20,-30},{15,-25},{12,-15},{10,-5},{8,5},{5,15},{0,20},
+         {-5,20},{-8,28},{-5,33},{10,34},{20,33},{30,32}},       // Afrika
+        {{68,24},{78,30},{88,26},{92,22},{90,15},{85,10},{78,8},
+         {72,15},{68,20}},                                      // Indien
+        {{-8,50},{-5,55},{-2,58},{0,53},{-3,50}},                // Britische Inseln
+        {{130,32},{135,35},{140,40},{142,43},{138,38},{132,34}}, // Japan
+        {{-165,65},{-150,70},{-130,70},{-95,72},{-75,65},{-65,55},
+         {-55,50},{-60,45},{-70,42},{-75,35},{-80,25},{-97,18},
+         {-105,20},{-115,30},{-122,38},{-124,45},{-130,52},
+         {-140,58},{-155,60}},                                  // Nordamerika
+        {{-80,8},{-75,10},{-70,5},{-60,5},{-50,0},{-35,-8},
+         {-40,-20},{-45,-25},{-55,-35},{-65,-45},{-70,-50},
+         {-73,-40},{-72,-25},{-70,-15},{-78,-5}},                // Suedamerika
+        {{113,-22},{122,-18},{130,-12},{137,-12},{145,-16},
+         {150,-22},{153,-28},{150,-35},{140,-38},{130,-32},
+         {118,-34},{113,-26}},                                  // Australien
+        {{-45,60},{-30,68},{-25,75},{-40,82},{-55,75},{-52,65}}, // Groenland
+    };
+    return polys;
+}
+
 } // namespace
 
 GlobeWidget::GlobeWidget(QWidget* parent)
@@ -62,9 +104,28 @@ GlobeWidget::GlobeWidget(QWidget* parent)
     // Ein Bildwechsel erreicht jede Ansicht ueber den Geber in
     // WorldTexture -- kein Aufruf, den eine neue Ansicht vergessen
     // koennte. Siehe die Notiz bei WorldTexture::Notifier.
+    //
+    // Betreiber 2026-09-02 (Photo style): anders als FlatMapWidget malt
+    // diese Kugel aus einem gecachten m_frame statt bei jedem paintEvent
+    // neu abzutasten -- ein blosses update() haette hier nur das ALTE
+    // Bild neu gezeichnet, solange kein Groessenwechsel m_frameDirty
+    // nebenbei gesetzt haette. loadTexture() dieser Instanz setzt es
+    // schon selbst; hier muss dieselbe Instanz auch auf einen Wechsel
+    // reagieren, der von woanders kam (z.B. der Stilwahl im
+    // MITSCHRIFT-Panel, waehrend diese Kugel im Logbuch-Kartenfenster
+    // offen ist).
     connect(&WorldTexture::Notifier::instance(),
             &WorldTexture::Notifier::changed,
-            this, qOverload<>(&QWidget::update));
+            this, [this]() { m_frameDirty = true; update(); });
+
+    // Schematischer Duotone-Fallback: Vorgabe entspricht Entwurf "D2"
+    // (rgb(150,138,108) auf dem App-Grund, siehe auch den eigenen
+    // Beleuchtungsboden fuer Land in renderSphere()) -- ueberschreibbar
+    // ueber den "World image…"-Knopf in RotorLogbookPanel.
+    m_landColour = ColorSwatchButton::colorFromHex(
+        AppSettings::instance()
+            .value(landColourSettingsKey(), QStringLiteral("#968a6cff"))
+            .toString());
 
     // The open hand is the only affordance saying "this turns". Without
     // it the globe reads as a picture.
@@ -133,6 +194,62 @@ bool GlobeWidget::loadTexture(const QString& path)
 bool GlobeWidget::hasTexture() const
 {
     return !WorldTexture::image().isNull();
+}
+
+void GlobeWidget::clearTexture()
+{
+    WorldTexture::clearPath();
+    m_frameDirty = true;
+    update();
+}
+
+void GlobeWidget::setLandColour(const QColor& c)
+{
+    if (!c.isValid() || c == m_landColour) { return; }
+    m_landColour = c;
+    AppSettings::instance().setValue(landColourSettingsKey(),
+                                     ColorSwatchButton::colorToHex(c));
+    m_syntheticMaskDirty = true;
+    m_frameDirty = true;
+    update();
+}
+
+void GlobeWidget::rebuildSyntheticMask()
+{
+    // Gleiche 2:1-Aequirektangular-Form wie eine echte Weltkarte, damit
+    // dieselbe Laenge/Breite -> u/v-Abbildung unten in renderSphere()
+    // fuer beide Quellen gilt -- kein zweiter Sonderfall im Abtastpfad.
+    constexpr int kW = 720;
+    constexpr int kH = 360;
+    m_syntheticMask = QImage(kW, kH, QImage::Format_RGB32);
+    m_syntheticMask.fill(QColor(Style::kAppBg));
+
+    // Parallel boolean gate for renderSphere()'s per-pixel lighting
+    // floor (see there) -- no antialiasing here, a land/ocean test
+    // needs a clean 0/255 answer, not a blended edge pixel.
+    m_syntheticLandMask = QImage(kW, kH, QImage::Format_Grayscale8);
+    m_syntheticLandMask.fill(0);
+
+    QPainter p(&m_syntheticMask);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(m_landColour);
+
+    QPainter pm(&m_syntheticLandMask);
+    pm.setPen(Qt::NoPen);
+    pm.setBrush(Qt::white);
+
+    for (const QVector<QPointF>& outline : continentOutlines()) {
+        QPolygonF poly;
+        poly.reserve(outline.size());
+        for (const QPointF& lonLat : outline) {
+            poly << QPointF((lonLat.x() + 180.0) / 360.0 * kW,
+                            (90.0 - lonLat.y()) / 180.0 * kH);
+        }
+        p.drawPolygon(poly);
+        pm.drawPolygon(poly);
+    }
+    m_syntheticMaskDirty = false;
 }
 
 void GlobeWidget::setHome(double lat, double lon)
@@ -271,6 +388,11 @@ void GlobeWidget::contextMenuEvent(QContextMenuEvent* e)
         ? QStringLiteral("Centre on the station being worked")
         : QStringLiteral("No station set — enter a callsign first"));
     QAction* home = menu.addAction(QStringLiteral("Reset view"));
+
+    // Betreiber 2026-09-02: Weltbild/Landfarbe zog von hier in den
+    // "World image…"-Knopf um (RotorLogbookPanel) -- ein Bedienweg fuer
+    // die Erscheinung der Kugel statt zwei. Dieses Menue bleibt reine
+    // Navigation: Zoom, Ziel anfliegen, Ansicht zuruecksetzen.
 
     const QAction* chosen = menu.exec(e->globalPos());
     if (chosen == in)        { zoomBy(1.3); }
@@ -579,7 +701,7 @@ bool GlobeWidget::projectAlt(double lat, double lon, double alt,
 
 double GlobeWidget::maxZoom() const
 {
-    const QImage& tex = WorldTexture::image();
+    const QImage tex = WorldTexture::styledImage();
     if (tex.isNull()) { return 6.0; }
 
     // 6x ist die Decke, die zur kleinen 2048er Textur passt. Groessere
@@ -691,10 +813,16 @@ void GlobeWidget::renderSphere()
 
     // One local handle to the shared image. QImage is implicitly
     // shared, so this copies a pointer, not 58 MB.
-    const QImage texture = WorldTexture::image();
-    const bool tex = !texture.isNull();
-    const int tw = tex ? texture.width()  : 0;
-    const int th = tex ? texture.height() : 0;
+    //
+    // Ohne eigene Textur des Betreibers tritt der schematische
+    // Duotone-Ersatz (m_syntheticMask) an dieselbe Stelle -- derselbe
+    // Abtastpfad unten gilt fuer beide, kein zweiter Sonderfall.
+    const QImage customTexture = WorldTexture::styledImage();
+    const bool haveCustomTexture = !customTexture.isNull();
+    if (!haveCustomTexture && m_syntheticMaskDirty) { rebuildSyntheticMask(); }
+    const QImage& texture = haveCustomTexture ? customTexture : m_syntheticMask;
+    const int tw = texture.width();
+    const int th = texture.height();
 
     const int x0 = std::max(0, static_cast<int>(cx - r) - 1);
     const int x1 = std::min(w - 1, static_cast<int>(cx + r) + 1);
@@ -717,25 +845,34 @@ void GlobeWidget::renderSphere()
             const double lon = m_viewLon * kDeg
                 + std::atan2(dx, nz * std::cos(vla) - dy * std::sin(vla));
 
-            QRgb base;
-            if (tex) {
-                int tx = static_cast<int>((norm180(lon / kDeg) + 180.0)
-                                          / 360.0 * tw) % tw;
-                if (tx < 0) { tx += tw; }
-                int ty = static_cast<int>((90.0 - lat / kDeg) / 180.0 * th);
-                ty = std::clamp(ty, 0, th - 1);
-                base = texture.pixel(tx, ty);
-            } else {
-                // No texture: a plain blue marble so the shape and the
-                // terminator still read.
-                base = qRgb(0x1a, 0x3a, 0x58);
-            }
+            int tx = static_cast<int>((norm180(lon / kDeg) + 180.0)
+                                      / 360.0 * tw) % tw;
+            if (tx < 0) { tx += tw; }
+            int ty = static_cast<int>((90.0 - lat / kDeg) / 180.0 * th);
+            ty = std::clamp(ty, 0, th - 1);
+            const QRgb base = texture.pixel(tx, ty);
 
             // Lambert term against the sun, with a floor so the night
             // side stays legible rather than going black — this is an
             // instrument, not a render.
+            //
+            // Betreiber 2026-09-02: the shared 0.18 floor crushed the
+            // schematic land/ocean duotone to nothing whenever the
+            // default view happened to face the real night side (it
+            // did, at his actual build time) — a ~10/255 difference on
+            // an already near-black panel. Land needs to read as a
+            // shape, not survive a photographic exposure, so it gets
+            // its own, much higher floor in schematic mode; the ocean
+            // keeps the original floor so day/night still has a feel.
+            // Chosen ("D2") after four candidates were rendered against
+            // his own real sun angle, not a flattering fictional one.
+            double floor = 0.18;
+            if (!haveCustomTexture) {
+                const bool isLand = m_syntheticLandMask.constScanLine(ty)[tx] != 0;
+                floor = isLand ? 0.62 : 0.18;
+            }
             double lit = dx * sunX + dy * sunY + nz * sunZ;
-            lit = 0.18 + 0.82 * std::clamp(lit, 0.0, 1.0);
+            lit = floor + (1.0 - floor) * std::clamp(lit, 0.0, 1.0);
 
             // Limb darkening towards the edge sells the curvature.
             lit *= 0.55 + 0.45 * nz;
@@ -820,6 +957,25 @@ void GlobeWidget::paintEvent(QPaintEvent*)
         p.setPen(Qt::NoPen);
         p.setBrush(halo);
         p.drawEllipse(c, r * 1.16, r * 1.16);
+        p.setBrush(Qt::NoBrush);
+    }
+
+    // Instrumentenglimmen: derselbe oliv-entsaettigte Radialverlauf wie
+    // bei S-Meter/SWR-Zifferblatt (HAUSSTIL.md, Style::kInstrumentGlowHi/
+    // Lo), damit die Kugel als Instrument neben ihnen steht statt als
+    // Bild daneben. Betreiber 2026-09-02, gewaehlt als "D2" aus vier
+    // Entwuerfen. Nur im schematischen Modus -- ueber einem echten Foto
+    // waere das ein Filter ueber etwas, das schon fertig ist.
+    if (!hasTexture()) {
+        const QColor hi(Style::kInstrumentGlowHi);
+        QRadialGradient glow(c, r * 1.45);
+        glow.setColorAt(0.00, QColor(0, 0, 0, 0));
+        glow.setColorAt(0.69, QColor(0, 0, 0, 0));
+        glow.setColorAt(0.80, QColor(hi.red(), hi.green(), hi.blue(), 110));
+        glow.setColorAt(1.00, QColor(hi.red(), hi.green(), hi.blue(), 0));
+        p.setPen(Qt::NoPen);
+        p.setBrush(glow);
+        p.drawEllipse(c, r * 1.45, r * 1.45);
         p.setBrush(Qt::NoBrush);
     }
 
@@ -1015,7 +1171,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
         const QColor text(Style::kTextSecondary);
 
         QFont f = p.font();
-        f.setPixelSize(15);
+        f.setPixelSize(16);
         f.setBold(true);
         p.setFont(f);
 

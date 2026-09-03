@@ -236,7 +236,7 @@ void QsoRecorderApplet::buildUI()
             auto* head = new QHBoxLayout;
             auto* name = new QLabel(title, box);
             name->setStyleSheet(QStringLiteral(
-                "QLabel { color: %1; font-size: 10px; border: none; }")
+                "QLabel { color: %1; font-size: 11px; border: none; }")
                 .arg(QLatin1String(Style::kTextSecondary)));
             head->addWidget(name);
             head->addStretch(1);
@@ -286,7 +286,7 @@ void QsoRecorderApplet::buildUI()
 
     m_lossLabel = new QLabel(body);
     m_lossLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }")
+        "QLabel { color: %1; font-size: 11px; }")
         .arg(QLatin1String(Style::kAmberText)));
     m_lossLabel->setVisible(false);
     vbox->addWidget(m_lossLabel);

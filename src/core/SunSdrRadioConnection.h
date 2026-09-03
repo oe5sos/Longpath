@@ -76,15 +76,86 @@
 
 #include "RadioConnection.h"
 #include "core/sunsdr/SunSdrProtocol.h"
+#include "core/sunsdr/SunSdrTxPacer.h"
+#include "core/safety/BandPlanGuard.h"
+#include "core/WdspTypes.h"
+#include "models/Band.h"
 
 #include <QElapsedTimer>
 #include <QHostAddress>
+#include <QMutex>
+#include <QString>
 #include <QTimer>
 #include <QUdpSocket>
+#include <QVector>
 
+#include <array>
 #include <atomic>
+#include <cstdint>
 
 namespace Longpath {
+
+// ── Step 2 (SunSDR2 QRP TX-chain plan): bench-only TX gate scaffolding ──
+//
+// Still zero wire reachability. These three free types back
+// SunSdrRadioConnection's bench-only arm gate, MOX-check context, and
+// 50-entry TX trace ring (see that class's own m_txArmed/m_mox/
+// m_txTrace comments). Free (not nested) so a test can name them
+// without a `SunSdrRadioConnection::` prefix — same shape as
+// FaultLog.h's free `FaultEvent` struct.
+
+/// Bench/test-only input to BandPlanGuard::checkMoxAllowed()
+/// (src/core/safety/BandPlanGuard.h). This class has no SliceModel/
+/// RadioModel of its own to source region/mode/band/frequency from the
+/// way RadioModel::installBandPlanMoxCheck()'s real lambda does
+/// (RadioModel.cpp:9318-9374 — the real call-site shape this mirrors:
+/// region + a requested TX frequency + mode + rx/tx band +
+/// preventDifferentBand + extended, exactly checkMoxAllowed()'s own
+/// parameter list). Until a later step wires real integration with
+/// MoxController's single-authority MOX flow (MoxController.h's own K.2
+/// setMoxCheck() callback), this is how a test (or, later, a bench UI)
+/// tells setMox() what to check against. Defaults are placeholders, not
+/// meaningful production values — they're inert unless a test also
+/// arms the gate (setTxArmedForTest(true)), since setMox() checks
+/// m_txArmed first and never reaches this context otherwise.
+struct TxCheckContext {
+    safety::Region region{safety::Region::Europe};
+    std::int64_t   txFreqHz{0};
+    DSPMode        mode{DSPMode::USB};
+    Band           rxBand{Band::GEN};
+    Band           txBand{Band::GEN};
+    bool           preventDifferentBand{false};
+    bool           extended{false};
+};
+
+/// What kind of event a TxTraceEntry records. Deliberately narrow — only
+/// the events Step 2 can actually produce (no pacer/antenna/PA code
+/// exists yet to generate anything else).
+enum class TxTraceKind : quint8 {
+    Armed,        ///< setTxArmedForTest(true)
+    Disarmed,     ///< setTxArmedForTest(false), or a teardown path's reset
+    MoxRefused,   ///< setMox() refused — see TxTraceEntry::reason for why
+    MoxAccepted,  ///< setMox() accepted (m_mox transitioned) — still zero
+                  ///< wire effect at this step; see setMox()'s own comment
+};
+
+/// One entry in the 50-entry TX trace ring. Timestamp-free by design —
+/// nothing here needs wall-clock ordering, only relative ordering, which
+/// `seq` (monotonically increasing for the lifetime of the connection
+/// object, never reset by disconnect()'s ring clear) already provides.
+struct TxTraceEntry {
+    quint32     seq{0};
+    TxTraceKind kind{TxTraceKind::Armed};
+    QString     reason;  ///< empty for Armed/Disarmed; the real
+                         ///< BandPlanGuard reason for MoxRefused (or
+                         ///< "refused: not armed"); "accepted: ..." for
+                         ///< MoxAccepted.
+};
+
+/// Ring capacity — small and fixed, per the design synthesis ("keep it
+/// genuinely small and simple, this is not a general-purpose logging
+/// system").
+inline constexpr int kTxTraceRingSize = 50;
 
 class SunSdrRadioConnection : public RadioConnection {
     Q_OBJECT
@@ -127,6 +198,91 @@ public:
     // then this is the only way to open the gate at all, including for
     // tests.
     void setRxReadyForTest(bool ready) { setRxReady(ready); }
+
+    // ── Step 2 (SunSDR2 QRP TX-chain plan): bench-only TX gate ─────────
+    //
+    // Still zero wire reachability — see setMox()'s own comment in the
+    // .cpp for the full rationale. This block is the test/bench-only
+    // surface for it: an arm gate that is never sticky and never
+    // settable except through these hooks, a MOX-check context this
+    // class has no other way to source (no SliceModel of its own), and
+    // a read-only view of the trace ring setMox() writes to.
+
+    // True once setTxArmedForTest(true) has been called and not since
+    // cleared by disconnect()/onConnectTimeout()/onDataWatchdogTick() —
+    // same *ForTest() naming and "every teardown path clears it"
+    // discipline as isRxReadyForTest()/hasRadioAddrForTest() above.
+    // m_txArmed is deliberately NEVER set true by any AppSettings-
+    // persisted value, GUI control, or default: this is a bench-only
+    // safety gate, not a preference, and arming is per-session by
+    // design, not sticky across a teardown or a reconnect.
+    bool isTxArmedForTest() const { return m_txArmed.load(std::memory_order_acquire); }
+    void setTxArmedForTest(bool armed) { setTxArmed(armed); }
+
+    // Reflects the CURRENT accepted MOX state (true only after a setMox()
+    // call was actually accepted — armed AND BandPlanGuard allowed it),
+    // not a pending request; a refused setMox() call never changes this.
+    // Cleared the same way m_txArmed is, on every teardown path.
+    bool isMoxForTest() const { return m_mox.load(std::memory_order_acquire); }
+
+    // What setMox() checks an armed request against. See TxCheckContext's
+    // own comment (top of this header) for why this exists at all.
+    void setTxCheckContextForTest(const TxCheckContext& ctx) { m_txCheckContext = ctx; }
+    TxCheckContext txCheckContextForTest() const { return m_txCheckContext; }
+
+    // Read-only snapshot of the 50-entry TX trace ring, oldest entry
+    // first. Lets a test inspect exactly what setMox()/setTxArmedForTest()
+    // recorded without parsing qCWarning/qCInfo log output.
+    QVector<TxTraceEntry> txTraceForTest() const;
+
+    // ── Step 3 (SunSDR2 QRP TX-chain plan): pacer skeleton ──────────────
+    //
+    // Still zero wire reachability (see SunSdrTxPacer.h's own top-of-file
+    // comment for this step's exact authorized scope). Forwards directly
+    // to the owned SunSdrTxPacer instance's own pacerRunningForTest() —
+    // same *ForTest() naming and "ask the real thing" discipline as this
+    // class's other test accessors above. True only while setMox(true)
+    // has been accepted and none of the four places that must stop the
+    // pacer (setMox(false), disconnect(), onConnectTimeout(),
+    // onDataWatchdogTick()) has since run.
+    bool pacerRunningForTest() const {
+        return m_txPacer && m_txPacer->pacerRunningForTest();
+    }
+
+    // ── Step 4 (SunSDR2 QRP TX-chain plan): read-only GUI accessors ─────
+    //
+    // Design synthesis quote that authorizes exactly this scope: "Network
+    // Diagnostics wiring — still zero wire reachability. 'TX (SunSDR)'
+    // row group: armed state, mox state, pace-repeat count, trace tail."
+    // NetworkDiagnosticsDialog is a read-only status panel — it must
+    // never call setTxArmedForTest()/setMox() itself — so it needs a
+    // plain, non-test-named way to read the exact same state the
+    // accessors above already expose for tests. Grep-verified 2026-09-02:
+    // no other production .cpp file in this tree calls any class's own
+    // *ForTest()-suffixed accessor, so a GUI-facing accessor gets its own
+    // name here rather than reusing isTxArmedForTest()/isMoxForTest()/
+    // txTraceForTest() directly, even though the underlying state is
+    // identical.
+    bool isTxArmed() const noexcept { return m_txArmed.load(std::memory_order_acquire); }
+    bool isMoxOn() const noexcept { return m_mox.load(std::memory_order_acquire); }
+
+    // Forwards to the owned SunSdrTxPacer's own pacerUnderrunsForTest() —
+    // same null-guarded forwarding shape pacerRunningForTest() above
+    // already uses for the same pacer. "Pace repeats" per the design
+    // synthesis quote: every tick whose ring held less than a full
+    // frame's worth of samples repeats the last built frame byte-
+    // identical instead of building a fresh one (SunSdrTxPacer.h's own
+    // onTick() comment) — this is that running count.
+    quint32 txPaceRepeatCount() const {
+        return m_txPacer ? m_txPacer->pacerUnderrunsForTest() : 0;
+    }
+
+    // The last `maxEntries` entries of the 50-entry TX trace ring,
+    // oldest-first (same order txTraceForTest() already returns) — a
+    // bounded view sized for a status panel with room for only a
+    // handful of lines, not the full ring. Reuses txTraceForTest()'s own
+    // ring-walk rather than re-deriving it a second time.
+    QVector<TxTraceEntry> txTraceTail(int maxEntries) const;
 
     // Test-only hook: feed a raw stream-socket datagram, as if from the
     // connected radio itself, through the exact same decode path
@@ -233,6 +389,18 @@ public slots:
     // otherwise being an RX-not-TX control.
     void setAttenuator(int dB) override;
 
+    // Step 2 of the SunSDR2 QRP TX-chain plan (design synthesis quote:
+    // "Gate scaffolding — still zero wire reachability... real setMox()
+    // body that calls BandPlanGuard::checkMoxAllowed() and — since no
+    // pacer/antenna/PA code exists yet — can only ever log-and-refuse or
+    // log-and-accept-with-no-wire-effect"). Sits outside the no-op block
+    // below for the same reason setAttenuator() does: it is no longer
+    // unconditionally a no-op (m_mox now genuinely changes on an armed,
+    // allowed request), even though — unlike setAttenuator() — nothing
+    // it does ever reaches the wire yet. Full body + rationale in the
+    // .cpp.
+    void setMox(bool enabled) override;
+
     // ── Safe no-ops: this connection is receive-only (plan doc §Phase B.5) ──
     //
     // Every one of these exists only because RadioConnection declares it
@@ -242,7 +410,6 @@ public slots:
     void setTxFrequency(quint64 frequencyHz) override;
     void setPreamp(bool enabled) override;
     void setTxDrive(int level) override;
-    void setMox(bool enabled) override;
     void setAntennaRouting(AntennaRouting routing) override;
     void sendTxIq(const float* iq, int n) override;
     void setTrxRelay(bool enabled) override;
@@ -312,6 +479,75 @@ private:
     // the DSP chain is ready).
     void setRxReady(bool ready);
     std::atomic<bool> m_rxReady{false};
+
+    // ── Step 2 (SunSDR2 QRP TX-chain plan): bench-only TX gate scaffolding ──
+    //
+    // Still zero wire reachability (design synthesis quote in setMox()'s
+    // own .cpp comment). m_txArmed is the bench-only arm gate — the ONLY
+    // way it becomes true is setTxArmedForTest() (see that accessor's
+    // comment for why it must never be settable any other way). m_mox
+    // reflects the current ACCEPTED MOX state as a plain bool, not a
+    // multi-value enum — mirrors this class's existing m_rxReady
+    // convention (a lone atomic<bool> gate) rather than introducing a new
+    // MoxState-shaped type for a two-state need.
+    void setTxArmed(bool armed);
+    std::atomic<bool> m_txArmed{false};
+    std::atomic<bool> m_mox{false};
+
+    // Bench/test-only BandPlanGuard input — see TxCheckContext's own
+    // comment (top of this header). Not persisted, not read from
+    // AppSettings, not touched by any teardown path (only m_txArmed and
+    // m_mox reset there; a stale context left over from a prior armed
+    // session is harmless because it's inert until the gate is armed
+    // again).
+    TxCheckContext m_txCheckContext;
+
+    // The BandPlanGuard instance setMox() calls checkMoxAllowed() on —
+    // pure data + pure functions, no Qt parent, default-constructed the
+    // same way RadioModel's own m_bandPlan is (RadioModel.h:3119).
+    safety::BandPlanGuard m_bandPlan;
+
+    // 50-entry TX trace ring — see TxTraceEntry/TxTraceKind's own
+    // comment (top of this header) for what it is and the events it
+    // records. m_txTraceNext is the next slot to be OVERWRITTEN (so once
+    // the ring has wrapped, it also points at the oldest surviving
+    // entry); m_txTraceCount saturates at kTxTraceRingSize rather than
+    // continuing to grow; m_txTraceSeq is the monotonic counter each new
+    // entry gets, and — unlike m_txTraceCount/m_txTraceNext — is NOT
+    // reset when disconnect() clears the ring, so sequence numbers stay
+    // unique for the object's whole lifetime rather than restarting at 0
+    // and potentially colliding with numbers a caller may have already
+    // observed from a prior session.
+    //
+    // m_txTraceMutex guards all four fields below. Writers (pushTxTrace(),
+    // disconnect()'s ring clear) run on this object's connection thread;
+    // the reader (txTraceForTest(), and therefore txTraceTail()) is
+    // called synchronously from NetworkDiagnosticsDialog::refresh() on
+    // the GUI thread (QMutexLocker — same pattern this project already
+    // uses for other cross-thread state, e.g. ReceiverManager's
+    // m_routingMutex). TxTraceEntry carries a QString, so an unguarded
+    // concurrent read/write here would be a real, not just theoretical,
+    // data race.
+    void pushTxTrace(TxTraceKind kind, const QString& reason);
+    mutable QMutex m_txTraceMutex;
+    std::array<TxTraceEntry, kTxTraceRingSize> m_txTrace{};
+    int     m_txTraceCount{0};
+    int     m_txTraceNext{0};
+    quint32 m_txTraceSeq{0};
+
+    // ── Step 3 (SunSDR2 QRP TX-chain plan): pacer skeleton ──────────────
+    //
+    // Still zero wire reachability — see SunSdrTxPacer.h's own top-of-
+    // file comment for this step's exact scope. Same ownership pattern
+    // as m_keepaliveTimer/m_dataWatchdog below: a raw pointer, Qt-
+    // parented (`new SunSdrTxPacer(this)`), constructed in init(), never
+    // explicitly deleted. setMox()'s accepted-true path calls
+    // resetSeq()+start(); setMox()'s unconditional-false path and all
+    // three real teardown paths (disconnect(), onConnectTimeout(),
+    // onDataWatchdogTick()) call stop() — a pacer left running after any
+    // of those four would be a "phantom pacer" ticking against a
+    // disarmed or torn-down connection.
+    SunSdrTxPacer* m_txPacer{nullptr};
 
     // Periodic silent RX-idle keepalive — SunSdrProtocol.h's own citation
     // (ArtemisSDR sunsdr.c) documents that the host must keep sending

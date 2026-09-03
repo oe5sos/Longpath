@@ -694,6 +694,14 @@ private:
     // Q_INVOKABLE aus demselben Grund wie detachRotorPanel:
     // eine Pruefung soll den echten Weg gehen duerfen.
     Q_INVOKABLE void setRotorPanelBelow(bool below);
+
+    // Betreiber 2026-09-02: "Vertikal ist da noch eine Linie inkl.
+    // blauer Punkt" ueber der CAT-Anzeige, auch wenn m_belowPane leer
+    // und verborgen ist. QSplitter versteckt seinen Griff NICHT von
+    // selbst, nur weil ein Kind hide() bekommt — genau die Falle, vor
+    // der der Kommentar oben bei setRotorPanelBelow() schon warnte.
+    // Nach jedem show()/hide() von m_belowPane aufrufen.
+    void syncOuterSplitterHandle();
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
     void ensureQrzClient();
@@ -892,6 +900,24 @@ private:
     /// in der Spalte existiert nicht mehr, und setAppletVisible fände
     /// keine Hülle.
     void applyAppletVisibility(const QString& id, bool effective);
+
+    /// Alle fuenf Schwebe-Mechanismen (Container, abgeloeste Applets,
+    /// Antenne, Panadapter, Rotor/Log) verstecken und in
+    /// m_floatingContainersHiddenPreConnect vormerken -- die eine
+    /// gemeinsame Liste fuer "hinter die Connect-Maske". Zurueck kommt
+    /// alles beim naechsten Connected ODER beim Schliessen der Maske
+    /// ohne Verbindung.
+    void hideFloatingWindowsBehindConnectMask();
+
+    /// Ersatz fuer showFullScreen() -- siehe m_borderlessFullSize. Randlos
+    /// und auf die volle Bildschirmflaeche gesetzt, KEIN eigener macOS-
+    /// Space. Idempotent: ruft nur um, was noch nicht stimmt.
+    void enterBorderlessFullSize();
+
+    /// Kehrseite von enterBorderlessFullSize() -- normaler Fensterrahmen
+    /// zurueck, fuer ein Profil, das ausdruecklich NICHT die volle
+    /// Flaeche will. Idempotent wie das Gegenstueck.
+    void exitBorderlessFullSize();
 
     /// Ein Eintrag der Widget-Auswahl, der ein eigenes FENSTER meint
     /// (Logbuch, Rotor, Kanalzug, Antenne …). Der Auswaehler verwaltet
@@ -1220,6 +1246,21 @@ private:
     // stop flag and runs a fresh ~5 s NIC walk on the main thread mid-
     // close. Symptom: ⌘Q beach-balls for the full SafeDefault scan time.
     bool m_shuttingDown{false};
+
+    // Betreiber 2026-09-01: echtes macOS-Vollbild (showFullScreen(), ein
+    // eigener "Space") entschieden gegen ein randloses, maximiertes
+    // Fenster ausgetauscht -- schwebende Werkzeugfenster (Panadapter,
+    // S-Meter, Bandwidth Filter, Rotor/Log...) blieben beim Wechsel in
+    // den eigenen Vollbild-Space zuverlaessig auf dem normalen
+    // Schreibtisch-Space zurueck (NSWindowCollectionBehaviorFullScreenAuxiliary
+    // nimmt ein bereits bestehendes Fenster nicht zuverlaessig mit --
+    // dokumentierte Cocoa-Eigenheit, kein Longpath-Bug). Ein randloses
+    // Fenster, das einfach die volle Bildschirmflaeche einnimmt, hat
+    // gar keinen eigenen Space -- schwebende Kinder bleiben immer auf
+    // demselben Space wie das Hauptfenster. isFullScreen() gilt dafuer
+    // nicht mehr (Qt::WindowFullScreen wird nie gesetzt); dieses Flag
+    // ist die neue Quelle der Wahrheit fuers Sichern/Wiederherstellen.
+    bool m_borderlessFullSize{false};
 
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
@@ -1628,6 +1669,16 @@ private:
     class FrequencyApplet*  m_frequencyApplet{nullptr};
     class InstrumentApplet* m_swrInstrument{nullptr};
     class InstrumentApplet* m_signalInstrument{nullptr};
+    // Betreiber 2026-09-03: "leider funktioniert die Frequenzanzeige
+    // nicht im S-Meter" -- die urspruengliche Verdrahtung (buildUI())
+    // lief EINMAL gegen die beim Start aktive Scheibe; ein frisches
+    // MainWindow hat aber null Scheiben, bevor ein Funkgeraet verbindet
+    // (siehe MainWindow_SunSdr.cpp-Kommentar am selben Fund), also lief
+    // sie damals ins Leere und niemand versuchte es je wieder. Diese
+    // Verbindung wird jetzt bei jedem RadioModel::activeSliceChanged neu
+    // gezogen -- muss vor dem naechsten Ziehen wieder geloest werden,
+    // sonst haengt am Ende eine tote Scheibe noch mit dran.
+    QMetaObject::Connection m_instrumentFreqConn;
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;

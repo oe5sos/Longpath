@@ -73,14 +73,20 @@ TxSwitch::TxSwitch(Kind kind, RadioModel* model, QWidget* parent)
     // Der Rahmen faellt weg, die Schrift wird groesser und gesperrt.
     // Angeschaltet traegt der TEXT die Farbe, nicht ein gefuellter
     // Kasten: bei MOX und TUNE die Sendefarbe, bei VOX und PS die
-    // neutrale. Ein rot gefuellter Kasten unten links sieht aus wie
-    // eine Warnung; roter Text sagt „hier geht Leistung raus".
-    const QString onColour = QString::fromLatin1(isRf ? Style::kTxRed
+    // neutrale.
+    //
+    // Die Sendefarbe war bis zum 2026-09-02 kTxRed. Sie ist mit dem
+    // Umbau des TX-Feldes auf Messing gewechselt, und sie MUSS hier
+    // mitwechseln: sonst leuchtet unten weiter Rot, waehrend oben die
+    // Sendetaste Messing traegt — zwei Farben fuer denselben Zustand
+    // sind schlimmer als die falschere von beiden. Rot bleibt im
+    // Programm der Warnung vorbehalten.
+    const QString onColour = QString::fromLatin1(isRf ? Style::kTxKeyBorder
                                                       : Style::kAccent);
     m_btn->setStyleSheet(Style::themed(QStringLiteral(
         "QPushButton { background: transparent; color: %1;"
         " border: none; padding: 2px 4px; font-weight: 600;"
-        " font-size: 14px; letter-spacing: 2px; }"
+        " font-size: 16px; letter-spacing: 2px; }"
         "QPushButton:hover { color: %2; }"
         "QPushButton:checked { color: %3; }")
         .arg(QString::fromLatin1(Style::kTextScale),

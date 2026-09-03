@@ -367,6 +367,8 @@ private slots:
 
 private:
     void buildUI();
+    void buildFinePopup();
+    void showFinePopup();
     void wireControls();  // called after buildUI() — attaches signals/slots
     // K.2: slot called when SliceModel::dspModeChanged fires (via RadioModel).
     // Updates m_moxBtn->setToolTip(tooltipForMode(mode)).
@@ -490,6 +492,14 @@ private:
 
     // 10. SWR protection LED (wired to SwrProtectionController::highSwrChanged)
     QLabel*      m_swrProtLed = nullptr;
+
+    // ── Umbau 2026-09-02: das Feinblatt hinter dem Zahnrad ──────────────────
+    // Traegt Profil, TX-Bandbreite, VOX-Schwelle/-Haltezeit und
+    // Mithoerlautstaerke. Es sind dieselben Bauteile wie vorher, nur an
+    // einem anderen Elternteil — objectNames und Verdrahtung unveraendert.
+    QLabel*      m_profileEcho = nullptr;   // Profilname in der Fusszeile
+    QPushButton* m_moreBtn    = nullptr;
+    QWidget*     m_finePopup  = nullptr;
     // Removed NYI members (re-add when their phases ship):
     //   m_atuBtn      — ATU phase (no plan yet)
     //   m_memBtn      — channel-memory phase

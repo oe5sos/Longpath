@@ -56,6 +56,10 @@
 #include "core/RadioDiscovery.h"
 #include "core/HpsdrModel.h"
 #include "core/sunsdr/SunSdrProtocol.h"
+#include "core/sunsdr/SunSdrTxPacer.h"
+#include "core/safety/BandPlanGuard.h"
+#include "core/WdspTypes.h"
+#include "models/Band.h"
 
 using namespace Longpath;
 
@@ -89,6 +93,23 @@ QByteArray silentIqPacket()
         /*byte8=*/0, /*byte9=*/0);
     pkt.append(SunSdr::kIqPayloadSize, char(0));
     return pkt;
+}
+
+// Step 3 (SunSDR2 QRP TX-chain plan): the exact same "armed, in-band,
+// mode-allowed" TxCheckContext the Step 2 tests above already use
+// (setMoxAcceptedWhenArmedAndInBandSendsZeroBytes()'s own ctx) — reused
+// here rather than picked fresh, same rationale that comment gives:
+// a regression in BandPlanGuard's own tables fails a Step 2 test first,
+// not silently show up here as a mysterious refusal.
+TxCheckContext armedInBandCtx()
+{
+    TxCheckContext ctx;
+    ctx.region   = safety::Region::UnitedStates;
+    ctx.txFreqHz = 14'200'000;  // US 20m, well in-band
+    ctx.mode     = DSPMode::USB;
+    ctx.rxBand   = Band::Band20m;
+    ctx.txBand   = Band::Band20m;
+    return ctx;
 }
 
 } // namespace
@@ -685,6 +706,493 @@ private slots:
             SunSdrRadioConnection::dataSilenceTimeoutMsForTest() + 2000);
         QVERIFY(!conn.hasRadioAddrForTest());
         QVERIFY(!conn.isRxReadyForTest());
+    }
+
+    // ── Step 2 (SunSDR2 QRP TX-chain plan): bench-only TX gate ─────────
+    //
+    // Still zero wire reachability — every one of these confirms setMox()
+    // never touches a socket (txByteRate() stays 0.0, the same accessor
+    // tst_radio_connection_byte_rates.cpp already uses to prove "nothing
+    // was sent"), no matter which of the three outcomes it reaches.
+    // Region::UnitedStates / 14,200,000 Hz / Band20m below are the exact
+    // "definitely in-band" values tst_band_plan_guard_mode_allow_list.cpp
+    // already pins for checkMoxAllowed()'s ok path (kRegion/kValidHz/
+    // kBand20m there) — reused here rather than picked fresh, so a
+    // regression in BandPlanGuard's own band tables would fail that
+    // test first, not silently show up here as a mysterious refusal.
+
+    // setMox(true) with the bench gate never armed: refused before
+    // BandPlanGuard is even consulted (m_txCheckContext is left at its
+    // default, meaningless-until-armed values — see that struct's own
+    // comment), and traced with the literal "refused: not armed" reason.
+    void setMoxRefusedWhenNotArmed()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        QVERIFY(!conn.isTxArmedForTest());
+        conn.setMox(true);
+
+        QVERIFY(!conn.isMoxForTest());
+        QCOMPARE(conn.txByteRate(1000), 0.0);  // never reaches the wire
+
+        const auto trace = conn.txTraceForTest();
+        QCOMPARE(trace.size(), 1);
+        QCOMPARE(trace.last().kind, TxTraceKind::MoxRefused);
+        QCOMPARE(trace.last().reason, QStringLiteral("refused: not armed"));
+    }
+
+    // Armed, but the context describes a mode BandPlanGuard's own 3M-1b
+    // allow-list rejects (CWL — "CW TX coming in Phase 3M-2"), at an
+    // otherwise perfectly in-band frequency, so the mode check — not the
+    // frequency/band check — is unambiguously what refuses this.
+    void setMoxRefusedByBandPlanGuardWhenArmedButModeNotAllowed()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+        QVERIFY(conn.isTxArmedForTest());
+
+        TxCheckContext ctx;
+        ctx.region  = safety::Region::UnitedStates;
+        ctx.txFreqHz = 14'200'000;   // valid US 20m -- not the blocker here
+        ctx.mode    = DSPMode::CWL;  // CW TX not allowed yet (Phase 3M-2)
+        ctx.rxBand  = Band::Band20m;
+        ctx.txBand  = Band::Band20m;
+        conn.setTxCheckContextForTest(ctx);
+
+        conn.setMox(true);
+
+        QVERIFY(!conn.isMoxForTest());
+        QCOMPARE(conn.txByteRate(1000), 0.0);
+
+        const auto trace = conn.txTraceForTest();
+        // Armed (from setTxArmedForTest(true) above) + this refusal.
+        QCOMPARE(trace.size(), 2);
+        QCOMPARE(trace.at(0).kind, TxTraceKind::Armed);
+        QCOMPARE(trace.at(1).kind, TxTraceKind::MoxRefused);
+        QCOMPARE(trace.at(1).reason, QStringLiteral("CW TX coming in Phase 3M-2"));
+    }
+
+    // Armed, out-of-band frequency this time (above the US 20m edge) on
+    // an otherwise-allowed mode — the freq/band half of checkMoxAllowed(),
+    // not the mode half, is what refuses this one.
+    void setMoxRefusedByBandPlanGuardWhenArmedButOutOfBand()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+
+        TxCheckContext ctx;
+        ctx.region  = safety::Region::UnitedStates;
+        ctx.txFreqHz = 14'500'000;  // above the US 20m edge (14.350 MHz)
+        ctx.mode    = DSPMode::USB;
+        ctx.rxBand  = Band::Band20m;
+        ctx.txBand  = Band::Band20m;
+        conn.setTxCheckContextForTest(ctx);
+
+        conn.setMox(true);
+
+        QVERIFY(!conn.isMoxForTest());
+        QCOMPARE(conn.txByteRate(1000), 0.0);
+
+        const auto trace = conn.txTraceForTest();
+        QCOMPARE(trace.last().kind, TxTraceKind::MoxRefused);
+        QCOMPARE(trace.last().reason,
+                  QStringLiteral("Frequency outside TX-allowed range"));
+    }
+
+    // Armed AND in-band/in-mode: BandPlanGuard allows it, m_mox actually
+    // transitions to true, an "accepted" transition is traced -- and,
+    // the whole point of this step, txByteRate() stays exactly 0.0: no
+    // frame is built or sent, even though Step 1's SunSdrProtocol
+    // encoders (buildMoxFrame() etc.) exist and could in principle be
+    // called here. That wiring is a later, separately-reviewed step.
+    void setMoxAcceptedWhenArmedAndInBandSendsZeroBytes()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+
+        TxCheckContext ctx;
+        ctx.region  = safety::Region::UnitedStates;
+        ctx.txFreqHz = 14'200'000;  // US 20m, well in-band
+        ctx.mode    = DSPMode::USB;
+        ctx.rxBand  = Band::Band20m;
+        ctx.txBand  = Band::Band20m;
+        conn.setTxCheckContextForTest(ctx);
+
+        conn.setMox(true);
+
+        QVERIFY(conn.isMoxForTest());
+        QCOMPARE(conn.txByteRate(1000), 0.0);  // accepted, but zero wire effect
+
+        const auto trace = conn.txTraceForTest();
+        QCOMPARE(trace.size(), 2);  // Armed + MoxAccepted
+        QCOMPARE(trace.at(0).kind, TxTraceKind::Armed);
+        QCOMPARE(trace.at(1).kind, TxTraceKind::MoxAccepted);
+        QVERIFY(trace.at(1).reason.contains(QStringLiteral("accepted")));
+    }
+
+    // setMox(false) must be an unconditional release — the "armed" gate
+    // and BandPlanGuard must apply ONLY to turning TX on, never to
+    // turning it off, the same precedent MoxController::setMox() already
+    // sets (K.2's BandPlanGuard check and the Task 87 TxInterlockPolicy
+    // check are both written as `if (on && ...)`, gating only the
+    // TX-on path). A kill switch that could itself be refused is not a
+    // kill switch. Found and fixed 2026-09-02, before this class ever
+    // shipped a caller that could hit it.
+    void setMoxFalseIsUnconditionalEvenWhenNeverArmed()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        // Deliberately never armed, and no TxCheckContext set at all —
+        // if setMox(false) routed through the same gate as setMox(true),
+        // this would either refuse (not armed) or hit BandPlanGuard with
+        // a default-constructed, meaningless context. It must do neither.
+        conn.setMox(false);
+
+        QVERIFY(!conn.isMoxForTest());
+        const auto trace = conn.txTraceForTest();
+        QCOMPARE(trace.size(), 1);
+        QCOMPARE(trace.at(0).kind, TxTraceKind::MoxAccepted);
+        QVERIFY(trace.at(0).reason.contains(QStringLiteral("unconditional")));
+    }
+
+    void setMoxFalseBypassesBandPlanGuardEvenWhenThatContextWouldRefuseEnable()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+
+        TxCheckContext ctx;
+        ctx.region  = safety::Region::UnitedStates;
+        ctx.txFreqHz = 14'200'000;  // in-band -- enable this once, cleanly
+        ctx.mode    = DSPMode::USB;
+        ctx.rxBand  = Band::Band20m;
+        ctx.txBand  = Band::Band20m;
+        conn.setTxCheckContextForTest(ctx);
+        conn.setMox(true);
+        QVERIFY(conn.isMoxForTest());
+
+        // Now mutate the context to something BandPlanGuard would refuse
+        // for an ENABLE call (out of band) -- and confirm setMox(false)
+        // still succeeds, proving the release path truly does not
+        // consult BandPlanGuard at all, not just that it happens to pass.
+        ctx.txFreqHz = 14'500'000;  // out of the US 20m TX-allowed range
+        conn.setTxCheckContextForTest(ctx);
+
+        conn.setMox(false);
+
+        QVERIFY(!conn.isMoxForTest());
+        const auto trace = conn.txTraceForTest();
+        QCOMPARE(trace.back().kind, TxTraceKind::MoxAccepted);
+        QVERIFY(trace.back().reason.contains(QStringLiteral("mox -> false")));
+        QVERIFY(trace.back().reason.contains(QStringLiteral("unconditional")));
+    }
+
+    // Disarming mid-transmission is itself a kill request, not merely a
+    // block on future setMox(true) calls -- found during Step 3's review
+    // (a running pacer survived setTxArmedForTest(false) alone, since
+    // only the four teardown paths and setMox(false) itself stopped it)
+    // and fixed by routing setTxArmed(false) through setMox(false)
+    // whenever MOX is currently on. Same "a kill switch that could be
+    // refused isn't one" reasoning as the two tests above, applied to the
+    // arm gate itself.
+    void disarmingMidTransmissionStopsThePacerAndClearsMox()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+        conn.setMox(true);
+        QVERIFY(conn.isMoxForTest());
+        QVERIFY(conn.pacerRunningForTest());
+
+        conn.setTxArmedForTest(false);
+
+        QVERIFY(!conn.isTxArmedForTest());
+        QVERIFY(!conn.isMoxForTest());
+        QVERIFY(!conn.pacerRunningForTest());
+
+        const auto trace = conn.txTraceForTest();
+        QCOMPARE(trace.back().kind, TxTraceKind::MoxAccepted);
+        QVERIFY(trace.back().reason.contains(QStringLiteral("mox -> false")));
+    }
+
+    // ── disconnect()'s reset of the new TX gate state ───────────────────
+    //
+    // Mirrors hasRadioAddrForTest()'s own after-teardown pattern
+    // (lateBeaconAfterDisconnectDoesNotReopenTheGate() above): arm, get
+    // an accepted MOX transition, then disconnect() — both the arm gate
+    // and the accepted MOX state must be false afterward, since bench
+    // arming is deliberately per-session, not sticky across a teardown.
+    void disconnectClearsTxArmedAndMoxAfterAnAcceptedTransition()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+
+        TxCheckContext ctx;
+        ctx.region  = safety::Region::UnitedStates;
+        ctx.txFreqHz = 14'200'000;
+        ctx.mode    = DSPMode::USB;
+        ctx.rxBand  = Band::Band20m;
+        ctx.txBand  = Band::Band20m;
+        conn.setTxCheckContextForTest(ctx);
+
+        conn.setMox(true);
+        QVERIFY(conn.isTxArmedForTest());
+        QVERIFY(conn.isMoxForTest());
+
+        conn.disconnect();
+
+        QVERIFY(!conn.isTxArmedForTest());
+        QVERIFY(!conn.isMoxForTest());
+        // The trace ring is cleared on disconnect() specifically (see
+        // that function's own comment) -- a fresh bench session starts
+        // from an empty ring, not the prior session's history.
+        QCOMPARE(conn.txTraceForTest().size(), 0);
+    }
+
+    // ── Step 3 (SunSDR2 QRP TX-chain plan): SunSdrTxPacer itself ────────
+    //
+    // These four instantiate SunSdrTxPacer directly (not through
+    // SunSdrRadioConnection) — the pacer's own tick/ring/seq behavior is
+    // independent of the connection that will eventually own one, and
+    // testing it directly avoids needing connection-level plumbing just
+    // to reach ring/seq accessors the connection itself never forwards
+    // (only pacerRunningForTest() is forwarded — see that accessor's own
+    // header comment). Synthetic tickForTest() calls throughout: never a
+    // real 5.12ms wait.
+
+    void txPacerStartsStoppedWithAnEmptyLastFrame()
+    {
+        SunSdrTxPacer pacer;
+        QVERIFY(!pacer.pacerRunningForTest());
+        QVERIFY(pacer.lastTxFrameForTest().isEmpty());
+        QCOMPARE(pacer.pacerUnderrunsForTest(), 0u);
+        QCOMPARE(pacer.pacerSeqForTest(), quint16(0));
+        QCOMPARE(pacer.ringSampleCountForTest(), 0);
+
+        pacer.start();
+        QVERIFY(pacer.pacerRunningForTest());
+        pacer.stop();
+        QVERIFY(!pacer.pacerRunningForTest());
+    }
+
+    // A tick with >= kIqComplexPerPkt samples queued must build a real,
+    // byte-exact 1210-byte frame: the same header SunSdrProtocol::
+    // buildIqHeader() would build by hand (opcode kOpIqTxActive, seq=0,
+    // state bytes 0x02/0x01 -- see SunSdrTxPacer.cpp's own comment for
+    // that citation) followed by the exact 200 pushed samples in push
+    // order, and the ring must be fully drained.
+    void txPacerTickBuildsByteExactFrameFromRingSamples()
+    {
+        SunSdrTxPacer pacer;  // defaults to SunSdr::kProfileQrp
+
+        QByteArray expectedPayload;
+        for (int i = 0; i < SunSdr::kIqComplexPerPkt; ++i) {
+            // Recognizable, non-degenerate sample content (index in the
+            // low two bytes, a fixed marker in the last) -- a
+            // wrong-slot or off-by-one copy bug would show up as a
+            // content mismatch, not just a length one.
+            QByteArray sample(SunSdr::kIqBytesPerComplex, char(0));
+            sample[0] = static_cast<char>(i & 0xFF);
+            sample[1] = static_cast<char>((i >> 8) & 0xFF);
+            sample[5] = char(0xAB);
+            QVERIFY(pacer.pushSample(sample));
+            expectedPayload += sample;
+        }
+        QCOMPARE(pacer.ringSampleCountForTest(), SunSdr::kIqComplexPerPkt);
+
+        pacer.tickForTest();
+
+        QCOMPARE(pacer.ringSampleCountForTest(), 0);   // fully drained
+        QCOMPARE(pacer.pacerUnderrunsForTest(), 0u);   // this tick built, didn't underrun
+        QCOMPARE(pacer.pacerSeqForTest(), quint16(1)); // advanced past the built frame's seq=0
+
+        const QByteArray expectedHeader = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqTxActive, /*seq=*/0,
+            /*byte8=*/0x02, /*byte9=*/0x01);
+        QCOMPARE(pacer.lastTxFrameForTest(), expectedHeader + expectedPayload);
+    }
+
+    // The design doc's explicit rule: an empty (or merely partial) ring
+    // must NOT build a new frame -- it must repeat the cached last frame
+    // byte-identical and count an underrun. Also covers the "nothing has
+    // ever been built yet" underrun case (lastTxFrameForTest() has
+    // nothing to repeat, so it simply stays empty).
+    void txPacerEmptyRingRepeatsLastFrameAndCountsUnderrun()
+    {
+        SunSdrTxPacer pacer;
+
+        pacer.tickForTest();  // nothing queued, nothing ever built yet
+        QCOMPARE(pacer.pacerUnderrunsForTest(), 1u);
+        QVERIFY(pacer.lastTxFrameForTest().isEmpty());
+
+        for (int i = 0; i < SunSdr::kIqComplexPerPkt; ++i) {
+            QVERIFY(pacer.pushSample(QByteArray(SunSdr::kIqBytesPerComplex, char(i))));
+        }
+        pacer.tickForTest();
+        const QByteArray built = pacer.lastTxFrameForTest();
+        QVERIFY(!built.isEmpty());
+        QCOMPARE(pacer.pacerUnderrunsForTest(), 1u);   // unchanged: that tick built
+        QCOMPARE(pacer.pacerSeqForTest(), quint16(1));
+
+        // Ring is empty again -- must repeat `built` byte-for-byte
+        // (seq included) rather than building a new, different-seq frame.
+        pacer.tickForTest();
+        QCOMPARE(pacer.pacerUnderrunsForTest(), 2u);
+        QCOMPARE(pacer.lastTxFrameForTest(), built);
+        QCOMPARE(pacer.pacerSeqForTest(), quint16(1));  // unchanged: no new frame built
+    }
+
+    // "TX packet sequence numbers reset to 0 on every PTT-on" (design
+    // doc) -- proven at the byte level: after resetSeq(), the very next
+    // built frame's own header must carry seq=0, not a continuation of
+    // whatever a prior "session" had already advanced to.
+    void txPacerResetSeqZeroesSequenceAfterAdvancing()
+    {
+        SunSdrTxPacer pacer;
+
+        for (int frame = 0; frame < 2; ++frame) {
+            for (int i = 0; i < SunSdr::kIqComplexPerPkt; ++i) {
+                QVERIFY(pacer.pushSample(QByteArray(SunSdr::kIqBytesPerComplex, char(i))));
+            }
+            pacer.tickForTest();
+        }
+        QVERIFY(pacer.pacerSeqForTest() > 0);  // advanced across two real builds
+
+        pacer.resetSeq();
+        QCOMPARE(pacer.pacerSeqForTest(), quint16(0));
+
+        for (int i = 0; i < SunSdr::kIqComplexPerPkt; ++i) {
+            QVERIFY(pacer.pushSample(QByteArray(SunSdr::kIqBytesPerComplex, char(i))));
+        }
+        pacer.tickForTest();
+
+        const QByteArray header = pacer.lastTxFrameForTest().left(SunSdr::kIqHeaderSize);
+        SunSdr::IqHeader parsed;
+        QVERIFY(SunSdr::parseIqHeader(
+            reinterpret_cast<const quint8*>(header.constData()), header.size(),
+            SunSdr::kProfileQrp, &parsed));
+        QCOMPARE(parsed.seq, quint16(0));
+    }
+
+    // ── Step 3: SunSdrRadioConnection's own pacer wiring ────────────────
+    //
+    // pacerRunningForTest() (delegating to the owned SunSdrTxPacer) is
+    // the only pacer-shaped thing exposed at the connection level -- see
+    // that accessor's own header comment. These confirm setMox(true)
+    // starts it, and that all four places obligated to stop it actually
+    // do, including while "mid-transmission" (mox accepted, pacer
+    // genuinely running) rather than only when nothing was ever armed.
+
+    void pacerRunsWhileMoxAcceptedAndStopsOnSetMoxFalse()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+
+        QVERIFY(!conn.pacerRunningForTest());
+        conn.setMox(true);
+        QVERIFY(conn.isMoxForTest());
+        QVERIFY(conn.pacerRunningForTest());
+
+        conn.setMox(false);
+        QVERIFY(!conn.isMoxForTest());
+        QVERIFY(!conn.pacerRunningForTest());
+    }
+
+    void pacerStopsAfterDisconnectMidTransmission()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+        conn.setMox(true);
+        QVERIFY(conn.pacerRunningForTest());
+
+        conn.disconnect();
+        QVERIFY(!conn.pacerRunningForTest());
+    }
+
+    // Invokes the private onConnectTimeout() slot directly (same
+    // QMetaObject::invokeMethod pattern tst_rf2ks_connection_reconnect.cpp
+    // already uses for its own private timeout slot) rather than waiting
+    // out a real kConnectTimeoutMs -- onConnectTimeout()'s own guard
+    // requires state()==Connecting, which connectToRadio() alone already
+    // reaches without ever needing a beacon.
+    void pacerStopsAfterConnectTimeoutMidTransmission()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        QTRY_COMPARE_WITH_TIMEOUT(conn.state(), ConnectionState::Connecting, 500);
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+        conn.setMox(true);
+        QVERIFY(conn.pacerRunningForTest());
+
+        QVERIFY(QMetaObject::invokeMethod(&conn, "onConnectTimeout",
+                                          Qt::DirectConnection));
+        QVERIFY(!conn.pacerRunningForTest());
+    }
+
+    // The data watchdog path: real beacon + one real decoded frame to
+    // reach Connected, mox accepted mid-"session", then the real
+    // kDataSilenceTimeoutMs wait for a genuine trip -- same shape
+    // dataWatchdogTripTransitionsToLinkLostAndClearsRadioAddr() above
+    // already uses, extended to also assert the pacer stopped.
+    void pacerStopsAfterDataWatchdogTripMidTransmission()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            QHostAddress(QStringLiteral("192.0.2.200")));
+        QVERIFY(conn.isRxReadyForTest());
+
+        conn.feedStreamDatagramForTest(silentIqPacket());
+        QTRY_COMPARE_WITH_TIMEOUT(conn.state(), ConnectionState::Connected, 500);
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+        conn.setMox(true);
+        QVERIFY(conn.pacerRunningForTest());
+
+        QTRY_COMPARE_WITH_TIMEOUT(
+            conn.state(), ConnectionState::LinkLost,
+            SunSdrRadioConnection::dataSilenceTimeoutMsForTest() + 2000);
+        QVERIFY(!conn.pacerRunningForTest());
     }
 };
 

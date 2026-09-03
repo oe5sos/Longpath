@@ -1290,9 +1290,17 @@ const BoardCapabilities kSunSdr2Qrp = {
     // This SKU does have TX hardware on the real radio (opcode 0x17
     // drive byte, PA enable opcode 0x24 both exist in the protocol) —
     // isRxOnlySku describes the hardware, not Longpath's current
-    // software support. TX simply isn't implemented yet
-    // (SunSdrRadioConnection is receive-only by explicit design-doc gate,
-    // not because the hardware lacks a transmitter).
+    // software support. TX itself is still unreachable end-to-end: no
+    // RF-relevant setter (setTxDrive/setAntennaRouting/sendTxIq/
+    // setTrxRelay/...) does anything but the class's "Safe no-ops" block
+    // documents, and SunSdrTxPacer never touches a socket (its own
+    // header: "THE TICK NEVER SENDS ANYTHING TO A SOCKET"). setMox()
+    // itself, though, is no longer one of those no-ops as of the
+    // in-progress SunSDR2 QRP TX-chain plan (Step 2/3, SunSdrRadioConnection.cpp) —
+    // it now runs a real arm-gate + BandPlanGuard check and, when
+    // accepted, starts an in-memory-only TX packet pacer. Update this
+    // comment again once a later step in that plan wires an actual
+    // socket send.
     .isRxOnlySku      = false,
     .canDriveGanymede = false,
     // Confirmed explicitly unsupported by ArtemisSDR itself, design doc

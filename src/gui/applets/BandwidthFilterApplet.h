@@ -115,6 +115,18 @@ private:
     QSpinBox*    m_lowBox{nullptr};
     QSpinBox*    m_widthBox{nullptr};
     QSpinBox*    m_highBox{nullptr};
+    // Betreiber 2026-09-03: "ich muss beide Werte frei eingeben koennen" --
+    // SliceModel::setFilterWidth() verankert LSB/USB/CW immer am
+    // Vorgabewert der Betriebsart (widthToEdges()), egal was zuletzt von
+    // Hand in LOW oder HIGH stand. Diese Kennung merkt sich, welche der
+    // beiden Kanten der Bedienende zuletzt selbst gesetzt hat, damit der
+    // WIDTH-Anschluss GENAU DIESE Kante festhaelt statt sie stillschweigend
+    // zu verwerfen. Nicht ueber m_lowBox/m_highBox erschliessbar: waehrend
+    // eines Edits zeigen beide Felder schon den neuen Wert, das Modell
+    // aber noch den alten -- ohne eigene Kennung liesse sich "zuletzt"
+    // nicht mehr feststellen, sobald WIDTH selbst dran ist.
+    enum class LastEditedEdge { Low, High };
+    LastEditedEdge m_lastEditedEdge{LastEditedEdge::High};
     QList<QPushButton*> m_varBtns;
     QPushButton* m_resetBtn{nullptr};
     QPushButton* m_spanBtn{nullptr};

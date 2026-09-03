@@ -417,11 +417,21 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
     // uebersprungen: dieselbe Regel wie bei SunSDR, aus demselben
     // Grund -- ein fremder KiwiSDR-Empfaenger darf nie den Ton oder
     // Panadapter eines echten Funkgeraets stumm ueberschreiben.
+    // Bench-gefunden 2026-09-03: derselbe Rueckfall existiert wortgleich
+    // in connectSunSdr() (MainWindow_SunSdr.cpp) -- siehe dort fuer die
+    // volle Begruendung. m_sunSdrTargetSliceId ist SunSDRs eigene, nie
+    // ueber streamIndex() sichtbare Zuordnung; ohne diese Pruefung
+    // koennte ein KiwiSDR-Empfaenger dieselbe Scheibe uebernehmen, die
+    // bereits an ein echtes, per TCI verbundenes SunSDR gebunden ist.
+    const auto isSunSdrClaimed = [this](const SliceModel* s) {
+        return s && m_sunSdrTargetSliceId == s->sliceIndex();
+    };
+
     SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
-    if (slice && slice->streamIndex() >= 0) { slice = nullptr; }
+    if (slice && (slice->streamIndex() >= 0 || isSunSdrClaimed(slice))) { slice = nullptr; }
     if (!slice && m_radioModel) {
         for (SliceModel* candidate : m_radioModel->slices()) {
-            if (candidate && candidate->streamIndex() < 0) {
+            if (candidate && candidate->streamIndex() < 0 && !isSunSdrClaimed(candidate)) {
                 slice = candidate;
                 break;
             }

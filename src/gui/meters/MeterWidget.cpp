@@ -112,9 +112,25 @@ MeterWidget::MeterWidget(QWidget* parent)
 #ifdef NEREUS_GPU_SPECTRUM
     // Platform-specific QRhi backend selection.
     // Order matters: setApi() first, then WA_NativeWindow.
-    // Mirrors SpectrumWidget.cpp:97-110 exactly.
+    // Mirrors SpectrumWidget.cpp:97-110 -- but that file picked up
+    // WA_DontCreateNativeAncestors on 2026-08-22 (upstream #4339: without
+    // it, macOS promotes the whole ancestor chain -- ContainerWidget,
+    // AppletPanelWidget, its QScrollArea, up to MainWindow -- to separate
+    // native QWidgetWindows) and this constructor, written to mirror the
+    // OLD pre-fix shape, never got the follow-up. MeterWidget is the fixed
+    // S-Meter head of every AppletPanelWidget (AppletPanelWidget.cpp:171),
+    // so every applet column carried this gap. Harmless until something
+    // hide()/show()s the whole MainWindow -- which the 2026-09-01 profile
+    // fullscreen restore (MainWindow.cpp, enterBorderlessFullSize()/
+    // exitBorderlessFullSize()) now does on every profile switch that
+    // changes fullscreen state, and Qt logged
+    // "QWidgetWindow(...) must be a top level window" for exactly the
+    // affected classes (AppletPanelWidget/ContainerWidget/QScrollArea/
+    // RotorLogbookPanel) while the whole applet column and docked
+    // panadapter went blank.
 #ifdef Q_OS_MAC
     setApi(QRhiWidget::Api::Metal);
+    setAttribute(Qt::WA_DontCreateNativeAncestors);
     setAttribute(Qt::WA_NativeWindow);
 #elif defined(Q_OS_WIN)
     setApi(QRhiWidget::Api::Direct3D11);

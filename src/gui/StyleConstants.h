@@ -92,10 +92,21 @@ constexpr auto kTextTertiary    = "#909096";
 // auseinanderliegen und offensichtlich nicht entschieden, sondern
 // gewachsen sind.
 //
-// Die Leiter unten deckt die drei Instrumente ab. Sie ist NICHT auf
-// den ganzen Baum angewandt: 641 Stellen blind zu ersetzen waere
-// derselbe Fehler wie die Palettenumstellung ohne Abbildungstabelle.
-// Wer sie ausweitet, tut es Datei fuer Datei.
+// Die Leiter unten deckte am 2026-08-18 zunaechst nur die drei
+// Instrumente ab, absichtlich NICHT den ganzen Baum: 641 Stellen blind
+// zu ersetzen waere derselbe Fehler wie die Palettenumstellung ohne
+// Abbildungstabelle. Wer sie ausweitet, tut es Datei fuer Datei.
+//
+// UPDATE 2026-08-21: genau diese Datei-fuer-Datei-Ausweitung ist seither
+// passiert — der ganze Baum wurde auf die Leiter zurueckgeholt (zwoelf
+// abweichende Schriftgroessen auf null). scripts/verify-style-drift.py
+// haelt seitdem den GANZEN Baum auf 0 abweichende Groessen fest (Decke
+// in docs/design/style-drift-baseline.json), nicht nur die drei
+// Instrumente. Wachsen dort neue Abweichungen (z.B. 2026-09-02: 20 neue
+// Stellen in KiwiSDR-/Chrome-/Applet-Dateien, seither wieder auf die
+// Leiter geholt), sind das keine neuen "erlaubten" Stellen ausserhalb
+// der Leiter, sondern Drift, die dieselbe Datei-fuer-Datei-Pruefung
+// braucht wie die urspruengliche Migration — kein blindes Ersetzen.
 //
 // Die Zahlen sind ein Vorschlag mit einer Stelle, an der man ihn
 // aendert. Herkunft:
@@ -270,6 +281,33 @@ constexpr auto kTxRed           = "#c25a5c";
 constexpr auto kRedBg           = "#7a2c2e";
 constexpr auto kRedText         = "#f0dcdc";
 constexpr auto kRedBorder       = "#a86b6d";
+
+// ── Die Sendetaste ────────────────────────────────────────────────────
+//
+// Bis zum 2026-09-02 trug MOX kTxRed — dieselbe Farbfamilie wie die
+// SWR-Warnung zwei Zeilen darueber. Zwei verschiedene Dinge in einer
+// Farbe: „ich sende" und „es stimmt etwas nicht".
+//
+// OE5SOS am Entwurfsblatt, 2026-09-02: „entwurf B, aber das rot finde
+// ich nicht sehr schoen" — gewaehlt wurde daraufhin der Ton „Messing":
+// der Panelakzent des Hausstils (linear-gradient #a87a3c → #8a6a30) als
+// FLAECHE, mit dunkler Schrift darauf. Eine gravierte Taste, kein
+// Leuchtschild. Damit ist Rot im TX-Feld wieder eindeutig die Warnung.
+//
+// TUNE ist dieselbe Art Handlung und bekommt denselben Ton eine Stufe
+// leiser — sonst stehen zwei gleich laute Tasten nebeneinander und
+// keine ist mehr die wichtigere.
+constexpr auto kTxKeyTop        = "#a87a3c";
+constexpr auto kTxKeyBottom     = "#8a6a30";
+constexpr auto kTxKeyBorder     = "#c2924f";
+constexpr auto kTxKeyText       = "#17130a";
+constexpr auto kTxKeyDimTop     = "#7a5a2c";
+constexpr auto kTxKeyDimBottom  = "#634c24";
+constexpr auto kTxKeyDimBorder  = "#9a763c";
+
+// Der SWR-Schutz, wenn er greift. Stand als nacktes „#c2924f" in
+// TxApplet::wireControls.
+constexpr auto kSwrProtActive   = "#c2924f";
 
 // ── Instrumente ───────────────────────────────────────────────────────
 //
@@ -570,11 +608,47 @@ inline QString blueCheckedStyle()
           QLatin1String(kBlueBorder));
 }
 
+// Eingerastet, aber leise: dunkler Grund, Akzentrand, heller Text.
+//
+// War bis zum 2026-09-02 ein Einzelstueck am MON-Knopf der TxApplet
+// ("NereusSDR-original one-off — do NOT snap to kBlueBg"). Seit dem
+// Umbau des TX-Feldes ist es die Bauform fuer ALLE Zustandsschalter
+// dort: VOX, MON, LEV, EQ, CFC, PS-A. Der Grund steht im Hausstil —
+// Farbe bedeckt hoechstens zwei Prozent, also darf im Feld genau eine
+// Stelle kraeftig sein, und das ist die Sendetaste (txKeyStyle).
+inline QString quietCheckedStyle()
+{
+    return QStringLiteral(
+        "QPushButton:checked { background: %1; color: %2;"
+        " border: 1px solid %3; }"
+    ).arg(QLatin1String(kBadgeInfoBg),
+          QLatin1String(kTextPrimary),
+          QLatin1String(kAccent));
+}
+
 inline QString amberCheckedStyle()
 {
     return QStringLiteral(
         "QPushButton:checked { background: %1; color: %2; border: 1px solid %3; }"
     ).arg(kAmberBg, kAmberText, kAmberBorder);
+}
+
+// Die Sendetaste, eingerastet: Messing als Flaeche, dunkle Schrift.
+// `leise` ist die Stufe fuer TUNE.  Wer MOX faerbt, muss auch die
+// untere Leiste faerben (TxSwitchBar) — sonst leuchtet unten weiter
+// Rot, waehrend oben Messing steht.
+inline QString txKeyStyle(bool leise = false)
+{
+    return QStringLiteral(
+        "QPushButton:checked {"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %1, stop:1 %2);"
+        "  color: %3; border: 1px solid %4;"
+        "}"
+    ).arg(QLatin1String(leise ? kTxKeyDimTop : kTxKeyTop),
+          QLatin1String(leise ? kTxKeyDimBottom : kTxKeyBottom),
+          QLatin1String(kTxKeyText),
+          QLatin1String(leise ? kTxKeyDimBorder : kTxKeyBorder));
 }
 
 inline QString redCheckedStyle()

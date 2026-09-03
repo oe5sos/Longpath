@@ -617,6 +617,13 @@ void PanadapterStack::dockPanadapter(const QString& panId)
 {
     PanFloatingWindow* floater = m_floating.value(panId, nullptr);
     if (!floater) { return; }
+    // 2026-09-01 Diagnose: requestDock() geht NICHT ueber close()/
+    // closeEvent() -- es emittiert dockRequested() direkt. Das
+    // [PanFloatClose]-Log in closeEvent() sieht diesen Weg also nie,
+    // obwohl er denselben Effekt hat (schreibt panFloatStateChanged
+    // false). Klaert, wer diesen Weg aufruft -- wird nach der
+    // Bestaetigung entfernt.
+    qWarning() << "[PanDockRequested]" << panId;
     floater->requestDock();
 }
 
@@ -635,6 +642,26 @@ void PanadapterStack::dockAllFloatingPans()
             applet->hide();
             applet->setParent(this);
         }
+        // Betreiber 2026-09-01: "der panadapter wird immer wieder auf
+        // fullsize gestellt". dockAllFloatingPans() ist der ALLERERSTE
+        // Schritt von applyLayout() -- also auch bei JEDEM Programmstart,
+        // bevor der eigentliche Wiederherstellungsschritt (weiter unten
+        // im MainWindow-Konstruktor: "was zuletzt tatsaechlich schwebte")
+        // ueberhaupt drankommt. Ohne setShuttingDown(true) faehrt das
+        // gleich folgende close() denselben Pfad wie ein echter
+        // Nutzer-Klick auf das Kreuz: PanFloatingWindow::closeEvent()
+        // ruft requestDock() und schreibt PanFloating_pan-0 = False in
+        // die Einstellungen -- mitten im Start, fuer einen Panadapter,
+        // der Sekunden spaeter laut Profil eigentlich wieder schweben
+        // soll. Normalerweise unsichtbar, weil der Wiederherstellungs-
+        // schritt es sofort wieder auf True zurueckdreht -- aber genau
+        // dieses kurze Fenster ist es, in dem der falsche Wert auch
+        // fuer eine ANDERE, parallel lesende/schreibende Instanz (siehe
+        // heutige Doppelstart-Kollisionen) sichtbar werden kann, und
+        // ist ohnehin ein unnoetiger Nebeneffekt eines rein internen
+        // Umbaus. dockAllFloatingPans() reisst hier ab -- keine
+        // Nutzerabsicht, kein Grund, irgendetwas zu speichern.
+        floater->setShuttingDown(true);
         floater->close();
         delete floater;
     }

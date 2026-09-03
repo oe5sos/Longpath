@@ -11,6 +11,7 @@
 #include "gui/FramelessResizer.h"
 #include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowChrome.h"
+#include "gui/WindowPlacement.h"
 #include "gui/applets/AppletWidget.h"
 
 #include <QCloseEvent>
@@ -231,6 +232,10 @@ void AppletFloatingWindow::moveEvent(QMoveEvent* ev)
 {
     QWidget::moveEvent(ev);
     scheduleGeometryReport();
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
+    // Runden hier wuerde gegen das native Ziehen kaempfen.
+    snapToGridAfterSettle(this);
 }
 
 void AppletFloatingWindow::resizeEvent(QResizeEvent* ev)

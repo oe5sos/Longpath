@@ -319,7 +319,20 @@ not a gap — but the row's actual reproducer (click MOX/TUNE live,
 confirm zero wire traffic through the real GUI dispatch path) is still
 untested.
 
----
+**Update 2026-09-03 — `setMox()` is no longer covered by
+`everyTxShapedSetterIsANoOp`.** The in-progress SunSDR2 QRP TX-chain
+plan (Step 2/3, `SunSdrRadioConnection.cpp`) pulled `setMox()` out of
+the "Safe no-ops" block: it now runs a real arm-gate + `BandPlanGuard`
+check and, on acceptance, starts a TX packet pacer. Every OTHER
+TX-shaped setter this row cares about (`setTxDrive`, `setAntennaRouting`,
+`sendTxIq`, `setTrxRelay`, TUNE, attenuator/preamp) is still a true,
+unit-tested no-op — this doesn't change the row's "no wire traffic"
+conclusion, because the pacer itself still never touches a socket
+(`SunSdrTxPacer.h`: "THE TICK NEVER SENDS ANYTHING TO A SOCKET"). But
+"MOX/PTT land on no-op overrides" above is no longer accurate for MOX
+specifically, and this row's live reproducer should confirm the
+current, more nuanced claim (arm-gated + BandPlan-checked, still zero
+wire effect) rather than the older flat "no-op" one once bench-tested.
 
 ## Row 10: Coexistence with a real OpenHPSDR radio
 

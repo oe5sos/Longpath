@@ -641,6 +641,7 @@ set(CORE_SOURCES
     src/core/audio/IqRecorderController.cpp
     src/core/audio/RecordingScheduler.cpp
     src/core/sunsdr/SunSdrProtocol.cpp
+    src/core/sunsdr/SunSdrTxPacer.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp
@@ -1852,3 +1853,26 @@ endif()
 #   ./build/tci_probe ws://127.0.0.1:40001 12
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
+
+# ── SunSDR-TX-Pacer-Jitter-Sonde (Schritt 5, 2026-09-02) ──────────────
+#
+# WERKZEUG, kein Programmteil. Misst, wie praezise SunSdrTxPacer's
+# QTimer(Qt::PreciseTimer) im echten Qt-Event-Loop tickt, gegen das
+# 5,12-ms-Ziel aus der Design-Doku — die Bank-Jitter-Messung, die der
+# Entwurfs-Workflow fuer Schritt 5 vorgesehen hat, um zu entscheiden, ob
+# ein einfacher Timer reicht oder ein eigener OS-Thread noetig ist (eine
+# Architekturentscheidung, die laut CLAUDE.md ohnehin eine Freigabe
+# braucht). Braucht kein Funkgeraet — SunSdrTxPacer sendet auf keinen
+# Socket. Baut SunSdrTxPacer.cpp/SunSdrProtocol.cpp direkt mit, statt
+# gegen LongpathObjs zu linken, weil beide Dateien ausschliesslich
+# Qt6::Core brauchen (keine Multimedia-/WDSP-Abhaengigkeiten mitziehen).
+#
+#   cmake --build build --target sunsdr_tx_pacer_jitter_probe
+#   ./build/sunsdr_tx_pacer_jitter_probe 30
+add_executable(sunsdr_tx_pacer_jitter_probe EXCLUDE_FROM_ALL
+    tools/sunsdr_tx_pacer_jitter_probe.cpp
+    src/core/sunsdr/SunSdrTxPacer.cpp
+    src/core/sunsdr/SunSdrProtocol.cpp
+)
+target_include_directories(sunsdr_tx_pacer_jitter_probe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(sunsdr_tx_pacer_jitter_probe PRIVATE Qt6::Core)

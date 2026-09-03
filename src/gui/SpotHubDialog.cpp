@@ -141,9 +141,11 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMetaObject>
+#include <QMoveEvent>
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSet>
 #include <QSlider>
 #include <QSortFilterProxyModel>
@@ -339,6 +341,18 @@ void SpotHubDialog::closeEvent(QCloseEvent* event)
 {
     saveGeometryState();
     QDialog::closeEvent(event);
+}
+
+void SpotHubDialog::moveEvent(QMoveEvent* event)
+{
+    QDialog::moveEvent(event);
+    saveGeometryState();
+}
+
+void SpotHubDialog::resizeEvent(QResizeEvent* event)
+{
+    QDialog::resizeEvent(event);
+    saveGeometryState();
 }
 
 void SpotHubDialog::saveGeometryState()
@@ -1776,7 +1790,8 @@ void SpotHubDialog::buildAlertsTab(QTabWidget* tabs)
             [this](const QString& error) {
         m_alertsStatusLabel->setText(QString("Fetch failed: %1").arg(error));
         m_alertsStatusLabel->setStyleSheet(
-            "QLabel { color: #c2635a; font-size: 11px; }");
+            QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                .arg(QString::fromLatin1(Style::kTxRed)));
     });
 
     tabs->addTab(page, "Alerts");

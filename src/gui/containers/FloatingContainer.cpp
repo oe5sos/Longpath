@@ -62,6 +62,7 @@ mw0lge@grange-lane.co.uk
 #include "gui/WindowChrome.h"
 
 #include <QCloseEvent>
+#include <QMoveEvent>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -191,6 +192,15 @@ void FloatingContainer::closeEvent(QCloseEvent* event)
     }
     saveGeometry();
     QWidget::closeEvent(event);
+}
+
+void FloatingContainer::moveEvent(QMoveEvent* event)
+{
+    QWidget::moveEvent(event);
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
+    // Runden hier wuerde gegen das native Ziehen kaempfen.
+    snapToGridAfterSettle(this);
 }
 
 void FloatingContainer::saveGeometry()

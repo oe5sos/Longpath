@@ -15,6 +15,7 @@
 #include "SunSdrRadioConnection.h"
 
 #include <QLoggingCategory>
+#include <QMutexLocker>
 #include <QNetworkAddressEntry>
 #include <QNetworkDatagram>
 #include <QNetworkInterface>
@@ -23,6 +24,12 @@ namespace Longpath {
 
 namespace {
 Q_LOGGING_CATEGORY(lcSunSdr, "longpath.sunsdr")
+
+// Step 2 of the SunSDR2 QRP TX-chain plan — a distinct category from
+// lcSunSdr above, same declare/define shape, so TX-gate log lines
+// (setMox()/setTxArmed()) can be filtered independently of this file's
+// existing RX/connection logging.
+Q_LOGGING_CATEGORY(lcSunSdrTx, "longpath.sunsdr.tx")
 }
 
 // ── Bench-confirmed exact-byte frames, 2026-08-26 ───────────────────
@@ -198,6 +205,13 @@ void SunSdrRadioConnection::init()
     connect(m_dataWatchdog, &QTimer::timeout,
             this, &SunSdrRadioConnection::onDataWatchdogTick);
 
+    // Step 3 (SunSDR2 QRP TX-chain plan): same construction shape as the
+    // two timers above (`new ...(this)`, constructed here, not started
+    // here). Still zero wire reachability — see SunSdrTxPacer.h's own
+    // top-of-file comment. setMox()/the teardown paths below start/stop
+    // it; connectToRadio() keeps its profile in sync with m_profile.
+    m_txPacer = new SunSdrTxPacer(this);
+
     qCDebug(lcSunSdr) << "SunSdr: init() control port"
                       << m_controlSocket->localPort() << "stream port"
                       << m_streamSocket->localPort();
@@ -211,6 +225,13 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
 
     m_radioInfo = info;
     m_profile = &resolveProfile(info.boardType);
+    // Step 3: keep the pacer's own profile pointer (defaulted to
+    // kProfileQrp at construction — see SunSdrTxPacer.h's own comment)
+    // in sync with whatever this connection actually resolved, so the
+    // two can never silently drift if a second profile is added later.
+    if (m_txPacer) {
+        m_txPacer->setProfile(*m_profile);
+    }
 
     m_running = true;
     m_txSeq = 0;
@@ -315,6 +336,29 @@ void SunSdrRadioConnection::onConnectTimeout()
     m_awaitingBeacon = false;
     m_radioAddr.clear();
     setRxReady(false);
+    // Step 2 TX gate: same reset as disconnect() (arming must never
+    // survive a teardown, of any kind) — but the trace ring itself is
+    // deliberately left alone here; see disconnect()'s own comment for
+    // why a failure teardown keeps it while a deliberate disconnect()
+    // clears it. TxTraceKind::Disarmed's own doc comment already covers
+    // "a teardown path's reset" — record it before the silent stores
+    // below, so an operator reading the trace tail after a connect
+    // timeout sees WHY TX/arm went off, not just that it did.
+    if (m_mox.load(std::memory_order_acquire)) {
+        pushTxTrace(TxTraceKind::MoxAccepted,
+                    QStringLiteral("accepted: mox -> false (forced by connect timeout)"));
+    }
+    if (m_txArmed.load(std::memory_order_acquire)) {
+        pushTxTrace(TxTraceKind::Disarmed,
+                    QStringLiteral("forced by connect timeout"));
+    }
+    m_txArmed.store(false, std::memory_order_release);
+    m_mox.store(false, std::memory_order_release);
+    // Step 3: a pacer left running after this teardown fires would be a
+    // "phantom pacer" ticking against a connection that just declared
+    // itself timed out — same discipline as the socket closes right
+    // below. Unconditional, same as this function's other resets above.
+    if (m_txPacer) { m_txPacer->stop(); }
     if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
     if (m_dataWatchdog) { m_dataWatchdog->stop(); }
     m_lastStreamPacketAt.invalidate();
@@ -338,6 +382,33 @@ void SunSdrRadioConnection::disconnect()
     m_radioAddr.clear();
     setRxReady(false);
 
+    // Step 2 TX gate: bench arming is per-session, deliberately not
+    // sticky (setTxArmedForTest()'s own comment) — a disconnect() ends
+    // the session, so both reset here, same discipline as m_radioAddr
+    // above and the same reset this class's other two teardown paths
+    // (onConnectTimeout(), onDataWatchdogTick()) also apply.
+    m_txArmed.store(false, std::memory_order_release);
+    m_mox.store(false, std::memory_order_release);
+
+    // The TX trace ring is cleared HERE and only here — not in
+    // onConnectTimeout() or onDataWatchdogTick(). Those two are failure
+    // teardowns (a beacon never came, or the link went dead mid-session)
+    // where the ring's most recent arm/gate-check/accept history is
+    // exactly the diagnostic breadcrumb trail worth keeping past the
+    // teardown; disconnect() is the deliberate, operator-initiated end
+    // of a bench session, where a clean slate for the next session makes
+    // more sense than carrying the prior one's trace forward. Only the
+    // count/write-cursor reset — m_txTraceSeq is NOT touched, see its
+    // own field comment in the header for why. Locked like every other
+    // access to these fields (m_txTraceMutex's own comment) — this reset
+    // runs on the connection thread, same as pushTxTrace(), but a GUI-
+    // thread txTraceForTest() read must never observe it half-applied.
+    {
+        const QMutexLocker locker(&m_txTraceMutex);
+        m_txTraceCount = 0;
+        m_txTraceNext = 0;
+    }
+
     if (m_connectWatchdog) {
         m_connectWatchdog->stop();
     }
@@ -346,6 +417,12 @@ void SunSdrRadioConnection::disconnect()
     }
     if (m_dataWatchdog) {
         m_dataWatchdog->stop();
+    }
+    // Step 3: same "must never survive a teardown" discipline as
+    // m_txArmed/m_mox above — a deliberate disconnect() ending the
+    // bench session must also silence the pacer, not just disarm MOX.
+    if (m_txPacer) {
+        m_txPacer->stop();
     }
     m_lastStreamPacketAt.invalidate();
 
@@ -461,6 +538,153 @@ void SunSdrRadioConnection::setAttenuator(int dB)
     m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
     recordBytesSent(static_cast<qint64>(frame.size()));
     qCInfo(lcSunSdr) << "SunSdr: setAttenuator() ->" << dB << "dB";
+}
+
+// ── Step 2 (SunSDR2 QRP TX-chain plan): bench-only TX gate scaffolding ──
+//
+// Design synthesis quote that authorizes exactly this scope, verbatim:
+// "Gate scaffolding — still zero wire reachability. lcSunSdrTx category;
+// m_txArmed/m_mox atomics; m_txCheckContext + setter; 50-entry trace
+// ring; real setMox() body that calls BandPlanGuard::checkMoxAllowed()
+// and — since no pacer/antenna/PA code exists yet — can only ever
+// log-and-refuse or log-and-accept-with-no-wire-effect." Step 1's pure
+// encoders (SunSdrProtocol::buildMoxFrame() and friends) are NOT called
+// from here — that wiring, plus the socket send itself, is a later,
+// separately-reviewed step. No QUdpSocket, no QTimer, nothing that
+// sends a single byte lives in this function.
+
+void SunSdrRadioConnection::setTxArmed(bool armed)
+{
+    m_txArmed.store(armed, std::memory_order_release);
+    qCInfo(lcSunSdrTx) << "SunSdr: TX" << (armed ? "armed" : "disarmed")
+                       << "(bench-only — setTxArmedForTest)";
+    pushTxTrace(armed ? TxTraceKind::Armed : TxTraceKind::Disarmed, QString());
+
+    // Disarming mid-transmission must actually stop the transmission, not
+    // just block future setMox(true) calls — the same "a kill switch that
+    // could be refused isn't one" reasoning that made setMox(false)
+    // unconditional (2026-09-02) applies here: revoking the arm gate is
+    // itself a kill request whenever TX is currently on. Found during
+    // Step 3's review (a running pacer survived setTxArmedForTest(false)
+    // alone, since only the four teardown paths and setMox(false) itself
+    // stopped it) — routed through setMox(false) rather than duplicating
+    // its release logic, so there is exactly one place that turns TX off.
+    if (!armed && m_mox.load(std::memory_order_acquire)) {
+        setMox(false);
+    }
+}
+
+void SunSdrRadioConnection::pushTxTrace(TxTraceKind kind, const QString& reason)
+{
+    const QMutexLocker locker(&m_txTraceMutex);
+    m_txTrace[static_cast<std::size_t>(m_txTraceNext)] =
+        TxTraceEntry{m_txTraceSeq++, kind, reason};
+    m_txTraceNext = (m_txTraceNext + 1) % kTxTraceRingSize;
+    if (m_txTraceCount < kTxTraceRingSize) {
+        ++m_txTraceCount;
+    }
+}
+
+QVector<TxTraceEntry> SunSdrRadioConnection::txTraceForTest() const
+{
+    const QMutexLocker locker(&m_txTraceMutex);
+    QVector<TxTraceEntry> out;
+    out.reserve(m_txTraceCount);
+    // Oldest-first. Before the ring has ever wrapped, that's simply
+    // index 0..count-1; once it has wrapped, the oldest surviving entry
+    // sits at m_txTraceNext (the slot the next push will overwrite).
+    const int start = (m_txTraceCount < kTxTraceRingSize) ? 0 : m_txTraceNext;
+    for (int i = 0; i < m_txTraceCount; ++i) {
+        const int idx = (start + i) % kTxTraceRingSize;
+        out.append(m_txTrace[static_cast<std::size_t>(idx)]);
+    }
+    return out;
+}
+
+// Step 4 (SunSDR2 QRP TX-chain plan) — see this method's own header
+// comment. Built on top of txTraceForTest() rather than walking m_txTrace
+// a second way: that method already produces the oldest-first snapshot
+// this one just trims to its last `maxEntries`.
+QVector<TxTraceEntry> SunSdrRadioConnection::txTraceTail(int maxEntries) const
+{
+    const QVector<TxTraceEntry> all = txTraceForTest();
+    if (maxEntries <= 0 || all.size() <= maxEntries) {
+        return all;
+    }
+    return all.mid(all.size() - maxEntries);
+}
+
+// setMox() — see the file-section comment above for the exact scope
+// this implements. m_txArmed gates everything: it is a bench-only arm
+// switch that is never set by any AppSettings-persisted value, GUI
+// control, or default (setTxArmedForTest()'s own header comment), so in
+// every real, non-test build today this always refuses. m_txCheckContext
+// is explicitly test/bench-settable state for now — this class has no
+// SliceModel/RadioModel of its own to source region/mode/band/frequency
+// from the way RadioModel::installBandPlanMoxCheck()'s real lambda does
+// (RadioModel.cpp:9318-9374, the shape m_txCheckContext's fields
+// mirror). Full integration with MoxController's single-authority MOX
+// flow (MoxController.h's own K.2 setMoxCheck() callback mechanism) is
+// future work, out of scope here.
+void SunSdrRadioConnection::setMox(bool enabled)
+{
+    // Disabling MOX is an unconditional release, never gated — same
+    // precedent as MoxController::setMox()'s own K.2 BandPlanGuard check
+    // and its Task 87 TxInterlockPolicy check, both written as
+    // `if (on && ...)`: the guard exists only on the path that turns TX
+    // ON, never on the path that turns it off. A kill switch that could
+    // itself be refused is not a kill switch. Found and fixed 2026-09-02,
+    // before this class ever had a caller that could hit it, precisely
+    // because the "armed" gate above this comment used to run for both
+    // directions.
+    if (!enabled) {
+        qCInfo(lcSunSdrTx) << "SunSdr: setMox(false) — unconditional release, "
+                              "no gate applies to turning TX off";
+        pushTxTrace(TxTraceKind::MoxAccepted, QStringLiteral("accepted: mox -> false (unconditional release)"));
+        m_mox.store(false, std::memory_order_release);
+        // Step 3: the pacer's stop() gets the exact same "no gate,
+        // always works" guarantee as the m_mox release right above —
+        // matching this whole branch's own unconditional-release
+        // discipline, not a second, separately-gated shutdown path.
+        if (m_txPacer) {
+            m_txPacer->stop();
+        }
+        return;
+    }
+
+    if (!m_txArmed.load(std::memory_order_acquire)) {
+        qCWarning(lcSunSdrTx) << "SunSdr: setMox(true) refused: not armed "
+                                 "(setTxArmedForTest(true) was never "
+                                 "called, or has since been disarmed)";
+        pushTxTrace(TxTraceKind::MoxRefused, QStringLiteral("refused: not armed"));
+        return;  // m_mox unchanged
+    }
+
+    const safety::BandPlanGuard::MoxCheckResult verdict = m_bandPlan.checkMoxAllowed(
+        m_txCheckContext.region, m_txCheckContext.txFreqHz, m_txCheckContext.mode,
+        m_txCheckContext.rxBand, m_txCheckContext.txBand,
+        m_txCheckContext.preventDifferentBand, m_txCheckContext.extended);
+
+    if (!verdict.ok) {
+        qCWarning(lcSunSdrTx) << "SunSdr: setMox(true) refused by BandPlanGuard:"
+                              << verdict.reason;
+        pushTxTrace(TxTraceKind::MoxRefused, verdict.reason);
+        return;  // m_mox unchanged
+    }
+
+    qCInfo(lcSunSdrTx) << "SunSdr: setMox(true) accepted — Step 3's pacer starts "
+                          "ticking, but still builds no socket send (still zero "
+                          "wire reachability; no antenna/PA wiring exists yet)";
+    pushTxTrace(TxTraceKind::MoxAccepted, QStringLiteral("accepted: mox -> true"));
+    m_mox.store(true, std::memory_order_release);
+    // Step 3: "on every PTT-on" (design doc) — this accepted-true path
+    // IS the PTT-on event this class recognizes, so it's what actually
+    // calls resetSeq(), not SunSdrTxPacer itself (see that class's own
+    // resetSeq() comment).
+    if (m_txPacer) {
+        m_txPacer->resetSeq();
+        m_txPacer->start();
+    }
 }
 
 void SunSdrRadioConnection::setActiveReceiverCount(int count)
@@ -635,6 +859,46 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         data.size() - SunSdr::kIqHeaderSize, &samples);
     if (samples.isEmpty()) { return; }
 
+    // TEMPORARY diagnostic, 2026-09-03 (bench session, real antenna,
+    // ExpertSDR2 shows the same "waterfall but no station audio" symptom
+    // -- ruling out a Longpath-specific decode bug, but not yet ruling
+    // out whether the QRP's ADC/RF front end is genuinely live at all.
+    // Two checks, once a second: (a) the payload's raw bytes vs the
+    // previous packet's -- identical would mean frozen/stuck data, not
+    // real antenna noise; (b) peak decoded sample magnitude, as a coarse
+    // "is anything moving" gauge. Remove once this question is settled.
+    {
+        static QElapsedTimer diagTimer;
+        static bool diagStarted = false;
+        static QByteArray lastPayload;
+        static quint64 packetsSinceLog = 0;
+        static quint64 identicalToPrevSinceLog = 0;
+        if (!diagStarted) { diagTimer.start(); diagStarted = true; }
+
+        const QByteArray payload = data.mid(SunSdr::kIqHeaderSize);
+        ++packetsSinceLog;
+        if (!lastPayload.isEmpty() && payload == lastPayload) {
+            ++identicalToPrevSinceLog;
+        }
+        lastPayload = payload;
+
+        if (diagTimer.elapsed() > 1000) {
+            diagTimer.restart();
+            float peakAbs = 0.0f;
+            for (float v : samples) {
+                const float a = v < 0.0f ? -v : v;
+                if (a > peakAbs) { peakAbs = a; }
+            }
+            qCInfo(lcSunSdr) << "SunSdr: [DIAG] peak |sample| =" << peakAbs
+                             << "(full scale 1.0) --" << identicalToPrevSinceLog
+                             << "of" << packetsSinceLog
+                             << "packets this second were byte-identical "
+                                "to the one before them";
+            packetsSinceLog = 0;
+            identicalToPrevSinceLog = 0;
+        }
+    }
+
     if (state() == ConnectionState::Connecting) {
         setState(ConnectionState::Connected);
         if (m_connectWatchdog) { m_connectWatchdog->stop(); }
@@ -685,6 +949,25 @@ void SunSdrRadioConnection::onDataWatchdogTick()
     m_awaitingBeacon = false;
     m_radioAddr.clear();
     setRxReady(false);
+    // Step 2 TX gate: same reset+leave-the-trace-ring-alone rationale as
+    // onConnectTimeout() above — a dead-link trip is exactly when the
+    // ring's recent history is most useful to a diagnosing operator.
+    // Recorded before the stores, same as onConnectTimeout(), so that
+    // history includes WHY TX/arm went off, not just that it did.
+    if (m_mox.load(std::memory_order_acquire)) {
+        pushTxTrace(TxTraceKind::MoxAccepted,
+                    QStringLiteral("accepted: mox -> false (forced by dead-link watchdog)"));
+    }
+    if (m_txArmed.load(std::memory_order_acquire)) {
+        pushTxTrace(TxTraceKind::Disarmed,
+                    QStringLiteral("forced by dead-link watchdog"));
+    }
+    m_txArmed.store(false, std::memory_order_release);
+    m_mox.store(false, std::memory_order_release);
+    // Step 3: same rationale as onConnectTimeout()'s identical line — a
+    // dead-link trip must silence the pacer along with everything else
+    // this block already tears down.
+    if (m_txPacer) { m_txPacer->stop(); }
     if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
     if (m_dataWatchdog) { m_dataWatchdog->stop(); }
     m_lastStreamPacketAt.invalidate();
@@ -697,11 +980,15 @@ void SunSdrRadioConnection::onDataWatchdogTick()
 }
 
 // ── Safe no-ops: receive-only, see header ───────────────────────────
+//
+// setMox() is NOT here any more — Step 2 of the SunSDR2 QRP TX-chain
+// plan gave it a real body (see its own definition, next to
+// setAttenuator() above), same reasoning that already pulled
+// setAttenuator() out of this block.
 
 void SunSdrRadioConnection::setTxFrequency(quint64) {}
 void SunSdrRadioConnection::setPreamp(bool) {}
 void SunSdrRadioConnection::setTxDrive(int) {}
-void SunSdrRadioConnection::setMox(bool) {}
 void SunSdrRadioConnection::setAntennaRouting(AntennaRouting) {}
 void SunSdrRadioConnection::sendTxIq(const float*, int) {}
 void SunSdrRadioConnection::setTrxRelay(bool) {}

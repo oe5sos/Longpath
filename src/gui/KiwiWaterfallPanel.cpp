@@ -36,7 +36,7 @@ KiwiWaterfallPanel::KiwiWaterfallPanel(RadioModel* model, QWidget* parent)
     m_emptyLabel->setTextFormat(Qt::PlainText);
     m_emptyLabel->setWordWrap(true);
     m_emptyLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-size: 10px; padding: 4px 2px; }")
+        QStringLiteral("QLabel { color: %1; font-size: 11px; padding: 4px 2px; }")
             .arg(label()));
     root->addWidget(m_emptyLabel);
 

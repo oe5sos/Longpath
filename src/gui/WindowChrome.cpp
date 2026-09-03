@@ -73,7 +73,7 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
 
     m_label = new QLabel(title, this);
     m_label->setStyleSheet(
-        QStringLiteral("color: %1; font-size: 10px; font-weight: 600;"
+        QStringLiteral("color: %1; font-size: 11px; font-weight: 600;"
                        " letter-spacing: 0.4px; background: transparent;")
             .arg(Style::kTextPrimary));
     lay->addWidget(m_label);
@@ -106,7 +106,7 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     close->setCursor(Qt::ArrowCursor);
     close->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 10px; }"
+                       " border: none; font-size: 11px; }"
                        "QPushButton:hover { background: #a03030; color: #fff; }")
             .arg(Style::kTextPrimary));
     connect(close, &QPushButton::clicked, this, &WindowTitleBar::closeRequested);

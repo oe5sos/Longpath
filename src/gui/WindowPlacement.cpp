@@ -7,10 +7,14 @@
 
 #include "gui/WindowPlacement.h"
 
+#include <cmath>
+
 #include <QGuiApplication>
+#include <QHash>
 #include <QLoggingCategory>
 #include <QRect>
 #include <QScreen>
+#include <QTimer>
 #include <QWidget>
 
 Q_LOGGING_CATEGORY(lcWindowPlacement, "nereus.windowplacement")
@@ -67,8 +71,25 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
     // WindowPlacement.h fuer die Sichtbarkeitspruefung selbst vorschlaegt
     // (Schwaeche 2 dort): genug Flaeche, um das Fenster mit der Maus
     // wieder greifen zu koennen, nicht nur ein Pixel Kontakt.
+    // Betreiber 2026-08-31: "vor allem rotor, bandfilter und panadapter
+    // sind immer anders als abgespeichert" -- IMMER, nicht gelegentlich.
+    // Ursache: alle drei werden waehrend MainWindows eigenem Konstruktor
+    // wiederhergestellt (Rotor-ToolWindow ueber detachRotorPanel() beim
+    // Start, Bandfilter/Frequenz ueber das Profil-Apply, beides lange vor
+    // dem ersten show()). Zu diesem Zeitpunkt hat `anchor` (MainWindow)
+    // die Bildschirm-Ebene noch nie erreicht: restoreGeometry() setzt nur
+    // die FENSTER-Grosse (z.B. 1280x800), der Vollbild/Maximiert-Zustand
+    // greift erst, wenn das Betriebssystem das Fenster tatsaechlich zeigt
+    // -- showFullScreen()/showMaximized() dafuer laufen selbst noch
+    // spaeter in derselben Profil-Anwenden-Kette. Eine Position, die in
+    // einer BREITEN/Vollbild-Sitzung gespeichert wurde, ueberlappt die zu
+    // diesem fruehen Zeitpunkt noch schmale Ersatzgroesse fast nie -- und
+    // wurde dadurch bei JEDEM Start/Import verworfen, nicht nur manchmal.
+    // Deshalb gilt die Ueberlapp-Pruefung nur, wenn der Anker schon
+    // sichtbar ist; vorher ist seine jetzige Groesse kein verlaesslicher
+    // Massstab, und die gespeicherte Position verdient das Vertrauen.
     bool nearAnchor = true;
-    if (anchorRect.isValid()) {
+    if (anchorRect.isValid() && anchor->window()->isVisible()) {
         static constexpr int kMinOverlapW = 80;
         static constexpr int kMinOverlapH = 40;
         const QRect overlap = anchorRect.intersected(g);
@@ -104,6 +125,60 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
                                << QRect(x, y, width, height) << "on screen"
                                << (screen ? screen->name()
                                           : QStringLiteral("(null)"));
+}
+
+QPoint snappedTopLeft(const QPoint& pos, int grid)
+{
+    if (grid <= 1) { return pos; }
+    const auto snapAxis = [grid](int v) {
+        return static_cast<int>(std::lround(v / static_cast<double>(grid))) * grid;
+    };
+    return QPoint(snapAxis(pos.x()), snapAxis(pos.y()));
+}
+
+void snapToGridAfterSettle(QWidget* w, int grid, int delayMs)
+{
+    if (!w) { return; }
+
+    // Ein Debounce-Timer je Fenster, angelegt beim ersten Aufruf und an
+    // `w` gebunden (QObject-Elternschaft), damit keine der vier
+    // aufrufenden Klassen selbst ein Timer-Feld fuehren muss -- der
+    // Aufruf aus moveEvent() bleibt eine Zeile. `timers` lebt nur
+    // hauptthread-seitig, wie jeder Widget-/Timer-Code ohnehin.
+    static QHash<QWidget*, QTimer*> timers;
+    QTimer*& timer = timers[w];
+    if (!timer) {
+        timer = new QTimer(w);
+        timer->setSingleShot(true);
+        QObject::connect(timer, &QTimer::timeout, w, [w, grid, delayMs, timer]() {
+            // Betreiber 2026-09-02: TX-Fenster liess sich waehrend
+            // eines Kanten-Groessenzugs (oben/links) nicht mehr
+            // bewegen. Ursache: ein solcher Zug verschiebt den
+            // Fensterursprung genauso wie ein Titelbalken-Zug -- beide
+            // laufen ueber denselben nativen OS-Griff
+            // (startSystemResize), FramelessResizer haelt selbst
+            // keinen abfragbaren Zugzustand, den man hier pruefen
+            // koennte. Haengt beim Ablauf dieses Timers noch eine
+            // Maustaste, ist der Bediener vermutlich mitten in genau
+            // so einem Zug (kurze Pause, nicht losgelassen) --
+            // verschieben statt schnappen, sonst kaempft dieses
+            // move() mit dem noch laufenden nativen Zug.
+            if (QGuiApplication::mouseButtons() != Qt::NoButton) {
+                timer->start(delayMs);
+                return;
+            }
+            const QPoint snapped = snappedTopLeft(w->pos(), grid);
+            // Nur bewegen, wenn es tatsaechlich abweicht -- der
+            // Rueckstoss dieses move() loest selbst ein moveEvent()
+            // aus, das diese Funktion erneut aufruft; beim zweiten
+            // Mal stimmt die Position schon, also keine dritte Runde.
+            if (snapped != w->pos()) { w->move(snapped); }
+        });
+        QObject::connect(w, &QObject::destroyed, w, [w]() {
+            timers.remove(w);
+        });
+    }
+    timer->start(delayMs);
 }
 
 } // namespace Longpath

@@ -253,7 +253,7 @@ void DvkApplet::buildUI()
         m_slotKey[i]->setFixedWidth(26);
         m_slotKey[i]->setAlignment(Qt::AlignCenter);
         m_slotKey[i]->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 10px; font-weight: bold;"
+            "QLabel { color: %1; font-size: 11px; font-weight: bold;"
             " background: %2; border: 1px solid %3; border-radius: 3px; }")
                 .arg(QLatin1String(Style::kAmberText),
                      QLatin1String(Style::kInsetBg),

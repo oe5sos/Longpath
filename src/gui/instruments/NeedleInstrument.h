@@ -101,6 +101,21 @@ public:
     const PeakHold& peakHold() const { return m_peak; }
     void resetPeak() { m_peak.reset(m_value); update(); }
 
+    // ── Frequenz zusaetzlich einblenden (2026-09-02) ──────────────────
+    //
+    // Betreiber: "die Idee ist, dass man sich bei kleinen Bildschirmen
+    // vielleicht ein Fenster erspart" -- S-Meter/Stehwelle koennen die
+    // Frequenz mit anzeigen, damit ein eigenes Frequenz-Fenster
+    // entfallen kann. Aus dem Rechtsklickmenue des Applets ein-/
+    // ausschaltbar wie Form und Spitzenhaltung, gemerkt ueber
+    // saveState()/restoreState(). Kein Kasten, keine Umrandung -- die
+    // Ziffern stehen frei auf dem Zifferblatt, wie eine Beschriftung im
+    // Diagramm selbst statt ein aufgesetztes UI-Element (nach drei
+    // Entwurfsrunden so entschieden).
+    void setShowFrequency(bool on);
+    bool showFrequency() const { return m_showFrequency; }
+    void setFrequencyHz(double hz);
+
     QSize sizeHint() const override { return {320, 210}; }
     QSize minimumSizeHint() const override { return {200, 140}; }
 
@@ -110,6 +125,13 @@ private:
     /// Ruhezustand — beleuchtet bleibt das Instrument trotzdem.
     void paintBacklight(QPainter& p, const QPointF& pivot, qreal radius,
                         const QColor& c, double strength);
+    /// Frequenz frei auf dem Zifferblatt, unter dem Bogenscheitel. No-op
+    /// ohne setShowFrequency(true) -- zeigt aber "0.000.000", solange
+    /// noch kein echter Wert gesetzt wurde (dieselbe Regel wie das
+    /// Frequenz-Panel selbst: 0 statt nichts, wenn kein Funkgeraet
+    /// verbunden ist).
+    void paintFrequencyOverlay(QPainter& p, const QPointF& pivot,
+                               qreal radius) const;
 
 public:
     /// Malt das Instrument fuer eine verlangte Groesse in einen fremden
@@ -151,6 +173,9 @@ private:
     bool m_hasValue{false};
     bool m_offline{false};
     bool m_hasSecond{false};
+
+    bool   m_showFrequency{false};
+    double m_frequencyHz{0.0};
 };
 
 } // namespace Longpath

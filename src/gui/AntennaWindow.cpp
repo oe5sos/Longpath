@@ -27,6 +27,8 @@
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QMoveEvent>
+#include <QResizeEvent>
 #include <QMimeData>
 #include <QFileDialog>
 #include <QCoreApplication>
@@ -132,6 +134,19 @@ void AntennaWindow::closeEvent(QCloseEvent* event)
 {
     saveGeometryState();
     QDialog::closeEvent(event);
+    emit closed();
+}
+
+void AntennaWindow::moveEvent(QMoveEvent* event)
+{
+    QDialog::moveEvent(event);
+    saveGeometryState();
+}
+
+void AntennaWindow::resizeEvent(QResizeEvent* event)
+{
+    QDialog::resizeEvent(event);
+    saveGeometryState();
 }
 
 void AntennaWindow::saveGeometryState()

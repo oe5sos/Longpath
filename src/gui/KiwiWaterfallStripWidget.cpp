@@ -35,8 +35,9 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     setObjectName(QStringLiteral("kiwiWaterfallStrip"));
     setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(QStringLiteral(
-        "QWidget#kiwiWaterfallStrip { background: #000000; "
-        "border: 1px solid %1; border-radius: 6px; }").arg(border()));
+        "QWidget#kiwiWaterfallStrip { background: %1; "
+        "border: 1px solid %2; border-radius: 6px; }")
+            .arg(QString::fromLatin1(Style::kInsetBg), border()));
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(9, 7, 9, 9);

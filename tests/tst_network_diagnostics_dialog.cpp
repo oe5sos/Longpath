@@ -20,6 +20,10 @@
 
 #include "gui/NetworkDiagnosticsDialog.h"
 #include "core/AudioEngine.h"
+#include "core/SunSdrRadioConnection.h"
+#include "core/WdspTypes.h"
+#include "core/safety/BandPlanGuard.h"
+#include "models/Band.h"
 #include "models/RadioModel.h"
 
 using namespace Longpath;
@@ -70,6 +74,80 @@ private slots:
             emit conn->pingRttMeasured(120);
         }
         QVERIFY(true);
+    }
+
+    // Step 4 (SunSDR2 QRP TX-chain plan): the new "TX (SunSDR)" section is
+    // read-only wiring on top of SunSdrRadioConnection's own bench-only TX
+    // gate (SunSdrRadioConnection.h's own m_txArmed/m_mox/m_txTrace
+    // comments). Drives that gate into a known armed-and-accepted state
+    // via the same setTxArmedForTest()/setTxCheckContextForTest()/
+    // setMox() hooks tst_sunsdr_radio_connection.cpp already uses, points
+    // the dialog at it via RadioModel::injectConnectionForTest() (the
+    // established injection pattern — see tst_pa_values_page.cpp and
+    // tst_alex_per_adc_bpf_wire.cpp among many others), triggers the
+    // dialog's existing refresh() slot the same way every other test in
+    // this file already does, and asserts the section shows exactly that
+    // state — never a control the test (or a user) could use to arm or
+    // transmit anything.
+    void sunSdrTxSectionShowsArmedMoxAndTraceTailAfterRefresh() {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+
+        conn.setTxArmedForTest(true);
+
+        TxCheckContext ctx;
+        ctx.region   = safety::Region::UnitedStates;
+        ctx.txFreqHz = 14'200'000;  // US 20m, well in-band
+        ctx.mode     = DSPMode::USB;
+        ctx.rxBand   = Band::Band20m;
+        ctx.txBand   = Band::Band20m;
+        conn.setTxCheckContextForTest(ctx);
+
+        conn.setMox(true);
+        QVERIFY(conn.isTxArmed());
+        QVERIFY(conn.isMoxOn());
+
+        RadioModel model;
+        model.injectConnectionForTest(&conn);
+
+        NetworkDiagnosticsDialog dlg(&model, nullptr);
+        QMetaObject::invokeMethod(&dlg, "refresh");
+
+        QCOMPARE(dlg.sunSdrArmedTextForTest(), QStringLiteral("Yes"));
+        QCOMPARE(dlg.sunSdrMoxTextForTest(), QStringLiteral("On"));
+        // No real QTimer tick has run (no event loop was pumped), so the
+        // pacer has ticked zero times — asserting the literal "0" (not
+        // just "not the placeholder") confirms this row is wired to a
+        // real number, not merely non-empty.
+        QCOMPARE(dlg.sunSdrPaceRepeatsTextForTest(), QStringLiteral("0"));
+
+        // The trace ring now holds exactly the two entries the calls
+        // above produced (Armed, then MoxAccepted) — the tail must show
+        // both, using TxTraceKind's own existing labels.
+        const QString tail = dlg.sunSdrTraceTailTextForTest();
+        QVERIFY(tail.contains(QStringLiteral("Armed")));
+        QVERIFY(tail.contains(QStringLiteral("MOX accepted")));
+
+        // Detach before `conn` goes out of scope — RadioModel must not be
+        // left holding a pointer to a connection this test is about to
+        // destroy.
+        model.injectConnectionForTest(nullptr);
+    }
+
+    // The placeholder path: no connection at all (RadioModel's default
+    // state — connection() is nullptr until something connects), same
+    // "— (not reported)"-shaped convention this dialog already uses for
+    // PA voltage. Confirms the section stays visible but visibly inert
+    // rather than showing stale or garbage values.
+    void sunSdrTxSectionShowsPlaceholderWithNoConnection() {
+        RadioModel model;
+        NetworkDiagnosticsDialog dlg(&model, nullptr);
+        QMetaObject::invokeMethod(&dlg, "refresh");
+
+        QVERIFY(dlg.sunSdrArmedTextForTest().contains(QStringLiteral("not SunSDR")));
+        QCOMPARE(dlg.sunSdrMoxTextForTest(), QStringLiteral("—"));
+        QCOMPARE(dlg.sunSdrPaceRepeatsTextForTest(), QStringLiteral("—"));
     }
 };
 

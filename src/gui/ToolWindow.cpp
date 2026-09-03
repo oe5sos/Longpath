@@ -16,6 +16,8 @@
 #include "gui/WindowPlacement.h"
 
 #include <QCloseEvent>
+#include <QMoveEvent>
+#include <QResizeEvent>
 #include <QScreen>
 #include <QVBoxLayout>
 
@@ -68,6 +70,15 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
 
     // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
     // derselbe Grund.
+    //
+    // Betreiber 2026-08-31: ein Versuch, diesen Aufruf per
+    // QTimer::singleShot(0, ...) auf den naechsten Schleifendurchlauf zu
+    // verschieben (Verdacht: "01 anklicken... es passiert nichts" /
+    // "ProfileRailClassWindow must be a top level window"), erreichte
+    // sein Ziel nachweislich NICHT -- die Warnung blieb, mit Log-Beweis,
+    // bestehen -- verursachte aber vermutlich die naechste Klage
+    // ("rotor wieder kein eigenes window"). Zurueckgenommen: der direkte,
+    // synchrone Aufruf war die zuletzt bestaetigt funktionierende Fassung.
     enableFullScreenAuxiliaryBehavior(this);
 }
 
@@ -131,14 +142,42 @@ void ToolWindow::applyDefaultSize(const QSize& want)
 
 void ToolWindow::closeEvent(QCloseEvent* ev)
 {
-    // Betreiber 2026-08-31: beweist, WANN diese Funktion beim Beenden
-    // per rotem Punkt (nicht Cmd+Q/Menue) laeuft, im Vergleich zu
-    // MainWindow::closeEvent()'s eigener Logzeile -- temporaer, bis der
-    // eigentliche Fund feststeht.
-    qWarning() << "ToolWindow::closeEvent() fuer" << m_id
-               << "-- emittiert dockRequested";
+    // Beim Beenden: hinnehmen und still sein, nicht andocken bitten.
+    // Sonst laeuft waehrend eines ganz normalen Herunterfahrens
+    // dockRotorPanel() (bzw. das Gegenstueck des jeweiligen Inhalts) mit
+    // und schreibt dessen "gerade angedockt"-Schalter -- der naechste
+    // Start liest DIESEN Schalter vor jedem Profil und ueberschreibt
+    // damit den eigentlich richtig gespeicherten Schwebe-Zustand.
+    // Gleiches Muster wie PanFloatingWindow::closeEvent() seit
+    // 2026-08-22, hierher uebernommen 2026-08-31 nach Log-Beweis
+    // (siehe setShuttingDown() in ToolWindow.h).
+    if (m_shuttingDown) {
+        ev->accept();
+        return;
+    }
+
     ev->accept();
     emit dockRequested(m_id);
+}
+
+// Betreiber 2026-08-31: "die ausrichtung des rotors passt nie" -- ohne
+// diese beiden faengt kein einziges Ziehen/Groessern die neue Lage ein,
+// nur das (fuer Rotor/Log praktisch nie genutzte) Andocken tat das.
+// Gleiches Muster wie PanFloatingWindow::moveEvent/resizeEvent.
+void ToolWindow::moveEvent(QMoveEvent* ev)
+{
+    QWidget::moveEvent(ev);
+    saveGeometryState();
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
+    // Runden hier wuerde gegen das native Ziehen kaempfen.
+    snapToGridAfterSettle(this);
+}
+
+void ToolWindow::resizeEvent(QResizeEvent* ev)
+{
+    QWidget::resizeEvent(ev);
+    saveGeometryState();
 }
 
 } // namespace Longpath

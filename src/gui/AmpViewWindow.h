@@ -75,6 +75,8 @@ mw0lge@grange-lane.co.uk
 
 class QCheckBox;
 class QCloseEvent;
+class QMoveEvent;
+class QResizeEvent;
 class QShowEvent;
 class QTimer;
 class QWidget;
@@ -143,6 +145,13 @@ protected:
     // Restore Always-On-Top window flag on first show.  AmpView.cs:521-525
     // OnShown [v2.10.3.13] calls FixOnTop().
     void showEvent(QShowEvent* event) override;
+
+    // 2026-08-31: closeEvent() alone only catches a clean close/hide;
+    // same gap found and fixed the same night across LogbookWindow,
+    // AntennaWindow and ToolWindow (Rotor/Log) — a drag/resize between
+    // opens was never actually persisted.
+    void moveEvent(QMoveEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private slots:
     // From AmpView.cs:435-455 chkAVShowGain_CheckedChanged [v2.10.3.13]:

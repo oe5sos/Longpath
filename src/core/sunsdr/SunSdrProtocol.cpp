@@ -54,15 +54,38 @@ of the License, or (at your option) any later version.
 // Modification history (NereusSDR):
 //   2026-08-25 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-02 — TX control-channel pure encoders (MOX 0x06, antenna
+//                 select 0x15, drive byte 0x17, PA enable 0x24) added
+//                 for Martin Fischer, AI-assisted via Anthropic Claude
+//                 (Cowork). Step 1 of a 6-step operator-approved TX
+//                 chain plan — see SunSdrProtocol.h's own modification
+//                 history entry for the same date.
 // =================================================================
 
 #include "core/sunsdr/SunSdrProtocol.h"
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 
 namespace Longpath {
 namespace SunSdr {
+
+namespace {
+
+// Appends `value` as 4 little-endian bytes — the payload shape every
+// `sunsdr_send_u32_cmd()`-issued opcode uses (ArtemisSDR
+// sunsdr.c:2391-2403 [@f8b01d25c5]; see this file's header comment on
+// the TX control-channel opcodes for the full citation).
+void appendU32Le(QByteArray& out, quint32 value)
+{
+    out.append(static_cast<char>(value & 0xFF));
+    out.append(static_cast<char>((value >> 8) & 0xFF));
+    out.append(static_cast<char>((value >> 16) & 0xFF));
+    out.append(static_cast<char>((value >> 24) & 0xFF));
+}
+
+} // namespace
 
 QByteArray buildControlHeader(const Profile& profile, quint8 opcode,
                               quint16 sub, quint16 declaredPayloadLen)
@@ -218,6 +241,121 @@ quint64 decodeFrequencyPayloadCandidate(const QByteArray& payload)
         scaled = (scaled << 8) | static_cast<quint8>(payload[i]);
     }
     return scaled / kFreqScaleCandidate;
+}
+
+// ── TX control-channel opcodes: PURE ENCODERS ───────────────────────
+//
+// See SunSdrProtocol.h's own comment above these four declarations for
+// the full citation and the "zero wire reachability" scope this Step 1
+// sits behind.
+
+QByteArray buildMoxFrame(const Profile& profile, bool on)
+{
+    QByteArray out = buildControlHeader(profile, kOpMoxPtt, /*sub=*/0,
+                                        /*declaredPayloadLen=*/4);
+    appendU32Le(out, on ? 1u : 0u);
+    return out;
+}
+
+namespace {
+
+// Confirmed-selector-byte table for opcode 0x15
+// (buildAntennaSelectFrame()). A3's RX/TX split is stated directly in
+// the design doc (docs/architecture/2026-08-24-sunsdr-native-driver-design.md:983:
+// "RX A3 wire 0x03, TX A3 wire 0x02 (differs!)") — the exact trap this
+// table exists to guard against: a copy-pasted `0x03`/`0x02` literal
+// at more than one call site could silently diverge, where a table
+// lookup that is wrong once is wrong everywhere the same way.
+//
+// A1/A2 are not stated in the design doc's own prose (its "Antenna
+// model" section, lines 1090-1099, names all three physical ports but
+// only spells out a byte for A3). Per the design doc's own closing
+// instruction ("re-derive it by re-reading the same ArtemisSDR files
+// rather than trusting a paraphrase, the same standard this project
+// holds Thetis ports to"), and per CLAUDE.md's Reference Repositories
+// entry for ArtemisSDR (the citable primary source for undocumented
+// SunSDR wire facts), the values below are read directly from
+// ArtemisSDR, not guessed:
+//   - HPSDR/SunSdrAntenna.cs:10-30,81-95 — "HF RX selector: A3 -> 0x03.
+//     HF TX selector: A3 -> 0x02"; A1/A2 RX=TX (no split).
+//   - sunsdr.c:2278-2293 (`sunsdr_map_ant_selector` /
+//     `sunsdr_map_tx_ant_selector`) — the same values in code form,
+//     confirming the .cs comment isn't stale.
+// Both sources agree independently, so these carry the same
+// confirmation tier as the A3 rows below — "confirmed" here means
+// "traced to a citable source", not "bench-verified against the real
+// QRP in a live TX session", a distinction that applies equally to
+// every row in this table (A3 included) until this driver's TX path
+// is actually armed and tested on real hardware. See
+// docs/architecture/2026-08-24-sunsdr-native-driver-design.md's own
+// caveat: opcodes/sequences need bench confirmation against the actual
+// QRP before any session-opening code may send them.
+struct AntennaByteEntry {
+    AntennaPort port;
+    bool        forTx;
+    bool        confirmed;
+    quint8      byteValue;  // meaningful only when confirmed is true
+};
+
+constexpr std::array<AntennaByteEntry, 6> kAntennaByteTable{{
+    // ArtemisSDR HPSDR/SunSdrAntenna.cs:10-30,81-95 + sunsdr.c:2278-2293 —
+    // A1 has no RX/TX split (VHF-only port).
+    {AntennaPort::A1, /*forTx=*/false, /*confirmed=*/true,  /*byteValue=*/0x01},
+    {AntennaPort::A1, /*forTx=*/true,  /*confirmed=*/true,  /*byteValue=*/0x01},
+    // Same source — A2 has no RX/TX split either.
+    {AntennaPort::A2, /*forTx=*/false, /*confirmed=*/true,  /*byteValue=*/0x01},
+    {AntennaPort::A2, /*forTx=*/true,  /*confirmed=*/true,  /*byteValue=*/0x01},
+    // Design doc line 983 (RX side of the trap).
+    {AntennaPort::A3, /*forTx=*/false, /*confirmed=*/true,  /*byteValue=*/0x03},
+    // Design doc line 983 (TX side of the trap) — THE VALUE THAT
+    // DIFFERS from the RX row above for the same physical port.
+    {AntennaPort::A3, /*forTx=*/true,  /*confirmed=*/true,  /*byteValue=*/0x02},
+}};
+
+} // namespace
+
+bool buildAntennaSelectFrame(const Profile& profile, AntennaPort port,
+                              bool forTx, QByteArray* out)
+{
+    if (out == nullptr) { return false; }
+
+    for (const AntennaByteEntry& entry : kAntennaByteTable) {
+        if (entry.port != port || entry.forTx != forTx) {
+            continue;
+        }
+        if (!entry.confirmed) {
+            // No row in kAntennaByteTable is currently unconfirmed (A1/A2
+            // were filled in from ArtemisSDR, see the table's own
+            // comment) — this branch is defensive, not dead: it's what
+            // protects any future row added without a real source
+            // citation from silently sending a guessed byte instead of
+            // refusing.
+            return false;
+        }
+        QByteArray frame = buildControlHeader(profile, kOpAntennaSelect,
+                                              /*sub=*/0,
+                                              /*declaredPayloadLen=*/4);
+        appendU32Le(frame, entry.byteValue);
+        *out = frame;
+        return true;
+    }
+    return false;
+}
+
+QByteArray buildDriveFrame(const Profile& profile, quint8 raw0to255)
+{
+    QByteArray out = buildControlHeader(profile, kOpDrive, /*sub=*/0,
+                                        /*declaredPayloadLen=*/4);
+    appendU32Le(out, static_cast<quint32>(raw0to255));
+    return out;
+}
+
+QByteArray buildPaEnableFrame(const Profile& profile, bool enabled)
+{
+    QByteArray out = buildControlHeader(profile, kOpPaEnable, /*sub=*/0,
+                                        /*declaredPayloadLen=*/4);
+    appendU32Le(out, enabled ? 1u : 0u);
+    return out;
 }
 
 } // namespace SunSdr

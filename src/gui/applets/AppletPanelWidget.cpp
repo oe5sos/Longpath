@@ -358,7 +358,7 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     if (AppletWidget* aw = qobject_cast<AppletWidget*>(child)) {
         const QString btnCss = QStringLiteral(
             "QPushButton { background: transparent; border: none;"
-            "  color: %1; font-size: 10px; padding: 0; }"
+            "  color: %1; font-size: 11px; padding: 0; }"
             "QPushButton:hover { background: %2; color: %3;"
             "  border-radius: 3px; }")
             .arg(QString::fromLatin1(Style::kTextScale),

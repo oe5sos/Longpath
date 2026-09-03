@@ -2,6 +2,8 @@
 #pragma once
 #include <QWidget>
 
+class QPainter;
+
 namespace Longpath {
 
 class HGauge : public QWidget {
@@ -18,6 +20,23 @@ public:
     void setValue(double val);
     void setPeakValue(double val);
     void setTickLabels(const QStringList& labels);
+
+    // ── Ablesbare Bauform (2026-09-02) ──────────────────────────────
+    //
+    // Standard bleibt der Streifen mit der Beschriftung IN der Mulde.
+    // Im TX-Feld steht die Beschriftung LINKS und der Messwert als
+    // ZAHL rechts daneben: eine Fuellhoehe liest man im Vorbeigehen
+    // nicht, eine Zahl schon. Nur die TxApplet schaltet das ein — die
+    // uebrigen sechs Anwender (PhoneCwApplet, VaxApplet, TunerApplet,
+    // AudioTxInputPage …) sollen unveraendert aussehen.
+    //
+    // `nachkommastellen` und `einheit` bestimmen die Zahl; solange der
+    // Wert auf dem Skalenanfang steht (kein Vorlauf, SWR 1,0), zeigt
+    // das Feld einen Gedankenstrich statt einer Scheingenauigkeit.
+    void setReadout(bool on, int nachkommastellen = 1,
+                    const QString& einheit = QString());
+    void setLabelWidth(int px);
+    bool hasReadout() const noexcept { return m_readout; }
 
     // Read-only accessor for unit tests + state inspection.  No
     // corresponding signal — HGauge is a passive read-only widget driven
@@ -41,6 +60,11 @@ protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
+    void paintReadout(QPainter& p);
+
+protected:
+
+private:
     double m_min = 0.0;
     double m_max = 100.0;
     double m_value = 0.0;
@@ -51,6 +75,10 @@ private:
     QString m_title;
     QString m_unit;
     QStringList m_tickLabels;
+    bool    m_readout = false;
+    int     m_readoutDecimals = 1;
+    QString m_readoutUnit;
+    int     m_labelWidth = 52;
 };
 
 } // namespace Longpath

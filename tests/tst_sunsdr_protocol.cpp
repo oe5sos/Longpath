@@ -24,6 +24,10 @@
 
 #include <QtTest>
 
+#include <QDirIterator>
+#include <QFile>
+#include <QRegularExpression>
+
 #include "core/sunsdr/SunSdrProtocol.h"
 
 using namespace Longpath::SunSdr;
@@ -325,6 +329,189 @@ private slots:
         const QByteArray payload = fullFrame.mid(18, 8);
         QCOMPARE(payload, hexBytes("6c e0 78 08 00 00 00 00"));
         QCOMPARE(decodeFrequencyPayloadCandidate(payload), quint64(14213950));
+    }
+
+    // ── TX control-channel pure encoders (Step 1 of 6) ──────────────────
+    //
+    // All four share the same header shape: buildControlHeader() with
+    // sub=0, declaredPayloadLen=4, followed by a 4-byte little-endian
+    // u32 payload — directly confirmed by ArtemisSDR's
+    // sunsdr_send_u32_cmd() (sunsdr.c:2391-2403 [@f8b01d25c5]; see
+    // SunSdrProtocol.h's comment on these functions). Every expected
+    // byte string below is that fixed 18-byte QRP-profile header
+    // prefix (magic0=0x03, magic1=0xff, opcode, sub=0, len=4) plus the
+    // 4-byte payload — not just "non-empty" or "starts with the right
+    // opcode".
+
+    // ── MOX/PTT (opcode 0x06) ────────────────────────────────────────
+
+    void buildMoxFrameEncodesOnAsOne()
+    {
+        const QByteArray built = buildMoxFrame(kProfileQrp, /*on=*/true);
+        const QByteArray expected = hexBytes(
+            "03 ff 06 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "01 00 00 00");
+        QCOMPARE(built, expected);
+    }
+
+    void buildMoxFrameEncodesOffAsZero()
+    {
+        const QByteArray built = buildMoxFrame(kProfileQrp, /*on=*/false);
+        const QByteArray expected = hexBytes(
+            "03 ff 06 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "00 00 00 00");
+        QCOMPARE(built, expected);
+    }
+
+    // ── Antenna select (opcode 0x15) ─────────────────────────────────
+    //
+    // THE TRAP: antenna A3 is one physical port and one opcode, but
+    // the selector byte differs by direction (design doc line 983 —
+    // "RX A3 wire 0x03, TX A3 wire 0x02 (differs!)"). These two tests
+    // exist specifically to catch a future edit that collapses the
+    // lookup table back into a single shared literal.
+
+    void antennaA3SelectorByteIs0x03OnRx()
+    {
+        QByteArray built;
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
+                                        /*forTx=*/false, &built));
+        const QByteArray expected = hexBytes(
+            "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "03 00 00 00");
+        QCOMPARE(built, expected);
+    }
+
+    void antennaA3SelectorByteIs0x02OnTxNotTheSameAsRx()
+    {
+        QByteArray built;
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
+                                        /*forTx=*/true, &built));
+        const QByteArray expected = hexBytes(
+            "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "02 00 00 00");
+        QCOMPARE(built, expected);
+
+        // Restated as a direct byte comparison, independent of the
+        // full-frame QCOMPARE above, so this specific fact survives
+        // even if the header shape ever changes: A3's RX byte (0x03)
+        // and TX byte (0x02) at the same payload offset must differ.
+        QByteArray rxBuilt;
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
+                                        /*forTx=*/false, &rxBuilt));
+        QVERIFY2(built.at(18) != rxBuilt.at(18),
+                 "antenna A3's TX selector byte must differ from its RX "
+                 "selector byte -- this is the one-byte trap the lookup "
+                 "table exists to guard");
+    }
+
+    // A1/A2 selector bytes are not stated in the design doc's own prose
+    // (only A3's are) -- sourced directly from ArtemisSDR instead
+    // (HPSDR/SunSdrAntenna.cs:10-30,81-95 + sunsdr.c:2278-2293, both
+    // agreeing independently): RX=TX=0x01 for both ports, no
+    // direction-dependent split (that trap is A3-only). See
+    // kAntennaByteTable's comment in SunSdrProtocol.cpp.
+    void antennaA1AndA2AreBothConfirmedAsByte0x01WithNoRxTxSplit()
+    {
+        QByteArray a1Rx, a1Tx, a2Rx, a2Tx;
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A1,
+                                        /*forTx=*/false, &a1Rx));
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A1,
+                                        /*forTx=*/true, &a1Tx));
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A2,
+                                        /*forTx=*/false, &a2Rx));
+        QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A2,
+                                        /*forTx=*/true, &a2Tx));
+
+        const QByteArray expected = hexBytes(
+            "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "01 00 00 00");
+        QCOMPARE(a1Rx, expected);
+        QCOMPARE(a1Tx, expected);
+        QCOMPARE(a2Rx, expected);
+        QCOMPARE(a2Tx, expected);
+    }
+
+    // ── Drive byte (opcode 0x17) ─────────────────────────────────────
+
+    void buildDriveFrameIsABarePassthrough()
+    {
+        QCOMPARE(buildDriveFrame(kProfileQrp, 0x00),
+                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 00 00 00 00"));
+        QCOMPARE(buildDriveFrame(kProfileQrp, 0x80),
+                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 80 00 00 00"));
+        QCOMPARE(buildDriveFrame(kProfileQrp, 0xFF),
+                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 ff 00 00 00"));
+    }
+
+    // Step 1 scope guard: this byte must never reach a real caller
+    // without a QRP-specific bench power-calibration table, which does
+    // not exist yet (design doc "TX drive / power scaling" -- the only
+    // known table is DX/PRO hardware, 40 m-only, "very likely wrong
+    // for a QRP"). Grep-scans src/ (production code only, not this
+    // test file) for any call to buildDriveFrame(...) outside its own
+    // declaration/definition in SunSdrProtocol.h/.cpp. Same grep-scan
+    // idea as tst_popup_style_coverage.cpp's kPopupMenu invariant,
+    // enforcing an absence instead of a presence.
+    void buildDriveFrameHasNoProductionCallSites()
+    {
+        const QString root =
+            QString::fromLatin1(NEREUS_SOURCE_ROOT) + QStringLiteral("/src");
+        QDirIterator it(root,
+                        QStringList{QStringLiteral("*.cpp"), QStringLiteral("*.h"),
+                                     QStringLiteral("*.cc"), QStringLiteral("*.hpp"),
+                                     QStringLiteral("*.mm")},
+                        QDir::Files, QDirIterator::Subdirectories);
+
+        const QRegularExpression callSite(
+            QStringLiteral(R"(\bbuildDriveFrame\s*\()"));
+        QStringList offenders;
+
+        while (it.hasNext()) {
+            const QString path = it.next();
+            if (path.endsWith(QStringLiteral(
+                    "src/core/sunsdr/SunSdrProtocol.h")) ||
+                path.endsWith(QStringLiteral(
+                    "src/core/sunsdr/SunSdrProtocol.cpp"))) {
+                continue;  // the function's own declaration/definition
+            }
+            QFile f(path);
+            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
+            const QString src = QString::fromUtf8(f.readAll());
+            if (callSite.match(src).hasMatch()) {
+                offenders << path;
+            }
+        }
+
+        QVERIFY2(offenders.isEmpty(),
+                 qPrintable(QStringLiteral(
+                     "buildDriveFrame() must have zero production call "
+                     "sites in Step 1 (no QRP bench power-calibration "
+                     "table exists yet) -- found references in: ") +
+                     offenders.join(QStringLiteral(", "))));
+    }
+
+    // ── PA enable (opcode 0x24) ──────────────────────────────────────
+
+    void buildPaEnableFrameEncodesEnabledAsOne()
+    {
+        const QByteArray built = buildPaEnableFrame(kProfileQrp, /*enabled=*/true);
+        const QByteArray expected = hexBytes(
+            "03 ff 24 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "01 00 00 00");
+        QCOMPARE(built, expected);
+    }
+
+    void buildPaEnableFrameEncodesDisabledAsZero()
+    {
+        const QByteArray built = buildPaEnableFrame(kProfileQrp, /*enabled=*/false);
+        const QByteArray expected = hexBytes(
+            "03 ff 24 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
+            "00 00 00 00");
+        QCOMPARE(built, expected);
     }
 };
 

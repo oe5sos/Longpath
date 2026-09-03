@@ -4374,8 +4374,12 @@ nereus_add_test(tst_radio_connection_supply_volts)
 nereus_add_test(tst_audio_engine_flow_state)
 
 # ── Shell-Chrome Redesign sub-PR-3: NetworkDiagnosticsDialog ──────────────
-# 4 tests: null-safe construction, refresh on disconnected model, reset
-# clears counters, signal-wire safety. QTEST_MAIN — needs QApplication.
+# 6 tests: null-safe construction, refresh on disconnected model, reset
+# clears counters, signal-wire safety, plus (Step 4 of the SunSDR2 QRP
+# TX-chain plan) the read-only "TX (SunSDR)" section showing armed/mox/
+# pace-repeats/trace-tail against a real SunSdrRadioConnection and the
+# "— (not SunSDR)" placeholder path with no connection. QTEST_MAIN —
+# needs QApplication.
 nereus_add_test(tst_network_diagnostics_dialog)
 
 # ── Bottom-banner cleanup Task A1: ChromeFoldPlan pure fold math ─────────
@@ -4796,6 +4800,7 @@ nereus_add_test(tst_asr_against_live_server)
 
 nereus_add_test(tst_filter_follows_the_panadapter)
 nereus_add_test(tst_filter_pane_sheet)
+nereus_add_test(tst_tx_entwurf_sheet)
 nereus_add_test(tst_band_buttons)
 nereus_add_test(tst_container_title_does_not_shove)
 nereus_add_test(tst_frequency_widget_tunes)
@@ -5160,6 +5165,13 @@ nereus_add_test(tst_recording_scheduler)
 # pins and why.
 nereus_add_test(tst_playback_radio_connection)
 nereus_add_test(tst_sunsdr_protocol)
+# buildDriveFrameHasNoProductionCallSites() grep-scans src/ for stray
+# calls to the Step-1 pure-encoder buildDriveFrame() (SunSdrProtocol.h)
+# — no QRP bench power-calibration table exists yet, so this byte must
+# never reach a real caller. Same NEREUS_SOURCE_ROOT pattern as
+# tst_popup_style_coverage's T22 kPopupMenu invariant.
+target_compile_definitions(tst_sunsdr_protocol PRIVATE
+    NEREUS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 nereus_add_test(tst_sunsdr_radio_connection)
 
 # Connection-plan Phase A.1-A.3 (docs/architecture/2026-08-26-sunsdr-

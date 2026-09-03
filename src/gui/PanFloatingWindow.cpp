@@ -172,6 +172,16 @@ void PanFloatingWindow::requestDock()
 
 void PanFloatingWindow::closeEvent(QCloseEvent* event)
 {
+    // 2026-09-01 Diagnose (Betreiber: "nach vollbild... anordnung wieder
+    // falsch" -- der schwebende Panadapter landete nach einem Vollbild-
+    // Wechsel angedockt, PanFloating_pan-0 stand danach auf False). Klaert,
+    // ob dieser closeEvent tatsaechlich waehrend eines Vollbild-Uebergangs
+    // des Hauptfensters eintrifft (macOS-Fenstermanagement-Nebenwirkung)
+    // oder aus einem anderen Grund -- wird nach der Bestaetigung entfernt.
+    qWarning() << "[PanFloatClose]" << panId() << "m_shuttingDown="
+               << m_shuttingDown << "ownWindowState=" << windowState()
+               << "spontaneous=" << event->spontaneous();
+
     // From AetherSDR PanFloatingWindow.cpp:84-95 [@0cd4559].
     //
     // Beim Beenden: hinnehmen und still sein. Der Betreiber sah am
@@ -197,6 +207,10 @@ void PanFloatingWindow::moveEvent(QMoveEvent*)
 {
     emit geometryChanged(panId(), saveGeometry());
     saveGeometryState();
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
+    // Runden hier wuerde gegen das native Ziehen kaempfen.
+    snapToGridAfterSettle(this);
 }
 
 void PanFloatingWindow::resizeEvent(QResizeEvent*)

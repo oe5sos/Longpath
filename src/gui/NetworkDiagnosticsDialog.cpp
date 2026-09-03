@@ -32,6 +32,7 @@
 #include "models/RadioModel.h"
 #include "core/AudioEngine.h"
 #include "core/RadioConnection.h"
+#include "core/SunSdrRadioConnection.h"
 
 #if defined(Q_OS_LINUX)
 #  include "core/audio/LinuxAudioBackend.h"
@@ -42,7 +43,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QStringList>
 #include <QVBoxLayout>
+#include <QVector>
 
 namespace Longpath {
 
@@ -100,6 +103,37 @@ static void addSectionHeader(QGridLayout* grid, int row, const QString& title)
     QLabel* hdr = new QLabel(title);
     hdr->setStyleSheet(QString::fromUtf8(kSectionHeaderStyle));
     grid->addWidget(hdr, row, 0, 1, 4);
+}
+
+// ── TX (SunSDR) trace-tail formatting ──────────────────────────────────────
+// Step 4 of the SunSDR2 QRP TX-chain plan. Short display labels for
+// TxTraceKind — reuses the enum's own existing four-way meaning
+// (SunSdrRadioConnection.h's own TxTraceKind comment) rather than
+// inventing new categories.
+static QString txTraceKindLabel(TxTraceKind kind)
+{
+    switch (kind) {
+    case TxTraceKind::Armed:       return QStringLiteral("Armed");
+    case TxTraceKind::Disarmed:    return QStringLiteral("Disarmed");
+    case TxTraceKind::MoxRefused:  return QStringLiteral("MOX refused");
+    case TxTraceKind::MoxAccepted: return QStringLiteral("MOX accepted");
+    }
+    return QStringLiteral("?");
+}
+
+// One trace-ring entry as one short display line, e.g.
+// "#7 MOX refused — refused: not armed". The reason is appended only
+// when non-empty — Armed/Disarmed entries carry none (TxTraceEntry's
+// own comment).
+static QString formatTxTraceEntry(const TxTraceEntry& entry)
+{
+    QString line = QStringLiteral("#%1 %2")
+                       .arg(entry.seq)
+                       .arg(txTraceKindLabel(entry.kind));
+    if (!entry.reason.isEmpty()) {
+        line += QStringLiteral(" — ") + entry.reason;
+    }
+    return line;
 }
 
 void NetworkDiagnosticsDialog::buildConnectionSection(QGridLayout* grid, int& row)
@@ -187,6 +221,41 @@ void NetworkDiagnosticsDialog::buildTelemetrySection(QGridLayout* grid, int& row
     }
 }
 
+// Step 4 of the SunSDR2 QRP TX-chain plan (design synthesis quote in
+// this file's header comment). Read-only display of
+// SunSdrRadioConnection's own bench-only TX gate state — see that
+// class's header for isTxArmed()/isMoxOn()/txPaceRepeatCount()/
+// txTraceTail(). No control of any kind lives here: no button, no
+// checkbox, and refresh() (below) never calls setTxArmed()/setMox().
+void NetworkDiagnosticsDialog::buildSunSdrTxSection(QGridLayout* grid, int& row)
+{
+    addSectionHeader(grid, row++, tr("TX (SunSDR)"));
+
+    auto addRow = [&](const QString& field, QLabel*& valueOut) {
+        grid->addWidget(makeFieldLabel(field), row, 0);
+        valueOut = makeValueLabel();
+        grid->addWidget(valueOut, row, 1, 1, 3);
+        ++row;
+    };
+
+    addRow(tr("Armed"),        m_sunSdrArmedLabel);
+    addRow(tr("MOX"),          m_sunSdrMoxLabel);
+    addRow(tr("Pace repeats"), m_sunSdrPaceRepeatsLabel);
+    addRow(tr("Trace tail"),   m_sunSdrTraceTailLabel);
+
+    // Same "— (not reported)"-shaped placeholder convention as the PA
+    // voltage row above: this whole section stays visible but visibly
+    // inert until refresh() finds the active connection is genuinely a
+    // SunSdrRadioConnection (see refresh()'s own comment) — matching
+    // this dialog's established pattern rather than hiding the group.
+    if (m_sunSdrArmedLabel) {
+        m_sunSdrArmedLabel->setText(tr("— (not SunSDR)"));
+    }
+    if (m_sunSdrTraceTailLabel) {
+        m_sunSdrTraceTailLabel->setWordWrap(true);
+    }
+}
+
 // ─── buildUi ──────────────────────────────────────────────────────────────────
 
 void NetworkDiagnosticsDialog::buildUi()
@@ -217,6 +286,7 @@ void NetworkDiagnosticsDialog::buildUi()
     buildNetworkSection(grid, row);
     buildAudioSection(grid, row);
     buildTelemetrySection(grid, row);
+    buildSunSdrTxSection(grid, row);
 
     root->addStretch();
 
@@ -483,6 +553,87 @@ void NetworkDiagnosticsDialog::refresh()
     if (m_adcOvlLabel) {
         m_adcOvlLabel->setText(tr("None"));
     }
+
+    // ── TX (SunSDR) section ───────────────────────────────────────────────
+    // Read-only: never arms, never transmits, never calls setTxArmed()/
+    // setMox() — see buildSunSdrTxSection()'s own comment. Populated only
+    // when the active connection is genuinely a SunSdrRadioConnection,
+    // via qobject_cast — the same downcast pattern RadioModel.cpp and
+    // Hl2IoBoardTab.cpp already use for P1RadioConnection/
+    // P2RadioConnection, matched here rather than inventing a second
+    // downcast idiom. Any other connection type (or none at all) keeps
+    // the "— (not SunSDR)" / "—" placeholders buildSunSdrTxSection()
+    // already set.
+    SunSdrRadioConnection* sunSdr =
+        (m_model && m_model->connection())
+            ? qobject_cast<SunSdrRadioConnection*>(m_model->connection())
+            : nullptr;
+
+    if (sunSdr) {
+        if (m_sunSdrArmedLabel) {
+            m_sunSdrArmedLabel->setText(sunSdr->isTxArmed() ? tr("Yes") : tr("No"));
+        }
+        if (m_sunSdrMoxLabel) {
+            m_sunSdrMoxLabel->setText(sunSdr->isMoxOn() ? tr("On") : tr("Off"));
+        }
+        if (m_sunSdrPaceRepeatsLabel) {
+            m_sunSdrPaceRepeatsLabel->setText(
+                QString::number(sunSdr->txPaceRepeatCount()));
+        }
+        if (m_sunSdrTraceTailLabel) {
+            // Last 5 entries — plenty for a status panel, per the design
+            // synthesis quote ("the last 3-5") this step was scoped to.
+            const QVector<TxTraceEntry> tail = sunSdr->txTraceTail(5);
+            if (tail.isEmpty()) {
+                m_sunSdrTraceTailLabel->setTextFormat(Qt::PlainText);
+                m_sunSdrTraceTailLabel->setText(QStringLiteral("—"));
+            } else {
+                QStringList lines;
+                lines.reserve(tail.size());
+                for (const TxTraceEntry& entry : tail) {
+                    lines.append(formatTxTraceEntry(entry));
+                }
+                m_sunSdrTraceTailLabel->setTextFormat(Qt::RichText);
+                m_sunSdrTraceTailLabel->setText(lines.join(QStringLiteral("<br>")));
+            }
+        }
+    } else {
+        if (m_sunSdrArmedLabel) {
+            m_sunSdrArmedLabel->setText(tr("— (not SunSDR)"));
+        }
+        if (m_sunSdrMoxLabel) {
+            m_sunSdrMoxLabel->setText(QStringLiteral("—"));
+        }
+        if (m_sunSdrPaceRepeatsLabel) {
+            m_sunSdrPaceRepeatsLabel->setText(QStringLiteral("—"));
+        }
+        if (m_sunSdrTraceTailLabel) {
+            m_sunSdrTraceTailLabel->setTextFormat(Qt::PlainText);
+            m_sunSdrTraceTailLabel->setText(QStringLiteral("—"));
+        }
+    }
+}
+
+// ─── TX (SunSDR) test-only text accessors ────────────────────────────────────
+
+QString NetworkDiagnosticsDialog::sunSdrArmedTextForTest() const
+{
+    return m_sunSdrArmedLabel ? m_sunSdrArmedLabel->text() : QString();
+}
+
+QString NetworkDiagnosticsDialog::sunSdrMoxTextForTest() const
+{
+    return m_sunSdrMoxLabel ? m_sunSdrMoxLabel->text() : QString();
+}
+
+QString NetworkDiagnosticsDialog::sunSdrPaceRepeatsTextForTest() const
+{
+    return m_sunSdrPaceRepeatsLabel ? m_sunSdrPaceRepeatsLabel->text() : QString();
+}
+
+QString NetworkDiagnosticsDialog::sunSdrTraceTailTextForTest() const
+{
+    return m_sunSdrTraceTailLabel ? m_sunSdrTraceTailLabel->text() : QString();
 }
 
 // ─── onResetSessionStats ─────────────────────────────────────────────────────

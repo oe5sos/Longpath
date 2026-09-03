@@ -205,10 +205,11 @@ private:
     void updateFlagFor(const QString& call);
     // Station line, with the current flag in front of it.
     void setStationLine(const QString& text);
-    // Everything worth reading from a lookup answer, as two lines:
-    // who/where on the first, county, licence class, QSL routes and
-    // distance/bearing on the second. One place, so the fresh-answer
-    // and the cached-answer paths cannot drift apart.
+    // Name, country and distance from a lookup answer, one line
+    // (2026-09-01 — trimmed from the earlier two-line everything-it-
+    // carries version once the portrait grew large enough to want the
+    // room). One place, so the fresh-answer and the cached-answer paths
+    // cannot drift apart.
     QString stationText(const CallsignInfo& info) const;
     // "New DXCC" / "worked 3x, last 2024-05-02" for the callsign being
     // typed, on the current band and mode.

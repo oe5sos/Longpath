@@ -97,7 +97,7 @@ bool LayoutProfiles::createInternal(const QString& name,
     // Nur bei vorgegebenem Zustand herstellen. Bei einer Aufnahme des
     // jetzigen wäre es ein Herstellen dessen, was ohnehin schon da ist
     // — überflüssige Arbeit, die im Fenster als Zucken sichtbar würde.
-    if (given && m_apply) { m_apply(*given); }
+    if (given) { runApply(*given); }
     emit currentChanged(m_current);
     emit profilesChanged();
     return true;
@@ -155,8 +155,8 @@ bool LayoutProfiles::remove(const QString& name)
         // Fenster, das keinem Profil mehr gehoert — und die naechste
         // Umgestaltung landete nirgends.
         m_current = m_order.isEmpty() ? QString{} : m_order.first();
-        if (!m_current.isEmpty() && m_apply) {
-            if (const Profile* p = find(m_current)) { m_apply(p->state); }
+        if (!m_current.isEmpty()) {
+            if (const Profile* p = find(m_current)) { runApply(p->state); }
         }
         emit currentChanged(m_current);
     }
@@ -169,6 +169,14 @@ bool LayoutProfiles::activate(const QString& name)
     if (!exists(name)) { return false; }
     if (name == m_current) { return true; }
 
+    // Unbedingtes Log, nach demselben Muster wie PanadapterStack.cpp's
+    // [PanDockRequested]/[PanFloatClose]: ein Profilwechsel war im Log
+    // bislang UNAUFFINDBAR (Untersuchung 2026-09-01 zum leeren-Fenster-
+    // Fehler musste die Zeitfenster indirekt ueber andere Log-Cluster
+    // erschliessen). qWarning(), nicht qDebug(), damit es auch in
+    // Release-Builds ankommt.
+    qWarning() << "[ProfileActivate]" << m_current << "->" << name;
+
     // ── Erst sichern, dann wechseln ──────────────────────────────────
     //
     // Ohne das geht jede Umgestaltung verloren, sobald jemand ein
@@ -178,24 +186,41 @@ bool LayoutProfiles::activate(const QString& name)
     captureIntoCurrent();
 
     m_current = name;
-    if (m_apply) {
-        if (const Profile* p = find(name)) { m_apply(p->state); }
-    }
+    if (const Profile* p = find(name)) { runApply(p->state); }
+    qWarning() << "[ProfileApplyDone]" << name;
     emit currentChanged(m_current);
     return true;
 }
 
 void LayoutProfiles::captureIntoCurrent()
 {
+    // Betreiber 2026-08-31, siehe m_applyingState im Header fuer die
+    // volle Herleitung: waehrend m_apply() laeuft, wuerde eine Aufnahme
+    // hier den halb angewendeten Zwischenstand sichern und den gerade
+    // hergestellten/importierten Zustand sofort wieder ueberschreiben.
+    // Ein Aufrufer, der WAEHREND eines laufenden m_apply() reentrant
+    // hierher zurueckkommt (z.B. MainWindow::dockAppletBack(), das beim
+    // Zurueckdocken eines nicht mehr abgeloesten Fensters selbst wieder
+    // sichert), bekommt hier ein stilles No-Op statt eines falschen
+    // Schnappschusses.
+    if (m_applyingState) { return; }
     if (m_current.isEmpty() || !m_capture) { return; }
     if (Profile* p = find(m_current)) { p->state = m_capture(); }
+}
+
+void LayoutProfiles::runApply(const QVariantMap& state)
+{
+    if (!m_apply) { return; }
+    m_applyingState = true;
+    m_apply(state);
+    m_applyingState = false;
 }
 
 void LayoutProfiles::applyCurrent()
 {
     if (m_current.isEmpty() || !m_apply) { return; }
     if (const Profile* p = find(m_current)) {
-        m_apply(p->state);
+        runApply(p->state);
         // Review-Fund 2026-08-28: activate() emits currentChanged after
         // applying; this sibling had silently dropped that. Harmless
         // today (load() already emits it before this runs at startup),
@@ -270,8 +295,8 @@ bool LayoutProfiles::importFromJson(const QString& targetProfile,
     // Nur beim AKTIVEN Profil sofort sichtbar machen -- fuer ein
     // anderes wuerde m_apply() das gerade laufende Fenster umbauen,
     // obwohl gar nicht dorthin gewechselt wurde.
-    if (targetProfile == m_current && m_apply) {
-        m_apply(p->state);
+    if (targetProfile == m_current) {
+        runApply(p->state);
     }
 
     save();

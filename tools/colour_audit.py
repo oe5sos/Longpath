@@ -55,6 +55,22 @@ nicht zu unterscheiden — ``#404858`` steht 18-mal in der App und liegt
 2,9 ΔE neben ``kTitleGradTop``. Es geht keine Information verloren,
 weil da keine war.
 
+**WARNUNG, 2026-09-02 nachgetragen — ΔE < 8 heißt NICHT rollensicher.**
+Eine vollständige Rollenprüfung aller 33 ΔE<8-Gruppen (400 Fundstellen)
+fand nur 7 (1,75 %) tatsächlich rollenkonsistent mit dem vorgeschlagenen
+Ziel. Der Rest scheiterte an genau der Falle, die dieses Skript oben
+selbst beschreibt (#205070-Geschichte): dieselbe Zahl, zwei Rollen.
+Bestes Beispiel: ``#203040`` (81 Vorkommen) läge 7,9 ΔE neben
+``kButtonAltHover`` — aber ein Code-Kommentar in ``FmApplet.cpp`` nennt
+``#203040`` explizit als ``kButtonHover``s eigenen, historischen Wert;
+``kButtonAltHover`` gehört zu einer ganz anderen Zahl (``#204060``), die
+nur zufällig farblich nah an ``#203040`` liegt. Die meisten der 81
+Fundstellen sind zudem Rahmenfarben, nicht Hover-Hintergründe — eine
+zweite, unabhängige Rollen-Divergenz. ``ΔE < 8`` bleibt eine nützliche
+Kandidatenliste zum PRÜFEN, ist aber keine Freigabe zum blinden
+Anwenden — auch nicht mit ``--apply``. Details je Fundstelle:
+``docs/design/2026-09-02-farbdrift-delta-e-rollenpruefung.md``.
+
 Was ``--unmapped`` meldet — der Fehlertyp hinter #00e5ff
 -------------------------------------------------------
 

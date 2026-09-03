@@ -93,6 +93,19 @@ public:
     void setTube(bool on);
     bool isTube() const;
 
+    // ── Frequenz zusaetzlich einblenden (2026-09-02) ──────────────────
+    //
+    // Betreiber: "die Idee ist, dass man sich bei kleinen Bildschirmen
+    // vielleicht ein Fenster erspart" -- Frequenz mit im S-Meter/
+    // Stehwelle statt in einem eigenen Frequenz-Fenster. Aus dem
+    // Rechtsklickmenue schaltbar wie Form/Spitzenhaltung, gemerkt in
+    // saveState()/restoreState(). Nur die Zeiger-Form zeigt sie derzeit
+    // (die genehmigte Gestaltung war ausdruecklich fuer das Zifferblatt,
+    // nicht fuer den Balken).
+    void setShowFrequency(bool on);
+    bool showFrequency() const;
+    void setFrequencyHz(double hz);
+
     // ── Gemerkt wird es auch ─────────────────────────────────────────
     //
     // Bis 2026-08-20 merkte sich ein Instrument NICHTS: Form,

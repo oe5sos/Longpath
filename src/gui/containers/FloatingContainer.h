@@ -150,6 +150,9 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten, siehe WindowPlacement.h snapToGridAfterSettle().
+    void moveEvent(QMoveEvent* event) override;
 
 private slots:
     // Collapse the top-level window to title-bar height when the owner

@@ -153,7 +153,7 @@ void ProfileRail::rebuild()
             x->setToolTip(QStringLiteral("Profil „%1\u201C loeschen").arg(name));
             x->setStyleSheet(QStringLiteral(
                 "QPushButton { background: %1; color: %2; border: none;"
-                "  border-radius: 7px; font-size: 10px; font-weight: bold; }"
+                "  border-radius: 7px; font-size: 11px; font-weight: bold; }"
                 "QPushButton:hover { background: %3; color: #ffffff; }")
                     .arg(QString::fromLatin1(Style::kButtonBg),
                          QString::fromLatin1(Style::kTextSecondary),

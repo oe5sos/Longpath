@@ -49,7 +49,9 @@ class QDragEnterEvent;
 class QDropEvent;
 class QDoubleSpinBox;
 class QLabel;
+class QMoveEvent;
 class QPushButton;
+class QResizeEvent;
 class QTableWidget;
 
 namespace Longpath {
@@ -73,6 +75,19 @@ public:
     /// window keeps working with no radio at all.
     SwrSweepPanel* sweepPanel() const { return m_sweepPanel; }
 
+signals:
+    /// Betreiber 2026-09-01: "passiert die ganze Zeit!" -- das Fenster
+    /// ging bei praktisch jedem Neustart von selbst wieder auf. Ursache:
+    /// closeEvent() sicherte bislang nur die Fenstergeometrie, meldete
+    /// das Schliessen aber nirgends zurueck -- der native rote Knopf und
+    /// AppletVisibilityController liefen als zwei getrennte Wahrheiten.
+    /// Der zuletzt GESPEICHERTE Sichtbarkeits-Wunsch blieb also fuer
+    /// immer "sichtbar", einmal gesetzt (egal von wo), und der
+    /// Konstruktor stellte ihn bei jedem Start treu wieder her. Dieses
+    /// Signal schliesst die Luecke; MainWindow::openAntennaWindow()
+    /// verbindet es einmalig mit dem Controller.
+    void closed();
+
 protected:
     // Drop a .s1p straight onto the window. A sweep usually arrives as
     // a file just copied off an SD card, and this is the shortest path
@@ -86,6 +101,11 @@ protected:
     // resize() below. Same idiom as LogbookWindow/AmpViewWindow:
     // capture on close, apply on construction.
     void closeEvent(QCloseEvent* event) override;
+
+    // 2026-08-31: closeEvent() alone only catches a CLEAN close; see the
+    // matching note added to LogbookWindow.h the same night.
+    void moveEvent(QMoveEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     void buildUi();

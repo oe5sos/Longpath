@@ -92,7 +92,7 @@ void BandwidthFilterApplet::buildUI()
         auto label = [&](const QString& t) {
             auto* l = new QLabel(t, body);
             l->setStyleSheet(QStringLiteral(
-                "QLabel { color: %1; font-size: 10px; font-weight: bold; }")
+                "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
                 .arg(QLatin1String(Style::kTextScale)));
             return l;
         };
@@ -127,14 +127,35 @@ void BandwidthFilterApplet::buildUI()
             row->addWidget(l);
         };
 
+        // Betreiber 2026-09-03, mit Nachdruck: "minus darf nie!!!!!" —
+        // LOW/HIGH sind intern vorzeichenbehaftete Versatzwerte (LSB legt
+        // beide Kanten unterhalb des Traegers), aber diese Felder zeigen
+        // und nehmen nur noch den BETRAG entgegen. Die Spanne beginnt
+        // darum bei 0 statt bei -kMaxFilterWidthHz — negativ eintippen
+        // geht am Feld selbst schon nicht mehr. Das Vorzeichen bleibt
+        // intern erhalten (siehe die beiden valueChanged-Anschluesse
+        // unten) und wird beim Zurueckschreiben ins Modell wieder
+        // angelegt.
         addShrinkableLabel(QStringLiteral("LOW"));
-        m_lowBox = box(-SliceModel::kMaxFilterWidthHz,
-                        SliceModel::kMaxFilterWidthHz);
+        m_lowBox = box(0, SliceModel::kMaxFilterWidthHz);
         m_lowBox->setObjectName(QStringLiteral("bwFilterLow"));
         row->addWidget(m_lowBox);
 
+        // Betreiber 2026-09-03: "bandbreite solle von 50-3000 sein" /
+        // "Ende zwischen 2700 bis 3000 standard, maximum 8000 (10000)
+        // sollte einstellbar sein" — Untergrenze von 10 auf 50 Hz an.
+        // Obergrenze bleibt bei 2*kMaxFilterWidthHz: kMaxFilterWidthHz
+        // (10000) deckelt laut SliceModel.h/constrainFilter() JEDE
+        // KANTE fuer sich, nicht die Breite direkt — FM sitzt
+        // symmetrisch um Null (resetFilter(): 12000 Hz Breite = je
+        // 6000 Hz Kante, weit unter dem Kantendeckel). Ein Deckel von
+        // genau 10000 auf DIESES Feld haette FMs eigenen, gueltigen
+        // Vorgabewert schon abgeschnitten. 2*kMaxFilterWidthHz deckt
+        // den breitesten ueberhaupt erreichbaren Fall (beide Kanten am
+        // Anschlag) und liegt fuer SSB/CW in der Praxis laengst
+        // innerhalb der 10000, die der Betreiber nannte.
         addShrinkableLabel(QStringLiteral("WIDTH"));
-        m_widthBox = box(10, 2 * SliceModel::kMaxFilterWidthHz);
+        m_widthBox = box(50, 2 * SliceModel::kMaxFilterWidthHz);
         m_widthBox->setObjectName(QStringLiteral("bwFilterWidth"));
         m_widthBox->setToolTip(QStringLiteral(
             "Type a width and the edges land where this mode wants them: "
@@ -143,8 +164,7 @@ void BandwidthFilterApplet::buildUI()
         row->addWidget(m_widthBox);
 
         addShrinkableLabel(QStringLiteral("HIGH"));
-        m_highBox = box(-SliceModel::kMaxFilterWidthHz,
-                         SliceModel::kMaxFilterWidthHz);
+        m_highBox = box(0, SliceModel::kMaxFilterWidthHz);
         m_highBox->setObjectName(QStringLiteral("bwFilterHigh"));
         row->addWidget(m_highBox);
 
@@ -211,18 +231,76 @@ void BandwidthFilterApplet::buildUI()
         setMinimumWidth(300);
 
         // ── Verdrahtung ──────────────────────────────────────────────
+        // v kommt jetzt immer als Betrag an (siehe box()-Aufruf oben,
+        // Spanne beginnt bei 0) -- das Vorzeichen, das diese Betriebsart
+        // fuer diese Kante vorsieht, bleibt erhalten: negativ, wenn die
+        // Kante gerade negativ stand (der Normalfall bei LSB), sonst
+        // positiv. Nur wenn die Kante zufaellig exakt auf 0 stand (keine
+        // Seite erkennbar), gilt das Vorzeichen der jeweils ANDEREN
+        // Kante als naechstbeste Auskunft ueber die Seite dieser
+        // Betriebsart -- beide Kanten liegen bei jeder Betriebsart hier
+        // auf derselben Seite oder symmetrisch, nie gemischt.
         connect(m_lowBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
-            if (SliceModel* s = activeSlice()) { s->setFilterLow(v); }
+            SliceModel* s = activeSlice();
+            if (!s) { return; }
+            m_lastEditedEdge = LastEditedEdge::Low;
+            const int prev = s->filterLow();
+            const bool negative = prev != 0 ? (prev < 0) : (s->filterHigh() <= 0);
+            s->setFilterLow(negative ? -v : v);
         });
         connect(m_highBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
-            if (SliceModel* s = activeSlice()) { s->setFilterHigh(v); }
+            SliceModel* s = activeSlice();
+            if (!s) { return; }
+            m_lastEditedEdge = LastEditedEdge::High;
+            const int prev = s->filterHigh();
+            const bool negative = prev != 0 ? (prev < 0) : (s->filterLow() < 0);
+            s->setFilterHigh(negative ? -v : v);
         });
         connect(m_widthBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
-            // Die Regel je Betriebsart steckt im Modell, nicht hier.
-            if (SliceModel* s = activeSlice()) { s->setFilterWidth(v); }
+            SliceModel* s = activeSlice();
+            if (!s) { return; }
+            // Betreiber 2026-09-03, mit Nachdruck, nach einem konkreten
+            // Nachvollzug: LOW auf 50 gesetzt, WIDTH auf 5000 gesetzt,
+            // "dann erscheint bei LOW automatisch 5150" -- die Regel je
+            // Betriebsart steckte bislang in SliceModel::setFilterWidth()
+            // (widthToEdges()), das LSB/USB/CW immer am VORGABEWERT der
+            // Betriebsart verankert (z.B. -150 Hz fuer LSB), unabhaengig
+            // davon, was gerade von Hand in LOW/HIGH stand -- die Kante,
+            // die der Bedienende zuletzt selbst gesetzt hatte, ging dabei
+            // stillschweigend verloren. Hier stattdessen: GENAU DIE Kante
+            // (m_lastEditedEdge) bleibt stehen, nur die andere folgt der
+            // neuen Breite. Symmetrische Betriebsarten (AM/SAM/FM/DSB) und
+            // alles Kuenftige behalten die bisherige, Mitten-erhaltende
+            // Regel -- dort ist "welche Kante zuletzt" keine sinnvolle
+            // Frage, beide Kanten gehoeren untrennbar zur Mitte.
+            switch (s->dspMode()) {
+            case DSPMode::LSB:
+            case DSPMode::DIGL:
+            case DSPMode::CWL:
+            case DSPMode::RADE_L:
+                if (m_lastEditedEdge == LastEditedEdge::Low) {
+                    s->setFilter(s->filterLow(), s->filterLow() + v);
+                } else {
+                    s->setFilter(s->filterHigh() - v, s->filterHigh());
+                }
+                break;
+            case DSPMode::USB:
+            case DSPMode::DIGU:
+            case DSPMode::CWU:
+            case DSPMode::RADE_U:
+                if (m_lastEditedEdge == LastEditedEdge::High) {
+                    s->setFilter(s->filterHigh() - v, s->filterHigh());
+                } else {
+                    s->setFilter(s->filterLow(), s->filterLow() + v);
+                }
+                break;
+            default:
+                s->setFilterWidth(v);
+                break;
+            }
         });
         connect(m_resetBtn, &QPushButton::clicked, this, [this]() {
             // resetFilter, nicht resetFilterCenter: hier stand bis zum
@@ -473,9 +551,20 @@ void BandwidthFilterApplet::refreshNumbers()
     const QSignalBlocker b2(m_highBox);
     const QSignalBlocker b3(m_widthBox);
 
-    m_lowBox->setValue(s->filterLow());
-    m_highBox->setValue(s->filterHigh());
-    m_widthBox->setValue(s->filterWidth());
+    // qAbs(): siehe die Anschluesse oben und cutLabel() in
+    // BandwidthFilterPane.cpp -- "minus darf nie!!!!!" gilt fuer jede
+    // Anzeige dieser Kanten, nicht nur die schwebende Beschriftung im
+    // Bild.
+    m_lowBox->setValue(qAbs(s->filterLow()));
+    m_highBox->setValue(qAbs(s->filterHigh()));
+    // qAbs() hier ebenso: SliceModel::filterWidth() ist ein einfaches
+    // filterHigh()-filterLow(), das negativ wird, sobald LOW zahlenmaessig
+    // kleiner als HIGH steht (z.B. LOW=50, HIGH=150 bei LSB -- ungewoehnlich,
+    // aber nach "er muss das machen, was ich eingebe" gueltig, seit die
+    // beiden Kanten oben unabhaengig voneinander stehen bleiben). Ohne
+    // qAbs() kappt QSpinBox::setValue() den negativen Wert stillschweigend
+    // auf das Feldminimum (50) -- eine Zahl, die nichts Echtes mehr zeigt.
+    m_widthBox->setValue(qAbs(s->filterWidth()));
     m_modeLbl->setText(SliceModel::modeName(s->dspMode()));
 
     m_updatingFromModel = false;

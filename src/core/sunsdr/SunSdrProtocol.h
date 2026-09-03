@@ -87,15 +87,26 @@ of the License, or (at your option) any later version.
 //     I/Q pairs. This is the one piece that actually makes a
 //     panadapter possible.
 //
-// Deliberately NOT here: the opcode table beyond what these functions
-// need, the ~30-step boot macro, STATE_SYNC/CONFIG_BLOCK payload
-// templates, PTT (0x06), drive byte (0x17), TX packet building. Those
-// opcode MEANINGS are still DX-sourced and only partially
-// cross-checked against the QRP (design doc "New finding: the QRP's
-// real opcode set is richer than ArtemisSDR's documented DX subset").
-// The framing implemented here — magic bytes, header layout, sample
-// encoding — IS confirmed; trust that, not the rest, until it's
-// separately confirmed.
+// Since then, Step 1 of a separate, operator-approved 6-step TX-chain
+// plan added four PURE ENCODERS for MOX/PTT (0x06), antenna select
+// (0x15), drive byte (0x17), and PA enable (0x24) — see their own
+// section near the end of this file. They are wire FRAME BUILDERS
+// only: zero socket code touches them anywhere, and buildDriveFrame()
+// in particular must have zero production call sites (see its own
+// comment). Steps 2-6 of that plan (gate scaffolding, pacer,
+// diagnostics UI, bench jitter test, real wire wiring) are separate,
+// later, individually-reviewed steps — do not treat their presence
+// here as those opcodes being wired into a real send path.
+//
+// Still deliberately NOT here: the opcode table beyond what all of the
+// above functions need, the ~30-step boot macro, STATE_SYNC/
+// CONFIG_BLOCK payload templates, TX packet pacing/sequencing. Every
+// opcode MEANING in this file (including the four TX encoders above)
+// is still DX-sourced and only partially cross-checked against the QRP
+// (design doc "New finding: the QRP's real opcode set is richer than
+// ArtemisSDR's documented DX subset"). The framing implemented here —
+// magic bytes, header layout, sample encoding — IS confirmed; trust
+// that, not the opcode meanings, until they're separately confirmed.
 //
 // No networking, no threading, no RadioConnection dependency. Pure
 // byte-level encode/decode, testable against the real captured packet
@@ -107,6 +118,14 @@ of the License, or (at your option) any later version.
 //                 AI-assisted via Anthropic Claude (Cowork). Ported
 //                 from ArtemisSDR sunsdr.c/sunsdr.h
 //                 [@f8b01d25c5, 2026-07-08, kk68/ArtemisSDR main].
+//   2026-09-02 — TX control-channel pure encoders (MOX 0x06, antenna
+//                 select 0x15, drive byte 0x17, PA enable 0x24) added
+//                 for Martin Fischer, AI-assisted via Anthropic Claude
+//                 (Cowork). Step 1 of a 6-step operator-approved TX
+//                 chain plan; facts still from ArtemisSDR sunsdr.c/
+//                 sunsdr.h [@f8b01d25c5, 2026-07-08, kk68/ArtemisSDR
+//                 main], via docs/architecture/2026-08-24-sunsdr-
+//                 native-driver-design.md's synthesis.
 // =================================================================
 
 #include <QByteArray>
@@ -307,6 +326,115 @@ QByteArray encodeFrequencyPayloadCandidate(quint64 freqHz);
 // returns `value / 10` as the candidate frequency in Hz. Returns 0 if
 // `payload` is shorter than 8 bytes.
 quint64 decodeFrequencyPayloadCandidate(const QByteArray& payload);
+
+// ── TX control-channel opcodes: PURE ENCODERS, ZERO WIRE REACHABILITY ──
+//
+// Step 1 of the SunSDR2 QRP TX chain (design-workflow-approved 6-step
+// plan). These four builders turn already DX/PRO-sourced opcode facts
+// into wire-shaped bytes and NOTHING ELSE — no socket anywhere in this
+// codebase sends what they build. buildDriveFrame() in particular must
+// have zero production call sites (enforced by grep, not the
+// compiler — see its own comment and its unit test). Steps 2-6 (gate
+// scaffolding, pacer, diagnostics UI, bench jitter test, real wire
+// wiring) are separate, later, individually-reviewed steps — nothing
+// here is wired into a real send path yet.
+//
+// Frame shape for all four: the existing 18-byte control header
+// (buildControlHeader() above) with sub=0 and a 4-byte little-endian
+// u32 payload appended. This exact shape — not just the opcode table —
+// is directly confirmed by ArtemisSDR's own generic
+// `sunsdr_send_u32_cmd(opcode, value)` helper, which every one of
+// these four opcodes is sent through on the DX/PRO reference
+// implementation: it calls `sunsdr_build_header(pkt, opcode,
+// /*sub=*/0, /*decl_len=*/0x04)` then writes `value` as 4 LE bytes at
+// offset 18 (ArtemisSDR sunsdr.c:2391-2403 [@f8b01d25c5]) — not an
+// invented convention.
+//
+// All four opcode meanings are still DX/PRO-sourced facts, only
+// partially cross-checked against the QRP — design doc "New finding:
+// the QRP's real opcode set is richer than ArtemisSDR's documented DX
+// subset" — same confirmation tier as every other opcode this file
+// already documents beyond the framing itself.
+
+// From design doc line 978 ("0x06 | MOX/PTT | u32, 1=TX / 0=RX |
+// sunsdr.c:3987,4075") and ArtemisSDR sunsdr.h:48 [@f8b01d25c5]
+// (`#define SUNSDR_OP_MOX_PTT 0x06`); call sites sunsdr.c:3987,4075
+// [@f8b01d25c5] (`sunsdr_send_u32_cmd(SUNSDR_OP_MOX_PTT, 1)` /
+// `..., 0)`).
+inline constexpr quint8 kOpMoxPtt = 0x06;
+
+// From design doc line 983 and ArtemisSDR sunsdr.h:54 [@f8b01d25c5]
+// (`#define SUNSDR_OP_RX_ANT 0x15`) — the design doc's own table names
+// this "RX/TX antenna select": one shared opcode for both directions.
+inline constexpr quint8 kOpAntennaSelect = 0x15;
+
+// From design doc line 984 and ArtemisSDR sunsdr.h:60-61 [@f8b01d25c5]
+// (`#define SUNSDR_OP_DRIVE 0x17`; the very next line's `#define
+// SUNSDR_OP_MODE 0x17` is explicitly commented "DEPRECATED alias - do
+// not use" in the upstream source — the real, shipped mode/drive
+// mixup bug the design doc's own "Note 0x17" paragraph describes).
+inline constexpr quint8 kOpDrive = 0x17;
+
+// From design doc line 992 and ArtemisSDR sunsdr.h:68 [@f8b01d25c5]
+// (`#define SUNSDR_OP_PA_ENABLE 0x24`).
+inline constexpr quint8 kOpPaEnable = 0x24;
+
+// Builds the 0x06 MOX/PTT control frame. `on`=true encodes u32 payload
+// 1 (TX), false encodes 0 (RX) — design doc line 978: "u32, 1=TX /
+// 0=RX". PURE ENCODER — see the file-section comment above; nothing
+// calls this yet, this is Step 1 of 6. The AND-with-other-state logic
+// (if any) belongs to a future caller, not here.
+QByteArray buildMoxFrame(const Profile& profile, bool on);
+
+// Physical SunSDR2 antenna ports — design doc "Antenna model" (lines
+// 1090-1099): "Three fixed physical ports ... A1 (2 m VHF only),
+// A2/A3 (HF only, mutually exclusive with A1 by band)."
+enum class AntennaPort { A1, A2, A3 };
+
+// Builds the 0x15 antenna-select control frame for `port`/`forTx`.
+// Returns false (leaving `*out` untouched) for any (port, direction)
+// combination this project has not confirmed a selector byte for — see
+// the confirmed-byte table's own comment in the .cpp file. All three
+// ports are confirmed: A3's RX/TX split (design doc line 983: "RX A3
+// wire 0x03, TX A3 wire 0x02 (differs!)") — THE TRAP this table exists
+// to guard: the same physical port, same opcode, a different byte
+// depending on direction — plus A1/A2 (RX=TX=0x01, no split), sourced
+// directly from ArtemisSDR (HPSDR/SunSdrAntenna.cs:10-30,81-95 +
+// sunsdr.c:2278-2293) since the design doc's own prose states a byte
+// for A3 only. "Confirmed" for every row here means "traced to a
+// citable source", not "bench-verified against the real QRP in a live
+// TX session" — that bench confirmation is still outstanding for all
+// three ports alike, per the design doc's own closing caveat.
+bool buildAntennaSelectFrame(const Profile& profile, AntennaPort port,
+                              bool forTx, QByteArray* out);
+
+// Builds the 0x17 drive-byte control frame: a bare 0-255 passthrough,
+// u32 payload = raw0to255 (design doc line 984: "u32, low byte =
+// pre-calibrated 0-255 passthrough"; ArtemisSDR
+// `sunsdr_drive_raw_to_wire_byte()`, sunsdr.c:3680-3685
+// [@f8b01d25c5], clamps to [0,255] then returns the integer
+// unchanged — the calibration that produces a meaningful `raw` value
+// happens entirely upstream of the wire layer, per that function's own
+// comment, and is explicitly out of this step's scope).
+//
+// DO NOT WIRE THIS INTO setTxDrive() OR ANY OTHER CALLER YET. The
+// design doc is explicit that this byte must never be sent without a
+// real QRP-specific bench power-calibration table, which does not
+// exist yet — the only known table (design doc "TX drive / power
+// scaling") is DX/PRO hardware, 40 m-only, and flagged "very likely
+// wrong for a QRP". This function exists so the wire fact is encoded
+// and unit-tested; its own unit test additionally asserts there are
+// zero production call sites (see tests/tst_sunsdr_protocol.cpp).
+QByteArray buildDriveFrame(const Profile& profile, quint8 raw0to255);
+
+// Builds the 0x24 PA-enable control frame. `enabled` is taken as the
+// final, already-AND-with-PTT bool — this function only encodes 0/1;
+// the "(paEnabled && ptt)" logic itself belongs to a future caller
+// (Step 2), not here (design doc line 992: "u32 = (paEnabled && ptt) ?
+// 1 : 0"; ArtemisSDR `sunsdr_current_pa_wire_state()`,
+// sunsdr.c:2579-2581 [@f8b01d25c5], computes exactly that AND upstream
+// of the wire call).
+QByteArray buildPaEnableFrame(const Profile& profile, bool enabled);
 
 } // namespace SunSdr
 } // namespace Longpath

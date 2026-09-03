@@ -205,7 +205,9 @@ class QSpinBox;
 class QPushButton;
 class QLabel;
 class QCheckBox;
+class QMoveEvent;
 class QPlainTextEdit;
+class QResizeEvent;
 class QTableView;
 class QToolButton;
 class QMenu;
@@ -341,6 +343,11 @@ protected:
     // resize() in the constructor. Same idiom: capture on close, apply
     // on construction.
     void closeEvent(QCloseEvent* event) override;
+
+    // 2026-08-31: closeEvent() alone only catches a CLEAN close; see the
+    // matching note added to LogbookWindow.h the same night.
+    void moveEvent(QMoveEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     void saveGeometryState();

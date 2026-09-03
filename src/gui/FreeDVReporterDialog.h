@@ -176,6 +176,7 @@
 
 class QAction;
 class QActionGroup;
+class QCloseEvent;
 class QComboBox;
 class QHBoxLayout;
 class QItemSelection;
@@ -183,9 +184,11 @@ class QLineEdit;
 class QMenu;
 class QMenuBar;
 class QModelIndex;
+class QMoveEvent;
 class QPoint;
 class QPushButton;
 class QRadioButton;
+class QResizeEvent;
 class QSortFilterProxyModel;
 class QTableView;
 class QTimer;
@@ -286,6 +289,17 @@ public:
     QMenu* buildRowContextMenuForTest(int proxyRow);
     QString qrzUrlForCallsignForTest(const QString& callsign) const;
 
+protected:
+    // 2026-08-31: this window never saved or restored its own
+    // position/size at all -- it always reopened at whatever default
+    // Qt::Window placement/size buildUi()'s natural layout produced.
+    // Same gap found and fixed the same night for LogbookWindow,
+    // AntennaWindow, SpotHubDialog and AmpViewWindow -- this one is
+    // worse, since it never even had the close-only half of the fix.
+    void closeEvent(QCloseEvent* event) override;
+    void moveEvent(QMoveEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
+
 signals:
     // G2: QSY request - connected externally to FreeDVReporterClient
     //   ::requestQSY (wire shape from freedv-gui FreeDVReporter.cpp
@@ -349,6 +363,10 @@ private:
                                   const Longpath::FreeDVStation& info);
     void setHighlight(const QString& sid, const QColor& bg);
     void refreshDelegateSidOrder();
+
+    // See closeEvent()/moveEvent()/resizeEvent() above.
+    void saveGeometryState();
+    void restoreGeometryState();
 
     // G2: AppSettings serialization helpers for the MRU message list.
     // Stored under "FreeDvReporter/SavedMessages" as a newline-joined
