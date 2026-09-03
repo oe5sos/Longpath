@@ -319,8 +319,24 @@ void leaveAudioThreadPriority(AudioPriorityToken* token)
 
 void elevateGuiMainThreadPriority()
 {
-    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)) {
-        qCWarning(lcRtAudio) << "SetThreadPriority(HIGHEST) for GUI failed"
+    // Was THREAD_PRIORITY_HIGHEST -- the same tier as
+    // elevateLatencyCriticalThreadPriority() below, per that function's
+    // own comment on the intended ladder (Pro Audio MMCSS > HIGHEST for
+    // GUI+latency-critical > ABOVE_NORMAL for compute). If the DSP
+    // thread's AvSetMmThreadCharacteristicsW('Pro Audio') call silently
+    // fails (elevateAudioThreadPriority() above only logs a warning, no
+    // fallback), the GUI thread sat at the SAME tier as audio-critical
+    // work with no OS-level tiebreak -- four independent ~100ms UI
+    // meter timers (MeterPoller, PhoneCwApplet DEXP, TxApplet VOX,
+    // StripWindow level) all run on this thread, and periodically
+    // pre-empting the audio thread from HIGHEST is a plausible source
+    // of the ~85ms periodic audio glitch measured on Windows (not
+    // reproducible on macOS, which schedules threads differently).
+    // Dropping the GUI thread one tier removes that head-to-head
+    // contention regardless of whether the Pro Audio elevation is
+    // actually succeeding.
+    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL)) {
+        qCWarning(lcRtAudio) << "SetThreadPriority(ABOVE_NORMAL) for GUI failed"
                              << "(GetLastError=" << GetLastError() << ").";
     }
 }
