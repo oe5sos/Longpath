@@ -307,6 +307,7 @@ warren@wpratt.com
 #include "core/WsjtxClient.h"
 #include "core/SpotCollectorClient.h"
 #include "core/PotaClient.h"
+#include "core/SotaClient.h"
 #include "core/FreeDVReporterClient.h"
 #include "core/FreeDVRadeReporterBridge.h"
 #include "core/PskReporterClient.h"
@@ -1825,6 +1826,7 @@ RadioModel::RadioModel(QObject* parent)
     m_wsjtx          = std::make_unique<WsjtxClient>(this);
     m_spotCollector  = std::make_unique<SpotCollectorClient>(this);
     m_pota           = std::make_unique<PotaClient>(this);
+    m_sota           = std::make_unique<SotaClient>(this);
 
     m_freeDvReporter = std::make_unique<FreeDVReporterClient>(this);
     m_freeDvReporter->setIdentity(
@@ -1877,6 +1879,8 @@ RadioModel::RadioModel(QObject* parent)
             this, &RadioModel::onSpotCollectorSpotReceived);
     connect(m_pota.get(),           &PotaClient::spotReceived,
             this, &RadioModel::onPotaSpotReceived);
+    connect(m_sota.get(),           &SotaClient::spotReceived,
+            this, &RadioModel::onSotaSpotReceived);
     connect(m_freeDvReporter.get(), &FreeDVReporterClient::spotReceived,
             this, &RadioModel::onFreeDvReporterSpotReceived);
     connect(m_pskReporter.get(),    &PskReporterClient::spotReceived,
@@ -2446,6 +2450,18 @@ void RadioModel::onPotaSpotReceived(const DxSpot& spot)
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 }
 
+void RadioModel::onSotaSpotReceived(const DxSpot& spot)
+{
+    if (!m_spotModel) { return; }
+    auto& s = AppSettings::instance();
+    const int lifetime = s.value(QStringLiteral("SotaSpotLifetimeSec"),
+                                 3600).toInt();
+    const QString color = s.value(QStringLiteral("SotaSpotColor"),
+                                  QStringLiteral("#c2924f")).toString();
+    const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
+    m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
+}
+
 void RadioModel::onFreeDvReporterSpotReceived(const DxSpot& spot)
 {
     if (!m_spotModel) { return; }
@@ -2552,6 +2568,13 @@ void RadioModel::restoreSpotClientAutoStartState()
     if (m_pota && isTrue(QStringLiteral("PotaAutoStart"))) {
         m_pota->startPolling(
             s.value(QStringLiteral("PotaPollInterval"), 30).toInt());
+    }
+
+    // SOTA (HTTPS poll loop, epoch-gated). Default interval matches the
+    // 60 s floor SotaClient enforces regardless of what is persisted.
+    if (m_sota && isTrue(QStringLiteral("SotaAutoStart"))) {
+        m_sota->startPolling(
+            s.value(QStringLiteral("SotaPollInterval"), 60).toInt());
     }
 
     // FreeDV Reporter (WebSocket connect; identity / URL already plumbed

@@ -347,6 +347,7 @@ warren@wpratt.com
 #include "core/WsjtxClient.h"
 #include "core/SpotCollectorClient.h"
 #include "core/PotaClient.h"
+#include "core/SotaClient.h"
 #include "core/PskReporterClient.h"
 #include "PsForm.h"
 #include "PsaIndicatorWidget.h"
@@ -13896,6 +13897,7 @@ void MainWindow::openSpotHub()
             m_radioModel->wsjtx(),
             m_radioModel->spotCollector(),
             m_radioModel->pota(),
+            m_radioModel->sota(),
             m_radioModel->freeDvReporter(),
             m_radioModel->pskReporter(),
             m_radioModel->spotModel(),
@@ -14030,6 +14032,14 @@ void MainWindow::openSpotHub()
             connect(m_spotHubDialog.data(),
                     &SpotHubDialog::potaStopRequested,
                     pota, &PotaClient::stopPolling);
+        }
+        if (auto* sota = m_radioModel->sota()) {
+            connect(m_spotHubDialog.data(),
+                    &SpotHubDialog::sotaStartRequested,
+                    sota, &SotaClient::startPolling);
+            connect(m_spotHubDialog.data(),
+                    &SpotHubDialog::sotaStopRequested,
+                    sota, &SotaClient::stopPolling);
         }
 
         // 2026-05-12 bench fix: PSK Reporter Start button source-first

@@ -184,6 +184,7 @@ class DxClusterClient;
 class WsjtxClient;
 class SpotCollectorClient;
 class PotaClient;
+class SotaClient;
 class FreeDVReporterClient;
 class FreeDVRadeReporterBridge;
 class PskReporterClient;
@@ -1048,6 +1049,7 @@ public:
     WsjtxClient*          wsjtx()               const { return m_wsjtx.get(); }
     SpotCollectorClient*  spotCollector()       const { return m_spotCollector.get(); }
     PotaClient*           pota()                const { return m_pota.get(); }
+    SotaClient*           sota()                const { return m_sota.get(); }
     FreeDVReporterClient* freeDvReporter()      const { return m_freeDvReporter.get(); }
     PskReporterClient*    pskReporter()         const { return m_pskReporter.get(); }
 
@@ -2593,6 +2595,7 @@ private slots:
     void onWsjtxSpotReceived(const Longpath::DxSpot& spot);
     void onSpotCollectorSpotReceived(const Longpath::DxSpot& spot);
     void onPotaSpotReceived(const Longpath::DxSpot& spot);
+    void onSotaSpotReceived(const Longpath::DxSpot& spot);
     void onFreeDvReporterSpotReceived(const Longpath::DxSpot& spot);
     void onPskReporterSpotReceived(const Longpath::DxSpot& spot);
 
@@ -3744,6 +3747,7 @@ private:
     std::unique_ptr<WsjtxClient>          m_wsjtx;
     std::unique_ptr<SpotCollectorClient>  m_spotCollector;
     std::unique_ptr<PotaClient>           m_pota;
+    std::unique_ptr<SotaClient>           m_sota;
     std::unique_ptr<FreeDVReporterClient> m_freeDvReporter;
     std::unique_ptr<PskReporterClient>    m_pskReporter;
 

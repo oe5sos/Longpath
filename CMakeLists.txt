@@ -621,6 +621,7 @@ set(CORE_SOURCES
     src/core/PotaClient.cpp
     src/core/PotaParkInfoClient.cpp
     src/core/PotaAlertsClient.cpp
+    src/core/SotaClient.cpp
     src/core/DxClusterClient.cpp
     src/core/WsjtxClient.cpp
     src/core/FreeDVReporterClient.cpp

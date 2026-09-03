@@ -5695,6 +5695,15 @@ nereus_add_test(tst_spot_collector_parser)
 # Source: AetherSDR src/core/PotaClient.cpp [@0cd4559].
 nereus_add_test(tst_pota_client)
 
+# ── SotaClient JSON parser + dedup (2026-09-03, no upstream equivalent) ────
+# Pins the contract that SotaClient parses api2.sota.org.uk/api/spots/...
+# JSON responses (including two fields confirmed live to be sometimes
+# absent: null frequency, empty mode), maps summitCode -> reference/entity
+# (split on '/', not POTA's '-'), converts lat/lon -> grid via the same
+# Maidenhead helper the logbook uses, dedups across polls via id, and
+# enforces the API maintainer's 60 s minimum poll interval.
+nereus_add_test(tst_sota_client)
+
 # ── SpotHub POTA improvement pass: PotaParkInfoClient JSON parser ───────────
 # NereusSDR-native, no upstream equivalent (operator-requested follow-up,
 # 2026-08-27). Pins the contract that PotaParkInfoClient parses

@@ -114,6 +114,7 @@
 #include "core/FreeDVReporterClient.h"
 #include "core/PotaAlertsClient.h"
 #include "core/PotaClient.h"
+#include "core/SotaClient.h"
 #include "core/PotaParkInfoClient.h"
 #include "core/PskReporterClient.h"
 #include "core/SpotCollectorClient.h"
@@ -279,6 +280,7 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
                              WsjtxClient* wsjtxClient,
                              SpotCollectorClient* spotCollectorClient,
                              PotaClient* potaClient,
+                             SotaClient* sotaClient,
                              FreeDVReporterClient* freedvClient,
                              PskReporterClient* pskClient,
                              SpotModel* spotModel,
@@ -291,6 +293,7 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
       m_wsjtxClient(wsjtxClient),
       m_spotCollectorClient(spotCollectorClient),
       m_potaClient(potaClient),
+      m_sotaClient(sotaClient),
       m_freedvClient(freedvClient),
       m_pskClient(pskClient),
       m_spotModel(spotModel),
@@ -327,6 +330,7 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
     buildWsjtxTab(tabs);
     buildSpotCollectorTab(tabs);
     buildPotaTab(tabs);
+    buildSotaTab(tabs);
     buildAlertsTab(tabs);
     buildFreeDvTab(tabs);
     buildPskTab(tabs);
@@ -1714,6 +1718,161 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     layout->addWidget(m_potaConsole, 1);
 
     tabs->addTab(page, "POTA");
+}
+
+// NereusSDR-native (2026-09-03, no upstream equivalent -- see
+// SotaClient.h). Same shape as buildPotaTab() above; the one behaviour
+// difference the operator sees is the poll interval floor: SOTA's own
+// published guidance is at most one request per 60 seconds, and
+// SotaClient enforces that regardless of what is typed into the
+// spinbox (PotaClient leaves 15 s reachable, matching POTA's own looser
+// guidance).
+void SpotHubDialog::buildSotaTab(QTabWidget* tabs)
+{
+    auto* page = new QWidget;
+    auto* layout = new QVBoxLayout(page);
+    layout->setSpacing(8);
+
+    auto& s = AppSettings::instance();
+
+    auto* connGroup = new QGroupBox("SOTA Spot Feed");
+    auto* connLayout = new QVBoxLayout(connGroup);
+    connLayout->setSpacing(4);
+
+    auto* grid = new QGridLayout;
+    grid->setColumnStretch(1, 1);
+    int row = 0;
+
+    grid->addWidget(new QLabel("Server:"), row, 0);
+    auto* serverLabel = new QLabel("api2.sota.org.uk (HTTP polling)");
+    serverLabel->setStyleSheet(Style::themed("QLabel { color: #8090a0; }"));
+    grid->addWidget(serverLabel, row, 1);
+    row++;
+
+    grid->addWidget(new QLabel("Poll Interval:"), row, 0);
+    m_sotaIntervalSpin = new QSpinBox;
+    m_sotaIntervalSpin->setObjectName("sotaIntervalSpin");
+    m_sotaIntervalSpin->setRange(SotaClient::kMinIntervalSec, 300);
+    m_sotaIntervalSpin->setValue(qMax(
+        s.value("SotaPollInterval", 60).toInt(), SotaClient::kMinIntervalSec));
+    m_sotaIntervalSpin->setSuffix(" sec");
+    m_sotaIntervalSpin->setToolTip(
+        "SOTA's own published guidance: at most one request every 60 "
+        "seconds, enforced here regardless of this box.");
+    m_sotaIntervalSpin->setStyleSheet(Style::spinBoxStyle());
+    connect(m_sotaIntervalSpin, &QSpinBox::valueChanged, this, [](int v) {
+        auto& settings = AppSettings::instance();
+        settings.setValue("SotaPollInterval", v);
+        settings.save();
+    });
+    grid->addWidget(m_sotaIntervalSpin, row, 1);
+    row++;
+
+    connLayout->addLayout(grid);
+
+    auto* btnRow = new QHBoxLayout;
+    m_sotaAutoStartBtn = new QPushButton(
+        s.value("SotaAutoStart", "False").toString() == "True"
+            ? "Auto-Start: ON" : "Auto-Start: OFF");
+    m_sotaAutoStartBtn->setObjectName("sotaAutoStartBtn");
+    m_sotaAutoStartBtn->setCheckable(true);
+    m_sotaAutoStartBtn->setChecked(s.value("SotaAutoStart", "False").toString() == "True");
+    m_sotaAutoStartBtn->setStyleSheet(kAutoToggleStyle);
+    connect(m_sotaAutoStartBtn, &QPushButton::toggled, this, [this](bool on) {
+        m_sotaAutoStartBtn->setText(on ? "Auto-Start: ON" : "Auto-Start: OFF");
+        auto& settings = AppSettings::instance();
+        settings.setValue("SotaAutoStart", on ? "True" : "False");
+        settings.save();
+    });
+    btnRow->addWidget(m_sotaAutoStartBtn);
+    btnRow->addStretch();
+
+    m_sotaStatusLabel = new QLabel("Stopped");
+    m_sotaStatusLabel->setObjectName("sotaStatusLabel");
+    m_sotaStatusLabel->setStyleSheet(kStatusIdleStyle);
+    btnRow->addWidget(m_sotaStatusLabel);
+    btnRow->addStretch();
+
+    m_sotaStartBtn = new QPushButton(m_sotaClient && m_sotaClient->isPolling()
+                                         ? "Stop" : "Start");
+    m_sotaStartBtn->setObjectName("sotaStartBtn");
+    m_sotaStartBtn->setFixedWidth(100);
+    m_sotaStartBtn->setStyleSheet(kStartBtnStyle);
+    connect(m_sotaStartBtn, &QPushButton::clicked, this, [this] {
+        if (m_sotaClient && m_sotaClient->isPolling()) {
+            emit sotaStopRequested();
+            return;
+        }
+        const int interval = m_sotaIntervalSpin->value();
+        auto& settings = AppSettings::instance();
+        settings.setValue("SotaPollInterval", interval);
+        settings.save();
+        emit sotaStartRequested(interval);
+    });
+    btnRow->addWidget(m_sotaStartBtn);
+    connLayout->addLayout(btnRow);
+
+    if (m_sotaClient) {
+        connect(m_sotaClient, &SotaClient::started,
+                this, [this]() {
+                    if (m_sotaStatusLabel) {
+                        m_sotaStatusLabel->setText("Polling api2.sota.org.uk");
+                        m_sotaStatusLabel->setStyleSheet(kStatusActiveStyle);
+                    }
+                    if (m_sotaStartBtn) m_sotaStartBtn->setText("Stop");
+                });
+        connect(m_sotaClient, &SotaClient::stopped,
+                this, [this]() {
+                    if (m_sotaStatusLabel) {
+                        m_sotaStatusLabel->setText("Stopped");
+                        m_sotaStatusLabel->setStyleSheet(kStatusIdleStyle);
+                    }
+                    if (m_sotaStartBtn) m_sotaStartBtn->setText("Start");
+                });
+        connect(m_sotaClient, &SotaClient::rawLineReceived,
+                this, [this](const QString& line) {
+                    if (m_sotaConsole) m_sotaConsole->appendPlainText(line);
+                });
+    }
+
+    layout->addWidget(connGroup);
+
+    auto* consoleRow = new QHBoxLayout;
+    auto* consoleLabel = new QLabel("SOTA Activations");
+    consoleLabel->setStyleSheet(Style::themed("QLabel { color: #4a7ba8; font-weight: bold; }"));
+    consoleRow->addWidget(consoleLabel);
+    consoleRow->addStretch();
+
+    auto* spotColorLabel = new QLabel("Spot Color:");
+    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    consoleRow->addWidget(spotColorLabel);
+
+    QColor sotaColor(s.value("SotaSpotColor", "#c2924f").toString());
+    auto* sotaColorBtn = new QPushButton;
+    sotaColorBtn->setObjectName("sotaColorBtn");
+    sotaColorBtn->setFixedSize(18, 18);
+    sotaColorBtn->setStyleSheet(swatchStyle(sotaColor));
+    connect(sotaColorBtn, &QPushButton::clicked, this, [this, sotaColorBtn] {
+        QColor c = QColorDialog::getColor(
+            QColor(AppSettings::instance().value("SotaSpotColor", "#c2924f").toString()),
+            this, "SOTA Spot Color");
+        if (c.isValid()) {
+            sotaColorBtn->setStyleSheet(swatchStyle(c));
+            AppSettings::instance().setValue("SotaSpotColor", c.name());
+            AppSettings::instance().save();
+        }
+    });
+    consoleRow->addWidget(sotaColorBtn);
+    layout->addLayout(consoleRow);
+
+    m_sotaConsole = new QPlainTextEdit;
+    m_sotaConsole->setObjectName("sotaConsole");
+    m_sotaConsole->setReadOnly(true);
+    m_sotaConsole->setMaximumBlockCount(2000);
+    m_sotaConsole->setStyleSheet(kConsoleStyle);
+    layout->addWidget(m_sotaConsole, 1);
+
+    tabs->addTab(page, "SOTA");
 }
 
 // NereusSDR-native (2026-08-27, operator-requested follow-up, no
