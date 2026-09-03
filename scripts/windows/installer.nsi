@@ -5,6 +5,11 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
+; Installer/uninstaller .exe icon — same artwork as the app itself
+; (resources/branding/longpath-appicon.svg), not the NSIS default.
+!define MUI_ICON "..\..\resources\icons\Longpath.ico"
+!define MUI_UNICON "..\..\resources\icons\Longpath.ico"
+
 ;--- Variables passed in via /D on the makensis command line ---
 ; NSDR_VERSION   — full version string, e.g. 0.2.0
 ; NSDR_DEPLOYDIR — path to the windeployqt'd deploy/ directory
