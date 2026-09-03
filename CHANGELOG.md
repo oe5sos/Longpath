@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+## [0.6.3-rc1] - 2026-09-03
+
+Testbau für den Betreiber (Release-Entwurf, nicht veröffentlicht).
+Gebaut, damit der Bandbreitenfilter und die Persistenz-Korrekturen auf
+echter Windows-Hardware geprüft werden können. Nicht zur Weitergabe.
+
+### Fixed
+
+- **Bandbreitenfilter verankerte in CWL/CWU/DIGL/DIGU eine Kante,
+  statt die Mitte festzuhalten.** Beim Ändern der Breite wanderte in
+  diesen vier Betriebsarten der Ton weg, weil eine Filterkante stehen
+  blieb und die andere allein lief.
+- **Röhre und Segmente überlebten den Neustart nie** (seit ihrer
+  Einführung am 2026-08-23). `InstrumentApplet`s Konstruktor rief
+  `setForm()`, und das ruft seinerseits `saveState()` — womit die
+  Vorgaben in die Ablage geschrieben wurden, *bevor* `restoreState()`
+  die gespeicherten Werte lesen konnte. Der Konstruktor schaltet die
+  Ansicht jetzt über `applyForm()` um, ohne dabei zu speichern.
+- **Ein fremdes Hauptfenster wurde beim Beenden als verwaistes
+  Werkzeugfenster eingesammelt** und synchron gelöscht — dessen
+  `~QThread()` riss den noch laufenden SpectrumThread mit, was Qt mit
+  `qFatal` beantwortet (Prozessabbruch). Betrifft nur Abläufe mit
+  mehreren Hauptfenstern im selben Prozess.
+- **Acht numerische AGC-Setter** nehmen jetzt nur noch Werte aus den
+  von Thetis vorgegebenen Bereichen an; `DspMode` und `AgcMode` sind
+  gegen beschädigte gespeicherte Werte abgesichert.
+- **TCI `agc_gain`** ist Thetis' AGC-T (WDSP AGC top), nicht der
+  AGC-Schwellpunkt — die Zuordnung war vertauscht.
+- Sechs weitere Befunde aus dem Durchgang derselben Nacht
+  (Bandbreitenfilter, Zoom-Gleichlauf, AGC-Schwelle).
+
 ## [0.6.2] - 2026-09-03
 
 Windows-only test build (draft release, not published) — same code as
