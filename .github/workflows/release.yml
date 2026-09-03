@@ -915,6 +915,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # nullglob so a platform-less partial release (e.g. a
+          # mac-only or windows-only tag, temporarily scoped via the
+          # build-* `if:` guards above) doesn't pass gh an unmatched
+          # literal glob string for an artifact type that simply
+          # wasn't built this run.
+          shopt -s nullglob
           VERSION="${{ needs.prepare.outputs.version }}"
           TAG="${{ needs.prepare.outputs.tag }}"
           PRERELEASE_FLAG=""
