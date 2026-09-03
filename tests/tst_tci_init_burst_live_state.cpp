@@ -192,10 +192,14 @@ void TestTciInitBurstLiveState::agc_drives_agc_mode_and_gain_lines()
              "agc_mode:0 should carry seeded fast mode");
     QVERIFY2(burst.contains(QStringLiteral("agc_mode:1,long;")),
              "agc_mode:1 should carry seeded long mode");
+    // "AGC gain", not "threshold": TCI agc_gain is Thetis's AGC-T / WDSP
+    // AGC top (-20..120), see RadioModel::setAgcGain -- the wording here
+    // predates the 2026-09-03 fix that stopped routing it to the -160..2
+    // dB threshold point.
     QVERIFY2(burst.contains(QStringLiteral("agc_gain:0,65;")),
-             "agc_gain:0 should carry seeded threshold");
+             "agc_gain:0 should carry seeded AGC gain");
     QVERIFY2(burst.contains(QStringLiteral("agc_gain:1,80;")),
-             "agc_gain:1 should carry seeded threshold");
+             "agc_gain:1 should carry seeded AGC gain");
 }
 
 void TestTciInitBurstLiveState::global_toggles_drive_their_lines()

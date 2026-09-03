@@ -2020,7 +2020,10 @@ public slots:
     Q_INVOKABLE void    setAgcMode(int rx, const QString& mode);
     Q_INVOKABLE QString agcMode(int rx) const;
 
-    // AGC gain (threshold) — routes to SliceModel::agcThreshold (-20..120).
+    // AGC gain — routes to SliceModel::rfGain (-20..120), i.e. Thetis's
+    // AGC-T / WDSP AGC top (SetAgcT -> RF -> ptbRF -> AGCMaxGain ->
+    // SetRXAAGCTop, console.cs:51746 / radio.cs:1022 [v2.10.3.15]). NOT
+    // agcThreshold, which is the -160..2 dB SetRXAAGCThresh point.
     Q_INVOKABLE void setAgcGain(int rx, int gain);
     Q_INVOKABLE int  agcGain(int rx) const;
 

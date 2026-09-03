@@ -203,13 +203,36 @@ private slots:
                  QStringLiteral("normal"));
     }
 
-    void agc_gain_routes_to_threshold() {
+    void agc_gain_routes_to_agc_top() {
+        // TCI agc_gain is Thetis's AGC-T (ptbRF, -20..120): SetAgcT -> RF
+        // -> ptbRF_Scroll -> SetupForm.AGCMaxGain -> RXAGCMaxGain ->
+        // WDSP.SetRXAAGCTop (console.cs:51746, :13087; setup.cs:9042;
+        // radio.cs:1022 [v2.10.3.15]). In Longpath that quantity is
+        // SliceModel::rfGain (-> RxChannel::setAgcTop) -- NOT agcThreshold,
+        // the -160..2 dB point handed to SetRXAAGCThresh. The shim wrote
+        // the threshold until 2026-09-03; harmless-looking while that
+        // setter had no clamp, exposed the moment b5a80d4f gave it the
+        // Thetis-sourced [-160, 2] one (42 came back as 2).
         RadioModel m;
         SliceModel* slice = setupOneSlice(m);
         QVERIFY(slice);
         QMetaObject::invokeMethod(&m, "setAgcGain",
                                   Q_ARG(int, 0), Q_ARG(int, 42));
-        QCOMPARE(slice->agcThreshold(), 42);
+        QCOMPARE(slice->rfGain(), 42);
+        int back = -1;
+        QMetaObject::invokeMethod(&m, "agcGain",
+                                  Q_RETURN_ARG(int, back), Q_ARG(int, 0));
+        QCOMPARE(back, 42);
+
+        // The whole Thetis range must survive the model (ptbRF -20..120,
+        // console.designer.cs:3708-3709 [v2.10.3.15]) -- the old 0..100
+        // clamp on rfGain would have folded both ends.
+        QMetaObject::invokeMethod(&m, "setAgcGain",
+                                  Q_ARG(int, 0), Q_ARG(int, -20));
+        QCOMPARE(slice->rfGain(), -20);
+        QMetaObject::invokeMethod(&m, "setAgcGain",
+                                  Q_ARG(int, 0), Q_ARG(int, 120));
+        QCOMPARE(slice->rfGain(), 120);
     }
 
     void squelch_enable_and_level_route_to_slice() {

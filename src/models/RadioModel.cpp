@@ -13214,14 +13214,29 @@ QString RadioModel::agcMode(int rx) const
     return QStringLiteral("MED");
 }
 
-// ── AGC gain (threshold) ────────────────────────────────────────────────────
+// ── AGC gain (TCI agc_gain = Thetis AGC-T = WDSP AGC top) ──────────────────
+//
+// From Thetis TCIServer.cs handleAgcGain -> console.SetAgcT(rx, gain)
+// (console.cs:51746) -> RF property (console.cs:13087, ptbRF.Value)
+// -> ptbRF_Scroll -> SetupForm.AGCMaxGain -> udDSPAGCMaxGaindB_ValueChanged
+// (setup.cs:9042) -> RadioDSPRX.RXAGCMaxGain -> WDSP.SetRXAAGCTop
+// (radio.cs:1022) [v2.10.3.15]. So the TCI value is the AGC MAX GAIN
+// ("AGC-T", ptbRF -20..120), which Longpath carries as SliceModel::rfGain
+// (-> RxChannel::setAgcTop). It is NOT the -160..2 dB threshold point that
+// SetRXAAGCThresh takes (SliceModel::agcThreshold).
+//
+// Until 2026-09-03 this shim wrote agcThreshold -- harmless-looking while
+// that setter had no clamp, but a TCI client sending Thetis's default
+// agc_gain=90 was setting a +90 dB AGC threshold. Exposed by the
+// Thetis-sourced [-160, 2] clamp in b5a80d4f (tst_tci_radio_model_shims:
+// 42 came back as 2).
 void RadioModel::setAgcGain(int rx, int gain)
 {
-    if (auto* s = sliceById(rx)) { s->setAgcThreshold(gain); }
+    if (auto* s = sliceById(rx)) { s->setRfGain(gain); }
 }
 int RadioModel::agcGain(int rx) const
 {
-    if (const auto* s = sliceById(rx)) { return s->agcThreshold(); }
+    if (const auto* s = sliceById(rx)) { return s->rfGain(); }
     return 0;
 }
 

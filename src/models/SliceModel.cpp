@@ -898,7 +898,14 @@ void SliceModel::setAfGain(int gain)
 
 void SliceModel::setRfGain(int gain)
 {
-    gain = std::clamp(gain, 0, 100);
+    // This is the WDSP AGC top / max gain (RadioModel feeds it to
+    // RxChannel::setAgcTop -> SetRXAAGCTop). From Thetis
+    // console.designer.cs:3708-3709 [v2.10.3.15]: ptbRF.Minimum = -20,
+    // ptbRF.Maximum = 120 -- the same bounds TCIServer.cs handleAgcGain
+    // clamps to and RxChannel::readBackAgcTop already applies. The earlier
+    // 0..100 here was a NereusSDR-original guess that silently narrowed
+    // both the TCI agc_gain path and the AGC-threshold readback mirror.
+    gain = std::clamp(gain, -20, 120);
     if (m_rfGain != gain) {
         m_rfGain = gain;
         emit rfGainChanged(gain);
