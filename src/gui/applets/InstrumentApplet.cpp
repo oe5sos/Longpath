@@ -39,7 +39,14 @@ InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
     m_stack->addWidget(m_bar);
     lay->addWidget(m_stack);
 
-    setForm(Form::Needle);
+    // applyForm, NICHT setForm: setForm() ruft saveState(), und das
+    // schriebe hier -- noch vor dem restoreState() des Aufrufers -- die
+    // Vorgaben (Zeiger, kein Segment, keine Roehre) in die Ablage und
+    // ueberschriebe damit genau die Werte, die restoreState() gleich
+    // lesen soll. So hat die Roehre seit ihrer Einfuehrung (2026-08-23)
+    // keinen Neustart ueberlebt; gefunden 2026-09-03 ueber
+    // tst_settings_are_remembered.
+    applyForm(Form::Needle);
 
     // Ruhelage ohne Radio (Betreiber-Entscheidung 2026-08-18). Das
     // Instrument selbst kennt kein Radio — es kennt Messwerte. Die
@@ -80,12 +87,17 @@ const PeakHold& InstrumentApplet::peakHold(Form f) const
     return f == Form::Needle ? m_needle->peakHold() : m_bar->peakHold();
 }
 
-void InstrumentApplet::setForm(Form f)
+void InstrumentApplet::applyForm(Form f)
 {
     m_form = f;
     m_stack->setCurrentWidget(f == Form::Needle
                                   ? static_cast<QWidget*>(m_needle)
                                   : static_cast<QWidget*>(m_bar));
+}
+
+void InstrumentApplet::setForm(Form f)
+{
+    applyForm(f);
     saveState();
 }
 

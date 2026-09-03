@@ -83,8 +83,15 @@ private slots:
         auto* vis = mwp->findChild<AppletVisibilityController*>();
         QVERIFY(vis);
 
+        // WinChannelStrip, nicht mehr WinAntenna: das Antennenfenster
+        // oeffnet seit 2026-09-03 (851c9e08, Betreiber 2026-09-01: "ALLE
+        // fliegenden Fenster gehoeren hinter die ConnectMaske") nur noch
+        // MIT verbundenem Funkgeraet -- ohne eines ist der Haken dort
+        // absichtlich wirkungslos, und dieses Fenster hier hat keines.
+        // Der Vertrag "ein Haken MUSS ein Fenster oeffnen" gilt weiter;
+        // geprueft wird er an einem Eintrag ohne diese Vorbedingung.
         const int before = QApplication::topLevelWidgets().size();
-        vis->setVisible(QStringLiteral("WinAntenna"), true);
+        vis->setVisible(QStringLiteral("WinChannelStrip"), true);
         QTest::qWait(500);
         const int after = QApplication::topLevelWidgets().size();
 

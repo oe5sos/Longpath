@@ -14,6 +14,7 @@
 // =================================================================
 #include <QtTest>
 #include <QScreen>
+#include "gui/ConnectionPanel.h"
 #include "gui/MainWindow.h"
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterStack.h"
@@ -97,6 +98,28 @@ private slots:
         mwp->show();
         QVERIFY(QTest::qWaitForWindowExposed(mwp));
         QTest::qWait(400);
+
+        // ── Erst die Connect-Maske abwarten und schliessen ──────────
+        //
+        // Der Kaltstart oeffnet die "Connect to Radio"-Maske per
+        // singleShot(0) (92d4e9a1), und die versteckt ohne Verbindung
+        // JEDES schwebende Fenster (hideFloatingWindowsBehindConnectMask,
+        // Betreiber 2026-09-01). Seriell kommt der Timer innerhalb der
+        // 400 ms oben zuverlaessig dran; unter 10-facher Testlast auch
+        // mal erst waehrend des qWait(500) NACH dem Abloesen -- dann
+        // liegt die Maske ueber dem frischen Schwebefenster, und das
+        // Schloss darin ist nicht "zu sehen". Belegt 2026-09-03 am
+        // Protokoll des Fehllaufs: die Zeile "SpectrumWidget: QRhi
+        // backend: Metal" fuer das Schwebefenster fehlt ganz, und
+        // "ConnectionPanel ctor total elapsed" steht direkt vor dem
+        // FAIL. Also: auf die Maske warten (ihr Konstruktor allein
+        // braucht gut 2 s, NIC-Suche), schliessen wie der Bediener,
+        // und erst dann abloesen.
+        QTRY_VERIFY_WITH_TIMEOUT(mwp->findChild<ConnectionPanel*>() != nullptr,
+                                 15000);
+        mwp->findChild<ConnectionPanel*>()->close();
+        QTRY_VERIFY_WITH_TIMEOUT(mwp->findChild<ConnectionPanel*>() == nullptr,
+                                 5000);
 
         auto* stack = mwp->findChild<PanadapterStack*>();
         auto* pan   = mwp->findChild<PanadapterApplet*>();

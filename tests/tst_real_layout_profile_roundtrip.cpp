@@ -100,6 +100,7 @@
 #include "core/AppSettings.h"
 #include "gui/LayoutProfiles.h"
 #include "gui/MainWindow.h"
+#include "gui/WindowPlacement.h"
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletWidget.h"
@@ -143,7 +144,16 @@ QRect distinctiveRectFor(const QString& id)
     const int y = 40  + int((h / 80) % 80);
     const int w = 320 + int((h / 6400) % 100);
     const int ht = 190 + int((h / 640000) % 90);
-    return QRect(x, y, w, ht);
+    // Seit 2026-09-03 (851c9e08) schnappen schwebende Fenster nach dem
+    // Loslassen aufs 8-Punkt-Raster (snapToGridAfterSettle, 180 ms) --
+    // und zwar VOR geometrySettled() (400 ms), also steht im Profil immer
+    // die geschnappte Lage (74 -> 72, 87 -> 88, 52 -> 56: genau die
+    // Abweichungen, an denen dieser Test seither scheiterte). Eine Ecke,
+    // die schon auf dem Raster liegt, laesst den Schnapper leer laufen;
+    // so prueft der Test weiter den Speicherweg und nicht das Raster.
+    // Dieselbe Funktion wie im Betrieb, damit ein geaendertes Raster den
+    // Test mitnimmt statt ihn stumm zu brechen.
+    return QRect(snappedTopLeft(QPoint(x, y)), QSize(w, ht));
 }
 
 /// "Neustart": ein FRISCHES LayoutProfiles, das nur ueber AppSettings

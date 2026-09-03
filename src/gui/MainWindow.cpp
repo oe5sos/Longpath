@@ -1039,7 +1039,21 @@ MainWindow::MainWindow(QWidget* parent)
     });
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
+    // SpectrumThread an, lange bevor es hierher kommt. Wird ein
+    // MainWindow aber OHNE closeEvent() zerstoert (Ausnahmepfad, Test-
+    // Harness), loescht ~QObject gleich darauf m_fftThread als Kind --
+    // und Qt bricht mit qFatal ab, wenn der Faden da noch laeuft. Der
+    // Destruktor-Rumpf laeuft VOR dem Abbau der Kinder; hier ist der
+    // letzte Ort, an dem sich das noch abfangen laesst. Im Normalfall
+    // ist isRunning() hier bereits false und die Zeile kostet nichts.
+    if (m_fftThread && m_fftThread->isRunning()) {
+        m_fftThread->quit();
+        m_fftThread->wait();
+    }
+}
 
 // Phase 3F Sub-Epic D Task 12: resolve the active pan's SpectrumWidget.
 // Used as a backward-compat shim for call sites that still address "the"
@@ -15225,6 +15239,18 @@ void MainWindow::closeEvent(QCloseEvent* event)
         if (!w->isWindow()) { continue; }
         if (qobject_cast<QDialog*>(w)) { continue; }   // oben erledigt
         if (w->windowType() == Qt::Popup) { continue; }
+        // ── Ein ANDERES Hauptfenster ist kein verwaistes Werkzeugfenster ──
+        //
+        // Im Betrieb gibt es genau eines (main.cpp); im Test-Harness aber
+        // mehrere nacheinander im selben Prozess. Wer hier ein fremdes
+        // MainWindow einsammelt, dessen closeEvent() nie lief, loescht es
+        // im sendPostedEvents() gleich darunter SYNCHRON -- und dessen
+        // ~QObject reisst m_fftThread noch laufend in ~QThread(): QFATAL
+        // "Destroyed while thread 'SpectrumThread' is still running",
+        // SIGABRT. Per lldb belegt am 2026-09-03 in
+        // tst_settings_are_remembered (Stapel: closeEvent() -> sendPosted
+        // Events -> ~MainWindow() eines ANDEREN Objekts -> ~QThread).
+        if (qobject_cast<MainWindow*>(w)) { continue; }
         w->hide();
         w->deleteLater();
     }

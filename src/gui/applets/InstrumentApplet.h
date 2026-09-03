@@ -140,6 +140,12 @@ private:
     /// Auf beide Ansichten anwenden. Eine Einstellung, die nur die
     /// sichtbare Form erreicht, springt beim Umschalten zurück.
     void forEachInstrument(const std::function<void(PeakHold&)>& fn);
+    /// Nur die Seite umschalten, NICHTS merken. setForm() = applyForm()
+    /// + saveState(); der Konstruktor darf nur ersteres -- sonst
+    /// ueberschreibt er mit den Vorgaben, was restoreState() gleich
+    /// darauf lesen will (2026-09-03, Roehre/Segmente ueberlebten den
+    /// Neustart nie).
+    void applyForm(Form f);
     QString m_id;
     QString m_title;
     Form    m_form{Form::Needle};
