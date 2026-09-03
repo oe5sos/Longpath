@@ -782,6 +782,7 @@ set(GUI_SOURCES
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
+    src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp
     src/gui/PanadapterApplet.cpp
     src/gui/PanadapterStack.cpp

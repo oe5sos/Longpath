@@ -187,3 +187,23 @@ presets sound exactly as they did.
 | `src/gui/FramelessMoveHelper.h` | `src/gui/FramelessMoveHelper.h` | `31b29583` | 2026-08-20 | Nur Namensraum geaendert. Fenster an der Titelleiste ziehen; auf macOS bewusst OHNE startSystemMove (manuell mit grabMouse). |
 | `src/gui/FramelessResizer.{h,cpp}` | `src/gui/FramelessResizer.{h,cpp}` | `31b29583` | 2026-08-20 | Nur Namensraum geaendert. Groessenaenderung an allen Kanten und Ecken eines rahmenlosen Fensters, Filter auf dem QWindow statt im Widgetbaum. |
 | `src/gui/FloatingContainerWindow.{h,cpp}` | `src/gui/WindowChrome.{h,cpp}` | `31b29583` | 2026-08-20 | Strukturell nachgebaut, nicht uebersetzt: eigene Titelleiste als Ziehgriff plus sichtbarer Anfasser unten rechts. Longpath-eigene Zutaten: der gelbe Zeus-Streifen links, der Andock-Knopf, und WA_NativeWindow auf dem Anfasser (macOS-Notwendigkeit wegen des nativen QRhi-Panadapters). |
+
+## 3D stacked-trace spectrum surface ("3DSS")
+
+AetherSDR v26.7.1 added a perspective stacked-trace display mode
+("3DSS") as a toggle on its existing `SpectrumWidget`, not a separate
+widget: a rolling history of FFT rows drawn back-to-front as a
+receding trapezoid, height anchored to the noise floor. AetherSDR
+ships both a GPU height-map mesh path (dedicated shaders, a static
+~1.47M-vertex buffer, ring-buffered height texture) and a CPU QImage
+fallback for when the mesh cannot be created. Longpath's first port
+takes only the CPU path — see `src/gui/DssRenderer.h` for the full
+rationale (no new shader/pipeline needed; the CPU surface composites
+through the existing overlay textured-quad pipeline) and what was
+deliberately left out (GPU mesh, native-tile "supplemental" overhang
+channels — Longpath has no native-tile waterfall source — reprojection
+on pan/zoom, deep scrollback history).
+
+| NereusSDR file | AetherSDR source | Rev | Ported | Notes |
+|---|---|---|---|---|
+| `src/gui/DssRenderer.h`, `.cpp` | `src/gui/DssRenderer.{h,cpp}` | `31b29583` | 2026-09-03 | Reduced-scope CPU-only port: ring buffer + `pushRow` (resample, median-of-3, temporal blend) + `image()`/`rebuild()` (perspective trapezoid painter's-algorithm surface) carried over close to verbatim, including the shared geometry constants. GPU mesh accessors, `pushRowWithSupplemental`, `reprojectFrequencyFrame`, deep history scrollback, and `dssDepthVisibleSegments` omitted — see the file header. `SpectrumWidget` integration (`SpectrumRenderMode`, the "Spectrum: 2D / 3D" combo in `SpectrumOverlayPanel`'s Display flyout, the GPU-texture upload of the rendered QImage through the existing overlay pipeline) is Longpath-original, not a port: AetherSDR wires its GPU mesh path through `dss_mesh.vert`/`.frag` (not ported) and a "3D VIEW" menu section with Floor/Gain/Span sliders (not yet ported — Longpath's v1 uses AetherSDR's own defaults, floor offset −6 dB and zCurve 0.70, in place of dedicated controls). |

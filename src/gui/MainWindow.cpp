@@ -5417,6 +5417,11 @@ void MainWindow::buildUI()
             activeSpectrumWidget()->setWfColorScheme(
                 static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
         });
+        connect(m_overlayPanel, &SpectrumOverlayPanel::spectrumRenderModeChanged,
+                activeSpectrumWidget(), [this](int idx) {
+            activeSpectrumWidget()->setSpectrumRenderMode(
+                idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
+        });
 
         // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
         //

@@ -4884,6 +4884,11 @@ nereus_add_test(tst_globe_geometry)
 #    styledImage() cache instead of sticking to the previous result --
 nereus_add_test(tst_world_texture_style)
 
+# -- DssRenderer (3D stacked-trace spectrum surface, ported from AetherSDR's
+#    "3DSS"): ring buffer growth/cap/clear, and that image() geometry
+#    actually follows strength = (dbm - floorDbm) / rangeDb --
+nereus_add_test(tst_dss_renderer)
+
 # -- DXCC prefix to flag: known entities, and no guess for the rest --
 nereus_add_test(tst_dxcc_flag)
 

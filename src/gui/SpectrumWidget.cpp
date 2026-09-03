@@ -926,6 +926,9 @@ void SpectrumWidget::loadSettings()
     m_wfColorScheme = static_cast<WfColorScheme>(qBound(0, scheme,
                           static_cast<int>(WfColorScheme::Count) - 1));
 
+    int renderMode = readInt(QStringLiteral("DisplaySpectrumRenderMode"), 0);
+    m_renderMode = static_cast<SpectrumRenderMode>(qBound(0, renderMode, 1));
+
     // Phase 3G-8 commit 3: spectrum renderer state.
     // DisplayAverageMode + DisplayAverageAlpha are retired keys (v0.3.0
     // migration removes the mode key; the alpha key is retired by the
@@ -1316,6 +1319,7 @@ void SpectrumWidget::saveSettings()
     s.setValue(settingsKey(QStringLiteral("DisplayPanFill"), m_panIndex),
               m_panFill ? QStringLiteral("True") : QStringLiteral("False"));
     writeInt(QStringLiteral("DisplayWfColorScheme"), static_cast<int>(m_wfColorScheme));
+    writeInt(QStringLiteral("DisplaySpectrumRenderMode"), static_cast<int>(m_renderMode));
     s.setValue(settingsKey(QStringLiteral("DisplayCtunEnabled"), m_panIndex),
               m_ctunEnabled ? QStringLiteral("True") : QStringLiteral("False"));
 
@@ -1634,6 +1638,22 @@ void SpectrumWidget::setDbmRange(float minDbm, float maxDbm)
         setWfLowThreshold(minDbm);
         setWfHighThreshold(maxDbm);
     }
+}
+
+void SpectrumWidget::setSpectrumRenderMode(SpectrumRenderMode mode)
+{
+    if (m_renderMode == mode) { return; }
+    m_renderMode = mode;
+    scheduleSettingsSave();
+
+    // Start the 3D surface's ring buffer empty rather than carrying rows
+    // pushed while it was off (and possibly against a since-changed
+    // frequency frame -- this port has no reprojection-on-pan yet, see
+    // DssRenderer.h). Also frees the CPU work of building a QImage nobody
+    // sees while the mode is off.
+    m_dss.clear();
+    m_dss3dNeedsUpload = true;
+    update();
 }
 
 void SpectrumWidget::setWfColorScheme(WfColorScheme scheme)
@@ -3400,6 +3420,15 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // m_showNoiseFloor) so the lerp/fft state stays current even when the
     // overlay is toggled off — saves a cold-start visual jump on toggle on.
     processNoiseFloor();
+
+    // 3D stacked-trace view -- feed the perspective ring buffer only while
+    // that mode is active, so the 2D-only majority of sessions pays
+    // nothing for it. Same finalized frame the flat FFT trace renders
+    // (dented, avenged, at display-pixel resolution).
+    if (m_renderMode == SpectrumRenderMode::Mode3D) {
+        m_dss.pushRow(m_renderedPixels);
+        m_dss3dNeedsUpload = true;
+    }
 
     // 2026-05-25 perf fix: this block USED to force the ENTIRE GPU
     // overlay texture (freq scale, dBm strip, bandplan, time scale,
@@ -9979,6 +10008,22 @@ void SpectrumWidget::initOverlayPipeline()
     });
     if (!rhiCreate(m_ovSrb, "overlay shader bindings", &m_gpuInitFailure)) { return; }
 
+    // ---- 3D stacked-trace texture + SRB ----
+    // Reuses this same overlay pipeline/VBO/sampler -- see DssRenderer.h.
+    // Sized lazily to specRect in renderGpuFrame() once that rect is known
+    // (it is a sub-region of the widget, not the full window like the
+    // overlay textures above), so create it 1x1 here and let the first
+    // 3D-mode frame resize it.
+    m_dss3dGpuTex = r->newTexture(QRhiTexture::RGBA8, QSize(1, 1));
+    if (!rhiCreate(m_dss3dGpuTex, "3D spectrum texture", &m_gpuInitFailure)) { return; }
+    m_dss3dGpuTexSize = QSize(1, 1);
+
+    m_dss3dSrb = r->newShaderResourceBindings();
+    m_dss3dSrb->setBindings({
+        QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, m_dss3dGpuTex, m_ovSampler),
+    });
+    if (!rhiCreate(m_dss3dSrb, "3D spectrum shader bindings", &m_gpuInitFailure)) { return; }
+
     QShader vs = loadShader(QStringLiteral(":/shaders/resources/shaders/overlay.vert.qsb"));
     QShader fs = loadShader(QStringLiteral(":/shaders/resources/shaders/overlay.frag.qsb"));
     if (!vs.isValid() || !fs.isValid()) {
@@ -11228,6 +11273,56 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
     }
 
+    // ---- 3D stacked-trace: build + upload the DSS surface ----
+    // Must happen before beginPass -- QRhi texture uploads go through a
+    // resource update batch outside the render pass, same as the overlay
+    // textures' uploads above.
+    if (m_renderMode == SpectrumRenderMode::Mode3D && m_dss3dGpuTex && m_dss3dSrb) {
+        const QSize dssPx(qMax(1, static_cast<int>(specRect.width() * dpr)),
+                          qMax(1, static_cast<int>(specRect.height() * dpr)));
+        if (dssPx != m_dss3dGpuTexSize) {
+            m_dss3dGpuTex->setPixelSize(dssPx);
+            m_dss3dGpuTex->create();
+            m_dss3dGpuTexSize = dssPx;
+            m_dss3dSrb->setBindings({
+                QRhiShaderResourceBinding::sampledTexture(1,
+                    QRhiShaderResourceBinding::FragmentStage, m_dss3dGpuTex, m_ovSampler),
+            });
+            m_dss3dSrb->create();
+            m_dss3dNeedsUpload = true;
+        }
+        if (m_dss3dNeedsUpload && m_dss.hasData()) {
+            // Noise-floor-anchored, like the classic waterfall's own
+            // AGC/threshold logic -- m_nfLerpAverage is the smoothed,
+            // visible estimate (see processNoiseFloor). -199 is just above
+            // the "not yet measured" sentinel default (-200).
+            const float floorBase = (m_nfLerpAverage > -199.0f)
+                ? m_nfLerpAverage : (m_refLevel - m_dynamicRange);
+            // -6 dB matches AetherSDR's default "3D Floor" offset
+            // (m_dssFloorOffsetDb) -- no dedicated slider yet, see
+            // DssRenderer.h for what this first port left out.
+            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f - 6.0f;
+            const float rangeDb = m_dynamicRange;
+            const quint64 paletteToken =
+                (static_cast<quint64>(m_wfColorScheme) << 32)
+                ^ static_cast<quint64>(m_wfLowColor.rgba());
+            // Reuses the classic waterfall's own palette (not a second,
+            // separately-maintained one) so the 3D surface always matches
+            // whichever waterfall colour scheme is active.
+            auto palette = [this, floorDbm, rangeDb](float dbm) -> QRgb {
+                const float f = rangeDb > 0.0f
+                    ? qBound(0.0f, (dbm - floorDbm) / rangeDb, 1.0f) : 0.0f;
+                return waterfallColorForIntensityF(f, m_wfColorScheme, m_wfLowColor);
+            };
+            // 0.70 -- AetherSDR's fixed default zCurve (m_dssZCurve).
+            const QImage& dssImg = m_dss.image(dssPx, 0, floorDbm, rangeDb, 0.70f,
+                                               palette, paletteToken, m_bgFillColor);
+            batch->uploadTexture(m_dss3dGpuTex, QRhiTextureUploadEntry(0, 0,
+                QRhiTextureSubresourceUploadDescription(dssImg)));
+            m_dss3dNeedsUpload = false;
+        }
+    }
+
     cb->resourceUpdate(batch);
 
     // ---- Begin render pass ----
@@ -11285,8 +11380,24 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         cb->draw(4);
     }
 
-    // Draw FFT spectrum
-    if (m_fftFillPipeline && m_fftLinePipeline && m_visibleBinCount > 0) {
+    // Draw FFT spectrum -- or, in Mode3D, the perspective stacked-trace
+    // surface instead (built + uploaded above). Either way the waterfall
+    // and both overlay layers draw exactly as usual; only this block
+    // changes. See DssRenderer.h.
+    if (m_renderMode == SpectrumRenderMode::Mode3D) {
+        if (m_dss3dSrb && m_dss.hasData()) {
+            float specVpX = static_cast<float>(specRect.x()) * dpr;
+            float specVpY = static_cast<float>(h - specRect.bottom() - 1) * dpr;
+            float specVpW = static_cast<float>(specRect.width()) * dpr;
+            float specVpH = static_cast<float>(specRect.height()) * dpr;
+            cb->setGraphicsPipeline(m_ovPipeline);
+            cb->setViewport({specVpX, specVpY, specVpW, specVpH});
+            const QRhiCommandBuffer::VertexInput dssVbuf(m_ovVbo, 0);
+            cb->setVertexInput(0, 1, &dssVbuf);
+            cb->setShaderResources(m_dss3dSrb);
+            cb->draw(4);
+        }
+    } else if (m_fftFillPipeline && m_fftLinePipeline && m_visibleBinCount > 0) {
         float specVpX = static_cast<float>(specRect.x()) * dpr;
         float specVpY = static_cast<float>(h - specRect.bottom() - 1) * dpr;
         float specVpW = static_cast<float>(specRect.width()) * dpr;
@@ -11373,6 +11484,10 @@ void SpectrumWidget::releaseResources()
     delete m_ovVbo;           m_ovVbo = nullptr;
     delete m_ovGpuTex;        m_ovGpuTex = nullptr;
     delete m_ovSampler;       m_ovSampler = nullptr;
+
+    delete m_dss3dSrb;        m_dss3dSrb = nullptr;
+    delete m_dss3dGpuTex;     m_dss3dGpuTex = nullptr;
+    m_dss3dGpuTexSize = QSize();
     // No overlay unlock pass here any more: the display buffers stopped
     // being page-locked on 2026-08-16 (rationale in initOverlayPipeline).
     // The lock/unlock bookkeeping this used to need — one registration

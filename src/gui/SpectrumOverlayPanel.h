@@ -100,6 +100,7 @@ signals:
     void wfColorGainChanged(int gain);
     void wfBlackLevelChanged(int level);
     void colorSchemeChanged(int scheme);
+    void spectrumRenderModeChanged(int mode);  // 0 = 2D, 1 = 3D — see SpectrumRenderMode
     void cursorFreqVisibleChanged(bool on);  // B8 Task 21
     void fillColorChanged(const QColor& color); // B8 Task 22
     void fillAlphaChanged(float alpha);  // 0.0..1.0  B8 fix-up
@@ -210,6 +211,7 @@ private:
     // ── Display flyout ───────────────────────────────────────────────────
     QWidget*     m_displayFlyout{nullptr};
     QComboBox*   m_colorSchemeCmb{nullptr};
+    QComboBox*   m_renderModeCmb{nullptr};
     QSlider*     m_wfGainSlider{nullptr};
     QLabel*      m_wfGainLabel{nullptr};
     QSlider*     m_wfBlackSlider{nullptr};

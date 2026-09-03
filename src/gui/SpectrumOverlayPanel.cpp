@@ -959,6 +959,27 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
         ++row;
     }
 
+    // Spectrum: 2D / 3D combo — perspective stacked-trace view, ported
+    // from AetherSDR's "3DSS" (see DssRenderer.h). Only the trace pipeline
+    // changes; waterfall and every other overlay stay as-is either way.
+    {
+        auto* lbl = new QLabel("Spectrum:");
+        lbl->setStyleSheet(labelStyle);
+        grid->addWidget(lbl, row, 0, 1, 2);
+
+        m_renderModeCmb = new QComboBox;
+        m_renderModeCmb->setObjectName(QStringLiteral("spectrumRenderModeCombo"));
+        m_renderModeCmb->setFixedHeight(18);
+        m_renderModeCmb->addItems({"2D Waterfall", "3D Stacked Trace"});
+        m_renderModeCmb->setToolTip(
+            "2D: FFT trace + waterfall.\n"
+            "3D: perspective stacked-trace spectrum stream.");
+        grid->addWidget(m_renderModeCmb, row, 2, 1, 2);
+        connect(m_renderModeCmb, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &SpectrumOverlayPanel::spectrumRenderModeChanged);
+        ++row;
+    }
+
     // WF Gain slider
     {
         auto* lbl = new QLabel("WF Gain:");

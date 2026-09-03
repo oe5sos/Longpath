@@ -164,6 +164,7 @@ mw0lge@grange-lane.co.uk
 #include <QTimer>
 #include <QPropertyAnimation>
 
+#include "gui/DssRenderer.h"
 #include "gui/StyleConstants.h"   // kAmberText — Vorgabe des Spot-Tons
 #include "gui/WaterfallHistoryBuffer.h"
 #include "spectrum/ActivePeakHoldTrace.h"
@@ -232,6 +233,15 @@ enum class WfColorScheme : int {
     // Anwender das Schema verschieben.
     Muted,
     Count
+};
+
+// Spectrum-trace display mode. Mode3D swaps the flat FFT trace pipeline for
+// a perspective stacked-trace surface (ported from AetherSDR's "3DSS" —
+// see DssRenderer.h); the waterfall and every other overlay keep rendering
+// exactly as in Mode2D. Stored as int in AppSettings, so append only.
+enum class SpectrumRenderMode : int {
+    Mode2D = 0,
+    Mode3D,
 };
 
 // Frequency label alignment for the bottom scale bar.
@@ -399,6 +409,10 @@ public:
     void setDbmRange(float minDbm, float maxDbm);
     float refLevel() const { return m_refLevel; }
     float dynamicRange() const { return m_dynamicRange; }
+
+    // ---- 3D stacked-trace view ----
+    void setSpectrumRenderMode(SpectrumRenderMode mode);
+    SpectrumRenderMode spectrumRenderMode() const { return m_renderMode; }
 
     // ---- Waterfall settings ----
     void setWfColorScheme(WfColorScheme scheme);
@@ -2219,6 +2233,13 @@ private:
     QVector<float> m_wfRenderedPixels;     // waterfall avenger output (dBm)
     int m_displayWidthOverrideForTest{0};  // 0 = off; see setDisplayWidthOverrideForTest()
 
+    // ---- 3D stacked-trace view (DssRenderer) ----
+    // Fed from m_renderedPixels (see updateSpectrumLinear) only while
+    // m_renderMode is Mode3D -- no cost to sessions that never enable it.
+    SpectrumRenderMode m_renderMode{SpectrumRenderMode::Mode2D};
+    DssRenderer m_dss;
+    bool m_dss3dNeedsUpload{false};  // set on pushRow, cleared after GPU upload
+
     // Equivalent Noise Bandwidth of the current FFT window, in bins.
     // Refreshed every frame via the windowEnb arg on fftReadyLinear so
     // the detector's invEnb scaling stays in lock-step with the bins it
@@ -3111,6 +3132,15 @@ private:
     // texture is undefined until it has (the 2026-08-11 magenta
     // waterfall). True initially so the very first upload is full.
     bool   m_ovDynNeedsFullUpload{true};
+
+    // ---- 3D stacked-trace GPU resources ----
+    // No new pipeline or shader: DssRenderer paints a QImage on the CPU,
+    // uploaded into this texture and drawn through the EXISTING overlay
+    // pipeline/VBO (m_ovPipeline/m_ovVbo) with the viewport clipped to
+    // specRect, in place of the FFT trace draws.
+    QRhiShaderResourceBindings* m_dss3dSrb{nullptr};
+    QRhiTexture*                m_dss3dGpuTex{nullptr};
+    QSize                       m_dss3dGpuTexSize;
 
     // 2026-05-25 perf fix: timestamp of the last per-frame "dynamic
     // overlay" force-dirty in updateSpectrumLinear.  Rate-limits the
