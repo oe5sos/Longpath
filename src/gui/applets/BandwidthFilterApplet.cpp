@@ -266,20 +266,30 @@ void BandwidthFilterApplet::buildUI()
             // Nachvollzug: LOW auf 50 gesetzt, WIDTH auf 5000 gesetzt,
             // "dann erscheint bei LOW automatisch 5150" -- die Regel je
             // Betriebsart steckte bislang in SliceModel::setFilterWidth()
-            // (widthToEdges()), das LSB/USB/CW immer am VORGABEWERT der
+            // (widthToEdges()), das LSB/USB immer am VORGABEWERT der
             // Betriebsart verankert (z.B. -150 Hz fuer LSB), unabhaengig
             // davon, was gerade von Hand in LOW/HIGH stand -- die Kante,
             // die der Bedienende zuletzt selbst gesetzt hatte, ging dabei
             // stillschweigend verloren. Hier stattdessen: GENAU DIE Kante
             // (m_lastEditedEdge) bleibt stehen, nur die andere folgt der
-            // neuen Breite. Symmetrische Betriebsarten (AM/SAM/FM/DSB) und
-            // alles Kuenftige behalten die bisherige, Mitten-erhaltende
-            // Regel -- dort ist "welche Kante zuletzt" keine sinnvolle
-            // Frage, beide Kanten gehoeren untrennbar zur Mitte.
+            // neuen Breite.
+            //
+            // NUR fuer LSB/USB/RADE_L/RADE_U -- widthToEdges() selbst
+            // behandelt CWL/CWU/DIGL/DIGU anders (Mitte bleibt stehen,
+            // beide Kanten wandern gemeinsam, SliceModel.cpp:633-640),
+            // weil dort der Mithoerton in der Mitte sitzt, keine Kante
+            // ein fester Ankerpunkt ist. Codereview 2026-09-03 (gefunden,
+            // nicht gemeldet): eine fruehere Fassung dieses switch zaehlte
+            // CWL/CWU/DIGL/DIGU faelschlich zu LSB/USB und verankerte dort
+            // eine Kante -- tst_bandwidth_filter_applet.cpp faengt genau
+            // das ab ("bei CW muss die Mitte auf dem Mithoerton
+            // stehenbleiben"). Symmetrische Betriebsarten (AM/SAM/FM/DSB)
+            // und alles Kuenftige behalten ebenfalls die bisherige,
+            // Mitten-erhaltende Regel -- dort ist "welche Kante zuletzt"
+            // keine sinnvolle Frage, beide Kanten gehoeren untrennbar zur
+            // Mitte.
             switch (s->dspMode()) {
             case DSPMode::LSB:
-            case DSPMode::DIGL:
-            case DSPMode::CWL:
             case DSPMode::RADE_L:
                 if (m_lastEditedEdge == LastEditedEdge::Low) {
                     s->setFilter(s->filterLow(), s->filterLow() + v);
@@ -288,8 +298,6 @@ void BandwidthFilterApplet::buildUI()
                 }
                 break;
             case DSPMode::USB:
-            case DSPMode::DIGU:
-            case DSPMode::CWU:
             case DSPMode::RADE_U:
                 if (m_lastEditedEdge == LastEditedEdge::High) {
                     s->setFilter(s->filterHigh() - v, s->filterHigh());
@@ -573,10 +581,14 @@ void BandwidthFilterApplet::refreshVarButtons()
 BandwidthFilterApplet::LastEditedEdge
 BandwidthFilterApplet::naturalAnchorEdge(DSPMode mode)
 {
+    // Muss mit dem switch im m_widthBox-Anschluss uebereinstimmen: nur
+    // LSB/RADE_L und USB/RADE_U fragen m_lastEditedEdge dort ueberhaupt
+    // ab (CWL/CWU/DIGL/DIGU/AM/FM/... nehmen den Mitten-erhaltenden
+    // Standardpfad und ignorieren diesen Wert) -- der Rueckgabewert fuer
+    // alles andere ist ohne Wirkung, bleibt hier aber auf High (die
+    // LSB-Seite) als harmlose Vorgabe.
     switch (mode) {
     case DSPMode::USB:
-    case DSPMode::DIGU:
-    case DSPMode::CWU:
     case DSPMode::RADE_U:
         return LastEditedEdge::Low;
     default:
