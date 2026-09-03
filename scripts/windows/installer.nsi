@@ -1,5 +1,5 @@
-; NereusSDR NSIS installer script
-; Builds: NereusSDR-vX.Y.Z-Windows-x64-setup.exe
+; Longpath NSIS installer script
+; Builds: Longpath-vX.Y.Z-Windows-x64-setup.exe
 ; Invoked by .github/workflows/release.yml build-windows job.
 
 !include "MUI2.nsh"
@@ -17,22 +17,22 @@
   !define NSDR_DEPLOYDIR "deploy"
 !endif
 !ifndef NSDR_OUTFILE
-  !define NSDR_OUTFILE "NereusSDR-setup.exe"
+  !define NSDR_OUTFILE "Longpath-setup.exe"
 !endif
 !ifndef NSDR_VERSION_NUMERIC
   !define NSDR_VERSION_NUMERIC "0.0.0"
 !endif
 
-Name "NereusSDR ${NSDR_VERSION}"
+Name "Longpath ${NSDR_VERSION}"
 OutFile "${NSDR_OUTFILE}"
 Unicode True
-InstallDir "$PROGRAMFILES64\NereusSDR"
-InstallDirRegKey HKLM "Software\NereusSDR" "InstallDir"
+InstallDir "$PROGRAMFILES64\Longpath"
+InstallDirRegKey HKLM "Software\Longpath" "InstallDir"
 RequestExecutionLevel admin
 
 VIProductVersion "${NSDR_VERSION_NUMERIC}.0"
-VIAddVersionKey "ProductName" "NereusSDR"
-VIAddVersionKey "FileDescription" "NereusSDR — cross-platform OpenHPSDR SDR console"
+VIAddVersionKey "ProductName" "Longpath"
+VIAddVersionKey "FileDescription" "Longpath — cross-platform OpenHPSDR SDR console"
 VIAddVersionKey "FileVersion" "${NSDR_VERSION}"
 VIAddVersionKey "ProductVersion" "${NSDR_VERSION}"
 VIAddVersionKey "LegalCopyright" "© 2026 J.J. Boyd (KG4VCF); GPLv3 port of Thetis + mi0bot/Thetis-HL2 within the OpenHPSDR / FlexRadio lineage."
@@ -51,7 +51,7 @@ VIAddVersionKey "CompanyName" "J.J. Boyd (KG4VCF)"
 
 !insertmacro MUI_LANGUAGE "English"
 
-Section "NereusSDR (required)" SecMain
+Section "Longpath (required)" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
   File /r "${NSDR_DEPLOYDIR}\*.*"
@@ -61,28 +61,28 @@ Section "NereusSDR (required)" SecMain
   File /r "${NSDR_DEPLOYDIR}\licenses\*.*"
   SetOutPath "$INSTDIR"
 
-  WriteRegStr HKLM "Software\NereusSDR" "InstallDir" "$INSTDIR"
-  WriteRegStr HKLM "Software\NereusSDR" "Version" "${NSDR_VERSION}"
+  WriteRegStr HKLM "Software\Longpath" "InstallDir" "$INSTDIR"
+  WriteRegStr HKLM "Software\Longpath" "Version" "${NSDR_VERSION}"
 
   ; Add/Remove Programs entry
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
-              "DisplayName" "NereusSDR ${NSDR_VERSION}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
+              "DisplayName" "Longpath ${NSDR_VERSION}"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
               "DisplayVersion" "${NSDR_VERSION}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
               "Publisher" "J.J. Boyd (KG4VCF) — GPLv3 port of Thetis / OpenHPSDR lineage"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
               "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
               "InstallLocation" "$INSTDIR"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
-              "DisplayIcon" "$INSTDIR\NereusSDR.exe"
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
+              "DisplayIcon" "$INSTDIR\Longpath.exe"
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
               "NoModify" 1
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR" \
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath" \
               "NoRepair" 1
 
-  ; Windows Firewall inbound UDP allow for NereusSDR.exe.
+  ; Windows Firewall inbound UDP allow for Longpath.exe.
   ;
   ; OpenHPSDR Protocol 2 radios (ANAN, Hermes, HL2, Saturn) stream
   ; DDC I/Q data from UDP source ports 1035-1041 to the client PC. Those
@@ -101,44 +101,44 @@ Section "NereusSDR (required)" SecMain
   ; netsh errors are non-fatal — log and continue so the installer still
   ; succeeds on systems where the firewall service is disabled or a
   ; policy blocks the change. The user can always allow manually.
-  DetailPrint "Adding Windows Firewall rule: NereusSDR (inbound UDP)"
-  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="NereusSDR (inbound UDP)"'
+  DetailPrint "Adding Windows Firewall rule: Longpath (inbound UDP)"
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="Longpath (inbound UDP)"'
   Pop $0
-  nsExec::ExecToLog 'netsh advfirewall firewall add rule name="NereusSDR (inbound UDP)" dir=in action=allow program="$INSTDIR\NereusSDR.exe" protocol=UDP profile=any description="Allow inbound UDP from OpenHPSDR radios (DDC IQ streams, control)"'
+  nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Longpath (inbound UDP)" dir=in action=allow program="$INSTDIR\Longpath.exe" protocol=UDP profile=any description="Allow inbound UDP from OpenHPSDR radios (DDC IQ streams, control)"'
   Pop $0
   ${If} $0 != 0
-    DetailPrint "netsh returned $0 — firewall rule may not be active. You can allow NereusSDR manually via Windows Security → Firewall & network protection."
+    DetailPrint "netsh returned $0 — firewall rule may not be active. You can allow Longpath manually via Windows Security → Firewall & network protection."
   ${EndIf}
 
   WriteUninstaller "$INSTDIR\uninstall.exe"
 SectionEnd
 
 Section "Start Menu shortcut" SecStartMenu
-  CreateDirectory "$SMPROGRAMS\NereusSDR"
-  CreateShortcut "$SMPROGRAMS\NereusSDR\NereusSDR.lnk" "$INSTDIR\NereusSDR.exe"
-  CreateShortcut "$SMPROGRAMS\NereusSDR\Uninstall NereusSDR.lnk" "$INSTDIR\uninstall.exe"
+  CreateDirectory "$SMPROGRAMS\Longpath"
+  CreateShortcut "$SMPROGRAMS\Longpath\Longpath.lnk" "$INSTDIR\Longpath.exe"
+  CreateShortcut "$SMPROGRAMS\Longpath\Uninstall Longpath.lnk" "$INSTDIR\uninstall.exe"
 SectionEnd
 
 Section "Desktop shortcut" SecDesktop
-  CreateShortcut "$DESKTOP\NereusSDR.lnk" "$INSTDIR\NereusSDR.exe"
+  CreateShortcut "$DESKTOP\Longpath.lnk" "$INSTDIR\Longpath.exe"
 SectionEnd
 
 ;--- Uninstaller ---
 Section "Uninstall"
-  Delete "$DESKTOP\NereusSDR.lnk"
-  Delete "$SMPROGRAMS\NereusSDR\NereusSDR.lnk"
-  Delete "$SMPROGRAMS\NereusSDR\Uninstall NereusSDR.lnk"
-  RMDir  "$SMPROGRAMS\NereusSDR"
+  Delete "$DESKTOP\Longpath.lnk"
+  Delete "$SMPROGRAMS\Longpath\Longpath.lnk"
+  Delete "$SMPROGRAMS\Longpath\Uninstall Longpath.lnk"
+  RMDir  "$SMPROGRAMS\Longpath"
 
   ; Remove the firewall rule we created at install time. Ignore the
   ; return code — if the rule is already gone (user removed it manually,
   ; or a previous uninstall already cleaned up), that's fine.
-  DetailPrint "Removing Windows Firewall rule: NereusSDR (inbound UDP)"
-  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="NereusSDR (inbound UDP)"'
+  DetailPrint "Removing Windows Firewall rule: Longpath (inbound UDP)"
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="Longpath (inbound UDP)"'
   Pop $0
 
   RMDir /r "$INSTDIR"
 
-  DeleteRegKey HKLM "Software\NereusSDR"
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NereusSDR"
+  DeleteRegKey HKLM "Software\Longpath"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Longpath"
 SectionEnd
