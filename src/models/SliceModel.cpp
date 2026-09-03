@@ -1191,41 +1191,80 @@ void SliceModel::setFmsqThresh(double dB)
 
 void SliceModel::setAgcThreshold(int dBu)
 {
-    if (m_agcThreshold != dBu) {
-        m_agcThreshold = dBu;
-        emit agcThresholdChanged(dBu);
+    // RxChannel::setAgcThreshold feeds this straight into WDSP's
+    // SetRXAAGCThresh, which computes max_gain via
+    // out_target / (var_gain * pow(10, (thresh+noise_offset)/20))
+    // (wcpAGC.c:504-515) -- an extreme thresh drives pow(10, x/20)
+    // toward overflow/underflow, producing an Inf/0/NaN max_gain that
+    // propagates through the whole AGC chain. Thetis has no bounded UI
+    // control for this value (it's normally auto-computed from noise
+    // floor + a small offset via setAGCThresholdPoint(), console.cs
+    // ~45969), so there's no Thetis-sourced "correct" range to cite --
+    // this is a wide, purely defensive sanity clamp against numeric
+    // degeneracy, not a musically-researched bound.
+    static constexpr int kAgcThresholdMin = -100;
+    static constexpr int kAgcThresholdMax = 100;
+    const int clamped = qBound(kAgcThresholdMin, dBu, kAgcThresholdMax);
+    if (m_agcThreshold != clamped) {
+        m_agcThreshold = clamped;
+        emit agcThresholdChanged(clamped);
     }
 }
 
 void SliceModel::setAgcHang(int ms)
 {
-    if (m_agcHang != ms) {
-        m_agcHang = ms;
-        emit agcHangChanged(ms);
+    // From Thetis setup.designer.cs udDSPAGCHangTime.Minimum/Maximum
+    // [v2.10.3.15]: 10..5000 ms.
+    static constexpr int kAgcHangMin = 10;
+    static constexpr int kAgcHangMax = 5000;
+    const int clamped = qBound(kAgcHangMin, ms, kAgcHangMax);
+    if (m_agcHang != clamped) {
+        m_agcHang = clamped;
+        emit agcHangChanged(clamped);
     }
 }
 
 void SliceModel::setAgcSlope(int dB)
 {
-    if (m_agcSlope != dB) {
-        m_agcSlope = dB;
-        emit agcSlopeChanged(dB);
+    // From Thetis setup.designer.cs udDSPAGCSlope.Minimum/Maximum
+    // [v2.10.3.15]: 0..20 dB.
+    static constexpr int kAgcSlopeMin = 0;
+    static constexpr int kAgcSlopeMax = 20;
+    const int clamped = qBound(kAgcSlopeMin, dB, kAgcSlopeMax);
+    if (m_agcSlope != clamped) {
+        m_agcSlope = clamped;
+        emit agcSlopeChanged(clamped);
     }
 }
 
 void SliceModel::setAgcAttack(int ms)
 {
-    if (m_agcAttack != ms) {
-        m_agcAttack = ms;
-        emit agcAttackChanged(ms);
+    // RxChannel::setAgcAttack's own port comment notes Thetis declares
+    // SetRXAAGCAttack (dsp.cs:116-117) but has "no explicit radio.cs
+    // call site (disabled in UI)" -- Thetis never exposes this as a
+    // bounded control in practice. WDSP's SetRXAAGCAttack (wcpAGC.c:418)
+    // does the same ms/1000.0 -> tau_attack conversion as the
+    // Thetis-bounded Decay setter below, so this mirrors Decay's cited
+    // 1..5000 ms range rather than inventing an unrelated number.
+    static constexpr int kAgcAttackMin = 1;
+    static constexpr int kAgcAttackMax = 5000;
+    const int clamped = qBound(kAgcAttackMin, ms, kAgcAttackMax);
+    if (m_agcAttack != clamped) {
+        m_agcAttack = clamped;
+        emit agcAttackChanged(clamped);
     }
 }
 
 void SliceModel::setAgcDecay(int ms)
 {
-    if (m_agcDecay != ms) {
-        m_agcDecay = ms;
-        emit agcDecayChanged(ms);
+    // From Thetis setup.designer.cs udDSPAGCDecay.Minimum/Maximum
+    // [v2.10.3.15]: 1..5000 ms.
+    static constexpr int kAgcDecayMin = 1;
+    static constexpr int kAgcDecayMax = 5000;
+    const int clamped = qBound(kAgcDecayMin, ms, kAgcDecayMax);
+    if (m_agcDecay != clamped) {
+        m_agcDecay = clamped;
+        emit agcDecayChanged(clamped);
     }
 }
 
@@ -1247,25 +1286,43 @@ void SliceModel::setAutoAgcOffset(double dB)
 
 void SliceModel::setAgcFixedGain(int dB)
 {
-    if (m_agcFixedGain != dB) {
-        m_agcFixedGain = dB;
-        emit agcFixedGainChanged(dB);
+    // From Thetis setup.designer.cs udDSPAGCFixedGaindB.Minimum/Maximum
+    // [v2.10.3.15]: -20..120 dB (Minimum decimal encodes the sign via
+    // its 4th int component, 0x80000000).
+    static constexpr int kAgcFixedGainMin = -20;
+    static constexpr int kAgcFixedGainMax = 120;
+    const int clamped = qBound(kAgcFixedGainMin, dB, kAgcFixedGainMax);
+    if (m_agcFixedGain != clamped) {
+        m_agcFixedGain = clamped;
+        emit agcFixedGainChanged(clamped);
     }
 }
 
 void SliceModel::setAgcHangThreshold(int val)
 {
-    if (m_agcHangThreshold != val) {
-        m_agcHangThreshold = val;
-        emit agcHangThresholdChanged(val);
+    // From Thetis setup.designer.cs tbDSPAGCHangThreshold.Maximum
+    // [v2.10.3.15]: 100 (TrackBar; Minimum left at the WinForms
+    // TrackBar default of 0 -- no explicit override in the designer
+    // file).
+    static constexpr int kAgcHangThresholdMin = 0;
+    static constexpr int kAgcHangThresholdMax = 100;
+    const int clamped = qBound(kAgcHangThresholdMin, val, kAgcHangThresholdMax);
+    if (m_agcHangThreshold != clamped) {
+        m_agcHangThreshold = clamped;
+        emit agcHangThresholdChanged(clamped);
     }
 }
 
 void SliceModel::setAgcMaxGain(int dB)
 {
-    if (m_agcMaxGain != dB) {
-        m_agcMaxGain = dB;
-        emit agcMaxGainChanged(dB);
+    // From Thetis setup.designer.cs udDSPAGCMaxGaindB.Minimum/Maximum
+    // [v2.10.3.15]: -20..120 dB (same encoding note as FixedGain above).
+    static constexpr int kAgcMaxGainMin = -20;
+    static constexpr int kAgcMaxGainMax = 120;
+    const int clamped = qBound(kAgcMaxGainMin, dB, kAgcMaxGainMax);
+    if (m_agcMaxGain != clamped) {
+        m_agcMaxGain = clamped;
+        emit agcMaxGainChanged(clamped);
     }
 }
 
