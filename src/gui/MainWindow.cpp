@@ -3997,15 +3997,29 @@ void MainWindow::buildUI()
     // Anschluss deckt also alle Wege ab. QSignalBlocker verhindert die
     // Rueckkopplung in den Connect-Handler oben (der seinerseits
     // setFrequencyRange() aufriefe).
-    connect(activeSpectrumWidget(), &SpectrumWidget::frequencyRangeChanged,
-            this, [zoomBar](double /*centerHz*/, double bandwidthHz) {
-        const int kHz = qBound(zoomBar->minimum(),
-                                qRound(bandwidthHz / 1000.0),
-                                zoomBar->maximum());
-        if (kHz != zoomBar->value()) {
-            const QSignalBlocker blocker(zoomBar);
-            zoomBar->setValue(kHz);
-        }
+    // Codereview 2026-09-03 (gefunden, nicht gemeldet): wirePane-artige
+    // Neuverdrahtung, siehe m_zoomBarSyncConn in MainWindow.h. Ein Lambda
+    // statt einer einzelnen connect()-Zeile, weil dieselbe Verdrahtung
+    // jetzt an zwei Stellen laufen muss: hier beim Bau und unten bei
+    // jedem PanadapterStack::activePanChanged.
+    auto wireZoomBarSync = [this, zoomBar](SpectrumWidget* sw) {
+        disconnect(m_zoomBarSyncConn);
+        if (!sw) { return; }
+        m_zoomBarSyncConn = connect(sw, &SpectrumWidget::frequencyRangeChanged,
+                this, [zoomBar](double /*centerHz*/, double bandwidthHz) {
+            const int kHz = qBound(zoomBar->minimum(),
+                                    qRound(bandwidthHz / 1000.0),
+                                    zoomBar->maximum());
+            if (kHz != zoomBar->value()) {
+                const QSignalBlocker blocker(zoomBar);
+                zoomBar->setValue(kHz);
+            }
+        });
+    };
+    wireZoomBarSync(activeSpectrumWidget());
+    connect(m_panStack, &PanadapterStack::activePanChanged, this,
+            [this, wireZoomBarSync](const QString& panId) {
+        if (m_panStack) { wireZoomBarSync(m_panStack->spectrum(panId)); }
     });
 
     m_mainSplitter->addWidget(spectrumPane);

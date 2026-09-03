@@ -1196,14 +1196,20 @@ void SliceModel::setAgcThreshold(int dBu)
     // out_target / (var_gain * pow(10, (thresh+noise_offset)/20))
     // (wcpAGC.c:504-515) -- an extreme thresh drives pow(10, x/20)
     // toward overflow/underflow, producing an Inf/0/NaN max_gain that
-    // propagates through the whole AGC chain. Thetis has no bounded UI
-    // control for this value (it's normally auto-computed from noise
-    // floor + a small offset via setAGCThresholdPoint(), console.cs
-    // ~45969), so there's no Thetis-sourced "correct" range to cite --
-    // this is a wide, purely defensive sanity clamp against numeric
-    // degeneracy, not a musically-researched bound.
-    static constexpr int kAgcThresholdMin = -100;
-    static constexpr int kAgcThresholdMax = 100;
+    // propagates through the whole AGC chain.
+    //
+    // From Thetis console.cs:45969-45970 [v2.10.3.13] -- clamp [-160, +2],
+    // already cited/ported at RadioModel.cpp's auto-AGC noise-floor calc
+    // and matching RxChannel::readBackAgcThresh's own -160 floor
+    // (console.cs:50345, "[2.10.3.6]MW0LGE changed from -143") and the
+    // RxApplet AGC-T slider range (-160..0, console.cs:45977). An
+    // earlier version of this clamp used an invented +-100 defensive
+    // bound that was narrower than this real range on the low end --
+    // caught live because it silently reclamped legitimate threshold
+    // values the auto-AGC path and RF-Gain sync routinely compute below
+    // -100, desyncing the model/UI from what WDSP was actually applying.
+    static constexpr int kAgcThresholdMin = -160;
+    static constexpr int kAgcThresholdMax = 2;
     const int clamped = qBound(kAgcThresholdMin, dBu, kAgcThresholdMax);
     if (m_agcThreshold != clamped) {
         m_agcThreshold = clamped;

@@ -63,8 +63,13 @@ QString cutLabel(int hz)
 
 QString widthLabel(int hz)
 {
-    if (hz < 1000) { return QStringLiteral("%1 Hz").arg(hz); }
-    return QStringLiteral("%1 kHz").arg(hz / 1000.0, 0, 'f', 1);
+    // Same "minus darf nie" guard as cutLabel() above -- m_high - m_low
+    // can go negative if the edges are inverted (a distinct, separately
+    // fixed bug), and this label must never expose that as a literal
+    // minus sign either.
+    const int mag = std::abs(hz);
+    if (mag < 1000) { return QStringLiteral("%1 Hz").arg(mag); }
+    return QStringLiteral("%1 kHz").arg(mag / 1000.0, 0, 'f', 1);
 }
 
 } // namespace

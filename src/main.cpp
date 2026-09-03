@@ -202,7 +202,11 @@ int main(int argc, char* argv[])
     // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
     //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
     //   Linux:   nice(-5)  (soft-fail without privilege)
-    //   Windows: SetThreadPriority(HIGHEST)
+    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
+    //            2026-09-03 after a measured ~85ms periodic Windows-only
+    //            audio glitch traced to this thread contending at the
+    //            same tier as audio-critical work (see
+    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
     Longpath::elevateGuiMainThreadPriority();
 
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM

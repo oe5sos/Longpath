@@ -1680,6 +1680,19 @@ private:
     // sonst haengt am Ende eine tote Scheibe noch mit dran.
     QMetaObject::Connection m_instrumentFreqConn;
 
+    // Codereview 2026-09-03 (gefunden, nicht gemeldet): dieselbe Krankheit
+    // wie bei m_instrumentFreqConn oben, diesmal bei der Zoom-Leiste unter
+    // dem Panadapter. Die urspruengliche Fassung verdrahtete
+    // SpectrumWidget::frequencyRangeChanged EINMAL gegen die beim Bau
+    // aktive Flaeche (activeSpectrumWidget()) -- bei mehreren Flaechen
+    // (2v/2h/2x2-Anordnung) folgte die Leiste danach dauerhaft nur noch
+    // dieser einen Flaeche, auch nachdem eine andere aktiv wurde, und
+    // konnte nach einem Anordnungswechsel sogar an einer inzwischen
+    // entfernten Flaeche haengen bleiben (Qt trennt dann automatisch,
+    // die Leiste folgt danach ueberhaupt keiner Flaeche mehr). Wird jetzt
+    // bei jedem PanadapterStack::activePanChanged neu gezogen.
+    QMetaObject::Connection m_zoomBarSyncConn;
+
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;
 

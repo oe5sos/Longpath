@@ -423,7 +423,29 @@ void BandwidthFilterApplet::wirePane(BandwidthFilterPane* pane, int sliceIndex)
             [this, sliceIndex](int low, int high) {
         // Nicht begrenzen — das tut setFilter. Die Flaeche meldet
         // Wunschwerte.
-        if (SliceModel* s = sliceAt(sliceIndex)) { s->setFilterByHand(low, high); }
+        if (SliceModel* s = sliceAt(sliceIndex)) {
+            // Ziehen an der Flaeche ist ein Bedienereingriff genau wie
+            // ein Zahlenfeld -- ohne diese Zeile merkt sich
+            // m_lastEditedEdge das Ziehen nicht, und ein anschliessender
+            // WIDTH-Eintrag verwirft die gerade gezogene Kante
+            // stillschweigend (dieselbe Beschwerde, die diese ganze
+            // Kennung ueberhaupt erst ausgeloest hat, jetzt ueber den
+            // Flaechen- statt den Zahlenfeld-Weg). Welche Kante sich
+            // staerker bewegt hat, gilt als die gezogene; bei
+            // gleichzeitiger Verschiebung beider (Mitte ziehen) bleibt
+            // die vorige Kennung stehen, weil keine Seite ausgezeichnet
+            // ist.
+            const int prevLow = s->filterLow();
+            const int prevHigh = s->filterHigh();
+            const int lowDelta = qAbs(low - prevLow);
+            const int highDelta = qAbs(high - prevHigh);
+            if (lowDelta > highDelta) {
+                m_lastEditedEdge = LastEditedEdge::Low;
+            } else if (highDelta > lowDelta) {
+                m_lastEditedEdge = LastEditedEdge::High;
+            }
+            s->setFilterByHand(low, high);
+        }
     });
 
     connect(pane, &BandwidthFilterPane::filterCentreChanged, this,
@@ -540,10 +562,46 @@ void BandwidthFilterApplet::refreshVarButtons()
     }
 }
 
+// Welche Kante SliceModel::widthToEdges() fuer diese Betriebsart als
+// Anker behandelt (High fuer die LSB-Familie: high=-defaultLowCut(),
+// low folgt; Low fuer die USB-Familie: low=defaultLowCut(), high
+// folgt -- SliceModel.cpp widthToEdges()). Nur fuer die beiden
+// Betriebsartfamilien sinnvoll, die der WIDTH-Anschluss unten selbst
+// unterscheidet; fuer alles andere (AM/FM/SAM/DSB/SPEC/DRM) ist der
+// Rueckgabewert bedeutungslos, weil jener Zweig m_lastEditedEdge gar
+// nicht befragt.
+BandwidthFilterApplet::LastEditedEdge
+BandwidthFilterApplet::naturalAnchorEdge(DSPMode mode)
+{
+    switch (mode) {
+    case DSPMode::USB:
+    case DSPMode::DIGU:
+    case DSPMode::CWU:
+    case DSPMode::RADE_U:
+        return LastEditedEdge::Low;
+    default:
+        return LastEditedEdge::High;
+    }
+}
+
 void BandwidthFilterApplet::refreshNumbers()
 {
     SliceModel* s = activeSlice();
     if (!s || !m_lowBox) { return; }
+
+    // Scheibe oder Betriebsart seit dem letzten Mal gewechselt? Dann ist
+    // m_lastEditedEdge die Auskunft einer ANDEREN Scheibe/Betriebsart und
+    // keine verlaessliche Angabe mehr fuer diese hier -- zurueck auf den
+    // natuerlichen Anker dieser Betriebsart. Ohne das wuerde die erste
+    // WIDTH-Eingabe nach einem Wechsel (oder die allererste der ganzen
+    // Sitzung) manchmal die falsche Kante festhalten, siehe
+    // naturalAnchorEdge().
+    const int modeInt = static_cast<int>(s->dspMode());
+    if (s != m_lastSyncedSlice || modeInt != m_lastSyncedModeInt) {
+        m_lastEditedEdge = naturalAnchorEdge(s->dspMode());
+        m_lastSyncedSlice = s;
+        m_lastSyncedModeInt = modeInt;
+    }
 
     m_updatingFromModel = true;
 
