@@ -97,6 +97,10 @@ jobs:
 
   build-linux:
     needs: prepare
+    # Temporarily disabled for the v0.6.1 mac-only release (2026-09-03,
+    # operator request). Revert this `if: false` in the follow-up commit
+    # that restores the full 3-platform pipeline.
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -644,6 +648,12 @@ jobs:
 
   build-windows:
     needs: prepare
+    # Temporarily disabled for the v0.6.1 mac-only release (2026-09-03,
+    # operator request — a known, undiagnosed Windows audio distortion
+    # regression means Windows isn't ready to publish this cycle).
+    # Revert this `if: false` in the follow-up commit that restores the
+    # full 3-platform pipeline.
+    if: false
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -823,7 +833,10 @@ jobs:
           retention-days: 7
 
   sign-and-publish:
-    needs: [prepare, build-linux, build-macos, build-windows]
+    # build-linux/build-windows temporarily disabled above for v0.6.1
+    # (mac-only release, 2026-09-03) — revert alongside the `if: false`
+    # lines when the full 3-platform pipeline comes back.
+    needs: [prepare, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

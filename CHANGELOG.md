@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased] - Phase 3F multi-pan multi-slice
+## [Unreleased]
+
+## [0.6.1] - 2026-09-03
+
+Phase 3F multi-pan multi-slice, plus overnight bandwidth-filter,
+S-meter overlay, and layout/window fixes. macOS-only release — Windows
+audio has a known, undiagnosed distortion regression (see
+`docs/architecture/` audio-path notes); Linux/Windows builds are
+deferred to the next release.
 
 ### Added
 
