@@ -15099,9 +15099,28 @@ void MainWindow::closeEvent(QCloseEvent* event)
     m_radioModel->discovery()->stopDiscovery();
 
     // Stop FFT thread
+    //
+    // Die begrenzte Wartezeit stand hier ohne Auswertung: lief sie ab,
+    // ging es trotzdem weiter -- und ~MainWindow() zerstoerte spaeter
+    // m_fftThread als Kind-QObject, worauf Qt mit qFatal abbricht, wenn
+    // der Faden da noch laeuft ("QThread: Destroyed while thread
+    // 'SpectrumThread' is still running").
+    //
+    // Der eigentliche Ausloeser dieses Abbruchs war ein anderer und ist
+    // in 6e7c1cad behoben (die Aufraeumschleife weiter unten sammelte
+    // ein FREMDES MainWindow ein und loeschte es synchron mitsamt
+    // laufendem Faden). Das Auswerten bleibt trotzdem richtig: dass ein
+    // stiller Zeitablauf hier direkt in einen Prozessabbruch fuehrt, ist
+    // unabhaengig davon, wer den Faden gerade aufhaelt. Dieselbe Wahl
+    // wie im ~MainWindow()-Sicherheitsnetz aus demselben Commit --
+    // lieber laenger warten als abbrechen.
     if (m_fftThread && m_fftThread->isRunning()) {
         m_fftThread->quit();
-        m_fftThread->wait(2000);
+        if (!m_fftThread->wait(2000)) {
+            qWarning() << "[ShutdownFftThread] SpectrumThread did not stop"
+                          " within 2s -- waiting without a timeout";
+            m_fftThread->wait();
+        }
     }
 
     // Save display settings before shutdown
