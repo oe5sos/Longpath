@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-03
+
+Windows-only test build (draft release, not published) — same code as
+0.6.1, built for Windows so the operator can bench-test the known
+audio distortion issue on real Windows 10 hardware. Not for public
+distribution.
+
 ## [0.6.1] - 2026-09-03
 
 Phase 3F multi-pan multi-slice, plus overnight bandwidth-filter,

@@ -299,6 +299,11 @@ jobs:
 
   build-macos:
     needs: prepare
+    # Disabled for the v0.6.2 windows-only test tag (2026-09-03) — the
+    # macOS build for the current code already shipped as v0.6.1. Revert
+    # this `if: false` alongside the rest of the temporary release.yml
+    # scoping once the platform builds are back in sync.
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -648,12 +653,6 @@ jobs:
 
   build-windows:
     needs: prepare
-    # Temporarily disabled for the v0.6.1 mac-only release (2026-09-03,
-    # operator request — a known, undiagnosed Windows audio distortion
-    # regression means Windows isn't ready to publish this cycle).
-    # Revert this `if: false` in the follow-up commit that restores the
-    # full 3-platform pipeline.
-    if: false
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -833,10 +832,10 @@ jobs:
           retention-days: 7
 
   sign-and-publish:
-    # build-linux/build-windows temporarily disabled above for v0.6.1
-    # (mac-only release, 2026-09-03) — revert alongside the `if: false`
-    # lines when the full 3-platform pipeline comes back.
-    needs: [prepare, build-macos]
+    # build-linux stays disabled; this tag (v0.6.2) exists only to
+    # produce a Windows test build in a draft release for the operator
+    # to download and test manually — not for public/website use.
+    needs: [prepare, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

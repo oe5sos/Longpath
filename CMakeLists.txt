@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Longpath VERSION 0.6.1 LANGUAGES C CXX)
+project(Longpath VERSION 0.6.2 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
