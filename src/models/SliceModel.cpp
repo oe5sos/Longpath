@@ -2332,13 +2332,24 @@ void SliceModel::restoreFromSettings(Band band)
         // Set mode WITHOUT applying the default filter — filter follows below.
         // We must update m_dspMode before reading FilterLow/FilterHigh so
         // the final setFilter call is not superseded by setDspMode's default.
-        DSPMode mode = static_cast<DSPMode>(
-            s.value(bp + QStringLiteral("DspMode")).toInt());
-        // Directly assign mode without calling setDspMode() (which also
-        // resets the filter). Emit the signal manually to keep observers in sync.
-        if (m_dspMode != mode) {
-            m_dspMode = mode;
-            emit dspModeChanged(mode);
+        const int rawMode = s.value(bp + QStringLiteral("DspMode")).toInt();
+        // Guard against a corrupted/out-of-range persisted value (e.g. a
+        // settings file edited or hand-crafted outside the app) reaching
+        // static_cast<DSPMode> as undefined enum territory and flowing
+        // unchecked into WDSP mode dispatch. RADE_L=13 is the highest
+        // defined value (WdspTypes.h).
+        if (rawMode >= static_cast<int>(DSPMode::LSB) &&
+            rawMode <= static_cast<int>(DSPMode::RADE_L)) {
+            const DSPMode mode = static_cast<DSPMode>(rawMode);
+            // Directly assign mode without calling setDspMode() (which also
+            // resets the filter). Emit the signal manually to keep observers in sync.
+            if (m_dspMode != mode) {
+                m_dspMode = mode;
+                emit dspModeChanged(mode);
+            }
+        } else {
+            qCWarning(lcDsp) << "Ignoring out-of-range persisted DspMode"
+                              << rawMode << "for" << bp;
         }
     }
     // Phase 3J-1 closeout Item 4 (2026-05-12): prefer (band, currentMode)
@@ -2359,8 +2370,18 @@ void SliceModel::restoreFromSettings(Band band)
         }
     }
     if (s.contains(bp + QStringLiteral("AgcMode"))) {
-        setAgcMode(static_cast<AGCMode>(
-            s.value(bp + QStringLiteral("AgcMode")).toInt()));
+        // Same corrupted-settings guard as DspMode above -- AGCMode's
+        // valid range is Off=0..Custom=5 (WdspTypes.h). An out-of-range
+        // value would otherwise flow straight into
+        // RxChannel::setAgcMode() -> SetRXAAGCMode() unchecked.
+        const int rawAgcMode = s.value(bp + QStringLiteral("AgcMode")).toInt();
+        if (rawAgcMode >= static_cast<int>(AGCMode::Off) &&
+            rawAgcMode <= static_cast<int>(AGCMode::Custom)) {
+            setAgcMode(static_cast<AGCMode>(rawAgcMode));
+        } else {
+            qCWarning(lcDsp) << "Ignoring out-of-range persisted AgcMode"
+                              << rawAgcMode << "for" << bp;
+        }
     }
     if (s.contains(bp + QStringLiteral("StepHz"))) {
         setStepHz(s.value(bp + QStringLiteral("StepHz")).toInt());
