@@ -97,10 +97,6 @@ jobs:
 
   build-linux:
     needs: prepare
-    # Temporarily disabled for the v0.6.1 mac-only release (2026-09-03,
-    # operator request). Revert this `if: false` in the follow-up commit
-    # that restores the full 3-platform pipeline.
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -299,11 +295,6 @@ jobs:
 
   build-macos:
     needs: prepare
-    # Disabled for the v0.6.2 windows-only retry (2026-09-03) — the
-    # macOS build for the current code already shipped as v0.6.1.
-    # Revert this `if: false` alongside the rest of the temporary
-    # release.yml scoping once the platform builds are back in sync.
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -832,11 +823,7 @@ jobs:
           retention-days: 7
 
   sign-and-publish:
-    # build-linux stays disabled; this tag (v0.6.2) exists only to
-    # produce a Windows test build for the operator to download and
-    # test manually — not for public/website use. The release stays a
-    # draft (never published).
-    needs: [prepare, build-windows]
+    needs: [prepare, build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
