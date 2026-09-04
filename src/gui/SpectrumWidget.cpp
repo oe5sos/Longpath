@@ -10807,6 +10807,12 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                       << QStringLiteral("audio  underruns %1 (+%2/s)")
                             .arg(stats.audioUnderrunsTotal)
                             .arg(stats.audioUnderrunsDelta)
+                      << QStringLiteral("ring   under %1 (+%2/s)")
+                            .arg(stats.audioRingUnderrunsTotal)
+                            .arg(stats.audioRingUnderrunsDelta)
+                      << QStringLiteral("ring   over  %1 (+%2/s)")
+                            .arg(stats.audioRingOverrunsTotal)
+                            .arg(stats.audioRingOverrunsDelta)
                       << QStringLiteral("udp    drops %1 (+%2/s)")
                             .arg(stats.udpDropsTotal)
                             .arg(stats.udpDropsDelta)
@@ -10866,6 +10872,13 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 bool red   = stats.audioUnderrunsDelta > 0
                           || stats.udpDropsDelta > 0
                           || stats.txIqUnderrunsDelta > 0
+                          // 2026-09-04: Ringpuffer-Ereignisse faerben
+                          // ebenfalls rot. Ein verworfenes oder
+                          // ueberblendetes Paket ist genauso hoerbar wie
+                          // ein Aussetzer des Geraets — es zaehlte bisher
+                          // nur an einer anderen Stelle.
+                          || stats.audioRingUnderrunsDelta > 0
+                          || stats.audioRingOverrunsDelta > 0
                           || stats.memCompressing
                           || stats.paintMsMax > 33.0
                           || stats.gapMsMax   > 50.0
