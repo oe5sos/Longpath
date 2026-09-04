@@ -3018,6 +3018,74 @@ private:
     // Default matches Style::kRxFilterOverlayFill = "rgba(0, 180, 216, 80)".
     QColor  m_rxFilterColor{0x00, 0xb4, 0xd8, 80};
 
+    // ── Bewusst AUSSERHALB des GPU-Gates ────────────────────────────
+    //
+    // Die folgenden Felder sind einfache Daten, keine QRhi-Objekte, und
+    // ihre Zugriffsfunktionen weiter oben stehen ebenfalls ungeschuetzt
+    // (backgroundImagePath(), backgroundOpacity(), backgroundBrightness(),
+    // backgroundFillColor(), waterfallBackgroundFillColor(),
+    // visibleBinCountForTest()). Lagen sie im #ifdef, liess sich Longpath
+    // mit -DNEREUS_GPU_SPECTRUM=OFF ueberhaupt nicht uebersetzen: sechs
+    // Zugriffe auf Member, die es in dieser Uebersetzung nicht gibt.
+    //
+    // Genau daran ist der ARM-Linux-Bau von v0.6.3-rc1 gescheitert — dort
+    // fehlten die Vulkan-Header, CMake hat QRhi abgeschaltet (CMakeLists
+    // :434-467), und der CPU-Pfad, den Zeile 417 ausdruecklich anbietet,
+    // baute nicht. Wer hier etwas hinzufuegt, das die Zugriffsfunktionen
+    // sehen, laesst es ausserhalb des Gates.
+    // ── Frei waehlbarer Hintergrund ──────────────────────────────────
+    //
+    // Port aus AetherSDR SpectrumWidget: setBackgroundImage /
+    // setBackgroundOpacity / setBackgroundFillColor
+    // (SpectrumWidget.cpp:11161-11187 [@0cd4559]) samt der Komposition
+    // bei :13730. Die Reihenfolge ist AetherSDRs, nicht neu erfunden:
+    //
+    //     Fuellfarbe   volle Deckkraft
+    //     Bild         Deckkraft 1 - opacity/100
+    //
+    // m_bgOpacity sagt also, wie stark die FUELLFARBE durchkommt, nicht
+    // wie stark das Bild deckt. Der Name stammt aus AetherSDR und
+    // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
+    // Umbenennung scheitert.
+    QImage  m_bgImage;
+    QImage  m_bgScaled;
+    QSize   m_bgScaledSize;
+    QString m_bgImagePath;
+    int     m_bgOpacity{80};
+    QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
+    QColor  m_wfBgFillColor{QColor(Style::kAppBg)};
+    int     m_bgBrightnessPct{100};
+
+    int m_visibleBinCount{0};  // bins rendered this frame (for draw call count)
+
+
+    // Ebenfalls ausserhalb, aus demselben Grund: der CPU-Pfad in
+    // SpectrumWidget.cpp fasst diese Felder ungeschuetzt an. Sie lagen
+    // im Gate, weil sie dort entstanden sind — nicht, weil sie die GPU
+    // braeuchten. Ein Bau ohne QRhi meldete darauf 35 Fehler.
+
+    /// Wasserfall-Textur beim naechsten Bild vollstaendig hochladen.
+    /// Der CPU-Pfad setzt die Fahne beim Groessenwechsel mit.
+    bool m_wfTexFullUpload{true};
+
+    /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
+    /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
+    /// pushWaterfallRow().
+    qint64 m_lastSpectrumArrivalMs{0};
+
+    /// Statische Einblendungen neu zeichnen (Gitter, Beschriftung,
+    /// dBm-Leiste). Auf dem CPU-Pfad ohne Wirkung, aber gesetzt.
+    bool   m_overlayStaticDirty{true};
+    bool   m_shutdownPrepared{false};
+
+    // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
+    // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
+    // Warum, steht am Auswertepunkt in mouseMoveEvent.
+    int    m_panDragLastX{0};
+    bool   m_panDragArmed{false};
+    int    m_vfoDragStartX{0};
+    double m_vfoDragStartHz{0.0};
+    double m_vfoDragHzPerPx{0.0};
 #ifdef NEREUS_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
@@ -3050,12 +3118,7 @@ private:
 
     int  m_wfGpuTexW{0};
     int  m_wfGpuTexH{0};
-    bool m_wfTexFullUpload{true};
     int  m_wfLastUploadedRow{-1};
-    /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
-    /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
-    /// pushWaterfallRow().
-    qint64 m_lastSpectrumArrivalMs{0};
 
     // ---- Overlay GPU resources ----
     QRhiGraphicsPipeline*       m_ovPipeline{nullptr};
@@ -3063,45 +3126,13 @@ private:
     QRhiBuffer*                 m_ovVbo{nullptr};
     QRhiTexture*                m_ovGpuTex{nullptr};
     QRhiSampler*                m_ovSampler{nullptr};
-    // ── Frei waehlbarer Hintergrund ──────────────────────────────────
-    //
-    // Port aus AetherSDR SpectrumWidget: setBackgroundImage /
-    // setBackgroundOpacity / setBackgroundFillColor
-    // (SpectrumWidget.cpp:11161-11187 [@0cd4559]) samt der Komposition
-    // bei :13730. Die Reihenfolge ist AetherSDRs, nicht neu erfunden:
-    //
-    //     Fuellfarbe   volle Deckkraft
-    //     Bild         Deckkraft 1 - opacity/100
-    //
-    // m_bgOpacity sagt also, wie stark die FUELLFARBE durchkommt, nicht
-    // wie stark das Bild deckt. Der Name stammt aus AetherSDR und
-    // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
-    // Umbenennung scheitert.
-    QImage  m_bgImage;
-    QImage  m_bgScaled;
-    QSize   m_bgScaledSize;
-    QString m_bgImagePath;
-    int     m_bgOpacity{80};
-    QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
-    QColor  m_wfBgFillColor{QColor(Style::kAppBg)};
-    int     m_bgBrightnessPct{100};
     /// Lage der Einblendungen als Anteil der Spektrumsflaeche.
     /// Vorgabe: links unten, rechts unten, Mitte unten — ueber dem
     /// Bandplan, wo beim Abstimmen nichts steht.
     /// Welche Einblendung gerade gezogen wird (-1 = keine).
 
     QImage m_overlayStatic;
-    bool   m_overlayStaticDirty{true};
-    bool   m_shutdownPrepared{false};
 
-    // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
-    // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
-    // Warum, steht am Auswertepunkt in mouseMoveEvent.
-    int    m_panDragLastX{0};
-    bool   m_panDragArmed{false};
-    int    m_vfoDragStartX{0};
-    double m_vfoDragStartHz{0.0};
-    double m_vfoDragHzPerPx{0.0};
     bool   m_overlayNeedsUpload{true};
 
     // 2026-05-26 KG4VCF dual-layer overlay split.
@@ -3179,7 +3210,6 @@ private:
     // From AetherSDR: kMaxFftBins = 8192, kFftVertStride = 6
     static constexpr int kMaxFftBins = 65536;
     static constexpr int kFftVertStride = 6;  // x, y, r, g, b, a
-    int m_visibleBinCount{0};  // bins rendered this frame (for draw call count)
 
 #endif
 
