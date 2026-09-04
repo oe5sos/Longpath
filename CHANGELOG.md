@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [0.6.3-rc3] - 2026-09-04
+
+Dritter Testbau. rc2 hat den Linux-Bau ein Stueck weit gebracht, aber
+nicht ans Ziel: hinter dem behobenen Fehler lag die naechste Schicht.
+Der Grund war nicht technisch, sondern organisatorisch — dieser Zweig
+war abgezweigt, bevor `main` seine Qt-6.4-Reparaturen bekam, und hat sie
+nie nachgezogen. Statt sie einzeln neu zu erfinden, sind sie jetzt
+herueberkopiert.
+
+### Fixed
+
+- **Gespeicherte Audio-Schnittstelle ueberlebt den Neustart wieder
+  (Windows).** Wer in Setup -> Audio "Windows WASAPI" waehlte, bekam
+  beim naechsten Start still wieder MME — den aeltesten und traegsten
+  Windows-Tonweg. Die Wahl wird als Name gespeichert, aber nur der
+  Setup-Dialog hat ihn je in einen Index zurueckuebersetzt; ohne Index
+  greift die Geraetesuche die erste passende Fassung in globaler
+  Reihenfolge ab, und das ist unter Windows die MME-Fassung. Auf dem Mac
+  faellt das nicht auf, dort gibt es nur CoreAudio. Wer nie eine
+  Schnittstelle gewaehlt hat, merkt keinen Unterschied.
+
+- **`QWebSocket::errorOccurred` gibt es erst ab Qt 6.5** — an drei
+  Stellen (`TciClient`, `KiwiSdrClient` zweimal) ungeschuetzt benutzt.
+  Der ARM-Linux-Bau laeuft gegen Ubuntus Qt 6.4.2 und ist daran
+  gescheitert. Von `main` uebernommen (`ace89a58`).
+
+- **`QTimeZone::UTC` und `QDateTimeEdit::setTimeZone` brauchen Qt 6.7.**
+  Ebenfalls von `main` uebernommen (`cc70cb44`, `beeb0fd2`); beide
+  Stellen kommen ohne Versionsweiche aus — `Qt::UTC` tut dasselbe auf
+  jeder Version.
+
+### Known
+
+- Die Kombination ARM + Qt 6.4 + CPU-Renderpfad wird ausschliesslich von
+  `release.yml` gebaut, und die laeuft nur auf Tags. Vorher gibt es kein
+  Signal — deshalb faellt so etwas erst beim Veroeffentlichen auf.
+
+
 ## [0.6.3-rc2] - 2026-09-04
 
 Zweiter Testbau. Behebt den Linux-Fehlschlag von rc1 — dadurch entsteht
