@@ -551,6 +551,11 @@ std::unique_ptr<IAudioBus> AudioEngine::makeBus(const AudioDeviceConfig& cfg,
     pcfg.direction     = capture ? AudioDirection::Input
                                  : AudioDirection::Output;
     pcfg.hostApiIndex  = cfg.hostApiIndex;
+    // Den Namen mitgeben, nicht nur den Index: loadFromSettings liefert
+    // hostApiIndex grundsaetzlich als -1 zurueck, weil ein PortAudio-Index
+    // zwischen zwei Starts nichts bedeutet. Ohne den Namen kann der Bus die
+    // gespeicherte Wahl nicht wiederherstellen.
+    pcfg.driverApi     = cfg.driverApi;
     pcfg.deviceName    = cfg.deviceName;
     pcfg.bufferSamples = cfg.bufferSamples;
     pcfg.exclusiveMode = cfg.exclusiveMode;

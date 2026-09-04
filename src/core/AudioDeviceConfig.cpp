@@ -64,9 +64,11 @@ AudioDeviceConfig AudioDeviceConfig::loadFromSettings(const QString& prefix)
         s.value(base + QStringLiteral("ManualLatencyMs"),
                 QString::number(cfg.manualLatencyMs)).toString().toInt();
 
-    // hostApiIndex is a PortAudio runtime value — not persisted directly.
-    // It remains -1 (PortAudio default) on load; the DeviceCard / AudioEngine
-    // may resolve it from driverApi at open time in a future sub-phase.
+    // hostApiIndex is a PortAudio runtime value — not persisted directly,
+    // because an index means nothing across restarts. It stays -1 here; the
+    // name in driverApi is what survives, and PortAudioBus::resolveDevice()
+    // translates it back at open time. (That resolution was left unwritten
+    // until 2026-09-04 — see the comment there for what it cost on Windows.)
     cfg.hostApiIndex = -1;
 
     return cfg;

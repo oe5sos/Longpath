@@ -119,6 +119,39 @@ private slots:
         bus.close();
     }
 
+    // 2026-09-04: die gespeicherte Host-API-Wahl muss einen Neustart
+    // ueberleben. AudioDeviceConfig legt sie als NAMEN ab und gibt
+    // hostApiIndex grundsaetzlich als -1 zurueck (ein PortAudio-Index
+    // bedeutet zwischen zwei Starts nichts). Uebersetzt der Bus den Namen
+    // nicht zurueck, ist `sameApi` in der Namenssuche immer wahr, die Suche
+    // laeuft in globaler Geraetereihenfolge — und unter Windows steht MME
+    // dort an erster Stelle. Der Betreiber waehlt dann WASAPI und bekommt
+    // nach jedem Neustart still wieder MME.
+    void driverApiNameSurvivesWithoutIndex() {
+        const auto apis = PortAudioBus::hostApis();
+        if (apis.isEmpty()) { QSKIP("No host APIs on test host"); }
+
+        for (const auto& api : apis) {
+            const auto devs = PortAudioBus::outputDevicesFor(api.index);
+            if (devs.isEmpty()) { continue; }
+
+            PortAudioBus bus;
+            PortAudioConfig cfg;
+            cfg.direction    = AudioDirection::Output;
+            cfg.hostApiIndex = -1;           // genau wie nach loadFromSettings
+            cfg.driverApi    = api.name;     // gespeichert ist nur der Name
+            cfg.deviceName   = devs.first().name;
+            bus.setConfig(cfg);
+
+            AudioFormat f;
+            if (!bus.open(f)) { continue; }  // Geraet belegt — naechste API
+            QCOMPARE(bus.backendName(), api.name);
+            bus.close();
+            return;
+        }
+        QSKIP("No openable output device on test host");
+    }
+
     // Issue #112: when cfg.deviceName doesn't match anything, open() must
     // fall back through (host-api default → global default → first
     // enumerated output device) rather than erroring out — on systems

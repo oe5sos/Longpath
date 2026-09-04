@@ -109,6 +109,37 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
         else if (!tier2.isEmpty()) effectiveCfg.deviceName = tier2;
     }
 #endif
+    // Die gespeicherte Host-API-Wahl zurueckuebersetzen.
+    //
+    // AudioDeviceConfig legt sie als Namen ab ("Windows WASAPI") und laesst
+    // hostApiIndex beim Laden bei -1; aufgeloest hat den Namen bis 2026-09-04
+    // ueberhaupt nur der Setup-Dialog, und auch nur solange er offen war.
+    // Nach jedem Neustart war der Index also wieder -1 — und damit ist
+    // `sameApi` in der Namenssuche unten IMMER wahr. Die Suche laeuft dann in
+    // globaler Geraetereihenfolge, und die folgt der Reihenfolge, in der
+    // PortAudio die Host-APIs hochfaehrt: auf Windows steht MME an erster
+    // Stelle (pa_win_hostapis.c). Dasselbe Geraet erscheint dort unter MME,
+    // DirectSound, WASAPI und WDM-KS mit fast gleichem Namen — getroffen
+    // wurde immer die MME-Fassung, der aelteste und traegste Windows-Tonweg.
+    // Die Wahl des Betreibers ging so bei jedem Start still verloren.
+    if (effectiveCfg.hostApiIndex < 0 && !effectiveCfg.driverApi.isEmpty()) {
+        const int apiCount = Pa_GetHostApiCount();
+        for (int i = 0; i < apiCount; ++i) {
+            const PaHostApiInfo* hai = Pa_GetHostApiInfo(i);
+            if (hai == nullptr || hai->name == nullptr) { continue; }
+            if (QString::fromUtf8(hai->name)
+                    .compare(effectiveCfg.driverApi, Qt::CaseInsensitive) == 0) {
+                effectiveCfg.hostApiIndex = i;
+                break;
+            }
+        }
+        if (effectiveCfg.hostApiIndex < 0) {
+            qCWarning(lcAudio) << "Gespeicherte Audio-API" << effectiveCfg.driverApi
+                               << "gibt es auf diesem System nicht —"
+                               << "PortAudio-Vorgabe wird verwendet.";
+        }
+    }
+
     const PortAudioConfig& cfg = effectiveCfg;
 
     auto directionOk = [wantOutput](const PaDeviceInfo* di) {

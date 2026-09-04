@@ -41,6 +41,12 @@ enum class AudioDirection { Output, Input };
 struct PortAudioConfig {
     AudioDirection direction = AudioDirection::Output;  // Output = render; Input = capture
     int     hostApiIndex  = -1;     // -1 = PortAudio default
+    // Name der gespeicherten Host-API ("Windows WASAPI", "CoreAudio", …).
+    // AudioDeviceConfig legt die Wahl des Betreibers als Namen ab, nicht als
+    // Index — der Index ist ein Laufzeitwert und zwischen zwei Starts nicht
+    // stabil. resolveDevice() uebersetzt den Namen zurueck, sobald
+    // hostApiIndex noch -1 ist. Leer = PortAudio-Vorgabe.
+    QString driverApi;
     QString deviceName;             // empty = default
     // 128 frames @ 48 kHz = 2.67 ms per callback. On macOS this maps
     // to a CoreAudio HAL output latency of ~10-12 ms (CoreAudio
