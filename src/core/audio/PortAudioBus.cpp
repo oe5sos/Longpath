@@ -444,6 +444,29 @@ bool PortAudioBus::open(const AudioFormat& format) {
     } else {
         m_backendName.clear();
     }
+
+    // 2026-09-04: Geraet, Host-API und die TATSAECHLICH ausgehandelte
+    // Latenz ins Protokoll. Gewuenscht haben wir defaultLow{Output,Input}
+    // Latency; was PortAudio daraus macht, haengt an der Host-API und ist
+    // die entscheidende Zahl, wenn das Geraet leerlaeuft. Unter Windows
+    // liegen MME, DirectSound und WASAPI hier weit auseinander, und ohne
+    // diese Zeile ist aus einem Fehlerbericht nicht zu erkennen, welcher
+    // Weg ueberhaupt benutzt wurde.
+    if (const PaStreamInfo* si = Pa_GetStreamInfo(m_stream)) {
+        qCInfo(lcAudio).noquote()
+            << QStringLiteral("PortAudioBus: %1 via [%2] on \"%3\" — "
+                              "latency %4 ms (wanted %5 ms), %6 Hz, %7 ch")
+                .arg(wantOutput ? QStringLiteral("output")
+                                : QStringLiteral("input"))
+                .arg(m_backendName.isEmpty() ? QStringLiteral("?")
+                                             : m_backendName)
+                .arg(QString::fromUtf8(di->name ? di->name : "?"))
+                .arg((wantOutput ? si->outputLatency : si->inputLatency) * 1000.0,
+                     0, 'f', 1)
+                .arg(params.suggestedLatency * 1000.0, 0, 'f', 1)
+                .arg(si->sampleRate, 0, 'f', 0)
+                .arg(effectiveChannels);
+    }
     return true;
 }
 
@@ -487,6 +510,9 @@ qint64 PortAudioBus::push(const char* data, qint64 bytes) {
     const qint64 afterWrite = w + floatCount;
     if (afterWrite - readPos > ringSize) {
         m_dropEvents.fetch_add(1, std::memory_order_relaxed);
+        // Sichtbar machen: ein ueberlaufender Ring bedeutet, dass der
+        // Erzeuger schneller nachschiebt, als das Geraet abholt.
+        Longpath::PerfMonitor::instance().incAudioRingOverrun();
         m_dropSamples.fetch_add(
             static_cast<quint64>(afterWrite - readPos - ringSize),
             std::memory_order_relaxed);
@@ -651,6 +677,7 @@ int PortAudioBus::paCallback(const void* in, void* out,
         if (wasUnderrun) {
             self->m_underrunEvents.fetch_add(
                 1, std::memory_order_relaxed);
+            Longpath::PerfMonitor::instance().incAudioRingUnderrun();
             sawSilenceStart = true;
         }
         for (int i = 0; i < want; ++i) {
@@ -670,6 +697,7 @@ int PortAudioBus::paCallback(const void* in, void* out,
                 if (!wasUnderrun && !sawSilenceStart) {
                     // Transitioned from "had data" to "empty" mid-callback.
                     self->m_underrunEvents.fetch_add(1, std::memory_order_relaxed);
+                    Longpath::PerfMonitor::instance().incAudioRingUnderrun();
                     sawSilenceStart = true;
                 }
                 wasUnderrun = true;

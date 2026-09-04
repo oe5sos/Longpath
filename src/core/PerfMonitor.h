@@ -59,6 +59,15 @@ public:
 
     // ── Counter writers (atomic; safe on any thread) ───────────────
     void incAudioUnderrun();
+    /// Ring leer, als der Rueckruf Daten wollte: WIR haben nicht
+    /// geliefert (Netz oder DSP hinken). Zu unterscheiden von
+    /// incAudioUnderrun(), das den Unterlauf des BETRIEBSSYSTEM-Geraets
+    /// meldet — dort war unsere Lieferung zu spaet, nicht zu wenig.
+    void incAudioRingUnderrun();
+    /// Ring uebergelaufen, aeltestes verworfen: der Erzeuger schiebt
+    /// schneller nach, als das Geraet abholt. Haeufigster Grund ist
+    /// eine Ratenabweichung zwischen unserer Annahme und dem Geraet.
+    void incAudioRingOverrun();
     void incUdpDrop();
 
     // TX I/Q ring-underrun telemetry.  Called from the connection-thread
@@ -108,6 +117,10 @@ public:
         // remembering the previous total client-side.
         uint64_t audioUnderrunsTotal{0};
         uint64_t audioUnderrunsDelta{0};
+        uint64_t audioRingUnderrunsTotal{0};
+        uint64_t audioRingUnderrunsDelta{0};
+        uint64_t audioRingOverrunsTotal{0};
+        uint64_t audioRingOverrunsDelta{0};
         uint64_t udpDropsTotal{0};
         uint64_t udpDropsDelta{0};
 
@@ -242,6 +255,10 @@ private:
     // either architecture.
     alignas(64) std::atomic<uint64_t> m_audioUnderrunsTotal{0};
     alignas(64) std::atomic<uint64_t> m_audioUnderrunsDelta{0};
+    alignas(64) std::atomic<uint64_t> m_audioRingUnderrunsTotal{0};
+    alignas(64) std::atomic<uint64_t> m_audioRingUnderrunsDelta{0};
+    alignas(64) std::atomic<uint64_t> m_audioRingOverrunsTotal{0};
+    alignas(64) std::atomic<uint64_t> m_audioRingOverrunsDelta{0};
     alignas(64) std::atomic<uint64_t> m_udpDropsTotal{0};
     alignas(64) std::atomic<uint64_t> m_udpDropsDelta{0};
     alignas(64) std::atomic<uint64_t> m_txIqUnderrunsTotal{0};

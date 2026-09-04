@@ -112,6 +112,18 @@ public:
     quint32 ringUnderrunEvents() const {
         return m_underrunEvents.load(std::memory_order_relaxed);
     }
+    /// PortAudios eigene Meldung: das Geraet des Betriebssystems lief
+    /// leer, weil wir auf Host-API-Ebene zu spaet geliefert haben —
+    /// unabhaengig davon, ob unser Ring gefuellt war. Der Kommentar an
+    /// der Zaehlstelle in paCallback versprach diese Abfrage schon; bis
+    /// 2026-09-04 gab es sie nicht.
+    quint32 paOutputUnderflowEvents() const {
+        return m_paOutputUnderflowEvents.load(std::memory_order_relaxed);
+    }
+    /// Gegenstueck: von uns geliefertes Material wurde verworfen.
+    quint32 paOutputOverflowEvents() const {
+        return m_paOutputOverflowEvents.load(std::memory_order_relaxed);
+    }
     /// Capture frames discarded because a callback block exceeded the
     /// preallocated downmix scratch.  Expected to stay 0; non-zero
     /// means the host API is handing us blocks larger than the

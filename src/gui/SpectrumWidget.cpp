@@ -710,7 +710,9 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
         const auto ml = memoryLockStats();
         qInfo().noquote() << QString(
             "perf: paint %1/%2 ms gap %3/%4 ms fft %5/%6 ms ovly %7/%8 ms"
-            " audio_fill %9/%10 ms underruns %11 (+%12/s) udp %13 (+%14/s)"
+            " audio_fill %9/%10 ms underruns %11 (+%12/s)"
+            " ring_under %21 (+%22/s) ring_over %23 (+%24/s)"
+            " udp %13 (+%14/s)"
             " tx_iq_under %15 (+%16/s)"
             " mem %17 MB%18 mlock %19 regions / %20 MB")
             .arg(s.paintMsAvg, 0, 'f', 1).arg(s.paintMsMax, 0, 'f', 1)
@@ -726,7 +728,18 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
             .arg(s.memCompressing ? QStringLiteral(" COMPRESSING")
                                   : QString{})
             .arg(ml.regionsLocked)
-            .arg(ml.bytesLocked / (1024.0 * 1024.0), 0, 'f', 1);
+            .arg(ml.bytesLocked / (1024.0 * 1024.0), 0, 'f', 1)
+            // 2026-09-04: drei Unterlaufarten getrennt, weil sie auf
+            // verschiedene Schuldige zeigen. underruns = das Geraet des
+            // Betriebssystems lief leer (wir zu spaet: Zeitplanung,
+            // Puffergroesse, Host-API). ring_under = unser Ring war leer
+            // (Erzeuger hinkt: Netz oder DSP). ring_over = unser Ring lief
+            // ueber, Aeltestes verworfen (wir schieben schneller nach, als
+            // das Geraet abholt — klassisch bei Ratenabweichung). Bis hier
+            // waren nur die ersten sichtbar, die beiden anderen wurden
+            // gezaehlt und nie ausgegeben.
+            .arg(s.audioRingUnderrunsTotal).arg(s.audioRingUnderrunsDelta)
+            .arg(s.audioRingOverrunsTotal).arg(s.audioRingOverrunsDelta);
         markOverlayDirty();
         update();
     });

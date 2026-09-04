@@ -45,6 +45,18 @@ void PerfMonitor::incAudioUnderrun()
     m_audioUnderrunsDelta.fetch_add(1, std::memory_order_relaxed);
 }
 
+void PerfMonitor::incAudioRingUnderrun()
+{
+    m_audioRingUnderrunsTotal.fetch_add(1, std::memory_order_relaxed);
+    m_audioRingUnderrunsDelta.fetch_add(1, std::memory_order_relaxed);
+}
+
+void PerfMonitor::incAudioRingOverrun()
+{
+    m_audioRingOverrunsTotal.fetch_add(1, std::memory_order_relaxed);
+    m_audioRingOverrunsDelta.fetch_add(1, std::memory_order_relaxed);
+}
+
 void PerfMonitor::incUdpDrop()
 {
     m_udpDropsTotal.fetch_add(1, std::memory_order_relaxed);
@@ -87,6 +99,10 @@ PerfMonitor::Snapshot PerfMonitor::snapshotAndClearDeltas()
 
     s.audioUnderrunsTotal = m_audioUnderrunsTotal.load(std::memory_order_relaxed);
     s.audioUnderrunsDelta = m_audioUnderrunsDelta.exchange(0, std::memory_order_relaxed);
+    s.audioRingUnderrunsTotal = m_audioRingUnderrunsTotal.load(std::memory_order_relaxed);
+    s.audioRingUnderrunsDelta = m_audioRingUnderrunsDelta.exchange(0, std::memory_order_relaxed);
+    s.audioRingOverrunsTotal = m_audioRingOverrunsTotal.load(std::memory_order_relaxed);
+    s.audioRingOverrunsDelta = m_audioRingOverrunsDelta.exchange(0, std::memory_order_relaxed);
     s.udpDropsTotal = m_udpDropsTotal.load(std::memory_order_relaxed);
     s.udpDropsDelta = m_udpDropsDelta.exchange(0, std::memory_order_relaxed);
     s.txIqUnderrunsTotal = m_txIqUnderrunsTotal.load(std::memory_order_relaxed);
@@ -121,6 +137,10 @@ void PerfMonitor::resetAll()
     m_audioFillRing.clear();
     m_audioUnderrunsTotal.store(0, std::memory_order_relaxed);
     m_audioUnderrunsDelta.store(0, std::memory_order_relaxed);
+    m_audioRingUnderrunsTotal.store(0, std::memory_order_relaxed);
+    m_audioRingUnderrunsDelta.store(0, std::memory_order_relaxed);
+    m_audioRingOverrunsTotal.store(0, std::memory_order_relaxed);
+    m_audioRingOverrunsDelta.store(0, std::memory_order_relaxed);
     m_udpDropsTotal.store(0, std::memory_order_relaxed);
     m_udpDropsDelta.store(0, std::memory_order_relaxed);
     m_txIqUnderrunsTotal.store(0, std::memory_order_relaxed);
