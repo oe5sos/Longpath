@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+## [0.6.3-rc2] - 2026-09-04
+
+Zweiter Testbau. Behebt den Linux-Fehlschlag von rc1 — dadurch entsteht
+wieder ein vollstaendiges Release statt nur Lauf-Artefakten — und bringt
+die Diagnose fuer die weiter bestehende Tonverzerrung unter Windows mit
+der ANAN-10 mit.
+
+### Fixed
+
+- **Longpath liess sich ohne QRhi ueberhaupt nicht uebersetzen.** Neun
+  Felder in `SpectrumWidget.h` lagen im `#ifdef NEREUS_GPU_SPECTRUM`,
+  obwohl der CPU-Pfad sie ungeschuetzt anfasst: Mausbedienung
+  (`m_vfoDragStartX`, `m_panDragArmed`, `m_vfoDragStartHz`,
+  `m_vfoDragHzPerPx`, `m_panDragLastX`), Abbau (`m_shutdownPrepared`),
+  Wasserfall-Fahnen (`m_wfTexFullUpload`, `m_lastSpectrumArrivalMs`) und
+  die Einblendungs-Fahne (`m_overlayStaticDirty`). Sie sind dort
+  entstanden, nicht dort noetig. Ein Bau mit
+  `-DNEREUS_GPU_SPECTRUM=OFF` meldete darauf 35 Fehler.
+
+  Genau daran ist der ARM-Linux-Job von v0.6.3-rc1 gescheitert: dort
+  fehlten die Vulkan-Header, CMake hat QRhi abgeschaltet
+  (CMakeLists:434-467), und der CPU-Pfad, den CMakeLists:417
+  ausdruecklich als Ausweg anbietet, baute nicht. Weil der
+  Veroeffentlichungs-Job alle vier Plattformen braucht, entstand kein
+  Release-Entwurf.
+
+  Die Felder stehen jetzt ausserhalb des Gates, mit einer Notiz, warum
+  sie dort bleiben muessen. Der Bau ohne QRhi ist wieder gruen. Ob der
+  CPU-Pfad danach auch korrekt ZEICHNET, ist damit ausdruecklich nicht
+  geprueft — das war schon vorher offen.
+
+### Added
+
+- **Die drei Unterlaufarten im Ton werden getrennt ausgewiesen.** Die
+  `perf:`-Zeile nannte bisher nur `underruns`, und das war allein der
+  Unterlauf des Betriebssystem-Geraets. Die beiden Ring-Zaehler wurden
+  gezaehlt und nie ausgegeben; `m_paOutputUnderflowEvents` versprach im
+  Kommentar sogar eine Abfrage ueber die oeffentliche Schnittstelle, die
+  es gar nicht gab. Jetzt stehen dort nebeneinander: `underruns` (das
+  Geraet lief leer — wir lieferten zu spaet), `ring_under` (unser Ring
+  war leer — der Erzeuger hinkt) und `ring_over` (Ring uebergelaufen,
+  Aeltestes verworfen — der klassische Fingerabdruck einer
+  Ratenabweichung). Zusaetzlich protokolliert `PortAudioBus::open()`
+  jetzt Geraet, Host-API und die tatsaechlich ausgehandelte Latenz
+  gegenueber der gewuenschten.
+
+  Zweck: die Tonverzerrung unter Windows mit der ANAN-10 ist nach zwei
+  Anlaeufen unverstanden. Diese Zahlen sagen beim naechsten Bench-Lauf,
+  welche Schicht schuld ist, statt einen dritten Fix zu raten.
+  Einzuschalten ueber View > Performance Overlay; die Zeile erscheint
+  dann einmal je Sekunde im Protokoll.
+
 ## [0.6.3-rc1] - 2026-09-03
 
 Testbau für den Betreiber (Release-Entwurf, nicht veröffentlicht).
