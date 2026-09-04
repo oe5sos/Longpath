@@ -15,6 +15,7 @@
 // Merken vergessen wurde.
 
 #include <QtTest>
+#include <QComboBox>
 
 #include "core/AppSettings.h"
 #include "gui/MainWindow.h"
@@ -49,6 +50,45 @@ class TstSettingsAreRemembered : public QObject
     Q_OBJECT
 
 private slots:
+    // Die 3D-Ansicht des Spektrums (Display-Flyout, Combo "Spectrum:
+    // 2D / 3D") muss den Neustart ueberleben -- und zwar an beiden
+    // Enden: das Widget zeichnet wieder 3D, UND der Combo zeigt "3D".
+    // Der zweite Teil fehlte: das Widget laedt seine Einstellungen,
+    // bevor das Panel existiert, und niemand sagte es dem Combo.
+    void dreiDAnsichtUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("spectrumRenderModeCombo"));
+            QVERIFY2(combo, "Combo 'Spectrum: 2D / 3D' nicht gefunden");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(combo->currentIndex(), 0);
+            QCOMPARE(sw->spectrumRenderMode(), SpectrumRenderMode::Mode2D);
+            combo->setCurrentIndex(1);
+            QCOMPARE(sw->spectrumRenderMode(), SpectrumRenderMode::Mode3D);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("spectrumRenderModeCombo"));
+            QVERIFY(combo);
+            QVERIFY2(sw->spectrumRenderMode() == SpectrumRenderMode::Mode3D,
+                     "Das Widget hat die 3D-Ansicht vergessen");
+            QVERIFY2(combo->currentIndex() == 1,
+                     "Der Combo zeigt 2D, obwohl das Widget 3D zeichnet");
+            mw->close();
+            delete mw;
+        }
+    }
+
     void balkenformUeberlebtDenNeustart()
     {
         {

@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **3D-Ansicht des Spektrums: von einem Bild pro Sekunde auf fluessig.**
+  Die 3D-Ansicht (Display-Flyout, "Spectrum: 3D Stacked Trace") baute
+  ihre Flaeche auf dem Weg von AetherSDRs CPU-Notpfad: je Bild 96 Zeilen
+  mal 767 Trapeze plus 767 Linien durch QPainter, jeder Pixel bis zu
+  96-mal uebermalt. Gemessen auf einem MacBook Air (Apple Silicon):
+  0,6 s je Bild, bei Retina-Breite 1,3 s -- die ganze Oberflaeche fror
+  mit ein. AetherSDR selbst nimmt diesen Weg nur, wenn sein GPU-Mesh
+  nicht anlegbar ist. Die Flaeche wird jetzt direkt gerastert: Zeilen
+  von vorn nach hinten gegen einen Horizont je Spalte, jeder
+  Vorhangpixel genau einmal geschrieben, die Stiftbreite des Kamms
+  (1,6 px vorn, 1 px dahinter) als Deckung nachgebildet und die
+  Teilpixel am Ende in Malreihenfolge gemischt. 7-10 ms je Bild,
+  pixelweise gegen das Original geprueft: gleiches Bild bis auf
+  Kantenmischtoene.
+
+- **Der Combo "Spectrum: 2D / 3D" zeigt nach dem Neustart, was gespeichert
+  ist.** Der Panadapter lud seinen Modus, bevor das Panel existierte;
+  der Combo stand deshalb nach jedem Start auf "2D", auch wenn laengst
+  3D gezeichnet wurde. Der Rundlauf Setzen -> Schliessen -> Neustart ist
+  jetzt in `tst_settings_are_remembered` festgenagelt.
+
+### Known
+
+- Die uebrigen Regler desselben Flyouts (WF Gain, Black Lvl, Farbschema)
+  zeigen nach dem Start weiterhin ihre Vorgaben (50 / 15 / "Classic")
+  statt der gespeicherten Werte (Widget: 45 / 104 / ClarityBlue). Ein
+  blosses Nachziehen ginge schief: der Schwarzwert-Schieber reicht bis
+  100, das Widget kennt 0..125; der Schema-Combo hat vier Eintraege fuer
+  mindestens acht Schemata. Das braucht eine Entscheidung ueber die
+  Regler selbst.
+
 ## [0.6.3-rc3] - 2026-09-04
 
 Dritter Testbau. rc2 hat den Linux-Bau ein Stueck weit gebracht, aber

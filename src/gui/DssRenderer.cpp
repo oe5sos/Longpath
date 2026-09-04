@@ -3,6 +3,7 @@
 #include <QVector>
 
 #include <cmath>
+#include <cstdlib>
 #include <vector>
 
 // =================================================================
@@ -20,22 +21,28 @@
 // about one frame per second, with the GUI thread frozen in between.
 // AetherSDR only ever runs that path when its GPU mesh cannot be created.
 //
-// The rasteriser below produces the same picture (same geometry, same
-// per-column colours, same crest) but writes each pixel exactly once:
+// The rasteriser below produces an equivalent picture (same geometry, same
+// per-column colours, the crest's pen width reproduced as coverage) at
+// ~7-10 ms:
 // traces are walked FRONT to back and a per-x "horizon" remembers how far
 // up a nearer trace has already claimed the column, so a farther trace
-// only fills the part of its curtain that is still visible. Because every
-// curtain reaches the plot floor, "the last trace painted back-to-front"
-// and "the nearest trace whose ridge lies above the pixel" are the same
-// trace, so the result matches the painter's-algorithm original.
+// only fills the part of its curtain that is still visible -- each curtain
+// pixel is written once. Because every curtain reaches the plot floor,
+// "the last trace painted back-to-front" and "the nearest trace whose
+// ridge lies above the pixel" are the same trace, so the result matches
+// the painter's-algorithm original. The crest's partially covered pixels
+// (the pen's anti-aliasing) are the one thing that cannot be resolved
+// front to back; they are collected and blended at the end in painter's
+// order (see PartialCrest in the header).
 //
 // Modification history (NereusSDR):
 //   2026-09-03 — Ported in C++20/Qt6 for NereusSDR by Martin Fischer
 //                 (OE5SOS), AI-assisted via Anthropic Claude Code.
 //   2026-09-03 — rebuild(): QPainter polygon/line painting replaced by a
-//                 direct horizon rasteriser (one write per pixel); geometry
-//                 and colour formulas unchanged. Martin Fischer (OE5SOS),
-//                 AI-assisted via Anthropic Claude Code.
+//                 direct horizon rasteriser with coverage-based crest
+//                 anti-aliasing; geometry and colour formulas unchanged.
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic
+//                 Claude Code.
 // =================================================================
 
 namespace Longpath {
@@ -43,10 +50,11 @@ namespace Longpath {
 namespace {
 
 // CPU-only tunables. The perspective geometry (back-width / depth-span /
-// front-ridge / haze) lives in DssRenderer.h as shared constants so a
-// future GPU mesh uses the same values; these are extra CPU-render touches
-// a GPU fragment shader would not replicate (depth dimming floor, slope
-// shading).
+// front-ridge / haze) lives in DssRenderer.h as shared constants so the GPU
+// mesh uses the same values; these are extra CPU-render touches the GPU frag
+// doesn't replicate (depth dimming floor, smoothing, slope shading).
+//   [verbatim from AetherSDR DssRenderer.cpp:12-15 @31b29583; Longpath has
+//    no GPU mesh yet -- the constants are shared so a later port can't drift]
 constexpr double kMinDim        = 0.50;  // depth dimming never falls below this
 constexpr float  kTemporalAlpha = 0.60f; // temporal IIR: fraction of the new row
 constexpr double kSlopeGain     = 0.55;  // slope shading strength
@@ -87,6 +95,19 @@ inline quint32 packOpaque(QRgb c)
     b[2] = static_cast<uchar>(qBlue(c));
     b[3] = 255;
     return v;
+}
+
+// dst = src * cov + dst * (1 - cov), per channel, opaque result. Used for
+// the crest's partial pixels (its anti-aliasing) and nothing else.
+inline void blendInto(quint32* dst, quint32 src, double cov)
+{
+    const int a = std::clamp(static_cast<int>(cov * 256.0 + 0.5), 0, 256);
+    auto*       d = reinterpret_cast<uchar*>(dst);
+    const auto* s = reinterpret_cast<const uchar*>(&src);
+    for (int i = 0; i < 3; ++i) {
+        d[i] = static_cast<uchar>((s[i] * a + d[i] * (256 - a)) >> 8);
+    }
+    d[3] = 255;
 }
 
 std::array<float, DssRenderer::kCols> resampledRawRow(
@@ -196,6 +217,13 @@ const QImage& DssRenderer::image(const QSize& px, int scaleStripPx,
                                  quint64 paletteToken,
                                  const QColor& bgFill)
 {
+    // A palette that calls back into image() (nothing in Longpath does, but
+    // the callback is host-injected) would otherwise reassign m_cache under
+    // the frame being rasterised. Hand it what there is.
+    if (m_rebuilding) {
+        return m_cache;
+    }
+
     const bool changed = m_dirty
         || px != m_cacheSize
         || scaleStripPx != m_cacheScaleStrip
@@ -221,6 +249,18 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
                           float rangeDb, float zCurve, const PaletteFn& palette,
                           const QColor& bgFill)
 {
+    struct RebuildScope {
+        bool& flag;
+        explicit RebuildScope(bool& f) : flag(f) { flag = true; }
+        ~RebuildScope() { flag = false; }
+    };
+    const RebuildScope scope(m_rebuilding);
+
+    // Never carry the deferred crest pixels of a frame that did not finish
+    // (a throwing palette, std::bad_alloc) into the next one: their x/y
+    // belong to that frame's size.
+    m_partials.clear();
+
     const int W    = px.width();
     const int Htot = px.height();
     if (W <= 0 || Htot <= 0) {
@@ -230,6 +270,11 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
 
     if (m_cache.size() != px || m_cache.format() != QImage::Format_RGBA8888_Premultiplied) {
         m_cache = QImage(px, QImage::Format_RGBA8888_Premultiplied);
+    }
+    if (m_cache.isNull()) {
+        // QImage refused the allocation (absurd size, or out of memory):
+        // bits() would be nullptr. Nothing to draw into.
+        return;
     }
     m_cache.fill(Qt::transparent);
 
@@ -248,7 +293,11 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
         std::fill_n(rowPixels(y), W, bgPx);
     }
 
-    if (m_count <= 0 || !palette || rangeDb <= 0.0f) {
+    // NaN/inf in the anchor or range would pass std::clamp unchanged and end
+    // in static_cast<int>(NaN) below (undefined behaviour) -- treat like
+    // "no usable mapping" and leave the background.
+    if (m_count <= 0 || !palette || !(rangeDb > 0.0f)
+        || !std::isfinite(rangeDb) || !std::isfinite(floorDbm)) {
         return;
     }
 
@@ -256,6 +305,9 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
     const double bottomY       = H;                       // plot floor
     const double depthSpan     = H * kDepthSpanFrac;
     const double frontMaxRidge = H * kFrontMaxRidgeFrac;
+    // Match dss_mesh.vert's depth parametrization exactly (v = rr / rows), so
+    // the CPU fallback and the GPU mesh place rows at the same depth.
+    //   [original inline comment from AetherSDR DssRenderer.cpp:811-812]
     const double denom         = kVisibleRows;
 
     std::array<double,  kCols> ys;       // ridge y per column (px, down = +)
@@ -309,8 +361,38 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
         const int x0 = std::max(0,     static_cast<int>(std::ceil(inset - 0.5)));
         const int x1 = std::min(W - 1, static_cast<int>(std::floor(inset + rowW - 0.5)));
         const double colPerPx = (kCols - 1) / std::max(rowW, 1e-9);
-        const int crestRows = (age == 0) ? 2 : 1;   // 1.6 px front rim, 1 px behind
-        int prevTop = -1;
+        // Crest pen width of the original: 1.6 px on the front trace, 1.0
+        // behind. Reproduced as coverage, never as whole pixels.
+        const double crestW = (age == 0) ? 1.6 : 1.0;
+
+        // One crest pixel. colTop is the first row of THIS trace's curtain
+        // in that column, colLimit the row from which a nearer trace owns
+        // the column. Rows inside our own curtain blend right away, as the
+        // pen did over the freshly filled trapezoid. A fully covered row
+        // above the curtain is solid and claimed. A PARTIALLY covered row
+        // above the curtain is deferred: in painter's order it blends over
+        // whatever lies behind us, and that is drawn later -- so it stays
+        // unclaimed (farther curtains fill it first) and composites at the
+        // end.
+        const auto paintCrest = [&](int col, int r, int colTop, int colLimit,
+                                    double cov, quint32 rgba) {
+            if (r < 0 || r >= colLimit || cov <= 0.0) {
+                return;
+            }
+            if (r >= colTop) {
+                blendInto(&rowPixels(r)[col], rgba, cov);
+            } else if (cov >= 0.999) {
+                rowPixels(r)[col] = rgba;
+                horizon[static_cast<size_t>(col)] =
+                    std::min(horizon[static_cast<size_t>(col)], r);
+            } else {
+                m_partials.push_back({col, r, rgba, static_cast<float>(cov)});
+            }
+        };
+
+        double prevY     = 0.0;
+        int    prevTop   = -1;
+        int    prevLimit = 0;
         for (int x = x0; x <= x1; ++x) {
             const double u = (x + 0.5 - inset) * colPerPx;
             const int    c = std::clamp(static_cast<int>(u), 0, kCols - 2);
@@ -320,30 +402,66 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
             const int top   = std::clamp(static_cast<int>(std::ceil(y - 0.5)), 0, H);
             const int limit = horizon[static_cast<size_t>(x)];   // exclusive
 
-            // Curtain: ridge down to where a nearer trace takes over.
+            // Curtain: ridge down to where a nearer trace takes over. The
+            // curtain claims the column from the ridge; paintCrest() may
+            // raise that claim for solid crest pixels above it.
             for (int yy = top; yy < limit; ++yy) {
                 rowPixels(yy)[x] = fillPx[c];
             }
+            horizon[static_cast<size_t>(x)] = std::min(top, limit);
 
-            // Crest: the rim sits on top of the curtain and, like the
-            // anti-aliased line it replaces, bridges the vertical gap to
-            // the previous column so steep flanks stay connected. Clipped
-            // by the same horizon — nearer curtains cover it.
-            const int crestTop = top - (crestRows - 1);
-            int runLo = (prevTop < 0) ? crestTop : std::min(crestTop, prevTop);
-            int runHi = (prevTop < 0) ? top      : std::max(top, prevTop);
-            runLo = std::max(runLo, 0);
-            runHi = std::min(runHi, limit - 1);
-            for (int yy = runLo; yy <= runHi; ++yy) {
-                rowPixels(yy)[x] = crestPx[c];
+            // Crest band: the rim as a crestW-high band centred on the ridge.
+            {
+                const double bandLo = y - crestW * 0.5;
+                const double bandHi = y + crestW * 0.5;
+                const int rLo = std::max(0,     static_cast<int>(std::floor(bandLo)));
+                const int rHi = std::min(H - 1, static_cast<int>(std::floor(bandHi)));
+                for (int r = rLo; r <= rHi; ++r) {
+                    const double cov = std::clamp(
+                        std::min(r + 1.0, bandHi) - std::max(static_cast<double>(r), bandLo),
+                        0.0, 1.0);
+                    paintCrest(x, r, top, limit, cov, crestPx[c]);
+                }
             }
 
-            // Everything this trace touched in the column is now claimed.
-            horizon[static_cast<size_t>(x)] =
-                std::clamp(std::min(crestTop, runLo), 0, limit);
-            prevTop = top;
+            // Flank: where the ridge jumps between neighbouring pixel
+            // columns, the original's pen ran as a steep hairline from
+            // (x - 0.5, prevY) to (x + 0.5, y), its width spread over the
+            // two columns it drifts across. Same here, row by row.
+            if (prevTop >= 0 && std::abs(top - prevTop) >= 2) {
+                const double dy  = y - prevY;
+                const double yLo = std::min(y, prevY);
+                const double yHi = std::max(y, prevY);
+                const int rA = std::max(0,     static_cast<int>(std::ceil(yLo - 0.5)));
+                const int rB = std::min(H - 1, static_cast<int>(std::floor(yHi - 0.5)));
+                for (int r = rA; r <= rB; ++r) {
+                    const double xr = (x - 0.5) + ((r + 0.5) - prevY) / dy;
+                    const double lo = xr - crestW * 0.5;
+                    const double hi = xr + crestW * 0.5;
+                    const double covL = std::clamp(
+                        std::min(hi, static_cast<double>(x)) - std::max(lo, x - 1.0), 0.0, 1.0);
+                    const double covR = std::clamp(
+                        std::min(hi, x + 1.0) - std::max(lo, static_cast<double>(x)), 0.0, 1.0);
+                    if (x - 1 >= 0) {
+                        paintCrest(x - 1, r, prevTop, prevLimit, covL, crestPx[c]);
+                    }
+                    paintCrest(x, r, top, limit, covR, crestPx[c]);
+                }
+            }
+
+            prevY     = y;
+            prevTop   = top;
+            prevLimit = limit;
         }
     }
+
+    // Deferred crest anti-aliasing, composited in painter's order: the
+    // entries were pushed front to back, so walk them back to front and the
+    // nearest trace's rim ends up on top, over whatever was drawn behind it.
+    for (auto it = m_partials.rbegin(); it != m_partials.rend(); ++it) {
+        blendInto(&rowPixels(it->y)[it->x], it->rgba, it->cov);
+    }
+    m_partials.clear();
 }
 
 }  // namespace Longpath

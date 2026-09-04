@@ -1658,4 +1658,11 @@ void SpectrumOverlayPanel::setClarityStatus(bool active, bool paused)
     m_clarityBadge->show();
 }
 
+void SpectrumOverlayPanel::setSpectrumRenderModeIndex(int renderModeIndex)
+{
+    if (!m_renderModeCmb) { return; }
+    if (renderModeIndex < 0 || renderModeIndex >= m_renderModeCmb->count()) { return; }
+    m_renderModeCmb->setCurrentIndex(renderModeIndex);
+}
+
 } // namespace Longpath

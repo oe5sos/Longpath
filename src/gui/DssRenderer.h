@@ -38,17 +38,21 @@
 // 1400x450 px, 1,3 s bei Retina 2800x900 px -- in AetherSDR selbst nur
 // der Notpfad, wenn das GPU-Mesh nicht angelegt werden kann. rebuild()
 // rastert deshalb direkt: Zeilen von vorn nach hinten gegen einen
-// Horizont je Spalte, jeder Pixel genau einmal geschrieben. Geometrie-
-// und Farbformeln sind unveraendert (siehe DssRenderer.cpp).
+// Horizont je Spalte, jeder Vorhangpixel genau einmal geschrieben; nur
+// die Kantenglaettung des Kamms wird gesammelt und am Ende in
+// Malreihenfolge gemischt. Das Bild ist dasselbe (Geometrie- und
+// Farbformeln unveraendert, Kamm-Stiftbreite als Deckung nachgebildet),
+// gemessen 7-10 ms je Bild statt 0,6-1,3 s. Siehe DssRenderer.cpp.
 //
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-09-03 — Ported (reduced scope, CPU-only) in C++20/Qt6 for
 //                 NereusSDR by Martin Fischer (OE5SOS), AI-assisted via
 //                 Anthropic Claude Code.
-//   2026-09-03 — rebuild() rasterises directly (horizon algorithm) instead
-//                 of QPainter polygons; same picture, ~100x faster. Martin
-//                 Fischer (OE5SOS), AI-assisted via Anthropic Claude Code.
+//   2026-09-03 — rebuild() rasterises directly (horizon algorithm, crest
+//                 anti-aliasing as coverage) instead of QPainter polygons;
+//                 same picture, ~100x faster. Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 #include <QColor>
@@ -58,13 +62,15 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+#include <vector>
 
 namespace Longpath {
 
 // ─── Stacked-trace spectrum stream surface ──────────────────────────────
 //
 // Renders a perspective stacked-trace spectrum stream: a rolling history of
-// FFT rows drawn back-to-front (painter's algorithm) as a receding
+// FFT rows composed back-to-front (painter's algorithm -- that is the
+// picture; the implementation walks front to back, see below) as a receding
 // trapezoid. The newest trace spans the full width across the front; older
 // traces recede into a narrower, higher trapezoid. Each ridge is filled
 // down to the plot floor so nearer traces occlude farther ones. Fill
@@ -75,7 +81,8 @@ namespace Longpath {
 // row arrives, the target size changes, or the amplitude mapping / palette
 // changes. The rebuild is a direct rasteriser (see rebuild() in the .cpp):
 // traces are walked front to back against a per-column horizon so every
-// pixel is written exactly once -- a few milliseconds even at Retina
+// curtain pixel is written exactly once, with the crest's anti-aliasing
+// composited afterwards -- about ten milliseconds even at Retina
 // panadapter sizes, where the QPainter painting it replaces needed well
 // over a second. The image composites through the existing QRhi overlay
 // pipeline (no new shaders). The renderer is standalone and knows nothing
@@ -148,6 +155,20 @@ private:
     std::array<float, kCols> m_rawPrev1{};
     std::array<float, kCols> m_rawPrev2{};
     int m_rawHistCount = 0;
+
+    // Crest anti-aliasing that cannot be applied in place while walking
+    // front to back: a partially covered rim pixel ABOVE its own curtain has
+    // to blend over traces that are drawn later (they lie behind). Collected
+    // during rebuild(), composited at its end, kept as a member only so the
+    // capacity survives between frames.
+    struct PartialCrest {
+        int     x;
+        int     y;
+        quint32 rgba;
+        float   cov;
+    };
+    std::vector<PartialCrest> m_partials;
+    bool m_rebuilding = false;   // re-entrancy guard for image() (see rebuild)
 
     // Cache + the parameters it was built for (rebuild on any change).
     QImage  m_cache;

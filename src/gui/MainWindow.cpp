@@ -5422,6 +5422,14 @@ void MainWindow::buildUI()
             activeSpectrumWidget()->setSpectrumRenderMode(
                 idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
         });
+        // Der Panadapter hat seinen Modus laengst aus den Einstellungen
+        // geladen (loadSettings in ensureOverlayPanels); das Panel wusste
+        // davon nichts und zeigte nach jedem Start "2D", auch wenn 3D
+        // gespeichert war. Der Setter loest nur bei echter Aenderung aus,
+        // und setSpectrumRenderMode() ist bei gleichem Wert ein No-op.
+        m_overlayPanel->setSpectrumRenderModeIndex(
+            activeSpectrumWidget()->spectrumRenderMode() == SpectrumRenderMode::Mode3D
+                ? 1 : 0);
 
         // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
         //

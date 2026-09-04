@@ -969,6 +969,17 @@ separately by the upstream
 
 ---
 
+### Nachtrag 2026-09-03 — Port nach dem 25c-Abgleich
+
+Zwei Dateien, die erst nach dem Abgleich entstanden sind; hier eingetragen,
+damit `scripts/check-new-ports.py --full-tree` sie als registriert erkennt
+(der Zähler oben bleibt der Stand von 25c).
+
+| NereusSDR file | AetherSDR counterpart | Evidence | Specific mod-history wording |
+|---|---|---|---|
+| `src/gui/DssRenderer.h` | `src/gui/DssRenderer.h` | Header attribution block names the counterpart [@31b29583]; class shape, ring buffer, shared geometry constants and `image()` contract carried over (reduced scope: no GPU-mesh accessors, no supplemental channels, no reprojection, no deep history). Index row in `AETHERSDR-PORTS.md` §3DSS. | Already present in the file header: "Ported from AetherSDR `src/gui/DssRenderer.{h,cpp}` (AetherSDR 31b29583)" + Modification history (2026-09-03, reduced-scope port; 2026-09-03, horizon rasteriser). |
+| `src/gui/DssRenderer.cpp` | `src/gui/DssRenderer.cpp` | `pushRow` (peak-preserving resample, median-of-3, temporal IIR) and `rebuild()` passes 1-2 (geometry, colour) close to verbatim [@31b29583]; `rebuild()` pass 3 (horizon rasteriser, coverage crest) is Longpath-original, replacing AetherSDR's QPainter painter's-algorithm drawing (measured 0.6–1.3 s/frame). | Already present in the file header: "Ported from AetherSDR `src/gui/DssRenderer.cpp` (AetherSDR 31b29583), reduced scope" + Modification history (2026-09-03 ×2). |
+
 ## Bucket B — False AetherSDR citations (126 files)
 
 Every file below carries the mod-history boilerplate

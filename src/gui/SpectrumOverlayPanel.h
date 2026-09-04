@@ -145,6 +145,14 @@ public:
     // active=true → green "C", paused=true → amber "C", both false → hidden.
     void setClarityStatus(bool active, bool paused);
 
+    // Show the persisted spectrum render mode (0 = 2D, 1 = 3D) in the
+    // Display flyout's combo. The SpectrumWidget loads its settings before
+    // this panel exists; without this the combo shows "2D" after every
+    // start regardless of what was saved. Emits spectrumRenderModeChanged
+    // only if the index actually changes, and the receiving setter is
+    // idempotent, so calling it with the widget's own state is a no-op.
+    void setSpectrumRenderModeIndex(int renderModeIndex);
+
 private:
     /// Which panadapter this strip is drawn on; see setPanId.
     QString m_panId;
