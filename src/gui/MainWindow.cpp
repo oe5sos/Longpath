@@ -9453,6 +9453,31 @@ void MainWindow::buildMenuBar()
                 act->setEnabled(available);
             }
         });
+
+        // "WinAntenna" bewusst NICHT ueber m_appletVis->setAvailable(): das
+        // wuerde auch effectiveVisibilityChanged ausloesen und damit in
+        // applyWindowVisibility()'s eigene, bereits am 2026-09-01
+        // gegenpruefte Wiederaufgehen-Logik beim naechsten Connect
+        // hineinspielen (deren Speicher fuer "soll wieder aufgehen" ist
+        // genau isVisible/isAvailable). Betreiber 2026-09-05: nur den
+        // Haken ausgrauen, wenn kein Funkgeraet verbunden ist -- der
+        // Haken-Zustand (die Absicht) bleibt unangetastet, das
+        // Oeffnen/Schliessen bleibt allein bei applyWindowVisibility()'s
+        // eigener Sperre (MainWindow.cpp, WinAntenna-Zweig).
+        if (m_radioModel) {
+            auto updateAntennaMenuEnabled = [this](bool connected) {
+                if (auto* act = m_topMenuAppletActions.value(
+                        QStringLiteral("WinAntenna"), nullptr)) {
+                    act->setEnabled(connected);
+                }
+            };
+            updateAntennaMenuEnabled(
+                m_radioModel->connectionState() == ConnectionState::Connected);
+            connect(m_radioModel, &RadioModel::connectionStateChanged, this,
+                    [updateAntennaMenuEnabled](ConnectionState state) {
+                updateAntennaMenuEnabled(state == ConnectionState::Connected);
+            });
+        }
     }
 
     // =========================================================================

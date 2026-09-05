@@ -98,8 +98,10 @@
 #include <QSignalSpy>
 
 #include "core/AppSettings.h"
+#include "core/ConnectionState.h"
 #include "gui/LayoutProfiles.h"
 #include "gui/MainWindow.h"
+#include "models/RadioModel.h"
 #include "gui/WindowPlacement.h"
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletPanelWidget.h"
@@ -431,8 +433,15 @@ private slots:
         // deckt den echten Zustand bereits ab.
         QTest::newRow("WinChannelStrip") << QStringLiteral("WinChannelStrip")
                                          << QStringLiteral("Kanalzug");
-        QTest::newRow("WinAntenna")     << QStringLiteral("WinAntenna")
-                                         << QStringLiteral("Antenne");
+        // WinAntenna bewusst NICHT hier: seit 2026-09-05 sperrt MainWindow
+        // diesen Menueintrag (setEnabled(false)), solange kein Funkgeraet
+        // verbunden ist -- action->trigger() unten wirkt auf ein
+        // deaktiviertes QAction nicht, der Test wuerde also nicht die
+        // Persistenz pruefen, sondern nur beweisen, dass ein gesperrter
+        // Knopf sich nicht bewegen laesst. Das Sperren selbst deckt
+        // winAntennaMenuEntryGreysOutWhenDisconnected() weiter unten ab.
+        // Eine Pruefung der Haken-Persistenz UEBER einen echten
+        // Connect/Restart-Zyklus waere ein eigener, groesserer Test.
         QTest::newRow("WinSpotHub")     << QStringLiteral("WinSpotHub")
                                          << QStringLiteral("Spot-Zentrale");
         QTest::newRow("ChromeSpectrumButtons")
@@ -469,6 +478,34 @@ private slots:
         // Zurueck in den Ausgangszustand.
         action->trigger();
         QTest::qWait(150);
+    }
+
+    // Betreiber 2026-09-03/09-05: der "Antenne"-Haken blieb optisch
+    // anklickbar, obwohl er ohne Funkgeraet wirkungslos ist
+    // (applyWindowVisibility()'s eigene WinAntenna-Sperre, MainWindow.cpp).
+    // Fix greift NICHT ueber m_appletVis->setAvailable() (das wuerde auch
+    // das Fenster oeffnen/schliessen und in die Wiederaufgehen-Logik beim
+    // Connect hineinspielen) -- nur der Menueintrag selbst wird gesperrt,
+    // der Haken-Zustand (die Absicht) bleibt unangetastet.
+    void winAntennaMenuEntryGreysOutWhenDisconnected()
+    {
+        QAction* action = findActionByExactText(m_mw, QStringLiteral("Antenne"));
+        QVERIFY2(action, "Menueintrag 'Antenne' nicht gefunden");
+
+        RadioModel* radio = m_mw->findChild<RadioModel*>();
+        QVERIFY(radio);
+
+        radio->setConnectionStateForTest(ConnectionState::Disconnected);
+        QVERIFY2(!action->isEnabled(),
+                 "Der Antenne-Eintrag ist anklickbar, obwohl kein Funkgeraet verbunden ist");
+
+        radio->setConnectionStateForTest(ConnectionState::Connected);
+        QVERIFY2(action->isEnabled(),
+                 "Der Antenne-Eintrag bleibt ausgegraut, obwohl verbunden");
+
+        radio->setConnectionStateForTest(ConnectionState::Disconnected);
+        QVERIFY2(!action->isEnabled(),
+                 "Der Antenne-Eintrag ist nach erneuter Trennung wieder anklickbar");
     }
 };
 
