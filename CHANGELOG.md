@@ -63,22 +63,20 @@
   Stattdessen auf `kAccent` (das aktuelle Blau, das die Tuerkis-Rolle
   beerbt hat) -- Nachfrage bei Martin noch offen, ob das so passt.
 
-### Known
-
-- Der WinAntenna-Haken bleibt optisch gesetzt, wenn er ohne Funkgeraet
-  angeklickt wird (wirkungslos) oder waehrend eine Verbindung mitten in
-  der Sitzung abbricht -- Bug bekannt, siehe
-  `longpath-session-2026-09-03-stale-test-failures.md`. Betreiber-
-  Entscheidung 2026-09-05 fuer "automatisch abhaken bei Trennung" kann
-  so NICHT eins-zu-eins umgesetzt werden: `m_appletVis`s Sichtbarkeits-
-  Flag fuer "WinAntenna" ist bewusst der Speicher fuer "soll beim
-  naechsten Verbinden wieder aufgehen" (Review-Fund 2026-09-01,
-  `MainWindow.cpp` um Zeile 14477) -- ein Abhaken bei Trennung wuerde
-  dieses Wiederaufgehen nach dem naechsten Connect stillschweigend
-  abschalten. Vorschlag: den Eintrag stattdessen ausgrauen (Interaktion
-  sperren, Haken-Zustand/Erinnerung unangetastet) -- deckt dieselbe
-  Beschwerde ohne den Zielkonflikt. Noch nicht umgesetzt, Rueckfrage bei
-  Martin noetig.
+- **Der "Antenne"-Eintrag unter Containers > Applets graut jetzt aus,
+  statt anklickbar-aber-wirkungslos zu bleiben, solange kein Funkgeraet
+  verbunden ist.** `applyWindowVisibility()`s eigene WinAntenna-Sperre
+  (SWR-Sweep ist ohne Radio sicherheitsrelevant bedeutungslos) verwarf
+  einen Klick ohnehin lautlos; der Haken selbst blieb optisch anklickbar.
+  Betreiber 2026-09-05 wollte urspruenglich "automatisch abhaken bei
+  Trennung" -- das haette aber den Wiederaufgehen-Mechanismus beim
+  naechsten Connect (Review-Fund 2026-09-01) stillschweigend abgeschaltet,
+  da dessen Speicher fuer "soll wieder aufgehen" genau der Haken-Zustand
+  ist. Stattdessen nur `setEnabled()` auf dem Menueintrag, ueber einen
+  eigenen, schmalen `connectionStateChanged`-Hook -- der Haken-Zustand
+  (die Absicht) bleibt unangetastet, Oeffnen/Schliessen bleibt allein bei
+  der bestehenden Sperre. Neuer Test
+  `winAntennaMenuEntryGreysOutWhenDisconnected`.
 
 ## [0.6.3-rc3] - 2026-09-04
 
