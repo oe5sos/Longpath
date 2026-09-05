@@ -39,8 +39,36 @@
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
+#include <QSysInfo>
+#include <QThread>
+#ifdef Q_OS_MAC
+#include <sys/sysctl.h>
+#endif
 
 static QFile* s_logFile = nullptr;
+
+// Von einer AetherSDR-Sichtung angestossen (2026-09-05): dort gibt es ein
+// umfangreiches SystemInventory, das aber an ihre eigene Whisper/ggml-
+// Spracherkennung gekoppelt ist -- die hat Longpath nicht. Hier nur der
+// allgemeine Teil, den ein Support-Fall wirklich braucht: Betriebssystem,
+// CPU-Architektur, Kernzahl, Qt-Laufzeitversion, RAM (macOS; andere
+// Plattformen lassen das Feld bewusst weg statt zu raten -- "wir machen
+// hier nur mac", siehe CLAUDE.local.md).
+static void logStartupHardwareInventory()
+{
+    qInfo("System: %s, %s, %d Kerne, Qt %s",
+          qPrintable(QSysInfo::prettyProductName()),
+          qPrintable(QSysInfo::currentCpuArchitecture()),
+          QThread::idealThreadCount(),
+          qVersion());
+#ifdef Q_OS_MAC
+    int64_t memBytes = 0;
+    size_t len = sizeof(memBytes);
+    if (sysctlbyname("hw.memsize", &memBytes, &len, nullptr, 0) == 0 && memBytes > 0) {
+        qInfo("RAM: %.1f GB", static_cast<double>(memBytes) / (1024.0 * 1024.0 * 1024.0));
+    }
+#endif
+}
 
 // Redact PII from log messages before writing to file.
 // Patterns: IP addresses, MAC addresses.
@@ -290,6 +318,8 @@ int main(int argc, char* argv[])
         delete s_logFile;
         s_logFile = nullptr;
     }
+
+    logStartupHardwareInventory();
 
     // Fusion style as a clean cross-platform base, then layer the
     // NereusSDR dark palette + minimal baseline QSS on top so every
