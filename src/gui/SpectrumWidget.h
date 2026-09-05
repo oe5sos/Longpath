@@ -422,6 +422,14 @@ public:
     void setWfBlackLevel(int level);
     int  wfBlackLevel() const { return m_wfBlackLevel; }
 
+    // Display-Flyout auf/zu (der Pfeil-Knopf links oben im Panel) --
+    // reines Chrome, keine Wasserfall-Eigenschaft, aber vom selben Fehler
+    // betroffen: SpectrumOverlayPanel::collapsed() wurde nie irgendwohin
+    // verdrahtet (aehnlich dem B8-Task-20-Fund bei WF Gain/Black Lvl/
+    // Farbschema), der Zustand ging also nie in die Einstellungen.
+    void setOverlayPanelExpanded(bool expanded);
+    bool overlayPanelExpanded() const { return m_overlayPanelExpanded; }
+
     // ---- Spectrum renderer controls (Phase 3G-8 commit 3) ----
 
     // Legacy combined averaging mode — kept for backward compat (existing
@@ -2355,6 +2363,7 @@ private:
     WfColorScheme m_wfColorScheme{WfColorScheme::Default};
     int    m_wfColorGain{45};         // 0-100
     int    m_wfBlackLevel{104};       // 0-125 — keep in sync with loadSettings ship default
+    bool   m_overlayPanelExpanded{true};
     // Waterfall uses its own dBm range (narrower than spectrum for better contrast).
     // Persistent user-configured thresholds (saved/loaded as DisplayWfHigh/LowLevel).
     // Ship defaults — keep in sync with loadSettings (SpectrumWidget.cpp)

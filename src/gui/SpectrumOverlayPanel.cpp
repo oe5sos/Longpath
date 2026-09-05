@@ -684,6 +684,16 @@ void SpectrumOverlayPanel::toggle()
     emit collapsed(!m_expanded);
 }
 
+void SpectrumOverlayPanel::setExpandedState(bool expanded)
+{
+    if (m_expanded == expanded) { return; }
+    m_expanded = expanded;
+    if (!m_expanded) {
+        hideFlyout();
+    }
+    updateLayout();
+}
+
 // ── Band flyout ───────────────────────────────────────────────────────────────
 
 void SpectrumOverlayPanel::buildBandFlyout()

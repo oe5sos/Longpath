@@ -921,6 +921,8 @@ void SpectrumWidget::loadSettings()
                           readFloat(QStringLiteral("DisplayBandwidth"), 192000.0f));
     m_wfColorGain    = readInt(QStringLiteral("DisplayWfColorGain"), 45);
     m_wfBlackLevel   = readInt(QStringLiteral("DisplayWfBlackLevel"), 104);
+    m_overlayPanelExpanded = readBool(
+        QStringLiteral("DisplayOverlayPanelExpanded"), true);
     m_wfHighThreshold = readFloat(QStringLiteral("DisplayWfHighLevel"), -62.0f);
     m_wfLowThreshold = readFloat(QStringLiteral("DisplayWfLowLevel"), -122.0f);
     // Seed render-active mirror from persistent user values — matches
@@ -1331,6 +1333,8 @@ void SpectrumWidget::saveSettings()
     writeFloat(QStringLiteral("DisplayFftFillAlpha"), m_fillAlpha);
     s.setValue(settingsKey(QStringLiteral("DisplayPanFill"), m_panIndex),
               m_panFill ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayOverlayPanelExpanded"), m_panIndex),
+              m_overlayPanelExpanded ? QStringLiteral("True") : QStringLiteral("False"));
     writeInt(QStringLiteral("DisplayWfColorScheme"), static_cast<int>(m_wfColorScheme));
     writeInt(QStringLiteral("DisplaySpectrumRenderMode"), static_cast<int>(m_renderMode));
     s.setValue(settingsKey(QStringLiteral("DisplayCtunEnabled"), m_panIndex),
@@ -1700,6 +1704,13 @@ void SpectrumWidget::setWfBlackLevel(int level)
     m_wfBlackLevel = level;
     scheduleSettingsSave();
     update();
+}
+
+void SpectrumWidget::setOverlayPanelExpanded(bool expanded)
+{
+    if (m_overlayPanelExpanded == expanded) { return; }
+    m_overlayPanelExpanded = expanded;
+    scheduleSettingsSave();
 }
 
 // ---- Phase 3G-8 commit 3 setters ----

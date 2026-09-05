@@ -5447,6 +5447,16 @@ void MainWindow::buildUI()
         m_overlayPanel->setColorSchemeIndex(
             static_cast<int>(activeSpectrumWidget()->wfColorScheme()));
 
+        // Der Auf/Zu-Pfeil links oben am Panel (◀/▶) war noch nicht einmal
+        // in der obigen B8-Task-20-Liste: collapsed() wurde nie irgendwohin
+        // verdrahtet, der Zustand ging also gar nicht erst in die
+        // Einstellungen, egal ob beim Speichern oder Laden.
+        connect(m_overlayPanel, &SpectrumOverlayPanel::collapsed,
+                activeSpectrumWidget(), [this](bool isCollapsed) {
+            activeSpectrumWidget()->setOverlayPanelExpanded(!isCollapsed);
+        });
+        m_overlayPanel->setExpandedState(activeSpectrumWidget()->overlayPanelExpanded());
+
         // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
         //
         // Sie waren seit jeher TOT. Der Betreiber am 2026-08-22: "test

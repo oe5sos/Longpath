@@ -172,6 +172,14 @@ public:
     // (operator decision, 2026-09-05) — see CHANGELOG.md.
     void setColorSchemeIndex(int index);
 
+    // The collapsed()/expanded chrome state (the ◀/▶ arrow, top-left)
+    // was never wired to anything — SpectrumWidget loads its own display
+    // settings, but this panel's own auf/zu state was never among them,
+    // so it always started expanded. Sets m_expanded directly, without
+    // re-emitting collapsed(), so restoring it can't loop back into
+    // SpectrumWidget::setOverlayPanelExpanded().
+    void setExpandedState(bool expanded);
+
 private:
     /// Which panadapter this strip is drawn on; see setPanId.
     QString m_panId;

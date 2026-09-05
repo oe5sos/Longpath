@@ -16,10 +16,12 @@
 
 #include <QtTest>
 #include <QComboBox>
+#include <QPushButton>
 #include <QSlider>
 
 #include "core/AppSettings.h"
 #include "gui/MainWindow.h"
+#include "gui/SpectrumOverlayPanel.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/AsrApplet.h"
 #include "gui/applets/FrequencyApplet.h"
@@ -197,6 +199,55 @@ private slots:
                      "Das Widget hat das Farbschema vergessen");
             QVERIFY2(combo->currentIndex() == 7,
                      "Der Combo zeigt seine Vorgabe, obwohl das Widget Schema 7 geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Der Auf/Zu-Pfeil (◀/▶) links oben am Display-Flyout war nirgendwo
+    // verdrahtet -- SpectrumOverlayPanel::collapsed() wurde emittiert,
+    // aber nichts hoerte zu, also ging der Zustand nie in die
+    // Einstellungen. Klickt den echten Knopf (nicht den privaten
+    // toggle()), damit der ganze Signalweg mitgeprueft ist.
+    void flyoutAufZuUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* panel = mw->findChild<SpectrumOverlayPanel*>();
+            QVERIFY2(panel, "Display-Flyout-Panel nicht gefunden");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(sw->overlayPanelExpanded(), true);
+
+            QPushButton* collapseBtn = nullptr;
+            for (QPushButton* b : panel->findChildren<QPushButton*>()) {
+                if (b->text() == QStringLiteral("◀")) { collapseBtn = b; break; }
+            }
+            QVERIFY2(collapseBtn, "Auf/Zu-Knopf (◀) nicht gefunden");
+            collapseBtn->click();
+            QCOMPARE(sw->overlayPanelExpanded(), false);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QVERIFY2(!sw->overlayPanelExpanded(),
+                     "Das Widget hat den Auf/Zu-Zustand vergessen");
+
+            auto* panel = mw->findChild<SpectrumOverlayPanel*>();
+            QVERIFY(panel);
+            QPushButton* collapseBtn = nullptr;
+            for (QPushButton* b : panel->findChildren<QPushButton*>()) {
+                if (b->text() == QStringLiteral("▶")) { collapseBtn = b; break; }
+            }
+            QVERIFY2(collapseBtn,
+                     "Der Knopf zeigt nicht '▶', obwohl das Widget zugeklappt geladen hat");
             mw->close();
             delete mw;
         }
