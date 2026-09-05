@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
+  Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
+  AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
+
 ### Fixed
 
 - **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand
