@@ -952,7 +952,22 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
         m_colorSchemeCmb = new QComboBox;
         m_colorSchemeCmb->setObjectName(QStringLiteral("colorSchemeCmb"));
         m_colorSchemeCmb->setFixedHeight(18);
-        m_colorSchemeCmb->addItems({"Classic", "Phosphor", "Sunrise", "Inverted"});
+        // War {"Classic","Phosphor","Sunrise","Inverted"} -- vier erfundene
+        // Namen, die keinem WfColorScheme-Wert entsprachen; das aktuell
+        // geladene Schema (z.B. ClarityBlue) war darueber gar nicht
+        // waehlbar. Betreiber 2026-09-05: alle Schemata aufnehmen. Liste
+        // wortgleich aus DisplaySetupPages.cpp uebernommen (dort seit
+        // Phase 3G-8/3G-9b die kanonische, Reihenfolge-verbindliche
+        // Quelle -- der Index IST der gespeicherte Wert, siehe dortiger
+        // Kommentar). Anhaengen, nie einfuegen.
+        m_colorSchemeCmb->addItems({
+            QStringLiteral("Default"),   QStringLiteral("Enhanced"),
+            QStringLiteral("Spectran"),  QStringLiteral("BlackWhite"),
+            QStringLiteral("LinLog"),    QStringLiteral("LinRad"),
+            QStringLiteral("Custom"),
+            QStringLiteral("Clarity Blue"),
+            QStringLiteral("Gedämpft")
+        });
         grid->addWidget(m_colorSchemeCmb, row, 2, 1, 2);
         connect(m_colorSchemeCmb, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, &SpectrumOverlayPanel::colorSchemeChanged);
@@ -1015,7 +1030,11 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
 
         m_wfBlackSlider = new QSlider(Qt::Horizontal);
         m_wfBlackSlider->setObjectName(QStringLiteral("wfBlackSlider"));
-        m_wfBlackSlider->setRange(0, 100);
+        // SpectrumWidget::m_wfBlackLevel reicht 0..125 (Vorgabe 104); der
+        // Regler deckelte bislang bei 100 und haette einen gespeicherten
+        // Wert darueber beim ersten Anfassen still gekappt. Betreiber
+        // 2026-09-05: Regler auf den Widget-Bereich erweitern.
+        m_wfBlackSlider->setRange(0, 125);
         m_wfBlackSlider->setValue(15);
         m_wfBlackSlider->setStyleSheet(sliderStyle);
         m_wfBlackSlider->setToolTip("Waterfall black level. Increase to darken the noise floor.");
@@ -1669,6 +1688,19 @@ void SpectrumOverlayPanel::setWfGainValue(int gain)
 {
     if (!m_wfGainSlider) { return; }
     m_wfGainSlider->setValue(gain);
+}
+
+void SpectrumOverlayPanel::setWfBlackLevelValue(int level)
+{
+    if (!m_wfBlackSlider) { return; }
+    m_wfBlackSlider->setValue(level);
+}
+
+void SpectrumOverlayPanel::setColorSchemeIndex(int index)
+{
+    if (!m_colorSchemeCmb) { return; }
+    if (index < 0 || index >= m_colorSchemeCmb->count()) { return; }
+    m_colorSchemeCmb->setCurrentIndex(index);
 }
 
 } // namespace Longpath

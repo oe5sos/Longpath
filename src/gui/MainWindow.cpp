@@ -5434,9 +5434,18 @@ void MainWindow::buildUI()
         // Gleiche Masche, ein Regler weiter: die WF-Gain-Slider hatte ihren
         // eigenen fest verdrahteten Vorgabewert (50) und wusste nichts vom
         // Wert, den SpectrumWidget schon geladen hatte (Vorgabe 45). Beide
-        // reichen von 0 bis 100 -- kein Deckelungsproblem hier, anders als
-        // bei Black Lvl/Farbschema (siehe CHANGELOG "Known").
+        // reichen von 0 bis 100 -- kein Deckelungsproblem hier.
         m_overlayPanel->setWfGainValue(activeSpectrumWidget()->wfColorGain());
+
+        // Black Lvl und Farbschema hatten denselben Restore-Fehler, dazu
+        // je einen echten Konflikt (Wertebereich bzw. fehlende Eintraege),
+        // der erst eine Entscheidung brauchte (Betreiber 2026-09-05: Regler
+        // auf 0..125 erweitern; Combo um alle Schemata ergaenzen -- siehe
+        // die beiden Konstruktor-Stellen oben in SpectrumOverlayPanel.cpp).
+        // Jetzt, mit beiden Konflikten geloest, derselbe Nachzieh-Aufruf.
+        m_overlayPanel->setWfBlackLevelValue(activeSpectrumWidget()->wfBlackLevel());
+        m_overlayPanel->setColorSchemeIndex(
+            static_cast<int>(activeSpectrumWidget()->wfColorScheme()));
 
         // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
         //

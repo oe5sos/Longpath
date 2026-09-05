@@ -161,6 +161,17 @@ public:
     // is idempotent on an unchanged value.
     void setWfGainValue(int gain);
 
+    // Same restore gap as setWfGainValue, for the Black Lvl slider. Its
+    // range was widened from 0..100 to 0..125 (operator decision,
+    // 2026-09-05) to match SpectrumWidget's own range — see
+    // CHANGELOG.md.
+    void setWfBlackLevelValue(int level);
+
+    // Same restore gap, for the Scheme combo. Its item list was expanded
+    // from four placeholder names to the full WfColorScheme list
+    // (operator decision, 2026-09-05) — see CHANGELOG.md.
+    void setColorSchemeIndex(int index);
+
 private:
     /// Which panadapter this strip is drawn on; see setPanId.
     QString m_panId;

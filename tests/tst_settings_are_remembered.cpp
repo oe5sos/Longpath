@@ -93,10 +93,7 @@ private slots:
     // Gleicher Fehler wie bei der 3D-Ansicht, ein Regler weiter: die
     // WF-Gain-Slider im Display-Flyout hatte ihren eigenen fest
     // verdrahteten Vorgabewert (50) und wusste nichts vom Wert, den
-    // SpectrumWidget schon geladen hatte. Black Lvl und Farbschema haben
-    // denselben Fehler, aber zusaetzlich einen echten Wertebereich- bzw.
-    // Eintrags-Konflikt (siehe CHANGELOG "Known") -- die bleiben bewusst
-    // aussen vor, bis darueber entschieden ist.
+    // SpectrumWidget schon geladen hatte.
     void wfGainUeberlebtDenNeustart()
     {
         {
@@ -124,6 +121,82 @@ private slots:
             QVERIFY2(sw->wfColorGain() == 77, "Das Widget hat den WF-Gain-Wert vergessen");
             QVERIFY2(slider->value() == 77,
                      "Der Regler zeigt seine Vorgabe, obwohl das Widget 77 geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Gleicher Fehler wie WF Gain, plus der Regler-Bereich (0..100), der
+    // zu eng fuer das Widget (0..125) war. 110 liegt bewusst ueber der
+    // alten Deckelung -- waere der Bereich nicht wirklich erweitert
+    // worden, wuerde setValue(110) hier still auf 100 gekappt und der
+    // Test faellt sichtbar durch, statt zufaellig grün zu bleiben.
+    void blackLvlUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfBlackSlider"));
+            QVERIFY2(slider, "Regler 'Black Lvl' nicht gefunden");
+            QCOMPARE(slider->maximum(), 125);
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(slider->value(), sw->wfBlackLevel());
+            slider->setValue(110);
+            QCOMPARE(sw->wfBlackLevel(), 110);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfBlackSlider"));
+            QVERIFY(slider);
+            QVERIFY2(sw->wfBlackLevel() == 110, "Das Widget hat den Black-Lvl-Wert vergessen");
+            QVERIFY2(slider->value() == 110,
+                     "Der Regler zeigt seine Vorgabe, obwohl das Widget 110 geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Gleicher Fehler wie WF Gain, plus vier erfundene Combo-Eintraege,
+    // die keinem WfColorScheme-Wert entsprachen. Index 7 ("Clarity Blue")
+    // liegt bewusst ausserhalb der alten Vier -- war die Liste nicht
+    // wirklich erweitert worden, gaebe es diesen Eintrag im Combo gar
+    // nicht und der Test faellt beim Setzen schon durch.
+    void farbschemaUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("colorSchemeCmb"));
+            QVERIFY2(combo, "Combo 'Farbschema' nicht gefunden");
+            QVERIFY2(combo->count() >= 9, "Der Combo hat nicht alle Schemata");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            combo->setCurrentIndex(7);
+            QCOMPARE(static_cast<int>(sw->wfColorScheme()), 7);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("colorSchemeCmb"));
+            QVERIFY(combo);
+            QVERIFY2(static_cast<int>(sw->wfColorScheme()) == 7,
+                     "Das Widget hat das Farbschema vergessen");
+            QVERIFY2(combo->currentIndex() == 7,
+                     "Der Combo zeigt seine Vorgabe, obwohl das Widget Schema 7 geladen hat");
             mw->close();
             delete mw;
         }

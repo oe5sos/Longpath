@@ -55,6 +55,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "MeterItem.h"
+#include "gui/StyleConstants.h"
 #include <QColor>
 #include <vector>
 
@@ -171,8 +172,15 @@ private:
     RingBuffer m_buf0;
     RingBuffer m_buf1;
 
-    // Colors: cyan for axis 0 (AetherSDR palette), amber for axis 1
-    QColor  m_lineColor0{0x00, 0xb4, 0xd8};   // #00b4d8 cyan
+    // War Tuerkis fuer Achse 0 (abgeschafft), Bernstein fuer Achse 1
+    // (AetherSDR-Palette) -- absichtlich zwei verschiedene Farben, damit
+    // die zwei Kurven auseinanderzuhalten sind. Nicht auf die Bernstein-
+    // Rolle "measured" umgestellt wie PowerBar/SwrBar/S-Meter-Text: Achse
+    // 1 sitzt schon auf Bernstein, Achse 0 wuerde ihr sonst zum Verwechseln
+    // aehnlich. Auf kAccent (das neue Blau, das die Tuerkis-Rolle beerbt
+    // hat) statt auf einen Messwert-Ton -- eigene Nachfrage bei Martin
+    // noetig, siehe CHANGELOG.
+    QColor  m_lineColor0{Style::role("accent", Style::kAccent)};
     QColor  m_lineColor1{0xff, 0xb8, 0x00};   // #ffb800 amber
     bool    m_showGrid{true};
     bool    m_autoScale0{true};

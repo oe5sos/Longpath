@@ -31,18 +31,54 @@
   (45). Beide reichen von 0 bis 100, also kein Wertebereich-Konflikt --
   reiner Nachtrag. Ebenfalls in `tst_settings_are_remembered` gedeckt.
 
+- **Black Lvl und Farbschema desselben Flyouts zeigen jetzt ebenfalls
+  den gespeicherten Wert.** Beide hatten denselben Nachzieh-Fehler wie
+  WF Gain, dazu je einen echten Konflikt, der erst eine Entscheidung
+  brauchte (Betreiber 2026-09-05):
+  - Schwarzwert-Schieber reichte bis 100, das Widget kennt 0..125
+    (Vorgabe 104) -- der Regler haette einen gespeicherten Wert darueber
+    beim ersten Anfassen still auf 100 gekappt. Regler jetzt auf 0..125
+    erweitert.
+  - Schema-Combo hatte vier erfundene Eintraege ("Classic/Phosphor/
+    Sunrise/Inverted"), die keinem `WfColorScheme`-Wert entsprachen; das
+    Widget kennt mindestens neun Schemata, darunter das damals geladene
+    ClarityBlue, das im Combo gar nicht waehlbar war. Liste jetzt
+    wortgleich aus der Setup-Seite (Setup > Display) uebernommen, wo sie
+    seit Phase 3G-8/9b die kanonische Quelle ist.
+
+  Beide Rundlaeufe in `tst_settings_are_remembered` festgenagelt.
+
+- **Vier Messwert-Anzeigen in `meters/` zeigten noch das 2026-08-21
+  abgeschaffte Tuerkis (`#00b4d8`), unabhaengig vom aktuellen Farbschema.**
+  Power-Balken, SWR-Balken und der S-Meter-Text (`ItemGroup.cpp`,
+  `MeterItem.cpp`) wurden bislang mit dem rohen Hex-Wert konstruiert statt
+  mit einer benannten Rolle. `HGauge.cpp` hatte fuer vergleichbare Balken
+  bereits die Trennung aus `HAUSSTIL.md` umgesetzt (Messwert = Bernstein,
+  nicht Blau); die drei genannten Stellen jetzt auf dieselbe Rolle
+  (`Style::role("measured", Style::kAmberText)`) umgestellt (Betreiber
+  2026-09-05). Die vierte, urspruenglich mit vorgeschlagene Stelle
+  (Verlaufsgraph-Achse 0, `HistoryGraphItem.h`) wurde bewusst NICHT auf
+  Bernstein umgestellt: Achse 1 desselben Graphen sitzt bereits auf
+  Bernstein, beide Achsen waeren sich zum Verwechseln aehnlich geworden.
+  Stattdessen auf `kAccent` (das aktuelle Blau, das die Tuerkis-Rolle
+  beerbt hat) -- Nachfrage bei Martin noch offen, ob das so passt.
+
 ### Known
 
-- Black Lvl und Farbschema desselben Flyouts haben denselben Fehler wie
-  WF Gain, aber zusaetzlich einen echten Konflikt, der eine Entscheidung
-  ueber den Regler selbst braucht, kein blosses Nachziehen: der
-  Schwarzwert-Schieber reicht bis 100, das Widget kennt 0..125 (aktueller
-  Wert 104 wuerde beim ersten Anfassen des Reglers still auf 100 gekappt);
-  der Schema-Combo hat vier feste Eintraege ("Classic/Phosphor/Sunrise/
-  Inverted"), die nicht einmal den echten `WfColorScheme`-Namen
-  entsprechen, waehrend das Widget mindestens neun Schemata kennt
-  (u.a. das aktuell geladene ClarityBlue, das im Combo gar nicht waehlbar
-  ist).
+- Der WinAntenna-Haken bleibt optisch gesetzt, wenn er ohne Funkgeraet
+  angeklickt wird (wirkungslos) oder waehrend eine Verbindung mitten in
+  der Sitzung abbricht -- Bug bekannt, siehe
+  `longpath-session-2026-09-03-stale-test-failures.md`. Betreiber-
+  Entscheidung 2026-09-05 fuer "automatisch abhaken bei Trennung" kann
+  so NICHT eins-zu-eins umgesetzt werden: `m_appletVis`s Sichtbarkeits-
+  Flag fuer "WinAntenna" ist bewusst der Speicher fuer "soll beim
+  naechsten Verbinden wieder aufgehen" (Review-Fund 2026-09-01,
+  `MainWindow.cpp` um Zeile 14477) -- ein Abhaken bei Trennung wuerde
+  dieses Wiederaufgehen nach dem naechsten Connect stillschweigend
+  abschalten. Vorschlag: den Eintrag stattdessen ausgrauen (Interaktion
+  sperren, Haken-Zustand/Erinnerung unangetastet) -- deckt dieselbe
+  Beschwerde ohne den Zielkonflikt. Noch nicht umgesetzt, Rueckfrage bei
+  Martin noetig.
 
 ## [0.6.3-rc3] - 2026-09-04
 
