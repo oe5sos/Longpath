@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand
+  jetzt ebenfalls.** Von einer AetherSDR-Sichtung angestossen: dort gibt
+  es das schon, hier fehlte es. `SpectrumOverlayPanel::collapsed()` war
+  seit jeher ein Signal ohne Empfaenger -- der Knopf stand nach jedem
+  Neustart wieder auf "auf".
+
 - **3D-Ansicht des Spektrums: von einem Bild pro Sekunde auf fluessig.**
   Die 3D-Ansicht (Display-Flyout, "Spectrum: 3D Stacked Trace") baute
   ihre Flaeche auf dem Weg von AetherSDRs CPU-Notpfad: je Bild 96 Zeilen
