@@ -59,6 +59,7 @@ mw0lge@grange-lane.co.uk
 
 #include <QObject>
 #include <QSignalSpy>
+#include <QSharedMemory>
 #include <QUdpSocket>
 #include <QtTest>
 #include "core/RadioDiscovery.h"
@@ -244,6 +245,73 @@ private slots:
         QVERIFY2(other.holdOffRemainingMs() > 4000,
                  "a second RadioDiscovery instance ignored the quiet period — "
                  "the Add Radio dialog could probe a stopping radio");
+    }
+
+    // 2026-09-05 (longpath-p2-discovery-crossprocess-freeze). The test above
+    // only proves the guard is shared WITHIN one process; the bug it was
+    // named after is two independent Longpath PROCESSES, each starting with
+    // its own clean s_scanHoldOff. holdOffScans() now also mirrors its
+    // deadline into a QSharedMemory segment every process on the machine can
+    // see. We can't spawn a second real process cheaply here, but a second,
+    // independently-constructed QSharedMemory handle attached to the same
+    // key IS the same OS-level test a second process would perform — the
+    // isolation that makes two processes "independent" is address space,
+    // which QSharedMemory's own attach/lock/data() calls don't touch at all.
+    //
+    // Key literal duplicated from the anonymous-namespace constant in
+    // RadioDiscovery.cpp (kCrossProcessHoldoffKey) — not reachable from a
+    // test, so kept in sync by this comment rather than a shared header.
+    void holdOffIsVisibleAcrossSharedMemory() {
+        constexpr auto kKey = "at.oe5sos.longpath.discoveryHoldoff";
+
+        // Write side: holdOffScans() must publish a future deadline that a
+        // completely separate QSharedMemory handle (standing in for another
+        // process) can read back.
+        {
+            RadioDiscovery disc;
+            disc.holdOffScans(std::chrono::milliseconds(5000));
+
+            QSharedMemory reader{QLatin1String(kKey)};
+            QVERIFY2(reader.attach(QSharedMemory::ReadOnly),
+                     "holdOffScans() did not create the cross-process shared segment");
+            QVERIFY(reader.lock());
+            QVERIFY2(reader.size() >= static_cast<int>(sizeof(qint64)),
+                     "shared segment is smaller than the qint64 deadline it should hold");
+            const qint64 deadlineNs = *static_cast<const qint64*>(reader.constData());
+            reader.unlock();
+
+            const qint64 nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            QVERIFY2(deadlineNs > nowNs,
+                     "published deadline is not in the future — a second process "
+                     "would see no holdoff at all");
+        }
+
+        // Read side, the actual bug: a value written by "someone else" (here,
+        // a bare QSharedMemory write, standing in for another Longpath
+        // process) must show up in a BRAND NEW RadioDiscovery's
+        // holdOffRemainingMs() — that object's own s_scanHoldOff has never
+        // been armed, so only the cross-process path can explain a nonzero
+        // result.
+        {
+            QSharedMemory writer{QLatin1String(kKey)};
+            if (!writer.attach()) {
+                QVERIFY2(writer.create(sizeof(qint64)),
+                         "could not create or attach the shared segment for the read-side check");
+            }
+            QVERIFY(writer.lock());
+            const qint64 farFutureNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                (std::chrono::steady_clock::now() + std::chrono::seconds(6)).time_since_epoch()).count();
+            *static_cast<qint64*>(writer.data()) = farFutureNs;
+            writer.unlock();
+
+            RadioDiscovery fresh;   // never called holdOffScans() itself
+            QVERIFY2(fresh.holdOffRemainingMs() > 4000,
+                     "a deadline published by another process (simulated via a bare "
+                     "QSharedMemory write) was not honoured by a brand-new "
+                     "RadioDiscovery — the exact gap longpath-p2-discovery-"
+                     "crossprocess-freeze describes");
+        }
     }
 
     void timeoutEmitsProbeFailed() {

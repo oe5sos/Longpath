@@ -236,10 +236,13 @@ public:
     }
     void forceStaleCheckForTest() { onStaleCheck(); }
 
-    // The holdOffScans deadline is process-wide (see s_scanHoldOff), so it
-    // survives across test functions and would defer probes in unrelated
-    // cases. Call from a QTest init() for a clean slate.
-    static void clearHoldOffForTest() { s_scanHoldOff = QDeadlineTimer(); }
+    // The holdOffScans deadline is process-wide (see s_scanHoldOff) AND, as
+    // of 2026-09-05, mirrored into a cross-process shared-memory segment
+    // (see the anonymous-namespace helpers in RadioDiscovery.cpp) — either
+    // one surviving across test functions would defer probes in unrelated
+    // cases. Call from a QTest init() for a clean slate. Defined in the .cpp
+    // file because clearing the shared segment needs those TU-local helpers.
+    static void clearHoldOffForTest();
 #endif
 
     // Public static parsers — exposed for unit-testing in Task 5.
