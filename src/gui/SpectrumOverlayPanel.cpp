@@ -1665,4 +1665,10 @@ void SpectrumOverlayPanel::setSpectrumRenderModeIndex(int renderModeIndex)
     m_renderModeCmb->setCurrentIndex(renderModeIndex);
 }
 
+void SpectrumOverlayPanel::setWfGainValue(int gain)
+{
+    if (!m_wfGainSlider) { return; }
+    m_wfGainSlider->setValue(gain);
+}
+
 } // namespace Longpath

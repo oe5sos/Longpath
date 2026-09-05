@@ -153,6 +153,14 @@ public:
     // idempotent, so calling it with the widget's own state is a no-op.
     void setSpectrumRenderModeIndex(int renderModeIndex);
 
+    // Same gap as setSpectrumRenderModeIndex, one slider over: the WF Gain
+    // slider is built with its own hardcoded default (50) and never learns
+    // what SpectrumWidget actually loaded (default 45). Both share a 0-100
+    // range, so there is no clamping concern here — setValue() is a no-op
+    // if the value already matches, and SpectrumWidget::setWfColorGain()
+    // is idempotent on an unchanged value.
+    void setWfGainValue(int gain);
+
 private:
     /// Which panadapter this strip is drawn on; see setPanId.
     QString m_panId;

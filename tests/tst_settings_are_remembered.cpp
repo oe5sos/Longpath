@@ -16,6 +16,7 @@
 
 #include <QtTest>
 #include <QComboBox>
+#include <QSlider>
 
 #include "core/AppSettings.h"
 #include "gui/MainWindow.h"
@@ -84,6 +85,45 @@ private slots:
                      "Das Widget hat die 3D-Ansicht vergessen");
             QVERIFY2(combo->currentIndex() == 1,
                      "Der Combo zeigt 2D, obwohl das Widget 3D zeichnet");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Gleicher Fehler wie bei der 3D-Ansicht, ein Regler weiter: die
+    // WF-Gain-Slider im Display-Flyout hatte ihren eigenen fest
+    // verdrahteten Vorgabewert (50) und wusste nichts vom Wert, den
+    // SpectrumWidget schon geladen hatte. Black Lvl und Farbschema haben
+    // denselben Fehler, aber zusaetzlich einen echten Wertebereich- bzw.
+    // Eintrags-Konflikt (siehe CHANGELOG "Known") -- die bleiben bewusst
+    // aussen vor, bis darueber entschieden ist.
+    void wfGainUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfGainSlider"));
+            QVERIFY2(slider, "Regler 'WF Gain' nicht gefunden");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(slider->value(), sw->wfColorGain());
+            slider->setValue(77);
+            QCOMPARE(sw->wfColorGain(), 77);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfGainSlider"));
+            QVERIFY(slider);
+            QVERIFY2(sw->wfColorGain() == 77, "Das Widget hat den WF-Gain-Wert vergessen");
+            QVERIFY2(slider->value() == 77,
+                     "Der Regler zeigt seine Vorgabe, obwohl das Widget 77 geladen hat");
             mw->close();
             delete mw;
         }

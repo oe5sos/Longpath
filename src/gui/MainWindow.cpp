@@ -5431,6 +5431,13 @@ void MainWindow::buildUI()
             activeSpectrumWidget()->spectrumRenderMode() == SpectrumRenderMode::Mode3D
                 ? 1 : 0);
 
+        // Gleiche Masche, ein Regler weiter: die WF-Gain-Slider hatte ihren
+        // eigenen fest verdrahteten Vorgabewert (50) und wusste nichts vom
+        // Wert, den SpectrumWidget schon geladen hatte (Vorgabe 45). Beide
+        // reichen von 0 bis 100 -- kein Deckelungsproblem hier, anders als
+        // bei Black Lvl/Farbschema (siehe CHANGELOG "Known").
+        m_overlayPanel->setWfGainValue(activeSpectrumWidget()->wfColorGain());
+
         // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
         //
         // Sie waren seit jeher TOT. Der Betreiber am 2026-08-22: "test

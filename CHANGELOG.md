@@ -25,15 +25,24 @@
   3D gezeichnet wurde. Der Rundlauf Setzen -> Schliessen -> Neustart ist
   jetzt in `tst_settings_are_remembered` festgenagelt.
 
+- **Der Regler "WF Gain" desselben Flyouts zeigt jetzt ebenfalls den
+  gespeicherten Wert.** Derselbe Fehler wie beim 2D/3D-Combo: eigener
+  fest verdrahteter Vorgabewert (50) statt des vom Widget geladenen
+  (45). Beide reichen von 0 bis 100, also kein Wertebereich-Konflikt --
+  reiner Nachtrag. Ebenfalls in `tst_settings_are_remembered` gedeckt.
+
 ### Known
 
-- Die uebrigen Regler desselben Flyouts (WF Gain, Black Lvl, Farbschema)
-  zeigen nach dem Start weiterhin ihre Vorgaben (50 / 15 / "Classic")
-  statt der gespeicherten Werte (Widget: 45 / 104 / ClarityBlue). Ein
-  blosses Nachziehen ginge schief: der Schwarzwert-Schieber reicht bis
-  100, das Widget kennt 0..125; der Schema-Combo hat vier Eintraege fuer
-  mindestens acht Schemata. Das braucht eine Entscheidung ueber die
-  Regler selbst.
+- Black Lvl und Farbschema desselben Flyouts haben denselben Fehler wie
+  WF Gain, aber zusaetzlich einen echten Konflikt, der eine Entscheidung
+  ueber den Regler selbst braucht, kein blosses Nachziehen: der
+  Schwarzwert-Schieber reicht bis 100, das Widget kennt 0..125 (aktueller
+  Wert 104 wuerde beim ersten Anfassen des Reglers still auf 100 gekappt);
+  der Schema-Combo hat vier feste Eintraege ("Classic/Phosphor/Sunrise/
+  Inverted"), die nicht einmal den echten `WfColorScheme`-Namen
+  entsprechen, waehrend das Widget mindestens neun Schemata kennt
+  (u.a. das aktuell geladene ClarityBlue, das im Combo gar nicht waehlbar
+  ist).
 
 ## [0.6.3-rc3] - 2026-09-04
 
