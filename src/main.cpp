@@ -9,6 +9,7 @@
 #include "core/RadioConnection.h"
 #include "core/mmio/ExternalVariableEngine.h"
 #include "core/LogCategories.h"
+#include "core/DevAutomationServer.h"
 
 // Generated into the build tree by cmake/LongpathBuildTag.cmake, once per
 // build, so NEREUSSDR_BUILD_TAG names the commit actually being compiled
@@ -437,6 +438,13 @@ int main(int argc, char* argv[])
     {
         Longpath::MainWindow window;
         window.show();
+
+        // Dev automation bridge (Phase 0: dumpTree + grab, read-only) --
+        // off unless explicitly requested, so a normal launch is unaffected.
+        Longpath::DevAutomationServer automationServer;
+        if (qEnvironmentVariableIsSet("LONGPATH_AUTOMATION")) {
+            automationServer.start();
+        }
 
         rc = app.exec();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);

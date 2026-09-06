@@ -980,6 +980,19 @@ damit `scripts/check-new-ports.py --full-tree` sie als registriert erkennt
 | `src/gui/DssRenderer.h` | `src/gui/DssRenderer.h` | Header attribution block names the counterpart [@31b29583]; class shape, ring buffer, shared geometry constants and `image()` contract carried over (reduced scope: no GPU-mesh accessors, no supplemental channels, no reprojection, no deep history). Index row in `AETHERSDR-PORTS.md` §3DSS. | Already present in the file header: "Ported from AetherSDR `src/gui/DssRenderer.{h,cpp}` (AetherSDR 31b29583)" + Modification history (2026-09-03, reduced-scope port; 2026-09-03, horizon rasteriser). |
 | `src/gui/DssRenderer.cpp` | `src/gui/DssRenderer.cpp` | `pushRow` (peak-preserving resample, median-of-3, temporal IIR) and `rebuild()` passes 1-2 (geometry, colour) close to verbatim [@31b29583]; `rebuild()` pass 3 (horizon rasteriser, coverage crest) is Longpath-original, replacing AetherSDR's QPainter painter's-algorithm drawing (measured 0.6–1.3 s/frame). | Already present in the file header: "Ported from AetherSDR `src/gui/DssRenderer.cpp` (AetherSDR 31b29583), reduced scope" + Modification history (2026-09-03 ×2). |
 
+### Nachtrag 2026-09-06 — Dev-Automatisierungs-Bruecke (Phase 0)
+
+Zwei neue Dateien, strukturelle Ableitung von AetherSDRs `AutomationServer`
+(Issue #3646) -- Idee und Phase-0-Umfang uebernommen, ~12.000 Zeilen auf
+eine Handvoll Verben zurueckgestuft, fuer Longpaths eigenen Widget-Baum
+neu geschrieben statt zeilenweise portiert. Details:
+[2026-09-06-dev-automation-bridge-design.md](../architecture/2026-09-06-dev-automation-bridge-design.md).
+
+| NereusSDR file | AetherSDR counterpart | Evidence | Specific mod-history wording |
+|---|---|---|---|
+| `src/core/DevAutomationServer.h` | `src/core/AutomationServer.h`, `docs/automation-bridge.md` | Header attribution block names the counterpart [@d58e2b8a]; carried over: opt-in env-var gate, QLocalServer line/JSON protocol shape, per-widget JSON field set, `QRhiWidget::grabFramebuffer()` for GPU capture, objectName-then-class-name target resolution (AetherSDR's own `resolveWidget()` has the identical fallback for the identical reason). Index row in `AETHERSDR-PORTS.md`. | Already present in the file header: "structural derivative of AetherSDR's automation bridge" + Modification history (2026-09-06, Phase 0 created). |
+| `src/core/DevAutomationServer.cpp` | `src/core/AutomationServer.cpp`, `docs/automation-bridge.md` | `describeAutomationWidget()`/`doDumpTree()`/`doGrab()` are Longpath-original implementations of the same JSON shape and verb set AetherSDR's `describeWidget()`/`doDumpTree()`/`doGrab()` establish; `grabAutomationWidget()`'s `QRhiWidget` branch is the one directly-carried-over technique (a real Qt API call, not custom GPU readback), confirmed live against Longpath's own `SpectrumWidget`. | Attribution block lives in the paired header (`DevAutomationServer.h`), per the existing convention for header+source pairs elsewhere in this tree. |
+
 ## Bucket B — False AetherSDR citations (126 files)
 
 Every file below carries the mod-history boilerplate

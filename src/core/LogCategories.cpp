@@ -24,6 +24,7 @@ Q_LOGGING_CATEGORY(lcMeter,      "nereus.meter")
 Q_LOGGING_CATEGORY(lcMmio,       "nereus.mmio")
 Q_LOGGING_CATEGORY(lcTci,        "nereus.tci")
 Q_LOGGING_CATEGORY(lcSpots,      "nereus.spots")
+Q_LOGGING_CATEGORY(lcAutomation, "nereus.automation")
 
 // --- LogManager ---
 
@@ -62,6 +63,8 @@ LogManager::LogManager()
           QStringLiteral("TCI WebSocket server, command dispatch, client lifecycle"), false },
         { QStringLiteral("nereus.spots"),    QStringLiteral("Spots"),
           QStringLiteral("DX spot ingest (cluster, RBN, SpotCollector, WSJT-X)"), false },
+        { QStringLiteral("nereus.automation"), QStringLiteral("Automation"),
+          QStringLiteral("Dev automation bridge (LONGPATH_AUTOMATION) -- widget-tree dump, screen capture"), false },
     };
 }
 

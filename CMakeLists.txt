@@ -520,6 +520,7 @@ set(CORE_SOURCES
     src/core/SkuUiProfile.cpp
     src/core/HardwareProfile.cpp
     src/core/LogCategories.cpp
+    src/core/DevAutomationServer.cpp
     src/core/SupportBundle.cpp
     src/core/RadioDiscovery.cpp
     src/core/RadioConnection.cpp
