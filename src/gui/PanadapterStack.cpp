@@ -510,6 +510,29 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // Oberflaeche des Hauptfensters mitnimmt. Das ist ein eigener
     // Schritt, kein Anhaengsel an diesen hier — und Raten macht es
     // schlimmer, siehe die zwei verworfenen Kuren.
+    //
+    // NACHTRAG 2026-09-06 (zweite Bestaetigung, erste am 2026-09-05):
+    // am laufenden Bau erneut geprueft, einzelner Panadapter, mehrere
+    // volle Abloese-/Andock-Runden. Jedes Mal 0 Meldungen "QRhiWidget:
+    // No QRhi" im Protokoll, TX/S-Meter/Bandwidth-Filter (alle
+    // QRhiWidget-basiert) blieben durchgehend normal gezeichnet, das
+    // abgeloeste Fenster zeigte seine eigene Flaeche samt Spot-
+    // Beschriftungen korrekt. Vermutlich eine Nebenwirkung von 8f442832
+    // (der SpectrumWidget-eigenen GPU-Schutzkette, AetherSDR-Quelle):
+    // wenn der Kontextverlust am 2026-08-20 daher kam, dass sw's eigener
+    // fehlerhafter Reparent einen GEMEINSAMEN QRhi/Backing-Store
+    // beschaedigte, wuerde das Beheben von sw's eigener Lebenszyklus-
+    // Kette denselben Kaskadeneffekt beheben, ohne dass der Commit das
+    // je behauptet haette.
+    //
+    // WEITERHIN UNGEPRUEFT: das Szenario, das AetherSDRs eigener,
+    // baugleicher Fehler (#2495) tatsaechlich brauchte -- MEHRERE
+    // Panadapter, davon einer abgeloest, DANN ein Layout-Wechsel. Bei
+    // uns braucht "Pan Layout..." eine Funkgeraeteverbindung (View-Menue,
+    // sonst ausgegraut) und war in dieser Sitzung nicht pruefbar. Vor
+    // dem Entfernen dieses Kommentarblocks: genau dieses Szenario einmal
+    // an der Werkbank nachstellen. Bis dahin bleibt der Block stehen --
+    // als Warnung, nicht als aktueller Befund.
 }
 // Der umgekehrte Weg zu floatPanadapter. Er tut genau das, was der
 // dockRequested-Empfaenger dort tut — nur von aussen aufrufbar, damit
