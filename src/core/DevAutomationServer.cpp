@@ -24,6 +24,11 @@
 #include <QRhiWidget>
 #endif
 
+#include "ConnectionState.h"
+#include "models/Band.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
+
 namespace Longpath {
 
 namespace {
@@ -291,11 +296,18 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
         }
         return doGrab(parts.at(1));
     }
+    if (verb == QStringLiteral("get")) {
+        if (parts.size() < 2) {
+            return QJsonObject{{QStringLiteral("ok"), false},
+                                {QStringLiteral("error"), QStringLiteral("get needs a model (radio|slice)")}};
+        }
+        return doGet(parts.at(1), parts.size() > 2 ? parts.at(2) : QString());
+    }
 
     return QJsonObject{{QStringLiteral("ok"), false},
                         {QStringLiteral("error"),
                          QStringLiteral("unknown command: ") + verb +
-                             QStringLiteral(" (known: ping, dumpTree, grab)")}};
+                             QStringLiteral(" (known: ping, dumpTree, grab, get)")}};
 }
 
 QJsonObject DevAutomationServer::doPing() const
@@ -352,6 +364,83 @@ QJsonObject DevAutomationServer::doGrab(const QString& target) const
         {QStringLiteral("height"), img.height()},
         {QStringLiteral("bytes"), static_cast<qint64>(QFileInfo(outPath).size())},
     };
+}
+
+namespace {
+
+// RadioModel is a QObject child somewhere under MainWindow, not a widget
+// itself -- findChild reaches it the same way tests do
+// (tst_dev_automation_server.cpp and friends already rely on this being
+// discoverable this way). Returns nullptr before a MainWindow exists yet,
+// which callers must treat as "no radio", not an error.
+RadioModel* findAutomationRadioModel()
+{
+    for (QWidget* top : QApplication::topLevelWidgets()) {
+        if (auto* rm = top->findChild<RadioModel*>()) {
+            return rm;
+        }
+    }
+    return nullptr;
+}
+
+QJsonObject describeAutomationSlice(const SliceModel* s)
+{
+    if (!s) { return QJsonObject{}; }
+    return QJsonObject{
+        {QStringLiteral("frequencyHz"), s->frequency()},
+        {QStringLiteral("mode"), SliceModel::modeName(s->dspMode())},
+        {QStringLiteral("filterLowHz"), s->filterLow()},
+        {QStringLiteral("filterHighHz"), s->filterHigh()},
+        {QStringLiteral("band"), bandKeyName(bandFromFrequency(s->frequency()))},
+        {QStringLiteral("rxAntenna"), s->rxAntenna()},
+    };
+}
+
+} // namespace
+
+QJsonObject DevAutomationServer::doGet(const QString& model, const QString& selector) const
+{
+    RadioModel* radio = findAutomationRadioModel();
+    if (!radio) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                            {QStringLiteral("error"), QStringLiteral("no RadioModel found (no MainWindow yet?)")}};
+    }
+
+    if (model == QStringLiteral("radio")) {
+        QJsonObject o{
+            {QStringLiteral("ok"), true},
+            {QStringLiteral("connectionState"), connectionStateName(radio->connectionState())},
+            {QStringLiteral("model"), radio->model()},
+        };
+        if (SliceModel* active = radio->activeSlice()) {
+            o[QStringLiteral("activeSliceIndex")] = active->sliceIndex();
+        }
+        return o;
+    }
+
+    if (model == QStringLiteral("slice")) {
+        SliceModel* s = nullptr;
+        if (selector.isEmpty() || selector == QStringLiteral("active")) {
+            s = radio->activeSlice();
+        } else {
+            bool okIndex = false;
+            const int id = selector.toInt(&okIndex);
+            if (okIndex) { s = radio->sliceById(id); }
+        }
+        if (!s) {
+            return QJsonObject{{QStringLiteral("ok"), false},
+                                {QStringLiteral("error"), QStringLiteral("no such slice: ") + selector}};
+        }
+        QJsonObject o = describeAutomationSlice(s);
+        o[QStringLiteral("ok")] = true;
+        o[QStringLiteral("sliceIndex")] = s->sliceIndex();
+        return o;
+    }
+
+    return QJsonObject{{QStringLiteral("ok"), false},
+                        {QStringLiteral("error"),
+                         QStringLiteral("unknown get model: ") + model +
+                             QStringLiteral(" (known: radio, slice)")}};
 }
 
 } // namespace Longpath

@@ -20,6 +20,8 @@
 #include <QWidget>
 
 #include "core/DevAutomationServer.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
 
 using namespace Longpath;
 
@@ -170,7 +172,49 @@ private slots:
                   qPrintable(byClass.value(QStringLiteral("error")).toString()));
         QFile::remove(byClass.value(QStringLiteral("path")).toString());
 
+        // No RadioModel exists in this test window at all -- get must say
+        // so plainly, not crash and not fabricate a reply.
+        const QJsonObject noRadio = sendCommand(socketName, QStringLiteral("get radio"));
+        QVERIFY2(!noRadio.value(QStringLiteral("ok")).toBool(),
+                  "get radio should fail cleanly with no RadioModel present");
+
         delete probe;
+        qunsetenv("LONGPATH_AUTOMATION_SOCKET");
+    }
+
+    void getRadioAndSliceReportRealModelState()
+    {
+        const QString socketName = QStringLiteral("longpath-automation-test-get-%1")
+                                        .arg(QCoreApplication::applicationPid());
+        qputenv("LONGPATH_AUTOMATION_SOCKET", socketName.toUtf8());
+
+        DevAutomationServer server;
+        QVERIFY(server.start());
+
+        // RadioModel is a QObject, not a widget -- findChild() reaches it as
+        // long as it is parented somewhere under a top-level QWidget, same
+        // as the real app (RadioModel lives under MainWindow).
+        auto* host = new QWidget();
+        auto* radio = new RadioModel(host);
+        const int sliceId = radio->addSlice();
+        SliceModel* slice = radio->sliceById(sliceId);
+        QVERIFY(slice);
+        slice->setFrequency(14.195e6);
+        radio->setActiveSliceById(sliceId);
+        host->show();
+        QVERIFY(QTest::qWaitForWindowExposed(host));
+
+        const QJsonObject radioInfo = sendCommand(socketName, QStringLiteral("get radio"));
+        QVERIFY2(radioInfo.value(QStringLiteral("ok")).toBool(),
+                  qPrintable(radioInfo.value(QStringLiteral("error")).toString()));
+
+        const QJsonObject sliceInfo = sendCommand(socketName, QStringLiteral("get slice active"));
+        QVERIFY2(sliceInfo.value(QStringLiteral("ok")).toBool(),
+                  qPrintable(sliceInfo.value(QStringLiteral("error")).toString()));
+        QCOMPARE(sliceInfo.value(QStringLiteral("frequencyHz")).toDouble(), 14.195e6);
+        QCOMPARE(sliceInfo.value(QStringLiteral("band")).toString(), QStringLiteral("20m"));
+
+        delete host;
         qunsetenv("LONGPATH_AUTOMATION_SOCKET");
     }
 };

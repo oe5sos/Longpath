@@ -1,7 +1,10 @@
 # Dev Automation Bridge — Design & Phased Plan
 
-**Status:** Phase 0 shipped 2026-09-06 (`src/core/DevAutomationServer.{h,cpp}`).
-Phases 1+ below are scoped but not started.
+**Status:** Phase 0 shipped 2026-09-06 (`src/core/DevAutomationServer.{h,cpp}`),
+extended the same day with `get radio`/`get slice` (originally filed under
+Phase 1 below, reclassified into Phase 0 since a pure model *read* carries
+none of the risk the click/setValue/tune verbs do — see the Phase 0 section).
+Phases 1+ below (interact verbs, TX-safety gating) are scoped but not started.
 
 **Origin:** an AetherSDR deep-dive (2026-09-06) found their in-process agent
 automation bridge (`docs/automation-bridge.md`,
@@ -29,7 +32,7 @@ set, so a normal launch is unaffected.
 
 ## Phase 0 (shipped 2026-09-06): read-only introspection + capture
 
-**Verbs:** `ping`, `dumpTree`, `grab <target>`.
+**Verbs:** `ping`, `dumpTree`, `grab <target>`, `get <model> [selector]`.
 
 **Protocol:** `QLocalServer` on a name from `LONGPATH_AUTOMATION_SOCKET`
 (default `longpath-automation`). One newline-terminated command per line in,
@@ -62,6 +65,20 @@ width/height/byte-count, not inline base64 — matching AetherSDR's own
 choice, and for the same reason (a panadapter frame inline would make for
 an enormous JSON line for no benefit an agent needs).
 
+**`get <model> [selector]`** reads live model state directly, no widget or
+screenshot involved. `get radio` reports `connectionState` (as the same
+string `connectionStateName()` uses elsewhere) and the radio's `model`
+name. `get slice [active|<id>]` reports `frequencyHz`, `mode`, `filterLowHz`,
+`filterHighHz`, `band` (via `Band::bandFromFrequency()` + `bandKeyName()` —
+the same pair the Band-flyout highlight feature uses, shipped the same
+day) and `rxAntenna` for the given slice. Added the same day as the rest of
+Phase 0 (not at launch) after confirming it carries none of Phase 1's risk:
+it never writes to a model or touches a widget, so it doesn't need to wait
+on `invoke`'s target resolution or TX-safety gating below. `RadioModel` is
+found via `findChild<RadioModel*>()` from the top-level widgets, the same
+way it's owned (a `QObject` child under `MainWindow`) and the same way
+`tst_dev_automation_server.cpp`'s own test constructs one to verify against.
+
 **Deliberately not in Phase 0:** anything that clicks, types, moves a
 slider, tunes, connects, or could conceivably key a transmitter. AetherSDR
 did not add interact verbs and safety gating until later phases either, and
@@ -93,9 +110,11 @@ Mirrors AetherSDR's own Phase 1 boundary:
 - `invoke <target> <action> [value]` — click / toggle / setChecked /
   setValue / setText / setCurrentText / setCurrentIndex, resolved through
   the same target resolution Phase 0 already has.
-- `get <model> [selector] [prop]` — live JSON snapshot of a Longpath model
-  (`radio`, `slice <id|active>`, `pan <panId|active>`, `dsp`), so state can
-  be asserted without a screenshot at all.
+- Widen `get` past `radio`/`slice` (already shipped in Phase 0) to `pan
+  <panId|active>` and `dsp`, once there's a real per-pan model worth
+  reading (see the `PanadapterModel` dead-code finding in
+  `longpath-panadapter-model-tote-klasse-2026-09-06.md` — `pan` here should
+  read whatever turns out to be the *live* per-pan state, not that class).
 - `assert_state` / `wait_for` helpers, so a caller reads pass/fail instead
   of diffing JSON by hand.
 

@@ -5,7 +5,14 @@
 // reports a JSON tree (class, objectName, accessibleName, enabled, visible,
 // geometry, and a best-effort "value" for common controls). grab captures a
 // single widget by objectName as a PNG, including GPU-rendered QRhiWidgets
-// (SpectrumWidget, MeterWidget) via QRhiWidget::grabFramebuffer().
+// (SpectrumWidget, MeterWidget) via QRhiWidget::grabFramebuffer(). get reads
+// a handful of live model properties (radio connection state, the active
+// slice's frequency/mode/filter/band) directly, without a screenshot at
+// all -- reclassified into Phase 0 on 2026-09-06 (the design doc originally
+// filed it as Phase 1) because it carries zero interaction risk: it never
+// writes to a model, never touches a widget, so it belongs with the other
+// read-only verbs rather than waiting on Phase 1's click/setValue/tune
+// machinery and TX-safety gating.
 //
 // Off by default: the server only starts when the LONGPATH_AUTOMATION
 // environment variable is set (see main.cpp), so it adds no attack surface
@@ -90,6 +97,7 @@ private:
     QJsonObject handleLine(const QByteArray& line);
     QJsonObject doDumpTree() const;
     QJsonObject doGrab(const QString& target) const;
+    QJsonObject doGet(const QString& model, const QString& selector) const;
     QJsonObject doPing() const;
 
     QLocalServer* m_server{nullptr};
