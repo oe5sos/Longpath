@@ -15,6 +15,11 @@
   AetherSDR angestossen (dort ein eigenes Fenster; hier eine Zeile im
   schon vorhandenen Dialog, der den Log-Teil laengst hatte).
 
+- **Das Band-Flyout markiert jetzt, welches Band gerade gehoert wird.**
+  Zwoelf Knoepfe ohne jede Markierung vorher -- Betreiber waehlte
+  Entwurf A (gefuellt, wie der WNB-Knopf im selben Panel) nach zwei
+  Entwurfsblaettern. Ebenfalls von AetherSDR angestossen.
+
 ### Fixed
 
 - **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand
@@ -96,6 +101,24 @@
   (die Absicht) bleibt unangetastet, Oeffnen/Schliessen bleibt allein bei
   der bestehenden Sperre. Neuer Test
   `winAntennaMenuEntryGreysOutWhenDisconnected`.
+
+### Known
+
+- **`RadioModel::addPanadapter()` (und damit die ganze `PanadapterModel`-
+  Klasse) hat im ausgelieferten Code keinen einzigen Aufrufer.** Gefunden
+  beim Bandmarkierung-Fix oben, per Debug-Ausgabe in der laufenden App
+  bestaetigt: `panadapters()` ist zur Laufzeit immer leer. Betroffen sind
+  mindestens `MainWindow.cpp`s ClarityController-NF-Priming/Fast-Attack-
+  Verdrahtung (Zeile ~5136-5203) und `TxApplet::setCurrentBand` (Zeile
+  ~6337) -- beide haengen an `PanadapterModel::bandChanged`, das nie
+  feuert. `OcOutputsHfTab` (OC-Ausgaenge/Band-Decoder) baut ebenfalls auf
+  `PanadapterModel` auf und wird nur in `tst_oc_outputs_live_pins.cpp`
+  ueberhaupt mit einem Panadapter versorgt (der Test ruft
+  `addPanadapter()` selbst auf) -- ob die Live-Pin-Anzeige in der echten
+  App je etwas anzeigt, ist damit offen. Noch nicht untersucht, ob das
+  ein echter Backend-Ausfall ist oder ob eine andere Stelle den Band-Weg
+  laengst uebernommen hat (die tatsaechlich lebendige Quelle fuer "welches
+  Band" ist `SliceModel::bandChanged`, siehe der Fix oben).
 
 ## [0.6.3-rc3] - 2026-09-04
 
