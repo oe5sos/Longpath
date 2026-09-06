@@ -12,7 +12,9 @@
 // filed it as Phase 1) because it carries zero interaction risk: it never
 // writes to a model, never touches a widget, so it belongs with the other
 // read-only verbs rather than waiting on Phase 1's click/setValue/tune
-// machinery and TX-safety gating.
+// machinery and TX-safety gating. get reads the RadioModel handed to
+// setRadioModel() -- not discovered by scanning widgets -- see that
+// method's own comment for why.
 //
 // Off by default: the server only starts when the LONGPATH_AUTOMATION
 // environment variable is set (see main.cpp), so it adds no attack surface
@@ -58,6 +60,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 
 class QLocalServer;
@@ -66,6 +69,8 @@ class QWidget;
 class QJsonObject;
 
 namespace Longpath {
+
+class RadioModel;
 
 // Serializes one widget's introspectable state into the shape dumpTree/grab
 // report. Exposed standalone (not just as a private file-local helper) so
@@ -89,6 +94,18 @@ public:
     // True once start() has succeeded and the server is actually listening.
     bool isListening() const;
 
+    // Wires the one true RadioModel for `get` to read, handed in directly by
+    // whoever owns it (main.cpp, from MainWindow::radioModelForTest()) rather
+    // than discovered by scanning QApplication::topLevelWidgets() -- that
+    // scan has no way to tell "the" MainWindow's RadioModel apart from a
+    // stray one under some other top-level widget (a floated ToolWindow, or
+    // an orphaned MainWindow left over in a test harness that runs several
+    // in the same process; MainWindow::closeEvent() was bitten by exactly
+    // this ambiguity once already, commit 6e7c1cad). QPointer so a RadioModel
+    // destroyed without a matching setRadioModel(nullptr) call is read back
+    // as null instead of dangling.
+    void setRadioModel(RadioModel* radio);
+
 private slots:
     void onNewConnection();
     void onReadyRead();
@@ -101,6 +118,7 @@ private:
     QJsonObject doPing() const;
 
     QLocalServer* m_server{nullptr};
+    QPointer<RadioModel> m_radioModel;
 };
 
 } // namespace Longpath

@@ -439,9 +439,13 @@ int main(int argc, char* argv[])
         Longpath::MainWindow window;
         window.show();
 
-        // Dev automation bridge (Phase 0: dumpTree + grab, read-only) --
+        // Dev automation bridge (Phase 0: dumpTree + grab + get, read-only) --
         // off unless explicitly requested, so a normal launch is unaffected.
+        // setRadioModel() is wired unconditionally (cheap, a QPointer store)
+        // so `get` always sees the one true RadioModel -- never a scan of
+        // QApplication::topLevelWidgets() that could pick up a stray one.
         Longpath::DevAutomationServer automationServer;
+        automationServer.setRadioModel(window.radioModelForTest());
         if (qEnvironmentVariableIsSet("LONGPATH_AUTOMATION")) {
             automationServer.start();
         }

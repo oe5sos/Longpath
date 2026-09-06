@@ -74,10 +74,30 @@ the same pair the Band-flyout highlight feature uses, shipped the same
 day) and `rxAntenna` for the given slice. Added the same day as the rest of
 Phase 0 (not at launch) after confirming it carries none of Phase 1's risk:
 it never writes to a model or touches a widget, so it doesn't need to wait
-on `invoke`'s target resolution or TX-safety gating below. `RadioModel` is
-found via `findChild<RadioModel*>()` from the top-level widgets, the same
-way it's owned (a `QObject` child under `MainWindow`) and the same way
-`tst_dev_automation_server.cpp`'s own test constructs one to verify against.
+on `invoke`'s target resolution or TX-safety gating below.
+
+`RadioModel` reaches `get` via `DevAutomationServer::setRadioModel()`,
+called once from `main.cpp` with `MainWindow::radioModelForTest()` — not
+discovered by scanning `QApplication::topLevelWidgets()` for a matching
+`findChild<RadioModel*>()`, which the first cut of this code did. A same-day
+adversarial review (three independent reviewers, findings cross-checked
+against current source before being accepted) confirmed that scan had no
+way to prefer "the" real `MainWindow`'s `RadioModel` over a stray one under
+an unrelated top-level widget — the exact ambiguity `MainWindow::closeEvent()`
+was already bitten by once (commit `6e7c1cad`: a cleanup loop over the same
+`topLevelWidgets()` list collected a foreign `MainWindow` left over from a
+test harness and destroyed it mid-thread-teardown). `m_radioModel` is a
+`QPointer<RadioModel>`, so a model destroyed without an explicit
+`setRadioModel(nullptr)` reads back null instead of dangling. The same
+review also found `doGrab`'s target resolution applied its documented
+"objectName beats class-name fallback" priority per top-level window
+instead of globally, letting an early window's incidental class-name match
+shadow a later window's exact objectName match — fixed by splitting the
+search into two full passes across every window (objectName first, then
+class name), and a fixed ordering bug in `doGet` where an unsupported model
+name was misreported as "no RadioModel" whenever none happened to be set,
+instead of "unknown get model" regardless of RadioModel presence. All four
+findings have dedicated regression tests in `tst_dev_automation_server.cpp`.
 
 **Deliberately not in Phase 0:** anything that clicks, types, moves a
 slider, tunes, connects, or could conceivably key a transmitter. AetherSDR

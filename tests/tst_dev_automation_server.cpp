@@ -182,6 +182,72 @@ private slots:
         qunsetenv("LONGPATH_AUTOMATION_SOCKET");
     }
 
+    void objectNameMatchWinsGloballyOverClassNameFallback()
+    {
+        const QString socketName = QStringLiteral("longpath-automation-test-priority-%1")
+                                        .arg(QCoreApplication::applicationPid());
+        qputenv("LONGPATH_AUTOMATION_SOCKET", socketName.toUtf8());
+
+        DevAutomationServer server;
+        QVERIFY(server.start());
+
+        // Two top-level windows. One has a QLineEdit findable only via the
+        // (spurious) class-name fallback; the other has a QLineEdit whose
+        // objectName is literally the string "QLineEdit". An exact
+        // objectName match must win over any class-name fallback match no
+        // matter which top-level window Qt happens to enumerate first --
+        // a per-window search (the original, buggy resolveAutomationTarget)
+        // could let the class-name-only window shadow this one if it were
+        // enumerated first.
+        auto* classNameOnlyWidget = new QLineEdit();
+        classNameOnlyWidget->resize(30, 16);
+        classNameOnlyWidget->show();
+        QVERIFY(QTest::qWaitForWindowExposed(classNameOnlyWidget));
+
+        auto* objectNameMatchWidget = new QLineEdit();
+        objectNameMatchWidget->setObjectName(QStringLiteral("QLineEdit"));
+        objectNameMatchWidget->resize(400, 200);
+        objectNameMatchWidget->show();
+        QVERIFY(QTest::qWaitForWindowExposed(objectNameMatchWidget));
+
+        const QJsonObject grabbed = sendCommand(socketName, QStringLiteral("grab QLineEdit"));
+        QVERIFY2(grabbed.value(QStringLiteral("ok")).toBool(),
+                  qPrintable(grabbed.value(QStringLiteral("error")).toString()));
+        // The class-name-only widget is 30x16; the objectName match is
+        // 400x200. Any width comfortably above the small widget's rules out
+        // having grabbed the wrong one.
+        QVERIFY2(grabbed.value(QStringLiteral("width")).toInt() > 100,
+                  "grab QLineEdit returned the class-name-only widget instead of the exact objectName match");
+
+        QFile::remove(grabbed.value(QStringLiteral("path")).toString());
+        delete classNameOnlyWidget;
+        delete objectNameMatchWidget;
+        qunsetenv("LONGPATH_AUTOMATION_SOCKET");
+    }
+
+    void getUnknownModelReportsUnknownRegardlessOfRadioPresence()
+    {
+        const QString socketName = QStringLiteral("longpath-automation-test-unknown-%1")
+                                        .arg(QCoreApplication::applicationPid());
+        qputenv("LONGPATH_AUTOMATION_SOCKET", socketName.toUtf8());
+
+        // Deliberately no setRadioModel() call -- an unsupported model name
+        // (e.g. the not-yet-shipped "pan") must be reported as such even
+        // when no RadioModel exists yet, not masked by the unrelated
+        // "no RadioModel set" error.
+        DevAutomationServer server;
+        QVERIFY(server.start());
+
+        const QJsonObject reply = sendCommand(socketName, QStringLiteral("get pan"));
+        QVERIFY2(!reply.value(QStringLiteral("ok")).toBool(),
+                  "get with an unsupported model name must fail");
+        QVERIFY2(reply.value(QStringLiteral("error")).toString().contains(QStringLiteral("unknown get model")),
+                  qPrintable(QStringLiteral("expected an 'unknown get model' error even with no RadioModel set, got: ") +
+                             reply.value(QStringLiteral("error")).toString()));
+
+        qunsetenv("LONGPATH_AUTOMATION_SOCKET");
+    }
+
     void getRadioAndSliceReportRealModelState()
     {
         const QString socketName = QStringLiteral("longpath-automation-test-get-%1")
@@ -189,20 +255,22 @@ private slots:
         qputenv("LONGPATH_AUTOMATION_SOCKET", socketName.toUtf8());
 
         DevAutomationServer server;
+
+        // get reads whichever RadioModel setRadioModel() was handed -- not
+        // one discovered by scanning widgets, which has no way to prefer
+        // "the" real RadioModel over one under some unrelated top-level
+        // widget. RadioModel itself doesn't need to live under a QWidget at
+        // all for this to work; a plain QObject parent is enough.
+        auto* host = new QObject();
+        auto* radio = new RadioModel(host);
+        server.setRadioModel(radio);
         QVERIFY(server.start());
 
-        // RadioModel is a QObject, not a widget -- findChild() reaches it as
-        // long as it is parented somewhere under a top-level QWidget, same
-        // as the real app (RadioModel lives under MainWindow).
-        auto* host = new QWidget();
-        auto* radio = new RadioModel(host);
         const int sliceId = radio->addSlice();
         SliceModel* slice = radio->sliceById(sliceId);
         QVERIFY(slice);
         slice->setFrequency(14.195e6);
         radio->setActiveSliceById(sliceId);
-        host->show();
-        QVERIFY(QTest::qWaitForWindowExposed(host));
 
         const QJsonObject radioInfo = sendCommand(socketName, QStringLiteral("get radio"));
         QVERIFY2(radioInfo.value(QStringLiteral("ok")).toBool(),

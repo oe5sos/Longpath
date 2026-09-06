@@ -88,17 +88,8 @@ QString shortClassName(const QWidget* w)
     return sep < 0 ? full : full.mid(sep + 2);
 }
 
-// Depth-first search for the first widget (in any top-level window) whose
-// objectName matches exactly, falling back to an exact (namespace-stripped)
-// class-name match -- e.g. "SpectrumWidget" resolves the live panadapter,
-// which carries no objectName of its own. Confirmed necessary by dogfooding
-// against the real app (2026-09-06): the panadapter is exactly the widget an
-// agent most wants to grab, and it has no objectName to look it up by.
-// Phase 0 stops here -- no accessibleName fallback, no scoped "Scope/Name"
-// disambiguation, no "first visible wins" tie-break for duplicate classes
-// (SpectrumWidget instances are unique today; multi-panadapter needs this
-// widened, a Phase 1 concern once #3F work makes duplicates real).
-QWidget* resolveAutomationTarget(QWidget* root, const QString& name)
+// objectName-only search within one top-level window's subtree.
+QWidget* findByObjectName(QWidget* root, const QString& name)
 {
     if (root->objectName() == name) {
         return root;
@@ -110,13 +101,53 @@ QWidget* resolveAutomationTarget(QWidget* root, const QString& name)
             return k;
         }
     }
+    return nullptr;
+}
+
+// (Namespace-stripped) class-name-only search within one top-level window's
+// subtree -- e.g. "SpectrumWidget" resolves the live panadapter, which
+// carries no objectName of its own. Confirmed necessary by dogfooding
+// against the real app (2026-09-06): the panadapter is exactly the widget an
+// agent most wants to grab, and it has no objectName to look it up by.
+QWidget* findByClassName(QWidget* root, const QString& name)
+{
     if (shortClassName(root) == name) {
         return root;
     }
+    const QList<QWidget*> kids = root->findChildren<QWidget*>(
+        QString(), Qt::FindChildrenRecursively);
     for (QWidget* k : kids) {
         if (shortClassName(k) == name) {
             return k;
         }
+    }
+    return nullptr;
+}
+
+// A real objectName match must win over an incidental class-name match
+// regardless of which top-level window either lives in -- so this scans
+// every window for an objectName hit FIRST, and only checks class names at
+// all if that whole pass comes up empty. A per-window resolveAutomationTarget
+// that tried both within each window before moving to the next window got
+// this backwards: an early window's class-name fallback match would shadow
+// a later window's exact objectName match. Caught by review 2026-09-06 --
+// not yet reachable via a same-named collision in practice, but multiple
+// top-level windows already exist in normal use (the Rotor/Log panel floats
+// into its own ToolWindow by default), so the ordering bug was real, not
+// hypothetical.
+// Phase 0 stops here -- no accessibleName fallback, no scoped "Scope/Name"
+// disambiguation, no "first visible wins" tie-break for duplicate classes
+// (SpectrumWidget instances are unique today; multi-panadapter needs this
+// widened, a Phase 1 concern once #3F work makes duplicates real).
+QWidget* resolveAutomationTarget(const QString& name)
+{
+    for (QWidget* top : QApplication::topLevelWidgets()) {
+        if (!top) { continue; }
+        if (QWidget* found = findByObjectName(top, name)) { return found; }
+    }
+    for (QWidget* top : QApplication::topLevelWidgets()) {
+        if (!top) { continue; }
+        if (QWidget* found = findByClassName(top, name)) { return found; }
     }
     return nullptr;
 }
@@ -327,10 +358,7 @@ QJsonObject DevAutomationServer::doDumpTree() const
 
 QJsonObject DevAutomationServer::doGrab(const QString& target) const
 {
-    QWidget* found = nullptr;
-    for (QWidget* top : QApplication::topLevelWidgets()) {
-        if ((found = resolveAutomationTarget(top, target))) { break; }
-    }
+    QWidget* found = resolveAutomationTarget(target);
     if (!found) {
         return QJsonObject{{QStringLiteral("ok"), false},
                             {QStringLiteral("error"),
@@ -368,21 +396,6 @@ QJsonObject DevAutomationServer::doGrab(const QString& target) const
 
 namespace {
 
-// RadioModel is a QObject child somewhere under MainWindow, not a widget
-// itself -- findChild reaches it the same way tests do
-// (tst_dev_automation_server.cpp and friends already rely on this being
-// discoverable this way). Returns nullptr before a MainWindow exists yet,
-// which callers must treat as "no radio", not an error.
-RadioModel* findAutomationRadioModel()
-{
-    for (QWidget* top : QApplication::topLevelWidgets()) {
-        if (auto* rm = top->findChild<RadioModel*>()) {
-            return rm;
-        }
-    }
-    return nullptr;
-}
-
 QJsonObject describeAutomationSlice(const SliceModel* s)
 {
     if (!s) { return QJsonObject{}; }
@@ -398,12 +411,24 @@ QJsonObject describeAutomationSlice(const SliceModel* s)
 
 } // namespace
 
+void DevAutomationServer::setRadioModel(RadioModel* radio)
+{
+    m_radioModel = radio;
+}
+
 QJsonObject DevAutomationServer::doGet(const QString& model, const QString& selector) const
 {
-    RadioModel* radio = findAutomationRadioModel();
+    if (model != QStringLiteral("radio") && model != QStringLiteral("slice")) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                            {QStringLiteral("error"),
+                             QStringLiteral("unknown get model: ") + model +
+                                 QStringLiteral(" (known: radio, slice)")}};
+    }
+
+    RadioModel* radio = m_radioModel;
     if (!radio) {
         return QJsonObject{{QStringLiteral("ok"), false},
-                            {QStringLiteral("error"), QStringLiteral("no RadioModel found (no MainWindow yet?)")}};
+                            {QStringLiteral("error"), QStringLiteral("no RadioModel set (no MainWindow yet?)")}};
     }
 
     if (model == QStringLiteral("radio")) {
@@ -437,10 +462,7 @@ QJsonObject DevAutomationServer::doGet(const QString& model, const QString& sele
         return o;
     }
 
-    return QJsonObject{{QStringLiteral("ok"), false},
-                        {QStringLiteral("error"),
-                         QStringLiteral("unknown get model: ") + model +
-                             QStringLiteral(" (known: radio, slice)")}};
+    Q_UNREACHABLE(); // model is one of "radio"/"slice", checked above
 }
 
 } // namespace Longpath
