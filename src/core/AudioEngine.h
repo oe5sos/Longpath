@@ -213,6 +213,9 @@ public:
     // Dritter Abgriff, fuer die "off the air"-WAV-Aufnahme (Phase 3M).
     std::atomic<AudioTapRing*> m_wavRecordTap{nullptr};
     std::atomic<int>           m_wavRecordTapSlice{-1};
+    // Vierter Abgriff, fuer den nativen RTTY-Decoder (2026-09-06).
+    std::atomic<AudioTapRing*> m_rttyTap{nullptr};
+    std::atomic<int>           m_rttyTapSlice{-1};
 
     // Non-owning back-pointer so rxBlockReady can look up the active
     // SliceModel to read mute / VAX-channel state. Null is safe (unit
@@ -428,6 +431,20 @@ public:
     /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
     /// der Abgriff; zum Abschalten nullptr uebergeben.
     void setWavRecordTap(AudioTapRing* ring, int sliceId);
+
+    /// ── Vierter Abgriff, fuer den nativen RTTY-Decoder (2026-09-06) ──
+    ///
+    /// Genau derselbe Bau wie die drei anderen Abgriffe, wieder ein
+    /// EIGENER Ring aus demselben Grund: der RTTY-Decoder soll neben
+    /// Aufnahme/ASR/WAV-Mitschnitt laufen koennen, ohne sich beim Lesen
+    /// zu stoeren.
+    ///
+    /// Design doc: docs/architecture/2026-09-06-rtty-decoder-scoping.md.
+    ///
+    /// Kein Signal, kein Schloss, keine Speicheranforderung im
+    /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
+    /// der Abgriff; zum Abschalten nullptr uebergeben.
+    void setRttyTap(AudioTapRing* ring, int sliceId);
 
     void rxBlockReady(int sliceId, const float* samples, int frames);
 

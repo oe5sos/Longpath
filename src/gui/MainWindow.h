@@ -1424,6 +1424,7 @@ private:
     // PhoneCwApplet in the panel stack and is shown/hidden in the same
     // dspModeChanged lambda.
     class RadeApplet* m_radeApplet{nullptr};
+    class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 

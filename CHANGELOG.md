@@ -20,6 +20,16 @@
   Entwurf A (gefuellt, wie der WNB-Knopf im selben Panel) nach zwei
   Entwurfsblaettern. Ebenfalls von AetherSDR angestossen.
 
+- **Neuer nativer RTTY-Decoder** (View > Containers > Applets, sichtbar
+  nur im Modus DIGL): dekodiert Baudot/ITA2 direkt aus dem Empfangston,
+  ohne WSJT-X/fldigi. Mark/Space-Pegelanzeige, Lock/SNR-Status,
+  einstellbare Baudrate/Umkehrpolaritaet/Empfindlichkeit; Mark- und
+  Shift-Frequenz folgen live dem schon vorhandenen VFO-Flaggen-Regler
+  (`RttyMarkShiftContainer`). FT8/FT4/PSK31 & Co. bleiben bewusst extern
+  (WSJT-X/fldigi via VAC+CAT) -- weder Thetis noch AetherSDR dekodieren
+  diese selbst, aber AetherSDR hat einen echten, eigenstaendigen
+  RTTY-Decoder, der hier portiert wurde.
+
 ### Fixed
 
 - **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand

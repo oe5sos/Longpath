@@ -1,6 +1,25 @@
-# Nativer RTTY-Decoder — Scoping (Recherche, kein Bauauftrag)
+# Nativer RTTY-Decoder — Scoping & Umsetzung
 
-**Status:** reine Recherche/Scoping, 2026-09-06. Kein Code geschrieben.
+**Status:** GEBAUT UND VERSCHIFFT, 2026-09-06 (Betreiber-Freigabe: "ja bitte
+rtty"). `src/core/RttyDecoder.{h,cpp}`, `src/gui/RttyDecoderSensitivity.h`,
+`src/gui/applets/RttyDecoderApplet.{h,cpp}` + Verdrahtung in
+`AudioEngine`/`MainWindow`. Sichtbar nur im Modus DIGL (RTTY ist eine
+DIGL-Untermenge, siehe `RxApplet::applyModeVisibility`s eigene Regel "RTTY
+-> NUR DIGL"). Der ursprüngliche Recherche-Teil dieses Dokuments (unten)
+bleibt unverändert stehen — er war die Grundlage für den Bau, nicht nur eine
+Vorstudie, die verworfen wurde.
+
+**Companion:** `tests/tst_rtty_decoder.cpp` (Ende-zu-Ende gegen ein
+synthetisches AFSK-Signal geprüft — echte Baudot/ITA2-Zeichen kommen
+tatsächlich richtig raus, nicht nur "kompiliert"), `tests/tst_rtty_decoder_sensitivity.cpp`.
+
+**Was noch offen ist:** Sichtprüfung am echten Bildschirm (Modus auf DIGL
+umschalten, Panel ansehen) — Computer-Use-Zugriff war in dieser Sitzung
+nicht verfügbar (keine Reaktion auf die Vollbild-Freigabe). Der
+Gerätebaum (`dumpTree` über die Automatisierungs-Bruecke) bestätigt: das
+Applet existiert, sitzt an der richtigen Stelle im Panel, ist beim Start
+(Modus USB) korrekt unsichtbar. Die eigentliche Dekodierlogik ist über den
+synthetischen Test bereits echt geprüft, nicht nur die Verdrahtung.
 
 ## Woher das kommt
 

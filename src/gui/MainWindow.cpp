@@ -362,6 +362,7 @@ warren@wpratt.com
 #include "applets/DiversityApplet.h"
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
+#include "applets/RttyDecoderApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
@@ -6389,6 +6390,14 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_radeApplet);
     m_radeApplet->setVisible(false);
 
+    // RttyDecoderApplet — visible only when the active slice's mode is
+    // DSPMode::DIGL (RTTY is a DIGL submode -- RxApplet::applyModeVisibility
+    // documents this exact rule for the mark/shift container; this applet
+    // follows the same gate). Same visibility-controller wiring as RADE.
+    m_rttyDecoderApplet = new RttyDecoderApplet(m_radioModel, nullptr);
+    panel->addApplet(m_rttyDecoderApplet);
+    m_rttyDecoderApplet->setVisible(false);
+
     // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // These applets are entirely placeholder-only today (no wired controls).
     // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
@@ -6894,6 +6903,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Tx")]         = m_txApplet;
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
+    m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -6952,6 +6962,12 @@ void MainWindow::populateDefaultMeter()
     // shortly after to correct it if needed.
     m_appletVis->registerApplet(QStringLiteral("Rade"),
                                 QStringLiteral("RADE"),         true);
+    // RTTY: defaultVisible=true (user pref). Actual visibility is gated
+    // on the active slice's mode via the availability axis, same pattern
+    // as RADE above -- the dspModeChanged lambda below calls
+    // setAvailable(true) only when mode is DSPMode::DIGL.
+    m_appletVis->registerApplet(QStringLiteral("RttyDecoder"),
+                                QStringLiteral("RTTY Decoder"), true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -7080,6 +7096,11 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("rade"), QStringLiteral("freedv"),
          QStringLiteral("digital"), QStringLiteral("codec"),
          QStringLiteral("sprache")});
+    m_appletVis->describeApplet(QStringLiteral("RttyDecoder"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("rtty"), QStringLiteral("digital"),
+         QStringLiteral("decoder"), QStringLiteral("baudot"),
+         QStringLiteral("fernschreiber"), QStringLiteral("digl")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -7260,6 +7281,10 @@ void MainWindow::populateDefaultMeter()
     // USB, so initial availability=false. The dspModeChanged lambda
     // below updates this on every mode change.
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
+    // RTTY: available only in DIGL mode (RTTY is a DIGL submode). Startup
+    // mode is USB, so initial availability=false; the dspModeChanged
+    // lambda below updates this on every mode change.
+    m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
 
     // RF-Kit RF2K-S: available only when the master toggle is enabled.
     // Default OFF; live-updated via rfKitEnabledChanged below.
@@ -11624,6 +11649,14 @@ void MainWindow::wireSliceToSpectrum()
         });
     }
 
+    // RTTY decoder applet: bound once to this slice, same as the squelch
+    // wiring above -- RttyDecoderApplet is a single global widget, not
+    // per-flag, so it follows whichever slice wireSliceToSpectrum() runs
+    // for (the active slice at slice-0-added time), same scope RADE uses.
+    if (m_rttyDecoderApplet) {
+        m_rttyDecoderApplet->setSlice(slice);
+    }
+
     connect(slice, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
         // Phase 3R L2: RADE applet shows for either RADE sideband, IN ADDITION
         // to PhoneCwApplet -- bench feedback showed PhoneCw hosts the mic gain
@@ -11634,6 +11667,13 @@ void MainWindow::wireSliceToSpectrum()
                              || mode == DSPMode::RADE_L);
         if (m_appletVis) {
             m_appletVis->setAvailable(QStringLiteral("Rade"), isRade);
+        }
+        // RTTY is a DIGL submode only -- RxApplet::applyModeVisibility
+        // documents this exact rule ("RTTY -> NUR DIGL") for the VFO
+        // flag's mark/shift container; this applet follows the same gate.
+        if (m_appletVis) {
+            m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
+                                      mode == DSPMode::DIGL);
         }
         if (m_phoneCwApplet) {
             m_phoneCwApplet->setVisible(true);  // always visible

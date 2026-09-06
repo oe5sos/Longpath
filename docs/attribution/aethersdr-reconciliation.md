@@ -993,6 +993,31 @@ neu geschrieben statt zeilenweise portiert. Details:
 | `src/core/DevAutomationServer.h` | `src/core/AutomationServer.h`, `docs/automation-bridge.md` | Header attribution block names the counterpart [@d58e2b8a]; carried over: opt-in env-var gate, QLocalServer line/JSON protocol shape, per-widget JSON field set, `QRhiWidget::grabFramebuffer()` for GPU capture, objectName-then-class-name target resolution (AetherSDR's own `resolveWidget()` has the identical fallback for the identical reason). Index row in `AETHERSDR-PORTS.md`. | Already present in the file header: "structural derivative of AetherSDR's automation bridge" + Modification history (2026-09-06, Phase 0 created). |
 | `src/core/DevAutomationServer.cpp` | `src/core/AutomationServer.cpp`, `docs/automation-bridge.md` | `describeAutomationWidget()`/`doDumpTree()`/`doGrab()` are Longpath-original implementations of the same JSON shape and verb set AetherSDR's `describeWidget()`/`doDumpTree()`/`doGrab()` establish; `grabAutomationWidget()`'s `QRhiWidget` branch is the one directly-carried-over technique (a real Qt API call, not custom GPU readback), confirmed live against Longpath's own `SpectrumWidget`. | Attribution block lives in the paired header (`DevAutomationServer.h`), per the existing convention for header+source pairs elsewhere in this tree. |
 
+## Nachtrag 2026-09-06 — Nativer RTTY-Decoder
+
+Fuenf neue Dateien. Sole-source AetherSDR-Ableitung wie die Automatisierungs-
+Bruecke oben -- Thetis hat keinen nativen Digitalmodus-Decoder jeder Art
+(bestaetigt per Recherche vor dem Bau, siehe
+[2026-09-06-rtty-decoder-scoping.md](../architecture/2026-09-06-rtty-decoder-scoping.md)),
+daher kein Zwei-Quellen-Abgleich noetig. `RttyDecoder.{h,cpp}` und
+`RttyDecoderSensitivity.h` sind nah-woertliche Uebernahmen (Mark/Space-
+Biquad-Filter, Schmitt-Trigger-Bitschlitzung, Baudot/ITA2-Tabellendecode;
+Abtastrate auf Longpaths natives 48-kHz-WDSP-RX-Tempo statt AetherSDRs
+24 kHz umgerechnet, Mark/Shift-Vorgaben bewusst NICHT von AetherSDR
+uebernommen sondern aus dem bereits vorhandenen, Thetis-stammenden
+`SliceModel::rttyMarkHz/rttyShiftHz` gelesen). `RttyDecoderApplet.{h,cpp}`
+ist neuer Longpath-Code gegen die eigene `AppletWidget`-Basisklasse, aber
+mit dem Regler-/Anzeigesatz aus AetherSDRs RTTY-Bedienfeld (Text, Mark/
+Space-Pegel, Lock/SNR, Empfindlichkeit).
+
+| NereusSDR file | AetherSDR counterpart | Evidence | Specific mod-history wording |
+|---|---|---|---|
+| `src/core/RttyDecoder.h` | `src/core/RttyDecoder.h` [@d58e2b8a] | Header attribution block names the counterpart; mark/space biquad design, envelope-based Schmitt-trigger bit slicing, proportional clock recovery, and Baudot/ITA2 decode structure carried over; sample rate re-derived for 48 kHz (Longpath's native WDSP RX rate) instead of AetherSDR's 24 kHz; default mark/shift deliberately NOT copied from AetherSDR (2125/170 Hz) -- reads Thetis-sourced `SliceModel::rttyMarkHz`/`rttyShiftHz` (2295/170 Hz) instead, see the file's own header comment for the full rationale. | Already present in the file header: "structural and behavioral derivative of AetherSDR's RTTY decoder" + Modification history (2026-09-06, created). |
+| `src/core/RttyDecoder.cpp` | `src/core/RttyDecoder.cpp` [@d58e2b8a] | Near-verbatim port: Baudot/ITA2 tables (international standard, not AetherSDR-original), `designBandpass`/`processBiquad`, `recalcFilterCoeffs`, `decodeLoop`'s state machine (start-bit edge detection, 25%-per-edge clock correction, 5-bit shift register, LTRS/FIGS handling) all carried over; `feedAudio` signature changed to `(const float*, int frames)` instead of AetherSDR's `QByteArray` to match Longpath's `AudioTapRing::read()` shape; chunk size and stats-tick constants re-derived for 48 kHz (10 ms / 0.5 s cadence preserved, sample counts doubled). Verified end-to-end against a synthetic AFSK signal in `tests/tst_rtty_decoder.cpp` (2026-09-06), not just eyeballed. | Attribution block lives in the paired header (`RttyDecoder.h`), per the existing convention for header+source pairs elsewhere in this tree. |
+| `src/gui/RttyDecoderSensitivity.h` | `src/gui/RttyDecoderSensitivity.h` [@d58e2b8a] | Near-verbatim port: identical slider-to-threshold formula and constants (0..100 -> 0.50..0.95), identical rationale comment. Namespace AetherSDR -> Longpath only. | Already present in the file header: "near-verbatim port of AetherSDR's src/gui/RttyDecoderSensitivity.h". |
+| `src/gui/applets/RttyDecoderApplet.h` | `src/gui/PanadapterApplet.cpp` (RTTY control set), `src/gui/RttyDecoderSensitivity.h` [@d58e2b8a] | Structural derivative, not a port: Longpath has no `PanadapterApplet` equivalent, so the widget tree is new code against `AppletWidget`. The control SET (text output, mark/space level meters, lock/SNR status, baud/reverse/sensitivity controls) is carried over from AetherSDR's RTTY panel; mark/shift are read-only here (not duplicated controls) since `RxApplet::RttyMarkShiftContainer` already edits the same Thetis-sourced `SliceModel` fields. | Already present in the file header: "structural derivative of AetherSDR's RTTY panel ... widget tree itself is new Longpath code". |
+| `src/gui/applets/RttyDecoderApplet.cpp` | `src/gui/PanadapterApplet.cpp` (RTTY control set) [@d58e2b8a] | Same as `.h`. Mode-visibility gate (`DSPMode::DIGL` only) matches the existing, documented rule in `RxApplet::applyModeVisibility` ("RTTY -> NUR DIGL") rather than any AetherSDR behavior — Longpath-native, not carried over. | "Same as `.h`." |
+
 ## Bucket B — False AetherSDR citations (126 files)
 
 Every file below carries the mod-history boilerplate

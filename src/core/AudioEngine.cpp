@@ -1111,6 +1111,18 @@ void AudioEngine::setWavRecordTap(AudioTapRing* ring, int sliceId)
     }
 }
 
+void AudioEngine::setRttyTap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie bei den anderen Abgriffen.
+    if (ring) {
+        m_rttyTapSlice.store(sliceId, std::memory_order_release);
+        m_rttyTap.store(ring, std::memory_order_release);
+    } else {
+        m_rttyTap.store(nullptr, std::memory_order_release);
+        m_rttyTapSlice.store(-1, std::memory_order_release);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1329,6 +1341,15 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // ASR-Abgriff. Design doc: phase3m-recording-design.md §7.1.
     if (AudioTapRing* tap = m_wavRecordTap.load(std::memory_order_acquire)) {
         if (sliceId == m_wavRecordTapSlice.load(std::memory_order_acquire)) {
+            tap->write(samples, frames * 2);
+        }
+    }
+
+    // Der Abgriff fuer den nativen RTTY-Decoder (2026-09-06). Wieder ein
+    // eigener Ring, aus demselben Grund wie bei den anderen drei.
+    // Design doc: 2026-09-06-rtty-decoder-scoping.md.
+    if (AudioTapRing* tap = m_rttyTap.load(std::memory_order_acquire)) {
+        if (sliceId == m_rttyTapSlice.load(std::memory_order_acquire)) {
             tap->write(samples, frames * 2);
         }
     }
