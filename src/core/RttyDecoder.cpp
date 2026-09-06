@@ -59,8 +59,20 @@ void RttyDecoder::stop()
     if (!m_running) { return; }
     m_running = false;
     if (m_workerThread) {
+        // Same choice as MainWindow's ShutdownFftThread and
+        // RadioConnectionTeardown: an abandoned timeout used to mean
+        // "log a warning and carry on" here too, which left the worker
+        // free to keep touching `this` after ~RttyDecoder() ran (a
+        // second stop() call during Qt's automatic QObject child
+        // teardown no-ops on `if (!m_running)` above and never waits
+        // again) -- a real, if narrow-window, use-after-free. Rather
+        // wait longer than abort; decodeLoop() only checks m_running
+        // once per ~10ms iteration, so this should return almost
+        // immediately in the overwhelmingly common case.
         if (!m_workerThread->wait(2000)) {
-            qCWarning(lcDsp) << "RttyDecoder: worker did not stop within 2 s -- abandoning";
+            qCWarning(lcDsp) << "RttyDecoder: worker did not stop within 2 s"
+                                 " -- waiting without a timeout";
+            m_workerThread->wait();
         }
         m_workerThread = nullptr;
     }
@@ -109,6 +121,13 @@ void RttyDecoder::feedAudio(const float* interleavedStereo, int frames)
     m_ringBuf.append(mono);
     if (m_ringBuf.size() > kRingCapacity) {
         m_ringBuf.remove(0, m_ringBuf.size() - kRingCapacity);
+        // A real time discontinuity in the audio (the worker fell more
+        // than kRingCapacity behind) -- reuse the same reset decodeLoop()
+        // already does on a parameter change (filter state + bit clock),
+        // so the next chunk doesn't decode across the gap as if it were
+        // continuous and produce a garbled character from mixed
+        // pre-gap/post-gap state.
+        m_paramsChanged = true;
     }
 }
 

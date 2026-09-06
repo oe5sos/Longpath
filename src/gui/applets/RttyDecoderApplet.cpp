@@ -57,7 +57,24 @@ RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
     m_decoder->setReversePolarity(m_reverseBtn->isChecked());
     m_decoder->start();
 
-    m_tapRing = new AudioTapRing(kTapRingFloats);
+    // Unbind promptly when the bound slice goes away -- without this, the
+    // stale sliceIndex left in AudioEngine's tap keeps routing whatever
+    // slice RadioModel::addSlice() next reuses that index for (its
+    // lowest-free-index reuse policy) into this decoder, silently -- not
+    // a crash, but the wrong signal decodes under this applet's title.
+    // RadeApplet and PhoneCwApplet share the same "single global applet,
+    // bound once to whichever slice wireSliceToSpectrum() ran for" shape
+    // and don't re-target to another slice either; this only closes the
+    // stale-routing part, not full multi-slice reassignment.
+    if (m_model) {
+        connect(m_model, &RadioModel::sliceRemoved, this, [this](int index) {
+            if (m_slice && m_slice->sliceIndex() == index) {
+                setSlice(nullptr);
+            }
+        });
+    }
+
+    m_tapRing = std::make_unique<AudioTapRing>(kTapRingFloats);
 
     m_pumpTimer = new QTimer(this);
     m_pumpTimer->setInterval(kPumpIntervalMs);
@@ -78,11 +95,18 @@ RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
 
 RttyDecoderApplet::~RttyDecoderApplet()
 {
+    // Stop the pump FIRST: with m_tapRing/m_decoder as a genuine C++ member
+    // (unique_ptr) and a QObject child respectively, they are destroyed at
+    // two DIFFERENT points during teardown (the member in this destructor's
+    // own unwind, the QObject child later via ~QObject()'s automatic child
+    // cleanup) -- stopping the timer explicitly here removes any question
+    // of whether its queued lambda could still fire in between and touch
+    // either one after it's gone.
+    if (m_pumpTimer) { m_pumpTimer->stop(); }
     if (m_model && m_model->audioEngine()) {
         m_model->audioEngine()->setRttyTap(nullptr, -1);
     }
     if (m_decoder) { m_decoder->stop(); }
-    delete m_tapRing;
 }
 
 void RttyDecoderApplet::buildUI()
@@ -252,7 +276,7 @@ void RttyDecoderApplet::updateAudioTap()
 {
     if (!m_model || !m_model->audioEngine() || !m_tapRing) { return; }
     if (m_slice) {
-        m_model->audioEngine()->setRttyTap(m_tapRing, m_slice->sliceIndex());
+        m_model->audioEngine()->setRttyTap(m_tapRing.get(), m_slice->sliceIndex());
     } else {
         m_model->audioEngine()->setRttyTap(nullptr, -1);
     }
@@ -275,10 +299,17 @@ void RttyDecoderApplet::onTextDecoded(const QString& text, float confidence)
 
     m_charCount += text.size();
     if (m_charCount > kMaxCharCount) {
+        // NextCharacter, not Down: RTTY text has no guaranteed line breaks
+        // at all (only appears if the far station sends a Baudot CR/LF),
+        // so a long unbroken run is one continuously WRAPPED paragraph --
+        // "lines" moved by QTextCursor::Down are the widget's current
+        // soft-wrapped visual rows (panel-width- and font-size-dependent),
+        // not a fixed character count. Trimming by exact character count
+        // instead removes precisely the excess regardless of wrap width.
+        const int excess = m_charCount - kMaxCharCount;
         auto trimCursor = m_textOutput->textCursor();
         trimCursor.movePosition(QTextCursor::Start);
-        trimCursor.movePosition(QTextCursor::Down, QTextCursor::KeepAnchor,
-                                 (m_charCount - kMaxCharCount) / 60 + 1);
+        trimCursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor, excess);
         trimCursor.removeSelectedText();
         m_charCount = m_textOutput->toPlainText().size();
     }

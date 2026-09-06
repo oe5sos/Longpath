@@ -37,6 +37,8 @@
 
 #include <QPointer>
 
+#include <memory>
+
 class QLabel;
 class QComboBox;
 class QSlider;
@@ -90,7 +92,7 @@ private:
 
     QPointer<SliceModel> m_slice;
     RttyDecoder* m_decoder{nullptr};
-    AudioTapRing* m_tapRing{nullptr};
+    std::unique_ptr<AudioTapRing> m_tapRing;
     class QTimer* m_pumpTimer{nullptr};
 
     QMetaObject::Connection m_markHzConn;

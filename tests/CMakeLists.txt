@@ -899,6 +899,7 @@ nereus_add_test(tst_support_dialog)
 nereus_add_test(tst_dev_automation_server)
 nereus_add_test(tst_rtty_decoder)
 nereus_add_test(tst_rtty_decoder_sensitivity)
+nereus_add_test(tst_rtty_decoder_applet)
 
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 nereus_add_test(tst_vax_first_run_dialog)
