@@ -16,6 +16,10 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QStandardPaths>
+#include <QThread>
+#ifdef Q_OS_MAC
+#include <sys/sysctl.h>
+#endif
 
 namespace Longpath {
 
@@ -28,6 +32,16 @@ SupportBundle::SystemInfo SupportBundle::collectSystemInfo()
     sys.kernelVersion = QSysInfo::kernelVersion();
     sys.cpuArch = QSysInfo::currentCpuArchitecture();
     sys.buildDate = QString::fromLatin1(__DATE__);
+    sys.cpuCoreCount = QThread::idealThreadCount();
+#ifdef Q_OS_MAC
+    // "wir machen hier nur mac" (CLAUDE.local.md) — andere Plattformen
+    // lassen ramGb bei 0.0 statt zu raten.
+    int64_t memBytes = 0;
+    size_t len = sizeof(memBytes);
+    if (sysctlbyname("hw.memsize", &memBytes, &len, nullptr, 0) == 0 && memBytes > 0) {
+        sys.ramGb = static_cast<double>(memBytes) / (1024.0 * 1024.0 * 1024.0);
+    }
+#endif
     return sys;
 }
 
@@ -115,6 +129,10 @@ void SupportBundle::writeSystemInfo(const QString& dir, const SystemInfo& sys)
     obj[QStringLiteral("kernel")] = sys.kernelVersion;
     obj[QStringLiteral("cpu")] = sys.cpuArch;
     obj[QStringLiteral("buildDate")] = sys.buildDate;
+    obj[QStringLiteral("cpuCoreCount")] = sys.cpuCoreCount;
+    if (sys.ramGb > 0.0) {
+        obj[QStringLiteral("ramGb")] = sys.ramGb;
+    }
 
     QFile f(dir + QStringLiteral("/system-info.json"));
     if (f.open(QIODevice::WriteOnly)) {

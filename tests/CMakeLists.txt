@@ -895,6 +895,7 @@ nereus_add_test(tst_radio_model_band_click)
 
 # ── About dialog ─────────────────────────────────────────────────────────
 nereus_add_test(tst_about_dialog)
+nereus_add_test(tst_support_dialog)
 
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 nereus_add_test(tst_vax_first_run_dialog)

@@ -39,35 +39,26 @@
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
-#include <QSysInfo>
-#include <QThread>
-#ifdef Q_OS_MAC
-#include <sys/sysctl.h>
-#endif
+#include "core/SupportBundle.h"
 
 static QFile* s_logFile = nullptr;
 
 // Von einer AetherSDR-Sichtung angestossen (2026-09-05): dort gibt es ein
 // umfangreiches SystemInventory, das aber an ihre eigene Whisper/ggml-
 // Spracherkennung gekoppelt ist -- die hat Longpath nicht. Hier nur der
-// allgemeine Teil, den ein Support-Fall wirklich braucht: Betriebssystem,
-// CPU-Architektur, Kernzahl, Qt-Laufzeitversion, RAM (macOS; andere
-// Plattformen lassen das Feld bewusst weg statt zu raten -- "wir machen
-// hier nur mac", siehe CLAUDE.local.md).
+// allgemeine Teil, den ein Support-Fall wirklich braucht -- und der steht
+// schon in SupportBundle::collectSystemInfo() (fuer den Bundle-Export),
+// jetzt erweitert um Kernzahl/RAM und hier zusaetzlich sofort ins Log
+// geschrieben, nicht erst beim Erzeugen eines Bundles.
 static void logStartupHardwareInventory()
 {
+    const auto sys = Longpath::SupportBundle::collectSystemInfo();
     qInfo("System: %s, %s, %d Kerne, Qt %s",
-          qPrintable(QSysInfo::prettyProductName()),
-          qPrintable(QSysInfo::currentCpuArchitecture()),
-          QThread::idealThreadCount(),
-          qVersion());
-#ifdef Q_OS_MAC
-    int64_t memBytes = 0;
-    size_t len = sizeof(memBytes);
-    if (sysctlbyname("hw.memsize", &memBytes, &len, nullptr, 0) == 0 && memBytes > 0) {
-        qInfo("RAM: %.1f GB", static_cast<double>(memBytes) / (1024.0 * 1024.0 * 1024.0));
+          qPrintable(sys.osName), qPrintable(sys.cpuArch),
+          sys.cpuCoreCount, qPrintable(sys.qtVersion));
+    if (sys.ramGb > 0.0) {
+        qInfo("RAM: %.1f GB", sys.ramGb);
     }
-#endif
 }
 
 // Redact PII from log messages before writing to file.
