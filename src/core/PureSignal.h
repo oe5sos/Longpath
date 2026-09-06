@@ -57,6 +57,7 @@
 
 #include <QColor>
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QTimer>
 
@@ -645,7 +646,17 @@ private:
 
     // Construction-time non-owning pointers
     WdspEngine* m_engine;
-    TxChannel* m_tx;
+    // QPointer, not a raw TxChannel*: ~PureSignal() dereferences this to
+    // leave WDSP in a clean state (setPSControl/setPSMox), and a caller is
+    // free to destroy the bound TxChannel first -- confirmed by
+    // AddressSanitizer 2026-09-06 (stack-use-after-scope,
+    // tst_puresignal_coordinator::setTxChannel_lateBindingDoesNotCrash: a
+    // locally-scoped TxChannel destructs before the PureSignal holding a
+    // pointer to it, in plain reverse-declaration-order teardown, no
+    // exotic setup required). QPointer reads back null once TxChannel is
+    // gone instead of dangling, so the existing `if (m_tx)` guards already
+    // used everywhere else in this file become correct instead of lucky.
+    QPointer<TxChannel> m_tx;
     PsFeedbackChannel* m_fb;
     MoxController* m_mox;
     StepAttenuatorController* m_stepAtt;

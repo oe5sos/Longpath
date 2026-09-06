@@ -347,13 +347,14 @@ double PureSignal::getHwPeak() const
     // ANAN-G2E bench-fix 2026-05-23 (JJ Boyd): expose calcc's current
     // hardware peak so PsForm GetPk label can mirror Thetis PSForm.cs:614
     // [v2.10.3.13].  Returns 0.0 when no TX channel is bound (e.g.
-    // pre-connect).  Const-cast required because TxChannel::getPSHWPeak
-    // wraps a non-const WDSP call (GetPSHWPeak); the WDSP call itself
-    // is read-only despite the missing const qualifier.
+    // pre-connect).  QPointer::operator->() already hands back a non-const
+    // TxChannel* regardless of this method's own constness, so no cast is
+    // needed to reach the (non-const-qualified, despite being read-only)
+    // TxChannel::getPSHWPeak wrapping GetPSHWPeak.
     if (!m_tx) {
         return 0.0;
     }
-    return const_cast<TxChannel*>(m_tx)->getPSHWPeak();
+    return m_tx->getPSHWPeak();
 }
 
 void PureSignal::setAutoCalEnabled(bool on)

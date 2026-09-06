@@ -7069,5 +7069,27 @@ target_include_directories(kiwi_sdr_trace_math_test PRIVATE ${CMAKE_SOURCE_DIR}/
 add_test(NAME kiwi_sdr_trace_math_test COMMAND kiwi_sdr_trace_math_test)
 add_dependencies(all_tests kiwi_sdr_trace_math_test)
 
+# Diese elf Pruefstaende oben (bewusst mit eigenem main() statt QTest,
+# siehe deren Kopfkommentare) laufen NICHT ueber nereus_add_test() und
+# haben deshalb nie die dortige ASAN-Link-Ergaenzung bekommen (§ oben,
+# "found 2026-08-30 ... existing sanitizer support was never actually
+# usable for tests at all"). Erst am 2026-09-06 aufgefallen, als ein
+# voller Testlauf im Debug/ASAN-Build sie mit "Unable to find
+# executable" meldete -- sie waren unter dieser Konfiguration nie
+# gebaut worden, weil derselbe Linker-Fehler (ASAN-instrumentierte
+# LongpathObjs, aber keine ASAN-Laufzeit an DIESEM Ziel verlinkt) sie
+# traf. Dieselbe Ergaenzung hier statt in nereus_add_test(), weil diese
+# elf absichtlich nicht durch diese Funktion laufen.
+foreach(_asan_gap_target IN ITEMS
+        kiwi_sdr_protocol_test kiwi_public_directory_test
+        kiwi_sdr_redirect_policy_test kiwi_sdr_manager_password_test
+        kiwi_sdr_manager_csv_test kiwi_rebind_tracker_test
+        asr_segmenter_test asr_remote_backend_test asr_tap_policy_test
+        kiwi_sdr_tx_mute_policy_test kiwi_sdr_trace_math_test)
+    if(NOT MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_options(${_asan_gap_target} PRIVATE -fsanitize=address)
+    endif()
+endforeach()
+
 
 
