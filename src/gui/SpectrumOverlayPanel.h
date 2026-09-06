@@ -40,6 +40,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QHash>
 #include <QVector>
 #include <functional>
 
@@ -180,6 +181,15 @@ public:
     // SpectrumWidget::setOverlayPanelExpanded().
     void setExpandedState(bool expanded);
 
+    // Marks which button in the Band flyout matches this pan's resolved
+    // slice's current band (Band::bandKeyName() — e.g. "40m"), set from
+    // bindToPanSlice(). Von einer AetherSDR-Sichtung angestossen
+    // (2026-09-06, "highlight active band"); Entwurf A (gefuellt, wie der
+    // WNB-Knopf im selben Panel) vom Betreiber gewaehlt. No match (a name
+    // not in kBands, e.g. "GEN", or an empty string when the pan has no
+    // slice) just clears the highlight — a fine, silent no-op, not a bug.
+    void setActiveBandHighlight(const QString& bandKeyName);
+
 private:
     /// Which panadapter this strip is drawn on; see setPanId.
     QString m_panId;
@@ -226,6 +236,8 @@ private:
 
     // ── Band flyout ──────────────────────────────────────────────────────
     QWidget* m_bandFlyout{nullptr};
+    // Keyed by Band::bandKeyName() (e.g. "40m"), for setActiveBandHighlight().
+    QHash<QString, QPushButton*> m_bandButtons;
 
     // ── ANT flyout ───────────────────────────────────────────────────────
     QWidget*     m_antFlyout{nullptr};
@@ -276,6 +288,10 @@ private:
     RadioModel*              m_radioModel{nullptr};
     SliceResolver            m_sliceResolver;
     QMetaObject::Connection  m_vaxChannelConn;
+    // Same rebind-on-shuffle pattern as m_vaxChannelConn above, for the
+    // Band-flyout highlight (2026-09-06) -- SliceModel::bandChanged of
+    // whichever slice bindToPanSlice() currently resolves to.
+    QMetaObject::Connection  m_bandChangedConn;
     bool                     m_updatingFromModel{false};
 
     SliceModel* resolvedSlice() const;

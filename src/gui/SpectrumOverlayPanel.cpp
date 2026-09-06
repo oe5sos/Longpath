@@ -711,6 +711,12 @@ void SpectrumOverlayPanel::buildBandFlyout()
         "border: 1px solid #304050; border-radius: 6px; "
         "color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: rgba(0, 112, 192, 180); "
+        "border: 1px solid #4a7ba8; }"
+        // Welches Band gerade gehoert wird -- von einer AetherSDR-
+        // Sichtung angestossen (2026-09-06). Entwurf A vom Betreiber
+        // gewaehlt: wortgleich der :checked-Stil, den der WNB-Knopf
+        // im selben Panel schon nutzt (Zeile ~892).
+        "QPushButton:checked { background: #4a7ba8; color: #ffffff; "
         "border: 1px solid #4a7ba8; }";
 
     // 4-column grid layout:
@@ -718,6 +724,7 @@ void SpectrumOverlayPanel::buildBandFlyout()
     // Row 1: 30, 20, 17, 15
     // Row 2: 12, 10, 6, WWV
     static constexpr int kCols = 4;
+    m_bandButtons.clear();
     for (int i = 0; i < kBandCount; ++i) {
         int row = i / kCols;
         int col = i % kCols;
@@ -725,6 +732,7 @@ void SpectrumOverlayPanel::buildBandFlyout()
         auto* btn = new QPushButton(QString::fromLatin1(kBands[i].label), m_bandFlyout);
         btn->setFixedSize(kBandBtnW, kBandBtnH);
         btn->setStyleSheet(bandBtnStyle);
+        btn->setCheckable(true);
 
         QString bandName = QString::fromLatin1(kBands[i].name);
         double  freqHz   = kBands[i].freqHz;
@@ -735,9 +743,17 @@ void SpectrumOverlayPanel::buildBandFlyout()
             emit bandSelected(bandName, freqHz, mode);
         });
         grid->addWidget(btn, row, col);
+        m_bandButtons.insert(bandName, btn);
     }
 
     m_bandFlyout->adjustSize();
+}
+
+void SpectrumOverlayPanel::setActiveBandHighlight(const QString& bandKeyName)
+{
+    for (auto it = m_bandButtons.constBegin(); it != m_bandButtons.constEnd(); ++it) {
+        it.value()->setChecked(it.key() == bandKeyName);
+    }
 }
 
 void SpectrumOverlayPanel::toggleBandFlyout()
@@ -1404,6 +1420,8 @@ void SpectrumOverlayPanel::bindToPanSlice()
     // rebind-on-shuffle pattern as VAX above.
     if (m_rxAntConn) { QObject::disconnect(m_rxAntConn); m_rxAntConn = {}; }
     if (m_txAntConn) { QObject::disconnect(m_txAntConn); m_txAntConn = {}; }
+    // Band-flyout highlight (2026-09-06). Same rebind-on-shuffle pattern.
+    if (m_bandChangedConn) { QObject::disconnect(m_bandChangedConn); m_bandChangedConn = {}; }
 
     SliceModel* s = resolvedSlice();
     if (s) {
@@ -1413,6 +1431,20 @@ void SpectrumOverlayPanel::bindToPanSlice()
         m_updatingFromModel = true;
         m_vaxCmb->setCurrentIndex(s->vaxChannel());
         m_updatingFromModel = false;
+
+        // Welches Band im Band-Flyout gehoert wird -- von einer
+        // AetherSDR-Sichtung angestossen (2026-09-06, "highlight active
+        // band"). Ursprünglich an PanadapterModel::bandChanged gebunden
+        // versucht -- die Klasse wird aber nirgends instanziiert
+        // (RadioModel::addPanadapter() hat keinen einzigen Aufrufer,
+        // siehe Nachtrag in der Speicher-Notiz), also nie ausgeloest.
+        // SliceModel ist die tatsaechlich lebendige Quelle (wie der
+        // Bandklick oben in MainWindow::ensureOverlayPanels schon zeigt).
+        setActiveBandHighlight(bandKeyName(bandFromFrequency(s->frequency())));
+        m_bandChangedConn = connect(s, &SliceModel::bandChanged,
+                                    this, [this](Longpath::Band newBand) {
+            setActiveBandHighlight(bandKeyName(newBand));
+        });
 
         m_vaxChannelConn = connect(s, &SliceModel::vaxChannelChanged,
                                    this, [this](int ch) {
@@ -1475,6 +1507,7 @@ void SpectrumOverlayPanel::bindToPanSlice()
         m_vaxCmb->setToolTip("VAX channel (waiting for this pan's slice)");
         if (m_rxAntCmb) { m_rxAntCmb->setEnabled(false); }
         if (m_txAntCmb) { m_txAntCmb->setEnabled(false); }
+        setActiveBandHighlight(QString());
     }
 }
 
