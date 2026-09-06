@@ -8,6 +8,13 @@
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
 
+- **Der Support-Dialog (Tools > Support Bundle...) zeigt jetzt eine
+  Systemzeile ganz oben** (Betriebssystem, CPU, Kernzahl, Qt- und
+  Longpath-Version, RAM) -- dieselben Werte wie im Start-Protokoll,
+  jetzt auch auf einen Blick sichtbar statt nur im Log. Ebenfalls von
+  AetherSDR angestossen (dort ein eigenes Fenster; hier eine Zeile im
+  schon vorhandenen Dialog, der den Log-Teil laengst hatte).
+
 ### Fixed
 
 - **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand
