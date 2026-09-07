@@ -3056,6 +3056,14 @@ private:
     // wie stark das Bild deckt. Der Name stammt aus AetherSDR und
     // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
     // Umbenennung scheitert.
+    //
+    // Unconditional (not inside #ifdef NEREUS_GPU_SPECTRUM): both the
+    // GPU and the CPU-only paint path call paintBackgroundLayer(), and
+    // its setters/getters above are declared unconditionally too -- these
+    // members were stranded inside the GPU-only block below, which broke
+    // every CPU-only build (e.g. release.yml's ubuntu-24.04-arm job,
+    // which sets -DNEREUS_GPU_SPECTRUM=OFF because that runner's Qt is
+    // older than the 6.7 QRhiWidget needs).
     QImage  m_bgImage;
     QImage  m_bgScaled;
     QSize   m_bgScaledSize;
@@ -3067,16 +3075,18 @@ private:
 
     int m_visibleBinCount{0};  // bins rendered this frame (for draw call count)
 
-
     // Ebenfalls ausserhalb, aus demselben Grund: der CPU-Pfad in
     // SpectrumWidget.cpp fasst diese Felder ungeschuetzt an. Sie lagen
     // im Gate, weil sie dort entstanden sind — nicht, weil sie die GPU
-    // braeuchten. Ein Bau ohne QRhi meldete darauf 35 Fehler.
+    // braeuchten. Ein Bau ohne QRhi meldete darauf 35 Fehler. Gefunden per
+    // systematischem Abgleich jedes Members in diesem Block gegen seine
+    // echten Verwendungsstellen in SpectrumWidget.cpp, nachdem der
+    // ubuntu-24.04-arm-Bau (-DNEREUS_GPU_SPECTRUM=OFF, aeltere Qt-Version
+    // ohne QRhiWidget) daran einen Fehler nach dem anderen meldete.
 
     /// Wasserfall-Textur beim naechsten Bild vollstaendig hochladen.
     /// Der CPU-Pfad setzt die Fahne beim Groessenwechsel mit.
     bool m_wfTexFullUpload{true};
-
     /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
     /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
     /// pushWaterfallRow().
@@ -3086,7 +3096,6 @@ private:
     /// dBm-Leiste). Auf dem CPU-Pfad ohne Wirkung, aber gesetzt.
     bool   m_overlayStaticDirty{true};
     bool   m_shutdownPrepared{false};
-
     // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
     // Beim Druck festgehalten: Zeigerposition, VFO und Hz-je-Punkt.
     // Warum, steht am Auswertepunkt in mouseMoveEvent.
@@ -3095,6 +3104,7 @@ private:
     int    m_vfoDragStartX{0};
     double m_vfoDragStartHz{0.0};
     double m_vfoDragHzPerPx{0.0};
+
 #ifdef NEREUS_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
