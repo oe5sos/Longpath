@@ -223,6 +223,67 @@ private slots:
 
         conn.disconnect();
     }
+
+    // Bug fix 2026-09-07 regression: a connection that survives an initial
+    // connect-watchdog timeout (onConnectTimeout(), which tears m_running
+    // down to false and sets m_intentionalDisconnect) and then auto-retries
+    // into Connected must come out of onReconnectTimeout() with BOTH flags
+    // restored -- otherwise onWatchdogTick()'s and onEp2PacerTick()'s shared
+    // `if (!m_running ...) return;` guard silently disables silence
+    // detection (and the EP2 audio-clock pacer) for the rest of that
+    // connection object's life, even though it looks perfectly Connected.
+    //
+    // Exercised here by making the fake stay silent through the WHOLE real,
+    // uncompressible kConnectTimeoutMs window (not just the compressed test
+    // intervals used elsewhere in this file), so onConnectTimeout() actually
+    // fires and the automatic retry genuinely goes through onReconnectTimeout().
+    // Then, once reconnected, a SECOND silence must still trip the watchdog.
+    void connectTimeoutThenRetryStillDetectsLaterSilence() {
+        P1FakeRadio fake;
+        fake.start();
+        // The radio never answers the very first connect attempt at all.
+        fake.goSilent();
+
+        P1RadioConnection conn;
+        conn.init();
+        conn.setReconnectTimingForTest(kTestWatchdogSilenceMs,
+                                        kTestReconnectIntervalMs);
+
+        // Resume the fake the instant the (real) connect watchdog tears the
+        // first attempt down to Disconnected -- late enough that
+        // onConnectTimeout() genuinely fires, early enough that the
+        // automatic retry (onReconnectTimeout) reaches a live radio rather
+        // than timing out a second time.
+        bool sawInitialTimeout = false;
+        QObject::connect(&conn, &P1RadioConnection::connectionStateChanged,
+                         &conn, [&fake, &sawInitialTimeout](ConnectionState s) {
+                             if (s == ConnectionState::Disconnected && !sawInitialTimeout) {
+                                 sawInitialTimeout = true;
+                                 fake.resume();
+                             }
+                         });
+
+        conn.connectToRadio(makeInfo(fake));
+
+        QTRY_VERIFY_WITH_TIMEOUT(
+            sawInitialTimeout,
+            P1RadioConnection::connectTimeoutMsForTest() + 2000);
+
+        QTRY_VERIFY_WITH_TIMEOUT(
+            conn.state() == ConnectionState::Connected,
+            P1RadioConnection::connectTimeoutMsForTest() + 5000);
+
+        // Second silence, on the SAME connection object that already lived
+        // through one connect-timeout-then-retry cycle. If m_running was
+        // left false by that cycle (the pre-fix bug), this can never trip
+        // and the QTRY below times out.
+        fake.goSilent();
+        QTRY_VERIFY_WITH_TIMEOUT(
+            conn.state() != ConnectionState::Connected, 2000);
+
+        conn.disconnect();
+        fake.stop();
+    }
 };
 
 QTEST_MAIN(TestReconnectOnSilence)
