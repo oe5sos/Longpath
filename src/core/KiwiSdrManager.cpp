@@ -940,14 +940,20 @@ void KiwiSdrManager::disconnectProfile(const QString& id)
         });
     }
     emit audioSourceEnabledChanged(id, false);
-    // Releasing a receiver ends its waterfall stream, so drop the per-profile
-    // waterfall history the GUI cached for fast switch-back. Without this the
-    // SpectrumWidget keeps a full waterfall + history QImage for every distinct
-    // Kiwi ever switched to (m_kiwiProfileWaterfallStates), which grows the
-    // working set by ~100-200 MB per receiver and is only freed on a full reset
-    // — the leak reported in #4199. Profiles that stay assigned/auto-connected
-    // are never disconnected here, so their cached history (multi-slice toggle)
-    // is preserved. The stream, and its history, rebuild on reconnection.
+    // Releasing a receiver ends its waterfall stream; tell the GUI so it can
+    // drop whatever per-profile waterfall state it's holding.
+    //
+    // Stale note removed 2026-09-07 (deep OOM investigation, see
+    // longpath-kiwisdr-oom-2026-09-07 memory): this comment used to describe
+    // a `m_kiwiProfileWaterfallStates` GUI-side cache ("~100-200 MB per
+    // receiver, leak #4199") that a `grep -r` of the full src/ tree confirms
+    // does NOT exist anywhere in the current codebase. It described the
+    // pre-2026-08-27 KiwiWaterfallPanel architecture, superseded by the
+    // small, fixed-size (48-row) per-profile strip in
+    // KiwiWaterfallStripWidget — read and confirmed bounded during that
+    // investigation. Signal kept as-is (still the correct place to tell the
+    // GUI a profile's stream ended), just the misleading history removed so
+    // it stops pointing future investigators at a mechanism that's gone.
     emit profileStreamReset(id);
 }
 
