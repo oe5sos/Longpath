@@ -9,12 +9,14 @@
 
 #include "gui/KiwiPublicReceiverPicker.h"
 
+#include <QAccessible>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -163,8 +165,9 @@ void KiwiPublicReceiverPicker::onReady(const QVector<KiwiPublicReceiver>& receiv
 void KiwiPublicReceiverPicker::applyFilter()
 {
     const QString needle = m_search->text().trimmed();
-    m_table->setRowCount(0);
-    int shown = 0;
+
+    QVector<const KiwiPublicReceiver*> matches;
+    matches.reserve(m_apiReceivers.size());
     for (const auto& r : m_apiReceivers) {
         if (!needle.isEmpty()
             && !r.name.contains(needle, Qt::CaseInsensitive)
@@ -172,33 +175,65 @@ void KiwiPublicReceiverPicker::applyFilter()
             && !r.url.contains(needle, Qt::CaseInsensitive)) {
             continue;
         }
-        const int row = m_table->rowCount();
-        m_table->insertRow(row);
-
-        auto* nameItem = new QTableWidgetItem(r.name.isEmpty() ? r.url : r.name);
-        nameItem->setToolTip(r.url);
-        // Carry the endpoint + a suggested name on the row's first item.
-        nameItem->setData(Qt::UserRole, endpointFromUrl(r.url));
-        nameItem->setData(Qt::UserRole + 1,
-                          QUrl(r.url).host().left(16));  // short default name
-        m_table->setItem(row, ReceiverColumn, nameItem);
-        m_table->setItem(row, LocationColumn, new QTableWidgetItem(r.location));
-        m_table->setItem(row, UsersColumn, new QTableWidgetItem(
-            QStringLiteral("%1/%2").arg(r.users).arg(r.usersMax)));
-        m_table->setItem(row, ApiColumn, new QTableWidgetItem(r.apiBadge()));
-
-        auto* limitsItem = new QTableWidgetItem(r.connectionLimitBadge());
-        if (r.advertisesConnectionLimit()) {
-            limitsItem->setToolTip(tr("This receiver advertises connection limits, "
-                                      "but the public directory does not publish "
-                                      "the configured duration."));
-        } else {
-            limitsItem->setToolTip(tr("No connection limit is advertised in the "
-                                      "public directory."));
-        }
-        m_table->setItem(row, LimitsColumn, limitsItem);
-        ++shown;
+        matches.append(&r);
     }
+
+    // Bug fix 2026-09-07: this used to insertRow()+setItem() one row at a
+    // time, re-running on EVERY keystroke in the search box. Each
+    // insertRow()/setItem() fires its own model signal, and Qt's macOS
+    // accessibility bridge rebuilds the WHOLE table's accessible element
+    // array from scratch on every one of those whenever an accessibility
+    // observer (VoiceOver, remote-control software, or a11y-based
+    // automation) is attached -- confirmed to crash Longpath the same
+    // way for LogbookWindow::refreshTable() (see that fix, same date,
+    // for the full writeup and Qt-source citations). The public
+    // directory realistically runs several hundred entries, so this was
+    // the same O((rows x cols)^2) shape, at a worse retrigger rate.
+    // setRowCount() stays outside the blocked scope so the view's own
+    // geometry/scrollbars stay correct; only the per-cell population is
+    // batched into one accessibility notification afterward.
+    m_table->setRowCount(matches.size());
+    {
+        const QSignalBlocker modelBlocker(m_table->model());
+        for (int row = 0; row < matches.size(); ++row) {
+            const KiwiPublicReceiver& r = *matches.at(row);
+
+            auto* nameItem = new QTableWidgetItem(r.name.isEmpty() ? r.url : r.name);
+            nameItem->setToolTip(r.url);
+            // Carry the endpoint + a suggested name on the row's first item.
+            nameItem->setData(Qt::UserRole, endpointFromUrl(r.url));
+            nameItem->setData(Qt::UserRole + 1,
+                              QUrl(r.url).host().left(16));  // short default name
+            m_table->setItem(row, ReceiverColumn, nameItem);
+            m_table->setItem(row, LocationColumn, new QTableWidgetItem(r.location));
+            m_table->setItem(row, UsersColumn, new QTableWidgetItem(
+                QStringLiteral("%1/%2").arg(r.users).arg(r.usersMax)));
+            m_table->setItem(row, ApiColumn, new QTableWidgetItem(r.apiBadge()));
+
+            auto* limitsItem = new QTableWidgetItem(r.connectionLimitBadge());
+            if (r.advertisesConnectionLimit()) {
+                limitsItem->setToolTip(tr("This receiver advertises connection limits, "
+                                          "but the public directory does not publish "
+                                          "the configured duration."));
+            } else {
+                limitsItem->setToolTip(tr("No connection limit is advertised in the "
+                                          "public directory."));
+            }
+            m_table->setItem(row, LimitsColumn, limitsItem);
+        }
+    }
+    m_table->viewport()->update();
+    {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_table, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(qMax(0, m_table->rowCount() - 1));
+        tableEvent.setFirstColumn(0);
+        tableEvent.setLastColumn(ColumnCount - 1);
+        QAccessible::updateAccessibility(&tableEvent);
+    }
+
+    const int shown = matches.size();
     QString status = tr("%1 receivers allow API access").arg(shown);
     QStringList hiddenParts;
     if (m_hiddenWebOnly > 0)
