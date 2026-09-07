@@ -5137,6 +5137,23 @@ nereus_add_test(tst_nested_splitter_layout)
 nereus_add_test(tst_container_grab_handle)
 nereus_add_test(tst_container_lock_button)
 nereus_add_test(tst_audio_tap_ring)
+
+# ── 2026-09-06 race fix: setXxxTap(nullptr, ...) vs. an in-flight write ──────
+# Code review found that AudioEngine::setQsoTap / setAsrTap /
+# setWavRecordTap / setRttyTap only ever stored two plain atomics, with no
+# handshake against a rxBlockReady() call already past the tap-pointer load
+# on the real audio thread — a caller that frees the AudioTapRing right
+# after disabling the tap (e.g. QsoRecorderController's dtor, "Erst den
+# Abgriff loesen, dann sterben") could race a still-running write() into
+# freed memory. Fixed via a per-tap busy counter (writeToTapIfCurrent /
+# waitForTapQuiescence in AudioEngine.cpp) that setXxxTap(nullptr, ...)
+# drains before returning. This test uses the NEREUS_BUILD_TESTS-only
+# setTapWriteDelayHookForTest seam to hold a simulated audio thread inside
+# that exact window and asserts setXxxTap(nullptr, ...) blocks for the
+# delay's duration instead of returning immediately — deterministic and
+# CI-safe, unlike actually racing a real use-after-free.
+nereus_add_test(tst_audio_engine_tap_teardown_race)
+
 nereus_add_test(tst_qso_recorder_controller)
 nereus_add_test(tst_qso_recorder_applet)
 nereus_add_test(tst_wav_player)

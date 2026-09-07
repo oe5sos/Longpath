@@ -372,6 +372,17 @@ public:
         m_withdrawalPublishedHookForTest = std::move(hook);
     }
 
+    // Test seam (2026-09-06) — arms m_tapWriteDelayHookForTest so a test
+    // can hold the simulated audio thread inside the setXxxTap(nullptr,
+    // ...) race window (busy already announced, tap pointer already
+    // loaded, write() not yet called) and prove the wait in setXxxTap
+    // really blocks until that write() has returned. See
+    // tst_audio_engine_tap_teardown_race.cpp.
+    void setTapWriteDelayHookForTest(std::function<void()> hook)
+    {
+        m_tapWriteDelayHookForTest = std::move(hook);
+    }
+
     /// Test seam — directly set MOX state without going through MoxController.
     /// Bypasses the signal/slot connection that RadioModel wires in Phase L so
     /// unit tests can drive the gate logic without a full radio fixture.
@@ -990,6 +1001,37 @@ private:
     // admitted regions to finish before withdrawal returns.
     std::atomic<bool> m_mixAdmissionClosed{false};
     std::atomic<unsigned> m_mixRegionsInFlight{0};
+
+    // Per-tap quiescence counters (2026-09-06 race fix). setXxxTap(nullptr,
+    // ...) callers free or reuse the AudioTapRing immediately afterward
+    // (see e.g. QsoRecorderController's dtor comment "Erst den Abgriff
+    // loesen, dann sterben"), but until this fix setXxxTap only stored two
+    // plain atomics with no handshake — a rxBlockReady() call already past
+    // the tap pointer's load on the real audio thread could still be inside
+    // tap->write() when the ring is destroyed underneath it. rxBlockReady
+    // announces itself here (fetch_add) BEFORE loading the tap pointer, and
+    // setXxxTap(nullptr, ...) publishes the null pointer THEN waits for the
+    // counter to drain — see writeToTapIfCurrent / waitForTapQuiescence in
+    // AudioEngine.cpp. Deliberately one counter per tap rather than reusing
+    // m_mixRegionsInFlight above: that counter (and its admission-closed
+    // gate) stops the ENTIRE mix pipeline for every slice, which is fine
+    // for the rare full-slice teardown it guards but would glitch every
+    // other slice's audio each time an operator merely stops a QSO
+    // recording, ASR, WAV capture, or the RTTY decoder.
+    std::atomic<unsigned> m_qsoTapBusy{0};
+    std::atomic<unsigned> m_asrTapBusy{0};
+    std::atomic<unsigned> m_wavRecordTapBusy{0};
+    std::atomic<unsigned> m_rttyTapBusy{0};
+
+    // Test-only seam for the four counters above (2026-09-06). Fires on
+    // the audio thread from inside writeToTapIfCurrent (AudioEngine.cpp),
+    // after the matching busy counter has been incremented and the tap
+    // pointer loaded, immediately before tap->write() runs — i.e. inside
+    // the exact window the fix closes. A no-op std::function outside
+    // tests (checked, never called), so it costs nothing in production;
+    // the setter that arms it is gated under NEREUS_BUILD_TESTS below
+    // like every other *ForTest seam in this class.
+    std::function<void()> m_tapWriteDelayHookForTest;
 
 #ifdef NEREUS_BUILD_TESTS
     std::function<void()> m_withdrawalPublishedHookForTest;
