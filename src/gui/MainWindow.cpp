@@ -7277,13 +7277,14 @@ void MainWindow::populateDefaultMeter()
     const bool fourO3AOn = m_radioModel && m_radioModel->fourO3AEnabled();
     m_appletVis->setAvailable(QStringLiteral("Amp"),   fourO3AOn);
     m_appletVis->setAvailable(QStringLiteral("Tuner"), fourO3AOn);
-    // RADE: available only in RADE_U / RADE_L modes. Startup mode is
-    // USB, so initial availability=false. The dspModeChanged lambda
-    // below updates this on every mode change.
+    // RADE / RTTY: available only in RADE_U/_L / DIGL respectively.
+    // Safe pre-slice default -- no slice exists yet at this point in
+    // startup, so there is no real mode to read. wireSliceToSpectrum()
+    // corrects both against the slice's ACTUAL mode the moment one
+    // exists (a restored session can start directly in RADE/DIGL, not
+    // just USB -- see the 2026-09-07 comment there for why that case
+    // needs its own correction, not just the dspModeChanged lambda).
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
-    // RTTY: available only in DIGL mode (RTTY is a DIGL submode). Startup
-    // mode is USB, so initial availability=false; the dspModeChanged
-    // lambda below updates this on every mode change.
     m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
 
     // RF-Kit RF2K-S: available only when the master toggle is enabled.
@@ -11655,6 +11656,25 @@ void MainWindow::wireSliceToSpectrum()
     // for (the active slice at slice-0-added time), same scope RADE uses.
     if (m_rttyDecoderApplet) {
         m_rttyDecoderApplet->setSlice(slice);
+    }
+
+    // Correct the two hardcoded "startup mode is USB" availability guesses
+    // above (setAvailable("Rade"/"RttyDecoder", false)) against the SLICE'S
+    // REAL mode now that one exists -- found live 2026-09-07 against a real
+    // ANAN 10e: a restored profile/session can start directly in DIGL (or
+    // RADE_U/_L), and if it does, SliceModel::dspModeChanged() never fires
+    // (nothing changed from the slice's own point of view), so the startup
+    // guess never gets corrected and the applet stays wrongly hidden for
+    // the entire session. This runs once here, at the same point the
+    // dspModeChanged lambda below runs on every later change; together
+    // they cover both "already there at startup" and "changed later".
+    if (m_appletVis) {
+        const DSPMode initialMode = slice->dspMode();
+        m_appletVis->setAvailable(QStringLiteral("Rade"),
+                                  initialMode == DSPMode::RADE_U
+                                      || initialMode == DSPMode::RADE_L);
+        m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
+                                  initialMode == DSPMode::DIGL);
     }
 
     connect(slice, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
