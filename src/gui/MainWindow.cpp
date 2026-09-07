@@ -5131,78 +5131,117 @@ void MainWindow::buildUI()
         struct NFHistoryEntry { qint64 t; float value; };
         struct SettleState {
             QList<NFHistoryEntry> history;
+            // Bug fix 2026-09-07: this per-band memory used to live on
+            // PanadapterModel (setBandNFEstimate/bandNFEstimate), but
+            // RadioModel::addPanadapter() has no caller anywhere in the
+            // shipped app (only tests call it) -- no PanadapterModel
+            // instance, and therefore no storage, ever existed in
+            // production. Relocated here (captured by both lambdas
+            // below via the shared settle state) rather than adding a
+            // real caller for the dead class.
+            QHash<Longpath::Band, float> bandNfEstimate;
+            Longpath::Band currentBand{Longpath::Band::Band20m};
         };
         auto settle = QSharedPointer<SettleState>::create();
 
-        PanadapterModel* pan0 = m_radioModel->panadapters().isEmpty()
-                                ? nullptr
-                                : m_radioModel->panadapters().first();
-        if (pan0) {
-            connect(m_clarityController, &ClarityController::noiseFloorChanged,
-                    this, [pan0, settle](float nf) {
-                const qint64 now = QDateTime::currentMSecsSinceEpoch();
-                settle->history.append({now, nf});
+        // Same AppSettings key convention PanadapterModel::bandNFEstimate
+        // already used (and tst_per_band_nf_priming.cpp already tests) --
+        // load whatever a working PanadapterModel would have loaded, so a
+        // restart still snaps instantly instead of cold-starting.
+        for (int i = 0; i < static_cast<int>(Longpath::Band::SwlFirst); ++i) {
+            const auto b = static_cast<Longpath::Band>(i);
+            const QVariant nfV = AppSettings::instance().value(
+                QStringLiteral("DisplayBandNFEstimate_") + bandKeyName(b));
+            if (nfV.isValid()) { settle->bandNfEstimate[b] = nfV.toFloat(); }
+        }
 
-                // Trim to 2-second window.
-                const qint64 cutoff = now - 2000;
-                while (!settle->history.isEmpty() && settle->history.first().t < cutoff) {
-                    settle->history.removeFirst();
+        connect(m_clarityController, &ClarityController::noiseFloorChanged,
+                this, [settle](float nf) {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            settle->history.append({now, nf});
+
+            // Trim to 2-second window.
+            const qint64 cutoff = now - 2000;
+            while (!settle->history.isEmpty() && settle->history.first().t < cutoff) {
+                settle->history.removeFirst();
+            }
+
+            // Compute variance when we have ≥30 samples (~30 cadence ticks).
+            if (settle->history.size() >= 30) {
+                float sum = 0.0f;
+                for (const auto& e : std::as_const(settle->history)) { sum += e.value; }
+                const float mean = sum / static_cast<float>(settle->history.size());
+                float sqSum = 0.0f;
+                for (const auto& e : std::as_const(settle->history)) {
+                    const float d = e.value - mean;
+                    sqSum += d * d;
                 }
+                const float variance = sqSum / static_cast<float>(settle->history.size());
 
-                // Compute variance when we have ≥30 samples (~30 cadence ticks).
-                if (settle->history.size() >= 30) {
-                    float sum = 0.0f;
-                    for (const auto& e : std::as_const(settle->history)) { sum += e.value; }
-                    const float mean = sum / static_cast<float>(settle->history.size());
-                    float sqSum = 0.0f;
-                    for (const auto& e : std::as_const(settle->history)) {
-                        const float d = e.value - mean;
-                        sqSum += d * d;
-                    }
-                    const float variance = sqSum / static_cast<float>(settle->history.size());
-
-                    if (variance < 1.0f) {
-                        // NereusSDR-original — no Thetis equivalent.
-                        // NF settled within 1 dB variance over 2s; save for this band.
-                        pan0->setBandNFEstimate(pan0->band(), nf);
-                    }
+                if (variance < 1.0f) {
+                    // NereusSDR-original — no Thetis equivalent.
+                    // NF settled within 1 dB variance over 2s; save for this band.
+                    settle->bandNfEstimate[settle->currentBand] = nf;
+                    AppSettings::instance().setValue(
+                        QStringLiteral("DisplayBandNFEstimate_")
+                            + bandKeyName(settle->currentBand),
+                        nf);
                 }
-            });
+            }
+        });
 
-            // Task 2.10: band-change → prime ClarityController EWMA with stored NF.
-            // NereusSDR-original — no Thetis equivalent.
-            //
-            // PanadapterModel::bandChanged fires when the pan center crosses a band
-            // boundary. snapToFloor() seeds the EWMA (m_smoothedFloor) and emits
-            // waterfallThresholdsChanged immediately so the waterfall snaps to the
-            // remembered state rather than cold-starting from an uninitialized floor.
-            // NaN is ignored by snapToFloor (band with no stored data is a no-op).
-            connect(pan0, &PanadapterModel::bandChanged,
-                    this, [this, pan0](Longpath::Band newBand) {
+        // Task 2.10: band-change → prime ClarityController EWMA with stored NF.
+        // NereusSDR-original — no Thetis equivalent.
+        //
+        // Bug fix 2026-09-07: used to connect to PanadapterModel::
+        // bandChanged (dead, see above); ClarityController tracks a
+        // single global floor for RX1, so this only follows the first
+        // slice, re-checked live at every frequencyChanged rather than
+        // bound to one SliceModel* (slices can be added/removed/
+        // reordered — same live-recheck idiom as OcOutputsHfTab's fix
+        // the same day). snapToFloor() seeds the EWMA (m_smoothedFloor)
+        // and emits waterfallThresholdsChanged immediately so the
+        // waterfall snaps to the remembered state rather than
+        // cold-starting from an uninitialized floor. NaN is ignored by
+        // snapToFloor (band with no stored data is a no-op).
+        //
+        // The dead PanadapterModel::bandChanged fast-attack trigger that
+        // used to sit here (From Thetis display.cs:879-905 [v2.10.3.13],
+        // "if (rx == 1) FastAttackNoiseFloorRX1 = true") is NOT
+        // reinstated: the sibling slice freq-jump trigger below (same
+        // Thetis citation, the ">0.5 MHz" half of the same condition)
+        // already fires on every realistic band change, since band
+        // boundaries are always far more than 0.5 MHz apart. Reinstating
+        // it would just be a second call to setNoiseFloorFastAttack(true)
+        // for the same event.
+        auto subscribeSliceForNf = [this, settle](SliceModel* slice) {
+            if (!slice) { return; }
+            connect(slice, &SliceModel::frequencyChanged, this,
+                    [this, slice, settle](double freq) {
+                const auto& allSlices = m_radioModel->slices();
+                if (allSlices.isEmpty() || allSlices.first() != slice) {
+                    return;  // ClarityController tracks RX1's floor only.
+                }
+                const Longpath::Band newBand = bandFromFrequency(freq);
+                if (newBand == settle->currentBand) { return; }
+                settle->currentBand = newBand;
+                settle->history.clear();  // fresh settle window for the new band
+
                 // NereusSDR-original — no Thetis equivalent.
                 // Prime estimator with last-seen NF for this band to eliminate
                 // cold-start visual jump after band change.
-                const float storedNF = pan0->bandNFEstimate(newBand);
+                const float storedNF = settle->bandNfEstimate.value(
+                    newBand, std::numeric_limits<float>::quiet_NaN());
                 m_clarityController->snapToFloor(storedNF);
             });
-
-            // NF fast-attack triggers — From Thetis display.cs:879-905
-            // [v2.10.3.13]:
-            //   if (rx == 1) FastAttackNoiseFloorRX1 = true;  // band change
-            //   if (Math.Abs(oldFreq - newFreq) > 0.5)         // freq jump
-            //       FastAttackNoiseFloorRX1 = true;
-            // While in fast-attack state SpectrumWidget renders the NF
-            // line/box/text in gray to signal the smoothed estimate is
-            // still settling.  Auto-clear is internal to the setter (see
-            // SpectrumWidget::setNoiseFloorFastAttack — 1000ms timer
-            // matching Thetis display.cs:5906 minimum delay).
-            if (activeSpectrumWidget()) {
-                connect(pan0, &PanadapterModel::bandChanged,
-                        this, [this](Longpath::Band) {
-                    activeSpectrumWidget()->setNoiseFloorFastAttack(true);
-                });
-            }
+        };
+        for (SliceModel* slice : m_radioModel->slices()) {
+            subscribeSliceForNf(slice);
         }
+        connect(m_radioModel, &RadioModel::sliceAdded, this,
+                [this, subscribeSliceForNf](int index) {
+            subscribeSliceForNf(sliceForAddedIdForTest(m_radioModel, index));
+        });
     }
 
     // Slice freq-jump > 0.5 MHz fast-attack trigger — Thetis display.cs:905

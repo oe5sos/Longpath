@@ -162,6 +162,24 @@
   eingesetzt wurde. Regressionstest `band_change_switches_mask`
   (umgestellt von `addPanadapter()` auf `addSlice()`).
 
+- **Das per-Band-Rauschboden-Gedaechtnis (Task 2.10) und die graue
+  Fast-Attack-Anzeige im Wasserfall bei Bandwechsel liefen seit ihrer
+  Einfuehrung nie -- dritter und letzter Fund derselben
+  PanadapterModel-Untersuchung.** `MainWindow.cpp`s Verdrahtung hing an
+  `PanadapterModel::bandChanged` und `PanadapterModel::setBandNFEstimate`/
+  `bandNFEstimate` -- beides tot, siehe oben. Rein kosmetisch (kein
+  Korrektheitsproblem: der ClarityController-Schaetzer startet ohne
+  Priming einfach kalt statt sofort zu springen), aber seit Einfuehrung
+  wirkungslos. Das per-Band-Gedaechtnis samt Persistenz (dieselben
+  `DisplayBandNFEstimate_<Band>`-AppSettings-Schluessel, die
+  `tst_per_band_nf_priming.cpp` bereits gegen `PanadapterModel` prueft)
+  lebt jetzt direkt in der MainWindow-Verdrahtung, an
+  `SliceModel::frequencyChanged` (RX1) gehaengt. Der doppelte
+  Fast-Attack-Ausloeser bei Bandwechsel wurde NICHT nachgebaut: der
+  benachbarte Scheiben-Frequenzsprung-Ausloeser (>0,5 MHz, aus derselben
+  Thetis-Quelle) feuert bei jedem realistischen Bandwechsel ohnehin schon
+  mit.
+
 ### Known
 
 - **`RadioModel::addPanadapter()` (und damit die ganze `PanadapterModel`-
@@ -176,11 +194,8 @@
     `SliceModel::frequencyChanged` und ueberschreibt den toten
     Panadapter-Pfad ohnehin bei jeder echten Bandaenderung.
   - Die ClarityController-NF-Priming/Fast-Attack-Verdrahtung in
-    `MainWindow.cpp` (~Zeile 5137-5205) haengt echt am toten Signal und
-    laeuft dadurch nie -- bleibt offen. Rein kosmetisch/DSP-Feinschliff,
-    kein Korrektheitsproblem: das per-Band-NF-Gedaechtnis saet den
-    ClarityController-EWMA nie, und die graue Fast-Attack-Anzeige im
-    Wasserfall reagiert nie auf Bandwechsel.
+    `MainWindow.cpp` (~Zeile 5137-5205) haengt ebenfalls tatsaechlich am
+    toten Signal -- **jetzt auch behoben**, siehe "Fixed" oben.
 
 ## [0.6.3-rc3] - 2026-09-04
 
