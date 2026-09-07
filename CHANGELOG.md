@@ -112,6 +112,42 @@
   der bestehenden Sperre. Neuer Test
   `winAntennaMenuEntryGreysOutWhenDisconnected`.
 
+- **Ein Verbindungsversuch, der beim ersten Anlauf still verhungert (kein
+  einziger ep6-Rahmen kommt an), haengt jetzt nicht mehr fuer immer in
+  "Connecting" statt der zugesagten Wiederholversuche.**
+  `P1RadioConnection::onConnectTimeout()` raeumt einen gescheiterten
+  Erstversuch komplett ab (`m_running=false`,
+  `m_intentionalDisconnect=true`), aber `onReconnectTimeout()` setzte
+  keins von beidem zurueck und bewaffnete auch den Connect-Waechter nicht
+  neu. Da `onWatchdogTick()`/`onEp2PacerTick()` beide als erstes
+  `!m_running` pruefen, war nach dem ersten automatischen
+  Wiederholversuch die komplette Stille-Erkennung fuer den Rest der
+  Verbindung tot -- auch nach einem erfolgreichen Reconnect. Live am ANAN
+  10e reproduziert und nach dem Fix bestaetigt (Verbindung erholte sich
+  sauber vom Connect-Timeout). Neuer Test
+  `connectTimeoutThenRetryStillDetectsLaterSilence`.
+
+- **Das Logbuch-Fenster und die oeffentliche KiwiSDR-Empfaengerliste
+  konnten den Speicherbedarf innerhalb von Sekunden auf mehrere GB
+  hochtreiben und den Prozess einfrieren oder abstuerzen lassen, sobald
+  irgendein Bedienungshilfen-Beobachter (VoiceOver, Fernwartungssoftware
+  wie TeamViewer/AnyDesk, oder AX-gestuetzte Automatisierung) am Prozess
+  haengt.** Beide Tabellen fuellten sich zellenweise (`setItem()` je
+  Spalte und Zeile), und jede einzelne Zellenaenderung loeste ein
+  `dataChanged`-Signal am Tabellenmodell aus. Qts macOS-Accessibility-
+  Bruecke baut bei JEDEM solchen Signal die komplette Tabelle als frische
+  Bedienungshilfen-Objekte neu auf, statt die Aenderung zu buendeln --
+  bei ein paar hundert Zeilen (das Logbuch nach Jahren an QSOs, die
+  oeffentliche Empfaenger-Liste ohnehin) ergab das O((Zeilen x
+  Spalten)^2) statt O(1) Arbeit, gemessen bis zu 164 Millionen lebende
+  Accessibility-Objekte (~10 GB) in einem einzigen Heap-Schnappschuss.
+  Beide Stellen blockieren die Modell-Signale jetzt waehrend des
+  Bulk-Aufbaus und schicken danach genau EINE gebuendelte
+  Accessibility-Benachrichtigung fuer die ganze Tabelle. Regressionstest
+  `importingManyEntriesDoesNotFloodDataChanged` (Logbuch); die
+  KiwiSDR-Empfaengerliste hat noch keine eigene Testabdeckung. Weitere
+  Tabellen mit demselben Bau-Muster werden noch geprueft.
+
 ### Known
 
 - **`RadioModel::addPanadapter()` (und damit die ganze `PanadapterModel`-
