@@ -533,6 +533,22 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // dem Entfernen dieses Kommentarblocks: genau dieses Szenario einmal
     // an der Werkbank nachstellen. Bis dahin bleibt der Block stehen --
     // als Warnung, nicht als aktueller Befund.
+    //
+    // NACHTRAG 2026-09-07 -- genau dieses Szenario jetzt bestaetigt, live
+    // am ANAN 10e (2 Pans, das Maximum dieses Boards). Layout "A | B
+    // (2 pans)" gewaehlt, rechten Panadapter per "Float active pan..."
+    // geloest (kurze, dokumentierte Verzoegerung bis refreshAfterReparent()
+    // greift, dann korrekt gezeichnet, echte Rufzeichen-Beschriftungen
+    // sichtbar), WAEHREND er noch schwebte erneut "Pan Layout..." geoeffnet
+    // und auf "Single (1 pan)" zurueckgeschaltet. Ergebnis: kein
+    // Schwarzbild, sauberer Uebergang, ein parallel offener, aktiv
+    // dekodierender RTTY-Decoder lief ununterbrochen weiter. Damit ist
+    // das letzte offene Szenario aus diesem Block erledigt -- der
+    // urspruengliche Fehler (Hauptfenster schwarz waehrend ein Panadapter
+    // abgeloest ist) tritt in keiner bisher geprueften Kombination mehr
+    // auf. Block bleibt trotzdem stehen: er dokumentiert die Vorgeschichte
+    // und die zwei verworfenen Kuren, die beim naechsten aehnlichen Fund
+    // nicht nochmal versucht werden sollten.
 }
 // Der umgekehrte Weg zu floatPanadapter. Er tut genau das, was der
 // dockRequested-Empfaenger dort tut — nur von aussen aufrufbar, damit
