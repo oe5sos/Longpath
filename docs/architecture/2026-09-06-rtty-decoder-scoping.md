@@ -13,13 +13,22 @@ Vorstudie, die verworfen wurde.
 synthetisches AFSK-Signal geprüft — echte Baudot/ITA2-Zeichen kommen
 tatsächlich richtig raus, nicht nur "kompiliert"), `tests/tst_rtty_decoder_sensitivity.cpp`.
 
-**Was noch offen ist:** Sichtprüfung am echten Bildschirm (Modus auf DIGL
-umschalten, Panel ansehen) — Computer-Use-Zugriff war in dieser Sitzung
-nicht verfügbar (keine Reaktion auf die Vollbild-Freigabe). Der
-Gerätebaum (`dumpTree` über die Automatisierungs-Bruecke) bestätigt: das
-Applet existiert, sitzt an der richtigen Stelle im Panel, ist beim Start
-(Modus USB) korrekt unsichtbar. Die eigentliche Dekodierlogik ist über den
-synthetischen Test bereits echt geprüft, nicht nur die Verdrahtung.
+**Live am ANAN 10e bestätigt (2026-09-07):** Modus auf DIGL geschaltet,
+Panel erschien angedockt unten rechts wie vorgesehen, zeigte korrekt
+"Mark 2295 Hz · Shift 170 Hz" (live von der Scheibe gelesen), Pegelbalken
+liefen, Text dekodierte (erwartungsgemäß wirres Rauschen ohne Antenne).
+Baudrate/Umkehrpolarität/Empfindlichkeit-Regler funktionsfähig. Ein
+Nachtrag zur Sichtbarkeits-Korrektur (Commit `a7dadd82`, siehe unten) war
+noetig, weil eine wiederhergestellte Sitzung direkt in DIGL/RADE starten
+kann, ohne dass ein Moduswechsel-Signal je feuert.
+
+Eine Randnotiz: `dumpTree` (Automatisierungs-Bruecke) meldete waehrend
+der Live-Pruefung `visible: false` fuer das angedockte Panel, obwohl es
+auf dem Bildschirm sichtbar war (Betreiber-Bestaetigung) -- eine
+dumpTree-Eigenart bei Widgets in einem scrollbaren Bereich, kein echter
+Fehler. Fuer kuenftige Fernpruefungen: bei Widgets im AppletPanelWidget-
+Scrollbereich lieber am Bildschirm nachsehen (Screenshot/Betreiber
+fragen) statt sich allein auf `dumpTree`s `visible`-Feld zu verlassen.
 
 ## Woher das kommt
 
