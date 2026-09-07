@@ -5723,6 +5723,12 @@ void MainWindow::buildUI()
         // einer Scheibe haengen blieb, ohne dass diese Wache je ein
         // erneutes attach() ausgeloest hat.
         if (m_commandBar) { m_commandBar->attach(slice); }
+        // Derselbe Fehler, dieselbe Behandlung: RttyDecoderApplet und die
+        // RADE/RttyDecoder-Sichtbarkeit hingen bis 2026-09-07 nur an der
+        // Scheibe, die beim allerersten sliceAdded(0) existierte (siehe
+        // wireSliceToSpectrum). rebindRttyRadeAvailability() deckt auch
+        // hier den Null-Fall ab.
+        rebindRttyRadeAvailability(slice);
         if (!slice) { return; }
         // Phase 3F Sub-Epic J Task 11: RadioModel::rxChannelForSlice()
         // replaces the direct wdspEngine()->rxChannel() reach.
@@ -5734,6 +5740,7 @@ void MainWindow::buildUI()
     // feuert erst beim ersten Wechsel, und bis dahin stünde die Leiste
     // auf ihrem Vorgabewert statt auf dem, was das Gerät tut.
     if (m_commandBar) { m_commandBar->attach(m_radioModel->activeSlice()); }
+    rebindRttyRadeAvailability(m_radioModel->activeSlice());
 
     // H.2 (Phase 3M-1a): wire MoxController::moxStateChanged → MeterPoller::setInTx.
     // Switches the poll set between RX meters (TX off) and TX meters (TX on).
@@ -7290,11 +7297,11 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->setAvailable(QStringLiteral("Tuner"), fourO3AOn);
     // RADE / RTTY: available only in RADE_U/_L / DIGL respectively.
     // Safe pre-slice default -- no slice exists yet at this point in
-    // startup, so there is no real mode to read. wireSliceToSpectrum()
-    // corrects both against the slice's ACTUAL mode the moment one
-    // exists (a restored session can start directly in RADE/DIGL, not
-    // just USB -- see the 2026-09-07 comment there for why that case
-    // needs its own correction, not just the dspModeChanged lambda).
+    // startup, so there is no real mode to read. rebindRttyRadeAvailability()
+    // corrects both against the slice's ACTUAL mode the moment one exists
+    // (a restored session can start directly in RADE/DIGL, not just USB),
+    // and re-corrects on every later activeSliceChanged too -- see that
+    // method's doc comment in MainWindow.h.
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
     m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
 
@@ -11584,6 +11591,50 @@ void MainWindow::showTciLogWindow()
 void MainWindow::showTciLogWindow() {}  // no-op in non-WebSocket builds
 #endif // HAVE_WEBSOCKETS
 
+void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
+{
+    // Same QMetaObject::Connection-list idiom as CommandBar::attach():
+    // drop the old slice's dspModeChanged listener before wiring the new
+    // one, so a slice-identity change never leaves two connections alive.
+    for (const auto& c : m_rttyRadeLinks) { disconnect(c); }
+    m_rttyRadeLinks.clear();
+
+    // RttyDecoderApplet is a single global widget, not per-flag -- it
+    // follows whichever slice is CURRENTLY active. setSlice() already
+    // disconnects its own old mark/shift links and re-points the audio
+    // tap (RttyDecoderApplet::setSlice), so calling it again here with the
+    // (possibly unchanged) active slice is cheap and safe.
+    if (m_rttyDecoderApplet) {
+        m_rttyDecoderApplet->setSlice(slice);
+    }
+
+    if (!m_appletVis) { return; }
+
+    if (!slice) {
+        m_appletVis->setAvailable(QStringLiteral("Rade"), false);
+        m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
+        return;
+    }
+
+    // Apply the slice's REAL mode immediately -- a restored profile/
+    // session can start (or, after this bench fix, ARRIVE via a slice-
+    // identity change) already in DIGL or RADE_U/_L, and
+    // SliceModel::dspModeChanged only fires on a later CHANGE, not on
+    // this initial snapshot.
+    const auto applyForMode = [this](DSPMode mode) {
+        const bool isRade = (mode == DSPMode::RADE_U || mode == DSPMode::RADE_L);
+        m_appletVis->setAvailable(QStringLiteral("Rade"), isRade);
+        // RTTY is a DIGL submode only -- RxApplet::applyModeVisibility
+        // documents this exact rule ("RTTY -> NUR DIGL") for the VFO
+        // flag's mark/shift container; this applet follows the same gate.
+        m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
+                                  mode == DSPMode::DIGL);
+    };
+    applyForMode(slice->dspMode());
+
+    m_rttyRadeLinks << connect(slice, &SliceModel::dspModeChanged, this, applyForMode);
+}
+
 void MainWindow::wireSliceToSpectrum()
 {
     SliceModel* slice = m_radioModel->activeSlice();
@@ -11661,51 +11712,18 @@ void MainWindow::wireSliceToSpectrum()
         });
     }
 
-    // RTTY decoder applet: bound once to this slice, same as the squelch
-    // wiring above -- RttyDecoderApplet is a single global widget, not
-    // per-flag, so it follows whichever slice wireSliceToSpectrum() runs
-    // for (the active slice at slice-0-added time), same scope RADE uses.
-    if (m_rttyDecoderApplet) {
-        m_rttyDecoderApplet->setSlice(slice);
-    }
+    // RTTY decoder / RADE availability: was bound once here, inline, to
+    // whichever slice existed at slice-0-added time. Now shared with the
+    // activeSliceChanged handler in buildUI() via
+    // rebindRttyRadeAvailability() -- see that method's doc comment in
+    // MainWindow.h for the bench-found bug this closes.
+    rebindRttyRadeAvailability(slice);
 
-    // Correct the two hardcoded "startup mode is USB" availability guesses
-    // above (setAvailable("Rade"/"RttyDecoder", false)) against the SLICE'S
-    // REAL mode now that one exists -- found live 2026-09-07 against a real
-    // ANAN 10e: a restored profile/session can start directly in DIGL (or
-    // RADE_U/_L), and if it does, SliceModel::dspModeChanged() never fires
-    // (nothing changed from the slice's own point of view), so the startup
-    // guess never gets corrected and the applet stays wrongly hidden for
-    // the entire session. This runs once here, at the same point the
-    // dspModeChanged lambda below runs on every later change; together
-    // they cover both "already there at startup" and "changed later".
-    if (m_appletVis) {
-        const DSPMode initialMode = slice->dspMode();
-        m_appletVis->setAvailable(QStringLiteral("Rade"),
-                                  initialMode == DSPMode::RADE_U
-                                      || initialMode == DSPMode::RADE_L);
-        m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
-                                  initialMode == DSPMode::DIGL);
-    }
-
+    // PhoneCwApplet's page follows the mode too, but it is not a per-slice
+    // rebinding concern the way RTTY/RADE availability is (PhoneCwApplet
+    // has no per-slice state to go stale) -- left as the original single
+    // dspModeChanged connection here.
     connect(slice, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
-        // Phase 3R L2: RADE applet shows for either RADE sideband, IN ADDITION
-        // to PhoneCwApplet -- bench feedback showed PhoneCw hosts the mic gain
-        // slider, which RADE TX still needs. Routed through the visibility
-        // controller so the wrapper and the menu entry agree, and the user's
-        // persisted preference survives the mode change.
-        const bool isRade = (mode == DSPMode::RADE_U
-                             || mode == DSPMode::RADE_L);
-        if (m_appletVis) {
-            m_appletVis->setAvailable(QStringLiteral("Rade"), isRade);
-        }
-        // RTTY is a DIGL submode only -- RxApplet::applyModeVisibility
-        // documents this exact rule ("RTTY -> NUR DIGL") for the VFO
-        // flag's mark/shift container; this applet follows the same gate.
-        if (m_appletVis) {
-            m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
-                                      mode == DSPMode::DIGL);
-        }
         if (m_phoneCwApplet) {
             m_phoneCwApplet->setVisible(true);  // always visible
             switch (mode) {

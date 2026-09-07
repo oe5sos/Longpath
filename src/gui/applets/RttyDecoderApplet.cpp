@@ -62,10 +62,13 @@ RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
     // slice RadioModel::addSlice() next reuses that index for (its
     // lowest-free-index reuse policy) into this decoder, silently -- not
     // a crash, but the wrong signal decodes under this applet's title.
-    // RadeApplet and PhoneCwApplet share the same "single global applet,
-    // bound once to whichever slice wireSliceToSpectrum() ran for" shape
-    // and don't re-target to another slice either; this only closes the
-    // stale-routing part, not full multi-slice reassignment.
+    // This is the safety net for the slice DISAPPEARING outright; the
+    // separate case of the ACTIVE slice's identity changing (a KiwiSDR
+    // profile, a removed-and-replaced slice) without this one being
+    // removed is MainWindow's job -- see
+    // MainWindow::rebindRttyRadeAvailability(), which re-calls setSlice()
+    // on every RadioModel::activeSliceChanged (bench-found 2026-09-07;
+    // this applet used to be bound once, for the whole session).
     if (m_model) {
         connect(m_model, &RadioModel::sliceRemoved, this, [this](int index) {
             if (m_slice && m_slice->sliceIndex() == index) {

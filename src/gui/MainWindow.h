@@ -723,6 +723,21 @@ private:
     void openConnectionPanelOnLaunch();
     void wireSliceToSpectrum();
 
+    /// Re-bind RttyDecoderApplet and the RADE/RttyDecoder availability gate
+    /// to `slice` (nullptr included). Both used to be wired ONCE, inside
+    /// wireSliceToSpectrum(), to whichever slice existed at slice-0-added
+    /// time -- unlike RxApplet and CommandBar, which already re-bind on
+    /// every RadioModel::activeSliceChanged. Bench-found 2026-09-07 against
+    /// a real ANAN 10e, same root cause CommandBar had (db0c50cf, same
+    /// day): after the active slice's IDENTITY changes (a band click that
+    /// restores a per-band mode, a slice removed and a new one taking its
+    /// index), RxApplet's own Mark/Shift line correctly followed the real
+    /// mode, but RttyDecoderApplet stayed visible with the OLD slice's
+    /// values -- it never got the equivalent re-bind. Called from
+    /// wireSliceToSpectrum() (first slice) and from the same
+    /// activeSliceChanged handler that already re-binds CommandBar.
+    void rebindRttyRadeAvailability(class SliceModel* slice);
+
     /// Stream 0's engine. Back-compat accessor for call sites that still
     /// address "the" FFT engine (display settings, Max Bin, auto-zoom).
     FFTEngine* primaryFftEngine() const { return m_fftEngines.value(0, nullptr); }
@@ -1425,6 +1440,11 @@ private:
     // dspModeChanged lambda.
     class RadeApplet* m_radeApplet{nullptr};
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
+    // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
+    // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
+    // so the dspModeChanged listener below never accumulates one dangling
+    // connection per past slice.
+    QList<QMetaObject::Connection> m_rttyRadeLinks;
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 
