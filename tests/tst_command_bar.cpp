@@ -225,6 +225,50 @@ private slots:
                  QStringLiteral("CWU"));
     }
 
+    // ── Der Fund vom 2026-09-07 ──────────────────────────────────────
+    //
+    // Live gegen ein angeschlossenes ANAN 10E, nach einer laengeren
+    // Sitzung mit zwischenzeitlich aktivem KiwiSDR-Profil: die
+    // MODE-Gruppe zeigte LSB und DIGL gleichzeitig als aktiv, obwohl
+    // SliceModel::dspMode() der echten Scheibe durchgehend DIGL blieb.
+    //
+    // Ursache: die angehaengte Scheibe war verschwunden, ohne dass ein
+    // erneutes attach() das nachgezogen hatte. Ein Klick auf LSB
+    // schaltete daraufhin nur Qt's EIGENEN Checked-Haken des Knopfes um
+    // (Vorgabeverhalten eines checkable QPushButton ohne
+    // QButtonGroup-Exklusivitaet) -- pushModeToModel() und
+    // pullFromModel() liefen beide durch ihre "kein Modell"-Wachen und
+    // liessen den alten Zustand (DIGL) stehen, statt LSB abzulehnen.
+    //
+    // Dieser Test simuliert das Verschwinden direkt (delete statt eines
+    // erneuten attach()), unabhaengig davon, WAS im Zusammenspiel von
+    // RadioModel/KiwiSDR die Bindung im Betrieb verloren hat -- die
+    // Leiste selbst darf so einen Zustand nicht zeigen.
+    void danglingSliceLeavesNothingLitInsteadOfTwoPillsLit()
+    {
+        auto* slice = new SliceModel();
+        slice->setDspMode(DSPMode::DIGL);
+
+        CommandBar bar;
+        bar.attach(slice);
+        QCOMPARE(bar.activePill(QStringLiteral("Mode")),
+                 QStringLiteral("DIGL"));
+
+        delete slice;   // verschwindet, OHNE dass jemand attach() erneut ruft
+
+        QVERIFY(bar.clickPill(QStringLiteral("Mode"), QStringLiteral("LSB")));
+
+        int lit = 0;
+        const QStringList modePills = bar.pillsIn(QStringLiteral("Mode"));
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (modePills.contains(b->text()) && b->isChecked()) { ++lit; }
+        }
+        QVERIFY2(lit == 0,
+                 qPrintable(QStringLiteral(
+                     "Ohne Modell darf keine Pille leuchten -- %1 tun es")
+                     .arg(lit)));
+    }
+
     void detachingIsAllowedAndQuiet()
     {
         SliceModel slice;

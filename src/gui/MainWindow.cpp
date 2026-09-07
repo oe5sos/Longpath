@@ -5708,15 +5708,26 @@ void MainWindow::buildUI()
     // they are untouched here.
     connect(m_radioModel, &RadioModel::activeSliceChanged, this, [this](int) {
         SliceModel* slice = m_radioModel->activeSlice();
+        // Die Kopfleiste zeigt den Modus der Kette, auf der man gerade
+        // ist. attach() löst die vorige — sonst meldete die Leiste nach
+        // dem Umschalten weiter den Modus des alten Pans.
+        //
+        // Unconditional, VOR der Null-Wache unten: ein activeSliceChanged
+        // ohne aktive Scheibe muss die Leiste auf "keine Bindung" setzen
+        // (attach(nullptr) — CommandBar zeigt dann nichts als aktiv an,
+        // siehe CommandBar::pullFromModel), statt sie kommentarlos an
+        // ihrer letzten, moeglicherweise gerade verschwindenden Scheibe
+        // haengen zu lassen. Bench-Fund 2026-09-07: die Kopfleiste zeigte
+        // nach einer laengeren Sitzung mit zwischenzeitlichem KiwiSDR-
+        // Profil zwei Modus-Knoepfe gleichzeitig als aktiv, weil sie an
+        // einer Scheibe haengen blieb, ohne dass diese Wache je ein
+        // erneutes attach() ausgeloest hat.
+        if (m_commandBar) { m_commandBar->attach(slice); }
         if (!slice) { return; }
         // Phase 3F Sub-Epic J Task 11: RadioModel::rxChannelForSlice()
         // replaces the direct wdspEngine()->rxChannel() reach.
         RxChannel* rxCh = m_radioModel->rxChannelForSlice(slice->sliceIndex());
         if (rxCh) { m_meterPoller->setRxChannel(rxCh); }
-        // Die Kopfleiste zeigt den Modus der Kette, auf der man gerade
-        // ist. attach() löst die vorige — sonst meldete die Leiste nach
-        // dem Umschalten weiter den Modus des alten Pans.
-        if (m_commandBar) { m_commandBar->attach(slice); }
     });
 
     // Und einmal jetzt, für den Zustand beim Start: das Signal oben

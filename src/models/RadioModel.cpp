@@ -6208,7 +6208,15 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             m_slices.first()->setPanKey(QStringLiteral("pan-0"));
         }
     }
-    setActiveSlice(0);
+    // By id, not by list position: setActiveSlice(int) indexes m_slices
+    // positionally, but "Slice A" means sliceIndex() == 0, and the two only
+    // coincide when id 0 has never been removed and re-created. A slice
+    // already present here (e.g. a KiwiSDR-created placeholder, or a
+    // survivor from a prior connect) can leave a DIFFERENT id sitting at
+    // position 0 -- the same divergence MainWindow.cpp's band-click and
+    // VFO-focus handlers already route around via setActiveSliceById()
+    // instead of this positional form.
+    setActiveSliceById(0);
     loadSliceState(m_activeSlice);
 
     // ── 3M-1c L.2: TwoToneController active-slice mode source ────────────────
