@@ -582,14 +582,6 @@ int currentCwPitch()
 constexpr int kDiguClickTuneOffset = 1500;
 constexpr int kDiglClickTuneOffset = 2210;
 
-// Bei AM, SAM, FM und DSB ist die ANGEZEIGTE Breite die halbe.
-// From Thetis console.cs:35222-35229 — `bw /= 2` fuer genau diese vier.
-bool isDoubleSidebandMode(DSPMode mode)
-{
-    return mode == DSPMode::AM  || mode == DSPMode::SAM
-        || mode == DSPMode::FM  || mode == DSPMode::DSB;
-}
-
 } // namespace
 
 int SliceModel::defaultLowCut()
