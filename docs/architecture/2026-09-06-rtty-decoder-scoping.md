@@ -30,6 +30,18 @@ Fehler. Fuer kuenftige Fernpruefungen: bei Widgets im AppletPanelWidget-
 Scrollbereich lieber am Bildschirm nachsehen (Screenshot/Betreiber
 fragen) statt sich allein auf `dumpTree`s `visible`-Feld zu verlassen.
 
+**Zweiter Stale-Slice-Fund, behoben (2026-09-07, Commit `d4c001af`):**
+bei einer spaeteren, systematischen Bereich-fuer-Bereich-Pruefung am
+selben Abend zeigte ein Bandklick (per-Band gemerkter Modus DIGL -> USB)
+`RxApplet`s Mark/Shift-Zeile korrekt, aber `RttyDecoderApplet` blieb
+sichtbar mit den Werten der ALTEN Scheibe -- `MainWindow` band das
+Applet nur einmal, beim allerersten `sliceAdded(0)`, nie erneut bei
+`RadioModel::activeSliceChanged`. Dieselbe Fehlerklasse, die `CommandBar`
+am selben Tag hatte (`db0c50cf`). Fix: `MainWindow::
+rebindRttyRadeAvailability(SliceModel*)`, aufgerufen sowohl aus
+`wireSliceToSpectrum()` als auch aus dem `activeSliceChanged`-Handler.
+Neuer Regressionstest in `tests/tst_rtty_decoder_applet.cpp`.
+
 ## Woher das kommt
 
 Martin fragte allgemein nach "digitalen Programmen" (FT8, PSK31, RTTY &
