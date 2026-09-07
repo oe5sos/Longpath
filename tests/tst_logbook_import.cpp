@@ -16,9 +16,12 @@
 // lesen koennen, was wir selbst schreiben.
 
 #include <QtTest>
+#include <QAbstractItemModel>
 #include <QDir>
 #include <QFile>
 #include <QPushButton>
+#include <QSignalSpy>
+#include <QTableWidget>
 #include <QTemporaryDir>
 
 #include "gui/LogbookWindow.h"
@@ -50,6 +53,26 @@ QByteArray zeusExport()
         "<CALL:6>OE5AOO <QSO_DATE:8>20260731 <TIME_ON:6>150126 "
         "<FREQ:9>14.203700 <BAND:3>20m <MODE:3>USB <RST_SENT:2>59 "
         "<RST_RCVD:2>59 <NAME:14>Michael Wagner <COUNTRY:7>Austria <EOR>\n");
+}
+
+/// A synthetic multi-entry ADIF blob, `count` distinct QSOs, minimal but
+/// valid fields. Used to exercise refreshTable() at a size where a
+/// per-cell (rather than per-refresh) notification would be obvious in
+/// a signal count, without needing a real operator log on disk.
+QByteArray manyEntriesAdif(int count)
+{
+    QByteArray out = "ADIF Export from test\n<ADIF_VER:5>3.1.4\n<EOH>\n\n";
+    for (int i = 0; i < count; ++i) {
+        const QString call = QStringLiteral("OE5T%1").arg(i, 2, 10, QChar('0'));
+        const QByteArray line = QStringLiteral(
+            "<CALL:%1>%2 <QSO_DATE:8>20260101 <TIME_ON:6>%3 "
+            "<FREQ:9>14.203700 <BAND:3>20m <MODE:3>USB <RST_SENT:2>59 "
+            "<RST_RCVD:2>59 <NAME:4>Test <COUNTRY:7>Austria <EOR>\n")
+            .arg(call.size()).arg(call)
+            .arg(i, 6, 10, QChar('0')).toUtf8();
+        out += line;
+    }
+    return out;
 }
 
 QString writeTemp(const QDir& dir, const QString& name,
@@ -204,6 +227,67 @@ private slots:
                      .arg(inWindow.x()).arg(inWindow.y())
                      .arg(inWindow.width()).arg(inWindow.height())
                      .arg(w.width()).arg(w.height())));
+    }
+
+    /// Bug fix 2026-09-07 regression: refreshTable() used to fire one
+    /// dataChanged signal per cell (setItem() x ColumnCount x row count).
+    /// On macOS, with any accessibility observer attached (VoiceOver,
+    /// remote-control software, or a11y-based automation), Qt's cocoa
+    /// bridge re-walks and reallocates the WHOLE table's accessible
+    /// element array on every single one of those -- confirmed live via
+    /// a heap snapshot showing 164 million live QMacAccessibilityElement
+    /// instances (~10 GB) after opening a moderately-sized log table,
+    /// which eventually forced macOS to freeze or kill the process. The
+    /// fix blocks the model's signals for the whole bulk-population loop
+    /// and posts exactly one accessibility DataChanged event afterward.
+    /// This test can't attach a real accessibility observer (that needs
+    /// the actual macOS AX API), but it CAN assert the mechanism the fix
+    /// relies on: importing many entries must not flood dataChanged.
+    void importingManyEntriesDoesNotFloodDataChanged()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QDir dir(tmp.path());
+        const QString logPath = dir.filePath(QStringLiteral("l.adi"));
+        constexpr int kEntries = 60;
+        const QString adif = writeTemp(dir, QStringLiteral("many.adi"),
+                                       manyEntriesAdif(kEntries));
+        QVERIFY(!adif.isEmpty());
+
+        LogbookWindow w(logPath);
+        w.setOperatorHooks([](const QString&) { return true; },
+                           [](const QString&) {});
+        w.reload();
+
+        QTableWidget* table = w.findChild<QTableWidget*>();
+        QVERIFY2(table, "Kein QTableWidget im Logbuch-Fenster");
+        QAbstractItemModel* model = table->model();
+        QVERIFY(model);
+
+        QSignalSpy dataChangedSpy(model, &QAbstractItemModel::dataChanged);
+
+        w.importAdifFile(adif);
+
+        QCOMPARE(w.entryCountForTesting(), kEntries);
+        QCOMPARE(table->rowCount(), kEntries);
+        // The regression: before the fix, this was one per cell (up to
+        // kEntries * ColumnCount == 960). Blocked during the bulk build,
+        // it must be exactly 0 -- the single notification afterward is a
+        // QAccessibleEvent, not a QAbstractItemModel::dataChanged signal.
+        QCOMPARE(dataChangedSpy.count(), 0);
+
+        // And the data really landed despite the blocked signals --
+        // paintEvent reads the model directly, but let's not just trust
+        // that; check actual cell content survived the bulk build.
+        bool foundLast = false;
+        for (int row = 0; row < table->rowCount(); ++row) {
+            QTableWidgetItem* item = table->item(row, /*ColCall=*/2);
+            if (item && item->text() == QStringLiteral("OE5T59")) {
+                foundLast = true;
+                break;
+            }
+        }
+        QVERIFY2(foundLast, "Letzter importierter Ruf fehlt in der Tabelle");
     }
 };
 

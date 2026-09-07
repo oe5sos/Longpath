@@ -24,6 +24,7 @@
 
 #include <QSplitter>
 
+#include <QAccessible>
 #include <QAction>
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -841,6 +842,34 @@ void LogbookWindow::showRowMenu(const QPoint& pos)
 void LogbookWindow::refreshTable()
 {
     m_table->setRowCount(m_visible.size());
+
+    // Bug fix 2026-09-07: this loop calls setItem()/setForeground()/
+    // setFont()/setToolTip() up to ColumnCount times PER ROW, and each
+    // one fires a dataChanged signal from the table's model. Qt's macOS
+    // accessibility bridge does not coalesce those -- confirmed against
+    // Qt's own source (qtbase src/widgets/accessible/itemviews.cpp,
+    // src/plugins/platforms/cocoa/qcocoaaccessibilityelement.mm): every
+    // dataChanged re-walks and reallocates the WHOLE table's
+    // NSAccessibilityElement row/column arrays via
+    // -[QMacAccessibilityElement populateTableArray:count:], which
+    // always allocates fresh elements rather than reusing cached ones.
+    // With any accessibility observer attached (VoiceOver, remote
+    // control software, or a11y-based automation), that is O(rows x
+    // cols) work PER CELL -- O((rows x cols)^2) total for one refresh.
+    // Confirmed live: opening this window while an observer was attached
+    // grew process RSS from under 1 GB to 2-5+ GB within seconds (up to
+    // 164 million live QMacAccessibilityElement instances in one heap
+    // snapshot), eventually forcing macOS to freeze or kill the app.
+    //
+    // setRowCount() above stays unblocked (the view still needs its
+    // rowsInserted/rowsRemoved to keep geometry/scrollbars correct); only
+    // the per-cell dataChanged flood from the loop below is suppressed,
+    // and replaced with a single manual repaint + a single accessibility
+    // DataChanged event covering the whole table after the loop. This
+    // turns O(rows x cols) accessibility notifications into O(1) without
+    // disabling accessibility for real VoiceOver users.
+    {
+    const QSignalBlocker modelBlocker(m_table->model());
     for (int row = 0; row < m_visible.size(); ++row) {
         const LogEntry& e = m_all.at(m_visible.at(row));
         const QDateTime u = e.timeOn.toUTC();
@@ -912,6 +941,23 @@ void LogbookWindow::refreshTable()
         }
         put(ColComment, e.comment);
     }
+    } // modelBlocker scope
+
+    // Single manual repaint (paintEvent reads current model data directly,
+    // so this is correct even though dataChanged was suppressed above) and
+    // a single accessibility notification for the whole table, replacing
+    // the O(rows x cols) per-cell ones that were just blocked.
+    m_table->viewport()->update();
+    {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_table, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(qMax(0, m_table->rowCount() - 1));
+        tableEvent.setFirstColumn(0);
+        tableEvent.setLastColumn(ColumnCount - 1);
+        QAccessible::updateAccessibility(&tableEvent);
+    }
+
     if (!m_headerRestored) { m_table->resizeColumnsToContents(); }
 
     // ── Something has to be selected for the pane to have a subject ──
