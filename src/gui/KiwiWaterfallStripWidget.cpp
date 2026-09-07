@@ -16,6 +16,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cstring>
 
 namespace Longpath {
 
@@ -79,12 +80,24 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm)
         return;
     }
 
-    const QImage old = m_history;
-    m_history = QImage(binsDbm.size(), kHistoryRows, QImage::Format_RGB32);
-    m_history.fill(QColor(Style::kAppBg));
-    if (old.width() == binsDbm.size()) {
-        QPainter shift(&m_history);
-        shift.drawImage(0, 1, old, 0, 0, old.width(), kHistoryRows - 1);
+    if (m_history.width() != binsDbm.size()) {
+        m_history = QImage(binsDbm.size(), kHistoryRows, QImage::Format_RGB32);
+        m_history.fill(QColor(Style::kAppBg));
+    } else {
+        // Scroll the existing buffer down by one row IN PLACE instead of
+        // allocating a brand-new kHistoryRows-tall QImage on every incoming
+        // waterfall row (a live KiwiSDR sends several per second). The old
+        // code (`const QImage old = m_history; m_history = QImage(...); ...`)
+        // reallocated + repainted the full buffer every single call — pure
+        // churn on the hot path, found 2026-09-06 while chasing a runaway
+        // memory event that force-quit the whole app during a live KiwiSDR
+        // session. memmove() is safe on the overlapping same-buffer move a
+        // QPainter blit is not. scanLine() below already calls detach()
+        // internally, so the buffer is never shared with another QImage
+        // while this mutates it in place.
+        const int bytesPerLine = m_history.bytesPerLine();
+        std::memmove(m_history.scanLine(1), m_history.scanLine(0),
+                     static_cast<size_t>(bytesPerLine) * (kHistoryRows - 1));
     }
 
     const QColor floor(Style::kAppBg);
