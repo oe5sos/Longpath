@@ -21,6 +21,16 @@
 //                reflects OcMatrix::maskFor(currentBand, isTx) for
 //                the current PanadapterModel band and TransmitModel
 //                MOX state.
+//   2026-09-07 — Bug fix: the 2026-04-21 wiring connected to
+//                PanadapterModel::bandChanged, but RadioModel::
+//                addPanadapter() has no caller anywhere in the shipped
+//                app (only tests call it) -- the signal never fired, so
+//                the live OC byte was silently frozen on the Band20m
+//                fallback regardless of the real operating band. Found
+//                while auditing every other consumer of the same dead
+//                signal (see CHANGELOG.md "### Known"). Rewired to
+//                SliceModel::frequencyChanged (RX1), the actually-live
+//                source, AI-assisted via Anthropic Claude Code.
 // =================================================================
 //
 // === Verbatim Thetis Console/setup.designer.cs header (lines 1-50) ===
@@ -194,7 +204,7 @@ private:
 
     // Phase 3P-H Task 5b: last computed OC byte for the live-LED row.
     // bit N == 1 means pin N lit. Recomputed on OcMatrix::changed,
-    // PanadapterModel::bandChanged, and TransmitModel::moxChanged.
+    // SliceModel::frequencyChanged (RX1), and TransmitModel::moxChanged.
     quint8 m_currentOcByte{0};
 };
 
