@@ -148,23 +148,39 @@
   KiwiSDR-Empfaengerliste hat noch keine eigene Testabdeckung. Weitere
   Tabellen mit demselben Bau-Muster werden noch geprueft.
 
+- **Die OC-Ausgaenge (Hardware > OC Outputs, externe Antennenweiche/
+  Banddecoder) folgten nie dem echten Band, sondern blieben dauerhaft
+  auf dem 20m-Ausweichwert eingefroren.** `onLiveStateChanged()` las das
+  aktuelle Band aus `RadioModel::panadapters().first()`, aktualisiert
+  ueber `PanadapterModel::bandChanged` -- aber `RadioModel::
+  addPanadapter()` hat im ausgelieferten Programm keinen einzigen
+  Aufrufer (siehe "Known" unten), `panadapters()` ist also immer leer und
+  das Signal feuert nie. Fuer einen Betreiber, der diese Pins an externe
+  Hardware haengt, ein selbstsicher FALSCHER Ausgang, nicht nur ein
+  fehlender. Jetzt an `SliceModel::frequencyChanged` (RX1) gehaengt --
+  dieselbe Anbindung, die bereits fuer die Band-Flyout-Markierung
+  eingesetzt wurde. Regressionstest `band_change_switches_mask`
+  (umgestellt von `addPanadapter()` auf `addSlice()`).
+
 ### Known
 
 - **`RadioModel::addPanadapter()` (und damit die ganze `PanadapterModel`-
-  Klasse) hat im ausgelieferten Code keinen einzigen Aufrufer.** Gefunden
-  beim Bandmarkierung-Fix oben, per Debug-Ausgabe in der laufenden App
-  bestaetigt: `panadapters()` ist zur Laufzeit immer leer. Betroffen sind
-  mindestens `MainWindow.cpp`s ClarityController-NF-Priming/Fast-Attack-
-  Verdrahtung (Zeile ~5136-5203) und `TxApplet::setCurrentBand` (Zeile
-  ~6337) -- beide haengen an `PanadapterModel::bandChanged`, das nie
-  feuert. `OcOutputsHfTab` (OC-Ausgaenge/Band-Decoder) baut ebenfalls auf
-  `PanadapterModel` auf und wird nur in `tst_oc_outputs_live_pins.cpp`
-  ueberhaupt mit einem Panadapter versorgt (der Test ruft
-  `addPanadapter()` selbst auf) -- ob die Live-Pin-Anzeige in der echten
-  App je etwas anzeigt, ist damit offen. Noch nicht untersucht, ob das
-  ein echter Backend-Ausfall ist oder ob eine andere Stelle den Band-Weg
-  laengst uebernommen hat (die tatsaechlich lebendige Quelle fuer "welches
-  Band" ist `SliceModel::bandChanged`, siehe der Fix oben).
+  Klasse) hat im ausgelieferten Code weiterhin keinen einzigen Aufrufer**
+  -- alle drei damals vermuteten Betroffenen sind inzwischen einzeln
+  geprueft:
+  - `OcOutputsHfTab` (OC-Ausgaenge/Band-Decoder) hing tatsaechlich am
+    toten Signal und lieferte dauerhaft den Band20m-Ausweichwert,
+    unabhaengig vom echten Band -- **behoben**, siehe "Fixed" oben.
+  - `TxApplet::setCurrentBand` ist **nicht betroffen**: eine zweite,
+    unabhaengige Verdrahtung (2026-04-27) haengt bereits an
+    `SliceModel::frequencyChanged` und ueberschreibt den toten
+    Panadapter-Pfad ohnehin bei jeder echten Bandaenderung.
+  - Die ClarityController-NF-Priming/Fast-Attack-Verdrahtung in
+    `MainWindow.cpp` (~Zeile 5137-5205) haengt echt am toten Signal und
+    laeuft dadurch nie -- bleibt offen. Rein kosmetisch/DSP-Feinschliff,
+    kein Korrektheitsproblem: das per-Band-NF-Gedaechtnis saet den
+    ClarityController-EWMA nie, und die graue Fast-Attack-Anzeige im
+    Wasserfall reagiert nie auf Bandwechsel.
 
 ## [0.6.3-rc3] - 2026-09-04
 
