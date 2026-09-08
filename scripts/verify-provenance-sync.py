@@ -87,6 +87,21 @@ def parse_provenance_paths():
 
     Files in independent_paths are expected to NOT have "Ported from"
     markers, so they should not be flagged as missing from ported_files.
+
+    Row shape, not the section a row happens to sit under, decides how a
+    row is parsed: a derivative-table row has the NereusSDR path in column
+    0 (6 columns: file | Thetis source | lines | type | variant | notes);
+    an "Independently implemented" row has it in column 1 (3 columns:
+    resemblance | file | basis). Thetis-side paths always read
+    "Project Files/Source/..." or similar, never "src/"/"tests/", so the
+    two shapes never collide. Deciding per row — instead of flipping a
+    `in_independent_section` flag on the section heading and never
+    flipping it back — means a row keeps parsing correctly regardless of
+    which section it lives under, and a stray or misplaced row no longer
+    silently drags every later row into the wrong column (see the
+    src/core/audio/{QsoRecorder,VoiceKeyer,WavFile,WavPlayer,WavRecorder,
+    IqRecorder}.{h,cpp} + QsoRecorderApplet.{h,cpp} cluster, moved back
+    into the derivative table 2026-09-08 after this exact failure mode).
     """
     declared = set()
     independent = set()
@@ -103,7 +118,10 @@ def parse_provenance_paths():
     for lineno, raw in enumerate(text.splitlines(), 1):
         line = raw.strip()
 
-        # Track when we enter the independent section
+        # Still tracked for the independent-row branch below (it disambiguates
+        # a genuine 3-column independent row from a stray 2-column table
+        # elsewhere in the doc) — but, unlike before, it is never the sole
+        # signal for a declared row.
         if "Independently implemented" in line:
             in_independent_section = True
             continue
@@ -122,21 +140,14 @@ def parse_provenance_paths():
         if "---" in all_cells_text or not cells[0] or cells[0] == "---":
             continue
 
-        # Skip header rows by checking if first cell looks like a column header
-        # Headers are typically: "NereusSDR file", "Behavioral resemblance", etc.
-        # They don't start with "src/" or "tests/"
         first_cell = cells[0]
-        if not (first_cell.startswith("src/") or first_cell.startswith("tests/")):
-            continue
+        second_cell = cells[1]
+        first_is_path = first_cell.startswith("src/") or first_cell.startswith("tests/")
+        second_is_path = second_cell.startswith("src/") or second_cell.startswith("tests/")
 
-        # For independent section, extract from column 1 (index 1)
-        if in_independent_section:
-            candidate = cells[1].replace("`", "").strip()
-            if candidate:
-                independent.add(candidate)
-                path_linenos.setdefault(candidate, lineno)
-        else:
-            # For derivative section, extract from column 0 (index 0)
+        if first_is_path:
+            # Derivative-table row: NereusSDR file in column 0 — regardless
+            # of which section it is (mis)placed under.
             candidate = first_cell.replace("`", "").strip()
             if not candidate:
                 continue
@@ -164,6 +175,13 @@ def parse_provenance_paths():
 
             declared.add(candidate)
             path_linenos.setdefault(candidate, lineno)
+        elif in_independent_section and second_is_path:
+            # "Independently implemented" row: NereusSDR file in column 1.
+            candidate = second_cell.replace("`", "").strip()
+            if candidate:
+                independent.add(candidate)
+                path_linenos.setdefault(candidate, lineno)
+        # else: header row or unrelated table — skip.
 
     return declared, independent, path_linenos, withdrawn, withdrawn_without_commit
 
