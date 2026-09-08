@@ -2051,10 +2051,6 @@ void RxApplet::syncInheritedFromSlice()
     if (m_muteBtn)  { m_muteBtn->setChecked(m_slice->muted()); }
     if (m_binBtn)   { m_binBtn->setChecked(m_slice->binauralEnabled()); }
 
-    const NrSlot active = m_slice->activeNr();
-    // NICHT `slots` nennen: das ist Qts Makro-Schluesselwort, und der
-    // Uebersetzer meldet dann „expected unqualified-id" an einer Stelle,
-    // an der nichts falsch aussieht.
     if (m_anfBtn) { m_anfBtn->setChecked(m_slice->anfEnabled()); }
 
     if (m_nbBtn) {
