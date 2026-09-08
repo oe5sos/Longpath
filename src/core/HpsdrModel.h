@@ -140,6 +140,8 @@ enum class HPSDRHW : int {
     SunSdr2Qrp       = 13, // SunSDR2 QRP, native driver (no ExpertSDR2)
     // 14..19 available for future NereusSDR-original SKU slots.
     // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10)
+    // -- same tagged enum block also carries //MI0BOT at :422 (HermesLite,
+    // see above) and G8NJJ at :423 (Saturn, see above)
     HermesC10        = 20, // ANAN-G2E (formerly G1) single-ADC HERMES-class RX + OrionMKII TX
     // NereusSDR-native; relocated from 20 to 21 on 2026-05-21 (G2E port) to free Thetis byte 20.
     // See docs/architecture/2026-05-21-anan-g2e-port-design.md §4 for rationale.
