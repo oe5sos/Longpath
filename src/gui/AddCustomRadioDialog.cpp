@@ -275,6 +275,17 @@ void AddCustomRadioDialog::buildUi()
     // no Thetis file, and the line number was wrong, so it never resolved.
     m_portSpin->setValue(1024);
     m_portSpin->setStyleSheet(kFieldStyle);
+    // For SunSDR2 QRP specifically this field has zero effect —
+    // SunSdrRadioConnection always binds the protocol's own fixed
+    // control port (50001) regardless of what's saved here (see its
+    // init()'s comment). Nothing else in the dialog said so, so a
+    // SunSDR operator changing this value could reasonably believe it
+    // does something. Found live, 2026-08-26. Worded to stay true
+    // regardless of which protocol is currently selected, so no
+    // per-protocol tooltip-swap logic is needed.
+    m_portSpin->setToolTip(QStringLiteral(
+        "For SunSDR2 QRP: has no effect — the fixed protocol port "
+        "(50001) is always used, regardless of this value."));
     form->addRow(QStringLiteral("Port:"), m_portSpin);
 
     // MAC — optional; NereusSDR addition to enable Pin-to-MAC.
@@ -535,6 +546,15 @@ void AddCustomRadioDialog::populateProtocolCombo()
                              QVariant::fromValue(static_cast<int>(ProtocolVersion::Protocol1)));
     m_protocolCombo->addItem(QStringLiteral("Protocol 2"),
                              QVariant::fromValue(static_cast<int>(ProtocolVersion::Protocol2)));
+    // SunSDR2 QRP native driver — not an OpenHPSDR protocol at all, so it
+    // doesn't fit the model combo above (that list mirrors Thetis's own
+    // HPSDRModel enum; SunSDR isn't a Thetis-recognized board at all — see
+    // docs/architecture/2026-08-24-sunsdr-native-driver-design.md). Kept
+    // here in the protocol combo instead: safest option, touches neither
+    // HPSDRModel nor its exhaustive boardForModel() switch. The model
+    // combo is simply ignored when this entry is selected — see result().
+    m_protocolCombo->addItem(QStringLiteral("SunSDR2 QRP (native, no ExpertSDR2)"),
+                             QVariant::fromValue(static_cast<int>(ProtocolVersion::SunSdr)));
     m_protocolCombo->setCurrentIndex(0);  // Auto-detect default; probe will fill this in
 }
 
@@ -552,6 +572,21 @@ void AddCustomRadioDialog::onModelChanged(int /*index*/)
         return;  // Auto-detect — don't touch protocol
     }
 
+    // SunSDR2 QRP entries never have a real HPSDRModel (result() always
+    // saves modelOverride==FIRST for them — see the SunSdr branch below);
+    // the Model combo is documented as simply ignored while this
+    // protocol is selected. Without this guard, editing a saved SunSDR
+    // entry and merely browsing the Model dropdown — even by accident,
+    // arrow keys included — would silently flip Protocol away from
+    // "SunSDR2 QRP" to whatever P1/P2 the browsed model implies, with
+    // nothing in the dialog signaling that Model and Protocol are
+    // linked. Found live, 2026-08-26, during a from-scratch review the
+    // same evening this protocol's Edit flow first existed.
+    if (m_protocolCombo->currentData().toInt()
+        == static_cast<int>(ProtocolVersion::SunSdr)) {
+        return;
+    }
+
     const HPSDRHW hw = boardForModel(model);
     const BoardCapabilities& caps = BoardCapsTable::forBoard(hw);
     const int protoInt = static_cast<int>(caps.protocol);
@@ -563,6 +598,25 @@ void AddCustomRadioDialog::onModelChanged(int /*index*/)
 
 void AddCustomRadioDialog::onProbeClicked()
 {
+    // RadioDiscovery::probeAddress() only ever speaks OpenHPSDR P1/P2
+    // discovery — it has no SunSDR2 QRP branch and never can, the wire
+    // protocols are unrelated (design doc, "No broadcast/discovery
+    // packet exists in this [SunSDR] protocol"). Without this check, a
+    // SunSDR2 QRP entry's Probe button ran the doomed P1/P2 probe anyway
+    // and always failed with the generic "radio may be off / IP may be
+    // wrong" message — misleading for a protocol where that's never the
+    // actual reason. Found live, 2026-08-26. Save directly instead (the
+    // offline-save path onSaveOfflineClicked() already handles this
+    // protocol, per its own comment: "this offline-save path is the
+    // *only* way a SunSDR entry is ever created").
+    if (m_protocolCombo->currentData().toInt()
+        == static_cast<int>(ProtocolVersion::SunSdr)) {
+        showInlineError(QStringLiteral(
+            "SunSDR2 QRP has no discovery/probe on the wire — "
+            "just fill in the IP and Save directly."));
+        return;
+    }
+
     // Design §4.4 / §5.1: probe the entered address before accepting.
     // Failure preserves the form + shows a typed error; button flips to "Retry probe".
     const QString ipText = m_ipEdit->text().trimmed();
@@ -690,11 +744,17 @@ void AddCustomRadioDialog::onSaveOfflineClicked()
     if (!wasProbed) {
         const int protoIdx = m_protocolCombo->currentIndex();
         if (m_protocolCombo->itemData(protoIdx).toInt() < 0) {
+            // Was worded as if only P1/P2 existed — a first-time SunSDR2
+            // QRP operator landing here (the only save path this
+            // protocol has, since it's never probed) saw a message that
+            // didn't even hint their protocol was in the same dropdown.
+            // Found live, 2026-08-26.
             showInlineInfo(
                 QStringLiteral(
-                    "Pick Protocol (P1 / P2) before saving — without a probe "
+                    "Pick a Protocol before saving — without a probe "
                     "we have no way to learn it.\n"
-                    "Protocol 1 = HL2 / classic ANAN. Protocol 2 = Saturn / ANAN-G2."));
+                    "Protocol 1 = HL2 / classic ANAN. Protocol 2 = Saturn / ANAN-G2. "
+                    "SunSDR2 QRP = native driver, no ExpertSDR2 needed."));
             m_protocolCombo->setStyleSheet(
                 kFieldStyle + QStringLiteral("QComboBox { border: 1px solid #4a7ba8; }"));  // §D exception: info-blue highlight
             return;
@@ -850,6 +910,35 @@ RadioInfo AddCustomRadioDialog::result() const
             .arg(info.port);
     }
 
+    const int protoInt = m_protocolCombo->currentData().toInt();
+
+    // SunSDR2 QRP: does not go through the model-combo/boardForModel()
+    // path at all — that path is Thetis's own HPSDRModel taxonomy, and
+    // SunSDR isn't a Thetis-recognized board (design doc
+    // docs/architecture/2026-08-24-sunsdr-native-driver-design.md).
+    // Whatever the model combo happens to show is ignored here; the
+    // protocol combo alone decides. No broadcast discovery exists for
+    // this protocol (same design doc), so this offline-save path is the
+    // *only* way a SunSDR entry is ever created — there is no
+    // probe-then-save branch for it, by protocol design, not by an
+    // omission in this dialog.
+    if (protoInt == static_cast<int>(ProtocolVersion::SunSdr)) {
+        info.protocol  = ProtocolVersion::SunSdr;
+        info.boardType = HPSDRHW::SunSdr2Qrp;
+        info.modelOverride = HPSDRModel::FIRST;  // no HPSDRModel entry exists for this board
+
+        const BoardCapabilities& caps = BoardCapsTable::forBoard(HPSDRHW::SunSdr2Qrp);
+        info.adcCount             = caps.adcCount;
+        info.maxReceivers         = caps.maxReceivers;
+        info.maxSampleRate        = caps.maxSampleRate;
+        info.hasDiversityReceiver = caps.hasDiversityReceiver;
+        info.hasPureSignal        = caps.hasPureSignal;
+
+        info.firmwareVersion = 0;
+        info.inUse           = false;
+        return info;
+    }
+
     // Model override — user-selected SKU (or FIRST for auto-detect)
     const int userModelInt = m_modelCombo->currentData().toInt();
     info.modelOverride = static_cast<HPSDRModel>(userModelInt);
@@ -867,7 +956,6 @@ RadioInfo AddCustomRadioDialog::result() const
     info.hasPureSignal        = caps.hasPureSignal;
 
     // Protocol — from Thetis comboProtocol (Designer.cs:79-84)
-    const int protoInt = m_protocolCombo->currentData().toInt();
     if (protoInt >= 0) {
         info.protocol = static_cast<ProtocolVersion>(protoInt);
     } else {

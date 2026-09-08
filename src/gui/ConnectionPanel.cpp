@@ -121,6 +121,8 @@ mw0lge@grange-lane.co.uk
 #include <QIcon>
 #include <QLoggingCategory>
 #include <QTimer>
+#include <QAccessible>
+#include <QSignalBlocker>
 
 #include "gui/StyleConstants.h"
 
@@ -218,9 +220,10 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
 
     setWindowTitle(QStringLiteral("Connect to Radio"));
     setMinimumSize(800, 460);
-    resize(900, 520);
+    resize(900, 520);   // Vorgabe, bevor restoreGeometryState() greift
 
     buildUI();
+    restoreGeometryState();
     const qint64 buildUiMs = ctorTimer.elapsed();
 
     // Wire discovery signals
@@ -245,6 +248,18 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
             this, &ConnectionPanel::onConnectionStateChanged);
     connect(m_radioModel, &RadioModel::connectionStateChanged,
             this, &ConnectionPanel::updateStatusStrip);
+
+    // A failed connect attempt gives a reason (RadioModel.h's own
+    // rationale for this signal: "wer von Hand verband und scheiterte,
+    // sah 'Disconnected' und sonst nichts"). That reason previously only
+    // reached a MainWindow toast, which this dialog — the thing the
+    // operator is actually looking at while clicking Connect — can sit
+    // in front of. Show it right in the status strip instead.
+    connect(m_radioModel, &RadioModel::connectAttemptFailed,
+            this, [this](Longpath::ConnectFailure /*reason*/, const QString& detail) {
+        m_lastConnectFailureDetail = detail;
+        updateStatusStrip();
+    });
 
     // Periodic refresh of Last Seen relative times — every 15 s is adequate.
     connect(&m_lastSeenRefreshTimer, &QTimer::timeout,
@@ -308,6 +323,40 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
 ConnectionPanel::~ConnectionPanel()
 {
     // Don't stop discovery here — RadioModel owns it and it keeps running
+}
+
+void ConnectionPanel::closeEvent(QCloseEvent* event)
+{
+    saveGeometryState();
+    QDialog::closeEvent(event);
+}
+
+void ConnectionPanel::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+    raise();
+    activateWindow();
+}
+
+namespace {
+QString connectionPanelGeometryKey()
+{
+    return QStringLiteral("ConnectionPanelGeometryState");
+}
+} // namespace
+
+void ConnectionPanel::saveGeometryState()
+{
+    AppSettings::instance().setValue(connectionPanelGeometryKey(),
+                                     saveGeometry());
+}
+
+void ConnectionPanel::restoreGeometryState()
+{
+    const QByteArray st = AppSettings::instance()
+                              .value(connectionPanelGeometryKey())
+                              .toByteArray();
+    if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
 // ---------------------------------------------------------------------------
@@ -461,8 +510,11 @@ void ConnectionPanel::buildUI()
         "QComboBox { background: #1a2a3a; color: #c8d8e8; border: 1px solid #304050;"
         "  border-radius: 6px; padding: 4px 8px; }"
         "QComboBox::drop-down { border: none; }"
+        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
         "QComboBox QAbstractItemView { background: #0a1a28; color: #c8d8e8;"
-        "  selection-background-color: #205070; }")));
+        "  selection-background-color: #205070; selection-color: #ffffff; }")));
     connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ConnectionPanel::onModelComboChanged);
     modelRow->addWidget(modelLabel);
@@ -726,12 +778,17 @@ void ConnectionPanel::updateStatusStrip()
 
         m_stripDisconnectBtn->setVisible(true);
         m_stripReconnectLabel->setVisible(false);
+        m_lastConnectFailureDetail.clear();
     } else {
-        // Show red pill + Disconnected + optional Reconnect hint
+        // Show red pill + Disconnected (+ the reason, if the last thing
+        // that happened was a failed connect attempt) + optional
+        // Reconnect hint
         m_stripPillLabel->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 16px; }").arg(QLatin1String(kPillOfflineColor)));
 
-        m_stripInfoLabel->setText(QStringLiteral("Disconnected"));
+        m_stripInfoLabel->setText(m_lastConnectFailureDetail.isEmpty()
+            ? QStringLiteral("Disconnected")
+            : QStringLiteral("Disconnected — %1").arg(m_lastConnectFailureDetail));
         m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: #8090a0; font-size: 13px; }")));
 
@@ -761,21 +818,44 @@ void ConnectionPanel::updateStatusStrip()
 void ConnectionPanel::refreshLastSeenColumn()
 {
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    for (int row = 0; row < m_radioTable->rowCount(); ++row) {
-        QTableWidgetItem* statusCell = m_radioTable->item(row, ColStatus);
-        if (!statusCell) {
-            continue;
-        }
-        const QString mac = statusCell->data(kMacRole).toString();
+    const int rowCount = m_radioTable->rowCount();
 
-        // Refresh Last Seen column
-        QTableWidgetItem* lsCell = m_radioTable->item(row, ColLastSeen);
-        if (lsCell) {
-            const qint64 lastSeen = m_lastSeenMs.value(mac, 0LL);
-            lsCell->setText(relativeTime(lastSeen, now));
-        }
+    // Bug fix 2026-09-08 (task_829af93c -- same class as LogbookWindow::
+    // refreshTable()'s 2026-09-07 fix, b5e9b915). This slot fires every
+    // 15s indefinitely (m_lastSeenRefreshTimer), so unlike the one-shot
+    // bulk-load candidates it's a long-running low-volume source of AX
+    // churn if left unblocked. Only ColLastSeen's text actually changes
+    // here (setPillIconForRow uses setCellWidget, not part of the
+    // dataChanged mechanism), so the bundled event is scoped to that one
+    // column, not the whole table width.
+    {
+        const QSignalBlocker modelBlocker(m_radioTable->model());
+        for (int row = 0; row < rowCount; ++row) {
+            QTableWidgetItem* statusCell = m_radioTable->item(row, ColStatus);
+            if (!statusCell) {
+                continue;
+            }
+            const QString mac = statusCell->data(kMacRole).toString();
 
-        setPillIconForRow(row, mac);
+            // Refresh Last Seen column
+            QTableWidgetItem* lsCell = m_radioTable->item(row, ColLastSeen);
+            if (lsCell) {
+                const qint64 lastSeen = m_lastSeenMs.value(mac, 0LL);
+                lsCell->setText(relativeTime(lastSeen, now));
+            }
+
+            setPillIconForRow(row, mac);
+        }
+    }
+    m_radioTable->viewport()->update();
+    if (rowCount > 0) {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_radioTable, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(rowCount - 1);
+        tableEvent.setFirstColumn(ColLastSeen);
+        tableEvent.setLastColumn(ColLastSeen);
+        QAccessible::updateAccessibility(&tableEvent);
     }
 }
 
@@ -911,12 +991,21 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
         case HPSDRHW::SaturnMKII:        boardStr = QStringLiteral("Saturn MkII"); break;
         case HPSDRHW::HermesC10:         boardStr = QStringLiteral("HermesC10");   break;  // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10) — within ±5 of cite: //MI0BOT (network.h:422 HermesLite) and //G8NJJ (network.h:423 Saturn) preserved per inline-tag-preservation rule
         case HPSDRHW::Andromeda:         boardStr = QStringLiteral("Andromeda");   break;
+        case HPSDRHW::SunSdr2Qrp:        boardStr = QStringLiteral("SunSDR2 QRP"); break;
         default:                         boardStr = QStringLiteral("Unknown");     break;
     }
 
-    // Protocol string — ucRadioList.cs:1342 "Protocol-1" / "Protocol-2"
-    const QString protoStr = (info.protocol == ProtocolVersion::Protocol2)
-                             ? QStringLiteral("P2") : QStringLiteral("P1");
+    // Protocol string — ucRadioList.cs:1342 "Protocol-1" / "Protocol-2".
+    // SunSdr isn't an OpenHPSDR protocol at all (design doc
+    // docs/architecture/2026-08-24-sunsdr-native-driver-design.md); shown
+    // as its own label rather than folded into the P1/P2 pair.
+    QString protoStr;
+    switch (info.protocol) {
+        case ProtocolVersion::Protocol2: protoStr = QStringLiteral("P2"); break;
+        case ProtocolVersion::SunSdr:    protoStr = QStringLiteral("SunSDR"); break;
+        case ProtocolVersion::Protocol1:
+        default:                         protoStr = QStringLiteral("P1"); break;
+    }
 
     // In-use string — ucRadioList.cs:101 RadioIsBusy
     const QString inUseStr = info.inUse
@@ -1168,6 +1257,7 @@ void ConnectionPanel::onConnectClicked()
         setStatusText(QStringLiteral("Connecting to %1...").arg(info.displayName()));
     }
     m_connectBtn->setEnabled(false);
+    m_lastConnectFailureDetail.clear();
 
     // Phase 3I Task 17 — remember this as the last-connected radio (no
     // longer as an auto-reconnect target — that feature was removed
@@ -1496,8 +1586,21 @@ void ConnectionPanel::updateDetailPanel()
     m_detailBoardLabel->setText(QStringLiteral("Board: %1 (0x%2)")
         .arg(boardName)
         .arg(static_cast<int>(info.boardType), 2, 16, QLatin1Char('0')));
-    m_detailProtoLabel->setText(QStringLiteral("Protocol: P%1")
-        .arg(info.protocol == ProtocolVersion::Protocol2 ? 2 : 1));
+    // Same three-way distinction as populateRow()'s protoStr switch above
+    // (:945-951) — SunSdr isn't P1 or P2 at all. This label used to fall
+    // through a binary ternary straight to "P1" for anything that wasn't
+    // literally Protocol2, so every SunSDR2 QRP entry showed "Protocol:
+    // P1" here despite the table column correctly showing "SunSDR" a few
+    // lines above it (found live, 2026-08-26, first real SunSDR connect
+    // attempt through this dialog).
+    QString detailProtoStr;
+    switch (info.protocol) {
+        case ProtocolVersion::Protocol2: detailProtoStr = QStringLiteral("P2");     break;
+        case ProtocolVersion::SunSdr:    detailProtoStr = QStringLiteral("SunSDR"); break;
+        case ProtocolVersion::Protocol1:
+        default:                         detailProtoStr = QStringLiteral("P1");    break;
+    }
+    m_detailProtoLabel->setText(QStringLiteral("Protocol: %1").arg(detailProtoStr));
     m_detailFwLabel->setText(QStringLiteral("Firmware: %1").arg(info.firmwareVersion));
     m_detailIpLabel->setText(QStringLiteral("IP: %1").arg(info.address.toString()));
     m_detailMacLabel->setText(QStringLiteral("MAC: %1").arg(info.macAddress));
@@ -1506,29 +1609,49 @@ void ConnectionPanel::updateDetailPanel()
     m_modelCombo->blockSignals(true);
     m_modelCombo->clear();
     QList<HPSDRModel> models = compatibleModels(info.boardType);
-    HPSDRModel defaultModel = defaultModelForBoard(info.boardType);
 
-    HPSDRModel persisted = AppSettings::instance().modelOverride(info.macAddress);
-    HPSDRModel selected = (persisted != HPSDRModel::FIRST) ? persisted : defaultModel;
-
-    int selectIdx = 0;
-    for (int i = 0; i < models.size(); ++i) {
-        m_modelCombo->addItem(
-            QString::fromLatin1(displayName(models[i])),
-            static_cast<int>(models[i]));
-        if (models[i] == selected) {
-            selectIdx = i;
-        }
-    }
-    m_modelCombo->setCurrentIndex(selectIdx);
-    m_modelCombo->blockSignals(false);
-
-    if (selected != defaultModel) {
-        m_modelHintLabel->setText(QStringLiteral("Board reports \"%1\" -- model override applied")
-            .arg(boardName));
-        m_modelHintLabel->setVisible(true);
-    } else {
+    // SunSDR2 QRP (and any other board with no HPSDRModel entry at all —
+    // by design, per AddCustomRadioDialog.cpp's own comment: "no
+    // HPSDRModel entry exists for this board") makes compatibleModels()
+    // return empty and defaultModelForBoard() silently fall through to
+    // its final HERMES fallback — a real board's model, meaningless
+    // here. Selecting a saved SunSDR row used to render an empty,
+    // apparently-broken combo with no explanation. Found live,
+    // 2026-08-26. A single disabled placeholder is honest about there
+    // being nothing to pick, instead of leaving the field looking wrong.
+    if (models.isEmpty()) {
+        m_modelCombo->addItem(QStringLiteral("N/A — no model selection for this protocol"));
+        m_modelCombo->setCurrentIndex(0);
+        m_modelCombo->setEnabled(false);
+        m_modelCombo->blockSignals(false);
         m_modelHintLabel->setVisible(false);
+    } else {
+        m_modelCombo->setEnabled(true);
+
+        HPSDRModel defaultModel = defaultModelForBoard(info.boardType);
+
+        HPSDRModel persisted = AppSettings::instance().modelOverride(info.macAddress);
+        HPSDRModel selected = (persisted != HPSDRModel::FIRST) ? persisted : defaultModel;
+
+        int selectIdx = 0;
+        for (int i = 0; i < models.size(); ++i) {
+            m_modelCombo->addItem(
+                QString::fromLatin1(displayName(models[i])),
+                static_cast<int>(models[i]));
+            if (models[i] == selected) {
+                selectIdx = i;
+            }
+        }
+        m_modelCombo->setCurrentIndex(selectIdx);
+        m_modelCombo->blockSignals(false);
+
+        if (selected != defaultModel) {
+            m_modelHintLabel->setText(QStringLiteral("Board reports \"%1\" -- model override applied")
+                .arg(boardName));
+            m_modelHintLabel->setVisible(true);
+        } else {
+            m_modelHintLabel->setVisible(false);
+        }
     }
 
 }

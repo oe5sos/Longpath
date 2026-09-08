@@ -40,6 +40,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QHash>
 #include <QVector>
 #include <functional>
 
@@ -100,6 +101,7 @@ signals:
     void wfColorGainChanged(int gain);
     void wfBlackLevelChanged(int level);
     void colorSchemeChanged(int scheme);
+    void spectrumRenderModeChanged(int mode);  // 0 = 2D, 1 = 3D — see SpectrumRenderMode
     void cursorFreqVisibleChanged(bool on);  // B8 Task 21
     void fillColorChanged(const QColor& color); // B8 Task 22
     void fillAlphaChanged(float alpha);  // 0.0..1.0  B8 fix-up
@@ -143,6 +145,50 @@ public:
     // Phase 3G-9c: update the Clarity status badge.
     // active=true → green "C", paused=true → amber "C", both false → hidden.
     void setClarityStatus(bool active, bool paused);
+
+    // Show the persisted spectrum render mode (0 = 2D, 1 = 3D) in the
+    // Display flyout's combo. The SpectrumWidget loads its settings before
+    // this panel exists; without this the combo shows "2D" after every
+    // start regardless of what was saved. Emits spectrumRenderModeChanged
+    // only if the index actually changes, and the receiving setter is
+    // idempotent, so calling it with the widget's own state is a no-op.
+    void setSpectrumRenderModeIndex(int renderModeIndex);
+
+    // Same gap as setSpectrumRenderModeIndex, one slider over: the WF Gain
+    // slider is built with its own hardcoded default (50) and never learns
+    // what SpectrumWidget actually loaded (default 45). Both share a 0-100
+    // range, so there is no clamping concern here — setValue() is a no-op
+    // if the value already matches, and SpectrumWidget::setWfColorGain()
+    // is idempotent on an unchanged value.
+    void setWfGainValue(int gain);
+
+    // Same restore gap as setWfGainValue, for the Black Lvl slider. Its
+    // range was widened from 0..100 to 0..125 (operator decision,
+    // 2026-09-05) to match SpectrumWidget's own range — see
+    // CHANGELOG.md.
+    void setWfBlackLevelValue(int level);
+
+    // Same restore gap, for the Scheme combo. Its item list was expanded
+    // from four placeholder names to the full WfColorScheme list
+    // (operator decision, 2026-09-05) — see CHANGELOG.md.
+    void setColorSchemeIndex(int index);
+
+    // The collapsed()/expanded chrome state (the ◀/▶ arrow, top-left)
+    // was never wired to anything — SpectrumWidget loads its own display
+    // settings, but this panel's own auf/zu state was never among them,
+    // so it always started expanded. Sets m_expanded directly, without
+    // re-emitting collapsed(), so restoring it can't loop back into
+    // SpectrumWidget::setOverlayPanelExpanded().
+    void setExpandedState(bool expanded);
+
+    // Marks which button in the Band flyout matches this pan's resolved
+    // slice's current band (Band::bandKeyName() — e.g. "40m"), set from
+    // bindToPanSlice(). Von einer AetherSDR-Sichtung angestossen
+    // (2026-09-06, "highlight active band"); Entwurf A (gefuellt, wie der
+    // WNB-Knopf im selben Panel) vom Betreiber gewaehlt. No match (a name
+    // not in kBands, e.g. "GEN", or an empty string when the pan has no
+    // slice) just clears the highlight — a fine, silent no-op, not a bug.
+    void setActiveBandHighlight(const QString& bandKeyName);
 
 private:
     /// Which panadapter this strip is drawn on; see setPanId.
@@ -190,6 +236,8 @@ private:
 
     // ── Band flyout ──────────────────────────────────────────────────────
     QWidget* m_bandFlyout{nullptr};
+    // Keyed by Band::bandKeyName() (e.g. "40m"), for setActiveBandHighlight().
+    QHash<QString, QPushButton*> m_bandButtons;
 
     // ── ANT flyout ───────────────────────────────────────────────────────
     QWidget*     m_antFlyout{nullptr};
@@ -210,6 +258,7 @@ private:
     // ── Display flyout ───────────────────────────────────────────────────
     QWidget*     m_displayFlyout{nullptr};
     QComboBox*   m_colorSchemeCmb{nullptr};
+    QComboBox*   m_renderModeCmb{nullptr};
     QSlider*     m_wfGainSlider{nullptr};
     QLabel*      m_wfGainLabel{nullptr};
     QSlider*     m_wfBlackSlider{nullptr};
@@ -239,6 +288,10 @@ private:
     RadioModel*              m_radioModel{nullptr};
     SliceResolver            m_sliceResolver;
     QMetaObject::Connection  m_vaxChannelConn;
+    // Same rebind-on-shuffle pattern as m_vaxChannelConn above, for the
+    // Band-flyout highlight (2026-09-06) -- SliceModel::bandChanged of
+    // whichever slice bindToPanSlice() currently resolves to.
+    QMetaObject::Connection  m_bandChangedConn;
     bool                     m_updatingFromModel{false};
 
     SliceModel* resolvedSlice() const;

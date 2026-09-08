@@ -3025,9 +3025,18 @@ void P2RadioConnection::sendCmdGeneral()
                                           m_baseOutboundPort);
     }
     if (written != pkt.size()) {
+        // 2026-09-01: bench-reproduced (OE5SOS) with the send failing on
+        // EVERY retry for the full 6 s watchdog window, not just the first
+        // send of a freshly opened socket as the 2026-08-27 one-shot-retry
+        // fix assumed. errorString() alone ("Unable to send a message") is
+        // Qt's generic wording for the write() syscall failing and does not
+        // say WHICH errno fired -- error() + state() do, and are needed to
+        // tell a real network condition (route/ARP/firewall) apart from a
+        // socket left in a bad state by this object's own lifecycle.
         qCWarning(lcConnection)
             << "P2: CmdGeneral send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
+            << "error=" << m_socket->error() << "state=" << m_socket->state();
     }
 }
 
@@ -3063,9 +3072,11 @@ void P2RadioConnection::sendCmdHighPriority()
         written = m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
     }
     if (written != pkt.size()) {
+        // 2026-09-01: see the diagnostic comment in sendCmdGeneral() above.
         qCWarning(lcConnection)
             << "P2: CmdHighPriority send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
+            << "error=" << m_socket->error() << "state=" << m_socket->state();
     }
     // Shell-chrome sub-PR-2 B.1: record egress bytes for ▲ Mbps readout.
     recordBytesSent(static_cast<qint64>(pkt.size()));
@@ -3092,9 +3103,11 @@ void P2RadioConnection::sendCmdRx()
                                           m_baseOutboundPort + 1);
     }
     if (written != pkt.size()) {
+        // 2026-09-01: see the diagnostic comment in sendCmdGeneral() above.
         qCWarning(lcConnection)
             << "P2: CmdRx send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
+            << "error=" << m_socket->error() << "state=" << m_socket->state();
     }
 }
 
@@ -3115,9 +3128,11 @@ void P2RadioConnection::sendCmdTx()
                                           m_baseOutboundPort + 2);
     }
     if (written != pkt.size()) {
+        // 2026-09-01: see the diagnostic comment in sendCmdGeneral() above.
         qCWarning(lcConnection)
             << "P2: CmdTx send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString();
+            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
+            << "error=" << m_socket->error() << "state=" << m_socket->state();
     }
 }
 

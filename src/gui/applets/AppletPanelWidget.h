@@ -181,6 +181,12 @@ signals:
     /// hoert zu und setzt AppletVisibilityController.
     void appletHideRequested(AppletWidget* applet);
 
+    /// Das ⚙ im Fensterkopf (2026-09-08). Genau wie beim Abloesen/
+    /// Ausblenden loest das Panel selbst nichts aus — es meldet nur
+    /// weiter, was GridCellWidget schon auf ein einzelnes Applet
+    /// aufgeloest hat.
+    void appletSettingsRequested(AppletWidget* applet);
+
 protected:
     void resizeEvent(QResizeEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;

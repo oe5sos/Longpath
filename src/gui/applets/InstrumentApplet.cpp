@@ -15,6 +15,7 @@
 #include <QActionGroup>
 #include <QContextMenuEvent>
 #include <QMenu>
+#include <QPainter>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include "models/RadioModel.h"
@@ -38,7 +39,14 @@ InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
     m_stack->addWidget(m_bar);
     lay->addWidget(m_stack);
 
-    setForm(Form::Needle);
+    // applyForm, NICHT setForm: setForm() ruft saveState(), und das
+    // schriebe hier -- noch vor dem restoreState() des Aufrufers -- die
+    // Vorgaben (Zeiger, kein Segment, keine Roehre) in die Ablage und
+    // ueberschriebe damit genau die Werte, die restoreState() gleich
+    // lesen soll. So hat die Roehre seit ihrer Einfuehrung (2026-08-23)
+    // keinen Neustart ueberlebt; gefunden 2026-09-03 ueber
+    // tst_settings_are_remembered.
+    applyForm(Form::Needle);
 
     // Ruhelage ohne Radio (Betreiber-Entscheidung 2026-08-18). Das
     // Instrument selbst kennt kein Radio — es kennt Messwerte. Die
@@ -79,12 +87,17 @@ const PeakHold& InstrumentApplet::peakHold(Form f) const
     return f == Form::Needle ? m_needle->peakHold() : m_bar->peakHold();
 }
 
-void InstrumentApplet::setForm(Form f)
+void InstrumentApplet::applyForm(Form f)
 {
     m_form = f;
     m_stack->setCurrentWidget(f == Form::Needle
                                   ? static_cast<QWidget*>(m_needle)
                                   : static_cast<QWidget*>(m_bar));
+}
+
+void InstrumentApplet::setForm(Form f)
+{
+    applyForm(f);
     saveState();
 }
 
@@ -147,6 +160,22 @@ bool InstrumentApplet::isTube() const
     return m_bar && m_bar->isTube();
 }
 
+void InstrumentApplet::setShowFrequency(bool on)
+{
+    m_needle->setShowFrequency(on);
+    saveState();
+}
+
+bool InstrumentApplet::showFrequency() const
+{
+    return m_needle->showFrequency();
+}
+
+void InstrumentApplet::setFrequencyHz(double hz)
+{
+    m_needle->setFrequencyHz(hz);
+}
+
 // ── Merken ──────────────────────────────────────────────────────────
 //
 // Ein Schluessel je Instrument: „SwrInstrument" und „SignalInstrument"
@@ -164,6 +193,9 @@ QString segKey(const QString& id) {
 QString tubeKey(const QString& id) {
     return QStringLiteral("Instrument_%1_BarTube").arg(id);
 }
+QString freqKey(const QString& id) {
+    return QStringLiteral("Instrument_%1_ShowFrequency").arg(id);
+}
 } // namespace
 
 void InstrumentApplet::saveState() const
@@ -176,6 +208,8 @@ void InstrumentApplet::saveState() const
                                             : QStringLiteral("False"));
     st.setValue(tubeKey(m_id), isTube() ? QStringLiteral("True")
                                         : QStringLiteral("False"));
+    st.setValue(freqKey(m_id), showFrequency() ? QStringLiteral("True")
+                                               : QStringLiteral("False"));
 }
 
 void InstrumentApplet::restoreState()
@@ -189,6 +223,9 @@ void InstrumentApplet::restoreState()
             st.value(tubeKey(m_id), QStringLiteral("False")).toString()
             == QStringLiteral("True"));
     }
+    m_needle->setShowFrequency(
+        st.value(freqKey(m_id), QStringLiteral("False")).toString()
+        == QStringLiteral("True"));
     // setForm zuletzt: es ruft saveState, und das soll den eben
     // gelesenen Segmentzustand mitschreiben, nicht den vorigen.
     const QString f = st.value(formKey(m_id), QStringLiteral("Needle")).toString();
@@ -218,6 +255,15 @@ void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
     QMenu* menu = buildContextMenu(this);
     menu->exec(ev->globalPos());
+    menu->deleteLater();
+}
+
+// Der geteilte ⚙-Knopf (GridCellWidget) traegt keine Klick-Koordinate,
+// daher an der Mitte des Widgets verankert statt am Klickpunkt.
+void InstrumentApplet::openExtendedSettings()
+{
+    QMenu* menu = buildContextMenu(this);
+    menu->exec(mapToGlobal(rect().center()));
     menu->deleteLater();
 }
 
@@ -364,6 +410,19 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
             this, [this]() {
         m_needle->resetPeak();
         m_bar->resetPeak();
+    });
+
+    // ── Frequenz zusaetzlich ─────────────────────────────────────────
+    //
+    // Betreiber 2026-09-02: "die Idee ist, dass man sich bei kleinen
+    // Bildschirmen vielleicht ein Fenster erspart" -- Frequenz mit im
+    // S-Meter/Stehwelle statt in einem eigenen Frequenz-Fenster.
+    menu->addSeparator();
+    QAction* showFreq = menu->addAction(tr("Frequenz anzeigen"));
+    showFreq->setCheckable(true);
+    showFreq->setChecked(showFrequency());
+    connect(showFreq, &QAction::triggered, this, [this](bool checked) {
+        setShowFrequency(checked);
     });
 
     return menu;

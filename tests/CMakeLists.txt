@@ -165,6 +165,22 @@ function(nereus_add_test name)
     target_link_libraries(${name} PRIVATE LongpathObjs Qt6::Test)
     set_property(GLOBAL APPEND PROPERTY NEREUS_ALL_TESTS ${name})
 
+    # CMakeLists.txt's top-level `if(CMAKE_BUILD_TYPE STREQUAL "Debug")`
+    # block already compiles LongpathObjs with -fsanitize=address (its
+    # PUBLIC compile option, so every test executable linking against it
+    # inherits the instrumentation) but only adds the matching LINK
+    # option to the `Longpath` app target, not to test executables —
+    # found 2026-08-30 while investigating a real, non-reproducing
+    # SIGSEGV (docs/architecture/2026-08-29-sunsdr-tci-teardown-segfault-investigation.md):
+    # a Debug-configured test build would have ASAN-instrumented object
+    # code but no ASAN runtime linked in, which fails at link time
+    # (undefined __asan_* symbols), not silently — but that means the
+    # existing sanitizer support was never actually usable for tests at
+    # all, only for the app binary. Mirrors the same Debug-only gate.
+    if(NOT MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_options(${name} PRIVATE -fsanitize=address)
+    endif()
+
     # Reuse the LongpathObjs precompiled header (CMakeLists.txt §PCH).
     # 451 test executables × per-target PCH compile would burn the wins;
     # REUSE_FROM means the PCH is built once on LongpathObjs and shared
@@ -879,6 +895,11 @@ nereus_add_test(tst_radio_model_band_click)
 
 # ── About dialog ─────────────────────────────────────────────────────────
 nereus_add_test(tst_about_dialog)
+nereus_add_test(tst_support_dialog)
+nereus_add_test(tst_dev_automation_server)
+nereus_add_test(tst_rtty_decoder)
+nereus_add_test(tst_rtty_decoder_sensitivity)
+nereus_add_test(tst_rtty_decoder_applet)
 
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 nereus_add_test(tst_vax_first_run_dialog)
@@ -4358,8 +4379,12 @@ nereus_add_test(tst_radio_connection_supply_volts)
 nereus_add_test(tst_audio_engine_flow_state)
 
 # ── Shell-Chrome Redesign sub-PR-3: NetworkDiagnosticsDialog ──────────────
-# 4 tests: null-safe construction, refresh on disconnected model, reset
-# clears counters, signal-wire safety. QTEST_MAIN — needs QApplication.
+# 6 tests: null-safe construction, refresh on disconnected model, reset
+# clears counters, signal-wire safety, plus (Step 4 of the SunSDR2 QRP
+# TX-chain plan) the read-only "TX (SunSDR)" section showing armed/mox/
+# pace-repeats/trace-tail against a real SunSdrRadioConnection and the
+# "— (not SunSDR)" placeholder path with no connection. QTEST_MAIN —
+# needs QApplication.
 nereus_add_test(tst_network_diagnostics_dialog)
 
 # ── Bottom-banner cleanup Task A1: ChromeFoldPlan pure fold math ─────────
@@ -4752,7 +4777,6 @@ nereus_add_test(tst_swr_refined_sheet)
 nereus_add_test(tst_swr_depth_sheet)
 nereus_add_test(tst_instrument_tube_sheet)
 nereus_add_test(tst_filter_reset_recovers)
-nereus_add_test(tst_tx_meter_switches)
 nereus_add_test(tst_kiwi_display_source)
 nereus_add_test(tst_kiwi_is_reachable)
 nereus_add_test(tst_vfo_tiles)
@@ -4781,6 +4805,9 @@ nereus_add_test(tst_asr_against_live_server)
 
 nereus_add_test(tst_filter_follows_the_panadapter)
 nereus_add_test(tst_filter_pane_sheet)
+nereus_add_test(tst_tx_entwurf_sheet)
+nereus_add_test(tst_band_flyout_highlight_entwurf)
+nereus_add_test(tst_band_flyout_highlight)
 nereus_add_test(tst_band_buttons)
 nereus_add_test(tst_container_title_does_not_shove)
 nereus_add_test(tst_frequency_widget_tunes)
@@ -4858,6 +4885,16 @@ target_link_libraries(tst_log_entry PRIVATE Qt6::Network)
 # -- GlobeWidget geometry: subsolar point (terminator) and great-circle
 #    slerp (the path), both static so no window is needed --
 nereus_add_test(tst_globe_geometry)
+
+# -- WorldTexture photo style (Muted/NightWash/Crisp, 2026-09-02): the
+#    tone-curve maths and that a style change actually invalidates the
+#    styledImage() cache instead of sticking to the previous result --
+nereus_add_test(tst_world_texture_style)
+
+# -- DssRenderer (3D stacked-trace spectrum surface, ported from AetherSDR's
+#    "3DSS"): ring buffer growth/cap/clear, and that image() geometry
+#    actually follows strength = (dbm - floorDbm) / rangeDb --
+nereus_add_test(tst_dss_renderer)
 
 # -- DXCC prefix to flag: known entities, and no guess for the rest --
 nereus_add_test(tst_dxcc_flag)
@@ -5028,6 +5065,24 @@ nereus_add_test(tst_widget_picker)
 #    herrenlos, die Bindung raet --
 nereus_add_test(tst_layout_profiles)
 
+# -- Der Rundgang durch ein ECHTES MainWindow, nicht durch ein blosses
+#    QVariantMap an Haken (das deckt tst_layout_profiles.cpp bereits ab,
+#    und genau DAS haette den Bandwidth-Filter-Fehler vom 2026-08-30
+#    nicht gefunden -- der Fehler sass nicht in LayoutProfiles selbst,
+#    sondern darin, OB und WANN MainWindow captureIntoCurrent()+save()
+#    ueberhaupt aufruft). Drei Pruefungen: (1) jedes Applet, das die
+#    Spalte beim Start zeigt, ueberlebt Abloesen+Geometrie+Neustart --
+#    die Liste wird zur Testzeit aus dem echten Fenster gelesen, nicht
+#    von Hand gepflegt; (2) der Betriebsfall, der den Fehler ausgeloest
+#    haben koennte: Wiedereinschalten ueber das Containers-Menue bei
+#    aktiver "freier Flaeche" trifft einen Zweig in
+#    applyAppletVisibility() (MainWindow.cpp ~1628-1635), der -- anders
+#    als jeder Geschwisterpfad -- KEIN unmittelbares
+#    captureIntoCurrent()+save() nach dem Abloesen ruft; (3) die fuenf
+#    eigenen Fenster und die zwei Chrome-Eintraege ueberstehen densel-
+#    ben Rundgang in der Sichtbarkeits-Karte --
+nereus_add_test(tst_real_layout_profile_roundtrip)
+
 # -- Widgets im rechten Stapel verschieben. Geprueft wird die eine
 #    Eigenschaft, an der so etwas scheitert: dass die sichtbare Reihen-
 #    folge und die gespeicherte Liste dasselbe sagen. Dazu der Zug, der
@@ -5082,6 +5137,23 @@ nereus_add_test(tst_nested_splitter_layout)
 nereus_add_test(tst_container_grab_handle)
 nereus_add_test(tst_container_lock_button)
 nereus_add_test(tst_audio_tap_ring)
+
+# ── 2026-09-06 race fix: setXxxTap(nullptr, ...) vs. an in-flight write ──────
+# Code review found that AudioEngine::setQsoTap / setAsrTap /
+# setWavRecordTap / setRttyTap only ever stored two plain atomics, with no
+# handshake against a rxBlockReady() call already past the tap-pointer load
+# on the real audio thread — a caller that frees the AudioTapRing right
+# after disabling the tap (e.g. QsoRecorderController's dtor, "Erst den
+# Abgriff loesen, dann sterben") could race a still-running write() into
+# freed memory. Fixed via a per-tap busy counter (writeToTapIfCurrent /
+# waitForTapQuiescence in AudioEngine.cpp) that setXxxTap(nullptr, ...)
+# drains before returning. This test uses the NEREUS_BUILD_TESTS-only
+# setTapWriteDelayHookForTest seam to hold a simulated audio thread inside
+# that exact window and asserts setXxxTap(nullptr, ...) blocks for the
+# delay's duration instead of returning immediately — deterministic and
+# CI-safe, unlike actually racing a real use-after-free.
+nereus_add_test(tst_audio_engine_tap_teardown_race)
+
 nereus_add_test(tst_qso_recorder_controller)
 nereus_add_test(tst_qso_recorder_applet)
 nereus_add_test(tst_wav_player)
@@ -5121,6 +5193,23 @@ nereus_add_test(tst_recording_scheduler)
 # PlaybackRadioConnection. See the test file's own header for what it
 # pins and why.
 nereus_add_test(tst_playback_radio_connection)
+nereus_add_test(tst_sunsdr_protocol)
+# buildDriveFrameHasNoProductionCallSites() grep-scans src/ for stray
+# calls to the Step-1 pure-encoder buildDriveFrame() (SunSdrProtocol.h)
+# — no QRP bench power-calibration table exists yet, so this byte must
+# never reach a real caller. Same NEREUS_SOURCE_ROOT pattern as
+# tst_popup_style_coverage's T22 kPopupMenu invariant.
+target_compile_definitions(tst_sunsdr_protocol PRIVATE
+    NEREUS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+nereus_add_test(tst_sunsdr_radio_connection)
+
+# Connection-plan Phase A.1-A.3 (docs/architecture/2026-08-26-sunsdr-
+# connection-plan.md): enum/board-id/factory-dispatch coverage that
+# doesn't need bench hardware. See each file's own header for what it
+# pins and why.
+nereus_add_test(tst_protocol_version_sunsdr)
+nereus_add_test(tst_board_id_sunsdr)
+nereus_add_test(tst_radio_connection_factory_sunsdr)
 
 # -- Was die RxApplet von der VFO-Flagge geerbt hat. Fuenf Gruppen
 #    lebten NUR dort; die Flagge faellt ersatzlos weg. Gingen sie still
@@ -5634,6 +5723,15 @@ nereus_add_test(tst_spot_collector_parser)
 # parsesPotaJsonResponse, dedupsAcrossPolls, rejectsMalformedJson.
 # Source: AetherSDR src/core/PotaClient.cpp [@0cd4559].
 nereus_add_test(tst_pota_client)
+
+# ── SotaClient JSON parser + dedup (2026-09-03, no upstream equivalent) ────
+# Pins the contract that SotaClient parses api2.sota.org.uk/api/spots/...
+# JSON responses (including two fields confirmed live to be sometimes
+# absent: null frequency, empty mode), maps summitCode -> reference/entity
+# (split on '/', not POTA's '-'), converts lat/lon -> grid via the same
+# Maidenhead helper the logbook uses, dedups across polls via id, and
+# enforces the API maintainer's 60 s minimum poll interval.
+nereus_add_test(tst_sota_client)
 
 # ── SpotHub POTA improvement pass: PotaParkInfoClient JSON parser ───────────
 # NereusSDR-native, no upstream equivalent (operator-requested follow-up,
@@ -6990,6 +7088,28 @@ target_link_libraries(kiwi_sdr_trace_math_test PRIVATE LongpathObjs Qt6::Core Qt
 target_include_directories(kiwi_sdr_trace_math_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME kiwi_sdr_trace_math_test COMMAND kiwi_sdr_trace_math_test)
 add_dependencies(all_tests kiwi_sdr_trace_math_test)
+
+# Diese elf Pruefstaende oben (bewusst mit eigenem main() statt QTest,
+# siehe deren Kopfkommentare) laufen NICHT ueber nereus_add_test() und
+# haben deshalb nie die dortige ASAN-Link-Ergaenzung bekommen (§ oben,
+# "found 2026-08-30 ... existing sanitizer support was never actually
+# usable for tests at all"). Erst am 2026-09-06 aufgefallen, als ein
+# voller Testlauf im Debug/ASAN-Build sie mit "Unable to find
+# executable" meldete -- sie waren unter dieser Konfiguration nie
+# gebaut worden, weil derselbe Linker-Fehler (ASAN-instrumentierte
+# LongpathObjs, aber keine ASAN-Laufzeit an DIESEM Ziel verlinkt) sie
+# traf. Dieselbe Ergaenzung hier statt in nereus_add_test(), weil diese
+# elf absichtlich nicht durch diese Funktion laufen.
+foreach(_asan_gap_target IN ITEMS
+        kiwi_sdr_protocol_test kiwi_public_directory_test
+        kiwi_sdr_redirect_policy_test kiwi_sdr_manager_password_test
+        kiwi_sdr_manager_csv_test kiwi_rebind_tracker_test
+        asr_segmenter_test asr_remote_backend_test asr_tap_policy_test
+        kiwi_sdr_tx_mute_policy_test kiwi_sdr_trace_math_test)
+    if(NOT MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_options(${_asan_gap_target} PRIVATE -fsanitize=address)
+    endif()
+endforeach()
 
 
 

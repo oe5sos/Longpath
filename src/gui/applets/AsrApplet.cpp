@@ -84,7 +84,7 @@ void AsrApplet::setService(AsrService* svc)
                      : Style::role("text-scale", Style::kTextScale));
     });
     connect(svc, &AsrService::failed, this, [this](const QString& reason) {
-        setStatus(tr("Fehler"), QStringLiteral("#c85a5a"));
+        setStatus(tr("Fehler"), QString::fromLatin1(Style::kTxRed));
         // Der Grund gehoert in den Text, nicht nur in eine Farbe. Wer
         // "Fehler" liest und nicht weiss, welchen, ist nicht besser
         // dran als vorher.
@@ -115,7 +115,7 @@ void AsrApplet::setStatus(const QString& s, const QString& colour)
     if (!m_status) { return; }
     m_status->setText(s);
     m_status->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(colour));
+        QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(colour));
 }
 
 } // namespace Longpath

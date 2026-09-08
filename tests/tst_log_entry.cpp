@@ -17,6 +17,9 @@ private slots:
     void empty_fields_are_omitted_entirely();
     void timestamps_are_converted_to_utc();
     void record_ends_with_eor();
+    void sota_ref_is_written_directly();
+    void pota_ref_is_written_via_sig_pair();
+    void pota_sig_is_omitted_when_ref_is_empty();
     void upload_response_ok();
     void upload_response_duplicate_counts_as_success();
     void upload_response_failure_carries_the_reason();
@@ -73,6 +76,48 @@ void TstLogEntry::record_ends_with_eor()
     LogEntry e;
     e.call = QStringLiteral("AA1AA");
     QVERIFY(e.toAdifRecord().endsWith(QStringLiteral("<EOR>")));
+}
+
+void TstLogEntry::sota_ref_is_written_directly()
+{
+    // SOTA has its own ADIF-registered fields, unlike POTA — no
+    // wrapping tag needed.
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    e.mySotaRef = QStringLiteral("OE/OO-001");
+    e.sotaRef = QStringLiteral("G/LD-003");
+
+    const QString adif = e.toAdifRecord();
+    QVERIFY(adif.contains(QStringLiteral("<MY_SOTA_REF:9>OE/OO-001")));
+    QVERIFY(adif.contains(QStringLiteral("<SOTA_REF:8>G/LD-003")));
+}
+
+void TstLogEntry::pota_ref_is_written_via_sig_pair()
+{
+    // POTA has no dedicated field — it rides ADIF's generic Special
+    // Interest Activity pair, with MY_SIG/SIG carrying the literal
+    // text "POTA".
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    e.myPotaRef = QStringLiteral("OE-1234");
+    e.potaRef = QStringLiteral("OE-5678");
+
+    const QString adif = e.toAdifRecord();
+    QVERIFY(adif.contains(QStringLiteral("<MY_SIG:4>POTA")));
+    QVERIFY(adif.contains(QStringLiteral("<MY_SIG_INFO:7>OE-1234")));
+    QVERIFY(adif.contains(QStringLiteral("<SIG:4>POTA")));
+    QVERIFY(adif.contains(QStringLiteral("<SIG_INFO:7>OE-5678")));
+}
+
+void TstLogEntry::pota_sig_is_omitted_when_ref_is_empty()
+{
+    // An empty MY_SIG=POTA with no MY_SIG_INFO would be a claim with
+    // nothing behind it — the pair only appears when there is a park
+    // reference to name.
+    LogEntry e;
+    e.call = QStringLiteral("OE1W");
+    const QString adif = e.toAdifRecord();
+    QVERIFY(!adif.contains(QStringLiteral("SIG")));
 }
 
 void TstLogEntry::upload_response_ok()

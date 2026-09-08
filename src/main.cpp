@@ -9,6 +9,7 @@
 #include "core/RadioConnection.h"
 #include "core/mmio/ExternalVariableEngine.h"
 #include "core/LogCategories.h"
+#include "core/DevAutomationServer.h"
 
 // Generated into the build tree by cmake/LongpathBuildTag.cmake, once per
 // build, so NEREUSSDR_BUILD_TAG names the commit actually being compiled
@@ -39,8 +40,27 @@
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
+#include "core/SupportBundle.h"
 
 static QFile* s_logFile = nullptr;
+
+// Von einer AetherSDR-Sichtung angestossen (2026-09-05): dort gibt es ein
+// umfangreiches SystemInventory, das aber an ihre eigene Whisper/ggml-
+// Spracherkennung gekoppelt ist -- die hat Longpath nicht. Hier nur der
+// allgemeine Teil, den ein Support-Fall wirklich braucht -- und der steht
+// schon in SupportBundle::collectSystemInfo() (fuer den Bundle-Export),
+// jetzt erweitert um Kernzahl/RAM und hier zusaetzlich sofort ins Log
+// geschrieben, nicht erst beim Erzeugen eines Bundles.
+static void logStartupHardwareInventory()
+{
+    const auto sys = Longpath::SupportBundle::collectSystemInfo();
+    qInfo("System: %s, %s, %d Kerne, Qt %s",
+          qPrintable(sys.osName), qPrintable(sys.cpuArch),
+          sys.cpuCoreCount, qPrintable(sys.qtVersion));
+    if (sys.ramGb > 0.0) {
+        qInfo("RAM: %.1f GB", sys.ramGb);
+    }
+}
 
 // Redact PII from log messages before writing to file.
 // Patterns: IP addresses, MAC addresses.
@@ -202,7 +222,11 @@ int main(int argc, char* argv[])
     // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
     //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
     //   Linux:   nice(-5)  (soft-fail without privilege)
-    //   Windows: SetThreadPriority(HIGHEST)
+    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
+    //            2026-09-03 after a measured ~85ms periodic Windows-only
+    //            audio glitch traced to this thread contending at the
+    //            same tier as audio-critical work (see
+    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
     Longpath::elevateGuiMainThreadPriority();
 
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM
@@ -286,6 +310,8 @@ int main(int argc, char* argv[])
         delete s_logFile;
         s_logFile = nullptr;
     }
+
+    logStartupHardwareInventory();
 
     // Fusion style as a clean cross-platform base, then layer the
     // NereusSDR dark palette + minimal baseline QSS on top so every
@@ -412,6 +438,17 @@ int main(int argc, char* argv[])
     {
         Longpath::MainWindow window;
         window.show();
+
+        // Dev automation bridge (Phase 0: dumpTree + grab + get, read-only) --
+        // off unless explicitly requested, so a normal launch is unaffected.
+        // setRadioModel() is wired unconditionally (cheap, a QPointer store)
+        // so `get` always sees the one true RadioModel -- never a scan of
+        // QApplication::topLevelWidgets() that could pick up a stray one.
+        Longpath::DevAutomationServer automationServer;
+        automationServer.setRadioModel(window.radioModelForTest());
+        if (qEnvironmentVariableIsSet("LONGPATH_AUTOMATION")) {
+            automationServer.start();
+        }
 
         rc = app.exec();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);

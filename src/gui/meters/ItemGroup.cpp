@@ -680,7 +680,11 @@ ItemGroup* ItemGroup::createPowerSwrPreset(const QString& name, QObject* parent)
     pwrBar->setOrientation(BarItem::Orientation::Horizontal);
     pwrBar->setRange(0.0, 120.0);
     pwrBar->setBindingId(MeterBinding::TxPower);
-    pwrBar->setBarColor(QColor(0x00, 0xb4, 0xd8));
+    // War das abgeschaffte Tuerkis (#00b4d8). Dieser Balken zeigt einen
+    // Messwert, keine Bedienung -- Betreiber 2026-09-05: wie HGauge.cpp
+    // auf die Bernstein-Rolle "measured" umstellen (Blau bleibt
+    // "anfassbar").
+    pwrBar->setBarColor(QColor(Style::role("measured", Style::kAmberText)));
     pwrBar->setBarRedColor(QColor(0xff, 0x44, 0x44));
     pwrBar->setRedThreshold(100.0);   // From Thetis: HighPoint = 100W
     pwrBar->setAttackRatio(0.8f);     // From Thetis MeterManager.cs
@@ -730,7 +734,8 @@ ItemGroup* ItemGroup::createPowerSwrPreset(const QString& name, QObject* parent)
     swrBar->setOrientation(BarItem::Orientation::Horizontal);
     swrBar->setRange(1.0, 5.0);
     swrBar->setBindingId(MeterBinding::TxSwr);
-    swrBar->setBarColor(QColor(0x00, 0xb4, 0xd8));
+    // Gleiche Umstellung wie beim PowerBar oben.
+    swrBar->setBarColor(QColor(Style::role("measured", Style::kAmberText)));
     swrBar->setBarRedColor(QColor(0xff, 0x44, 0x44));
     swrBar->setRedThreshold(3.0);     // From Thetis: HighPoint = SWR 3:1
     swrBar->setAttackRatio(0.8f);

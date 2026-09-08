@@ -7,14 +7,20 @@
 //   - RX matrix pin 3 set for 40m → byte 0x08, LED 3 lit (band change wiring).
 //   - TX matrix pin 1 set for 20m → byte 0x02, LED 1 lit only while MOX
 //     is on (RX matrix for same band is different).
+//
+// Bug fix 2026-09-07: this drove the band via addPanadapter() +
+// PanadapterModel::setCenterFrequency(), which is exactly the dead path
+// the fix removed (RadioModel::addPanadapter() has no caller anywhere in
+// the shipped app). Rewired to addSlice() + SliceModel::setFrequency(),
+// matching what OcOutputsHfTab actually listens to now.
 #include <QtTest/QtTest>
 #include <QApplication>
 
 #include "core/OcMatrix.h"
 #include "gui/setup/hardware/OcOutputsHfTab.h"
 #include "models/Band.h"
-#include "models/PanadapterModel.h"
 #include "models/RadioModel.h"
+#include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
 using namespace Longpath;
@@ -32,12 +38,11 @@ private slots:
         }
     }
 
-    // Empty matrix + first-panadapter 20m + MOX=off → byte 0, no LEDs lit.
+    // Empty matrix + first-slice 20m + MOX=off → byte 0, no LEDs lit.
     void empty_matrix_yields_zero_byte()
     {
         RadioModel model;
-        model.addPanadapter();
-        model.panadapters().first()->setCenterFrequency(14.200e6);
+        model.sliceById(model.addSlice())->setFrequency(14.200e6);
         OcOutputsHfTab tab(&model, &model.ocMatrixMutable());
         QCOMPARE(int(tab.currentOcByteForTest()), 0);
         for (int pin = 0; pin < 7; ++pin) {
@@ -49,8 +54,7 @@ private slots:
     void rx_pin_for_current_band_lights_led()
     {
         RadioModel model;
-        model.addPanadapter();
-        model.panadapters().first()->setCenterFrequency(14.200e6);
+        model.sliceById(model.addSlice())->setFrequency(14.200e6);
         model.ocMatrixMutable().setPin(Band::Band20m, /*pin=*/0,
                                         /*tx=*/false, /*enabled=*/true);
         OcOutputsHfTab tab(&model, &model.ocMatrixMutable());
@@ -63,8 +67,8 @@ private slots:
     void band_change_switches_mask()
     {
         RadioModel model;
-        model.addPanadapter();
-        model.panadapters().first()->setCenterFrequency(14.200e6);
+        SliceModel* slice = model.sliceById(model.addSlice());
+        slice->setFrequency(14.200e6);
 
         OcMatrix& m = model.ocMatrixMutable();
         m.setPin(Band::Band20m, /*pin=*/0, /*tx=*/false, true);
@@ -73,7 +77,7 @@ private slots:
         QCOMPARE(int(tab.currentOcByteForTest()), 0x01);  // 20m pin 0
 
         // Setting to 40m RX freq crosses into Band40m.
-        model.panadapters().first()->setCenterFrequency(7.150e6);
+        slice->setFrequency(7.150e6);
         QCOMPARE(int(tab.currentOcByteForTest()), 0x08);  // 40m pin 3
     }
 
@@ -81,8 +85,7 @@ private slots:
     void mox_toggles_rx_tx_matrix()
     {
         RadioModel model;
-        model.addPanadapter();
-        model.panadapters().first()->setCenterFrequency(14.200e6);
+        model.sliceById(model.addSlice())->setFrequency(14.200e6);
 
         OcMatrix& m = model.ocMatrixMutable();
         m.setPin(Band::Band20m, /*pin=*/0, /*tx=*/false, true);  // RX

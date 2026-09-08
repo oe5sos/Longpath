@@ -51,6 +51,7 @@
 class QLabel;
 class QVBoxLayout;
 class QHBoxLayout;
+class QPushButton;
 
 namespace Longpath {
 
@@ -119,16 +120,30 @@ public:
     // hat, es lasse sich nichts abloesen und nichts verschieben: der
     // Weg war gebaut, aber nirgends erreichbar. Der achte Fall dieser
     // Art in diesem Vorhaben.
+    // ── Optionen ─────────────────────────────────────────────────────
+    //
+    // Der Betreiber am 2026-09-08: "generell sollten bei allen widget
+    // die otionen rechts oben zu sehen sein" — "bitte mache das bei
+    // allen widgets". Diese Kopfleiste ist der eine Ort, der das fuer
+    // JEDES Applet auf einmal einloest (siehe Klassenkommentar). Der
+    // Knopf existiert immer, ist aber nur sichtbar, wenn der Inhalt
+    // etwas hat, das er oeffnen kann (AppletWidget::hasExtendedSettings).
+    // Ein Knopf, der ins Leere klickt, waere derselbe Fehler wie beim
+    // Ablöseknopf oben — sichtbar, aber ohne Wirkung.
+
 signals:
     /// Der Nutzer will DIESES Applet als eigenes Fenster.
     void detachRequested(AppletWidget* applet);
     /// Der Nutzer will es ausblenden.
     void hideRequested(AppletWidget* applet);
+    /// Der Nutzer will seine erweiterten Einstellungen sehen.
+    void settingsRequested(AppletWidget* applet);
 
 private:
     void buildCellButtons();
 
     void refreshTitleText();
+    void updateOptionsButtonVisibility();
 
     QString m_id;
     QString m_title;
@@ -138,6 +153,7 @@ private:
     QLabel*      m_titleLabel{nullptr};
     QVBoxLayout* m_contentLayout{nullptr};
     QWidget*     m_trailing{nullptr};
+    class QPushButton* m_btnOptions{nullptr};
 
     QList<QWidget*> m_contents;
 };

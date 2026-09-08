@@ -67,6 +67,14 @@ bool LogEntry::modelsAdifField(const QString& upperName)
         QStringLiteral("QTH"),           QStringLiteral("COUNTRY"),
         QStringLiteral("COMMENT"),       QStringLiteral("TX_PWR"),
         QStringLiteral("APP_NEREUS_QRZUP"),
+        QStringLiteral("MY_SOTA_REF"),   QStringLiteral("SOTA_REF"),
+        // MY_SIG/MY_SIG_INFO/SIG/SIG_INFO are deliberately NOT here.
+        // They are ADIF's generic Special Interest Activity pair, not a
+        // POTA-only field, so whether a given record's SIG value is
+        // "modelled" depends on the VALUE ("POTA" or not), which this
+        // static, name-only check cannot express. AdifLog::parse()
+        // intercepts them itself and hands anything that is not POTA
+        // back to extras rather than losing it — see there.
     };
     return kMine.contains(upperName);
 }
@@ -97,6 +105,19 @@ QString LogEntry::toAdifRecord() const
     field(r, QStringLiteral("RST_RCVD"), rstRcvd);
     field(r, QStringLiteral("GRIDSQUARE"), gridSquare);
     field(r, QStringLiteral("MY_GRIDSQUARE"), myGridSquare);
+    field(r, QStringLiteral("MY_SOTA_REF"), mySotaRef);
+    field(r, QStringLiteral("SOTA_REF"), sotaRef);
+    // POTA: MY_SIG/SIG only appear when there is a park to name them
+    // for — an empty MY_SIG=POTA with no MY_SIG_INFO would be a claim
+    // with nothing behind it.
+    if (!myPotaRef.trimmed().isEmpty()) {
+        field(r, QStringLiteral("MY_SIG"), QStringLiteral("POTA"));
+        field(r, QStringLiteral("MY_SIG_INFO"), myPotaRef);
+    }
+    if (!potaRef.trimmed().isEmpty()) {
+        field(r, QStringLiteral("SIG"), QStringLiteral("POTA"));
+        field(r, QStringLiteral("SIG_INFO"), potaRef);
+    }
     field(r, QStringLiteral("NAME"), name);
     field(r, QStringLiteral("QTH"), qth);
     field(r, QStringLiteral("COUNTRY"), country);

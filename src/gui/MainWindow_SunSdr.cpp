@@ -39,6 +39,7 @@
 #include "core/AudioEngine.h"
 #include "core/FFTEngine.h"
 #include "core/FFTRouter.h"
+#include "core/KiwiSdrManager.h"
 #include "core/LogCategories.h"
 #include "core/TciClient.h"
 #include "models/RadioModel.h"
@@ -230,11 +231,28 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     // aber nicht. Der Rueckfall ueberspringt darum jede echte Scheibe:
     // aktive Scheibe NUR wenn ungebunden, sonst die erste ungebundene,
     // sonst eine neue anlegen.
+    // Bench-gefunden 2026-09-03: derselbe Rueckfall existiert wortgleich
+    // in addKiwiSdrReceiver() (MainWindow_KiwiSdr.cpp) und beide pruefen
+    // nur streamIndex() -- keiner weiss vom Anspruch des jeweils anderen.
+    // KiwiSdrManager::assignSliceToProfile() setzt streamIndex() nie
+    // (sie merkt sich die Zuordnung nur in ihrer eigenen m_sliceAssignments-
+    // Tabelle), eine von Kiwi belegte Scheibe sah fuer diesen Rueckfall
+    // also weiterhin "unbelegt" aus. Ohne diese Pruefung koennte eine
+    // Scheibe gleichzeitig an einen entfernten Kiwi-Empfaenger UND an
+    // wireSunSdrOutboundControl() (also an das echte, angeschlossene
+    // SunSDR) gebunden werden -- danach retunet jede gewoehnliche
+    // Bedienung, die der Betreiber nur dem Kiwi zuschreibt, ueber TCI das
+    // echte Funkgeraet mit.
+    const auto isKiwiClaimed = [this](const SliceModel* s) {
+        return m_kiwiSdrManager && s
+            && !m_kiwiSdrManager->assignedProfileForSlice(s->sliceIndex()).isEmpty();
+    };
+
     SliceModel* slice = m_radioModel->activeSlice();
-    if (slice && slice->streamIndex() >= 0) { slice = nullptr; }
+    if (slice && (slice->streamIndex() >= 0 || isKiwiClaimed(slice))) { slice = nullptr; }
     if (!slice) {
         for (SliceModel* candidate : m_radioModel->slices()) {
-            if (candidate && candidate->streamIndex() < 0) {
+            if (candidate && candidate->streamIndex() < 0 && !isKiwiClaimed(candidate)) {
                 slice = candidate;
                 break;
             }
@@ -294,14 +312,16 @@ void MainWindow::disconnectSunSdr()
     if (m_sunSdrClient) {
         m_sunSdrClient->disconnectFromEndpoint();
     }
-    if (m_radioModel && m_sunSdrTargetSliceId >= 0) {
-        if (AudioEngine* audio = m_radioModel->audioEngine()) {
-            audio->removeSunSdrAudioSource(m_sunSdrTargetSliceId);
-        }
-    }
-    disconnect(m_sunSdrFreqOutConn);
-    disconnect(m_sunSdrModeOutConn);
-    disconnect(m_sunSdrStreamIndexWatchConn);
+    // Bench-gefunden 2026-09-03: dies liess m_sunSdrTargetSliceId
+    // stehen (anders als releaseSunSdrSlice(), das denselben Aufraeum-
+    // Schritt schon tut UND die Kennung zuruecksetzt) -- eine spaetere
+    // RadioModel::streamBindingsChanged-Runde auf einer ganz anderen
+    // Scheibe konnte darum reassertSunSdrRouterMapping() dazu bringen,
+    // den Panadapter erneut an den laengst getrennten SunSDR-Pseudo-
+    // Stream zu haengen. releaseSunSdrSlice() deckt alles ab, was hier
+    // vorher von Hand stand (Ton-Quelle entfernen, die drei
+    // Verbindungen trennen), plus die fehlende Kennungs-Ruecksetzung.
+    releaseSunSdrSlice(QStringLiteral("Trennen (Menü)"));
 }
 
 // Siehe MainWindow.h fuer den Zweck: die EINE Stelle, die "gibt es eine
@@ -312,7 +332,32 @@ void MainWindow::disconnectSunSdr()
 // Fehler jetzt nicht mehr machen, weil er keine Wahl hat.
 SliceModel* MainWindow::sunSdrControllableSlice() const
 {
+    // Betreiber 2026-08-30, in der Nacht: dieselbe Bewachung wie im
+    // TciClient::stateChanged-Handler (ASAN-bestaetigter Heap-UAF, siehe
+    // docs/architecture/2026-08-29-sunsdr-tci-teardown-segfault-investigation.md),
+    // hier zentral statt an jeder Anrufstelle einzeln. "if (!m_radioModel)"
+    // allein schuetzt NICHT: m_radioModel ist ein rohes RadioModel*
+    // (MainWindow.h), kein QPointer, wird beim Abbau also FREIGEGEBEN,
+    // nicht auf nullptr gesetzt. Jeder der sechs Verbraucher dieser
+    // Funktion (deviceDescribed, audioFrameReady, applySunSdrStreamWindow,
+    // applyRemoteSunSdrFrequency, applyRemoteSunSdrModulation) griffe
+    // sonst genau in demselben Reentranz-Fenster auf den freigegebenen
+    // Zeiger zu wie der bereits gefundene Fall -- nur noch nicht mit ASAN
+    // erwischt.
+    if (m_shuttingDown) { return nullptr; }
     if (!m_radioModel || m_sunSdrTargetSliceId < 0) { return nullptr; }
+    // Bench-gefunden 2026-09-03, dann selbst wieder verworfen: ein
+    // erster Anlauf prüfte hier zusätzlich TciClient::state() ==
+    // Connected. Das brach reassertSunSdrRouterMapping()'s eigenen,
+    // ABSICHTLICH synchronen Erstaufruf in wireSunSdr() (Zeile ~771) —
+    // der läuft, bevor connectToEndpoint() überhaupt gerufen wird, also
+    // lange bevor der Client je Connected erreicht (tst_sunsdr_
+    // spectrum_wiring::verbindenSetztDieRouterZuordnungSofort() deckte
+    // das sofort auf). Die eigentliche Lücke (eine stehengebliebene
+    // Zielscheibe nach einer UNERWARTETEN Trennung) wird stattdessen an
+    // ihrer Quelle geschlossen: dem TciClient::stateChanged-Handler in
+    // wireSunSdr(), der jetzt releaseSunSdrSlice() aufruft statt nur
+    // Ton/Router von Hand abzuräumen — siehe dort.
     SliceModel* slice = m_radioModel->sliceById(m_sunSdrTargetSliceId);
     if (!slice || slice->streamIndex() >= 0) { return nullptr; }
     return slice;
@@ -590,6 +635,19 @@ void MainWindow::wireSunSdr()
     // aufgebaut zu werden (siehe removeSunSdrAudioSource).
     connect(m_sunSdrClient, &TciClient::stateChanged, this,
             [this](TciClient::State state, const QString& detail) {
+        // m_shuttingDown guard, same pattern closeEvent() already uses
+        // elsewhere in this class (e.g. the auto-open-ConnectionPanel
+        // slot) — found missing here via a real, ASAN-confirmed
+        // heap-use-after-free, 2026-08-30 (see
+        // docs/architecture/2026-08-29-sunsdr-tci-teardown-segfault-investigation.md).
+        // QObject destroys a parent's children in insertion order, not
+        // a safe one: when MainWindow itself is torn down,
+        // m_radioModel can already be destroyed (freed, not merely
+        // nulled — the `if (m_radioModel ...)` check below does NOT
+        // catch this) by the time m_sunSdrClient's own destructor runs
+        // disconnectFromEndpoint() -> setState() -> this signal,
+        // synchronously, still inside the same teardown cascade.
+        if (m_shuttingDown) { return; }
         if (state == TciClient::State::Error) {
             qCWarning(lcTci) << "SunSDR:" << detail;
             // Derselbe Grund wie bei der Erfolgsmeldung oben: sonst gibt
@@ -607,19 +665,23 @@ void MainWindow::wireSunSdr()
         }
         if (state == TciClient::State::Error
             || state == TciClient::State::Disconnected) {
-            if (m_radioModel && m_sunSdrTargetSliceId >= 0) {
-                if (AudioEngine* audio = m_radioModel->audioEngine()) {
-                    audio->removeSunSdrAudioSource(m_sunSdrTargetSliceId);
-                }
-                // Spiegelbild zum Ton: der Panadapter darf nicht auf
-                // einer Zuordnung stehen bleiben, die niemand mehr
-                // speist -- sonst wuerde reassertSunSdrRouterMapping()
-                // (unten) sie bei jedem echten VFO-Tick munter wieder
-                // herstellen, obwohl TciClient laengst getrennt ist.
-                if (auto* router = m_radioModel->fftRouter()) {
-                    router->removeReceiver(kSunSdrPseudoStreamIndex);
-                }
-            }
+            // Bench-gefunden 2026-09-03: der Kommentar, der hier stand
+            // ("sonst würde reassertSunSdrRouterMapping() sie bei jedem
+            // echten VFO-Tick munter wieder herstellen"), beschrieb die
+            // Absicht richtig, aber der Code darunter hat sie nie
+            // eingelöst — er entfernte Ton-Quelle und Router-Zuordnung,
+            // liess m_sunSdrTargetSliceId aber stehen. sunSdrControllableSlice()
+            // (der einzige Torwaechter, den reassertSunSdrRouterMapping()
+            // fragt) sah die Zielscheibe darum weiterhin als gueltig an
+            // -- ein spaeterer, voellig unabhaengiger VFO-Tick auf IRGEND-
+            // einer echten Scheibe holte die gerade entfernte Zuordnung
+            // postwendend zurueck, obwohl TciClient laengst getrennt war.
+            // releaseSunSdrSlice() deckt beide Aufraeumschritte ab, die
+            // hier vorher von Hand standen, UND setzt die Kennung zurueck
+            // -- derselbe Fund/derselbe Fix wie bei disconnectSunSdr().
+            releaseSunSdrSlice(state == TciClient::State::Error
+                                    ? QStringLiteral("Verbindungsfehler")
+                                    : QStringLiteral("Verbindung getrennt"));
         }
     });
 

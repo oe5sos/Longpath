@@ -12,6 +12,7 @@
 #include <QSignalSpy>
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "gui/widgets/CommandBar.h"
 
 using namespace Longpath;
 
@@ -411,6 +412,125 @@ private slots:
 
         sa->setNb1Threshold(250);
         QCOMPARE(sb->nb1Threshold(), 30);
+    }
+
+    // ── CommandBar attach() vs. addSlice()s Kennung-Wiederverwendung ──
+    //
+    // Bench-Fund 2026-09-07 (siehe tst_command_bar.cpp,
+    // danglingSliceLeavesNothingLitInsteadOfTwoPillsLit): live gegen ein
+    // ANAN 10E zeigte die CommandBar-Modusgruppe zwei Knoepfe gleichzeitig
+    // als aktiv, nachdem zwischenzeitlich ein KiwiSDR-Profil eine "virtuelle"
+    // Scheibe mit Kennung 0 angelegt hatte. Der urspruengliche Verdacht war,
+    // dass RadioModel::addSlice()s Strategie "niedrigste freie Kennung
+    // zuerst" (siehe reAddedSliceDoesNotCollideWithASurvivor oben) eine an
+    // die ALTE Scheibe angehaengte CommandBar unbemerkt auf einem bereits
+    // geloeschten Objekt sitzen liesse, weil RadioModel::activeSliceChanged
+    // beim Wiederverwenden der Kennung nicht (erneut) feuert.
+    //
+    // Dieser Test verdrahtet CommandBar::attach() wortgleich zu
+    // MainWindow.cpp (activeSliceChanged -> attach(radio.activeSlice())) und
+    // faehrt genau diese Wiederverwendung nach. Er haelt fest, dass die
+    // JETZIGE Verdrahtung die Neuanheftung bereits korrekt leistet, sooft
+    // die entfernte Scheibe die AKTIVE war (removeSlice()'s einziger
+    // Aufrufer, MainWindow.cpp's "Remove active slice", entfernt immer nur
+    // die aktive) -- und schuetzt diese Eigenschaft vor einer kuenftigen
+    // Regression in addSlice()/removeSlice()s Behandlung von m_activeSlice.
+    void reusedSliceIdIsCaughtByTheActiveSliceSignal()
+    {
+        RadioModel radio;
+        radio.configureStreamPool(5, 5, 192000);
+
+        CommandBar bar;
+        QObject::connect(&radio, &RadioModel::activeSliceChanged,
+                          [&](int) {
+            // Wortgleich zu MainWindow.cpp: attach() laeuft unconditional,
+            // auch mit nullptr, damit die Leiste nie an einer verschwindenden
+            // Scheibe haengen bleibt (siehe CommandBar.cpp pullFromModel()).
+            bar.attach(radio.activeSlice());
+        });
+
+        const int a = radio.addSlice();
+        SliceModel* sliceA = radio.sliceById(a);
+        QVERIFY(sliceA);
+        sliceA->setDspMode(DSPMode::DIGL);
+        QCOMPARE(bar.activePill(QStringLiteral("Mode")),
+                 QStringLiteral("DIGL"));
+
+        const int b = radio.addSlice();
+        SliceModel* sliceB = radio.sliceById(b);
+        QVERIFY(sliceB);
+        // B does not steal activity from A just by existing.
+        QCOMPARE(radio.activeSlice(), sliceA);
+
+        // A (active) goes away; B becomes active, and the wiring above must
+        // move the bar onto it before A is actually destroyed.
+        radio.removeSlice(a);
+        QCOMPARE(radio.activeSlice(), sliceB);
+
+        // addSlice() hands the freed id (0) to a BRAND NEW C++ object, not
+        // the one the bar was ever attached to.
+        const int reused = radio.addSlice();
+        QCOMPARE(reused, a);
+        QVERIFY(radio.sliceById(reused) != sliceA);
+
+        // The bar must still speak for the truly active slice (B) -- not a
+        // dangling reference to the deleted A, and not a mistaken binding to
+        // the reused-id newcomer, which never became active.
+        sliceB->setDspMode(DSPMode::CWU);
+        QCOMPARE(bar.activePill(QStringLiteral("Mode")),
+                 QStringLiteral("CWU"));
+
+        QVERIFY(bar.clickPill(QStringLiteral("Mode"), QStringLiteral("LSB")));
+        QCOMPARE(sliceB->dspMode(), DSPMode::LSB);
+    }
+
+    // ── setActiveSlice(int) is positional, setActiveSliceById() is not ──
+    //
+    // RadioModel::connectToRadio() used to call the positional
+    // setActiveSlice(0), intending "activate Slice A" (sliceIndex() == 0).
+    // That is only the same slice as m_slices.at(0) while id 0 has never
+    // been removed and re-created -- exactly the divergence two OTHER call
+    // sites in MainWindow.cpp (band click, VFO focus) already route around
+    // via setActiveSliceById(), per their own comments there. Fixed
+    // 2026-09-07 alongside the CommandBar stale-attachment bug (see
+    // tst_command_bar.cpp danglingSliceLeavesNothingLitInsteadOfTwoPillsLit)
+    // as a related, separately-found latent bug in the same neighbourhood.
+    //
+    // This test reproduces the divergence directly on the model: after A is
+    // removed and re-added, id 0 sits at the END of m_slices, not the front,
+    // so the positional and by-id forms disagree about which slice "0" means.
+    void activatingSliceZeroFindsTheIdEvenAfterAPositionShift()
+    {
+        RadioModel radio;
+        radio.configureStreamPool(5, 5, 192000);
+
+        const int a = radio.addSlice();   // id 0, position 0 -- becomes active
+        const int b = radio.addSlice();   // id 1, position 1
+        QCOMPARE(radio.activeSlice(), radio.sliceById(a));
+
+        // Remove A (the active one). B becomes active and slides to
+        // position 0.
+        radio.removeSlice(a);
+        QCOMPARE(radio.slices().at(0), radio.sliceById(b));
+
+        // Re-create id 0 via the lowest-free-id reuse strategy. It is
+        // appended at the END of the list -- position 1, not 0. B still
+        // holds position 0.
+        const int reAdded = radio.addSlice();
+        QCOMPARE(reAdded, a);
+        QCOMPARE(radio.slices().at(0), radio.sliceById(b));
+        QCOMPARE(radio.slices().at(1), radio.sliceById(reAdded));
+
+        // The bug, made concrete: the positional form activates whichever
+        // slice sits at position 0 -- here, B, not "Slice A".
+        radio.setActiveSlice(0);
+        QCOMPARE(radio.activeSlice(), radio.sliceById(b));
+
+        // The fix: resolving by id activates the slice actually named 0,
+        // wherever it now sits in the list.
+        QVERIFY(radio.setActiveSliceById(0));
+        QCOMPARE(radio.activeSlice(), radio.sliceById(reAdded));
+        QVERIFY(radio.activeSlice() != radio.sliceById(b));
     }
 
     // Single-slice operation is untouched: slice A is still id 0 and still

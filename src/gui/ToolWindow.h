@@ -67,6 +67,20 @@ public:
     /// Panadapterfenstern (2026-08-20).
     void applyDefaultSize(const QSize& want);
 
+    /// Betreiber 2026-08-31: "rotor... immer anders als abgespeichert".
+    /// closeEvent() bat bislang IMMER ums Zurueckdocken, auch wenn
+    /// MainWindow gerade beendet und dieses Fenster nur mit abraeumt --
+    /// derselbe Fehler, den PanFloatingWindow schon 2026-08-22 gelöst
+    /// hatte (siehe dort). Ohne diese Sperre lief beim Beenden per rotem
+    /// Punkt ganz normal dockRotorPanel(), das schreibt
+    /// RotorFloating=False in AppSettings -- ein zweiter, vom Profil
+    /// UNABHAENGIGER Schalter, der beim naechsten Start VOR jedem Profil
+    /// geprueft wird und dessen (richtig gespeicherten) Schwebe-Zustand
+    /// damit überstimmt. Log-Beweis 2026-08-31 15:32:11: "ToolWindow::
+    /// closeEvent() fuer RotorLog -- emittiert dockRequested" lief
+    /// waehrend des ganz normalen Herunterfahrens.
+    void setShuttingDown(bool on) { m_shuttingDown = on; }
+
 signals:
     /// Schliessen HEISST andocken: ein Werkzeug, das man wegklickt und
     /// das danach nirgends mehr auftaucht, ist verloren.
@@ -74,6 +88,8 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent* ev) override;
+    void moveEvent(QMoveEvent* ev) override;
+    void resizeEvent(QResizeEvent* ev) override;
 
 private:
     // Lage/Groesse merken -- ohne das reisst jedes Andocken/Abloesen die
@@ -81,6 +97,16 @@ private:
     // Bildschirm, oft genau ueber dem Verbinden-Dialog (Betreiber,
     // 2026-08-28: "wieder hier"). Dasselbe Muster wie LogbookWindow /
     // AntennaWindow / SpotHubDialog.
+    //
+    // Betreiber 2026-08-31: "die ausrichtung des rotors passt nie" /
+    // "automatisch wird auch nie etwas gespeichert obwohl ich auf
+    // sichern gehen" -- bis hierher lief saveGeometryState() nur beim
+    // Andocken (releaseContent(), siehe .cpp). Rotor/Log bleibt aber im
+    // dokumentierten Normalfall DAUERHAFT schwebend und wird nie
+    // angedockt -- der einzige Speicherpfad griff damit praktisch nie.
+    // PanFloatingWindow und AppletFloatingWindow sichern deshalb schon
+    // laenger bei jedem Ziehen/Groessern per move-/resizeEvent; dieselbe
+    // Lehre fehlte hier bislang.
     void saveGeometryState();
     void restoreGeometryState();
 
@@ -88,6 +114,7 @@ private:
     QString           m_id;
     WindowTitleBar*   m_titleBar{nullptr};
     bool              m_sizedOnce{false};
+    bool              m_shuttingDown{false};
 };
 
 } // namespace Longpath

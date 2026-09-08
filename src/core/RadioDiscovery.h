@@ -74,9 +74,19 @@ mw0lge@grange-lane.co.uk
 namespace Longpath {
 
 // Protocol version supported by the radio.
+//
+// SunSdr is not an OpenHPSDR protocol at all — it is SunSDR2's own
+// native UDP wire protocol (design doc
+// docs/architecture/2026-08-24-sunsdr-native-driver-design.md). It sits
+// in this enum because RadioConnection::create() and BoardCapabilities
+// both key off it as "which wire format", and there is no broadcast
+// discovery for this protocol (the radio's IP is supplied out-of-band,
+// same design doc) — see AddCustomRadioDialog's manual-entry path,
+// plan docs/architecture/2026-08-26-sunsdr-connection-plan.md §Phase A.
 enum class ProtocolVersion : int {
     Protocol1 = 1,
-    Protocol2 = 2
+    Protocol2 = 2,
+    SunSdr    = 3
 };
 
 // Information about a discovered OpenHPSDR radio.
@@ -85,7 +95,7 @@ struct RadioInfo {
     QString name;                        // User-friendly name, e.g. "ANAN-G2"
     QString macAddress;                  // MAC as "AA:BB:CC:DD:EE:FF" (primary key)
     QHostAddress address;                // IP address on local network
-    quint16 port{1024};                  // Always 1024 for OpenHPSDR
+    quint16 port{1024};                  // 1024 for OpenHPSDR (P1/P2); SunSdr uses 50001 (control)
 
     // Hardware
     HPSDRHW boardType{HPSDRHW::Unknown};
@@ -226,10 +236,13 @@ public:
     }
     void forceStaleCheckForTest() { onStaleCheck(); }
 
-    // The holdOffScans deadline is process-wide (see s_scanHoldOff), so it
-    // survives across test functions and would defer probes in unrelated
-    // cases. Call from a QTest init() for a clean slate.
-    static void clearHoldOffForTest() { s_scanHoldOff = QDeadlineTimer(); }
+    // The holdOffScans deadline is process-wide (see s_scanHoldOff) AND, as
+    // of 2026-09-05, mirrored into a cross-process shared-memory segment
+    // (see the anonymous-namespace helpers in RadioDiscovery.cpp) — either
+    // one surviving across test functions would defer probes in unrelated
+    // cases. Call from a QTest init() for a clean slate. Defined in the .cpp
+    // file because clearing the shared segment needs those TU-local helpers.
+    static void clearHoldOffForTest();
 #endif
 
     // Public static parsers — exposed for unit-testing in Task 5.

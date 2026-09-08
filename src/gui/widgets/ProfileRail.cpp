@@ -153,7 +153,7 @@ void ProfileRail::rebuild()
             x->setToolTip(QStringLiteral("Profil „%1\u201C loeschen").arg(name));
             x->setStyleSheet(QStringLiteral(
                 "QPushButton { background: %1; color: %2; border: none;"
-                "  border-radius: 7px; font-size: 10px; font-weight: bold; }"
+                "  border-radius: 7px; font-size: 11px; font-weight: bold; }"
                 "QPushButton:hover { background: %3; color: #ffffff; }")
                     .arg(QString::fromLatin1(Style::kButtonBg),
                          QString::fromLatin1(Style::kTextSecondary),
@@ -207,6 +207,8 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     // dort erscheinen, sonst waere "Jetzt sichern" auf einem anderen
     // Abzeichen ein Versprechen, das der Aufruf gar nicht einloest.
     save->setEnabled(m_profiles && m_profiles->current() == name);
+    QAction* exportToDesktop = menu.addAction(QStringLiteral("Auf Schreibtisch sichern…"));
+    QAction* importFromDesktop = menu.addAction(QStringLiteral("Vom Schreibtisch laden…"));
     menu.addSeparator();
     QAction* ren = menu.addAction(QStringLiteral("Umbenennen…"));
     QAction* dup = menu.addAction(QStringLiteral("Duplizieren…"));
@@ -218,6 +220,8 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
 
     QAction* chosen = menu.exec(globalPos);
     if (chosen == save)      { emit saveRequested(name); }
+    else if (chosen == exportToDesktop) { emit exportRequested(name); }
+    else if (chosen == importFromDesktop) { emit importRequested(name); }
     else if (chosen == ren)  { emit renameRequested(name); }
     else if (chosen == dup)  { emit duplicateRequested(name); }
     else if (chosen == del)  { emit removeRequested(name); }

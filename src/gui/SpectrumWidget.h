@@ -164,6 +164,7 @@ mw0lge@grange-lane.co.uk
 #include <QTimer>
 #include <QPropertyAnimation>
 
+#include "gui/DssRenderer.h"
 #include "gui/StyleConstants.h"   // kAmberText — Vorgabe des Spot-Tons
 #include "gui/WaterfallHistoryBuffer.h"
 #include "spectrum/ActivePeakHoldTrace.h"
@@ -232,6 +233,15 @@ enum class WfColorScheme : int {
     // Anwender das Schema verschieben.
     Muted,
     Count
+};
+
+// Spectrum-trace display mode. Mode3D swaps the flat FFT trace pipeline for
+// a perspective stacked-trace surface (ported from AetherSDR's "3DSS" —
+// see DssRenderer.h); the waterfall and every other overlay keep rendering
+// exactly as in Mode2D. Stored as int in AppSettings, so append only.
+enum class SpectrumRenderMode : int {
+    Mode2D = 0,
+    Mode3D,
 };
 
 // Frequency label alignment for the bottom scale bar.
@@ -400,6 +410,10 @@ public:
     float refLevel() const { return m_refLevel; }
     float dynamicRange() const { return m_dynamicRange; }
 
+    // ---- 3D stacked-trace view ----
+    void setSpectrumRenderMode(SpectrumRenderMode mode);
+    SpectrumRenderMode spectrumRenderMode() const { return m_renderMode; }
+
     // ---- Waterfall settings ----
     void setWfColorScheme(WfColorScheme scheme);
     WfColorScheme wfColorScheme() const { return m_wfColorScheme; }
@@ -407,6 +421,14 @@ public:
     int  wfColorGain() const { return m_wfColorGain; }
     void setWfBlackLevel(int level);
     int  wfBlackLevel() const { return m_wfBlackLevel; }
+
+    // Display-Flyout auf/zu (der Pfeil-Knopf links oben im Panel) --
+    // reines Chrome, keine Wasserfall-Eigenschaft, aber vom selben Fehler
+    // betroffen: SpectrumOverlayPanel::collapsed() wurde nie irgendwohin
+    // verdrahtet (aehnlich dem B8-Task-20-Fund bei WF Gain/Black Lvl/
+    // Farbschema), der Zustand ging also nie in die Einstellungen.
+    void setOverlayPanelExpanded(bool expanded);
+    bool overlayPanelExpanded() const { return m_overlayPanelExpanded; }
 
     // ---- Spectrum renderer controls (Phase 3G-8 commit 3) ----
 
@@ -2219,6 +2241,13 @@ private:
     QVector<float> m_wfRenderedPixels;     // waterfall avenger output (dBm)
     int m_displayWidthOverrideForTest{0};  // 0 = off; see setDisplayWidthOverrideForTest()
 
+    // ---- 3D stacked-trace view (DssRenderer) ----
+    // Fed from m_renderedPixels (see updateSpectrumLinear) only while
+    // m_renderMode is Mode3D -- no cost to sessions that never enable it.
+    SpectrumRenderMode m_renderMode{SpectrumRenderMode::Mode2D};
+    DssRenderer m_dss;
+    bool m_dss3dNeedsUpload{false};  // set on pushRow, cleared after GPU upload
+
     // Equivalent Noise Bandwidth of the current FFT window, in bins.
     // Refreshed every frame via the windowEnb arg on fftReadyLinear so
     // the detector's invEnb scaling stays in lock-step with the bins it
@@ -2334,6 +2363,7 @@ private:
     WfColorScheme m_wfColorScheme{WfColorScheme::Default};
     int    m_wfColorGain{45};         // 0-100
     int    m_wfBlackLevel{104};       // 0-125 — keep in sync with loadSettings ship default
+    bool   m_overlayPanelExpanded{true};
     // Waterfall uses its own dBm range (narrower than spectrum for better contrast).
     // Persistent user-configured thresholds (saved/loaded as DisplayWfHigh/LowLevel).
     // Ship defaults — keep in sync with loadSettings (SpectrumWidget.cpp)
@@ -2997,6 +3027,21 @@ private:
     // Default matches Style::kRxFilterOverlayFill = "rgba(0, 180, 216, 80)".
     QColor  m_rxFilterColor{0x00, 0xb4, 0xd8, 80};
 
+    // ── Bewusst AUSSERHALB des GPU-Gates ────────────────────────────
+    //
+    // Die folgenden Felder sind einfache Daten, keine QRhi-Objekte, und
+    // ihre Zugriffsfunktionen weiter oben stehen ebenfalls ungeschuetzt
+    // (backgroundImagePath(), backgroundOpacity(), backgroundBrightness(),
+    // backgroundFillColor(), waterfallBackgroundFillColor(),
+    // visibleBinCountForTest()). Lagen sie im #ifdef, liess sich Longpath
+    // mit -DNEREUS_GPU_SPECTRUM=OFF ueberhaupt nicht uebersetzen: sechs
+    // Zugriffe auf Member, die es in dieser Uebersetzung nicht gibt.
+    //
+    // Genau daran ist der ARM-Linux-Bau von v0.6.3-rc1 gescheitert — dort
+    // fehlten die Vulkan-Header, CMake hat QRhi abgeschaltet (CMakeLists
+    // :434-467), und der CPU-Pfad, den Zeile 417 ausdruecklich anbietet,
+    // baute nicht. Wer hier etwas hinzufuegt, das die Zugriffsfunktionen
+    // sehen, laesst es ausserhalb des Gates.
     // ── Frei waehlbarer Hintergrund ──────────────────────────────────
     //
     // Port aus AetherSDR SpectrumWidget: setBackgroundImage /
@@ -3027,25 +3072,28 @@ private:
     QColor  m_bgFillColor{QColor(Style::kPanadapterBg)};
     QColor  m_wfBgFillColor{QColor(Style::kAppBg)};
     int     m_bgBrightnessPct{100};
-    // Bins rendered this frame (GPU draw-call count). visibleBinCountForTest()
-    // above reads it unconditionally, so -- same reason as the background
-    // members -- it lives here rather than inside the GPU-only block below.
-    int m_visibleBinCount{0};
 
-    // A second wave of the same stranding bug as the background block
-    // above: these are plain widget/interaction state used from CPU-path
-    // (and shared GPU+CPU) code -- overlay dirty flags, the waterfall
-    // stale-data timestamp, shutdown/drag state -- not GPU resources, but
-    // they were declared inside #ifdef NEREUS_GPU_SPECTRUM below anyway.
-    // Found via a systematic sweep of every member in that block against
-    // its actual (non-comment) usage sites in SpectrumWidget.cpp, after
-    // the ubuntu-24.04-arm CPU-only build (-DNEREUS_GPU_SPECTRUM=OFF) hit
-    // several of these one compile error at a time.
-    bool   m_wfTexFullUpload{true};
+    int m_visibleBinCount{0};  // bins rendered this frame (for draw call count)
+
+    // Ebenfalls ausserhalb, aus demselben Grund: der CPU-Pfad in
+    // SpectrumWidget.cpp fasst diese Felder ungeschuetzt an. Sie lagen
+    // im Gate, weil sie dort entstanden sind — nicht, weil sie die GPU
+    // braeuchten. Ein Bau ohne QRhi meldete darauf 35 Fehler. Gefunden per
+    // systematischem Abgleich jedes Members in diesem Block gegen seine
+    // echten Verwendungsstellen in SpectrumWidget.cpp, nachdem der
+    // ubuntu-24.04-arm-Bau (-DNEREUS_GPU_SPECTRUM=OFF, aeltere Qt-Version
+    // ohne QRhiWidget) daran einen Fehler nach dem anderen meldete.
+
+    /// Wasserfall-Textur beim naechsten Bild vollstaendig hochladen.
+    /// Der CPU-Pfad setzt die Fahne beim Groessenwechsel mit.
+    bool m_wfTexFullUpload{true};
     /// Wann zuletzt ECHTE Spektrumdaten ankamen (ms seit Epoche).
     /// Der Wasserfall friert ein, wenn der Strom abreisst — siehe
     /// pushWaterfallRow().
     qint64 m_lastSpectrumArrivalMs{0};
+
+    /// Statische Einblendungen neu zeichnen (Gitter, Beschriftung,
+    /// dBm-Leiste). Auf dem CPU-Pfad ohne Wirkung, aber gesetzt.
     bool   m_overlayStaticDirty{true};
     bool   m_shutdownPrepared{false};
     // ── Der VFO-Zug rechnet RELATIV zum Startpunkt ───────────────────
@@ -3103,6 +3151,7 @@ private:
     /// Welche Einblendung gerade gezogen wird (-1 = keine).
 
     QImage m_overlayStatic;
+
     bool   m_overlayNeedsUpload{true};
 
     // 2026-05-26 KG4VCF dual-layer overlay split.
@@ -3133,6 +3182,15 @@ private:
     // texture is undefined until it has (the 2026-08-11 magenta
     // waterfall). True initially so the very first upload is full.
     bool   m_ovDynNeedsFullUpload{true};
+
+    // ---- 3D stacked-trace GPU resources ----
+    // No new pipeline or shader: DssRenderer paints a QImage on the CPU,
+    // uploaded into this texture and drawn through the EXISTING overlay
+    // pipeline/VBO (m_ovPipeline/m_ovVbo) with the viewport clipped to
+    // specRect, in place of the FFT trace draws.
+    QRhiShaderResourceBindings* m_dss3dSrb{nullptr};
+    QRhiTexture*                m_dss3dGpuTex{nullptr};
+    QSize                       m_dss3dGpuTexSize;
 
     // 2026-05-25 perf fix: timestamp of the last per-frame "dynamic
     // overlay" force-dirty in updateSpectrumLinear.  Rate-limits the

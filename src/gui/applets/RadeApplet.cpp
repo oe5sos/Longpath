@@ -55,7 +55,7 @@ QString formatSnr(double db)
 QString snrColour(double db)
 {
     if (qIsNaN(db)) {
-        return QStringLiteral("#708090");
+        return QString::fromLatin1(Style::kTextScale);
     }
     return (db < kGoodSnrDb) ? QStringLiteral("#c2924f")
                              : QStringLiteral("#6fa384");
@@ -122,8 +122,9 @@ void RadeApplet::buildUI()
 
         m_snrLabel = new QLabel(QStringLiteral(" -   - "), body);
         m_snrLabel->setStyleSheet(Style::themed(QStringLiteral(
-            "QLabel { color: #708090; font-size: 11px; "
-            "font-weight: bold; background: transparent; }")));
+            "QLabel { color: %1; font-size: 11px; "
+            "font-weight: bold; background: transparent; }")
+                .arg(QString::fromLatin1(Style::kTextScale))));
         m_snrLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
         row->addWidget(m_syncIndicator);

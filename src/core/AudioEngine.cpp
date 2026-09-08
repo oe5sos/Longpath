@@ -159,6 +159,57 @@ AudioFormat toAudioFormat(const AudioDeviceConfig& cfg)
     return f;
 }
 
+// 2026-09-06 race fix (AudioEngine::m_qsoTap / m_asrTap / m_wavRecordTap /
+// m_rttyTap). Called from rxBlockReady() on the real audio thread for each
+// of the four taps. `busy` is announced BEFORE the tap pointer is read and
+// cleared AFTER write() returns, so waitForTapQuiescence() below can tell
+// whether a write() using the old ring is still in flight the instant
+// setXxxTap(nullptr, ...) has published the null pointer.
+//
+// seq_cst (not the acquire/release used elsewhere in this file) is
+// required on both the busy RMWs and the tap-pointer load/store: this is a
+// coordination between TWO different atomics (`tapAtomic` and `busy`), and
+// only a single total order across all seq_cst operations guarantees that
+// a caller which observes busy == 0 after publishing the null pointer
+// cannot still race a fresh rxBlockReady call that has not yet announced
+// itself — a plain release store to `tapAtomic` gives no such guarantee on
+// its own (store-buffering can let another core's load stay stale past an
+// unrelated atomic's fence). See waitForTapQuiescence() for the other half.
+void writeToTapIfCurrent(std::atomic<AudioTapRing*>& tapAtomic,
+                          std::atomic<int>& tapSliceAtomic,
+                          std::atomic<unsigned>& busy,
+                          int sliceId, const float* samples, int frames,
+                          const std::function<void()>& testDelayHook = {})
+{
+    busy.fetch_add(1, std::memory_order_seq_cst);
+    if (AudioTapRing* tap = tapAtomic.load(std::memory_order_seq_cst)) {
+        if (sliceId == tapSliceAtomic.load(std::memory_order_acquire)) {
+            // Test-only seam: no-op outside tests. See
+            // AudioEngine::setTapWriteDelayHookForTest.
+            if (testDelayHook) {
+                testDelayHook();
+            }
+            tap->write(samples, frames * 2);
+        }
+    }
+    if (busy.fetch_sub(1, std::memory_order_seq_cst) == 1) {
+        busy.notify_all();
+    }
+}
+
+// Other half of the handshake above. Call AFTER publishing the tap pointer
+// as nullptr (seq_cst store) — blocks the control thread until no
+// concurrent writeToTapIfCurrent() call can still be holding the old,
+// about-to-be-freed ring.
+void waitForTapQuiescence(std::atomic<unsigned>& busy)
+{
+    unsigned inFlight = busy.load(std::memory_order_seq_cst);
+    while (inFlight != 0) {
+        busy.wait(inFlight, std::memory_order_seq_cst);
+        inFlight = busy.load(std::memory_order_seq_cst);
+    }
+}
+
 } // namespace
 
 AudioEngine::AudioEngine(QObject* parent)
@@ -551,6 +602,11 @@ std::unique_ptr<IAudioBus> AudioEngine::makeBus(const AudioDeviceConfig& cfg,
     pcfg.direction     = capture ? AudioDirection::Input
                                  : AudioDirection::Output;
     pcfg.hostApiIndex  = cfg.hostApiIndex;
+    // Den Namen mitgeben, nicht nur den Index: loadFromSettings liefert
+    // hostApiIndex grundsaetzlich als -1 zurueck, weil ein PortAudio-Index
+    // zwischen zwei Starts nichts bedeutet. Ohne den Namen kann der Bus die
+    // gespeicherte Wahl nicht wiederherstellen.
+    pcfg.driverApi     = cfg.driverApi;
     pcfg.deviceName    = cfg.deviceName;
     pcfg.bufferSamples = cfg.bufferSamples;
     pcfg.exclusiveMode = cfg.exclusiveMode;
@@ -1075,8 +1131,11 @@ void AudioEngine::setQsoTap(AudioTapRing* ring, int sliceId)
         m_qsoTapSlice.store(sliceId, std::memory_order_release);
         m_qsoTap.store(ring, std::memory_order_release);
     } else {
-        m_qsoTap.store(nullptr, std::memory_order_release);
+        m_qsoTap.store(nullptr, std::memory_order_seq_cst);
         m_qsoTapSlice.store(-1, std::memory_order_release);
+        // 2026-09-06 race fix: wait for any write() already in flight on
+        // the audio thread before letting the caller free the ring.
+        waitForTapQuiescence(m_qsoTapBusy);
     }
 }
 
@@ -1089,8 +1148,11 @@ void AudioEngine::setAsrTap(AudioTapRing* ring, int sliceId)
         m_asrTapSlice.store(sliceId, std::memory_order_release);
         m_asrTap.store(ring, std::memory_order_release);
     } else {
-        m_asrTap.store(nullptr, std::memory_order_release);
+        m_asrTap.store(nullptr, std::memory_order_seq_cst);
         m_asrTapSlice.store(-1, std::memory_order_release);
+        // 2026-09-06 race fix: wait for any write() already in flight on
+        // the audio thread before letting the caller free the ring.
+        waitForTapQuiescence(m_asrTapBusy);
     }
 }
 
@@ -1101,8 +1163,26 @@ void AudioEngine::setWavRecordTap(AudioTapRing* ring, int sliceId)
         m_wavRecordTapSlice.store(sliceId, std::memory_order_release);
         m_wavRecordTap.store(ring, std::memory_order_release);
     } else {
-        m_wavRecordTap.store(nullptr, std::memory_order_release);
+        m_wavRecordTap.store(nullptr, std::memory_order_seq_cst);
         m_wavRecordTapSlice.store(-1, std::memory_order_release);
+        // 2026-09-06 race fix: wait for any write() already in flight on
+        // the audio thread before letting the caller free the ring.
+        waitForTapQuiescence(m_wavRecordTapBusy);
+    }
+}
+
+void AudioEngine::setRttyTap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie bei den anderen Abgriffen.
+    if (ring) {
+        m_rttyTapSlice.store(sliceId, std::memory_order_release);
+        m_rttyTap.store(ring, std::memory_order_release);
+    } else {
+        m_rttyTap.store(nullptr, std::memory_order_seq_cst);
+        m_rttyTapSlice.store(-1, std::memory_order_release);
+        // 2026-09-06 race fix: wait for any write() already in flight on
+        // the audio thread before letting the caller free the ring.
+        waitForTapQuiescence(m_rttyTapBusy);
     }
 }
 
@@ -1304,29 +1384,32 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // Kein Signal, kein Schloss, keine Speicheranforderung. Der Zeiger
     // wird bei jedem Block neu gelesen, damit Abschalten sofort wirkt.
     // Ueberlauf verwirft und zaehlt — siehe AudioTapRing::dropped().
-    if (AudioTapRing* tap = m_qsoTap.load(std::memory_order_acquire)) {
-        if (sliceId == m_qsoTapSlice.load(std::memory_order_acquire)) {
-            tap->write(samples, frames * 2);
-        }
-    }
+    //
+    // writeToTapIfCurrent (2026-09-06 race fix) announces itself in the
+    // matching m_xxxTapBusy counter before reading the pointer, so
+    // setXxxTap(nullptr, ...) can safely wait for this call to finish
+    // before its caller frees or reuses the ring.
+    writeToTapIfCurrent(m_qsoTap, m_qsoTapSlice, m_qsoTapBusy, sliceId,
+                        samples, frames, m_tapWriteDelayHookForTest);
 
     // Der Abgriff fuer die Spracherkennung. Getrennt vom QSO-Abgriff,
     // damit Aufnahme und Erkennung nebeneinander laufen koennen — ein
     // geteilter Ring haette einen Leser zu wenig.
-    if (AudioTapRing* tap = m_asrTap.load(std::memory_order_acquire)) {
-        if (sliceId == m_asrTapSlice.load(std::memory_order_acquire)) {
-            tap->write(samples, frames * 2);
-        }
-    }
+    writeToTapIfCurrent(m_asrTap, m_asrTapSlice, m_asrTapBusy, sliceId,
+                        samples, frames, m_tapWriteDelayHookForTest);
 
     // Der Abgriff fuer die "off the air"-WAV-Aufnahme (Phase 3M).
     // Wieder ein eigener Ring, aus demselben Grund wie beim
     // ASR-Abgriff. Design doc: phase3m-recording-design.md §7.1.
-    if (AudioTapRing* tap = m_wavRecordTap.load(std::memory_order_acquire)) {
-        if (sliceId == m_wavRecordTapSlice.load(std::memory_order_acquire)) {
-            tap->write(samples, frames * 2);
-        }
-    }
+    writeToTapIfCurrent(m_wavRecordTap, m_wavRecordTapSlice,
+                        m_wavRecordTapBusy, sliceId, samples, frames,
+                        m_tapWriteDelayHookForTest);
+
+    // Der Abgriff fuer den nativen RTTY-Decoder (2026-09-06). Wieder ein
+    // eigener Ring, aus demselben Grund wie bei den anderen drei.
+    // Design doc: 2026-09-06-rtty-decoder-scoping.md.
+    writeToTapIfCurrent(m_rttyTap, m_rttyTapSlice, m_rttyTapBusy, sliceId,
+                        samples, frames, m_tapWriteDelayHookForTest);
 
     // Flush synchronously on the DSP thread. thread_local scratch so the
     // per-block vector reuse costs zero allocation after the first block

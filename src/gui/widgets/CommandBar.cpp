@@ -598,7 +598,24 @@ void CommandBar::pushBandToModel(Band band)
 
 void CommandBar::pullFromModel()
 {
-    if (!m_slice) { return; }
+    if (!m_slice) {
+        // Ohne Modell darf keine Pille etwas behaupten. Vorher liess diese
+        // Wache den Checked-Zustand von VOR dem Verschwinden der Scheibe
+        // stehen -- und ein Klick auf eine ANDERE Pille in derselben
+        // Gruppe zeigte danach zwei gleichzeitig an: Qt schaltet den
+        // eigenen Haken jedes checkable QPushButton beim Klick IMMER um
+        // (kein QButtonGroup-Exklusivitaet hier), unabhaengig davon, ob
+        // der verbundene Slot (pushModeToModel & Co., auch ueber diese
+        // Funktion) mangels Modell etwas bewirkt.
+        //
+        // Live gegen ein angeschlossenes ANAN 10E gefunden (2026-09-07):
+        // LSB und DIGL gleichzeitig als aktiv angezeigt, waehrend
+        // SliceModel::dspMode() der echten, aktiven Scheibe durchgehend
+        // DIGL blieb -- die Leiste hing an einer Scheibe, die verschwunden
+        // war, ohne dass ein erneutes attach() das je bemerkt hatte.
+        for (Group* g : m_groups) { setActive(*g, QString()); }
+        return;
+    }
 
     // ── Das eingeschaltete Band leuchtet ────────────────────────────
     //

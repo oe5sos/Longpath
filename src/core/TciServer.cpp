@@ -783,13 +783,18 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
                         .arg(TciProtocol::tciAgcModeForWire(modeStr)));
             });
 
-    // ── AGC gain / threshold (agc_gain: line) ───────────────────────────────
+    // ── AGC gain (agc_gain: line) ───────────────────────────────────────────
     // Source: Thetis AGCGainChangedHandlers at TCIServer.cs:6752 [v2.10.3.15]
-    // routed to OnAGCGainChanged.
-    connect(slice, &SliceModel::agcThresholdChanged, this,
-            [this, sliceId](int dBu) {
+    // routed to OnAGCGainChanged. The handler is invoked from ptbRF_Scroll
+    // with ptbRF.Value (console.cs, "AGCGainChangedHandlers?.Invoke(1,
+    // _old_rx1_agc_gain, ptbRF.Value)") -- the AGC-T / WDSP AGC top, which
+    // is SliceModel::rfGain here. Until 2026-09-03 this listened to
+    // agcThresholdChanged and broadcast the -160..2 dB threshold point as
+    // agc_gain; see RadioModel::setAgcGain for the full Thetis chain.
+    connect(slice, &SliceModel::rfGainChanged, this,
+            [this, sliceId](int gain) {
                 m_protocol->enqueueLocalBroadcast(
-                    QStringLiteral("agc_gain:%1,%2;").arg(sliceId).arg(dBu));
+                    QStringLiteral("agc_gain:%1,%2;").arg(sliceId).arg(gain));
             });
 
     // ── Squelch enable / level ─────────────────────────────────────────────

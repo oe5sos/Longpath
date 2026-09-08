@@ -35,10 +35,26 @@
 //
 // Getastet wird nichts. Beide Abgriffe lesen mit.
 //
+// ── Zeitlich unbegrenzt: die Speicherplatz-Wache (2026-09-02) ───────
+//
+// QsoRecorder schreibt seit diesem Datum streamend statt im Speicher
+// zu sammeln (siehe QsoRecorder.h) — der alte 30-Minuten-Deckel ist
+// weg. Der Schutz gegen "Aufnahme laeuft vergessen weiter, bis die
+// Platte voll ist" wandert hierher, Thetis-treu uebernommen:
+// `OkToRecord`/`onRecordSpaceTimer` (clsAudioRecordPlayback.cs:620-692
+// [@852bf0e]) prueft den freien Platz als PROZENTSATZ der
+// Laufwerksgroesse, nicht als absolute Zahl — eine Dauer-abhaengige
+// Schaetzung ("330 MB fuer 30 Minuten") ergibt keinen Sinn mehr, wenn
+// die Dauer nicht mehr begrenzt ist. Thetis-Vorgabe: 10 % Reserve,
+// alle 2000 ms geprueft, waehrend der Aufnahme.
+//
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-02 — Speicherplatz-Wache statt Dauer-Deckel, von Martin
+//                 Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 (Cowork). Begruendung oben.
 // =================================================================
 
 #include <QObject>
@@ -65,6 +81,11 @@ public:
     static constexpr int kRingSeconds = 2;
     static constexpr int kDrainMs     = 200;
 
+    // Thetis StopRecordingFreeSpacePerc / RecordSpaceCheckMs
+    // (clsAudioRecordPlayback.cs:162,256 [@852bf0e]) — siehe Header.
+    static constexpr int kFreeSpacePercentFloor = 10;
+    static constexpr int kSpaceCheckMs          = 2000;
+
     explicit QsoRecorderController(QObject* parent = nullptr);
     ~QsoRecorderController() override;
 
@@ -80,8 +101,19 @@ public:
     int  sampleRate() const { return m_recorder.sampleRate(); }
 
     bool isRecording() const { return m_recorder.isRecording(); }
-    void start(const QsoRecordingInfo& info);
+
+    // Oeffnet wavPath sofort und startet die Abholung. false, wenn die
+    // Datei nicht angelegt werden konnte (siehe QsoRecorder::start) —
+    // dann laeuft nichts, und *error steht wieso.
+    bool start(const QString& wavPath, const QsoRecordingInfo& info,
+              QString* error = nullptr);
     void stop();
+
+    // Fuer die Vorab-Warnung im Applet (derselbe Massstab wie die
+    // laufende Wache unten): genug Platz FUER DEN ORDNER, in dem
+    // wavPath liegen wuerde? Prozentual, siehe Header — Thetis
+    // OkToRecord (clsAudioRecordPlayback.cs:630-641 [@852bf0e]).
+    static bool hasEnoughDiskSpace(const QString& forPath);
 
     // Nur fuer Tests und fuer den Notfall: holt jetzt ab, statt auf den
     // Zeitgeber zu warten.
@@ -115,14 +147,20 @@ signals:
     void secondsChanged(double seconds);
     // Einmal je Aufnahme, sobald der erste Wert verlorengegangen ist.
     void samplesLost();
+    // Die Speicherplatz-Wache hat gestoppt, weil die Platte knapp
+    // wurde — die Aufnahme selbst ist bis dahin vollstaendig auf der
+    // Platte, nur zu Ende ist sie frueher als geplant.
+    void diskSpaceLow();
 
 private:
     void drain();
+    void checkDiskSpace();
 
     QsoRecorder  m_recorder;
     AudioTapRing m_rxRing;
     AudioTapRing m_txRing;
     QTimer       m_drainTimer;
+    QTimer       m_spaceTimer;
 
     AudioEngine*    m_audio{nullptr};
     TxWorkerThread* m_tx{nullptr};

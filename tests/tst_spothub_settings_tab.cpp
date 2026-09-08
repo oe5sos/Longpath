@@ -44,6 +44,7 @@
 #include "core/DxClusterClient.h"
 #include "core/FreeDVReporterClient.h"
 #include "core/PotaClient.h"
+#include "core/SotaClient.h"
 #include "core/PskReporterClient.h"
 #include "core/SpotCollectorClient.h"
 #include "core/WsjtxClient.h"
@@ -70,13 +71,14 @@ SpotHubDialog* makeDialog()
     auto* wsjtx = new WsjtxClient;
     auto* spotCollector = new SpotCollectorClient;
     auto* pota = new PotaClient;
+    auto* sota = new SotaClient;
     auto* freedv = new FreeDVReporterClient;
     auto* psk = new PskReporterClient;
     auto* spots = new SpotModel;
     auto* spotTable = new SpotTableModel;
     auto* dxcc = new DxccColorProvider;
 
-    return new SpotHubDialog(cluster, rbn, wsjtx, spotCollector, pota,
+    return new SpotHubDialog(cluster, rbn, wsjtx, spotCollector, pota, sota,
                              freedv, psk, spots, spotTable, dxcc, nullptr);
 }
 
@@ -104,10 +106,11 @@ private slots:
         auto* dlg = makeDialog();
         auto* tabs = dlg->findChild<QTabWidget*>();
         QVERIFY(tabs != nullptr);
-        // 11, not 10: the POTA improvement pass (2026-08-26/27) added
-        // an "Alerts" tab -- see tst_spothub_dialog_smoke.cpp's
+        // 12, not 10: the POTA improvement pass (2026-08-26/27) added
+        // an "Alerts" tab, and the SOTA connection (2026-09-03) added
+        // a "SOTA" tab -- see tst_spothub_dialog_smoke.cpp's
         // tabOrderMatchesAetherSdr() for the full updated order.
-        QCOMPARE(tabs->count(), 11);
+        QCOMPARE(tabs->count(), 12);
         delete dlg;
     }
 

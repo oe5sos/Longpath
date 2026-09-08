@@ -28,10 +28,21 @@ inline void applyComboStyle(QComboBox* combo)
         "QComboBox::down-arrow {"
         "  image: url(:/icons/spin-down.svg); width: 10px; height: 10px;"
         "}"
+        // 2026-09-08: ohne selection-color blieb der gerade ausgewaehlte
+        // Eintrag im aufgeklappten Dropdown praktisch unsichtbar --
+        // Qt liess die Vordergrundfarbe dieser Zeile dem Systemstandard,
+        // der gegen den erzwungenen Grund nicht trug. Betreiber-Meldung
+        // "immer das ausgewaehlte ist unsichtbar" -- diese Funktion ist
+        // die am breitesten geteilte der drei betroffenen Stellen
+        // (siehe StyleConstants.h::kComboStyle/applyDarkPageStyle und
+        // SpectrumOverlayPanel.cpp::OverlayColors::kPanelStyle).
         "QComboBox QAbstractItemView {"
         "  background: %1; color: %2;"
-        "  selection-background-color: %4;"
+        "  selection-background-color: %4; selection-color: %2;"
         "  border: 1px solid %3;"
+        "}"
+        "QComboBox QAbstractItemView::item:selected {"
+        "  background: %4; color: %2;"
         "}"
     ).arg(Style::kButtonBg, Style::kTextPrimary,
           Style::kBorder, Style::kAccent,

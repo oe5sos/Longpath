@@ -22,7 +22,9 @@
 #include "gui/PanadapterApplet.h"
 #include "core/AppSettings.h"
 #include "gui/FramelessResizer.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowChrome.h"
+#include "gui/WindowPlacement.h"
 
 #include <QScreen>
 #include <QShowEvent>
@@ -102,6 +104,22 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     resize(900, 460);
 
     restoreGeometryState();
+
+    // Betreiber 2026-08-31: "S-Meter usw. liegen frei am Desktop" --
+    // derselbe Grund wie bei ToolWindow (siehe dort): restoreGeometryState()
+    // rief den vorhandenen Klammer-Helfer nie auf, eine aus einer
+    // breiteren/Vollbild-Sitzung gespeicherte Position blieb also auch
+    // dann stehen, wenn `parent` seither viel kleiner geworden ist. Nach
+    // restoreGeometryState(), vor applyDefaultSize()'s eigener,
+    // unabhaengiger Erstlauf-Groesse -- dieselbe "wer zuerst kommt"-
+    // Reihenfolge, die m_sizedOnce ueberall in dieser Klasse schon
+    // durchhaelt.
+    ensureOnVisibleScreen(this, parent, QSize(420, 240));
+
+    // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
+    // derselbe Grund -- der "FullScreenAuxiliary"-Kommentar oben war nie
+    // mehr als eine Annahme.
+    enableFullScreenAuxiliaryBehavior(this);
 }
 
 // Die Groesse setzen, NACHDEM der Inhalt sichtbar ist.
@@ -154,6 +172,16 @@ void PanFloatingWindow::requestDock()
 
 void PanFloatingWindow::closeEvent(QCloseEvent* event)
 {
+    // 2026-09-01 Diagnose (Betreiber: "nach vollbild... anordnung wieder
+    // falsch" -- der schwebende Panadapter landete nach einem Vollbild-
+    // Wechsel angedockt, PanFloating_pan-0 stand danach auf False). Klaert,
+    // ob dieser closeEvent tatsaechlich waehrend eines Vollbild-Uebergangs
+    // des Hauptfensters eintrifft (macOS-Fenstermanagement-Nebenwirkung)
+    // oder aus einem anderen Grund -- wird nach der Bestaetigung entfernt.
+    qWarning() << "[PanFloatClose]" << panId() << "m_shuttingDown="
+               << m_shuttingDown << "ownWindowState=" << windowState()
+               << "spontaneous=" << event->spontaneous();
+
     // From AetherSDR PanFloatingWindow.cpp:84-95 [@0cd4559].
     //
     // Beim Beenden: hinnehmen und still sein. Der Betreiber sah am
@@ -179,6 +207,10 @@ void PanFloatingWindow::moveEvent(QMoveEvent*)
 {
     emit geometryChanged(panId(), saveGeometry());
     saveGeometryState();
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
+    // Runden hier wuerde gegen das native Ziehen kaempfen.
+    snapToGridAfterSettle(this);
 }
 
 void PanFloatingWindow::resizeEvent(QResizeEvent*)

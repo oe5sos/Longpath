@@ -48,8 +48,12 @@ void SpectrumOverlayMenu::buildUI()
         "  border-radius: 6px; padding: 2px 6px; font-size: 11px;"
         "}"
         "QComboBox::drop-down { border: none; }"
+        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
         "QComboBox QAbstractItemView {"
         "  background: #1a2a3a; color: #c8d8e8; selection-background-color: #4a7ba8;"
+        "  selection-color: #ffffff;"
         "}"
         "QCheckBox { color: #c8d8e8; font-size: 11px; }"
         "QCheckBox::indicator { width: 14px; height: 14px; }"

@@ -6,6 +6,7 @@
 
 #include "gui/instruments/BarInstrument.h"
 
+#include "gui/StyleConstants.h"
 #include "gui/instruments/InstrumentFooter.h"
 #include "gui/instruments/InstrumentPainter.h"
 #include "gui/instruments/InstrumentSpine.h"
@@ -48,13 +49,47 @@ bool BarInstrument::setPrimary(int bindingId)
 
 bool BarInstrument::setSecondary(int bindingId)
 {
-    if (bindingId < 0) { m_secondary = -1; m_hasSecond = false; update(); return true; }
+    if (bindingId < 0) {
+        m_secondary = -1;
+        m_hasSecond = false;
+        updateGeometry();   // die zweite Mulde braucht Hoehe, siehe sizeHint()
+        update();
+        return true;
+    }
     const ReadingDescriptor* d = readingFor(bindingId);
     if (!d || !d->hasScale) { return false; }
     m_secondary = bindingId;
     m_hasSecond = false;
+    updateGeometry();
     update();
     return true;
+}
+
+QSize BarInstrument::sizeHint() const
+{
+    // Betreiber 2026-08-30: SWR/Leistung soll beide Mulden dauerhaft
+    // zeigen (setSecondary), nicht nur umschalten -- die feste Groesse
+    // von vorher (fuer genau EINE Mulde bemessen) liess die zweite
+    // dann am unteren Rand abgeschnitten oder gequetscht. Dieselbe
+    // Rechnung wie paintInto()s "lower"-Rechteck, nur rueckwaerts: was
+    // braucht eine zweite Mulde an zusaetzlicher Hoehe.
+    const int extra = (m_secondary >= 0) ? int(kTroughHeight + kScaleHeight + kGap) : 0;
+    // Betreiber 2026-08-30, zum Frequenz-Widget: "abstand noch immer
+    // zu gross". setCompact() nimmt die Fusszeile weg, aber sizeHint()
+    // fragte bislang trotzdem nach demselben Platz wie MIT Fusszeile
+    // (74) -- das umgebende Layout (FrequencyApplet) reservierte also
+    // Hoehe, die nirgends mehr hinging, und genau das war die Luecke.
+    // Mulde + Skalenzahlen brauchen kTroughHeight+kScaleHeight (38);
+    // ein wenig Luft (6) haelt die Zeile atembar.
+    const int base = m_compact ? int(kTroughHeight + kScaleHeight) + 6 : 74;
+    return {320, base + extra};
+}
+
+QSize BarInstrument::minimumSizeHint() const
+{
+    const int extra = (m_secondary >= 0) ? int(kTroughHeight + kScaleHeight + kGap) : 0;
+    const int base = m_compact ? 30 : 56;
+    return {kMinWidth, base + extra};
 }
 
 void BarInstrument::clearValue()
@@ -147,11 +182,56 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
                              const ReadingDescriptor& d, double value,
                              bool withGlow, bool hasValue)
 {
-    LinearSpine spine(QRectF(area.left(), area.top(), area.width(),
-                             kTroughHeight));
-
     const double f = d.fraction(value);
     const QColor col = Instrument::valueColour(d, value);
+
+    // ── Die knappe Form: Haarlinie statt Mulde ────────────────────────
+    //
+    // Betreiber 2026-08-30, nach drei Entwurfsblaettern ("A -- bisher",
+    // "B -- nur schmaler", "C -- Haarlinie statt Mulde"): "c" gewaehlt.
+    // Keine gefuellte Flaeche mehr -- Name+Wert stehen in einer
+    // Textzeile, darunter nur eine duenne Linie, deren linker Teil bis
+    // zum Wert in Messwertfarbe hervortritt. Segmente, Roehre, Glut,
+    // Spitzenhaltung und Schwellenmarke gehoeren zur GROSSEN Mulde und
+    // haben hier keinen Platz mehr -- wer sie sehen will, nutzt die
+    // eigenstaendige Anzeige (setCompact(false)).
+    if (m_compact) {
+        const QFont capFont = Style::capsFont(p.font(), Style::kFontSmall);
+        const qreal textY = area.top() + QFontMetricsF(capFont).ascent();
+
+        p.setFont(capFont);
+        p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
+        p.drawText(QPointF(area.left(), textY), d.thetisName());
+
+        if (hasValue) {
+            const QString text = d.unit.isEmpty()
+                                      ? d.text(value)
+                                      : QStringLiteral("%1 %2")
+                                            .arg(d.text(value), d.unit);
+            const QFont valueFont = Style::monoFont(
+                p.font(), Style::kFontCaption, QFont::DemiBold);
+            p.setFont(valueFont);
+            const QFontMetricsF fm(valueFont);
+            p.setPen(col);
+            p.drawText(QPointF(area.right() - fm.horizontalAdvance(text),
+                               textY), text);
+        }
+
+        const qreal lineY = area.top() + kTroughHeight - 2.0;
+        p.setPen(QPen(QColor(Style::role("border-subtle", Style::kBorderSubtle)),
+                      1.2, Qt::SolidLine, Qt::FlatCap));
+        p.drawLine(QPointF(area.left(), lineY), QPointF(area.right(), lineY));
+
+        if (hasValue) {
+            p.setPen(QPen(col, 1.6, Qt::SolidLine, Qt::FlatCap));
+            p.drawLine(QPointF(area.left(), lineY),
+                      QPointF(area.left() + area.width() * f, lineY));
+        }
+        return;
+    }
+
+    LinearSpine spine(QRectF(area.left(), area.top(), area.width(),
+                             kTroughHeight));
 
     const double thresholdF = d.threshold.has_value()
                                   ? d.fraction(d.threshold.value())

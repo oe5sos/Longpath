@@ -39,25 +39,25 @@ QString listStyle()
 {
     return QStringLiteral(
         "QListWidget { background: transparent; border: none; "
-        "color: %1; font-size: 10px; }"
+        "color: %1; font-size: 11px; }"
         "QListWidget::item { padding: 0; margin: 0; }").arg(ink());
 }
 
 QString emptyStyle()
 {
     return QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; padding: 4px 2px; }").arg(label());
+        "QLabel { color: %1; font-size: 11px; padding: 4px 2px; }").arg(label());
 }
 
 QString labelStyle()
 {
-    return QStringLiteral("QLabel { color: %1; font-size: 10px; }").arg(label());
+    return QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(label());
 }
 
 QString primaryLabelStyle()
 {
     return QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; font-weight: bold; }").arg(ink());
+        "QLabel { color: %1; font-size: 11px; font-weight: bold; }").arg(ink());
 }
 
 QString receiverRowStyle()
@@ -83,7 +83,7 @@ QString stateColor(KiwiSdrClient::State state)
         return QStringLiteral("#d4a23c");
     case KiwiSdrClient::State::Error:
     case KiwiSdrClient::State::CampDisconnected:
-        return Style::role("danger", "#c85a5a");
+        return Style::role("danger", Style::kTxRed);
     case KiwiSdrClient::State::Disconnected:
         return label();
     }
@@ -93,7 +93,7 @@ QString stateColor(KiwiSdrClient::State state)
 QString statusStyle(KiwiSdrClient::State state)
 {
     return QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; font-weight: bold; }")
+        "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
         .arg(stateColor(state));
 }
 

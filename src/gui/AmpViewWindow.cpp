@@ -64,6 +64,8 @@ mw0lge@grange-lane.co.uk
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QHBoxLayout>
+#include <QMoveEvent>
+#include <QResizeEvent>
 #include <QShowEvent>
 #include <QSpacerItem>
 #include <QTimer>
@@ -502,6 +504,18 @@ void AmpViewWindow::showEvent(QShowEvent* event)
     if (m_chkStayOnTop) {
         setWindowFlag(Qt::WindowStaysOnTopHint, m_chkStayOnTop->isChecked());
     }
+}
+
+void AmpViewWindow::moveEvent(QMoveEvent* event)
+{
+    QDialog::moveEvent(event);
+    persistGeometry();
+}
+
+void AmpViewWindow::resizeEvent(QResizeEvent* event)
+{
+    QDialog::resizeEvent(event);
+    persistGeometry();
 }
 
 } // namespace Longpath

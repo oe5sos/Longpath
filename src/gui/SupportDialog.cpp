@@ -39,6 +39,35 @@ void SupportDialog::buildUI()
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(10);
 
+    // --- System ---
+    //
+    // Von einer AetherSDR-Sichtung angestossen (2026-09-05, "System Info
+    // dialog"): dort ein eigenes Fenster, hier stattdessen eine Zeile im
+    // schon vorhandenen Support-Dialog -- der hat den Log-Teil laengst,
+    // nur die Systemzeilen fehlten. Dieselben Werte, die seit demselben
+    // Abend auch im Start-Protokoll stehen (main.cpp) und in jedes
+    // Support-Bundle geschrieben werden (SupportBundle::writeSystemInfo).
+    {
+        const auto sys = SupportBundle::collectSystemInfo();
+        auto* sysGroup = new QGroupBox(QStringLiteral("System"), this);
+        auto* sysLayout = new QVBoxLayout(sysGroup);
+
+        QString line = QStringLiteral("%1 · %2 · %3 Kerne · Qt %4 · Longpath %5")
+            .arg(sys.osName, sys.cpuArch)
+            .arg(sys.cpuCoreCount)
+            .arg(sys.qtVersion, sys.appVersion);
+        if (sys.ramGb > 0.0) {
+            line += QStringLiteral(" · %1 GB RAM").arg(sys.ramGb, 0, 'f', 1);
+        }
+
+        auto* sysLabel = new QLabel(line, sysGroup);
+        sysLabel->setStyleSheet(
+            QStringLiteral("QLabel { color: %1; }").arg(Style::kTextPrimary));
+        sysLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        sysLayout->addWidget(sysLabel);
+        mainLayout->addWidget(sysGroup);
+    }
+
     // --- Diagnostic Logging Categories ---
     auto* catGroup = new QGroupBox(QStringLiteral("Diagnostic Logging"), this);
     auto* catGrid = new QGridLayout(catGroup);

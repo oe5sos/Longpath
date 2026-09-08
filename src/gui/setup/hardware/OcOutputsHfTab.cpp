@@ -61,8 +61,8 @@
 #include "core/OcMatrix.h"
 #include "gui/ComboStyle.h"
 #include "models/Band.h"
-#include "models/PanadapterModel.h"
 #include "models/RadioModel.h"
+#include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
 #include <QCheckBox>
@@ -442,16 +442,36 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
 
     // ── Phase 3P-H Task 5b: live OC pin state wiring ────────────────────────
     // Recompute the 7-bit OC byte = OcMatrix::maskFor(currentBand, isTx)
-    // whenever: the matrix mutates, the panadapter crosses a band
-    // boundary, or MOX toggles. Thetis sends this byte via
-    // console.cs UpdateOCBits (grep reveals it is called from each of
-    // the above state transitions at [@501e3f5]).
+    // whenever: the matrix mutates, the current band changes, or MOX
+    // toggles. Thetis sends this byte via console.cs UpdateOCBits (grep
+    // reveals it is called from each of the above state transitions at
+    // [@501e3f5]).
+    //
+    // Bug fix 2026-09-07: this used to connect to
+    // PanadapterModel::bandChanged, but RadioModel::addPanadapter() has
+    // no caller anywhere in the shipped app (only tests call it) -- the
+    // signal never fires, so the OC byte was permanently frozen on the
+    // Band::Band20m fallback below regardless of the real operating band.
+    // For an operator relying on these pins to drive an external antenna
+    // switch or band decoder, that is a confidently-wrong output, not
+    // just a missing one. SliceModel::frequencyChanged is the actually-
+    // live source (same conclusion already reached for the band-flyout
+    // highlight, see SpectrumOverlayPanel.cpp and the memory note there);
+    // subscribe to every current AND future slice, matching the pattern
+    // already established in MainWindow.cpp's TxApplet band wiring.
     if (m_model) {
-        const auto pans = m_model->panadapters();
-        if (!pans.isEmpty()) {
-            connect(pans.first(), &PanadapterModel::bandChanged,
+        auto subscribeSlice = [this](SliceModel* slice) {
+            if (!slice) { return; }
+            connect(slice, &SliceModel::frequencyChanged,
                     this, &OcOutputsHfTab::onLiveStateChanged);
+        };
+        for (SliceModel* slice : m_model->slices()) {
+            subscribeSlice(slice);
         }
+        connect(m_model, &RadioModel::sliceAdded, this,
+                [this, subscribeSlice](int sliceId) {
+                    subscribeSlice(m_model->sliceById(sliceId));
+                });
         connect(&m_model->transmitModel(), &TransmitModel::moxChanged,
                 this, &OcOutputsHfTab::onLiveStateChanged);
     }
@@ -583,19 +603,20 @@ void OcOutputsHfTab::onMatrixChanged()
 // ── onLiveStateChanged (Phase 3P-H Task 5b) ──────────────────────────────────
 
 // Recomputes the OC byte from OcMatrix::maskFor(currentBand, isTx) for
-// the active panadapter band and the current MOX state. Mirrors the
-// dispatch in Thetis console.cs UpdateOCBits: band change, MOX change,
-// and OcMatrix mutation all feed into the same 7-bit output [@501e3f5].
+// the active band and the current MOX state. Mirrors the dispatch in
+// Thetis console.cs UpdateOCBits: band change, MOX change, and OcMatrix
+// mutation all feed into the same 7-bit output [@501e3f5].
 void OcOutputsHfTab::onLiveStateChanged()
 {
     if (!m_ocMatrix || !m_model) { setCurrentOcByte(0); return; }
 
-    // Current band: first panadapter is the RX1 source of truth (see
-    // PanadapterModel::setCenterFrequency → bandFromFrequency()).
-    Band band = Band::Band20m;  // harmless default if no panadapter yet
-    const auto pans = m_model->panadapters();
-    if (!pans.isEmpty()) {
-        band = pans.first()->band();
+    // Current band: first slice (RX1) is the source of truth. See the
+    // 2026-09-07 bug-fix comment on the constructor wiring above for why
+    // this is no longer PanadapterModel-based.
+    Band band = Band::Band20m;  // harmless default if no slice yet
+    const auto slices = m_model->slices();
+    if (!slices.isEmpty()) {
+        band = bandFromFrequency(slices.first()->frequency());
     }
     const bool isTx = m_model->transmitModel().isMox();
     setCurrentOcByte(m_ocMatrix->maskFor(band, isTx));

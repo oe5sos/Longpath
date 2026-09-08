@@ -3,6 +3,7 @@
 #include "HGauge.h"
 #include "StyleConstants.h"
 #include <QPainter>
+#include <QLocale>
 #include <QPaintEvent>
 
 namespace Longpath {
@@ -45,10 +46,37 @@ void HGauge::setPeakValue(double val) {
 }
 void HGauge::setTickLabels(const QStringList& labels) { m_tickLabels = labels; update(); }
 
+void HGauge::setReadout(bool on, int nachkommastellen, const QString& einheit)
+{
+    m_readout = on;
+    m_readoutDecimals = nachkommastellen;
+    m_readoutUnit = einheit;
+    // Die ablesbare Bauform braucht weniger Hoehe als der Streifen mit
+    // Teilung darunter: keine Skalenbeschriftung, dafuer die Zahl auf
+    // derselben Zeile.
+    setFixedHeight(on ? 24 : 30);
+    update();
+}
+
+void HGauge::setLabelWidth(int px) { m_labelWidth = px; update(); }
+
+// Die Zahl rechts. Am Skalenanfang steht ein Gedankenstrich: „0,0 W"
+// und „1,0" behaupten eine Messung, die es ohne Sendung nicht gibt.
+static QString readoutText(double v, double min, int decimals,
+                           const QString& unit)
+{
+    if (v <= min) { return QStringLiteral("\u2014"); }
+    QString s = QLocale::system().toString(v, 'f', decimals);
+    if (!unit.isEmpty()) { s += QLatin1Char(' ') + unit; }
+    return s;
+}
+
 void HGauge::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+
+    if (m_readout) { paintReadout(p); return; }
 
     const int w = width();
     const int h = height();
@@ -153,6 +181,82 @@ void HGauge::paintEvent(QPaintEvent*)
                        Qt::AlignHCenter | Qt::AlignTop, m_tickLabels[i]);
         }
     }
+}
+
+// ── Beschriftung links, Mulde, Zahl rechts ──────────────────────────
+//
+// Dieselben drei Zonen wie oben (gemessen / Grenze / zu viel), nur
+// ohne Beschriftung IN der Mulde — die stuende sonst unter der
+// Fuellung und waere ab etwa zwei Dritteln nicht mehr lesbar. Genau
+// das ist am Entwurfsblatt vom 2026-09-02 an der SWR-Anzeige
+// aufgefallen.
+void HGauge::paintReadout(QPainter& p)
+{
+    const int w = width();
+    const int h = height();
+    const bool ueber = (m_value >= m_redStart);
+
+    QFont f = p.font();
+    f.setPixelSize(Style::kFontCaption);
+    f.setBold(false);
+    p.setFont(f);
+    p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
+    p.drawText(QRect(0, 0, m_labelWidth, h),
+               Qt::AlignLeft | Qt::AlignVCenter, m_title);
+
+    const int zahlW = 62;
+    const int x = m_labelWidth + 4;
+    const int barW = w - x - zahlW - 4;
+    const int barH = 8;
+    const int barY = (h - barH) / 2;
+
+    if (barW > 8) {
+        p.setPen(QColor(Style::role("border", Style::kBorder)));
+        p.setBrush(QColor(Style::role("inset-bg", Style::kInsetBg)));
+        p.drawRoundedRect(x, barY, barW, barH, 2, 2);
+
+        const double range = m_max - m_min;
+        if (range > 0.0) {
+            const double norm = qBound(0.0, (m_value - m_min) / range, 1.0);
+            const int fill = static_cast<int>(norm * (barW - 2));
+            if (fill > 0) {
+                const double yellowNorm = (m_yellowStart - m_min) / range;
+                const double redNorm    = (m_redStart - m_min) / range;
+                const int yellowX = static_cast<int>(yellowNorm * (barW - 2));
+                const int redX    = static_cast<int>(redNorm * (barW - 2));
+                p.setPen(Qt::NoPen);
+
+                const int normalEnd = qMin(fill, yellowX);
+                if (normalEnd > 0) {
+                    p.setBrush(QColor(Style::role("measured-dim", Style::kAmberDim)));
+                    p.drawRoundedRect(x + 1, barY + 1, normalEnd, barH - 2, 1, 1);
+                }
+                if (fill > yellowX) {
+                    const int warnEnd = qMin(fill, redX) - yellowX;
+                    if (warnEnd > 0) {
+                        p.setBrush(QColor(Style::role("measured", Style::kAmberText)));
+                        p.drawRect(x + 1 + yellowX, barY + 1, warnEnd, barH - 2);
+                    }
+                }
+                if (fill > redX) {
+                    p.setBrush(QColor(Style::role("danger", Style::kGaugeDanger)));
+                    p.drawRect(x + 1 + redX, barY + 1, fill - redX, barH - 2);
+                }
+            }
+        }
+    }
+
+    const QString zahl = readoutText(m_value, m_min, m_readoutDecimals,
+                                     m_readoutUnit);
+    const bool leer = (m_value <= m_min);
+    f.setPixelSize(Style::kFontBody);
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(QColor(ueber ? Style::role("danger", Style::kGaugeDanger)
+                          : (leer ? Style::role("text-inactive", Style::kTextInactive)
+                                  : Style::role("text-primary", Style::kTextPrimary))));
+    p.drawText(QRect(w - zahlW, 0, zahlW, h),
+               Qt::AlignRight | Qt::AlignVCenter, zahl);
 }
 
 } // namespace Longpath

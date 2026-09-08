@@ -18,6 +18,9 @@ public:
         QString kernelVersion;
         QString cpuArch;
         QString buildDate;
+        int     cpuCoreCount{0};
+        // 0 where unknown (non-macOS today — see collectSystemInfo()).
+        double  ramGb{0.0};
     };
 
     struct RadioDiagInfo {

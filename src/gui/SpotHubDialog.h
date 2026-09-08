@@ -205,7 +205,9 @@ class QSpinBox;
 class QPushButton;
 class QLabel;
 class QCheckBox;
+class QMoveEvent;
 class QPlainTextEdit;
+class QResizeEvent;
 class QTableView;
 class QToolButton;
 class QMenu;
@@ -217,6 +219,7 @@ class DxClusterClient;
 class WsjtxClient;
 class SpotCollectorClient;
 class PotaClient;
+class SotaClient;
 class FreeDVReporterClient;
 class PskReporterClient;
 class SpotModel;
@@ -254,6 +257,7 @@ public:
                            WsjtxClient* wsjtxClient,
                            SpotCollectorClient* spotCollectorClient,
                            PotaClient* potaClient,
+                           SotaClient* sotaClient,
                            FreeDVReporterClient* freedvClient,
                            PskReporterClient* pskClient,
                            SpotModel* spotModel,
@@ -293,6 +297,8 @@ signals:
     void spotCollectorStopRequested();
     void potaStartRequested(int intervalSec);
     void potaStopRequested();
+    void sotaStartRequested(int intervalSec);
+    void sotaStopRequested();
     void freedvStartRequested();
     void freedvStopRequested();
     // 2026-05-12 bench fix (review P1 / P2 — PR #238): carry the
@@ -342,6 +348,11 @@ protected:
     // on construction.
     void closeEvent(QCloseEvent* event) override;
 
+    // 2026-08-31: closeEvent() alone only catches a CLEAN close; see the
+    // matching note added to LogbookWindow.h the same night.
+    void moveEvent(QMoveEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
+
 private:
     void saveGeometryState();
     void restoreGeometryState();
@@ -356,6 +367,7 @@ private:
     void buildWsjtxTab(QTabWidget* tabs);
     void buildSpotCollectorTab(QTabWidget* tabs);
     void buildPotaTab(QTabWidget* tabs);
+    void buildSotaTab(QTabWidget* tabs);
     void buildFreeDvTab(QTabWidget* tabs);
     void buildPskTab(QTabWidget* tabs);
     void buildSpotListTab(QTabWidget* tabs);
@@ -391,6 +403,7 @@ private:
     WsjtxClient*          m_wsjtxClient{nullptr};
     SpotCollectorClient*  m_spotCollectorClient{nullptr};
     PotaClient*           m_potaClient{nullptr};
+    SotaClient*           m_sotaClient{nullptr};
     FreeDVReporterClient* m_freedvClient{nullptr};
     PskReporterClient*    m_pskClient{nullptr};
     SpotModel*            m_spotModel{nullptr};
@@ -471,6 +484,12 @@ private:
     QPushButton*    m_potaAutoStartBtn{nullptr};
     QLabel*         m_potaStatusLabel{nullptr};
     QPlainTextEdit* m_potaConsole{nullptr};
+
+    QSpinBox*       m_sotaIntervalSpin{nullptr};
+    QPushButton*    m_sotaStartBtn{nullptr};
+    QPushButton*    m_sotaAutoStartBtn{nullptr};
+    QLabel*         m_sotaStatusLabel{nullptr};
+    QPlainTextEdit* m_sotaConsole{nullptr};
 
     // FreeDV tab
     QPushButton*    m_freedvStartBtn{nullptr};

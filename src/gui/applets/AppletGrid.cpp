@@ -231,6 +231,14 @@ void AppletGrid::relayout()
         GridCellWidget* w = m_cells.at(i);
         if (!w) { continue; }
         const GridCell c = m_meta.value(w->cellId());
+        // Betreiber 2026-09-01 (Untersuchung nach einem Haenger/OOM-
+        // Verdacht): removeWidget() VOR jedem erneuten addWidget() --
+        // QGridLayout dedupliziert nicht selbst, ein wiederholtes
+        // addWidget() ohne vorheriges removeWidget() haeuft bei jedem
+        // relayout()-Lauf (addCell/moveCell/setColumns/
+        // applyArrangement) ein weiteres, nie geloeschtes QLayoutItem
+        // fuer dasselbe Widget an.
+        m_layout->removeWidget(w);
         m_layout->addWidget(w, i / m_columns, i % m_columns,
                             c.rowSpan, c.colSpan);
     }

@@ -154,6 +154,36 @@ public:
 
     QVariantMap snapshot(const QString& name) const;
 
+    /// Ein einzelnes Profil (Name, Zustand, Band-/Modus-Bindung) als
+    /// eigenstaendiges JSON -- dieselbe Feldform wie ein Eintrag in
+    /// save()s Array, nur einzeln herausgeloest, fuer eine manuelle
+    /// Sicherung auf den Schreibtisch. Leeres Array bei unbekanntem Namen.
+    QByteArray exportToJson(const QString& name) const;
+
+    /// Das Gegenstueck: ein von exportToJson() geschriebenes JSON in ein
+    /// BESTEHENDES Profil einspielen -- ersetzt dessen Zustand samt
+    /// Band-/Modus-Bindung. Der eingebettete Name aus der Datei wird
+    /// dabei ignoriert; welches Profil ueberschrieben wird, entscheidet
+    /// targetProfile (bei Longpath: der Rechtsklick-Ort, nicht die
+    /// Datei).
+    ///
+    /// Betreiber, 2026-08-30: „wenn ich importiere will ich es nicht
+    /// als neues profil importiren" -- ein frueherer Anlauf legte
+    /// stattdessen immer ein neues Profil an ("Buero (2)"), aus Sorge
+    /// vor stillem Datenverlust. Das war die falsche Sorge: ein Import
+    /// IST ein Wiederherstellen, und ein Wiederherstellen, das nichts
+    /// ersetzt, stellt nichts wieder her. Die Absicherung gegen
+    /// versehentliches Ueberschreiben gehoert an die Aufrufstelle (ein
+    /// Rueckfragedialog), nicht in diese Klasse.
+    ///
+    /// Ist targetProfile das gerade AKTIVE Profil, wird der neue
+    /// Zustand sofort angewendet (m_apply) -- sonst erst beim naechsten
+    /// Umschalten dorthin sichtbar. false bei kaputtem/unlesbarem JSON
+    /// oder unbekanntem targetProfile; outError traegt dann eine fuer
+    /// den Betreiber lesbare Begruendung.
+    bool importFromJson(const QString& targetProfile, const QByteArray& json,
+                        QString* outError = nullptr);
+
     // ── Bindung ──────────────────────────────────────────────────────
 
     void bindBand(const QString& name, Band b, bool on);
@@ -197,6 +227,11 @@ private:
     Profile* find(const QString& name);
     const Profile* find(const QString& name) const;
 
+    /// Ruft m_apply() und haelt m_applyingState waehrenddessen hoch --
+    /// der EINZIGE Weg, wie m_apply je aufgerufen wird. Siehe
+    /// m_applyingState fuer den Grund.
+    void runApply(const QVariantMap& state);
+
     QList<Profile> m_profiles;
     QStringList m_order;
     QString m_current;
@@ -209,6 +244,27 @@ private:
     // this is safe: MainWindow::closeEvent's own unconditional
     // AppSettings::instance().save() at quit is the backstop.
     mutable bool m_diskFlushScheduled{false};
+
+    // Betreiber 2026-08-31, nach sehr langer Suche: "das speichern und
+    // wieder aufrufen hat bis dato nicht geklappt" / "es passt gar
+    // nichts" / "Fensteranordnung falsch" nach einem Profilwechsel oder
+    // -import. Ursache: m_apply() haengt schwebende Fenster um, und
+    // MINDESTENS einer dieser Umhaenge-Schritte
+    // (MainWindow::dockAppletBack(), aufgerufen fuer jedes Applet, das
+    // im NEUEN Profil nicht mehr abgeloest sein soll) ruft SELBST wieder
+    // captureIntoCurrent()+save() -- REENTRANT, WAEHREND m_apply() fuer
+    // GENAU DIESES Profil noch mitten in der Anwendung steht. Die
+    // Aufnahme dabei ist der halb angewendete, innerlich inkonsistente
+    // Zwischenstand (manche Schluessel schon uebernommen, Container-
+    // Geometrie/Splitter/Rotor/Vollbild noch nicht) -- und ueberschreibt
+    // damit sofort wieder, was gerade erst importiert/hergestellt wurde.
+    // Fast identisch mit dem Fund, der m_shuttingDown in
+    // dockAppletBack() begruendet (siehe dort) -- nur dass DIESER Pfad
+    // nicht beim Beenden, sondern bei JEDEM Profilwechsel/-import
+    // zuschlagen kann, der ein abgeloestes Fenster zurueckholt.
+    // runApply() haelt dieses Flag waehrend jedes m_apply()-Aufrufs
+    // hoch; captureIntoCurrent() wird waehrenddessen zum No-Op.
+    bool m_applyingState{false};
 };
 
 } // namespace Longpath

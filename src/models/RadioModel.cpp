@@ -307,6 +307,7 @@ warren@wpratt.com
 #include "core/WsjtxClient.h"
 #include "core/SpotCollectorClient.h"
 #include "core/PotaClient.h"
+#include "core/SotaClient.h"
 #include "core/FreeDVReporterClient.h"
 #include "core/FreeDVRadeReporterBridge.h"
 #include "core/PskReporterClient.h"
@@ -1825,6 +1826,7 @@ RadioModel::RadioModel(QObject* parent)
     m_wsjtx          = std::make_unique<WsjtxClient>(this);
     m_spotCollector  = std::make_unique<SpotCollectorClient>(this);
     m_pota           = std::make_unique<PotaClient>(this);
+    m_sota           = std::make_unique<SotaClient>(this);
 
     m_freeDvReporter = std::make_unique<FreeDVReporterClient>(this);
     m_freeDvReporter->setIdentity(
@@ -1877,6 +1879,8 @@ RadioModel::RadioModel(QObject* parent)
             this, &RadioModel::onSpotCollectorSpotReceived);
     connect(m_pota.get(),           &PotaClient::spotReceived,
             this, &RadioModel::onPotaSpotReceived);
+    connect(m_sota.get(),           &SotaClient::spotReceived,
+            this, &RadioModel::onSotaSpotReceived);
     connect(m_freeDvReporter.get(), &FreeDVReporterClient::spotReceived,
             this, &RadioModel::onFreeDvReporterSpotReceived);
     connect(m_pskReporter.get(),    &PskReporterClient::spotReceived,
@@ -2446,6 +2450,18 @@ void RadioModel::onPotaSpotReceived(const DxSpot& spot)
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 }
 
+void RadioModel::onSotaSpotReceived(const DxSpot& spot)
+{
+    if (!m_spotModel) { return; }
+    auto& s = AppSettings::instance();
+    const int lifetime = s.value(QStringLiteral("SotaSpotLifetimeSec"),
+                                 3600).toInt();
+    const QString color = s.value(QStringLiteral("SotaSpotColor"),
+                                  QStringLiteral("#c2924f")).toString();
+    const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
+    m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
+}
+
 void RadioModel::onFreeDvReporterSpotReceived(const DxSpot& spot)
 {
     if (!m_spotModel) { return; }
@@ -2552,6 +2568,13 @@ void RadioModel::restoreSpotClientAutoStartState()
     if (m_pota && isTrue(QStringLiteral("PotaAutoStart"))) {
         m_pota->startPolling(
             s.value(QStringLiteral("PotaPollInterval"), 30).toInt());
+    }
+
+    // SOTA (HTTPS poll loop, epoch-gated). Default interval matches the
+    // 60 s floor SotaClient enforces regardless of what is persisted.
+    if (m_sota && isTrue(QStringLiteral("SotaAutoStart"))) {
+        m_sota->startPolling(
+            s.value(QStringLiteral("SotaPollInterval"), 60).toInt());
     }
 
     // FreeDV Reporter (WebSocket connect; identity / URL already plumbed
@@ -6185,7 +6208,15 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             m_slices.first()->setPanKey(QStringLiteral("pan-0"));
         }
     }
-    setActiveSlice(0);
+    // By id, not by list position: setActiveSlice(int) indexes m_slices
+    // positionally, but "Slice A" means sliceIndex() == 0, and the two only
+    // coincide when id 0 has never been removed and re-created. A slice
+    // already present here (e.g. a KiwiSDR-created placeholder, or a
+    // survivor from a prior connect) can leave a DIFFERENT id sitting at
+    // position 0 -- the same divergence MainWindow.cpp's band-click and
+    // VFO-focus handlers already route around via setActiveSliceById()
+    // instead of this positional form.
+    setActiveSliceById(0);
     loadSliceState(m_activeSlice);
 
     // ── 3M-1c L.2: TwoToneController active-slice mode source ────────────────
@@ -13191,14 +13222,29 @@ QString RadioModel::agcMode(int rx) const
     return QStringLiteral("MED");
 }
 
-// ── AGC gain (threshold) ────────────────────────────────────────────────────
+// ── AGC gain (TCI agc_gain = Thetis AGC-T = WDSP AGC top) ──────────────────
+//
+// From Thetis TCIServer.cs handleAgcGain -> console.SetAgcT(rx, gain)
+// (console.cs:51746) -> RF property (console.cs:13087, ptbRF.Value)
+// -> ptbRF_Scroll -> SetupForm.AGCMaxGain -> udDSPAGCMaxGaindB_ValueChanged
+// (setup.cs:9042) -> RadioDSPRX.RXAGCMaxGain -> WDSP.SetRXAAGCTop
+// (radio.cs:1022) [v2.10.3.15]. So the TCI value is the AGC MAX GAIN
+// ("AGC-T", ptbRF -20..120), which Longpath carries as SliceModel::rfGain
+// (-> RxChannel::setAgcTop). It is NOT the -160..2 dB threshold point that
+// SetRXAAGCThresh takes (SliceModel::agcThreshold).
+//
+// Until 2026-09-03 this shim wrote agcThreshold -- harmless-looking while
+// that setter had no clamp, but a TCI client sending Thetis's default
+// agc_gain=90 was setting a +90 dB AGC threshold. Exposed by the
+// Thetis-sourced [-160, 2] clamp in b5a80d4f (tst_tci_radio_model_shims:
+// 42 came back as 2).
 void RadioModel::setAgcGain(int rx, int gain)
 {
-    if (auto* s = sliceById(rx)) { s->setAgcThreshold(gain); }
+    if (auto* s = sliceById(rx)) { s->setRfGain(gain); }
 }
 int RadioModel::agcGain(int rx) const
 {
-    if (const auto* s = sliceById(rx)) { return s->agcThreshold(); }
+    if (const auto* s = sliceById(rx)) { return s->rfGain(); }
     return 0;
 }
 

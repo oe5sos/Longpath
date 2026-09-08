@@ -104,7 +104,26 @@ namespace OverlayColors {
     // Flyout panel backgrounds (verbatim from AetherSDR SpectrumOverlayMenu.cpp)
     constexpr auto kPanelStyle =
         "QWidget { background: rgba(15, 15, 26, 220); "
-        "border: 1px solid #304050; border-radius: 6px; }";
+        "border: 1px solid #304050; border-radius: 6px; }"
+        // Betreiber 2026-09-08 (Scheme-Combo im Display-Flyout): der
+        // gerade ausgewaehlte Eintrag im aufgeklappten Dropdown war
+        // praktisch unsichtbar. Ursache: die QWidget-Regel oben faerbt
+        // auch die Zeilen der Popup-Liste ein (Qt kaskadiert Stylesheets
+        // ueber die QObject-Elternschaft bis in QComboBox::view()
+        // hinein), aber OHNE eigene QComboBox/QAbstractItemView-Regel
+        // blieb Vordergrund/Auswahlfarbe dem Systemstandard ueberlassen
+        // -- der klirrt gegen den erzwungenen dunklen Grund. Alle drei
+        // Zustaende (normal/gehovert/ausgewaehlt) jetzt explizit, statt
+        // nur den Grund zu setzen und den Rest zu raten.
+        "QComboBox { background: #1a2a3a; color: #c8d8e8; "
+        "border: 1px solid #304050; border-radius: 6px; padding: 2px 4px; }"
+        "QComboBox::drop-down { border: none; }"
+        "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
+        "selection-background-color: #4a7ba8; selection-color: #ffffff; "
+        "outline: none; }"
+        "QComboBox QAbstractItemView::item { color: #c8d8e8; }"
+        "QComboBox QAbstractItemView::item:selected { "
+        "background: #4a7ba8; color: #ffffff; }";
 
     // Label style for rows inside translucent flyout panels.
     // Transparent background is required here because the label must not
@@ -684,6 +703,16 @@ void SpectrumOverlayPanel::toggle()
     emit collapsed(!m_expanded);
 }
 
+void SpectrumOverlayPanel::setExpandedState(bool expanded)
+{
+    if (m_expanded == expanded) { return; }
+    m_expanded = expanded;
+    if (!m_expanded) {
+        hideFlyout();
+    }
+    updateLayout();
+}
+
 // ── Band flyout ───────────────────────────────────────────────────────────────
 
 void SpectrumOverlayPanel::buildBandFlyout()
@@ -701,6 +730,12 @@ void SpectrumOverlayPanel::buildBandFlyout()
         "border: 1px solid #304050; border-radius: 6px; "
         "color: #c8d8e8; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: rgba(0, 112, 192, 180); "
+        "border: 1px solid #4a7ba8; }"
+        // Welches Band gerade gehoert wird -- von einer AetherSDR-
+        // Sichtung angestossen (2026-09-06). Entwurf A vom Betreiber
+        // gewaehlt: wortgleich der :checked-Stil, den der WNB-Knopf
+        // im selben Panel schon nutzt (Zeile ~892).
+        "QPushButton:checked { background: #4a7ba8; color: #ffffff; "
         "border: 1px solid #4a7ba8; }";
 
     // 4-column grid layout:
@@ -708,6 +743,7 @@ void SpectrumOverlayPanel::buildBandFlyout()
     // Row 1: 30, 20, 17, 15
     // Row 2: 12, 10, 6, WWV
     static constexpr int kCols = 4;
+    m_bandButtons.clear();
     for (int i = 0; i < kBandCount; ++i) {
         int row = i / kCols;
         int col = i % kCols;
@@ -715,6 +751,7 @@ void SpectrumOverlayPanel::buildBandFlyout()
         auto* btn = new QPushButton(QString::fromLatin1(kBands[i].label), m_bandFlyout);
         btn->setFixedSize(kBandBtnW, kBandBtnH);
         btn->setStyleSheet(bandBtnStyle);
+        btn->setCheckable(true);
 
         QString bandName = QString::fromLatin1(kBands[i].name);
         double  freqHz   = kBands[i].freqHz;
@@ -725,9 +762,17 @@ void SpectrumOverlayPanel::buildBandFlyout()
             emit bandSelected(bandName, freqHz, mode);
         });
         grid->addWidget(btn, row, col);
+        m_bandButtons.insert(bandName, btn);
     }
 
     m_bandFlyout->adjustSize();
+}
+
+void SpectrumOverlayPanel::setActiveBandHighlight(const QString& bandKeyName)
+{
+    for (auto it = m_bandButtons.constBegin(); it != m_bandButtons.constEnd(); ++it) {
+        it.value()->setChecked(it.key() == bandKeyName);
+    }
 }
 
 void SpectrumOverlayPanel::toggleBandFlyout()
@@ -952,10 +997,46 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
         m_colorSchemeCmb = new QComboBox;
         m_colorSchemeCmb->setObjectName(QStringLiteral("colorSchemeCmb"));
         m_colorSchemeCmb->setFixedHeight(18);
-        m_colorSchemeCmb->addItems({"Classic", "Phosphor", "Sunrise", "Inverted"});
+        // War {"Classic","Phosphor","Sunrise","Inverted"} -- vier erfundene
+        // Namen, die keinem WfColorScheme-Wert entsprachen; das aktuell
+        // geladene Schema (z.B. ClarityBlue) war darueber gar nicht
+        // waehlbar. Betreiber 2026-09-05: alle Schemata aufnehmen. Liste
+        // wortgleich aus DisplaySetupPages.cpp uebernommen (dort seit
+        // Phase 3G-8/3G-9b die kanonische, Reihenfolge-verbindliche
+        // Quelle -- der Index IST der gespeicherte Wert, siehe dortiger
+        // Kommentar). Anhaengen, nie einfuegen.
+        m_colorSchemeCmb->addItems({
+            QStringLiteral("Default"),   QStringLiteral("Enhanced"),
+            QStringLiteral("Spectran"),  QStringLiteral("BlackWhite"),
+            QStringLiteral("LinLog"),    QStringLiteral("LinRad"),
+            QStringLiteral("Custom"),
+            QStringLiteral("Clarity Blue"),
+            QStringLiteral("Gedämpft")
+        });
         grid->addWidget(m_colorSchemeCmb, row, 2, 1, 2);
         connect(m_colorSchemeCmb, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, &SpectrumOverlayPanel::colorSchemeChanged);
+        ++row;
+    }
+
+    // Spectrum: 2D / 3D combo — perspective stacked-trace view, ported
+    // from AetherSDR's "3DSS" (see DssRenderer.h). Only the trace pipeline
+    // changes; waterfall and every other overlay stay as-is either way.
+    {
+        auto* lbl = new QLabel("Spectrum:");
+        lbl->setStyleSheet(labelStyle);
+        grid->addWidget(lbl, row, 0, 1, 2);
+
+        m_renderModeCmb = new QComboBox;
+        m_renderModeCmb->setObjectName(QStringLiteral("spectrumRenderModeCombo"));
+        m_renderModeCmb->setFixedHeight(18);
+        m_renderModeCmb->addItems({"2D Waterfall", "3D Stacked Trace"});
+        m_renderModeCmb->setToolTip(
+            "2D: FFT trace + waterfall.\n"
+            "3D: perspective stacked-trace spectrum stream.");
+        grid->addWidget(m_renderModeCmb, row, 2, 1, 2);
+        connect(m_renderModeCmb, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &SpectrumOverlayPanel::spectrumRenderModeChanged);
         ++row;
     }
 
@@ -994,7 +1075,11 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
 
         m_wfBlackSlider = new QSlider(Qt::Horizontal);
         m_wfBlackSlider->setObjectName(QStringLiteral("wfBlackSlider"));
-        m_wfBlackSlider->setRange(0, 100);
+        // SpectrumWidget::m_wfBlackLevel reicht 0..125 (Vorgabe 104); der
+        // Regler deckelte bislang bei 100 und haette einen gespeicherten
+        // Wert darueber beim ersten Anfassen still gekappt. Betreiber
+        // 2026-09-05: Regler auf den Widget-Bereich erweitern.
+        m_wfBlackSlider->setRange(0, 125);
         m_wfBlackSlider->setValue(15);
         m_wfBlackSlider->setStyleSheet(sliderStyle);
         m_wfBlackSlider->setToolTip("Waterfall black level. Increase to darken the noise floor.");
@@ -1354,6 +1439,8 @@ void SpectrumOverlayPanel::bindToPanSlice()
     // rebind-on-shuffle pattern as VAX above.
     if (m_rxAntConn) { QObject::disconnect(m_rxAntConn); m_rxAntConn = {}; }
     if (m_txAntConn) { QObject::disconnect(m_txAntConn); m_txAntConn = {}; }
+    // Band-flyout highlight (2026-09-06). Same rebind-on-shuffle pattern.
+    if (m_bandChangedConn) { QObject::disconnect(m_bandChangedConn); m_bandChangedConn = {}; }
 
     SliceModel* s = resolvedSlice();
     if (s) {
@@ -1363,6 +1450,20 @@ void SpectrumOverlayPanel::bindToPanSlice()
         m_updatingFromModel = true;
         m_vaxCmb->setCurrentIndex(s->vaxChannel());
         m_updatingFromModel = false;
+
+        // Welches Band im Band-Flyout gehoert wird -- von einer
+        // AetherSDR-Sichtung angestossen (2026-09-06, "highlight active
+        // band"). Ursprünglich an PanadapterModel::bandChanged gebunden
+        // versucht -- die Klasse wird aber nirgends instanziiert
+        // (RadioModel::addPanadapter() hat keinen einzigen Aufrufer,
+        // siehe Nachtrag in der Speicher-Notiz), also nie ausgeloest.
+        // SliceModel ist die tatsaechlich lebendige Quelle (wie der
+        // Bandklick oben in MainWindow::ensureOverlayPanels schon zeigt).
+        setActiveBandHighlight(bandKeyName(bandFromFrequency(s->frequency())));
+        m_bandChangedConn = connect(s, &SliceModel::bandChanged,
+                                    this, [this](Longpath::Band newBand) {
+            setActiveBandHighlight(bandKeyName(newBand));
+        });
 
         m_vaxChannelConn = connect(s, &SliceModel::vaxChannelChanged,
                                    this, [this](int ch) {
@@ -1425,6 +1526,7 @@ void SpectrumOverlayPanel::bindToPanSlice()
         m_vaxCmb->setToolTip("VAX channel (waiting for this pan's slice)");
         if (m_rxAntCmb) { m_rxAntCmb->setEnabled(false); }
         if (m_txAntCmb) { m_txAntCmb->setEnabled(false); }
+        setActiveBandHighlight(QString());
     }
 }
 
@@ -1635,6 +1737,32 @@ void SpectrumOverlayPanel::setClarityStatus(bool active, bool paused)
                         "border-radius: 6px; font-size: 11px; "
                         "font-weight: bold; }").arg(color)));
     m_clarityBadge->show();
+}
+
+void SpectrumOverlayPanel::setSpectrumRenderModeIndex(int renderModeIndex)
+{
+    if (!m_renderModeCmb) { return; }
+    if (renderModeIndex < 0 || renderModeIndex >= m_renderModeCmb->count()) { return; }
+    m_renderModeCmb->setCurrentIndex(renderModeIndex);
+}
+
+void SpectrumOverlayPanel::setWfGainValue(int gain)
+{
+    if (!m_wfGainSlider) { return; }
+    m_wfGainSlider->setValue(gain);
+}
+
+void SpectrumOverlayPanel::setWfBlackLevelValue(int level)
+{
+    if (!m_wfBlackSlider) { return; }
+    m_wfBlackSlider->setValue(level);
+}
+
+void SpectrumOverlayPanel::setColorSchemeIndex(int index)
+{
+    if (!m_colorSchemeCmb) { return; }
+    if (index < 0 || index >= m_colorSchemeCmb->count()) { return; }
+    m_colorSchemeCmb->setCurrentIndex(index);
 }
 
 } // namespace Longpath

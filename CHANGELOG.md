@@ -1,5 +1,432 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
+  Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
+  AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
+
+- **Der Support-Dialog (Tools > Support Bundle...) zeigt jetzt eine
+  Systemzeile ganz oben** (Betriebssystem, CPU, Kernzahl, Qt- und
+  Longpath-Version, RAM) -- dieselben Werte wie im Start-Protokoll,
+  jetzt auch auf einen Blick sichtbar statt nur im Log. Ebenfalls von
+  AetherSDR angestossen (dort ein eigenes Fenster; hier eine Zeile im
+  schon vorhandenen Dialog, der den Log-Teil laengst hatte).
+
+- **Das Band-Flyout markiert jetzt, welches Band gerade gehoert wird.**
+  Zwoelf Knoepfe ohne jede Markierung vorher -- Betreiber waehlte
+  Entwurf A (gefuellt, wie der WNB-Knopf im selben Panel) nach zwei
+  Entwurfsblaettern. Ebenfalls von AetherSDR angestossen.
+
+- **Neuer nativer RTTY-Decoder** (View > Containers > Applets, sichtbar
+  nur im Modus DIGL): dekodiert Baudot/ITA2 direkt aus dem Empfangston,
+  ohne WSJT-X/fldigi. Mark/Space-Pegelanzeige, Lock/SNR-Status,
+  einstellbare Baudrate/Umkehrpolaritaet/Empfindlichkeit; Mark- und
+  Shift-Frequenz folgen live dem schon vorhandenen VFO-Flaggen-Regler
+  (`RttyMarkShiftContainer`). FT8/FT4/PSK31 & Co. bleiben bewusst extern
+  (WSJT-X/fldigi via VAC+CAT) -- weder Thetis noch AetherSDR dekodieren
+  diese selbst, aber AetherSDR hat einen echten, eigenstaendigen
+  RTTY-Decoder, der hier portiert wurde.
+
+- **"PC-mic pulls ran short"-Meldung liefert jetzt auch, WESSEN Seite
+  spaet dran war.** Bisher nur eine 5s-Zaehlung ("N von M"). Neu:
+  `PortAudioBus::nsSinceLastCallback()` (Nanosekunden seit die
+  Capture-Callback des Bus zuletzt wirklich lief) plus der Abstand
+  zwischen zwei Pump-Takten selbst, beide als Schlimmstfall im
+  5s-Fenster mitgemeldet. Damit laesst sich am Log unterscheiden, ob
+  die Capture-Seite (CoreAudio-Thread) spaet war oder der
+  radiogetaktete Pump ungewoehnlich frueh kam -- ohne Instruments-
+  Sitzung. Reine Diagnose, keine Verhaltensaenderung am Audiopfad.
+
+- **View > Full Screen -- endlich ein Menuepunkt und Tastenkuerzel
+  dafuer.** `enterBorderlessFullSize()`/`exitBorderlessFullSize()` gab
+  es seit dem 2026-09-01 (randloses Vollbild statt echtem macOS-Space,
+  damit schwebende Werkzeugfenster mitkommen), aber nur ueber das
+  Layoutprofil erreichbar -- kein Weg, es sich selbst anzuschalten.
+  Betreiber: "es sollte auch im gernellen fenster die möglichkeit
+  geben, immer auf full screen zu schalten". Checkbox in `View`, Haken
+  bleibt auch nach einem Profilwechsel korrekt.
+
+- **Geteilte Kopfleiste jedes Applets bekommt einen ⚙-Knopf fuer
+  erweiterte Einstellungen** (`GridCellWidget`, rechts neben dem
+  Abloese-/Ausblenden-Knopf). Betreiber: "generell sollten bei allen
+  widget die otionen rechts oben zu sehen sein" -- "bitte mache das bei
+  allen widgets". Neuer virtueller Haken `AppletWidget::
+  hasExtendedSettings()`/`openExtendedSettings()`: der Knopf bleibt
+  fuer Applets ohne eigene Erweiterung unsichtbar, statt ins Leere zu
+  klicken. `TxApplet` als erster Nutzer (oeffnet denselben Popup wie
+  sein bisheriger interner ⚙-Knopf). Weitere Applets folgen, sobald sie
+  eine erweiterte Einstellungsflaeche bekommen.
+
+- **Sechs weitere Applets bekommen den ⚙-Knopf** -- jedes davon hatte
+  bereits eine eigene erweiterte Einstellungsflaeche, nur noch nicht
+  ueber den geteilten Knopf erreichbar: `TciApplet` (oeffnet Setup >
+  Netzwerk > TCI Server, wie der bestehende "Setup"-Knopf im Applet),
+  `PureSignalApplet` (oeffnet den PsForm-Dialog, wie der bestehende
+  Rechtsklick auf jedes Bedienelement), `AmpApplet` / `TunerApplet` /
+  `Rf2ksApplet` (springen zu PGXL/TGXL/RF-Kit Advanced in Setup, wie
+  der erste Eintrag im bestehenden Rechtsklickmenue), `InstrumentApplet`
+  (oeffnet dasselbe Rechtsklickmenue, nur an der Widget-Mitte statt am
+  Klickpunkt verankert, da der ⚙-Knopf keine Klick-Koordinate traegt).
+  Keine neue Oberflaeche erfunden -- nur ein zweiter Weg zu einer schon
+  vorhandenen. `RxApplet`/`PhoneCwApplet` bewusst ausgelassen: beide
+  haben mehrere schmale Einstellungs-Signale (je ein anderes
+  Setup-Blatt), aber keinen einzigen eindeutigen "mehr Einstellungen"-
+  Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
+
+### Fixed
+
+- **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
+  Qt-Accessibility-Explosion ausloesen wie das Logbuch und die
+  KiwiSDR-Empfaengerliste (b5e9b915, e913abe6) -- jetzt ebenfalls
+  abgesichert.** Folgeaufgabe aus der KiwiSDR-OOM-Untersuchung
+  (task_829af93c): `MmioEndpointsDialog::refreshVariablesTree()`,
+  `MmioVariablePickerPopup::buildTree()` und
+  `ConnectionPanel::refreshLastSeenColumn()` (ein alle 15 Sekunden
+  laufender Timer-Slot) fuellten ihre `QTableWidget`/`QTreeWidget`
+  Zelle-fuer-Zelle bzw. Eintrag-fuer-Eintrag, jedes `setText`/
+  `setData` ein eigenes `dataChanged` -- baut macOS' Qt-Accessibility-
+  Bruecke bei angeschlossenem AX-Beobachter (VoiceOver, Fernsteuerung,
+  computer-use) je Signal die komplette Tabelle neu auf, aus O(Zellen)
+  Signalen wird O(Zellen²) Arbeit. Gleicher Fix wie beim Logbuch:
+  Fuellschleife in einen `QSignalBlocker` auf das Modell verpackt,
+  danach ein einziges gebuendeltes
+  `QAccessibleTableModelChangeEvent(DataChanged)` ueber den
+  tatsaechlich betroffenen Bereich (bei ConnectionPanel nur die
+  "Last Seen"-Spalte, da `setPillIconForRow` ueber `setCellWidget`
+  laeuft und vom `dataChanged`-Mechanismus ohnehin nicht erfasst wird).
+
+- **Der ausgewaehlte Eintrag in aufgeklappten Dropdown-Listen war
+  praktisch unsichtbar -- app-weit, an 18 Stellen.** Betreiber:
+  "immer das ausgewaehlte ist unsichtbar". Ursache ueberall dieselbe:
+  `QComboBox QAbstractItemView { ... selection-background-color: X; }`
+  setzte die Hervorhebungsfarbe, aber nie das dazugehoerige
+  `selection-color` -- der Vordergrund der markierten Zeile blieb dem
+  Systemstandard ueberlassen, der gegen den erzwungenen dunklen Grund
+  kaum noch zu lesen war. Betroffen: `SpectrumOverlayPanel`s Display-
+  Flyout (dort gemeldet, "Scheme:"-Combo), `SpectrumOverlayMenu`,
+  `ComboStyle::applyComboStyle` (die am breitesten geteilte der drei
+  zentralen Combo-Stile, siehe applets), `StyleConstants::kComboStyle`
+  + `applyDarkPageStyle` (Setup-Seiten allgemein), `ConnectionPanel`,
+  `ContainerSettingsDialog` (2x), `MmioEndpointsDialog`, 7 der
+  `meter_property_editors/*ItemEditor` (byte-identischer Textblock,
+  offenbar kopiert), sowie `DspSetupPages`, `AudioAdvancedPage`,
+  `DeviceCard`. Je Stelle dieselbe Ein-Zeilen-Ergaenzung; kein
+  Verhalten sonst geaendert.
+
+- **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand
+  jetzt ebenfalls.** Von einer AetherSDR-Sichtung angestossen: dort gibt
+  es das schon, hier fehlte es. `SpectrumOverlayPanel::collapsed()` war
+  seit jeher ein Signal ohne Empfaenger -- der Knopf stand nach jedem
+  Neustart wieder auf "auf".
+
+- **3D-Ansicht des Spektrums: von einem Bild pro Sekunde auf fluessig.**
+  Die 3D-Ansicht (Display-Flyout, "Spectrum: 3D Stacked Trace") baute
+  ihre Flaeche auf dem Weg von AetherSDRs CPU-Notpfad: je Bild 96 Zeilen
+  mal 767 Trapeze plus 767 Linien durch QPainter, jeder Pixel bis zu
+  96-mal uebermalt. Gemessen auf einem MacBook Air (Apple Silicon):
+  0,6 s je Bild, bei Retina-Breite 1,3 s -- die ganze Oberflaeche fror
+  mit ein. AetherSDR selbst nimmt diesen Weg nur, wenn sein GPU-Mesh
+  nicht anlegbar ist. Die Flaeche wird jetzt direkt gerastert: Zeilen
+  von vorn nach hinten gegen einen Horizont je Spalte, jeder
+  Vorhangpixel genau einmal geschrieben, die Stiftbreite des Kamms
+  (1,6 px vorn, 1 px dahinter) als Deckung nachgebildet und die
+  Teilpixel am Ende in Malreihenfolge gemischt. 7-10 ms je Bild,
+  pixelweise gegen das Original geprueft: gleiches Bild bis auf
+  Kantenmischtoene.
+
+- **Der Combo "Spectrum: 2D / 3D" zeigt nach dem Neustart, was gespeichert
+  ist.** Der Panadapter lud seinen Modus, bevor das Panel existierte;
+  der Combo stand deshalb nach jedem Start auf "2D", auch wenn laengst
+  3D gezeichnet wurde. Der Rundlauf Setzen -> Schliessen -> Neustart ist
+  jetzt in `tst_settings_are_remembered` festgenagelt.
+
+- **Der Regler "WF Gain" desselben Flyouts zeigt jetzt ebenfalls den
+  gespeicherten Wert.** Derselbe Fehler wie beim 2D/3D-Combo: eigener
+  fest verdrahteter Vorgabewert (50) statt des vom Widget geladenen
+  (45). Beide reichen von 0 bis 100, also kein Wertebereich-Konflikt --
+  reiner Nachtrag. Ebenfalls in `tst_settings_are_remembered` gedeckt.
+
+- **Black Lvl und Farbschema desselben Flyouts zeigen jetzt ebenfalls
+  den gespeicherten Wert.** Beide hatten denselben Nachzieh-Fehler wie
+  WF Gain, dazu je einen echten Konflikt, der erst eine Entscheidung
+  brauchte (Betreiber 2026-09-05):
+  - Schwarzwert-Schieber reichte bis 100, das Widget kennt 0..125
+    (Vorgabe 104) -- der Regler haette einen gespeicherten Wert darueber
+    beim ersten Anfassen still auf 100 gekappt. Regler jetzt auf 0..125
+    erweitert.
+  - Schema-Combo hatte vier erfundene Eintraege ("Classic/Phosphor/
+    Sunrise/Inverted"), die keinem `WfColorScheme`-Wert entsprachen; das
+    Widget kennt mindestens neun Schemata, darunter das damals geladene
+    ClarityBlue, das im Combo gar nicht waehlbar war. Liste jetzt
+    wortgleich aus der Setup-Seite (Setup > Display) uebernommen, wo sie
+    seit Phase 3G-8/9b die kanonische Quelle ist.
+
+  Beide Rundlaeufe in `tst_settings_are_remembered` festgenagelt.
+
+- **Vier Messwert-Anzeigen in `meters/` zeigten noch das 2026-08-21
+  abgeschaffte Tuerkis (`#00b4d8`), unabhaengig vom aktuellen Farbschema.**
+  Power-Balken, SWR-Balken und der S-Meter-Text (`ItemGroup.cpp`,
+  `MeterItem.cpp`) wurden bislang mit dem rohen Hex-Wert konstruiert statt
+  mit einer benannten Rolle. `HGauge.cpp` hatte fuer vergleichbare Balken
+  bereits die Trennung aus `HAUSSTIL.md` umgesetzt (Messwert = Bernstein,
+  nicht Blau); die drei genannten Stellen jetzt auf dieselbe Rolle
+  (`Style::role("measured", Style::kAmberText)`) umgestellt (Betreiber
+  2026-09-05). Die vierte, urspruenglich mit vorgeschlagene Stelle
+  (Verlaufsgraph-Achse 0, `HistoryGraphItem.h`) wurde bewusst NICHT auf
+  Bernstein umgestellt: Achse 1 desselben Graphen sitzt bereits auf
+  Bernstein, beide Achsen waeren sich zum Verwechseln aehnlich geworden --
+  per Entwurfsblatt (3 gerenderte Varianten, echte Zeichenlogik,
+  Worst-Case-Betriebsfall) am 2026-09-08 sichtbar bestaetigt. Auch nicht
+  auf `kAccent` (Blau): Achse 0 ist ein Messwert, kein Bedienelement, und
+  "Blau ist anfassbar" (`HAUSSTIL.md`) waere hier missverstaendlich.
+  Jetzt auf `kTextSecondary` (neutral, weder Warm- noch Anfass-Rolle,
+  gegen Achse 1 klar unterscheidbar) -- Betreiber 2026-09-08 delegierte
+  die Entscheidung ("egal, wie du meinst"). Gleichzeitig zwei weitere,
+  unstrittige Tuerkis-Reste in `meters/` migriert: `BarItem`s eigener
+  Default-Konstruktorwert (`MeterItem.h`, greift nur, wenn kein Aufrufer
+  `setBarColor()` setzt -- zeigt in jedem verbleibenden Aufrufer ebenfalls
+  einen Messwert) auf dieselbe Bernstein-Rolle wie PowerBar/SwrBar; und
+  `ButtonBoxItem`s Klick-Feedback-Farbe (echt "anfassbar") auf `kAccent`.
+
+- **Der "Antenne"-Eintrag unter Containers > Applets graut jetzt aus,
+  statt anklickbar-aber-wirkungslos zu bleiben, solange kein Funkgeraet
+  verbunden ist.** `applyWindowVisibility()`s eigene WinAntenna-Sperre
+  (SWR-Sweep ist ohne Radio sicherheitsrelevant bedeutungslos) verwarf
+  einen Klick ohnehin lautlos; der Haken selbst blieb optisch anklickbar.
+  Betreiber 2026-09-05 wollte urspruenglich "automatisch abhaken bei
+  Trennung" -- das haette aber den Wiederaufgehen-Mechanismus beim
+  naechsten Connect (Review-Fund 2026-09-01) stillschweigend abgeschaltet,
+  da dessen Speicher fuer "soll wieder aufgehen" genau der Haken-Zustand
+  ist. Stattdessen nur `setEnabled()` auf dem Menueintrag, ueber einen
+  eigenen, schmalen `connectionStateChanged`-Hook -- der Haken-Zustand
+  (die Absicht) bleibt unangetastet, Oeffnen/Schliessen bleibt allein bei
+  der bestehenden Sperre. Neuer Test
+  `winAntennaMenuEntryGreysOutWhenDisconnected`.
+
+- **Ein Verbindungsversuch, der beim ersten Anlauf still verhungert (kein
+  einziger ep6-Rahmen kommt an), haengt jetzt nicht mehr fuer immer in
+  "Connecting" statt der zugesagten Wiederholversuche.**
+  `P1RadioConnection::onConnectTimeout()` raeumt einen gescheiterten
+  Erstversuch komplett ab (`m_running=false`,
+  `m_intentionalDisconnect=true`), aber `onReconnectTimeout()` setzte
+  keins von beidem zurueck und bewaffnete auch den Connect-Waechter nicht
+  neu. Da `onWatchdogTick()`/`onEp2PacerTick()` beide als erstes
+  `!m_running` pruefen, war nach dem ersten automatischen
+  Wiederholversuch die komplette Stille-Erkennung fuer den Rest der
+  Verbindung tot -- auch nach einem erfolgreichen Reconnect. Live am ANAN
+  10e reproduziert und nach dem Fix bestaetigt (Verbindung erholte sich
+  sauber vom Connect-Timeout). Neuer Test
+  `connectTimeoutThenRetryStillDetectsLaterSilence`.
+
+- **Das Logbuch-Fenster und die oeffentliche KiwiSDR-Empfaengerliste
+  konnten den Speicherbedarf innerhalb von Sekunden auf mehrere GB
+  hochtreiben und den Prozess einfrieren oder abstuerzen lassen, sobald
+  irgendein Bedienungshilfen-Beobachter (VoiceOver, Fernwartungssoftware
+  wie TeamViewer/AnyDesk, oder AX-gestuetzte Automatisierung) am Prozess
+  haengt.** Beide Tabellen fuellten sich zellenweise (`setItem()` je
+  Spalte und Zeile), und jede einzelne Zellenaenderung loeste ein
+  `dataChanged`-Signal am Tabellenmodell aus. Qts macOS-Accessibility-
+  Bruecke baut bei JEDEM solchen Signal die komplette Tabelle als frische
+  Bedienungshilfen-Objekte neu auf, statt die Aenderung zu buendeln --
+  bei ein paar hundert Zeilen (das Logbuch nach Jahren an QSOs, die
+  oeffentliche Empfaenger-Liste ohnehin) ergab das O((Zeilen x
+  Spalten)^2) statt O(1) Arbeit, gemessen bis zu 164 Millionen lebende
+  Accessibility-Objekte (~10 GB) in einem einzigen Heap-Schnappschuss.
+  Beide Stellen blockieren die Modell-Signale jetzt waehrend des
+  Bulk-Aufbaus und schicken danach genau EINE gebuendelte
+  Accessibility-Benachrichtigung fuer die ganze Tabelle. Regressionstest
+  `importingManyEntriesDoesNotFloodDataChanged` (Logbuch); die
+  KiwiSDR-Empfaengerliste hat noch keine eigene Testabdeckung. Weitere
+  Tabellen mit demselben Bau-Muster werden noch geprueft.
+
+- **Die OC-Ausgaenge (Hardware > OC Outputs, externe Antennenweiche/
+  Banddecoder) folgten nie dem echten Band, sondern blieben dauerhaft
+  auf dem 20m-Ausweichwert eingefroren.** `onLiveStateChanged()` las das
+  aktuelle Band aus `RadioModel::panadapters().first()`, aktualisiert
+  ueber `PanadapterModel::bandChanged` -- aber `RadioModel::
+  addPanadapter()` hat im ausgelieferten Programm keinen einzigen
+  Aufrufer (siehe "Known" unten), `panadapters()` ist also immer leer und
+  das Signal feuert nie. Fuer einen Betreiber, der diese Pins an externe
+  Hardware haengt, ein selbstsicher FALSCHER Ausgang, nicht nur ein
+  fehlender. Jetzt an `SliceModel::frequencyChanged` (RX1) gehaengt --
+  dieselbe Anbindung, die bereits fuer die Band-Flyout-Markierung
+  eingesetzt wurde. Regressionstest `band_change_switches_mask`
+  (umgestellt von `addPanadapter()` auf `addSlice()`).
+
+- **Das per-Band-Rauschboden-Gedaechtnis (Task 2.10) und die graue
+  Fast-Attack-Anzeige im Wasserfall bei Bandwechsel liefen seit ihrer
+  Einfuehrung nie -- dritter und letzter Fund derselben
+  PanadapterModel-Untersuchung.** `MainWindow.cpp`s Verdrahtung hing an
+  `PanadapterModel::bandChanged` und `PanadapterModel::setBandNFEstimate`/
+  `bandNFEstimate` -- beides tot, siehe oben. Rein kosmetisch (kein
+  Korrektheitsproblem: der ClarityController-Schaetzer startet ohne
+  Priming einfach kalt statt sofort zu springen), aber seit Einfuehrung
+  wirkungslos. Das per-Band-Gedaechtnis samt Persistenz (dieselben
+  `DisplayBandNFEstimate_<Band>`-AppSettings-Schluessel, die
+  `tst_per_band_nf_priming.cpp` bereits gegen `PanadapterModel` prueft)
+  lebt jetzt direkt in der MainWindow-Verdrahtung, an
+  `SliceModel::frequencyChanged` (RX1) gehaengt. Der doppelte
+  Fast-Attack-Ausloeser bei Bandwechsel wurde NICHT nachgebaut: der
+  benachbarte Scheiben-Frequenzsprung-Ausloeser (>0,5 MHz, aus derselben
+  Thetis-Quelle) feuert bei jedem realistischen Bandwechsel ohnehin schon
+  mit.
+
+### Known
+
+- **`RadioModel::addPanadapter()` (und damit die ganze `PanadapterModel`-
+  Klasse) hat im ausgelieferten Code weiterhin keinen einzigen Aufrufer**
+  -- alle drei damals vermuteten Betroffenen sind inzwischen einzeln
+  geprueft:
+  - `OcOutputsHfTab` (OC-Ausgaenge/Band-Decoder) hing tatsaechlich am
+    toten Signal und lieferte dauerhaft den Band20m-Ausweichwert,
+    unabhaengig vom echten Band -- **behoben**, siehe "Fixed" oben.
+  - `TxApplet::setCurrentBand` ist **nicht betroffen**: eine zweite,
+    unabhaengige Verdrahtung (2026-04-27) haengt bereits an
+    `SliceModel::frequencyChanged` und ueberschreibt den toten
+    Panadapter-Pfad ohnehin bei jeder echten Bandaenderung.
+  - Die ClarityController-NF-Priming/Fast-Attack-Verdrahtung in
+    `MainWindow.cpp` (~Zeile 5137-5205) haengt ebenfalls tatsaechlich am
+    toten Signal -- **jetzt auch behoben**, siehe "Fixed" oben.
+
+## [0.6.3-rc3] - 2026-09-04
+
+Dritter Testbau. rc2 hat den Linux-Bau ein Stueck weit gebracht, aber
+nicht ans Ziel: hinter dem behobenen Fehler lag die naechste Schicht.
+Der Grund war nicht technisch, sondern organisatorisch — dieser Zweig
+war abgezweigt, bevor `main` seine Qt-6.4-Reparaturen bekam, und hat sie
+nie nachgezogen. Statt sie einzeln neu zu erfinden, sind sie jetzt
+herueberkopiert.
+
+### Fixed
+
+- **Gespeicherte Audio-Schnittstelle ueberlebt den Neustart wieder
+  (Windows).** Wer in Setup -> Audio "Windows WASAPI" waehlte, bekam
+  beim naechsten Start still wieder MME — den aeltesten und traegsten
+  Windows-Tonweg. Die Wahl wird als Name gespeichert, aber nur der
+  Setup-Dialog hat ihn je in einen Index zurueckuebersetzt; ohne Index
+  greift die Geraetesuche die erste passende Fassung in globaler
+  Reihenfolge ab, und das ist unter Windows die MME-Fassung. Auf dem Mac
+  faellt das nicht auf, dort gibt es nur CoreAudio. Wer nie eine
+  Schnittstelle gewaehlt hat, merkt keinen Unterschied.
+
+- **`QWebSocket::errorOccurred` gibt es erst ab Qt 6.5** — an drei
+  Stellen (`TciClient`, `KiwiSdrClient` zweimal) ungeschuetzt benutzt.
+  Der ARM-Linux-Bau laeuft gegen Ubuntus Qt 6.4.2 und ist daran
+  gescheitert. Von `main` uebernommen (`ace89a58`).
+
+- **`QTimeZone::UTC` und `QDateTimeEdit::setTimeZone` brauchen Qt 6.7.**
+  Ebenfalls von `main` uebernommen (`cc70cb44`, `beeb0fd2`); beide
+  Stellen kommen ohne Versionsweiche aus — `Qt::UTC` tut dasselbe auf
+  jeder Version.
+
+### Known
+
+- Die Kombination ARM + Qt 6.4 + CPU-Renderpfad wird ausschliesslich von
+  `release.yml` gebaut, und die laeuft nur auf Tags. Vorher gibt es kein
+  Signal — deshalb faellt so etwas erst beim Veroeffentlichen auf.
+
+
+## [0.6.3-rc2] - 2026-09-04
+
+Zweiter Testbau. Behebt den Linux-Fehlschlag von rc1 — dadurch entsteht
+wieder ein vollstaendiges Release statt nur Lauf-Artefakten — und bringt
+die Diagnose fuer die weiter bestehende Tonverzerrung unter Windows mit
+der ANAN-10 mit.
+
+### Fixed
+
+- **Longpath liess sich ohne QRhi ueberhaupt nicht uebersetzen.** Neun
+  Felder in `SpectrumWidget.h` lagen im `#ifdef NEREUS_GPU_SPECTRUM`,
+  obwohl der CPU-Pfad sie ungeschuetzt anfasst: Mausbedienung
+  (`m_vfoDragStartX`, `m_panDragArmed`, `m_vfoDragStartHz`,
+  `m_vfoDragHzPerPx`, `m_panDragLastX`), Abbau (`m_shutdownPrepared`),
+  Wasserfall-Fahnen (`m_wfTexFullUpload`, `m_lastSpectrumArrivalMs`) und
+  die Einblendungs-Fahne (`m_overlayStaticDirty`). Sie sind dort
+  entstanden, nicht dort noetig. Ein Bau mit
+  `-DNEREUS_GPU_SPECTRUM=OFF` meldete darauf 35 Fehler.
+
+  Genau daran ist der ARM-Linux-Job von v0.6.3-rc1 gescheitert: dort
+  fehlten die Vulkan-Header, CMake hat QRhi abgeschaltet
+  (CMakeLists:434-467), und der CPU-Pfad, den CMakeLists:417
+  ausdruecklich als Ausweg anbietet, baute nicht. Weil der
+  Veroeffentlichungs-Job alle vier Plattformen braucht, entstand kein
+  Release-Entwurf.
+
+  Die Felder stehen jetzt ausserhalb des Gates, mit einer Notiz, warum
+  sie dort bleiben muessen. Der Bau ohne QRhi ist wieder gruen. Ob der
+  CPU-Pfad danach auch korrekt ZEICHNET, ist damit ausdruecklich nicht
+  geprueft — das war schon vorher offen.
+
+### Added
+
+- **Die drei Unterlaufarten im Ton werden getrennt ausgewiesen.** Die
+  `perf:`-Zeile nannte bisher nur `underruns`, und das war allein der
+  Unterlauf des Betriebssystem-Geraets. Die beiden Ring-Zaehler wurden
+  gezaehlt und nie ausgegeben; `m_paOutputUnderflowEvents` versprach im
+  Kommentar sogar eine Abfrage ueber die oeffentliche Schnittstelle, die
+  es gar nicht gab. Jetzt stehen dort nebeneinander: `underruns` (das
+  Geraet lief leer — wir lieferten zu spaet), `ring_under` (unser Ring
+  war leer — der Erzeuger hinkt) und `ring_over` (Ring uebergelaufen,
+  Aeltestes verworfen — der klassische Fingerabdruck einer
+  Ratenabweichung). Zusaetzlich protokolliert `PortAudioBus::open()`
+  jetzt Geraet, Host-API und die tatsaechlich ausgehandelte Latenz
+  gegenueber der gewuenschten.
+
+  Zweck: die Tonverzerrung unter Windows mit der ANAN-10 ist nach zwei
+  Anlaeufen unverstanden. Diese Zahlen sagen beim naechsten Bench-Lauf,
+  welche Schicht schuld ist, statt einen dritten Fix zu raten.
+  Einzuschalten ueber View > Performance Overlay; die Zeile erscheint
+  dann einmal je Sekunde im Protokoll.
+
+## [0.6.3-rc1] - 2026-09-03
+
+Testbau für den Betreiber (Release-Entwurf, nicht veröffentlicht).
+Gebaut, damit der Bandbreitenfilter und die Persistenz-Korrekturen auf
+echter Windows-Hardware geprüft werden können. Nicht zur Weitergabe.
+
+### Fixed
+
+- **Bandbreitenfilter verankerte in CWL/CWU/DIGL/DIGU eine Kante,
+  statt die Mitte festzuhalten.** Beim Ändern der Breite wanderte in
+  diesen vier Betriebsarten der Ton weg, weil eine Filterkante stehen
+  blieb und die andere allein lief.
+- **Röhre und Segmente überlebten den Neustart nie** (seit ihrer
+  Einführung am 2026-08-23). `InstrumentApplet`s Konstruktor rief
+  `setForm()`, und das ruft seinerseits `saveState()` — womit die
+  Vorgaben in die Ablage geschrieben wurden, *bevor* `restoreState()`
+  die gespeicherten Werte lesen konnte. Der Konstruktor schaltet die
+  Ansicht jetzt über `applyForm()` um, ohne dabei zu speichern.
+- **Ein fremdes Hauptfenster wurde beim Beenden als verwaistes
+  Werkzeugfenster eingesammelt** und synchron gelöscht — dessen
+  `~QThread()` riss den noch laufenden SpectrumThread mit, was Qt mit
+  `qFatal` beantwortet (Prozessabbruch). Betrifft nur Abläufe mit
+  mehreren Hauptfenstern im selben Prozess.
+- **Acht numerische AGC-Setter** nehmen jetzt nur noch Werte aus den
+  von Thetis vorgegebenen Bereichen an; `DspMode` und `AgcMode` sind
+  gegen beschädigte gespeicherte Werte abgesichert.
+- **TCI `agc_gain`** ist Thetis' AGC-T (WDSP AGC top), nicht der
+  AGC-Schwellpunkt — die Zuordnung war vertauscht.
+- Sechs weitere Befunde aus dem Durchgang derselben Nacht
+  (Bandbreitenfilter, Zoom-Gleichlauf, AGC-Schwelle).
+
+## [0.6.2] - 2026-09-03
+
+Windows-only test build (draft release, not published) — same code as
+0.6.1, built for Windows so the operator can bench-test the known
+audio distortion issue on real Windows 10 hardware. Not for public
+distribution.
+
+## [0.6.1] - 2026-09-03
+
+Phase 3F multi-pan multi-slice, plus overnight bandwidth-filter,
+S-meter overlay, and layout/window fixes. macOS-only release — Windows
+audio has a known, undiagnosed distortion regression (see
+`docs/architecture/` audio-path notes); Linux/Windows builds are
+deferred to the next release.
+
 ## [0.6.0] - 2026-08-29
 
 ### Added

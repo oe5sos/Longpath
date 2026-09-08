@@ -694,6 +694,14 @@ private:
     // Q_INVOKABLE aus demselben Grund wie detachRotorPanel:
     // eine Pruefung soll den echten Weg gehen duerfen.
     Q_INVOKABLE void setRotorPanelBelow(bool below);
+
+    // Betreiber 2026-09-02: "Vertikal ist da noch eine Linie inkl.
+    // blauer Punkt" ueber der CAT-Anzeige, auch wenn m_belowPane leer
+    // und verborgen ist. QSplitter versteckt seinen Griff NICHT von
+    // selbst, nur weil ein Kind hide() bekommt — genau die Falle, vor
+    // der der Kommentar oben bei setRotorPanelBelow() schon warnte.
+    // Nach jedem show()/hide() von m_belowPane aufrufen.
+    void syncOuterSplitterHandle();
     // QRZ XML client, created on first use. Username from AppSettings,
     // password from the platform credential store.
     void ensureQrzClient();
@@ -714,6 +722,21 @@ private:
     void applyDarkTheme();
     void openConnectionPanelOnLaunch();
     void wireSliceToSpectrum();
+
+    /// Re-bind RttyDecoderApplet and the RADE/RttyDecoder availability gate
+    /// to `slice` (nullptr included). Both used to be wired ONCE, inside
+    /// wireSliceToSpectrum(), to whichever slice existed at slice-0-added
+    /// time -- unlike RxApplet and CommandBar, which already re-bind on
+    /// every RadioModel::activeSliceChanged. Bench-found 2026-09-07 against
+    /// a real ANAN 10e, same root cause CommandBar had (db0c50cf, same
+    /// day): after the active slice's IDENTITY changes (a band click that
+    /// restores a per-band mode, a slice removed and a new one taking its
+    /// index), RxApplet's own Mark/Shift line correctly followed the real
+    /// mode, but RttyDecoderApplet stayed visible with the OLD slice's
+    /// values -- it never got the equivalent re-bind. Called from
+    /// wireSliceToSpectrum() (first slice) and from the same
+    /// activeSliceChanged handler that already re-binds CommandBar.
+    void rebindRttyRadeAvailability(class SliceModel* slice);
 
     /// Stream 0's engine. Back-compat accessor for call sites that still
     /// address "the" FFT engine (display settings, Max Bin, auto-zoom).
@@ -892,6 +915,24 @@ private:
     /// in der Spalte existiert nicht mehr, und setAppletVisible fände
     /// keine Hülle.
     void applyAppletVisibility(const QString& id, bool effective);
+
+    /// Alle fuenf Schwebe-Mechanismen (Container, abgeloeste Applets,
+    /// Antenne, Panadapter, Rotor/Log) verstecken und in
+    /// m_floatingContainersHiddenPreConnect vormerken -- die eine
+    /// gemeinsame Liste fuer "hinter die Connect-Maske". Zurueck kommt
+    /// alles beim naechsten Connected ODER beim Schliessen der Maske
+    /// ohne Verbindung.
+    void hideFloatingWindowsBehindConnectMask();
+
+    /// Ersatz fuer showFullScreen() -- siehe m_borderlessFullSize. Randlos
+    /// und auf die volle Bildschirmflaeche gesetzt, KEIN eigener macOS-
+    /// Space. Idempotent: ruft nur um, was noch nicht stimmt.
+    void enterBorderlessFullSize();
+
+    /// Kehrseite von enterBorderlessFullSize() -- normaler Fensterrahmen
+    /// zurueck, fuer ein Profil, das ausdruecklich NICHT die volle
+    /// Flaeche will. Idempotent wie das Gegenstueck.
+    void exitBorderlessFullSize();
 
     /// Ein Eintrag der Widget-Auswahl, der ein eigenes FENSTER meint
     /// (Logbuch, Rotor, Kanalzug, Antenne …). Der Auswaehler verwaltet
@@ -1221,6 +1262,30 @@ private:
     // close. Symptom: ⌘Q beach-balls for the full SafeDefault scan time.
     bool m_shuttingDown{false};
 
+    // Betreiber 2026-09-01: echtes macOS-Vollbild (showFullScreen(), ein
+    // eigener "Space") entschieden gegen ein randloses, maximiertes
+    // Fenster ausgetauscht -- schwebende Werkzeugfenster (Panadapter,
+    // S-Meter, Bandwidth Filter, Rotor/Log...) blieben beim Wechsel in
+    // den eigenen Vollbild-Space zuverlaessig auf dem normalen
+    // Schreibtisch-Space zurueck (NSWindowCollectionBehaviorFullScreenAuxiliary
+    // nimmt ein bereits bestehendes Fenster nicht zuverlaessig mit --
+    // dokumentierte Cocoa-Eigenheit, kein Longpath-Bug). Ein randloses
+    // Fenster, das einfach die volle Bildschirmflaeche einnimmt, hat
+    // gar keinen eigenen Space -- schwebende Kinder bleiben immer auf
+    // demselben Space wie das Hauptfenster. isFullScreen() gilt dafuer
+    // nicht mehr (Qt::WindowFullScreen wird nie gesetzt); dieses Flag
+    // ist die neue Quelle der Wahrheit fuers Sichern/Wiederherstellen.
+    bool m_borderlessFullSize{false};
+
+    // View > Vollbild (2026-09-08, Betreiber: "es sollte auch im
+    // gernellen fenster die möglichkeit geben, immer auf full screen
+    // zu schalten"). enterBorderlessFullSize()/exitBorderlessFullSize()
+    // existierten schon -- bisher nur ueber das Layoutprofil erreichbar,
+    // ohne eigenen Menuepunkt oder Tastenkuerzel. checked wird von
+    // beiden Methoden nachgezogen, damit ein Profilwechsel den Haken
+    // nicht aus dem Takt bringt.
+    QAction* m_fullScreenAction{nullptr};
+
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
     QSplitter* m_mainSplitter{nullptr};
@@ -1383,6 +1448,12 @@ private:
     // PhoneCwApplet in the panel stack and is shown/hidden in the same
     // dspModeChanged lambda.
     class RadeApplet* m_radeApplet{nullptr};
+    class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
+    // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
+    // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
+    // so the dspModeChanged listener below never accumulates one dangling
+    // connection per past slice.
+    QList<QMetaObject::Connection> m_rttyRadeLinks;
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 
@@ -1483,7 +1554,6 @@ private:
 
     class KiwiSdrApplet*  m_kiwiSdrApplet{nullptr};
     class KiwiWaterfallPanel* m_kiwiWaterfallPanel{nullptr};
-    class TxMeterApplet*  m_txMeterApplet{nullptr};
 
     // ── Spracherkennung (2026-08-23) ────────────────────────────────
     //
@@ -1629,6 +1699,29 @@ private:
     class FrequencyApplet*  m_frequencyApplet{nullptr};
     class InstrumentApplet* m_swrInstrument{nullptr};
     class InstrumentApplet* m_signalInstrument{nullptr};
+    // Betreiber 2026-09-03: "leider funktioniert die Frequenzanzeige
+    // nicht im S-Meter" -- die urspruengliche Verdrahtung (buildUI())
+    // lief EINMAL gegen die beim Start aktive Scheibe; ein frisches
+    // MainWindow hat aber null Scheiben, bevor ein Funkgeraet verbindet
+    // (siehe MainWindow_SunSdr.cpp-Kommentar am selben Fund), also lief
+    // sie damals ins Leere und niemand versuchte es je wieder. Diese
+    // Verbindung wird jetzt bei jedem RadioModel::activeSliceChanged neu
+    // gezogen -- muss vor dem naechsten Ziehen wieder geloest werden,
+    // sonst haengt am Ende eine tote Scheibe noch mit dran.
+    QMetaObject::Connection m_instrumentFreqConn;
+
+    // Codereview 2026-09-03 (gefunden, nicht gemeldet): dieselbe Krankheit
+    // wie bei m_instrumentFreqConn oben, diesmal bei der Zoom-Leiste unter
+    // dem Panadapter. Die urspruengliche Fassung verdrahtete
+    // SpectrumWidget::frequencyRangeChanged EINMAL gegen die beim Bau
+    // aktive Flaeche (activeSpectrumWidget()) -- bei mehreren Flaechen
+    // (2v/2h/2x2-Anordnung) folgte die Leiste danach dauerhaft nur noch
+    // dieser einen Flaeche, auch nachdem eine andere aktiv wurde, und
+    // konnte nach einem Anordnungswechsel sogar an einer inzwischen
+    // entfernten Flaeche haengen bleiben (Qt trennt dann automatisch,
+    // die Leiste folgt danach ueberhaupt keiner Flaeche mehr). Wird jetzt
+    // bei jedem PanadapterStack::activePanChanged neu gezogen.
+    QMetaObject::Connection m_zoomBarSyncConn;
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;

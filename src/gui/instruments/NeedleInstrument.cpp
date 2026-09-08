@@ -106,6 +106,25 @@ void NeedleInstrument::setOffline(bool offline)
     update();
 }
 
+void NeedleInstrument::setShowFrequency(bool on)
+{
+    if (m_showFrequency == on) { return; }
+    m_showFrequency = on;
+    update();
+}
+
+void NeedleInstrument::setFrequencyHz(double hz)
+{
+    // Betreiber 2026-09-02: "geht anscheinend nur, wenn es mit
+    // funkgeraet verbunden ist... eigentlich sollte 0.0000 da stehen!"
+    // Kein hasValue-Torwaechter wie beim Messwert selbst -- die
+    // Frequenzanzeige des Programms zeigt ohne Funkgeraet ebenfalls
+    // "0.000.000" statt nichts (siehe Frequenz-Panel), also gilt hier
+    // dieselbe Regel: jeder gesetzte Wert wird gezeigt, auch 0.
+    m_frequencyHz = hz;
+    if (m_showFrequency) { update(); }
+}
+
 void NeedleInstrument::onReading(int bindingId, double value)
 {
     if (bindingId == m_primary) {
@@ -180,6 +199,51 @@ void NeedleInstrument::paintBacklight(QPainter& p, const QPointF& pivot,
     p.drawPie(QRectF(pivot.x() - radius * 1.15, pivot.y() - radius * 1.15,
                      radius * 2.3, radius * 2.3),
               0, 180 * 16);
+    p.restore();
+}
+
+// ── Frequenz zusaetzlich einblenden ──────────────────────────────────
+//
+// Betreiber 2026-09-02, nach drei Entwurfsrunden: kein Kasten, keine
+// Umrandung, kein eigenes Feld -- die Ziffern stehen frei auf dem
+// Zifferblatt, unter dem Bogenscheitel, wie eine Beschriftung im
+// Diagramm selbst statt ein aufgesetztes UI-Element. "14.225.000" mit
+// Punkten als Tausendertrennzeichen ist dieselbe Schreibweise, die die
+// Ziffernanzeige selbst als Eingabe akzeptiert (FrequencyInstrument.cpp).
+void NeedleInstrument::paintFrequencyOverlay(QPainter& p, const QPointF& pivot,
+                                             qreal radius) const
+{
+    if (!m_showFrequency) { return; }
+
+    qint64 hzRounded = qRound64(m_frequencyHz);
+    QString digits = QString::number(hzRounded);
+    for (int pos = digits.length() - 3; pos > 0; pos -= 3) {
+        digits.insert(pos, QLatin1Char('.'));
+    }
+
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    QFont digitFont = Style::monoFont(p.font(), qMax(11, qRound(radius * 0.15)),
+                                      QFont::DemiBold);
+    const QFontMetrics fm(digitFont);
+    const int digitsW = fm.horizontalAdvance(digits);
+
+    // Unter dem Bogenscheitel, ueber dem Drehpunkt -- derselbe Platz,
+    // den die drei Entwurfsblaetter gezeigt haben.
+    //
+    // Betreiber 2026-09-03: "bitte loesche dort das MHZ. braucht Platz
+    // und wird nicht benoetigt" -- die Einheit ist bei einer achtstelligen
+    // Hz-Anzeige (die Millionenstelle allein sagt schon "das ist MHz")
+    // selbsterklaerend, die Ziffern jetzt allein zentriert statt neben
+    // einer zweiten, kleineren Schrift.
+    const QPointF centre(pivot.x(), pivot.y() - radius * 0.32);
+    const qreal x = centre.x() - digitsW / 2.0;
+
+    p.setFont(digitFont);
+    p.setPen(QColor(Style::kAmberText));
+    p.drawText(QPointF(x, centre.y() + fm.ascent() / 2.0), digits);
+
     p.restore();
 }
 
@@ -340,6 +404,7 @@ void NeedleInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
         // Messwert. Ein Zifferblatt ohne Nabe sähe unfertig aus statt
         // ruhig.
         Instrument::paintHub(p, spine);
+        paintFrequencyOverlay(p, pivot, radius);
         return;
     }
 
@@ -382,6 +447,7 @@ void NeedleInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
 
     // Die Nabe deckt den Zeigerfuss ab.
     Instrument::paintHub(p, spine);
+    paintFrequencyOverlay(p, pivot, radius);
 }
 
 } // namespace Longpath

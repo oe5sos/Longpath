@@ -55,6 +55,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "MeterItem.h"
+#include "gui/StyleConstants.h"
 
 #include <QColor>
 #include <QFont>
@@ -108,7 +109,12 @@ public:
         QString text;
         QColor fillColour{0x1a, 0x2a, 0x3a};       // STYLEGUIDE button base
         QColor hoverColour{0x20, 0x40, 0x60};       // STYLEGUIDE button hover
-        QColor clickColour{0x00, 0xb4, 0xd8};       // STYLEGUIDE accent
+        // War AetherSDR-Tuerkis (#00b4d8, abgeschafft). Klick-Feedback
+        // eines Knopfs ist echt "anfassbar" (HAUSSTIL.md), also kAccent --
+        // anders als die Messwert-Balken/Grafiken anderswo in meters/.
+        // Betreiber 2026-09-08: Entscheidung an Claude delegiert
+        // ("egal, wie du meinst").
+        QColor clickColour{Style::role("accent", Style::kAccent)};
         QColor borderColour{0x20, 0x50, 0x70};      // STYLEGUIDE border
         QColor onColour{0x00, 0x70, 0xc0};          // STYLEGUIDE blue active bg
         QColor offColour{0x1a, 0x2a, 0x3a};

@@ -582,14 +582,6 @@ int currentCwPitch()
 constexpr int kDiguClickTuneOffset = 1500;
 constexpr int kDiglClickTuneOffset = 2210;
 
-// Bei AM, SAM, FM und DSB ist die ANGEZEIGTE Breite die halbe.
-// From Thetis console.cs:35222-35229 — `bw /= 2` fuer genau diese vier.
-bool isDoubleSidebandMode(DSPMode mode)
-{
-    return mode == DSPMode::AM  || mode == DSPMode::SAM
-        || mode == DSPMode::FM  || mode == DSPMode::DSB;
-}
-
 } // namespace
 
 int SliceModel::defaultLowCut()
@@ -898,7 +890,14 @@ void SliceModel::setAfGain(int gain)
 
 void SliceModel::setRfGain(int gain)
 {
-    gain = std::clamp(gain, 0, 100);
+    // This is the WDSP AGC top / max gain (RadioModel feeds it to
+    // RxChannel::setAgcTop -> SetRXAAGCTop). From Thetis
+    // console.designer.cs:3708-3709 [v2.10.3.15]: ptbRF.Minimum = -20,
+    // ptbRF.Maximum = 120 -- the same bounds TCIServer.cs handleAgcGain
+    // clamps to and RxChannel::readBackAgcTop already applies. The earlier
+    // 0..100 here was a NereusSDR-original guess that silently narrowed
+    // both the TCI agc_gain path and the AGC-threshold readback mirror.
+    gain = std::clamp(gain, -20, 120);
     if (m_rfGain != gain) {
         m_rfGain = gain;
         emit rfGainChanged(gain);
@@ -1191,41 +1190,86 @@ void SliceModel::setFmsqThresh(double dB)
 
 void SliceModel::setAgcThreshold(int dBu)
 {
-    if (m_agcThreshold != dBu) {
-        m_agcThreshold = dBu;
-        emit agcThresholdChanged(dBu);
+    // RxChannel::setAgcThreshold feeds this straight into WDSP's
+    // SetRXAAGCThresh, which computes max_gain via
+    // out_target / (var_gain * pow(10, (thresh+noise_offset)/20))
+    // (wcpAGC.c:504-515) -- an extreme thresh drives pow(10, x/20)
+    // toward overflow/underflow, producing an Inf/0/NaN max_gain that
+    // propagates through the whole AGC chain.
+    //
+    // From Thetis console.cs:45969-45970 [v2.10.3.13] -- clamp [-160, +2],
+    // already cited/ported at RadioModel.cpp's auto-AGC noise-floor calc
+    // and matching RxChannel::readBackAgcThresh's own -160 floor
+    // (console.cs:50345, "[2.10.3.6]MW0LGE changed from -143") and the
+    // RxApplet AGC-T slider range (-160..0, console.cs:45977). An
+    // earlier version of this clamp used an invented +-100 defensive
+    // bound that was narrower than this real range on the low end --
+    // caught live because it silently reclamped legitimate threshold
+    // values the auto-AGC path and RF-Gain sync routinely compute below
+    // -100, desyncing the model/UI from what WDSP was actually applying.
+    static constexpr int kAgcThresholdMin = -160;
+    static constexpr int kAgcThresholdMax = 2;
+    const int clamped = qBound(kAgcThresholdMin, dBu, kAgcThresholdMax);
+    if (m_agcThreshold != clamped) {
+        m_agcThreshold = clamped;
+        emit agcThresholdChanged(clamped);
     }
 }
 
 void SliceModel::setAgcHang(int ms)
 {
-    if (m_agcHang != ms) {
-        m_agcHang = ms;
-        emit agcHangChanged(ms);
+    // From Thetis setup.designer.cs udDSPAGCHangTime.Minimum/Maximum
+    // [v2.10.3.15]: 10..5000 ms.
+    static constexpr int kAgcHangMin = 10;
+    static constexpr int kAgcHangMax = 5000;
+    const int clamped = qBound(kAgcHangMin, ms, kAgcHangMax);
+    if (m_agcHang != clamped) {
+        m_agcHang = clamped;
+        emit agcHangChanged(clamped);
     }
 }
 
 void SliceModel::setAgcSlope(int dB)
 {
-    if (m_agcSlope != dB) {
-        m_agcSlope = dB;
-        emit agcSlopeChanged(dB);
+    // From Thetis setup.designer.cs udDSPAGCSlope.Minimum/Maximum
+    // [v2.10.3.15]: 0..20 dB.
+    static constexpr int kAgcSlopeMin = 0;
+    static constexpr int kAgcSlopeMax = 20;
+    const int clamped = qBound(kAgcSlopeMin, dB, kAgcSlopeMax);
+    if (m_agcSlope != clamped) {
+        m_agcSlope = clamped;
+        emit agcSlopeChanged(clamped);
     }
 }
 
 void SliceModel::setAgcAttack(int ms)
 {
-    if (m_agcAttack != ms) {
-        m_agcAttack = ms;
-        emit agcAttackChanged(ms);
+    // RxChannel::setAgcAttack's own port comment notes Thetis declares
+    // SetRXAAGCAttack (dsp.cs:116-117) but has "no explicit radio.cs
+    // call site (disabled in UI)" -- Thetis never exposes this as a
+    // bounded control in practice. WDSP's SetRXAAGCAttack (wcpAGC.c:418)
+    // does the same ms/1000.0 -> tau_attack conversion as the
+    // Thetis-bounded Decay setter below, so this mirrors Decay's cited
+    // 1..5000 ms range rather than inventing an unrelated number.
+    static constexpr int kAgcAttackMin = 1;
+    static constexpr int kAgcAttackMax = 5000;
+    const int clamped = qBound(kAgcAttackMin, ms, kAgcAttackMax);
+    if (m_agcAttack != clamped) {
+        m_agcAttack = clamped;
+        emit agcAttackChanged(clamped);
     }
 }
 
 void SliceModel::setAgcDecay(int ms)
 {
-    if (m_agcDecay != ms) {
-        m_agcDecay = ms;
-        emit agcDecayChanged(ms);
+    // From Thetis setup.designer.cs udDSPAGCDecay.Minimum/Maximum
+    // [v2.10.3.15]: 1..5000 ms.
+    static constexpr int kAgcDecayMin = 1;
+    static constexpr int kAgcDecayMax = 5000;
+    const int clamped = qBound(kAgcDecayMin, ms, kAgcDecayMax);
+    if (m_agcDecay != clamped) {
+        m_agcDecay = clamped;
+        emit agcDecayChanged(clamped);
     }
 }
 
@@ -1247,25 +1291,43 @@ void SliceModel::setAutoAgcOffset(double dB)
 
 void SliceModel::setAgcFixedGain(int dB)
 {
-    if (m_agcFixedGain != dB) {
-        m_agcFixedGain = dB;
-        emit agcFixedGainChanged(dB);
+    // From Thetis setup.designer.cs udDSPAGCFixedGaindB.Minimum/Maximum
+    // [v2.10.3.15]: -20..120 dB (Minimum decimal encodes the sign via
+    // its 4th int component, 0x80000000).
+    static constexpr int kAgcFixedGainMin = -20;
+    static constexpr int kAgcFixedGainMax = 120;
+    const int clamped = qBound(kAgcFixedGainMin, dB, kAgcFixedGainMax);
+    if (m_agcFixedGain != clamped) {
+        m_agcFixedGain = clamped;
+        emit agcFixedGainChanged(clamped);
     }
 }
 
 void SliceModel::setAgcHangThreshold(int val)
 {
-    if (m_agcHangThreshold != val) {
-        m_agcHangThreshold = val;
-        emit agcHangThresholdChanged(val);
+    // From Thetis setup.designer.cs tbDSPAGCHangThreshold.Maximum
+    // [v2.10.3.15]: 100 (TrackBar; Minimum left at the WinForms
+    // TrackBar default of 0 -- no explicit override in the designer
+    // file).
+    static constexpr int kAgcHangThresholdMin = 0;
+    static constexpr int kAgcHangThresholdMax = 100;
+    const int clamped = qBound(kAgcHangThresholdMin, val, kAgcHangThresholdMax);
+    if (m_agcHangThreshold != clamped) {
+        m_agcHangThreshold = clamped;
+        emit agcHangThresholdChanged(clamped);
     }
 }
 
 void SliceModel::setAgcMaxGain(int dB)
 {
-    if (m_agcMaxGain != dB) {
-        m_agcMaxGain = dB;
-        emit agcMaxGainChanged(dB);
+    // From Thetis setup.designer.cs udDSPAGCMaxGaindB.Minimum/Maximum
+    // [v2.10.3.15]: -20..120 dB (same encoding note as FixedGain above).
+    static constexpr int kAgcMaxGainMin = -20;
+    static constexpr int kAgcMaxGainMax = 120;
+    const int clamped = qBound(kAgcMaxGainMin, dB, kAgcMaxGainMax);
+    if (m_agcMaxGain != clamped) {
+        m_agcMaxGain = clamped;
+        emit agcMaxGainChanged(clamped);
     }
 }
 
@@ -2332,13 +2394,24 @@ void SliceModel::restoreFromSettings(Band band)
         // Set mode WITHOUT applying the default filter — filter follows below.
         // We must update m_dspMode before reading FilterLow/FilterHigh so
         // the final setFilter call is not superseded by setDspMode's default.
-        DSPMode mode = static_cast<DSPMode>(
-            s.value(bp + QStringLiteral("DspMode")).toInt());
-        // Directly assign mode without calling setDspMode() (which also
-        // resets the filter). Emit the signal manually to keep observers in sync.
-        if (m_dspMode != mode) {
-            m_dspMode = mode;
-            emit dspModeChanged(mode);
+        const int rawMode = s.value(bp + QStringLiteral("DspMode")).toInt();
+        // Guard against a corrupted/out-of-range persisted value (e.g. a
+        // settings file edited or hand-crafted outside the app) reaching
+        // static_cast<DSPMode> as undefined enum territory and flowing
+        // unchecked into WDSP mode dispatch. RADE_L=13 is the highest
+        // defined value (WdspTypes.h).
+        if (rawMode >= static_cast<int>(DSPMode::LSB) &&
+            rawMode <= static_cast<int>(DSPMode::RADE_L)) {
+            const DSPMode mode = static_cast<DSPMode>(rawMode);
+            // Directly assign mode without calling setDspMode() (which also
+            // resets the filter). Emit the signal manually to keep observers in sync.
+            if (m_dspMode != mode) {
+                m_dspMode = mode;
+                emit dspModeChanged(mode);
+            }
+        } else {
+            qCWarning(lcDsp) << "Ignoring out-of-range persisted DspMode"
+                              << rawMode << "for" << bp;
         }
     }
     // Phase 3J-1 closeout Item 4 (2026-05-12): prefer (band, currentMode)
@@ -2359,8 +2432,18 @@ void SliceModel::restoreFromSettings(Band band)
         }
     }
     if (s.contains(bp + QStringLiteral("AgcMode"))) {
-        setAgcMode(static_cast<AGCMode>(
-            s.value(bp + QStringLiteral("AgcMode")).toInt()));
+        // Same corrupted-settings guard as DspMode above -- AGCMode's
+        // valid range is Off=0..Custom=5 (WdspTypes.h). An out-of-range
+        // value would otherwise flow straight into
+        // RxChannel::setAgcMode() -> SetRXAAGCMode() unchecked.
+        const int rawAgcMode = s.value(bp + QStringLiteral("AgcMode")).toInt();
+        if (rawAgcMode >= static_cast<int>(AGCMode::Off) &&
+            rawAgcMode <= static_cast<int>(AGCMode::Custom)) {
+            setAgcMode(static_cast<AGCMode>(rawAgcMode));
+        } else {
+            qCWarning(lcDsp) << "Ignoring out-of-range persisted AgcMode"
+                              << rawAgcMode << "for" << bp;
+        }
     }
     if (s.contains(bp + QStringLiteral("StepHz"))) {
         setStepHz(s.value(bp + QStringLiteral("StepHz")).toInt());

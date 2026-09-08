@@ -58,6 +58,11 @@ public:
     QString appletTitle() const override { return QStringLiteral("Power Genius"); }
     void    syncFromModel() override {}
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) ruft denselben Signalweg wie
+    // "Open PGXL Advanced..." im Rechtsklickmenue.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { emit navigationRequested(QStringLiteral("pgxlAdvanced")); }
+
     // Test seam: returns a heap-allocated QMenu* without exec()-ing it.
     // Caller owns the returned menu; delete or deleteLater() as needed.
     // Same pattern as the other applets' buildContextMenuForTesting() (Task 38,

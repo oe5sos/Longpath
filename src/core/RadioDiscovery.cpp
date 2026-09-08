@@ -65,6 +65,10 @@ mw0lge@grange-lane.co.uk
 
 #include <QDateTime>
 #include <QNetworkInterface>
+#include <QSharedMemory>
+
+#include <algorithm>
+#include <chrono>
 
 #ifdef Q_OS_WIN
 #include <winsock2.h>
@@ -73,6 +77,155 @@ mw0lge@grange-lane.co.uk
 #endif
 
 namespace Longpath {
+
+namespace {
+
+// Cross-process companion to RadioDiscovery::s_scanHoldOff — see that
+// field's own comment for why the guard has to be process-wide at all
+// (a P2/Red-Pitaya board's ~2 s post-stop deadman window; a stray
+// discovery probe landing inside it can freeze the board) and why it is
+// monotonic, not wall-clock.
+//
+// s_scanHoldOff being "process-wide" only reaches every RadioDiscovery
+// object *inside one process*. Longpath does not run multi-radio in a
+// single process — "two windows" means two independent OS processes, each
+// with its own s_scanHoldOff starting at "no holdoff armed". Found
+// 2026-09-02 (see docs/architecture note / longpath-p2-discovery-crossprocess-freeze):
+// process A disconnects a P2 board and arms its own quiet period; if
+// process B's ConnectionPanel opens in that window, its startDiscovery()
+// call — reading process B's OWN clean s_scanHoldOff — sees no holdoff
+// at all and fires a broadcast probe straight into the board's deadman
+// window.
+//
+// Fix: mirror the deadline into a small OS-level shared-memory segment
+// keyed by a fixed name, so every Longpath process on this machine sees
+// the same value. CLOCK_MONOTONIC (Unix) and QueryPerformanceCounter
+// (Windows) are machine-wide clocks with a shared, unspecified epoch —
+// not per-process — so a nanosecond count one process writes is directly
+// comparable by another (see QElapsedTimer's platform notes). This is
+// therefore safe on all three platforms without needing wall-clock time
+// at all, matching the "MONOTONIC, not wall-clock" reasoning already
+// established for s_scanHoldOff itself.
+//
+// Best-effort by design: if the platform refuses shared memory (sandboxing,
+// resource exhaustion), discovery falls back to exactly today's
+// per-process-only behaviour — it never blocks, never crashes, and never
+// makes the single-window case worse than it already was.
+//
+// Known residual gap: the segment only outlives the OS-level attach count
+// across ALL processes, which means the deadline can only be seen by
+// another process while at least one attached handle -- ours or theirs --
+// is still open. If the process that armed the holdoff exits completely
+// within the quiet window before any other process attaches, the mirror
+// disappears with it and a later scan sees no cross-process guard, same as
+// before this fix. This does not regress the common real-world case the
+// 2026-09-02 finding describes (a second Longpath window opened while the
+// first is still running mid-disconnect -- the first process, and its
+// attached handle, are very much still alive), and it never makes anything
+// worse than the pre-fix baseline. A guarantee independent of any process
+// staying alive would need a persisted file instead of shared memory; not
+// done here because the only confirmed incident this addresses turned out
+// to have an unrelated root cause (a blown fuse), and the fix already
+// closes the gap for the scenario that is actually plausible.
+constexpr auto kCrossProcessHoldoffKey = "at.oe5sos.longpath.discoveryHoldoff";
+
+qint64 monotonicNowNs()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+// The one QSharedMemory handle this process keeps open for the segment's
+// entire lifetime.  QSharedMemory detaches in its destructor, and on Unix
+// (both the POSIX-shm and SysV-shm backends Qt uses) the segment itself is
+// torn down the moment its LAST attached handle in ANY process detaches —
+// there is no OS-level "this many processes still care" refcount beyond
+// "how many handles are currently attached". A fresh, function-local
+// QSharedMemory per publish/read call therefore creates the segment, writes
+// it, and destroys it again before anyone else — even a second call a
+// microsecond later — has a chance to attach. Keeping exactly one handle
+// alive for the process's lifetime, lazily created on first use, is what
+// makes the deadline actually survive between calls, in this process and in
+// every other one attached to the same key.
+QSharedMemory& sharedHoldoffSegment()
+{
+    static QSharedMemory shm{QLatin1String(kCrossProcessHoldoffKey)};
+    if (shm.isAttached()) {
+        return shm;
+    }
+    if (shm.create(sizeof(qint64))) {
+        *static_cast<qint64*>(shm.data()) = 0;   // don't trust the platform to zero a fresh segment
+        return shm;
+    }
+    if (shm.error() == QSharedMemory::AlreadyExists) {
+        shm.attach();   // another process (or an earlier call in this one) already created it
+    }
+    return shm;
+}
+
+// Publishes `deadlineNs` (an absolute monotonic-clock nanosecond count) to
+// every Longpath process on this machine, keeping whichever deadline is
+// LATER — same "a short holdoff can never pull in a longer one already in
+// flight" rule RadioDiscovery::holdOffScans() already applies in-process.
+void publishCrossProcessHoldoff(qint64 deadlineNs)
+{
+    QSharedMemory& shm = sharedHoldoffSegment();
+    if (!shm.isAttached()) {
+        qCDebug(lcDiscovery) << "cross-process discovery holdoff unavailable, falling back to"
+                                 " per-process guard only:" << shm.errorString();
+        return;
+    }
+    if (!shm.lock()) {
+        return;
+    }
+    auto* value = static_cast<qint64*>(shm.data());
+    if (deadlineNs > *value) {
+        *value = deadlineNs;
+    }
+    shm.unlock();
+}
+
+// Remaining cross-process holdoff in milliseconds, 0 if none is armed or
+// shared memory is unavailable — either way, "no extra guard" is exactly
+// today's behaviour, never a regression.
+qint64 crossProcessHoldoffRemainingMs()
+{
+    QSharedMemory& shm = sharedHoldoffSegment();
+    if (!shm.isAttached()) {
+        return 0;
+    }
+    if (!shm.lock()) {
+        return 0;
+    }
+    qint64 deadlineNs = 0;
+    if (shm.constData() != nullptr && shm.size() >= static_cast<int>(sizeof(qint64))) {
+        deadlineNs = *static_cast<const qint64*>(shm.constData());
+    }
+    shm.unlock();
+    const qint64 remainingNs = deadlineNs - monotonicNowNs();
+    return remainingNs > 0 ? remainingNs / 1000000 : 0;
+}
+
+#ifdef NEREUS_BUILD_TESTS
+// Test-only: zero the shared segment so a leftover deadline from one test
+// binary run's earlier test function doesn't leak into a later one via
+// std::max(local, crossProcess) in holdOffRemainingMs(). Mirrors
+// RadioDiscovery::clearHoldOffForTest()'s reset of s_scanHoldOff.
+void resetCrossProcessHoldoffForTest()
+{
+    QSharedMemory& shm = sharedHoldoffSegment();
+    if (!shm.isAttached()) {
+        return;
+    }
+    if (!shm.lock()) {
+        return;
+    }
+    *static_cast<qint64*>(shm.data()) = 0;
+    shm.unlock();
+}
+#endif
+
+}  // namespace
 
 // --- RadioInfo static helpers ---
 
@@ -160,6 +313,11 @@ void RadioDiscovery::holdOffScans(std::chrono::milliseconds quiet)
     if (candidate > s_scanHoldOff) {
         s_scanHoldOff = candidate;
     }
+    // Also publish to every OTHER Longpath process on this machine — see
+    // the cross-process helpers above for why s_scanHoldOff alone leaves a
+    // gap when two windows are open at once (2026-09-02 finding).
+    publishCrossProcessHoldoff(monotonicNowNs()
+        + std::chrono::duration_cast<std::chrono::nanoseconds>(quiet).count());
 }
 
 // Remaining quiet time, 0 when scans may run now.  See holdOffScans() decl
@@ -169,8 +327,20 @@ qint64 RadioDiscovery::holdOffRemainingMs() const
     // remainingTime() is monotonic and already clamps to 0 once expired; the
     // guard covers the -1 "forever" encoding, which we never construct.
     const qint64 remaining = s_scanHoldOff.remainingTime();
-    return remaining > 0 ? remaining : 0;
+    const qint64 localRemaining = remaining > 0 ? remaining : 0;
+    // The later of "this process's own guard" and "what any other Longpath
+    // process on this machine has armed" — see the cross-process helpers
+    // above.
+    return std::max(localRemaining, crossProcessHoldoffRemainingMs());
 }
+
+#ifdef NEREUS_BUILD_TESTS
+void RadioDiscovery::clearHoldOffForTest()
+{
+    s_scanHoldOff = QDeadlineTimer();
+    resetCrossProcessHoldoffForTest();
+}
+#endif
 
 void RadioDiscovery::startDiscovery()
 {

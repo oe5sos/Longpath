@@ -28,10 +28,8 @@
 //                                    (SpotHub POTA improvement pass, no
 //                                    upstream equivalent). Added
 //                                    `reference` and `entity` so
-//                                    activation-style sources (POTA
-//                                    today; SOTA is scoped but not yet
-//                                    connected — see PotaClient.h) don't
-//                                    have to flatten their park/summit
+//                                    activation-style sources (POTA)
+//                                    don't have to flatten their park
 //                                    reference into the free-text
 //                                    `comment` string. `entity` is the
 //                                    reference's location prefix (POTA
@@ -44,6 +42,17 @@
 //                                    such reference (Cluster, RBN,
 //                                    WSJT-X, SpotCollector, FreeDV,
 //                                    PSK).
+//   2026-09-03  AI (Anthropic Claude Code)  SOTA is connected now (see
+//                                    SotaClient.h) -- the note above
+//                                    about it being "scoped but not yet
+//                                    connected" no longer applies. SOTA
+//                                    references split on '/' rather
+//                                    than POTA's '-' (SotaClient derives
+//                                    `entity` accordingly); `grid` comes
+//                                    from a lat/lon-to-Maidenhead
+//                                    conversion instead of a ready-made
+//                                    field, since SOTA's API gives
+//                                    coordinates, not a locator.
 //   2026-08-27  AI (Anthropic Claude Code)  NereusSDR-native extension
 //                                    (operator-requested follow-up).
 //                                    Added `grid` (Maidenhead locator

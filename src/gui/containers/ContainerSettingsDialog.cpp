@@ -248,13 +248,6 @@ constexpr const char* kLabelStyle =
 constexpr const char* kSectionHeaderStyle =
     "color: #8aa8c0; font-weight: bold; font-size: 13px;";
 
-constexpr const char* kSpinStyle =
-    "background: #0a0a18;"
-    "color: #c8d8e8;"
-    "border: 1px solid #1e2e3e;"
-    "border-radius: 6px;"
-    "padding: 2px;";
-
 QPushButton* makeBtn(const QString& text, QWidget* parent)
 {
     QPushButton* btn = new QPushButton(text, parent);
@@ -764,8 +757,12 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px;"
         "  min-width: 160px; }"
+        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #205070; selection-background-color: #4a7ba8; }"));
+        "  border: 1px solid #205070; selection-background-color: #4a7ba8;"
+        "  selection-color: #ffffff; }"));
     if (m_manager) {
         const QList<ContainerWidget*> all = m_manager->allContainers();
         int activeIdx = -1;
@@ -848,8 +845,12 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     m_rxSourceCombo->setStyleSheet(Style::themed(
         "QComboBox { background: #0a0a18; color: #c8d8e8;"
         "  border: 1px solid #1e2e3e; border-radius: 6px; padding: 2px 4px; }"
+        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
         "QComboBox QAbstractItemView { background: #0a0a18; color: #c8d8e8;"
-        "  border: 1px solid #205070; selection-background-color: #4a7ba8; }"));
+        "  border: 1px solid #205070; selection-background-color: #4a7ba8;"
+        "  selection-color: #ffffff; }"));
     m_rxSourceCombo->setFixedWidth(64);
 
     // Show on RX / TX

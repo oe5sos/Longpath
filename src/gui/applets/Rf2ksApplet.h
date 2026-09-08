@@ -49,6 +49,11 @@ public:
     QString appletTitle() const override { return QStringLiteral("RF-Kit RF2K-S"); }
     void    syncFromModel() override {}
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) ruft denselben Signalweg wie
+    // "Open RF-Kit Advanced..." im Rechtsklickmenue.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { emit navigationRequested(QStringLiteral("rfKit")); }
+
     // Test seams (Section A - Task 7).
     QString deviceLabelTextForTesting()    const;
     QString nicknameLabelTextForTesting()  const;

@@ -2874,6 +2874,17 @@ void P1RadioConnection::onReconnectTimeout()
     // Transition to Connecting for this retry attempt.
     setState(ConnectionState::Connecting);
 
+    // Bug fix 2026-09-07: onConnectTimeout() tears a failed initial connect
+    // down to m_running=false / m_intentionalDisconnect=true (see there).
+    // This function never undid either flag, so onWatchdogTick()'s very
+    // first guard (`if (!m_running ...) return;`) made silence detection
+    // and onEp2PacerTick() permanently inert for the rest of the retry —
+    // and, if this retry's first ep6 frame DID arrive, for the rest of that
+    // whole connection too, since nothing else ever resets m_running back
+    // to true. Mirror connectToRadio()'s own reset of both flags here.
+    m_running = true;
+    m_intentionalDisconnect = false;
+
     // Send stop then prime then start so the radio re-arms its ep6 sender
     // with the current RX1 frequency latched. Without the primed C&C burst,
     // the radio comes back up in ADC-idle state (I=DC, Q=0).
@@ -2894,13 +2905,21 @@ void P1RadioConnection::onReconnectTimeout()
         m_ep2PacerTimer->start();
     }
 
-    // Re-arm the reconnect timer so if this attempt also fails, the next retry
-    // is scheduled automatically (the watchdog will stop itself and re-arm this
-    // timer again when it detects silence).
-    // We do NOT re-arm here unconditionally — the watchdog arms it when needed.
-    // But we schedule a fallback in case no ep6 data arrives within the window
-    // (i.e., watchdog trips again → re-arms reconnect timer).
-    // No extra start() needed; see onWatchdogTick for the arming path.
+    // Bug fix 2026-09-07: m_watchdogTimer's silence check (onWatchdogTick)
+    // only fires once m_lastEp6At is already valid — i.e. it can only detect
+    // "was receiving, went quiet", never "this retry also got zero data".
+    // For a radio that never delivers a single ep6 frame, m_lastEp6At stays
+    // invalid forever, so that path can never trip. The connect watchdog is
+    // the only mechanism that fires unconditionally after kConnectTimeoutMs
+    // regardless of prior data, so re-arm it exactly as connectToRadio()
+    // does; onReadyRead() already stops it on the first good frame either
+    // way. If this retry also gets no data, onConnectTimeout() runs again —
+    // which, per the comment there (Betreiberwunsch, 2026-08-27), is meant
+    // to give "never came through at all" retries full grace each time
+    // rather than counting against kMaxReconnectAttempts.
+    if (m_connectWatchdog) {
+        m_connectWatchdog->start(kConnectTimeoutMs);
+    }
 }
 
 // ---------------------------------------------------------------------------

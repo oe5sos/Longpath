@@ -57,10 +57,12 @@ mw0lge@grange-lane.co.uk
 #include "ContainerWidget.h"
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/WindowPlacement.h"
 #include "gui/WindowChrome.h"
 
 #include <QCloseEvent>
+#include <QMoveEvent>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -87,6 +89,10 @@ FloatingContainer::FloatingContainer(int rxSource, QWidget* parent)
     // Fenstern, und er ist nativ, damit ihn kein QRhiWidget im Inhalt
     // verdeckt (SpectrumWidget.cpp:551).
     attachResizeGrip(this);
+
+    // Betreiber, wiederholt gemeldet: siehe AppletFloatingWindow.cpp,
+    // derselbe Grund.
+    enableFullScreenAuxiliaryBehavior(this);
 
     qCDebug(lcContainer) << "FloatingContainer created for RX" << rxSource;
 }
@@ -186,6 +192,15 @@ void FloatingContainer::closeEvent(QCloseEvent* event)
     }
     saveGeometry();
     QWidget::closeEvent(event);
+}
+
+void FloatingContainer::moveEvent(QMoveEvent* event)
+{
+    QWidget::moveEvent(event);
+    // Betreiber 2026-09-02: schwebende Fenster sollen zueinander
+    // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
+    // Runden hier wuerde gegen das native Ziehen kaempfen.
+    snapToGridAfterSettle(this);
 }
 
 void FloatingContainer::saveGeometry()

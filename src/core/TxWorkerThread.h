@@ -486,6 +486,18 @@ private:
     quint64 m_pcMicTotalPulls{0};
     qint64  m_pcMicLastReportMs{0};
 
+    // Erweiterte Diagnose (2026-09-08): welche Seite steckt hinter
+    // einem kurzen pull() -- die Capture-Callback selbst spaet dran
+    // (Producer, CoreAudio-Thread), oder kam dieser Pump-Takt
+    // ungewoehnlich bald nach dem vorigen (Consumer, radiogetakteter
+    // Takt)? m_pcMicLastPumpTickNs wird bei JEDEM Takt aktualisiert
+    // (nicht nur bei kurzen), die beiden "worst"-Felder nur bei einem
+    // kurzen pull, und flie(ss)en mit in die 5s-Meldung ein.
+    qint64 m_pcMicLastPumpTickNs{0};
+    qint64 m_pcMicWorstProducerGapNs{0};
+    qint64 m_pcMicWorstConsumerGapNs{0};
+    int    m_pcMicWorstShortfall{0};
+
     // Channel strip and its mono scratch. m_in is interleaved double;
     // the strip works on mono float, so the I channel is lifted out,
     // processed and written back. Sized in setStripChain rather than

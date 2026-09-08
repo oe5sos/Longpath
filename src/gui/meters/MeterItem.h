@@ -119,6 +119,8 @@ mw0lge@grange-lane.co.uk
 #include <QUuid>
 #include <limits>
 
+#include "gui/StyleConstants.h"
+
 class QPainter;
 class QMouseEvent;
 class QWheelEvent;
@@ -556,8 +558,15 @@ private:
     Orientation m_orientation{Orientation::Horizontal};
     double      m_minVal{-140.0};
     double      m_maxVal{0.0};
-    // AetherSDR cyan bar color
-    QColor      m_barColor{0x00, 0xb4, 0xd8};
+    // War AetherSDR-Tuerkis (#00b4d8, abgeschafft). Greift nur, wenn der
+    // Aufrufer keine eigene setBarColor()-Farbe setzt (PowerBar/SwrBar tun
+    // das und stehen schon auf Bernstein) -- die verbleibenden Aufrufer
+    // (generischer "BAR"-Itemtyp in MeterWidget::deserialize,
+    // ContainerSettingsDialog "Add Item"/deserialize) zeigen ebenfalls
+    // einen Messwert, keine Bedienung, also dieselbe Bernstein-Rolle
+    // "measured" wie PowerBar/SwrBar/S-Meter-Text. Betreiber 2026-09-08:
+    // Entscheidung an Claude delegiert ("egal, wie du meinst").
+    QColor      m_barColor{Style::role("measured", Style::kAmberText)};
     QColor      m_barRedColor{0xff, 0x44, 0x44};
     double      m_redThreshold{1000.0}; // disabled by default (above maxVal)
     // From Thetis MeterManager.cs

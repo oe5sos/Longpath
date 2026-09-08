@@ -251,6 +251,8 @@ warren@wpratt.com
 // state + drives PanadapterStack layout/float actions.
 #include "PanadapterStack.h"
 #include "PanadapterApplet.h"
+#include "PanFloatingWindow.h"
+#include "MacFloatingWindowBehavior.h"
 #include "PanLayoutDialog.h"
 
 #include <QColorDialog>
@@ -345,6 +347,7 @@ warren@wpratt.com
 #include "core/WsjtxClient.h"
 #include "core/SpotCollectorClient.h"
 #include "core/PotaClient.h"
+#include "core/SotaClient.h"
 #include "core/PskReporterClient.h"
 #include "PsForm.h"
 #include "PsaIndicatorWidget.h"
@@ -359,10 +362,10 @@ warren@wpratt.com
 #include "applets/DiversityApplet.h"
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
+#include "applets/RttyDecoderApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
-#include "applets/TxMeterApplet.h"
 #include "applets/AsrApplet.h"
 #include "asr/AsrService.h"
 #include "asr/RemoteAsrBackend.h"
@@ -450,6 +453,7 @@ warren@wpratt.com
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QLineEdit>
 #include <QStandardPaths>
@@ -583,10 +587,21 @@ MainWindow::MainWindow(QWidget* parent)
     // so the menu is fully populated with actions before we re-parent it.
     //
     // setMenuWidget() hands ownership to QMainWindow and installs the
-    // strip at the top of the window. On macOS this also disables Qt's
-    // promotion of the menu bar to the native global bar — menus render
-    // in-window alongside the master-output controls (explicit design
-    // choice, user-approved option D for Sub-Phase 10).
+    // strip at the top of the window. On macOS this does NOT by itself
+    // disable Qt's promotion of the menu bar to the native global bar —
+    // that claim, written here in April, was never true; setMenuWidget()
+    // only changes which widget occupies the QMainWindow's menu-area
+    // LAYOUT slot, and says nothing about QMenuBar::isNativeMenuBar(),
+    // which macOS defaults to true regardless. Left alone, the QMenuBar
+    // ends up neither properly promoted (it is no longer a direct
+    // QMainWindow-adjacent menu bar once TitleBar::setMenuBar() reparents
+    // it into m_hbox) nor rendered in-window (native mode suppresses its
+    // own widget painting) -- it goes missing from BOTH places, which is
+    // exactly the "Kopfleiste ist verschwunden" bug reported 2026-09-02.
+    // Explicit setNativeMenuBar(false) is the actual missing half of the
+    // "menus render in-window" design choice this comment always claimed
+    // was already in effect.
+    menuBar()->setNativeMenuBar(false);
     m_titleBar = new TitleBar(m_radioModel->audioEngine(), this);
     m_titleBar->setMenuBar(menuBar());
     setMenuWidget(m_titleBar);
@@ -933,10 +948,38 @@ MainWindow::MainWindow(QWidget* parent)
     // harmless. (Preserved from main PR #13 alongside Phase 3I's
     // singleShot auto-reconnect above.)
     connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
+        // Betreiber 2026-09-02, "das letzte Profil ist nie automatisch
+        // sichtbar" (zum wiederholten Mal gemeldet): dieser Handler kam
+        // am 2026-08-31 als Rueckfallpfad fuer den roten-Punkt-Weg dazu,
+        // OHNE die Sperre, die closeEvent() fuer den ANDEREN
+        // aboutToQuit-Handler (wireProfileRail(), siehe dessen Kommentar
+        // "prueft jetzt m_shuttingDown und tut auf diesem Weg nichts
+        // mehr") extra deswegen eingefuehrt hat -- Absturzbericht
+        // 2026-08-27 23:10, Cocoa loest aboutToQuit REENTRANT aus,
+        // waehrend closeEvent() noch auf dem Stapel steht. Ohne dieselbe
+        // Sperre HIER lief genau das weiter: closeEvent() erfasst den
+        // richtigen Stand zuerst (SOFORT, ganz am Anfang von closeEvent),
+        // dieser Handler erfasst DANACH nochmal -- unbedingt, auch wenn
+        // laengst m_shuttingDown gilt -- und ueberschreibt die richtige
+        // Erfassung mit dem halb abgebauten Zwischenstand. "Kein Fehler
+        // im Log" (jeder Schritt lief durch) UND "nie der richtige
+        // Letztzustand" (der zweite, unbeaufsichtigte Schreibvorgang
+        // gewinnt) sind damit kein Widerspruch. Fuer den Weg, den dieser
+        // Handler eigentlich abdeckt (SIGTERM/roter Punkt, closeEvent()
+        // laeuft dort NIE), bleibt er unveraendert wirksam: dort steht
+        // m_shuttingDown beim ersten und einzigen Aufruf noch auf false.
+        if (m_shuttingDown) { return; }
         // Same flush as closeEvent — covers the signal-shutdown path
         // (SIGTERM, force-quit, debugger detach) where closeEvent
         // doesn't run. Idempotent when closeEvent already flushed.
         m_shuttingDown = true;
+        // Betreiber 2026-08-31: dieselbe Sperre wie in closeEvent() --
+        // schadet hier nichts (die normale QObject-Elternschaft loest
+        // ohnehin kein QCloseEvent aus, siehe dockRotorPanel()'s
+        // Kommentar), schuetzt aber jeden kuenftigen Weg, der einem
+        // dieser Fenster doch ein echtes QCloseEvent zustellt.
+        if (m_panStack) { m_panStack->setShuttingDown(true); }
+        if (m_rotorWindow) { m_rotorWindow->setShuttingDown(true); }
         // 2026-05-22 bench-finding: graceful radio disconnect MUST happen
         // before the process tears down so the SendStop frame (run=0
         // CmdHighPriority) actually reaches the wire.  Without this,
@@ -952,15 +995,66 @@ MainWindow::MainWindow(QWidget* parent)
         if (m_containerManager) {
             m_containerManager->saveState();
         }
+        // Betreiber 2026-08-31: fehlte hier bislang, steht aber in
+        // closeEvent() (Phase 3F Sub-Epic D Task 15) -- Panadapter-
+        // Aufteilung/Splittergroessen (PanLayoutId + PanLayoutSplitter_*)
+        // wurden ueber DIESEN Beenden-Weg also nie gesichert, nur ueber
+        // den closeEvent()-Pfad, den dieser Nutzer nachweislich nie
+        // durchlaeuft.
+        if (m_panStack) { m_panStack->saveSplitterState(); }
+        // Betreiber 2026-08-31, per Log bewiesen: sein Beenden-Weg
+        // ("roter Punkt") liefert NIE ein QCloseEvent an MainWindow --
+        // in fuenf aufeinanderfolgenden Log-Dateien taucht die
+        // Diagnosezeile aus closeEvent() kein einziges Mal auf, obwohl
+        // der Funkgeraete-Rueckbau (WDSP/TCI/P2, alles unten in diesem
+        // Block) sichtbar sauber laeuft -- dieser aboutToQuit-Zweig ist
+        // fuer ihn also nicht der Rueckfallpfad, sondern der EINZIGE.
+        // captureIntoCurrent()+save() standen bisher nur in
+        // closeEvent() (Annahme im Kommentar oben: "closeEvent is fine
+        // for Cmd+Q" -- stimmte fuer diesen Beenden-Weg nicht). Ohne
+        // diese zwei Zeilen hier wurde der Profilstand beim Beenden nie
+        // aus der laufenden Oberflaeche neu eingesammelt, sondern blieb
+        // auf dem Stand der letzten Stelle, die captureIntoCurrent()
+        // sonst noch traf (Menue-Haken, Applet-Ablösen) -- fuer den
+        // Betreiber sah das aus wie "der gespeicherte Zustand ist nie
+        // der Letztzustand".
+        if (m_layoutProfiles) {
+            m_layoutProfiles->captureIntoCurrent();
+            m_layoutProfiles->save();
+            const QVariantMap snap =
+                m_layoutProfiles->snapshot(m_layoutProfiles->current());
+            qWarning() << "[ProfileSaveOnQuit:aboutToQuit]"
+                       << m_layoutProfiles->current()
+                       << "floatingApplets="
+                       << snap.value(QStringLiteral("floatingApplets")).toMap().size()
+                       << "floatingPans="
+                       << snap.value(QStringLiteral("floatingPans")).toMap().size()
+                       << "rotor=" << snap.value(QStringLiteral("rotor")).toMap();
+        }
         // Issue #206 — also flush window geometry on signal-based
         // shutdown (SIGTERM / force-quit). Idempotent with the
         // closeEvent path above.
         saveMainWindowGeometry();
         AppSettings::instance().save();
+        qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
     });
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
+    // SpectrumThread an, lange bevor es hierher kommt. Wird ein
+    // MainWindow aber OHNE closeEvent() zerstoert (Ausnahmepfad, Test-
+    // Harness), loescht ~QObject gleich darauf m_fftThread als Kind --
+    // und Qt bricht mit qFatal ab, wenn der Faden da noch laeuft. Der
+    // Destruktor-Rumpf laeuft VOR dem Abbau der Kinder; hier ist der
+    // letzte Ort, an dem sich das noch abfangen laesst. Im Normalfall
+    // ist isRunning() hier bereits false und die Zeile kostet nichts.
+    if (m_fftThread && m_fftThread->isRunning()) {
+        m_fftThread->quit();
+        m_fftThread->wait();
+    }
+}
 
 // Phase 3F Sub-Epic D Task 12: resolve the active pan's SpectrumWidget.
 // Used as a backward-compat shim for call sites that still address "the"
@@ -1491,20 +1585,73 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // Rechteck gar nicht erst gesetzt: ensureOnVisibleScreen holt es
     // dann auf den Schirm des Hauptfensters, statt es erst hinaus- und
     // dann wieder hereinzuschieben.
+    bool trustedRectApplied = false;
     if (rect.isValid()) {
         bool screenStillHere = screenKey.isEmpty();
+        QScreen* matchedScreen = nullptr;
         if (!screenStillHere) {
-            for (const QScreen* s : QGuiApplication::screens()) {
+            for (QScreen* s : QGuiApplication::screens()) {
                 if (!s) { continue; }
                 const QString key = s->serialNumber().isEmpty()
                                         ? s->name() : s->serialNumber();
-                if (key == screenKey) { screenStillHere = true; break; }
+                if (key == screenKey) {
+                    screenStillHere = true;
+                    matchedScreen = s;
+                    break;
+                }
             }
         }
-        if (screenStillHere) { win->setGeometry(rect); }
+        if (screenStillHere) {
+            // Betreiber 2026-09-02: TX-Fenster liess sich nicht mehr
+            // verschieben/vergroessern -- Ursache war nicht das Ziehen
+            // selbst, sondern dass es 78 Punkte rechts ueber den
+            // Bildschirmrand hinausstand: die Titelleisten-Symbole
+            // (Schloss/Einklappen/Schliessen) und der Groessengriff
+            // unten rechts (FramelessResizer) lagen physisch ausserhalb
+            // des sichtbaren Bereichs, mit der Maus nicht erreichbar.
+            //
+            // Dieser Zweig prueft nur "gibt es den Bildschirm noch",
+            // nicht "passt das Rechteck noch drauf" -- eine auf einem
+            // BREITEREN Bildschirm (oder vor einer Aufloesungsaenderung)
+            // gespeicherte Position blieb dadurch unangetastet
+            // bestehen, obwohl sie den heutigen Bildschirm ueberragt.
+            // ensureOnVisibleScreen() waere hier die naheliegende
+            // Antwort, liest aber win->geometry() NACH setGeometry() --
+            // fuer ein frisch erzeugtes, noch nie gezeigtes natives
+            // Fenster ist das auf macOS unzuverlaessig (Kommentar
+            // unten). Deshalb hier stattdessen gegen die SCHIRM-eigene
+            // (immer verlaessliche) verfuegbare Flaeche klemmen, bevor
+            // ueberhaupt gesetzt wird -- kein zweiter, unsicherer
+            // Lesevorgang noetig.
+            QRect clamped = rect;
+            if (matchedScreen) {
+                const QRect avail = matchedScreen->availableGeometry();
+                const int x = qBound(avail.x(), rect.x(), avail.right() - rect.width());
+                const int y = qBound(avail.y(), rect.y(), avail.bottom() - rect.height());
+                clamped.moveTopLeft(QPoint(x, y));
+            }
+            win->setGeometry(clamped);
+            trustedRectApplied = true;
+        }
     }
-    ensureOnVisibleScreen(win, this,
-                          QSize(Style::kAppletPanelW, 120));
+    // Betreiber 2026-08-30: "panadapter und filter wieder verrückt" --
+    // Bandwidth Filter, Frequenz und S-Meter landeten nach dem Neustart
+    // trotz gueltiger, bildschirmgeprueften Profil-Geometrie mittig
+    // ueber dem Panadapter statt an ihrer gemerkten Stelle.
+    // ensureOnVisibleScreen() liest win->geometry() und vertraut ihr
+    // nicht (siehe dort, "atOrigin"/Mindestgroesse) -- fuer ein frisch
+    // erzeugtes, noch nie gezeigtes Top-Level-Fenster ist genau dieser
+    // Wert auf macOS unmittelbar nach setGeometry() nicht verlaesslich
+    // dieselbe Zahl, die eben gesetzt wurde (das native Fenster
+    // existiert vor dem ersten show() schlicht noch nicht). Ein Rechteck,
+    // das schon durch die eigene Bildschirm-Pruefung oben kam, braucht
+    // keine zweite, weniger verlaessliche Pruefung mehr -- die galt
+    // ohnehin nur fuer den Fall, dass gar keine brauchbare Geometrie
+    // vorlag.
+    if (!trustedRectApplied) {
+        ensureOnVisibleScreen(win, this,
+                              QSize(Style::kAppletPanelW, 120));
+    }
 
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
@@ -1547,19 +1694,35 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
 
 void MainWindow::dockAppletBack(const QString& appletId)
 {
+    // ── Beim Beenden: NICHTS mehr andocken ───────────────────────────
+    //
+    // DER Grund fuer "profil nicht automatisch gespeichert" (Betreiber,
+    // 2026-08-30, zum wiederholten Mal): Cmd+Q schickt auch jedem
+    // Schwebefenster ein Schliessereignis, dessen closeEvent "Schliessen
+    // heisst andocken" ausloest -- und der Andock-Weg hier unten rief
+    // danach captureIntoCurrent()+save() und UEBERSCHRIEB damit die
+    // korrekte Profilaufnahme vom Anfang von MainWindow::closeEvent()
+    // mit "alles angedockt". Je nach Fensterreihenfolge verlor das
+    // Profil so bei jedem Beenden ein anderes abgeloestes Fenster
+    // (nachweisbar in Longpath.settings: floatingApplets schrumpfte
+    // von Sitzung zu Sitzung). Beim Herunterfahren gibt es nichts mehr
+    // anzudocken -- die Fenster sterben ohnehin mit dem Programm, und
+    // die Aufnahme ist laengst im Kasten.
+    if (m_shuttingDown) { return; }
+
     AppletFloatingWindow* win = m_floatingApplets.take(appletId);
     if (!win) { return; }
 
+    // Betreiber 2026-09-01 (Untersuchung nach einem Haenger/OOM-Verdacht
+    // beim Profilwechsel): dasselbe "erst verstecken, dann zerlegen"-
+    // Muster wie in dockRotorPanel() -- siehe dessen Kommentar fuer die
+    // volle Begruendung (PanadapterStack.cpp-Vorbild). win ist seit
+    // heute regelmaessig noch sichtbar, wenn releaseApplet()+deleteLater()
+    // darauf laufen.
+    win->hide();
     const int idx = win->dockIndex();
     AppletWidget* applet = win->releaseApplet();
-    if (m_shuttingDown) {
-        // Beim Herunterfahren gibt es keine Runde mehr, in der ein
-        // nachgereichtes Loeschen ankaeme — siehe die Notiz im
-        // closeEvent. Dann sofort.
-        delete win;
-    } else {
-        win->deleteLater();
-    }
+    win->deleteLater();
 
     if (!applet || !m_appletPanel) { return; }
     m_appletPanel->addApplet(applet);
@@ -1651,6 +1814,70 @@ void MainWindow::applyAppletVisibility(const QString& id, bool effective)
     // Kein Applet dahinter — die Knopfleiste und die Statuszeile gehen
     // ihren eigenen Weg.
     applyChromeVisibility(id, effective);
+}
+
+// Betreiber 2026-09-01: siehe m_borderlessFullSize in MainWindow.h fuer
+// die volle Begruendung. Kurzfassung: showFullScreen() legt das Fenster
+// in einen eigenen macOS-Space, und schwebende Werkzeugfenster
+// (Panadapter, S-Meter, Bandwidth Filter, Rotor/Log, TX, Frequenz ...)
+// folgten dabei nicht zuverlaessig -- sie blieben live beobachtet auf
+// dem normalen Schreibtisch-Space zurueck, unsichtbar hinter dem
+// Vollbild-Hauptfenster. Ein randloses Fenster auf voller
+// Bildschirmflaeche erreicht optisch dasselbe (kein Desktop sichtbar),
+// ohne je einen eigenen Space zu bekommen.
+void MainWindow::enterBorderlessFullSize()
+{
+    // availableGeometry(), NICHT geometry() (Betreiber 2026-09-01:
+    // "fullsize ist so groß, dass ich die untere leiste gar nicht
+    // öffnen kann"): die volle Bildschirmflaeche schliesst den Streifen
+    // unter der macOS-Menueleiste und hinter dem Dock mit ein -- macOS
+    // schiebt das Fenster unter der Menueleiste ein, die volle Hoehe
+    // ragt dann unten aus dem Schirm, und Longpaths eigene Statuszeile
+    // liegt unerreichbar hinter/unter dem Dock. availableGeometry() ist
+    // die Flaeche, die ein Fenster wirklich einnehmen kann; der
+    // Schreibtisch bleibt damit trotzdem vollstaendig bedeckt.
+    if (m_borderlessFullSize) {
+        // Schon randlos -- nur die Flaeche nachziehen, falls sich der
+        // Bildschirm (Aufloesung, externer Monitor) seither geaendert hat.
+        if (QScreen* scr = this->screen()) {
+            setGeometry(scr->availableGeometry());
+        }
+        return;
+    }
+    m_borderlessFullSize = true;
+    if (m_fullScreenAction && !m_fullScreenAction->isChecked()) {
+        const QSignalBlocker blocker(m_fullScreenAction);
+        m_fullScreenAction->setChecked(true);
+    }
+    // hide()/show(), nicht bloss setWindowFlag(): Qt dokumentiert, dass
+    // ein Rahmen-Flag am schon realisierten nativen Fenster (winId()
+    // existiert laengst -- die Applet-/Meter-Fenster brauchen es schon
+    // vorher) erst nach einem erneuten show() ankommt, auf macOS
+    // zuverlaessig nur mit einem hide() davor.
+    const bool wasVisible = isVisible();
+    if (wasVisible) { hide(); }
+    setWindowFlag(Qt::FramelessWindowHint, true);
+    if (QScreen* scr = this->screen()) {
+        setGeometry(scr->availableGeometry());
+    }
+    show();
+    raise();
+    activateWindow();
+}
+
+void MainWindow::exitBorderlessFullSize()
+{
+    if (!m_borderlessFullSize) { return; }
+    m_borderlessFullSize = false;
+    if (m_fullScreenAction && m_fullScreenAction->isChecked()) {
+        const QSignalBlocker blocker(m_fullScreenAction);
+        m_fullScreenAction->setChecked(false);
+    }
+    if (isVisible()) { hide(); }
+    setWindowFlag(Qt::FramelessWindowHint, false);
+    show();
+    raise();
+    activateWindow();
 }
 
 QVariantMap MainWindow::blankLayoutState() const
@@ -1793,6 +2020,91 @@ void MainWindow::wireProfileRail()
         if (!m_layoutProfiles) { return; }
         m_layoutProfiles->captureIntoCurrent();
         m_layoutProfiles->save();
+    });
+
+    // Betreiber 2026-08-30: "Das Layout Profil ... sollten auf dem
+    // Desktop zur Sicherheit abspeicherbar zu sein" -- eine Kopie neben
+    // AppSettings' XML, unabhaengig lesbar und fuer ein Backup geeignet.
+    // Beim aktiven Profil erst captureIntoCurrent(), sonst wuerde eine
+    // gerade eben umgebaute, aber noch nicht per "Jetzt sichern" oder
+    // Umschalten gesicherte Ansicht als der VORHERIGE Stand exportiert --
+    // bei einem anderen Profil ist dessen zuletzt gesicherter Zustand
+    // schon das Richtige, da nie aktiv seit dem letzten Umbau.
+    connect(m_profileRail, &ProfileRail::exportRequested, this,
+            [this](const QString& name) {
+        if (!m_layoutProfiles) { return; }
+        if (m_layoutProfiles->current() == name) {
+            m_layoutProfiles->captureIntoCurrent();
+        }
+        const QByteArray json = m_layoutProfiles->exportToJson(name);
+        if (json.isEmpty()) { return; }
+
+        const QString suggested =
+            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
+            + QStringLiteral("/Longpath-Layout-%1-%2.json")
+                .arg(name,
+                     QDateTime::currentDateTime()
+                         .toString(QStringLiteral("yyyy-MM-dd_HHmm")));
+        const QString path = QFileDialog::getSaveFileName(
+            this, QStringLiteral("Layout-Profil auf Schreibtisch sichern"),
+            suggested, QStringLiteral("JSON (*.json)"));
+        if (path.isEmpty()) { return; }
+
+        QFile f(path);
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            QMessageBox::warning(
+                this, QStringLiteral("Profil"),
+                QStringLiteral("„%1“ konnte nicht geschrieben werden.")
+                    .arg(path));
+            return;
+        }
+        f.write(json);
+    });
+
+    // Betreiber 2026-08-30: "DIE gespeicherten profile sollte man auch
+    // mit rechter moustaste importiren können" -- das Gegenstueck zum
+    // Export oben. Ersetzt DIESES Profil (Betreiber, selber Tag: "wenn
+    // ich importiere will ich es nicht als neues profil importiren" --
+    // ein frueherer Anlauf legte hier "Buero (2)" an statt zu ersetzen).
+    // Die Rueckfrage steht HIER, nicht in LayoutProfiles::
+    // importFromJson(): die Klasse selbst kennt keine Dialoge, siehe
+    // ihre eigene Begruendung ("kein Selbstzweck").
+    connect(m_profileRail, &ProfileRail::importRequested, this,
+            [this](const QString& name) {
+        if (!m_layoutProfiles) { return; }
+
+        const QString suggested =
+            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+        const QString path = QFileDialog::getOpenFileName(
+            this, QStringLiteral("Layout-Profil vom Schreibtisch laden"),
+            suggested, QStringLiteral("JSON (*.json)"));
+        if (path.isEmpty()) { return; }
+
+        const auto answer = QMessageBox::question(
+            this, QStringLiteral("Profil"),
+            QStringLiteral("„%1“ mit dem Inhalt der Datei ersetzen?")
+                .arg(name),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes) { return; }
+
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly)) {
+            QMessageBox::warning(
+                this, QStringLiteral("Profil"),
+                QStringLiteral("„%1“ konnte nicht gelesen werden.").arg(path));
+            return;
+        }
+        const QByteArray json = f.readAll();
+
+        QString error;
+        if (!m_layoutProfiles->importFromJson(name, json, &error)) {
+            QMessageBox::warning(
+                this, QStringLiteral("Profil"),
+                error.isEmpty()
+                    ? QStringLiteral("„%1“ liess sich nicht als Profil lesen.")
+                          .arg(path)
+                    : error);
+        }
     });
 
     connect(m_profileRail, &ProfileRail::renameRequested, this,
@@ -3345,6 +3657,24 @@ void MainWindow::buildUI()
     m_panStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     layout->addWidget(m_panStack, 1);
 
+    // Betreiber 2026-08-31: "Panadapter ändert sich immer!" -- ein
+    // abgeloester Panadapter kehrte bei JEDEM Neustart wieder angedockt
+    // zurueck, ganz gleich, wie er verlassen wurde. Ursache: PanadapterStack
+    // sendet panFloatStateChanged() seit Sub-Epic D Task 8 treu bei jedem
+    // Abloesen/Andocken -- nur hoerte hier nie jemand zu, und
+    // applyLayout() (der Start-Wiederherstellungs-Pfad ein paar Zeilen
+    // weiter unten) ruft als allerersten Schritt dockAllFloatingPans() auf,
+    // unbedingt, ohne jede Ausnahme. Ohne einen gemerkten Zustand blieb
+    // "schwebend" also niemals ueber einen Neustart hinweg erhalten --
+    // dasselbe Bild wie beim Rotor vor dem heutigen RotorFloating-Fix, nur
+    // dass hier noch nie ueberhaupt ein Schluessel dafuer existierte.
+    connect(m_panStack, &PanadapterStack::panFloatStateChanged,
+            this, [](const QString& panId, bool floating) {
+        AppSettings::instance().setValue(
+            QStringLiteral("PanFloating_%1").arg(panId),
+            floating ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+
     SpectrumWidget* const initialSpectrum = activeSpectrumWidget();
     if (initialSpectrum) {
         configureSpectrumForPanForTest(initialSpectrum,
@@ -3508,6 +3838,21 @@ void MainWindow::buildUI()
         m_panStack->applyLayout(restoredLayout, panIdsForLayout(restoredLayout));
         m_panStack->restoreSplitterState();
 
+        // Betreiber 2026-08-31: "Panadapter ändert sich immer!" -- siehe
+        // die ausfuehrliche Begruendung beim panFloatStateChanged-Anschluss
+        // oben. applyLayout() hat gerade eben jeden Panadapter angedockt
+        // (sein allererster Schritt, dockAllFloatingPans(), unbedingt);
+        // hier wird direkt danach nachgeholt, was zuletzt tatsaechlich
+        // schwebte. PanFloatingWindow::restoreGeometryState() (in dessen
+        // eigenem Konstruktor) liest die dazugehoerige Lage gleich mit.
+        for (const QString& panId : panIdsForLayout(restoredLayout)) {
+            if (s.value(QStringLiteral("PanFloating_%1").arg(panId),
+                        QStringLiteral("False")).toString()
+                    == QStringLiteral("True")) {
+                m_panStack->floatPanadapter(panId);
+            }
+        }
+
         // ...and finish the job once there IS a radio. Skipping the slice
         // add-loop above is right, but nothing used to pick it up afterwards,
         // so a persisted 2v layout came back with pan-1 permanently dead: no
@@ -3660,6 +4005,45 @@ void MainWindow::buildUI()
         activeSpectrumWidget()->setFrequencyRange(activeSpectrumWidget()->centerFrequency(), bwHz);
         emit activeSpectrumWidget()->bandwidthChangeRequested(bwHz);
     });
+    // Bench-gefunden 2026-09-03: zoomBar->setValue(768) oben ist nur der
+    // Startwert -- nichts hielt den Regler danach synchron, wenn sich die
+    // Bandbreite auf einem ANDEREN Weg aendert (Scroll-Zoom, Frequenzskalen-
+    // Ziehen am Panadapter, oder ein wiederhergestelltes Profil mit
+    // gespeicherter Zoom-Stufe, Phase 3G-12 persistiert genau das). Der
+    // Regler zeigte danach dauerhaft die Stellung vom Start, auch wenn der
+    // Panadapter laengst enger oder weiter gezoomt war — funktional
+    // folgenlos (Ziehen am Regler setzt weiterhin korrekt), aber
+    // irrefuehrend fuer den Bedienenden, der dem Regler nicht mehr
+    // ansehen kann, wo der Panadapter tatsaechlich steht.
+    // frequencyRangeChanged() feuert am Ende JEDER setFrequencyRange()
+    // unabhaengig von der Ursache (SpectrumWidget.cpp), ein einziger
+    // Anschluss deckt also alle Wege ab. QSignalBlocker verhindert die
+    // Rueckkopplung in den Connect-Handler oben (der seinerseits
+    // setFrequencyRange() aufriefe).
+    // Codereview 2026-09-03 (gefunden, nicht gemeldet): wirePane-artige
+    // Neuverdrahtung, siehe m_zoomBarSyncConn in MainWindow.h. Ein Lambda
+    // statt einer einzelnen connect()-Zeile, weil dieselbe Verdrahtung
+    // jetzt an zwei Stellen laufen muss: hier beim Bau und unten bei
+    // jedem PanadapterStack::activePanChanged.
+    auto wireZoomBarSync = [this, zoomBar](SpectrumWidget* sw) {
+        disconnect(m_zoomBarSyncConn);
+        if (!sw) { return; }
+        m_zoomBarSyncConn = connect(sw, &SpectrumWidget::frequencyRangeChanged,
+                this, [zoomBar](double /*centerHz*/, double bandwidthHz) {
+            const int kHz = qBound(zoomBar->minimum(),
+                                    qRound(bandwidthHz / 1000.0),
+                                    zoomBar->maximum());
+            if (kHz != zoomBar->value()) {
+                const QSignalBlocker blocker(zoomBar);
+                zoomBar->setValue(kHz);
+            }
+        });
+    };
+    wireZoomBarSync(activeSpectrumWidget());
+    connect(m_panStack, &PanadapterStack::activePanChanged, this,
+            [this, wireZoomBarSync](const QString& panId) {
+        if (m_panStack) { wireZoomBarSync(m_panStack->spectrum(panId)); }
+    });
 
     m_mainSplitter->addWidget(spectrumPane);
 
@@ -3740,6 +4124,7 @@ void MainWindow::buildUI()
     m_belowPane->setMinimumHeight(120);
     m_belowPane->hide();
     m_outerSplitter->addWidget(m_belowPane);
+    syncOuterSplitterHandle();
 
     centreCol->addWidget(m_outerSplitter, 1);
     centreRow->addLayout(centreCol, 1);
@@ -3920,9 +4305,12 @@ void MainWindow::buildUI()
         // fuehren (Stehwelle, SWR). Sie haengen an derselben Quelle wie
         // die eigenstaendigen Anzeigen, damit beide dieselbe Zahl zum
         // selben Zeitpunkt zeigen — der Grund, aus dem diese Verteilung
-        // ueberhaupt an EINER Stelle steht.
+        // ueberhaupt an EINER Stelle steht. Das eigene SWR/Leistung-
+        // Applet (TxMeterApplet) ist am 2026-08-30 entfernt worden --
+        // Betreiber: "nur zusaetzlich im Bereich des Frequenzfenster,
+        // nicht alle" -- das Frequenz-Widget ist seither die EINZIGE
+        // Stelle dafuer.
         if (m_frequencyApplet)  { m_frequencyApplet->onReading(bindingId, value); }
-        if (m_txMeterApplet)    { m_txMeterApplet->onReading(bindingId, value); }
     });
 
     // Task 3.1: expose MeterPoller via RadioModel so MultimeterPage can
@@ -3987,6 +4375,29 @@ void MainWindow::buildUI()
                 }
             }
         }
+        // Betreiber 2026-09-01: "wieder panadapter auf der anmeldeleiste!"
+        // -- ein VIERTER, unabhaengiger Schwebe-Mechanismus (PanadapterStack/
+        // PanFloatingWindow, ueber den globalen PanFloating_<id>-Schluessel,
+        // nicht ueber ContainerManager oder m_floatingApplets), den die
+        // beiden Schleifen oben nie trafen. Ohne Funkgeraet zeigt der
+        // Panadapter dieselbe bedeutungslose Leerflaeche wie S-Meter & Co.
+        // -- UND sein eigener Schliessen-Knopf ueberlappte den Verbinden-
+        // Dialog: ein Klick auf "Connect" konnte den Panadapter-Knopf
+        // darunter treffen und ihn andocken (siehe [PanFloatClose]-Fund,
+        // spontaneous=false -- ein echter Klick auf den eigenen X-Knopf,
+        // keine Nebenwirkung von aussen).
+        if (m_panStack) {
+            for (const QString& panId : m_panStack->panIdsForTesting()) {
+                if (m_panStack->isPanFloating(panId)) {
+                    if (auto* pf = m_panStack->floatingWindowForTest(panId)) {
+                        if (pf->isVisible()) {
+                            pf->hide();
+                            m_floatingContainersHiddenPreConnect.append(pf);
+                        }
+                    }
+                }
+            }
+        }
     }
     // Always populate the panel container's content (meters + applets).
     // On first run, createDefaultContainers() creates the shell; on restore,
@@ -4035,20 +4446,18 @@ void MainWindow::buildUI()
 
     // Betreiber, 2026-08-28: "das ist bevor ich mich einlogge - das rotor
     // fenster gehört weg" -- der Kompass ist ohne Verbindung ohnehin
-    // bedeutungslos (000°, kein Ziel). Egal, welche der drei Formen oben
-    // gerade aktiv wurde (Dock, unter dem Panadapter, oder das eigene
-    // schwebende Fenster von detachRotorPanel()) -- die sichtbaren zwei
-    // (Dock und schwebendes Fenster) werden hier versteckt und kommen erst
-    // mit der ERSTEN Verbindung dieser Sitzung wieder, siehe die
-    // connectionStateChanged-Bindung bei der Profil-Wiederherstellung
-    // weiter unten. Erster Fund war nur der halbe Fix: er traf ausschliesslich
-    // m_rotorDock, aber RotorFloating ist der Standardfall und haengt am
-    // eigenen m_rotorWindow -- genau das blieb sichtbar ("ist auch noch
-    // immer da").
+    // bedeutungslos (000°, kein Ziel). NUR NOCH m_rotorDock (die angedockte
+    // Form) folgt dieser Regel, siehe die dedizierte
+    // m_rotorDockWantedVisible-Logik im Profil-Anwenden weiter unten.
+    // m_rotorWindow (die SCHWEBENDE Form) NICHT mehr: Betreiber 2026-09-01,
+    // "kein Funkgerät hier, alles nicht verbunden" -- schwebende Fenster
+    // (Panadapter/Applets/Rotor-Log) sollen sich auch ohne Verbindung
+    // anordnen und ansehen lassen, sonst ist Layout-Arbeit ohne Radio am
+    // Tisch unmöglich. "000° kein Ziel" bleibt sichtbar stehen, statt das
+    // Fenster selbst zu verstecken.
     if (!m_radioModel
         || m_radioModel->connectionState() != ConnectionState::Connected) {
-        if (m_rotorDock)   { m_rotorDock->hide(); }
-        if (m_rotorWindow) { m_rotorWindow->hide(); }
+        if (m_rotorDock) { m_rotorDock->hide(); }
     }
 
     // Wire spectrum display to SliceModel (values come from persisted state,
@@ -4730,78 +5139,117 @@ void MainWindow::buildUI()
         struct NFHistoryEntry { qint64 t; float value; };
         struct SettleState {
             QList<NFHistoryEntry> history;
+            // Bug fix 2026-09-07: this per-band memory used to live on
+            // PanadapterModel (setBandNFEstimate/bandNFEstimate), but
+            // RadioModel::addPanadapter() has no caller anywhere in the
+            // shipped app (only tests call it) -- no PanadapterModel
+            // instance, and therefore no storage, ever existed in
+            // production. Relocated here (captured by both lambdas
+            // below via the shared settle state) rather than adding a
+            // real caller for the dead class.
+            QHash<Longpath::Band, float> bandNfEstimate;
+            Longpath::Band currentBand{Longpath::Band::Band20m};
         };
         auto settle = QSharedPointer<SettleState>::create();
 
-        PanadapterModel* pan0 = m_radioModel->panadapters().isEmpty()
-                                ? nullptr
-                                : m_radioModel->panadapters().first();
-        if (pan0) {
-            connect(m_clarityController, &ClarityController::noiseFloorChanged,
-                    this, [pan0, settle](float nf) {
-                const qint64 now = QDateTime::currentMSecsSinceEpoch();
-                settle->history.append({now, nf});
+        // Same AppSettings key convention PanadapterModel::bandNFEstimate
+        // already used (and tst_per_band_nf_priming.cpp already tests) --
+        // load whatever a working PanadapterModel would have loaded, so a
+        // restart still snaps instantly instead of cold-starting.
+        for (int i = 0; i < static_cast<int>(Longpath::Band::SwlFirst); ++i) {
+            const auto b = static_cast<Longpath::Band>(i);
+            const QVariant nfV = AppSettings::instance().value(
+                QStringLiteral("DisplayBandNFEstimate_") + bandKeyName(b));
+            if (nfV.isValid()) { settle->bandNfEstimate[b] = nfV.toFloat(); }
+        }
 
-                // Trim to 2-second window.
-                const qint64 cutoff = now - 2000;
-                while (!settle->history.isEmpty() && settle->history.first().t < cutoff) {
-                    settle->history.removeFirst();
+        connect(m_clarityController, &ClarityController::noiseFloorChanged,
+                this, [settle](float nf) {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            settle->history.append({now, nf});
+
+            // Trim to 2-second window.
+            const qint64 cutoff = now - 2000;
+            while (!settle->history.isEmpty() && settle->history.first().t < cutoff) {
+                settle->history.removeFirst();
+            }
+
+            // Compute variance when we have ≥30 samples (~30 cadence ticks).
+            if (settle->history.size() >= 30) {
+                float sum = 0.0f;
+                for (const auto& e : std::as_const(settle->history)) { sum += e.value; }
+                const float mean = sum / static_cast<float>(settle->history.size());
+                float sqSum = 0.0f;
+                for (const auto& e : std::as_const(settle->history)) {
+                    const float d = e.value - mean;
+                    sqSum += d * d;
                 }
+                const float variance = sqSum / static_cast<float>(settle->history.size());
 
-                // Compute variance when we have ≥30 samples (~30 cadence ticks).
-                if (settle->history.size() >= 30) {
-                    float sum = 0.0f;
-                    for (const auto& e : std::as_const(settle->history)) { sum += e.value; }
-                    const float mean = sum / static_cast<float>(settle->history.size());
-                    float sqSum = 0.0f;
-                    for (const auto& e : std::as_const(settle->history)) {
-                        const float d = e.value - mean;
-                        sqSum += d * d;
-                    }
-                    const float variance = sqSum / static_cast<float>(settle->history.size());
-
-                    if (variance < 1.0f) {
-                        // NereusSDR-original — no Thetis equivalent.
-                        // NF settled within 1 dB variance over 2s; save for this band.
-                        pan0->setBandNFEstimate(pan0->band(), nf);
-                    }
+                if (variance < 1.0f) {
+                    // NereusSDR-original — no Thetis equivalent.
+                    // NF settled within 1 dB variance over 2s; save for this band.
+                    settle->bandNfEstimate[settle->currentBand] = nf;
+                    AppSettings::instance().setValue(
+                        QStringLiteral("DisplayBandNFEstimate_")
+                            + bandKeyName(settle->currentBand),
+                        nf);
                 }
-            });
+            }
+        });
 
-            // Task 2.10: band-change → prime ClarityController EWMA with stored NF.
-            // NereusSDR-original — no Thetis equivalent.
-            //
-            // PanadapterModel::bandChanged fires when the pan center crosses a band
-            // boundary. snapToFloor() seeds the EWMA (m_smoothedFloor) and emits
-            // waterfallThresholdsChanged immediately so the waterfall snaps to the
-            // remembered state rather than cold-starting from an uninitialized floor.
-            // NaN is ignored by snapToFloor (band with no stored data is a no-op).
-            connect(pan0, &PanadapterModel::bandChanged,
-                    this, [this, pan0](Longpath::Band newBand) {
+        // Task 2.10: band-change → prime ClarityController EWMA with stored NF.
+        // NereusSDR-original — no Thetis equivalent.
+        //
+        // Bug fix 2026-09-07: used to connect to PanadapterModel::
+        // bandChanged (dead, see above); ClarityController tracks a
+        // single global floor for RX1, so this only follows the first
+        // slice, re-checked live at every frequencyChanged rather than
+        // bound to one SliceModel* (slices can be added/removed/
+        // reordered — same live-recheck idiom as OcOutputsHfTab's fix
+        // the same day). snapToFloor() seeds the EWMA (m_smoothedFloor)
+        // and emits waterfallThresholdsChanged immediately so the
+        // waterfall snaps to the remembered state rather than
+        // cold-starting from an uninitialized floor. NaN is ignored by
+        // snapToFloor (band with no stored data is a no-op).
+        //
+        // The dead PanadapterModel::bandChanged fast-attack trigger that
+        // used to sit here (From Thetis display.cs:879-905 [v2.10.3.13],
+        // "if (rx == 1) FastAttackNoiseFloorRX1 = true") is NOT
+        // reinstated: the sibling slice freq-jump trigger below (same
+        // Thetis citation, the ">0.5 MHz" half of the same condition)
+        // already fires on every realistic band change, since band
+        // boundaries are always far more than 0.5 MHz apart. Reinstating
+        // it would just be a second call to setNoiseFloorFastAttack(true)
+        // for the same event.
+        auto subscribeSliceForNf = [this, settle](SliceModel* slice) {
+            if (!slice) { return; }
+            connect(slice, &SliceModel::frequencyChanged, this,
+                    [this, slice, settle](double freq) {
+                const auto& allSlices = m_radioModel->slices();
+                if (allSlices.isEmpty() || allSlices.first() != slice) {
+                    return;  // ClarityController tracks RX1's floor only.
+                }
+                const Longpath::Band newBand = bandFromFrequency(freq);
+                if (newBand == settle->currentBand) { return; }
+                settle->currentBand = newBand;
+                settle->history.clear();  // fresh settle window for the new band
+
                 // NereusSDR-original — no Thetis equivalent.
                 // Prime estimator with last-seen NF for this band to eliminate
                 // cold-start visual jump after band change.
-                const float storedNF = pan0->bandNFEstimate(newBand);
+                const float storedNF = settle->bandNfEstimate.value(
+                    newBand, std::numeric_limits<float>::quiet_NaN());
                 m_clarityController->snapToFloor(storedNF);
             });
-
-            // NF fast-attack triggers — From Thetis display.cs:879-905
-            // [v2.10.3.13]:
-            //   if (rx == 1) FastAttackNoiseFloorRX1 = true;  // band change
-            //   if (Math.Abs(oldFreq - newFreq) > 0.5)         // freq jump
-            //       FastAttackNoiseFloorRX1 = true;
-            // While in fast-attack state SpectrumWidget renders the NF
-            // line/box/text in gray to signal the smoothed estimate is
-            // still settling.  Auto-clear is internal to the setter (see
-            // SpectrumWidget::setNoiseFloorFastAttack — 1000ms timer
-            // matching Thetis display.cs:5906 minimum delay).
-            if (activeSpectrumWidget()) {
-                connect(pan0, &PanadapterModel::bandChanged,
-                        this, [this](Longpath::Band) {
-                    activeSpectrumWidget()->setNoiseFloorFastAttack(true);
-                });
-            }
+        };
+        for (SliceModel* slice : m_radioModel->slices()) {
+            subscribeSliceForNf(slice);
         }
+        connect(m_radioModel, &RadioModel::sliceAdded, this,
+                [this, subscribeSliceForNf](int index) {
+            subscribeSliceForNf(sliceForAddedIdForTest(m_radioModel, index));
+        });
     }
 
     // Slice freq-jump > 0.5 MHz fast-attack trigger — Thetis display.cs:905
@@ -5017,6 +5465,45 @@ void MainWindow::buildUI()
             activeSpectrumWidget()->setWfColorScheme(
                 static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
         });
+        connect(m_overlayPanel, &SpectrumOverlayPanel::spectrumRenderModeChanged,
+                activeSpectrumWidget(), [this](int idx) {
+            activeSpectrumWidget()->setSpectrumRenderMode(
+                idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
+        });
+        // Der Panadapter hat seinen Modus laengst aus den Einstellungen
+        // geladen (loadSettings in ensureOverlayPanels); das Panel wusste
+        // davon nichts und zeigte nach jedem Start "2D", auch wenn 3D
+        // gespeichert war. Der Setter loest nur bei echter Aenderung aus,
+        // und setSpectrumRenderMode() ist bei gleichem Wert ein No-op.
+        m_overlayPanel->setSpectrumRenderModeIndex(
+            activeSpectrumWidget()->spectrumRenderMode() == SpectrumRenderMode::Mode3D
+                ? 1 : 0);
+
+        // Gleiche Masche, ein Regler weiter: die WF-Gain-Slider hatte ihren
+        // eigenen fest verdrahteten Vorgabewert (50) und wusste nichts vom
+        // Wert, den SpectrumWidget schon geladen hatte (Vorgabe 45). Beide
+        // reichen von 0 bis 100 -- kein Deckelungsproblem hier.
+        m_overlayPanel->setWfGainValue(activeSpectrumWidget()->wfColorGain());
+
+        // Black Lvl und Farbschema hatten denselben Restore-Fehler, dazu
+        // je einen echten Konflikt (Wertebereich bzw. fehlende Eintraege),
+        // der erst eine Entscheidung brauchte (Betreiber 2026-09-05: Regler
+        // auf 0..125 erweitern; Combo um alle Schemata ergaenzen -- siehe
+        // die beiden Konstruktor-Stellen oben in SpectrumOverlayPanel.cpp).
+        // Jetzt, mit beiden Konflikten geloest, derselbe Nachzieh-Aufruf.
+        m_overlayPanel->setWfBlackLevelValue(activeSpectrumWidget()->wfBlackLevel());
+        m_overlayPanel->setColorSchemeIndex(
+            static_cast<int>(activeSpectrumWidget()->wfColorScheme()));
+
+        // Der Auf/Zu-Pfeil links oben am Panel (◀/▶) war noch nicht einmal
+        // in der obigen B8-Task-20-Liste: collapsed() wurde nie irgendwohin
+        // verdrahtet, der Zustand ging also gar nicht erst in die
+        // Einstellungen, egal ob beim Speichern oder Laden.
+        connect(m_overlayPanel, &SpectrumOverlayPanel::collapsed,
+                activeSpectrumWidget(), [this](bool isCollapsed) {
+            activeSpectrumWidget()->setOverlayPanelExpanded(!isCollapsed);
+        });
+        m_overlayPanel->setExpandedState(activeSpectrumWidget()->overlayPanelExpanded());
 
         // ── Die vier Zoomknoepfe (S B − +) ───────────────────────────
         //
@@ -5268,21 +5755,39 @@ void MainWindow::buildUI()
     // they are untouched here.
     connect(m_radioModel, &RadioModel::activeSliceChanged, this, [this](int) {
         SliceModel* slice = m_radioModel->activeSlice();
+        // Die Kopfleiste zeigt den Modus der Kette, auf der man gerade
+        // ist. attach() löst die vorige — sonst meldete die Leiste nach
+        // dem Umschalten weiter den Modus des alten Pans.
+        //
+        // Unconditional, VOR der Null-Wache unten: ein activeSliceChanged
+        // ohne aktive Scheibe muss die Leiste auf "keine Bindung" setzen
+        // (attach(nullptr) — CommandBar zeigt dann nichts als aktiv an,
+        // siehe CommandBar::pullFromModel), statt sie kommentarlos an
+        // ihrer letzten, moeglicherweise gerade verschwindenden Scheibe
+        // haengen zu lassen. Bench-Fund 2026-09-07: die Kopfleiste zeigte
+        // nach einer laengeren Sitzung mit zwischenzeitlichem KiwiSDR-
+        // Profil zwei Modus-Knoepfe gleichzeitig als aktiv, weil sie an
+        // einer Scheibe haengen blieb, ohne dass diese Wache je ein
+        // erneutes attach() ausgeloest hat.
+        if (m_commandBar) { m_commandBar->attach(slice); }
+        // Derselbe Fehler, dieselbe Behandlung: RttyDecoderApplet und die
+        // RADE/RttyDecoder-Sichtbarkeit hingen bis 2026-09-07 nur an der
+        // Scheibe, die beim allerersten sliceAdded(0) existierte (siehe
+        // wireSliceToSpectrum). rebindRttyRadeAvailability() deckt auch
+        // hier den Null-Fall ab.
+        rebindRttyRadeAvailability(slice);
         if (!slice) { return; }
         // Phase 3F Sub-Epic J Task 11: RadioModel::rxChannelForSlice()
         // replaces the direct wdspEngine()->rxChannel() reach.
         RxChannel* rxCh = m_radioModel->rxChannelForSlice(slice->sliceIndex());
         if (rxCh) { m_meterPoller->setRxChannel(rxCh); }
-        // Die Kopfleiste zeigt den Modus der Kette, auf der man gerade
-        // ist. attach() löst die vorige — sonst meldete die Leiste nach
-        // dem Umschalten weiter den Modus des alten Pans.
-        if (m_commandBar) { m_commandBar->attach(slice); }
     });
 
     // Und einmal jetzt, für den Zustand beim Start: das Signal oben
     // feuert erst beim ersten Wechsel, und bis dahin stünde die Leiste
     // auf ihrem Vorgabewert statt auf dem, was das Gerät tut.
     if (m_commandBar) { m_commandBar->attach(m_radioModel->activeSlice()); }
+    rebindRttyRadeAvailability(m_radioModel->activeSlice());
 
     // H.2 (Phase 3M-1a): wire MoxController::moxStateChanged → MeterPoller::setInTx.
     // Switches the poll set between RX meters (TX off) and TX meters (TX on).
@@ -5950,6 +6455,14 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_radeApplet);
     m_radeApplet->setVisible(false);
 
+    // RttyDecoderApplet — visible only when the active slice's mode is
+    // DSPMode::DIGL (RTTY is a DIGL submode -- RxApplet::applyModeVisibility
+    // documents this exact rule for the mark/shift container; this applet
+    // follows the same gate). Same visibility-controller wiring as RADE.
+    m_rttyDecoderApplet = new RttyDecoderApplet(m_radioModel, nullptr);
+    panel->addApplet(m_rttyDecoderApplet);
+    m_rttyDecoderApplet->setVisible(false);
+
     // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // These applets are entirely placeholder-only today (no wired controls).
     // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
@@ -6053,6 +6566,27 @@ void MainWindow::populateDefaultMeter()
     });
     panel->addApplet(m_bwFilterApplet);
 
+    // Betreiber 2026-08-30: der Bandwidth Filter zeigt die Filterkanten
+    // (ein Einstellungswert), keine Live-Messung wie S-Meter/Stehwelle/SWR
+    // -- er bleibt auch ohne Verbindung sinnvoll und darf nicht in
+    // derselben Vorverbindungs-Versteckung landen wie die Meter (siehe der
+    // isFloating()/isOverlayDocked()-Block weiter oben). Der Block laeuft
+    // aber VOR dieser Zeile, als m_bwFilterApplet noch null war -- ein
+    // direkter Ausschluss dort war deshalb unmoeglich. Stattdessen hier,
+    // sobald das Applet existiert: falls sein eigener (OverlayDocked-)
+    // Container gerade eben mit in die Liste geraten und versteckt wurde,
+    // sofort wieder herausnehmen und zeigen, statt auf die erste Verbindung
+    // zu warten.
+    if (!m_floatingContainersHiddenPreConnect.isEmpty()) {
+        for (ContainerWidget* c : m_containerManager->allContainers()) {
+            if (c && c->content() == m_bwFilterApplet
+                && m_floatingContainersHiddenPreConnect.removeOne(c)) {
+                c->show();
+                break;
+            }
+        }
+    }
+
     // Phase 3M-4 Task 13 — PureSignalApplet quick-access surface.
     //
     // Constructed unconditionally and added to the right panel, but
@@ -6126,21 +6660,52 @@ void MainWindow::populateDefaultMeter()
     m_signalInstrument->restoreState();
     panel->addApplet(m_signalInstrument);
 
-    // ── SWR / Leistung in EINER Flaeche ──────────────────────────────
+    // ── Frequenz zusaetzlich in Stehwelle/S-Meter (2026-09-02) ───────
     //
-    // Der Betreiber am 2026-08-23: "ein widget, wo SWR und Stehwelle
-    // in einem Diagramm sind. wenn ich tune stellt es auf das diagramm
-    // SWR um, beim senden habe ich Stehwelle. dann würde ich mir auch
-    // einen platz sparen."
+    // Betreiber: "die Idee ist, dass man sich bei kleinen Bildschirmen
+    // vielleicht ein Fenster erspart" -- aus dem Rechtsklickmenue der
+    // beiden Instrumente an-/abschaltbar (InstrumentApplet::
+    // setShowFrequency); hier nur die Werteversorgung. Gleiches Muster
+    // wie FreeDVReporterDialog::setActiveFrequency weiter unten: Wert
+    // sofort setzen + auf jedes frequencyChanged der aktiven Scheibe
+    // hoeren.
     //
-    // Es steht NEBEN den beiden Einzelanzeigen, nicht statt ihnen: wer
-    // Platz hat, will beide gleichzeitig sehen. Sichtbar ist es
-    // anfangs nicht — das entscheidet der Betreiber ueber den
-    // Applet-Auswaehler.
-    m_txMeterApplet = new TxMeterApplet(m_radioModel, nullptr);
-    m_txMeterApplet->restoreState();
-    panel->addApplet(m_txMeterApplet);
+    // Bench-gefunden 2026-09-03 ("die Frequenzanzeige... da steht nur
+    // 0"): ein frisches MainWindow hat noch KEINE Scheibe -- die
+    // entsteht erst, wenn ein Funkgeraet verbindet (derselbe Fund wie
+    // in MainWindow_SunSdr.cpp's eigenem Kopf-Kommentar). Die einmalige
+    // Verdrahtung hier lief also beim Start ins Leere und wurde nie
+    // wiederholt. wireInstrumentFrequency() macht dasselbe wie vorher,
+    // laeuft aber jetzt bei jedem RadioModel::activeSliceChanged erneut
+    // -- und loest zuerst die alte Verbindung, falls eine vorherige
+    // Scheibe (z.B. nach einem Radiowechsel) noch dranhing.
+    auto wireInstrumentFrequency = [this]() {
+        disconnect(m_instrumentFreqConn);
+        SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+        if (!slice) { return; }
+        if (m_swrInstrument)    { m_swrInstrument->setFrequencyHz(slice->frequency()); }
+        if (m_signalInstrument) { m_signalInstrument->setFrequencyHz(slice->frequency()); }
+        m_instrumentFreqConn = connect(slice, &SliceModel::frequencyChanged, this,
+                                       [this](double hz) {
+            if (m_swrInstrument)    { m_swrInstrument->setFrequencyHz(hz); }
+            if (m_signalInstrument) { m_signalInstrument->setFrequencyHz(hz); }
+        });
+    };
+    wireInstrumentFrequency();
+    connect(m_radioModel, &RadioModel::activeSliceChanged, this, wireInstrumentFrequency);
 
+    // ── SWR / Leistung in EINER Flaeche — entfernt ───────────────────
+    //
+    // Stand hier von 2026-08-23 bis 2026-08-30 als eigenes Applet
+    // (TxMeterApplet, "ein widget, wo SWR und Stehwelle in einem
+    // Diagramm sind"). Der Betreiber am 2026-08-30, vor demselben
+    // Fenster wieder: "SWR / Leistungs Fenster soll es nur zusaetzlich
+    // im Bereich des Frequenzfenster geben, nicht alle." Die beiden
+    // Zusatzzeilen im Frequenz-Widget (FrequencyApplet::setShowPower/
+    // setShowSwr, seit 2026-08-23) decken dieselbe Anzeige schon ab —
+    // ein eigenes drittes Fenster dafuer war die Dopplung, die der
+    // Betreiber loswerden wollte.
+    //
     // ── Spracherkennung (2026-08-23) ────────────────────────────────
     //
     // Der Betreiber hat den OERTLICHEN Weg gewaehlt: ein
@@ -6403,6 +6968,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Tx")]         = m_txApplet;
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
+    m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -6426,7 +6992,6 @@ void MainWindow::populateDefaultMeter()
     // und vollstaendig unerreichbar war: gebaut und nicht erreichbar
     // ist so gut wie nicht gebaut, und keine Einzelpruefung sieht es,
     // weil jeder Baustein fuer sich in Ordnung ist.
-    m_appletsById[QStringLiteral("TxMeter")] = m_txMeterApplet;
     m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
     m_appletsById[QStringLiteral("KiwiWaterfalls")] = m_kiwiWaterfallPanel;
     m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
@@ -6462,6 +7027,12 @@ void MainWindow::populateDefaultMeter()
     // shortly after to correct it if needed.
     m_appletVis->registerApplet(QStringLiteral("Rade"),
                                 QStringLiteral("RADE"),         true);
+    // RTTY: defaultVisible=true (user pref). Actual visibility is gated
+    // on the active slice's mode via the availability axis, same pattern
+    // as RADE above -- the dspModeChanged lambda below calls
+    // setAvailable(true) only when mode is DSPMode::DIGL.
+    m_appletVis->registerApplet(QStringLiteral("RttyDecoder"),
+                                QStringLiteral("RTTY Decoder"), true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -6492,8 +7063,6 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Stehwelle"),    true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
                                 QStringLiteral("S-Meter"),      true);
-    m_appletVis->registerApplet(QStringLiteral("TxMeter"),
-                                QStringLiteral("SWR / Leistung"), true);
     m_appletVis->registerApplet(QStringLiteral("KiwiSdr"),
                                 QStringLiteral("KiwiSDR"),      true);
     // defaultVisible=false, bewusst anders als KiwiSdr: ein leeres Panel
@@ -6592,6 +7161,11 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("rade"), QStringLiteral("freedv"),
          QStringLiteral("digital"), QStringLiteral("codec"),
          QStringLiteral("sprache")});
+    m_appletVis->describeApplet(QStringLiteral("RttyDecoder"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("rtty"), QStringLiteral("digital"),
+         QStringLiteral("decoder"), QStringLiteral("baudot"),
+         QStringLiteral("fernschreiber"), QStringLiteral("digl")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -6768,10 +7342,15 @@ void MainWindow::populateDefaultMeter()
     const bool fourO3AOn = m_radioModel && m_radioModel->fourO3AEnabled();
     m_appletVis->setAvailable(QStringLiteral("Amp"),   fourO3AOn);
     m_appletVis->setAvailable(QStringLiteral("Tuner"), fourO3AOn);
-    // RADE: available only in RADE_U / RADE_L modes. Startup mode is
-    // USB, so initial availability=false. The dspModeChanged lambda
-    // below updates this on every mode change.
+    // RADE / RTTY: available only in RADE_U/_L / DIGL respectively.
+    // Safe pre-slice default -- no slice exists yet at this point in
+    // startup, so there is no real mode to read. rebindRttyRadeAvailability()
+    // corrects both against the slice's ACTUAL mode the moment one exists
+    // (a restored session can start directly in RADE/DIGL, not just USB),
+    // and re-corrects on every later activeSliceChanged too -- see that
+    // method's doc comment in MainWindow.h.
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
+    m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
 
     // RF-Kit RF2K-S: available only when the master toggle is enabled.
     // Default OFF; live-updated via rfKitEnabledChanged below.
@@ -6870,6 +7449,15 @@ void MainWindow::populateDefaultMeter()
                 m_layoutProfiles->save();
             }
         });
+
+        // Das ⚙ im Fensterkopf (2026-09-08, Betreiber: "bitte mache
+        // das bei allen widgets"). GridCellWidget blendet den Knopf
+        // schon aus, wenn das Applet nichts Erweitertes hat — hier nur
+        // noch ausfuehren, was das Applet selbst dafuer vorsieht.
+        connect(m_appletPanel, &AppletPanelWidget::appletSettingsRequested,
+                this, [](AppletWidget* a) {
+            if (a) { a->openExtendedSettings(); }
+        });
     }
 
     // ── Was in einem Profil steht ────────────────────────────────────
@@ -6960,6 +7548,91 @@ void MainWindow::populateDefaultMeter()
                              m_rotorDock->isVisible());
                 }
 
+                // ── Panadapter-Schwebefenster ───────────────────────
+                //
+                // Betreiber 2026-09-01: "Besonders Panadapter und Rotor
+                // machen hier Probleme. [...] jedes Fenster muss
+                // individuell sein, speicherbar sein, in seiner Größe
+                // veränderbar sein und frei schwebend sein." Beide
+                // liefen bis heute ausschliesslich ueber eigene,
+                // GLOBALE Schluessel (PanFloating_<id> bzw.
+                // RotorFloating/RotorPanelBelow) am Profil VORBEI --
+                // ein Desktop-Export (01.json) enthielt sie deshalb
+                // nie, und ein Import konnte ausgerechnet die zwei
+                // auffaelligsten Fenster prinzipiell nicht herstellen.
+                // Dieselbe Vorhandensein-ist-die-Antwort-Regel wie bei
+                // floatingApplets oben: ein Eintrag heisst "schwebt",
+                // ein fehlender heisst "angedockt". Die globalen
+                // Schluessel bleiben bestehen (der Programmstart ohne
+                // Profilwechsel liest weiterhin sie) -- das Profil
+                // traegt ab jetzt eine eigene, vollstaendige Kopie.
+                if (m_panStack) {
+                    QVariantMap fpans;
+                    for (const QString& panId
+                         : m_panStack->panIdsForTesting()) {
+                        if (!m_panStack->isPanFloating(panId)) {
+                            continue;
+                        }
+                        auto* pf =
+                            m_panStack->floatingWindowForTest(panId);
+                        if (!pf) { continue; }
+                        const QRect g = pf->geometry();
+                        QVariantMap one;
+                        one.insert(QStringLiteral("x"), g.x());
+                        one.insert(QStringLiteral("y"), g.y());
+                        one.insert(QStringLiteral("w"), g.width());
+                        one.insert(QStringLiteral("h"), g.height());
+                        one.insert(QStringLiteral("screen"),
+                                   screenKeyFor(pf));
+                        fpans.insert(panId, one);
+                    }
+                    s.insert(QStringLiteral("floatingPans"), fpans);
+                }
+
+                // ── Rotor/Log: FORM und Lage ────────────────────────
+                //
+                // rotorDockVisible (oben) kennt nur das Dock. Die
+                // eigentliche Frage -- schwebt es, liegt es unter dem
+                // Panadapter, oder haengt es im Dock -- lebte bislang
+                // nur in den globalen RotorFloating/RotorPanelBelow-
+                // Schluesseln. Ab jetzt traegt das Profil sie selbst,
+                // samt Fenstergeometrie im Schwebe-Fall.
+                {
+                    QVariantMap rotor;
+                    if (m_rotorWindow) {
+                        rotor.insert(QStringLiteral("form"),
+                                     QStringLiteral("floating"));
+                        const QRect g = m_rotorWindow->geometry();
+                        rotor.insert(QStringLiteral("x"), g.x());
+                        rotor.insert(QStringLiteral("y"), g.y());
+                        rotor.insert(QStringLiteral("w"), g.width());
+                        rotor.insert(QStringLiteral("h"), g.height());
+                    } else if (AppSettings::instance()
+                                   .value(QStringLiteral("RotorPanelBelow"),
+                                          QStringLiteral("False"))
+                                   .toString()
+                               == QStringLiteral("True")) {
+                        rotor.insert(QStringLiteral("form"),
+                                     QStringLiteral("below"));
+                        // Review-Fund 2026-09-01: die HOEHE der
+                        // Unten-Flaeche ist der aeussere Splitter --
+                        // ohne sie kaeme die Form zurueck, die Groesse
+                        // aber stets als 2/3-1/3-Vorgabe.
+                        if (m_outerSplitter) {
+                            QVariantList split;
+                            for (int v : m_outerSplitter->sizes()) {
+                                split << v;
+                            }
+                            rotor.insert(QStringLiteral("belowSplit"),
+                                         split);
+                        }
+                    } else {
+                        rotor.insert(QStringLiteral("form"),
+                                     QStringLiteral("docked"));
+                    }
+                    s.insert(QStringLiteral("rotor"), rotor);
+                }
+
                 if (m_mainSplitter) {
                     QVariantList sizes;
                     for (int v : m_mainSplitter->sizes()) { sizes << v; }
@@ -6978,10 +7651,95 @@ void MainWindow::populateDefaultMeter()
                 // ein Weltbild.
                 s.insert(QStringLiteral("worldImage"),
                          WorldTexture::currentPath());
+
+                // ── Das Hauptfenster selbst ─────────────────────────
+                //
+                // Betreiber 2026-08-30: "wenn ich vollbild habe und nur
+                // das profil ändere muss auch vollbild bleiben" und
+                // "nach dem import ist wieder nicht full screen". Das
+                // widerruft die Ausnahme vom 2026-08-15 ("NICHT dabei:
+                // die Fenstergroesse") fuer den Zustand: Vollbild/
+                // Maximiert gehoert zum Profil. Die Lage in Pixeln
+                // bleibt weiterhin beim globalen MainWindowGeometry-
+                // Schluessel -- hier zaehlt nur der MODUS.
+                QVariantMap mw;
+                mw.insert(QStringLiteral("fullScreen"), m_borderlessFullSize);
+                mw.insert(QStringLiteral("maximized"), isMaximized());
+                s.insert(QStringLiteral("mainWindow"), mw);
                 return s;
             },
             // ── herstellen ───────────────────────────────────────────
             [this](const QVariantMap& s) {
+                // Betreiber 2026-09-01, nach einem Haenger/OOM-Verdacht
+                // beim Profilwechsel: unbedingte Schritt-Marken, damit
+                // ein kuenftiger Haenger im Log exakt zeigt, VOR welchem
+                // Schritt die letzte Zeile steht -- ohne das war der
+                // gesamte ~450-zeilige Block ein einziger, blinder
+                // synchroner Aufruf.
+                qWarning() << "[ProfileApply:Step] 1/6 Vollbild";
+                // Vollbild MERKEN, bevor irgendein Schritt unten es
+                // kippen kann -- am Ende wird es wieder durchgesetzt
+                // (siehe der Block am Schluss dieses Lambdas).
+                const bool wasFullScreen = m_borderlessFullSize;
+
+                // ── Vollbild bleibt Vollbild ────────────────────────
+                //
+                // Betreiber 2026-08-30: "wenn ich vollbild habe und nur
+                // das profil ändere muss auch vollbild bleiben." Zwei
+                // Faelle: das Profil SAGT Vollbild (mainWindow-Karte,
+                // seit heute erfasst) -- dann herstellen. Oder das
+                // Profil kennt den Schluessel noch nicht (aeltere
+                // Aufnahme, Import einer alten Datei) -- dann gilt der
+                // Zustand von VOR dem Anwenden, festgehalten oben als
+                // wasFullScreen, damit kein Schritt dazwischen ihn
+                // stillschweigend kippen kann.
+                //
+                // Betreiber 2026-09-01: "panadapter zwar verschoben,
+                // aber [...] nicht auf vollgröße" -- dieser ganze Block
+                // stand bis eben GANZ AM ENDE der Lambda, NACH der
+                // Wiederherstellung der schwebenden Fenster weiter
+                // unten. ensureOnVisibleScreen() dort prueft, ob die
+                // gespeicherte Position das HEUTIGE Hauptfenster
+                // ueberlappt (WindowPlacement.cpp) -- und liest dafuer
+                // anchor->window()->geometry() in genau dem Moment.
+                // Stand der Block spaeter, war das Hauptfenster zu
+                // diesem fruehen Zeitpunkt (Import mitten in der
+                // Sitzung, Hauptfenster laengst sichtbar, aber noch mit
+                // der Geometrie VOR diesem Import) eine STALE Flaeche --
+                // enterBorderlessFullSize() setzte die richtige,
+                // bildschirmfuellende Geometrie ja erst gleich
+                // DANACH. Die Ueberlapp-Pruefung verglich also gegen
+                // die falsche, alte Flaeche und verschob das Fenster
+                // unnoetig. Hierher vorgezogen: die Hauptfenster-
+                // Geometrie steht fest, BEVOR irgendein schwebendes
+                // Fenster seine Position gegen sie prueft.
+                const QVariantMap mw =
+                    s.value(QStringLiteral("mainWindow")).toMap();
+                const bool wantFullScreen =
+                    mw.contains(QStringLiteral("fullScreen"))
+                        ? mw.value(QStringLiteral("fullScreen")).toBool()
+                        : wasFullScreen;
+                // Diagnose 2026-09-01 (leeres-Fenster-Untersuchung): NUR
+                // bei einer Abweichung loest enterBorderlessFullSize()/
+                // exitBorderlessFullSize() ihren hide()/setWindowFlag()/
+                // show()-Zyklus auf dem GESAMTEN MainWindow aus -- das
+                // Log macht sichtbar, ob und wann das bei einem
+                // Profilwechsel passiert.
+                if (wantFullScreen != wasFullScreen) {
+                    qWarning() << "[ProfileFullscreenRestore] wasFullScreen="
+                               << wasFullScreen << "wantFullScreen="
+                               << wantFullScreen;
+                }
+                if (wantFullScreen) {
+                    enterBorderlessFullSize();
+                } else {
+                    exitBorderlessFullSize();
+                    if (mw.value(QStringLiteral("maximized")).toBool()
+                        && !isMaximized()) {
+                        showMaximized();
+                    }
+                }
+
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
                 // zweimal.
@@ -7000,6 +7758,7 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
+                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map";
                 const QVariantMap vis =
                     s.value(QStringLiteral("visible")).toMap();
                 for (auto it = vis.constBegin(); it != vis.constEnd(); ++it) {
@@ -7031,6 +7790,7 @@ void MainWindow::populateDefaultMeter()
                 // Eigenkennungen („rx"), und die stimmten mit keinem
                 // Schluessel in m_floatingApplets oder m_appletsById
                 // ueberein.
+                qWarning() << "[ProfileApply:Step] 3/6 Applet-Andocken/Ablösen";
                 QVariantMap floating;
                 {
                     const QVariantMap raw =
@@ -7057,6 +7817,52 @@ void MainWindow::populateDefaultMeter()
                         one.value(QStringLiteral("dockIndex"), -1).toInt();
                     if (auto* w = m_floatingApplets.value(it.key(), nullptr)) {
                         // Schon abgelöst — nur nachführen.
+                        //
+                        // Betreiber 2026-09-01: "so wurde es nicht
+                        // abgespeichert" -- ein Profil-Import bei
+                        // getrennter Verbindung importierte den
+                        // gespeicherten Inhalt korrekt (settings-Datei
+                        // stimmte), zeigte am Bildschirm aber NICHTS:
+                        // Bandwidth Filter/Frequenz/S-Meter blieben
+                        // unsichtbar. Ursache war der eigene "ALLE
+                        // fliegenden Fenster..."-Fix von vorhin -- der
+                        // hatte diese Fenster bei "keine Verbindung"
+                        // per w->hide() versteckt, OHNE sie aus
+                        // m_floatingApplets zu nehmen. Dieser Zweig hier
+                        // sah sie darum als "schon abgelöst" und
+                        // aktualisierte nur Lage/dockIndex -- ein
+                        // show() stand nie dabei, weil ein bereits
+                        // abgelöstes Fenster bislang IMMER sichtbar war.
+                        // Das Profil verlangt es sichtbar -- show() holt
+                        // es aus genau diesem Versteck zurück. Steht
+                        // weiterhin keine Verbindung, versteckt der
+                        // Vorher-verstecken-Block ein paar Zeilen weiter
+                        // unten (im selben Lambda, laeuft IMMER danach)
+                        // es ohnehin gleich wieder -- die Reihenfolge
+                        // passt zu beiden Regeln zugleich: das Profil
+                        // wird treu hergestellt, UND es bleibt vor der
+                        // ConnectMaske nichts sichtbar.
+                        //
+                        // Review-Fund 2026-09-01 (adversarial
+                        // bestaetigt): NICHT bedingungslos zeigen. Ein
+                        // abgeloestes Fenster kann mit abgeschalteter
+                        // Sichtbarkeit existieren (Haken im Auswaehler
+                        // aus, Fenster bleibt in m_floatingApplets) --
+                        // das Profil traegt dann BEIDES: einen
+                        // floatingApplets-Eintrag UND visible=false.
+                        // Ein unbedingtes show() haette das Fenster im
+                        // VERBUNDENEN Zustand entgegen dem Profil
+                        // aufgerissen (der Versteck-Block unten laeuft
+                        // dann nicht), mit widersprechendem Haken im
+                        // Auswaehler.
+                        const bool wantShown = !m_appletVis
+                            || m_appletVis->isEffectivelyVisible(
+                                   it.key());
+                        w->setVisible(wantShown);
+                        if (wantShown) {
+                            m_floatingContainersHiddenPreConnect
+                                .removeAll(w);
+                        }
                         w->setDockIndex(dockIndex);
                         if (rect.isValid()) { w->setGeometry(rect); }
                         ensureOnVisibleScreen(w, this,
@@ -7069,25 +7875,229 @@ void MainWindow::populateDefaultMeter()
                     // kann Widgets nennen, die es nicht mehr gibt.
                 }
 
-                // Betreiber 2026-08-28: dieselbe Vorher-verstecken-Regel
-                // trifft auch die abgeloesten APPLET-Fenster (Stehwelle,
-                // wenn per Klick aus dem Panel geloest) -- ein dritter,
-                // von ContainerManager und vom Rotor-Dock UNABHAENGIGER
-                // Mechanismus (m_floatingApplets), den der erste und
-                // zweite Anlauf beide uebersehen hatten. Muss HIER
-                // stehen, nicht bei der ContainerManager-Schleife weiter
-                // oben im Konstruktor: erst der Restore-Block direkt
-                // darueber legt diese Fenster ueberhaupt an.
-                if (!m_radioModel
-                    || m_radioModel->connectionState()
-                           != ConnectionState::Connected) {
-                    for (AppletFloatingWindow* w
-                         : std::as_const(m_floatingApplets)) {
-                        if (w && w->isVisible()) {
-                            w->hide();
-                            m_floatingContainersHiddenPreConnect.append(w);
+                qWarning() << "[ProfileApply:Step] 4/6 Panadapter";
+                // ── Panadapter-Schwebefenster herstellen ────────────
+                //
+                // Betreiber 2026-09-01: siehe die Capture-Seite. Das
+                // contains()-Tor ist Absicht: eine Aufnahme von VOR
+                // diesem Update kennt den Schluessel nicht -- dann
+                // nichts andocken und nichts abloesen, der globale
+                // PanFloating_<id>-Stand bleibt fuer sie massgeblich
+                // (dasselbe Migrations-Muster wie bei rotorDockVisible
+                // weiter unten). Steht der Schluessel drin, gilt
+                // dieselbe Vorhandensein-Regel wie bei floatingApplets:
+                // Eintrag -> schwebt an dieser Stelle, kein Eintrag ->
+                // angedockt.
+                if (m_panStack
+                    && s.contains(QStringLiteral("floatingPans"))) {
+                    const QVariantMap fpans =
+                        s.value(QStringLiteral("floatingPans")).toMap();
+                    const QStringList panIds =
+                        m_panStack->panIdsForTesting();
+
+                    // ZWEI Durchgaenge, Reihenfolge tragend
+                    // (Review-Fund 2026-09-01, adversarial bestaetigt):
+                    // dockPanadapter() ist NICHT auf einen Panadapter
+                    // begrenzt -- sein dockRequested-Weg ruft
+                    // applyLayout(), dessen allererster Schritt
+                    // dockAllFloatingPans() ist und damit JEDES
+                    // Schwebefenster abraeumt. Ein einzelner Durchgang
+                    // in Kennungs-Reihenfolge haette eine in Runde 1
+                    // hergestellte Schwebe-Lage (pan-0) in Runde 2
+                    // (pan-1 andocken) sofort wieder zerstoert -- und
+                    // der naechste Beenden-Schnappschuss haette den
+                    // kaputten Stand dauerhaft ins Profil geschrieben.
+                    // Also: ERST alles andocken (die Kollateral-Docks
+                    // duerfen dabei passieren), DANACH schweben lassen
+                    // und die Lage setzen.
+                    for (const QString& panId : panIds) {
+                        if (!fpans.contains(panId)
+                            && m_panStack->isPanFloating(panId)) {
+                            m_panStack->dockPanadapter(panId);
                         }
                     }
+                    for (const QString& panId : panIds) {
+                        if (!fpans.contains(panId)) { continue; }
+                        const QVariantMap one =
+                            fpans.value(panId).toMap();
+                        if (!m_panStack->isPanFloating(panId)) {
+                            m_panStack->floatPanadapter(panId);
+                        }
+                        if (auto* pf = m_panStack
+                                ->floatingWindowForTest(panId)) {
+                            const QRect r(
+                                one.value(QStringLiteral("x")).toInt(),
+                                one.value(QStringLiteral("y")).toInt(),
+                                one.value(QStringLiteral("w")).toInt(),
+                                one.value(QStringLiteral("h")).toInt());
+                            // Untergrenzen -- ein kaputter Eintrag
+                            // soll kein 0x0-Fenster erzeugen. Der
+                            // mitgesicherte "screen"-Schluessel wird
+                            // hier bewusst (noch) nicht ausgewertet:
+                            // Einzelmonitor-Betrieb; bei Mehrschirm
+                            // greift ensureOnVisibleScreen() als Netz.
+                            if (r.width() >= 100 && r.height() >= 80) {
+                                pf->setGeometry(r);
+                            }
+                            ensureOnVisibleScreen(pf, this,
+                                                  QSize(420, 240));
+                        }
+                    }
+                    // Globale PanFloating_<id>-Schluessel nachziehen:
+                    // die Kollateral-Docks aus dockAllFloatingPans()
+                    // emittieren kein panFloatStateChanged (Signale
+                    // vorher getrennt), und das Signal ist der einzige
+                    // Schreiber dieser Schluessel -- ohne diese
+                    // Schleife koennte der naechste Programmstart
+                    // einen laengst angedockten Panadapter wieder
+                    // schweben lassen.
+                    for (const QString& panId : panIds) {
+                        AppSettings::instance().setValue(
+                            QStringLiteral("PanFloating_%1").arg(panId),
+                            m_panStack->isPanFloating(panId)
+                                ? QStringLiteral("True")
+                                : QStringLiteral("False"));
+                    }
+                }
+
+                qWarning() << "[ProfileApply:Step] 5/6 Rotor/Log";
+                // ── Rotor/Log-Form herstellen ───────────────────────
+                //
+                // Dasselbe contains()-Tor. Der "floating"-Zweig ist
+                // zusaetzlich auf die Sichtbarkeits-Map gebunden:
+                // detachRotorPanel() schaltet WinRotorLog im
+                // Controller auf sichtbar -- bei einem Profil, das den
+                // Rotor ausdruecklich NICHT zeigt, waere das ein
+                // Widerspruch, den erst der naechste Quit als
+                // Dauerzustand festschriebe.
+                if (s.contains(QStringLiteral("rotor"))) {
+                    const QVariantMap rotor =
+                        s.value(QStringLiteral("rotor")).toMap();
+                    const QString form =
+                        rotor.value(QStringLiteral("form")).toString();
+                    const bool rotorWanted =
+                        s.value(QStringLiteral("visible")).toMap()
+                            .value(QStringLiteral("WinRotorLog"), true)
+                            .toBool();
+                    if (form == QLatin1String("floating")
+                        && rotorWanted) {
+                        detachRotorPanel();
+                        if (m_rotorWindow) {
+                            // Betreiber 2026-09-01: "das ROTOR Fenster im
+                            // Format anders, auch die Positionierung" --
+                            // ToolWindow's eigener Konstruktor liest VOR
+                            // diesem Aufruf schon per restoreGeometryState()
+                            // einen GLOBALEN, profil-unabhaengigen
+                            // AppSettings-Schluessel (ToolWindowGeometry_
+                            // RotorLog) und setzt m_sizedOnce -- ein
+                            // synchrones setGeometry() direkt danach sollte
+                            // eigentlich gewinnen, tut es an dieser Stelle
+                            // aber nachweislich nicht zuverlaessig (derselbe
+                            // Verdacht besteht fuer PanFloatingWindow, das
+                            // dasselbe Muster traegt, dort aber noch nicht
+                            // gemeldet wurde). Dieselbe Kur wie beim
+                            // Panadapter-Reparenting (refreshAfterReparent,
+                            // PanadapterStack.cpp): auf den naechsten
+                            // Ereignisschleifen-Durchlauf verschieben, NACH
+                            // allem, was der Konstruktor/show() noch
+                            // nachreicht. QPointer schuetzt gegen ein
+                            // zwischenzeitliches dockRotorPanel()
+                            // (Andocken/Profilwechsel/Beenden).
+                            const QRect r(
+                                rotor.value(QStringLiteral("x")).toInt(),
+                                rotor.value(QStringLiteral("y")).toInt(),
+                                rotor.value(QStringLiteral("w")).toInt(),
+                                rotor.value(QStringLiteral("h")).toInt());
+                            QPointer<ToolWindow> guard(m_rotorWindow);
+                            QTimer::singleShot(0, this, [this, guard, r]() {
+                                if (!guard) { return; }
+                                if (r.width() >= 100 && r.height() >= 80) {
+                                    guard->setGeometry(r);
+                                }
+                                // Betreiber 2026-09-01: "immer falsch
+                                // gespeichert, zu groß, andere
+                                // Koordinaten" -- 420x240 ist die
+                                // Mindestgroesse von PanFloatingWindow
+                                // (dort per setMinimumSize() erzwungen),
+                                // NICHT von ToolWindow/Rotor-Log, das
+                                // gar keine eigene Mindestgroesse setzt.
+                                // Blind kopiert von der Panadapter-Stelle
+                                // direkt darueber. Eine echte,
+                                // schmalere gespeicherte Breite (hier
+                                // z.B. 270px) wurde dadurch bei JEDEM
+                                // Wiederherstellen wieder auf 420
+                                // aufgeblasen und neu positioniert --
+                                // exakt das gemeldete Symptom. Dieselbe
+                                // 100x80-Untergrenze wie in der
+                                // Kaputt-Eintrag-Pruefung direkt darueber,
+                                // nicht die Panadapter-Konstante.
+                                ensureOnVisibleScreen(guard, this,
+                                                      QSize(100, 80));
+                            });
+                        }
+                    } else if (form == QLatin1String("below")) {
+                        // Erst den Schluessel, dann andocken:
+                        // dockRotorPanel() liest RotorPanelBelow am
+                        // Ende selbst und legt das Panel entsprechend
+                        // ab.
+                        AppSettings::instance().setValue(
+                            QStringLiteral("RotorPanelBelow"),
+                            QStringLiteral("True"));
+                        if (m_rotorWindow) {
+                            dockRotorPanel();
+                        } else {
+                            setRotorPanelBelow(true);
+                        }
+                        // NACH setRotorPanelBelow(): das setzt den
+                        // aeusseren Splitter bedingungslos auf
+                        // 2/3-1/3 zurueck -- die gesicherte Teilung
+                        // muss danach kommen, sonst gewinnt die
+                        // Vorgabe (Review-Fund 2026-09-01).
+                        const QVariantList split =
+                            rotor.value(QStringLiteral("belowSplit"))
+                                .toList();
+                        if (m_outerSplitter && split.size() >= 2) {
+                            QList<int> px;
+                            for (const QVariant& v : split) {
+                                px << v.toInt();
+                            }
+                            m_outerSplitter->setSizes(px);
+                        }
+                    } else if (form == QLatin1String("docked")) {
+                        AppSettings::instance().setValue(
+                            QStringLiteral("RotorPanelBelow"),
+                            QStringLiteral("False"));
+                        if (m_rotorWindow) {
+                            dockRotorPanel();
+                        } else {
+                            setRotorPanelBelow(false);
+                        }
+                    }
+                }
+
+                // Betreiber 2026-09-01: "kein Funkgerät hier, alles nicht
+                // verbunden" -- die schwebenden Fenster von Applets
+                // (m_floatingApplets), Panadapter (PanadapterStack) und
+                // Rotor/Log (m_rotorWindow) werden beim Profil-Anwenden
+                // NICHT mehr wegen fehlender Verbindung versteckt (bis
+                // 2026-09-01 waren das drei getrennte "Vorher-verstecken"
+                // Zweige genau hier). Betreiber-Entscheidung: Layout-
+                // Arbeit (Panadapter/Applets/Rotor anordnen) muss auch
+                // ohne Radio am Tisch moeglich sein -- ein Widerruf der
+                // frueheren "ALLE fliegenden Fenster gehören hinter die
+                // ConnectMaske"-Weisung fuer genau diese drei Kategorien.
+                // NUR das Antenna-Fenster (SWR-Sweep, ohne Funkgeraet
+                // sicherheitsrelevant bedeutungslos) bleibt hinter der
+                // Connect-Maske -- eigener, aelterer Grund
+                // (applyWindowVisibility()'s WinAntenna-Wache), nicht
+                // Teil dieser Entscheidung.
+                if ((!m_radioModel
+                     || m_radioModel->connectionState()
+                            != ConnectionState::Connected)
+                    && m_antennaWindow && m_antennaWindow->isVisible()) {
+                    m_antennaWindow->hide();
+                    m_floatingContainersHiddenPreConnect.append(
+                        m_antennaWindow);
                 }
 
                 if (m_appletPanel) {
@@ -7137,9 +8147,26 @@ void MainWindow::populateDefaultMeter()
                     for (const QVariant& v : sizes) { px << v.toInt(); }
                     m_mainSplitter->setSizes(px);
                 }
+                qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
         m_layoutProfiles->load();
+        // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
+        // sichtbar" -- zeigt, was TATSAECHLICH von der Platte kam,
+        // bevor applyCurrent() irgendetwas damit tut. Vergleich mit
+        // [ProfileSaveOnQuit:*] aus dem letzten Beenden beantwortet
+        // die Frage, ob das Problem beim Sichern oder beim Laden liegt.
+        if (!m_layoutProfiles->current().isEmpty()) {
+            const QVariantMap snap =
+                m_layoutProfiles->snapshot(m_layoutProfiles->current());
+            qWarning() << "[ProfileLoadOnStartup]"
+                       << m_layoutProfiles->current()
+                       << "floatingApplets="
+                       << snap.value(QStringLiteral("floatingApplets")).toMap().size()
+                       << "floatingPans="
+                       << snap.value(QStringLiteral("floatingPans")).toMap().size()
+                       << "rotor=" << snap.value(QStringLiteral("rotor")).toMap();
+        }
         if (m_layoutProfiles->names().isEmpty()) {
             // Beim allerersten Start gibt es genau ein Profil, und es
             // hält, was gerade zu sehen ist. Ohne das stünde die
@@ -7174,11 +8201,25 @@ void MainWindow::populateDefaultMeter()
                     // Standardfall, und ein sichtbares m_rotorWindow lässt
                     // ein daneben existierendes, aber leeres m_rotorDock
                     // ohnehin unbeachtet.
+                    //
+                    // Betreiber 2026-08-31, per Log/Einstellungsdatei
+                    // bestaetigt: m_rotorDockWantedVisible durfte hier NIE
+                    // das schwebende Fenster sperren. Der Wert kommt aus
+                    // m_rotorDock->isVisible() zum Sicherungszeitpunkt
+                    // (siehe "rotorDockVisible" Erfassung oben) -- steht
+                    // Rotor/Log gerade schwebend (der dokumentierte
+                    // Normalfall), ist das Dock leer und unbenutzt, seine
+                    // isVisible() also ganz legitim false. Genau dieses
+                    // false unterdrueckte danach auch m_rotorWindow->show(),
+                    // obwohl das schwebende Fenster laengst existierte und
+                    // nur auf die erste Verbindung wartete. Ein
+                    // existierendes m_rotorWindow soll nach der ersten
+                    // Verbindung IMMER wieder erscheinen -- das Flag gilt
+                    // nur noch fuer den m_rotorDock-Zweig, wo es tatsaechlich
+                    // die richtige Frage beantwortet.
                     if (m_rotorWindow) {
-                        if (m_rotorDockWantedVisible) {
-                            m_rotorWindow->show();
-                            m_rotorWindow->raise();
-                        }
+                        m_rotorWindow->show();
+                        m_rotorWindow->raise();
                     } else if (m_rotorDock) {
                         m_rotorDock->setVisible(m_rotorDockWantedVisible);
                     }
@@ -7217,7 +8258,42 @@ void MainWindow::populateDefaultMeter()
     // Apply initial visibility state from the controller (in case
     // AppSettings already had values from a prior session).
     // Uses effective visibility (user pref AND available).
+    //
+    // Betreiber 2026-08-31, nach langer Suche: "rotor war auch wieder
+    // kein eigenes fenster", trotz sauber beendeter Sitzungen ohne jede
+    // Absturzspur -- die Ursache war genau diese Schleife. Fuer
+    // "WinRotorLog" bedeutet ein/aus nicht bloss sichtbar/unsichtbar,
+    // sondern welche FORM das Fenster hat (siehe applyWindowVisibility():
+    // "on" ruft detachRotorPanel(), "off" ruft dockRotorPanel() -- beide
+    // aendern die Form, nicht nur die Sichtbarkeit). Die Form ist aber
+    // schon LAENGST entschieden, weiter oben im selben Konstruktor, aus
+    // der eigentlich zustaendigen Quelle (RotorFloating/RotorPanelBelow).
+    // Diese Schleife hier liest stattdessen den generischen, im PROFIL
+    // gespeicherten "WinRotorLog"-Haken -- der oft genug einen anderen
+    // (aelteren, oder nie synchronisierten) Stand traegt -- und rief
+    // dockRotorPanel() jedes Mal auf, wenn der davon abwich. Ergebnis:
+    // die richtige Form von oben wurde hier unten, im selben Start,
+    // sofort wieder verworfen, UND RotorFloating gleich mit ueberschrieben
+    // (dockRotorPanel() schreibt es). "WinRotorLog" ist deshalb hier
+    // ausgenommen; seine Sichtbarkeit lebt fuer den Sonderfall Rotor/Log
+    // ausschliesslich in RotorFloating/RotorPanelBelow, nicht hier.
+    // Betreiber 2026-09-01: "kein Funkgerät hier, alles nicht verbunden" --
+    // schwebende Applet-Fenster (m_floatingApplets: TX, S-Meter,
+    // Mitschrift & Co.) werden beim Start nicht mehr wegen fehlender
+    // Verbindung uebersprungen (widerruft die fruehere "ALLE fliegenden
+    // Fenster gehören hinter die ConnectMaske"-Weisung fuer diese
+    // Kategorie). "WinAntenna" haengt nicht an m_floatingApplets (eigener,
+    // dritter Mechanismus fuer Werkzeugfenster wie Antenne/Logbuch/
+    // Kanalzug) und bleibt weiterhin ausgenommen: SWR-Sweep ist ohne
+    // Funkgeraet sicherheitsrelevant bedeutungslos ("no radio" steht
+    // selbst im Fenster), nicht nur uninformativ wie ein Applet.
     for (const QString& id : m_appletVis->registeredIds()) {
+        if (id == QLatin1String("WinRotorLog")) { continue; }
+        if ((!m_radioModel
+             || m_radioModel->connectionState() != ConnectionState::Connected)
+            && id == QLatin1String("WinAntenna")) {
+            continue;
+        }
         applyAppletVisibility(id, m_appletVis->isEffectivelyVisible(id));
     }
 
@@ -7328,8 +8404,27 @@ void MainWindow::buildMenuBar()
 
     fileMenu->addSeparator();
 
+    // Betreiber 2026-08-30, nach zwei Fehlschlaegen am Rotor/Log-Fix:
+    // "habe ich gemacht, leider nein". Der Grund: Qt garantiert NICHT,
+    // dass MainWindow::closeEvent() (wo m_shuttingDown bisher gesetzt
+    // wurde) vor den Schliessereignissen der schwebenden Fenster
+    // (Rotor/Log, Applets) laeuft -- closeAllWindows() geht die
+    // Top-Level-Fenster in einer Reihenfolge durch, auf die sich kein
+    // Aufrufer verlassen darf. Traf es zuerst ein schwebendes Fenster,
+    // stand m_shuttingDown dort noch auf false, und dessen closeEvent
+    // dockte sich selbst an, bevor MainWindow ueberhaupt zum Zug kam.
+    //
+    // Dieser Cmd+Q-Menuepunkt ist der EINE Ort, an dem das Beenden auf
+    // macOS tatsaechlich beginnt (Qt zieht ihn per Rollen-Erkennung an
+    // "Quit" automatisch ins Anwendungsmenue) -- alles Weitere
+    // (closeAllWindows(), jedes einzelne closeEvent) folgt erst DANACH.
+    // Die Sperre hier zu setzen, bevor qApp->quit() ueberhaupt aufgerufen
+    // wird, macht die Reihenfolge der einzelnen Fenster bedeutungslos.
     fileMenu->addAction(QStringLiteral("&Quit"), QKeySequence(Qt::CTRL | Qt::Key_Q),
-                        qApp, &QApplication::quit);
+                        this, [this]() {
+        m_shuttingDown = true;
+        qApp->quit();
+    });
 
     // =========================================================================
     // RADIO
@@ -7824,6 +8919,31 @@ void MainWindow::buildMenuBar()
     // would drift out of sync. CAT + MIDI greyed placeholders deferred to
     // their feature phases (3K-1 / 3K-3) — re-add at that time wired
     // through the controller.
+
+    viewMenu->addSeparator();
+
+    // Vollbild (2026-09-08, Betreiber: "es sollte auch im gernellen
+    // fenster die möglichkeit geben, immer auf full screen zu
+    // schalten"). enterBorderlessFullSize()/exitBorderlessFullSize()
+    // gab es schon seit 2026-09-01, aber nur ueber das Layoutprofil
+    // erreichbar -- kein Menuepunkt, kein Tastenkuerzel. checked wird
+    // von beiden Methoden selbst nachgezogen (siehe m_fullScreenAction
+    // in MainWindow.h), damit ein Profilwechsel den Haken nicht aus
+    // dem Takt bringt.
+    m_fullScreenAction = viewMenu->addAction(QStringLiteral("&Full Screen"));
+    m_fullScreenAction->setCheckable(true);
+    m_fullScreenAction->setChecked(m_borderlessFullSize);
+    m_fullScreenAction->setShortcut(QKeySequence(QKeySequence::FullScreen));
+    m_fullScreenAction->setToolTip(QStringLiteral(
+        "Vollbild ohne Fensterrahmen. Schwebende Werkzeugfenster "
+        "(Panadapter, S-Meter, TX ...) bleiben sichtbar."));
+    connect(m_fullScreenAction, &QAction::toggled, this, [this](bool on) {
+        if (on) {
+            enterBorderlessFullSize();
+        } else {
+            exitBorderlessFullSize();
+        }
+    });
 
     viewMenu->addSeparator();
 
@@ -8434,6 +9554,17 @@ void MainWindow::buildMenuBar()
 
             connect(act, &QAction::toggled, this, [this, id](bool checked) {
                 if (m_appletVis) { m_appletVis->setVisible(id, checked); }
+                // Betreiber 2026-08-30, ueber einen Regressionstest
+                // gefunden: dieser Weg fehlte im Gegensatz zum
+                // Ausblenden-Kreuz (appletHideRequested oben) das
+                // sofortige captureIntoCurrent()+save() -- ein Haken hier
+                // ueberlebte bislang nur, wenn die App normal ueber
+                // closeEvent() beendet wurde, sonst ging er beim
+                // naechsten Start wieder verloren, lautlos.
+                if (m_layoutProfiles) {
+                    m_layoutProfiles->captureIntoCurrent();
+                    m_layoutProfiles->save();
+                }
             });
             m_topMenuAppletActions.insert(id, act);
         }
@@ -8457,6 +9588,31 @@ void MainWindow::buildMenuBar()
                 act->setEnabled(available);
             }
         });
+
+        // "WinAntenna" bewusst NICHT ueber m_appletVis->setAvailable(): das
+        // wuerde auch effectiveVisibilityChanged ausloesen und damit in
+        // applyWindowVisibility()'s eigene, bereits am 2026-09-01
+        // gegenpruefte Wiederaufgehen-Logik beim naechsten Connect
+        // hineinspielen (deren Speicher fuer "soll wieder aufgehen" ist
+        // genau isVisible/isAvailable). Betreiber 2026-09-05: nur den
+        // Haken ausgrauen, wenn kein Funkgeraet verbunden ist -- der
+        // Haken-Zustand (die Absicht) bleibt unangetastet, das
+        // Oeffnen/Schliessen bleibt allein bei applyWindowVisibility()'s
+        // eigener Sperre (MainWindow.cpp, WinAntenna-Zweig).
+        if (m_radioModel) {
+            auto updateAntennaMenuEnabled = [this](bool connected) {
+                if (auto* act = m_topMenuAppletActions.value(
+                        QStringLiteral("WinAntenna"), nullptr)) {
+                    act->setEnabled(connected);
+                }
+            };
+            updateAntennaMenuEnabled(
+                m_radioModel->connectionState() == ConnectionState::Connected);
+            connect(m_radioModel, &RadioModel::connectionStateChanged, this,
+                    [updateAntennaMenuEnabled](ConnectionState state) {
+                updateAntennaMenuEnabled(state == ConnectionState::Connected);
+            });
+        }
     }
 
     // =========================================================================
@@ -8779,6 +9935,25 @@ void MainWindow::buildMenuBar()
             if (m_radioModel && m_radioModel->spotModel()) {
                 m_radioModel->spotModel()->clear();
             }
+        });
+    }
+
+    // Betreiber 2026-09-02: "kann ich das Fenster auch nicht kleiner und
+    // größer machen" -- enterBorderlessFullSize() (2026-09-01) nimmt dem
+    // Fenster Qt::FramelessWindowHint weg und damit die nativen
+    // Ziehgriffe; es gibt aber keinen Knopf und keine Taste, die zurueck
+    // in den normalen, groessenveraenderbaren Rahmen fuehrt -- und der
+    // Zustand kann schon beim Start lautlos aus einem gespeicherten
+    // Profil (fullScreen=true) kommen, ohne dass irgendetwas auf dem
+    // Schirm sagt, warum das Fenster jetzt starr ist. Escape ist der
+    // Fluchtweg, den jedes Vollbild kennt -- Standardkontext
+    // (Qt::WindowShortcut), damit ein fokussierter Dialog sein eigenes
+    // Escape (schliessen) zuerst bekommt.
+    {
+        auto* exitBorderlessShortcut = new QShortcut(
+            QKeySequence(Qt::Key_Escape), this);
+        connect(exitBorderlessShortcut, &QShortcut::activated, this, [this]() {
+            exitBorderlessFullSize();
         });
     }
 }
@@ -10497,6 +11672,50 @@ void MainWindow::showTciLogWindow()
 void MainWindow::showTciLogWindow() {}  // no-op in non-WebSocket builds
 #endif // HAVE_WEBSOCKETS
 
+void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
+{
+    // Same QMetaObject::Connection-list idiom as CommandBar::attach():
+    // drop the old slice's dspModeChanged listener before wiring the new
+    // one, so a slice-identity change never leaves two connections alive.
+    for (const auto& c : m_rttyRadeLinks) { disconnect(c); }
+    m_rttyRadeLinks.clear();
+
+    // RttyDecoderApplet is a single global widget, not per-flag -- it
+    // follows whichever slice is CURRENTLY active. setSlice() already
+    // disconnects its own old mark/shift links and re-points the audio
+    // tap (RttyDecoderApplet::setSlice), so calling it again here with the
+    // (possibly unchanged) active slice is cheap and safe.
+    if (m_rttyDecoderApplet) {
+        m_rttyDecoderApplet->setSlice(slice);
+    }
+
+    if (!m_appletVis) { return; }
+
+    if (!slice) {
+        m_appletVis->setAvailable(QStringLiteral("Rade"), false);
+        m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
+        return;
+    }
+
+    // Apply the slice's REAL mode immediately -- a restored profile/
+    // session can start (or, after this bench fix, ARRIVE via a slice-
+    // identity change) already in DIGL or RADE_U/_L, and
+    // SliceModel::dspModeChanged only fires on a later CHANGE, not on
+    // this initial snapshot.
+    const auto applyForMode = [this](DSPMode mode) {
+        const bool isRade = (mode == DSPMode::RADE_U || mode == DSPMode::RADE_L);
+        m_appletVis->setAvailable(QStringLiteral("Rade"), isRade);
+        // RTTY is a DIGL submode only -- RxApplet::applyModeVisibility
+        // documents this exact rule ("RTTY -> NUR DIGL") for the VFO
+        // flag's mark/shift container; this applet follows the same gate.
+        m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
+                                  mode == DSPMode::DIGL);
+    };
+    applyForMode(slice->dspMode());
+
+    m_rttyRadeLinks << connect(slice, &SliceModel::dspModeChanged, this, applyForMode);
+}
+
 void MainWindow::wireSliceToSpectrum()
 {
     SliceModel* slice = m_radioModel->activeSlice();
@@ -10574,17 +11793,18 @@ void MainWindow::wireSliceToSpectrum()
         });
     }
 
+    // RTTY decoder / RADE availability: was bound once here, inline, to
+    // whichever slice existed at slice-0-added time. Now shared with the
+    // activeSliceChanged handler in buildUI() via
+    // rebindRttyRadeAvailability() -- see that method's doc comment in
+    // MainWindow.h for the bench-found bug this closes.
+    rebindRttyRadeAvailability(slice);
+
+    // PhoneCwApplet's page follows the mode too, but it is not a per-slice
+    // rebinding concern the way RTTY/RADE availability is (PhoneCwApplet
+    // has no per-slice state to go stale) -- left as the original single
+    // dspModeChanged connection here.
     connect(slice, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
-        // Phase 3R L2: RADE applet shows for either RADE sideband, IN ADDITION
-        // to PhoneCwApplet -- bench feedback showed PhoneCw hosts the mic gain
-        // slider, which RADE TX still needs. Routed through the visibility
-        // controller so the wrapper and the menu entry agree, and the user's
-        // persisted preference survives the mode change.
-        const bool isRade = (mode == DSPMode::RADE_U
-                             || mode == DSPMode::RADE_L);
-        if (m_appletVis) {
-            m_appletVis->setAvailable(QStringLiteral("Rade"), isRade);
-        }
         if (m_phoneCwApplet) {
             m_phoneCwApplet->setVisible(true);  // always visible
             switch (mode) {
@@ -11490,7 +12710,27 @@ void MainWindow::openNrSetupPage(Longpath::NrSlot slot)
 
 void MainWindow::applyDarkTheme()
 {
-    setStyleSheet(Style::themed(QStringLiteral(
+    // ── Der Dock-Griff neben Rotor/Log ───────────────────────────────
+    //
+    // Betreiber, 2026-08-30: "roto log ist wieder nicht
+    // größenveränderbar" -- angedockt ist Rotor/Log ein echtes
+    // QDockWidget (ensureRotorPanel()), dessen Ziehgriff Qts eigener,
+    // UNGESTALTETER QMainWindow::separator ist. Gegen das fast
+    // schwarze Hausstil-Grau ist der praktisch unsichtbar und schwer
+    // zu treffen -- derselbe Fehler wie bei den drei Pixel breiten
+    // Splitter-Griffen, den Style::splitterStyle() schon einmal
+    // behoben hat (siehe dort), nur diesmal am QMainWindow selbst statt
+    // an einem QSplitter. Dieselben Masse, damit sich beide Griffe
+    // gleich anfuehlen.
+    const QString separatorStyle = QStringLiteral(
+        "QMainWindow::separator { background: %1; width: %2px; "
+        "  height: %2px; border: none; }"
+        "QMainWindow::separator:hover { background: %3; }")
+            .arg(Style::hexRole(Style::kPanelBg))
+            .arg(Style::kSplitterHandlePx)
+            .arg(Style::hexRole(Style::kAccent));
+
+    setStyleSheet(Style::themed(separatorStyle + QStringLiteral(
         "QMainWindow { background: #0f0f1a; }"
         "QMenuBar {"
         "  background: #1a2a3a;"
@@ -11512,13 +12752,118 @@ void MainWindow::applyDarkTheme()
         "}")));
 }
 
+// ── Alle Schwebefenster hinter die Connect-Maske ─────────────────────
+//
+// Betreiber 2026-09-01: "ALLE fliegenden Fenster gehören hinter die
+// ConnectMaske oder hier gelöscht." EINE Methode fuer alle fuenf
+// Schwebe-Mechanismen (ContainerManager-Container, abgeloeste Applet-
+// Fenster, Antennen-Werkzeugfenster, Panadapter-Schwebefenster,
+// Rotor/Log-ToolWindow) -- die Zaehlung selbst ist die Lehre dieses
+// Tages: jede Kopie dieser Liste an einer anderen Stelle hat
+// mindestens einen Mechanismus vergessen (erst die Applets, dann die
+// Antenne, dann die Pans, zuletzt den Rotor -- alle vier Luecken
+// einzeln vom Betreiber oder vom adversarialen Review gefunden).
+// Alles Versteckte landet in m_floatingContainersHiddenPreConnect und
+// kommt an genau zwei Stellen zurueck: mit der naechsten Verbindung
+// (onConnectionStateChanged, Connected-Zweig) oder beim SCHLIESSEN der
+// Maske ohne Verbindung (ConnectionPanel-destroyed-Handler unten) --
+// Betreiber 2026-09-01: "panadapter kann ich nicht finden / profil 01
+// ist leer": nach dem Wegklicken der Maske blieb sonst eine leere
+// Flaeche, das Layout des Betreibers unauffindbar versteckt.
+void MainWindow::hideFloatingWindowsBehindConnectMask()
+{
+    for (ContainerWidget* c : m_containerManager->allContainers()) {
+        if (!c) { continue; }
+        if (c->isFloating()) {
+            QWidget* win = c->window();
+            if (win && win != this && win->isVisible()) {
+                win->hide();
+                m_floatingContainersHiddenPreConnect.append(win);
+            }
+        } else if (c->isOverlayDocked()) {
+            if (c->isVisible()) {
+                c->hide();
+                m_floatingContainersHiddenPreConnect.append(c);
+            }
+        }
+    }
+    // Betreiber 2026-09-01, korrigiert nach "es liegt da wieder alles
+    // durcheinander, bevor man connected. dies hatte ich dir schon 30
+    // mal gesagt": DIESE Methode (nur noch aufgerufen, wenn der
+    // Connect-Dialog tatsaechlich aufgeht -- siehe showConnectionPanel()
+    // unten, der einzige verbliebene Aufrufer) versteckt weiterhin ALLE
+    // schwebenden Fenster einschliesslich Applets/Panadapter/Rotor. Die
+    // fruehere Entfernung dieser drei war zu weit gefasst: sie sollten
+    // nicht mehr wegen blosser Trennung ohne offenen Dialog verschwinden
+    // (das war der eigentliche Wunsch von "kein Funkgerät hier, alles
+    // nicht verbunden" -- siehe die entfernten Aufrufe im Profil-
+    // Anwenden-Lambda und im Konstruktor), aber SEHR WOHL, solange die
+    // "Connect to Radio"-Maske selbst offen ist und den Bildschirm
+    // bedeckt -- genau die urspruengliche, wiederholt eingeforderte
+    // Regel ("ALLE fliegenden Fenster gehören hinter die ConnectMaske").
+    for (AppletFloatingWindow* w : std::as_const(m_floatingApplets)) {
+        if (w && w->isVisible()) {
+            w->hide();
+            m_floatingContainersHiddenPreConnect.append(w);
+        }
+    }
+    if (m_antennaWindow && m_antennaWindow->isVisible()) {
+        m_antennaWindow->hide();
+        m_floatingContainersHiddenPreConnect.append(m_antennaWindow);
+    }
+    if (m_panStack) {
+        for (const QString& panId : m_panStack->panIdsForTesting()) {
+            if (m_panStack->isPanFloating(panId)) {
+                if (auto* pf = m_panStack->floatingWindowForTest(panId)) {
+                    if (pf->isVisible()) {
+                        pf->hide();
+                        m_floatingContainersHiddenPreConnect.append(pf);
+                    }
+                }
+            }
+        }
+    }
+    if (m_rotorWindow && m_rotorWindow->isVisible()) {
+        m_rotorWindow->hide();
+        m_floatingContainersHiddenPreConnect.append(m_rotorWindow);
+    }
+}
+
 void MainWindow::showConnectionPanel()
 {
+    // Maske auf, Fenster weg -- egal, WER sie oeffnet (automatisch
+    // nach einer Trennung oder von Hand ueber Menue/Klick auf die
+    // Statuszeile). Vorher galt das nur fuer den automatischen Weg.
+    if (!m_radioModel
+        || m_radioModel->connectionState() != ConnectionState::Connected) {
+        hideFloatingWindowsBehindConnectMask();
+    }
     if (!m_connectionPanel) {
         m_connectionPanel = new ConnectionPanel(m_radioModel, this);
         m_connectionPanel->setAttribute(Qt::WA_DeleteOnClose);
         connect(m_connectionPanel, &QObject::destroyed, this, [this]() {
             m_connectionPanel = nullptr;
+            // Betreiber 2026-09-01: "panadapter kann ich nicht finden
+            // ... profil 01 ist leer" -- die Maske ist zu, aber ohne
+            // Verbindung blieb ALLES dauerhaft versteckt und der
+            // Betreiber sah nur noch eine leere Flaeche. Die Regel
+            // heisst "hinter die ConnectMaske", nicht "weg bis zur
+            // Verbindung": schliesst der Betreiber die Maske, gehoert
+            // ihm sein Layout zurueck. Beim Verbinden uebernimmt
+            // stattdessen der Connected-Zweig in
+            // onConnectionStateChanged dieselbe Liste (dann ist sie
+            // hier schon leer -- doppeltes show() droht nicht).
+            if (m_shuttingDown) { return; }
+            if (m_radioModel
+                && m_radioModel->connectionState()
+                       == ConnectionState::Connected) {
+                return;
+            }
+            for (const QPointer<QWidget>& w
+                 : std::as_const(m_floatingContainersHiddenPreConnect)) {
+                if (w) { w->show(); w->raise(); }
+            }
+            m_floatingContainersHiddenPreConnect.clear();
         });
     }
     m_connectionPanel->show();
@@ -12112,6 +13457,7 @@ void MainWindow::detachRotorPanel()
     if (m_rotorHeader) { m_rotorHeader->hide(); }
     if (m_belowPane)   { m_belowPane->hide(); }
     if (m_rotorDock)   { m_rotorDock->hide(); }
+    syncOuterSplitterHandle();
 
     m_rotorWindow = new ToolWindow(panel, QStringLiteral("RotorLog"),
                                    QStringLiteral("Rotor / Log"), this);
@@ -12128,17 +13474,81 @@ void MainWindow::detachRotorPanel()
     // Fenster mit Titelleiste, Schloss und Anfasser sein, kein Dock.
     AppSettings::instance().setValue(QStringLiteral("RotorFloating"),
                                      QStringLiteral("True"));
+
+    // Betreiber 2026-08-30, in der Nacht gefunden: RotorFloating war nie
+    // das einzige "wie steht das Fenster"-Signal. m_appletVis fuehrt
+    // fuer "WinRotorLog" eine EIGENE, persistierte Sichtbarkeit
+    // (AppletWinRotorLogVisible, plus die Kopie in der aktiven
+    // Profil-JSON ueber captureIntoCurrent()'s "visible"-Map) -- und
+    // die wurde von detachRotorPanel()/dockRotorPanel() nie
+    // nachgefuehrt. Ergebnis: das Fenster stand sichtbar offen, aber
+    // der Controller hielt es fuer unsichtbar, und genau DIESEN
+    // veralteten Stand schrieb jeder Quit in die Profil-JSON. Ohne
+    // diese Zeile bleibt "RotorFloating=True" zwar korrekt, aber die
+    // Startreihenfolge in buildUI() liest die Profil-JSON VOR der
+    // RotorFloating-Wiederherstellung -- ein zweiter, unabhaengiger Weg
+    // zu genau demselben Symptom wie der Cmd+Q-Wettlauf oben in
+    // dockRotorPanel(). setVisible() ist ein No-Op, wenn der Wert schon
+    // stimmt, also keine zusaetzliche Arbeit im Normalfall.
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("WinRotorLog"), true);
+    }
 }
 
 void MainWindow::dockRotorPanel()
 {
+    // ── Beim Beenden: NICHTS mehr andocken ───────────────────────────
+    //
+    // Betreiber 2026-08-30, wieder: "Rotor log wieder kein eigenes
+    // Fenster. das hatten wir auch schon mehrmals." DER Grund, derselbe
+    // wie beim Profil-nicht-gespeichert-Fund vom selben Tag: Cmd+Q
+    // schickt auch dem schwebenden Rotor/Log-Fenster ein Schliess-
+    // ereignis, und ToolWindow::closeEvent() behandelt "geschlossen"
+    // als "andocken" -- genau wie AppletFloatingWindow es tat. Dieser
+    // Andock-Weg hier unten schrieb danach RotorFloating=False in die
+    // Einstellungen, JEDES Mal beim Beenden, egal wie das Fenster
+    // gerade stand. Der Fix fuer AppletFloatingWindow/dockAppletBack()
+    // (m_shuttingDown-Sperre) galt nur dort -- diese zweite, aehnlich
+    // gebaute Klasse hatte ihn nie bekommen.
+    //
+    // Betreiber 2026-08-31, per Log geklaert: qApp->quit() (Cmd+Q, ueber
+    // die "&Quit"-Handlung) liefert GAR KEIN QCloseEvent an irgendein
+    // Fenster -- weder an MainWindow noch an dieses ToolWindow. Es
+    // beendet nur die Ereignisschleife (aboutToQuit) und raeumt danach
+    // per normaler QObject-Elternschaft ab. dockRotorPanel() laeuft ueber
+    // diesen Weg also nie, diese Sperre bleibt trotzdem als Schutz fuer
+    // jeden ANDEREN Weg stehen, der tatsaechlich ein QCloseEvent
+    // ausloest (z.B. ein spaeter hinzugefuegter nativer Schliessen-Knopf).
+    if (m_shuttingDown) { return; }
+
     if (!m_rotorWindow) { return; }
+    // Betreiber 2026-09-01 (Untersuchung nach einem Haenger/OOM-Verdacht
+    // beim Profilwechsel): erst verstecken, DANN zerlegen -- dasselbe
+    // Muster, das PanadapterStack.cpp fuer sein eigenes Schwebefenster
+    // bewusst einhaelt ("erst den GPU-Schutz, DANN das Umhaengen -- sonst
+    // bricht der doppelte NSView-Lebenszyklus die NSResponder-Kette
+    // (#1344)", PanadapterStack.cpp ~Zeile 395-397). m_rotorWindow ist
+    // seit heute (schwebende Fenster bleiben auch ohne Verbindung
+    // sichtbar) zum ersten Mal regelmaessig noch SICHTBAR/gemappt, wenn
+    // releaseContent()+deleteLater() darauf laufen -- vorher war es an
+    // dieser Stelle durch die inzwischen entfernte "hinter die
+    // ConnectMaske"-Logik praktisch immer schon unsichtbar, und
+    // setParent(nullptr) auf einem ungemappten NSPanel ist ein reiner
+    // Buchhaltungsvorgang ohne Fenster-Server-Roundtrip.
+    m_rotorWindow->hide();
     QWidget* panel = m_rotorWindow->releaseContent();
     m_rotorWindow->deleteLater();
     m_rotorWindow = nullptr;
     if (!panel) { return; }
     AppSettings::instance().setValue(QStringLiteral("RotorFloating"),
                                      QStringLiteral("False"));
+    // Gegenstueck zum Sync in detachRotorPanel() -- siehe dortigen
+    // Kommentar. m_shuttingDown ist hier oben schon abgefangen, also
+    // laeuft diese Zeile nie beim Beenden; sie haelt m_appletVis nur im
+    // normalen Betrieb (Klick auf den Andocken-Pfeil) synchron.
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("WinRotorLog"), false);
+    }
     // Zurueck an den Ort, den die Einstellung nennt. Vorgabe "False"
     // wie beim Programmstart (MainWindow-Konstruktor) -- "unten" ist
     // ein bewusst gewaehlter Zustand, kein Standard. Stand hier bis
@@ -12150,6 +13560,29 @@ void MainWindow::dockRotorPanel()
                                   QStringLiteral("False"))
                            .toString() == QStringLiteral("True");
     setRotorPanelBelow(below);
+}
+
+// Betreiber 2026-09-02: "Vertikal ist da noch eine Linie inkl. blauer
+// Punkt" ueber der CAT-Anzeige — sichtbar, obwohl m_belowPane leer und
+// verborgen war. QSplitter hebt seinen Griff nicht von selbst auf, nur
+// weil das benachbarte Kind hide() bekommt; auf macOS zeichnet der
+// native Stil obendrein einen kleinen Griff-Punkt in die Mitte des
+// Balkens, egal was Style::splitterStyle() an Hintergrundfarbe setzt.
+// Der Griff selbst bleibt: er gehoert m_outerSplitter, dem Splitter
+// zwischen Panadapter/Applet-Leiste (Index 0) und m_belowPane
+// (Index 1) — und m_belowPane ist kein totes Feld, sondern das Ziel
+// von setRotorPanelBelow(true) weiter unten. Nur seine SICHTBARKEIT
+// soll der von m_belowPane folgen.
+void MainWindow::syncOuterSplitterHandle()
+{
+    if (!m_outerSplitter || !m_belowPane) { return; }
+    // isHidden() statt isVisible(): Letzteres haengt auch von der
+    // Sichtbarkeit des ganzen Vorfahrenpfads ab und liefert vor dem
+    // ersten show() des Hauptfensters immer false — unabhaengig davon,
+    // ob m_belowPane gerade selbst show() oder hide() bekommen hat.
+    if (auto* handle = m_outerSplitter->handle(1)) {
+        handle->setHidden(m_belowPane->isHidden());
+    }
 }
 
 // ── Rotor/Log unter den Panadapter ───────────────────────────────────
@@ -12198,6 +13631,7 @@ void MainWindow::setRotorPanelBelow(bool below)
         panel->show();
         m_belowPane->show();
         m_rotorDock->hide();
+        syncOuterSplitterHandle();
 
         // Zwei Drittel Panadapter, ein Drittel darunter — dieselbe
         // Aufteilung wie beim waagerechten Splitter.
@@ -12212,6 +13646,7 @@ void MainWindow::setRotorPanelBelow(bool below)
         m_belowPane->hide();
         m_rotorDock->show();
         m_rotorDock->raise();
+        syncOuterSplitterHandle();
     }
 
     AppSettings::instance().setValue(
@@ -12304,6 +13739,23 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
         return;
     }
     if (id == QLatin1String("WinAntenna")) {
+        // Betreiber 2026-09-01: "ALLE fliegenden Fenster gehören hinter
+        // die ConnectMaske oder hier gelöscht" -- diese eine Stelle ist
+        // der einzige Weg, ueber den JEDER Aufrufer (die einmalige
+        // Start-Schleife, ein Profil-Anwenden/-Import, und der staendig
+        // laufende effectiveVisibilityChanged-Signalpumpen-Anschluss --
+        // DREI unabhaengige Wege, alle drei fuehren hier durch) das
+        // Fenster oeffnet. Ohne Funkgeraet zeigt es selbst "no radio";
+        // ein Import, dessen Profil "sichtbar" gespeichert hat, riss es
+        // trotz der Start-Ausnahme weiter auf, weil jene Ausnahme nur
+        // die einmalige Start-Schleife traf, nicht diese gemeinsame
+        // Endstelle.
+        if (on
+            && (!m_radioModel
+                || m_radioModel->connectionState()
+                       != ConnectionState::Connected)) {
+            return;
+        }
         if (on) { openAntennaWindow(); } else { closeIf(m_antennaWindow); }
         return;
     }
@@ -12334,6 +13786,27 @@ void MainWindow::openAntennaWindow()
     if (!m_antennaWindow) {
         m_antennaWindow = new AntennaWindow(this);
         m_antennaWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+        // Betreiber 2026-09-01: "Das Öffnen weiterer Fenster wie zum
+        // Beispiel Antenne darf sich nicht hinter anderen Fenstern
+        // verstecken, sondern muss ebenfalls im Vordergrund stehen."
+        // raise()/activateWindow() unten standen laengst da und
+        // wirkten trotzdem nicht: die schwebenden Werkzeugfenster
+        // (Panadapter, Rotor/Log, Bandwidth Filter ...) sind Qt::Tool
+        // -- auf macOS ein NSPanel auf einer HOEHEREN Fensterebene als
+        // ein gewoehnlicher QDialog. Ein raise() hebt nur innerhalb
+        // der eigenen Ebene; gegen ein NSPanel dardrueber ist es
+        // machtlos. Also dieselbe Ebene und dasselbe Space-Verhalten
+        // wie die anderen vier Fensterklassen.
+        m_antennaWindow->setWindowFlag(Qt::Tool, true);
+        enableFullScreenAuxiliaryBehavior(m_antennaWindow);
+        // Betreiber 2026-09-01: "passiert die ganze Zeit!" -- siehe
+        // AntennaWindow::closed() fuer die volle Begruendung. Der native
+        // rote Knopf schloss das Fenster bisher, ohne den Controller
+        // davon zu unterrichten, also stand "sichtbar" fuer immer fest
+        // und der Konstruktor riss es bei jedem Start wieder auf.
+        connect(m_antennaWindow, &AntennaWindow::closed, this, [this]() {
+            m_appletVis->setVisible(QStringLiteral("WinAntenna"), false);
+        });
         // 2026-08-13: wire the radio-as-analyzer backend into the
         // "Sweep (Radio)" tab. Without a RadioModel the tab stays
         // inert with its explanatory status line.
@@ -12686,6 +14159,7 @@ void MainWindow::openSpotHub()
             m_radioModel->wsjtx(),
             m_radioModel->spotCollector(),
             m_radioModel->pota(),
+            m_radioModel->sota(),
             m_radioModel->freeDvReporter(),
             m_radioModel->pskReporter(),
             m_radioModel->spotModel(),
@@ -12820,6 +14294,14 @@ void MainWindow::openSpotHub()
             connect(m_spotHubDialog.data(),
                     &SpotHubDialog::potaStopRequested,
                     pota, &PotaClient::stopPolling);
+        }
+        if (auto* sota = m_radioModel->sota()) {
+            connect(m_spotHubDialog.data(),
+                    &SpotHubDialog::sotaStartRequested,
+                    sota, &SotaClient::startPolling);
+            connect(m_spotHubDialog.data(),
+                    &SpotHubDialog::sotaStopRequested,
+                    sota, &SotaClient::stopPolling);
         }
 
         // 2026-05-12 bench fix: PSK Reporter Start button source-first
@@ -13189,6 +14671,35 @@ void MainWindow::onConnectionStateChanged()
     updateAddPanButtonState();
 
     if (m_radioModel->isConnected()) {
+        // Betreiber 2026-09-01: "diese fliegenden Fenster sind zu
+        // löschen auf der Connect Seite" -- Meter-/Applet-Fenster, die
+        // der else-Zweig unten bei einer Trennung MITTEN in der
+        // Sitzung versteckt hat, kommen bei JEDEM erneuten Verbinden
+        // zurueck, nicht nur beim allerersten der Sitzung (das
+        // behandelt bereits der eigene, einmalige Rotor/Log-Haken
+        // weiter unten im Konstruktor -- diese Schleife hier ist
+        // dieselbe Wiederherstellung, nur nicht auf "einmal" begrenzt).
+        for (const QPointer<QWidget>& w
+             : std::as_const(m_floatingContainersHiddenPreConnect)) {
+            if (w) { w->show(); w->raise(); }
+        }
+        m_floatingContainersHiddenPreConnect.clear();
+
+        // Review-Fund 2026-09-01 (adversarial bestaetigt): ein Profil
+        // mit sichtbarem Antennen-Fenster, angewendet OHNE Verbindung,
+        // lief in die WinAntenna-Sperre in applyWindowVisibility() --
+        // das Fenster wurde dort nie ANGELEGT, stand also auch nie in
+        // der Liste oben und kaeme sonst nach dem Verbinden nie
+        // wieder; der gespeicherte Wunsch waere still verloren, obwohl
+        // der Auswaehler-Haken weiter "sichtbar" sagte. Jetzt, MIT
+        // Verbindung, laesst die Sperre den Weg frei.
+        if (m_appletVis
+            && m_appletVis->isEffectivelyVisible(
+                   QStringLiteral("WinAntenna"))
+            && (!m_antennaWindow || !m_antennaWindow->isVisible())) {
+            applyWindowVisibility(QStringLiteral("WinAntenna"), true);
+        }
+
         // Neuer Ausfall darf wieder einmal gemeldet werden.
         m_connectionPanelAutoOpenedThisEpisode = false;
         m_connectFailedToastShownThisEpisode = false;
@@ -13538,6 +15049,20 @@ void MainWindow::onConnectionStateChanged()
         // the radio-name check below handles that case.
         // The panel itself is non-modal (show/raise), matching the current pattern.
         if (!m_shuttingDown) {
+            // Betreiber 2026-09-01, korrigiert nach "es liegt da wieder
+            // alles durcheinander, bevor man connected": HIER nicht mehr
+            // unbedingt verstecken -- eine blosse Trennung MITTEN in der
+            // Sitzung soll die schwebenden Fenster nicht mehr anfassen,
+            // solange die Connect-Maske gar nicht aufgeht (das war die
+            // heutige "kein Funkgerät hier"-Entscheidung). Versteckt
+            // wird nur noch, wenn showConnectionPanel() unten den Dialog
+            // TATSAECHLICH oeffnet -- dessen eigener Aufruf von
+            // hideFloatingWindowsBehindConnectMask() deckt genau diesen
+            // Fall ab. Wiederhergestellt wird weiterhin bei JEDEM
+            // erneuten Verbinden (oben im Connected-Zweig dieser
+            // Funktion) sowie beim SCHLIESSEN der Maske (siehe
+            // showConnectionPanel()).
+
             // Only open if we were previously connected (transition from Connected,
             // not the initial Disconnected state at startup). We detect this by
             // checking if the model has ever reported a radio name — set on connect.
@@ -13767,6 +15292,20 @@ void MainWindow::closeEvent(QCloseEvent* event)
     if (m_layoutProfiles) {
         m_layoutProfiles->captureIntoCurrent();
         m_layoutProfiles->save();
+        // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
+        // sichtbar" -- unbedingtes Log, damit sich Erfassen (hier),
+        // Laden (Start, siehe [ProfileLoadOnStartup]) und die
+        // tatsaechlich auf Platte stehende Datei direkt vergleichen
+        // lassen, statt weiter zu vermuten.
+        const QVariantMap snap =
+            m_layoutProfiles->snapshot(m_layoutProfiles->current());
+        qWarning() << "[ProfileSaveOnQuit:closeEvent]"
+                   << m_layoutProfiles->current()
+                   << "floatingApplets="
+                   << snap.value(QStringLiteral("floatingApplets")).toMap().size()
+                   << "floatingPans="
+                   << snap.value(QStringLiteral("floatingPans")).toMap().size()
+                   << "rotor=" << snap.value(QStringLiteral("rotor")).toMap();
     }
 
     // Die Schwebefenster SOFORT informieren — nicht erst unten bei
@@ -13775,6 +15314,13 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // mitten im Abbau ums Zurueckhaengen und stirbt daran.
     // (AetherSDR MainWindow.cpp:2653 [@0cd4559])
     if (m_panStack) { m_panStack->setShuttingDown(true); }
+
+    // Dasselbe fuer das Rotor/Log-Werkzeugfenster -- Betreiber
+    // 2026-08-31, siehe ToolWindow::setShuttingDown()'s Kommentar: ohne
+    // das schrieb ein ganz normales Beenden per rotem Punkt
+    // RotorFloating=False in AppSettings, weil ToolWindow::closeEvent()
+    // sonst IMMER ums Zurueckdocken bittet.
+    if (m_rotorWindow) { m_rotorWindow->setShuttingDown(true); }
 
     // Force-run any pending coalesced slice save BEFORE we tear anything
     // down. The 500 ms debounce in RadioModel::scheduleSettingsSave can't
@@ -13787,9 +15333,28 @@ void MainWindow::closeEvent(QCloseEvent* event)
     m_radioModel->discovery()->stopDiscovery();
 
     // Stop FFT thread
+    //
+    // Die begrenzte Wartezeit stand hier ohne Auswertung: lief sie ab,
+    // ging es trotzdem weiter -- und ~MainWindow() zerstoerte spaeter
+    // m_fftThread als Kind-QObject, worauf Qt mit qFatal abbricht, wenn
+    // der Faden da noch laeuft ("QThread: Destroyed while thread
+    // 'SpectrumThread' is still running").
+    //
+    // Der eigentliche Ausloeser dieses Abbruchs war ein anderer und ist
+    // in 6e7c1cad behoben (die Aufraeumschleife weiter unten sammelte
+    // ein FREMDES MainWindow ein und loeschte es synchron mitsamt
+    // laufendem Faden). Das Auswerten bleibt trotzdem richtig: dass ein
+    // stiller Zeitablauf hier direkt in einen Prozessabbruch fuehrt, ist
+    // unabhaengig davon, wer den Faden gerade aufhaelt. Dieselbe Wahl
+    // wie im ~MainWindow()-Sicherheitsnetz aus demselben Commit --
+    // lieber laenger warten als abbrechen.
     if (m_fftThread && m_fftThread->isRunning()) {
         m_fftThread->quit();
-        m_fftThread->wait(2000);
+        if (!m_fftThread->wait(2000)) {
+            qWarning() << "[ShutdownFftThread] SpectrumThread did not stop"
+                          " within 2s -- waiting without a timeout";
+            m_fftThread->wait();
+        }
     }
 
     // Save display settings before shutdown
@@ -13823,6 +15388,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     saveMainWindowGeometry();
 
     AppSettings::instance().save();
+    qWarning() << "[ProfileSaveOnQuit:closeEvent] AppSettings::save() done";
 
     // ── Schwebende Fenster JETZT abraeumen ───────────────────────────
     //
@@ -13895,10 +15461,49 @@ void MainWindow::closeEvent(QCloseEvent* event)
     //
     // Dialoge sind oben schon geschlossen; was hier ankommt, sind
     // Werkzeugfenster.
+    //
+    // ── Popups sind KEINE Werkzeugfenster (Absturz 2026-08-30) ───────
+    //
+    // Absturzbericht 2026-08-30 13:58: SIGABRT, "pointer being freed
+    // was not allocated". Der Bediener hatte per Rechtsklick auf ein
+    // ProfileRail-Abzeichen ein Kontextmenue offen (showMenuFor() in
+    // widgets/ProfileRail.cpp — ein STAPEL-lokales `QMenu menu(this)`,
+    // gerade mitten in seinem eigenen menu.exec()) und schloss dabei
+    // das Fenster. Der Klick auf die Ampel lief ueber genau die
+    // verschachtelte Cocoa-Eventschleife, die menu.exec() fuer sich
+    // selbst aufgemacht hatte — deshalb feuerte dieses closeEvent()
+    // REENTRANT, mit dem exec()-Aufruf noch auf dem Stapel darunter.
+    //
+    // Ein QMenu ist trotz `parent = this` ein echtes Top-Level-Fenster
+    // (Qt::Popup) und stand damit in QApplication::topLevelWidgets().
+    // Die Schleife unten hat es also miteingesammelt: hide() +eigenes
+    // deleteLater(), sofort im naechsten Sendpostedevents-Aufruf
+    // zugestellt — "delete this" auf ein QMenu, dessen "this" eine
+    // Stapeladresse ist, nie ein malloc()-Zeiger. Daher exakt dieses
+    // Fehlerbild.
+    //
+    // Popups (Kontextmenues, DspParamPopup, SpectrumOverlayMenu, ...)
+    // sind fluechtig und raeumen sich ueber ihre eigene exec()/hide()
+    // selbst ab — sie gehoeren nicht zu den "Werkzeugfenstern", die
+    // diese Schleife eigentlich sucht, und duerfen hier nicht
+    // angefasst werden, gleich ob sie gerade laufen oder nicht.
     for (QWidget* w : QApplication::topLevelWidgets()) {
         if (w == this) { continue; }
         if (!w->isWindow()) { continue; }
         if (qobject_cast<QDialog*>(w)) { continue; }   // oben erledigt
+        if (w->windowType() == Qt::Popup) { continue; }
+        // ── Ein ANDERES Hauptfenster ist kein verwaistes Werkzeugfenster ──
+        //
+        // Im Betrieb gibt es genau eines (main.cpp); im Test-Harness aber
+        // mehrere nacheinander im selben Prozess. Wer hier ein fremdes
+        // MainWindow einsammelt, dessen closeEvent() nie lief, loescht es
+        // im sendPostedEvents() gleich darunter SYNCHRON -- und dessen
+        // ~QObject reisst m_fftThread noch laufend in ~QThread(): QFATAL
+        // "Destroyed while thread 'SpectrumThread' is still running",
+        // SIGABRT. Per lldb belegt am 2026-09-03 in
+        // tst_settings_are_remembered (Stapel: closeEvent() -> sendPosted
+        // Events -> ~MainWindow() eines ANDEREN Objekts -> ~QThread).
+        if (qobject_cast<MainWindow*>(w)) { continue; }
         w->hide();
         w->deleteLater();
     }

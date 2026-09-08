@@ -84,6 +84,11 @@ public:
     QString appletTitle() const override { return QStringLiteral("Tuner Genius"); }
     void    syncFromModel() override;
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) ruft denselben Signalweg wie
+    // "Open TGXL Advanced..." im Rechtsklickmenue.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { emit navigationRequested(QStringLiteral("tgxlAdvanced")); }
+
     // Attach (or replace) the TunerModel. Safe to call with nullptr.
     void setTunerModel(TunerModel* model);
 

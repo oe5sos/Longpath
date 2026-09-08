@@ -1828,7 +1828,9 @@ void NeedleItem::paintOverlayDynamic(QPainter& p, int widgetW, int widgetH)
     // AetherSDR uses drawText(x, topY, text) where topY is the baseline.
     // QPointF overload also treats Y as baseline — pass topY directly, no ascent offset.
     const QString sText = sUnitsText(m_smoothedDbm);
-    p.setPen(QColor(0x00, 0xb4, 0xd8));
+    // War das abgeschaffte Tuerkis (#00b4d8) -- ein Messwert, Betreiber
+    // 2026-09-05: wie HGauge.cpp auf die Bernstein-Rolle "measured".
+    p.setPen(QColor(Style::role("measured", Style::kAmberText)));
     p.drawText(QPointF(rect.left() + 6.0f, topY), sText);
 
     // Right-side readout (light steel) — from AetherSDR SMeterWidget.cpp line 537

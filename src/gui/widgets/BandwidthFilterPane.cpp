@@ -44,18 +44,32 @@ QString axisLabel(double hz)
 // Eine Kantenangabe. Unter 1 kHz in Hertz, darueber in Kilohertz mit
 // zwei Stellen — so macht es die Vorlage, und so bleibt die Zahl kurz
 // genug, um ueber der Kante zu stehen.
+//
+// Betreiber 2026-09-03, mit Nachdruck: "minus darf nie!!!!!" — LSB legt
+// beide Kanten unterhalb des Traegers, technisch also negativ, aber das
+// gehoert nicht in die Anzeige. std::abs() schuetzte bisher nur die
+// KILOHERTZ-JA-ODER-NEIN-Schwelle oben, nicht die ausgegebene Zahl
+// selbst — "%1" mit dem rohen (moeglicherweise negativen) hz ergab
+// "-150 Hz". Jetzt wird ueberall dieselbe Betragszahl verwendet wie die
+// LOW/WIDTH/HIGH-Felder daneben (BandwidthFilterApplet::refreshNumbers).
 QString cutLabel(int hz)
 {
-    if (std::abs(hz) < 1000) {
-        return QStringLiteral("%1 Hz").arg(hz);
+    const int mag = std::abs(hz);
+    if (mag < 1000) {
+        return QStringLiteral("%1 Hz").arg(mag);
     }
-    return QStringLiteral("%1 kHz").arg(hz / 1000.0, 0, 'f', 2);
+    return QStringLiteral("%1 kHz").arg(mag / 1000.0, 0, 'f', 2);
 }
 
 QString widthLabel(int hz)
 {
-    if (hz < 1000) { return QStringLiteral("%1 Hz").arg(hz); }
-    return QStringLiteral("%1 kHz").arg(hz / 1000.0, 0, 'f', 1);
+    // Same "minus darf nie" guard as cutLabel() above -- m_high - m_low
+    // can go negative if the edges are inverted (a distinct, separately
+    // fixed bug), and this label must never expose that as a literal
+    // minus sign either.
+    const int mag = std::abs(hz);
+    if (mag < 1000) { return QStringLiteral("%1 Hz").arg(mag); }
+    return QStringLiteral("%1 kHz").arg(mag / 1000.0, 0, 'f', 1);
 }
 
 } // namespace

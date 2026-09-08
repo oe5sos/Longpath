@@ -50,8 +50,11 @@ static const char* kComboStyle =
     "  padding: 2px 6px;"
     "}"
     "QComboBox::drop-down { border: none; }"
+    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
     "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-    "  selection-background-color: #4a7ba8; }";
+    "  selection-background-color: #4a7ba8; selection-color: #ffffff; }";
 
 static const char* kCheckStyle =
     "QCheckBox { color: #c8d8e8; spacing: 4px; }"

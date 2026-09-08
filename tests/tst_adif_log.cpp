@@ -33,6 +33,12 @@ private slots:
     void csv_quotes_embedded_commas_and_quotes();
     void distance_is_recomputed_from_the_locators();
 
+    // 2026-09-02: SOTA/POTA activation references.
+    void sota_ref_round_trips();
+    void pota_ref_round_trips_via_sig();
+    void non_pota_sig_activity_is_not_lost();
+    void sig_info_without_a_matching_sig_is_kept_as_extras();
+
     void duplicate_within_tolerance_is_the_same_qso();
     void a_later_contact_with_the_same_station_is_not_a_duplicate();
     void a_different_band_or_mode_is_not_a_duplicate();
@@ -371,6 +377,83 @@ void TstAdifLog::distance_is_recomputed_from_the_locators()
              qPrintable(QStringLiteral("%1 km").arg(v.at(0).distanceKm)));
     QVERIFY2(v.at(0).bearingDeg > 280 && v.at(0).bearingDeg < 315,
              qPrintable(QStringLiteral("%1 deg").arg(v.at(0).bearingDeg)));
+}
+
+void TstAdifLog::sota_ref_round_trips()
+{
+    const QVector<LogEntry> v = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:4>OE1W <MY_SOTA_REF:9>OE/OO-001 "
+        "<SOTA_REF:8>G/LD-003 <EOR>\n"));
+    QCOMPARE(v.size(), 1);
+    QCOMPARE(v.at(0).mySotaRef, QStringLiteral("OE/OO-001"));
+    QCOMPARE(v.at(0).sotaRef, QStringLiteral("G/LD-003"));
+    QCOMPARE(v.at(0).extras.size(), 0);   // modelled, not left in extras
+
+    const QVector<LogEntry> back = AdifLog::parse(v.at(0).toAdifRecord());
+    QCOMPARE(back.at(0).mySotaRef, QStringLiteral("OE/OO-001"));
+    QCOMPARE(back.at(0).sotaRef, QStringLiteral("G/LD-003"));
+}
+
+void TstAdifLog::pota_ref_round_trips_via_sig()
+{
+    // Field order swapped from how it is normally written (SIG_INFO
+    // before SIG) — the pair must combine regardless of which comes
+    // first, since ADIF gives no guarantee either way.
+    const QVector<LogEntry> v = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:4>OE1W "
+        "<MY_SIG_INFO:7>OE-1234 <MY_SIG:4>POTA "
+        "<SIG:4>POTA <SIG_INFO:7>OE-5678 <EOR>\n"));
+    QCOMPARE(v.size(), 1);
+    QCOMPARE(v.at(0).myPotaRef, QStringLiteral("OE-1234"));
+    QCOMPARE(v.at(0).potaRef, QStringLiteral("OE-5678"));
+    QCOMPARE(v.at(0).extras.size(), 0);
+
+    const QVector<LogEntry> back = AdifLog::parse(v.at(0).toAdifRecord());
+    QCOMPARE(back.at(0).myPotaRef, QStringLiteral("OE-1234"));
+    QCOMPARE(back.at(0).potaRef, QStringLiteral("OE-5678"));
+}
+
+// ── The reason SIG/SIG_INFO cannot just be modelled fields ───────────
+//
+// SIG/SIG_INFO is ADIF's GENERIC Special Interest Activity pair — WWFF
+// and others use it exactly the same way POTA does. A file tagged for
+// a different activity must round-trip untouched, not be silently
+// discarded because this program only understands POTA's use of it —
+// the same data-loss rule LogEntry.h states for every field it does
+// not model.
+void TstAdifLog::non_pota_sig_activity_is_not_lost()
+{
+    const QVector<LogEntry> v = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:4>OE1W <MY_SIG:4>WWFF <MY_SIG_INFO:8>OEFF-001 <EOR>\n"));
+    QCOMPARE(v.size(), 1);
+    QVERIFY(v.at(0).myPotaRef.isEmpty());   // not claimed as POTA
+
+    QString sig, sigInfo;
+    for (const auto& kv : v.at(0).extras) {
+        if (kv.first == QLatin1String("MY_SIG"))      { sig = kv.second; }
+        if (kv.first == QLatin1String("MY_SIG_INFO")) { sigInfo = kv.second; }
+    }
+    QCOMPARE(sig, QStringLiteral("WWFF"));
+    QCOMPARE(sigInfo, QStringLiteral("OEFF-001"));
+
+    // And it survives a full round trip, the way any other extra does.
+    const QVector<LogEntry> back = AdifLog::parse(v.at(0).toAdifRecord());
+    QVERIFY(back.at(0).toAdifRecord()
+                .contains(QStringLiteral("<MY_SIG:4>WWFF")));
+}
+
+void TstAdifLog::sig_info_without_a_matching_sig_is_kept_as_extras()
+{
+    // A lone SIG_INFO with no SIG at all cannot be claimed as POTA
+    // either — nothing said it was POTA — so it must still come back
+    // out rather than vanish.
+    const QVector<LogEntry> v = AdifLog::parse(QStringLiteral(
+        "<EOH>\n<CALL:4>OE1W <SIG_INFO:7>OE-9999 <EOR>\n"));
+    QCOMPARE(v.size(), 1);
+    QVERIFY(v.at(0).potaRef.isEmpty());
+    QCOMPARE(v.at(0).extras.size(), 1);
+    QCOMPARE(v.at(0).extras.at(0).first, QStringLiteral("SIG_INFO"));
+    QCOMPARE(v.at(0).extras.at(0).second, QStringLiteral("OE-9999"));
 }
 
 namespace {

@@ -230,6 +230,10 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
             this, [this](AppletWidget* a) {
         if (a) { emit appletHideRequested(a); }
     });
+    connect(cell, &GridCellWidget::settingsRequested,
+            this, [this](AppletWidget* a) {
+        if (a) { emit appletSettingsRequested(a); }
+    });
 }
 
 void AppletPanelWidget::removeApplet(AppletWidget* applet)
@@ -358,7 +362,7 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     if (AppletWidget* aw = qobject_cast<AppletWidget*>(child)) {
         const QString btnCss = QStringLiteral(
             "QPushButton { background: transparent; border: none;"
-            "  color: %1; font-size: 10px; padding: 0; }"
+            "  color: %1; font-size: 11px; padding: 0; }"
             "QPushButton:hover { background: %2; color: %3;"
             "  border-radius: 3px; }")
             .arg(QString::fromLatin1(Style::kTextScale),

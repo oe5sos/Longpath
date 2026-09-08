@@ -20,6 +20,7 @@
 #include <portaudio.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -109,6 +110,37 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
         else if (!tier2.isEmpty()) effectiveCfg.deviceName = tier2;
     }
 #endif
+    // Die gespeicherte Host-API-Wahl zurueckuebersetzen.
+    //
+    // AudioDeviceConfig legt sie als Namen ab ("Windows WASAPI") und laesst
+    // hostApiIndex beim Laden bei -1; aufgeloest hat den Namen bis 2026-09-04
+    // ueberhaupt nur der Setup-Dialog, und auch nur solange er offen war.
+    // Nach jedem Neustart war der Index also wieder -1 — und damit ist
+    // `sameApi` in der Namenssuche unten IMMER wahr. Die Suche laeuft dann in
+    // globaler Geraetereihenfolge, und die folgt der Reihenfolge, in der
+    // PortAudio die Host-APIs hochfaehrt: auf Windows steht MME an erster
+    // Stelle (pa_win_hostapis.c). Dasselbe Geraet erscheint dort unter MME,
+    // DirectSound, WASAPI und WDM-KS mit fast gleichem Namen — getroffen
+    // wurde immer die MME-Fassung, der aelteste und traegste Windows-Tonweg.
+    // Die Wahl des Betreibers ging so bei jedem Start still verloren.
+    if (effectiveCfg.hostApiIndex < 0 && !effectiveCfg.driverApi.isEmpty()) {
+        const int apiCount = Pa_GetHostApiCount();
+        for (int i = 0; i < apiCount; ++i) {
+            const PaHostApiInfo* hai = Pa_GetHostApiInfo(i);
+            if (hai == nullptr || hai->name == nullptr) { continue; }
+            if (QString::fromUtf8(hai->name)
+                    .compare(effectiveCfg.driverApi, Qt::CaseInsensitive) == 0) {
+                effectiveCfg.hostApiIndex = i;
+                break;
+            }
+        }
+        if (effectiveCfg.hostApiIndex < 0) {
+            qCWarning(lcAudio) << "Gespeicherte Audio-API" << effectiveCfg.driverApi
+                               << "gibt es auf diesem System nicht —"
+                               << "PortAudio-Vorgabe wird verwendet.";
+        }
+    }
+
     const PortAudioConfig& cfg = effectiveCfg;
 
     auto directionOk = [wantOutput](const PaDeviceInfo* di) {
@@ -444,6 +476,29 @@ bool PortAudioBus::open(const AudioFormat& format) {
     } else {
         m_backendName.clear();
     }
+
+    // 2026-09-04: Geraet, Host-API und die TATSAECHLICH ausgehandelte
+    // Latenz ins Protokoll. Gewuenscht haben wir defaultLow{Output,Input}
+    // Latency; was PortAudio daraus macht, haengt an der Host-API und ist
+    // die entscheidende Zahl, wenn das Geraet leerlaeuft. Unter Windows
+    // liegen MME, DirectSound und WASAPI hier weit auseinander, und ohne
+    // diese Zeile ist aus einem Fehlerbericht nicht zu erkennen, welcher
+    // Weg ueberhaupt benutzt wurde.
+    if (const PaStreamInfo* si = Pa_GetStreamInfo(m_stream)) {
+        qCInfo(lcAudio).noquote()
+            << QStringLiteral("PortAudioBus: %1 via [%2] on \"%3\" — "
+                              "latency %4 ms (wanted %5 ms), %6 Hz, %7 ch")
+                .arg(wantOutput ? QStringLiteral("output")
+                                : QStringLiteral("input"))
+                .arg(m_backendName.isEmpty() ? QStringLiteral("?")
+                                             : m_backendName)
+                .arg(QString::fromUtf8(di->name ? di->name : "?"))
+                .arg((wantOutput ? si->outputLatency : si->inputLatency) * 1000.0,
+                     0, 'f', 1)
+                .arg(params.suggestedLatency * 1000.0, 0, 'f', 1)
+                .arg(si->sampleRate, 0, 'f', 0)
+                .arg(effectiveChannels);
+    }
     return true;
 }
 
@@ -487,6 +542,9 @@ qint64 PortAudioBus::push(const char* data, qint64 bytes) {
     const qint64 afterWrite = w + floatCount;
     if (afterWrite - readPos > ringSize) {
         m_dropEvents.fetch_add(1, std::memory_order_relaxed);
+        // Sichtbar machen: ein ueberlaufender Ring bedeutet, dass der
+        // Erzeuger schneller nachschiebt, als das Geraet abholt.
+        Longpath::PerfMonitor::instance().incAudioRingOverrun();
         m_dropSamples.fetch_add(
             static_cast<quint64>(afterWrite - readPos - ringSize),
             std::memory_order_relaxed);
@@ -651,6 +709,7 @@ int PortAudioBus::paCallback(const void* in, void* out,
         if (wasUnderrun) {
             self->m_underrunEvents.fetch_add(
                 1, std::memory_order_relaxed);
+            Longpath::PerfMonitor::instance().incAudioRingUnderrun();
             sawSilenceStart = true;
         }
         for (int i = 0; i < want; ++i) {
@@ -670,6 +729,7 @@ int PortAudioBus::paCallback(const void* in, void* out,
                 if (!wasUnderrun && !sawSilenceStart) {
                     // Transitioned from "had data" to "empty" mid-callback.
                     self->m_underrunEvents.fetch_add(1, std::memory_order_relaxed);
+                    Longpath::PerfMonitor::instance().incAudioRingUnderrun();
                     sawSilenceStart = true;
                 }
                 wasUnderrun = true;
@@ -696,6 +756,15 @@ int PortAudioBus::paCallback(const void* in, void* out,
         self->m_lastOutR = lastR;
         self->m_crossfadeFramesRem = crossfadeRem;
     } else {
+        // TX-Mikrofon-Klick-Untersuchung (2026-09-08): Zeitstempel VOR
+        // jeder anderen Arbeit, unabhaengig davon ob diese Invokation
+        // spaeter Samples liefert. So misst nsSinceLastCaptureCallback()
+        // wirklich den Abstand zwischen zwei tatsaechlichen Aufrufen
+        // dieser Callback, nicht nur zwischen erfolgreichen.
+        self->m_lastCaptureCallbackNs.store(
+            std::chrono::steady_clock::now().time_since_epoch().count(),
+            std::memory_order_relaxed);
+
         // Input mode: read captured samples from `in`, write to ring,
         // update m_txLevel (the audio here is destined for transmit).
         //
@@ -782,6 +851,14 @@ int PortAudioBus::paCallback(const void* in, void* out,
         self->m_ringWrite.store(w, std::memory_order_release);
     }
     return paContinue;
+}
+
+qint64 PortAudioBus::nsSinceLastCaptureCallback() const
+{
+    const qint64 last = m_lastCaptureCallbackNs.load(std::memory_order_relaxed);
+    if (last == 0) { return -1; }
+    const qint64 now = std::chrono::steady_clock::now().time_since_epoch().count();
+    return now - last;
 }
 
 int PortAudioBus::downmixToMono(const float* interleaved, int frames,

@@ -1259,7 +1259,7 @@ private:
     AGCMode m_agcMode{AGCMode::Med};
     int     m_stepHz{100};               // From Thetis tune_step_list[5] = 100 Hz
     int     m_afGain{50};                // 0-100, maps to 0.0-1.0 volume
-    int     m_rfGain{80};                // 0-100, maps to AGC gain
+    int     m_rfGain{80};                // -20..120, WDSP AGC top (Thetis AGC-T / ptbRF, console.designer.cs:3708-3709 [v2.10.3.15])
     QString m_rxAntenna{QStringLiteral("ANT1")};
     QString m_txAntenna{QStringLiteral("ANT1")};
     bool    m_active{false};

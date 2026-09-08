@@ -25,7 +25,10 @@ constexpr const char* kComboStyle =
     "QComboBox QAbstractItemView {"
     "  background: #0a0a18; color: #c8d8e8;"
     "  border: 1px solid #205070;"
-    "  selection-background-color: #4a7ba8;"
+    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
+    "  selection-background-color: #4a7ba8; selection-color: #ffffff;"
     "}";
 } // namespace
 

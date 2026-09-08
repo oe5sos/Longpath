@@ -69,6 +69,13 @@ public:
     QString appletTitle() const override { return m_title; }
     void    syncFromModel() override     {}
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) oeffnet dasselbe Rechtsklick-
+    // menue, nur an der Mitte des Widgets verankert statt am Klickpunkt
+    // (der Knopf traegt keine Klick-Koordinate). Implementierung in der
+    // .cpp, da buildContextMenu() den vollen QMenu-Typ braucht.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override;
+
     /// Beide Formen zeigen dieselbe Grösse. Abgelehnt (false), wenn die
     /// Grösse keine belegte Skala hat.
     bool setPrimary(int bindingId);
@@ -92,6 +99,19 @@ public:
     bool isSegmented() const;
     void setTube(bool on);
     bool isTube() const;
+
+    // ── Frequenz zusaetzlich einblenden (2026-09-02) ──────────────────
+    //
+    // Betreiber: "die Idee ist, dass man sich bei kleinen Bildschirmen
+    // vielleicht ein Fenster erspart" -- Frequenz mit im S-Meter/
+    // Stehwelle statt in einem eigenen Frequenz-Fenster. Aus dem
+    // Rechtsklickmenue schaltbar wie Form/Spitzenhaltung, gemerkt in
+    // saveState()/restoreState(). Nur die Zeiger-Form zeigt sie derzeit
+    // (die genehmigte Gestaltung war ausdruecklich fuer das Zifferblatt,
+    // nicht fuer den Balken).
+    void setShowFrequency(bool on);
+    bool showFrequency() const;
+    void setFrequencyHz(double hz);
 
     // ── Gemerkt wird es auch ─────────────────────────────────────────
     //
@@ -127,6 +147,12 @@ private:
     /// Auf beide Ansichten anwenden. Eine Einstellung, die nur die
     /// sichtbare Form erreicht, springt beim Umschalten zurück.
     void forEachInstrument(const std::function<void(PeakHold&)>& fn);
+    /// Nur die Seite umschalten, NICHTS merken. setForm() = applyForm()
+    /// + saveState(); der Konstruktor darf nur ersteres -- sonst
+    /// ueberschreibt er mit den Vorgaben, was restoreState() gleich
+    /// darauf lesen will (2026-09-03, Roehre/Segmente ueberlebten den
+    /// Neustart nie).
+    void applyForm(Form f);
     QString m_id;
     QString m_title;
     Form    m_form{Form::Needle};

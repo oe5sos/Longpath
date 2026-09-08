@@ -182,6 +182,7 @@
 #include <QComboBox>
 #include <QContextMenuEvent>
 #include <QEvent>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -206,8 +207,33 @@ TxApplet::TxApplet(RadioModel* model, QWidget* parent)
 
 void TxApplet::buildUI()
 {
-    // Outer layout: zero margins (title bar flush to edges)
-    // Body: padded content — matches AetherSDR TxApplet.cpp outer/inner pattern
+    // ══════════════════════════════════════════════════════════════════════
+    // Umbau 2026-09-02 — Entwurf „Sendeleiste", Ton „Messing".
+    //
+    // Vorher stapelte dieses Feld VIERZEHN Zeilen in einer Spalte und
+    // brauchte dafuer rund 420 Punkt Hoehe. Angedockt sind 154 da: MOX
+    // und TUNE standen an der Unterkante, VOX und MON schon hinter dem
+    // Rollbalken — ausgerechnet die Knoepfe, wegen derer man das Feld
+    // aufmacht. Gleichzeitig lagen 520 Punkt Breite brach.
+    //
+    // Der Umbau raeumt in drei Baendern:
+    //   1. Messblock links (Vorlauf und SWR mit ZAHL daneben, darunter
+    //      die zwei Leistungsregler), Sendetasten rechts.
+    //   2. eine Reihe gleich aussehender Zustandsschalter.
+    //   3. eine Fusszeile: Mikrofonquelle, TX-Bandbreite, SWR-Schutz.
+    //
+    // Was seltener gebraucht wird — Profil, TX-Bandbreite, VOX-Schwelle
+    // und -Haltezeit, Mithoerlautstaerke — steht im Feinblatt hinter
+    // dem Zahnrad. Es sind DIESELBEN Bauteile, nur umgehaengt: die
+    // Verdrahtung in wireControls() und jeder Test, der sie ueber
+    // objectName findet, bleiben unberuehrt.
+    //
+    // Der Ton: bis heute trug MOX kTxRed — dieselbe Farbfamilie wie die
+    // SWR-Warnung zwei Zeilen darueber. Jetzt traegt die Sendetaste
+    // Messing (Style::txKeyStyle) und Rot bedeutet im Feld wieder genau
+    // eine Sache: es stimmt etwas nicht.
+    // ══════════════════════════════════════════════════════════════════════
+
     auto* outer = new QVBoxLayout(this);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
@@ -215,584 +241,448 @@ void TxApplet::buildUI()
     auto* body = new QWidget(this);
     body->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
     auto* vbox = new QVBoxLayout(body);
-    vbox->setContentsMargins(4, 2, 4, 2);
-    vbox->setSpacing(2);
+    vbox->setContentsMargins(6, 5, 6, 5);
+    vbox->setSpacing(5);
     outer->addWidget(body);
 
-    // ── 0. Mic-source badge ── read-only label above the gauges ─────────────
-    // Phase 3M-1b J.3: shows "PC mic" or "Radio mic" reflecting
-    // TransmitModel::micSource (default MicSource::Pc). Read-only; no interaction.
-    // Updates on micSourceChanged signal (wired in wireControls()).
-    {
-        m_micSourceBadge = new QLabel(QStringLiteral("PC mic"), this);
-        m_micSourceBadge->setAlignment(Qt::AlignCenter);
-        m_micSourceBadge->setFixedHeight(16);
-        m_micSourceBadge->setStyleSheet(QStringLiteral(
-            "QLabel {"
-            " color: %1;"
-            " font-size: 9px;"
-            " border: 1px solid %2;"
-            " border-radius: 6px;"
-            " padding: 0px 4px;"
-            " background: %3;"
-            "}"
-        ).arg(Style::kTitleText, Style::kInsetBorder, Style::kInsetBg));
-        m_micSourceBadge->setAccessibleName(QStringLiteral("Mic source indicator"));
-        m_micSourceBadge->setToolTip(QStringLiteral(
-            "Active microphone source: PC mic or Radio mic.\n"
-            "Change via Setup → Transmit → Mic Source."));
-        vbox->addWidget(m_micSourceBadge);
-    }
+    // Ein Zustandsschalter: gleiche Groesse, gleiche Bauform, gleicher
+    // Einrast-Ton. Dass sie alle gleich aussehen, IST die Aussage —
+    // vorher hatte dieses Feld vier verschiedene Einrast-Faerbungen
+    // (VOX gruen, MON dunkelblau, 2-Tone rot, PS-A dunkelgruen).
+    auto schalter = [this](const QString& text) {
+        auto* b = new QPushButton(text, this);
+        b->setCheckable(true);
+        b->setFixedHeight(20);
+        b->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        b->setStyleSheet(Style::buttonBaseStyle()
+                         + QStringLiteral("QPushButton { padding: 1px 3px; }")
+                         + Style::quietCheckedStyle());
+        return b;
+    };
 
-    // ── 1. Forward Power gauge — per-SKU scale ──────────────────────────────
-    // Default ticks at construction match the Hermes-class 100 W radio
-    // (0 / 40 / 80 / 100 / 120 — AetherSDR TxApplet.cpp:71); rescaleFwdGaugeForModel()
-    // reapplies a per-SKU range when RadioModel::currentRadioChanged fires
-    // (wired in wireControls()).  Bench-reported #167 follow-up: HL2 reading
-    // 1-5 W on a 0-120 W scale was a barely-visible sliver; per-SKU scaling
-    // gives each radio a properly-sized meter.
+    // ── Band 1: Messblock links, Sendetasten rechts ─────────────────────────
+    auto* oben = new QHBoxLayout;
+    oben->setSpacing(8);
+
+    auto* mess = new QVBoxLayout;
+    mess->setSpacing(2);
+
+    // ── Vorlauf ── per-SKU-Skala ────────────────────────────────────────────
+    // Ticks bei der Konstruktion wie beim 100-W-Geraet der Hermes-Klasse;
+    // rescaleFwdGaugeForModel() zieht die Skala nach, sobald
+    // RadioModel::currentRadioChanged feuert (verdrahtet in wireControls()).
+    // Bench #167: ein HL2 mit 1-5 W auf einer 0-120-W-Skala war ein kaum
+    // sichtbarer Span.
     auto* fwdGauge = new HGauge(this);
-    fwdGauge->setTitle(QStringLiteral("RF Pwr"));
+    fwdGauge->setTitle(QStringLiteral("VORLAUF"));
+    fwdGauge->setReadout(true, 1, QStringLiteral("W"));
     fwdGauge->setAccessibleName(QStringLiteral("Forward power gauge"));
     m_fwdPowerGauge = fwdGauge;
-    rescaleFwdGaugeForModel(HPSDRModel::FIRST);   // sentinel default until model known
-    // 3M-1a (2026-04-27): wired to RadioStatus::powerChanged in
-    // wireControls() — the gauge displays radio-reported forward
-    // power in watts (scaleFwdPowerWatts'd at the model side).
-    // The legacy "Phase 3I-1" NYI marker has been dropped.
-    vbox->addWidget(fwdGauge);
+    rescaleFwdGaugeForModel(HPSDRModel::FIRST);   // Platzhalter, bis das Geraet bekannt ist
+    mess->addWidget(fwdGauge);
 
-    // ── 2. SWR gauge ── 1.0–3.0, redStart 2.5 ───────────────────────────────
-    // Ticks: 1 / 1.5 / 2.5 / 3  (AetherSDR TxApplet.cpp:77)
+    // ── SWR ─────────────────────────────────────────────────────────────────
+    // Die Vorwarnung ist neu: bis zum Umbau standen setYellowStart und
+    // setRedStart BEIDE auf 2,5 — das gelbe Band war null breit, es gab
+    // also keine Stufe zwischen „gut" und „zu viel". Jetzt faerbt sich
+    // der Balken ab 2,0 und wird ab 2,5 zur Warnung.
     auto* swrGauge = new HGauge(this);
     swrGauge->setRange(1.0, 3.0);
+    swrGauge->setYellowStart(2.0);
     swrGauge->setRedStart(2.5);
-    swrGauge->setYellowStart(2.5);
     swrGauge->setTitle(QStringLiteral("SWR"));
-    swrGauge->setTickLabels({QStringLiteral("1"), QStringLiteral("1.5"),
-                              QStringLiteral("2.5"), QStringLiteral("3")});
+    swrGauge->setReadout(true, 1);
     swrGauge->setAccessibleName(QStringLiteral("SWR gauge"));
     m_swrGauge = swrGauge;
-    vbox->addWidget(swrGauge);
+    mess->addWidget(swrGauge);
 
-    // ── 3. RF Power slider row ───────────────────────────────────────────────
-    // Label fixedWidth 62, value fixedWidth 22  (AetherSDR TxApplet.cpp:87–104)
+    // ── Leistung ────────────────────────────────────────────────────────────
     {
-        auto* rfSlider = new QSlider(Qt::Horizontal, this);
-        rfSlider->setRange(0, 100);
-        rfSlider->setValue(100);
-        rfSlider->setAccessibleName(QStringLiteral("RF power"));
-        rfSlider->setObjectName(QStringLiteral("TxRfPowerSlider"));
+        m_rfPowerSlider = new QSlider(Qt::Horizontal, this);
+        m_rfPowerSlider->setRange(0, 100);
+        m_rfPowerSlider->setValue(100);
+        m_rfPowerSlider->setAccessibleName(QStringLiteral("RF power"));
+        m_rfPowerSlider->setObjectName(QStringLiteral("TxRfPowerSlider"));
 
-        auto* rfValue = new QLabel(QStringLiteral("100"), this);
-        rfValue->setFixedWidth(22);
-        rfValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        rfValue->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
-
-        m_rfPowerSlider = rfSlider;
-        m_rfPowerValue  = rfValue;
-
-        auto* row = new QHBoxLayout;
-        row->setSpacing(4);
-
-        auto* lbl = new QLabel(QStringLiteral("RF Power:"), this);
-        lbl->setFixedWidth(62);
-        lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTitleText));
-        row->addWidget(lbl);
-
-        rfSlider->setFixedHeight(18);
-        rfSlider->setEnabled(true);   // Phase 3M-1a H.3: wired
-        // Tooltip set by rescalePowerSlidersForModel() (Issue #175 Task 7) -
-        // Thetis-faithful "Transmit Drive - relative value" wording, applied
-        // every time the active SKU changes.  No initial setToolTip here.
-        row->addWidget(rfSlider, 1);
-        row->addWidget(rfValue);
-
-        vbox->addLayout(row);
+        m_rfPowerValue = new QLabel(QStringLiteral("100"), this);
+        auto* row = sliderRow(QStringLiteral("Leistung"), m_rfPowerSlider,
+                              m_rfPowerValue, 54);
+        // Auf dem HL2 steht hier „-7.5 dB" statt einer nackten Zahl —
+        // die 36 Punkt aus sliderRow() schneiden das ab.
+        m_rfPowerValue->setFixedWidth(46);
+        m_rfPowerSlider->setFixedHeight(16);
+        mess->addLayout(row);
     }
 
-    // ── 4. Tune Power slider row ─────────────────────────────────────────────
-    // Label fixedWidth 62, value fixedWidth 22  (AetherSDR TxApplet.cpp:107–128)
+    // ── Tune-Leistung ───────────────────────────────────────────────────────
     {
-        auto* tunSlider = new QSlider(Qt::Horizontal, this);
-        tunSlider->setRange(0, kTuneSliderMaxWatts);
-        tunSlider->setValue(10);
-        tunSlider->setAccessibleName(QStringLiteral("Tune power"));
+        m_tunePwrSlider = new QSlider(Qt::Horizontal, this);
+        m_tunePwrSlider->setRange(0, kTuneSliderMaxWatts);
+        m_tunePwrSlider->setValue(10);
+        m_tunePwrSlider->setAccessibleName(QStringLiteral("Tune power"));
+        // Der Hinweistext kommt aus rescalePowerSlidersForModel()
+        // (Issue #175 Task 7) und wird bei jedem SKU-Wechsel neu gesetzt.
 
-        auto* tunValue = new QLabel(QStringLiteral("10"), this);
-        tunValue->setFixedWidth(22);
-        tunValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        tunValue->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
-
-        m_tunePwrSlider = tunSlider;
-        m_tunePwrValue  = tunValue;
-
-        auto* row = new QHBoxLayout;
-        row->setSpacing(4);
-
-        auto* lbl = new QLabel(QStringLiteral("Tune Pwr:"), this);
-        lbl->setFixedWidth(62);
-        lbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTitleText));
-        row->addWidget(lbl);
-
-        tunSlider->setFixedHeight(18);
-        tunSlider->setEnabled(true);  // Phase 3M-1a H.3: wired
-        // Tooltip set by rescalePowerSlidersForModel() (Issue #175 Task 7) -
-        // Thetis-faithful "Tune and/or 2Tone Drive - relative value" wording,
-        // applied every time the active SKU changes.  No initial setToolTip
-        // here.
-        row->addWidget(tunSlider, 1);
-        row->addWidget(tunValue);
-
-        vbox->addLayout(row);
+        m_tunePwrValue = new QLabel(QStringLiteral("10"), this);
+        auto* row = sliderRow(QStringLiteral("Tune"), m_tunePwrSlider,
+                              m_tunePwrValue, 54);
+        m_tunePwrValue->setFixedWidth(46);
+        m_tunePwrSlider->setFixedHeight(16);
+        mess->addLayout(row);
     }
+    oben->addLayout(mess, 1);
 
-    // ── Button row: TUNE + MOX (50% each) ──────────────────────────────────
-    // Positioned above VOX+MON for action-button prominence
-    // (docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 5).
-    // ATU + MEM removed (ATU phase, no plan yet; MEM = channel-memory phase).
-    // MOX: red active (#cc2222 bg, #ff4444 border, white text)
-    // TUNE: red active when tuning, text becomes "TUNING..."
+    // ── Die Sendetasten ─────────────────────────────────────────────────────
+    // MOX ist die groesste Flaeche im Feld und die einzige kraeftige.
+    // TUNE ist dieselbe Art Handlung, eine Stufe leiser.
     {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(2);
-
-        const QString btnStyle = Style::buttonBaseStyle()
-            + QStringLiteral("QPushButton { padding: 2px; }");
-        const QString redChecked = Style::redCheckedStyle();
-
-        m_tuneBtn = new QPushButton(QStringLiteral("TUNE"), this);
-        m_tuneBtn->setCheckable(true);
-        m_tuneBtn->setFixedHeight(22);
-        m_tuneBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_tuneBtn->setStyleSheet(btnStyle + redChecked);
-        m_tuneBtn->setEnabled(true);  // Phase 3M-1a H.3: wired
-        m_tuneBtn->setAccessibleName(QStringLiteral("Tune carrier"));
-        m_tuneBtn->setToolTip(QStringLiteral("Enable TUNE carrier (single-tone CW)"));
-        row->addWidget(m_tuneBtn, 1);
+        auto* tasten = new QVBoxLayout;
+        tasten->setSpacing(4);
 
         m_moxBtn = new QPushButton(QStringLiteral("MOX"), this);
         m_moxBtn->setCheckable(true);
-        m_moxBtn->setFixedHeight(22);
-        m_moxBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_moxBtn->setStyleSheet(btnStyle + redChecked);
-        m_moxBtn->setEnabled(true);  // Phase 3M-1a H.3: wired
+        m_moxBtn->setFixedSize(104, 58);
+        m_moxBtn->setStyleSheet(Style::buttonBaseStyle()
+            + QStringLiteral("QPushButton { font-size: %1px; }")
+                  .arg(Style::kFontSub)
+            + Style::txKeyStyle());
+        m_moxBtn->setEnabled(true);
         m_moxBtn->setAccessibleName(QStringLiteral("MOX transmit"));
         m_moxBtn->setToolTip(QStringLiteral("Manual transmit (MOX)"));
-        row->addWidget(m_moxBtn, 1);
+        tasten->addWidget(m_moxBtn);
 
-        vbox->addLayout(row);
+        m_tuneBtn = new QPushButton(QStringLiteral("TUNE"), this);
+        m_tuneBtn->setCheckable(true);
+        m_tuneBtn->setFixedSize(104, 24);
+        m_tuneBtn->setStyleSheet(Style::buttonBaseStyle() + Style::txKeyStyle(true));
+        m_tuneBtn->setEnabled(true);
+        m_tuneBtn->setAccessibleName(QStringLiteral("Tune carrier"));
+        m_tuneBtn->setToolTip(QStringLiteral("Enable TUNE carrier (single-tone CW)"));
+        tasten->addWidget(m_tuneBtn);
+
+        oben->addLayout(tasten);
     }
+    vbox->addLayout(oben);
 
-    // ── 4b. VOX row (3M-3a-iii bench polish 2026-05-04) ───────────────────────
-    // Relocated from PhoneCwApplet (Phone tab Control #10).  Operators
-    // wanted the VOX engage surface next to MOX/TUNE on the right pane
-    // where they engage TX, not buried on the Phone tab.  Full row moves
-    // as a unit including the live DexpPeakMeter strip + 100 ms poller.
-    //
-    // Layout (Option B - full row):
-    //   [VOX btn 48px] | { Threshold slider top, DexpPeakMeter strip
-    //   below } | [-20 dB inset] | [Hold slider 1..2000 ms] | [500 ms inset]
-    //
-    // Threshold slider range -80..0 dB matches Thetis ptbVOX
-    // (console.Designer.cs:6018-6019 [v2.10.3.13]).  Hold slider range
-    // 1..2000 ms matches Thetis udDEXPHold (setup.designer.cs:45005-45013
-    // [v2.10.3.13]).  Default values mirror Thetis ptbVOX.Value=-20
-    // (console.Designer.cs:6024) and udDEXPHold.Value=500
-    // (setup.designer.cs:45020).
-    //
-    // Slider-stack: a small QVBoxLayout wraps the threshold slider (top)
-    // and DexpPeakMeter (below) so the live mic peak strip sits directly
-    // under the threshold knob — matches Thetis picVOX placement.
+    // ── Band 2: die Zustandsschalter ────────────────────────────────────────
     {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(4);
+        auto* reihe = new QHBoxLayout;
+        reihe->setSpacing(3);
 
-        m_voxBtn = new QPushButton(QStringLiteral("VOX"), this);
-        m_voxBtn->setCheckable(true);
-        m_voxBtn->setFixedWidth(48);
-        m_voxBtn->setFixedHeight(22);
-        m_voxBtn->setStyleSheet(Style::buttonBaseStyle()
-                                + Style::greenCheckedStyle());
+        m_voxBtn = schalter(QStringLiteral("VOX"));
         m_voxBtn->setAccessibleName(QStringLiteral("VOX voice-operated transmit"));
         m_voxBtn->setObjectName(QStringLiteral("TxVoxButton"));
         m_voxBtn->setToolTip(QStringLiteral(
             "VOX — voice-operated transmit.  Left-click to toggle.\n"
             "Right-click to open the DEXP/VOX setup page."));
-        // CustomContextMenu so right-click hits the openSetupRequested slot
-        // instead of the default platform menu.
         m_voxBtn->setContextMenuPolicy(Qt::CustomContextMenu);
-        row->addWidget(m_voxBtn);
+        reihe->addWidget(m_voxBtn, 1);
 
-        // Threshold slider-stack: slider on top, DexpPeakMeter strip below.
-        auto* voxStackGroup = new QWidget(this);
-        auto* voxStackVbox = new QVBoxLayout(voxStackGroup);
-        voxStackVbox->setContentsMargins(0, 0, 0, 0);
-        voxStackVbox->setSpacing(1);
-
-        m_voxSlider = new QSlider(Qt::Horizontal, voxStackGroup);
-        // From Thetis console.Designer.cs:6018-6019 [v2.10.3.13]:
-        //   ptbVOX.Maximum = 0; ptbVOX.Minimum = -80;
-        m_voxSlider->setRange(-80, 0);
-        m_voxSlider->setValue(-20);
-        m_voxSlider->setFixedHeight(14);
-        m_voxSlider->setStyleSheet(Style::sliderHStyle());
-        m_voxSlider->setAccessibleName(QStringLiteral("VOX threshold (dB)"));
-        m_voxSlider->setObjectName(QStringLiteral("TxVoxThresholdSlider"));
-        voxStackVbox->addWidget(m_voxSlider);
-
-        m_voxPeakMeter = new DexpPeakMeter(voxStackGroup);
-        m_voxPeakMeter->setObjectName(QStringLiteral("TxVoxPeakMeter"));
-        m_voxPeakMeter->setAccessibleName(QStringLiteral("VOX live mic peak"));
-        voxStackVbox->addWidget(m_voxPeakMeter);
-
-        row->addWidget(voxStackGroup, 1);
-
-        m_voxLvlLabel = new QLabel(QStringLiteral("-20 dB"), this);
-        m_voxLvlLabel->setStyleSheet(Style::insetValueStyle());
-        m_voxLvlLabel->setFixedWidth(38);
-        m_voxLvlLabel->setAlignment(Qt::AlignCenter);
-        row->addWidget(m_voxLvlLabel);
-
-        m_voxDlySlider = new QSlider(Qt::Horizontal, this);
-        // From Thetis setup.designer.cs:45005-45013 [v2.10.3.13]:
-        //   udDEXPHold.Maximum = 2000; udDEXPHold.Minimum = 1; (units: ms)
-        m_voxDlySlider->setRange(1, 2000);
-        m_voxDlySlider->setValue(500);
-        m_voxDlySlider->setStyleSheet(Style::sliderHStyle());
-        m_voxDlySlider->setAccessibleName(QStringLiteral("VOX hold time (ms)"));
-        m_voxDlySlider->setObjectName(QStringLiteral("TxVoxHoldSlider"));
-        row->addWidget(m_voxDlySlider, 1);
-
-        m_voxDlyLabel = new QLabel(QStringLiteral("500 ms"), this);
-        m_voxDlyLabel->setStyleSheet(Style::insetValueStyle());
-        m_voxDlyLabel->setFixedWidth(42);
-        m_voxDlyLabel->setAlignment(Qt::AlignCenter);
-        row->addWidget(m_voxDlyLabel);
-
-        vbox->addLayout(row);
-    }
-
-    // ── 4c. MON toggle button + 4d. Monitor volume slider ─────────────────────
-    // Phase 3M-1b J.3: below VOX toggle.
-    // MON: checkable, blue border when active (indicates monitor on).
-    //   monEnabled does NOT persist — plan §0 row 9 safety: loads OFF always.
-    //   Default volume 50 (matches model default 0.5f from Thetis audio.cs:417).
-    //
-    // Volume slider: 0..100 integer → monitorVolume float 0.0..1.0 (value/100.0f).
-    //   Inverse: monitorVolumeChanged(float) → slider position = qRound(v * 100.0f).
-    {
-        // MON button row
-        auto* monRow = new QHBoxLayout;
-        monRow->setSpacing(4);
-
-        m_monBtn = new QPushButton(QStringLiteral("MON"), this);
-        m_monBtn->setCheckable(true);
-        m_monBtn->setChecked(false);  // default: OFF — plan §0 row 9 safety rule
-        m_monBtn->setFixedHeight(22);
-        m_monBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        // MON button intentionally uses dark-navy/cyan (#001a33 bg / #3399ff border)
-        // to distinguish from generic blue toggles (kBlueBg=#0070c0/kBlueBorder=#0090e0).
-        // NereusSDR-original one-off — do NOT snap to Style::kBlueBg / kBlueBorder.
-        m_monBtn->setStyleSheet(Style::buttonBaseStyle()
-            + QStringLiteral("QPushButton:checked {"
-                             " background: #161e27;"
-                             " border: 1px solid #4a7ba8;"
-                             " color: #ffffff;"
-                             "}"));
+        m_monBtn = schalter(QStringLiteral("MON"));
+        m_monBtn->setChecked(false);   // Plan §0 Zeile 9: laedt IMMER aus
         m_monBtn->setAccessibleName(QStringLiteral("Monitor enable"));
         m_monBtn->setToolTip(QStringLiteral(
             "Monitor: mix received audio into headphones during TX.\n"
+            "Right-click for the monitor volume.\n"
             "Does NOT persist across restarts (safety)."));
-        monRow->addWidget(m_monBtn, 1);
-        monRow->addStretch();
+        m_monBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        reihe->addWidget(m_monBtn, 1);
 
-        vbox->addLayout(monRow);
-
-        // Monitor volume slider row
-        auto* volRow = new QHBoxLayout;
-        volRow->setSpacing(4);
-
-        auto* volLbl = new QLabel(QStringLiteral("Mon Vol:"), this);
-        volLbl->setFixedWidth(62);
-        volLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTitleText));
-        volRow->addWidget(volLbl);
-
-        // Range 0..100 integer; default 50 (model default 0.5f).
-        m_monitorVolumeSlider = new QSlider(Qt::Horizontal, this);
-        m_monitorVolumeSlider->setRange(0, 100);
-        m_monitorVolumeSlider->setValue(50);
-        m_monitorVolumeSlider->setFixedHeight(18);
-        m_monitorVolumeSlider->setAccessibleName(QStringLiteral("Monitor volume"));
-        m_monitorVolumeSlider->setToolTip(QStringLiteral(
-            "Monitor receive audio volume during TX (0–100 %)"));
-        volRow->addWidget(m_monitorVolumeSlider, 1);
-
-        m_monitorVolumeValue = new QLabel(QStringLiteral("50"), this);
-        m_monitorVolumeValue->setFixedWidth(26);
-        m_monitorVolumeValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        m_monitorVolumeValue->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
-        volRow->addWidget(m_monitorVolumeValue);
-
-        vbox->addLayout(volRow);
-    }
-
-    // ── 4e. TX-processing quick toggles: [LEV] [EQ] [CFC] ──────────────────
-    // Phase 3M-3a-i Batch 2 (Task F): introduced the row of 3 (LEV/EQ/PROC).
-    // Phase 3M-3a-ii Batch 6 (Task A + F, then post-bench cleanup):
-    // PROC was promoted in Batch 6, then dropped here in the cleanup pass —
-    // PhoneCwApplet already had a wired PROC button + slider sitting un-wired
-    // since 3I-3 (NyiOverlay-marked).  Two PROC controls confused users.
-    // Row is now 3 buttons (LEV / EQ / CFC); PROC lives on PhoneCwApplet.
-    // All three share the same VOX/MON styling family (compact 22-px-tall,
-    // expanding width, green-checked LED look).
-    //
-    //   LEV  — checkable, bidirectional with TransmitModel::txLevelerOn.
-    //   EQ   — checkable, bidirectional with TransmitModel::txEqEnabled.
-    //          Left-click toggles.  Right-click → TxEqDialog (3M-3a-i Batch 3).
-    //   CFC  — checkable, bidirectional with TransmitModel::cfcEnabled.
-    //          Left-click toggles.  Right-click → modeless TxCfcDialog
-    //          (10-band per-band CFC editor; mirrors Thetis frmCFCConfig
-    //          [v2.10.3.13]).
-    //
-    {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(2);
-
-        const QString btnStyle = Style::buttonBaseStyle()
-            + Style::greenCheckedStyle();
-
-        m_levBtn = new QPushButton(QStringLiteral("LEV"), this);
-        m_levBtn->setCheckable(true);
-        m_levBtn->setFixedHeight(22);
-        m_levBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_levBtn->setStyleSheet(btnStyle);
-        m_levBtn->setAccessibleName(QStringLiteral("TX Leveler enable"));
+        m_levBtn = schalter(QStringLiteral("LEV"));
         m_levBtn->setObjectName(QStringLiteral("TxLevButton"));
-        m_levBtn->setToolTip(QStringLiteral(
-            "TX Leveler — slow speech-leveling AGC. Improves intelligibility on weak speech."));
-        row->addWidget(m_levBtn, 1);
+        m_levBtn->setAccessibleName(QStringLiteral("TX leveler"));
+        m_levBtn->setToolTip(QStringLiteral("TX leveler (ALC-style gain rider)"));
+        reihe->addWidget(m_levBtn, 1);
 
-        m_eqBtn = new QPushButton(QStringLiteral("EQ"), this);
-        m_eqBtn->setCheckable(true);
-        m_eqBtn->setFixedHeight(22);
-        m_eqBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_eqBtn->setStyleSheet(btnStyle);
-        m_eqBtn->setAccessibleName(QStringLiteral("TX EQ enable"));
+        m_eqBtn = schalter(QStringLiteral("EQ"));
         m_eqBtn->setObjectName(QStringLiteral("TxEqButton"));
+        m_eqBtn->setAccessibleName(QStringLiteral("TX equaliser"));
         m_eqBtn->setToolTip(QStringLiteral(
-            "TX 10-band graphic EQ.  Left-click to toggle.\n"
-            "Right-click to open the EQ dialog."));
-        // Custom context-menu policy so right-click hits a slot (not the
-        // default menu).
+            "TX equaliser.  Left-click to toggle.  Right-click to configure."));
         m_eqBtn->setContextMenuPolicy(Qt::CustomContextMenu);
-        row->addWidget(m_eqBtn, 1);
+        reihe->addWidget(m_eqBtn, 1);
 
-        m_cfcBtn = new QPushButton(QStringLiteral("CFC"), this);
-        m_cfcBtn->setCheckable(true);
-        m_cfcBtn->setFixedHeight(22);
-        m_cfcBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_cfcBtn->setStyleSheet(btnStyle);
-        m_cfcBtn->setAccessibleName(QStringLiteral("Continuous Frequency Compressor enable"));
+        m_cfcBtn = schalter(QStringLiteral("CFC"));
         m_cfcBtn->setObjectName(QStringLiteral("TxCfcButton"));
+        m_cfcBtn->setAccessibleName(QStringLiteral("TX continuous frequency compressor"));
         m_cfcBtn->setToolTip(QStringLiteral(
-            "CFC — 10-band continuous frequency compressor. Left-click to "
-            "toggle. Right-click to open the CFC dialog."));
-        // Right-click → modeless TxCfcDialog (mirrors EQ button pattern).
+            "Continuous frequency compressor.  Left-click to toggle.  "
+            "Right-click to configure."));
         m_cfcBtn->setContextMenuPolicy(Qt::CustomContextMenu);
-        row->addWidget(m_cfcBtn, 1);
+        reihe->addWidget(m_cfcBtn, 1);
 
-        vbox->addLayout(row);
-    }
-
-    // ── Profile combo row (full width) ──────────────────────────────────────
-    // Tune Mode combo removed (ATU phase, no plan yet).
-    // (AetherSDR TxApplet.cpp:131–153)
-    {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(2);
-
-        // ── Phase 3M-1c J.1 ─ TX Profile combo ─────────────────────────────────
-        // Populated from MicProfileManager via setMicProfileManager().
-        // Right-click → emit txProfileMenuRequested (mirrors Thetis
-        // comboTXProfile_MouseDown at console.cs:44519-44522 [v2.10.3.13]).
-        m_profileCombo = new QComboBox(this);
-        m_profileCombo->addItem(QStringLiteral("Default"));
-        m_profileCombo->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_profileCombo->setFixedHeight(22);
-        applyComboStyle(m_profileCombo);
-        m_profileCombo->setAccessibleName(QStringLiteral("TX profile"));
-        m_profileCombo->setToolTip(QStringLiteral(
-            "TX Profile — left-click to switch.  Right-click to edit "
-            "(Setup → Audio → TX Profile)."));
-        // Custom context-menu policy so right-click emits
-        // customContextMenuRequested instead of the default popup.
-        m_profileCombo->setContextMenuPolicy(Qt::CustomContextMenu);
-        row->addWidget(m_profileCombo, 1);
-
-        vbox->addLayout(row);
-    }
-
-    // ── Plan 4 Cluster C (Task 4 / D2+D3+D9-status): TX BW spinbox row ──────
-    // Low/High cutoff spinboxes for the TX bandpass filter.  Bidirectional with
-    // TransmitModel::filterLow / filterHigh (wired in wireControls).  Defaults
-    // 100 / 2900 Hz from the model (m_filterLow{100} / m_filterHigh{2900}).
-    {
-        auto* bwRow = new QHBoxLayout;
-        bwRow->setSpacing(4);
-
-        // "TX BW" section label — 56 px wide, bold, kTitleText colour, 10 px.
-        auto* bwLbl = new QLabel(QStringLiteral("TX BW"), this);
-        bwLbl->setFixedWidth(56);
-        bwLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; font-weight: bold; }"
-        ).arg(Style::kTitleText));
-        bwRow->addWidget(bwLbl);
-
-        // "Lo" sub-label
-        auto* loLbl = new QLabel(QStringLiteral("Lo"), this);
-        loLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 9.5px; }"
-        ).arg(Style::kTextSecondary));
-        bwRow->addWidget(loLbl);
-
-        // Low-cutoff spinbox — range [0, 5000] Hz
-        m_txFilterLowSpin = new QSpinBox(this);
-        m_txFilterLowSpin->setRange(0, 5000);
-        m_txFilterLowSpin->setSuffix(QStringLiteral(" Hz"));
-        m_txFilterLowSpin->setStyleSheet(Style::spinBoxStyle());
-        m_txFilterLowSpin->setMinimumWidth(72);
-        m_txFilterLowSpin->setAccessibleName(QStringLiteral("TX filter low cutoff"));
-        m_txFilterLowSpin->setToolTip(QStringLiteral(
-            "TX bandpass filter lower cutoff (Hz).  0 Hz for voice SSB modes."));
-        bwRow->addWidget(m_txFilterLowSpin);
-
-        // "Hi" sub-label
-        auto* hiLbl = new QLabel(QStringLiteral("Hi"), this);
-        hiLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 9.5px; }"
-        ).arg(Style::kTextSecondary));
-        bwRow->addWidget(hiLbl);
-
-        // High-cutoff spinbox — range [200, 10000] Hz
-        m_txFilterHighSpin = new QSpinBox(this);
-        m_txFilterHighSpin->setRange(200, 10000);
-        m_txFilterHighSpin->setSuffix(QStringLiteral(" Hz"));
-        m_txFilterHighSpin->setStyleSheet(Style::spinBoxStyle());
-        m_txFilterHighSpin->setMinimumWidth(72);
-        m_txFilterHighSpin->setAccessibleName(QStringLiteral("TX filter high cutoff"));
-        m_txFilterHighSpin->setToolTip(QStringLiteral(
-            "TX bandpass filter upper cutoff (Hz).  2900 Hz for typical SSB voice."));
-        bwRow->addWidget(m_txFilterHighSpin);
-
-        vbox->addLayout(bwRow);
-
-        // D9 status label — orange tint, right-aligned, 9 px bold.
-        // Displays e.g. "100-2900 Hz · 2.8k BW" (asymmetric) or "±2900 Hz · 5.8k BW"
-        // (symmetric modes).  Refreshed by filterChanged + dspModeChanged.
-        m_txFilterStatusLabel = new QLabel(this);
-        m_txFilterStatusLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        m_txFilterStatusLabel->setStyleSheet(QStringLiteral(
-            // Plan 4 D9 (Cluster E): colour centralised in Style::kTxFilterOverlayLabel.
-            "QLabel { color: %1; font-size: 9px; font-weight: bold; }"
-        ).arg(QLatin1String(Style::kTxFilterOverlayLabel)));
-        m_txFilterStatusLabel->setAccessibleName(QStringLiteral("TX filter status"));
-        vbox->addWidget(m_txFilterStatusLabel);
-    }
-
-    // ── Button row 3: 2-Tone + PS-A + DUP ───────────────────────────────────
-    // Phase 3M-1a H.3: 2-Tone and PS-A are hidden until their owning phases land.
-    //   2-Tone: TODO [3M-3]: visible when 2-tone test feature lands.
-    //   PS-A:   TODO [3M-4]: visible when PureSignal lands.
-    {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(2);
-
-        // ── Phase 3M-1c J.2 ─ 2-TONE button ────────────────────────────────────
-        // Mirrors Thetis chk2TONE_CheckedChanged (console.cs:44728-44760
-        // [v2.10.3.13]).  Wired to TwoToneController via
-        // setTwoToneController().  The TUN-stop pre-step + 300 ms settle
-        // delay live inside TwoToneController::setActive (Phase I.3) so the
-        // button itself just dispatches setActive(checked).
-        m_twoToneBtn = new QPushButton(QStringLiteral("2-Tone"), this);
-        m_twoToneBtn->setCheckable(true);
-        m_twoToneBtn->setFixedHeight(22);
-        m_twoToneBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_twoToneBtn->setStyleSheet(Style::buttonBaseStyle() + Style::redCheckedStyle());
+        // 2-Tone bringt das Geraet AUF DIE LUFT — es gehoert damit zur
+        // Sendetasten-Familie, nicht zu den stillen Zustandsschaltern.
+        m_twoToneBtn = schalter(QStringLiteral("2-Tone"));
+        m_twoToneBtn->setStyleSheet(Style::buttonBaseStyle()
+            + QStringLiteral("QPushButton { padding: 1px 3px; }")
+            + Style::txKeyStyle(true));
         m_twoToneBtn->setAccessibleName(QStringLiteral("2-tone test"));
         m_twoToneBtn->setToolTip(QStringLiteral(
             "Continuous or pulsed two-tone IMD test "
             "(configure in Setup → Test → Two-Tone)."));
-        row->addWidget(m_twoToneBtn, 1);
+        reihe->addWidget(m_twoToneBtn, 1);
 
-        // PS-A: green when checked — #1a6030/#008040 are a darker green than kGreenBg=#006040.
-        // Phase 3M-4 Task 13: un-hidden under capability gating.  Visibility
-        // is set by setBoardCapabilities() / MainWindow board-change handler;
-        // hidden by default until that fires (matches the Phase 3M-1a comment
-        // pattern of hidden-until-capability-known).
-        m_psaBtn = new QPushButton(QStringLiteral("PS-A"), this);
+        // PS-A: Sichtbarkeit haengt an setBoardCapabilities(); sichtbar
+        // voreingestellt wegen des am Pruefstand beobachteten Wettlaufs
+        // (die Faehigkeiten treffen manchmal erst nach dem Bau ein).
+        m_psaBtn = schalter(QStringLiteral("PS-A"));
         m_psaBtn->setObjectName(QStringLiteral("TxAppletPsaBtn"));
-        m_psaBtn->setCheckable(true);
-        m_psaBtn->setFixedHeight(22);
-        m_psaBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        m_psaBtn->setStyleSheet(Style::themed(Style::buttonBaseStyle()
-            + QStringLiteral("QPushButton:checked {"
-                             " background: #1a6030; border: 1px solid #6fa384; color: #fff; }")));
         m_psaBtn->setAccessibleName(QStringLiteral("PS-A PureSignal"));
         m_psaBtn->setToolTip(QStringLiteral(
             "Toggle PureSignal auto-calibration. Right-click to open PureSignal..."));
-        // Phase 3M-4 bench-fix: default visible so the button shows on every
-        // PS-capable board even if MainWindow's capability gate fires after
-        // applet construction (timing race observed at bench).  setBoardCapabilities
-        // (TxApplet.cpp:1985) hides for caps.hasPureSignal=false (Atlas/HL2).
-        row->addWidget(m_psaBtn, 1);
+        reihe->addWidget(m_psaBtn, 1);
 
-        vbox->addLayout(row);
+        // Das Zahnrad oeffnet das Feinblatt. Kein Rastknopf: es ist eine
+        // Handlung, kein Zustand.
+        m_moreBtn = new QPushButton(QStringLiteral("⚙"), this);
+        m_moreBtn->setFixedSize(26, 20);
+        m_moreBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        m_moreBtn->setStyleSheet(Style::buttonBaseStyle()
+            + QStringLiteral("QPushButton { padding: 1px 3px; }"));
+        m_moreBtn->setAccessibleName(QStringLiteral("More TX settings"));
+        m_moreBtn->setToolTip(QStringLiteral(
+            "Feineinstellung: TX-Profil, TX-Bandbreite, VOX-Schwelle "
+            "und Mithoerlautstaerke."));
+        reihe->addWidget(m_moreBtn);
+
+        vbox->addLayout(reihe);
     }
 
-    // ── SWR protection LED inset ─────────────────────────────────────────────
-    // xPA button removed (external-PA hardware-specific phase, no plan yet).
-    // SWR Prot LED now occupies its own full-width inset row.
-    // Inset: fixedHeight 22, bg #0a0a18, border #1e2e3e (AetherSDR TxApplet.cpp:224–253)
+    // ── Band 3: die Fusszeile ───────────────────────────────────────────────
+    // Mikrofonquelle und Bandbreite sind ZUSTAND, kein Bedienelement —
+    // sie hatten vorher je eine eigene Zeile mitten im Feld.
     {
-        auto* row = new QHBoxLayout;
-        row->setSpacing(4);
+        auto* fuss = new QHBoxLayout;
+        fuss->setSpacing(6);
 
-        // Inset container for SWR protection LED (styled like AetherSDR atuInset)
-        auto* inset = new QWidget(this);
-        inset->setFixedHeight(22);
-        inset->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        inset->setObjectName(QStringLiteral("xpaInset"));
-        inset->setStyleSheet(QStringLiteral(
-            "#xpaInset { background: %1; border: 1px solid %2; border-radius: 6px; }"
-            "#xpaInset QLabel { border: none; background: transparent; }"
-        ).arg(Style::kInsetBg, Style::kInsetBorder));
+        m_micSourceBadge = new QLabel(QStringLiteral("PC mic"), this);
+        m_micSourceBadge->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: %2px; }")
+            .arg(QLatin1String(Style::kTextScale)).arg(Style::kFontCaption));
+        m_micSourceBadge->setAccessibleName(QStringLiteral("Mic source indicator"));
+        m_micSourceBadge->setToolTip(QStringLiteral(
+            "Active microphone source: PC mic or Radio mic.\n"
+            "Change via Setup → Transmit → Mic Source."));
+        fuss->addWidget(m_micSourceBadge);
 
-        auto* insetLayout = new QHBoxLayout(inset);
-        insetLayout->setContentsMargins(4, 0, 4, 0);
-        insetLayout->setSpacing(2);
+        auto trenner = [this] {
+            auto* l = new QLabel(QStringLiteral("·"), this);
+            l->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; font-size: %2px; }")
+                .arg(QLatin1String(Style::kTextInactive)).arg(Style::kFontCaption));
+            return l;
+        };
+        fuss->addWidget(trenner());
 
-        // 15. SWR protection LED — inactive: #405060, 9px bold
-        // Matches AetherSDR makeIndicator() pattern (TxApplet.cpp:22–27)
-        m_swrProtLed = new QLabel(QStringLiteral("SWR Prot"), inset);
+        // Das aktive TX-Profil. Der Waehler dafuer steht seit dem Umbau
+        // im Feinblatt — sein NAME muss trotzdem sichtbar bleiben, sonst
+        // arbeitet man mit einer Einstellung, die man nicht mehr sieht.
+        m_profileEcho = new QLabel(QStringLiteral("Default"), this);
+        m_profileEcho->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: %2px; }")
+            .arg(QLatin1String(Style::kTextScale)).arg(Style::kFontCaption));
+        m_profileEcho->setAccessibleName(QStringLiteral("Active TX profile"));
+        fuss->addWidget(m_profileEcho);
+
+        fuss->addWidget(trenner());
+
+        // Zeigt z.B. „100-2900 Hz · 2.8k BW"; nachgezogen von
+        // filterChanged + dspModeChanged.
+        m_txFilterStatusLabel = new QLabel(this);
+        m_txFilterStatusLabel->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: %2px; }")
+            .arg(QLatin1String(Style::kTxFilterOverlayLabel)).arg(Style::kFontCaption));
+        m_txFilterStatusLabel->setAccessibleName(QStringLiteral("TX filter status"));
+        fuss->addWidget(m_txFilterStatusLabel);
+
+        fuss->addStretch();
+
+        m_swrProtLed = new QLabel(QStringLiteral("SWR Prot"), this);
         m_swrProtLed->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 9px; font-weight: bold; }"
-        ).arg(Style::kTextInactive));
-        m_swrProtLed->setAlignment(Qt::AlignCenter);
+            "QLabel { color: %1; font-size: %2px; font-weight: bold; }")
+            .arg(QLatin1String(Style::kTextInactive)).arg(Style::kFontCaption));
         m_swrProtLed->setAccessibleName(QStringLiteral("SWR protection indicator"));
-        insetLayout->addWidget(m_swrProtLed);
+        fuss->addWidget(m_swrProtLed);
 
-        row->addWidget(inset, 1); // full width (xPA removed)
-        vbox->addLayout(row);
+        vbox->addLayout(fuss);
     }
 
     vbox->addStretch();
+
+    buildFinePopup();
+}
+
+// ── Das Feinblatt hinter dem Zahnrad ────────────────────────────────────────
+//
+// Alles, was aus dem Feld verschwunden ist, steht hier — und zwar als
+// DIESELBEN Bauteile mit denselben objectNames. Wer sie ueber
+// findChild() sucht (und das tun tst_tx_applet_vox_relocated,
+// tst_tx_applet_profile_combo und tst_tx_applet_lev_eq_cfc), findet sie
+// weiterhin; sie haengen nur an einem anderen Elternteil.
+//
+// Qt::Popup statt Dialog: das Blatt schliesst sich beim Klick daneben,
+// so wie ein Menue. Es ist eine Feineinstellung, kein Arbeitsfenster.
+void TxApplet::buildFinePopup()
+{
+    m_finePopup = new QWidget(this, Qt::Popup);
+    m_finePopup->setObjectName(QStringLiteral("TxFinePopup"));
+    m_finePopup->setStyleSheet(QStringLiteral(
+        "#TxFinePopup { background: %1; border: 1px solid %2; border-radius: 8px; }"
+        "#TxFinePopup QLabel { color: %3; font-size: %4px; background: transparent; }"
+    ).arg(QLatin1String(Style::kPanelBg), QLatin1String(Style::kBorder),
+          QLatin1String(Style::kTextSecondary)).arg(Style::kFontSmall));
+
+    auto* grid = new QGridLayout(m_finePopup);
+    grid->setContentsMargins(10, 8, 10, 8);
+    grid->setHorizontalSpacing(6);
+    grid->setVerticalSpacing(6);
+
+    auto beschriftung = [this](const QString& t) {
+        auto* l = new QLabel(t, m_finePopup);
+        l->setFixedWidth(64);
+        return l;
+    };
+
+    int z = 0;
+
+    // ── TX-Profil ───────────────────────────────────────────────────────────
+    // Gefuellt aus dem MicProfileManager ueber setMicProfileManager().
+    // Rechtsklick meldet txProfileMenuRequested (wie Thetis
+    // comboTXProfile_MouseDown, console.cs:44519-44522 [v2.10.3.13]).
+    grid->addWidget(beschriftung(QStringLiteral("TX-Profil")), z, 0);
+    m_profileCombo = new QComboBox(m_finePopup);
+    m_profileCombo->addItem(QStringLiteral("Default"));
+    m_profileCombo->setFixedHeight(22);
+    applyComboStyle(m_profileCombo);
+    m_profileCombo->setAccessibleName(QStringLiteral("TX profile"));
+    m_profileCombo->setToolTip(QStringLiteral(
+        "TX Profile — left-click to switch.  Right-click to edit "
+        "(Setup → Audio → TX Profile)."));
+    m_profileCombo->setContextMenuPolicy(Qt::CustomContextMenu);
+    grid->addWidget(m_profileCombo, z, 1, 1, 3);
+    ++z;
+
+    // ── TX-Bandbreite ───────────────────────────────────────────────────────
+    grid->addWidget(beschriftung(QStringLiteral("TX BW")), z, 0);
+    m_txFilterLowSpin = new QSpinBox(m_finePopup);
+    m_txFilterLowSpin->setRange(0, 5000);
+    m_txFilterLowSpin->setSuffix(QStringLiteral(" Hz"));
+    m_txFilterLowSpin->setStyleSheet(Style::spinBoxStyle());
+    m_txFilterLowSpin->setMinimumWidth(78);
+    m_txFilterLowSpin->setAccessibleName(QStringLiteral("TX filter low cutoff"));
+    m_txFilterLowSpin->setToolTip(QStringLiteral(
+        "TX bandpass filter lower cutoff (Hz).  0 Hz for voice SSB modes."));
+    grid->addWidget(m_txFilterLowSpin, z, 1);
+
+    m_txFilterHighSpin = new QSpinBox(m_finePopup);
+    m_txFilterHighSpin->setRange(200, 10000);
+    m_txFilterHighSpin->setSuffix(QStringLiteral(" Hz"));
+    m_txFilterHighSpin->setStyleSheet(Style::spinBoxStyle());
+    m_txFilterHighSpin->setMinimumWidth(78);
+    m_txFilterHighSpin->setAccessibleName(QStringLiteral("TX filter high cutoff"));
+    m_txFilterHighSpin->setToolTip(QStringLiteral(
+        "TX bandpass filter upper cutoff (Hz).  2900 Hz for typical SSB voice."));
+    grid->addWidget(m_txFilterHighSpin, z, 2, 1, 2);
+    ++z;
+
+    // ── VOX-Schwelle mit dem lebenden Pegelstreifen darunter ────────────────
+    // Bereich -80..0 dB wie Thetis ptbVOX (console.Designer.cs:6018-6019
+    // [v2.10.3.13]); Voreinstellung -20 wie ptbVOX.Value.
+    grid->addWidget(beschriftung(QStringLiteral("VOX-Schwelle")), z, 0);
+    auto* voxStack = new QWidget(m_finePopup);
+    auto* voxStackVbox = new QVBoxLayout(voxStack);
+    voxStackVbox->setContentsMargins(0, 0, 0, 0);
+    voxStackVbox->setSpacing(1);
+
+    m_voxSlider = new QSlider(Qt::Horizontal, voxStack);
+    m_voxSlider->setRange(-80, 0);
+    m_voxSlider->setValue(-20);
+    m_voxSlider->setFixedHeight(14);
+    m_voxSlider->setStyleSheet(Style::sliderHStyle());
+    m_voxSlider->setAccessibleName(QStringLiteral("VOX threshold (dB)"));
+    m_voxSlider->setObjectName(QStringLiteral("TxVoxThresholdSlider"));
+    voxStackVbox->addWidget(m_voxSlider);
+
+    m_voxPeakMeter = new DexpPeakMeter(voxStack);
+    m_voxPeakMeter->setObjectName(QStringLiteral("TxVoxPeakMeter"));
+    m_voxPeakMeter->setAccessibleName(QStringLiteral("VOX live mic peak"));
+    voxStackVbox->addWidget(m_voxPeakMeter);
+    grid->addWidget(voxStack, z, 1, 1, 2);
+
+    m_voxLvlLabel = new QLabel(QStringLiteral("-20 dB"), m_finePopup);
+    m_voxLvlLabel->setStyleSheet(Style::insetValueStyle());
+    m_voxLvlLabel->setFixedWidth(46);
+    m_voxLvlLabel->setAlignment(Qt::AlignCenter);
+    grid->addWidget(m_voxLvlLabel, z, 3);
+    ++z;
+
+    // ── VOX-Haltezeit ───────────────────────────────────────────────────────
+    // 1..2000 ms wie Thetis udDEXPHold (setup.designer.cs:45005-45013).
+    grid->addWidget(beschriftung(QStringLiteral("VOX-Halten")), z, 0);
+    m_voxDlySlider = new QSlider(Qt::Horizontal, m_finePopup);
+    m_voxDlySlider->setRange(1, 2000);
+    m_voxDlySlider->setValue(500);
+    m_voxDlySlider->setFixedHeight(14);
+    m_voxDlySlider->setStyleSheet(Style::sliderHStyle());
+    m_voxDlySlider->setAccessibleName(QStringLiteral("VOX hold time (ms)"));
+    m_voxDlySlider->setObjectName(QStringLiteral("TxVoxHoldSlider"));
+    grid->addWidget(m_voxDlySlider, z, 1, 1, 2);
+
+    m_voxDlyLabel = new QLabel(QStringLiteral("500 ms"), m_finePopup);
+    m_voxDlyLabel->setStyleSheet(Style::insetValueStyle());
+    m_voxDlyLabel->setFixedWidth(46);
+    m_voxDlyLabel->setAlignment(Qt::AlignCenter);
+    grid->addWidget(m_voxDlyLabel, z, 3);
+    ++z;
+
+    // ── Mithoerlautstaerke ──────────────────────────────────────────────────
+    // 0..100 ganzzahlig -> monitorVolume 0,0..1,0. Voreinstellung 50
+    // (Modellvorgabe 0.5f, Thetis audio.cs:417).
+    grid->addWidget(beschriftung(QStringLiteral("Mithören")), z, 0);
+    m_monitorVolumeSlider = new QSlider(Qt::Horizontal, m_finePopup);
+    m_monitorVolumeSlider->setRange(0, 100);
+    m_monitorVolumeSlider->setValue(50);
+    m_monitorVolumeSlider->setFixedHeight(14);
+    m_monitorVolumeSlider->setStyleSheet(Style::sliderHStyle());
+    m_monitorVolumeSlider->setAccessibleName(QStringLiteral("Monitor volume"));
+    m_monitorVolumeSlider->setToolTip(QStringLiteral(
+        "Monitor receive audio volume during TX (0–100 %)"));
+    grid->addWidget(m_monitorVolumeSlider, z, 1, 1, 2);
+
+    m_monitorVolumeValue = new QLabel(QStringLiteral("50"), m_finePopup);
+    m_monitorVolumeValue->setStyleSheet(Style::insetValueStyle());
+    m_monitorVolumeValue->setFixedWidth(46);
+    m_monitorVolumeValue->setAlignment(Qt::AlignCenter);
+    grid->addWidget(m_monitorVolumeValue, z, 3);
+
+    m_finePopup->setFixedWidth(376);
+    m_finePopup->adjustSize();
+
+    connect(m_profileCombo, &QComboBox::currentTextChanged, this,
+            [this](const QString& name) {
+                if (m_profileEcho) { m_profileEcho->setText(name); }
+            });
+
+    connect(m_moreBtn, &QPushButton::clicked, this, &TxApplet::showFinePopup);
+    // Rechtsklick auf MON fuehrt zur Mithoerlautstaerke — die stand
+    // vorher als eigene Reglerzeile im Feld.
+    connect(m_monBtn, &QPushButton::customContextMenuRequested,
+            this, [this](const QPoint&) { showFinePopup(); });
+}
+
+void TxApplet::showFinePopup()
+{
+    if (!m_finePopup) { return; }
+    m_finePopup->adjustSize();
+    // Unter dem Zahnrad, aber rechtsbuendig mit ihm — sonst haengt das
+    // Blatt bei angedocktem Feld ueber den rechten Fensterrand hinaus.
+    const QPoint unten = m_moreBtn
+        ? m_moreBtn->mapToGlobal(QPoint(m_moreBtn->width() - m_finePopup->width(),
+                                        m_moreBtn->height() + 4))
+        : mapToGlobal(QPoint(0, height()));
+    m_finePopup->move(unten);
+    m_finePopup->show();
 }
 
 // ── Phase 3M-1a H.3 wiring ──────────────────────────────────────────────────
@@ -933,11 +823,13 @@ void TxApplet::wireControls()
     {
         auto updateSwrProtLed = [this](bool isHigh) {
             if (!m_swrProtLed) { return; }
-            const QString color = isHigh ? QStringLiteral("#c2924f")
-                                         : Style::kTextInactive;
+            // Der Ton hatte hier keinen Namen und stand als nacktes
+            // Literal; seit 2026-09-02 heisst er Style::kSwrProtActive.
+            const QString color = isHigh ? QLatin1String(Style::kSwrProtActive)
+                                         : QLatin1String(Style::kTextInactive);
             m_swrProtLed->setStyleSheet(QStringLiteral(
-                "QLabel { color: %1; font-size: 9px; font-weight: bold; }"
-            ).arg(color));
+                "QLabel { color: %1; font-size: %2px; font-weight: bold; }"
+            ).arg(color).arg(Style::kFontCaption));
         };
         connect(&m_model->swrProt(),
                 &safety::SwrProtectionController::highSwrChanged,

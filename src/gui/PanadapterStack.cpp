@@ -510,6 +510,45 @@ void PanadapterStack::floatPanadapter(const QString& panId)
     // Oberflaeche des Hauptfensters mitnimmt. Das ist ein eigener
     // Schritt, kein Anhaengsel an diesen hier — und Raten macht es
     // schlimmer, siehe die zwei verworfenen Kuren.
+    //
+    // NACHTRAG 2026-09-06 (zweite Bestaetigung, erste am 2026-09-05):
+    // am laufenden Bau erneut geprueft, einzelner Panadapter, mehrere
+    // volle Abloese-/Andock-Runden. Jedes Mal 0 Meldungen "QRhiWidget:
+    // No QRhi" im Protokoll, TX/S-Meter/Bandwidth-Filter (alle
+    // QRhiWidget-basiert) blieben durchgehend normal gezeichnet, das
+    // abgeloeste Fenster zeigte seine eigene Flaeche samt Spot-
+    // Beschriftungen korrekt. Vermutlich eine Nebenwirkung von 8f442832
+    // (der SpectrumWidget-eigenen GPU-Schutzkette, AetherSDR-Quelle):
+    // wenn der Kontextverlust am 2026-08-20 daher kam, dass sw's eigener
+    // fehlerhafter Reparent einen GEMEINSAMEN QRhi/Backing-Store
+    // beschaedigte, wuerde das Beheben von sw's eigener Lebenszyklus-
+    // Kette denselben Kaskadeneffekt beheben, ohne dass der Commit das
+    // je behauptet haette.
+    //
+    // WEITERHIN UNGEPRUEFT: das Szenario, das AetherSDRs eigener,
+    // baugleicher Fehler (#2495) tatsaechlich brauchte -- MEHRERE
+    // Panadapter, davon einer abgeloest, DANN ein Layout-Wechsel. Bei
+    // uns braucht "Pan Layout..." eine Funkgeraeteverbindung (View-Menue,
+    // sonst ausgegraut) und war in dieser Sitzung nicht pruefbar. Vor
+    // dem Entfernen dieses Kommentarblocks: genau dieses Szenario einmal
+    // an der Werkbank nachstellen. Bis dahin bleibt der Block stehen --
+    // als Warnung, nicht als aktueller Befund.
+    //
+    // NACHTRAG 2026-09-07 -- genau dieses Szenario jetzt bestaetigt, live
+    // am ANAN 10e (2 Pans, das Maximum dieses Boards). Layout "A | B
+    // (2 pans)" gewaehlt, rechten Panadapter per "Float active pan..."
+    // geloest (kurze, dokumentierte Verzoegerung bis refreshAfterReparent()
+    // greift, dann korrekt gezeichnet, echte Rufzeichen-Beschriftungen
+    // sichtbar), WAEHREND er noch schwebte erneut "Pan Layout..." geoeffnet
+    // und auf "Single (1 pan)" zurueckgeschaltet. Ergebnis: kein
+    // Schwarzbild, sauberer Uebergang, ein parallel offener, aktiv
+    // dekodierender RTTY-Decoder lief ununterbrochen weiter. Damit ist
+    // das letzte offene Szenario aus diesem Block erledigt -- der
+    // urspruengliche Fehler (Hauptfenster schwarz waehrend ein Panadapter
+    // abgeloest ist) tritt in keiner bisher geprueften Kombination mehr
+    // auf. Block bleibt trotzdem stehen: er dokumentiert die Vorgeschichte
+    // und die zwei verworfenen Kuren, die beim naechsten aehnlichen Fund
+    // nicht nochmal versucht werden sollten.
 }
 // Der umgekehrte Weg zu floatPanadapter. Er tut genau das, was der
 // dockRequested-Empfaenger dort tut — nur von aussen aufrufbar, damit
@@ -617,6 +656,13 @@ void PanadapterStack::dockPanadapter(const QString& panId)
 {
     PanFloatingWindow* floater = m_floating.value(panId, nullptr);
     if (!floater) { return; }
+    // 2026-09-01 Diagnose: requestDock() geht NICHT ueber close()/
+    // closeEvent() -- es emittiert dockRequested() direkt. Das
+    // [PanFloatClose]-Log in closeEvent() sieht diesen Weg also nie,
+    // obwohl er denselben Effekt hat (schreibt panFloatStateChanged
+    // false). Klaert, wer diesen Weg aufruft -- wird nach der
+    // Bestaetigung entfernt.
+    qWarning() << "[PanDockRequested]" << panId;
     floater->requestDock();
 }
 
@@ -635,6 +681,26 @@ void PanadapterStack::dockAllFloatingPans()
             applet->hide();
             applet->setParent(this);
         }
+        // Betreiber 2026-09-01: "der panadapter wird immer wieder auf
+        // fullsize gestellt". dockAllFloatingPans() ist der ALLERERSTE
+        // Schritt von applyLayout() -- also auch bei JEDEM Programmstart,
+        // bevor der eigentliche Wiederherstellungsschritt (weiter unten
+        // im MainWindow-Konstruktor: "was zuletzt tatsaechlich schwebte")
+        // ueberhaupt drankommt. Ohne setShuttingDown(true) faehrt das
+        // gleich folgende close() denselben Pfad wie ein echter
+        // Nutzer-Klick auf das Kreuz: PanFloatingWindow::closeEvent()
+        // ruft requestDock() und schreibt PanFloating_pan-0 = False in
+        // die Einstellungen -- mitten im Start, fuer einen Panadapter,
+        // der Sekunden spaeter laut Profil eigentlich wieder schweben
+        // soll. Normalerweise unsichtbar, weil der Wiederherstellungs-
+        // schritt es sofort wieder auf True zurueckdreht -- aber genau
+        // dieses kurze Fenster ist es, in dem der falsche Wert auch
+        // fuer eine ANDERE, parallel lesende/schreibende Instanz (siehe
+        // heutige Doppelstart-Kollisionen) sichtbar werden kann, und
+        // ist ohnehin ein unnoetiger Nebeneffekt eines rein internen
+        // Umbaus. dockAllFloatingPans() reisst hier ab -- keine
+        // Nutzerabsicht, kein Grund, irgendetwas zu speichern.
+        floater->setShuttingDown(true);
         floater->close();
         delete floater;
     }

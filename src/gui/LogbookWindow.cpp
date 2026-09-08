@@ -24,6 +24,7 @@
 
 #include <QSplitter>
 
+#include <QAccessible>
 #include <QAction>
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -32,6 +33,8 @@
 #include <QDateTimeEdit>
 #include <QHash>
 #include <QMenu>
+#include <QMoveEvent>
+#include <QResizeEvent>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
@@ -114,6 +117,18 @@ void LogbookWindow::closeEvent(QCloseEvent* event)
     // instead of Qt's default QDialog(parent) placement.
     saveGeometryState();
     QDialog::closeEvent(event);
+}
+
+void LogbookWindow::moveEvent(QMoveEvent* event)
+{
+    QDialog::moveEvent(event);
+    saveGeometryState();
+}
+
+void LogbookWindow::resizeEvent(QResizeEvent* event)
+{
+    QDialog::resizeEvent(event);
+    saveGeometryState();
 }
 
 void LogbookWindow::saveGeometryState()
@@ -480,6 +495,16 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     m_countryEdit->setMaximumWidth(140);
     row->addWidget(m_countryEdit);
 
+    row->addWidget(caption(QStringLiteral("ACTIVATION")));
+    m_activationBox = new QComboBox(this);
+    m_activationBox->setMinimumWidth(100);
+    m_activationBox->setToolTip(QStringLiteral(
+        "SOTA summit or POTA park this contact was logged from.\n\n"
+        "Pick one to see just that activation — Export ADIF exports "
+        "what is filtered, so this is also how one activation leaves "
+        "as its own file."));
+    row->addWidget(m_activationBox);
+
     // Off by default. A live date range would hide contacts the moment
     // the window opened, and an empty log reads as an empty log.
     // ── Only what is still outstanding ───────────────────────────────
@@ -536,6 +561,7 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     };
     connect(m_bandBox, &QComboBox::currentTextChanged, this, reapply);
     connect(m_modeBox, &QComboBox::currentTextChanged, this, reapply);
+    connect(m_activationBox, &QComboBox::currentTextChanged, this, reapply);
     connect(m_gridEdit, &QLineEdit::textChanged, this, reapply);
     connect(m_countryEdit, &QLineEdit::textChanged, this, reapply);
     connect(m_fromDate, &QDateEdit::dateChanged, this, reapply);
@@ -553,9 +579,11 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         // way to an empty filter.
         QSignalBlocker b1(m_search), b2(m_bandBox), b3(m_modeBox);
         QSignalBlocker b4(m_gridEdit), b5(m_countryEdit), b6(m_useDates);
+        QSignalBlocker b7(m_activationBox);
         m_search->clear();
         m_bandBox->setCurrentIndex(0);
         m_modeBox->setCurrentIndex(0);
+        m_activationBox->setCurrentIndex(0);
         m_gridEdit->clear();
         m_countryEdit->clear();
         m_useDates->setChecked(false);
@@ -585,13 +613,21 @@ void LogbookWindow::refreshFilterChoices()
 
     QStringList bands;
     QStringList modes;
+    QStringList activations;
     for (const LogEntry& e : m_all) {
         if (!e.band.trimmed().isEmpty())    { bands << e.band.trimmed(); }
         if (!e.mode.trimmed().isEmpty())    { modes << e.mode.trimmed(); }
         if (!e.submode.trimmed().isEmpty()) { modes << e.submode.trimmed(); }
+        if (!e.mySotaRef.trimmed().isEmpty()) {
+            activations << e.mySotaRef.trimmed();
+        }
+        if (!e.myPotaRef.trimmed().isEmpty()) {
+            activations << e.myPotaRef.trimmed();
+        }
     }
     fill(m_bandBox, bands);
     fill(m_modeBox, modes);
+    fill(m_activationBox, activations);
 }
 
 LogFilter LogbookWindow::currentFilter() const
@@ -604,6 +640,9 @@ LogFilter LogbookWindow::currentFilter() const
     // Index 0 is "any" and is not a value to match against.
     if (m_bandBox->currentIndex() > 0) { f.band = m_bandBox->currentText(); }
     if (m_modeBox->currentIndex() > 0) { f.mode = m_modeBox->currentText(); }
+    if (m_activationBox->currentIndex() > 0) {
+        f.activation = m_activationBox->currentText();
+    }
 
     f.unconfirmedOnly = m_unconfirmedOnly->isChecked();
     f.useDates = m_useDates->isChecked();
@@ -803,6 +842,34 @@ void LogbookWindow::showRowMenu(const QPoint& pos)
 void LogbookWindow::refreshTable()
 {
     m_table->setRowCount(m_visible.size());
+
+    // Bug fix 2026-09-07: this loop calls setItem()/setForeground()/
+    // setFont()/setToolTip() up to ColumnCount times PER ROW, and each
+    // one fires a dataChanged signal from the table's model. Qt's macOS
+    // accessibility bridge does not coalesce those -- confirmed against
+    // Qt's own source (qtbase src/widgets/accessible/itemviews.cpp,
+    // src/plugins/platforms/cocoa/qcocoaaccessibilityelement.mm): every
+    // dataChanged re-walks and reallocates the WHOLE table's
+    // NSAccessibilityElement row/column arrays via
+    // -[QMacAccessibilityElement populateTableArray:count:], which
+    // always allocates fresh elements rather than reusing cached ones.
+    // With any accessibility observer attached (VoiceOver, remote
+    // control software, or a11y-based automation), that is O(rows x
+    // cols) work PER CELL -- O((rows x cols)^2) total for one refresh.
+    // Confirmed live: opening this window while an observer was attached
+    // grew process RSS from under 1 GB to 2-5+ GB within seconds (up to
+    // 164 million live QMacAccessibilityElement instances in one heap
+    // snapshot), eventually forcing macOS to freeze or kill the app.
+    //
+    // setRowCount() above stays unblocked (the view still needs its
+    // rowsInserted/rowsRemoved to keep geometry/scrollbars correct); only
+    // the per-cell dataChanged flood from the loop below is suppressed,
+    // and replaced with a single manual repaint + a single accessibility
+    // DataChanged event covering the whole table after the loop. This
+    // turns O(rows x cols) accessibility notifications into O(1) without
+    // disabling accessibility for real VoiceOver users.
+    {
+    const QSignalBlocker modelBlocker(m_table->model());
     for (int row = 0; row < m_visible.size(); ++row) {
         const LogEntry& e = m_all.at(m_visible.at(row));
         const QDateTime u = e.timeOn.toUTC();
@@ -874,6 +941,23 @@ void LogbookWindow::refreshTable()
         }
         put(ColComment, e.comment);
     }
+    } // modelBlocker scope
+
+    // Single manual repaint (paintEvent reads current model data directly,
+    // so this is correct even though dataChanged was suppressed above) and
+    // a single accessibility notification for the whole table, replacing
+    // the O(rows x cols) per-cell ones that were just blocked.
+    m_table->viewport()->update();
+    {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_table, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(qMax(0, m_table->rowCount() - 1));
+        tableEvent.setFirstColumn(0);
+        tableEvent.setLastColumn(ColumnCount - 1);
+        QAccessible::updateAccessibility(&tableEvent);
+    }
+
     if (!m_headerRestored) { m_table->resizeColumnsToContents(); }
 
     // ── Something has to be selected for the pane to have a subject ──
@@ -1160,6 +1244,23 @@ void LogbookWindow::editSelected()
     auto* rcvd    = new QLineEdit(e.rstRcvd, &dlg);
     auto* grid    = new QLineEdit(e.gridSquare, &dlg);
     auto* myGrid  = new QLineEdit(e.myGridSquare, &dlg);
+
+    // One field for either scheme rather than four: SOTA references
+    // always carry a '/' (W2/WE-003, G/LD-003), POTA park references
+    // never do (US-0005, OE-1234) — that alone is enough to sort a
+    // typed reference into the right ADIF field on save (see below).
+    // Whichever of the pair is set shows here; both are cleared before
+    // the save re-populates one of them, so switching schemes on an
+    // existing contact does not leave the old one behind.
+    auto* myActivation = new QLineEdit(
+        e.mySotaRef.isEmpty() ? e.myPotaRef : e.mySotaRef, &dlg);
+    myActivation->setPlaceholderText(
+        QStringLiteral("summit or park you're activating, e.g. OE/OO-001 or OE-1234"));
+    auto* theirActivation = new QLineEdit(
+        e.sotaRef.isEmpty() ? e.potaRef : e.sotaRef, &dlg);
+    theirActivation->setPlaceholderText(
+        QStringLiteral("their summit/park, if they're activating too"));
+
     auto* name    = new QLineEdit(e.name, &dlg);
     auto* qth     = new QLineEdit(e.qth, &dlg);
     auto* country = new QLineEdit(e.country, &dlg);
@@ -1174,6 +1275,8 @@ void LogbookWindow::editSelected()
     form->addRow(QStringLiteral("RST rcvd"),    rcvd);
     form->addRow(QStringLiteral("Their grid"),  grid);
     form->addRow(QStringLiteral("My grid"),     myGrid);
+    form->addRow(QStringLiteral("My activation (SOTA/POTA)"), myActivation);
+    form->addRow(QStringLiteral("Their activation"), theirActivation);
     form->addRow(QStringLiteral("Name"),        name);
     form->addRow(QStringLiteral("QTH"),         qth);
     form->addRow(QStringLiteral("Country"),     country);
@@ -1202,6 +1305,22 @@ void LogbookWindow::editSelected()
     e.rstRcvd      = rcvd->text().trimmed();
     e.gridSquare   = grid->text().trimmed().toUpper();
     e.myGridSquare = myGrid->text().trimmed().toUpper();
+
+    e.mySotaRef.clear();
+    e.myPotaRef.clear();
+    if (const QString mine = myActivation->text().trimmed().toUpper();
+        !mine.isEmpty()) {
+        if (mine.contains(QLatin1Char('/'))) { e.mySotaRef = mine; }
+        else                                 { e.myPotaRef = mine; }
+    }
+    e.sotaRef.clear();
+    e.potaRef.clear();
+    if (const QString theirs = theirActivation->text().trimmed().toUpper();
+        !theirs.isEmpty()) {
+        if (theirs.contains(QLatin1Char('/'))) { e.sotaRef = theirs; }
+        else                                   { e.potaRef = theirs; }
+    }
+
     e.name         = name->text().trimmed();
     e.qth          = qth->text().trimmed();
     e.country      = country->text().trimmed();

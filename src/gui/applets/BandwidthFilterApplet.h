@@ -51,6 +51,7 @@ namespace Longpath {
 
 class BandwidthFilterPane;
 class SliceModel;
+enum class DSPMode : int;
 
 class BandwidthFilterApplet : public AppletWidget {
     Q_OBJECT
@@ -115,6 +116,35 @@ private:
     QSpinBox*    m_lowBox{nullptr};
     QSpinBox*    m_widthBox{nullptr};
     QSpinBox*    m_highBox{nullptr};
+    // Betreiber 2026-09-03: "ich muss beide Werte frei eingeben koennen" --
+    // SliceModel::setFilterWidth() verankert LSB/USB/CW immer am
+    // Vorgabewert der Betriebsart (widthToEdges()), egal was zuletzt von
+    // Hand in LOW oder HIGH stand. Diese Kennung merkt sich, welche der
+    // beiden Kanten der Bedienende zuletzt selbst gesetzt hat, damit der
+    // WIDTH-Anschluss GENAU DIESE Kante festhaelt statt sie stillschweigend
+    // zu verwerfen. Nicht ueber m_lowBox/m_highBox erschliessbar: waehrend
+    // eines Edits zeigen beide Felder schon den neuen Wert, das Modell
+    // aber noch den alten -- ohne eigene Kennung liesse sich "zuletzt"
+    // nicht mehr feststellen, sobald WIDTH selbst dran ist.
+    enum class LastEditedEdge { Low, High };
+    /// Welche Kante SliceModel::widthToEdges() fuer diese Betriebsart als
+    /// Anker behandelt -- High fuer die LSB-Familie, Low fuer die
+    /// USB-Familie. Nur fuer die beiden Betriebsartfamilien
+    /// aussagekraeftig, die der WIDTH-Anschluss selbst unterscheidet.
+    static LastEditedEdge naturalAnchorEdge(DSPMode mode);
+    LastEditedEdge m_lastEditedEdge{LastEditedEdge::High};
+    /// Fuer welche (Scheibe, Betriebsart) m_lastEditedEdge zuletzt einen
+    /// echten Bedienereingriff gesehen hat. Wechselt eines der beiden,
+    /// ist die gemerkte Kante nicht mehr die Auskunft des Bedienenden,
+    /// sondern ein Zufallstreffer aus der vorigen Scheibe/Betriebsart --
+    /// dann wird auf den von SliceModel::widthToEdges vorgesehenen
+    /// natuerlichen Anker (High fuer LSB-Familie, Low fuer USB-Familie)
+    /// zurueckgesetzt statt ihn stehen zu lassen. m_lastSyncedModeInt
+    /// haelt den rohen DSPMode-Wert (int statt Enum, damit dieser Header
+    /// keinen Modellheader ziehen muss); -1 heisst "noch nie
+    /// synchronisiert", trifft also beim allerersten Aufruf immer.
+    SliceModel*    m_lastSyncedSlice{nullptr};
+    int            m_lastSyncedModeInt{-1};
     QList<QPushButton*> m_varBtns;
     QPushButton* m_resetBtn{nullptr};
     QPushButton* m_spanBtn{nullptr};

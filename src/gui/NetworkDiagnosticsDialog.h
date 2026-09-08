@@ -40,9 +40,15 @@ namespace Longpath {
 class RadioModel;
 class AudioEngine;
 
-// NetworkDiagnosticsDialog — modal 4-section diagnostic grid.
+// NetworkDiagnosticsDialog — modal diagnostic grid.
 //
-// Sections: Connection / Network / Audio / Radio Telemetry.
+// Sections: Connection / Network / Audio / Radio Telemetry / TX (SunSDR).
+// TX (SunSDR) added Step 4 of the SunSDR2 QRP TX-chain plan — a
+// read-only window onto SunSdrRadioConnection's own bench-only TX gate
+// state (armed / mox / pace-repeat count / trace tail); populated only
+// when the active connection is a SunSdrRadioConnection, "— (not
+// reported)" placeholders otherwise, same convention as the PA voltage
+// row above. This dialog never arms or transmits anything itself.
 // Refreshes at 250 ms from m_refreshTimer.
 //
 // Session-scoped accumulators (maxRtt, underruns) persist for the
@@ -63,6 +69,19 @@ public:
     NetworkDiagnosticsDialog(RadioModel* model, AudioEngine* audio,
                              QWidget* parent = nullptr);
 
+    // Test-only accessors — read the exact text shown in the new
+    // TX (SunSDR) section (Step 4 of the SunSDR2 QRP TX-chain plan), so a
+    // test can assert against what a user would actually see rather than
+    // re-reading SunSdrRadioConnection's own state a second, independent
+    // way. Same *ForTest() naming and QLabel-text-read shape as this
+    // project's other GUI test accessors (e.g. PaValuesPage::
+    // fwdCalibratedTextForTest()). Defined in the .cpp, not inline here —
+    // QLabel is only forward-declared in this header.
+    QString sunSdrArmedTextForTest() const;
+    QString sunSdrMoxTextForTest() const;
+    QString sunSdrPaceRepeatsTextForTest() const;
+    QString sunSdrTraceTailTextForTest() const;
+
 private slots:
     void refresh();
     void onResetSessionStats();
@@ -73,6 +92,7 @@ private:
     void buildNetworkSection(QGridLayout* grid, int& row);
     void buildAudioSection(QGridLayout* grid, int& row);
     void buildTelemetrySection(QGridLayout* grid, int& row);
+    void buildSunSdrTxSection(QGridLayout* grid, int& row);
     QLabel* makeValueLabel();
     QLabel* makeFieldLabel(const QString& text);
 
@@ -106,6 +126,19 @@ private:
     // dead data Thetis itself never displays).
     QLabel* m_paVoltLabel{nullptr};
     QLabel* m_adcOvlLabel{nullptr};
+    // TX (SunSDR) section labels — Step 4 of the SunSDR2 QRP TX-chain
+    // plan (design synthesis: "Network Diagnostics wiring ... 'TX
+    // (SunSDR)' row group: armed state, mox state, pace-repeat count,
+    // trace tail"). Read-only display only; refresh() populates these
+    // from SunSdrRadioConnection's own read-only accessors only when the
+    // active connection is actually a SunSdrRadioConnection — see
+    // buildSunSdrTxSection()'s own comment for the placeholder shown
+    // otherwise, matching this dialog's existing "— (not reported)"
+    // convention (m_paVoltLabel above).
+    QLabel* m_sunSdrArmedLabel{nullptr};
+    QLabel* m_sunSdrMoxLabel{nullptr};
+    QLabel* m_sunSdrPaceRepeatsLabel{nullptr};
+    QLabel* m_sunSdrTraceTailLabel{nullptr};
 
     // Session-scoped accumulators — zeroed by onResetSessionStats()
     int   m_maxRttMs{0};

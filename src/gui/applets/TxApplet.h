@@ -217,6 +217,13 @@ public:
     QString appletTitle() const override { return QStringLiteral("TX"); }
     void syncFromModel() override;
 
+    // Der ⚙-Knopf in der geteilten Kopfleiste (GridCellWidget) oeffnet
+    // denselben Popup wie der bestehende ⚙-Knopf im Applet selbst
+    // (showFinePopup) — zwei Wege zum selben Ziel, bis der interne
+    // Knopf in einem eigenen Schritt entfernt wird.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { showFinePopup(); }
+
     // Called by MainWindow when band changes so the Tune Power slider
     // can reflect the stored per-band tune power.
     // Phase 3M-1a H.3.
@@ -367,6 +374,8 @@ private slots:
 
 private:
     void buildUI();
+    void buildFinePopup();
+    void showFinePopup();
     void wireControls();  // called after buildUI() — attaches signals/slots
     // K.2: slot called when SliceModel::dspModeChanged fires (via RadioModel).
     // Updates m_moxBtn->setToolTip(tooltipForMode(mode)).
@@ -490,6 +499,14 @@ private:
 
     // 10. SWR protection LED (wired to SwrProtectionController::highSwrChanged)
     QLabel*      m_swrProtLed = nullptr;
+
+    // ── Umbau 2026-09-02: das Feinblatt hinter dem Zahnrad ──────────────────
+    // Traegt Profil, TX-Bandbreite, VOX-Schwelle/-Haltezeit und
+    // Mithoerlautstaerke. Es sind dieselben Bauteile wie vorher, nur an
+    // einem anderen Elternteil — objectNames und Verdrahtung unveraendert.
+    QLabel*      m_profileEcho = nullptr;   // Profilname in der Fusszeile
+    QPushButton* m_moreBtn    = nullptr;
+    QWidget*     m_finePopup  = nullptr;
     // Removed NYI members (re-add when their phases ship):
     //   m_atuBtn      — ATU phase (no plan yet)
     //   m_memBtn      — channel-memory phase

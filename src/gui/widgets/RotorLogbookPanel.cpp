@@ -20,6 +20,7 @@
 
 #include "RotorLogbookPanel.h"
 #include "GlobeWidget.h"
+#include "WorldTexture.h"
 #include "RotorDialWidget.h"
 
 #include <QContextMenuEvent>
@@ -45,6 +46,7 @@
 #include "models/SliceModel.h"
 
 #include <QAction>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QCryptographicHash>
 #include <QDialog>
@@ -271,13 +273,24 @@ void RotorLogbookPanel::buildUi()
     connect(quickLogBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::onLogQso);
 
+    // Betreiber (2026-09-02): Tab aus dem Rufzeichenfeld soll SOFORT auf
+    // LOG fuehren, nicht erst ueber den QRZ-Knopf — und dort angekommen
+    // soll Enter genuegen. setAutoDefault() allein reicht, weil dieses
+    // Panel kein QDialog ist: Enter loest den Knopf nur aus, wenn ER
+    // selbst den Fokus haelt, nicht irgendein anderes Feld im Panel —
+    // das Enter-auf-QRZ-Verhalten des Rufzeichenfelds (weiter unten,
+    // returnPressed) bleibt davon unberuehrt.
+    quickLogBtn->setAutoDefault(true);
+    setTabOrder(m_callEdit, quickLogBtn);
+
     m_rowCall = addShedRow(col, callRow, this);
 
-    // Station card: portrait, flag, name line. The portrait is on the
-    // left and fixed-width so the text below never reflows as images of
-    // different shapes arrive.
-    auto* cardRow = new QHBoxLayout;
-    cardRow->setSpacing(8);
+    // Station card: portrait on top, name line below. Was a side-by-side
+    // row (portrait left, text right); the operator wanted the portrait
+    // as large as the column allows instead, with the text underneath
+    // and trimmed to what still fits at a glance (2026-09-01).
+    auto* cardRow = new QVBoxLayout;
+    cardRow->setSpacing(6);
 
     // The fetching rules — https only, no downgrade on redirect, a size
     // cap, a cache beside the log — used to live in this file. The
@@ -285,7 +298,12 @@ void RotorLogbookPanel::buildUi()
     // security decision is one copy too many, so they moved into
     // StationPhoto and both callers use it. (2026-08-10)
     m_photo = new StationPhoto(this);
-    m_photo->setFixedSize(78, 78);
+    // Betreiber 2026-09-01: "foto soll so gross wie moeglich sein" --
+    // erst 78x78 (Quadrat, quetschte das Portraet), dann 160x120. Jetzt
+    // so gross, wie die Spalte traegt, ohne die Reglerzeilen darunter zu
+    // verdraengen (die Klasse selbst ist fuer 220x165 gebaut, siehe
+    // StationPhoto::sizeHint()).
+    m_photo->setFixedSize(300, 225);
     m_photo->setVisible(false);
     // A portrait is one network request per station, so it has to be
     // switchable — and a setting nobody can find is not a switch.
@@ -307,37 +325,39 @@ void RotorLogbookPanel::buildUi()
     // rather than explaining itself in 78 pixels.
     connect(m_photo, &StationPhoto::photoShown, this,
             [this]() { m_photo->setVisible(true); });
-    cardRow->addWidget(m_photo, 0, Qt::AlignTop);
-
-    auto* cardCol = new QVBoxLayout;
-    cardCol->setSpacing(2);
+    cardRow->addWidget(m_photo, 0, Qt::AlignHCenter);
 
     // The flag lives on the same line as the station text rather than in
     // a label of its own. A separate row is one more thing that can end
     // up zero-height or laid out off-screen, and then a missing flag
     // looks like a missing lookup.
+    //
+    // Betreiber 2026-09-01: "Daten koennen minimiert werden. Name,
+    // Entfernung, Land wuerde reichen" -- jetzt eine Zeile statt zwei,
+    // siehe stationText(). Zentriert unter dem groesseren Foto statt
+    // linksbuendig daneben.
     m_stationLine = new QLabel(QString{}, this);
     m_stationLine->setWordWrap(true);
+    m_stationLine->setAlignment(Qt::AlignHCenter);
     m_stationLine->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
-    cardCol->addWidget(m_stationLine);
+    cardRow->addWidget(m_stationLine);
 
     // Grey line at the far end. On the low bands this decides whether
     // the path is open at all, so it belongs next to the callsign, not
-    // buried in a propagation window.
+    // buried in a propagation window. Still kept up to date (see
+    // updateSolarLine()) for whoever re-enables it — just not shown in
+    // this trimmed-down card (2026-09-01).
     m_solarLine = new QLabel(QString{}, this);
     m_solarLine->setWordWrap(true);
-    cardCol->addWidget(m_solarLine);
+    m_solarLine->setVisible(false);
 
-    // Have I had this one before, and does it count. The question gets
-    // asked in the two seconds before deciding to call, so it belongs
-    // beside the callsign and not in a window.
+    // Have I had this one before, and does it count. Same as
+    // m_solarLine above: still maintained, not shown here.
     m_workedLine = new QLabel(QString{}, this);
     m_workedLine->setWordWrap(true);
-    cardCol->addWidget(m_workedLine);
-    cardCol->addStretch(1);
+    m_workedLine->setVisible(false);
 
-    cardRow->addLayout(cardCol, 1);
     m_rowCard = addShedRow(col, cardRow, this);
 
     // Locators
@@ -370,8 +390,9 @@ void RotorLogbookPanel::buildUi()
     auto* worldBtn = new QPushButton(QStringLiteral("World image…"), globePage);
     worldBtn->setStyleSheet(Style::buttonBaseStyle());
     worldBtn->setToolTip(QStringLiteral(
-        "Paint the globe with an equirectangular world map (2:1). "
-        "Without one it still shows the path, just unpainted."));
+        "Paint the globe with an equirectangular world map (2:1), or "
+        "keep the schematic duotone globe and pick its land colour — "
+        "click for all of it in one menu."));
     globeCol->addWidget(worldBtn);
 
     m_viewStack = new QStackedWidget(this);
@@ -384,6 +405,11 @@ void RotorLogbookPanel::buildUi()
         AppSettings::instance().value(kWorldImgKey, QString{}).toString();
     if (!saved.isEmpty()) { m_globe->loadTexture(saved); }
 
+    // Betreiber 2026-09-02, Task 3: Landfarbe/Schema-Umschalter lebten
+    // kurzzeitig im Rechtsklick-Menue der Kugel selbst -- zwei
+    // Bedienwege fuer dieselbe Sache (wie das Weltbild aussieht). Jetzt
+    // beides hier, im einen Knopf, der schon fuer "wie sieht die Kugel
+    // aus" zustaendig ist.
     connect(worldBtn, &QPushButton::clicked, this, [this, worldBtn]() {
         QMenu menu(this);
         QAction* small = menu.addAction(
@@ -392,6 +418,34 @@ void RotorLogbookPanel::buildUi()
             QStringLiteral("Download from NASA — 5400 × 2700 (about 7 MB)"));
         menu.addSeparator();
         QAction* pick = menu.addAction(QStringLiteral("Choose a file…"));
+
+        menu.addSeparator();
+        QAction* schematic = nullptr;
+        QAction* landColour = nullptr;
+        QAction* styleMuted = nullptr;
+        QAction* styleNight = nullptr;
+        QAction* styleCrisp = nullptr;
+        if (m_globe->hasTexture()) {
+            schematic = menu.addAction(QStringLiteral("Use schematic globe"));
+
+            // Betreiber 2026-09-02: drei Tonwertkurven gezeigt, alle drei
+            // gefielen -- also waehlbar statt entschieden. Nur sichtbar,
+            // wenn ein echtes Foto geladen ist; der schematische Globus
+            // hat sein eigenes, unabhaengiges Glimmen.
+            QMenu* styleMenu = menu.addMenu(QStringLiteral("Photo style"));
+            const WorldTexture::Style cur = WorldTexture::style();
+            styleMuted = styleMenu->addAction(QStringLiteral("Muted"));
+            styleMuted->setCheckable(true);
+            styleMuted->setChecked(cur == WorldTexture::Style::Muted);
+            styleNight = styleMenu->addAction(QStringLiteral("Night wash"));
+            styleNight->setCheckable(true);
+            styleNight->setChecked(cur == WorldTexture::Style::NightWash);
+            styleCrisp = styleMenu->addAction(QStringLiteral("Crisp"));
+            styleCrisp->setCheckable(true);
+            styleCrisp->setChecked(cur == WorldTexture::Style::Crisp);
+        } else {
+            landColour = menu.addAction(QStringLiteral("Land colour…"));
+        }
 
         QAction* chosen = menu.exec(worldBtn->mapToGlobal(
             QPoint(0, worldBtn->height())));
@@ -403,6 +457,19 @@ void RotorLogbookPanel::buildUi()
                                QStringLiteral("5400 × 2700"));
         } else if (chosen == pick) {
             chooseWorldImage();
+        } else if (chosen == schematic) {
+            m_globe->clearTexture();
+            setStatus(QStringLiteral("Schematic globe"));
+        } else if (chosen == landColour) {
+            const QColor picked = QColorDialog::getColor(
+                m_globe->landColour(), this, tr("Land colour"));
+            if (picked.isValid()) { m_globe->setLandColour(picked); }
+        } else if (chosen == styleMuted) {
+            WorldTexture::setStyle(WorldTexture::Style::Muted);
+        } else if (chosen == styleNight) {
+            WorldTexture::setStyle(WorldTexture::Style::NightWash);
+        } else if (chosen == styleCrisp) {
+            WorldTexture::setStyle(WorldTexture::Style::Crisp);
         }
     });
 
@@ -477,6 +544,16 @@ void RotorLogbookPanel::buildUi()
     for (QLineEdit* e : {m_myGrid, m_dxGrid, m_rstSent, m_rstRcvd, m_comment}) {
         e->setStyleSheet(Style::lineEditStyle());
     }
+    // Betreiber 2026-09-01: "die Daten darunter koennen kleiner sein" --
+    // RST/Kommentar treten hinter die groesser gewordene QRZ-Kopfzeile
+    // zurueck. Gleiche Optik wie lineEditStyle(), nur eine Stufe der
+    // Schriftleiter kleiner; MY/DX-Locator bleiben bei den 13px der
+    // Vorlage, sie sind kein Teil dieser Anfrage.
+    const QString smallLineEdit = QString(Style::lineEditStyle())
+        .replace(QStringLiteral("13px"), QStringLiteral("11px"));
+    for (QLineEdit* e : {m_rstSent, m_rstRcvd, m_comment}) {
+        e->setStyleSheet(smallLineEdit);
+    }
 
     auto* logRow = new QHBoxLayout;
     logRow->setSpacing(6);
@@ -501,15 +578,20 @@ void RotorLogbookPanel::buildUi()
 
     // Recent contacts — the log is a file, and a file you cannot see is
     // a file you do not trust. Newest first.
-    m_recent = new QTableWidget(0, 4, this);
+    // Betreiber 2026-09-01: "unten steht der MODE, diese Spalte sollte
+    // kleiner sein, die Frequenz waere hier wichtiger." Freq dazu, Mode
+    // nicht mehr die letzte (gestreckte) Spalte -- Call streckt jetzt,
+    // Mode faellt mit den anderen content-fit-Spalten schmal aus.
+    m_recent = new QTableWidget(0, 5, this);
     m_recent->setHorizontalHeaderLabels({QStringLiteral("UTC"),
+                                         QStringLiteral("Freq"),
                                          QStringLiteral("Call"),
                                          QStringLiteral("Band"),
                                          QStringLiteral("Mode")});
     m_recent->verticalHeader()->setVisible(false);
     m_recent->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_recent->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_recent->horizontalHeader()->setStretchLastSection(true);
+    m_recent->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_recent->setMaximumHeight(130);
     m_recent->setStyleSheet(QStringLiteral(
         "QTableWidget { background: %1; color: %2; border: 1px solid %3;"
@@ -1714,47 +1796,28 @@ void RotorLogbookPanel::updateFlagFor(const QString& call)
     m_flagEmoji = dxccFlagEmoji(dxcc->ctyDat().resolvePrimaryPrefix(call));
 }
 
-// 2026-08-10, operator wish: "more data after Enter". Everything the
-// lookup answer carries that an operator in QSO actually uses, on two
-// readable lines instead of one thin one.
+// 2026-08-10, operator wish: "more data after Enter" — everything the
+// lookup answer carries that an operator in QSO actually uses. Trimmed
+// back down 2026-09-01 to the three facts that still earn their place
+// once the portrait grew large enough to want the room; see the note
+// inside the function.
 QString RotorLogbookPanel::stationText(const CallsignInfo& info) const
 {
-    QStringList top;
-    if (!info.displayName().isEmpty()) { top << info.displayName(); }
-    if (!info.city.trimmed().isEmpty())    { top << info.city.trimmed(); }
-    if (!info.state.trimmed().isEmpty())   { top << info.state.trimmed(); }
-    if (!info.country.trimmed().isEmpty()) { top << info.country.trimmed(); }
-    if (isValidGridSquare(info.grid)) {
-        top << info.grid.trimmed().toUpper();
-    }
+    // Betreiber 2026-09-01: "Daten koennen minimiert werden. Name,
+    // Entfernung, Land wuerde reichen." Stadt/Bundesland/Locator/County/
+    // Lizenzklasse/QSL-Wege/Peilung fallen aus dieser Zeile -- die
+    // Peilung steht ohnehin schon als Zeiger auf dem Kompass, das
+    // brauchte hier keine zweite Zahl.
+    QStringList bits;
+    if (!info.displayName().isEmpty()) { bits << info.displayName(); }
+    if (!info.country.trimmed().isEmpty()) { bits << info.country.trimmed(); }
 
-    QStringList more;
-    if (!info.county.trimmed().isEmpty()) { more << info.county.trimmed(); }
-    if (!info.licenseClass.trimmed().isEmpty()) {
-        more << QStringLiteral("class %1").arg(info.licenseClass.trimmed());
-    }
-    // Which QSL routes the station answers on — the question that
-    // decides whether working them will ever count for an award.
-    QStringList qsl;
-    if (info.lotw)    { qsl << QStringLiteral("LoTW"); }
-    if (info.eqsl)    { qsl << QStringLiteral("eQSL"); }
-    if (info.mailQsl) { qsl << QStringLiteral("card"); }
-    if (!qsl.isEmpty()) {
-        more << QStringLiteral("QSL: %1").arg(qsl.join(QLatin1Char(' ')));
-    }
     const QString mine = m_myGrid->text().trimmed().toUpper();
     if (isValidGridSquare(mine) && isValidGridSquare(info.grid)) {
-        more << QStringLiteral("%1 km · %2°")
-                    .arg(calculateDistanceKm(mine, info.grid), 0, 'f', 0)
-                    .arg(calculateBearingInDegrees(mine, info.grid),
-                         0, 'f', 0);
+        bits << QStringLiteral("%1 km")
+                    .arg(calculateDistanceKm(mine, info.grid), 0, 'f', 0);
     }
-
-    QString text = top.join(QStringLiteral(" · "));
-    if (!more.isEmpty()) {
-        text += QLatin1Char('\n') + more.join(QStringLiteral(" · "));
-    }
-    return text;
+    return bits.join(QStringLiteral(" · "));
 }
 
 void RotorLogbookPanel::setStationLine(const QString& text)
@@ -2107,9 +2170,15 @@ void RotorLogbookPanel::refreshRecentList()
         const QDateTime u = e.timeOn.toUTC();
         m_recent->setItem(i, 0, new QTableWidgetItem(
             u.isValid() ? u.toString(QStringLiteral("hh:mm")) : QString{}));
-        m_recent->setItem(i, 1, new QTableWidgetItem(e.call));
-        m_recent->setItem(i, 2, new QTableWidgetItem(e.band));
-        m_recent->setItem(i, 3, new QTableWidgetItem(
+        // HAUSSTIL.md Regel 7: "Unbekannt ist ein Strich, keine Null" --
+        // 0.000 sieht wie eine echte Frequenz aus, ist aber nur der
+        // Sentinel fuer "kein Funkgeraet beim Loggen verbunden".
+        m_recent->setItem(i, 1, new QTableWidgetItem(
+            e.freqMHz > 0.0 ? QString::number(e.freqMHz, 'f', 3)
+                            : QStringLiteral("—")));
+        m_recent->setItem(i, 2, new QTableWidgetItem(e.call));
+        m_recent->setItem(i, 3, new QTableWidgetItem(e.band));
+        m_recent->setItem(i, 4, new QTableWidgetItem(
             e.submode.isEmpty() ? e.mode : e.submode));
     }
     m_recent->resizeColumnsToContents();

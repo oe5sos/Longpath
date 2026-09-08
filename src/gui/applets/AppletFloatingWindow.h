@@ -48,6 +48,7 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
+#include <QElapsedTimer>
 #include <QPointer>
 #include <QString>
 #include <QWidget>
@@ -136,6 +137,17 @@ private:
     /// hundert; kurz genug, dass ein Absturz kurz nach dem Loslassen
     /// nichts kostet.
     static constexpr int kSettleMs = 400;
+
+    /// Laeuft seit dem Konstruktor. Siehe kDockGuardMs: der ↙-Knopf
+    /// dieses Fensters landet beim Entstehen fast exakt dort, wo eben
+    /// noch der ↗-Knopf in der Spalte sass.
+    QElapsedTimer m_createdAt;
+
+    /// Sperrfrist fuer m_titleBar::dockRequested nach dem Entstehen.
+    /// Siehe die Begruendung am Verbindungsort in der .cpp. Kurz genug,
+    /// dass ein wirklich gewollter Klick auf ↙ eine halbe Sekunde
+    /// spaeter immer noch andockt.
+    static constexpr int kDockGuardMs = 600;
 };
 
 } // namespace Longpath

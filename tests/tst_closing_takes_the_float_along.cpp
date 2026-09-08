@@ -23,6 +23,7 @@
 #include <QPointer>
 #include <QDialog>
 
+#include "gui/ConnectionPanel.h"
 #include "gui/MainWindow.h"
 #include "gui/PanadapterStack.h"
 #include "gui/PanFloatingWindow.h"
@@ -108,6 +109,33 @@ private slots:
         mw->resize(1200, 800);
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw));
+
+        // ── Die Connect-Maske erst zumachen ─────────────────────────
+        //
+        // Zwei Dinge, die es beim Schreiben dieser Pruefung (2026-08-22)
+        // noch nicht gab, treffen hier aufeinander: der Kaltstart oeffnet
+        // die "Connect to Radio"-Maske per singleShot(0) (92d4e9a1), und
+        // der Konstruktor stellt pan-0 aus dem vorigen Fall (PanFloating_
+        // pan-0 = True, ueberlebt den Prozess) gleich wieder schwebend
+        // her (851c9e08). Die Maske versteckt ohne Verbindung JEDES
+        // schwebende Fenster (hideFloatingWindowsBehindConnectMask), also
+        // auch dieses -- und floatPanadapter() unten waere ein stiller
+        // Leerlauf, weil pan-0 laengst in m_floating steht, nur eben
+        // versteckt. Was der Bediener taete: die Maske schliessen. Ihr
+        // destroyed-Anschluss gibt ihm sein Layout zurueck (MainWindow.cpp,
+        // showConnectionPanel), und erst dann prueft dieser Fall, was er
+        // pruefen soll -- das Zurueckdocken mit sofortigem Beenden.
+        //
+        // WARTEN, nicht bloss ein paar Runden pumpen: unter 10-facher
+        // Testlast kommt der singleShot(0) auch mal erst nach Sekunden
+        // dran (tst_real_pan_float ist genau daran gescheitert), und ihr
+        // Konstruktor allein braucht gut 2 s (NIC-Suche). Wer die Maske
+        // verpasst, bekommt sie spaeter ueber das Schwebefenster gelegt.
+        QTRY_VERIFY_WITH_TIMEOUT(mw->findChild<ConnectionPanel*>() != nullptr,
+                                 15000);
+        mw->findChild<ConnectionPanel*>()->close();
+        QTRY_VERIFY_WITH_TIMEOUT(mw->findChild<ConnectionPanel*>() == nullptr,
+                                 5000);
 
         PanadapterStack* stack = mw->findChild<PanadapterStack*>();
         QVERIFY(stack);

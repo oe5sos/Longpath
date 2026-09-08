@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Longpath VERSION 0.6.0 LANGUAGES C CXX)
+project(Longpath VERSION 0.6.3 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
@@ -520,6 +520,8 @@ set(CORE_SOURCES
     src/core/SkuUiProfile.cpp
     src/core/HardwareProfile.cpp
     src/core/LogCategories.cpp
+    src/core/DevAutomationServer.cpp
+    src/core/RttyDecoder.cpp
     src/core/SupportBundle.cpp
     src/core/RadioDiscovery.cpp
     src/core/RadioConnection.cpp
@@ -540,6 +542,7 @@ set(CORE_SOURCES
     src/core/P1RadioConnection.cpp
     src/core/P2RadioConnection.cpp
     src/core/PlaybackRadioConnection.cpp
+    src/core/SunSdrRadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp
     # ── KiwiSDR (2026-08-23, Nachtschicht) ───────────────────────────
@@ -620,6 +623,7 @@ set(CORE_SOURCES
     src/core/PotaClient.cpp
     src/core/PotaParkInfoClient.cpp
     src/core/PotaAlertsClient.cpp
+    src/core/SotaClient.cpp
     src/core/DxClusterClient.cpp
     src/core/WsjtxClient.cpp
     src/core/FreeDVReporterClient.cpp
@@ -639,6 +643,8 @@ set(CORE_SOURCES
     src/core/audio/IqRecorder.cpp
     src/core/audio/IqRecorderController.cpp
     src/core/audio/RecordingScheduler.cpp
+    src/core/sunsdr/SunSdrProtocol.cpp
+    src/core/sunsdr/SunSdrTxPacer.cpp
     src/core/AdifParser.cpp
     src/core/DxccWorkedStatus.cpp
     src/core/DxccColorProvider.cpp
@@ -778,6 +784,7 @@ set(GUI_SOURCES
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
+    src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp
     src/gui/PanadapterApplet.cpp
     src/gui/PanadapterStack.cpp
@@ -874,7 +881,6 @@ set(GUI_SOURCES
     src/gui/applets/KiwiSdrApplet.cpp
     src/gui/KiwiWaterfallStripWidget.cpp
     src/gui/KiwiWaterfallPanel.cpp
-    src/gui/applets/TxMeterApplet.cpp
     src/gui/applets/AsrApplet.cpp
     src/gui/widgets/VfoTileRow.cpp
     src/asr/AsrSegmenter.cpp
@@ -1124,6 +1130,7 @@ set(GUI_SOURCES
     src/gui/applets/DiversityApplet.cpp
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
+    src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
@@ -1133,6 +1140,17 @@ set(GUI_SOURCES
     src/gui/applets/TciApplet.cpp
     src/gui/applets/ClientChainApplet.cpp
 )
+
+# MacFloatingWindowBehavior — Objective-C++ helper that sets
+# NSWindowCollectionBehaviorFullScreenAuxiliary on the schwebenden
+# Qt::Tool windows (AppletFloatingWindow, ToolWindow, FloatingContainer,
+# PanFloatingWindow) so they follow the main window into native macOS
+# fullscreen instead of being left behind on the previous Space.
+# Betreiber, repeatedly reported. See MacFloatingWindowBehavior.h.
+if(APPLE)
+    list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.mm)
+    list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.h)
+endif()
 
 # --------------------------------------------------------------------------
 # Resources
@@ -1324,6 +1342,13 @@ if(APPLE)
     # AVFoundation provides AVCaptureDevice for the launch-time mic-permission
     # prompt (src/core/MacMicPermission.mm, issue #203).
     target_link_libraries(LongpathObjs PUBLIC "-framework AVFoundation")
+
+    # AppKit provides NSWindow/NSView for the floating-window fullscreen
+    # fix (src/gui/MacFloatingWindowBehavior.mm) -- explicit here even
+    # though Qt's own Cocoa platform plugin links it transitively,
+    # matching this project's practice of declaring the frameworks a
+    # source file directly calls into (see the AVFoundation line above).
+    target_link_libraries(LongpathObjs PUBLIC "-framework AppKit")
 
     # CoreAudio framework for AudioObjectGetPropertyData +
     # kAudioDevicePropertyIOThreadOSWorkgroup used by
@@ -1732,6 +1757,8 @@ option(NEREUS_USE_PCH "Use precompiled headers to speed up builds" ON)
 if(APPLE)
     set_source_files_properties(src/core/MacMicPermission.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(NEREUS_USE_PCH)
     target_precompile_headers(LongpathObjs PRIVATE
@@ -1831,3 +1858,26 @@ endif()
 #   ./build/tci_probe ws://127.0.0.1:40001 12
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
+
+# ── SunSDR-TX-Pacer-Jitter-Sonde (Schritt 5, 2026-09-02) ──────────────
+#
+# WERKZEUG, kein Programmteil. Misst, wie praezise SunSdrTxPacer's
+# QTimer(Qt::PreciseTimer) im echten Qt-Event-Loop tickt, gegen das
+# 5,12-ms-Ziel aus der Design-Doku — die Bank-Jitter-Messung, die der
+# Entwurfs-Workflow fuer Schritt 5 vorgesehen hat, um zu entscheiden, ob
+# ein einfacher Timer reicht oder ein eigener OS-Thread noetig ist (eine
+# Architekturentscheidung, die laut CLAUDE.md ohnehin eine Freigabe
+# braucht). Braucht kein Funkgeraet — SunSdrTxPacer sendet auf keinen
+# Socket. Baut SunSdrTxPacer.cpp/SunSdrProtocol.cpp direkt mit, statt
+# gegen LongpathObjs zu linken, weil beide Dateien ausschliesslich
+# Qt6::Core brauchen (keine Multimedia-/WDSP-Abhaengigkeiten mitziehen).
+#
+#   cmake --build build --target sunsdr_tx_pacer_jitter_probe
+#   ./build/sunsdr_tx_pacer_jitter_probe 30
+add_executable(sunsdr_tx_pacer_jitter_probe EXCLUDE_FROM_ALL
+    tools/sunsdr_tx_pacer_jitter_probe.cpp
+    src/core/sunsdr/SunSdrTxPacer.cpp
+    src/core/sunsdr/SunSdrProtocol.cpp
+)
+target_include_directories(sunsdr_tx_pacer_jitter_probe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(sunsdr_tx_pacer_jitter_probe PRIVATE Qt6::Core)

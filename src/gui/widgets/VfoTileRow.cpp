@@ -56,7 +56,7 @@ public:
         // Sendend: roter Rahmen — auf dem Bild des Betreibers ist das
         // die einzige Kachel mit Farbe, und das ist richtig, denn es
         // ist die einzige, bei der ein Irrtum Folgen hat.
-        const QString border = alert ? QStringLiteral("#c85a5a")
+        const QString border = alert ? QString::fromLatin1(Style::kTxRed)
                                      : (active ? accent.name()
                                                : Style::role("border", Style::kBorder));
         setStyleSheet(QStringLiteral(
@@ -64,8 +64,8 @@ public:
             .arg(active ? QStringLiteral("#16161c")
                         : Style::role("panel", Style::kPanelBg), border));
         m_top->setStyleSheet(QStringLiteral(
-            "QLabel { border: none; color: %1; font-size: 8px; font-weight: bold; }")
-            .arg(alert ? QStringLiteral("#c85a5a") : accent.name()));
+            "QLabel { border: none; color: %1; font-size: 9px; font-weight: bold; }")
+            .arg(alert ? QString::fromLatin1(Style::kTxRed) : accent.name()));
         m_bottom->setStyleSheet(QStringLiteral(
             "QLabel { border: none; color: %1; font-size: 11px; }")
             .arg(Style::role("text", Style::kTextPrimary)));

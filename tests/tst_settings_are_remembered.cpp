@@ -15,34 +15,255 @@
 // Merken vergessen wurde.
 
 #include <QtTest>
+#include <QComboBox>
+#include <QPushButton>
+#include <QSlider>
 
 #include "core/AppSettings.h"
 #include "gui/MainWindow.h"
+#include "gui/SpectrumOverlayPanel.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/AsrApplet.h"
 #include "gui/applets/FrequencyApplet.h"
-#include "gui/applets/TxMeterApplet.h"
-#include "gui/instruments/BarInstrument.h"
+#include "gui/applets/InstrumentApplet.h"
 #include "gui/meters/MeterPoller.h"
 
 using namespace Longpath;
+
+namespace {
+// TxMeterApplet ist am 2026-08-30 entfernt worden (Betreiber: das
+// SWR/Leistung-Fenster soll es nur noch als Zusatzzeile im
+// Frequenzfenster geben, nicht mehr als eigenes Applet). Diese Pruefung
+// wollte Roehre/Segmente nur an IRGENDEINEM BarInstrument sehen, das
+// diese beiden Formen kennt und sie speichert -- SwrInstrument (ein
+// InstrumentApplet auf Balkenform) leistet genau das.
+InstrumentApplet* swrInstrument(MainWindow* mw)
+{
+    for (InstrumentApplet* ia : mw->findChildren<InstrumentApplet*>()) {
+        if (ia && ia->appletId() == QStringLiteral("SwrInstrument")) {
+            return ia;
+        }
+    }
+    return nullptr;
+}
+} // namespace
 
 class TstSettingsAreRemembered : public QObject
 {
     Q_OBJECT
 
 private slots:
+    // Die 3D-Ansicht des Spektrums (Display-Flyout, Combo "Spectrum:
+    // 2D / 3D") muss den Neustart ueberleben -- und zwar an beiden
+    // Enden: das Widget zeichnet wieder 3D, UND der Combo zeigt "3D".
+    // Der zweite Teil fehlte: das Widget laedt seine Einstellungen,
+    // bevor das Panel existiert, und niemand sagte es dem Combo.
+    void dreiDAnsichtUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("spectrumRenderModeCombo"));
+            QVERIFY2(combo, "Combo 'Spectrum: 2D / 3D' nicht gefunden");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(combo->currentIndex(), 0);
+            QCOMPARE(sw->spectrumRenderMode(), SpectrumRenderMode::Mode2D);
+            combo->setCurrentIndex(1);
+            QCOMPARE(sw->spectrumRenderMode(), SpectrumRenderMode::Mode3D);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("spectrumRenderModeCombo"));
+            QVERIFY(combo);
+            QVERIFY2(sw->spectrumRenderMode() == SpectrumRenderMode::Mode3D,
+                     "Das Widget hat die 3D-Ansicht vergessen");
+            QVERIFY2(combo->currentIndex() == 1,
+                     "Der Combo zeigt 2D, obwohl das Widget 3D zeichnet");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Gleicher Fehler wie bei der 3D-Ansicht, ein Regler weiter: die
+    // WF-Gain-Slider im Display-Flyout hatte ihren eigenen fest
+    // verdrahteten Vorgabewert (50) und wusste nichts vom Wert, den
+    // SpectrumWidget schon geladen hatte.
+    void wfGainUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfGainSlider"));
+            QVERIFY2(slider, "Regler 'WF Gain' nicht gefunden");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(slider->value(), sw->wfColorGain());
+            slider->setValue(77);
+            QCOMPARE(sw->wfColorGain(), 77);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfGainSlider"));
+            QVERIFY(slider);
+            QVERIFY2(sw->wfColorGain() == 77, "Das Widget hat den WF-Gain-Wert vergessen");
+            QVERIFY2(slider->value() == 77,
+                     "Der Regler zeigt seine Vorgabe, obwohl das Widget 77 geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Gleicher Fehler wie WF Gain, plus der Regler-Bereich (0..100), der
+    // zu eng fuer das Widget (0..125) war. 110 liegt bewusst ueber der
+    // alten Deckelung -- waere der Bereich nicht wirklich erweitert
+    // worden, wuerde setValue(110) hier still auf 100 gekappt und der
+    // Test faellt sichtbar durch, statt zufaellig grün zu bleiben.
+    void blackLvlUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfBlackSlider"));
+            QVERIFY2(slider, "Regler 'Black Lvl' nicht gefunden");
+            QCOMPARE(slider->maximum(), 125);
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(slider->value(), sw->wfBlackLevel());
+            slider->setValue(110);
+            QCOMPARE(sw->wfBlackLevel(), 110);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* slider = mw->findChild<QSlider*>(QStringLiteral("wfBlackSlider"));
+            QVERIFY(slider);
+            QVERIFY2(sw->wfBlackLevel() == 110, "Das Widget hat den Black-Lvl-Wert vergessen");
+            QVERIFY2(slider->value() == 110,
+                     "Der Regler zeigt seine Vorgabe, obwohl das Widget 110 geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Gleicher Fehler wie WF Gain, plus vier erfundene Combo-Eintraege,
+    // die keinem WfColorScheme-Wert entsprachen. Index 7 ("Clarity Blue")
+    // liegt bewusst ausserhalb der alten Vier -- war die Liste nicht
+    // wirklich erweitert worden, gaebe es diesen Eintrag im Combo gar
+    // nicht und der Test faellt beim Setzen schon durch.
+    void farbschemaUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("colorSchemeCmb"));
+            QVERIFY2(combo, "Combo 'Farbschema' nicht gefunden");
+            QVERIFY2(combo->count() >= 9, "Der Combo hat nicht alle Schemata");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            combo->setCurrentIndex(7);
+            QCOMPARE(static_cast<int>(sw->wfColorScheme()), 7);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            auto* combo = mw->findChild<QComboBox*>(QStringLiteral("colorSchemeCmb"));
+            QVERIFY(combo);
+            QVERIFY2(static_cast<int>(sw->wfColorScheme()) == 7,
+                     "Das Widget hat das Farbschema vergessen");
+            QVERIFY2(combo->currentIndex() == 7,
+                     "Der Combo zeigt seine Vorgabe, obwohl das Widget Schema 7 geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
+    // Der Auf/Zu-Pfeil (◀/▶) links oben am Display-Flyout war nirgendwo
+    // verdrahtet -- SpectrumOverlayPanel::collapsed() wurde emittiert,
+    // aber nichts hoerte zu, also ging der Zustand nie in die
+    // Einstellungen. Klickt den echten Knopf (nicht den privaten
+    // toggle()), damit der ganze Signalweg mitgeprueft ist.
+    void flyoutAufZuUeberlebtDenNeustart()
+    {
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* panel = mw->findChild<SpectrumOverlayPanel*>();
+            QVERIFY2(panel, "Display-Flyout-Panel nicht gefunden");
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QCOMPARE(sw->overlayPanelExpanded(), true);
+
+            QPushButton* collapseBtn = nullptr;
+            for (QPushButton* b : panel->findChildren<QPushButton*>()) {
+                if (b->text() == QStringLiteral("◀")) { collapseBtn = b; break; }
+            }
+            QVERIFY2(collapseBtn, "Auf/Zu-Knopf (◀) nicht gefunden");
+            collapseBtn->click();
+            QCOMPARE(sw->overlayPanelExpanded(), false);
+            mw->close();
+            delete mw;
+        }
+        {
+            auto* mw = new MainWindow();
+            mw->show();
+            QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+            auto* sw = mw->findChild<SpectrumWidget*>();
+            QVERIFY(sw);
+            QVERIFY2(!sw->overlayPanelExpanded(),
+                     "Das Widget hat den Auf/Zu-Zustand vergessen");
+
+            auto* panel = mw->findChild<SpectrumOverlayPanel*>();
+            QVERIFY(panel);
+            QPushButton* collapseBtn = nullptr;
+            for (QPushButton* b : panel->findChildren<QPushButton*>()) {
+                if (b->text() == QStringLiteral("▶")) { collapseBtn = b; break; }
+            }
+            QVERIFY2(collapseBtn,
+                     "Der Knopf zeigt nicht '▶', obwohl das Widget zugeklappt geladen hat");
+            mw->close();
+            delete mw;
+        }
+    }
+
     void balkenformUeberlebtDenNeustart()
     {
         {
             auto* mw = new MainWindow();
             mw->show();
             QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-            auto* txm = mw->findChild<TxMeterApplet*>();
-            QVERIFY(txm);
-            txm->bar()->setTube(true);
-            txm->bar()->setSegmented(true);
-            txm->saveState();
+            auto* swr = swrInstrument(mw);
+            QVERIFY(swr);
+            swr->setTube(true);
+            swr->setSegmented(true);
+            swr->saveState();
             mw->close();
             QCoreApplication::processEvents();
         }
@@ -50,12 +271,12 @@ private slots:
             auto* mw = new MainWindow();
             mw->show();
             QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-            auto* txm = mw->findChild<TxMeterApplet*>();
-            QVERIFY(txm);
-            qInfo() << "nach Neustart — Roehre:" << txm->bar()->isTube()
-                    << "Segmente:" << txm->bar()->isSegmented();
-            QVERIFY2(txm->bar()->isTube(), "Die Roehre ist vergessen");
-            QVERIFY2(txm->bar()->isSegmented(), "Die Segmente sind vergessen");
+            auto* swr = swrInstrument(mw);
+            QVERIFY(swr);
+            qInfo() << "nach Neustart — Roehre:" << swr->isTube()
+                    << "Segmente:" << swr->isSegmented();
+            QVERIFY2(swr->isTube(), "Die Roehre ist vergessen");
+            QVERIFY2(swr->isSegmented(), "Die Segmente sind vergessen");
             mw->close();
         }
     }
