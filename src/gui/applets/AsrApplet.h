@@ -45,7 +45,7 @@ class AsrApplet : public AppletWidget {
 public:
     explicit AsrApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("asr"); }
+    QString appletId()    const override { return QStringLiteral("Asr"); }
     QString appletTitle() const override { return QStringLiteral("MITSCHRIFT"); }
     void    syncFromModel() override {}
 

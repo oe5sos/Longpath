@@ -47,7 +47,7 @@ class DvkApplet : public AppletWidget {
 public:
     explicit DvkApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("dvk"); }
+    QString appletId()    const override { return QStringLiteral("Dvk"); }
     QString appletTitle() const override { return QStringLiteral("Voice Keyer"); }
     void    syncFromModel() override;
 

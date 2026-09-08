@@ -106,7 +106,7 @@ class QsoRecorderApplet : public AppletWidget {
 public:
     explicit QsoRecorderApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("qsorec"); }
+    QString appletId()    const override { return QStringLiteral("QsoRec"); }
     QString appletTitle() const override { return QStringLiteral("QSO Recorder"); }
     void    syncFromModel() override;
 

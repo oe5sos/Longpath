@@ -58,7 +58,7 @@ class BandwidthFilterApplet : public AppletWidget {
 public:
     explicit BandwidthFilterApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("bwfilter"); }
+    QString appletId()    const override { return QStringLiteral("BwFilter"); }
     QString appletTitle() const override { return QStringLiteral("Bandwidth Filter"); }
     void    syncFromModel() override;
 

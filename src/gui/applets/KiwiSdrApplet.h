@@ -59,7 +59,7 @@ class KiwiSdrApplet : public AppletWidget {
 public:
     explicit KiwiSdrApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("kiwisdr"); }
+    QString appletId()    const override { return QStringLiteral("KiwiSdr"); }
     QString appletTitle() const override { return QStringLiteral("KIWISDR"); }
     // Die Empfaengerliste kommt vom KiwiSdrManager, nicht aus dem
     // RadioModel — hier ist also nichts abzugleichen.
