@@ -18,6 +18,7 @@
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 #include <QtTest>
+#include <QGuiApplication>
 #include <QPushButton>
 #include "gui/MainWindow.h"
 #include "gui/containers/ContainerWidget.h"
@@ -142,6 +143,27 @@ private slots:
     // Fenster, das noch Qt::Window war und keine Groessengrenze hatte.
     void aFloatedContainerIsNotFullScreen()
     {
+        // ── Offscreen-Abbau-Absturz, kein Longpath-Fehler ──────────────
+        //
+        // Dieser Test laesst absichtlich drei Top-Level-Fenster leben
+        // (Hauptfenster + abgeloester Container + abgeloestes Applet --
+        // siehe unten). Unter der echten Fensterverwaltung (cocoa) ist
+        // das folgenlos; unter der Offscreen-Plattform (nur von CI
+        // benutzt, .github/workflows/ci.yml) stuerzt Qts eigenes
+        // QOffscreenBackingStore::clearHash() beim Abbau ab -- ein
+        // Nullzeiger-Zugriff in Qts eigenem statischen Hash, bestaetigt
+        // per AddressSanitizer (kein Speicherfehler in Longpath-Code)
+        // und per cocoa/offscreen-Vergleich (4/4 sauber vs. 5/5 Absturz,
+        // identisches Binary). Volle Untersuchung:
+        // docs/architecture/2026-09-08-container-move-test-offscreen-teardown-segfault.md
+        if (QGuiApplication::platformName() == QLatin1String("offscreen")) {
+            QSKIP("Qt-eigener Absturz in QOffscreenBackingStore::clearHash() "
+                  "beim Fensterabbau -- siehe docs/architecture/"
+                  "2026-09-08-container-move-test-offscreen-teardown-"
+                  "segfault.md. Laeuft unter einem echten Fenstersystem "
+                  "(z.B. cocoa) unveraendert durch.");
+        }
+
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
