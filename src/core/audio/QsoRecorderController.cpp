@@ -130,6 +130,9 @@ void QsoRecorderController::drainNow() { drain(); }
 // QsoRecorder.h). allowUnknown-equivalent: an unreadable drive doesn't
 // block recording, same as Thetis's OkToRecord(..., allowUnknown) call
 // from the running timer.
+//
+// Independently implemented from Thetis clsAudioRecordPlayback.cs --
+// see QsoRecorderController.h for what carried over and what didn't.
 bool QsoRecorderController::hasEnoughDiskSpace(const QString& forPath)
 {
     const QStorageInfo disk(QFileInfo(forPath).absolutePath());

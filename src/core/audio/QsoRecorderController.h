@@ -48,6 +48,11 @@
 // die Dauer nicht mehr begrenzt ist. Thetis-Vorgabe: 10 % Reserve,
 // alle 2000 ms geprueft, waehrend der Aufnahme.
 //
+// Independently implemented from Thetis clsAudioRecordPlayback.cs --
+// die Schwellenwerte und die Prozentsatz-statt-Bytes-Idee sind
+// uebernommen, die Klasse selbst (Streaming-Wache statt Timer-Poll
+// eines .NET-UserControls) ist Longpath-original.
+//
 // =================================================================
 // Modification history (NereusSDR):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,

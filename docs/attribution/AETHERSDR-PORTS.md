@@ -211,3 +211,46 @@ on pan/zoom, deep scrollback history).
 | `src/core/RttyDecoder.h`, `.cpp` | `src/core/RttyDecoder.{h,cpp}` | `d58e2b8a` | 2026-09-06 | Near-verbatim port of AetherSDR's native RTTY (Baudot/ITA2) decoder -- no Thetis equivalent exists at all, so this is sole-source like the automation bridge above. Carried over close to verbatim: mark/space biquad bandpass design, envelope-based Schmitt-trigger bit slicing, proportional (25%-per-edge) clock recovery, the 5-bit shift-register/LTRS-FIGS state machine, and the Baudot/ITA2 character tables (the international standard, not AetherSDR-original). Sample rate re-derived for Longpath's native 48 kHz WDSP RX output instead of AetherSDR's 24 kHz (the biquad design already parameterizes on sample rate, so this needed no resampler). Default mark/shift deliberately NOT copied from AetherSDR's own numeric defaults (2125/170 Hz) -- reads the already-existing, Thetis-sourced `SliceModel::rttyMarkHz`/`rttyShiftHz` (2295/170 Hz, `setup.designer.cs:40635-40665 [v2.10.3.13]`) instead, since that's the value the operator already tunes via `RxApplet`'s `RttyMarkShiftContainer`. `feedAudio()`'s signature changed to a raw `(const float*, int frames)` pointer/count pair instead of AetherSDR's `QByteArray`, to match Longpath's `AudioTapRing::read()` shape. Verified end-to-end (not just eyeballed) against a synthetic AFSK signal in `tests/tst_rtty_decoder.cpp`. |
 | `src/gui/RttyDecoderSensitivity.h` | `src/gui/RttyDecoderSensitivity.h` | `d58e2b8a` | 2026-09-06 | Near-verbatim port: identical slider-to-confidence-threshold formula (0..100 -> 0.50..0.95) and rationale. Namespace only. |
 | `src/gui/applets/RttyDecoderApplet.h`, `.cpp` | `src/gui/PanadapterApplet.cpp` (RTTY control set) | `d58e2b8a` | 2026-09-06 | Structural derivative, not a port -- Longpath has no `PanadapterApplet` equivalent, so the widget tree is new code against Longpath's own `AppletWidget` base class. The control SET (decoded-text output, mark/space level meters via `HGauge`, a lock/SNR status capsule, baud-rate/reverse-polarity/sensitivity controls) mirrors AetherSDR's RTTY panel. Mark/Shift are shown read-only here rather than duplicated as editable controls, since `RxApplet`'s existing `RttyMarkShiftContainer` already edits the same Thetis-sourced `SliceModel` fields -- this applet just reads them live. Visibility gate (`DSPMode::DIGL` only, "RTTY is a DIGL submode") is Longpath-native, matching the already-documented rule in `RxApplet::applyModeVisibility`, not an AetherSDR behavior. |
+
+The rows below close a 2026-09-08 compliance-sweep gap: the first real
+full-tree CI run against this branch (`CHECK_NEW_PORTS_FULL=1
+scripts/check-new-ports.py`, added 2026-05-13, never actually executed
+for this branch before its first pull request) found that every KiwiSDR
+file, the ASR backend, and a handful of others already carry a complete
+`// Ported from AetherSDR <path> [@31b29583]` header — they were simply
+never given a row here. No header content changed; this is registration
+only.
+
+| `src/core/KiwiSdrClient.h`, `.cpp` | `src/core/KiwiSdrClient.{h,cpp}` | `31b29583` | 2026-08-23 | KiwiSDR client connection (Stufe 2). Namespace change, include paths rebased; KiwiSDR wire protocol itself credited to John Seamons (ZL/KF6VO), kiwisdr.com. |
+| `src/core/KiwiSdrManager.h`, `.cpp` | `src/core/KiwiSdrManager.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
+| `src/core/KiwiSdrProtocol.h`, `.cpp` | `src/core/KiwiSdrProtocol.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
+| `src/core/KiwiSdrCredentialStore.h`, `.cpp` | `src/core/KiwiSdrCredentialStore.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
+| `src/core/KiwiSdrRedirectPolicy.h`, `.cpp` | `src/core/KiwiSdrRedirectPolicy.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
+| `src/core/KiwiSdrTxMutePolicy.h` | `src/core/KiwiSdrTxMutePolicy.h` | `31b29583` | 2026-08-23 | Namespace change only. |
+| `src/core/KiwiPublicDirectory.h`, `.cpp` | `src/core/KiwiPublicDirectory.{h,cpp}` | `31b29583` | 2026-08-27 | `ext_api`-aware public receiver directory client. Namespace change only. |
+| `src/core/ReceivePresentationSync.h`, `.cpp` | `src/core/ReceivePresentationSync.{h,cpp}` | `31b29583` | 2026-08-27 | Namespace change only. |
+| `src/core/WaterfallRate.h` | `src/core/WaterfallRate.h` | `31b29583` | 2026-08-27 | Namespace change only. |
+| `src/gui/KiwiPublicReceiverPicker.h`, `.cpp` | `src/gui/KiwiPublicReceiverPicker.{h,cpp}` | `31b29583` | 2026-08-27 | Public-directory picker dialog. Namespace change only. |
+| `src/gui/KiwiRebindTracker.h` | `src/gui/KiwiRebindTracker.h` | `31b29583` | 2026-08-27 | Namespace change only. |
+| `src/gui/KiwiSdrTraceMath.h` | `src/gui/KiwiSdrTraceMath.h` | `31b29583` | 2026-08-27 | Namespace change only. |
+| `src/gui/MainWindow_KiwiSdr.cpp` | `src/gui/MainWindow_KiwiSdr.cpp` | `31b29583` | 2026-08-23 | Stufe 4 (Bedienflaeche). Upstream is ~2429 lines across ~30 `MainWindow` methods; most depend on features Longpath doesn't have yet (per-slice virtual antennas, band recall, diversity — Stufe 7, deliberately deferred). This file ports the bridge that does exist: manager state → applet display, audio + waterfall wiring. |
+| `src/gui/WaterfallHistoryBuffer.h`, `.cpp` | `src/gui/WaterfallHistoryBuffer.{h,cpp}` | `31b29583` | 2026-08-27 | Namespace change only. |
+| `src/gui/applets/KiwiSdrApplet.h`, `.cpp` | `src/gui/KiwiSdrApplet.{h,cpp}` | `31b29583` | 2026-08-27 | Directory path rebased onto `gui/applets/` to match Longpath's applet layout convention; otherwise namespace change only. |
+| `src/gui/widgets/SliceColors.h` | `src/gui/SliceColors.h` | `0cd4559` | 2026-08-18 | The four per-slice colours (A cyan / B magenta / C green / D yellow). Extracted from a static `VfoWidget` method into its own header so it survives that class's later deletion; content unchanged. |
+| `src/asr/AsrSegmenter.h`, `.cpp` | `src/asr/AsrSegmenter.{h,cpp}` | `31b29583` | 2026-08-2x | Voice-activity segmentation feeding the ASR backend. Namespace change only. |
+| `src/asr/IAsrBackend.h` | `src/asr/IAsrBackend.h` | `31b29583` | 2026-08-2x | Backend interface. Namespace change only. |
+| `src/asr/IVad.h` | `src/asr/IVad.h` | `31b29583` | 2026-08-2x | VAD interface. Namespace change only. |
+| `src/asr/RemoteAsrBackend.h`, `.cpp` | `src/asr/RemoteAsrBackend.{h,cpp}` | `31b29583` | 2026-08-2x | Remote (network) ASR backend implementation. Namespace change only. |
+| `src/gui/AsrTapPolicy.h` | `src/gui/AsrTapPolicy.h` | `31b29583` | 2026-08-2x | Namespace change only. |
+
+The three rows below are structural derivatives, not line-by-line
+ports — each file's own header already says so; this closes the same
+2026-09-08 registration gap for files the full-tree sweep also flags
+via inline AetherSDR citations.
+
+| `src/core/strip/StripChain.h` | `src/core/AudioEngine.cpp` (`defaultChain()`) | `31b29583` | 2026-08-08 | Longpath-original chain runner (transmit audio here doesn't pass through an AudioEngine the way AetherSDR's does); the stage ORDER and stage SET (gate → EQ → de-esser → compressor → tube → PUDU → reverb → limiter) follow AetherSDR's `defaultChain()`. |
+| `src/gui/applets/StripWindow.h` | `AetherialAudioStrip` + nine `Strip*Panel` classes | `31b29583` | 2026-08-09 | Longpath-original window (same AudioEngine-independence reason as StripChain above); control sets and their ranges come from the already-ported stage headers, not from this file directly. |
+| `src/gui/applets/StripGraphics.h` | (none — draws over already-ported DSP) | `31b29583` | 2026-08-09 | Longpath-original visualisation; the curve/bar values it draws come from the already-ported `ClientEq`/stage classes' own analytic functions, not a separate model. |
+| `src/gui/applets/eq/ClientEqApplet.h` | `src/gui/ClientEqApplet.h` | `31b29583` | 2026-08-09 | Longpath-original stand-in for exactly one two-value enum (`Path`) that the ported `StripEqPanel` names in its public signals/members — porting the whole (receive-side, unused-here) applet just to obtain the enum would import a widget nobody would ever show. Both enum values kept (including the unused one) so a persisted setting never silently renumbers. |
+| `src/gui/applets/eq/EqPalette.h` | (none — colour substitution table for the ported EQ widgets) | `31b29583` | 2026-08-09, extended 2026-08-11 | Longpath-original. The equaliser widgets in this directory are AetherSDR's, ported verbatim; this is the one reviewable colour-substitution table they all reference, so a future re-sync stays a copy instead of a hand-merge across five files. |
+| `src/gui/WindowChrome.h` | `src/gui/FloatingContainerWindow.{h,cpp}` | `31b2958` | 2026-08-20 | Longpath-original frameless-window titlebar + resize-handle chrome; structurally modeled on AetherSDR's file, which pairs the same two parts (a draggable bar, a resize handle) atop a frameless window. |
