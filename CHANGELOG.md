@@ -30,6 +30,26 @@
   diese selbst, aber AetherSDR hat einen echten, eigenstaendigen
   RTTY-Decoder, der hier portiert wurde.
 
+- **View > Full Screen -- endlich ein Menuepunkt und Tastenkuerzel
+  dafuer.** `enterBorderlessFullSize()`/`exitBorderlessFullSize()` gab
+  es seit dem 2026-09-01 (randloses Vollbild statt echtem macOS-Space,
+  damit schwebende Werkzeugfenster mitkommen), aber nur ueber das
+  Layoutprofil erreichbar -- kein Weg, es sich selbst anzuschalten.
+  Betreiber: "es sollte auch im gernellen fenster die möglichkeit
+  geben, immer auf full screen zu schalten". Checkbox in `View`, Haken
+  bleibt auch nach einem Profilwechsel korrekt.
+
+- **Geteilte Kopfleiste jedes Applets bekommt einen ⚙-Knopf fuer
+  erweiterte Einstellungen** (`GridCellWidget`, rechts neben dem
+  Abloese-/Ausblenden-Knopf). Betreiber: "generell sollten bei allen
+  widget die otionen rechts oben zu sehen sein" -- "bitte mache das bei
+  allen widgets". Neuer virtueller Haken `AppletWidget::
+  hasExtendedSettings()`/`openExtendedSettings()`: der Knopf bleibt
+  fuer Applets ohne eigene Erweiterung unsichtbar, statt ins Leere zu
+  klicken. `TxApplet` als erster Nutzer (oeffnet denselben Popup wie
+  sein bisheriger interner ⚙-Knopf). Weitere Applets folgen, sobald sie
+  eine erweiterte Einstellungsflaeche bekommen.
+
 ### Fixed
 
 - **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand

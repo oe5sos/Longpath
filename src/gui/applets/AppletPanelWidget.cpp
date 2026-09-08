@@ -230,6 +230,10 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
             this, [this](AppletWidget* a) {
         if (a) { emit appletHideRequested(a); }
     });
+    connect(cell, &GridCellWidget::settingsRequested,
+            this, [this](AppletWidget* a) {
+        if (a) { emit appletSettingsRequested(a); }
+    });
 }
 
 void AppletPanelWidget::removeApplet(AppletWidget* applet)

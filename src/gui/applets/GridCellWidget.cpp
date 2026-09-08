@@ -145,6 +145,25 @@ void GridCellWidget::buildCellButtons()
         if (!as.isEmpty()) { emit hideRequested(as.first()); }
     });
     m_titleLayout->addWidget(close);
+
+    // Optionen (2026-09-08, Betreiber: "generell sollten bei allen
+    // widget die otionen rechts oben zu sehen sein" / "bitte mache
+    // das bei allen widgets"). Vor dem Abloesepfeil, damit das Kreuz
+    // wie bisher der letzte Knopf ganz rechts bleibt. Startet
+    // unsichtbar — updateOptionsButtonVisibility() (Konstruktor,
+    // addWidget, removeWidget) entscheidet je nach Inhalt, ob es
+    // ueberhaupt etwas zu oeffnen gibt.
+    m_btnOptions = new QPushButton(QStringLiteral("⚙"), m_titleBar);
+    m_btnOptions->setFixedSize(16, 14);
+    m_btnOptions->setCursor(Qt::PointingHandCursor);
+    m_btnOptions->setToolTip(QStringLiteral("Weitere Einstellungen"));
+    m_btnOptions->setStyleSheet(btnCss);
+    m_btnOptions->setVisible(false);
+    connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
+        const QList<AppletWidget*> as = applets();
+        if (!as.isEmpty()) { emit settingsRequested(as.first()); }
+    });
+    m_titleLayout->insertWidget(m_titleLayout->indexOf(detach), m_btnOptions);
 }
 
 void GridCellWidget::addWidget(QWidget* w)
@@ -155,6 +174,7 @@ void GridCellWidget::addWidget(QWidget* w)
     w->show();
     m_contentLayout->addWidget(w);
     refreshTitleText();
+    updateOptionsButtonVisibility();
 }
 
 void GridCellWidget::removeWidget(QWidget* w)
@@ -168,6 +188,18 @@ void GridCellWidget::removeWidget(QWidget* w)
     w->hide();
     m_contents.removeOne(w);
     refreshTitleText();
+    updateOptionsButtonVisibility();
+}
+
+// Nur EIN Applet im Feld, und nur wenn es selbst etwas Erweitertes
+// hat (AppletWidget::hasExtendedSettings) — sonst bliebe der Knopf
+// sichtbar und taete nichts, derselbe Fehler wie beim toten
+// Abloeseknopf oben im Klassenkommentar.
+void GridCellWidget::updateOptionsButtonVisibility()
+{
+    if (!m_btnOptions) { return; }
+    const QList<AppletWidget*> a = applets();
+    m_btnOptions->setVisible(a.size() == 1 && a.first()->hasExtendedSettings());
 }
 
 QList<AppletWidget*> GridCellWidget::applets() const

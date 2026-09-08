@@ -1845,6 +1845,10 @@ void MainWindow::enterBorderlessFullSize()
         return;
     }
     m_borderlessFullSize = true;
+    if (m_fullScreenAction && !m_fullScreenAction->isChecked()) {
+        const QSignalBlocker blocker(m_fullScreenAction);
+        m_fullScreenAction->setChecked(true);
+    }
     // hide()/show(), nicht bloss setWindowFlag(): Qt dokumentiert, dass
     // ein Rahmen-Flag am schon realisierten nativen Fenster (winId()
     // existiert laengst -- die Applet-/Meter-Fenster brauchen es schon
@@ -1865,6 +1869,10 @@ void MainWindow::exitBorderlessFullSize()
 {
     if (!m_borderlessFullSize) { return; }
     m_borderlessFullSize = false;
+    if (m_fullScreenAction && m_fullScreenAction->isChecked()) {
+        const QSignalBlocker blocker(m_fullScreenAction);
+        m_fullScreenAction->setChecked(false);
+    }
     if (isVisible()) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, false);
     show();
@@ -7441,6 +7449,15 @@ void MainWindow::populateDefaultMeter()
                 m_layoutProfiles->save();
             }
         });
+
+        // Das ⚙ im Fensterkopf (2026-09-08, Betreiber: "bitte mache
+        // das bei allen widgets"). GridCellWidget blendet den Knopf
+        // schon aus, wenn das Applet nichts Erweitertes hat — hier nur
+        // noch ausfuehren, was das Applet selbst dafuer vorsieht.
+        connect(m_appletPanel, &AppletPanelWidget::appletSettingsRequested,
+                this, [](AppletWidget* a) {
+            if (a) { a->openExtendedSettings(); }
+        });
     }
 
     // ── Was in einem Profil steht ────────────────────────────────────
@@ -8902,6 +8919,31 @@ void MainWindow::buildMenuBar()
     // would drift out of sync. CAT + MIDI greyed placeholders deferred to
     // their feature phases (3K-1 / 3K-3) — re-add at that time wired
     // through the controller.
+
+    viewMenu->addSeparator();
+
+    // Vollbild (2026-09-08, Betreiber: "es sollte auch im gernellen
+    // fenster die möglichkeit geben, immer auf full screen zu
+    // schalten"). enterBorderlessFullSize()/exitBorderlessFullSize()
+    // gab es schon seit 2026-09-01, aber nur ueber das Layoutprofil
+    // erreichbar -- kein Menuepunkt, kein Tastenkuerzel. checked wird
+    // von beiden Methoden selbst nachgezogen (siehe m_fullScreenAction
+    // in MainWindow.h), damit ein Profilwechsel den Haken nicht aus
+    // dem Takt bringt.
+    m_fullScreenAction = viewMenu->addAction(QStringLiteral("&Full Screen"));
+    m_fullScreenAction->setCheckable(true);
+    m_fullScreenAction->setChecked(m_borderlessFullSize);
+    m_fullScreenAction->setShortcut(QKeySequence(QKeySequence::FullScreen));
+    m_fullScreenAction->setToolTip(QStringLiteral(
+        "Vollbild ohne Fensterrahmen. Schwebende Werkzeugfenster "
+        "(Panadapter, S-Meter, TX ...) bleiben sichtbar."));
+    connect(m_fullScreenAction, &QAction::toggled, this, [this](bool on) {
+        if (on) {
+            enterBorderlessFullSize();
+        } else {
+            exitBorderlessFullSize();
+        }
+    });
 
     viewMenu->addSeparator();
 

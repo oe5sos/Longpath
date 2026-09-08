@@ -53,6 +53,16 @@ public:
     virtual QIcon appletIcon() const;
     virtual void syncFromModel() = 0;
 
+    // Optional extended-settings surface, reached from the shared ⚙
+    // button in the grid cell's title bar (top-right of every applet —
+    // GridCellWidget::buildCellButtons). Most applets expose everything
+    // inline and have nothing extra to show; the default reports that,
+    // and the title bar hides its ⚙ for them rather than showing a
+    // button that opens nothing. An applet with a deeper settings
+    // surface (e.g. TxApplet's fine TX-settings popup) overrides both.
+    virtual bool hasExtendedSettings() const { return false; }
+    virtual void openExtendedSettings() {}
+
 protected:
     // Call from subclass constructor to add the gradient title bar
     QWidget* appletTitleBar(const QString& text);

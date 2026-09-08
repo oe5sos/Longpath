@@ -217,6 +217,13 @@ public:
     QString appletTitle() const override { return QStringLiteral("TX"); }
     void syncFromModel() override;
 
+    // Der ⚙-Knopf in der geteilten Kopfleiste (GridCellWidget) oeffnet
+    // denselben Popup wie der bestehende ⚙-Knopf im Applet selbst
+    // (showFinePopup) — zwei Wege zum selben Ziel, bis der interne
+    // Knopf in einem eigenen Schritt entfernt wird.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { showFinePopup(); }
+
     // Called by MainWindow when band changes so the Tune Power slider
     // can reflect the stored per-band tune power.
     // Phase 3M-1a H.3.

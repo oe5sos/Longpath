@@ -1277,6 +1277,15 @@ private:
     // ist die neue Quelle der Wahrheit fuers Sichern/Wiederherstellen.
     bool m_borderlessFullSize{false};
 
+    // View > Vollbild (2026-09-08, Betreiber: "es sollte auch im
+    // gernellen fenster die möglichkeit geben, immer auf full screen
+    // zu schalten"). enterBorderlessFullSize()/exitBorderlessFullSize()
+    // existierten schon -- bisher nur ueber das Layoutprofil erreichbar,
+    // ohne eigenen Menuepunkt oder Tastenkuerzel. checked wird von
+    // beiden Methoden nachgezogen, damit ein Profilwechsel den Haken
+    // nicht aus dem Takt bringt.
+    QAction* m_fullScreenAction{nullptr};
+
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
     QSplitter* m_mainSplitter{nullptr};
