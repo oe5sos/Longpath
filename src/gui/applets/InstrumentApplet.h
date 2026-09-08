@@ -69,6 +69,13 @@ public:
     QString appletTitle() const override { return m_title; }
     void    syncFromModel() override     {}
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) oeffnet dasselbe Rechtsklick-
+    // menue, nur an der Mitte des Widgets verankert statt am Klickpunkt
+    // (der Knopf traegt keine Klick-Koordinate). Implementierung in der
+    // .cpp, da buildContextMenu() den vollen QMenu-Typ braucht.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override;
+
     /// Beide Formen zeigen dieselbe Grösse. Abgelehnt (false), wenn die
     /// Grösse keine belegte Skala hat.
     bool setPrimary(int bindingId);

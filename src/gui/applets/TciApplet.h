@@ -64,6 +64,11 @@ public:
     QString appletTitle() const override { return QStringLiteral("TCI Server"); }
     void    syncFromModel() override;
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) ruft denselben Signalweg wie
+    // der bestehende "Setup"-Knopf im Applet selbst.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { emit setupRequested(); }
+
 signals:
     // Emitted when the user clicks the Setup button.
     // Phase 23 wires this to open Setup -> Network -> TCI Server.

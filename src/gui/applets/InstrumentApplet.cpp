@@ -258,6 +258,15 @@ void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
     menu->deleteLater();
 }
 
+// Der geteilte ⚙-Knopf (GridCellWidget) traegt keine Klick-Koordinate,
+// daher an der Mitte des Widgets verankert statt am Klickpunkt.
+void InstrumentApplet::openExtendedSettings()
+{
+    QMenu* menu = buildContextMenu(this);
+    menu->exec(mapToGlobal(rect().center()));
+    menu->deleteLater();
+}
+
 QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
 {
     auto* menu = new QMenu(parent);

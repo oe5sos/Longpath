@@ -60,6 +60,22 @@
   sein bisheriger interner ⚙-Knopf). Weitere Applets folgen, sobald sie
   eine erweiterte Einstellungsflaeche bekommen.
 
+- **Sechs weitere Applets bekommen den ⚙-Knopf** -- jedes davon hatte
+  bereits eine eigene erweiterte Einstellungsflaeche, nur noch nicht
+  ueber den geteilten Knopf erreichbar: `TciApplet` (oeffnet Setup >
+  Netzwerk > TCI Server, wie der bestehende "Setup"-Knopf im Applet),
+  `PureSignalApplet` (oeffnet den PsForm-Dialog, wie der bestehende
+  Rechtsklick auf jedes Bedienelement), `AmpApplet` / `TunerApplet` /
+  `Rf2ksApplet` (springen zu PGXL/TGXL/RF-Kit Advanced in Setup, wie
+  der erste Eintrag im bestehenden Rechtsklickmenue), `InstrumentApplet`
+  (oeffnet dasselbe Rechtsklickmenue, nur an der Widget-Mitte statt am
+  Klickpunkt verankert, da der ⚙-Knopf keine Klick-Koordinate traegt).
+  Keine neue Oberflaeche erfunden -- nur ein zweiter Weg zu einer schon
+  vorhandenen. `RxApplet`/`PhoneCwApplet` bewusst ausgelassen: beide
+  haben mehrere schmale Einstellungs-Signale (je ein anderes
+  Setup-Blatt), aber keinen einzigen eindeutigen "mehr Einstellungen"-
+  Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
+
 ### Fixed
 
 - **Der ausgewaehlte Eintrag in aufgeklappten Dropdown-Listen war

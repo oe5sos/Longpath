@@ -112,6 +112,11 @@ public:
     QString appletTitle() const override { return QStringLiteral("PureSignal"); }
     void    syncFromModel() override;
 
+    // Der geteilte ⚙-Knopf (GridCellWidget) ruft denselben Signalweg wie
+    // der bestehende Rechtsklick auf jedes Bedienelement.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override { emit openPureSignalDialogRequested(); }
+
 public slots:
     // ── Phase 3M-4 Task 13: late-bound coordinator wiring ──────────────────
     //
