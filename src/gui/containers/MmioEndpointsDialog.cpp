@@ -72,6 +72,8 @@ mw0lge@grange-lane.co.uk
 #include <QTreeWidgetItem>
 #include <QSplitter>
 #include <QFrame>
+#include <QAccessible>
+#include <QSignalBlocker>
 
 namespace Longpath {
 
@@ -335,11 +337,32 @@ void MmioEndpointsDialog::refreshVariablesTree(MmioEndpoint* ep)
     m_treeVariables->clear();
     if (!ep) { return; }
     const QStringList names = ep->variableNames();
-    for (const QString& name : names) {
-        const QVariant v = ep->valueForName(name);
-        auto* item = new QTreeWidgetItem(m_treeVariables);
-        item->setText(0, name);
-        item->setText(1, v.toString());
+
+    // Bug fix 2026-09-08 (task_829af93c -- same class as LogbookWindow::
+    // refreshTable()'s 2026-09-07 fix, b5e9b915: see that function for the
+    // full writeup). Each setText() below fires a dataChanged that Qt's
+    // macOS accessibility bridge answers by re-populating the WHOLE tree's
+    // AX elements whenever an observer is attached (VoiceOver, remote-
+    // control software, computer-use). Block the model's signals for the
+    // fill loop and emit one bundled DataChanged event afterward instead.
+    {
+        const QSignalBlocker modelBlocker(m_treeVariables->model());
+        for (const QString& name : names) {
+            const QVariant v = ep->valueForName(name);
+            auto* item = new QTreeWidgetItem(m_treeVariables);
+            item->setText(0, name);
+            item->setText(1, v.toString());
+        }
+    }
+    m_treeVariables->viewport()->update();
+    {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_treeVariables, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(qMax(0, names.size() - 1));
+        tableEvent.setFirstColumn(0);
+        tableEvent.setLastColumn(1);
+        QAccessible::updateAccessibility(&tableEvent);
     }
 }
 

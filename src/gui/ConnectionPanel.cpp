@@ -121,6 +121,8 @@ mw0lge@grange-lane.co.uk
 #include <QIcon>
 #include <QLoggingCategory>
 #include <QTimer>
+#include <QAccessible>
+#include <QSignalBlocker>
 
 #include "gui/StyleConstants.h"
 
@@ -816,21 +818,44 @@ void ConnectionPanel::updateStatusStrip()
 void ConnectionPanel::refreshLastSeenColumn()
 {
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    for (int row = 0; row < m_radioTable->rowCount(); ++row) {
-        QTableWidgetItem* statusCell = m_radioTable->item(row, ColStatus);
-        if (!statusCell) {
-            continue;
-        }
-        const QString mac = statusCell->data(kMacRole).toString();
+    const int rowCount = m_radioTable->rowCount();
 
-        // Refresh Last Seen column
-        QTableWidgetItem* lsCell = m_radioTable->item(row, ColLastSeen);
-        if (lsCell) {
-            const qint64 lastSeen = m_lastSeenMs.value(mac, 0LL);
-            lsCell->setText(relativeTime(lastSeen, now));
-        }
+    // Bug fix 2026-09-08 (task_829af93c -- same class as LogbookWindow::
+    // refreshTable()'s 2026-09-07 fix, b5e9b915). This slot fires every
+    // 15s indefinitely (m_lastSeenRefreshTimer), so unlike the one-shot
+    // bulk-load candidates it's a long-running low-volume source of AX
+    // churn if left unblocked. Only ColLastSeen's text actually changes
+    // here (setPillIconForRow uses setCellWidget, not part of the
+    // dataChanged mechanism), so the bundled event is scoped to that one
+    // column, not the whole table width.
+    {
+        const QSignalBlocker modelBlocker(m_radioTable->model());
+        for (int row = 0; row < rowCount; ++row) {
+            QTableWidgetItem* statusCell = m_radioTable->item(row, ColStatus);
+            if (!statusCell) {
+                continue;
+            }
+            const QString mac = statusCell->data(kMacRole).toString();
 
-        setPillIconForRow(row, mac);
+            // Refresh Last Seen column
+            QTableWidgetItem* lsCell = m_radioTable->item(row, ColLastSeen);
+            if (lsCell) {
+                const qint64 lastSeen = m_lastSeenMs.value(mac, 0LL);
+                lsCell->setText(relativeTime(lastSeen, now));
+            }
+
+            setPillIconForRow(row, mac);
+        }
+    }
+    m_radioTable->viewport()->update();
+    if (rowCount > 0) {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_radioTable, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(rowCount - 1);
+        tableEvent.setFirstColumn(ColLastSeen);
+        tableEvent.setLastColumn(ColLastSeen);
+        QAccessible::updateAccessibility(&tableEvent);
     }
 }
 

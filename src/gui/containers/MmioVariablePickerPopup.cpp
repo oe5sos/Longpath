@@ -64,6 +64,8 @@ mw0lge@grange-lane.co.uk
 #include <QTreeWidgetItem>
 #include <QPushButton>
 #include <QLabel>
+#include <QAccessible>
+#include <QSignalBlocker>
 
 namespace Longpath {
 
@@ -140,30 +142,53 @@ void MmioVariablePickerPopup::buildTree()
 {
     m_tree->clear();
     const QList<MmioEndpoint*> eps = ExternalVariableEngine::instance().endpoints();
-    for (MmioEndpoint* ep : eps) {
-        const QString label = ep->name().isEmpty()
-            ? ep->guid().toString(QUuid::WithoutBraces).left(8)
-            : ep->name();
-        auto* root = new QTreeWidgetItem(m_tree);
-        root->setText(0, label);
-        root->setData(0, Qt::UserRole, ep->guid());
-        root->setData(0, Qt::UserRole + 1, QString());  // endpoint row, no var
-        root->setFirstColumnSpanned(true);
+    int totalRows = 0;
 
-        const QStringList names = ep->variableNames();
-        for (const QString& n : names) {
-            auto* leaf = new QTreeWidgetItem(root);
-            leaf->setText(0, n);
-            leaf->setText(1, ep->valueForName(n).toString());
-            leaf->setData(0, Qt::UserRole, ep->guid());
-            leaf->setData(0, Qt::UserRole + 1, n);
+    // Bug fix 2026-09-08 (task_829af93c -- same class as LogbookWindow::
+    // refreshTable()'s 2026-09-07 fix, b5e9b915: see that function for the
+    // full writeup). Block the model's signals for the whole build (root +
+    // leaf construction together -- QTreeWidget has no setRowCount()-style
+    // bulk-presize call whose own bookkeeping would need to see them) and
+    // emit one bundled DataChanged event afterward instead.
+    {
+        const QSignalBlocker modelBlocker(m_tree->model());
+        for (MmioEndpoint* ep : eps) {
+            const QString label = ep->name().isEmpty()
+                ? ep->guid().toString(QUuid::WithoutBraces).left(8)
+                : ep->name();
+            auto* root = new QTreeWidgetItem(m_tree);
+            root->setText(0, label);
+            root->setData(0, Qt::UserRole, ep->guid());
+            root->setData(0, Qt::UserRole + 1, QString());  // endpoint row, no var
+            root->setFirstColumnSpanned(true);
+            ++totalRows;
 
-            // Pre-select the current binding.
-            if (ep->guid() == m_selectedGuid && n == m_selectedVariable) {
-                m_tree->setCurrentItem(leaf);
+            const QStringList names = ep->variableNames();
+            for (const QString& n : names) {
+                auto* leaf = new QTreeWidgetItem(root);
+                leaf->setText(0, n);
+                leaf->setText(1, ep->valueForName(n).toString());
+                leaf->setData(0, Qt::UserRole, ep->guid());
+                leaf->setData(0, Qt::UserRole + 1, n);
+                ++totalRows;
+
+                // Pre-select the current binding.
+                if (ep->guid() == m_selectedGuid && n == m_selectedVariable) {
+                    m_tree->setCurrentItem(leaf);
+                }
             }
+            root->setExpanded(true);
         }
-        root->setExpanded(true);
+    }
+    m_tree->viewport()->update();
+    if (totalRows > 0) {
+        QAccessibleTableModelChangeEvent tableEvent(
+            m_tree, QAccessibleTableModelChangeEvent::DataChanged);
+        tableEvent.setFirstRow(0);
+        tableEvent.setLastRow(totalRows - 1);
+        tableEvent.setFirstColumn(0);
+        tableEvent.setLastColumn(1);
+        QAccessible::updateAccessibility(&tableEvent);
     }
 }
 

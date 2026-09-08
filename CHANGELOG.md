@@ -78,6 +78,26 @@
 
 ### Fixed
 
+- **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
+  Qt-Accessibility-Explosion ausloesen wie das Logbuch und die
+  KiwiSDR-Empfaengerliste (b5e9b915, e913abe6) -- jetzt ebenfalls
+  abgesichert.** Folgeaufgabe aus der KiwiSDR-OOM-Untersuchung
+  (task_829af93c): `MmioEndpointsDialog::refreshVariablesTree()`,
+  `MmioVariablePickerPopup::buildTree()` und
+  `ConnectionPanel::refreshLastSeenColumn()` (ein alle 15 Sekunden
+  laufender Timer-Slot) fuellten ihre `QTableWidget`/`QTreeWidget`
+  Zelle-fuer-Zelle bzw. Eintrag-fuer-Eintrag, jedes `setText`/
+  `setData` ein eigenes `dataChanged` -- baut macOS' Qt-Accessibility-
+  Bruecke bei angeschlossenem AX-Beobachter (VoiceOver, Fernsteuerung,
+  computer-use) je Signal die komplette Tabelle neu auf, aus O(Zellen)
+  Signalen wird O(Zellen²) Arbeit. Gleicher Fix wie beim Logbuch:
+  Fuellschleife in einen `QSignalBlocker` auf das Modell verpackt,
+  danach ein einziges gebuendeltes
+  `QAccessibleTableModelChangeEvent(DataChanged)` ueber den
+  tatsaechlich betroffenen Bereich (bei ConnectionPanel nur die
+  "Last Seen"-Spalte, da `setPillIconForRow` ueber `setCellWidget`
+  laeuft und vom `dataChanged`-Mechanismus ohnehin nicht erfasst wird).
+
 - **Der ausgewaehlte Eintrag in aufgeklappten Dropdown-Listen war
   praktisch unsichtbar -- app-weit, an 18 Stellen.** Betreiber:
   "immer das ausgewaehlte ist unsichtbar". Ursache ueberall dieselbe:
