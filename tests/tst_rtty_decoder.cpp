@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
+// no-port-check: tests an AetherSDR port (see src/core/RttyDecoder.h);
+// the inline Thetis mention below is a single default-value citation,
+// not a Thetis derivation of this test.
+//
 // core/RttyDecoder.{h,cpp}: feeds a synthetic AFSK RTTY signal (real sine
 // tones, Baudot/ITA2-encoded start-stop framing) through the actual
 // biquad-filter/Schmitt-trigger/clock-recovery decode path and checks the

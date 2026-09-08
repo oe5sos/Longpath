@@ -1,3 +1,13 @@
+// =================================================================
+// src/core/DevAutomationServer.cpp  (Longpath)
+// =================================================================
+// Attribution: see DevAutomationServer.h (AetherSDR structural derivative).
+//
+// Modification history (Longpath):
+//   2026-09-06 -- Created alongside DevAutomationServer.h; see that
+//                 file's own Modification history section for detail.
+// =================================================================
+
 #include "DevAutomationServer.h"
 #include "LogCategories.h"
 

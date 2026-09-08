@@ -8,6 +8,7 @@
 
 #include "gui/MacFloatingWindowBehavior.h"
 
+#include <QGuiApplication>
 #include <QWidget>
 #include <QWindow>
 
@@ -16,6 +17,21 @@ namespace Longpath {
 void enableFullScreenAuxiliaryBehavior(QWidget* widget)
 {
     if (!widget) { return; }
+
+    // Bug fix 2026-09-08 (erster echter CI-Testlauf auf macOS, alle
+    // *FloatingWindow-Konstruktoren SEGFAULT): unter QT_QPA_PLATFORM=
+    // offscreen (CI, ci.yml) erzeugt winId() KEIN echtes natives
+    // NSView -- der zurueckgegebene WId-Wert ist eine synthetische
+    // Kennung der Offscreen-Plattform-Engine, kein Zeiger auf ein
+    // echtes Cocoa-Objekt. Der `!view`-Nullcheck weiter unten faengt
+    // das NICHT ab (der Wert ist nicht null, nur ungueltig) -- der
+    // (__bridge NSView*)-Cast liefert einen Zeiger, der beim ersten
+    // objc_msgSend (hier: `.window`) sofort abstuerzt (SIGSEGV,
+    // reproduziert per lldb: objc_msgSend -> enableFullScreenAuxiliary-
+    // Behavior). Diese ganze Funktion ist ohnehin nur auf der echten
+    // Cocoa-Plattform sinnvoll (schwebende NSPanel-Fensterebenen
+    // existieren nicht ausserhalb davon) -- vor jedem Zugriff pruefen.
+    if (QGuiApplication::platformName() != QLatin1String("cocoa")) { return; }
 
     // winId() erzwingt die Anlage des nativen Fensters, falls es noch
     // keines hat -- ohne das waere windowHandle() hier oft noch

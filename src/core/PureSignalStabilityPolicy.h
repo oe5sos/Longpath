@@ -97,6 +97,11 @@ struct PureSignalStabilityPolicy {
     // "in Ordnung" (PSForm.cs:1113), und > 90 heisst "korrigiert
     // gerade" (PSForm.cs:1106). Dazwischen liegt der brauchbare
     // Bereich. Beides ist hier NICHT neu erfunden, sondern uebernommen.
+    //
+    // Independently implemented from Thetis PSForm.cs -- nur die zwei
+    // genannten Zahlenwerte sind uebernommen, die Regel drumherum
+    // (Kaltstart-Schutz, Aussetzer-Gnadenfrist) ist Longpath-original
+    // nach Yuri EU2AVs unveroeffentlichter Idee, siehe Dateikopf.
     int minCalibrations{2};
     int feedbackOkMax{256};
     int feedbackOkMin{1};

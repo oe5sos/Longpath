@@ -66,6 +66,19 @@ PROVENANCE = REPO / "docs" / "attribution" / "THETIS-PROVENANCE.md"
 AETHERSDR_RECONCILIATION = REPO / "docs" / "attribution" / "aethersdr-reconciliation.md"
 WDSP_SRC_DIR = REPO / "third_party" / "wdsp" / "src"
 
+# A marker entry is normally a single required substring. It can also be a
+# tuple of alternatives, any one of which satisfies the requirement -- used
+# below for "Modification history (NereusSDR)" vs "Modification history
+# (Longpath)": the project renamed 2026-08-20, and per CLAUDE.md this is
+# intentional, not stale drift -- files written before the rename correctly
+# say NereusSDR (a historical record of "what it was called then"), files
+# written after correctly say Longpath. A checker that only recognized the
+# old string would fail every legitimately-new port forever.
+MOD_HISTORY_MARKER = (
+    "Modification history (NereusSDR)",
+    "Modification history (Longpath)",
+)
+
 # Per-kind required-marker tables. Keys must match the --kind CLI choices.
 MARKERS_BY_KIND = {
     "thetis": [
@@ -73,11 +86,11 @@ MARKERS_BY_KIND = {
         "Thetis",
         "Copyright (C)",
         "General Public License",
-        "Modification history (NereusSDR)",
+        MOD_HISTORY_MARKER,
     ],
     "aethersdr": [
         "AetherSDR",
-        "Modification history (NereusSDR)",
+        MOD_HISTORY_MARKER,
     ],
     "wdsp": [
         "Copyright (C)",
@@ -237,7 +250,12 @@ def list_wdsp_sources():
 
 def check_required_markers(path: Path, markers):
     head = "\n".join(path.read_text(errors="replace").splitlines()[:HEADER_WINDOW])
-    return [m for m in markers if m not in head]
+    missing = []
+    for marker in markers:
+        alternatives = (marker,) if isinstance(marker, str) else marker
+        if not any(alt in head for alt in alternatives):
+            missing.append(alternatives[0])
+    return missing
 
 
 def check_orphan_pair(rel: str, listed) -> Optional[str]:

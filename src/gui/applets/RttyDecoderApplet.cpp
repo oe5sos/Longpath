@@ -1,3 +1,15 @@
+// =================================================================
+// src/gui/applets/RttyDecoderApplet.cpp  (Longpath)
+// =================================================================
+// Attribution: see RttyDecoderApplet.h -- structural derivative of
+// AetherSDR's RTTY control set (GPLv3, Jeremy [KK7GWY] /
+// ten9876/AetherSDR).
+//
+// Modification history (Longpath):
+//   2026-09-06 -- Created alongside RttyDecoderApplet.h; see that
+//                 file's own Modification history section for detail.
+// =================================================================
+
 #include "RttyDecoderApplet.h"
 #include "gui/HGauge.h"
 #include "gui/StyleConstants.h"

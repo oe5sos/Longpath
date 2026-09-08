@@ -51,6 +51,7 @@ REPO = Path(__file__).resolve().parent.parent
 PROVENANCE = REPO / "docs" / "attribution" / "THETIS-PROVENANCE.md"
 WDSP_PROVENANCE = REPO / "docs" / "attribution" / "WDSP-PROVENANCE.md"
 AETHER_RECONCILIATION = REPO / "docs" / "attribution" / "aethersdr-reconciliation.md"
+AETHER_PORTS = REPO / "docs" / "attribution" / "AETHERSDR-PORTS.md"
 FREEDV_PROVENANCE = REPO / "docs" / "attribution" / "FREEDV-GUI-PROVENANCE.md"
 BASE_REF = os.environ.get("CHECK_NEW_PORTS_BASE_REF", "origin/main")
 FULL_TREE = (
@@ -246,9 +247,20 @@ def parse_provenance_paths(*doc_paths):
     creates a false-negative loophole for future ports.
 
     Backtick wrapping (``| `src/foo.h` |``) is handled. The `.{h,cpp}`
-    shorthand is only recognised in the first cell (it is, in practice,
-    never used there today — the shorthand is only used in the counterpart
-    column — but we support it for robustness).
+    shorthand is also recognised in the first cell.
+
+    2026-09-08 bug fix: AETHERSDR-PORTS.md and FREEDV-GUI-PROVENANCE.md
+    both use a second first-cell shorthand for a header/source pair --
+    two separate backtick-quoted tokens, comma-separated, where the
+    second token is extension-only and shares the first token's
+    basename (e.g. ``| `src/core/strip/ClientGate.h`, `.cpp` | ...``).
+    The old code only stripped the OUTERMOST backtick characters of the
+    whole cell, which left the inner backticks and comma embedded in a
+    single bogus "path" that could never match a real src file -- every
+    one of the 23+ rows already using this established format was
+    silently unregistered as a result. Extract every backtick-quoted
+    token in the cell instead and resolve extension-only tokens against
+    the nearest preceding `src/...` token.
     """
     if not doc_paths:
         doc_paths = (PROVENANCE,)
@@ -263,16 +275,37 @@ def parse_provenance_paths(*doc_paths):
             cells = [c.strip() for c in line.strip("|").split("|")]
             if not cells:
                 continue
-            first = cells[0].strip("`").strip()
-            if not first or first.lower() in ("nereussdr file", "file"):
+            first_cell = cells[0].strip()
+            if not first_cell or first_cell.lower() in ("nereussdr file", "file"):
                 continue
-            # Expand `.{h,cpp}` shorthand if it somehow appears in column 1.
-            m = re.match(r"(src/.+)\.\{h,cpp\}$", first)
-            if m:
-                paths.add(f"{m.group(1)}.h")
-                paths.add(f"{m.group(1)}.cpp")
-            else:
-                paths.add(first)
+
+            tokens = re.findall(r"`([^`]+)`", first_cell)
+            if not tokens:
+                tokens = [first_cell.strip("`").strip()]
+
+            base = None
+            for tok in tokens:
+                tok = tok.strip()
+                if not tok:
+                    continue
+                m = re.match(r"(src/.+)\.\{h,cpp\}$", tok)
+                if m:
+                    paths.add(f"{m.group(1)}.h")
+                    paths.add(f"{m.group(1)}.cpp")
+                    base = m.group(1)
+                    continue
+                if tok.startswith("."):
+                    # Extension-only shorthand referring to the previous
+                    # token's basename (e.g. the "`.cpp`" in the example
+                    # above). Silently ignored if there was no preceding
+                    # src/ token to anchor it to.
+                    if base:
+                        paths.add(f"{base}{tok}")
+                    continue
+                if tok.startswith("src/"):
+                    stem = re.sub(r"\.[^./]+$", "", tok)
+                    paths.add(tok)
+                    base = stem
     return paths
 
 
@@ -363,7 +396,7 @@ def main():
         files = all_src_files()
         listed = parse_provenance_paths(
             PROVENANCE, WDSP_PROVENANCE, AETHER_RECONCILIATION,
-            FREEDV_PROVENANCE,
+            AETHER_PORTS, FREEDV_PROVENANCE,
         )
         mode_label = "full-tree"
     else:

@@ -1,3 +1,15 @@
+// =================================================================
+// src/core/RttyDecoder.cpp  (Longpath)
+// =================================================================
+// Attribution: see RttyDecoder.h (AetherSDR structural + behavioral
+// derivative; the Baudot/ITA2 tables below are the international
+// ITA2 standard, transcribed rather than AetherSDR-original).
+//
+// Modification history (Longpath):
+//   2026-09-06 -- Created alongside RttyDecoder.h; see that file's own
+//                 Modification history section for detail.
+// =================================================================
+
 #include "RttyDecoder.h"
 #include "LogCategories.h"
 

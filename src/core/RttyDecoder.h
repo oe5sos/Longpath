@@ -1,4 +1,8 @@
 // src/core/RttyDecoder.h
+// no-port-check: this file is an AetherSDR port (registered in
+// AETHERSDR-PORTS.md, see the header block further down) that inline-
+// cites one specific Thetis default value (mark/shift frequency) for
+// context, not a Thetis derivation of the file itself.
 // Native RTTY (Baudot/ITA2) decoder for Longpath -- no external program
 // (fldigi, WSJT-X) needed, unlike FT8/PSK31 which stay routed through an
 // external decoder via VAC + CAT (see docs/architecture/2026-09-06-rtty-

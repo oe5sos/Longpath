@@ -390,6 +390,20 @@ Discovery-reply hex fixtures are covered by `tests/fixtures/discovery/README.md`
 | third_party/wdsp/src/calcc.h | Project Files/Source/wdsp/calcc.h | full | port | thetis-no-samphire | Vendored alongside calcc.c (Phase 3M-4 Task 2). Header mirrors calcc.c. NR0V only. |
 | third_party/wdsp/src/iqc.c | Project Files/Source/wdsp/iqc.c | full | port | thetis-no-samphire | Vendored verbatim from Thetis v2.10.3.13 @ 501e3f5 for Phase 3M-4 Task 2 (PureSignal iqc adaptive-predistortion driver) — TAPR v1.29 has no calcc/iqc. NR0V (Warren Pratt) only — no Samphire contributions or dual-license block. |
 | third_party/wdsp/src/iqc.h | Project Files/Source/wdsp/iqc.h | full | port | thetis-no-samphire | Vendored alongside iqc.c (Phase 3M-4 Task 2). Header mirrors iqc.c. NR0V only. |
+| src/core/audio/QsoRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | RecordingDetails-Feldauswahl fuer die JSON-Beschreibung; kein Zeilenport |
+| src/core/audio/VoiceKeyer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Sprachspeicher-Verhalten als Vorbild; NereusSDR-original |
+| src/core/audio/WavFile.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umfang (WAV + Beschreibung) als Vorbild; Leser/Schreiber NereusSDR-original |
+| src/core/audio/WavPlayer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | PlayFileViaPCAudio als Vorbild fuer den Lautsprecher-Weg |
+| src/gui/applets/QsoRecorderApplet.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Platzpruefung, Loeschen, Beschreibung einlesen, Nachhoeren |
+| src/core/audio/QsoRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | Umsetzung zu QsoRecorder.h; kein Zeilenport |
+| src/core/audio/VoiceKeyer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu VoiceKeyer.h; kein Zeilenport |
+| src/core/audio/WavFile.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umsetzung zu WavFile.h; Leser/Schreiber Longpath-original |
+| src/core/audio/WavPlayer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | Umsetzung zu WavPlayer.h; kein Zeilenport |
+| src/gui/applets/QsoRecorderApplet.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Kopf zu QsoRecorderApplet.cpp |
+| src/core/audio/WavRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | "Off the air"-WAV-Aufnahme (Phase 3M) als Vorbild; streamender Schreiber NereusSDR-original, kein Zeilenport |
+| src/core/audio/WavRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu WavRecorder.h; kein Zeilenport |
+| src/core/audio/IqRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | AudioRecordRxSource.ReceiverInputIQ ("pre"-Abgriff vor der Demodulation) als Vorbild fuer den Rohabtastwert-Abgriff; baugleich zu WavRecorder.h, andere Quelle/Vorgabeformat; design doc docs/architecture/phase3m-recording-design.md §4, §7.2 |
+| src/core/audio/IqRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu IqRecorder.h; kein Zeilenport |
 
 ## Files derived from TAPR WDSP
 
@@ -459,17 +473,3 @@ column 2 (not column 1) so the header-verifier script does not scan them.
 | Same as .cpp | src/gui/applets/ClientChainApplet.h | NereusSDR-original applet header; see .cpp |
 | Setup → Network → TCI Server page — NereusSDR-original Setup UI; 6 group boxes, 17 AppSettings keys | src/gui/setup/CatNetworkSetupPages.cpp | NereusSDR-native Setup page; TCI server settings surfaced from Thetis frmOptions/TCIServer section but no .Designer.cs code ported |
 | Same as .cpp | src/gui/setup/CatNetworkSetupPages.h | NereusSDR-original Setup page header; see .cpp |
-| src/core/audio/QsoRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | RecordingDetails-Feldauswahl fuer die JSON-Beschreibung; kein Zeilenport |
-| src/core/audio/VoiceKeyer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Sprachspeicher-Verhalten als Vorbild; NereusSDR-original |
-| src/core/audio/WavFile.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umfang (WAV + Beschreibung) als Vorbild; Leser/Schreiber NereusSDR-original |
-| src/core/audio/WavPlayer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | PlayFileViaPCAudio als Vorbild fuer den Lautsprecher-Weg |
-| src/gui/applets/QsoRecorderApplet.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Platzpruefung, Loeschen, Beschreibung einlesen, Nachhoeren |
-| src/core/audio/QsoRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | Umsetzung zu QsoRecorder.h; kein Zeilenport |
-| src/core/audio/VoiceKeyer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu VoiceKeyer.h; kein Zeilenport |
-| src/core/audio/WavFile.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umsetzung zu WavFile.h; Leser/Schreiber Longpath-original |
-| src/core/audio/WavPlayer.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | 1862 | reference | MW0LGE | Umsetzung zu WavPlayer.h; kein Zeilenport |
-| src/gui/applets/QsoRecorderApplet.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 633; 776; 1102; 1862 | reference | MW0LGE | Kopf zu QsoRecorderApplet.cpp |
-| src/core/audio/WavRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | "Off the air"-WAV-Aufnahme (Phase 3M) als Vorbild; streamender Schreiber NereusSDR-original, kein Zeilenport |
-| src/core/audio/WavRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu WavRecorder.h; kein Zeilenport |
-| src/core/audio/IqRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | AudioRecordRxSource.ReceiverInputIQ ("pre"-Abgriff vor der Demodulation) als Vorbild fuer den Rohabtastwert-Abgriff; baugleich zu WavRecorder.h, andere Quelle/Vorgabeformat; design doc docs/architecture/phase3m-recording-design.md §4, §7.2 |
-| src/core/audio/IqRecorder.cpp | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Umsetzung zu IqRecorder.h; kein Zeilenport |

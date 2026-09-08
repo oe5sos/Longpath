@@ -117,13 +117,24 @@ def classify(path: str) -> str:
     return "nereussdr-original"
 
 
+# A marker entry is normally a single required substring. It can also be a
+# tuple of alternatives, any one of which satisfies the requirement -- used
+# below for "Modification history (NereusSDR)" vs "Modification history
+# (Longpath)": the project renamed 2026-08-20, and per CLAUDE.md this is
+# intentional, not stale drift (mirrors the same fix in
+# scripts/verify-thetis-headers.py).
+MOD_HISTORY_MARKER = (
+    "Modification history (NereusSDR)",
+    "Modification history (Longpath)",
+)
+
 # Required header markers per classification. Empty list = advisory-only.
-REQUIRED_MARKERS: dict[str, list[str]] = {
+REQUIRED_MARKERS: dict[str, list] = {
     "thetis-port": [
         "Ported from", "Thetis", "Copyright (C)",
-        "General Public License", "Modification history (NereusSDR)",
+        "General Public License", MOD_HISTORY_MARKER,
     ],
-    "aethersdr-port": ["AetherSDR", "Modification history (NereusSDR)"],
+    "aethersdr-port": ["AetherSDR", MOD_HISTORY_MARKER],
     "wdsp-vendored": ["Copyright (C)", "General Public License"],
     # The following classes carry no merge-gated marker requirement; the
     # inventory records them without flagging missing markers.
@@ -166,7 +177,12 @@ def _verify_markers(path: str, classification: str) -> list[str]:
         head = abs_path.read_text(encoding="utf-8", errors="replace")[:8000]
     except (IsADirectoryError, FileNotFoundError):
         return []
-    return [m for m in markers if m not in head]
+    missing = []
+    for marker in markers:
+        alternatives = (marker,) if isinstance(marker, str) else marker
+        if not any(alt in head for alt in alternatives):
+            missing.append(alternatives[0])
+    return missing
 
 
 def build_inventory() -> list[dict]:
