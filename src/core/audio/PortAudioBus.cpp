@@ -20,6 +20,7 @@
 #include <portaudio.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -755,6 +756,15 @@ int PortAudioBus::paCallback(const void* in, void* out,
         self->m_lastOutR = lastR;
         self->m_crossfadeFramesRem = crossfadeRem;
     } else {
+        // TX-Mikrofon-Klick-Untersuchung (2026-09-08): Zeitstempel VOR
+        // jeder anderen Arbeit, unabhaengig davon ob diese Invokation
+        // spaeter Samples liefert. So misst nsSinceLastCaptureCallback()
+        // wirklich den Abstand zwischen zwei tatsaechlichen Aufrufen
+        // dieser Callback, nicht nur zwischen erfolgreichen.
+        self->m_lastCaptureCallbackNs.store(
+            std::chrono::steady_clock::now().time_since_epoch().count(),
+            std::memory_order_relaxed);
+
         // Input mode: read captured samples from `in`, write to ring,
         // update m_txLevel (the audio here is destined for transmit).
         //
@@ -841,6 +851,14 @@ int PortAudioBus::paCallback(const void* in, void* out,
         self->m_ringWrite.store(w, std::memory_order_release);
     }
     return paContinue;
+}
+
+qint64 PortAudioBus::nsSinceLastCaptureCallback() const
+{
+    const qint64 last = m_lastCaptureCallbackNs.load(std::memory_order_relaxed);
+    if (last == 0) { return -1; }
+    const qint64 now = std::chrono::steady_clock::now().time_since_epoch().count();
+    return now - last;
 }
 
 int PortAudioBus::downmixToMono(const float* interleaved, int frames,

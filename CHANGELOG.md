@@ -30,6 +30,16 @@
   diese selbst, aber AetherSDR hat einen echten, eigenstaendigen
   RTTY-Decoder, der hier portiert wurde.
 
+- **"PC-mic pulls ran short"-Meldung liefert jetzt auch, WESSEN Seite
+  spaet dran war.** Bisher nur eine 5s-Zaehlung ("N von M"). Neu:
+  `PortAudioBus::nsSinceLastCallback()` (Nanosekunden seit die
+  Capture-Callback des Bus zuletzt wirklich lief) plus der Abstand
+  zwischen zwei Pump-Takten selbst, beide als Schlimmstfall im
+  5s-Fenster mitgemeldet. Damit laesst sich am Log unterscheiden, ob
+  die Capture-Seite (CoreAudio-Thread) spaet war oder der
+  radiogetaktete Pump ungewoehnlich frueh kam -- ohne Instruments-
+  Sitzung. Reine Diagnose, keine Verhaltensaenderung am Audiopfad.
+
 - **View > Full Screen -- endlich ein Menuepunkt und Tastenkuerzel
   dafuer.** `enterBorderlessFullSize()`/`exitBorderlessFullSize()` gab
   es seit dem 2026-09-01 (randloses Vollbild statt echtem macOS-Space,

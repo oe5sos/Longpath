@@ -59,6 +59,13 @@ public:
     virtual QString backendName() const = 0;
     virtual AudioFormat negotiatedFormat() const = 0;
     virtual QString errorString() const { return {}; }
+
+    // TX-Mikrofon-Klick-Untersuchung (2026-09-08): Nanosekunden seit
+    // die Audio-Thread-Callback dieses Bus zuletzt lief, oder -1 wenn
+    // nicht unterstuetzt/noch nie gelaufen. Default: nicht unterstuetzt
+    // (die HAL-/PipeWire-Buse ohne eigene Callback-Taktung brauchen das
+    // nicht). PortAudioBus ueberschreibt es echt.
+    virtual qint64 nsSinceLastCallback() const { return -1; }
 };
 
 } // namespace Longpath

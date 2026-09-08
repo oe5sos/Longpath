@@ -584,6 +584,13 @@ public:
     // redesign (removal of accumulator side effects).
     int pullTxMic(float* dst, int n);
 
+    // TX-Mikrofon-Klick-Untersuchung (2026-09-08): siehe
+    // IAudioBus::nsSinceLastCallback(). -1, wenn kein Bus offen ist
+    // oder der Bus-Typ es nicht unterstuetzt.
+    qint64 txMicNsSinceLastCallback() const {
+        return m_txInputBus ? m_txInputBus->nsSinceLastCallback() : -1;
+    }
+
     // Pull VAX-TX audio samples from the VAX TX shared-memory bus.
     //
     // This is the consumer side of the VAX TX route: 3rd-party apps

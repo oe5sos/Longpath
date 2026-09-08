@@ -108,6 +108,7 @@
 #include <QLoggingCategory>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 Q_LOGGING_CATEGORY(lcTxWorker, "nereus.tx.worker")
@@ -858,7 +859,26 @@ void TxWorkerThread::dispatchOneBlock()
         // zero-fill click in the TX audio itself (monitor AND air).
         // Throttled to one line per 5 s; only logs when shorts occurred.
         ++m_pcMicTotalPulls;
-        if (n < kBlockFrames) { ++m_pcMicShortPulls; }
+        // Erweiterte Diagnose (2026-09-08, TX-Mikrofon-Klick-Untersuchung):
+        // Producer-Luecke (wie lange lief die Capture-Callback selbst
+        // nicht mehr -- gross heisst CoreAudio-Thread war spaet) UND
+        // Consumer-Takt (wie kurz nach dem letzten Pump-Takt kam dieser
+        // -- klein heisst ungewoehnlich fruehes/haeufiges Wecken) bei
+        // JEDEM Takt gemessen, damit m_pcMicLastPumpTickNs auch bei
+        // erfolgreichen Takten aktuell bleibt; nur bei einem kurzen
+        // pull() als "worst" im 5s-Fenster festgehalten.
+        const qint64 nowNs = std::chrono::steady_clock::now()
+                                 .time_since_epoch().count();
+        const qint64 consumerGapNs = m_pcMicLastPumpTickNs != 0
+            ? (nowNs - m_pcMicLastPumpTickNs) : 0;
+        m_pcMicLastPumpTickNs = nowNs;
+        if (n < kBlockFrames) {
+            ++m_pcMicShortPulls;
+            const qint64 producerGapNs = m_audioEngine->txMicNsSinceLastCallback();
+            m_pcMicWorstProducerGapNs = std::max(m_pcMicWorstProducerGapNs, producerGapNs);
+            m_pcMicWorstConsumerGapNs = std::max(m_pcMicWorstConsumerGapNs, consumerGapNs);
+            m_pcMicWorstShortfall = std::max(m_pcMicWorstShortfall, kBlockFrames - n);
+        }
         {
             const qint64 now = QDateTime::currentMSecsSinceEpoch();
             if (now - m_pcMicLastReportMs > 5000) {
@@ -867,11 +887,20 @@ void TxWorkerThread::dispatchOneBlock()
                         << "PC-mic pulls ran short" << m_pcMicShortPulls
                         << "of" << m_pcMicTotalPulls
                         << "times in 5 s — each short pull is an audible"
-                           " click (PC/radio clock jitter at the mic ring)";
+                           " click (PC/radio clock jitter at the mic ring)"
+                        << "— worst gap since last capture callback:"
+                        << (m_pcMicWorstProducerGapNs / 1000000) << "ms"
+                        << "worst consumer-tick interval:"
+                        << (m_pcMicWorstConsumerGapNs / 1000000) << "ms"
+                        << "worst shortfall:" << m_pcMicWorstShortfall
+                        << "/" << kBlockFrames << "samples";
                 }
                 m_pcMicLastReportMs = now;
                 m_pcMicShortPulls = 0;
                 m_pcMicTotalPulls = 0;
+                m_pcMicWorstProducerGapNs = 0;
+                m_pcMicWorstConsumerGapNs = 0;
+                m_pcMicWorstShortfall = 0;
             }
         }
         for (int i = 0; i < n; ++i) {

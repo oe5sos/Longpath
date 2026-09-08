@@ -130,6 +130,15 @@ public:
     quint32 paOutputOverflowEvents() const {
         return m_paOutputOverflowEvents.load(std::memory_order_relaxed);
     }
+    /// TX-Mikrofon-Klick-Untersuchung (2026-09-08): Nanosekunden
+    /// (steady_clock) seit die Capture-Callback dieses Bus zuletzt
+    /// wirklich lief, oder -1, wenn sie noch nie lief. Nur fuer
+    /// Input-Buse aussagekraeftig. Damit laesst sich am Ort eines
+    /// kurzen pull() unterscheiden: lief die Capture-Seite (CoreAudio-
+    /// Thread) selbst gerade spaet, oder war sie puenktlich und der
+    /// Abholer (radiogetakteter TX-Pump) kam ungewoehnlich frueh?
+    qint64 nsSinceLastCaptureCallback() const;
+    qint64 nsSinceLastCallback() const override { return nsSinceLastCaptureCallback(); }
     /// Capture frames discarded because a callback block exceeded the
     /// preallocated downmix scratch.  Expected to stay 0; non-zero
     /// means the host API is handing us blocks larger than the
@@ -245,6 +254,12 @@ private:
     // looks like.
     std::atomic<quint32> m_paOutputUnderflowEvents{0};
     std::atomic<quint32> m_paOutputOverflowEvents{0};
+
+    // Wall-clock (steady_clock, ns since epoch) of the most recent
+    // Input-direction callback invocation. Written by paCallback on
+    // the audio thread every time it runs (success or not); read from
+    // any thread via nsSinceLastCaptureCallback(). 0 = never ran.
+    std::atomic<qint64> m_lastCaptureCallbackNs{0};
 
     // Crossfade state for discontinuity smoothing in paCallback.  Only
     // read / written from the audio callback (single-threaded by
