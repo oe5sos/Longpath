@@ -487,8 +487,11 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         "QComboBox { background: #1a2a3a; border: 1px solid #304050; "
         "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
         "QComboBox::drop-down { border: none; }"
+        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
         "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-        "selection-background-color: #4a7ba8; }";
+        "selection-background-color: #4a7ba8; selection-color: #ffffff; }";
     static const QString kSlider =
         "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
         "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "

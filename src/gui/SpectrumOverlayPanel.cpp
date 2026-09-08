@@ -104,7 +104,26 @@ namespace OverlayColors {
     // Flyout panel backgrounds (verbatim from AetherSDR SpectrumOverlayMenu.cpp)
     constexpr auto kPanelStyle =
         "QWidget { background: rgba(15, 15, 26, 220); "
-        "border: 1px solid #304050; border-radius: 6px; }";
+        "border: 1px solid #304050; border-radius: 6px; }"
+        // Betreiber 2026-09-08 (Scheme-Combo im Display-Flyout): der
+        // gerade ausgewaehlte Eintrag im aufgeklappten Dropdown war
+        // praktisch unsichtbar. Ursache: die QWidget-Regel oben faerbt
+        // auch die Zeilen der Popup-Liste ein (Qt kaskadiert Stylesheets
+        // ueber die QObject-Elternschaft bis in QComboBox::view()
+        // hinein), aber OHNE eigene QComboBox/QAbstractItemView-Regel
+        // blieb Vordergrund/Auswahlfarbe dem Systemstandard ueberlassen
+        // -- der klirrt gegen den erzwungenen dunklen Grund. Alle drei
+        // Zustaende (normal/gehovert/ausgewaehlt) jetzt explizit, statt
+        // nur den Grund zu setzen und den Rest zu raten.
+        "QComboBox { background: #1a2a3a; color: #c8d8e8; "
+        "border: 1px solid #304050; border-radius: 6px; padding: 2px 4px; }"
+        "QComboBox::drop-down { border: none; }"
+        "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
+        "selection-background-color: #4a7ba8; selection-color: #ffffff; "
+        "outline: none; }"
+        "QComboBox QAbstractItemView::item { color: #c8d8e8; }"
+        "QComboBox QAbstractItemView::item:selected { "
+        "background: #4a7ba8; color: #ffffff; }";
 
     // Label style for rows inside translucent flyout panels.
     // Transparent background is required here because the label must not

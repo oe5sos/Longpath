@@ -62,6 +62,24 @@
 
 ### Fixed
 
+- **Der ausgewaehlte Eintrag in aufgeklappten Dropdown-Listen war
+  praktisch unsichtbar -- app-weit, an 18 Stellen.** Betreiber:
+  "immer das ausgewaehlte ist unsichtbar". Ursache ueberall dieselbe:
+  `QComboBox QAbstractItemView { ... selection-background-color: X; }`
+  setzte die Hervorhebungsfarbe, aber nie das dazugehoerige
+  `selection-color` -- der Vordergrund der markierten Zeile blieb dem
+  Systemstandard ueberlassen, der gegen den erzwungenen dunklen Grund
+  kaum noch zu lesen war. Betroffen: `SpectrumOverlayPanel`s Display-
+  Flyout (dort gemeldet, "Scheme:"-Combo), `SpectrumOverlayMenu`,
+  `ComboStyle::applyComboStyle` (die am breitesten geteilte der drei
+  zentralen Combo-Stile, siehe applets), `StyleConstants::kComboStyle`
+  + `applyDarkPageStyle` (Setup-Seiten allgemein), `ConnectionPanel`,
+  `ContainerSettingsDialog` (2x), `MmioEndpointsDialog`, 7 der
+  `meter_property_editors/*ItemEditor` (byte-identischer Textblock,
+  offenbar kopiert), sowie `DspSetupPages`, `AudioAdvancedPage`,
+  `DeviceCard`. Je Stelle dieselbe Ein-Zeilen-Ergaenzung; kein
+  Verhalten sonst geaendert.
+
 - **Der Auf/Zu-Pfeil (◀/▶) am Display-Flyout merkt sich seinen Zustand
   jetzt ebenfalls.** Von einer AetherSDR-Sichtung angestossen: dort gibt
   es das schon, hier fehlte es. `SpectrumOverlayPanel::collapsed()` war

@@ -747,8 +747,13 @@ constexpr auto kComboStyle =
     "QComboBox { background: #1a2a3a; border: 1px solid #304050;"
     " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
     "QComboBox::drop-down { border: none; }"
+    // 2026-09-08: selection-background-color allein liess Qt die
+    // Vordergrundfarbe des ausgewaehlten Eintrags dem Systemstandard
+    // ueberlassen -- gegen den erzwungenen dunklen Grund praktisch
+    // unsichtbar. selection-color ergaenzt (siehe auch der gleiche Fund
+    // in SpectrumOverlayPanel.cpp::OverlayColors::kPanelStyle).
     "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
-    " selection-background-color: #4a7ba8; }";
+    " selection-background-color: #4a7ba8; selection-color: #ffffff; }";
 
 constexpr auto kCheckBoxStyle =
     "QCheckBox { color: #c8d8e8; font-size: 13px; }"
@@ -881,8 +886,11 @@ inline void applyDarkPageStyle(QWidget* w)
         "QComboBox { background: %4; color: %2; border: 1px solid %3;"
         "  border-radius: 6px; padding: 2px 6px; }"
         "QComboBox::drop-down { border: none; }"
+        // 2026-09-08: selection-color ergaenzt (siehe kComboStyle oben) --
+        // ohne sie blieb der ausgewaehlte Eintrag im aufgeklappten
+        // Dropdown praktisch unsichtbar.
         "QComboBox QAbstractItemView { background: %4; color: %2;"
-        "  selection-background-color: %5; }"
+        "  selection-background-color: %5; selection-color: %2; }"
         "QSlider::groove:horizontal { background: %4; height: 4px;"
         "  border-radius: 2px; }"
         "QSlider::handle:horizontal { background: %5; width: 12px;"

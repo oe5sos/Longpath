@@ -508,8 +508,11 @@ void ConnectionPanel::buildUI()
         "QComboBox { background: #1a2a3a; color: #c8d8e8; border: 1px solid #304050;"
         "  border-radius: 6px; padding: 4px 8px; }"
         "QComboBox::drop-down { border: none; }"
+        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
+        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
+        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
         "QComboBox QAbstractItemView { background: #0a1a28; color: #c8d8e8;"
-        "  selection-background-color: #205070; }")));
+        "  selection-background-color: #205070; selection-color: #ffffff; }")));
     connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ConnectionPanel::onModelComboChanged);
     modelRow->addWidget(modelLabel);
