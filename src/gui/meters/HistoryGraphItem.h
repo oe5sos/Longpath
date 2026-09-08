@@ -174,13 +174,18 @@ private:
 
     // War Tuerkis fuer Achse 0 (abgeschafft), Bernstein fuer Achse 1
     // (AetherSDR-Palette) -- absichtlich zwei verschiedene Farben, damit
-    // die zwei Kurven auseinanderzuhalten sind. Nicht auf die Bernstein-
+    // die zwei Kurven auseinanderzuhalten sind. NICHT auf die Bernstein-
     // Rolle "measured" umgestellt wie PowerBar/SwrBar/S-Meter-Text: Achse
     // 1 sitzt schon auf Bernstein, Achse 0 wuerde ihr sonst zum Verwechseln
-    // aehnlich. Auf kAccent (das neue Blau, das die Tuerkis-Rolle beerbt
-    // hat) statt auf einen Messwert-Ton -- eigene Nachfrage bei Martin
-    // noetig, siehe CHANGELOG.
-    QColor  m_lineColor0{Style::role("accent", Style::kAccent)};
+    // aehnlich sein (per Entwurfsblatt gegengeprueft, 2026-09-08 --
+    // "Variante C, beide Bernstein" ist im Ueberschneidungsfall kaum
+    // auseinanderzuhalten). Auch NICHT auf kAccent (Blau): Achse 0 ist
+    // ein Messwert, kein Bedienelement, "Blau ist anfassbar" (HAUSSTIL.md)
+    // waere hier missverstaendlich. kTextSecondary ist neutral -- weder
+    // Warm- noch Anfass-Rolle -- und bleibt gegen Achse 1 klar
+    // unterscheidbar (Entwurfsblatt "Variante B"). Betreiber 2026-09-08:
+    // Entscheidung an Claude delegiert ("egal, wie du meinst").
+    QColor  m_lineColor0{Style::role("text-secondary", Style::kTextSecondary)};
     QColor  m_lineColor1{0xff, 0xb8, 0x00};   // #ffb800 amber
     bool    m_showGrid{true};
     bool    m_autoScale0{true};

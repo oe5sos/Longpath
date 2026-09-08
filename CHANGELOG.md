@@ -157,9 +157,19 @@
   2026-09-05). Die vierte, urspruenglich mit vorgeschlagene Stelle
   (Verlaufsgraph-Achse 0, `HistoryGraphItem.h`) wurde bewusst NICHT auf
   Bernstein umgestellt: Achse 1 desselben Graphen sitzt bereits auf
-  Bernstein, beide Achsen waeren sich zum Verwechseln aehnlich geworden.
-  Stattdessen auf `kAccent` (das aktuelle Blau, das die Tuerkis-Rolle
-  beerbt hat) -- Nachfrage bei Martin noch offen, ob das so passt.
+  Bernstein, beide Achsen waeren sich zum Verwechseln aehnlich geworden --
+  per Entwurfsblatt (3 gerenderte Varianten, echte Zeichenlogik,
+  Worst-Case-Betriebsfall) am 2026-09-08 sichtbar bestaetigt. Auch nicht
+  auf `kAccent` (Blau): Achse 0 ist ein Messwert, kein Bedienelement, und
+  "Blau ist anfassbar" (`HAUSSTIL.md`) waere hier missverstaendlich.
+  Jetzt auf `kTextSecondary` (neutral, weder Warm- noch Anfass-Rolle,
+  gegen Achse 1 klar unterscheidbar) -- Betreiber 2026-09-08 delegierte
+  die Entscheidung ("egal, wie du meinst"). Gleichzeitig zwei weitere,
+  unstrittige Tuerkis-Reste in `meters/` migriert: `BarItem`s eigener
+  Default-Konstruktorwert (`MeterItem.h`, greift nur, wenn kein Aufrufer
+  `setBarColor()` setzt -- zeigt in jedem verbleibenden Aufrufer ebenfalls
+  einen Messwert) auf dieselbe Bernstein-Rolle wie PowerBar/SwrBar; und
+  `ButtonBoxItem`s Klick-Feedback-Farbe (echt "anfassbar") auf `kAccent`.
 
 - **Der "Antenne"-Eintrag unter Containers > Applets graut jetzt aus,
   statt anklickbar-aber-wirkungslos zu bleiben, solange kein Funkgeraet
