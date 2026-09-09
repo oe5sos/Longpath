@@ -138,6 +138,21 @@ protocol-timing semantics without being asked is out of scope here; flagged
 separately for whoever wants to decide whether it's worth matching upstream
 exactly.
 
+**Follow-up, same day:** investigated separately and confirmed via
+`git log`/`git blame` that the reset-on-readable line was never a
+deliberate decision — it was introduced silently alongside the initial
+mi0bot port (`2936f612`, 2026-04-12) with no Thetis citation and no
+commit-message discussion, i.e. unreviewed drift from an AI-assisted
+port, not a design choice. Operator sign-off obtained the same day to
+match upstream exactly (default discovery-scan timing changes slightly:
+a NIC that replies once and then goes quiet is now recognized as quiet
+after `quietBeforeStop` polls total, same as Thetis, instead of after an
+extra `quietBeforeStop` polls tacked on by the reset). Fixed in
+`RadioDiscovery::quietPollAttempt()` — the readable branch no longer
+touches `quietPolls`, matching `clsRadioDiscovery.cs:964-976 [@852bf0e]`
+— with a new regression test, `tst_radio_discovery_scan_bound`'s
+`aBurstyReplyDoesNotResetTheQuietCounter`.
+
 **Fix:** `quietPollAttempt()` now takes a `QDeadlineTimer` armed at
 `(quietBeforeStop + 1) × pollTimeoutMs` (one extra poll of slack so the
 ordinary no-reply case, which already takes almost exactly
