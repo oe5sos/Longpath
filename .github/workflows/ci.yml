@@ -379,7 +379,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            cmake ninja-build pkg-config g++ mold \
+            cmake ninja-build pkg-config g++ mold gdb \
             libgl1-mesa-dev libfftw3-dev \
             libasound2-dev libjack-jackd2-dev \
             libpipewire-0.3-dev \
@@ -682,13 +682,65 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             export QT_QPA_PLATFORM=offscreen
+            # ── Hang watchdog (2026-09-09) ──────────────────────────────
+            #
+            # A large, fluctuating set of GUI tests times out at ctest's
+            # 120s ceiling on Linux specifically -- present since before
+            # any of this week's fixes, unrelated to them. Not
+            # reproducible on macOS (real display or Apple's offscreen
+            # plugin both fine) and no Linux machine is available to
+            # attach a live debugger the way the macOS ASAN/lldb
+            # investigations did. Rather than guess at a fix blind, this
+            # watches every tests/tst_* process and grabs a full
+            # thread-apply-all backtrace via gdb the moment one has run
+            # for 90s (comfortably before ctest's own 120s TIMEOUT kills
+            # it) -- one shot per pid so a genuinely hung process
+            # doesn't get re-dumped on every poll. sudo is needed because
+            # the watchdog isn't the target's parent process, so ptrace
+            # scope (YAMA) would otherwise refuse to attach.
+            mkdir -p /tmp/hang-diagnostics
+            hang_watchdog() {
+              declare -A seen
+              while true; do
+                sleep 5
+                for pid in $(pgrep -f '/tests/tst_' 2>/dev/null); do
+                  [ -n "${seen[$pid]:-}" ] && continue
+                  etime=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+                  [ -z "$etime" ] && continue
+                  if [ "$etime" -ge 90 ]; then
+                    seen[$pid]=1
+                    name=$(ps -o comm= -p "$pid" 2>/dev/null | tr -d '/ ')
+                    echo "[hang-watchdog] PID $pid ($name) running ${etime}s -- dumping"
+                    sudo gdb -p "$pid" -batch \
+                      -ex "thread apply all bt" -ex "detach" -ex "quit" \
+                      > "/tmp/hang-diagnostics/${name:-unknown}_${pid}.txt" 2>&1
+                  fi
+                done
+              done
+            }
+            hang_watchdog &
+            WATCHDOG_PID=$!
+            set +e
             xvfb-run -a ctest --output-on-failure
+            CTEST_EXIT=$?
+            set -e
+            kill "$WATCHDOG_PID" 2>/dev/null || true
+            exit "$CTEST_EXIT"
           elif [ "${{ runner.os }}" = "macOS" ]; then
             export QT_QPA_PLATFORM=offscreen
             ctest --output-on-failure
           else
             ctest --output-on-failure --no-tests=ignore
           fi
+
+      - name: Upload hang-diagnostics (Linux, on failure)
+        if: runner.os == 'Linux' && failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hang-diagnostics-${{ matrix.name }}
+          path: /tmp/hang-diagnostics/
+          retention-days: 7
+          if-no-files-found: ignore
 
       # ------------------------------------------------------------------
       # PR artifact upload
