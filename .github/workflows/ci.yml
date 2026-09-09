@@ -737,7 +737,12 @@ jobs:
         if: runner.os == 'Linux' && failure()
         uses: actions/upload-artifact@v4
         with:
-          name: hang-diagnostics-${{ matrix.name }}
+          # matrix.name ("Linux x64 (1/4)") has a "/" and spaces, both
+          # invalid in an artifact name (2026-09-09: first watchdog run
+          # captured 5 backtraces on shard 0 and then lost every one of
+          # them to this — "The artifact name is not valid"). matrix.shard
+          # is a bare int (0..3), always safe.
+          name: hang-diagnostics-linux-shard${{ matrix.shard }}
           path: /tmp/hang-diagnostics/
           retention-days: 7
           if-no-files-found: ignore
