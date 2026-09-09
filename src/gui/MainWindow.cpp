@@ -845,15 +845,30 @@ MainWindow::MainWindow(QWidget* parent)
         }
     });
 
-    // Start discovery in background so radios are found before the user opens the panel
-    m_radioModel->discovery()->startDiscovery();
-
     // Open the Connect-to-Radio panel — deferred so the event loop is running
     // before any signal/slot activity (e.g. discovery radioDiscovered).
     // No longer attempts an automatic connection first: that feature was
     // removed 2026-08-27 (operator decision, OE5SOS — it kept silently
     // re-arming itself and auto-connecting was actively unwanted, not just
     // unreliable over a flaky WLAN link).
+    //
+    // 2026-09-09: this used to be preceded by its own direct
+    // `m_radioModel->discovery()->startDiscovery()` call, under a comment
+    // claiming it ran "in background so radios are found before the user
+    // opens the panel". scanAllNics() is fully synchronous (a per-NIC
+    // blocking send+poll loop — see RadioDiscovery.cpp), so that call
+    // actually blocked this constructor, on the GUI thread, for the whole
+    // NIC-walk (~2.2 s measured locally on a single real NIC; the CI
+    // investigation this note points at found the same span twice over on
+    // GitHub Actions Linux runners) — before ConnectionPanel's OWN
+    // constructor unconditionally re-ran the exact same scan moments later
+    // (openConnectionPanelOnLaunch → showConnectionPanel → `new
+    // ConnectionPanel(...)`, whose ctor always calls startDiscovery() itself
+    // — see ConnectionPanel.cpp). Removed: it never contributed anything
+    // ConnectionPanel's own scan didn't already provide, it doubled this
+    // window's real discovery latency for every user, and it doubled the
+    // blocking work several GUI tests were paying for.  See
+    // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md.
     QTimer::singleShot(0, this, &MainWindow::openConnectionPanelOnLaunch);
 
     // Phase 3J-2 + 3R M3: restore each spot client's auto-connect /

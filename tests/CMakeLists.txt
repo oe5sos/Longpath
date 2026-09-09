@@ -2736,6 +2736,18 @@ nereus_add_test(tst_connection_state)
 nereus_add_test(tst_radio_discovery_probe)
 target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 
+# ── 2026-09-09: quietPollAttempt() deadline safety net ────────────────────────
+# 3 tests: a flooded loopback socket (always "readable") still terminates via
+# the QDeadlineTimer bound instead of hanging (the actual CI-only 120s GUI
+# timeout this closes — see
+# docs/architecture/2026-09-09-ci-discovery-hang-investigation.md); the
+# ordinary no-traffic case still exits the normal way, within budget; the
+# cooperative-cancel path still wins over a flood. Linux/macOS only (raw
+# POSIX socket in the flooder helper), matching where NEREUS_BUILD_TESTS is
+# enabled.
+nereus_add_test(tst_radio_discovery_scan_bound)
+target_link_libraries(tst_radio_discovery_scan_bound PRIVATE Qt6::Network)
+
 # ── Phase 3Q Task 4: AddCustomRadioDialog — SKU model picker + action buttons ──
 # 4 tests: Auto-detect at index 0, all 16 SKUs present in modelCombo,
 # saveOfflineButton + probeButton objectNames accessible via findChild.

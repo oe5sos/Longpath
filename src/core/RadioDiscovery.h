@@ -70,6 +70,7 @@ mw0lge@grange-lane.co.uk
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 
 namespace Longpath {
 
@@ -184,6 +185,14 @@ class RadioDiscovery : public QObject {
     Q_OBJECT
 
 public:
+    // Outcome of one quietPollAttempt() call (private, near scanAllNics()
+    // below, for the actual per-attempt quiet-poll loop and full rationale).
+    // Declared public and up here — rather than beside quietPollAttempt()
+    // itself — only because quietPollAttemptForTest()'s signature, further
+    // down in this same public section, needs the name in scope already;
+    // enum access can't differ between one declaration and another.
+    enum class QuietPollOutcome { Quiet, DeadlineExceeded, Cancelled };
+
     explicit RadioDiscovery(QObject* parent = nullptr);
     ~RadioDiscovery() override;
 
@@ -243,6 +252,18 @@ public:
     // cases. Call from a QTest init() for a clean slate. Defined in the .cpp
     // file because clearing the shared segment needs those TU-local helpers.
     static void clearHoldOffForTest();
+
+    // Test-only forwarding to the private quiet-poll loop scanAllNics() uses
+    // per attempt — see quietPollAttempt()'s declaration for behaviour. Lets
+    // a test drive that exact loop against a fully-controlled loopback
+    // socket: scanAllNics() itself always skips loopback interfaces (see its
+    // isNicCandidate check), so the loop is otherwise unreachable without a
+    // real non-loopback NIC and a live radio on it.
+    QuietPollOutcome quietPollAttemptForTest(QUdpSocket& sock, int quietBeforeStop, int pollMs,
+                                              const QDeadlineTimer& deadline) {
+        return quietPollAttempt(sock, quietBeforeStop, pollMs, deadline,
+                                 [](const QByteArray&, const QHostAddress&, quint16) {});
+    }
 #endif
 
     // Public static parsers — exposed for unit-testing in Task 5.
@@ -289,6 +310,34 @@ private:
     // Sends P1+P2 probes, polls for replies using the timing profile,
     // calls parseP1Reply / parseP2Reply and de-duplicates by MAC.
     void scanAllNics();
+
+    // One attempt's quiet-poll loop, extracted out of scanAllNics() for
+    // testability (2026-09-09 — CI-only 120s GUI-test-timeout investigation,
+    // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md).
+    //
+    // Polls `sock` up to `pollMs` at a time. A poll that comes back
+    // readable resets the quiet counter to 0 (replies may be bursty — see
+    // scanAllNics()) and every pending datagram is drained and handed to
+    // `onDatagram` in arrival order; a poll that comes back not-readable
+    // advances the quiet counter by one.
+    //
+    // Returns Quiet once quietBeforeStop consecutive not-readable polls are
+    // observed — the class header's documented
+    // "attemptsPerNic x quietPollsBeforeResend x pollTimeoutMs" bound.
+    // Returns DeadlineExceeded if that never happens before `deadline`
+    // expires: nothing before this existed to stop a sustained "readable,
+    // but nothing usable comes out of it" condition (a stray reply from an
+    // unrelated host on a shared subnet, a spurious wakeup, or a duplicate
+    // NIC entry each doing their own confusingly-fast-looking scan — see the
+    // investigation doc for what the CI log actually showed) from holding
+    // the quiet counter at 0 forever, which is a genuinely unbounded hang,
+    // not merely a slow path. Returns Cancelled if stopDiscovery() fires
+    // mid-poll (checked once per poll, same cadence scanAllNics() always
+    // had).
+    QuietPollOutcome quietPollAttempt(
+        QUdpSocket& sock, int quietBeforeStop, int pollMs, const QDeadlineTimer& deadline,
+        const std::function<void(const QByteArray& datagram, const QHostAddress& sender,
+                                  quint16 senderPort)>& onDatagram);
 
     DiscoveryProfile m_profile{DiscoveryProfile::SafeDefault};
 
