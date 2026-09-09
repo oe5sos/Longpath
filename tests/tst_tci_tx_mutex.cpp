@@ -83,9 +83,13 @@ void TestTciTxMutex::tx_mutex_single_client_claim_and_release()
 
     // ── 3. clientA claims TX mutex ────────────────────────────────────────────
     clientA.sendTextMessage(QStringLiteral("trx:0,true,tci;"));
-    QTest::qWait(50);  // allow event loop to process the message
-
-    QCOMPARE(server.activeTxClientCount(), 1);
+    // QTRY_* polls and returns the moment the condition holds, instead of a
+    // fixed qWait(50) that occasionally lost the race against the real
+    // loopback socket on a loaded CI runner (2026-09-09: activeTxClientCount()
+    // was still 0 right after "client connected" in GitHub Actions — the
+    // same class of flakiness fixed in tst_tci_resampler_lifecycle the same
+    // week; not reproducible locally).
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeTxClientCount(), 1, 2000);
     QVERIFY(!server.activeTxClientPeer().isEmpty());
 
     // ── 4. clientA sends a TX audio frame ─────────────────────────────────────
@@ -96,19 +100,14 @@ void TestTciTxMutex::tx_mutex_single_client_claim_and_release()
 
     const int ringBefore = server.peekTxRingSize();
     clientA.sendBinaryMessage(txFrame);
-    QTest::qWait(50);
 
     // Ring should now contain the decoded float bytes.
     // kSamples Float32 samples = kSamples * 4 bytes.
-    QVERIFY2(server.peekTxRingSize() > ringBefore,
-             qPrintable(QStringLiteral("TX ring did not grow: before=%1 after=%2")
-                 .arg(ringBefore).arg(server.peekTxRingSize())));
+    QTRY_VERIFY_WITH_TIMEOUT(server.peekTxRingSize() > ringBefore, 2000);
 
     // ── 5. clientA releases TX mutex ──────────────────────────────────────────
     clientA.sendTextMessage(QStringLiteral("trx:0,false;"));
-    QTest::qWait(50);
-
-    QCOMPARE(server.activeTxClientCount(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeTxClientCount(), 0, 2000);
     QVERIFY(server.activeTxClientPeer().isEmpty());
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
@@ -148,18 +147,15 @@ void TestTciTxMutex::tx_mutex_second_client_frame_is_dropped()
 
     // ── 3. clientA claims TX mutex ────────────────────────────────────────────
     clientA.sendTextMessage(QStringLiteral("trx:0,true,tci;"));
-    QTest::qWait(50);
-    QCOMPARE(server.activeTxClientCount(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeTxClientCount(), 1, 2000);
 
     // ── 4. clientA sends a TX audio frame ─────────────────────────────────────
     const int kSamples = 64;   // 32 stereo frames
     const QByteArray txFrame = makeTxFrame(kSamples, 0.3f);
     clientA.sendBinaryMessage(txFrame);
-    QTest::qWait(50);
-    const int ringAfterA = server.peekTxRingSize();
     // Ring should have grown (clientA is active owner).
-    QVERIFY2(ringAfterA > 0,
-             "clientA frame should have landed in TX ring");
+    QTRY_VERIFY_WITH_TIMEOUT(server.peekTxRingSize() > 0, 2000);
+    const int ringAfterA = server.peekTxRingSize();
 
     // ── 5. clientB sends a TX audio frame (no mutex) ──────────────────────────
     // clientB has NOT sent "trx:0,true,tci;" — it is not the active TX client.
@@ -185,8 +181,7 @@ void TestTciTxMutex::tx_mutex_second_client_frame_is_dropped()
 
     // ── 7. clientA releases mutex ─────────────────────────────────────────────
     clientA.sendTextMessage(QStringLiteral("trx:0,false;"));
-    QTest::qWait(50);
-    QCOMPARE(server.activeTxClientCount(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeTxClientCount(), 0, 2000);
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     clientA.close();
