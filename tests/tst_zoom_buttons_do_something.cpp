@@ -16,6 +16,7 @@
 // sich aendern.
 
 #include <QtTest>
+#include <QGuiApplication>
 #include <QPushButton>
 #include <QMouseEvent>
 #include <QSignalSpy>
@@ -302,6 +303,23 @@ private slots:
         // Erwartung: beide veraendern die Ansicht ODER lassen sie in
         // Ruhe (wenn die Frequenz in keinem Segment liegt) — aber sie
         // duerfen sie nie in einen unbrauchbaren Zustand bringen.
+        //
+        // Bug fix 2026-09-09 (erster echter Offscreen-CI-Lauf fuer
+        // diesen Branch): der Schwarzbild-Check unten braucht
+        // grabFramebuffer(), also ein echtes QRhi-Backend. Unter der
+        // Offscreen-Plattform kann QRhi keines anlegen -- das Bild
+        // ist dann IMMER leer/schwarz, unabhaengig davon, ob die
+        // Knoepfe wirklich etwas Sinnvolles zeigen. Kein
+        // Longpath-Fehler, siehe tst_spectrum_trace_visible.cpp fuer
+        // dieselbe Diagnose. Laeuft unter einem echten Fenstersystem
+        // mit echter GPU (z.B. cocoa) unveraendert durch.
+        if (QGuiApplication::platformName() == QLatin1String("offscreen")) {
+            QSKIP("Kein echtes QRhi-Backend unter der Offscreen-Plattform -- "
+                  "grabFramebuffer() kann hier nichts Aussagekraeftiges "
+                  "liefern. Laeuft unter einem echten Fenstersystem mit "
+                  "echter GPU (z.B. cocoa) unveraendert durch.");
+        }
+
         QVERIFY(m_sw);
         m_sw->setSampleRate(384000.0);
         m_sw->setFrequencyRange(7'100'000.0, 100'000.0);

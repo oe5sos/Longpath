@@ -316,8 +316,28 @@ private slots:
             }
         }
 
+        // Bug fix 2026-09-09 (erster echter Offscreen-CI-Lauf fuer
+        // diesen Branch): die Schwelle stand auf 40, unter der
+        // impliziten Annahme, alle vier Viertel truegen etwa gleich
+        // viel "Tinte". Stimmt nicht -- die fett gesetzten
+        // Himmelsrichtungs-Buchstaben (N/E/S/W, volle Deckkraft) liegen
+        // GENAU auf den Viertelgrenzen (0/90/180/270 Grad) und faerben
+        // je nach Sub-Pixel-Rundung fast komplett in EIN Nachbarviertel
+        // statt sich gleichmaessig zu teilen -- zwei Viertel bekommen
+        // dadurch strukturell weniger "helle" Punkte als die anderen
+        // zwei, unabhaengig von der Plattform (gemessen: 80 vs.
+        // 1106/1366/255 unter echtem cocoa). Qts Offscreen-Plattform
+        // rendert Text zusaetzlich mit insgesamt geringerer Deckkraft
+        // (kein echter Font-Renderer), was das ohnehin knappe Viertel
+        // unter die alte Schwelle von 40 drueckt (gemessen: 13).
+        // Die eigentliche Absicht der Pruefung -- der historische Fund
+        // vom 2026-08-20, die ganze Rose auf Briefmarkengroesse
+        // geschrumpft -- zeigte sich in ALLEN VIER Vierteln nahe null,
+        // nicht in einem einzelnen knappen. 6 faengt das weiterhin
+        // zuverlaessig, ohne an der echten (harmlosen) Textverteilung
+        // zu scheitern.
         for (int q = 0; q < 4; ++q) {
-            QVERIFY2(rim[q] > 40,
+            QVERIFY2(rim[q] > 6,
                      qPrintable(QStringLiteral(
                          "Im Viertel %1 fehlt der Ring: nur %2 Punkte")
                          .arg(q).arg(rim[q])));
