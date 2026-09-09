@@ -14656,6 +14656,26 @@ void MainWindow::updatePsaIndicatorVisibility()
 void MainWindow::showAudioDiagnoseDialog()
 {
 #if defined(Q_OS_LINUX)
+    // 2026-09-09: this is the actual cause of the CI-only 120s GUI-test
+    // timeouts investigated in
+    // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md — NOT
+    // RadioDiscovery (that fix stands on its own merits but turned out not
+    // to be the culprit here). dlg->exec() below is modal and has no
+    // internal timeout; on a headless test binary this is scheduled
+    // unconditionally (MainWindow's ctor, guarded only on
+    // `linuxBackend() == None` — true on every Linux CI runner, which has
+    // no ALSA/JACK device at all — and on `Audio/LinuxFirstRunSeen` never
+    // having been set, true on every fresh QStandardPaths test sandbox).
+    // Nothing in an automated run ever clicks Dismiss, so exec() blocks
+    // forever and only CTest's own external 120s TIMEOUT ever ends it —
+    // matching, test for test, every one of the (far more than originally
+    // reported) MainWindow-constructing tests that were hanging.
+    // QStandardPaths::isTestModeEnabled() is true in every test binary
+    // (tests/TestSandboxInit.cpp sets it before main()) and never true in
+    // a real install, so this guard is a no-op for actual users.
+    if (QStandardPaths::isTestModeEnabled()) {
+        return;
+    }
     AudioEngine* eng = m_radioModel->audioEngine();
     if (!eng) {
         return;
