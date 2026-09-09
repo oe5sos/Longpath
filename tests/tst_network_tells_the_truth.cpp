@@ -89,7 +89,26 @@ private slots:
             for (int y = 0; y < img.height(); ++y) {
                 for (int x = 0; x < img.width(); ++x) {
                     const QColor c = img.pixelColor(x, y);
-                    if (qAbs(c.red()   - want.red())   < 24
+                    // Bug fix 2026-09-09 (erster echter Offscreen-CI-Lauf
+                    // fuer diesen Branch): kRedText (#f0dcdc) ist ein
+                    // blasses Rosa, keine kraeftige Farbe -- ein reines,
+                    // neutrales Hellgrau (z.B. die 4 Eckpixel des
+                    // abgerundeten Rahmens, R=G=B durch Anti-Aliasing)
+                    // faellt zufaellig in dieselbe +/-24-Toleranz um alle
+                    // drei Kanaele, obwohl es nichts mit dem Verlustwert
+                    // zu tun hat -- false positive, das den Rueckgesetzt-
+                    // Zustand als "noch rot" meldete, obwohl
+                    // ConnectionSegment::setState() den Wert bereits
+                    // korrekt geloescht hatte (bestaetigt per Debug-Dump:
+                    // m_lossWorstPct war -1). Zusaetzlich verlangen, dass
+                    // die Farbe tatsaechlich ROETLICH ist (R deutlich
+                    // ueber G und B) -- reines Grau (R==G==B) faellt
+                    // damit sauber heraus, echtes kRedText weiterhin
+                    // erkannt.
+                    const bool reddish = c.red() > c.green() + 10
+                                      && c.red() > c.blue()  + 10;
+                    if (reddish
+                        && qAbs(c.red()   - want.red())   < 24
                         && qAbs(c.green() - want.green()) < 24
                         && qAbs(c.blue()  - want.blue())  < 24) { ++n; }
                 }
