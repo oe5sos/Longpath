@@ -335,7 +335,8 @@ void DiversityDialog::refreshMemoryLabels()
         if (!btn) { continue; }
         btn->setStyleSheet(m_memorySlots[i].populated
             ? Style::buttonBaseStyle()
-                  + QStringLiteral("QPushButton { color: #cfe2f5; }")
+                  + QStringLiteral("QPushButton { color: %1; }")
+                        .arg(QString::fromLatin1(Style::kBlueText))
             : Style::buttonBaseStyle());
     }
 }

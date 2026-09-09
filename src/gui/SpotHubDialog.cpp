@@ -188,14 +188,16 @@ constexpr const char* kAutoToggleStyle =
     "border: 1px solid #2c5c44; padding: 4px 10px; }"
     "QPushButton:!checked { background: #33280f; }";
 
-constexpr const char* kStartBtnStyle =
+const QString kStartBtnStyle = QStringLiteral(
     "QPushButton { background: #4a7ba8; color: #0f0f1a; font-weight: bold; "
     "border: 1px solid #4a7ba8; padding: 4px; border-radius: 6px; }"
     "QPushButton:hover { background: #4a7ba8; }"
-    "QPushButton:disabled { background: #254a72; color: #4e4e53; }";
+    "QPushButton:disabled { background: %1; color: #4e4e53; }")
+    .arg(QString::fromLatin1(Style::kBlueBg));
 
-constexpr const char* kStatusIdleStyle =
-    "QLabel { color: #8e8e93; font-size: 11px; }";
+const QString kStatusIdleStyle = QStringLiteral(
+    "QLabel { color: %1; font-size: 11px; }")
+    .arg(QString::fromLatin1(Style::kTextTertiary));
 
 constexpr const char* kStatusActiveStyle =
     "QLabel { color: #4a7ba8; font-size: 11px; font-weight: bold; }";
@@ -235,7 +237,7 @@ constexpr const char* kFilterPillStyle =
     "}"
     "QPushButton:hover { border-color: #c8d8e8; }";
 
-constexpr const char* kSpotTableStyle =
+const QString kSpotTableStyle = QStringLiteral(
     "QTableView {"
     "  background: #0a0a14;"
     "  alternate-background-color: #0a0a18;"
@@ -246,7 +248,7 @@ constexpr const char* kSpotTableStyle =
     "}"
     "QTableView::item:selected {"
     "  background: #204060;"
-    "  color: #cfe2f5;"
+    "  color: %1;"
     "}"
     "QHeaderView::section {"
     "  background: #1a1a2a;"
@@ -255,7 +257,8 @@ constexpr const char* kSpotTableStyle =
     "  padding: 3px 6px;"
     "  font-weight: bold;"
     "  font-size: 11px;"
-    "}";
+    "}")
+    .arg(QString::fromLatin1(Style::kBlueText));
 
 QString swatchStyle(const QColor& c) {
     return QString(
@@ -846,7 +849,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* dxcColorLabel = new QLabel("Spot Color:");
-    dxcColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    dxcColorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     consoleRow->addWidget(dxcColorLabel);
 
     QColor dxcColor(s.value("DxClusterSpotColor", "#D2B48C").toString());
@@ -1083,7 +1086,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     rbnConsoleRow->addStretch();
 
     auto* rbnColorLabel = new QLabel("Spot Color:");
-    rbnColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    rbnColorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     rbnConsoleRow->addWidget(rbnColorLabel);
 
     QColor rbnColor(s.value("RbnSpotColor", "#4a7ba8").toString());
@@ -1267,7 +1270,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     auto* filterRow = new QHBoxLayout;
     filterRow->setSpacing(6);
     auto* filterLabel = new QLabel("Spot Filter:");
-    filterLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 16px; }");
+    filterLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 16px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     filterRow->addWidget(filterLabel);
 
     const QString cbStyle =
@@ -1398,7 +1401,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     decodeRow->addStretch();
 
     auto* lifeLabel = new QLabel("Spot Life:");
-    lifeLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    lifeLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     decodeRow->addWidget(lifeLabel);
 
     int wsjtxLife = s.value("WsjtxSpotLifetime", 120).toInt();
@@ -1689,7 +1692,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    spotColorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     consoleRow->addWidget(spotColorLabel);
 
     QColor potaColor(s.value("PotaSpotColor", "#c2924f").toString());
@@ -1844,7 +1847,7 @@ void SpotHubDialog::buildSotaTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    spotColorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     consoleRow->addWidget(spotColorLabel);
 
     QColor sotaColor(s.value("SotaSpotColor", "#c2924f").toString());
@@ -2283,7 +2286,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
     consoleRow->addStretch();
 
     auto* spotColorLabel = new QLabel("Spot Color:");
-    spotColorLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 13px; }");
+    spotColorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 13px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     consoleRow->addWidget(spotColorLabel);
 
     QColor freedvColor(s.value("FreeDvSpotColor", "#c2924f").toString());
@@ -2557,7 +2560,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* bandRow = new QHBoxLayout;
     bandRow->setSpacing(3);
     auto* bandLabel = new QLabel("Bands:");
-    bandLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    bandLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     bandLabel->setFixedWidth(40);
     bandRow->addWidget(bandLabel);
 
@@ -2634,7 +2637,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* srcRow = new QHBoxLayout;
     srcRow->setSpacing(3);
     auto* srcLabel = new QLabel("Sources:");
-    srcLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    srcLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     srcLabel->setFixedWidth(40);
     srcRow->addWidget(srcLabel);
     for (const auto& src : sources) {
@@ -2743,7 +2746,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     watchRow->addWidget(m_modeFilterBtn);
 
     auto* watchLabel = new QLabel("Watch:");
-    watchLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    watchLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     watchLabel->setFixedWidth(40);
     watchRow->addWidget(watchLabel);
 
@@ -2837,7 +2840,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* searchRow = new QHBoxLayout;
     searchRow->setSpacing(3);
     auto* searchLabel = new QLabel("Search:");
-    searchLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    searchLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     searchLabel->setFixedWidth(40);
     searchRow->addWidget(searchLabel);
     auto* searchEdit = new QLineEdit;
@@ -3002,7 +3005,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     auto* bottomRow = new QHBoxLayout;
     auto* countLabel = new QLabel("0 spots");
     countLabel->setObjectName("spotListCountLabel");
-    countLabel->setStyleSheet("QLabel { color: #8e8e93; font-size: 11px; }");
+    countLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(QString::fromLatin1(Style::kTextTertiary)));
     connect(m_spotTableModel, &QAbstractTableModel::rowsInserted,
             this, [this, countLabel] {
         countLabel->setText(QString("%1 spots").arg(m_spotTableModel->rowCount()));

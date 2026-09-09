@@ -56,6 +56,9 @@ namespace Longpath::Style {
 // docs/design/HAUSSTIL.md.
 constexpr auto kAppBg           = "#08080a";   // war #0f0f1a
 constexpr auto kPanelBg         = "#0c0c0e";   // war #0a0a18
+// Hintergrund einer aktiv ausgewaehlten Kachel (z.B. VFO-Kachel) --
+// eine Stufe heller als kPanelBg, aber kein eigenes Knopf-Hover.
+constexpr auto kTileActiveBg    = "#16161c";
 // ── Die Textleiter, 2026-08-20 angehoben ─────────────────────────────
 //
 // Der Betreiber: „generell ist die schrift sehr dunkel. heller waere
@@ -137,6 +140,10 @@ constexpr auto kTextInactive    = "#58585e";
 // NereusSDR-original — used in 5+ places for AGC-T / pan / similar labels;
 // sits between kTextSecondary (#8090a0) and kTextScale (#607080).
 constexpr auto kLabelMid        = "#828288";
+// Versalzeilen-Text ueber Gruppen (z.B. Spektrum-Overlay-Ueberschriften)
+// und Fallback fuer unbekannte Zustaende -- dunkler als kTextTertiary,
+// heller als kTextInactive.
+constexpr auto kTextGroupHead   = "#5c5c60";
 constexpr auto kAccent          = "#4a7ba8";
 constexpr auto kTitleText       = "#c4c4ca";
 
@@ -151,6 +158,10 @@ constexpr auto kButtonHover     = "#26262b";   // war #203040
 constexpr auto kButtonAltHover  = "#2f3138";   // war #204060
 constexpr auto kBorder          = "#2c2c31";   // war #205070
 constexpr auto kBorderSubtle    = "#1f1f23";   // war #203040
+// Gedaempft/aus -- eine Stufe dunkler als kBorder. Gegenstueck zu
+// kGreenBorder bei LED-artigen An/Aus-Zustaenden, auch fuer blassen
+// Knopftext auf dunklem Grund.
+constexpr auto kBorderMuted     = "#3d3d41";
 // Grundflaeche des Panadapters, unter Bild und Raster.
 //
 // Grau-Blau statt des fast schwarzen #0a0a12: der Betreiber hat am
@@ -183,6 +194,9 @@ constexpr auto kPanadapterBg    = "#141e27";
 // eine VERSENKTE Flaeche ohnehin richtig ist: ein Feld liegt im Grund,
 // es liegt nicht darauf.
 constexpr auto kInsetBg         = "#050507";   // war #08080a (= kAppBg!)
+// Verlaufsanfang einer Mulde -- bewusst eine Stufe heller als kInsetBg,
+// nicht derselbe Wert: der Verlauf braucht beide Enden.
+constexpr auto kInsetBgTop      = "#101014";
 constexpr auto kInsetBorder     = "#232329";   // war #1e2e3e
 constexpr auto kGroove          = "#1f1f23";   // war #203040
 
@@ -196,6 +210,19 @@ constexpr auto kTitleBorder     = "#0d0d0f";
 constexpr auto kGreenBg         = "#1c3a2a";
 constexpr auto kGreenText       = "#6fa384";
 constexpr auto kGreenBorder     = "#2c5c44";
+// "Verbunden/live" -- kraeftiger und gesaettigter als das gedaempfte
+// kGreenText, fuer einen echten Live-Zustand statt einer ruhigen
+// Erfolgsmeldung (z.B. Spracherkennung "hoert", KiwiSDR verbunden).
+constexpr auto kLiveGreen       = "#4caf6a";
+// Dunkle Phase eines langsamen Verbindungs-Pulses (TitleBar Probing/
+// Connecting), abwechselnd mit kAccent. Bewusst NICHT kBlueBg: der
+// Puls braucht einen deutlich gedaempfteren Gegenpart, kBlueBg wurde
+// 2026-08-21 genau umgekehrt (gesaettigter, damit der aktive Knopf
+// auffaellt) gerichtet.
+constexpr auto kBluePulseDim    = "#254a72";
+// Unterste Stufe einer mehrstufigen Zustandsskala ("still,
+// unauffaellig" -- z.B. Paketverlust nahe null, vor Gruen/Amber/Rot).
+constexpr auto kQuietTone       = "#4a5a52";
 // ── Der aktive Zustand ───────────────────────────────────────────────
 //
 // Der Betreiber, 2026-08-21, zu Zeus: „das design hat teilweise mehr
@@ -228,6 +255,10 @@ constexpr auto kAmberText       = "#d8a55f";
 constexpr auto kAmberDim        = "#6b5630";
 constexpr auto kAmberBorder     = "#6b5426";
 constexpr auto kAmberWarn       = "#a8853f";
+// "Beschaeftigt/wartet" -- ein heller Bernstein fuer Uebergangs-
+// zustaende (PureSignal "wartet", KiwiSDR Connecting/Waiting/Busy),
+// unterscheidbar von kAmberWarn (Warnung) und kSwrProtActive (Schutz).
+constexpr auto kBusyAmber       = "#d4a23c";
 // ── Abzeichen: Paare aus Grund und Text ─────────────────────────────
 //
 // OE5SOS, 2026-08-17: „keine errechneten Deckkraftwerte, sondern

@@ -10625,7 +10625,8 @@ void MainWindow::buildStatusBar()
     m_tgxlChip = new QLabel(QStringLiteral("TGXL"), barWidget);
     m_tgxlChip->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background:#204060; border:1px solid #205070; "
-        "padding:1px 8px; border-radius:6px; color:#cfe2f5; }")));
+        "padding:1px 8px; border-radius:6px; color:%1; }")
+        .arg(QString::fromLatin1(Style::kBlueText))));
     m_tgxlChip->setVisible(false);
     hbox->addWidget(m_tgxlChip);
 

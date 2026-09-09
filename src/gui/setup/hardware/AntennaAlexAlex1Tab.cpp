@@ -68,6 +68,7 @@
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
+#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -765,7 +766,8 @@ void AntennaAlexAlex1Tab::setLedLit(QFrame* led, bool lit)
             QStringLiteral("QFrame { background: #6fa384; border-radius: 6px; }"));
     } else {
         led->setStyleSheet(
-            QStringLiteral("QFrame { background: #3d3d41; border-radius: 6px; }"));
+            QStringLiteral("QFrame { background: %1; border-radius: 6px; }")
+                .arg(QString::fromLatin1(Style::kBorderMuted)));
     }
 }
 

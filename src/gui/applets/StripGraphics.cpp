@@ -458,8 +458,9 @@ QString StripDynamicsCurve::explain() const
         const double gr  = double(g.gainReductionDb());
         if (quiet) {
             return QStringLiteral(
-                "<b style='color:#5c5c60'>Silent</b><br>Nothing is arriving "
-                "at the gate. Talk, or check the microphone.");
+                "<b style='color:%1'>Silent</b><br>Nothing is arriving "
+                "at the gate. Talk, or check the microphone.")
+                .arg(QString::fromLatin1(Style::kTextGroupHead));
         }
         if (in >= thr) {
             return QStringLiteral(
@@ -488,16 +489,18 @@ QString StripDynamicsCurve::explain() const
         const double gr  = double(c.gainReductionDb());
         if (quiet) {
             return QStringLiteral(
-                "<b style='color:#5c5c60'>Silent</b><br>Nothing is reaching "
-                "the compressor.");
+                "<b style='color:%1'>Silent</b><br>Nothing is reaching "
+                "the compressor.")
+                .arg(QString::fromLatin1(Style::kTextGroupHead));
         }
         if (gr < 0.3) {
             return QStringLiteral(
-                "<b style='color:#8e8e93'>Not working</b><br>You are "
+                "<b style='color:%2'>Not working</b><br>You are "
                 "%1 dB below the threshold, so the compressor is a straight "
                 "wire right now. Lower the threshold if you wanted it to do "
                 "something.")
-                .arg(thr - in, 0, 'f', 1);
+                .arg(thr - in, 0, 'f', 1)
+                .arg(QString::fromLatin1(Style::kTextTertiary));
         }
         if (gr > 12.0) {
             return QStringLiteral(
@@ -517,7 +520,8 @@ QString StripDynamicsCurve::explain() const
         const double gr   = double(m_chain->limiter().gainReductionDb());
         if (quiet) {
             return QStringLiteral(
-                "<b style='color:#5c5c60'>Silent</b><br>Nothing to limit.");
+                "<b style='color:%1'>Silent</b><br>Nothing to limit.")
+                .arg(QString::fromLatin1(Style::kTextGroupHead));
         }
         if (gr < 0.2) {
             return QStringLiteral(
@@ -787,8 +791,9 @@ QString StripShaperCurve::explain() const
 
     if (m_livePeak < -55.0) {
         return QStringLiteral(
-            "<b style='color:#5c5c60'>Silent</b><br>Nothing is reaching the "
-            "tube.");
+            "<b style='color:%1'>Silent</b><br>Nothing is reaching the "
+            "tube.")
+            .arg(QString::fromLatin1(Style::kTextGroupHead));
     }
     // How far up the curve the signal actually gets. This is the whole
     // question for a waveshaper and it is not answerable from the knobs.
@@ -796,10 +801,11 @@ QString StripShaperCurve::explain() const
                        * std::pow(10.0, drive / 20.0);
     if (reach < 0.25) {
         return QStringLiteral(
-            "<b style='color:#8e8e93'>A straight wire</b><br>Your voice is "
+            "<b style='color:%1'>A straight wire</b><br>Your voice is "
             "only reaching the flat middle of the curve, so this stage is "
             "doing nothing audible whatever the knobs say. More drive, or "
-            "more level ahead of it.");
+            "more level ahead of it.")
+            .arg(QString::fromLatin1(Style::kTextTertiary));
     }
     if (reach > 1.4) {
         return QStringLiteral(
@@ -956,11 +962,12 @@ QString StripBandCurve::explain() const
                 .arg(m_liveGr, 0, 'f', 1).arg(f0, 0, 'f', 0);
         }
         return QStringLiteral(
-            "<b style='color:#8e8e93'>Listening, not acting</b><br>Nothing "
+            "<b style='color:%2'>Listening, not acting</b><br>Nothing "
             "loud enough at %1 Hz to trigger it. Either you are not "
             "sibilant, or it is pointed at the wrong band — that is the "
             "commonest way to end up with a de-esser that does nothing.")
-            .arg(f0, 0, 'f', 0);
+            .arg(f0, 0, 'f', 0)
+            .arg(QString::fromLatin1(Style::kTextTertiary));
     }
 
     ClientPudu& p = m_chain->pudu();
@@ -968,8 +975,9 @@ QString StripBandCurve::explain() const
     const double hi = double(p.dooMix());
     if (lo < 0.02 && hi < 0.02) {
         return QStringLiteral(
-            "<b style='color:#8e8e93'>Nothing mixed in</b><br>Both "
-            "generators are at zero, so the stage is running and silent.");
+            "<b style='color:%1'>Nothing mixed in</b><br>Both "
+            "generators are at zero, so the stage is running and silent.")
+            .arg(QString::fromLatin1(Style::kTextTertiary));
     }
     return QStringLiteral(
         "<b style='color:#6fa384'>Generating</b><br>Low at %1 Hz mixed "
@@ -991,9 +999,10 @@ QString StripBandCurve::legend() const
             "it is working now");
     }
     return QStringLiteral(
-        "<span style='color:#2f5c86'>▬</span> the low generator<br>"
+        "<span style='color:%1'>▬</span> the low generator<br>"
         "<span style='color:#c2924f'>▬</span> the high generator<br>"
-        "height is how much is mixed in, position is where it is tuned");
+        "height is how much is mixed in, position is where it is tuned")
+        .arg(QString::fromLatin1(Style::kBlueBorder));
 }
 
 void StripBandCurve::paintEvent(QPaintEvent*)

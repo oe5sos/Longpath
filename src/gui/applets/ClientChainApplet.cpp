@@ -302,7 +302,7 @@ QWidget* ClientChainApplet::buildClientRow(
         // RX sensors badge
         if (session->rxSensorsEnabled) {
             hbox->addWidget(makeBadge(
-                QStringLiteral("RX sens"), "#254a72", "#4a7ba8", row));
+                QStringLiteral("RX sens"), Style::kBlueBg, "#4a7ba8", row));
         }
         // TX sensors badge
         if (session->txSensorsEnabled) {

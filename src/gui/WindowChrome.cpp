@@ -107,8 +107,8 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     close->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
                        " border: none; font-size: 11px; }"
-                       "QPushButton:hover { background: #a03030; color: #fff; }")
-            .arg(Style::kTextPrimary));
+                       "QPushButton:hover { background: %2; color: #fff; }")
+            .arg(Style::kTextPrimary, Style::kTxRed));
     connect(close, &QPushButton::clicked, this, &WindowTitleBar::closeRequested);
     lay->addWidget(close);
 

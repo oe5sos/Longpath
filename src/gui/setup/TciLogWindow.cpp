@@ -126,9 +126,9 @@ void TciLogWindow::buildUI()
         "QPlainTextEdit {"
         "  background-color: #18181a;"
         "  color: #c4c4c9;"
-        "  border: 1px solid #3d3d41;"
+        "  border: 1px solid %1;"
         "  selection-background-color: #4a7ba8;"
-        "}"));
+        "}").arg(QString::fromLatin1(Style::kBorderMuted)));
     root->addWidget(m_logView, /*stretch=*/1);
 }
 

@@ -68,6 +68,7 @@
 
 #include "core/AppSettings.h"
 #include "core/HpsdrModel.h"
+#include "gui/StyleConstants.h"
 #include "models/SliceModel.h"
 #include "models/RadioModel.h"
 
@@ -186,7 +187,7 @@ AntennaAlexAlex2Tab::AntennaAlexAlex2Tab(RadioModel* model, QWidget* parent)
     m_statusLed = new QLabel(statusFrame);
     m_statusLed->setFixedSize(10, 10);
     m_statusLed->setStyleSheet(
-        QStringLiteral("QLabel { background: #3d3d41; border-radius: 6px; }"));
+        QStringLiteral("QLabel { background: %1; border-radius: 6px; }").arg(QString::fromLatin1(Style::kBorderMuted)));
 
     m_statusLabel = new QLabel(tr("Alex-2 board: Not detected"), statusFrame);
     m_statusLabel->setStyleSheet(
@@ -472,7 +473,7 @@ void AntennaAlexAlex2Tab::updateBoardCapabilities(bool hasAlex2)
             QStringLiteral("QLabel { color: #6fa384; font-weight: bold; }"));
     } else {
         m_statusLed->setStyleSheet(
-            QStringLiteral("QLabel { background: #3d3d41; border-radius: 6px; }"));
+            QStringLiteral("QLabel { background: %1; border-radius: 6px; }").arg(QString::fromLatin1(Style::kBorderMuted)));
         m_statusLabel->setText(tr("Alex-2 board: Not detected"));
         m_statusLabel->setStyleSheet(
             QStringLiteral("QLabel { color: palette(mid); }"));
@@ -607,7 +608,7 @@ void AntennaAlexAlex2Tab::setLedLit(QFrame* led, bool lit)
             QStringLiteral("QFrame { background: #6fa384; border-radius: 6px; }"));
     } else {
         led->setStyleSheet(
-            QStringLiteral("QFrame { background: #3d3d41; border-radius: 6px; }"));
+            QStringLiteral("QFrame { background: %1; border-radius: 6px; }").arg(QString::fromLatin1(Style::kBorderMuted)));
     }
 }
 

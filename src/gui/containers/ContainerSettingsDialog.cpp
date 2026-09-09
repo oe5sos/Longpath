@@ -99,6 +99,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerSettingsDialog.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "ContainerManager.h"
 #include "MmioEndpointsDialog.h"
@@ -213,16 +214,17 @@ constexpr const char* kBtnStyle =
     "}"
     "QPushButton:hover { background: #203040; }";
 
-constexpr const char* kOkBtnStyle =
+const QString kOkBtnStyle = QStringLiteral(
     "QPushButton {"
     "  background: #4a7ba8;"
     "  color: #0f0f1a;"
-    "  border: 1px solid #cfe2f5;"
+    "  border: 1px solid %1;"
     "  border-radius: 6px;"
     "  padding: 4px 8px;"
     "  font-weight: bold;"
     "}"
-    "QPushButton:hover { background: #cfe2f5; }";
+    "QPushButton:hover { background: %1; }")
+    .arg(QString::fromLatin1(Style::kBlueText));
 
 constexpr const char* kEditStyle =
     "background: #0a0a18;"

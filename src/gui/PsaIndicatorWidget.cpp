@@ -105,6 +105,7 @@ mw0lge@grange-lane.co.uk
 
 
 #include "gui/PsaIndicatorWidget.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/MoxController.h"
@@ -607,11 +608,11 @@ void PsaIndicatorWidget::updateDisplay()
         if (m_stabilityAction == PsCorrectionAction::Withhold) {
             m_lblPs->setText(m_useSmallFonts ? tr("Wartet")
                                              : tr("PS wartet"));
-            applyBackground(m_lblPs, QColor(0xd4, 0xa2, 0x3c));
+            applyBackground(m_lblPs, QColor(Style::kBusyAmber));
         } else if (m_stabilityAction == PsCorrectionAction::Hold) {
             m_lblPs->setText(m_useSmallFonts ? tr("Halt")
                                              : tr("PS eingefroren"));
-            applyBackground(m_lblPs, QColor(0xd4, 0xa2, 0x3c));
+            applyBackground(m_lblPs, QColor(Style::kBusyAmber));
         } else if (m_correctionsApplied) {
             m_lblPs->setText(m_useSmallFonts ? tr("Correct")
                                              : tr("Correcting"));

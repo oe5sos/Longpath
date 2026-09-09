@@ -250,7 +250,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     // Grund: eine Mulde, oben minimal heller. Dieselbe Richtung wie bei
     // den Eingabefeldern — versenkt, nicht aufgelegt.
     QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0.0, QColor(0x10, 0x10, 0x14));
+    bg.setColorAt(0.0, QColor(Style::role("inset-bg-top", Style::kInsetBgTop)));
     bg.setColorAt(1.0, QColor(Style::role("inset-bg", Style::kInsetBg)));
     p.fillRect(rect(), bg);
 
@@ -756,7 +756,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         const int tw = fm.horizontalAdvance(t) + 14;
         const int cx = (xl + xh) / 2;
         const QRect box(cx - tw / 2, 8, tw, 17);
-        p.setBrush(QColor(0x0b, 0x0b, 0x0d));
+        p.setBrush(QColor(Style::role("app-bg", Style::kAppBg)));
         p.setPen(QColor(Style::role("border", Style::kBorder)));
         p.drawRoundedRect(box, 3, 3);
         p.setPen(ink);
