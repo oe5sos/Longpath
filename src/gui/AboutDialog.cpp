@@ -180,7 +180,8 @@ void AboutDialog::buildUI()
     auto* author = new QLabel(QStringLiteral("Created by JJ Boyd · KG4VCF"), this);
     author->setAlignment(Qt::AlignCenter);
     // §D exception: #aabbcc — author byline; lighter blue-gray than kTitleText (#8aa8c0).
-    author->setStyleSheet(QStringLiteral("color: #8e8e93; font-size: 13px;"));
+    author->setStyleSheet(QStringLiteral("color: %1; font-size: 13px;")
+        .arg(QString::fromLatin1(Style::kTextTertiary)));
     mainLayout->addWidget(author);
 
     // ── Divider ─────────────────────────────────────────────────────────
@@ -375,9 +376,10 @@ void AboutDialog::buildUI()
     for (const auto& lib : kLibraries) {
         // §D exception: #aabbcc — card subtitle blue-gray; lighter than kTitleText (#8aa8c0).
         auto* card = new QLabel(
-            QStringLiteral("<b>%1</b><br><span style=\"color:#8e8e93\">%2</span>")  // §D exception
+            QStringLiteral("<b>%1</b><br><span style=\"color:%3\">%2</span>")  // §D exception
                 .arg(QString::fromUtf8(lib.name),
-                     QString::fromUtf8(lib.desc)),
+                     QString::fromUtf8(lib.desc))
+                .arg(QString::fromLatin1(Style::kTextTertiary)),
             this);
         card->setAlignment(Qt::AlignCenter);
         card->setStyleSheet(

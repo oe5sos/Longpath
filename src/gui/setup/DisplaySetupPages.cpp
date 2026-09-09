@@ -2427,8 +2427,9 @@ void GridScalesPage::buildUI()
     // Larger + brighter than before — section-header style instead of an
     // inline note.  Cyan picks up the existing accent palette.
     m_editingBandLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #cfe2f5; font-size: 13px; font-weight: bold;"
-        " padding: 4px 0; }"));
+        "QLabel { color: %1; font-size: 13px; font-weight: bold;"
+        " padding: 4px 0; }")
+        .arg(QString::fromLatin1(Style::kBlueText)));
     gridForm->addRow(m_editingBandLabel);
 
     m_dbMaxSpin = new QSpinBox(gridGroup);

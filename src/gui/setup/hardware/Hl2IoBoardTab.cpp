@@ -120,6 +120,7 @@
 // =================================================================
 
 #include "Hl2IoBoardTab.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/BoardCapabilities.h"
@@ -171,7 +172,8 @@ static QFrame* makeLed(QWidget* parent)
     led->setFixedSize(12, 12);
     led->setFrameShape(QFrame::NoFrame);
     led->setStyleSheet(QStringLiteral(
-        "QFrame { background: #3d3d41; border-radius: 6px; }"));
+        "QFrame { background: %1; border-radius: 6px; }")
+        .arg(QString::fromLatin1(Style::kBorderMuted)));
     return led;
 }
 
@@ -182,7 +184,8 @@ static void setLedColor(QFrame* led, bool active)
             "QFrame { background: #6fa384; border-radius: 6px; }"));
     } else {
         led->setStyleSheet(QStringLiteral(
-            "QFrame { background: #3d3d41; border-radius: 6px; }"));
+            "QFrame { background: %1; border-radius: 6px; }")
+            .arg(QString::fromLatin1(Style::kBorderMuted)));
     }
 }
 

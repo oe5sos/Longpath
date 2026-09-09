@@ -14,6 +14,7 @@
 // =================================================================
 
 #include "TgxlAdvancedPage.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include <QAbstractTableModel>
@@ -649,12 +650,14 @@ void TgxlAdvancedPage::onTgxlStatusUpdated(const QMap<QString, QString>& kvs)
                                " border-radius: 6px; padding: 2px 6px;"));
         } else if (state == QStringLiteral("BYPASS")) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #1a1a1e; color: #8e8e93;"
-                               " border-radius: 6px; padding: 2px 6px;"));
+                QStringLiteral("background: #1a1a1e; color: %1;"
+                               " border-radius: 6px; padding: 2px 6px;")
+                    .arg(QString::fromLatin1(Style::kTextTertiary)));
         } else if (state == QStringLiteral("STANDBY")) {
             m_stateBadge->setStyleSheet(
-                QStringLiteral("background: #1a1a1e; color: #8e8e93;"
-                               " border-radius: 6px; padding: 2px 6px;"));
+                QStringLiteral("background: #1a1a1e; color: %1;"
+                               " border-radius: 6px; padding: 2px 6px;")
+                    .arg(QString::fromLatin1(Style::kTextTertiary)));
         } else if (state.startsWith(QStringLiteral("FAULT"))) {
             m_stateBadge->setStyleSheet(
                 QStringLiteral("background: #7a2c2e; color: #f0dcdc;"

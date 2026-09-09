@@ -556,7 +556,7 @@ void ConnectionPanel::buildUI()
     static const QString kPrimaryStyle = QStringLiteral(
         "QPushButton {"
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
-        "    stop:0 %1, stop:1 #254a72);"
+        "    stop:0 %1, stop:1 %8);"
         "  color: %2; border: 1px solid %3;"
         "  border-radius: 6px; padding: 6px 12px; font-weight: bold;"
         "}"
@@ -566,7 +566,7 @@ void ConnectionPanel::buildUI()
         .arg(QLatin1String(Style::kBlueBg), QLatin1String(Style::kBlueText),
              QLatin1String(Style::kBlueBorder), QLatin1String(Style::kBlueHover),
              QLatin1String(Style::kDisabledBg), QLatin1String(Style::kDisabledText),
-             QLatin1String(Style::kDisabledBorder));
+             QLatin1String(Style::kDisabledBorder), QLatin1String(Style::kBlueHover));
 
     static const QString kSecondaryStyle = QStringLiteral(
         "QPushButton {"

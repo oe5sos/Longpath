@@ -159,27 +159,32 @@ namespace OverlayColors {
     // MULDEN. Ein Knopf liegt auf der Flaeche und braucht einen eigenen
     // Grund und einen sichtbaren Rand. "Fast unsichtbar" heisst
     // zurueckhaltend gegenueber dem AKTIVEN Knopf, nicht unlesbar.
-    constexpr auto kMenuBtnNormal =
+    const QString kMenuBtnNormal = QStringLiteral(
         "QPushButton { background: #1a1a1e; "
         "border: 1px solid #2c2c31; border-radius: 6px; "
         "padding: 0 11px; "
         "color: #c4c4c9; font-size: 11px; font-weight: bold; }"
         "QPushButton:hover { background: #2f3138; "
-        "border: 1px solid #2f5c86; }";
+        "border: 1px solid %1; }")
+        .arg(QString::fromLatin1(Style::kBlueBorder));
 
     // Auswahl: Füllung, Rahmen und Text wörtlich aus HAUSSTIL §Token.
-    constexpr auto kMenuBtnActive =
+    const QString kMenuBtnActive = QStringLiteral(
         "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #254a72, stop:1 #254a72); "
-        "border: 1px solid #2f5c86; border-radius: 6px; "
+        "stop:0 %1, stop:1 %1); "
+        "border: 1px solid %2; border-radius: 6px; "
         "padding: 0 11px; "
-        "color: #cfe2f5; font-size: 11px; font-weight: bold; }";
+        "color: %3; font-size: 11px; font-weight: bold; }")
+        .arg(QString::fromLatin1(Style::kBlueBg),
+             QString::fromLatin1(Style::kBlueBorder),
+             QString::fromLatin1(Style::kBlueText));
 
-    constexpr auto kMenuBtnDisabled =
+    const QString kMenuBtnDisabled = QStringLiteral(
         "QPushButton { background: transparent; "
         "border: 1px solid #232327; border-radius: 6px; "
         "padding: 0 11px; "
-        "color: #3d3d41; font-size: 11px; font-weight: bold; }";
+        "color: %1; font-size: 11px; font-weight: bold; }")
+        .arg(QString::fromLatin1(Style::kBorderMuted));
 
     // ── Die Versalzeile über jeder Gruppe ───────────────────────────
     //
@@ -198,9 +203,10 @@ namespace OverlayColors {
         "QWidget#spectrumOverlayPanel { background: rgba(12, 12, 14, 232); "
         "border: 1px solid #1f1f23; border-radius: 6px; }";
 
-    constexpr auto kGroupHeadStyle =
-        "QLabel { color: #5c5c60; font-size: 9px; font-weight: bold; "
-        "background: transparent; }";
+    const QString kGroupHeadStyle = QStringLiteral(
+        "QLabel { color: %1; font-size: 9px; font-weight: bold; "
+        "background: transparent; }")
+        .arg(QString::fromLatin1(Style::kTextGroupHead));
 } // namespace OverlayColors
 
 // File-local helpers for opaque styles that diverge from the canonical

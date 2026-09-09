@@ -199,7 +199,7 @@ void AsrPage::probeEndpoint()
 
     const QUrl url = probeUrlFor(m_urlEdit->text());
     if (!url.isValid()) {
-        showProbeResult(tr("Adresse unlesbar"), QStringLiteral("#c85050"));
+        showProbeResult(tr("Adresse unlesbar"), QString::fromLatin1(Style::kTxRed));
         return;
     }
 
@@ -224,11 +224,11 @@ void AsrPage::probeEndpoint()
             || err == QNetworkReply::HostNotFoundError
             || err == QNetworkReply::TimeoutError
             || err == QNetworkReply::OperationCanceledError) {
-            showProbeResult(tr("niemand horcht dort"), QStringLiteral("#c85050"));
+            showProbeResult(tr("niemand horcht dort"), QString::fromLatin1(Style::kTxRed));
             return;
         }
         // Jede HTTP-Antwort -- auch 404 -- beweist, dass ein Dienst da ist.
-        showProbeResult(tr("Dienst antwortet"), QStringLiteral("#50c878"));
+        showProbeResult(tr("Dienst antwortet"), QString::fromLatin1(Style::kGreenText));
     });
 }
 

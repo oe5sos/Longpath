@@ -148,7 +148,7 @@ void RttyDecoderApplet::buildUI()
     m_lockCapsule->setFixedHeight(20);
     m_lockCapsule->setStyleSheet(QStringLiteral(
         "QLabel { background: %1; color: %2; border: 1px solid %3;"
-        " border-radius: 10px; padding: 0 10px; font-size: 10px; }")
+        " border-radius: 10px; padding: 0 10px; font-size: 9px; }")
         .arg(Style::kBadgeOffBg, Style::kTextTertiary, Style::kBorder));
     statusRow->addWidget(m_lockCapsule);
     root->addLayout(statusRow);
@@ -341,13 +341,13 @@ void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float 
         m_lockCapsule->setText(QStringLiteral("LOCK"));
         m_lockCapsule->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %3;"
-            " border-radius: 10px; padding: 0 10px; font-size: 10px; }")
+            " border-radius: 10px; padding: 0 10px; font-size: 9px; }")
             .arg(Style::kGreenBg, Style::kGreenText, Style::kGreenBorder));
     } else {
         m_lockCapsule->setText(QStringLiteral("KEIN LOCK"));
         m_lockCapsule->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %3;"
-            " border-radius: 10px; padding: 0 10px; font-size: 10px; }")
+            " border-radius: 10px; padding: 0 10px; font-size: 9px; }")
             .arg(Style::kBadgeOffBg, Style::kTextTertiary, Style::kBorder));
     }
 }

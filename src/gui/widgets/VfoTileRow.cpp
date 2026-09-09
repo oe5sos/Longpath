@@ -61,7 +61,7 @@ public:
                                                : Style::role("border", Style::kBorder));
         setStyleSheet(QStringLiteral(
             "QWidget { background: %1; border: 1px solid %2; border-radius: 3px; }")
-            .arg(active ? QStringLiteral("#16161c")
+            .arg(active ? Style::role("tile-active", Style::kTileActiveBg)
                         : Style::role("panel", Style::kPanelBg), border));
         m_top->setStyleSheet(QStringLiteral(
             "QLabel { border: none; color: %1; font-size: 9px; font-weight: bold; }")
@@ -186,7 +186,7 @@ void VfoTileRow::refresh()
                              m_kiwiOn ? QStringLiteral("AN")
                                       : QStringLiteral("AUS"));
         m_kiwiTile->setLook(
-            QColor(m_kiwiOn ? QStringLiteral("#4caf6a")
+            QColor(m_kiwiOn ? Style::role("live", Style::kLiveGreen)
                             : Style::role("text-scale", Style::kTextScale)),
             m_kiwiOn, false);
     }

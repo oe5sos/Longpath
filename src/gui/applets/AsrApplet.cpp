@@ -80,7 +80,7 @@ void AsrApplet::setService(AsrService* svc)
         // — ohne sie wuesste der Betreiber bei ausbleibendem Text
         // nicht, ob niemand spricht oder nichts ankommt.
         setStatus(on ? tr("hört") : tr("wartet"),
-                  on ? QStringLiteral("#4caf6a")
+                  on ? Style::role("live", Style::kLiveGreen)
                      : Style::role("text-scale", Style::kTextScale));
     });
     connect(svc, &AsrService::failed, this, [this](const QString& reason) {

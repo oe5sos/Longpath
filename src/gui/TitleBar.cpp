@@ -275,7 +275,7 @@ QColor ConnectionSegment::stateDotColor() const
             return m_pulseOn ? QColor("#6fa384") : QColor("#33684c");
         case ConnectionState::Probing:
         case ConnectionState::Connecting:
-            return m_pulseOn ? QColor("#4a7ba8") : QColor("#254a72");
+            return m_pulseOn ? QColor("#4a7ba8") : QColor(Style::kBluePulseDim);
         case ConnectionState::LinkLost:
             return m_pulseOn ? QColor("#c2924f") : QColor("#6b5426");
         case ConnectionState::Disconnected:
@@ -302,12 +302,12 @@ QColor ConnectionSegment::stateDotColor() const
             // aendert die andere mit oder streicht diesen Absatz.
             return QColor("#a8853f");
     }
-    return QColor("#5c5c60");
+    return QColor(Style::kTextGroupHead);
 }
 
 QColor ConnectionSegment::rttColor(int rttMs) const
 {
-    if (rttMs < 0)    { return QColor("#5c5c60"); }
+    if (rttMs < 0)    { return QColor(Style::kTextGroupHead); }
     if (rttMs < 50)   { return QColor("#6fa384"); }
     if (rttMs < 150)  { return QColor("#c2924f"); }
     return QColor("#a8853f");
@@ -355,7 +355,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     const int textY = height() / 2 + 4;
 
     if (m_state == ConnectionState::Disconnected) {
-        p.setPen(QColor("#5c5c60"));
+        p.setPen(QColor(Style::kTextGroupHead));
         p.drawText(x, textY, tr("Disconnected — click to connect"));
         m_lastRttX1 = m_lastRttX2 = 0;
         m_lastPipX1 = m_lastPipX2 = 0;
@@ -423,7 +423,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     if (m_lossWorstPct >= 0.0 && m_state == ConnectionState::Connected) {
         const double v = m_lossWorstPct;
         QColor c;
-        if (v < 0.01)      { c = QColor("#4a5a52"); }   // still, unauffaellig
+        if (v < 0.01)      { c = QColor(Style::kQuietTone); }   // still, unauffaellig
         else if (v < 0.10) { c = QColor("#6fa384"); }
         else if (v < 1.00) { c = QColor(Style::kAmberText); }
         else               { c = QColor(Style::kRedText); }
@@ -671,7 +671,7 @@ void TitleBar::setMenuBar(QMenuBar* mb)
     mb->setStyleSheet(QStringLiteral(
         "QMenuBar { background: transparent; color: %1; font-size: 13px; }"
         "QMenuBar::item { padding: 4px 8px; }"
-        "QMenuBar::item:selected { background: %2; color: #cfe2f5; }"
+        "QMenuBar::item:selected { background: %2; color: %7; }"
         "QMenu { background: %3; color: %5; border: 1px solid %4; }"
         "QMenu::item:selected { background: %6; }")
         .arg(QLatin1String(Style::kTitleText),
@@ -679,7 +679,8 @@ void TitleBar::setMenuBar(QMenuBar* mb)
              QLatin1String(Style::kAppBg),
              QLatin1String(Style::kOverlayBorder),
              QLatin1String(Style::kTextPrimary),
-             QLatin1String(Style::kBlueBg)));
+             QLatin1String(Style::kBlueBg))
+        .arg(QLatin1String(Style::kBlueText)));
     mb->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
     m_menuBar = mb;
     // Insert at position 0 (before the first stretch).

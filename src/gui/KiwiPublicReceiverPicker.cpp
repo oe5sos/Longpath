@@ -8,6 +8,7 @@
 //                steht in der Kopfdatei.
 
 #include "gui/KiwiPublicReceiverPicker.h"
+#include "gui/StyleConstants.h"
 
 #include <QAccessible>
 #include <QDialogButtonBox>
@@ -91,7 +92,8 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
     outer->addWidget(m_table, 1);
 
     m_status = new QLabel(tr("Loading public receivers…"));
-    m_status->setStyleSheet("QLabel { color: #8ea8c0; }");
+    m_status->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+        .arg(QString::fromLatin1(Style::kTextScale)));
     outer->addWidget(m_status);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
