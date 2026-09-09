@@ -13,6 +13,15 @@
 //   5. server stop                    → 0 resamplers
 //
 // Uses QWebSocket in loopback (same pattern as tst_tci_server_lifecycle.cpp).
+//
+// The post-sendAndProcess assertions use QTRY_COMPARE_WITH_TIMEOUT rather
+// than a plain QCOMPARE: sendAndProcess's own fixed QTest::qWait(30) is
+// normally enough for the server to process the just-sent text message
+// over the real loopback socket, but on a loaded/shared CI runner it
+// occasionally isn't (2026-09-08: totalResamplerInstances() was still 0
+// right after "client connected", before "audio resampler created" had
+// even logged — not reproducible locally). Polling with a generous
+// ceiling is both fast when healthy and robust under CI load.
 
 #ifdef HAVE_WEBSOCKETS
 
@@ -73,23 +82,23 @@ void TestTciResamplerLifecycle::resampler_lifecycle()
     auto* ws1 = connectClient(server);
     QVERIFY(ws1->state() == QAbstractSocket::ConnectedState);
     sendAndProcess(ws1, QStringLiteral("audio_start:0;"));
-    QCOMPARE(server.totalResamplerInstances(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
 
     // Step 3: client 2 subscribes to the same slice 0.
     auto* ws2 = connectClient(server);
     QVERIFY(ws2->state() == QAbstractSocket::ConnectedState);
     sendAndProcess(ws2, QStringLiteral("audio_start:0;"));
-    QCOMPARE(server.totalResamplerInstances(), 2);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 2, 2000);
 
     // Step 4: client 1 unsubscribes.
     sendAndProcess(ws1, QStringLiteral("audio_stop:0;"));
-    QCOMPARE(server.totalResamplerInstances(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
 
     // Step 5: server stop → 0 resamplers.
     ws1->deleteLater();
     ws2->deleteLater();
     server.stop();
-    QCOMPARE(server.totalResamplerInstances(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 0, 2000);
 }
 
 void TestTciResamplerLifecycle::audio_start_idempotent()
@@ -101,15 +110,15 @@ void TestTciResamplerLifecycle::audio_start_idempotent()
     QVERIFY(ws->state() == QAbstractSocket::ConnectedState);
 
     sendAndProcess(ws, QStringLiteral("audio_start:0;"));
-    QCOMPARE(server.totalResamplerInstances(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
 
     // Second audio_start for the same rx must not create another resampler.
     sendAndProcess(ws, QStringLiteral("audio_start:0;"));
-    QCOMPARE(server.totalResamplerInstances(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
 
     ws->deleteLater();
     server.stop();
-    QCOMPARE(server.totalResamplerInstances(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 0, 2000);
 }
 
 QTEST_GUILESS_MAIN(TestTciResamplerLifecycle)

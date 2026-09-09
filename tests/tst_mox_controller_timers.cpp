@@ -353,9 +353,18 @@ private slots:
     // ════════════════════════════════════════════════════════════════════════
     // §7 — Wall-clock cadence tests (real elapsed time)
     //
-    // These tests use QTest::qWait() to verify that the timers actually
-    // fire after real elapsed time, not just synchronously. Add generous
-    // overhead (2×) to avoid CI flakiness.
+    // These tests verify that the timers actually fire after real elapsed
+    // time, not just synchronously. A fixed QTest::qWait(80) followed by an
+    // immediate QCOMPARE was flaky on a loaded/shared CI runner (2026-09-08:
+    // two of these failed in GitHub Actions — ctrl.state() still Rx/no
+    // signal yet — while 405 other tests in the same run passed; not
+    // reproducible locally). QTRY_COMPARE_WITH_TIMEOUT polls and returns
+    // the moment the condition holds, so it is both faster on a healthy
+    // machine and robust under CI load, exactly the pattern
+    // docs/development/fast-test-loop.md already documents for
+    // tst_reconnect_on_silence. The negative "hasn't fired yet" checks
+    // right after setMox() stay plain QCOMPARE — those are intentionally
+    // synchronous, not something to poll for.
     // ════════════════════════════════════════════════════════════════════════
 
     void rxToTx_wallClock_stateIsTxAfterRfDelay()
@@ -367,9 +376,8 @@ private slots:
         // Immediately after setMox: state == RxToTxRfDelay.
         QCOMPARE(ctrl.state(), MoxState::RxToTxRfDelay);
 
-        // Wait long enough for rfDelay (30ms) to fire — allow 80ms overhead.
-        QTest::qWait(80);
-        QCOMPARE(ctrl.state(), MoxState::Tx);
+        // rfDelay (30ms) should fire well within this ceiling.
+        QTRY_COMPARE_WITH_TIMEOUT(ctrl.state(), MoxState::Tx, 2000);
     }
 
     void txToRx_wallClock_stateIsRxAfterBothDelays()
@@ -378,16 +386,14 @@ private slots:
         // Default intervals: keyUpDelay=10ms + pttOutDelay=20ms = 30ms total.
 
         ctrl.setMox(true);
-        QTest::qWait(80); // wait for RX→TX to complete first
-        QCOMPARE(ctrl.state(), MoxState::Tx);
+        QTRY_COMPARE_WITH_TIMEOUT(ctrl.state(), MoxState::Tx, 2000); // RX→TX first
 
         ctrl.setMox(false);
         // Immediately after setMox: state == TxToRxInFlight.
         QCOMPARE(ctrl.state(), MoxState::TxToRxInFlight);
 
-        // Wait for both delays (10 + 20 = 30ms total) with generous overhead.
-        QTest::qWait(80);
-        QCOMPARE(ctrl.state(), MoxState::Rx);
+        // Both delays (10 + 20 = 30ms total) should fire within this ceiling.
+        QTRY_COMPARE_WITH_TIMEOUT(ctrl.state(), MoxState::Rx, 2000);
     }
 
     void rxToTx_wallClock_moxStateChangedFiresAfterRfDelay()
@@ -400,8 +406,7 @@ private slots:
         // Before rfDelay fires: no signal.
         QCOMPARE(spy.count(), 0);
 
-        QTest::qWait(80);
-        QCOMPARE(spy.count(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
         QCOMPARE(spy.at(0).at(0).toBool(), true);
     }
 
@@ -410,15 +415,14 @@ private slots:
         MoxController ctrl;
 
         ctrl.setMox(true);
-        QTest::qWait(80);
+        QTRY_COMPARE_WITH_TIMEOUT(ctrl.state(), MoxState::Tx, 2000);
 
         QSignalSpy spy(&ctrl, &MoxController::moxStateChanged);
 
         ctrl.setMox(false);
         QCOMPARE(spy.count(), 0);
 
-        QTest::qWait(80);
-        QCOMPARE(spy.count(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
         QCOMPARE(spy.at(0).at(0).toBool(), false);
     }
 
