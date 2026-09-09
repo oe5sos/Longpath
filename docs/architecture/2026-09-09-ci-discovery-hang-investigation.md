@@ -1,17 +1,26 @@
 # CI-only (Linux) 120s GUI-test timeouts — investigation + fix
 
-> **Status: PARTIALLY RESOLVED, 2026-09-09.** Two real, confirmed bugs
-> found and fixed (one reproduced locally on macOS, not just inferred
-> from the CI log; the other proven by direct code reading plus a new
-> regression test). Both close the *possibility* of an unbounded
-> discovery-scan hang, which is necessary and sufficient to explain
-> CTest's 120s `TIMEOUT` firing. **What is NOT confirmed:** the exact
-> Linux-only condition that turns an ordinary, bounded discovery scan
-> into something slow enough to actually reach 120 seconds on GitHub
-> Actions runners specifically. No Linux, Docker, or `act` environment
-> was available in this session — see "What I could not confirm"
-> below for why that gap is being reported honestly instead of papered
-> over with a guess.
+> **Status: RESOLVED, 2026-09-09 (second pass, same day).** The
+> RadioDiscovery fix below (PR #9, merged as `988fa77e`) was shipped
+> first and closes two real, confirmed bugs — but a post-merge CI run
+> on `main` showed the *exact same* set of tests still timing out at
+> 120s, byte-for-byte identical to the pre-fix run, proving discovery
+> was never the actual cause. The real cause, found by reading the
+> post-merge CI log more carefully and confirmed against the source:
+> `MainWindow::showAudioDiagnoseDialog()` (Linux-only) pops a **modal**
+> dialog (`dlg->exec()`, no internal timeout) whenever no ALSA/JACK
+> device is detected and the "first run seen" flag isn't set — both
+> true on *every* Linux CI test run, never on macOS (the feature is
+> `#ifdef Q_OS_LINUX`-gated end to end) and never past the first real
+> launch on a real machine. Nothing in an automated test ever clicks
+> Dismiss, so `exec()` blocks forever and only CTest's own external
+> 120s `TIMEOUT` ever ends it. See "The actual root cause" below for
+> the full evidence chain. The RadioDiscovery fix stays — it closes two
+> real, independently-worthwhile bugs — but is not, and was never
+> confirmed to be, why CI was timing out. Everything under "The
+> failure" through "Verification performed" is kept as the original,
+> same-day writeup for the record; read "The actual root cause" for
+> what actually explains the timeouts.
 
 ## The failure
 
@@ -234,4 +243,130 @@ this investigation rather than assuming the fix was incomplete.
   anywhere near the 120s CTest `TIMEOUT`.
 - Not run: the full ~32-minute test suite (`docs/development/fast-test-loop.md`)
   and anything on an actual Linux CI runner — no Linux access this session.
+  The next CI run on this branch is the real confirmation. *(It ran; see
+  below — the RadioDiscovery fix had no effect on the failures.)*
+
+## The actual root cause
+
+PR #9 merged as `988fa77e`. `main`'s own post-merge CI run
+([34368565107](https://github.com/oe5sos/Longpath/actions/runs/34368565107))
+finished with the four Linux shards failing with the identical set of
+timeouts as the pre-fix reference run
+([34353708375](https://github.com/oe5sos/Longpath/actions/runs/34353708375))
+— not a subset, not a different set, the *same* tests in the *same* shards
+down to the test number:
+
+| Shard | Pre-fix failures | Post-fix failures |
+| --- | --- | --- |
+| 1/4 | `tst_real_container_move`, `tst_real_zoom_visible`, `tst_splitter_handles_grabbable`, `tst_real_notch_rightclick`, `tst_sunsdr_spectrum_wiring` | identical |
+| 2/4 | `tst_real_rotor_window`, `tst_kiwi_is_reachable`, `tst_compact_bar_draws`, `tst_every_applet_is_reachable`, `tst_settings_are_remembered`, `tst_a_second_receiver_can_be_closed`, `tst_zoom_buttons_do_something`, `tst_real_pan_float_state`, `tst_native_overlay_audit`, `tst_sunsdr_control_wiring` | (shard still running when checked; expected identical based on the other three) |
+| 3/4 | `tst_window_widgets`, `tst_kiwi_sdr_safety_gate`, `tst_sunsdr_audio_feed`, `tst_sunsdr_is_reachable`, `tst_todays_work_together`, `tst_sunsdr_connect_wiring` | identical |
+| 4/4 | `tst_real_mainwindow_detach`, `tst_quit_leaves_no_pending_deletes`, `tst_kiwi_tx_mute`, `tst_reachability_audit`, `tst_real_layout_profile_roundtrip` | identical |
+
+(This also means the failure was never actually limited to the 11 tests
+named at the start of this investigation — the real reference run had 26
+across all four shards. The 11 were whichever subset had been reported by
+the time this investigation started.)
+
+A deterministic, byte-for-byte-identical failure set before and after a fix
+that made the one thing it targeted strictly faster and strictly bounded is
+about as clean a "your fix didn't touch the actual mechanism" signal as CI
+can give. Time to go back to the log.
+
+**Reading shard 3/4's buffered dump for `tst_window_widgets` more
+carefully** (post-fix run) shows only **one** `Scanning NIC` line now (the
+double-scan fix worked) and `ConnectionPanel ctor total elapsed (ms): 2260`
+— a normal, bounded discovery cycle. The dump continues *past* that point
+this time, through `ConnectionPanel`'s own `show()`/`raise()` calls, and
+then stops with no further output at all. That "stops with no further
+output" gap is the same shape as before, just later in the sequence — the
+discovery scan was never the wall the process hit, it was just the last
+thing that happened to still be printing when the wall was hit slightly
+after. `tst_window_widgets`'s own test body
+(`tests/tst_window_widgets.cpp:29-51`) is:
+
+```cpp
+auto* mwp = new MainWindow();      // bewusst nicht abgeraeumt
+mwp->resize(1280, 800);
+mwp->show();
+QVERIFY(QTest::qWaitForWindowExposed(mwp));
+QTest::qWait(400);
+```
+
+`MainWindow`'s constructor queues its post-construction work via several
+`QTimer::singleShot(0, ...)` calls (the ConnectionPanel-open one already
+covered above, plus a spot-client auto-connect restore, a VAX first-run
+check, and — on Linux only — a Linux-audio first-run check). All of these
+only actually *run* once something pumps the event loop, which is exactly
+what `mwp->show()` and `QTest::qWaitForWindowExposed()` do. One of them,
+`MainWindow::showAudioDiagnoseDialog()` (`src/gui/MainWindow.cpp:14656`,
+scheduled at line 920), is:
+
+```cpp
+void MainWindow::showAudioDiagnoseDialog()
+{
+#if defined(Q_OS_LINUX)
+    AudioEngine* eng = m_radioModel->audioEngine();
+    if (!eng) { return; }
+    auto* dlg = new VaxLinuxFirstRunDialog(eng, this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->exec();          // <-- modal. blocks. no timeout.
+#endif
+}
+```
+
+`QDialog::exec()` is modal and blocks the calling thread until the dialog
+is closed — there is no internal timeout, and nothing in an automated,
+headless test run ever clicks its Dismiss button. It is scheduled
+whenever both are true:
+
+- `m_radioModel->audioEngine()->linuxBackend() == LinuxAudioBackend::None`
+  — every buffered CI dump in this investigation shows the exact log line
+  this produces: `QINFO: nereus.audio: Linux audio backend detected:
+  "None"`, immediately preceded by ALSA failing to find any card and JACK
+  failing to start. This is not inferred — it is printed, verbatim, by
+  every single one of the hanging tests' own logs. A GitHub Actions Linux
+  runner has no audio hardware at all, so this is `None` on every run,
+  every time.
+- `AppSettings::instance().value("Audio/LinuxFirstRunSeen", "False") !=
+  "True"` — every test binary runs under
+  `QStandardPaths::setTestModeEnabled(true)` (`tests/TestSandboxInit.cpp`,
+  linked into every `nereus_add_test()` target), which sandboxes
+  `AppSettings` to a **fresh** per-run config directory. `Audio/
+  LinuxFirstRunSeen` has never been set to `"True"` there, because nothing
+  has ever run in that fresh sandbox before. This is true for every test,
+  every time, on every platform whose sandbox is fresh — the reason it
+  only *matters* on Linux is that the dialog itself is Linux-only.
+
+Both conditions hold unconditionally, on every Linux CI test run, for
+every test that constructs a `MainWindow`. The dialog pops, `exec()`
+blocks forever, and CTest's own external 120s `TIMEOUT` per test
+(`tests/CMakeLists.txt`, `set_tests_properties(... TIMEOUT 120)`) is the
+only thing that ever ends it — which is exactly, precisely, what "the same
+tests time out at ~120.0x sec every single run, deterministically,
+regardless of what else in the process changes" looks like. This also
+explains why the RadioDiscovery fix made zero difference: it was correct
+and real, just downstream of a wall the process had already stopped
+walking toward.
+
+**The fix:** `showAudioDiagnoseDialog()` now returns immediately if
+`QStandardPaths::isTestModeEnabled()` is true, before touching
+`AudioEngine` or constructing the dialog. That function is `true` in
+every test binary (set unconditionally, before `main()`, by
+`TestSandboxInit.cpp`) and `false` in every real install (the shipped
+`Longpath` app never links `TestSandboxInit.cpp` and never calls
+`setTestModeEnabled`), so this is a no-op for actual users and a
+guaranteed skip for every automated test — it does not change what a real
+first-time Linux user sees on a real machine with no audio backend
+detected.
+
+**Not run against a live Linux CI job yet** — this fix is going out as its
+own PR; the next CI run on it is the real confirmation, the same caveat as
+the RadioDiscovery fix above, and for the same reason (no Linux/Docker/act
+access this session). What's different this time: the mechanism is a
+plain, unconditional `QDialog::exec()` with no environmental
+non-determinism involved at all (no network, no timing races, no "which
+condition triggers it" — both gating conditions are logged verbatim in
+every failing test's own output), so there is far less room for a third
+surprise here than there was for the discovery hypothesis.
   The next CI run on this branch is the real confirmation.
