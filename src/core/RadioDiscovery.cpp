@@ -623,6 +623,45 @@ static QByteArray buildP1DiscoveryProbe()
     return p;
 }
 
+RadioDiscovery::QuietPollOutcome RadioDiscovery::quietPollAttempt(
+    QUdpSocket& sock, int quietBeforeStop, int pollMs, const QDeadlineTimer& deadline,
+    const std::function<void(const QByteArray&, const QHostAddress&, quint16)>& onDatagram)
+{
+    int quietPolls = 0;
+    while (quietPolls < quietBeforeStop) {
+        // Cooperative cancel — see stopDiscovery(). Checked after each
+        // waitForReadyRead window so shutdown latency is at most one
+        // pollTimeoutMs (~150 ms on SafeDefault).
+        if (m_stopRequested.load(std::memory_order_acquire)) {
+            return QuietPollOutcome::Cancelled;
+        }
+        // Safety-net check — see this method's declaration for why a
+        // sustained "readable" condition below can't be trusted to end on
+        // its own within the documented time bound.
+        if (deadline.hasExpired()) {
+            return QuietPollOutcome::DeadlineExceeded;
+        }
+        // From Thetis: s.Poll(pollMs * 1000, SelectMode.SelectRead)
+        bool readable = sock.waitForReadyRead(pollMs);
+        if (!readable) {
+            quietPolls++;
+            continue;
+        }
+        // Reset quiet counter on activity — replies may be bursty
+        quietPolls = 0;
+
+        while (sock.hasPendingDatagrams()) {
+            QHostAddress senderAddr;
+            quint16 senderPort = 0;
+            QByteArray data;
+            data.resize(static_cast<int>(sock.pendingDatagramSize()));
+            sock.readDatagram(data.data(), data.size(), &senderAddr, &senderPort);
+            onDatagram(data, senderAddr, senderPort);
+        }
+    }
+    return QuietPollOutcome::Quiet;
+}
+
 void RadioDiscovery::scanAllNics()
 {
     // From Thetis clsRadioDiscovery.cs buildDiscoveryPacketP1()
@@ -709,33 +748,19 @@ void RadioDiscovery::scanAllNics()
             sock.writeDatagram(p1Packet, QHostAddress::Broadcast, kDiscoveryPort);
             sock.writeDatagram(p2Packet, QHostAddress::Broadcast, kDiscoveryPort);
 
-            int quietPolls = 0;
-            while (quietPolls < quietBeforeStop) {
-                // Cooperative cancel — see stopDiscovery(). Checked after
-                // each waitForReadyRead window so shutdown latency is at
-                // most one pollTimeoutMs (~150 ms on SafeDefault).
-                if (m_stopRequested.load(std::memory_order_acquire)) {
-                    sock.close();
-                    return;
-                }
-                // From Thetis: s.Poll(pollMs * 1000, SelectMode.SelectRead)
-                bool readable = sock.waitForReadyRead(pollMs);
-                if (!readable) {
-                    quietPolls++;
-                    continue;
-                }
-                // Reset quiet counter on activity — replies may be bursty
-                quietPolls = 0;
-
-                while (sock.hasPendingDatagrams()) {
-                    QHostAddress senderAddr;
-                    quint16 senderPort = 0;
-                    QByteArray data;
-                    data.resize(static_cast<int>(sock.pendingDatagramSize()));
-                    sock.readDatagram(data.data(), data.size(), &senderAddr, &senderPort);
-
+            // Safety-net bound for quietPollAttempt() below — one extra
+            // pollMs of slack so the ordinary "never went quiet" exit keeps
+            // deciding the normal case; the deadline exists only to catch a
+            // sustained readable-but-empty condition that would otherwise
+            // hold this attempt open forever (2026-09-09 CI investigation,
+            // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md).
+            const QDeadlineTimer attemptDeadline(qint64(quietBeforeStop + 1) * pollMs,
+                                                  Qt::CoarseTimer);
+            const QuietPollOutcome outcome = quietPollAttempt(
+                sock, quietBeforeStop, pollMs, attemptDeadline,
+                [&](const QByteArray& data, const QHostAddress& senderAddr, quint16 /*senderPort*/) {
                     if (data.size() < 11) {
-                        continue;
+                        return;
                     }
 
                     RadioInfo info;
@@ -749,17 +774,17 @@ void RadioDiscovery::scanAllNics()
                     }
 
                     if (!parsed) {
-                        continue;
+                        return;
                     }
 
                     // From Thetis: MAC-based de-duplication (seen set)
                     if (info.macAddress.isEmpty()
                         || info.macAddress == "00:00:00:00:00:00") {
-                        continue;
+                        return;
                     }
 
                     if (seenThisScan.contains(info.macAddress)) {
-                        continue;
+                        return;
                     }
                     seenThisScan.insert(info.macAddress);
 
@@ -775,8 +800,15 @@ void RadioDiscovery::scanAllNics()
                         m_radios[info.macAddress] = info;
                         emit radioUpdated(info);
                     }
-                }
+                });
+
+            if (outcome == QuietPollOutcome::Cancelled) {
+                sock.close();
+                return;
             }
+            // DeadlineExceeded: treat exactly like a normal Quiet exit and
+            // move on to the next attempt/NIC — see quietPollAttempt() for
+            // why this can happen and why it is safe to just continue.
         }
 
         sock.close();
