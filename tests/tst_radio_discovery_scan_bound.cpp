@@ -65,6 +65,27 @@ void floodLoopbackPort(quint16 port, std::atomic<bool>* stop)
     ::close(fd);
 }
 
+// Sends exactly one 1-byte UDP datagram to 127.0.0.1:`port` after sleeping
+// `delayMs`. Runs on its own std::thread for the same reason
+// floodLoopbackPort() does — the code under test blocks the calling thread
+// inside waitForReadyRead(), so a same-thread timer would never fire.
+void sendSingleDatagramAfterDelay(quint16 port, int delayMs)
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+    const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        return;
+    }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    const char payload = 0;
+    ::sendto(fd, &payload, sizeof(payload), 0,
+             reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+    ::close(fd);
+}
+
 } // namespace
 
 class TstRadioDiscoveryScanBound : public QObject {
@@ -110,6 +131,51 @@ private slots:
                  qPrintable(QStringLiteral(
                      "flooded quiet-poll loop took %1 ms — the deadline "
                      "safety net did not bound it").arg(elapsedMs)));
+    }
+
+    // Regression for the 2026-09-09 quietPolls-reset fix: a single bursty
+    // reply must leave the quiet counter where it was, not reset it to 0
+    // (From Thetis clsRadioDiscovery.cs:964-976 [@852bf0e] — only the
+    // not-readable branch touches quietPolls there). Sends exactly one
+    // datagram after kBurstDelayMs, i.e. after roughly
+    // kBurstDelayMs/kPollMs quiet polls have already elapsed. Fixed
+    // behaviour is invariant to when in the loop that single reply
+    // arrives: total time to Quiet stays close to kQuietBeforeStop *
+    // kPollMs, same as if no reply had come at all. The pre-fix
+    // reset-to-0 behaviour instead adds a full extra kQuietBeforeStop
+    // polls on top of however many had already elapsed before the burst,
+    // which for this delay would push it close to 270 ms instead of the
+    // fixed behaviour's ~180 ms — the threshold below sits clearly between
+    // the two so a regression back to reset-on-readable fails the test.
+    void aBurstyReplyDoesNotResetTheQuietCounter() {
+        RadioDiscovery disc;
+        QUdpSocket victim;
+        QVERIFY(victim.bind(QHostAddress::LocalHost, 0));
+
+        constexpr int kQuietBeforeStop = 6;
+        constexpr int kPollMs = 30;
+        constexpr int kBurstDelayMs = 3 * kPollMs;
+        const QDeadlineTimer deadline(qint64(kQuietBeforeStop + 4) * kPollMs, Qt::CoarseTimer);
+
+        std::thread burst(sendSingleDatagramAfterDelay, victim.localPort(), kBurstDelayMs);
+
+        QElapsedTimer clock;
+        clock.start();
+        const auto outcome =
+            disc.quietPollAttemptForTest(victim, kQuietBeforeStop, kPollMs, deadline);
+        const qint64 elapsedMs = clock.elapsed();
+
+        burst.join();
+
+        QCOMPARE(int(outcome), int(RadioDiscovery::QuietPollOutcome::Quiet));
+        QVERIFY2(elapsedMs < 8 * kPollMs,
+                 qPrintable(QStringLiteral(
+                     "bursty-reply quiet-poll loop took %1 ms — expected close "
+                     "to %2 ms (quietBeforeStop * pollMs); a reset-on-readable "
+                     "regression would push this past ~%3 ms")
+                     .arg(elapsedMs)
+                     .arg(kQuietBeforeStop * kPollMs)
+                     .arg((kBurstDelayMs / kPollMs + kQuietBeforeStop) * kPollMs)));
     }
 
     // No-regression check: with nothing flooding it, the loop must still

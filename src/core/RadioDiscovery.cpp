@@ -647,8 +647,12 @@ RadioDiscovery::QuietPollOutcome RadioDiscovery::quietPollAttempt(
             quietPolls++;
             continue;
         }
-        // Reset quiet counter on activity — replies may be bursty
-        quietPolls = 0;
+        // From Thetis clsRadioDiscovery.cs:964-976 [@852bf0e]: the
+        // readable branch never touches quietPolls — only the not-readable
+        // branch above does quietPolls++. A reply leaves the counter frozen
+        // at its prior value rather than resetting it to 0, so occasional
+        // (non-continuous) bursty replies don't push the natural
+        // give-up point back out any further than upstream does.
 
         while (sock.hasPendingDatagrams()) {
             QHostAddress senderAddr;
