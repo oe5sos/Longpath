@@ -58,6 +58,13 @@ static void drainEvents()
 {
     QCoreApplication::processEvents();
     QCoreApplication::processEvents(); // two passes: some timers fire on first pass
+    // Third pass, 2026-09-13: MoxController::onMicPttFromRadio(false) now
+    // starts m_micPttReleaseTailTimer (kMicPttReleaseTailMs, 0 via
+    // setTimerIntervals in these tests) instead of calling setMox(false)
+    // directly -- one more single-shot-timer hop before the release walk
+    // below it even starts, on top of the two passes that walk already
+    // needed.
+    QCoreApplication::processEvents();
 }
 
 class TestMoxControllerPttSourceDispatch : public QObject {

@@ -229,6 +229,16 @@ public:
     // 3M-2 CW QSK; not used in any 3M-1a path.
     static constexpr int kBreakInDelayMs = 300;
 
+    // NereusSDR-original (2026-09-13, operator-approved) — NOT a Thetis
+    // port; Thetis has no equivalent (its mox_delay/space_mox_delay are
+    // short hardware-settle waits AFTER MOX already drops, not a hold
+    // before dropping it). Modeled on a competing OpenHPSDR console's
+    // fix for hardware/mic PTT (a footswitch wired into the radio's mic-
+    // PTT line): releasing PTT the instant the switch opens can clip the
+    // tail of the last spoken syllable. Held here as a plain fixed
+    // constant rather than a Setup-page control -- see onMicPttFromRadio().
+    static constexpr int kMicPttReleaseTailMs = 150;
+
     // ── Getters ──────────────────────────────────────────────────────────────
     bool     isMox()      const noexcept { return m_mox; }
     MoxState state()      const noexcept { return m_state; }
@@ -284,8 +294,15 @@ public:
     //   ctrl.setTimerIntervals(0, 0, 0, 0, 0, 0);
     // so QCoreApplication::processEvents() drives the entire walk
     // without waiting for wall-clock time.
+    //
+    // micPttTailMs (2026-09-13, added with kMicPttReleaseTailMs -- NOT
+    // part of the Thetis B.3 chain above) defaults to 0 so every existing
+    // 6-argument call site above keeps its original all-synchronous
+    // behavior unchanged; pass it explicitly only to test the tail delay
+    // itself.
     void setTimerIntervals(int rfMs, int moxMs, int spaceMs,
-                           int keyUpMs, int pttOutMs, int breakInMs);
+                           int keyUpMs, int pttOutMs, int breakInMs,
+                           int micPttTailMs = 0);
 
 public slots:
     // setTune: engage / release the TUN function.
@@ -977,6 +994,10 @@ private slots:
     void onPttOutElapsed();
     void onBreakInDelayElapsed(); // declared for 3M-2 CW QSK; not started in 3M-1a
 
+    // NereusSDR-original -- see kMicPttReleaseTailMs / m_micPttReleaseTailTimer.
+    // Fires kMicPttReleaseTailMs after mic-PTT release; actually drops MOX.
+    void onMicPttReleaseTailElapsed();
+
 private:
     // isVoiceMode: true for the 8 voice-family DSP modes.
     //
@@ -1176,6 +1197,15 @@ private:
     QTimer m_keyUpDelayTimer;   // 10 ms — TX→RX: mox_delay (SSB) or key_up_delay (CW); drives TxToRxInFlight
     QTimer m_pttOutDelayTimer;  // 20 ms — TX→RX: HW settle before WDSP RX on; drives TxToRxFlush
     QTimer m_breakInDelayTimer; // 300 ms — 3M-2 CW QSK; NOT started from any B.3 logic
+
+    // NereusSDR-original, not part of the Thetis B.3 chain above -- see
+    // kMicPttReleaseTailMs's declaration comment. Started on mic-PTT
+    // release instead of calling setMox(false) immediately; stopAllTimers()
+    // (called at the top of every setMox()) cancels it the same way it
+    // cancels every other B.3 timer, so a fresh mic-PTT press (or any
+    // other setMox() call) during the hold correctly cancels the pending
+    // release.
+    QTimer m_micPttReleaseTailTimer;
 };
 
 } // namespace Longpath

@@ -134,6 +134,7 @@ MoxController::MoxController(QObject* parent)
     , m_keyUpDelayTimer(this)
     , m_pttOutDelayTimer(this)
     , m_breakInDelayTimer(this)
+    , m_micPttReleaseTailTimer(this)
 {
     // All timers are single-shot — each fires once then stops.
     m_rfDelayTimer.setSingleShot(true);
@@ -142,6 +143,7 @@ MoxController::MoxController(QObject* parent)
     m_keyUpDelayTimer.setSingleShot(true);
     m_pttOutDelayTimer.setSingleShot(true);
     m_breakInDelayTimer.setSingleShot(true);
+    m_micPttReleaseTailTimer.setSingleShot(true);
 
     // Set default intervals from Thetis constants.
     // From Thetis console.cs:19687 — private int rf_delay = 30 [v2.10.3.13]
@@ -156,6 +158,8 @@ MoxController::MoxController(QObject* parent)
     m_pttOutDelayTimer.setInterval(kPttOutDelayMs);
     // From Thetis console.cs:18494 — private double break_in_delay = 300 [v2.10.3.13]
     m_breakInDelayTimer.setInterval(kBreakInDelayMs);
+    // NereusSDR-original — see kMicPttReleaseTailMs.
+    m_micPttReleaseTailTimer.setInterval(kMicPttReleaseTailMs);
 
     // Wire timer timeouts to their advancement slots.
     connect(&m_rfDelayTimer,      &QTimer::timeout, this, &MoxController::onRfDelayElapsed);
@@ -164,6 +168,7 @@ MoxController::MoxController(QObject* parent)
     connect(&m_keyUpDelayTimer,   &QTimer::timeout, this, &MoxController::onKeyUpDelayElapsed);
     connect(&m_pttOutDelayTimer,  &QTimer::timeout, this, &MoxController::onPttOutElapsed);
     connect(&m_breakInDelayTimer, &QTimer::timeout, this, &MoxController::onBreakInDelayElapsed);
+    connect(&m_micPttReleaseTailTimer, &QTimer::timeout, this, &MoxController::onMicPttReleaseTailElapsed);
 }
 
 MoxController::~MoxController() = default;
@@ -177,7 +182,8 @@ MoxController::~MoxController() = default;
 // entire state walk without waiting for wall-clock time.
 // ---------------------------------------------------------------------------
 void MoxController::setTimerIntervals(int rfMs, int moxMs, int spaceMs,
-                                      int keyUpMs, int pttOutMs, int breakInMs)
+                                      int keyUpMs, int pttOutMs, int breakInMs,
+                                      int micPttTailMs)
 {
     m_rfDelayTimer.setInterval(rfMs);
     m_moxDelayTimer.setInterval(moxMs);
@@ -185,6 +191,7 @@ void MoxController::setTimerIntervals(int rfMs, int moxMs, int spaceMs,
     m_keyUpDelayTimer.setInterval(keyUpMs);
     m_pttOutDelayTimer.setInterval(pttOutMs);
     m_breakInDelayTimer.setInterval(breakInMs);
+    m_micPttReleaseTailTimer.setInterval(micPttTailMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,6 +656,12 @@ void MoxController::stopAllTimers()
     // but include it for completeness so future 3M-2 CW code gets the guard
     // for free.
     m_breakInDelayTimer.stop();
+    // NereusSDR-original — see kMicPttReleaseTailMs. Any setMox() call
+    // (this function runs at the top of every one) means MOX state is
+    // being decided afresh right now, so a still-pending "drop MOX after
+    // the tail" from an earlier mic-PTT release is stale and must not
+    // fire later.
+    m_micPttReleaseTailTimer.stop();
 }
 
 // ---------------------------------------------------------------------------
@@ -1204,9 +1217,33 @@ void MoxController::onMicPttFromRadio(bool pressed)
         // MOX button (PttMode::Manual) or TUN, or any other PTT source
         // had engaged transmit. Only the source that owns the current
         // MOX may release it.
+        //
+        // NereusSDR-original (2026-09-13, operator-approved) — don't drop
+        // MOX immediately; hold it for kMicPttReleaseTailMs so the tail of
+        // the last spoken syllable (a footswitch or the mic PTT button
+        // physically releasing a beat before speech actually stops) isn't
+        // clipped. m_micPttReleaseTailTimer.stop() runs at the top of
+        // EVERY setMox() call (stopAllTimers()), so a fresh mic-PTT press
+        // within the tail window correctly cancels this pending release
+        // instead of racing it.
         if (m_pttMode == PttMode::Mic) {
-            setMox(false);
+            m_micPttReleaseTailTimer.start();
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// onMicPttReleaseTailElapsed — NereusSDR-original; see kMicPttReleaseTailMs.
+//
+// Fires kMicPttReleaseTailMs after onMicPttFromRadio(false) started the
+// tail timer. Re-checks PttMode::Mic (not just trusting the timer fired)
+// because stopAllTimers() cancels this timer on every setMox() call --
+// if it still managed to fire, Mic must still be the owning source.
+// ---------------------------------------------------------------------------
+void MoxController::onMicPttReleaseTailElapsed()
+{
+    if (m_pttMode == PttMode::Mic) {
+        setMox(false);
     }
 }
 
