@@ -632,6 +632,18 @@ signals:
 
 private:
     bool m_initialized{false};
+    // Code review, 2026-09-13: guards initialize() re-entry for the
+    // window between "wisdom thread started" and "m_initialized flips
+    // true" -- m_initialized alone doesn't cover it, since that only
+    // happens in finishInitialization(), which can run up to ~15
+    // minutes after a cold-start wisdom thread was launched. A second
+    // initialize() call landing in that window (e.g. RadioModel::
+    // connectToRadio() re-entered via the Radio-menu reconnect action
+    // while the first call's nested wisdomLoop is still waiting) would
+    // otherwise start a second concurrent QThread running WDSPwisdom()
+    // against the same on-disk wisdom file and the same process-global,
+    // not-thread-safe FFTW planner state.
+    bool m_wisdomInProgress{false};
     QString m_configDir;
 
     // True when wisdom was regenerated this session.

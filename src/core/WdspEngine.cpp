@@ -141,6 +141,13 @@ bool WdspEngine::initialize(const QString& configDir)
         qCWarning(lcDsp) << "WdspEngine already initialized";
         return true;
     }
+    if (m_wisdomInProgress) {
+        // See m_wisdomInProgress's declaration comment (WdspEngine.h):
+        // m_initialized alone doesn't reject a re-entrant call landing
+        // while the first call's wisdom thread is still running.
+        qCWarning(lcDsp) << "WdspEngine wisdom generation already in progress; ignoring re-entrant initialize()";
+        return true;
+    }
 
 #ifdef HAVE_WDSP
     m_configDir = configDir;
@@ -204,11 +211,13 @@ bool WdspEngine::initialize(const QString& configDir)
     auto* pollTimer = new QTimer(this);
     pollTimer->setInterval(250);
 
+    m_wisdomInProgress = true;
     connect(wisdomThread, &QThread::finished, this,
             [this, wisdomThread, pollTimer, needsGeneration]() {
         pollTimer->stop();
         pollTimer->deleteLater();
         wisdomThread->deleteLater();
+        m_wisdomInProgress = false;
         emit wisdomProgress(100, QStringLiteral("FFTW planning complete"));
         finishInitialization(/*wisdomWasRebuilt=*/needsGeneration);
     });
