@@ -5791,6 +5791,9 @@ void MainWindow::buildUI()
         // wireSliceToSpectrum). rebindRttyRadeAvailability() deckt auch
         // hier den Null-Fall ab.
         rebindRttyRadeAvailability(slice);
+        // 2026-09-13 code review fix: same bug class, same fix shape --
+        // see rebindTunerAppletBand()'s own doc comment.
+        rebindTunerAppletBand(slice);
         if (!slice) { return; }
         // Phase 3F Sub-Epic J Task 11: RadioModel::rxChannelForSlice()
         // replaces the direct wdspEngine()->rxChannel() reach.
@@ -5803,6 +5806,7 @@ void MainWindow::buildUI()
     // auf ihrem Vorgabewert statt auf dem, was das Gerät tut.
     if (m_commandBar) { m_commandBar->attach(m_radioModel->activeSlice()); }
     rebindRttyRadeAvailability(m_radioModel->activeSlice());
+    rebindTunerAppletBand(m_radioModel->activeSlice());
 
     // H.2 (Phase 3M-1a): wire MoxController::moxStateChanged → MeterPoller::setInTx.
     // Switches the poll set between RX meters (TX off) and TX meters (TX on).
@@ -6355,6 +6359,16 @@ void MainWindow::populateDefaultMeter()
     auto* txApplet = new TxApplet(m_radioModel, nullptr);
     m_txApplet = txApplet;
     panel->addApplet(txApplet);
+
+    // 2026-09-13 code review fix: TxApplet's MOX-tooltip and TX-filter-
+    // status-label bindings are only ever made against whichever slice is
+    // active AT THE TIME rebindActiveSlice() runs (once at construction,
+    // above, when there is usually no active slice yet) -- mirrors how
+    // m_rxApplet is re-bound via RxApplet::setSlice() a few lines above.
+    if (m_radioModel) {
+        connect(m_radioModel, &RadioModel::activeSliceChanged, txApplet,
+                [txApplet](int) { txApplet->rebindActiveSlice(); });
+    }
 
     // ── 3M-1c Phase L: hand TxApplet the controllers it needs ──────────────
     //
@@ -11731,6 +11745,25 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     m_rttyRadeLinks << connect(slice, &SliceModel::dspModeChanged, this, applyForMode);
 }
 
+void MainWindow::rebindTunerAppletBand(SliceModel* slice)
+{
+    // Same idiom as rebindRttyRadeAvailability() just above, same bug
+    // class: wireSliceToSpectrum() used to wire this once, to whichever
+    // slice existed at slice-0-added time (Phase 3P-II review fix C1),
+    // never re-bound on a later active-slice change. Bench-found via
+    // code review 2026-09-13.
+    disconnect(m_tunerAppletBandConn);
+    m_tunerAppletBandConn = {};
+
+    if (!m_tunerApplet || !slice) { return; }
+
+    m_tunerAppletBandConn = connect(slice, &SliceModel::bandChanged,
+                                     m_tunerApplet, &TunerApplet::setBand);
+    // Seed with the slice's current band immediately -- bandChanged only
+    // fires on a later band crossing, not on this initial snapshot.
+    m_tunerApplet->setBand(bandFromFrequency(slice->frequency()));
+}
+
 void MainWindow::wireSliceToSpectrum()
 {
     SliceModel* slice = m_radioModel->activeSlice();
@@ -12267,16 +12300,14 @@ void MainWindow::wireSliceToSpectrum()
         }
     });
 
-    // Phase 3P-II review fix C1: keep TunerApplet m_currentBand in sync so
-    // right-click Save/Recall/Clear actions always address the actual current
-    // (antenna, band) slot rather than the Band::Band20m default.
-    if (m_tunerApplet) {
-        connect(slice, &SliceModel::bandChanged,
-                m_tunerApplet, &TunerApplet::setBand);
-        // Seed with the slice's current band so the first context-menu open
-        // before any band crossing is already correct.
-        m_tunerApplet->setBand(bandFromFrequency(slice->frequency()));
-    }
+    // Phase 3P-II review fix C1 / 2026-09-13 code review fix: keep
+    // TunerApplet's band tracking in sync so right-click Save/Recall/Clear
+    // actions always address the actual active slice's (antenna, band)
+    // slot. Moved into rebindTunerAppletBand() -- called here for the
+    // first slice, and again by the activeSliceChanged handler whenever
+    // the active slice changes identity (this call site alone only ever
+    // wired slice 0, forever; see that method's doc comment).
+    rebindTunerAppletBand(slice);
 }
 
 // ── CPU usage source toggle ──────────────────────────────────────────────────

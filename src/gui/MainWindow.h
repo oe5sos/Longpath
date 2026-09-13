@@ -738,6 +738,18 @@ private:
     /// activeSliceChanged handler that already re-binds CommandBar.
     void rebindRttyRadeAvailability(class SliceModel* slice);
 
+    /// Re-bind TunerApplet::setBand to `slice`'s bandChanged (nullptr
+    /// included) and immediately seed it with that slice's current band.
+    /// Same fix shape as rebindRttyRadeAvailability() just above, for the
+    /// same underlying bug class: wireSliceToSpectrum() used to wire this
+    /// ONCE, to whichever slice existed at slice-0-added time, so
+    /// TunerApplet's Save/Recall/Clear context-menu actions kept reading/
+    /// writing the wrong (antenna, band) slot after the active slice
+    /// changed identity. Called from wireSliceToSpectrum() (first slice)
+    /// and from the same activeSliceChanged handler that re-binds
+    /// CommandBar and RttyDecoderApplet.
+    void rebindTunerAppletBand(class SliceModel* slice);
+
     /// Stream 0's engine. Back-compat accessor for call sites that still
     /// address "the" FFT engine (display settings, Max Bin, auto-zoom).
     FFTEngine* primaryFftEngine() const { return m_fftEngines.value(0, nullptr); }
@@ -1573,6 +1585,12 @@ private:
     class BandwidthFilterApplet* m_bwFilterApplet{nullptr};
     class CatApplet*        m_catApplet{nullptr};
     class TunerApplet*      m_tunerApplet{nullptr};
+    // Code review, 2026-09-13: rebindTunerAppletBand() re-makes this on
+    // every RadioModel::activeSliceChanged so TunerApplet's Save/Recall/
+    // Clear actions always address the truly active slice's band -- see
+    // rebindTunerAppletBand()'s own comment for the bug this replaces
+    // (wireSliceToSpectrum() used to wire this once, to slice 0, forever).
+    QMetaObject::Connection m_tunerAppletBandConn;
 
     // Phase 3P-III Task 14: RF-Kit RF2K-S applet.
     class Rf2ksApplet*      m_rfKitApplet{nullptr};
