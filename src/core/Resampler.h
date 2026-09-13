@@ -83,8 +83,26 @@ public:
     double dstRate() const { return m_dstRate; }
 
 private:
+    // NereusSDR-original (2026-09-13, code review): clamps every
+    // process*() entry point's sample count to m_maxBlockSamples before
+    // it reaches m_inBuf/m_resampler. m_inBuf.reserve(maxBlockSamples)
+    // in the constructor only avoids reallocation within that capacity
+    // -- it never stopped resize() from growing past it -- and
+    // m_resampler (r8b::CDSPResampler24) was itself constructed for at
+    // most maxBlockSamples samples per call; a caller handing in more
+    // (e.g. a PortAudio host API callback with a larger-than-requested
+    // frame count around stream start/stop or a device reconfiguration)
+    // previously reallocated m_inBuf on the calling thread -- realtime
+    // audio callback included -- and hand r8brain more samples than it
+    // was sized for. All five methods below funnel through this.
+    int clampToCapacity(int numSamples) const
+    {
+        return numSamples > m_maxBlockSamples ? m_maxBlockSamples : numSamples;
+    }
+
     double m_srcRate;
     double m_dstRate;
+    int m_maxBlockSamples;
     std::unique_ptr<r8b::CDSPResampler24> m_resampler;
     std::vector<double> m_inBuf;   // float32 -> double conversion buffer
 };

@@ -427,10 +427,21 @@ bool PortAudioBus::open(const AudioFormat& format) {
         // block than we asked for.
         m_monoScratch.assign(
             static_cast<size_t>(std::max(1, m_cfg.bufferSamples) * 2), 0.0f);
+        // Code review, 2026-09-13: worstInputSamples above carries zero
+        // slack, unlike worstOutputSamples' explicit 4x margin just a
+        // few lines up. PortAudio's framesPerBuffer is a request to
+        // Pa_OpenStream(), not a hard contract -- CoreAudio can hand
+        // paCallback a larger frame count around stream start/stop or a
+        // device reconfiguration. Give the input resampler's hard
+        // maxBlockSamples the same 4x+256 headroom the output side
+        // already has, so an oversized callback resizes within reserved
+        // capacity (Resampler::clampToCapacity() also now backstops
+        // this even if the margin is somehow still not enough).
+        const int inputResamplerCapacity = worstInputSamples * 4 + 256;
         m_inputResampler = std::make_unique<Resampler>(
             static_cast<double>(openRate),
             static_cast<double>(requestedRate),
-            worstInputSamples);
+            inputResamplerCapacity);
         qCInfo(lcAudio).noquote()
             << QStringLiteral("PortAudioBus: mic opened at native %1 Hz, "
                               "resampling to %2 Hz via r8brain "

@@ -32,6 +32,7 @@ namespace Longpath {
 Resampler::Resampler(double srcRate, double dstRate, int maxBlockSamples)
     : m_srcRate(srcRate)
     , m_dstRate(dstRate)
+    , m_maxBlockSamples(maxBlockSamples)
     , m_resampler(std::make_unique<r8b::CDSPResampler24>(srcRate, dstRate, maxBlockSamples))
 {
     m_inBuf.reserve(maxBlockSamples);
@@ -44,6 +45,7 @@ Resampler::~Resampler() = default;
 QByteArray Resampler::process(const float* in, int numSamples)
 {
     if (numSamples <= 0) return {};
+    numSamples = clampToCapacity(numSamples);
 
     // Convert float32 -> double
     m_inBuf.resize(numSamples);
@@ -75,6 +77,7 @@ int Resampler::processInto(const float* in, int numSamples,
         out == nullptr || outCapacity <= 0) {
         return 0;
     }
+    numSamples = clampToCapacity(numSamples);
 
     // Convert float32 -> double.  m_inBuf was reserved to maxBlockSamples
     // in the constructor; resize() within that capacity is allocation-free.
@@ -104,6 +107,7 @@ int Resampler::processInto(const float* in, int numSamples,
 QByteArray Resampler::processStereoToMono(const float* stereoIn, int numStereoFrames)
 {
     if (numStereoFrames <= 0) return {};
+    numStereoFrames = clampToCapacity(numStereoFrames);
 
     // Downmix stereo -> mono
     m_inBuf.resize(numStereoFrames);
@@ -128,6 +132,7 @@ QByteArray Resampler::processStereoToMono(const float* stereoIn, int numStereoFr
 QByteArray Resampler::processMonoToStereo(const float* monoIn, int numSamples)
 {
     if (numSamples <= 0) return {};
+    numSamples = clampToCapacity(numSamples);
 
     // Convert float32 -> double
     m_inBuf.resize(numSamples);
@@ -155,6 +160,7 @@ QByteArray Resampler::processMonoToStereo(const float* monoIn, int numSamples)
 QByteArray Resampler::processStereoToStereo(const float* stereoIn, int numStereoFrames)
 {
     if (numStereoFrames <= 0) return {};
+    numStereoFrames = clampToCapacity(numStereoFrames);
 
     // Downmix stereo -> mono, resample, duplicate back to stereo
     m_inBuf.resize(numStereoFrames);
