@@ -160,21 +160,38 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         // this tick. From Thetis TCIServer.cs:1722-1727 [v2.10.3.13].
         m_protocol->drainCoalescedNotifications();
 
+        // Code review, 2026-09-13: ws->sendTextMessage()/sendBinaryMessage()
+        // below can synchronously drive a socket to UnconnectedState on a
+        // broken pipe / peer reset, which emits QWebSocket::disconnected()
+        // same-thread (no queued connection anywhere in this class) and
+        // reenters onClientDisconnected() -> m_clients.erase() on the very
+        // entry a loop below may be parked on -- invalidating that loop's
+        // iterator and dangling a `session` reference bound into the erased
+        // hash node. stop() already guards the analogous hazard around its
+        // own close() calls (see its comment); the three loops below did
+        // not. A snapshot copy is the minimal fix: QHash's value type here
+        // is std::shared_ptr<TciClientSession>, so copying the hash is a
+        // cheap key-pointer + refcount-bump copy, and iterating the copy
+        // is unaffected by whatever onClientDisconnected() does to the
+        // real m_clients meanwhile -- each snapshot entry keeps its own
+        // session alive regardless.
+        const QHash<QWebSocket*, std::shared_ptr<TciClientSession>> clientsSnapshot = m_clients;
+
         // Broadcast any drained notifications to all clients.
         // Without this, drainCoalescedNotifications() populates
         // m_pendingNotifications but nothing pumps it to the send queues.
         while (m_protocol->hasPendingNotification()) {
             const QString notif = m_protocol->takePendingNotification();
-            for (auto sit = m_clients.cbegin(); sit != m_clients.cend(); ++sit) {
+            for (auto sit = clientsSnapshot.cbegin(); sit != clientsSnapshot.cend(); ++sit) {
                 sit.value()->sendQueue.push(TciSendQueue::Priority::Control, notif);
             }
         }
 
         // Phase 14 per-client send-queue drain (unchanged):
         constexpr int kDrainMaxPerTick = 64;
-        for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
+        for (auto it = clientsSnapshot.begin(); it != clientsSnapshot.end(); ++it) {
             QWebSocket* ws    = it.key();
-            auto&       session = it.value();
+            const auto& session = it.value();
             QString frame;
             int drained = 0;
             while (drained < kDrainMaxPerTick && session->sendQueue.tryPop(&frame)) {
@@ -204,9 +221,9 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         // From Thetis TCIServer.cs:5444-5512 [v2.10.3.13] — the sendRXAudioStream
         // loop reads samples, resamples, encodes, and calls sendBinaryFrame.
         // NereusSDR replicates this per drain-tick rather than in a dedicated thread.
-        for (auto cit = m_clients.begin(); cit != m_clients.end(); ++cit) {
+        for (auto cit = clientsSnapshot.begin(); cit != clientsSnapshot.end(); ++cit) {
             QWebSocket* ws = cit.key();
-            auto& session  = cit.value();
+            const auto& session  = cit.value();
 
             for (int rx : session->audioStreamEnabled) {
                 if (rx < 0 || rx >= kMaxTciRxSlices) { continue; }
@@ -2652,7 +2669,12 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
     // once more than RX1 streams.
     const int iqSampleRate = m_model ? m_model->iqSampleRate() : 192000;
 
-    for (auto it = m_clients.cbegin(); it != m_clients.cend(); ++it) {
+    // Code review, 2026-09-13: same m_clients-iterator/dangling-session
+    // hazard as the drain timer's loops above (ws->sendBinaryMessage()
+    // can synchronously trigger onClientDisconnected() -> m_clients.erase()
+    // mid-loop) -- snapshot for the same reason.
+    const QHash<QWebSocket*, std::shared_ptr<TciClientSession>> clientsSnapshot = m_clients;
+    for (auto it = clientsSnapshot.cbegin(); it != clientsSnapshot.cend(); ++it) {
         QWebSocket* ws     = it.key();
         const auto& session = it.value();
 
