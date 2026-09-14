@@ -326,6 +326,18 @@ class SliceModel : public QObject {
     Q_PROPERTY(double nr4PostThresh READ nr4PostThresh WRITE setNr4PostThresh NOTIFY nr4PostThreshChanged)
     Q_PROPERTY(Longpath::SbnrAlgo nr4Algo READ nr4Algo WRITE setNr4Algo NOTIFY nr4AlgoChanged)
 
+    // NNR (WDSP 2.10 Neural Noise Reduction) — no Thetis precedent.
+    // Model weight files are GLOBAL (SetNNRModelPathSlot), not per-slice.
+    Q_PROPERTY(Longpath::NrPosition nnrPosition READ nnrPosition WRITE setNnrPosition NOTIFY nnrPositionChanged)
+    Q_PROPERTY(int    nnrModel      READ nnrModel      WRITE setNnrModel      NOTIFY nnrModelChanged)
+    Q_PROPERTY(double nnrMaskFloor  READ nnrMaskFloor  WRITE setNnrMaskFloor  NOTIFY nnrMaskFloorChanged)
+    Q_PROPERTY(double nnrAlpha      READ nnrAlpha      WRITE setNnrAlpha      NOTIFY nnrAlphaChanged)
+    Q_PROPERTY(double nnrAlphaKnee  READ nnrAlphaKnee  WRITE setNnrAlphaKnee  NOTIFY nnrAlphaKneeChanged)
+    Q_PROPERTY(double nnrTau        READ nnrTau        WRITE setNnrTau        NOTIFY nnrTauChanged)
+    Q_PROPERTY(double nnrMaxGain    READ nnrMaxGain    WRITE setNnrMaxGain    NOTIFY nnrMaxGainChanged)
+    Q_PROPERTY(double nnrAttackMs   READ nnrAttackMs   WRITE setNnrAttackMs   NOTIFY nnrAttackMsChanged)
+    Q_PROPERTY(double nnrReleaseMs  READ nnrReleaseMs  WRITE setNnrReleaseMs  NOTIFY nnrReleaseMsChanged)
+
     // DFNR — AttenLimit + PostFilterBeta.
     Q_PROPERTY(double dfnrAttenLimit     READ dfnrAttenLimit     WRITE setDfnrAttenLimit     NOTIFY dfnrAttenLimitChanged)
     Q_PROPERTY(double dfnrPostFilterBeta READ dfnrPostFilterBeta WRITE setDfnrPostFilterBeta NOTIFY dfnrPostFilterBetaChanged)
@@ -888,6 +900,26 @@ public:
     Longpath::SbnrAlgo nr4Algo() const { return m_nr4Algo; }
     void                setNr4Algo(Longpath::SbnrAlgo v);
 
+    // NNR
+    Longpath::NrPosition nnrPosition() const { return m_nnrPosition; }
+    void   setNnrPosition(Longpath::NrPosition p);
+    int    nnrModel()      const { return m_nnrModel; }
+    void   setNnrModel(int v);
+    double nnrMaskFloor()  const { return m_nnrMaskFloor; }
+    void   setNnrMaskFloor(double v);
+    double nnrAlpha()      const { return m_nnrAlpha; }
+    void   setNnrAlpha(double v);
+    double nnrAlphaKnee()  const { return m_nnrAlphaKnee; }
+    void   setNnrAlphaKnee(double v);
+    double nnrTau()        const { return m_nnrTau; }
+    void   setNnrTau(double v);
+    double nnrMaxGain()    const { return m_nnrMaxGain; }
+    void   setNnrMaxGain(double v);
+    double nnrAttackMs()   const { return m_nnrAttackMs; }
+    void   setNnrAttackMs(double v);
+    double nnrReleaseMs()  const { return m_nnrReleaseMs; }
+    void   setNnrReleaseMs(double v);
+
     // DFNR
     double dfnrAttenLimit()     const { return m_dfnrAttenLimit; }
     void   setDfnrAttenLimit(double v);
@@ -1191,6 +1223,15 @@ signals:
     void nr4RescaleChanged(double v);
     void nr4PostThreshChanged(double v);
     void nr4AlgoChanged(Longpath::SbnrAlgo v);
+    void nnrPositionChanged(Longpath::NrPosition v);
+    void nnrModelChanged(int v);
+    void nnrMaskFloorChanged(double v);
+    void nnrAlphaChanged(double v);
+    void nnrAlphaKneeChanged(double v);
+    void nnrTauChanged(double v);
+    void nnrMaxGainChanged(double v);
+    void nnrAttackMsChanged(double v);
+    void nnrReleaseMsChanged(double v);
     void dfnrAttenLimitChanged(double v);
     void dfnrPostFilterBetaChanged(double v);
     void bnrStrengthChanged(double v);
@@ -1375,6 +1416,17 @@ private:
     double m_nr4Rescale    = 2.0;      // setup.cs default
     double m_nr4PostThresh = -10.0;    // setup.cs default
     Longpath::SbnrAlgo m_nr4Algo = Longpath::SbnrAlgo::Algo2;  // setup.cs:34511-34527
+    // NNR — defaults match WDSP's own internal defaults (RXA.c create_nnr(),
+    // nnet.c NNET_TAU_DEFAULT/NNET_GMAX_DB). See RxChannel.h NnrTuning.
+    Longpath::NrPosition m_nnrPosition = Longpath::NrPosition::PostAgc;
+    int    m_nnrModel      = 0;
+    double m_nnrMaskFloor  = -25.0;
+    double m_nnrAlpha      = 1.0;
+    double m_nnrAlphaKnee  = 10.0;
+    double m_nnrTau        = 2.0;
+    double m_nnrMaxGain    = 12.0;
+    double m_nnrAttackMs   = 0.0;
+    double m_nnrReleaseMs  = 0.0;
 
     // DFNR — AetherSDR DeepFilterFilter defaults [@0cd4559] (post-WDSP, not
     // in Thetis). m_attenLimit{100.0f}, m_postFilterBeta{0.0f} verbatim.

@@ -1581,6 +1581,62 @@ void SliceModel::setNr4Algo(Longpath::SbnrAlgo v)
     emit nr4AlgoChanged(v);
 }
 
+// NNR
+void SliceModel::setNnrPosition(Longpath::NrPosition p)
+{
+    if (m_nnrPosition == p) { return; }
+    m_nnrPosition = p;
+    emit nnrPositionChanged(p);
+}
+void SliceModel::setNnrModel(int v)
+{
+    if (m_nnrModel == v) { return; }
+    m_nnrModel = v;
+    emit nnrModelChanged(v);
+}
+void SliceModel::setNnrMaskFloor(double v)
+{
+    if (m_nnrMaskFloor == v) { return; }
+    m_nnrMaskFloor = v;
+    emit nnrMaskFloorChanged(v);
+}
+void SliceModel::setNnrAlpha(double v)
+{
+    if (m_nnrAlpha == v) { return; }
+    m_nnrAlpha = v;
+    emit nnrAlphaChanged(v);
+}
+void SliceModel::setNnrAlphaKnee(double v)
+{
+    if (m_nnrAlphaKnee == v) { return; }
+    m_nnrAlphaKnee = v;
+    emit nnrAlphaKneeChanged(v);
+}
+void SliceModel::setNnrTau(double v)
+{
+    if (m_nnrTau == v) { return; }
+    m_nnrTau = v;
+    emit nnrTauChanged(v);
+}
+void SliceModel::setNnrMaxGain(double v)
+{
+    if (m_nnrMaxGain == v) { return; }
+    m_nnrMaxGain = v;
+    emit nnrMaxGainChanged(v);
+}
+void SliceModel::setNnrAttackMs(double v)
+{
+    if (m_nnrAttackMs == v) { return; }
+    m_nnrAttackMs = v;
+    emit nnrAttackMsChanged(v);
+}
+void SliceModel::setNnrReleaseMs(double v)
+{
+    if (m_nnrReleaseMs == v) { return; }
+    m_nnrReleaseMs = v;
+    emit nnrReleaseMsChanged(v);
+}
+
 // DFNR
 void SliceModel::setDfnrAttenLimit(double v)
 {
@@ -2302,6 +2358,16 @@ void SliceModel::saveToSettings(Band band)
     s.setValue(sp + QStringLiteral("Nr4Rescale"),      m_nr4Rescale);
     s.setValue(sp + QStringLiteral("Nr4PostThresh"),   m_nr4PostThresh);
     s.setValue(sp + QStringLiteral("Nr4Algo"),         static_cast<int>(m_nr4Algo));
+    // NNR
+    s.setValue(sp + QStringLiteral("NnrPosition"),  static_cast<int>(m_nnrPosition));
+    s.setValue(sp + QStringLiteral("NnrModel"),     m_nnrModel);
+    s.setValue(sp + QStringLiteral("NnrMaskFloor"), m_nnrMaskFloor);
+    s.setValue(sp + QStringLiteral("NnrAlpha"),     m_nnrAlpha);
+    s.setValue(sp + QStringLiteral("NnrAlphaKnee"), m_nnrAlphaKnee);
+    s.setValue(sp + QStringLiteral("NnrTau"),       m_nnrTau);
+    s.setValue(sp + QStringLiteral("NnrMaxGain"),   m_nnrMaxGain);
+    s.setValue(sp + QStringLiteral("NnrAttackMs"),  m_nnrAttackMs);
+    s.setValue(sp + QStringLiteral("NnrReleaseMs"), m_nnrReleaseMs);
     // DFNR
     s.setValue(sp + QStringLiteral("DfnrAttenLimit"),     m_dfnrAttenLimit);
     s.setValue(sp + QStringLiteral("DfnrPostFilterBeta"), m_dfnrPostFilterBeta);
@@ -2561,6 +2627,34 @@ void SliceModel::restoreFromSettings(Band band)
     }
     if (s.contains(sp + QStringLiteral("Nr4Algo"))) {
         setNr4Algo(static_cast<Longpath::SbnrAlgo>(s.value(sp + QStringLiteral("Nr4Algo")).toInt()));
+    }
+    // NNR
+    if (s.contains(sp + QStringLiteral("NnrPosition"))) {
+        setNnrPosition(static_cast<Longpath::NrPosition>(s.value(sp + QStringLiteral("NnrPosition")).toInt()));
+    }
+    if (s.contains(sp + QStringLiteral("NnrModel"))) {
+        setNnrModel(s.value(sp + QStringLiteral("NnrModel")).toInt());
+    }
+    if (s.contains(sp + QStringLiteral("NnrMaskFloor"))) {
+        setNnrMaskFloor(s.value(sp + QStringLiteral("NnrMaskFloor")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrAlpha"))) {
+        setNnrAlpha(s.value(sp + QStringLiteral("NnrAlpha")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrAlphaKnee"))) {
+        setNnrAlphaKnee(s.value(sp + QStringLiteral("NnrAlphaKnee")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrTau"))) {
+        setNnrTau(s.value(sp + QStringLiteral("NnrTau")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrMaxGain"))) {
+        setNnrMaxGain(s.value(sp + QStringLiteral("NnrMaxGain")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrAttackMs"))) {
+        setNnrAttackMs(s.value(sp + QStringLiteral("NnrAttackMs")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrReleaseMs"))) {
+        setNnrReleaseMs(s.value(sp + QStringLiteral("NnrReleaseMs")).toDouble());
     }
     // DFNR
     if (s.contains(sp + QStringLiteral("DfnrAttenLimit"))) {

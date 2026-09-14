@@ -8,7 +8,8 @@ WDSP (Warren Pratt NR0V's DSP library) is vendored in `third_party/wdsp/`.
 - **Canonical repository:** https://github.com/TAPR/OpenHPSDR-wdsp
 - **Version in NereusSDR:** v1.29 (as of 2025-02-XX), with **partial Thetis
   v2.10.3.13 sync** for `cfcomp.c` + `cfcomp.h` (see "Partial sync record"
-  below).
+  below), plus a **direct WDSP 2.10 vendor** of the NNR (Neural Noise
+  Reduction) module — see "NNR (WDSP 2.10)" below.
 
 ## Partial sync record
 
@@ -37,12 +38,99 @@ All other 140 WDSP source files remain at TAPR v1.29.  Full WDSP upstream
 re-sync is out of scope for 3M-3a-ii — see `UPSTREAM-SYNC-PROTOCOL.md` §6
 for the full-sync procedure.
 
+## NNR (WDSP 2.10) — direct upstream vendor
+
+WDSP 2.10 adds a new algorithm, NNR (Neural Noise Reduction): a DPRNN-based
+deep-filtering denoiser distinct from NR3/RNNR (rnnoise) and NR4/SBNR
+(libspecbleach). Unlike those two, NNR has **no Thetis precedent** — it is
+not part of any Thetis release (Thetis's own WDSP checkout is still v1.29)
+and was never routed through Thetis at all. It is ported straight from the
+canonical TAPR/OpenHPSDR-wdsp repository's `wdsp 2.10/Source/` tree.
+
+| File | Status | Source | Date |
+| --- | --- | --- | --- |
+| `third_party/wdsp/src/nnr.c` | Verbatim vendor of WDSP 2.10 (commit `b02d5bac675dd2f33ec2bab2b339f79a597c47dd`) | `TAPR/OpenHPSDR-wdsp` `wdsp 2.10/Source/nnr.c` | 2026-09-14 |
+| `third_party/wdsp/src/nnr.h` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnr.h` | 2026-09-14 |
+| `third_party/wdsp/src/nnet.c` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnet.c` | 2026-09-14 |
+| `third_party/wdsp/src/nnet.h` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnet.h` | 2026-09-14 |
+| `third_party/wdsp/src/nnet_profile.h` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnet_profile.h` | 2026-09-14 |
+| `third_party/wdsp/src/nnio.c` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnio.c` | 2026-09-14 |
+| `third_party/wdsp/src/nnio.h` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnio.h` | 2026-09-14 |
+
+All six files carry Warren Pratt NR0V's own GPLv2-or-later header verbatim
+(`Copyright (C) 2026 Warren Pratt, NR0V`) — no Thetis or Samphire
+attribution applies, since no Thetis intermediary exists for this module.
+
+**RXA integration:** `RXA.c`/`RXA.h`/`comm.h` were hand-merged (not
+overwritten) to add the `nnr` struct member, `create_nnr`/`destroy_nnr`/
+`flush_nnr`/`xnnr` calls, and an `nnr_run` parameter appended to the
+existing `RXAbp1Check` signature (already extended once before, for NR3/
+NR4 — see "RXA bandpass-gain gating" note below) — NereusSDR's `RXA.c` has
+diverged from stock WDSP since the NR3/NR4 port and a wholesale overwrite
+from WDSP 2.10 would have dropped that work. The eight call sites
+(`RXA.c`, `amd.c`, `anf.c`, `anr.c`, `emnr.c`, `rnnr.c`, `sbnr.c`, `snb.c`)
+that invoke `RXAbp1Check` were all updated to pass `getRun_nnr(rxa[channel].nnr.p)`
+as the new trailing argument — `nnr`'s struct (`typedef struct _nnr* NNR`)
+is opaque outside `nnr.c`, unlike `rnnr`/`sbnr`'s exposed structs, so
+`getRun_nnr()` is required rather than a direct `.p->run` read.
+
+**`dprintf` — a new dependency this port introduced.** `nnr.c`/`nnet.c`
+call `dprintf(const char*, ...)` for debug tracing. Upstream's own
+`utilities.c` (WDSP 2.10) implements it as
+`vsnprintf()` + `OutputDebugStringA()` — a Win32-only sink. NereusSDR's
+`utilities.c` is still at v1.29 and never gained that function, so on
+POSIX the bare name resolved to the unrelated system `dprintf(int fd,
+const char*, ...)` from `<stdio.h>`, producing int-conversion build
+errors. Fixed with a POSIX shim in the existing `linux_port.h`/`.c`
+cross-platform-macro file (same file that already substitutes
+`CRITICAL_SECTION`, `CreateSemaphore`, etc.): a `#define dprintf(...)
+wdsp_dprintf(__VA_ARGS__)` macro (placed after `<stdio.h>` is already
+fully parsed, so the redirect never corrupts the system header's own
+declaration) plus a `wdsp_dprintf()` implementation that writes to
+`stderr`. No upstream files were altered for this — the macro lives
+entirely in NereusSDR's own POSIX-port file.
+
+**Model weights — shipped as external `.bin` files, not compiled-in
+C arrays.** Upstream's `nnr_model_0.c` / `nnr_model_1.c` encode the two
+trained models (2,098,944 and 4,682,240 bytes of actual tensor data) as
+hex-byte-array C literals — ~10.7 MB and ~24 MB of generated source text
+respectively. NereusSDR does not vendor those files, for the same reason
+`rnnoise_data.c` is excluded (see `RNNOISE-PROVENANCE.md`): `nnet.c`'s
+`nnet_build()` already tries an external file at `nnet_model_path[slot]`
+before falling back to the compiled-in `nnr_builtin[slot]` table, so only
+the small binary tensor payload needs to exist, not the 34 MB of
+generated C wrapping it.
+
+- `third_party/wdsp/src/nnr_model_stub.c` (NereusSDR-original glue,
+  see "NereusSDR-original glue" table below) provides zero-length
+  `nnr_model_0_data`/`nnr_model_1_data` arrays so the linker resolves;
+  this fallback path is never actually reached in a normal install.
+- `third_party/wdsp/models/wdsp_nnr_0.bin` (2,098,944 bytes) and
+  `wdsp_nnr_1.bin` (4,682,240 bytes) are the real weights, extracted
+  byte-for-byte from the upstream `nnr_model_0.c` / `nnr_model_1.c` hex
+  arrays via `scripts/extract-nnr-models.py`. The script parses the
+  `0x??` literals in order and writes them out raw; extraction was
+  independently verified by re-parsing each `.bin`'s own `WDSPNN`
+  tensor-container header (magic, tensor count, per-tensor dims) and
+  confirming self-consistency and the exact upstream byte count.
+  SHA-256: `e1ebfed6f522746bcfc1265d4990f0250ae1de5b2050e58af9fc965dc1d94c9`
+  (slot 0), `925fdb6830627d84ef4ec8b2116ad66047e56d593d168db10f510dcbac0934a`
+  (slot 1).
+- `RxChannel`/`RadioModel` point both slots at these bundled files via
+  the upstream-exported `SetNNRModelPathSlot(slot, path)` on radio
+  connect (mirroring `RNNRloadModel`'s timing) — see
+  `Longpath::ModelPaths::nnrModel0Bin()`/`nnrModel1Bin()`.
+- These `.bin` files are Warren Pratt's own trained model weights,
+  distributed as part of WDSP itself (GPLv2-or-later) — no separate
+  third-party model license applies, unlike RNNoise's case.
+
 ## NereusSDR-original glue (not from upstream)
 
 | File | Status | Reason | Date |
 | --- | --- | --- | --- |
 | `third_party/wdsp/src/txgain_stub.c` | NereusSDR-original glue stub (GPLv2-or-later, J.J. Boyd KG4VCF) | Provides `SetTXFixedGain` / `SetTXFixedGainRun` symbols so the bundled `wdsp_static` library exposes the API surface that Thetis's ChannelMaster module exports (`Project Files/Source/ChannelMaster/txgain.c [v2.10.3.13]`). NereusSDR has not yet ported the wider ChannelMaster module (only individual primitives like `cmbuffs.c` have landed in `src/core/audio/TxMicSource.{cpp,h}`); the stub stores per-channel `(Igain, Qgain)` plus a run flag in a flat static so the linker resolves and the C++ wrapper at `src/core/TxChannel.cpp::setTxFixedGain` (issue #167 Phase 1 Agent 1C) can be unit-tested. A future ChannelMaster-port phase can replace this stub with the byte-for-byte port of `txgain.c`. | 2026-05-03 |
 | `third_party/wdsp/src/ps_sync_stub.c` | NereusSDR-original glue stub (GPLv2-or-later, J.J. Boyd KG4VCF) | Provides `SetPSRxIdx` / `SetPSTxIdx` symbols so the bundled `wdsp_static` library exposes the API surface that Thetis's ChannelMaster module exports (`Project Files/Source/ChannelMaster/sync.c:69-79 [v2.10.3.13]`). Same convention as `txgain_stub.c`; the stub stores per-id RX/TX feedback indices in a flat static so the linker resolves and the C++ wrappers at `src/core/TxChannel.cpp::setPSRxIdx` / `setPSTxIdx` (Phase 3M-4 Task 3) can be unit-tested. cmaster.cs:533-534 [v2.10.3.13] only ever calls these once at PS init with `txid = 0`, so the non-atomic store is sufficient until real ChannelMaster wiring lands. A future ChannelMaster-port phase can replace this stub with the byte-for-byte port of `sync.c`. | 2026-05-06 |
+| `third_party/wdsp/src/nnr_model_stub.c` | NereusSDR-original glue stub (GPLv2-or-later, NereusSDR contributors) | Provides zero-length `nnr_model_0_data`/`nnr_model_0_size` and `nnr_model_1_data`/`nnr_model_1_size` symbols that `nnet.c` (WDSP 2.10) declares `extern` — not a Thetis API-surface gap like the two stubs above (NNR has no Thetis precedent at all), but a deliberate substitute for upstream's `nnr_model_0.c`/`nnr_model_1.c`, which encode the same weights as ~34 MB of generated hex-byte-array C source. The real weights ship as `third_party/wdsp/models/wdsp_nnr_{0,1}.bin` instead (see "NNR (WDSP 2.10)" above for the extraction record); `nnet.c`'s own file-path lookup always finds them first, so this stub's fallback arrays are never actually reached. | 2026-09-14 |
 
 The glue stub is GPLv2-or-later (compatible with the rest of `wdsp_static`)
 and carries a verbatim NereusSDR-authored GPL header so

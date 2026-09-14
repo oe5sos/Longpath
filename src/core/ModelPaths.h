@@ -51,4 +51,16 @@ QString rnnoiseDefaultSmallBin();
 // disable DFNR in that case.
 QString dfnrModelTarball();
 
+// Path to the bundled NNR (Neural Noise Reduction, WDSP 2.10) model-0
+// weight file. Same probe sequence as rnnoiseDefaultLargeBin(), but under
+// the "nnr" subdir (dev-build fallback resolves to
+// third_party/wdsp/models/wdsp_nnr_0.bin — NNR ships inside the already
+// in-tree wdsp vendor directory, not a separate third_party/ subproject).
+// Returns empty QString if not found.
+QString nnrModel0Bin();
+
+// Path to the bundled NNR model-1 (larger) weight file. Same probe
+// sequence as nnrModel0Bin().
+QString nnrModel1Bin();
+
 } // namespace Longpath::ModelPaths

@@ -206,6 +206,10 @@ jobs:
           # DeepFilterNet3 ONNX tarball
           mkdir -p AppDir/usr/share/Longpath/models/dfnet3
           cp third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz AppDir/usr/share/Longpath/models/dfnet3/
+          # NNR (Neural Noise Reduction, WDSP 2.10) models
+          mkdir -p AppDir/usr/share/Longpath/models/nnr
+          cp third_party/wdsp/models/wdsp_nnr_0.bin AppDir/usr/share/Longpath/models/nnr/
+          cp third_party/wdsp/models/wdsp_nnr_1.bin AppDir/usr/share/Longpath/models/nnr/
           # License files — DFNR (Apache-2.0 + MIT) and rnnoise (BSD)
           mkdir -p AppDir/usr/share/doc/Longpath/deepfilter
           cp third_party/deepfilter/LICENSE       AppDir/usr/share/doc/Longpath/deepfilter/
@@ -519,6 +523,10 @@ jobs:
           # DeepFilterNet3 ONNX tarball
           mkdir -p build/Longpath.app/Contents/Resources/models/dfnet3
           cp third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz build/Longpath.app/Contents/Resources/models/dfnet3/
+          # NNR (Neural Noise Reduction, WDSP 2.10) models
+          mkdir -p build/Longpath.app/Contents/Resources/models/nnr
+          cp third_party/wdsp/models/wdsp_nnr_0.bin build/Longpath.app/Contents/Resources/models/nnr/
+          cp third_party/wdsp/models/wdsp_nnr_1.bin build/Longpath.app/Contents/Resources/models/nnr/
 
       # Sign the .app bundle. With APPLE_DEVELOPER_ID set we use Developer
       # ID + hardened runtime + entitlements (required for notarization).
@@ -781,6 +789,10 @@ jobs:
           # DeepFilterNet3 ONNX tarball
           New-Item -ItemType Directory -Force -Path deploy\models\dfnet3 | Out-Null
           Copy-Item third_party\deepfilter\models\DeepFilterNet3_onnx.tar.gz deploy\models\dfnet3\
+          # NNR (Neural Noise Reduction, WDSP 2.10) models
+          New-Item -ItemType Directory -Force -Path deploy\models\nnr | Out-Null
+          Copy-Item third_party\wdsp\models\wdsp_nnr_0.bin deploy\models\nnr\
+          Copy-Item third_party\wdsp\models\wdsp_nnr_1.bin deploy\models\nnr\
 
       - name: Create portable ZIP
         shell: pwsh
