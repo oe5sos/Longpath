@@ -316,10 +316,20 @@ private:
     // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md).
     //
     // Polls `sock` up to `pollMs` at a time. A poll that comes back
-    // readable resets the quiet counter to 0 (replies may be bursty — see
-    // scanAllNics()) and every pending datagram is drained and handed to
-    // `onDatagram` in arrival order; a poll that comes back not-readable
-    // advances the quiet counter by one.
+    // readable leaves the quiet counter untouched — matching Thetis
+    // clsRadioDiscovery.cs:964-976 [@852bf0e], where only the not-readable
+    // branch advances it — and every pending datagram is drained and
+    // handed to `onDatagram` in arrival order; a poll that comes back
+    // not-readable advances the quiet counter by one.
+    //
+    // Until 2026-09-09 a readable poll reset the counter to 0 instead
+    // (NereusSDR-original drift from the 2026-04-12 port, not a deliberate
+    // divergence — see docs/architecture/2026-09-09-ci-discovery-hang-
+    // investigation.md for how it was found and confirmed unintentional).
+    // That made a single bursty reply push the natural give-up point out by
+    // a full extra quietBeforeStop polls; freezing the counter instead
+    // matches upstream exactly and bounds that to one poll no matter when
+    // in the loop the reply arrives.
     //
     // Returns Quiet once quietBeforeStop consecutive not-readable polls are
     // observed — the class header's documented

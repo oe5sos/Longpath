@@ -6424,6 +6424,18 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                     n4.algo                = m_activeSlice->nr4Algo();
                     rxCh->setSbnrTuning(n4);
 
+                    RxChannel::NnrTuning nn;
+                    nn.position     = m_activeSlice->nnrPosition();
+                    nn.model        = m_activeSlice->nnrModel();
+                    nn.maskFloorDb  = m_activeSlice->nnrMaskFloor();
+                    nn.alpha        = m_activeSlice->nnrAlpha();
+                    nn.alphaKneeDb  = m_activeSlice->nnrAlphaKnee();
+                    nn.tauSeconds   = m_activeSlice->nnrTau();
+                    nn.maxGainDb    = m_activeSlice->nnrMaxGain();
+                    nn.attackMs     = m_activeSlice->nnrAttackMs();
+                    nn.releaseMs    = m_activeSlice->nnrReleaseMs();
+                    rxCh->setNnrTuning(nn);
+
 #ifdef HAVE_DFNR
                     rxCh->setDfnrAttenLimit(static_cast<float>(m_activeSlice->dfnrAttenLimit()));
                     rxCh->setDfnrPostFilterBeta(static_cast<float>(m_activeSlice->dfnrPostFilterBeta()));
@@ -6456,6 +6468,39 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                         } else {
                             qCWarning(lcDsp) << "NR3 model not found at expected paths;"
                                              << "NR3 will be disabled until a model is loaded.";
+                        }
+                    }
+
+                    // NNR models — global (SetNNRModelPathSlot), not per-channel.
+                    // No Thetis precedent (new WDSP 2.10 algorithm). Slot 0 is the
+                    // smaller/default model, slot 1 the larger one; both are shipped
+                    // as external .bin files (see nnr_model_stub.c — the compiled-in
+                    // fallback arrays are intentionally empty).
+                    {
+                        const QString default0 = Longpath::ModelPaths::nnrModel0Bin();
+                        const QString model0 = AppSettings::instance().value(
+                            QStringLiteral("NnrModelPath0"), default0).toString();
+                        if (!model0.isEmpty()) {
+                            qCInfo(lcDsp) << "NNR: loading model slot 0 from" << model0;
+#ifdef HAVE_WDSP
+                            SetNNRModelPathSlot(0, model0.toStdString().c_str());
+#endif
+                        } else {
+                            qCWarning(lcDsp) << "NNR model slot 0 not found at expected paths;"
+                                             << "NNR slot 0 will be disabled until a model is loaded.";
+                        }
+
+                        const QString default1 = Longpath::ModelPaths::nnrModel1Bin();
+                        const QString model1 = AppSettings::instance().value(
+                            QStringLiteral("NnrModelPath1"), default1).toString();
+                        if (!model1.isEmpty()) {
+                            qCInfo(lcDsp) << "NNR: loading model slot 1 from" << model1;
+#ifdef HAVE_WDSP
+                            SetNNRModelPathSlot(1, model1.toStdString().c_str());
+#endif
+                        } else {
+                            qCWarning(lcDsp) << "NNR model slot 1 not found at expected paths;"
+                                             << "NNR slot 1 will be disabled until a model is loaded.";
                         }
                     }
 
@@ -10257,6 +10302,53 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         scheduleSettingsSave();
     });
 
+    // NNR — Neural Noise Reduction (WDSP 2.10). No Thetis precedent.
+    connect(slice, &SliceModel::nnrPositionChanged, this, [this, slice](Longpath::NrPosition p) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrPosition(p); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrModelChanged, this, [this, slice](int v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrModel(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrMaskFloorChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrMaskFloor(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrAlphaChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrAlpha(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrAlphaKneeChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrAlphaKnee(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrTauChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrTau(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrMaxGainChanged, this, [this, slice](double v) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrMaxGain(v); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrAttackMsChanged, this, [this, slice](double) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrSmooth(slice->nnrAttackMs(), slice->nnrReleaseMs()); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::nnrReleaseMsChanged, this, [this, slice](double) {
+        RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+        if (rxCh) { rxCh->setNnrSmooth(slice->nnrAttackMs(), slice->nnrReleaseMs()); }
+        scheduleSettingsSave();
+    });
+
 #ifdef HAVE_DFNR
     // DFNR — AttenLimit + PostFilterBeta
     // double→float cast at the boundary (SliceModel stores double for QSpinBox compat)
@@ -13361,6 +13453,7 @@ void RadioModel::setRxNr(int rx, bool on, int nrIndex)
         case 4: slot = NrSlot::DFNR; break;
         case 5: slot = NrSlot::BNR;  break;
         case 6: slot = NrSlot::MNR;  break;
+        case 7: slot = NrSlot::NNR;  break;
         default: slot = NrSlot::NR1; break;
     }
     s->setActiveNr(slot);
@@ -13382,6 +13475,7 @@ int RadioModel::rxNrIndex(int rx) const
             case NrSlot::DFNR: return 4;
             case NrSlot::BNR:  return 5;
             case NrSlot::MNR:  return 6;
+            case NrSlot::NNR:  return 7;
         }
     }
     return 0;

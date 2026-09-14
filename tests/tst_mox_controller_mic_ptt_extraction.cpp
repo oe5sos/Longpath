@@ -113,6 +113,13 @@ void drainEvents()
 {
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
+    // Third pass, 2026-09-13: MoxController::onMicPttFromRadio(false) now
+    // starts m_micPttReleaseTailTimer (kMicPttReleaseTailMs, 0 via
+    // setTimerIntervals/makeSync() in these tests) instead of calling
+    // setMox(false) directly -- one more single-shot-timer hop before the
+    // release walk below it even starts, on top of the two passes that
+    // walk already needed.
+    QCoreApplication::processEvents();
 }
 
 // Convenience: make MoxController state machine synchronous.

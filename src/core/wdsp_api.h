@@ -619,6 +619,49 @@ void SetRXASBNRnoiseScalingType(int channel, int noise_scaling_type);
 // NR2 and NR3 all had one. Thetis calls this; we did not.
 void SetRXASBNRPosition(int channel, int position);  // 0=pre-AGC, 1=post-AGC
 
+// =====================================================================
+// NNR — Neural Noise Reduction (WDSP nnr.c, Warren Pratt NR0V).
+// New in WDSP 2.10 (wdsp 2.10/Source/nnr.h, nnet.h) — no Thetis precedent;
+// ported straight from the canonical TAPR/OpenHPSDR-wdsp upstream, commit
+// b02d5bac675dd2f33ec2bab2b339f79a597c47dd. See
+// docs/attribution/WDSP-PROVENANCE.md for the NNR vendoring record.
+// =====================================================================
+
+void SetRXANNRRun(int channel, int setit);
+
+void SetRXANNRPosition(int channel, int position);
+
+void SetRXANNRMaskFloor(int channel, double floor_db);
+
+void SetRXANNRcmode(int channel, int cmode);
+
+void SetRXANNRTestMode(int channel, int mode);
+
+void SetRXANNRAlpha(int channel, double alpha);
+
+void SetRXANNRAlphaKnee(int channel, double knee_db);
+
+void SetRXANNRTau(int channel, double tau);
+
+void SetRXANNRMaxGain(int channel, double gmax_db);
+
+void SetRXANNRSmooth(int channel, double att_ms, double rel_ms);
+
+int SetRXANNRModel(int channel, int slot);
+
+int GetRXANNRModel(int channel);
+
+// Global (not per-channel): points model slot 0 or 1 at an external .bin
+// tensor file (nnio.c's "WDSPNN" format). Empty path reverts to the
+// compiled-in fallback for that slot (see nnr_model_stub.c — NereusSDR
+// ships the real weights as external files instead, so the fallback is a
+// zero-length stub and this must be called before NNR can run).
+// SetNNRModelPath(path) is upstream's slot-0-only convenience; it is
+// equivalent to SetNNRModelPathSlot(0, path).
+void SetNNRModelPathSlot(int slot, const char* path);
+
+void SetNNRModelPath(const char* path);
+
 // ---------------------------------------------------------------------------
 // Spectral noise blanker (snb.h) — From Thetis dsp.cs P/Invoke declarations
 // ---------------------------------------------------------------------------

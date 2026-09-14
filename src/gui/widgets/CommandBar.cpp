@@ -517,6 +517,7 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
         {QStringLiteral("DFNR"), NrSlot::DFNR},
         {QStringLiteral("BNR"),  NrSlot::BNR},
         {QStringLiteral("MNR"),  NrSlot::MNR},
+        {QStringLiteral("NNR"),  NrSlot::NNR},
     };
 
     Group& g = addGroup(QStringLiteral("NR"), row);

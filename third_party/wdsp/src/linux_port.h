@@ -36,6 +36,7 @@ john.d.melton@googlemail.com
 
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,6 +91,18 @@ typedef pthread_mutex_t *LPCRITICAL_SECTION;
 
 #define AllocConsole() ((void)0)
 #define FreeConsole()  ((void)0)
+
+// WDSP 2.10's nnr.c/nnet.c call dprintf(const char*, ...) for debug tracing —
+// upstream utilities.c implements it as vsnprintf()+OutputDebugStringA(), a
+// Win32-only sink (utilities.h:84 [wdsp 2.10]). NereusSDR's utilities.c is
+// still at v1.29 and never gained that function, so on POSIX the name would
+// otherwise resolve to the unrelated system dprintf(int fd, const char*, ...)
+// declared in <stdio.h> above — wrong signature, hence the int-conversion
+// build errors this macro exists to prevent. Redirecting through a macro
+// (rather than declaring our own `dprintf`) avoids colliding with that
+// already-visible system prototype. Implementation in linux_port.c.
+#define dprintf(...) wdsp_dprintf(__VA_ARGS__)
+void wdsp_dprintf(const char *format, ...);
 
 // Windows AVRT (multimedia thread scheduling) — no-ops on POSIX
 #define AvSetMmThreadCharacteristics(name, idx) ((HANDLE)0)

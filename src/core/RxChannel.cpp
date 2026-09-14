@@ -1151,6 +1151,91 @@ void RxChannel::setSbnrAlgo(SbnrAlgo a)
 }
 
 // ---------------------------------------------------------------------------
+// NNR — Neural Noise Reduction (WDSP 2.10 nnr.c, Warren Pratt NR0V).
+// No Thetis precedent — new upstream algorithm, not a port.
+// ---------------------------------------------------------------------------
+
+void RxChannel::setNnrTuning(const NnrTuning& t)
+{
+    m_nnrTuning = t;
+#ifdef HAVE_WDSP
+    SetRXANNRPosition (m_channelId, static_cast<int>(t.position));
+    SetRXANNRModel    (m_channelId, t.model);
+    SetRXANNRMaskFloor(m_channelId, t.maskFloorDb);
+    SetRXANNRAlpha    (m_channelId, t.alpha);
+    SetRXANNRAlphaKnee(m_channelId, t.alphaKneeDb);
+    SetRXANNRTau      (m_channelId, t.tauSeconds);
+    SetRXANNRMaxGain  (m_channelId, t.maxGainDb);
+    SetRXANNRSmooth   (m_channelId, t.attackMs, t.releaseMs);
+#endif
+}
+
+void RxChannel::setNnrPosition(NrPosition p)
+{
+    m_nnrTuning.position = p;
+#ifdef HAVE_WDSP
+    SetRXANNRPosition(m_channelId, static_cast<int>(p));
+#endif
+}
+
+void RxChannel::setNnrModel(int slot)
+{
+    m_nnrTuning.model = slot;
+#ifdef HAVE_WDSP
+    SetRXANNRModel(m_channelId, slot);
+#endif
+}
+
+void RxChannel::setNnrMaskFloor(double floorDb)
+{
+    m_nnrTuning.maskFloorDb = floorDb;
+#ifdef HAVE_WDSP
+    SetRXANNRMaskFloor(m_channelId, floorDb);
+#endif
+}
+
+void RxChannel::setNnrAlpha(double alpha)
+{
+    m_nnrTuning.alpha = alpha;
+#ifdef HAVE_WDSP
+    SetRXANNRAlpha(m_channelId, alpha);
+#endif
+}
+
+void RxChannel::setNnrAlphaKnee(double kneeDb)
+{
+    m_nnrTuning.alphaKneeDb = kneeDb;
+#ifdef HAVE_WDSP
+    SetRXANNRAlphaKnee(m_channelId, kneeDb);
+#endif
+}
+
+void RxChannel::setNnrTau(double tauSeconds)
+{
+    m_nnrTuning.tauSeconds = tauSeconds;
+#ifdef HAVE_WDSP
+    SetRXANNRTau(m_channelId, tauSeconds);
+#endif
+}
+
+void RxChannel::setNnrMaxGain(double gainDb)
+{
+    m_nnrTuning.maxGainDb = gainDb;
+#ifdef HAVE_WDSP
+    SetRXANNRMaxGain(m_channelId, gainDb);
+#endif
+}
+
+void RxChannel::setNnrSmooth(double attackMs, double releaseMs)
+{
+    m_nnrTuning.attackMs  = attackMs;
+    m_nnrTuning.releaseMs = releaseMs;
+#ifdef HAVE_WDSP
+    SetRXANNRSmooth(m_channelId, attackMs, releaseMs);
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // setActiveNr — central mode dispatch (Sub-epic C-1)
 // Porting from Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13]
 // Original C# logic (condensed — NR1 case shown):
@@ -1173,6 +1258,7 @@ void RxChannel::setActiveNr(NrSlot slot)
     SetRXAEMNRRun(m_channelId, (slot == NrSlot::NR2) ? 1 : 0);
     SetRXARNNRRun(m_channelId, (slot == NrSlot::NR3) ? 1 : 0);
     SetRXASBNRRun(m_channelId, (slot == NrSlot::NR4) ? 1 : 0);
+    SetRXANNRRun (m_channelId, (slot == NrSlot::NNR) ? 1 : 0);
 #endif
 
     // Post-WDSP filter flags.  Filter instances added in Tasks 9-11; for now
@@ -1186,7 +1272,8 @@ void RxChannel::setActiveNr(NrSlot slot)
     // until Task 12 retires setEmnrEnabled / setNrEnabled.  Not strictly
     // required for correctness, but avoids surprising readers of the old API.
     m_nrEnabled  .store(slot == NrSlot::NR1 || slot == NrSlot::NR2 ||
-                        slot == NrSlot::NR3 || slot == NrSlot::NR4);
+                        slot == NrSlot::NR3 || slot == NrSlot::NR4 ||
+                        slot == NrSlot::NNR);
     m_emnrEnabled.store(slot == NrSlot::NR2);
 }
 

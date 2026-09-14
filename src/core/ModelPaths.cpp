@@ -73,7 +73,9 @@ QString probeModel(const QString& subdir, const QString& filename)
     //    The third_party/<libname>/models/ path is relative to the repo root.
     const QString libname = (subdir == QStringLiteral("dfnet3"))
         ? QStringLiteral("deepfilter")
-        : QStringLiteral("rnnoise");
+        : (subdir == QStringLiteral("nnr"))
+            ? QStringLiteral("wdsp")
+            : QStringLiteral("rnnoise");
     for (const char* rel : {
              "/../third_party/",
              "/../../third_party/",
@@ -103,6 +105,16 @@ QString rnnoiseDefaultSmallBin()
 QString dfnrModelTarball()
 {
     return probeModel(QStringLiteral("dfnet3"), QStringLiteral("DeepFilterNet3_onnx.tar.gz"));
+}
+
+QString nnrModel0Bin()
+{
+    return probeModel(QStringLiteral("nnr"), QStringLiteral("wdsp_nnr_0.bin"));
+}
+
+QString nnrModel1Bin()
+{
+    return probeModel(QStringLiteral("nnr"), QStringLiteral("wdsp_nnr_1.bin"));
 }
 
 } // namespace Longpath::ModelPaths

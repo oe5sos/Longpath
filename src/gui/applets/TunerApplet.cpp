@@ -520,10 +520,24 @@ void TunerApplet::setPowerScale(int maxWatts, bool hasAmplifier)
 {
     // From AetherSDR src/gui/TunerApplet.cpp:setPowerScale [@0cd4559]
     if (hasAmplifier) {
-        // PGXL: 0-2000 W, red > 1500 W
-        m_fwdPowerGauge->setRange(0.0, 2000.0);
-        m_fwdPowerGauge->setYellowStart(1500.0);
-        m_fwdPowerGauge->setRedStart(1500.0);
+        // Code review, 2026-09-13 (Zeus SDR changelog comparison): same
+        // fix as TxApplet::setPowerScale, kept in lockstep with it per
+        // this function's own "damit die Anzeigen nicht auseinander-
+        // laufen" contract. maxWatts<=0 (PGXL, RF-Kit/RF2K-S -- both
+        // genuinely ~2kW-class) keeps the historical fixed scale;
+        // maxWatts>0 (a future lower-power amp) scales proportionally
+        // instead of inheriting the fixed 2kW ceiling.
+        if (maxWatts > 0) {
+            const double red = static_cast<double>(maxWatts);
+            m_fwdPowerGauge->setRange(0.0, red * 1.2);
+            m_fwdPowerGauge->setYellowStart(red);
+            m_fwdPowerGauge->setRedStart(red);
+        } else {
+            // PGXL: 0-2000 W, red > 1500 W
+            m_fwdPowerGauge->setRange(0.0, 2000.0);
+            m_fwdPowerGauge->setYellowStart(1500.0);
+            m_fwdPowerGauge->setRedStart(1500.0);
+        }
     } else if (maxWatts > 100) {
         // Aurora (500 W): 0-600 W, red > 500 W
         m_fwdPowerGauge->setRange(0.0, 600.0);

@@ -474,6 +474,24 @@ public:
         NrPosition position          = NrPosition::PostAgc;
     };
 
+    // NNR — Neural Noise Reduction (WDSP 2.10 nnr.c, Warren Pratt NR0V).
+    // No Thetis precedent — new upstream algorithm. Defaults match WDSP's
+    // own internal defaults: RXA.c's create_nnr() call (mask floor, position)
+    // and nnet.c's create_nnet_slot()/NNET_TAU_DEFAULT/NNET_GMAX_DB (tau,
+    // max gain, zero attack/release meaning "use the model's own smoothing").
+    struct NnrTuning {
+        NrPosition position = NrPosition::PostAgc;  // RXA.c create_nnr() position=1
+        int    model        = 0;      // slot 0 (small) or 1 (large)
+        double maskFloorDb  = -25.0;  // RXA.c create_nnr() mask_floor
+        double alpha        = 1.0;
+        double alphaKneeDb  = 10.0;
+        double tauSeconds   = 2.0;    // nnet.c NNET_TAU_DEFAULT
+        double maxGainDb    = 12.0;   // nnet.c NNET_GMAX_DB
+        double attackMs     = 0.0;
+        double releaseMs    = 0.0;
+        // Note: NNR model files are global (SetNNRModelPathSlot), not per-channel.
+    };
+
     // ----- NR API (Sub-epic C-1) -----
     // New unified NR surface.  Coexists with legacy setEmnrEnabled /
     // setNrEnabled stubs until Task 12 finishes the SliceModel cutover.
@@ -483,6 +501,7 @@ public:
     void setEmnrTuning (const Nr2Tuning& t);
     void setRnnrTuning (const Nr3Tuning& t);
     void setSbnrTuning (const Nr4Tuning& t);
+    void setNnrTuning  (const NnrTuning& t);
 
     // Per-knob convenience setters (single WDSP call each).
     // Gain/leakage are in raw WDSP domain (caller is responsible for 1e-6/1e-3 scaling).
@@ -530,6 +549,17 @@ public:
     void setSbnrNoiseRescale        (double dB);
     void setSbnrPostFilterThreshold (double dB);
     void setSbnrAlgo                (SbnrAlgo a);
+
+    // NNR per-knob setters.
+    void setNnrPosition   (NrPosition p);
+    void setNnrModel      (int slot);        // 0 or 1; per-channel model selector
+    void setNnrMaskFloor  (double floorDb);
+    void setNnrAlpha      (double alpha);
+    void setNnrAlphaKnee  (double kneeDb);
+    void setNnrTau        (double tauSeconds);
+    void setNnrMaxGain    (double gainDb);
+    void setNnrSmooth     (double attackMs, double releaseMs);
+    NnrTuning nnrTuning() const { return m_nnrTuning; }
 
     // Central mode dispatch — flip SetRXA*Run flags so exactly 0 or 1 is on.
     // Byte-for-byte from Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13].
@@ -1030,6 +1060,7 @@ private:
     Nr2Tuning m_nr2Tuning;
     Nr3Tuning m_nr3Tuning;
     Nr4Tuning m_nr4Tuning;
+    NnrTuning m_nnrTuning;
 
     // Post-WDSP filter "on" flags.  Filter instances (DeepFilterFilter,
     // NvidiaBnrFilter, MacNRFilter) land in Tasks 9-11; these atomics exist now

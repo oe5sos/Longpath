@@ -397,7 +397,17 @@ bool TciBinaryFrame::headerMatchesPayload(const TciStreamHeader& h)
     if (!h.valid || h.length <= 0) { return false; }
     const int width = bytesPerSample(h.sampleType);
     if (width <= 0) { return false; }
-    return h.payloadBytes() == h.length * width;
+    // Code review, 2026-09-13: h.length * width computed in plain `int`
+    // let a crafted/corrupted header (e.g. length near 2^30 with a
+    // 4-byte sample width) overflow and wrap to match a tiny real
+    // payload, defeating this function's only sanity check -- the sole
+    // caller, TciClient::handleBinaryMessage(), then passes the
+    // unchecked, un-wrapped h.length straight into decodeSamples(),
+    // which allocates a std::vector sized by that value (a multi-GiB
+    // allocation from a 64-byte wire frame). Widen to int64_t before
+    // multiplying so the comparison can't wrap.
+    return static_cast<qint64>(h.payloadBytes()) ==
+           static_cast<qint64>(h.length) * static_cast<qint64>(width);
 }
 
 } // namespace Longpath

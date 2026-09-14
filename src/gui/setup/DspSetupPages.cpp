@@ -1463,6 +1463,183 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 #endif
     }
 
+    // ── NNR tab ───────────────────────────────────────────────────────────────
+    // Neural Noise Reduction — WDSP 2.10 nnr.c, Warren Pratt NR0V.
+    // No Thetis precedent — new upstream algorithm, not a port. Defaults and
+    // ranges taken from WDSP's own internal defaults (RXA.c create_nnr(),
+    // nnet.c NNET_TAU_DEFAULT/NNET_GMAX_DB); see RxChannel.h NnrTuning.
+    {
+        auto [tabPage, tabLay] = makeTab(tabs, "NNR");
+        Q_UNUSED(tabPage)
+
+        QVBoxLayout* grpLay = makeGroup(tabLay, "NNR (Neural Noise Reduction)");
+
+        // Position radio
+        auto [preRdo, postRdo] = addPositionRow(grpLay);
+        {
+            const bool isPost = !slice || (slice->nnrPosition() == NrPosition::PostAgc);
+            preRdo->setChecked(!isPost);
+            postRdo->setChecked(isPost);
+        }
+
+        // Model radio — slot 0 (small) / slot 1 (large). Weight files are
+        // GLOBAL (SetNNRModelPathSlot on radio connect), not per-slice —
+        // this only selects which already-loaded slot the channel uses.
+        const QString rdoStyle =
+            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
+            "QRadioButton::indicator { width: 14px; height: 14px; }"
+            "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
+            "border-radius: 7px; background: #1a2a3a; }"
+            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
+            "border-radius: 7px; background: #4a7ba8; }";
+        auto* modelSmall = new QRadioButton("Small");
+        auto* modelLarge = new QRadioButton("Large");
+        modelSmall->setStyleSheet(rdoStyle);
+        modelLarge->setStyleSheet(rdoStyle);
+        (slice && slice->nnrModel() == 1) ? modelLarge->setChecked(true) : modelSmall->setChecked(true);
+        auto* modelRow = new QHBoxLayout;
+        auto* modelLbl = new QLabel("Model");
+        modelLbl->setStyleSheet(kLbl);
+        modelLbl->setFixedWidth(150);
+        modelRow->addWidget(modelLbl);
+        modelRow->addWidget(modelSmall);
+        modelRow->addWidget(modelLarge);
+        modelRow->addStretch(1);
+        grpLay->addLayout(modelRow);
+
+        auto [maskFloor, maskFloorVal, maskFloorScale] = addDoubleSliderRow(grpLay, "Mask Floor",
+            -60.0, 0.0, slice ? slice->nnrMaskFloor() : -25.0,
+            1.0, 0,
+            tr("Minimum mask magnitude in dB — how far the network is allowed "
+               "to attenuate a bin. Range -60 to 0, default -25."),
+            " dB");
+
+        auto [alpha, alphaVal, alphaScale] = addDoubleSliderRow(grpLay, "Alpha",
+            0.0, 4.0, slice ? slice->nnrAlpha() : 1.0,
+            0.1, 1,
+            tr("Output gain exponent applied to the network's mask. Range 0-4, default 1.0."),
+            "");
+
+        auto [alphaKnee, alphaKneeVal, alphaKneeScale] = addDoubleSliderRow(grpLay, "Alpha Knee",
+            0.0, 40.0, slice ? slice->nnrAlphaKnee() : 10.0,
+            1.0, 0,
+            tr("Knee point in dB where the alpha exponent transitions. Range 0-40, default 10."),
+            " dB");
+
+        auto [tau, tauVal, tauScale] = addDoubleSliderRow(grpLay, "Tau",
+            0.05, 30.0, slice ? slice->nnrTau() : 2.0,
+            0.05, 2,
+            tr("Noise-estimate time constant in seconds. Range 0.05-30, default 2.0."),
+            " s");
+
+        auto [maxGain, maxGainVal, maxGainScale] = addDoubleSliderRow(grpLay, "Max Gain",
+            0.0, 24.0, slice ? slice->nnrMaxGain() : 12.0,
+            1.0, 0,
+            tr("Maximum gain the post-filter head may apply, in dB. Range 0-24, default 12."),
+            " dB");
+
+        auto [attackMs, attackMsVal, attackMsScale] = addDoubleSliderRow(grpLay, "Attack",
+            0.0, 500.0, slice ? slice->nnrAttackMs() : 0.0,
+            5.0, 0,
+            tr("Gain-smoothing attack time in ms. 0 uses the model's own smoothing. Range 0-500, default 0."),
+            " ms");
+
+        auto [releaseMs, releaseMsVal, releaseMsScale] = addDoubleSliderRow(grpLay, "Release",
+            0.0, 500.0, slice ? slice->nnrReleaseMs() : 0.0,
+            5.0, 0,
+            tr("Gain-smoothing release time in ms. 0 uses the model's own smoothing. Range 0-500, default 0."),
+            " ms");
+
+        tabLay->addStretch(1);
+
+        // ── Wire NNR controls → SliceModel ───────────────────────────────────
+        if (slice) {
+            connect(preRdo, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrPosition(NrPosition::PreAgc); }
+            });
+            connect(postRdo, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrPosition(NrPosition::PostAgc); }
+            });
+            connect(slice, &SliceModel::nnrPositionChanged, preRdo,
+                    [preRdo, postRdo](NrPosition p) {
+                QSignalBlocker b1(preRdo), b2(postRdo);
+                preRdo->setChecked(p == NrPosition::PreAgc);
+                postRdo->setChecked(p == NrPosition::PostAgc);
+            });
+
+            connect(modelSmall, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrModel(0); }
+            });
+            connect(modelLarge, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrModel(1); }
+            });
+            connect(slice, &SliceModel::nnrModelChanged, modelSmall,
+                    [modelSmall, modelLarge](int v) {
+                QSignalBlocker b1(modelSmall), b2(modelLarge);
+                modelSmall->setChecked(v == 0);
+                modelLarge->setChecked(v == 1);
+            });
+
+            connect(maskFloor, &QSlider::valueChanged, slice, [slice, maskFloorScale](int v) {
+                slice->setNnrMaskFloor(v / maskFloorScale);
+            });
+            connect(slice, &SliceModel::nnrMaskFloorChanged, maskFloor,
+                    [maskFloor, maskFloorScale](double v) {
+                QSignalBlocker b(maskFloor); maskFloor->setValue(static_cast<int>(v * maskFloorScale));
+            });
+
+            connect(alpha, &QSlider::valueChanged, slice, [slice, alphaScale](int v) {
+                slice->setNnrAlpha(v / alphaScale);
+            });
+            connect(slice, &SliceModel::nnrAlphaChanged, alpha,
+                    [alpha, alphaScale](double v) {
+                QSignalBlocker b(alpha); alpha->setValue(static_cast<int>(v * alphaScale));
+            });
+
+            connect(alphaKnee, &QSlider::valueChanged, slice, [slice, alphaKneeScale](int v) {
+                slice->setNnrAlphaKnee(v / alphaKneeScale);
+            });
+            connect(slice, &SliceModel::nnrAlphaKneeChanged, alphaKnee,
+                    [alphaKnee, alphaKneeScale](double v) {
+                QSignalBlocker b(alphaKnee); alphaKnee->setValue(static_cast<int>(v * alphaKneeScale));
+            });
+
+            connect(tau, &QSlider::valueChanged, slice, [slice, tauScale](int v) {
+                slice->setNnrTau(v / tauScale);
+            });
+            connect(slice, &SliceModel::nnrTauChanged, tau,
+                    [tau, tauScale](double v) {
+                QSignalBlocker b(tau); tau->setValue(static_cast<int>(v * tauScale));
+            });
+
+            connect(maxGain, &QSlider::valueChanged, slice, [slice, maxGainScale](int v) {
+                slice->setNnrMaxGain(v / maxGainScale);
+            });
+            connect(slice, &SliceModel::nnrMaxGainChanged, maxGain,
+                    [maxGain, maxGainScale](double v) {
+                QSignalBlocker b(maxGain); maxGain->setValue(static_cast<int>(v * maxGainScale));
+            });
+
+            connect(attackMs, &QSlider::valueChanged, slice, [slice, attackMsScale](int v) {
+                slice->setNnrAttackMs(v / attackMsScale);
+            });
+            connect(slice, &SliceModel::nnrAttackMsChanged, attackMs,
+                    [attackMs, attackMsScale](double v) {
+                QSignalBlocker b(attackMs); attackMs->setValue(static_cast<int>(v * attackMsScale));
+            });
+
+            connect(releaseMs, &QSlider::valueChanged, slice, [slice, releaseMsScale](int v) {
+                slice->setNnrReleaseMs(v / releaseMsScale);
+            });
+            connect(slice, &SliceModel::nnrReleaseMsChanged, releaseMs,
+                    [releaseMs, releaseMsScale](double v) {
+                QSignalBlocker b(releaseMs); releaseMs->setValue(static_cast<int>(v * releaseMsScale));
+            });
+        }
+        Q_UNUSED(maskFloorVal); Q_UNUSED(alphaVal); Q_UNUSED(alphaKneeVal);
+        Q_UNUSED(tauVal); Q_UNUSED(maxGainVal); Q_UNUSED(attackMsVal); Q_UNUSED(releaseMsVal);
+    }
+
     // ── ANF tab ───────────────────────────────────────────────────────────────
     // From Thetis setup.designer.cs — chkDSPANFEnable [v2.10.3.13].
     // Advanced ANF tuning (Taps/Delay/Gain/Leakage) is not yet in SliceModel;
@@ -2727,6 +2904,7 @@ void NrAnfSetupPage::selectSubtab(NrSlot slot)
         case NrSlot::NR4:  target = QStringLiteral("NR4");  break;
         case NrSlot::DFNR: target = QStringLiteral("DFNR"); break;
         case NrSlot::MNR:  target = QStringLiteral("MNR");  break;
+        case NrSlot::NNR:  target = QStringLiteral("NNR");  break;
         case NrSlot::BNR:
         case NrSlot::Off:  return;  // no dedicated sub-tab
     }
