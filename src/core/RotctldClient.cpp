@@ -59,7 +59,7 @@ RotctldClient::RotctldClient(QObject* parent) : RotorController(parent)
 
     m_retry = new QTimer(this);
     m_retry->setSingleShot(true);
-    m_retry->setInterval(3000);
+    m_retry->setInterval(kRetryAfterDropMs);
     connect(m_retry, &QTimer::timeout, this, [this]() {
         if (m_state == State::Disconnected && !m_host.isEmpty()) {
             connectToRotor();
@@ -87,7 +87,8 @@ RotctldClient::RotctldClient(QObject* parent) : RotorController(parent)
         m_buffer.clear();
         m_awaiting = Pending::None;
         setState(State::Disconnected);
-        if (!m_host.isEmpty()) { m_retry->start(); }
+        emit replyTimedOut();
+        if (!m_host.isEmpty()) { m_retry->start(kRetryAfterDropMs); }
     });
 
     connect(&m_socket, &QTcpSocket::connected, this, [this]() {
@@ -109,12 +110,24 @@ RotctldClient::RotctldClient(QObject* parent) : RotorController(parent)
         // Keep trying. A rotator controller that is power-cycled mid
         // session should come back on its own rather than needing the
         // operator to notice and reconnect by hand.
-        if (!m_host.isEmpty()) { m_retry->start(); }
+        if (!m_host.isEmpty()) { m_retry->start(kRetryAfterDropMs); }
     });
 
     connect(&m_socket, &QTcpSocket::errorOccurred, this,
             [this](QAbstractSocket::SocketError) {
         fail(m_socket.errorString());
+        // 2026-09-16: a connect that is refused (or times out) never
+        // produces disconnected() — Qt only emits that for a link that
+        // was up. So this used to stay in Connecting for good, with the
+        // retry timer never started: "Connection refused" on screen and
+        // nothing further. Seen live against an ARCO, where the refusal
+        // is the normal first outcome — the rotctld this program had
+        // just started was not yet listening.
+        if (m_state == State::Connecting) {
+            m_socket.abort();
+            setState(State::Disconnected);
+            if (!m_host.isEmpty()) { m_retry->start(kRetryAfterRefusedMs); }
+        }
     });
 }
 

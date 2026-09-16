@@ -41,6 +41,11 @@ public:
     {
         return m_server.listen(QHostAddress::LocalHost, 0);
     }
+    // On a port the test chose — for a client that is already trying it.
+    bool listenOn(quint16 port)
+    {
+        return m_server.listen(QHostAddress::LocalHost, port);
+    }
     quint16 port() const { return m_server.serverPort(); }
 
     double azimuth{123.0};
@@ -123,6 +128,8 @@ private slots:
     void moving_while_disconnected_complains_rather_than_silently_failing();
     void a_frozen_daemon_is_cut_and_reconnected();
     void elevation_is_kept_and_sent_back_on_a_move();
+    void a_refused_connect_retries_until_the_daemon_is_there();
+    void the_watchdog_announces_a_hung_daemon();
 };
 
 // ── Pure parsing ────────────────────────────────────────────────────
@@ -384,6 +391,78 @@ void TstRotctldClient::elevation_is_kept_and_sent_back_on_a_move()
     c.moveTo(240.0);
     QTRY_VERIFY_WITH_TIMEOUT(
         fake.received.contains(QStringLiteral("P 240.00 30.50")), 3000);
+}
+
+void TstRotctldClient::a_refused_connect_retries_until_the_daemon_is_there()
+{
+    // 2026-09-16 regression test, from the first live run against an
+    // ARCO. The panel starts rotctld and connects at once; rotctld has
+    // not bound its port yet, so the connect is refused. Qt emits no
+    // disconnected() for a link that never came up, and the client
+    // used to sit in Connecting for good — "Connection refused" on
+    // screen, retry timer never started. Meanwhile the ARCO dropped
+    // rotctld's silent session after ~20 s and everything was dead.
+    //
+    // Find a port nobody listens on, point the client at it, and only
+    // then bring the daemon up there. The client must get through on
+    // its own.
+    quint16 port = 0;
+    {
+        QTcpServer probe;
+        QVERIFY(probe.listen(QHostAddress::LocalHost, 0));
+        port = probe.serverPort();
+    }   // closed again: the port is now free and refuses connects
+
+    RotctldClient c;
+    c.setPollIntervalMs(100);
+    c.setTarget(QStringLiteral("127.0.0.1"), port);
+    QSignalSpy err(&c, &RotorController::errorOccurred);
+    QSignalSpy pos(&c, &RotorController::positionChanged);
+    c.connectToRotor();
+
+    // The refusal must be reported and must land in Disconnected, not
+    // hang in Connecting.
+    QTRY_VERIFY_WITH_TIMEOUT(!err.isEmpty(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(c.state(), RotorController::State::Disconnected,
+                              3000);
+
+    // Now the daemon appears on that very port. Nobody calls
+    // connectToRotor() again — the retry has to do it.
+    FakeRotctld fake;
+    QVERIFY(fake.listenOn(port));
+    fake.azimuth = 271.0;
+    QVERIFY(pos.wait(RotctldClient::kRetryAfterRefusedMs + 3000));
+    QVERIFY(c.isConnected());
+    QCOMPARE(c.azimuth(), 271.0);
+}
+
+void TstRotctldClient::the_watchdog_announces_a_hung_daemon()
+{
+    // 2026-09-16. Whoever owns a local rotctld needs to know that the
+    // daemon is hung (as opposed to any other reason for Disconnected),
+    // because a hung daemon has to be restarted — reconnecting to it
+    // just repeats the cut every few seconds, which is exactly the
+    // "connects, then not, then connects" the operator saw.
+    FakeRotctld fake;
+    QVERIFY(fake.listen());
+
+    RotctldClient c;
+    c.setPollIntervalMs(100);
+    c.setTarget(QStringLiteral("127.0.0.1"), fake.port());
+    QSignalSpy pos(&c, &RotorController::positionChanged);
+    QSignalSpy hung(&c, &RotctldClient::replyTimedOut);
+    c.connectToRotor();
+    QVERIFY(pos.wait(3000));
+    QCOMPARE(hung.count(), 0);
+
+    fake.mute = true;
+    QTRY_COMPARE_WITH_TIMEOUT(hung.count(), 1,
+                              RotctldClient::kReplyTimeoutMs + 2000);
+    QVERIFY(!c.isConnected());
+
+    // A plain drop is not a hang: closing the socket must not fire it.
+    c.disconnectFromRotor();
+    QCOMPARE(hung.count(), 1);
 }
 
 QTEST_MAIN(TstRotctldClient)

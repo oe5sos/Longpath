@@ -36,6 +36,14 @@
 //                 rotator no longer has its elevation slammed down by
 //                 every azimuth command. AI-assisted via Anthropic
 //                 Claude (Cowork), operator Martin Fischer.
+//   2026-09-16 — A refused connect used to park the client in
+//                 Connecting for good (Qt emits no disconnected() for
+//                 a link that never came up), so the retry never ran;
+//                 it now drops to Disconnected and retries after one
+//                 second. New replyTimedOut() signal lets the owner of
+//                 a local rotctld restart it. Found live against an
+//                 ARCO. AI-assisted via Anthropic Claude (Claude Code),
+//                 operator Martin Fischer.
 // =================================================================
 
 #include "RotorController.h"
@@ -73,6 +81,16 @@ public:
     // closing the socket, not a latency budget. Cutting the connection
     // hands recovery to the auto-reconnect that already exists.
     static constexpr int kReplyTimeoutMs = 4000;
+
+    // How long to wait before trying again. After a link that was up
+    // and dropped, three seconds — a controller being power-cycled
+    // needs that long anyway. After a connect that was refused
+    // outright, one second: the usual reason is a rotctld this program
+    // started a moment ago that has not bound its port yet, and the
+    // ARCO family drops a GS-232A session that stays silent for ~20 s,
+    // so the first poll should reach the daemon well inside that.
+    static constexpr int kRetryAfterDropMs    = 3000;
+    static constexpr int kRetryAfterRefusedMs = 1000;
 
     QString description() const override;
     State state() const override { return m_state; }
@@ -114,6 +132,14 @@ signals:
     // positionChanged: RotorController's contract stays azimuth-only,
     // and every existing connect keeps compiling.
     void elevationChanged(double elevationDeg);
+
+    // The reply watchdog fired: an outstanding command got no answer
+    // within kReplyTimeoutMs and the link has been cut. Separate from
+    // errorOccurred (which carries the operator-facing text) so that
+    // whoever owns the rotctld process can tell "the daemon is hung"
+    // from every other reason the state went to Disconnected — a hung
+    // daemon needs restarting, not reconnecting to.
+    void replyTimedOut();
 
 private:
     enum class Pending { None, Position, Report };

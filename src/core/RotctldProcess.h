@@ -26,6 +26,13 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-09-16 — Takes a free port when the preferred one is held (a
+//                 rotctld orphaned by an earlier crash was sitting on
+//                 4533 with the wrong device, live); restart() for a
+//                 daemon whose controller link has died; exited() no
+//                 longer fires for a stop this object asked for.
+//                 AI-assisted via Anthropic Claude (Claude Code),
+//                 operator Martin Fischer.
 // =================================================================
 
 #include <QObject>
@@ -64,20 +71,45 @@ public:
     // missing or the process refuses to start; a rotctld that starts
     // and then exits reports through exited() instead, because that
     // failure arrives later.
+    //
+    // `listenPort` is the port to prefer. If something already holds
+    // it, a free one is taken instead — read listenPort() afterwards
+    // for the port actually in use. 2026-09-16: found live — a rotctld
+    // from an earlier, crashed session was still sitting on 4533 with
+    // the wrong device; the new rotctld could not bind, exited at once,
+    // and the client then happily talked to the stale one, which never
+    // answered. Sidestepping the port is the fix that needs nothing
+    // from the operator; killing strangers' processes is not ours to do.
     bool start(int hamlibModel, const QString& device, int baud,
                quint16 listenPort, QString* error);
 
+    // The port the running (or last started) rotctld listens on.
+    quint16 listenPort() const { return m_listenPort; }
+
     void stop();
+
+    // Everything start() needs, kept so the owner can bounce the daemon
+    // without re-collecting it: a rotctld whose link to the controller
+    // has died (the ARCO drops a silent GS-232A session after ~20 s)
+    // never recovers on its own and has to be started afresh.
+    bool restart(QString* error);
 
 signals:
     // rotctld stopped on its own. Carries whatever it wrote to stderr,
     // which is where Hamlib puts the reason — a wrong model number or a
     // serial port that is not there both come out here and nowhere
-    // else.
+    // else. Not emitted for a stop() this object asked for.
     void exited(int exitCode, const QString& stderrText);
 
 private:
     QProcess m_proc;
+    quint16  m_listenPort{0};
+    bool     m_stopRequested{false};
+
+    int     m_model{0};
+    QString m_device;
+    int     m_baud{0};
+    quint16 m_preferredPort{0};
 };
 
 } // namespace Longpath

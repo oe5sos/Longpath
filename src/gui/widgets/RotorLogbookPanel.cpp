@@ -16,6 +16,16 @@
 //                 of only being written silently into the DX field.
 //                 AI-assisted via Anthropic Claude (Cowork), operator
 //                 Martin Fischer.
+//   2026-09-16 — First live run against a microHAM ARCO on the LAN
+//                 (GS-232A over TCP), three defects found in one go:
+//                 the setup dialog's Connect used the port combo's
+//                 stale currentData() instead of the address on screen
+//                 and then saved that wrong value back; a rotctld whose
+//                 controller link died (the ARCO drops a silent session
+//                 after ~20 s) is now restarted on the reply watchdog
+//                 instead of being reconnected to forever; rotctld
+//                 exiting on its own is now reported. AI-assisted via
+//                 Anthropic Claude (Claude Code), operator Martin Fischer.
 // =================================================================
 
 #include "RotorLogbookPanel.h"
@@ -1072,6 +1082,43 @@ void RotorLogbookPanel::ensureRotor()
             [this](const QString& msg) {
         setStatus(QStringLiteral("Rotator: %1").arg(msg), true);
     });
+
+    // 2026-09-16, found live against a microHAM ARCO on the LAN: the
+    // ARCO closes a GS-232A TCP session after ~20 s without traffic.
+    // rotctld opens that session the moment it starts, and if nothing
+    // polls it in time (the first client connect was refused because
+    // rotctld had not bound its port yet — see RotctldClient), the
+    // session dies underneath rotctld, which then hangs on every
+    // command for good. Reconnecting the client to a hung daemon just
+    // repeats the watchdog cut every few seconds. The daemon is ours,
+    // so bounce it; the client's own retry then finds the fresh one.
+    connect(m_rotor, &RotctldClient::replyTimedOut, this, [this]() {
+        if (!m_rotorProc.isRunning()) { return; }
+        QString err;
+        if (!m_rotorProc.restart(&err)) {
+            setStatus(QStringLiteral("Rotator: rotctld restart failed — %1")
+                          .arg(err), true);
+            return;
+        }
+        m_rotor->setTarget(QStringLiteral("127.0.0.1"),
+                           m_rotorProc.listenPort());
+        setStatus(QStringLiteral("Rotator stopped answering — "
+                                 "restarted rotctld"), true);
+    });
+
+    // rotctld quitting by itself was never surfaced: Hamlib's reason
+    // (bad model number, device not there, port taken) went to a
+    // stderr nobody read, and the client kept retrying a port with
+    // nothing behind it.
+    connect(&m_rotorProc, &RotctldProcess::exited, this,
+            [this](int code, const QString& stderrText) {
+        m_rotor->disconnectFromRotor();
+        const QString why = stderrText.isEmpty()
+            ? QStringLiteral("exit code %1").arg(code)
+            : stderrText.section(QLatin1Char('\n'), -1).trimmed();
+        setStatus(QStringLiteral("Rotator: rotctld exited — %1").arg(why),
+                  true);
+    });
 }
 
 void RotorLogbookPanel::showRotorSetup()
@@ -1445,8 +1492,25 @@ void RotorLogbookPanel::openRotorSetupDialog()
 
         if (local) {
             const int model = currentModel();
-            const QString device = portCombo->currentData().isValid()
-                && !portCombo->currentData().toString().isEmpty()
+            // 2026-09-16: currentData() survives a setEditText() call
+            // untouched — refreshPorts() pre-fills the line edit with a
+            // saved network address (e.g. an ARCO's "host:port") via
+            // setEditText(), but currentIndex() (and so currentData())
+            // stays wherever it was left, usually index 0's real serial
+            // port. Trusting currentData() whenever it happens to be
+            // valid meant Connect silently used that stale real port
+            // instead of the address on screen — and then SAVED it back
+            // over the operator's setting, so the correct value kept
+            // reappearing lost. currentData() is only trustworthy when
+            // the visible text still matches the selected item's own
+            // text, i.e. the operator picked it from the dropdown rather
+            // than typing or having it pre-filled.
+            const int idx = portCombo->currentIndex();
+            const bool selectionStillShown = idx >= 0
+                && portCombo->itemText(idx) == portCombo->currentText();
+            const QString device = (selectionStillShown
+                && portCombo->currentData().isValid()
+                && !portCombo->currentData().toString().isEmpty())
                     ? portCombo->currentData().toString()
                     : portCombo->currentText().trimmed();
             const int baud = baudCombo->currentData().toInt();
@@ -1460,9 +1524,12 @@ void RotorLogbookPanel::openRotorSetupDialog()
                 status->setText(err);
                 return;
             }
-            m_rotor->setTarget(QStringLiteral("127.0.0.1"), 4533);
+            // The port actually bound — 4533 unless something else
+            // had it (see RotctldProcess::start).
+            const quint16 port = m_rotorProc.listenPort();
+            m_rotor->setTarget(QStringLiteral("127.0.0.1"), port);
             s.setValue(kRotorHostKey, QStringLiteral("127.0.0.1"));
-            s.setValue(kRotorPortKey, 4533);
+            s.setValue(kRotorPortKey, port);
         } else {
             const QString host = hostEdit->text().trimmed();
             const quint16 port =

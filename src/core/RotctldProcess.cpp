@@ -13,17 +13,49 @@
 #include "RotctldProcess.h"
 
 #include <QFileInfo>
+#include <QHostAddress>
+#include <QLoggingCategory>
 #include <QStandardPaths>
+#include <QTcpServer>
 
 namespace Longpath {
+
+namespace {
+
+Q_LOGGING_CATEGORY(lcRotctld, "nereus.rotctld")
+
+// True if nothing on this machine is listening on loopback:port. A
+// bind that succeeds is released again at once; rotctld binds it for
+// real a moment later.
+bool loopbackPortIsFree(quint16 port)
+{
+    QTcpServer probe;
+    return probe.listen(QHostAddress::LocalHost, port);
+}
+
+// A port the kernel says is free right now.
+quint16 anyFreeLoopbackPort()
+{
+    QTcpServer probe;
+    if (!probe.listen(QHostAddress::LocalHost, 0)) { return 0; }
+    return probe.serverPort();
+}
+
+} // namespace
 
 RotctldProcess::RotctldProcess(QObject* parent) : QObject(parent)
 {
     connect(&m_proc, &QProcess::finished, this,
             [this](int code, QProcess::ExitStatus) {
-        emit exited(code,
-                    QString::fromLocal8Bit(m_proc.readAllStandardError())
-                        .trimmed());
+        const QString err =
+            QString::fromLocal8Bit(m_proc.readAllStandardError()).trimmed();
+        if (m_stopRequested) {
+            m_stopRequested = false;
+            return;
+        }
+        qCWarning(lcRotctld) << "rotctld exited on its own, code" << code
+                             << err;
+        emit exited(code, err);
     });
 }
 
@@ -106,8 +138,34 @@ bool RotctldProcess::start(int hamlibModel, const QString& device, int baud,
         return false;
     }
 
+    m_model         = hamlibModel;
+    m_device        = device;
+    m_baud          = baud;
+    m_preferredPort = listenPort;
+
+    quint16 port = listenPort;
+    if (!loopbackPortIsFree(port)) {
+        const quint16 other = anyFreeLoopbackPort();
+        qCWarning(lcRotctld)
+            << "port" << port << "is already taken (a leftover rotctld?)"
+            << "— using" << other << "instead";
+        port = other;
+        if (port == 0) {
+            if (error) {
+                *error = QStringLiteral(
+                    "Port %1 is already in use and no free port could be "
+                    "found. Something else — most likely a rotctld from "
+                    "an earlier session — is still running; quit it and "
+                    "try again.").arg(listenPort);
+            }
+            return false;
+        }
+    }
+    m_listenPort = port;
+
     m_proc.setProgram(binary);
-    m_proc.setArguments(arguments(hamlibModel, device, baud, listenPort));
+    m_proc.setArguments(arguments(hamlibModel, device, baud, port));
+    m_stopRequested = false;
     m_proc.start();
 
     if (!m_proc.waitForStarted(3000)) {
@@ -117,7 +175,18 @@ bool RotctldProcess::start(int hamlibModel, const QString& device, int baud,
         }
         return false;
     }
+    qCInfo(lcRotctld) << "started" << binary << m_proc.arguments();
     return true;
+}
+
+bool RotctldProcess::restart(QString* error)
+{
+    if (m_model == 0) {
+        if (error) { *error = QStringLiteral("rotctld was never started"); }
+        return false;
+    }
+    stop();
+    return start(m_model, m_device, m_baud, m_preferredPort, error);
 }
 
 void RotctldProcess::stop()
@@ -128,6 +197,7 @@ void RotctldProcess::stop()
     // outright it can leave the port held until the device is
     // re-plugged, and the next connection attempt then fails for a
     // reason that has nothing to do with the rotator.
+    m_stopRequested = true;
     m_proc.terminate();
     if (!m_proc.waitForFinished(2000)) {
         m_proc.kill();
