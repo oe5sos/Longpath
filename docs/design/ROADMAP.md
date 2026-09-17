@@ -30,35 +30,22 @@ und trägt das alles — sie steht hier nicht mehr als eigene Baustelle.
 | 8 | Sechs weitere Tabellen auf den Glas-Tabellenstil, Zebra-Farbe | 89e9d5d8 |
 | 9 | Drift-Ratsche wieder grün (61 namenlose Farben, 0 Schriften daneben) | 9bb73c13 |
 | 10 | Applets, erste Runde: Auswahlblau gedeckt, Knöpfe nie schmaler als ihr Text, VAX-Pegel in Bernstein, RTTY-Doppelkopf, Bandfilter-Enge | a46ec862 |
+| 11 | Sichern, ohne auf das Beenden zu warten: Autosave jede Minute bei Änderung, Tageskopien `Longpath.settings.<JJJJ-MM-TT>` (14 bleiben) | f1f5dd53 |
+| 12 | Mitschrift: Whisper-Dienst aus Longpath heraus starten (Setup → Spracherkennung → „Dienst auf diesem Rechner", Automatik beim Einschalten), Applet im Glas-Look; läuft der Dienst schon (Login-Dienst), wird er benutzt statt verdoppelt | 19903b6f |
+| 13 | `LONGPATH_CONFIG_DIR`: eigener Konfigurationsordner für eine Prüf-Instanz — die Sandbox mit `HOME=` las auf macOS trotzdem die echten Einstellungen (und meldete sich mit dem Rufzeichen am Cluster an) | b7edab81 |
 
 Werkzeuge, die dabei entstanden sind und bleiben: `tst_filter_pane_sheet`
 (Bandfilter-Fläche in Betriebsgröße), `tst_tx_entwurf_sheet` mit
-`gebaut` / `kopfleiste` / `platte` / `logbuch` / `applets` (echte
-Widgets als Blatt), `tst_real_status_bar_chain_indicators` (Fußleiste
-am echten Fenster). Live-Prüfung ohne Funkgerät: Sandbox-Instanz mit
-eigenem HOME und `LONGPATH_AUTOMATION=1` (`dumpTree`, `grab`).
+`gebaut` / `kopfleiste` / `platte` / `logbuch` / `applets` / `mitschrift`
+(echte Widgets als Blatt), `tst_real_status_bar_chain_indicators`
+(Fußleiste am echten Fenster). Live-Prüfung ohne Funkgerät: Sandbox-
+Instanz mit `LONGPATH_CONFIG_DIR=<Kopie der Einstellungen, Rufzeichen
+N0CALL, Cluster-Automatik aus>` und `LONGPATH_AUTOMATION=1` (`dumpTree`,
+`grab`). **Nicht** `HOME=` — das greift auf macOS nicht (Schritt 13).
 
 ---
 
 ## Als Nächstes, in dieser Reihenfolge
-
-### A · Sichern, ohne auf das Beenden zu warten  *(gebaut, noch nicht übernommen)*
-
-Betreiber, 17.09.: „wichtig ist, dass sich das programm immer
-automatisch sichert. sollte ein stromausfall oder sonstiges sein,
-sollte man immer auf die daten zurück greifen können!"
-
-- `AppSettings::isDirty()` + Autosave-Timer im Hauptfenster: jede
-  Minute, wenn sich etwas geändert hat, wird der ganze Stand samt
-  Fenstergeometrie geschrieben (bisher nur beim Beenden — ein
-  Stromausfall kennt kein closeEvent).
-- Tageskopie `Longpath.settings.<JJJJ-MM-TT>` beim ersten Schreiben
-  eines Tages, 14 Tage bleiben, Handkopien bleiben unberührt — die
-  `.bak` hielt nur den Stand vor dem letzten Schreiben.
-- Logbuch (ADIF) und Profile schreiben schon heute sofort bzw. nach
-  500 ms und atomar (QSaveFile); daran ändert sich nichts.
-- Prüfstand `tst_app_settings_autosave` grün; ein zweiter am echten
-  Fenster ist vorbereitet, aber noch nicht eingebaut.
 
 ### B · „Nereus" verschwindet  *(Betreiber, 17.09.: „wir haben kein nereus … weg damit")*
 
