@@ -198,6 +198,12 @@
 
 namespace Longpath {
 
+namespace {
+// Breite der Beschriftungsspalte im Messblock (Vorlauf, SWR, Leistung,
+// Tune): eine Zahl fuer alle vier, damit die Rinnen buendig stehen.
+constexpr int kTxLabelW = 62;
+} // namespace
+
 TxApplet::TxApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
 {
@@ -275,6 +281,11 @@ void TxApplet::buildUI()
     // sichtbarer Span.
     auto* fwdGauge = new HGauge(this);
     fwdGauge->setTitle(QStringLiteral("VORLAUF"));
+    // 62, nicht 52: die Versalzeile mit Laufweite (Glas & Tiefe,
+    // 2026-09-17) braucht fuer "VORLAUF" rund 58 Punkte — bei 52 stand
+    // "VORLAUI" auf dem Blatt. Dieselbe Breite wie die Reglerzeilen
+    // darunter, damit Rinnen und Regler buendig beginnen.
+    fwdGauge->setLabelWidth(kTxLabelW);
     fwdGauge->setReadout(true, 1, QStringLiteral("W"));
     fwdGauge->setAccessibleName(QStringLiteral("Forward power gauge"));
     m_fwdPowerGauge = fwdGauge;
@@ -291,6 +302,7 @@ void TxApplet::buildUI()
     swrGauge->setYellowStart(2.0);
     swrGauge->setRedStart(2.5);
     swrGauge->setTitle(QStringLiteral("SWR"));
+    swrGauge->setLabelWidth(kTxLabelW);
     swrGauge->setReadout(true, 1);
     swrGauge->setAccessibleName(QStringLiteral("SWR gauge"));
     m_swrGauge = swrGauge;
@@ -306,7 +318,7 @@ void TxApplet::buildUI()
 
         m_rfPowerValue = new QLabel(QStringLiteral("100"), this);
         auto* row = sliderRow(QStringLiteral("Leistung"), m_rfPowerSlider,
-                              m_rfPowerValue, 54);
+                              m_rfPowerValue, kTxLabelW);
         // Auf dem HL2 steht hier „-7.5 dB" statt einer nackten Zahl —
         // die 36 Punkt aus sliderRow() schneiden das ab.
         m_rfPowerValue->setFixedWidth(46);
@@ -325,7 +337,7 @@ void TxApplet::buildUI()
 
         m_tunePwrValue = new QLabel(QStringLiteral("10"), this);
         auto* row = sliderRow(QStringLiteral("Tune"), m_tunePwrSlider,
-                              m_tunePwrValue, 54);
+                              m_tunePwrValue, kTxLabelW);
         m_tunePwrValue->setFixedWidth(46);
         m_tunePwrSlider->setFixedHeight(16);
         mess->addLayout(row);

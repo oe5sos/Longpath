@@ -50,9 +50,17 @@ QLabel* captionLabel(const QString& text, QWidget* parent)
 /// dieselbe Optik traegt.
 QString CommandBar::pillStyle()
 {
+    // Glas & Tiefe (2026-09-17, Stilblatt 3): die Pille ist ERHABEN —
+    // Verlauf, Lichtkante oben, dunkle Unterkante — und die aktive
+    // traegt den gedeckten Auswahlverlauf statt des flachen kBlueBg.
+    // Das nimmt der Kopfleiste die Blau-Summe (fuenf leuchtende Knoepfe
+    // in einer Reihe), ohne dass die Auswahl leiser wuerde.
     return QStringLiteral(
         "QPushButton {"
-        "  background: %1; border: 1px solid %2; border-radius: %6px;"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %1, stop:1 %10);"
+        "  border: 1px solid %2; border-radius: %6px;"
+        "  border-top-color: %11; border-bottom-color: %12;"
         "  color: %3; font-size: 11px; font-weight: 600;"
         "  padding: 0 11px; min-height: %5px; max-height: %5px;"
         "}"
@@ -60,17 +68,24 @@ QString CommandBar::pillStyle()
         // Genau einer je Gruppe leuchtet. Der Rest ist fast unsichtbar —
         // das ist der Unterschied zwischen einer Leiste und einer Wand.
         "QPushButton:checked {"
-        "  background: %7; border: 1px solid %8; color: %9;"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %7, stop:1 %13);"
+        "  border: 1px solid %8; border-top-color: %14; color: %9;"
         "}")
-        .arg(QString::fromLatin1(Style::kButtonBg),
+        .arg(QString::fromLatin1(Style::kGlassBtnTop),
              QString::fromLatin1(Style::kBorder),
              QString::fromLatin1(Style::kTextSecondary),
              QString::fromLatin1(Style::kButtonHover))
         .arg(CommandBar::kPillHeight)
         .arg(CommandBar::kPillRadius)
-        .arg(QString::fromLatin1(Style::kBlueBg),
-             QString::fromLatin1(Style::kBlueBorder),
-             QString::fromLatin1(Style::kBlueText));
+        .arg(QString::fromLatin1(Style::kGlassSelTop),
+             QString::fromLatin1(Style::kGlassSelBorder),
+             QString::fromLatin1(Style::kGlassSelText))
+        .arg(QString::fromLatin1(Style::kGlassBtnBot),
+             Style::shiftL(QColor(Style::kBorder), 12),
+             Style::shiftL(QColor(Style::kBorder), -14),
+             QString::fromLatin1(Style::kGlassSelBot),
+             Style::shiftL(QColor(Style::kGlassSelBorder), 16));
 }
 
 CommandBar::CommandBar(QWidget* parent) : QWidget(parent)

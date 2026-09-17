@@ -117,10 +117,11 @@ void GridCellWidget::buildCellButtons()
         "QPushButton { background: transparent; border: none;"
         "  color: %1; font-size: 11px; padding: 0; }"
         "QPushButton:hover { background: %2; color: %3;"
-        "  border-radius: 3px; }")
+        "  border-radius: %4px; }")
         .arg(QString::fromLatin1(Style::kTextScale),
              QString::fromLatin1(Style::kButtonHover),
-             QString::fromLatin1(Style::kTextPrimary));
+             QString::fromLatin1(Style::kTextPrimary))
+        .arg(Style::kGlassChipRadius);   // nie Radius 3 (Hausstil)
 
     auto* detach = new QPushButton(QStringLiteral("\u2197"), m_titleBar);
     detach->setFixedSize(16, 14);

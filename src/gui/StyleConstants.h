@@ -672,16 +672,21 @@ inline QString amberCheckedStyle()
 // Rot, waehrend oben Messing steht.
 inline QString txKeyStyle(bool leise = false)
 {
+    // Glas & Tiefe (2026-09-17): auch die Messingtaste ist erhaben —
+    // Lichtkante oben, dunkle Unterkante, wie jeder andere Knopf.
     return QStringLiteral(
         "QPushButton:checked {"
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
         "               stop:0 %1, stop:1 %2);"
         "  color: %3; border: 1px solid %4;"
+        "  border-top-color: %5; border-bottom-color: %6;"
         "}"
     ).arg(QLatin1String(leise ? kTxKeyDimTop : kTxKeyTop),
           QLatin1String(leise ? kTxKeyDimBottom : kTxKeyBottom),
           QLatin1String(kTxKeyText),
-          QLatin1String(leise ? kTxKeyDimBorder : kTxKeyBorder));
+          QLatin1String(leise ? kTxKeyDimBorder : kTxKeyBorder),
+          shiftL(QColor(leise ? kTxKeyDimBorder : kTxKeyBorder), 16),
+          shiftL(QColor(leise ? kTxKeyDimBottom : kTxKeyBottom), -12));
 }
 
 inline QString redCheckedStyle()
@@ -709,15 +714,27 @@ inline QString dspToggleStyle()
 
 inline QString sliderHStyle()
 {
+    // Glas & Tiefe (2026-09-17): die Rinne ist VERSENKT (schwarz, oben
+    // die dunkle Kante, unten Licht), der Griff ERHABEN — eine Pille im
+    // Knopfverlauf mit Akzentrand, nicht mehr die blaue Kugel von Qt.
+    // Blau bleibt am Rand: der Griff ist anfassbar.
     return QStringLiteral(
         "QSlider::groove:horizontal {"
-        "  height: 4px; background: %1; border-radius: 2px;"
+        "  height: 4px; background: %1; border: 1px solid %2;"
+        "  border-top-color: %3; border-bottom-color: %4; border-radius: 3px;"
         "}"
         "QSlider::handle:horizontal {"
-        "  width: 10px; height: 10px; margin: -3px 0;"
-        "  background: %2; border-radius: 5px;"
+        "  width: 10px; height: 14px; margin: -6px 0;"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %5, stop:1 %6);"
+        "  border: 1px solid %7; border-top-color: %8; border-radius: 5px;"
         "}"
-    ).arg(kGroove, kAccent);
+        "QSlider::handle:horizontal:hover { background: %9; }"
+    ).arg(hexRole(kInsetBg), hexRole(kBorder),
+          QLatin1String(kGlassShade), QLatin1String(kGlassLight),
+          hexRole(kGlassBtnTop), hexRole(kGlassBtnBot),
+          hexRole(kAccent), shiftL(QColor(hexRole(kAccent)), 18),
+          hexRole(kGlassBtnTop));
 }
 
 inline QString sliderVStyle()
@@ -769,14 +786,20 @@ inline QString insetValueStyle()
     // VERSENKT: oben dunkel, unten heller — siehe die Notiz bei
     // buttonBaseStyle. Dasselbe Mittel wie bei der Platte, nur
     // umgedreht, und das Feld liegt drin statt drauf.
+    // Glas & Tiefe (2026-09-17): ein Glaschip wie im Bandfilter — oben
+    // die dunkle Kante, unten Licht, Monospace fuer die Zahl (Regel 4).
     return QStringLiteral(
         "QLabel {"
-        "  font-size: 11px; background: %1; border: 1px solid %2;"
-        "  border-radius: 6px; padding: 1px 2px; color: %3;"
+        "  font-size: 11px; font-family: Menlo; background: %1; border: 1px solid %2;"
+        "  border-top-color: %4; border-bottom-color: %5;"
+        "  border-radius: %6px; padding: 1px 4px; color: %3;"
         "}"
-    ).arg(sunkenFill(kInsetBg),
+    ).arg(sunkenFill(kInsetBg, 8, 4),
           QLatin1String(kInsetBorder),
-          QLatin1String(kTextPrimary));
+          QLatin1String(kTextPrimary),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight))
+     .arg(kGlassChipRadius);
 }
 
 inline QString titleBarStyle()

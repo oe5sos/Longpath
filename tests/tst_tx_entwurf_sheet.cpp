@@ -24,6 +24,7 @@
 
 #include "gui/HGauge.h"
 #include "gui/applets/TxApplet.h"
+#include "gui/widgets/CommandBar.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
 
@@ -702,6 +703,31 @@ private slots:
             const QImage img = blatt(x.f, QString::fromUtf8(x.kopf));
             QVERIFY2(img.save(QString::fromUtf8(x.datei)), x.datei);
         }
+    }
+
+    // Die Kopfleiste, gebaut: eine Pille je Gruppe eingerastet, damit
+    // man den Auswahlverlauf neben den ruhenden sieht (Glas & Tiefe,
+    // 2026-09-17). Ohne Funkgeraet rastet in der App nichts ein.
+    void kopfleiste()
+    {
+        CommandBar bar;
+        bar.resize(1130, 60);
+        bar.setAttribute(Qt::WA_DontShowOnScreen);
+        bar.show();
+        QCoreApplication::processEvents();
+        const QStringList an{QStringLiteral("40m"), QStringLiteral("LSB"),
+                             QStringLiteral("100 Hz"), QStringLiteral("NR2")};
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (an.contains(b->text())) { b->setChecked(true); }
+        }
+        QCoreApplication::processEvents();
+        QImage img(bar.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        bar.render(&img);
+        const QString aus = QStringLiteral("/tmp/kopfleiste_gebaut.png");
+        QVERIFY2(img.save(aus), qPrintable(aus));
+        qInfo().noquote() << "Blatt:" << aus;
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.
