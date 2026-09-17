@@ -35,7 +35,9 @@ und trägt das alles — sie steht hier nicht mehr als eigene Baustelle.
 | 13 | `LONGPATH_CONFIG_DIR`: eigener Konfigurationsordner für eine Prüf-Instanz — die Sandbox mit `HOME=` las auf macOS trotzdem die echten Einstellungen (und meldete sich mit dem Rufzeichen am Cluster an) | b7edab81 |
 | 14 | „Nereus" verschwindet, Teil 1 — alles Sichtbare: Log-Kategorien `longpath.*`, Log-Dateien `longpath-*.log`, TCI-Servername, Schlüsselbund mit Umzug, VAX-Geräte „Longpath VAX n"/„Longpath TX" (Plug-in + Erkennung beider Namen), Exporte (ADIF/Cabrillo/KML), Kennungen nach außen, Menüs/Dialoge; Nebenfund: fünf tote `NereusSDR--`-Stylesheets (Fußleisten-Abzeichen ohne Hintergrund seit 20.08.) | 2ea2aa00 |
 | 15 | Teil 2 — Bau-Namen (`LONGPATH_*`, `longpath_add_test`), ADIF-Feld `APP_LONGPATH_QRZUP` (altes wird gelesen), CLAUDE.md-Kopf, HOW-TO-PORT, HAUSSTIL, STYLEGUIDE | 2217cca5 |
-| 16 | Teil 3 — Kopfzeilen („Modification history (Longpath)", `(Longpath)`, „Longpath-original") und Kommentare in ~1 570 Dateien; Herkunft, datierte Historienzeilen und Übergangs-Erkennungen bleiben | *(dieser Commit)* |
+| 16 | Teil 3 — Kopfzeilen („Modification history (Longpath)", `(Longpath)`, „Longpath-original") und Kommentare in ~1 570 Dateien; Herkunft, datierte Historienzeilen und Übergangs-Erkennungen bleiben | 355f2f17 |
+| 17 | Formularstil (C): eine Definition für Auswahlfelder (erhaben), Häkchen/Wahlpunkte (versenkt), Glasfelder, Rinnen waagrecht/senkrecht (EQ), Gruppen, Knöpfe, Bildlaufleisten — auch als App-Basislinie, damit Ungestyltes im Haus-Look erscheint; AGC-T-Regler und DSP-Popup auf die Haus-Rinne | 8e3d0da2 |
+| 18 | Setup-Dialog, erster Gang (F): Haus-Reiter (`kTabStyle`), DSP-Seiten, SpectrumPeaks, FilterPresets, Transmit, Display, VAX, Mitschrift, AudioAdvanced, DeviceCard, Container-Editoren auf die Bausteine; Ratsche 1 477 → 1 230 | af9466d2 |
 
 Werkzeuge, die dabei entstanden sind und bleiben: `tst_filter_pane_sheet`
 (Bandfilter-Fläche in Betriebsgröße), `tst_tx_entwurf_sheet` mit
@@ -63,9 +65,10 @@ Erledigt in drei Commits (Tabelle 14–16). Was noch aussteht:
    cd ~/Longpath && mv NereusSDR Longpath && cd Longpath && git worktree repair && git worktree list
    ```
 
-   Danach lautet der Befehl `cd ~/Longpath/Longpath && ./build.sh && ./run.sh`.
-   Vorher Longpath beenden und `~/Library/LaunchAgents/at.oe5sos.longpath.plist`
-   auf den Pfad prüfen.
+   Danach `rm -rf build` (der Cache trägt den alten absoluten Pfad;
+   der nächste Bau ist ein voller, ~10 min) und der Befehl lautet
+   `cd ~/Longpath/Longpath && ./build.sh && ./run.sh`. Vorher Longpath
+   beenden. Launch-Agents hängen nicht am Pfad (geprüft 18.09.).
 8. **HAL-Plug-in (VAX)**: auf diesem Rechner ist keines installiert, es
    gibt also nichts zu ersetzen. Wenn VAX-Geräte gewünscht sind:
    ```bash
@@ -80,11 +83,11 @@ Was bewusst bleibt, steht in `CLAUDE.md` oben (Herkunft/Copyright,
 datierte Historienzeilen, Übergangs-Erkennungen, datierte Dokumente
 unter `docs/architecture/`).
 
-### C · Übrige Applets, zweite Runde
-Qt-Standard-Comboboxen (USB, Preset, Profile, Rate, Buffer, Baud) und
--Checkboxen auf Glas, vertikale EQ-Regler, CAT-Kapseln, Slider-Rinnen in
-Tuner/Diversity. Braucht einen App-weiten Formularstil (QComboBox,
-QCheckBox, QLineEdit) — derselbe Hebel wie für den Setup-Dialog.
+### C · Übrige Applets, zweite Runde  *(Formularstil erledigt, 18.09.)*
+Der App-weite Formularstil steht (Tabelle 17). Offen aus den Blättern:
+RX-Applet unter ~300 px Breite überlappt (MUTE/BIN, NB/SNB/APF, AGC-T)
+— Umbruch oder Mindestbreite wie beim Bandfilter; CAT-Kapseln sind
+noch flache Kapseln; „Me…"-Auswahlfeld (AGC-Modus) zu schmal.
 
 ### D · Verbindungsdialog
 Der erste Bildschirm, den jeder sieht: Versalzeilen statt
@@ -98,8 +101,13 @@ MOX, VOX, BW, S-Meter sind ohnehin englisch) oder Deutsch durchgehend.
 Danach eine Durchsicht aller sichtbaren Texte („Bandwidth Filter" neben
 „Frequenz", „Leistung" neben „Tune", „Mitschrift", „Leeren").
 
-### F · Setup-Dialog
-Seite für Seite auf Glas, mit dem Formularstil aus C.
+### F · Setup-Dialog  *(erster Gang erledigt, 18.09.)*
+Reiter, Gruppen, Felder, Regler, Wahlpunkte auf den Bausteinen
+(Tabelle 18; Blatt `tst_tx_entwurf_sheet setup`). Offen: Seiten mit
+eigener Palette in Labels/Pillen (DeviceCard-Pillen, AudioVax-Badge,
+Hardware-Tabs über HardwarePage), `SetupPage.cpp` selbst (Titelzeile,
+Scrollfläche über themed), Dialograhmen/Seitenliste des `SetupDialog`,
+ConnectionPanel (wartet auf D).
 
 ### G · Panadapter-Kopf, Overlay, Wasserfall-Palette
 Die Pillen CH 0/TX, die dBm-Pfeile, das Rechtsklick-Menü; eine

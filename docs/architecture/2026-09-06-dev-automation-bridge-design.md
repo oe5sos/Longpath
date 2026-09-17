@@ -158,6 +158,32 @@ typed tool. Each is real, separable future work — deliberately not
 pre-designed here past naming them, since Phase 1 will surface real
 requirements Phase 0 can't predict.
 
+## Isolating a probe instance (added 2026-09-18)
+
+A second Longpath started "just to look" must not touch the operator's
+data. `HOME=<sandbox>` does NOT do that on macOS: `QStandardPaths`
+resolves the home directory through the OS, not `$HOME`, so on
+2026-09-17 nineteen probe launches read the real
+`~/Library/Preferences/Longpath/`, logged in to the DX cluster and RBN
+with the operator's callsign (kicking his own session) and wrote the
+layout back on quit. Since b7edab81 the launch is
+
+```
+LONGPATH_CONFIG_DIR=<copy of the settings, callsign N0CALL,
+                    DxClusterAutoConnect/RbnAutoConnect False> \
+LONGPATH_AUTOMATION=1 ./build/Longpath.app/Contents/MacOS/Longpath
+```
+
+`AppSettings::resolveConfigDir` returns that directory verbatim
+(settings, profiles, logs; no legacy-folder migration). Proof that it
+took: `longpath-<stamp>.log` appears in the sandbox directory and no
+`DxClusterClient: connecting` line follows. Still unredirected (caches
+only, read-mostly): DxClusterClient, FreeDVReporterClient, SotaClient,
+SupportBundle, ModelPaths resolve their folders straight from
+`QStandardPaths`. Applet visibility in a probe comes from the layout
+profile (`LayoutProfiles` JSON, `profiles[].state.visible`), not only
+from `Applet<Id>Visible` — set both when you need an applet on screen.
+
 ## What Longpath did not copy
 
 AetherSDR's KiwiSDR diagnostic env knobs, its per-worktree `GUIClientID`

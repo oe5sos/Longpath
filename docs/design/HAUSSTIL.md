@@ -155,6 +155,43 @@ aussehen.
 
 ---
 
+## Bausteine (Glas & Tiefe, seit 17./18.09.2026)
+
+Der Betreiber hat am 17.09. aus vier Richtungen „Glas & Tiefe" gewählt.
+Seitdem gibt es für jedes Formularteil GENAU EINE Definition in
+`src/gui/StyleConstants.h`, und dieselbe steht als App-Basislinie in
+`AppTheme::applyAppBaselineQss` — ein Widget ohne eigenes Stylesheet
+sieht damit von selbst richtig aus. Wer ein Stylesheet schreibt, nimmt
+den Baustein und legt höchstens Polsterung oder Schriftgröße darüber:
+
+```
+Erhaben (liegt AUF der Fläche — Knöpfe, Auswahlfelder, Reiter, Griffe)
+  Verlauf #222227 → #141417, Lichtkante oben, dunkle Kante unten,
+  Radius 7; gedrückt kippt der Verlauf.
+    buttonBaseStyle()  kButtonStyle  kComboStyle  kTabStyle
+
+Versenkt (liegt IN der Fläche — Felder, Rinnen, Häkchen, Zeichenflächen)
+  Schwarz, Schattenkante oben (rgba 0,0,0,160), Lichtkante unten
+  (rgba 255,255,255,18), Radius 7 (Häkchen 4, Wahlpunkte rund).
+    formFieldStyle() (mit Pfeilen)  glassFieldStyle() (Wertchips, ohne)
+    sliderHStyle()  sliderVStyle()  kSliderStyle  kCheckBoxStyle
+    kRadioButtonStyle  tableStyle()
+
+Auswahl (genau eine Farbe für „gewählt")
+  Verlauf #2f5f92 → #1e3d5f, Rahmen #3d78b0, Text #dbe9f8.
+    blueCheckedStyle()  Liste in kComboStyle  Zellen in tableStyle()
+
+Platte (Panel, Gruppe, schwebendes Fenster)
+  Verlauf #17171b → #0e0e10, Rahmen kBorder mit Lichtkante, Radius 10.
+    glassPanelFill()  kGroupBoxStyle  GridCellWidget/AppletFloatingWindow
+```
+
+Die Konstanten `kGlassEdgeLight`/`kGlassEdgeDark` sind die Kanten auf
+`kBorder`. Blätter zum Nachsehen: `tst_tx_entwurf_sheet formular`
+(Basislinie pur), `setup` (Setup-Seiten), `applets` (alle Applets).
+
+---
+
 ## Wie die Palette gewechselt wird
 
 Stand 2026-08-15: **1733 Hex-Literale, 276 verschiedene Farben, 130
