@@ -31,6 +31,18 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
+    // Glas & Tiefe (2026-09-17): die Zelle ist eine Platte — Verlauf
+    // von oben hell nach unten dunkel, feiner Rahmen — auf dem
+    // dunkleren Grund der Spalte. Dieselbe Platte wie das schwebende
+    // Fenster (AppletFloatingWindow); die Applets darin sind
+    // durchsichtig.
+    setObjectName(QStringLiteral("gridCell"));
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet(QStringLiteral(
+        "QWidget#gridCell { background: %1; border: 1px solid %2; }")
+            .arg(Style::glassPanelFill(),
+                 QString::fromLatin1(Style::kBorderSubtle)));
+
     m_titleBar = new QWidget(this);
     m_titleBar->setStyleSheet(Style::titleBarStyle());
 

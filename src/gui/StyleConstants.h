@@ -750,6 +750,17 @@ inline QString sliderVStyle()
     ).arg(kGroove, kAccent);
 }
 
+/// Die Platte eines Panels (Glas & Tiefe, 2026-09-17): ein Verlauf von
+/// oben hell nach unten dunkel und ein feiner Rahmen. Fuer schwebende
+/// Fenster und gedockte Zellen dasselbe — die Applets darin sind
+/// durchsichtig, damit die Platte durchscheint.
+inline QString glassPanelFill()
+{
+    return QStringLiteral(
+        "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2)")
+        .arg(hexRole(kGlassPanelTop), hexRole(kGlassPanelBot));
+}
+
 /// Ein Zahlenfeld hinter Glas (Glas & Tiefe, 2026-09-17): schwarz,
 /// feiner Rahmen, oben die dunkle Kante des Innenschattens, unten eine
 /// Lichtkante — und KEINE Pfeile. Mausrad, Pfeiltasten und Tippen

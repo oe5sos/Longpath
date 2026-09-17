@@ -120,6 +120,10 @@ protected:
     void closeEvent(QCloseEvent* ev) override;
     void moveEvent(QMoveEvent* ev) override;
     void resizeEvent(QResizeEvent* ev) override;
+    /// Die Platte (Glas & Tiefe): Verlauf und Rahmen, selbst gemalt —
+    /// ein Stylesheet-Grund greift an einem rahmenlosen Top-Level-Fenster
+    /// nicht zuverlaessig (auf dem Werkzeug-Blatt blieb es hell).
+    void paintEvent(QPaintEvent* ev) override;
 
 private:
     void scheduleGeometryReport();

@@ -234,7 +234,9 @@ void RxApplet::buildUi()
     outer->setSpacing(0);
 
     auto* body = new QWidget(this);
-    body->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
+    // Durchsichtig (Glas & Tiefe, 2026-09-17): die Platte malt das
+    // Fenster bzw. die Zelle, siehe AppletFloatingWindow.
+    body->setStyleSheet(QStringLiteral("background: transparent;"));
     auto* root = new QVBoxLayout(body);
     root->setContentsMargins(4, 2, 4, 2);
     root->setSpacing(2);

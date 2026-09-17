@@ -90,6 +90,9 @@ protected:
     void closeEvent(QCloseEvent* ev) override;
     void moveEvent(QMoveEvent* ev) override;
     void resizeEvent(QResizeEvent* ev) override;
+    /// Die Platte (Glas & Tiefe), selbst gemalt wie bei
+    /// AppletFloatingWindow — der Stylesheet-Grund griff hier nie.
+    void paintEvent(QPaintEvent* ev) override;
 
 private:
     // Lage/Groesse merken -- ohne das reisst jedes Andocken/Abloesen die

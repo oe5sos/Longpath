@@ -52,8 +52,14 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     // Minimum width matches AetherSDR AppletPanel (260px), but allow
     // dynamic expansion when the user drags the splitter handle wider.
     setMinimumWidth(Style::kAppletPanelW);
-    setStyleSheet(QStringLiteral("AppletPanelWidget { background: %1; }")
-                      .arg(Style::kPanelBg));
+    // Longpath--AppletPanelWidget: Selektor mit Namensraum, sonst greift
+    // die Regel nicht (siehe AppletFloatingWindow). Der Grund der
+    // Spalte ist seit "Glas & Tiefe" der App-Grund — dunkler als die
+    // Platten, die darauf liegen.
+    setObjectName(QStringLiteral("appletPanel"));
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet(QStringLiteral("QWidget#appletPanel { background: %1; }")
+                      .arg(Style::kAppBg));
 
     m_rootLayout = new QVBoxLayout(this);
     m_rootLayout->setContentsMargins(0, 0, 0, 0);
@@ -104,7 +110,12 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     // Feld — dasselbe Bild wie der Stapel davor, aber Ort statt
     // Reihenfolge. Siehe AppletGrid.h.
     m_grid = new AppletGrid(m_scrollArea);
-    m_grid->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
+    // Der Grund HINTER den Platten: dunkler als die Platte, damit
+    // Abstand und Rahmen etwas trennen (Glas & Tiefe, 2026-09-17).
+    m_grid->setObjectName(QStringLiteral("appletGrid"));
+    m_grid->setAttribute(Qt::WA_StyledBackground, true);
+    m_grid->setStyleSheet(QStringLiteral("QWidget#appletGrid { background: %1; }")
+                              .arg(Style::kAppBg));
     // 8 px matches the QScrollBar:vertical width in the stylesheet above;
     // Qt::ScrollBarAsNeeded means the gutter is wasted when the bar hides,
     // but 8 px is negligible and avoids a layout reflow on bar show/hide.

@@ -148,8 +148,7 @@ ClientChainApplet::ClientChainApplet(TciServer* server, QWidget* parent)
     // ── Rows area (rebuilt by refresh()) ─────────────────────────────────────
     auto* rowsContainer = new QWidget(this);
     rowsContainer->setStyleSheet(QStringLiteral(
-        "QWidget { background: %1; }"
-    ).arg(Style::kPanelBg));
+        "QWidget { background: transparent; }"));   // Platte scheint durch (Glas & Tiefe)
     m_rowsLayout = new QVBoxLayout(rowsContainer);
     m_rowsLayout->setContentsMargins(0, 0, 0, 0);
     m_rowsLayout->setSpacing(0);
@@ -215,8 +214,8 @@ QWidget* ClientChainApplet::buildClientRow(
 {
     auto* row = new QWidget(this);
     row->setStyleSheet(QStringLiteral(
-        "QWidget { background: %1; border-bottom: 1px solid %2; }"
-    ).arg(Style::kPanelBg, Style::kBorderSubtle));
+        "QWidget { background: transparent; border-bottom: 1px solid %1; }"
+    ).arg(Style::kBorderSubtle));
 
     auto* vbox = new QVBoxLayout(row);
     vbox->setContentsMargins(6, 4, 6, 4);

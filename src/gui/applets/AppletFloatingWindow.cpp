@@ -16,6 +16,7 @@
 
 #include <QCloseEvent>
 #include <QDebug>
+#include <QPainter>
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QTimer>
@@ -39,8 +40,21 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
 {
     setWindowTitle(applet ? applet->appletTitle()
                           : QStringLiteral("Longpath"));
-    setStyleSheet(QStringLiteral("AppletFloatingWindow { background: %1; }")
-                      .arg(Style::kPanelBg));
+    // Glas & Tiefe (2026-09-17): die Platte ist ein Verlauf, oben hell,
+    // unten dunkel, mit feinem Rahmen. Die Applets darin sind
+    // durchsichtig (ihre Boedies setzen kein kPanelBg mehr), sonst
+    // deckte ein flaches Grau den Verlauf wieder zu. WA_StyledBackground
+    // ausdruecklich: ein blosses QWidget malt seinen Stylesheet-Grund
+    // sonst nicht selbst, und bisher war es der opake Body, der ihn
+    // vortaeuschte.
+    // Der Grund wird in paintEvent() gemalt, nicht per Stylesheet: der
+    // alte Selektor "AppletFloatingWindow { … }" hat NIE gegriffen
+    // (Klasse im Namensraum) — was man als Fenstergrund sah, war der
+    // opake Body des Applets — und auch ein objectName-Selektor blieb
+    // an diesem rahmenlosen Top-Level-Fenster auf dem Werkzeug-Blatt
+    // (tst_tx_entwurf_sheet platte) ohne Wirkung. Ein eigenes
+    // paintEvent ist an keiner Selektor-Feinheit interessiert.
+    setObjectName(QStringLiteral("appletFloatingWindow"));
     m_createdAt.start();
 
     auto* lay = new QVBoxLayout(this);
@@ -111,7 +125,15 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
         m_scroll->setFrameShape(QFrame::NoFrame);
         m_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        // Durchsichtig, samt Viewport: sonst deckt der Rollbereich die
+        // Platte (paintEvent) mit seinem Palettengrund zu. Auf dem
+        // Werkzeug-Blatt war das Fenster deshalb hell, obwohl Verlauf
+        // und Rahmen laengst gemalt wurden — sie lagen DARUNTER.
+        m_scroll->setStyleSheet(QStringLiteral(
+            "QScrollArea { background: transparent; border: none; }"));
+        m_scroll->viewport()->setAutoFillBackground(false);
         m_scroll->setWidget(applet);
+        applet->setAutoFillBackground(false);
         lay->addWidget(m_scroll);
     }
     setMinimumWidth(Style::kAppletPanelW);
@@ -275,6 +297,21 @@ void AppletFloatingWindow::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
     scheduleGeometryReport();
+}
+
+void AppletFloatingWindow::paintEvent(QPaintEvent*)
+{
+    // Glas & Tiefe (2026-09-17): die Platte — Verlauf von oben hell
+    // nach unten dunkel, feiner Rahmen. Dieselbe Platte wie eine
+    // gedockte Zelle (GridCellWidget); die Applets darin sind
+    // durchsichtig, damit sie durchscheint.
+    QPainter p(this);
+    QLinearGradient g(0, 0, 0, height());
+    g.setColorAt(0.0, QColor(Style::hexRole(Style::kGlassPanelTop)));
+    g.setColorAt(1.0, QColor(Style::hexRole(Style::kGlassPanelBot)));
+    p.fillRect(rect(), g);
+    p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
+    p.drawRect(rect().adjusted(0, 0, -1, -1));
 }
 
 void AppletFloatingWindow::scheduleGeometryReport()

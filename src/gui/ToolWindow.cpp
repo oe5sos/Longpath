@@ -17,6 +17,7 @@
 
 #include <QCloseEvent>
 #include <QMoveEvent>
+#include <QPainter>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QVBoxLayout>
@@ -30,8 +31,9 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     , m_id(id)
 {
     setWindowTitle(title);
-    setStyleSheet(QStringLiteral("ToolWindow { background: %1; }")
-                      .arg(QLatin1String(Style::kPanelBg)));
+    // Der Grund wird in paintEvent() gemalt (Glas & Tiefe, 2026-09-17).
+    // Hier stand `ToolWindow { background: … }` — ein Selektor ohne
+    // Namensraum, der nie gegriffen hat; siehe AppletFloatingWindow.
 
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(0, 0, 0, 0);
@@ -192,6 +194,17 @@ void ToolWindow::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
     saveGeometryState();
+}
+
+void ToolWindow::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    QLinearGradient g(0, 0, 0, height());
+    g.setColorAt(0.0, QColor(Style::hexRole(Style::kGlassPanelTop)));
+    g.setColorAt(1.0, QColor(Style::hexRole(Style::kGlassPanelBot)));
+    p.fillRect(rect(), g);
+    p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
+    p.drawRect(rect().adjusted(0, 0, -1, -1));
 }
 
 } // namespace Longpath

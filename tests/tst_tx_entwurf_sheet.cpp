@@ -25,6 +25,9 @@
 #include "gui/HGauge.h"
 #include "gui/applets/TxApplet.h"
 #include "gui/widgets/CommandBar.h"
+#include "gui/applets/AppletFloatingWindow.h"
+#include "gui/applets/AppletGrid.h"
+#include "gui/applets/GridCellWidget.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
 
@@ -728,6 +731,48 @@ private slots:
         const QString aus = QStringLiteral("/tmp/kopfleiste_gebaut.png");
         QVERIFY2(img.save(aus), qPrintable(aus));
         qInfo().noquote() << "Blatt:" << aus;
+    }
+
+    // Die PLATTE (Glas & Tiefe, 2026-09-17): das echte schwebende
+    // Fenster und die echte gedockte Zelle mit demselben TX-Feld darin.
+    // Erst dieses Blatt zeigt, ob der Verlauf der Platte durch das
+    // Applet scheint oder ein opaker Body ihn zudeckt.
+    void platte()
+    {
+        RadioModel modell;
+        {
+            auto* applet = new TxApplet(&modell);
+            AppletFloatingWindow win(applet, QStringLiteral("p"), 0);
+            win.resize(557, 190);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            const QString aus = QStringLiteral("/tmp/platte_fenster.png");
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus;
+        }
+        {
+            AppletGrid grid;
+            grid.resize(560, 420);
+            const QString a = grid.addCell(QString());
+            const QString b = grid.addCell(QString());
+            grid.cell(a)->addWidget(new TxApplet(&modell));
+            grid.cell(b)->addWidget(new TxApplet(&modell));
+            grid.setAttribute(Qt::WA_DontShowOnScreen);
+            grid.show();
+            QCoreApplication::processEvents();
+            QImage img(grid.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            grid.render(&img);
+            const QString aus = QStringLiteral("/tmp/platte_zellen.png");
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus;
+        }
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.

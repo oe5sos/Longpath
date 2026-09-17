@@ -74,10 +74,14 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     lay->addWidget(stripe);
 
     m_label = new QLabel(title, this);
+    // Versal mit weiter Laufweite, wie der Kopf einer gedockten Zelle
+    // (GridCellWidget) — dasselbe Bauteil in zwei Faessungen sah nach
+    // zwei Programmen aus. Groesse per capsFont, nicht im Stylesheet
+    // (HAUSSTIL.md, die Falle).
+    m_label->setFont(Style::capsFont(font(), Style::kFontCaption));
     m_label->setStyleSheet(
-        QStringLiteral("color: %1; font-size: 11px; font-weight: 600;"
-                       " letter-spacing: 0.4px; background: transparent;")
-            .arg(Style::kTextPrimary));
+        QStringLiteral("color: %1; background: transparent;")
+            .arg(Style::kLabelMid));
     lay->addWidget(m_label);
     lay->addStretch();
 

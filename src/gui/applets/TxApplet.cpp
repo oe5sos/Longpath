@@ -245,7 +245,9 @@ void TxApplet::buildUI()
     outer->setSpacing(0);
 
     auto* body = new QWidget(this);
-    body->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
+    // Durchsichtig (Glas & Tiefe, 2026-09-17): die Platte mit ihrem
+    // Verlauf malt das Fenster bzw. die Zelle, nicht das Applet.
+    body->setStyleSheet(QStringLiteral("background: transparent;"));
     auto* vbox = new QVBoxLayout(body);
     vbox->setContentsMargins(6, 5, 6, 5);
     vbox->setSpacing(5);
