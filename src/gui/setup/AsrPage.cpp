@@ -6,9 +6,11 @@
 // =================================================================
 
 #include "AsrPage.h"
+#include "asr/WhisperServerLauncher.h"
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 
+#include <QCheckBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -169,19 +171,102 @@ void AsrPage::buildRecognitionGroup()
 // ---------------------------------------------------------------------------
 void AsrPage::buildHintGroup()
 {
-    auto* group = new QGroupBox(tr("Hinweis"), this);
+    // ── Der Dienst aus Longpath heraus (2026-09-17) ──────────────────
+    //
+    // Hier stand ein Hinweis mit einer Terminalzeile. Betreiber: "ein
+    // Startknopf fuer den Dienst aus Longpath heraus, damit du das
+    // Terminal nicht brauchst" — "ja bitte". Jetzt: Programm und
+    // Modell (mit Vorgaben, wo Homebrew und ~/whisper sie hinlegen),
+    // ein Haken fuer den Automatikstart beim Einschalten der Mitschrift,
+    // Starten/Stoppen von Hand, und der Zustand mit Grund.
+    auto* group = new QGroupBox(tr("Dienst auf diesem Rechner"), this);
     group->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
     auto* form = new QFormLayout(group);
+    form->setSpacing(6);
 
-    auto* hint = new QLabel(
-        tr("Die Mitschrift braucht einen laufenden Dienst. Lokal etwa:\n"
-           "    whisper-server -m ggml-large-v3-turbo.bin --port 8080\n"
-           "Solange dort nichts horcht, meldet die Mitschrift \"Fehler\"."),
-        group);
-    hint->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
-    hint->setWordWrap(true);
-    hint->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    form->addRow(hint);
+    auto& s = AppSettings::instance();
+    const auto cfg = WhisperServerLauncher::configFromSettings();
+
+    m_binaryEdit = new QLineEdit(group);
+    m_binaryEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_binaryEdit->setText(s.value(QStringLiteral("AsrServerBinary"), QString()).toString());
+    m_binaryEdit->setPlaceholderText(cfg.binary.isEmpty()
+        ? tr("whisper-server nicht gefunden — brew install whisper-cpp")
+        : cfg.binary);
+    m_binaryEdit->setToolTip(tr("Pfad zu whisper-server. Leer: die Homebrew-Vorgabe."));
+    connect(m_binaryEdit, &QLineEdit::editingFinished, this, [this] {
+        storeTrimmed(QStringLiteral("AsrServerBinary"), m_binaryEdit->text());
+    });
+    form->addRow(tr("Programm:"), m_binaryEdit);
+
+    m_modelPathEdit = new QLineEdit(group);
+    m_modelPathEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_modelPathEdit->setText(s.value(QStringLiteral("AsrModelPath"), QString()).toString());
+    m_modelPathEdit->setPlaceholderText(cfg.model.isEmpty()
+        ? tr("kein ggml-*.bin in ~/whisper")
+        : cfg.model);
+    m_modelPathEdit->setToolTip(tr("Die Modelldatei (ggml-*.bin). Leer: die erste in ~/whisper. "
+                                   "\"small\" ist schnell, \"medium\" versteht deutlich mehr."));
+    connect(m_modelPathEdit, &QLineEdit::editingFinished, this, [this] {
+        storeTrimmed(QStringLiteral("AsrModelPath"), m_modelPathEdit->text());
+    });
+    form->addRow(tr("Modelldatei:"), m_modelPathEdit);
+
+    m_autoStart = new QCheckBox(tr("beim Einschalten der Mitschrift selbst starten"), group);
+    m_autoStart->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_autoStart->setChecked(s.value(QStringLiteral("AsrAutoStartServer"),
+                                    QStringLiteral("True")).toString()
+                                .compare(QStringLiteral("True"), Qt::CaseInsensitive) == 0);
+    connect(m_autoStart, &QCheckBox::toggled, this, [](bool on) {
+        AppSettings::instance().setValue(QStringLiteral("AsrAutoStartServer"),
+                                         on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    form->addRow(m_autoStart);
+
+    auto* row = new QWidget(group);
+    auto* rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    m_startButton = new QPushButton(tr("Starten"), row);
+    m_startButton->setStyleSheet(QString::fromLatin1(Style::kButtonStyle));
+    connect(m_startButton, &QPushButton::clicked, this, [this] {
+        storeTrimmed(QStringLiteral("AsrServerBinary"), m_binaryEdit->text());
+        storeTrimmed(QStringLiteral("AsrModelPath"), m_modelPathEdit->text());
+        WhisperServerLauncher::instance().start(WhisperServerLauncher::configFromSettings());
+    });
+    rowLayout->addWidget(m_startButton);
+    m_stopButton = new QPushButton(tr("Stoppen"), row);
+    m_stopButton->setStyleSheet(QString::fromLatin1(Style::kButtonStyle));
+    connect(m_stopButton, &QPushButton::clicked, this, [] {
+        WhisperServerLauncher::instance().stop();
+    });
+    rowLayout->addWidget(m_stopButton);
+    m_serverState = new QLabel(QString(), row);
+    m_serverState->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    m_serverState->setWordWrap(true);
+    rowLayout->addWidget(m_serverState, 1);
+    form->addRow(row);
+
+    auto& launcher = WhisperServerLauncher::instance();
+    auto showState = [this](WhisperServerLauncher::State st, const QString& reason) {
+        using S = WhisperServerLauncher::State;
+        QString text;
+        QString colour = QString::fromLatin1(Style::kTextSecondary);
+        switch (st) {
+        case S::Stopped:  text = tr("aus"); break;
+        case S::Starting: text = tr("startet … (das Modell laedt einige Sekunden)"); break;
+        case S::Running:  text = tr("laeuft"); colour = QString::fromLatin1(Style::kGreenText); break;
+        case S::External: text = tr("laeuft ausserhalb von Longpath (%1)").arg(reason);
+                          colour = QString::fromLatin1(Style::kGreenText); break;
+        case S::Failed:   text = tr("Fehler: %1").arg(reason);
+                          colour = QString::fromLatin1(Style::kRedBorder); break;
+        }
+        m_serverState->setText(text);
+        m_serverState->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(colour));
+        m_startButton->setEnabled(st != S::Running && st != S::Starting);
+        m_stopButton->setEnabled(st == S::Running || st == S::Starting);
+    };
+    connect(&launcher, &WhisperServerLauncher::stateChanged, this, showState);
+    showState(launcher.state(), launcher.reason());
 
     contentLayout()->addWidget(group);
 }

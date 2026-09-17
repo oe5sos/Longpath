@@ -44,6 +44,8 @@
 #include "gui/applets/CatApplet.h"
 #include "gui/applets/TciApplet.h"
 #include "gui/applets/AsrApplet.h"
+#include "gui/setup/AsrPage.h"
+#include "asr/WhisperServerLauncher.h"
 #include "gui/applets/DvkApplet.h"
 #include "gui/applets/QsoRecorderApplet.h"
 #include "gui/applets/ClientChainApplet.h"
@@ -888,6 +890,55 @@ private slots:
             QVERIFY2(img.save(aus), qPrintable(aus));
             qInfo().noquote() << "Blatt:" << aus << win.size();
         }
+    }
+
+    // Die Mitschrift mit dem Dienst-Starter (2026-09-17): das Applet
+    // nach dem Einschalten und die Setup-Seite mit der Gruppe "Dienst
+    // auf diesem Rechner". Der Starter wird wirklich angestossen —
+    // auf dem Rechner des Betreibers antwortet "Extern" (sein Login-
+    // Dienst), ohne whisper-server "Fehler: nicht gefunden". Beides
+    // sind Zustaende, die das Blatt zeigen soll.
+    void mitschrift()
+    {
+        RadioModel modell;
+        auto& launcher = WhisperServerLauncher::instance();
+        launcher.start(WhisperServerLauncher::configFromSettings());
+        QTest::qWait(300);
+
+        {
+            auto* applet = new AsrApplet(&modell);
+            AppletFloatingWindow win(applet, QStringLiteral("Mitschrift"), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            win.resize(420, 260);
+            // Der Zustand kommt sonst nur ueber stateChanged an — hier
+            // nachgereicht, wie es das Hauptfenster beim Einschalten tut.
+            emit launcher.stateChanged(launcher.state(), launcher.reason());
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            QVERIFY(img.save(QStringLiteral("/tmp/mitschrift_applet.png")));
+            qInfo().noquote() << "Blatt: /tmp/mitschrift_applet.png" << win.size()
+                              << "Dienst:" << int(launcher.state()) << launcher.reason();
+        }
+        {
+            AsrPage page(&modell);
+            page.setAttribute(Qt::WA_DontShowOnScreen);
+            page.show();
+            QCoreApplication::processEvents();
+            page.resize(720, qMin(page.sizeHint().height() + 20, 900));
+            QCoreApplication::processEvents();
+            QImage img(page.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            page.render(&img);
+            QVERIFY(img.save(QStringLiteral("/tmp/mitschrift_setup.png")));
+            qInfo().noquote() << "Blatt: /tmp/mitschrift_setup.png" << page.size();
+        }
+        launcher.stop();
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.

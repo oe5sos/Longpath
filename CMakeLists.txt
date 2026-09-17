@@ -886,6 +886,7 @@ set(GUI_SOURCES
     src/asr/AsrSegmenter.cpp
     src/asr/AsrService.cpp
     src/asr/RemoteAsrBackend.cpp
+    src/asr/WhisperServerLauncher.cpp
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/MainWindow_Asr.cpp
     src/gui/MainWindow_SunSdr.cpp

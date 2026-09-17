@@ -11,11 +11,12 @@
 // =================================================================
 
 #include "gui/applets/AsrApplet.h"
+#include "asr/WhisperServerLauncher.h"
 
 #include "asr/AsrService.h"
 #include "gui/StyleConstants.h"
 
-#include <QCheckBox>
+#include <QPushButton>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPlainTextEdit>
@@ -36,8 +37,11 @@ AsrApplet::AsrApplet(RadioModel* model, QWidget* parent)
     head->setContentsMargins(0, 0, 0, 0);
     head->setSpacing(8);
 
-    m_enable = new QCheckBox(tr("Mitschreiben"), this);
-    connect(m_enable, &QCheckBox::toggled, this, &AsrApplet::enableRequested);
+    // Ein Schalter, kein Haekchen (Glas & Tiefe, 2026-09-17): dieselbe
+    // leise einrastende Bauform wie die Zustandsschalter im TX-Feld.
+    m_enable = styledButton(tr("Mitschreiben"), 110, 26);
+    m_enable->setStyleSheet(m_enable->styleSheet() + Style::quietCheckedStyle());
+    connect(m_enable, &QPushButton::toggled, this, &AsrApplet::enableRequested);
     head->addWidget(m_enable);
 
     m_status = new QLabel(this);
@@ -54,16 +58,49 @@ AsrApplet::AsrApplet(RadioModel* model, QWidget* parent)
     // Zweihundert Zeilen sind mehr, als jemand zurueckliest, und
     // kosten nichts.
     m_text->setMaximumBlockCount(200);
-    m_text->setStyleSheet(QStringLiteral(
-        "QPlainTextEdit { background: %1; border: 1px solid %2; "
-        "border-radius: 3px; color: %3; font-size: 11px; padding: 4px; }")
-        .arg(Style::role("inset-bg", Style::kInsetBg),
-             Style::role("border", Style::kBorder),
-             Style::role("text", Style::kTextPrimary)));
+    // Versenkt wie ein Zahlenfeld: Glasfeld-Stil (dunkle Kante oben,
+    // Licht unten, Radius 7, nie 3), Schrift per setFont.
+    m_text->setStyleSheet(Style::glassFieldStyle()
+                          + QStringLiteral("QPlainTextEdit { background: %1; border: 1px solid %2;"
+                                           " border-top-color: %3; border-bottom-color: %4;"
+                                           " border-radius: %5px; color: %6; padding: 4px; }")
+                                .arg(Style::role("inset-bg", Style::kInsetBg),
+                                     Style::role("border", Style::kBorder),
+                                     QLatin1String(Style::kGlassShade),
+                                     QLatin1String(Style::kGlassLight))
+                                .arg(Style::kGlassChipRadius)
+                                .arg(Style::role("text", Style::kTextPrimary)));
+    m_text->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
     m_text->setMinimumHeight(90);
     root->addWidget(m_text, 1);
 
     setStatus(tr("aus"), Style::role("text-scale", Style::kTextScale));
+
+    // Der Dienst, den Longpath selbst startet: sein Zustand steht hier
+    // mit, weil der Bediener sonst nur "Fehler" saehe und nicht, dass
+    // das Modell fehlt oder das Programm nicht da ist.
+    auto& launcher = WhisperServerLauncher::instance();
+    connect(&launcher, &WhisperServerLauncher::stateChanged, this,
+            [this](WhisperServerLauncher::State st, const QString& reason) {
+        using S = WhisperServerLauncher::State;
+        switch (st) {
+        case S::Starting:
+            setStatus(tr("Dienst startet …"), Style::role("text-scale", Style::kTextScale));
+            break;
+        case S::Running:
+            setStatus(tr("Dienst läuft"), QString::fromLatin1(Style::kGreenText));
+            break;
+        case S::External:
+            setStatus(tr("Dienst läuft (extern)"), QString::fromLatin1(Style::kGreenText));
+            break;
+        case S::Failed:
+            setStatus(tr("Dienst: Fehler"), QString::fromLatin1(Style::kTxRed));
+            if (m_text) { m_text->appendPlainText(tr("— Dienst: %1").arg(reason)); }
+            break;
+        case S::Stopped:
+            break;
+        }
+    });
 }
 
 void AsrApplet::setService(AsrService* svc)
