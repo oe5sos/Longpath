@@ -816,7 +816,10 @@ QStringList AppSettings::dailyBackups() const
 {
     const QFileInfo fi(m_filePath);
     QDir dir(fi.absolutePath());
-    const QString pattern = fi.fileName() + QStringLiteral(".????-??-??");
+    // "\?" statt "?": vier Fragezeichen am Stueck enthalten "??-", das
+    // der Compiler als Trigraph anmeckert (-Wtrigraphs), auch wenn er
+    // ihn seit C++17 nicht mehr ersetzt.
+    const QString pattern = fi.fileName() + QStringLiteral(".\?\?\?\?-\?\?-\?\?");
     QStringList names = dir.entryList({pattern}, QDir::Files, QDir::Name);
     static const QRegularExpression rx(QStringLiteral("\\.\\d{4}-\\d{2}-\\d{2}$"));
     QStringList out;
