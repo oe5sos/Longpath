@@ -30,6 +30,7 @@
 // =================================================================
 
 #include "TunerApplet.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "core/AppSettings.h"
 #include "gui/HGauge.h"
@@ -396,8 +397,9 @@ void TunerApplet::setTunerModel(TunerModel* model)
             m_postTuneTimer->stop();
             m_tuneSwr = 999.0f;  // reset high so capture tracking works
             m_tuneBtn->setStyleSheet(Style::themed(QStringLiteral(
-                "QPushButton { background: #cc2222; border: 1px solid #c25a5c; "
-                "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }")));
+                "QPushButton { background: %1; border: 1px solid %2; "
+                "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }")
+                .arg(QLatin1String(Style::kRedBg), QLatin1String(Style::kTxRed))));
             m_tuneBtn->setText(QStringLiteral("TUNING..."));
 
             // Engage local CW tune carrier + standby PGXL for a hardware-
@@ -575,9 +577,10 @@ void TunerApplet::syncFromModel()
     } else if (m_tunerModel->isOperate() && m_tunerModel->isBypass()) {
         m_operateBtn->setText(QStringLiteral("BYPASS"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
-            "QPushButton { background: #906000; border: 1px solid #a8853f; "
+            "QPushButton { background: %1; border: 1px solid #a8853f; "
             "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
-            "QPushButton:hover { background: #a8853f; }")));
+            "QPushButton:hover { background: #a8853f; }")
+            .arg(QLatin1String(Style::kAmberBorder))));
     } else {
         m_operateBtn->setText(QStringLiteral("STANDBY"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(

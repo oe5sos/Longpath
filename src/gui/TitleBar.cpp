@@ -423,7 +423,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     if (m_lossWorstPct >= 0.0 && m_state == ConnectionState::Connected) {
         const double v = m_lossWorstPct;
         QColor c;
-        if (v < 0.01)      { c = QColor("#4a5a52"); }   // still, unauffaellig
+        if (v < 0.01)      { c = QColor(Style::kTextInactive); }   // still, unauffaellig
         else if (v < 0.10) { c = QColor("#6fa384"); }
         else if (v < 1.00) { c = QColor(Style::kAmberText); }
         else               { c = QColor(Style::kRedText); }

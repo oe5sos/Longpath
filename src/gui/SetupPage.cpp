@@ -264,7 +264,7 @@ QHBoxLayout* SetupPage::addLabeledToggle(QLayout* parent, const QString& label, 
         "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; "
         "padding: 3px 10px; }"
         "QPushButton:checked { background: #2c5c44; color: #6fa384; "
-        "border: 1px solid #20a040; }"));
+        "border: 1px solid %1; }").arg(QLatin1String(Style::kDspToggleBorder)));
     return makeLabeledRow(parent, label, toggle);
 }
 

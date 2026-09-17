@@ -1668,19 +1668,19 @@ void RxApplet::connectSlice(SliceModel* s)
                 // kAmberWarn (#ddbb00) is darker; these are distinct intents.
                 badge->setStyleSheet(QStringLiteral(
                     "QLabel { background: rgba(255,200,0,0.20);"
-                    " color: #FFD700;"  // §A2 one-off overload warning gold
+                    " color: %1;"  // Warnung: Bernstein (war Gold #FFD700, eine namenlose Farbe)
                     " border: 1px solid rgba(255,200,0,0.40);"
                     " border-radius: 6px; font-size: 9px; font-weight: bold;"
-                    " padding: 1px 4px; }"));
+                    " padding: 1px 4px; }").arg(QLatin1String(Style::kAmberText)));
             } else {  // Red
                 // §A2 one-off: #FF6868 is a soft red for ADC overload critical badge.
                 // kGaugeDanger (#ff4444) is more saturated; distinct intent.
                 badge->setStyleSheet(QStringLiteral(
                     "QLabel { background: rgba(255,90,90,0.25);"
-                    " color: #FF6868;"  // §A2 one-off overload critical soft-red
+                    " color: %1;"  // kritisch: das Sende-/Gefahrenrot (war #FF6868)
                     " border: 1px solid rgba(255,90,90,0.50);"
                     " border-radius: 6px; font-size: 9px; font-weight: bold;"
-                    " padding: 1px 4px; }"));
+                    " padding: 1px 4px; }").arg(QLatin1String(Style::kTxRed)));
             }
         });
     }

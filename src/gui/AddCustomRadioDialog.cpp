@@ -827,7 +827,8 @@ void AddCustomRadioDialog::showInlineError(const QString& message)
     // Error band: dark red border + lighter red background, white text.
     // Colour: #c14848 error red (design §6.3).
     m_feedbackFrame->setStyleSheet(QStringLiteral(
-        "QFrame { background: #2a1010; border: 1px solid #c14848; border-radius: 6px; }"));
+        "QFrame { background: %1; border: 1px solid %2; border-radius: 6px; }")
+        .arg(QLatin1String(Style::kRedBg), QLatin1String(Style::kRedBorder)));
     m_feedbackLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: #c25a5c; font-size: 13px; }"));
     m_feedbackLabel->setText(message);

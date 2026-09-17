@@ -76,11 +76,11 @@ QString stateColor(KiwiSdrClient::State state)
     switch (state) {
     case KiwiSdrClient::State::Connected:
     case KiwiSdrClient::State::Camping:
-        return QStringLiteral("#4caf6a");
+        return QString::fromLatin1(Style::kGreenText);
     case KiwiSdrClient::State::Connecting:
     case KiwiSdrClient::State::Waiting:
     case KiwiSdrClient::State::Busy:
-        return QStringLiteral("#d4a23c");
+        return QString::fromLatin1(Style::kAmberText);
     case KiwiSdrClient::State::Error:
     case KiwiSdrClient::State::CampDisconnected:
         return Style::role("danger", Style::kTxRed);
@@ -133,14 +133,14 @@ QString sliceBadgeStyle(int colorIdx, bool assigned)
     const QString color = sliceColor(colorIdx).name();
     if (assigned) {
         return QStringLiteral(
-            "QLabel { background: %1; color: #000000; border: 1px solid %1; "
+            "QLabel { background: %1; color: %2; border: 1px solid %1; "
             "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
             .arg(color);
     }
     return QStringLiteral(
-        "QLabel { background: #2a2a2a; color: %1; border: 1px solid %1; "
+        "QLabel { background: %2; color: %1; border: 1px solid %1; "
         "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
-        .arg(color);
+        .arg(color, QLatin1String(Style::kButtonHover));
 }
 
 QString sliceLetterOf(SliceModel* slice)

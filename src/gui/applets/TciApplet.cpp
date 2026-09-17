@@ -50,7 +50,7 @@ namespace Longpath {
 namespace {
 
 // Status dot color tokens.
-constexpr auto kDotOff      = "#cc2222";   // red  — server stopped
+constexpr auto kDotOff      = Style::kTxRed;   // red  — server stopped
 constexpr auto kDotRunning  = "#6fa384";   // green — running, no clients
 constexpr auto kDotClients  = "#7fae91";   // cyan  — running with clients
 

@@ -58,6 +58,7 @@
 //============================================================================================//
 
 #include "RadioInfoTab.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
@@ -162,8 +163,9 @@ RadioInfoTab::RadioInfoTab(RadioModel* model, QWidget* parent)
     m_reconnectBanner = new QFrame(this);
     m_reconnectBanner->setFrameShape(QFrame::StyledPanel);
     m_reconnectBanner->setStyleSheet(Style::themed(QStringLiteral(
-        "QFrame { background-color: #33280f; border: 1px solid #906000; "
-        "border-radius: 6px; padding: 4px; }")));
+        "QFrame { background-color: #33280f; border: 1px solid %1; "
+        "border-radius: 6px; padding: 4px; }")
+        .arg(QLatin1String(Style::kAmberBorder))));
     auto* bannerLayout = new QHBoxLayout(m_reconnectBanner);
     bannerLayout->setContentsMargins(6, 4, 6, 4);
     m_reconnectBannerLabel = new QLabel(m_reconnectBanner);

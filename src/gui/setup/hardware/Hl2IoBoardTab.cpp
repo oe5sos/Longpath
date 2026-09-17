@@ -120,6 +120,7 @@
 // =================================================================
 
 #include "Hl2IoBoardTab.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/BoardCapabilities.h"
@@ -660,7 +661,8 @@ void Hl2IoBoardTab::updateOcIndicator(quint8 ocByte, int bandIdx, bool mox)
         if (!m_ocPinLeds[i]) { continue; }
         const bool on = (ocByte & (1u << i)) != 0;
         m_ocPinLeds[i]->setStyleSheet(Style::themed(
-            on ? QStringLiteral("QFrame { background: #6fa384; border: 1px solid #80ff80; border-radius: 6px; }")
+            on ? QStringLiteral("QFrame { background: #6fa384; border: 1px solid %1; border-radius: 6px; }")
+                     .arg(QLatin1String(Style::kDspToggleText))
                : QStringLiteral("QFrame { background: #222; border: 1px solid #555; border-radius: 6px; }")));
     }
 }

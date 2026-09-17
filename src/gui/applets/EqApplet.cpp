@@ -98,7 +98,7 @@ static const QString kBtnBase =
 
 static const QString kGreenActive =
     "QPushButton:checked { background-color: #006040; color: #00ff88; "
-    "border: 1px solid #00a060; }";
+    "border: 1px solid " + QString::fromLatin1(Style::kGreenBorder) + "; }";
 
 static const QString kBlueActive =
     "QPushButton:checked { background-color: #4a7ba8; color: #ffffff; "

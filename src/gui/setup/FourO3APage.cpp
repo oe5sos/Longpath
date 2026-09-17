@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "FourO3APage.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "CatNetworkSetupPages.h"   // PeripheralsPage
@@ -263,7 +264,7 @@ void FourO3APage::refreshFlexApiStatus()
         m_flexApiStatusLabel->setText(
             tr("Status: \xE2\x97\x8F Listening on TCP 4992"));
         m_flexApiStatusLabel->setStyleSheet(
-            QStringLiteral("color: #4CAF50;"));  // green
+            QStringLiteral("color: %1;").arg(QLatin1String(Style::kGreenText)));  // green
     } else {
         const bool gateOn = m_model && m_model->fourO3AEnabled();
         if (gateOn) {
@@ -272,7 +273,7 @@ void FourO3APage::refreshFlexApiStatus()
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8F TCP 4992 bind failed"));
             m_flexApiStatusLabel->setStyleSheet(Style::themed(
-                QStringLiteral("color: #cc2222;")));  // red
+                QStringLiteral("color: %1;").arg(QLatin1String(Style::kTxRed))));  // red
         } else {
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8B Disabled "

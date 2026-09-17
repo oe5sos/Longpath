@@ -407,7 +407,8 @@ void NetworkDiagnosticsDialog::refresh()
         const bool connected = m_model && m_model->isConnected();
         m_statusLabel->setText(
             connected
-                ? QStringLiteral("<span style='color:#5fff8a;'>&#x25cf; Connected</span>")
+                ? QStringLiteral("<span style='color:%1;'>&#x25cf; Connected</span>")
+                      .arg(QLatin1String(Style::kGreenText))
                 : QStringLiteral("<span style='color:#c25a5c;'>&#x25cf; Disconnected</span>"));
         m_statusLabel->setTextFormat(Qt::RichText);
     }
