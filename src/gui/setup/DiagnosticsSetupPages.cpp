@@ -1,6 +1,6 @@
 #include "DiagnosticsSetupPages.h"
-#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
+#include "gui/StyleConstants.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>

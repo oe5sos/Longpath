@@ -16,8 +16,8 @@
 #include "TxProfileSetupPage.h"
 
 #include "core/MicProfileManager.h"
-#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
+#include "gui/StyleConstants.h"
 #include "models/TransmitModel.h"
 
 #include <QComboBox>

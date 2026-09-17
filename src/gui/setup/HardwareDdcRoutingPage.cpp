@@ -16,8 +16,8 @@
 
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
-#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
+#include "gui/StyleConstants.h"
 
 #include <QComboBox>
 #include <QGroupBox>

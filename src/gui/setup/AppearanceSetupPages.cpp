@@ -4,8 +4,8 @@
 #include "gui/styles/Theme.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/SpectrumWidget.h"
-#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
+#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 
 #include <QVBoxLayout>

@@ -45,6 +45,11 @@
 #include "gui/applets/TciApplet.h"
 #include "gui/applets/AsrApplet.h"
 #include "gui/setup/AsrPage.h"
+#include "gui/setup/DspSetupPages.h"
+#include "gui/setup/FilterPresetsSetupPage.h"
+#include "gui/setup/SpectrumPeaksPage.h"
+#include "gui/setup/AudioVaxPage.h"
+#include "gui/setup/TransmitSetupPages.h"
 #include "gui/styles/AppTheme.h"
 #include <QCheckBox>
 #include <QGroupBox>
@@ -1032,6 +1037,39 @@ private slots:
         page.render(&img);
         QVERIFY(img.save(QStringLiteral("/tmp/formular.png")));
         qInfo().noquote() << "Blatt: /tmp/formular.png" << page.size();
+    }
+
+    // Setup-Seiten (Roadmap F): jede als Blatt, mit der App-Basislinie
+    // wie im Programm. /tmp/setup_<Name>.png
+    void setup()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        struct P { const char* name; std::function<QWidget*()> bauen; };
+        const P liste[] = {
+            {"NrAnf",         [&]{ return new NrAnfSetupPage(&modell); }},
+            {"AgcAlc",        [&]{ return new AgcAlcSetupPage(&modell); }},
+            {"Mnf",           [&]{ return new MnfSetupPage(&modell); }},
+            {"FilterPresets", [&]{ return new FilterPresetsSetupPage(modell.filterPresetStore(), &modell); }},
+            {"SpectrumPeaks", [&]{ return new SpectrumPeaksPage(&modell); }},
+            {"AudioVax",      [&]{ return new AudioVaxPage(&modell); }},
+            {"Power",         [&]{ return new PowerPage(&modell); }},
+        };
+        for (const P& p : liste) {
+            QWidget* page = p.bauen();
+            page->setAttribute(Qt::WA_DontShowOnScreen);
+            page->resize(760, 900);
+            page->show();
+            QCoreApplication::processEvents();
+            QImage img(page->size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            page->render(&img);
+            const QString aus = QStringLiteral("/tmp/setup_%1.png").arg(QLatin1String(p.name));
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus;
+            delete page;
+        }
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.

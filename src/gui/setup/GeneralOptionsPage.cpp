@@ -59,8 +59,8 @@
 
 #include "GeneralOptionsPage.h"
 #include "gui/styles/ThemeQss.h"
-#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
+#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
 #include "core/PureSignal.h"

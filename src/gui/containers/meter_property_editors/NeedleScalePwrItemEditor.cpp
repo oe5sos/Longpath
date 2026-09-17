@@ -53,8 +53,8 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "NeedleScalePwrItemEditor.h"
-#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 #include "../../meters/MeterItem.h"
 #include "../../meters/NeedleScalePwrItem.h"
 
@@ -75,20 +75,7 @@ namespace Longpath {
 
 namespace {
 
-constexpr const char* kComboStyle =
-    "QComboBox {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 6px;"
-    "  padding: 2px 4px; min-height: 18px;"
-    "}"
-    "QComboBox QAbstractItemView {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #205070;"
-    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-    "  selection-background-color: #4a7ba8; selection-color: #ffffff;"
-    "}";
+constexpr const char* kComboStyle = Longpath::Style::kComboStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
 // Der Tabellenstil ist seit dem 2026-09-17 zentral: Style::tableStyle().
 

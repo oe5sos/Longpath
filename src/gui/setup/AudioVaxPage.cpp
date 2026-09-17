@@ -16,6 +16,7 @@
 
 #include "AudioVaxPage.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
@@ -45,16 +46,7 @@ namespace Longpath {
 // ---------------------------------------------------------------------------
 namespace {
 
-static const char* kGroupStyle =
-    "QGroupBox {"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  margin-top: 8px;"
-    "  padding-top: 12px;"
-    "  font-weight: bold;"
-    "  color: #8aa8c0;"
-    "}"
-    "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
+static const char* kGroupStyle = Style::kGroupBoxStyle;   // Hausplatte (Glas & Tiefe, 2026-09-18)
 
 static const char* kBadgeStyle =
     "QLabel {"
@@ -66,16 +58,13 @@ static const char* kBadgeStyle =
     "  padding: 2px 6px;"
     "}";
 
-static const char* kAutoDetectStyle =
-    "QPushButton {"
-    "  background: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  color: #4a7ba8;"
-    "  font-size: 11px;"
-    "  padding: 3px 8px;"
-    "}"
-    "QPushButton:hover { background: #203040; }";
+// Hausknopf, Text in Akzentfarbe: ein Verweis-Knopf, kein Schalter.
+static QString autoDetectStyle()
+{
+    return QLatin1String(Style::kButtonStyle)
+         + QStringLiteral("QPushButton { color: %1; font-size: 11px; padding: 3px 8px; }")
+               .arg(QLatin1String(Style::kAccent));
+}
 
 // Binding-status banner — persistent one-line indicator kept hidden;
 // queried by test probes (findStatusBanner) via Qt widget hierarchy.
@@ -118,21 +107,17 @@ static const char* kSpecRowValueStyle =
 static const char* kSpecRowPlaceholderStyle =
     "QLabel { color: #607080; font-size: 11px; font-style: italic; }";
 
-static const char* kActionBtnStyle =
-    "QPushButton {"
-    "  background: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  color: #8aa8c0;"
-    "  font-size: 11px;"
-    "  padding: 3px 10px;"
-    "}"
-    "QPushButton:hover { background: #203040; color: #c8d8e8; }";
+static QString actionBtnStyle()
+{
+    return QLatin1String(Style::kButtonStyle)
+         + QStringLiteral("QPushButton { font-size: 11px; padding: 3px 10px; }");
+}
 
-static const char* kEnableChkStyle =
-    "QCheckBox { color: #8aa8c0; font-size: 11px; font-weight: bold; }"
-    "QCheckBox::indicator { width: 14px; height: 14px; }"
-    "QCheckBox::indicator:checked { background: #4a7ba8; border: 1px solid #4a7ba8; border-radius: 2px; }";
+static QString enableChkStyle()
+{
+    return QLatin1String(Style::kCheckBoxStyle)
+         + QStringLiteral("QCheckBox { font-size: 11px; font-weight: bold; }");
+}
 
 // Label builder for the disabled "native (bound automatically)" info
 // row shown at the top of the Auto-detect menu on Mac/Linux when the
@@ -179,7 +164,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
     //    findChild traversal is DFS in child-creation order, so earliest
     //    parented wins.
     m_autoDetectBtn = new QPushButton(QStringLiteral("Auto-detect…"), this);
-    m_autoDetectBtn->setStyleSheet(QLatin1String(kAutoDetectStyle));
+    m_autoDetectBtn->setStyleSheet(autoDetectStyle());
     m_autoDetectBtn->setAutoDefault(false);
     m_autoDetectBtn->setDefault(false);
     m_autoDetectBtn->setVisible(false);
@@ -208,7 +193,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         auto* enableRow = new QHBoxLayout;
         enableRow->setSpacing(6);
         m_enableChk = new QCheckBox(tr("On"), this);
-        m_enableChk->setStyleSheet(QLatin1String(kEnableChkStyle));
+        m_enableChk->setStyleSheet(enableChkStyle());
         m_enableChk->setChecked(false);  // loadFromSettings() will set real value
         m_enableChk->setToolTip(tr("Enable this VAX channel. When on, Longpath "
                                    "exposes the channel as a PipeWire source that "
@@ -300,7 +285,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         btnRow->setSpacing(6);
 
         m_renameBtn = new QPushButton(tr("Rename…"), this);
-        m_renameBtn->setStyleSheet(QLatin1String(kActionBtnStyle));
+        m_renameBtn->setStyleSheet(actionBtnStyle());
         m_renameBtn->setAutoDefault(false);
         m_renameBtn->setDefault(false);
         m_renameBtn->setToolTip(tr("Change the display name this channel is "
@@ -308,7 +293,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         btnRow->addWidget(m_renameBtn);
 
         m_copyNodeBtn = new QPushButton(tr("Copy node name"), this);
-        m_copyNodeBtn->setStyleSheet(QLatin1String(kActionBtnStyle));
+        m_copyNodeBtn->setStyleSheet(actionBtnStyle());
         m_copyNodeBtn->setAutoDefault(false);
         m_copyNodeBtn->setDefault(false);
         m_copyNodeBtn->setToolTip(

@@ -24,9 +24,7 @@ namespace Longpath {
 
 namespace {
 
-constexpr auto kEditStyle =
-    "QLineEdit { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 6px; }";
+static QString kEditStyle() { return Longpath::Style::formFieldStyle(); }   // seit 2026-09-18 das Glasfeld
 
 constexpr int kProbeTimeoutMs = 2500;
 
@@ -85,7 +83,7 @@ void AsrPage::buildServerGroup()
     auto& s = AppSettings::instance();
 
     m_urlEdit = new QLineEdit(group);
-    m_urlEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_urlEdit->setStyleSheet(kEditStyle());
     m_urlEdit->setText(s.value(QStringLiteral("AsrEndpointUrl"), kDefaultUrl).toString());
     m_urlEdit->setToolTip(
         tr("Adresse des Whisper-Dienstes. Voreinstellung ist der eigene Rechner "
@@ -96,7 +94,7 @@ void AsrPage::buildServerGroup()
     form->addRow(tr("Adresse:"), m_urlEdit);
 
     m_keyEdit = new QLineEdit(group);
-    m_keyEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_keyEdit->setStyleSheet(kEditStyle());
     m_keyEdit->setEchoMode(QLineEdit::Password);
     m_keyEdit->setText(s.value(QStringLiteral("AsrApiKey"), QString()).toString());
     m_keyEdit->setPlaceholderText(tr("leer lassen beim eigenen Dienst"));
@@ -140,7 +138,7 @@ void AsrPage::buildRecognitionGroup()
     auto& s = AppSettings::instance();
 
     m_languageEdit = new QLineEdit(group);
-    m_languageEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_languageEdit->setStyleSheet(kEditStyle());
     m_languageEdit->setText(
         s.value(QStringLiteral("AsrLanguage"), QStringLiteral("de")).toString());
     m_languageEdit->setToolTip(
@@ -152,7 +150,7 @@ void AsrPage::buildRecognitionGroup()
     form->addRow(tr("Sprache:"), m_languageEdit);
 
     m_modelEdit = new QLineEdit(group);
-    m_modelEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_modelEdit->setStyleSheet(kEditStyle());
     m_modelEdit->setText(
         s.value(QStringLiteral("AsrModel"), QStringLiteral("whisper-1")).toString());
     m_modelEdit->setToolTip(
@@ -188,7 +186,7 @@ void AsrPage::buildHintGroup()
     const auto cfg = WhisperServerLauncher::configFromSettings();
 
     m_binaryEdit = new QLineEdit(group);
-    m_binaryEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_binaryEdit->setStyleSheet(kEditStyle());
     m_binaryEdit->setText(s.value(QStringLiteral("AsrServerBinary"), QString()).toString());
     m_binaryEdit->setPlaceholderText(cfg.binary.isEmpty()
         ? tr("whisper-server nicht gefunden — brew install whisper-cpp")
@@ -200,7 +198,7 @@ void AsrPage::buildHintGroup()
     form->addRow(tr("Programm:"), m_binaryEdit);
 
     m_modelPathEdit = new QLineEdit(group);
-    m_modelPathEdit->setStyleSheet(QString::fromLatin1(kEditStyle));
+    m_modelPathEdit->setStyleSheet(kEditStyle());
     m_modelPathEdit->setText(s.value(QStringLiteral("AsrModelPath"), QString()).toString());
     m_modelPathEdit->setPlaceholderText(cfg.model.isEmpty()
         ? tr("kein ggml-*.bin in ~/whisper")

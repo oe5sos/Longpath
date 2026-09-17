@@ -86,19 +86,11 @@ namespace {
 
 void applyDarkStyle(QWidget* w)
 {
-    w->setStyleSheet(Style::themed(QStringLiteral(
-        "QGroupBox { color: #8090a0; font-size: 11px;"
-        "  border: 1px solid #203040; border-radius: 6px;"
-        "  margin-top: 8px; padding-top: 4px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
-        "QLabel { color: #c8d8e8; }"
-        "QSpinBox { background: #1a2a3a; color: #c8d8e8;"
-        "  border: 1px solid #203040; border-radius: 6px; padding: 1px 4px; }"
-        "QCheckBox { color: #c8d8e8; }"
-        "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
-        "  border: 1px solid #203040; border-radius: 2px; }"
-        "QCheckBox::indicator:checked { background: #4a7ba8; border-color: #4a7ba8; }"
-    )));
+    // Hausbausteine (Glas & Tiefe, 2026-09-18) statt einer eigenen Palette.
+    w->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #c8d8e8; }"))
+                     + QLatin1String(Style::kGroupBoxStyle)
+                     + Style::formFieldStyle()
+                     + QLatin1String(Style::kCheckBoxStyle));
 }
 
 } // anonymous namespace
@@ -479,10 +471,7 @@ void SpectrumPeaksPage::buildUI()
     m_backBtn = new QPushButton(QStringLiteral("← Spectrum defaults"), this);
     m_backBtn->setToolTip(QStringLiteral(
         "Navigate back to the Spectrum Defaults page."));
-    m_backBtn->setStyleSheet(Style::themed(QStringLiteral(
-        "QPushButton { background: #1a2a3a; color: #8aa8c0; border: 1px solid #203040;"
-        "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #203040; color: #c8d8e8; }")));
+    m_backBtn->setStyleSheet(QLatin1String(Style::kButtonStyle));   // Hausknopf
     connect(m_backBtn, &QPushButton::clicked,
             this, &SpectrumPeaksPage::backToSpectrumDefaultsRequested);
     contentLayout()->addWidget(m_backBtn, 0, Qt::AlignLeft);

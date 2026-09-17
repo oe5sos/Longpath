@@ -1,4 +1,5 @@
 #include "DataOutItemEditor.h"
+#include "gui/StyleConstants.h"
 #include "../../meters/DataOutItem.h"
 
 #include <QComboBox>
@@ -7,25 +8,9 @@
 namespace Longpath {
 
 namespace {
-constexpr const char* kComboStyle =
-    "QComboBox {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 6px;"
-    "  padding: 2px 4px; min-height: 18px;"
-    "}"
-    "QComboBox QAbstractItemView {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #205070;"
-    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-    "  selection-background-color: #4a7ba8; selection-color: #ffffff;"
-    "}";
+constexpr const char* kComboStyle = Longpath::Style::kComboStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
-constexpr const char* kLineStyle =
-    "QLineEdit { background: #0a0a18; color: #c8d8e8;"
-    " border: 1px solid #1e2e3e; border-radius: 6px;"
-    " padding: 1px 4px; min-height: 18px; }";
+static QString kLineStyle() { return Longpath::Style::formFieldStyle(); }   // seit 2026-09-18 das Glasfeld
 } // namespace
 
 DataOutItemEditor::DataOutItemEditor(QWidget* parent)
@@ -97,7 +82,7 @@ void DataOutItemEditor::buildTypeSpecific()
     addHeader(QStringLiteral("MMIO binding"));
 
     m_editGuid = new QLineEdit(this);
-    m_editGuid->setStyleSheet(kLineStyle);
+    m_editGuid->setStyleSheet(kLineStyle());
     m_editGuid->setPlaceholderText(QStringLiteral("MMIO GUID"));
     addRow(QStringLiteral("GUID"), m_editGuid);
     connect(m_editGuid, &QLineEdit::editingFinished, this, [this]() {
@@ -109,7 +94,7 @@ void DataOutItemEditor::buildTypeSpecific()
     });
 
     m_editVariable = new QLineEdit(this);
-    m_editVariable->setStyleSheet(kLineStyle);
+    m_editVariable->setStyleSheet(kLineStyle());
     m_editVariable->setPlaceholderText(QStringLiteral("Variable name"));
     addRow(QStringLiteral("Variable"), m_editVariable);
     connect(m_editVariable, &QLineEdit::editingFinished, this, [this]() {

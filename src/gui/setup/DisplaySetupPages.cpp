@@ -62,8 +62,8 @@
 #include "gui/styles/ThemeQss.h"
 #include "SetupHelpers.h"
 #include "gui/SpectrumWidget.h"
-#include "gui/StyleConstants.h"
 #include "core/FFTEngine.h"
+#include "gui/StyleConstants.h"
 #include "core/ClarityController.h"
 #include "core/AppSettings.h"
 #include "models/Band.h"
@@ -1655,10 +1655,7 @@ void SpectrumDefaultsPage::buildUI()
         "QLabel { color: #607080; font-style: italic; font-size: 11px; }")));
     contentLayout()->addWidget(hintFilter);
 
-    const QString crossLinkStyle = QStringLiteral(
-        "QPushButton { background: #1a2a3a; color: #8aa8c0; border: 1px solid #203040;"
-        "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #203040; color: #c8d8e8; }");
+    const QString crossLinkStyle = QLatin1String(Style::kButtonStyle);   // Hausknopf
 
     auto* crossLinkRow = new QWidget(this);
     auto* crossLinkLayout = new QHBoxLayout(crossLinkRow);

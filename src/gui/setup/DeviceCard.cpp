@@ -10,6 +10,7 @@
 // =================================================================
 
 #include "DeviceCard.h"
+#include "gui/StyleConstants.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
@@ -41,26 +42,9 @@ static const char* kGroupStyle =
     "}"
     "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
 
-static const char* kComboStyle =
-    "QComboBox {"
-    "  background: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  color: #c8d8e8;"
-    "  padding: 2px 6px;"
-    "}"
-    "QComboBox::drop-down { border: none; }"
-    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-    "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-    "  selection-background-color: #4a7ba8; selection-color: #ffffff; }";
+static const char* kComboStyle = Longpath::Style::kComboStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
-static const char* kCheckStyle =
-    "QCheckBox { color: #c8d8e8; spacing: 4px; }"
-    "QCheckBox::indicator { width: 12px; height: 12px; border: 1px solid #203040;"
-    "  border-radius: 2px; background: #0f0f1a; }"
-    "QCheckBox::indicator:checked { background: #4a7ba8; }";
+static const char* kCheckStyle = Longpath::Style::kCheckBoxStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
 static const char* kLabelStyle = "QLabel { color: #c8d8e8; font-size: 13px; }";
 

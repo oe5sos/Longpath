@@ -61,8 +61,8 @@
 //============================================================================================//
 
 #include "DspSetupPages.h"
-#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
@@ -421,12 +421,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     auto* tabs = new QTabWidget(this);
     m_tabs = tabs;  // remember for selectSubtab()
     tabs->setTabPosition(QTabWidget::North);
-    tabs->setStyleSheet(Style::themed(
-        "QTabWidget::pane { border: 1px solid #304050; background: #0f0f1a; }"
-        "QTabBar::tab { background: #1a2a3a; color: #8aa8c0; padding: 4px 10px; "
-        "               border: 1px solid #304050; border-bottom: none; border-radius: 6px 3px 0 0; }"
-        "QTabBar::tab:selected { background: #0f0f1a; color: #c8d8e8; }"
-        "QTabBar::tab:hover { background: #203040; }"));
+    tabs->setStyleSheet(QLatin1String(Style::kTabStyle));   // Haus-Reiter (Glas & Tiefe, 2026-09-18)
     contentLayout()->setContentsMargins(0, 0, 0, 0);
     // Remove the trailing stretch that SetupPage adds in its ctor
     // (SetupPage.cpp:90 — m_contentLayout->addStretch(1)). That stretch
@@ -469,10 +464,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     // Returns the group's inner QVBoxLayout.
     auto makeGroup = [](QVBoxLayout* parent, const QString& title) -> QVBoxLayout*
     {
-        static const QString kGrpStyle =
-            "QGroupBox { border: 1px solid #304050; border-radius: 6px; "
-            "margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
-            "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
+        static const QString kGrpStyle = QLatin1String(Style::kGroupBoxStyle);   // Hausplatte
         auto* grp = new QGroupBox(title);
         grp->setStyleSheet(kGrpStyle);
         auto* lay = new QVBoxLayout(grp);
@@ -484,19 +476,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 
     // Shared label/control style constants (mirror SetupPage::makeLabeledRow).
     static const QString kLbl = "QLabel { color: #c8d8e8; font-size: 13px; }";
-    static const QString kCombo =
-        "QComboBox { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
-        "QComboBox::drop-down { border: none; }"
-        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-        "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-        "selection-background-color: #4a7ba8; selection-color: #ffffff; }";
-    static const QString kSlider =
-        "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
-        "border-radius: 6px; margin: -4px 0; }";
+    static const QString kCombo  = QLatin1String(Style::kComboStyle);    // Hausdefinitionen (Glas & Tiefe)
+    static const QString kSlider = QLatin1String(Style::kSliderStyle);
     static const QString kInfoLbl =
         "QLabel { color: #4a7ba8; font-size: 13px; font-style: italic; }";
 
@@ -536,10 +517,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* slider = new QSlider(Qt::Horizontal);
         slider->setRange(minimum, maximum);
         slider->setValue(defaultValue);
-        slider->setStyleSheet(Style::themed(
-            "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
-            "border-radius: 6px; margin: -4px 0; }"));
+        slider->setStyleSheet(QLatin1String(Style::kSliderStyle));   // Haus-Rinne
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, /*stretch=*/1);
 
@@ -579,10 +557,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         slider->setRange(static_cast<int>(minimum * scale),
                          static_cast<int>(maximum * scale));
         slider->setValue(static_cast<int>(defaultValue * scale));
-        slider->setStyleSheet(Style::themed(
-            "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
-            "border-radius: 6px; margin: -4px 0; }"));
+        slider->setStyleSheet(QLatin1String(Style::kSliderStyle));   // Haus-Rinne
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, 1);
 
@@ -608,13 +583,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     {
         auto* preRdo  = new QRadioButton("Pre-AGC");
         auto* postRdo = new QRadioButton("Post-AGC");
-        preRdo->setStyleSheet(Style::themed(
-            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-            "QRadioButton::indicator { width: 14px; height: 14px; }"
-            "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-            "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-            "border-radius: 7px; background: #4a7ba8; }"));
+        preRdo->setStyleSheet(QLatin1String(Style::kRadioButtonStyle));   // Haus-Wahlpunkt
         postRdo->setStyleSheet(preRdo->styleSheet());
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
@@ -825,13 +794,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         {
             for (int i = 0; i < gmLabels.size(); ++i) {
                 auto* rdo = new QRadioButton(gmLabels[i]);
-                rdo->setStyleSheet(Style::themed(
-                    "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-                    "QRadioButton::indicator { width: 14px; height: 14px; }"
-                    "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-                    "border-radius: 7px; background: #1a2a3a; }"
-                    "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-                    "border-radius: 7px; background: #4a7ba8; }"));
+                rdo->setStyleSheet(QLatin1String(Style::kRadioButtonStyle));   // Haus-Wahlpunkt
                 gmGrp->addWidget(rdo);
                 gmRdos.append(rdo);
             }
@@ -1051,11 +1014,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 
         auto* btnRow = new QHBoxLayout;
         auto* useModelBtn = new QPushButton("Use Model...");
-        useModelBtn->setStyleSheet(Style::themed(
-            "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-            "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
-            "QPushButton:hover { background: #203040; }"
-            "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }"));
+        useModelBtn->setStyleSheet(QLatin1String(Style::kButtonStyle));   // Hausknopf
         auto* defBtn = new QPushButton("Default");
         defBtn->setStyleSheet(useModelBtn->styleSheet());
         btnRow->addWidget(useModelBtn);
@@ -1178,13 +1137,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         }
 
         // Algorithm radio — rdoSBNR1/2/3 [v2.10.3.13]
-        const QString rdoStyle =
-            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-            "QRadioButton::indicator { width: 14px; height: 14px; }"
-            "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-            "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-            "border-radius: 7px; background: #4a7ba8; }";
+        const QString rdoStyle = QLatin1String(Style::kRadioButtonStyle);   // Haus-Wahlpunkt
 
         auto* algo1 = new QRadioButton("Algo 1");
         auto* algo2 = new QRadioButton("Algo 2");
@@ -1486,13 +1439,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         // Model radio — slot 0 (small) / slot 1 (large). Weight files are
         // GLOBAL (SetNNRModelPathSlot on radio connect), not per-slice —
         // this only selects which already-loaded slot the channel uses.
-        const QString rdoStyle =
-            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-            "QRadioButton::indicator { width: 14px; height: 14px; }"
-            "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-            "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-            "border-radius: 7px; background: #4a7ba8; }";
+        const QString rdoStyle = QLatin1String(Style::kRadioButtonStyle);   // Haus-Wahlpunkt
         auto* modelSmall = new QRadioButton("Small");
         auto* modelLarge = new QRadioButton("Large");
         modelSmall->setStyleSheet(rdoStyle);
@@ -2000,11 +1947,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
         "QLabel { color: #c8d8e8; font-size: 13px; }")));
     auto* sidetoneVol = new QSlider(Qt::Horizontal);
     sidetoneVol->setRange(0, 100);
-    sidetoneVol->setStyleSheet(Style::themed(
-        "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; "
-        "border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; "
-        "height: 12px; border-radius: 6px; margin: -4px 0; }"));
+    sidetoneVol->setStyleSheet(QLatin1String(Style::kSliderStyle));   // Haus-Rinne
     sidetoneRowLay->addWidget(sidetoneLbl);
     sidetoneRowLay->addWidget(sidetoneVol, 1);
     timingLay->addWidget(m_sidetoneRow);
@@ -2508,11 +2451,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     mnfLay->addWidget(m_notchTable);
 
     // ── Add ──────────────────────────────────────────────────────────────────
-    static const QString kMnfButtonStyle = QStringLiteral(
-        "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #204060; }"
-        "QPushButton:pressed { background: #1a2a3a; }");
+    static const QString kMnfButtonStyle = QLatin1String(Style::kButtonStyle);   // Hausknopf
 
     m_addBtn = new QPushButton(QStringLiteral("Add"), mnfGrp);
     m_addBtn->setObjectName(QStringLiteral("btnMNFAdd"));
@@ -2641,15 +2580,10 @@ void MnfSetupPage::rebuildTable()
     RadioModel* rm = model();
     if (!m_notchTable || !rm || !rm->notchModel()) { return; }
 
-    static const QString kMnfEditorStyle = QStringLiteral(
-        "QDoubleSpinBox { background: #1a1a2a; color: #c8d8e8; "
-        "  border: 1px solid #304050; border-radius: 2px; padding: 1px; }"
-        "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button "
-        "  { background: #1a2a3a; width: 14px; }");
-    static const QString kMnfRowButtonStyle = QStringLiteral(
-        "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 2px; padding: 1px 6px; font-size: 11px; }"
-        "QPushButton:hover { background: #204060; }");
+    static const QString kMnfEditorStyle = Style::formFieldStyle();   // Glasfeld
+    // Der Hausknopf, nur enger gepolstert — er sitzt in einer Tabellenzeile.
+    static const QString kMnfRowButtonStyle = QLatin1String(Style::kButtonStyle)
+        + QStringLiteral("QPushButton { padding: 1px 6px; font-size: 11px; }");
 
     // setRowCount() destroys the outgoing cell widgets; a focused spin box
     // being destroyed emits editingFinished on its way out, so the guard has

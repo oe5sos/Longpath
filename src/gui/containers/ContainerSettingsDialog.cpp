@@ -99,6 +99,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerSettingsDialog.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "ContainerManager.h"
 #include "MmioEndpointsDialog.h"
@@ -224,12 +225,7 @@ constexpr const char* kOkBtnStyle =
     "}"
     "QPushButton:hover { background: #cfe2f5; }";
 
-constexpr const char* kEditStyle =
-    "background: #0a0a18;"
-    "color: #c8d8e8;"
-    "border: 1px solid #1e2e3e;"
-    "border-radius: 6px;"
-    "padding: 2px 4px;";
+static QString kEditStyle() { return Longpath::Style::formFieldStyle(); }   // seit 2026-09-18 das Glasfeld
 
 constexpr const char* kListStyle =
     "QListWidget {"
@@ -803,7 +799,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QLabel* titleLabel = new QLabel(QStringLiteral("Title:"), bar);
     titleLabel->setStyleSheet(kLabelStyle);
     m_titleEdit = new QLineEdit(bar);
-    m_titleEdit->setStyleSheet(kEditStyle);
+    m_titleEdit->setStyleSheet(kEditStyle());
     m_titleEdit->setPlaceholderText(QStringLiteral("Container title..."));
     m_titleEdit->setFixedWidth(140);
 

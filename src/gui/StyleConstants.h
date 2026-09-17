@@ -957,7 +957,7 @@ constexpr auto kComboStyle =
     "QComboBox QAbstractItemView::item:selected { background: #1e3d5f; color: #dbe9f8; }";
 
 constexpr auto kCheckBoxStyle =
-    "QCheckBox { color: #dcdce1; spacing: 6px; }"
+    "QCheckBox { color: #dcdce1; spacing: 6px; min-height: 20px; }"   // min-height: drei Haekchen untereinander kollidierten
     "QCheckBox:disabled { color: #6a6a70; }"
     "QCheckBox::indicator { width: 14px; height: 14px;"
     "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #000000, stop:1 #08080c);"
@@ -970,7 +970,7 @@ constexpr auto kCheckBoxStyle =
     "QCheckBox::indicator:checked:disabled { background: #232327; border-color: #232327; }";
 
 constexpr auto kRadioButtonStyle =
-    "QRadioButton { color: #dcdce1; spacing: 6px; }"
+    "QRadioButton { color: #dcdce1; spacing: 6px; min-height: 20px; }"
     "QRadioButton:disabled { color: #6a6a70; }"
     "QRadioButton::indicator { width: 14px; height: 14px;"
     "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #000000, stop:1 #08080c);"
@@ -1076,6 +1076,21 @@ constexpr auto kButtonStyle =
     "  border-top-color: #1f1f23; border-bottom-color: #38383e; }"
     "QPushButton:disabled { color: #58585e; border-color: #232327;"
     "  background: #101013; }";   // flach: ein gesperrter Knopf hat keine Dicke
+
+// Reiter (QTabWidget): die Platte darunter mit Lichtkante, die Reiter
+// erhaben wie Knoepfe; der gewaehlte Reiter ist Teil der Platte —
+// gleicher Grund, keine Unterkante, Text in Erstfarbe.
+constexpr auto kTabStyle =
+    "QTabWidget::pane { border: 1px solid #2c2c31; border-top-color: #38383e;"
+    "  border-radius: 10px; background: #0e0e10; top: -1px; }"
+    "QTabBar::tab {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222227, stop:1 #141417);"
+    "  color: #a6a6ac; border: 1px solid #2c2c31; border-top-color: #38383e; border-bottom: none;"
+    "  border-top-left-radius: 7px; border-top-right-radius: 7px;"
+    "  padding: 5px 14px; margin-right: 2px; }"
+    "QTabBar::tab:hover { color: #dcdce1; }"
+    "QTabBar::tab:selected { background: #0e0e10; color: #dcdce1; border-bottom: none;"
+    "  margin-bottom: -1px; }";
 
 // Bildlaufleisten: schmal, dunkel, ohne Pfeile — Qt/macOS malt sonst
 // eine helle Systemleiste in jede Setup-Seite.

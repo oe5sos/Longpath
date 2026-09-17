@@ -210,9 +210,7 @@ constexpr const char* kConsoleStyle =
     "  padding: 4px;"
     "}";
 
-constexpr const char* kCmdEditStyle =
-    "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
-    "border: 1px solid #203040; padding: 3px; font-family: monospace; }";
+static QString kCmdEditStyle() { return Longpath::Style::formFieldStyle(); }   // seit 2026-09-18 das Glasfeld
 
 // F3 (Longpath-native). Pill buttons for the band + source filter
 // rows on the Spot List tab. Checked = pill lit (cyan accent), filter
@@ -289,11 +287,7 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
     root->setContentsMargins(4, 4, 4, 4);
 
     auto* tabs = new QTabWidget;
-    tabs->setStyleSheet(Style::themed(
-        "QTabWidget::pane { border: 1px solid #203040; }"
-        "QTabBar::tab { background: #1a1a2a; color: #8090a0; border: 1px solid #203040; "
-        "  padding: 6px 16px; margin-right: 2px; }"
-        "QTabBar::tab:selected { background: #0f0f1a; color: #4a7ba8; border-bottom: none; }"));
+    tabs->setStyleSheet(QLatin1String(Style::kTabStyle));   // Haus-Reiter (Glas & Tiefe, 2026-09-18)
 
     // Tab order matches AetherSDR upstream
     // (src/gui/DxClusterDialog.cpp:262-271). Longpath adds the PSK
@@ -859,7 +853,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     m_cmdEdit = new QLineEdit;
     m_cmdEdit->setObjectName("clusterCmdEdit");
     m_cmdEdit->setPlaceholderText("Type a cluster command (e.g. sh/dx 20, set/filter, bye)");
-    m_cmdEdit->setStyleSheet(kCmdEditStyle);
+    m_cmdEdit->setStyleSheet(kCmdEditStyle());
     m_cmdEdit->setEnabled(m_clusterClient && m_clusterClient->isConnected());
     connect(m_cmdEdit, &QLineEdit::returnPressed, this, [this] {
         QString cmd = m_cmdEdit->text().trimmed();
@@ -1096,7 +1090,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     m_rbnCmdEdit = new QLineEdit;
     m_rbnCmdEdit->setObjectName("rbnCmdEdit");
     m_rbnCmdEdit->setPlaceholderText("Type an RBN command (e.g. set/skimmer, set/ft8, bye)");
-    m_rbnCmdEdit->setStyleSheet(kCmdEditStyle);
+    m_rbnCmdEdit->setStyleSheet(kCmdEditStyle());
     m_rbnCmdEdit->setEnabled(m_rbnClient && m_rbnClient->isConnected());
     connect(m_rbnCmdEdit, &QLineEdit::returnPressed, this, [this] {
         QString cmd = m_rbnCmdEdit->text().trimmed();

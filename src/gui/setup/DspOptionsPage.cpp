@@ -92,8 +92,8 @@
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
-#include "gui/StyleConstants.h"
 #include "gui/containers/ContainerManager.h"
+#include "gui/StyleConstants.h"
 #include "gui/meters/FilterDisplayItem.h"
 #include "gui/meters/MeterItem.h"
 

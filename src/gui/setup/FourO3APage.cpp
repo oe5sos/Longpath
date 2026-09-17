@@ -25,8 +25,8 @@
 // =================================================================
 
 #include "FourO3APage.h"
-#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 
 #include "CatNetworkSetupPages.h"   // PeripheralsPage
 #include "PgxlInterlockPage.h"

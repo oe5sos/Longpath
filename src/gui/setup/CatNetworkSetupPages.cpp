@@ -5,8 +5,8 @@
 // translated here; all AppSettings keys are attributed in TciProtocol.h.
 
 #include "CatNetworkSetupPages.h"
-#include "gui/StyleConstants.h"
 #include "gui/LanScanDialog.h"
+#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
 
