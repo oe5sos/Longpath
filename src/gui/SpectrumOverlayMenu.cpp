@@ -21,7 +21,7 @@ void SpectrumOverlayMenu::buildUI()
     layout->setContentsMargins(10, 8, 10, 8);
     layout->setSpacing(4);
 
-    // Dark theme matching NereusSDR STYLEGUIDE
+    // Dark theme matching the STYLEGUIDE
     // QSS Type selectors match QMetaObject::className(), and Qt rewrites
     // namespace `::` as `--`. The bare `SpectrumOverlayMenu` selector
     // never matched `Longpath::SpectrumOverlayMenu`, so the popup
@@ -30,7 +30,7 @@ void SpectrumOverlayMenu::buildUI()
     // gets its dark surface back. Same trap applies to any future
     // top-level QWidget popup in this namespace.
     setStyleSheet(Style::themed(QStringLiteral(
-        "NereusSDR--SpectrumOverlayMenu {"
+        "Longpath--SpectrumOverlayMenu {"
         "  background: #1a2a3a;"
         "  border: 1px solid #205070;"
         "  border-radius: 6px;"

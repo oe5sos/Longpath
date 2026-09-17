@@ -14,7 +14,7 @@
 //                                    (Phase 3J-2 Task B1) instead of
 //                                    upstream's transitive include from
 //                                    DxClusterClient.h. Logging routes
-//                                    through lcSpots ("nereus.spots")
+//                                    through lcSpots ("longpath.spots")
 //                                    instead of upstream AetherSDR's
 //                                    lcDxCluster. Log file path uses Qt's
 //                                    AppConfigLocation (already lands

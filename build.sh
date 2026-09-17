@@ -38,7 +38,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")"
 
-LOG=/tmp/nereus-build.log
+LOG=/tmp/longpath-build.log
 QUIET=0
 [ "${1:-}" = "--quiet" ] && QUIET=1
 

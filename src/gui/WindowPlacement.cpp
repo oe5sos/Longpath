@@ -17,7 +17,7 @@
 #include <QTimer>
 #include <QWidget>
 
-Q_LOGGING_CATEGORY(lcWindowPlacement, "nereus.windowplacement")
+Q_LOGGING_CATEGORY(lcWindowPlacement, "longpath.windowplacement")
 
 namespace Longpath {
 

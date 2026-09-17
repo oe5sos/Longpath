@@ -28,7 +28,7 @@
 #include <QPushButton>
 #include <QLoggingCategory>
 
-Q_LOGGING_CATEGORY(lcPeripherals, "nereus.peripherals")
+Q_LOGGING_CATEGORY(lcPeripherals, "longpath.peripherals")
 
 namespace Longpath {
 

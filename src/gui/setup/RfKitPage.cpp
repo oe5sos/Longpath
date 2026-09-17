@@ -196,7 +196,7 @@ QWidget* RfKitPage::buildRf2ksTab()
     auto* labelsFm  = new QFormLayout(labelsBox);
     auto* note      = new QLabel(tr(
         "RF2K-S firmware does not expose antenna names via REST. "
-        "Labels are stored locally in NereusSDR."), labelsBox);
+        "Labels are stored locally in Longpath."), labelsBox);
     note->setWordWrap(true);
     note->setStyleSheet(Style::themed(QStringLiteral("color:#8899aa; font-size:11px;")));
     labelsFm->addRow(note);

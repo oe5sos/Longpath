@@ -52,9 +52,9 @@ QByteArray KiwiPublicDirectory::userAgent()
     // aus der Zeit vor der Umbenennung, der Wert ist der richtige).
 #ifdef NEREUSSDR_VERSION
     return QByteArrayLiteral("Longpath/" NEREUSSDR_VERSION
-                             " (+https://github.com/OE5SOS/NereusSDR)");
+                             " (+https://github.com/oe5sos/Longpath)");
 #else
-    return QByteArrayLiteral("Longpath (+https://github.com/OE5SOS/NereusSDR)");
+    return QByteArrayLiteral("Longpath (+https://github.com/oe5sos/Longpath)");
 #endif
 }
 

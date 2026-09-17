@@ -21,7 +21,7 @@
 #include <QDebug>
 #include <cmath>
 
-Q_LOGGING_CATEGORY(lcTunerModel, "nereus.tuner.model")
+Q_LOGGING_CATEGORY(lcTunerModel, "longpath.tuner.model")
 
 namespace Longpath {
 

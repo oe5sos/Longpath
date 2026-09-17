@@ -22,7 +22,7 @@
 namespace Longpath {
 
 namespace {
-Q_LOGGING_CATEGORY(lcQrzLog, "nereus.qrz.logbook")
+Q_LOGGING_CATEGORY(lcQrzLog, "longpath.qrz.logbook")
 
 constexpr const char* kApi = "https://logbook.qrz.com/api";
 constexpr int kTimeoutMs = 20000;

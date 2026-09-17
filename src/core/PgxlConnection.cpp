@@ -22,7 +22,7 @@
 
 namespace Longpath {
 
-Q_LOGGING_CATEGORY(lcPgxl, "nereus.pgxl")
+Q_LOGGING_CATEGORY(lcPgxl, "longpath.pgxl")
 
 // Exponential backoff schedule for auto-reconnect, in seconds.
 // From FlexRadio wiki spec + design §6.4: amp keeps connection state;

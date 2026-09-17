@@ -136,9 +136,9 @@ namespace Longpath {
 // next repro say whether this dialog contributes at all, without a profiler.
 //
 // Disabled by default. Enable with either of:
-//   QT_LOGGING_RULES="nereus.connpanel.timing.debug=true"
+//   QT_LOGGING_RULES="longpath.connpanel.timing.debug=true"
 //   QT_LOGGING_RULES="*.timing.debug=true"   (covers nereus.setup.timing too)
-Q_LOGGING_CATEGORY(lcConnPanelTiming, "nereus.connpanel.timing")
+Q_LOGGING_CATEGORY(lcConnPanelTiming, "longpath.connpanel.timing")
 
 // ---------------------------------------------------------------------------
 // Color constants — from ucRadioList.cs ~:1115 (adapted to dark theme)

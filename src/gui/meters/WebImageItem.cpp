@@ -63,7 +63,7 @@ mw0lge@grange-lane.co.uk
 #include <QStringList>
 #include <QLoggingCategory>
 
-Q_LOGGING_CATEGORY(lcWebImageItem, "nereus.gui.meters.webimageitem")
+Q_LOGGING_CATEGORY(lcWebImageItem, "longpath.gui.meters.webimageitem")
 
 namespace Longpath {
 

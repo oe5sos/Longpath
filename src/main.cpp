@@ -280,21 +280,27 @@ int main(int argc, char* argv[])
         parser.process(app);
     }
 
-    // Set up file logging in ~/.config/NereusSDR/ (or the profile's
-    // isolated config dir when --profile is set).
+    // Set up file logging in the config dir (or the profile's isolated
+    // config dir when --profile is set).
     const QString logDir = Longpath::AppSettings::resolveConfigDir(activeProfile);
     QDir().mkpath(logDir);
 
     const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
-    const QString logPath = logDir + "/nereussdr-" + timestamp + ".log";
+    const QString logPath = logDir + "/longpath-" + timestamp + ".log";
 
-    // Prune old log files (keep newest 4 + the one we're about to create = 5)
+    // Prune old log files (keep newest 4 + the one we're about to create = 5).
+    // "nereussdr-*" are the files this program wrote before 2026-09-17;
+    // they age out the same way instead of lingering forever.
     {
         QDir dir(logDir);
-        QStringList logs = dir.entryList({"nereussdr-*.log"}, QDir::Files, QDir::Name);
+        // By age, oldest first — by name, every "longpath-*" would sort
+        // before every "nereussdr-*" and the newest files would go first.
+        QStringList logs = dir.entryList({"longpath-*.log", "nereussdr-*.log"},
+                                         QDir::Files, QDir::Time | QDir::Reversed);
         while (logs.size() >= 5) {
             dir.remove(logs.takeFirst());
         }
+        QFile::remove(logDir + "/nereussdr.log");   // der alte Verweis
     }
 
     s_logFile = new QFile(logPath);
@@ -302,7 +308,7 @@ int main(int argc, char* argv[])
         s_logFile->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         qInstallMessageHandler(messageHandler);
 
-        const QString symlink = logDir + "/nereussdr.log";
+        const QString symlink = logDir + "/longpath.log";
         QFile::remove(symlink);
         QFile::link(logPath, symlink);
     } else {

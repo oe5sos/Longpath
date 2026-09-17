@@ -478,7 +478,7 @@ void DspOptionsPage::buildUI()
         tr("Persist impulse cache to disk between sessions"), cacheGroup);
     m_cacheImpulseSaveRestore->setToolTip(
         tr("Save the impulse cache to disk on shutdown and reload on next launch. "
-           "Eliminates the first-rebuild cost after restarting NereusSDR. "
+           "Eliminates the first-rebuild cost after restarting Longpath. "
            "Warning: the cache file can become very large. "
            "Takes effect on the next radio connect or channel rebuild."));
 

@@ -23,7 +23,7 @@
 
 namespace Longpath {
 
-Q_LOGGING_CATEGORY(lcTgxl, "nereus.tgxl")
+Q_LOGGING_CATEGORY(lcTgxl, "longpath.tgxl")
 
 // Exponential backoff schedule for auto-reconnect, in seconds.
 // Parallel to PgxlConnection (design §6.4); cap at 60 s.

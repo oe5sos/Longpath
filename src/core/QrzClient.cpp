@@ -32,7 +32,7 @@
 
 namespace Longpath {
 
-namespace { Q_LOGGING_CATEGORY(lcQrz, "nereus.qrz") }
+namespace { Q_LOGGING_CATEGORY(lcQrz, "longpath.qrz") }
 
 
 namespace {

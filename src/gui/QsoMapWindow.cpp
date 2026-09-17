@@ -827,7 +827,7 @@ void QsoMapWindow::exportKml()
 
     const QString suggested =
         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
-        + QStringLiteral("/NereusSDR-log.kml");
+        + QStringLiteral("/Longpath-log.kml");
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export for Google Earth"), suggested,
         QStringLiteral("Google Earth KML (*.kml)"));

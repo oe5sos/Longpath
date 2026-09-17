@@ -172,7 +172,7 @@ extern "C" {
 #include "fargan.h"
 }
 
-Q_LOGGING_CATEGORY(lcRade, "nereus.rade")
+Q_LOGGING_CATEGORY(lcRade, "longpath.rade")
 
 namespace Longpath {
 

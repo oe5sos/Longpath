@@ -60,7 +60,7 @@ static QString spoofFlexLicenseId(const QString& hostMacDashed)
 // Packet structure:
 //   28-byte VITA-49-style header
 //   ASCII key=value payload (space-separated, padded to 4-byte multiple)
-Q_LOGGING_CATEGORY(lcFlexDisc, "nereus.flex.disc", QtInfoMsg)
+Q_LOGGING_CATEGORY(lcFlexDisc, "longpath.flex.disc", QtInfoMsg)
 
 FlexRadioDiscoveryBroadcaster::FlexRadioDiscoveryBroadcaster(QObject* parent)
     : QObject(parent)
@@ -311,10 +311,10 @@ QByteArray FlexRadioDiscoveryBroadcaster::buildBeacon(
                                     ? QStringLiteral("4.0.0.1")
                                     : m_version;
     const QString nicknameStr = m_nickname.isEmpty()
-                                    ? QStringLiteral("NereusSDR")
+                                    ? QStringLiteral("Longpath")
                                     : m_nickname;
     const QString callsignStr = m_callsign.isEmpty()
-                                    ? QStringLiteral("NEREUS")
+                                    ? QStringLiteral("LONGPATH")
                                     : m_callsign;
     const QString modelStr    = m_model.isEmpty()
                                     ? QStringLiteral("FLEX-6400")

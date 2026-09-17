@@ -67,7 +67,7 @@
 #include <QTimer>
 #include <cmath>
 
-Q_LOGGING_CATEGORY(lcRadeReporterBridge, "nereus.freedv.rade.bridge")
+Q_LOGGING_CATEGORY(lcRadeReporterBridge, "longpath.freedv.rade.bridge")
 
 namespace Longpath {
 

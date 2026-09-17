@@ -463,7 +463,7 @@ void RxDspWorker::setRadeChannel(RadeChannel* channel)
     }
 
     // Lifecycle tracer (off by default; enable with
-    // QT_LOGGING_RULES="nereus.dsp.debug=true").
+    // QT_LOGGING_RULES="longpath.dsp.debug=true").
     qCDebug(lcDsp).noquote() << QString("RxDspWorker::setRadeChannel(%1)")
                                     .arg(reinterpret_cast<quintptr>(channel),
                                          0, 16);
@@ -679,7 +679,7 @@ void RxDspWorker::processIqBatch(int receiverIndex,
                         ? m_radeChannel.load(std::memory_order_acquire)
                         : nullptr;
                 // One-shot tracer (off by default; enable with
-                // QT_LOGGING_RULES="nereus.dsp.debug=true") to confirm
+                // QT_LOGGING_RULES="longpath.dsp.debug=true") to confirm
                 // the RADE RX fork is reaching the codec during bench
                 // shakedown.
                 static int s_rxRadeDiagCount = 0;

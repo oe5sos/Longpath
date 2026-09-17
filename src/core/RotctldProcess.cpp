@@ -22,7 +22,7 @@ namespace Longpath {
 
 namespace {
 
-Q_LOGGING_CATEGORY(lcRotctld, "nereus.rotctld")
+Q_LOGGING_CATEGORY(lcRotctld, "longpath.rotctld")
 
 // True if nothing on this machine is listening on loopback:port. A
 // bind that succeeds is released again at once; rotctld binds it for

@@ -427,7 +427,7 @@ void PgxlAdvancedPage::buildPairingSection(QVBoxLayout* topLay)
     m_pairAttemptCheckbox = new QCheckBox(
         QStringLiteral("Auto-pair on connect"));
     m_pairAttemptCheckbox->setToolTip(
-        QStringLiteral("When enabled, NereusSDR sends the flexradio "
+        QStringLiteral("When enabled, Longpath sends the flexradio "
                        "pairing handshake to PGXL on every successful "
                        "9008 connect. Disable only if pairing is "
                        "managed externally."));

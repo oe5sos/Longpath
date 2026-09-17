@@ -129,7 +129,7 @@ QWidget* FourO3APage::buildGeneralTab()
     m_masterToggle->setToolTip(
         tr("Gates the FlexAPI listener on TCP 4992 and the PGXL / TGXL "
            "auto-connect paths.  Off by default; turn on only when you "
-           "want NereusSDR to expose itself to 4O3A amps and tuners on "
+           "want Longpath to expose itself to 4O3A amps and tuners on "
            "your local network."));
     m_masterToggle->setChecked(m_model && m_model->fourO3AEnabled());
     connect(m_masterToggle, &QCheckBox::toggled,

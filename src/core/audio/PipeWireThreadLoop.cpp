@@ -9,7 +9,7 @@
 #include <QLoggingCategory>
 #include <pipewire/pipewire.h>
 
-Q_LOGGING_CATEGORY(lcPw, "nereussdr.pipewire")
+Q_LOGGING_CATEGORY(lcPw, "longpath.pipewire")
 
 namespace Longpath {
 
@@ -43,7 +43,7 @@ PipeWireThreadLoop::~PipeWireThreadLoop()
 
 bool PipeWireThreadLoop::connect()
 {
-    m_loop = pw_thread_loop_new("nereussdr.pw", nullptr);
+    m_loop = pw_thread_loop_new("longpath.pw", nullptr);
     if (!m_loop) {
         qCWarning(lcPw) << "pw_thread_loop_new failed";
         return false;

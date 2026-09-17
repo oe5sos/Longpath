@@ -111,7 +111,7 @@
 #include <chrono>
 #include <cmath>
 
-Q_LOGGING_CATEGORY(lcTxWorker, "nereus.tx.worker")
+Q_LOGGING_CATEGORY(lcTxWorker, "longpath.tx.worker")
 
 namespace Longpath {
 

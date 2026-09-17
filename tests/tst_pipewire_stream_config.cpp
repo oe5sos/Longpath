@@ -20,7 +20,7 @@ private slots:
 
     void outputVirtualSource_setsCoreKeys() {
         StreamConfig cfg;
-        cfg.nodeName        = QStringLiteral("nereussdr.vax-1");
+        cfg.nodeName        = QStringLiteral("longpath.vax-1");
         cfg.nodeDescription = QStringLiteral("NereusSDR VAX 1");
         cfg.direction       = StreamConfig::Output;
         cfg.mediaClass      = QStringLiteral("Audio/Source");
@@ -45,7 +45,7 @@ private slots:
 
     void inputConsumer_setsCaptureCategory() {
         StreamConfig cfg;
-        cfg.nodeName = QStringLiteral("nereussdr.tx-input");
+        cfg.nodeName = QStringLiteral("longpath.tx-input");
         cfg.nodeDescription = QStringLiteral("NereusSDR TX input");
         cfg.direction = StreamConfig::Input;
         cfg.mediaClass = QStringLiteral("Stream/Input/Audio");
@@ -59,7 +59,7 @@ private slots:
 
     void targetNodeName_setsTargetObject() {
         StreamConfig cfg;
-        cfg.nodeName = QStringLiteral("nereussdr.rx-primary");
+        cfg.nodeName = QStringLiteral("longpath.rx-primary");
         cfg.nodeDescription = QStringLiteral("NereusSDR Primary");
         cfg.direction = StreamConfig::Output;
         cfg.mediaClass = QStringLiteral("Stream/Output/Audio");

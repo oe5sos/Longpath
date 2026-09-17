@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(LongpathVAX LANGUAGES CXX)
 
-# NereusSDR project-wide C++20 policy (CLAUDE.md); keep the HAL plugin aligned.
+# Longpath project-wide C++20 policy (CLAUDE.md); keep the HAL plugin aligned.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -21,7 +21,7 @@ target_link_libraries(LongpathVAX PRIVATE libASPL)
 # NOTE: AetherSDR's hal-plugin/CMakeLists.txt added
 # `target_include_directories(... PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)`
 # so the plugin could pull in a shared shm-layout header from its main tree.
-# NereusSDR keeps the plugin self-contained: VaxShmBlock is defined inline in
+# Longpath keeps the plugin self-contained: VaxShmBlock is defined inline in
 # LongpathVAX.cpp. Sub-Phase 5.3's CoreAudioHalBus must agree on the same
 # struct layout but shares no header with the plugin.
 

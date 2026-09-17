@@ -146,8 +146,8 @@ BoardCapabilities capsForModel(RadioModel* model)
 // page or interaction is blocking the UI thread, without needing a profiler.
 //
 // Disabled by default. Enable with:
-//   QT_LOGGING_RULES="nereus.setup.timing.debug=true"
-Q_LOGGING_CATEGORY(lcSetupTiming, "nereus.setup.timing")
+//   QT_LOGGING_RULES="longpath.setup.timing.debug=true"
+Q_LOGGING_CATEGORY(lcSetupTiming, "longpath.setup.timing")
 
 // ── Construction ──────────────────────────────────────────────────────────────
 

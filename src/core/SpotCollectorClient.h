@@ -17,7 +17,7 @@
 //                                    AetherSDR's "AetherSDR" namespace
 //                                    becomes "NereusSDR" and the qCDebug
 //                                    category name routes to lcSpots
-//                                    (NereusSDR's "nereus.spots") instead
+//                                    (NereusSDR's "longpath.spots") instead
 //                                    of AetherSDR's lcDxCluster. The log
 //                                    file path uses Qt's
 //                                    AppConfigLocation under

@@ -335,7 +335,7 @@ private slots:
     // §F.1 — CW press is rejected: no pttModeChanged, no moxStateChanged
     void cw_press_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);
@@ -357,7 +357,7 @@ private slots:
     // §F.2 — CW release is rejected: no signals regardless of direction
     void cw_release_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);
@@ -379,7 +379,7 @@ private slots:
     // §F.3 — TCI press is rejected: no pttModeChanged, no moxStateChanged
     void tci_press_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);
@@ -401,7 +401,7 @@ private slots:
     // §F.4 — TCI release is rejected: no signals regardless of direction
     void tci_release_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);

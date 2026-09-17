@@ -48,11 +48,11 @@ namespace {
 
 // Agreed shm-name table (Task 5.1 D7). Stored as string literals so the .h
 // can hand out a `const char*` without owning a QString or QByteArray.
-constexpr const char* kShmNameVax1   = "/nereussdr-vax-1";
-constexpr const char* kShmNameVax2   = "/nereussdr-vax-2";
-constexpr const char* kShmNameVax3   = "/nereussdr-vax-3";
-constexpr const char* kShmNameVax4   = "/nereussdr-vax-4";
-constexpr const char* kShmNameTxIn   = "/nereussdr-vax-tx";
+constexpr const char* kShmNameVax1   = "/longpath-vax-1";
+constexpr const char* kShmNameVax2   = "/longpath-vax-2";
+constexpr const char* kShmNameVax3   = "/longpath-vax-3";
+constexpr const char* kShmNameVax4   = "/longpath-vax-4";
+constexpr const char* kShmNameTxIn   = "/longpath-vax-tx";
 
 const char* shmNameForRole(CoreAudioHalBus::Role role) {
     switch (role) {

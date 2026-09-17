@@ -89,7 +89,7 @@ private slots:
     // per Vorgabe stumm), die Messung bildet damit den Normalfall ab.
     void initTestCase()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.shistory=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.shistory=false"));
     }
 
     // Die eigentliche Messung. Der Wert wird ausgegeben, damit er im

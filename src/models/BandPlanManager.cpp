@@ -28,7 +28,7 @@
 namespace Longpath {
 
 namespace {
-Q_LOGGING_CATEGORY(lcBandPlan, "nereussdr.bandplan")
+Q_LOGGING_CATEGORY(lcBandPlan, "longpath.bandplan")
 }
 
 BandPlanManager::BandPlanManager(QObject* parent)

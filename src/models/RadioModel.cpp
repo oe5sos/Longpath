@@ -2010,7 +2010,7 @@ RadioModel::RadioModel(QObject* parent)
                 // the same callsign is a no-op.
                 slice->setLastRadeRxCallsign(info.callsign);
                 // Off by default; enable for bench triage with
-                //   QT_LOGGING_RULES="nereus.dsp.debug=true"
+                //   QT_LOGGING_RULES="longpath.dsp.debug=true"
                 qCDebug(lcDsp).noquote()
                     << QStringLiteral("FreeDV-Reporter flag fallback: "
                                       "set callsign=%1 on slice (freq=%2 Hz, "
@@ -5321,7 +5321,7 @@ void RadioModel::wireRadeChannel(int sliceId, RadeChannel* channel,
                 [this, sliceId](const QByteArray& pcm) {
                     // One-shot first-fire tracer (off by default;
                     // enable with
-                    //   QT_LOGGING_RULES="nereus.rade.debug=true").
+                    //   QT_LOGGING_RULES="longpath.rade.debug=true").
                     // Useful for confirming RADE actually decoded
                     // anything during a bench session — without
                     // sync the codec emits nothing, so absence
@@ -5454,7 +5454,7 @@ void RadioModel::wireRadeChannel(int sliceId, RadeChannel* channel,
                 [this](const QByteArray& iq) {
                     // One-shot first-fire tracer (off by default;
                     // enable with
-                    //   QT_LOGGING_RULES="nereus.rade.debug=true").
+                    //   QT_LOGGING_RULES="longpath.rade.debug=true").
                     // Useful during bench TX shakedown to confirm
                     // rade_tx is actually producing modem output
                     // when the operator keys up.

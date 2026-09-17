@@ -42,19 +42,19 @@ fi
 
 # Quiet unless something is wrong: the interesting output is the errors,
 # and a wall of shader lines trains you to stop reading.
-if ! cmake --build build -j"$(sysctl -n hw.ncpu)" > /tmp/nereus-build.log 2>&1; then
+if ! cmake --build build -j"$(sysctl -n hw.ncpu)" > /tmp/longpath-build.log 2>&1; then
     echo "── build failed ──────────────────────────────────────────"
-    tail -40 /tmp/nereus-build.log
+    tail -40 /tmp/longpath-build.log
     echo "──────────────────────────────────────────────────────────"
-    echo "Full log: /tmp/nereus-build.log"
+    echo "Full log: /tmp/longpath-build.log"
     exit 1
 fi
 
 # Warnings are worth seeing even when the build succeeds; they are the
 # ones that turn into the next bug.
-if grep -q "warning:" /tmp/nereus-build.log; then
+if grep -q "warning:" /tmp/longpath-build.log; then
     echo "Build warnings:"
-    grep "warning:" /tmp/nereus-build.log | sort -u | head -20
+    grep "warning:" /tmp/longpath-build.log | sort -u | head -20
     echo
 fi
 

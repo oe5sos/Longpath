@@ -144,7 +144,7 @@ void QsoDetailPane::buildUi()
 {
     // By object name, not by class name. A Qt stylesheet type selector
     // matches the metaobject name, which for a class inside a namespace
-    // is "NereusSDR--QsoDetailPane" — write the plain class name and
+    // is "Longpath--QsoDetailPane" — write the plain class name and
     // the rule silently matches nothing, which is the kind of bug that
     // looks like a theming preference.
     setObjectName(QStringLiteral("qsoDetailPane"));

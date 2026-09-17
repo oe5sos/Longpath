@@ -49,7 +49,7 @@ warren@wpratt.com
 #include <algorithm>
 #include <cstring>
 
-Q_LOGGING_CATEGORY(lcTxMicSrc, "nereus.tx.micsrc")
+Q_LOGGING_CATEGORY(lcTxMicSrc, "longpath.tx.micsrc")
 
 namespace Longpath {
 

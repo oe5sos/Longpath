@@ -1308,7 +1308,7 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
 
     // v0 → v3 migration (covers v0.2.x → v0.3.0)
     if (storedVersion < 3 && currentVersion >= 3) {
-        qDebug() << "Migrating settings to schema v3 (NereusSDR v0.3.0)";
+        qDebug() << "Migrating settings to schema v3 (v0.3.0)";
 
         // Retire keys whose semantics changed in v0.3.0:
         remove(QStringLiteral("DisplayAverageMode"));           // split into Detector + Averaging (Task 2.1)

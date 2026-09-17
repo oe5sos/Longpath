@@ -738,7 +738,7 @@ void FreeDVReporterClient::onRxReport(const QJsonObject& data)
         const QString recvMode = data.value(QStringLiteral("mode")).toString();
 
         // Per-event tracer (off by default; enable via
-        // QT_LOGGING_RULES="nereus.spots.debug=true").  Captures
+        // QT_LOGGING_RULES="longpath.spots.debug=true").  Captures
         // wire-shape data for bench triage of "Last RX Callsign"
         // column update timing — freedv_reporter.cpp:3651-3723
         // upstream stores receivedCallsign verbatim, so empty
@@ -827,7 +827,7 @@ void FreeDVReporterClient::onTxReport(const QJsonObject& data)
         data.value(QStringLiteral("last_update")).toString(), Qt::ISODate);
 
     // Per-event tracer (off by default; enable via
-    // QT_LOGGING_RULES="nereus.spots.debug=true").  Captures
+    // QT_LOGGING_RULES="longpath.spots.debug=true").  Captures
     // tx_report state-transition events for bench triage of "row
     // not turning red" reports.  No keepalive: upstream fires
     // tx_report only on transmitting=true<->false transitions

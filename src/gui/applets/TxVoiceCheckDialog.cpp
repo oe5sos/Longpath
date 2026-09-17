@@ -892,7 +892,7 @@ void TxVoiceCheckDialog::saveRecording()
     if (!m_recorder.hasRecording()) { return; }
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Save recording"),
-        QStringLiteral("nereus-voice.wav"),
+        QStringLiteral("longpath-voice.wav"),
         QStringLiteral("WAV (*.wav)"));
     if (path.isEmpty()) { return; }
 

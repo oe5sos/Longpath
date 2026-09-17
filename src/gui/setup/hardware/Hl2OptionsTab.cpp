@@ -79,7 +79,7 @@
 namespace Longpath {
 
 namespace {
-Q_LOGGING_CATEGORY(lcHl2Options, "nereus.hl2.options")
+Q_LOGGING_CATEGORY(lcHl2Options, "longpath.hl2.options")
 
 // Small helper for hex-displayed integer spinboxes.
 QSpinBox* makeHexSpin(QWidget* parent, int min, int max, int initial, int width = 56)
@@ -300,7 +300,7 @@ void Hl2OptionsTab::buildI2cControl(QWidget* parent)
     auto* bus0 = new QCheckBox(tr("0 (deferred)"), parent);
     bus0->setEnabled(false);
     bus0->setToolTip(tr(
-        "Bus 0 surface deferred to a Phase 3L follow-up — NereusSDR's "
+        "Bus 0 surface deferred to a Phase 3L follow-up — Longpath's "
         "I2cTxn pipeline currently emits bus 1 only.  See "
         "docs/architecture/phase3l-hl2-visibility-design.md §4."));
     grid->addWidget(bus0, row, 1);

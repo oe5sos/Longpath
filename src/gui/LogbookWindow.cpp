@@ -1544,7 +1544,7 @@ void LogbookWindow::exportAdif()
 {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export ADIF"),
-        QStringLiteral("nereus-log.adi"),
+        QStringLiteral("longpath-log.adi"),
         QStringLiteral("ADIF (*.adi *.adif)"));
     if (path.isEmpty()) { return; }
 
@@ -1570,7 +1570,7 @@ void LogbookWindow::exportCsv()
 {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export CSV"),
-        QStringLiteral("nereus-log.csv"),
+        QStringLiteral("longpath-log.csv"),
         QStringLiteral("CSV (*.csv)"));
     if (path.isEmpty()) { return; }
 
@@ -1597,7 +1597,7 @@ void LogbookWindow::exportCabrillo()
 {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export Cabrillo"),
-        QStringLiteral("nereus-log.cbr"),
+        QStringLiteral("longpath-log.cbr"),
         QStringLiteral("Cabrillo (*.cbr *.log)"));
     if (path.isEmpty()) { return; }
 
@@ -1643,7 +1643,7 @@ void LogbookWindow::exportCabrillo()
 
     QTextStream out(&f);
     out << "START-OF-LOG: 3.0\n"
-        << "CREATED-BY: NereusSDR\n"
+        << "CREATED-BY: Longpath\n"
         << "CALLSIGN: " << (myCall.isEmpty()
                                 ? QStringLiteral("NOCALL") : myCall)
         << "\n";

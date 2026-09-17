@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/AudioVaxPage.cpp  (NereusSDR)
+// src/gui/setup/AudioVaxPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → VAX page.
+// Longpath-original Setup → Audio → VAX page.
 // See AudioVaxPage.h for the full header.
 //
 // Sub-Phase 12 Task 12.3 (2026-04-20): Written by J.J. Boyd (KG4VCF),
@@ -141,20 +141,20 @@ static const char* kEnableChkStyle =
 QString nativeHalLabelForCableImpl(const DetectedCable& cable)
 {
     return QStringLiteral(
-               "►  %1 · NereusSDR · native (bound automatically)")
+               "►  %1 · Longpath · native (bound automatically)")
         .arg(cable.deviceName);
 }
 
 // Default node description for a channel (spec §10).
 QString defaultNodeDescription(int channel)
 {
-    return QStringLiteral("NereusSDR VAX %1").arg(channel);
+    return QStringLiteral("Longpath VAX %1").arg(channel);
 }
 
 // PipeWire node name for a channel — the string consumer apps use.
 QString pipeWireNodeName(int channel)
 {
-    return QStringLiteral("nereussdr.vax-%1").arg(channel);
+    return QStringLiteral("longpath.vax-%1").arg(channel);
 }
 
 } // namespace
@@ -534,7 +534,7 @@ void VaxChannelCard::updateBadge()
         } else {
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
             const QString nativeName =
-                QStringLiteral("NereusSDR VAX %1").arg(m_channel);
+                QStringLiteral("Longpath VAX %1").arg(m_channel);
             if (hasDevice) {
                 // BYO override path.
                 if (!m_busOpen) {
@@ -544,7 +544,7 @@ void VaxChannelCard::updateBadge()
                         QStringLiteral("⚠  Bus failed to open: %1")
                             .arg(deviceName));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR tried to open the selected 3rd-party "
+                        "Longpath tried to open the selected 3rd-party "
                         "virtual cable but the PortAudio stream failed. "
                         "The device may be busy, unplugged, or the "
                         "Driver API / sample-rate combo may be "
@@ -569,17 +569,17 @@ void VaxChannelCard::updateBadge()
 #  if defined(Q_OS_MAC)
                     m_statusLabel->setText(QStringLiteral(
                         "⚠  Native HAL unavailable — reinstall "
-                        "NereusSDR"));
+                        "Longpath"));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR could not open the bundled CoreAudio "
+                        "Longpath could not open the bundled CoreAudio "
                         "HAL plugin's shared-memory bridge. Reinstall "
-                        "NereusSDR, or unblock NereusSDRVAX.driver in "
+                        "Longpath, or unblock LongpathVAX.driver in "
                         "System Settings → Privacy & Security."));
 #  else
                     m_statusLabel->setText(QStringLiteral(
                         "⚠  Native PipeWire bridge unavailable"));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR could not create a PipeWire "
+                        "Longpath could not create a PipeWire "
                         "pipe-source for this VAX slot. Check that "
                         "PipeWire is running and that pactl is "
                         "available on PATH."));
@@ -620,7 +620,7 @@ void VaxChannelCard::updateBadge()
                         QStringLiteral("⚠  Bus failed to open: %1")
                             .arg(deviceName));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR tried to open the selected virtual "
+                        "Longpath tried to open the selected virtual "
                         "cable but the PortAudio stream failed. The "
                         "device may be busy, unplugged, or the Driver "
                         "API / sample-rate combo may be unsupported."));
@@ -662,7 +662,9 @@ void VaxChannelCard::updateBadge()
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     // Amber badge logic — hidden widget, state kept for API compat.
     if (hasDevice) {
-        const bool isNative = deviceName.contains(QStringLiteral("NereusSDR"),
+        const bool isNative = deviceName.contains(QStringLiteral("Longpath"),
+                                                   Qt::CaseInsensitive)
+                           || deviceName.contains(QStringLiteral("Longpath"),   // vor 2026-09-17
                                                    Qt::CaseInsensitive);
         const bool badgeOn = !isNative
             && (VirtualCableDetector::consumerCount(deviceName) == 0);
@@ -706,7 +708,7 @@ void VaxChannelCard::onAutoDetectClicked()
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     int nativeHalCount = 0;
     for (const DetectedCable& cable : cables) {
-        if (cable.product != VirtualCableProduct::NereusSdrVax) {
+        if (cable.product != VirtualCableProduct::LongpathVax) {
             continue;
         }
         QAction* act = menu.addAction(nativeHalLabelForCable(cable));
@@ -736,7 +738,7 @@ void VaxChannelCard::onAutoDetectClicked()
         bool hasAny = false;
         for (const DetectedCable& cable : cables) {
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
-            if (cable.product == VirtualCableProduct::NereusSdrVax) {
+            if (cable.product == VirtualCableProduct::LongpathVax) {
                 continue;
             }
 #endif

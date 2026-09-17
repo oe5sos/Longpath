@@ -9,7 +9,7 @@
 #include <QtGlobal>
 #include <QLoggingCategory>
 
-Q_LOGGING_CATEGORY(lcRtAudio, "nereussdr.rt_audio")
+Q_LOGGING_CATEGORY(lcRtAudio, "longpath.rt_audio")
 
 namespace Longpath {
 

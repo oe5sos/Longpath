@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build NereusSDR macOS installer (.pkg)
+# Build Longpath macOS installer (.pkg)
 # Usage: ./packaging/macos/hal-installer.sh [build-dir]
 #
-# Bundles NereusSDR.app + the NereusSDRVAX HAL plugin into a single
+# Bundles Longpath.app + the LongpathVAX HAL plugin into a single
 # productbuild .pkg. The HAL component's postinstall script restarts
 # coreaudiod with a macOS 14.4+ killall fallback (see hal-postinstall.sh).
 # Ported from AetherSDR's packaging/macos/build-installer.sh.
@@ -20,8 +20,8 @@ PKG_DIR="${BUILD_DIR}/pkg-staging"
 # silently strip "-rcN" and the resulting .pkg filename would diverge from
 # release.yml's notarize/staple/upload steps that use the full tag version.
 # This was the root cause of the v0.3.1-rc1 build failure (run 25267007020):
-# productbuild wrote build/NereusSDR-0.3.1-macOS.pkg, but the notarize step
-# looked for build/NereusSDR-0.3.1-rc1-macOS.pkg and failed with exit 64.
+# productbuild wrote build/Longpath-0.3.1-macOS.pkg, but the notarize step
+# looked for build/Longpath-0.3.1-rc1-macOS.pkg and failed with exit 64.
 VERSION="${VERSION:-$(grep 'project(Longpath' CMakeLists.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")}"
 
 # PKG_SUFFIX selects the arch-tagged segment of the output filename. The
@@ -31,7 +31,7 @@ VERSION="${VERSION:-$(grep 'project(Longpath' CMakeLists.txt | grep -oE '[0-9]+\
 # devs running this script by hand keep the historical filename.
 PKG_SUFFIX="${PKG_SUFFIX:-macOS}"
 
-echo "=== Building NereusSDR macOS installer v${VERSION} (${PKG_SUFFIX}) ==="
+echo "=== Building Longpath macOS installer v${VERSION} (${PKG_SUFFIX}) ==="
 
 # 1. Build app — skip if already built (preserves pre-existing signatures from CI).
 if [ ! -d "${BUILD_DIR}/Longpath.app" ]; then
@@ -79,25 +79,25 @@ chmod +x "${PKG_DIR}/scripts/postinstall"
 pkgbuild \
     --root "${PKG_DIR}/app" \
     --install-location /Applications \
-    --identifier com.nereussdr.app \
+    --identifier at.oe5sos.longpath \
     --version "${VERSION}" \
-    "${PKG_DIR}/NereusSDR-app.pkg"
+    "${PKG_DIR}/Longpath-app.pkg"
 
 if [ -d "${PKG_DIR}/hal/LongpathVAX.driver" ]; then
     pkgbuild \
         --root "${PKG_DIR}/hal" \
         --install-location "/Library/Audio/Plug-Ins/HAL" \
-        --identifier com.nereussdr.vax \
+        --identifier at.oe5sos.longpath.vax \
         --version "${VERSION}" \
         --scripts "${PKG_DIR}/scripts" \
-        "${PKG_DIR}/NereusSDR-vax.pkg"
+        "${PKG_DIR}/Longpath-vax.pkg"
 fi
 
 # 5. Create distribution XML
 cat > "${PKG_DIR}/Distribution.xml" << DISTXML
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
-    <title>NereusSDR ${VERSION}</title>
+    <title>Longpath ${VERSION}</title>
     <welcome file="welcome.html"/>
     <options customize="allow" require-scripts="false"/>
 
@@ -121,20 +121,20 @@ cat > "${PKG_DIR}/Distribution.xml" << DISTXML
         <line choice="vax"/>
     </choices-outline>
 
-    <choice id="app" title="NereusSDR Application"
+    <choice id="app" title="Longpath Application"
             description="OpenHPSDR / Apache Labs SDR client (Thetis port).">
-        <pkg-ref id="com.nereussdr.app"/>
+        <pkg-ref id="at.oe5sos.longpath"/>
     </choice>
 
     <choice id="vax" title="VAX Virtual Audio Driver"
             description="Virtual audio devices for digital mode apps (WSJT-X, fldigi, etc.). Uncheck if already installed."
             selected="!vaxDriverInstalled() || vaxDriverNeedsUpdate()"
             tooltip="Currently installed: will skip unless a newer version is available">
-        <pkg-ref id="com.nereussdr.vax"/>
+        <pkg-ref id="at.oe5sos.longpath.vax"/>
     </choice>
 
-    <pkg-ref id="com.nereussdr.app" version="${VERSION}" onConclusion="none">NereusSDR-app.pkg</pkg-ref>
-    <pkg-ref id="com.nereussdr.vax" version="${VERSION}" onConclusion="none">NereusSDR-vax.pkg</pkg-ref>
+    <pkg-ref id="at.oe5sos.longpath" version="${VERSION}" onConclusion="none">Longpath-app.pkg</pkg-ref>
+    <pkg-ref id="at.oe5sos.longpath.vax" version="${VERSION}" onConclusion="none">Longpath-vax.pkg</pkg-ref>
 </installer-gui-script>
 DISTXML
 
@@ -142,11 +142,11 @@ DISTXML
 mkdir -p "${PKG_DIR}/resources"
 cat > "${PKG_DIR}/resources/welcome.html" << 'WELCOME'
 <html><body>
-<h1>NereusSDR</h1>
+<h1>Longpath</h1>
 <p>A native OpenHPSDR / Apache Labs SDR client for macOS.</p>
 <p>This installer includes:</p>
 <ul>
-<li><b>NereusSDR.app</b> &mdash; the main application</li>
+<li><b>Longpath.app</b> &mdash; the main application</li>
 <li><b>VAX Virtual Audio Driver</b> &mdash; creates virtual audio devices for digital mode apps (WSJT-X, fldigi, VARA, etc.)</li>
 </ul>
 <p>After installation, the CoreAudio daemon will restart automatically to register the new audio devices.</p>
@@ -168,9 +168,9 @@ if [ -n "${APPLE_INSTALLER_ID:-}" ]; then
 else
     echo "--- APPLE_INSTALLER_ID not set; producing unsigned .pkg ---"
 fi
-# Longpath-*.pkg, not NereusSDR-*.pkg: release.yml's "Upload .pkg artifact"
+# Longpath-*.pkg, not Longpath-*.pkg: release.yml's "Upload .pkg artifact"
 # step globs build/Longpath-*.pkg (matching every other release artifact --
-# Longpath-*.dmg, Longpath-*.AppImage, Longpath-*-setup.exe). A NereusSDR-*
+# Longpath-*.dmg, Longpath-*.AppImage, Longpath-*-setup.exe). A Longpath-*
 # name here means the glob matches nothing, upload-artifact silently
 # uploads zero files (default if-no-files-found: warn, not error) and the
 # step still reports success -- the .pkg quietly vanishes from the release.

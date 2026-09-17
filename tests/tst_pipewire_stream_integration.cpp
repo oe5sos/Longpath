@@ -28,7 +28,7 @@ private slots:
         }
 
         StreamConfig cfg;
-        cfg.nodeName        = QStringLiteral("nereussdr.integration-test");
+        cfg.nodeName        = QStringLiteral("longpath.integration-test");
         cfg.nodeDescription = QStringLiteral("Integration test");
         cfg.direction       = StreamConfig::Output;
         cfg.mediaClass      = QStringLiteral("Stream/Output/Audio");

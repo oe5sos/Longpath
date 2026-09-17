@@ -89,7 +89,7 @@ QString SupportBundle::createBundle(const RadioModel* model)
 {
     // Create timestamped temp directory
     QString timestamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
-    QString tempDir = QDir::tempPath() + QStringLiteral("/nereussdr-support-") + timestamp;
+    QString tempDir = QDir::tempPath() + QStringLiteral("/longpath-support-") + timestamp;
     QDir().mkpath(tempDir);
 
     SystemInfo sys = collectSystemInfo();
@@ -160,7 +160,8 @@ void SupportBundle::copyLogFiles(const QString& dir)
 {
     QString logDir = LogManager::instance().logDirPath();
     QDir d(logDir);
-    QStringList logs = d.entryList({QStringLiteral("nereussdr-*.log")},
+    QStringList logs = d.entryList({QStringLiteral("longpath-*.log"),
+                                    QStringLiteral("nereussdr-*.log")},   // vor 2026-09-17
                                    QDir::Files, QDir::Name);
 
     // Copy up to 3 most recent log files
@@ -174,9 +175,9 @@ void SupportBundle::copyLogFiles(const QString& dir)
 
         QString destName;
         if (count == 0) {
-            destName = QStringLiteral("nereussdr.log");
+            destName = QStringLiteral("longpath.log");
         } else {
-            destName = QStringLiteral("nereussdr-%1.log").arg(count);
+            destName = QStringLiteral("longpath-%1.log").arg(count);
         }
         QFile::copy(src, dir + QLatin1Char('/') + destName);
         ++count;

@@ -310,7 +310,7 @@ bool write(const QString& path, const QVector<LogEntry>& entries,
 
     QTextStream out(&f);
     out << "Longpath logbook\n"
-        << "<ADIF_VER:5>3.1.4 <PROGRAMID:9>NereusSDR <EOH>\n";
+        << "<ADIF_VER:5>3.1.4 <PROGRAMID:8>Longpath <EOH>\n";
     for (const LogEntry& e : entries) {
         out << e.toAdifRecord() << "\n";
     }

@@ -507,7 +507,7 @@ constexpr bool kChainIndicatorsInBottomBar = false;
 // Eine Minute: hoechstens so viel geht bei Stromausfall verloren.
 constexpr int kSettingsAutosaveMs = 60 * 1000;
 // First-run/rescan wants the "relevant" virtual cables for the current
-// platform — 3rd-party cables on Windows (BYO), our own NereusSdrVax
+// platform — 3rd-party cables on Windows (BYO), our own LongpathVax
 // entries on Mac/Linux (native HAL plugin / pipe-source). Centralising
 // the platform split here keeps checkVaxFirstRun() focused on
 // scenario-selection + dialog wiring.
@@ -518,7 +518,7 @@ QVector<DetectedCable> detectedForFirstRun()
 #else
     QVector<DetectedCable> out;
     for (const auto& c : VirtualCableDetector::scan()) {
-        if (c.product == VirtualCableProduct::NereusSdrVax) {
+        if (c.product == VirtualCableProduct::LongpathVax) {
             out.push_back(c);
         }
     }
@@ -9987,7 +9987,7 @@ void MainWindow::buildMenuBar()
         gettingStartedAction->setToolTip(QStringLiteral("NYI — Phase X"));
     }
     {
-        QAction* helpAction = helpMenu->addAction(QStringLiteral("&NereusSDR Help"));
+        QAction* helpAction = helpMenu->addAction(QStringLiteral("&Longpath Help"));
         helpAction->setEnabled(false);
         helpAction->setToolTip(QStringLiteral("NYI — Phase X"));
     }
@@ -10015,7 +10015,7 @@ void MainWindow::buildMenuBar()
     helpMenu->addSeparator();
 #endif
 
-    helpMenu->addAction(QStringLiteral("&About NereusSDR"), this, [this]() {
+    helpMenu->addAction(QStringLiteral("&About Longpath"), this, [this]() {
         AboutDialog dlg(this);
         dlg.exec();
     });
@@ -14467,7 +14467,7 @@ void MainWindow::openSpotHub()
                         // fields.  pskreporter.cpp:148-169 [@77e793a].
                         psk->setIdentity(
                             call, grid,
-                            QStringLiteral("NereusSDR ") +
+                            QStringLiteral("Longpath ") +
                                 QStringLiteral(NEREUSSDR_VERSION));
                         psk->setAutoSendIntervalSec(
                             PskReporterClient::kReportingIntervalSec);
@@ -15680,7 +15680,7 @@ void MainWindow::showFeatureRequestDialog()
     // Version check gate — warn if not on latest release before filing
     auto* nam = new QNetworkAccessManager(this);
     QNetworkRequest req(QUrl(QStringLiteral(
-        "https://api.github.com/repos/boydsoftprez/NereusSDR/releases/latest")));
+        "https://api.github.com/repos/oe5sos/Longpath/releases/latest")));
     req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Longpath"));
     auto* reply = nam->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, nam] {
@@ -15721,13 +15721,13 @@ void MainWindow::showFeatureRequestDialogImpl()
     static const QString kPrompt = QStringLiteral(
         "IMPORTANT — before doing anything else, fetch the complete list of open\n"
         "issues by reading pages sequentially until you get fewer than 100 results:\n"
-        "  Page 1: https://github.com/boydsoftprez/NereusSDR/issues?state=open&per_page=100&page=1\n"
-        "  Page 2: https://github.com/boydsoftprez/NereusSDR/issues?state=open&per_page=100&page=2\n"
+        "  Page 1: https://github.com/oe5sos/Longpath/issues?state=open&per_page=100&page=1\n"
+        "  Page 2: https://github.com/oe5sos/Longpath/issues?state=open&per_page=100&page=2\n"
         "  ... continue until a page returns fewer than 100 issues.\n"
         "Do NOT rely on cached or training data for the issue list.\n\n"
         "Also fetch CLAUDE.md fresh (do not use cached versions):\n"
-        "  https://raw.githubusercontent.com/boydsoftprez/NereusSDR/main/CLAUDE.md\n\n"
-        "I want to report an issue or request a feature for NereusSDR, a cross-platform\n"
+        "  https://raw.githubusercontent.com/oe5sos/Longpath/main/CLAUDE.md\n\n"
+        "I want to report an issue or request a feature for Longpath, a cross-platform\n"
         "Qt6/C++20 SDR console for OpenHPSDR radios (ANAN, Hermes Lite 2, etc.). It uses\n"
         "the OpenHPSDR Protocol 1 and Protocol 2 over UDP, with client-side DSP via WDSP.\n\n"
         "DUPLICATE CHECK — this is mandatory. Search the fetched issue list for keywords\n"
@@ -15745,7 +15745,7 @@ void MainWindow::showFeatureRequestDialogImpl()
         "3. ## Why — what problem it solves\n"
         "4. ## How Other Clients Do It — how Thetis, PowerSDR, SparkSDR, etc. handle this\n"
         "5. ## Suggested Behavior — specific UX: what the user clicks, sees, what happens.\n"
-        "   Reference NereusSDR UI elements (AppletPanel, RxApplet, TxApplet, SetupDialog, etc.)\n"
+        "   Reference Longpath UI elements (AppletPanel, RxApplet, TxApplet, SetupDialog, etc.)\n"
         "6. ## Protocol Hints — relevant OpenHPSDR commands, or \"Unknown — needs research\"\n"
         "7. ## Acceptance Criteria — 3-5 bullet points defining done vs not-done\n\n"
         "FOR BUG REPORTS include:\n"
@@ -15845,7 +15845,7 @@ void MainWindow::showFeatureRequestDialogImpl()
         "QPushButton:hover { background: #4a7ba8; }")));
     connect(submitBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
-            "https://github.com/boydsoftprez/NereusSDR/issues/new?template=feature_request.yml")));
+            "https://github.com/oe5sos/Longpath/issues/new?template=feature_request.yml")));
         QTimer::singleShot(500, dlg, &QDialog::close);
     });
     btnRow2->addWidget(submitBtn);
@@ -15873,7 +15873,7 @@ void MainWindow::showFeatureRequestDialogImpl()
              QLatin1String(Style::kButtonAltHover)));
     connect(bugBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
-            "https://github.com/boydsoftprez/NereusSDR/issues/new?template=bug_report.yml")));
+            "https://github.com/oe5sos/Longpath/issues/new?template=bug_report.yml")));
         QTimer::singleShot(500, dlg, &QDialog::close);
     });
     btnRow2->addWidget(bugBtn);

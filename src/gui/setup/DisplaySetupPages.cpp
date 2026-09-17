@@ -368,7 +368,7 @@ void SpectrumDefaultsPage::buildUI()
     auto* resetBtn = new QPushButton(QStringLiteral("Reset to Smooth Defaults"), this);
     resetBtn->setToolTip(QStringLiteral(
         "Overwrite the Spectrum and Waterfall display settings with the "
-        "NereusSDR smooth-default profile (Clarity Blue palette, "
+        "Longpath smooth-default profile (Clarity Blue palette, "
         "log-recursive averaging, tight threshold gap, waterfall AGC on). "
         "Intended to recover the out-of-box look after experimentation. "
         "FFT size, frequency, band stack, and per-band grid slots are "
@@ -379,7 +379,7 @@ void SpectrumDefaultsPage::buildUI()
             QStringLiteral("Reset to Smooth Defaults"),
             QStringLiteral(
                 "This will overwrite your current Spectrum and Waterfall "
-                "display settings with the NereusSDR smooth-default profile.\n\n"
+                "display settings with the Longpath smooth-default profile.\n\n"
                 "Your FFT size, frequency, band stack, and per-band grid "
                 "slots are NOT affected.\n\n"
                 "Continue?"),

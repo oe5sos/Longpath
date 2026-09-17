@@ -14,7 +14,7 @@
 //                                    (Phase 3J-2 Task B1) instead of
 //                                    AetherSDR's DxClusterClient.h. The
 //                                    qCDebug/qCWarning category routes to
-//                                    lcSpots ("nereus.spots") instead of
+//                                    lcSpots ("longpath.spots") instead of
 //                                    AetherSDR's lcDxCluster. The log file
 //                                    path uses Qt's AppConfigLocation
 //                                    (already lands under NereusSDR/) under

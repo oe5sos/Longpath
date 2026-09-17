@@ -2044,8 +2044,8 @@ bool RotorLogbookPanel::appendToLogFile(const LogEntry& entry, QString* error)
     if (isNew) {
         // Strict importers reject a file whose first token is a record
         // rather than a header terminated by <EOH>.
-        out << "NereusSDR logbook\n"
-            << "<ADIF_VER:5>3.1.4 <PROGRAMID:9>NereusSDR <EOH>\n";
+        out << "Longpath logbook\n"
+            << "<ADIF_VER:5>3.1.4 <PROGRAMID:8>Longpath <EOH>\n";
     }
     out << entry.toAdifRecord() << "\n";
     out.flush();

@@ -48,7 +48,7 @@ std::atomic<quint64> g_applied{0};
 ///
 /// A property rather than a member: the filter is one object watching
 /// every widget, and re-entrancy is per widget, not global.
-constexpr const char* kBusy = "nereusThemeBusy";
+constexpr const char* kBusy = "longpathThemeBusy";
 
 } // namespace
 

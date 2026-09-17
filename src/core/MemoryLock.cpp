@@ -23,7 +23,7 @@
 #include <unistd.h>
 #endif
 
-Q_LOGGING_CATEGORY(lcMemLock, "nereus.memlock")
+Q_LOGGING_CATEGORY(lcMemLock, "longpath.memlock")
 
 namespace Longpath {
 

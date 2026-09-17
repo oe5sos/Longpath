@@ -33,7 +33,7 @@ namespace Longpath {
 
 // AetherSDR fuehrt diese Kategorie zentral in LogManager.h; bei uns ist
 // sie oertlich, wie in QrzClient.cpp.
-namespace { Q_LOGGING_CATEGORY(lcSHistory, "nereus.shistory") }
+namespace { Q_LOGGING_CATEGORY(lcSHistory, "longpath.shistory") }
 
 namespace {
     // Minimum width for a detected region to be considered a voice signal.

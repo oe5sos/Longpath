@@ -1314,12 +1314,13 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     }
 
     m_server = new QWebSocketServer(
-        // Der alte Name bleibt mit Absicht: DIES meldet sich bei
-        // WSJT-X und anderen TCI-Gegenstellen. Wer ihn aendert, bricht
-        // deren gespeicherte Einstellungen — der Nutzer sieht dort
-        // dann ein unbekanntes Geraet. Ein kosmetischer Gewinn ist das
-        // nicht wert. (2026-08-23, beinahe blind mitgeaendert.)
-        QStringLiteral("NereusSDR-TCI"),
+        // Der Servername steht im "Server:"-Kopf des WebSocket-
+        // Handshakes. Bis zum 2026-09-17 hiess er "NereusSDR-TCI" und
+        // war als Bindung an Gegenstellen gedacht; TCI-Clients (WSJT-X,
+        // JTDX, Logger) verbinden aber nur ueber Host:Port und merken
+        // sich diesen Kopf nicht. Betreiber: "wir haben kein nereus …
+        // weg damit."
+        QStringLiteral("Longpath-TCI"),
         QWebSocketServer::NonSecureMode, this);
 
     // From AetherSDR src/core/TciServer.cpp:168-174 [@0cd4559] — listen + error path.

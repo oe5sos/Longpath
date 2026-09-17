@@ -15,7 +15,7 @@
 //                                    redefining DxSpot inline (upstream
 //                                    DxClusterClient.h:13-23 defined it).
 //                                    Logging routes through lcSpots
-//                                    ("nereus.spots") instead of upstream
+//                                    ("longpath.spots") instead of upstream
 //                                    AetherSDR's lcDxCluster. Log file
 //                                    path uses Qt's AppConfigLocation
 //                                    (already lands under NereusSDR/)

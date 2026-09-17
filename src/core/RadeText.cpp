@@ -33,7 +33,7 @@ extern "C" {
 #include "rade_api.h"
 }
 
-Q_LOGGING_CATEGORY(lcRadeText, "nereus.rade.text")
+Q_LOGGING_CATEGORY(lcRadeText, "longpath.rade.text")
 
 namespace Longpath {
 

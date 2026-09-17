@@ -245,7 +245,7 @@ void ExportImportConfigPage::onExportAllClicked()
     const QString src = AppSettings::instance().filePath();
     const QString dst = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export Settings"),
-        QStringLiteral("NereusSDR.settings.xml"),
+        QStringLiteral("Longpath.settings.xml"),
         QStringLiteral("XML (*.xml *.settings)"));
     if (dst.isEmpty()) { return; }
     QFile::remove(dst);
@@ -279,7 +279,7 @@ void ExportImportConfigPage::onImportAllClicked()
     }
     QMessageBox::information(
         this, QStringLiteral("Import Complete"),
-        QStringLiteral("Settings imported. Please restart NereusSDR."));
+        QStringLiteral("Settings imported. Please restart Longpath."));
 }
 
 void ExportImportConfigPage::onExportRadioClicked()

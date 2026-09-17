@@ -34,7 +34,7 @@ PgxlSaveRebootDialog::PgxlSaveRebootDialog(QWidget* parent)
     auto* msg = new QLabel(
         QStringLiteral("Sending `save` will persist your configuration to "
                        "flash and reboot the PGXL. The amplifier will be "
-                       "offline for approximately 20 seconds. NereusSDR will "
+                       "offline for approximately 20 seconds. Longpath will "
                        "auto-reconnect when it returns. Do not transmit "
                        "during reboot."),
         this);

@@ -1690,7 +1690,7 @@ void ContainerSettingsDialog::onSaveToFile()
     const QString path = QFileDialog::getSaveFileName(this,
         QStringLiteral("Save Container"),
         QString(),
-        QStringLiteral("NereusSDR Container (*.nscontainer);;All Files (*)"));
+        QStringLiteral("Longpath Container (*.nscontainer);;All Files (*)"));
     if (path.isEmpty()) { return; }
 
     // Pipe-delimited container serialize + newline + MeterWidget
@@ -1714,7 +1714,7 @@ void ContainerSettingsDialog::onLoadFromFile()
     const QString path = QFileDialog::getOpenFileName(this,
         QStringLiteral("Load Container"),
         QString(),
-        QStringLiteral("NereusSDR Container (*.nscontainer);;All Files (*)"));
+        QStringLiteral("Longpath Container (*.nscontainer);;All Files (*)"));
     if (path.isEmpty()) { return; }
 
     QFile f(path);

@@ -162,7 +162,7 @@
 
 // Forward-declare the lcRade logging category so other translation
 // units (notably RadioModel.cpp's wireRadeChannel extension at K4)
-// can qCInfo/qCWarning into "nereus.rade" without duplicating the
+// can qCInfo/qCWarning into "longpath.rade" without duplicating the
 // Q_LOGGING_CATEGORY definition.  The definition lives in
 // RadeChannel.cpp; this declaration just publishes the symbol.
 Q_DECLARE_LOGGING_CATEGORY(lcRade)

@@ -325,7 +325,7 @@ void AboutDialog::buildUI()
             "NereusSDR releases</a> &nbsp;·&nbsp; "
             "<a href=\"https://github.com/boydsoftprez/NereusSDR/tree/main/docs/attribution\">"
             "docs/attribution</a> &nbsp;·&nbsp; "
-            "<a href=\"https://github.com/boydsoftprez/NereusSDR/issues\">Issues</a><br>"
+            "<a href=\"https://github.com/oe5sos/Longpath/issues\">Issues</a><br>"
             "<a href=\"https://github.com/ramdor/Thetis\">Thetis upstream</a> &nbsp;·&nbsp; "
             "<a href=\"https://github.com/mi0bot/OpenHPSDR-Thetis\">mi0bot fork (HL2)</a> &nbsp;·&nbsp; "
             "<a href=\"https://github.com/ten9876/AetherSDR\">AetherSDR</a><br>"

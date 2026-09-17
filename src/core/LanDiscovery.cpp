@@ -20,7 +20,7 @@
 
 namespace Longpath {
 
-Q_LOGGING_CATEGORY(lcLan, "nereus.lan")
+Q_LOGGING_CATEGORY(lcLan, "longpath.lan")
 
 LanDiscovery::LanDiscovery(QObject* parent) : QObject(parent) {
     connect(&m_sock9008, &QUdpSocket::readyRead, this, &LanDiscovery::on9008Ready);

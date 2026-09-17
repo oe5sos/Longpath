@@ -559,7 +559,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         // Version string comes from CMake (NEREUSSDR_VERSION); the
         // FreeDV / PSK Reporter pools want a versioned client tag.
         const QString version =
-            QStringLiteral("NereusSDR/") + QStringLiteral(NEREUSSDR_VERSION);
+            QStringLiteral("Longpath/") + QStringLiteral(NEREUSSDR_VERSION);
         if (m_freedvClient) {
             m_freedvClient->setIdentity(call, gridSquare, message, version);
         }
@@ -2188,7 +2188,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
         dirCombo->setToolTip(
             "Heading column rendering in the FreeDV Reporter dialog. "
             "Mirrors freedv-gui's reportingDirectionAsCardinal setting "
-            "with an extra combined option matching NereusSDR's "
+            "with an extra combined option matching Longpath's "
             "default pre-bench rendering.");
         const QString savedDir =
             s.value("FreeDvReporter/DirectionAsCardinal",
