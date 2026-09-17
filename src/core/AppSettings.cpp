@@ -200,6 +200,24 @@ QString AppSettings::resolveConfigDir(const QString& profile)
     // path on macOS (~/Library/Preferences) when test mode is OFF,
     // so production behavior is unchanged — only test isolation
     // gets fixed.
+    // ── LONGPATH_CONFIG_DIR: ein anderer Ordner fuer diesen Lauf ─────
+    //
+    // 2026-09-17: eine zweite Instanz "zum Nachsehen" (Automatisierungs-
+    // bruecke, LONGPATH_AUTOMATION) wurde mit HOME=<Sandbox> gestartet —
+    // und las trotzdem die echten Einstellungen des Betreibers, weil
+    // QStandardPaths auf macOS den Home-Ordner nicht aus $HOME nimmt.
+    // Sie meldete sich mit seinem Rufzeichen am DX-Cluster an (und warf
+    // damit seine eigene Sitzung hinaus) und schrieb beim Beenden in
+    // seine Datei zurueck. Darum hier ein ausdruecklicher Ausweg: ist
+    // die Variable gesetzt, ist DAS der Konfigurationsordner, ohne
+    // Uebernahme aus NereusSDR-Zeiten und ohne Blick in ~/Library.
+    const QString override = qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed();
+    if (!override.isEmpty()) {
+        return isValidProfileName(profile)
+                   ? override + QStringLiteral("/profiles/") + profile
+                   : override;
+    }
+
     const QString base = QStandardPaths::writableLocation(
                              QStandardPaths::GenericConfigLocation);
     const QString root = base + QStringLiteral("/") + appFolderName();
