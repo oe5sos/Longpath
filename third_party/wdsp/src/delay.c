@@ -1,3 +1,6 @@
+// no-port-check: vendored upstream TAPR WDSP v1.29 — not a NereusSDR port of Thetis.
+// The 2026-09-17 clamp is a port from the Zeus station engine (GPL-2.0-or-later),
+// recorded in docs/attribution/ZEUS-PROVENANCE.md; see the modification history below.
 /*  delay.c
 
 This file is part of a program that implements a Software-Defined Radio.
@@ -24,7 +27,45 @@ warren@wpratt.com
 
 */
 
+//
+// =============================================================================
+// Modification history (NereusSDR):
+//   2026-09-17 — set_delay_value_unlocked() ported from the Zeus station
+//                engine (Zeus-SDR/station-engine, native/wdsp/delay.c,
+//                GPL-2.0-or-later, Douglas J. Cerrato KB2UKA and Christian
+//                Suarez N9WAR) @ 324e865 (v2.0.19). The requested delay is
+//                clamped to what the ring can hold — (WSDEL-1) whole samples
+//                plus (L-1) phases — instead of letting snum run past rsize.
+//                Upstream computed snum without a bound, and xdelay() wraps
+//                the read index only once, so a delay beyond (WSDEL-1)/rate
+//                (5.3 ms at 192 kHz; the PureSignal amp-delay field allows
+//                25 ms) read the ring outside its allocation. tdelay now
+//                holds the realised value, and SetDelayValue() returns it.
+//                Ported for NereusSDR by Martin Fischer, AI-assisted via
+//                Anthropic Claude; recorded in docs/attribution/
+//                ZEUS-PROVENANCE.md. No other change to this file.
+// =============================================================================
+
 #include "comm.h"
+
+// From Zeus station-engine native/wdsp/delay.c:29-38 [@324e865]
+// One place for the delay arithmetic, and the one place where it is
+// bounded: the ring holds (WSDEL - 1) whole-sample delays, and there are
+// L phases within a sample, so the largest phase number that can be
+// realised is (WSDEL - 1) * L + (L - 1). Anything larger is clamped, the
+// realised delay is what the caller gets back, and xdelay()'s single
+// index wrap is again sufficient.
+static void set_delay_value_unlocked (DELAY a, double tdelay)
+{
+	int phnum = (int)(0.5 + tdelay / a->adelta);
+	int max_phnum = (WSDEL - 1) * a->L + (a->L - 1);
+	if (phnum < 0) phnum = 0;
+	if (phnum > max_phnum) phnum = max_phnum;
+	a->tdelay = a->adelta * phnum;
+	a->snum = phnum / a->L;
+	a->phnum = phnum % a->L;
+	a->adelay = a->adelta * (a->snum * a->L + a->phnum);
+}
 
 DELAY create_delay (int run, int size, double* in, double* out, int rate, double tdelta, double tdelay)
 {
@@ -42,11 +83,9 @@ DELAY create_delay (int run, int size, double* in, double* out, int rate, double
 	a->ncoef = (int)(60.0 / a->ft);
 	a->ncoef = (a->ncoef / a->L + 1) * a->L;
 	a->cpp = a->ncoef / a->L;
-	a->phnum = (int)(0.5 + a->tdelay / a->adelta);
-	a->snum = a->phnum / a->L;
-	a->phnum %= a->L;
+	// From Zeus station-engine native/wdsp/delay.c:55 [@324e865]
+	set_delay_value_unlocked (a, a->tdelay);
 	a->idx_in = 0;
-	a->adelay = a->adelta * (a->snum * a->L + a->phnum);
 	a->h = fir_bandpass (a->ncoef,-a->ft, +a->ft, 1.0, 1, 0, (double)a->L);	
 	a->rsize = a->cpp + (WSDEL - 1);
 	a->ring = (double *) malloc0 (a->rsize * sizeof (complex));
@@ -115,11 +154,8 @@ double SetDelayValue (DELAY a, double tdelay)
 {
 	double adelay;
 	EnterCriticalSection (&a->cs_update);
-	a->tdelay = tdelay;
-	a->phnum = (int)(0.5 + a->tdelay / a->adelta);
-	a->snum = a->phnum / a->L;
-	a->phnum %= a->L;
-	a->adelay = a->adelta * (a->snum * a->L + a->phnum);
+	// From Zeus station-engine native/wdsp/delay.c:122-128 [@324e865]
+	set_delay_value_unlocked (a, tdelay);
 	adelay = a->adelay;
 	LeaveCriticalSection (&a->cs_update);
 	return adelay;
