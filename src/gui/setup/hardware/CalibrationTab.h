@@ -174,7 +174,7 @@ public:
     void populate(const RadioInfo& info, const BoardCapabilities& caps);
     void restoreSettings(const QMap<QString, QVariant>& settings);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam: counts QGroupBox children of the main layout.
     int groupBoxCountForTest() const;
 #endif

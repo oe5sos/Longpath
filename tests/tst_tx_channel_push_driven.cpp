@@ -6,7 +6,7 @@
 //   - TxChannel::driveOneTxBlock(const float*, int) push-driven slot
 //     (Phase 3M-1c E.1).
 //   - Removal of QTimer-driven pull model (m_txProductionTimer).
-//   - tickForTest(samples, frames) NEREUS_BUILD_TESTS seam.
+//   - tickForTest(samples, frames) LONGPATH_BUILD_TESTS seam.
 //
 // Phase 3M-1c E.1 converts TxChannel from a QTimer-driven puller (which
 // pulled mic samples from m_micRouter every 5 ms) to a push-driven slot
@@ -35,7 +35,7 @@
 //                 with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. NEREUS_BUILD_TESTS must be
+// no-port-check: NereusSDR-original test file. LONGPATH_BUILD_TESTS must be
 // defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>

@@ -2,7 +2,7 @@
 // tests/tst_pipewire_stream_config.cpp  (NereusSDR)
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Claude Code. 2026-04-23.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QtTest/QtTest>
 #include <pipewire/pipewire.h>

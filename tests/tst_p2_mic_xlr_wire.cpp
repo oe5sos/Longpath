@@ -35,7 +35,7 @@
 //   bit 5 (0x20): XLR selected (m_micXlr=true, no inversion → wire bit 1)
 //   Updated from 0x04 in G.6 — reflects both defaults at construction.
 //
-// Test seam: composeCmdTxForTest() in P2RadioConnection.h (NEREUS_BUILD_TESTS)
+// Test seam: composeCmdTxForTest() in P2RadioConnection.h (LONGPATH_BUILD_TESTS)
 // exposes the CmdTx buffer composition without needing a live socket.
 #include <QtTest/QtTest>
 #include "core/P2RadioConnection.h"

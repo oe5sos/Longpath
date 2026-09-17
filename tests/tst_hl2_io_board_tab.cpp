@@ -22,7 +22,7 @@ private slots:
     // Construction succeeds for HL2 board (tab visible)
     void construct_hl2_board_visible() {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -42,7 +42,7 @@ private slots:
     // Register change in model propagates to (and does not crash) the UI
     void register_change_updates_ui() {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -56,7 +56,7 @@ private slots:
     // Step advance propagates to UI without crash
     void step_advance_updates_ui() {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -69,7 +69,7 @@ private slots:
     // Detection signal propagates to UI without crash
     void detection_signal_propagates() {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -83,7 +83,7 @@ private slots:
     // Uses real-clock ticks (QTest::qSleep) to satisfy compute_bps time delta.
     void throttle_change_updates_ui() {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -113,7 +113,7 @@ private slots:
     // I2C queue change propagates to UI without crash
     void i2c_queue_change_propagates() {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);

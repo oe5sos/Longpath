@@ -3,7 +3,7 @@
 //   Copyright (C) 2026 J.J. Boyd (KG4VCF) — GPLv2-or-later.
 //   2026-04-23 — created. AI-assisted via Claude Code.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include "core/audio/PipeWireStream.h"
 
 #include <QLoggingCategory>
@@ -484,4 +484,4 @@ void PipeWireStream::maybeEmitTelemetry()
 
 }  // namespace Longpath
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE

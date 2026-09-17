@@ -69,7 +69,7 @@ warren@wpratt.com
 //   setAntiVoxRun:        cmaster.cs:208-209 [v2.10.3.13] — SetAntiVOXRun
 //   setAntiVoxGain:       cmaster.cs:211-212 [v2.10.3.13] — SetAntiVOXGain
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessors required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessors required):
 //   1. First call stores the value (NaN sentinel fires → WDSP path taken).
 //   2. Round-trip: set A, then B → last-value accessor returns B.
 //   3. Idempotent guard: set A twice → second call is a no-op at the WDSP
@@ -80,7 +80,7 @@ warren@wpratt.com
 // Each of the 5 wrappers gets: first-call, round-trip, idempotent (+ edge for
 // doubles).  Total: 17 test cases.
 //
-// Requires NEREUS_BUILD_TESTS (set by CMakeLists target
+// Requires LONGPATH_BUILD_TESTS (set by CMakeLists target
 // tst_tx_channel_vox_anti_vox).  Test-seam accessors (lastVoxRunForTest,
 // lastVoxAttackThresholdForTest, etc.) are compiled into TxChannel only when
 // that define is set.
@@ -97,7 +97,7 @@ warren@wpratt.com
 // no-port-check: NereusSDR-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan

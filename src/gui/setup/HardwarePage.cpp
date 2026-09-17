@@ -276,7 +276,7 @@ void HardwarePage::onCurrentRadioChanged(const RadioInfo& info)
 
 // ── Test helper ───────────────────────────────────────────────────────────────
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 bool HardwarePage::isTabVisibleForTest(Tab t) const
 {
     switch (t) {

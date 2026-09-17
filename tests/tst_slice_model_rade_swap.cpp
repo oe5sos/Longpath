@@ -43,7 +43,7 @@
 //   2. Creates a fresh RadeChannel with the new sideband flag.
 //
 // The tests below reach the WdspEngine via the friend-access trick
-// (NEREUS_BUILD_TESTS) to set m_initialized = true synchronously so
+// (LONGPATH_BUILD_TESTS) to set m_initialized = true synchronously so
 // createRxChannel does not error out on its !m_initialized guard.
 // createRadeChannel does NOT require m_initialized (it is pure C++
 // object management, no WDSP-side state).
@@ -107,7 +107,7 @@ class TestSliceModelRadeSwap : public QObject {
         RadioFixture()
         {
             engine = radio.wdspEngine();
-            engine->m_initialized = true;  // friend access (NEREUS_BUILD_TESTS)
+            engine->m_initialized = true;  // friend access (LONGPATH_BUILD_TESTS)
 
             // Seed slice 0 with a default RxChannel so the K-bench
             // contract has a channel to keep alive across mode swaps.

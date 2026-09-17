@@ -240,7 +240,7 @@ private slots:
     // breaks moveToThread.
     //
     // We use the test-only friend access (WdspEngine.h, gated on
-    // NEREUS_BUILD_TESTS) to set m_initialized = true synchronously, bypassing
+    // LONGPATH_BUILD_TESTS) to set m_initialized = true synchronously, bypassing
     // the async wisdom path which would otherwise need a running event loop
     // and a real WDSP wisdom file to complete.
     void createdTxChannelHasNoQtParentForThreadAffinity() {

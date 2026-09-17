@@ -15,7 +15,7 @@
 // Test strategy:
 //   1. Construct SetupDialog with a RadioModel.
 //   2. Realize the WattMeter and Values leaves, then pull the pages via
-//      NEREUS_BUILD_TESTS seams.
+//      LONGPATH_BUILD_TESTS seams.
 //   3. Drive RadioStatus::powerChanged so the Values page's running
 //      peak/min trackers diverge from current.
 //   4. Click the WattMeter Reset button via the Phase 5A test seam.

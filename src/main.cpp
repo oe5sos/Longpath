@@ -12,7 +12,7 @@
 #include "core/DevAutomationServer.h"
 
 // Generated into the build tree by cmake/LongpathBuildTag.cmake, once per
-// build, so NEREUSSDR_BUILD_TAG names the commit actually being compiled
+// build, so LONGPATH_BUILD_TAG names the commit actually being compiled
 // instead of whatever HEAD happened to be at the last cmake configure.
 //
 // This is the only translation unit that includes it, and that is on
@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     // window title from it. Empty on release artifacts, in which case the
     // title stays exactly as it was.
     Longpath::BuildIdentity::setBuildTag(
-        QString::fromUtf8(NEREUSSDR_BUILD_TAG));
+        QString::fromUtf8(LONGPATH_BUILD_TAG));
 
     // Resolve profile name first — downstream path lookups (AppSettings,
     // log dir, pre-QApplication UI scale read) all consult it.
@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
     app.setApplicationName("Longpath");
-    app.setApplicationVersion(NEREUSSDR_VERSION);
+    app.setApplicationVersion(LONGPATH_VERSION);
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 

@@ -26,7 +26,7 @@
 //             bit 5 (0x20): mic_xlr (Saturn/XLR only)
 //   byte 51: line_in gain
 //
-// Test seam: composeCmdTxForTest() in P2RadioConnection.h (NEREUS_BUILD_TESTS)
+// Test seam: composeCmdTxForTest() in P2RadioConnection.h (LONGPATH_BUILD_TESTS)
 // exposes the CmdTx buffer composition without needing a live socket.
 #include <QtTest/QtTest>
 #include "core/P2RadioConnection.h"

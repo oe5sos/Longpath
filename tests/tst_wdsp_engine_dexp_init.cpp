@@ -102,7 +102,7 @@ private slots:
     // calls create_dexp(channelId, ...) right after OpenChannel(type=1).
     void createTxChannel_initialisesDexp() {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
                                         // - bypasses async wisdom path
 
         TxChannel* tx = engine.createTxChannel(kTxChannelId);
@@ -136,7 +136,7 @@ private slots:
     // that because a slab allocator could legitimately reuse the slot).
     void destroyTxChannel_allowsRecreate() {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         TxChannel* tx1 = engine.createTxChannel(kTxChannelId);
         QVERIFY(tx1 != nullptr);

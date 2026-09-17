@@ -525,7 +525,7 @@ public:
 
     /// PureSignal-active predicate.  Reads the live PureSignal coordinator
     /// (3M-4 Task 7) when wired via setPureSignal(); falls back to the
-    /// test-seam override (NEREUS_BUILD_TESTS only) for unit tests that
+    /// test-seam override (LONGPATH_BUILD_TESTS only) for unit tests that
     /// don't construct a full RadioModel + PureSignal.  When neither is
     /// set, returns false (matches Phase 3A pre-3M-4 behaviour: gate
     /// dormant but present).
@@ -2202,17 +2202,17 @@ private:
     // ATT-on-TX-on-power-change gate inside setPowerUsingTargetDbm uses
     // this to decide whether the safety force-31-dB lift fires.  When
     // null (pre-connect or post-teardown), pureSignalActive() falls back
-    // to the test seam (NEREUS_BUILD_TESTS) or returns false (production).
+    // to the test seam (LONGPATH_BUILD_TESTS) or returns false (production).
     PureSignal* m_pureSignal{nullptr};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam (Phase 3C) — overrides pureSignalActive() return when set.
     // Phase 3A's predicate returns false unconditionally; this seam lets
     // tests flip it to true to exercise the ATT-on-TX gate without the
     // 3M-4 PureSignal feedback DDC wiring in place.  The seam is
     // intentionally a tri-state (-1 = no override; 0 = false; 1 = true)
     // so the default unset state preserves Phase 3A semantics in
-    // production-style code paths that compile in NEREUS_BUILD_TESTS
+    // production-style code paths that compile in LONGPATH_BUILD_TESTS
     // mode (e.g. a unit test that doesn't care about PS state).
 public:
     void setPureSignalActiveForTest(bool on) noexcept {

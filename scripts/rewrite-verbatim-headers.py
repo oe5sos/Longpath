@@ -251,7 +251,7 @@ def extract_source_header(source_path: Path) -> list[str]:
 # NereusSDR port block generation
 # =================================================================
 
-def build_nereus_blocks(nereus_rel: str,
+def build_longpath_blocks(longpath_rel: str,
                         source_entries: list[tuple[str, bool]],
                         has_aethersdr: bool = False) -> list[str]:
     """Return the NereusSDR port-citation + modification-history block
@@ -262,7 +262,7 @@ def build_nereus_blocks(nereus_rel: str,
     width = "// ================================================================="
     lines: list[str] = []
     lines.append(width)
-    lines.append(f"// {nereus_rel}  (NereusSDR)")
+    lines.append(f"// {longpath_rel}  (NereusSDR)")
     lines.append(width)
     lines.append("//")
     if len(source_entries) == 1:
@@ -309,7 +309,7 @@ def build_no_header_note(source_rel: str) -> list[str]:
 _WIDE = "// ================================================================="
 
 
-def find_body_start(nereus_lines: list[str]) -> int:
+def find_body_start(longpath_lines: list[str]) -> int:
     """Return the line index at which the NereusSDR file's BODY begins
     (i.e. where the existing header ends and code starts).
 
@@ -324,10 +324,10 @@ def find_body_start(nereus_lines: list[str]) -> int:
     it in the body.
     """
     idx = 0
-    n = len(nereus_lines)
+    n = len(longpath_lines)
 
     # Skip a line-0 `#pragma once` — caller will re-insert it.
-    if n > 0 and nereus_lines[0].strip() == "#pragma once":
+    if n > 0 and longpath_lines[0].strip() == "#pragma once":
         # Signal this via idx=-1 by returning a sentinel; the caller checks.
         pass  # handled in rewrite_file
 
@@ -336,7 +336,7 @@ def find_body_start(nereus_lines: list[str]) -> int:
     def is_blank(s: str) -> bool:
         return s.strip() == ""
 
-    for i, line in enumerate(nereus_lines):
+    for i, line in enumerate(longpath_lines):
         stripped = line.strip()
 
         if in_block:
@@ -361,7 +361,7 @@ def find_body_start(nereus_lines: list[str]) -> int:
     return n  # all comments / blank
 
 
-def compose_new_content(nereus_rel: str,
+def compose_new_content(longpath_rel: str,
                          source_headers: list[tuple[str, list[str]]],
                          body_lines: list[str],
                          had_pragma_once_at_top: bool,
@@ -373,12 +373,12 @@ def compose_new_content(nereus_rel: str,
         out.append("#pragma once")
         out.append("")
 
-    nereus_block = build_nereus_blocks(
-        nereus_rel,
+    longpath_block = build_longpath_blocks(
+        longpath_rel,
         [(sr, bool(hdr)) for sr, hdr in source_headers],
         has_aethersdr=has_aethersdr,
     )
-    out.extend(nereus_block)
+    out.extend(longpath_block)
 
     for src_rel, hdr_lines in source_headers:
         out.append("")  # blank line between our block and first source
@@ -434,11 +434,11 @@ def detect_mixed_with_aethersdr(current_text: str) -> bool:
 
 def process_file(row: dict, dry_run: bool, diff_mode: bool,
                   verbose: bool = False) -> dict:
-    nereus_rel = row["path"]
-    nereus_path = REPO / nereus_rel
+    longpath_rel = row["path"]
+    longpath_path = REPO / longpath_rel
 
-    if nereus_rel in SKIP_FILES:
-        return {"path": nereus_rel, "status": "skipped-explicit"}
+    if longpath_rel in SKIP_FILES:
+        return {"path": longpath_rel, "status": "skipped-explicit"}
 
     sources = row["sources"]
     is_mi0bot_row = row["is_mi0bot_row"]
@@ -455,15 +455,15 @@ def process_file(row: dict, dry_run: bool, diff_mode: bool,
         source_headers.append((src, header_lines))
 
     if unresolved:
-        return {"path": nereus_rel,
+        return {"path": longpath_rel,
                 "status": "unresolved",
                 "unresolved": unresolved}
 
     if not source_headers:
-        return {"path": nereus_rel, "status": "no-sources"}
+        return {"path": longpath_rel, "status": "no-sources"}
 
     # Read current file
-    current = nereus_path.read_text(encoding="utf-8", errors="replace")
+    current = longpath_path.read_text(encoding="utf-8", errors="replace")
     current_lines = current.split("\n")
     # Remove trailing blank line caused by final newline
     if current_lines and current_lines[-1] == "":
@@ -486,17 +486,17 @@ def process_file(row: dict, dry_run: bool, diff_mode: bool,
         body_lines = current_lines[body_offset:]
 
     new_content = compose_new_content(
-        nereus_rel, source_headers, body_lines,
+        longpath_rel, source_headers, body_lines,
         had_pragma_once_at_top=had_pragma_once_at_top,
         has_aethersdr=has_aethersdr,
     )
 
     if new_content == current:
-        return {"path": nereus_rel, "status": "unchanged"}
+        return {"path": longpath_rel, "status": "unchanged"}
 
     if dry_run:
         if diff_mode or verbose:
-            print(f"\n----- {nereus_rel} -----")
+            print(f"\n----- {longpath_rel} -----")
             # Show the new header region + the first couple of body lines
             header_end = 0
             newlines = new_content.split("\n")
@@ -508,11 +508,11 @@ def process_file(row: dict, dry_run: bool, diff_mode: bool,
             print("\n".join(newlines[:cutoff]))
             if cutoff < len(newlines):
                 print("...")
-        return {"path": nereus_rel, "status": "would-change",
+        return {"path": longpath_rel, "status": "would-change",
                 "bytes_old": len(current), "bytes_new": len(new_content)}
 
-    nereus_path.write_text(new_content, encoding="utf-8")
-    return {"path": nereus_rel, "status": "rewritten"}
+    longpath_path.write_text(new_content, encoding="utf-8")
+    return {"path": longpath_rel, "status": "rewritten"}
 
 
 def main():

@@ -6,7 +6,7 @@
 //
 // pullTxMic wraps m_txInputBus->pull(), converts raw bytes to float32
 // mono, and returns the sample count actually written. The test uses
-// FakeAudioBus injected via the NEREUS_BUILD_TESTS-only
+// FakeAudioBus injected via the LONGPATH_BUILD_TESTS-only
 // AudioEngine::setTxInputBusForTest seam, so no real PortAudio device
 // or CoreAudio HAL plugin is required. Cross-platform.
 //

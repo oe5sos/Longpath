@@ -99,7 +99,7 @@ QTEST_MAIN(TestP2WidebandEnableByte)
 #include "tst_p2_wideband_enable_byte.moc"
 ```
 
-Register: `nereus_add_test(tst_p2_wideband_enable_byte)`.
+Register: `longpath_add_test(tst_p2_wideband_enable_byte)`.
 
 - [ ] **Step 2: Run + verify failure**
 
@@ -222,7 +222,7 @@ QTEST_MAIN(TestWidebandFrameAccumulator)
 #include "tst_wideband_frame_accumulator.moc"
 ```
 
-Register: `nereus_add_test(tst_wideband_frame_accumulator)`.
+Register: `longpath_add_test(tst_wideband_frame_accumulator)`.
 
 - [ ] **Step 2: Create header**
 

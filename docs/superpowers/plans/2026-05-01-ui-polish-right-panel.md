@@ -279,7 +279,7 @@ Expected: a sequence of `m_xApplet = new XApplet(...); panel->addApplet(m_xApple
 Choose ONE of:
 - **Option A (cleanest): comment out** the `new XApplet(...)` and `panel->addApplet(...)` lines for Eq/FM/Digital/PureSignal/Diversity/Cwx/Dvk/Cat/Tuner. Leave a `// TODO 3X-Y: re-enable when feature ships` comment per applet so the future re-enable is one-line.
 
-- **Option B (gated): introduce a config flag** `#if NEREUSSDR_SHOW_GHOST_APPLETS` block and gate at compile time.
+- **Option B (gated): introduce a config flag** `#if LONGPATH_SHOW_GHOST_APPLETS` block and gate at compile time.
 
 Per design doc decision: comment them out (uncomment when feature ships, per phase). Don't introduce a runtime config (defaults are debated; comment is unambiguous).
 

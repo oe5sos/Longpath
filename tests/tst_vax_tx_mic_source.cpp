@@ -11,7 +11,7 @@
 // the expected average of L and R channels.
 //
 // Strategy: inject a FakeAudioBus into AudioEngine's VAX-TX slot via
-// the NEREUS_BUILD_TESTS seam setVaxTxBusForTest, then drive
+// the LONGPATH_BUILD_TESTS seam setVaxTxBusForTest, then drive
 // VaxTxMicSource::pullSamples through AudioEngine::pullVaxTxMic and
 // confirm the mono float results.
 //

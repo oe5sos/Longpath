@@ -25,7 +25,7 @@
 //       (defensive guard for stale or cross-talk callbacks).
 //
 // Test seam: TxChannel::invokePushVoxForTest is exposed under
-// NEREUS_BUILD_TESTS and forwards directly to the static
+// LONGPATH_BUILD_TESTS and forwards directly to the static
 // s_pushVoxCallback bridge.  WDSP normally invokes the bridge from
 // inside `xdexp` on the audio worker thread; tests cannot easily drive
 // that path without a live mic stream + DEXP detector, so the seam
@@ -42,7 +42,7 @@
 //                 Claude Code.
 // =================================================================
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

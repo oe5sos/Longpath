@@ -86,7 +86,7 @@ class TestTciMatrixRunner : public QObject {
 private:
     QList<Row> loadMatrix()
     {
-        QFile f(QStringLiteral(NEREUS_TEST_DATA_DIR "/tci/matrix.csv"));
+        QFile f(QStringLiteral(LONGPATH_TEST_DATA_DIR "/tci/matrix.csv"));
         if (!f.open(QIODevice::ReadOnly)) {
             return {};
         }

@@ -298,10 +298,10 @@ ctest --test-dir build -L models --output-on-failure
 git diff --check
 git diff --stat
 git add src/core/TxSliceArbiter.* src/models/RadioModel.* src/gui tests
-NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis \
-NEREUS_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
+LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis \
+LONGPATH_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
 git commit -S -m "fix(ui): make slice and pan ownership stable"
 git log --show-signature -1
 ```

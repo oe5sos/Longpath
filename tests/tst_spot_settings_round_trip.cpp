@@ -48,7 +48,7 @@ using namespace Longpath;
 namespace {
 
 // Helper: fresh AppSettings sandbox. TestSandboxInit (linked auto by
-// nereus_add_test) ensures QStandardPaths::setTestModeEnabled(true) is
+// longpath_add_test) ensures QStandardPaths::setTestModeEnabled(true) is
 // active, so this is harmless to real user state.
 AppSettings& testSettings()
 {

@@ -43,7 +43,7 @@ The new test file uses a real loopback `QTcpServer` (already inside the listener
 - Modify: `src/core/SmartSdrApiListener.h:53` (add `start(QHostAddress, quint16)` overload)
 - Modify: `src/core/SmartSdrApiListener.cpp:39-57` (refactor `start()` to delegate)
 - Create: `tests/tst_smart_sdr_api_listener_ptt_chain.cpp`
-- Modify: `tests/CMakeLists.txt` (add `nereus_add_test(tst_smart_sdr_api_listener_ptt_chain)` near the existing PTT-adjacent tests, e.g. after `tst_tx_interlock_policy`)
+- Modify: `tests/CMakeLists.txt` (add `longpath_add_test(tst_smart_sdr_api_listener_ptt_chain)` near the existing PTT-adjacent tests, e.g. after `tst_tx_interlock_policy`)
 
 - [ ] **Step 1: Add the new `start(addr, port)` overload to the header.**
 
@@ -205,14 +205,14 @@ QTEST_MAIN(SmartSdrApiListenerPttChainTest)
 
 - [ ] **Step 5: Register the test in `tests/CMakeLists.txt`.**
 
-Find the line `nereus_add_test(tst_tx_interlock_policy)` and add immediately after it:
+Find the line `longpath_add_test(tst_tx_interlock_policy)` and add immediately after it:
 
 ```cmake
 # 2026-05-21 4o3a-lan-ptt-pcap-divergence.md §8: PTT chain pcap-alignment.
 # Drives SmartSdrApiListener on loopback + ephemeral port and asserts the
 # wire format of the handshake, PTT_REQUESTED, TRANSMITTING, UNKEY_REQUESTED,
 # and READY frames. Companion design doc commit: 559890a2.
-nereus_add_test(tst_smart_sdr_api_listener_ptt_chain)
+longpath_add_test(tst_smart_sdr_api_listener_ptt_chain)
 ```
 
 - [ ] **Step 6: Configure the build to pick up the new files.**

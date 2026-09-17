@@ -497,7 +497,7 @@ private slots:
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
         QVERIFY(engine);
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
                                                 /*inputBufferSize*/ 238,
@@ -545,7 +545,7 @@ private slots:
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
         QVERIFY(engine);
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
                                                 238, 4096, 48000, 48000, 48000);

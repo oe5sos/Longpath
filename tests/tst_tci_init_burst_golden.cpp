@@ -55,7 +55,7 @@ void TestTciInitBurstGolden::pinAppSettingsToGoldenCaptureConditions()
 
 QStringList TestTciInitBurstGolden::loadGolden()
 {
-    QFile f(QStringLiteral(NEREUS_TEST_DATA_DIR "/tci/init_burst_anan_g2_rx1.txt"));
+    QFile f(QStringLiteral(LONGPATH_TEST_DATA_DIR "/tci/init_burst_anan_g2_rx1.txt"));
     if (!f.open(QIODevice::ReadOnly)) {
         return {};
     }

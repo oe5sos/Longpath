@@ -64,7 +64,7 @@ LinuxAudioBackend detectLinuxBackend(const LinuxAudioBackendProbes& probes)
     const QString forced = probes.forcedBackendOverride
                              ? probes.forcedBackendOverride() : QString();
     if (forced == QLatin1String("pipewire")) {
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
         return LinuxAudioBackend::PipeWire;
 #else
         qCWarning(lcAudio) << "Audio/LinuxBackendPreferred=pipewire but build lacks"
@@ -77,7 +77,7 @@ LinuxAudioBackend detectLinuxBackend(const LinuxAudioBackendProbes& probes)
     // Any other value (empty or garbage) falls through to probes.
 
     if (probes.pipewireSocketReachable && probes.pipewireSocketReachable(500)) {
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
         return LinuxAudioBackend::PipeWire;
 #endif
         // Build lacks PipeWire support — socket found but we can't use it.

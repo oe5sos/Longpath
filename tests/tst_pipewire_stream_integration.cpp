@@ -2,7 +2,7 @@
 // tests/tst_pipewire_stream_integration.cpp  (NereusSDR)
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Claude Code. 2026-04-24.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include <QtTest/QtTest>
 #include "core/audio/PipeWireThreadLoop.h"
 #include "core/audio/PipeWireStream.h"

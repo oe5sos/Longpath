@@ -14,7 +14,7 @@
 //   - Volume=0 still calls accumulate (gain-zero is valid; mixer returns silence).
 //   - Stereo expansion: mono input L=sample, R=sample in output.
 //
-// Test seam: masterMixForTest() (NEREUS_BUILD_TESTS) exposes m_masterMix so
+// Test seam: masterMixForTest() (LONGPATH_BUILD_TESTS) exposes m_masterMix so
 // we can call tryDrain() to observe accumulated audio without needing a full
 // IAudioBus pipeline.
 //

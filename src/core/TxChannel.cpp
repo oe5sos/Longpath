@@ -414,7 +414,7 @@ namespace Longpath {
 // ---------------------------------------------------------------------------
 TxChannel* TxChannel::s_voxKeyInstance = nullptr;
 
-void NEREUS_STDCALL TxChannel::s_pushVoxCallback(int id, int active)
+void LONGPATH_STDCALL TxChannel::s_pushVoxCallback(int id, int active)
 {
     TxChannel* inst = s_voxKeyInstance;
     if (inst == nullptr || inst->m_channelId != id) {

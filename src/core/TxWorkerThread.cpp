@@ -1051,7 +1051,7 @@ void TxWorkerThread::dispatchOneBlock()
     m_txChannel->driveOneTxBlockFromInterleaved(m_in.data());
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void TxWorkerThread::tickForTest()
 {
     if (m_micSource == nullptr || m_txChannel == nullptr) {
@@ -1246,7 +1246,7 @@ void TxWorkerThread::setCurrentTxPath(TxPath path)
     m_currentTxPath.store(path, std::memory_order_release);
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 TxWorkerThread::TxPath TxWorkerThread::currentTxPathForTest() const
 {
     return m_currentTxPath.load(std::memory_order_acquire);

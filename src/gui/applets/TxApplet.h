@@ -312,7 +312,7 @@ public slots:
 public:
 
     // ── Test accessors ──────────────────────────────────────────────────────
-    // Always-on (no NEREUS_BUILD_TESTS guard) — same convention as
+    // Always-on (no LONGPATH_BUILD_TESTS guard) — same convention as
     // TestTwoTonePage (matches AudioTxInputPage / RxApplet patterns).
     QComboBox*   profileCombo()      const { return m_profileCombo; }
     QPushButton* twoToneButton()     const { return m_twoToneBtn; }

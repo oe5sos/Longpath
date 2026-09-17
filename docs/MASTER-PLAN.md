@@ -82,7 +82,7 @@ NereusSDR is an independent cross-platform SDR client deeply informed by the wor
 - Phase word NCO fix from pcap analysis (Hz→phase word conversion)
 - Alex band filters (80/60m BPF), dither/random enabled on all ADCs
 - Signal routing: RadioModel::rawIqData → FFTEngine → SpectrumWidget
-- CPU fallback preserved under #ifndef NEREUS_GPU_SPECTRUM
+- CPU fallback preserved under #ifndef LONGPATH_GPU_SPECTRUM
 - Verified: live spectrum + waterfall + audio on 75m LSB from ANAN-G2
 
 ### Completed: Phase 3E — VFO & Controls + Multi-Receiver Foundation
@@ -215,7 +215,7 @@ NereusSDR is an independent cross-platform SDR client deeply informed by the wor
 
 - **Three release-artifact ship-blockers fixed:** Windows installer + portable ZIP were missing `rade.dll` (PR #250); macOS x86_64 DMG silently shipped without `Qt6::WebSockets` so FreeDV Reporter / PSK Reporter / TCI were disabled (PR #251; also promotes `Qt6::WebSockets` to REQUIRED in `CMakeLists.txt`); HL2 + Windows 11 waterfall sliders did not stick across launches (PR #243 closes issue #230 reported by Chris W4ORS); root-caused to `m_wfLow/HighThreshold` doing double duty as both persisted user setting and per-frame runtime AGC/Clarity output. Source-first re-aligned with Thetis `display.cs:2522 + 2536 + 6575-6594 [v2.10.3.13]`.
 - **Three persistence / connection-state correctness fixes:** VOX needed juggling to prime on radio connect (PR #253; `MoxController::primeWdspState` re-emits load-time signals after late-wired TxChannel connect); connection state stuck `Connected` on failed initial connect (PR #242 closes #239; both P1 and P2 now stay `Connecting` until first frame promotes to `Connected`); orphan `.bak` data-loss gap closed (PR #249 follow-up to #241; `AppSettings::load` falls through `Missing` to `.bak` if `.bak` exists, no longer silently goes to defaults).
-- **Two CodeQL pipeline maintenance fixes:** CodeQL required Qt 6.8 + `qt6-websockets-dev` (PRs #252 / #254). Replaces apt `qt6-*` with `jurplel/install-qt-action@v4` matching `ci.yml` and `release.yml`. Drops the stale `-DNEREUS_GPU_SPECTRUM=OFF` workaround (Qt 6.8 has `QRhiWidget`).
+- **Two CodeQL pipeline maintenance fixes:** CodeQL required Qt 6.8 + `qt6-websockets-dev` (PRs #252 / #254). Replaces apt `qt6-*` with `jurplel/install-qt-action@v4` matching `ci.yml` and `release.yml`. Drops the stale `-DLONGPATH_GPU_SPECTRUM=OFF` workaround (Qt 6.8 has `QRhiWidget`).
 
 ### Shipped in v0.5.0 (2026-05-13)
 

@@ -84,7 +84,7 @@ Files created or modified across all 10 tasks:
 | `src/gui/applets/TxEqDialog.h` | modify | 9 |
 | `src/gui/applets/TxEqDialog.cpp` | modify | 9 |
 | `CMakeLists.txt` | modify | 1 (add widget), 6 (add envelope + ZLIB), 7 (no change) |
-| `tests/CMakeLists.txt` | modify | 1, 2, 3, 4, 5, 6, 7, 8, 9 (one new `nereus_add_test(...)` per batch) |
+| `tests/CMakeLists.txt` | modify | 1, 2, 3, 4, 5, 6, 7, 8, 9 (one new `longpath_add_test(...)` per batch) |
 | `tests/tst_parametric_eq_widget_skeleton.cpp` | create | 1 |
 | `tests/tst_parametric_eq_widget_axis.cpp` | create | 2 |
 | `tests/tst_parametric_eq_widget_paint.cpp` | create | 3 |
@@ -110,7 +110,7 @@ Files created or modified across all 10 tasks:
 - Create: `src/gui/widgets/ParametricEqWidget.cpp`
 - Create: `tests/tst_parametric_eq_widget_skeleton.cpp`
 - Modify: `CMakeLists.txt` — add `src/gui/widgets/ParametricEqWidget.cpp` to the `target_sources` list (alphabetical placement: between `MeterSlider.cpp` and `ResetSlider.h` at lines 457-458)
-- Modify: `tests/CMakeLists.txt` — append `nereus_add_test(tst_parametric_eq_widget_skeleton)`
+- Modify: `tests/CMakeLists.txt` — append `longpath_add_test(tst_parametric_eq_widget_skeleton)`
 
 **Source range:** `ucParametricEq.cs:1-447` (license header through ctor end).
 
@@ -499,7 +499,7 @@ Append at the end of the file (with a section comment locating it within the 3M-
 
 ```cmake
 # ── Phase 3M-3a-ii follow-up Batch 1: ParametricEqWidget skeleton ──
-nereus_add_test(tst_parametric_eq_widget_skeleton)
+longpath_add_test(tst_parametric_eq_widget_skeleton)
 ```
 
 - [ ] **Step 8: Build and verify the test fails (because palette accessors don't exist yet)**
@@ -1204,7 +1204,7 @@ public:
 - [ ] **Step 14: Register the test in `tests/CMakeLists.txt`**
 
 ```cmake
-nereus_add_test(tst_parametric_eq_widget_axis)
+longpath_add_test(tst_parametric_eq_widget_axis)
 ```
 
 - [ ] **Step 15: Build, run the test, expect green**
@@ -1573,7 +1573,7 @@ Pin each test against verifiable expected output. Most important: `responseDbAtF
 - [ ] **Step 10: Register test**
 
 ```cmake
-nereus_add_test(tst_parametric_eq_widget_paint)
+longpath_add_test(tst_parametric_eq_widget_paint)
 ```
 
 - [ ] **Step 11: Build, run test, expect green**

@@ -66,7 +66,7 @@ bool LogEntry::modelsAdifField(const QString& upperName)
         QStringLiteral("MY_GRIDSQUARE"), QStringLiteral("NAME"),
         QStringLiteral("QTH"),           QStringLiteral("COUNTRY"),
         QStringLiteral("COMMENT"),       QStringLiteral("TX_PWR"),
-        QStringLiteral("APP_NEREUS_QRZUP"),
+        QStringLiteral("APP_LONGPATH_QRZUP"), QStringLiteral("APP_NEREUS_QRZUP"),
         QStringLiteral("MY_SOTA_REF"),   QStringLiteral("SOTA_REF"),
         // MY_SIG/MY_SIG_INFO/SIG/SIG_INFO are deliberately NOT here.
         // They are ADIF's generic Special Interest Activity pair, not a
@@ -127,7 +127,7 @@ QString LogEntry::toAdifRecord() const
         // does not define. Other programs must pass it through
         // untouched, so a log that goes out to Log4OM and comes back
         // still knows what has been uploaded.
-        field(r, QStringLiteral("APP_NEREUS_QRZUP"), QStringLiteral("Y"));
+        field(r, QStringLiteral("APP_LONGPATH_QRZUP"), QStringLiteral("Y"));
     }
     if (txPowerW > 0.0) {
         field(r, QStringLiteral("TX_PWR"), QString::number(txPowerW, 'f', 0));

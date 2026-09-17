@@ -362,7 +362,7 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
     if (n <= 0) { return 0; }
     n = std::min(n, maxFrames);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_drainAdmissionHookForTest) {
         m_drainAdmissionHookForTest();
     }

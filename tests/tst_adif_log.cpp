@@ -682,10 +682,17 @@ void TstAdifLog::an_unmarked_contact_writes_no_upload_field()
     // record would add a column of noise to every log this exports.
     LogEntry e;
     e.call = QStringLiteral("OE1W");
-    QVERIFY(!e.toAdifRecord().contains(QStringLiteral("APP_NEREUS_QRZUP")));
+    QVERIFY(!e.toAdifRecord().contains(QStringLiteral("APP_LONGPATH_QRZUP")));
 
     e.uploadedToQrz = true;
-    QVERIFY(e.toAdifRecord().contains(QStringLiteral("APP_NEREUS_QRZUP")));
+    QVERIFY(e.toAdifRecord().contains(QStringLiteral("APP_LONGPATH_QRZUP")));
+
+    // Ein Log von vor dem 2026-09-17 traegt den alten Feldnamen und
+    // muss weiter als hochgeladen gelesen werden.
+    const auto old = AdifLog::parse(QStringLiteral(
+        "<CALL:4>OE1W <APP_NEREUS_QRZUP:1>Y <EOR>"));
+    QCOMPARE(old.size(), 1);
+    QVERIFY(old.first().uploadedToQrz);
 }
 
 void TstAdifLog::lengths_count_utf8_bytes_not_qchars()

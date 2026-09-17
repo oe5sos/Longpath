@@ -18,7 +18,7 @@
 //   - chkPANewCal "New Cal" mode toggle
 //   - chkAutoPACalibrate auto-cal toggle (Phase 7 wires the sweep flow)
 //
-// Test seams (always-on, gated by NEREUS_BUILD_TESTS to keep the QObject
+// Test seams (always-on, gated by LONGPATH_BUILD_TESTS to keep the QObject
 // surface identical between builds):
 //   - profileComboForTest()       — return the QComboBox*
 //   - gainSpinForTest(Band)       — return the per-band gain QDoubleSpinBox*

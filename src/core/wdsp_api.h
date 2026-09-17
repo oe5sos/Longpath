@@ -90,7 +90,7 @@
 //                 bug fix).  Registers the WDSP DEXP threshold-crossing
 //                 callback that drives MOX engagement on mic envelope
 //                 attack/release.  Signature matches wdsp/dexp.c:399-403
-//                 [v2.10.3.13] with a NEREUS_STDCALL macro that maps to
+//                 [v2.10.3.13] with a LONGPATH_STDCALL macro that maps to
 //                 __stdcall on Windows and to nothing on Linux/macOS, mirroring
 //                 WDSP's own linux_port.h:65 shim.  AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -263,7 +263,7 @@ warren@wpratt.com
 
 #pragma once
 
-// NEREUS_STDCALL — calling-convention shim for WDSP function-pointer
+// LONGPATH_STDCALL — calling-convention shim for WDSP function-pointer
 // callbacks.  Defined OUTSIDE the HAVE_WDSP guard so consumers (TxChannel's
 // pushvox bridge) can declare a portable callback signature in test builds
 // that don't link WDSP.  On Windows the underlying WDSP function pointer
@@ -272,9 +272,9 @@ warren@wpratt.com
 // to nothing, so on those platforms the shim is a no-op and the
 // signature collapses to a plain C function pointer.
 #if defined(_WIN32) || defined(Q_OS_WIN)
-#  define NEREUS_STDCALL __stdcall
+#  define LONGPATH_STDCALL __stdcall
 #else
-#  define NEREUS_STDCALL
+#  define LONGPATH_STDCALL
 #endif
 
 #ifdef HAVE_WDSP
@@ -466,7 +466,7 @@ void SetRXAPanelGain1(int channel, double gain);
 
 // Set stereo pan position. pan=0.0 → full left, pan=0.5 → center, pan=1.0 → full right.
 // WDSP applies sin-law panning: adjusts gain2I/gain2Q via sin(pan*PI).
-// NereusSDR uses -1..+1 range; convert with wdsp_pan = (nereus_pan + 1.0) / 2.0.
+// NereusSDR uses -1..+1 range; convert with wdsp_pan = (longpath_pan + 1.0) / 2.0.
 // From Thetis Project Files/Source/Console/radio.cs:1386-1403
 //   pan default = 0.5f (center), dsp.cs:402-403 P/Invoke decl
 // WDSP: third_party/wdsp/src/patchpanel.c:159
@@ -1340,7 +1340,7 @@ void create_dexp(int id, int run_dexp, int size, double* in, double* out, int ra
                  double exp_ratio, double hyst_ratio, double attack_thresh,
                  int nc, int wtype, double lowcut, double highcut,
                  int run_filt, int run_vox, int run_audelay, double audelay,
-                 void (NEREUS_STDCALL *pushvox)(int id, int active),
+                 void (LONGPATH_STDCALL *pushvox)(int id, int active),
                  int antivox_run, int antivox_size, int antivox_rate,
                  double antivox_gain, double antivox_tau);
 void destroy_dexp(int id);
@@ -1359,7 +1359,7 @@ void SetDEXPIOBuffers(int id, double* in, double* out);
 // On Windows the underlying WDSP function pointer carries __stdcall; on
 // Linux/macOS WDSP's linux_port.h:65 shims `#define __stdcall` to nothing,
 // so the callback ABI matches a plain C function pointer there.  The
-// NEREUS_STDCALL macro (defined OUTSIDE the HAVE_WDSP guard, at the
+// LONGPATH_STDCALL macro (defined OUTSIDE the HAVE_WDSP guard, at the
 // bottom of this header) keeps the consumer-side function-pointer
 // signature byte-compatible with the WDSP-side typedef on every
 // platform — and stays available in test builds that don't define
@@ -1379,7 +1379,7 @@ void SetDEXPIOBuffers(int id, double* in, double* out);
 // the callback into MoxController::onVoxActive via a Qt signal — direct
 // signal-driven MOX engagement instead of Thetis's Audio.VOXActive +
 // PollPTT polling loop.
-void SendCBPushDexpVox(int id, void (NEREUS_STDCALL *pushvox)(int id, int active));
+void SendCBPushDexpVox(int id, void (LONGPATH_STDCALL *pushvox)(int id, int active));
 
 // DEXP peak signal readback (Phase 3M-3a-iii Task 6).
 // Returns the live audio peak observed by the DEXP detector.  Output is

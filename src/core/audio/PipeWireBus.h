@@ -18,7 +18,7 @@
 // =================================================================
 #pragma once
 
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QString>
 #include <atomic>
@@ -127,4 +127,4 @@ private:
 
 }  // namespace Longpath
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE

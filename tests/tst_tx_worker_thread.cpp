@@ -72,7 +72,7 @@
 // =================================================================
 
 // no-port-check: NereusSDR-original test file.  No Thetis logic ported.
-// NEREUS_BUILD_TESTS must be defined (see tests/CMakeLists.txt).
+// LONGPATH_BUILD_TESTS must be defined (see tests/CMakeLists.txt).
 
 #include <QtTest/QtTest>
 #include <QObject>

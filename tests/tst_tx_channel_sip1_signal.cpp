@@ -30,7 +30,7 @@ warren@wpratt.com
 //
 // No Thetis code is ported in this test file. The test exercises:
 //   - TxChannel::sip1OutputReady signal (Phase 3M-1b D.5).
-//   - driveOneTxBlock() via the NEREUS_BUILD_TESTS tickForTest seam,
+//   - driveOneTxBlock() via the LONGPATH_BUILD_TESTS tickForTest seam,
 //     updated to (samples, frames) for the Phase 3M-1c E.1 push model.
 //
 // This test verifies the invariants of the D.5 sip1OutputReady signal:
@@ -80,7 +80,7 @@ warren@wpratt.com
 // =================================================================
 
 // no-port-check: NereusSDR-original test file. All Thetis source cites are
-// in TxChannel.h/cpp. NEREUS_BUILD_TESTS must be defined (see CMakeLists.txt).
+// in TxChannel.h/cpp. LONGPATH_BUILD_TESTS must be defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>
 

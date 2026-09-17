@@ -278,7 +278,7 @@ Add to `tests/CMakeLists.txt` after the existing `tst_noise_floor_estimator` lin
 
 ```cmake
 # ── Auto AGC-T noise floor tracker ──────────────────────────────────
-nereus_add_test(tst_noise_floor_tracker)
+longpath_add_test(tst_noise_floor_tracker)
 ```
 
 - [ ] **Step 5: Build and run tests**
@@ -548,7 +548,7 @@ In `loadFromSettings`, add matching reads with defaults.
 Add to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_slice_auto_agc)
+longpath_add_test(tst_slice_auto_agc)
 ```
 
 Run: `cmake --build build --target tst_slice_auto_agc && ./build/tests/tst_slice_auto_agc`

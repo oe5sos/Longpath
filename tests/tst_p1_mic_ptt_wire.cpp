@@ -35,7 +35,7 @@
 // Test seam: every test calls setBoardForTest(HermesII) (or HermesLite for
 // HL2-specific cases) so composeCcForBank routes through the production
 // codec path (P1CodecStandard or P1CodecHl2) — not the legacy compose path.
-// The legacy path (env-gated by NEREUS_USE_LEGACY_P1_CODEC=1) is exercised
+// The legacy path (env-gated by LONGPATH_USE_LEGACY_P1_CODEC=1) is exercised
 // separately in the regression-freeze suite.
 #include <QtTest/QtTest>
 #include "core/P1RadioConnection.h"

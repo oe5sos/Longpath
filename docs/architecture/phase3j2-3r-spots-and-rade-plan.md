@@ -259,11 +259,11 @@ if(NOT TARGET rade)
 endif()
 ```
 
-Then later in the file where `NereusSDR_core` is defined, add:
+Then later in the file where `Longpath_core` is defined, add:
 
 ```cmake
-target_link_libraries(NereusSDR_core PRIVATE rade opus)
-target_include_directories(NereusSDR_core PRIVATE
+target_link_libraries(Longpath_core PRIVATE rade opus)
+target_include_directories(Longpath_core PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/rade/src
 )
 ```
@@ -282,7 +282,7 @@ Expected: clean build with new RADE + Opus libs visible in build artifacts. Firs
 ```bash
 echo '#include "rade_api.h"' > /tmp/rade_test.cpp
 echo 'int main() { return 0; }' >> /tmp/rade_test.cpp
-cd build && cmake --build . --target NereusSDR_core 2>&1 | grep -i error
+cd build && cmake --build . --target Longpath_core 2>&1 | grep -i error
 ```
 
 Expected: no errors mentioning rade_api.h.
@@ -298,7 +298,7 @@ Pinned commits:
 - radae_nopy: <SHA from A1>
 - libopus: 940d4e5af64351ca8ba8390df3f555484c567fbb (matches freedv-gui)
 
-Adds librade + libopus targets to NereusSDR_core. First clean build
+Adds librade + libopus targets to Longpath_core. First clean build
 adds ~90-180 seconds; incremental builds unchanged. Per design doc
 Section 5.
 
@@ -499,7 +499,7 @@ Expected: under 20 unique tags, mostly Mooneer Salem variants.
 
 Mirror `scripts/verify-thetis-headers.py`. For every `// From freedv-gui X:N [vX.Y.Z|@sha]` cite in a file: open `../freedv-gui/X` at line N, extract author tag within ±5 source lines, fail if no corresponding tag within ±10 port lines.
 
-Honor `NEREUS_FREEDV_DIR` env var override (matches `NEREUS_THETIS_DIR` pattern). SKIP gracefully if no freedv-gui clone found locally; CI runs strict.
+Honor `LONGPATH_FREEDV_DIR` env var override (matches `LONGPATH_THETIS_DIR` pattern). SKIP gracefully if no freedv-gui clone found locally; CI runs strict.
 
 - [ ] **Step 6: Wire verifier into pre-commit hook**
 
@@ -1208,7 +1208,7 @@ public:
     // Read-side query
     QHash<QString, FreeDVStation> stations() const;
 
-    // Test hooks (gated by NEREUS_TESTING define or QT_TESTLIB)
+    // Test hooks (gated by LONGPATH_TESTING define or QT_TESTLIB)
     int  pingIntervalMsForTest() const;
     QString lastSentMessageForTest() const;
     void handleEngineIOForTest(const QString& msg);

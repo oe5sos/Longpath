@@ -59,7 +59,7 @@
 // redesign §5.5 (TxWorkerThread construct/destroy on connect/teardown).
 // Pre-code review §0.3 + master design §5.2.4.
 
-// NEREUS_BUILD_TESTS is defined in CMakeLists.txt for this target, which
+// LONGPATH_BUILD_TESTS is defined in CMakeLists.txt for this target, which
 // unlocks the test seams used below (pcMicSourceForTest, etc.).
 
 #include <QtTest/QtTest>

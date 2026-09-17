@@ -235,8 +235,8 @@ public:
     void addSavedMac(const QString& mac) { m_savedMacs.insert(mac); }
     void removeSavedMac(const QString& mac) { m_savedMacs.remove(mac); }
 
-#ifdef NEREUS_BUILD_TESTS
-    // Test-only hooks — only compiled when NEREUS_BUILD_TESTS is defined.
+#ifdef LONGPATH_BUILD_TESTS
+    // Test-only hooks — only compiled when LONGPATH_BUILD_TESTS is defined.
     // Allow unit tests to inject a stale lastSeen entry and trigger the sweep
     // without needing a real UDP scan. Not part of the public API.
     void injectLastSeenForTest(const QString& mac, const RadioInfo& info, qint64 lastSeenMs) {

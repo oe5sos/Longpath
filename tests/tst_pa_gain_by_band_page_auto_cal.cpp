@@ -19,7 +19,7 @@
 //   * Halts on cancel (chkAutoPACalibrate unchecked) or when observed
 //     power exceeds band's max-power ceiling * 1.1 (10% safety margin).
 //
-// Test seams (always-on, gated by NEREUS_BUILD_TESTS):
+// Test seams (always-on, gated by LONGPATH_BUILD_TESTS):
 //   - autoCalStateForTest()          — return AutoCalState
 //   - autoCalCurrentBandForTest()    — return Band currently being swept
 //   - autoCalCurrentDriveStepForTest() — return drive-step index

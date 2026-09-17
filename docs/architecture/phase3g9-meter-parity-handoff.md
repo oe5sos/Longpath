@@ -306,7 +306,7 @@ live app:
 cd /Users/j.j.boyd/NereusSDR/.worktrees/default-multimeter-row
 
 # Configure + build tests
-cmake -B build-tests -G Ninja -DNEREUS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake -B build-tests -G Ninja -DLONGPATH_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build-tests
 
 # Run full suite

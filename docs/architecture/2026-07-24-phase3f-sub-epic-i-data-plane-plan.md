@@ -382,7 +382,7 @@ QTEST_MAIN(TestSliceStreamAllocator)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_slice_stream_allocator)
+longpath_add_test(tst_slice_stream_allocator)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -928,7 +928,7 @@ QTEST_MAIN(TestRxDspWorkerMultiSlice)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_rx_dsp_worker_multi_slice)
+longpath_add_test(tst_rx_dsp_worker_multi_slice)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1394,7 +1394,7 @@ QTEST_MAIN(TestStreamPoolBinding)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_stream_pool_binding)
+longpath_add_test(tst_stream_pool_binding)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -2272,7 +2272,7 @@ QTEST_MAIN(TestFftEnginePool)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_fft_engine_pool)
+longpath_add_test(tst_fft_engine_pool)
 ```
 
 - [ ] **Step 2: Run test to verify it passes or fails**

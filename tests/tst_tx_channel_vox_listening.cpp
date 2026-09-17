@@ -34,7 +34,7 @@
 //                 Claude Code.
 // =================================================================
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 

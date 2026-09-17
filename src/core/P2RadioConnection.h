@@ -371,7 +371,7 @@ private:
     void selectCodec();
     CodecContext buildCodecContext() const;
 
-    // Legacy compose paths — preserved for the NEREUS_USE_LEGACY_P2_CODEC rollback flag.
+    // Legacy compose paths — preserved for the LONGPATH_USE_LEGACY_P2_CODEC rollback flag.
     void composeCmdGeneralLegacy     (char buf[60])   const;
     void composeCmdHighPriorityLegacy(char buf[1444]) const;
     void composeCmdRxLegacy          (char buf[1444]) const;
@@ -943,7 +943,7 @@ private:
     std::array<QVector<float>, kMaxDdc> m_iqBuffers;
     int m_totalIqPackets{0};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only helpers — allow unit tests to inject board state without a live radio.
     void setBoardForTest(HPSDRHW board) {

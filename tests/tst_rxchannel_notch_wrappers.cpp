@@ -78,13 +78,13 @@ class TestRxChannelNotchWrappers : public QObject {
     Q_OBJECT
 
 private:
-    // Primes the engine past its async wisdom load (the NEREUS_BUILD_TESTS
+    // Primes the engine past its async wisdom load (the LONGPATH_BUILD_TESTS
     // friend seam on WdspEngine) and opens one real RX channel, so
     // rxa[kNotchTestChannel].ndb exists. Same pattern as
     // tests/tst_ps_feedback_channel.cpp:72,78.
     RxChannel* openNotchChannel(WdspEngine& engine)
     {
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
         return engine.createRxChannel(kNotchTestChannel,
                                       /*inputBufferSize*/ 238,
                                       /*dspBufferSize*/ kDspBufferSize,

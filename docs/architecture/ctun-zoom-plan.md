@@ -45,7 +45,7 @@ void SpectrumWidget::setDdcCenterFrequency(double hz)
 {
     if (!qFuzzyCompare(m_ddcCenterHz, hz)) {
         m_ddcCenterHz = hz;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -57,7 +57,7 @@ void SpectrumWidget::setSampleRate(double hz)
 {
     if (!qFuzzyCompare(m_sampleRateHz, hz)) {
         m_sampleRateHz = hz;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -238,7 +238,7 @@ Replace from `// ---- FFT spectrum vertices ----` through the `batch->updateDyna
 
 In the draw call section (lines 1629-1653), the `n` variable used for `cb->draw(n)` and `cb->draw(n * 2)` needs to use the visible count. Store it as a member or recompute. Simplest: add a member `m_visibleBinCount{0}` to the header (private section, near the GPU resources), set it in the vertex generation block above, and use it in the draw calls.
 
-In `src/gui/SpectrumWidget.h`, in the `#ifdef NEREUS_GPU_SPECTRUM` block (after line 299), add:
+In `src/gui/SpectrumWidget.h`, in the `#ifdef LONGPATH_GPU_SPECTRUM` block (after line 299), add:
 
 ```cpp
     int m_visibleBinCount{0};  // bins rendered this frame (for draw call count)
@@ -456,7 +456,7 @@ The block should now read:
         m_centerHz = m_vfoHz;
         emit centerChanged(m_centerHz);
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();

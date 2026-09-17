@@ -1467,7 +1467,7 @@ public:
 
     // ── Kein Testzugriff: TxVoiceCheckDialog benutzt das ─────────────
     //
-    // Stand bis 2026-08-17 INNERHALB des #ifdef NEREUS_BUILD_TESTS
+    // Stand bis 2026-08-17 INNERHALB des #ifdef LONGPATH_BUILD_TESTS
     // weiter unten — direkt unter txWorkerForTest(), dessen Kommentar
     // ausdruecklich sagt "Test-only accessor — do not use in production
     // code". Der Nachbar hat den Platz geerbt, aber nicht die
@@ -1478,7 +1478,7 @@ public:
     // das Makro gibt es die Funktion nicht. Gesehen hat es niemand,
     // weil ./build.sh inkrementell baut und die alte Objektdatei liegen
     // blieb, waehrend ./tools/run_tests.sh mit
-    // NEREUS_BUILD_TESTS=ON konfiguriert und deshalb immer durchlief.
+    // LONGPATH_BUILD_TESTS=ON konfiguriert und deshalb immer durchlief.
     // Erst ein rm -rf build hat es gezeigt.
     //
     // Voice-check access to the worker's pre/post-strip taps
@@ -1487,7 +1487,7 @@ public:
     // txChannel().
     TxWorkerThread* txWorker() { return m_txWorker.get(); }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only: inject board caps without a live radio connection.
     // Mirrors P1RadioConnection::setBoardForTest pattern.
@@ -1773,10 +1773,10 @@ public:
     // Cite: Thetis console.cs:30010 [v2.10.3.13] — _tuning = true (read by
     // many UI/meter/PA paths in console.cs).
     //
-    // Lives OUTSIDE the NEREUS_BUILD_TESTS block because production code
+    // Lives OUTSIDE the LONGPATH_BUILD_TESTS block because production code
     // (TunerApplet::onTuneClicked at TunerApplet.cpp:183) uses it to gate
     // local-tune carrier engage on hardware-TUNE entry.  Prior placement
-    // inside the test block compiled green on Linux (-DNEREUS_BUILD_TESTS=ON
+    // inside the test block compiled green on Linux (-DLONGPATH_BUILD_TESTS=ON
     // in CI) but broke macOS / Windows where the option defaults OFF.
     bool isTune() const noexcept { return m_isTuning; }
 
@@ -3381,7 +3381,7 @@ private:
     // fully-updated state.
     bool m_republishingAlexBpf{false};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     bool     m_testCapsOverride{false};
     bool     m_testCapsHasAlex{false};
     bool     m_testCapsIsRxOnly{false};              // 3M-1a G.2: injected via setCapsRxOnlyForTest

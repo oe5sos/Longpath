@@ -692,7 +692,7 @@ void VaxChannelCard::onAutoDetectClicked()
     }
 
     // Scan virtual cables (or use injected test vector if the seam is active).
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     const QVector<DetectedCable> cables =
         m_useTestCables ? m_testCables : VirtualCableDetector::scan();
 #else

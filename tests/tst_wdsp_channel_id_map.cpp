@@ -118,7 +118,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         const int rateHz = 192000;
         model.openRxChannelPool(WdspEngine::kMaxSliceChannels,

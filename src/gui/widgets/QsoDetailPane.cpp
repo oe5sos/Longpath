@@ -625,7 +625,7 @@ void QsoDetailPane::refreshExtras()
 
     int shown = 0;
     for (const auto& kv : m_entry.extras) {
-        // APP_NEREUS_QRZUP is ours and already has a column. Showing it
+        // APP_LONGPATH_QRZUP is ours and already has a column. Showing it
         // here as well would be the same fact twice, in two notations.
         if (LogEntry::modelsAdifField(kv.first.toUpper())) { continue; }
         if (kv.second.trimmed().isEmpty()) { continue; }

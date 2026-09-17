@@ -67,7 +67,7 @@ blocking forever.
 
 Labels are derived from each test's **direct** includes, so they are a
 triage aid, not a blast-radius calculation. **132 of the 674 tests carry no
-`core` label but still statically link all of `NereusSDRObjs`**, so a
+`core` label but still statically link all of `LongpathObjs`**, so a
 `src/core` edit genuinely affects them even though `ctest -L core` will not
 run them.
 
@@ -106,13 +106,13 @@ while the other is broken.**
 | | `build/` | `build-tests/` |
 |---|---|---|
 | configured by | `./build.sh` | `./tools/run_tests.sh` |
-| `NEREUS_BUILD_TESTS` | OFF (the shipping default) | ON |
+| `LONGPATH_BUILD_TESTS` | OFF (the shipping default) | ON |
 | what it proves | the app compiles as shipped | the tests compile and pass |
 
-`CMakeLists.txt:1691` propagates `NEREUS_BUILD_TESTS` to the
-`NereusSDRObjs` object library, so the two directories hold **different
+`CMakeLists.txt:1691` propagates `LONGPATH_BUILD_TESTS` to the
+`LongpathObjs` object library, so the two directories hold **different
 object code for the same sources**. Anything inside an
-`#ifdef NEREUS_BUILD_TESTS` block exists in one and not in the other.
+`#ifdef LONGPATH_BUILD_TESTS` block exists in one and not in the other.
 
 Two consequences, both of which have already bitten:
 
@@ -120,7 +120,7 @@ Two consequences, both of which have already bitten:
 not been buildable from scratch since `49d10dc8`: `RadioModel::txWorker()`
 sat inside the test-only guard while `TxVoiceCheckDialog.cpp` — production
 code — called it five times. Every CI job configures with
-`NEREUS_BUILD_TESTS=ON`, so the suite compiled it every time and reported
+`LONGPATH_BUILD_TESTS=ON`, so the suite compiled it every time and reported
 678 green. The `ship-build` job in `ci.yml` exists to close exactly this
 gap; run it locally as a clean `rm -rf build && ./build.sh`.
 
@@ -206,8 +206,8 @@ on macOS it resolves elsewhere (see `src/core/AppSettings.cpp:112-118`):
 
 | Platform | Path |
 | --- | --- |
-| macOS | `~/Library/Preferences/NereusSDR/NereusSDR.settings` |
-| Linux | `~/.config/NereusSDR/NereusSDR.settings` |
+| macOS | `~/Library/Preferences/Longpath/Longpath.settings` |
+| Linux | `~/.config/Longpath/Longpath.settings` |
 
 If you are verifying that a test did not touch it, check the right one. A
 check against the wrong path silently "passes" while proving nothing.
@@ -215,7 +215,7 @@ check against the wrong path silently "passes" while proving nothing.
 ## Why the suite is slow, structurally
 
 Linking dominates: about 32 minutes of the 37 is the linker, not the tests.
-The cause is that `NereusSDRObjs` is one all-or-nothing OBJECT library
+The cause is that `LongpathObjs` is one all-or-nothing OBJECT library
 spanning `core`, `models`, and `gui`, so every source file is a transitive
 input to every test binary and the build graph cannot tell that a
 `SpectrumWidget` edit is irrelevant to a protocol test.

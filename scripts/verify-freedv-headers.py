@@ -41,7 +41,7 @@ from typing import Optional
 REPO = Path(__file__).resolve().parent.parent
 PROVENANCE = REPO / "docs" / "attribution" / "FREEDV-GUI-PROVENANCE.md"
 FREEDV_DIR = Path(os.environ.get(
-    "NEREUS_FREEDV_DIR", "/Users/j.j.boyd/freedv-gui")).expanduser()
+    "LONGPATH_FREEDV_DIR", "/Users/j.j.boyd/freedv-gui")).expanduser()
 
 # Required marker set (mirrors verify-thetis-headers.py "thetis" kind
 # but adapted for freedv-gui's LGPL / BSD header text).
@@ -50,7 +50,7 @@ MARKERS = [
     "freedv-gui",
     "Copyright",
     "License",
-    "Modification history (NereusSDR)",
+    ("Modification history (NereusSDR)", "Modification history (Longpath)"),
 ]
 
 # Header must appear within this many lines of top of file
@@ -151,7 +151,7 @@ def upstream_present() -> bool:
     """Is a freedv-gui clone reachable on this machine?
 
     SKIP gracefully if absent (matches the pre-commit hook's
-    NEREUS_THETIS_DIR auto-locate behavior). CI sets the env var
+    LONGPATH_THETIS_DIR auto-locate behavior). CI sets the env var
     explicitly so the strict check fires there.
     """
     if FREEDV_DIR.is_dir():
@@ -188,14 +188,14 @@ def main():
         print(f"ERROR: {PROVENANCE} not found", file=sys.stderr)
         return 2
 
-    if not upstream_present() and not os.environ.get("NEREUS_FREEDV_DIR"):
+    if not upstream_present() and not os.environ.get("LONGPATH_FREEDV_DIR"):
         # Local-dev convenience: SKIP if no clone is reachable. CI sets
-        # NEREUS_FREEDV_DIR explicitly so the strict check fires there.
+        # LONGPATH_FREEDV_DIR explicitly so the strict check fires there.
         print(
             "[freedv] SKIPPED (no freedv-gui clone found locally; searched "
             "/Users/j.j.boyd/freedv-gui, ../freedv-gui, ../../freedv-gui, "
             "../../../freedv-gui, ../../../../freedv-gui; "
-            "set NEREUS_FREEDV_DIR to override; CI runs strict)"
+            "set LONGPATH_FREEDV_DIR to override; CI runs strict)"
         )
         return 0
 

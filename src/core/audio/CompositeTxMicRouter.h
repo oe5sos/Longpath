@@ -170,7 +170,7 @@ public:
         return m_vaxSource.load(std::memory_order_acquire);
     }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     /// True iff a source switch was deferred because MOX was active
     /// and has not yet been applied. For test inspection only.
     bool hasPendingSwitchForTest() const

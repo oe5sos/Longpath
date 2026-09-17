@@ -569,7 +569,7 @@ void Hl2OptionsTab::onIoBoardOcByteChanged(quint8 ocByte, int /*bandIdx*/, bool 
     if (m_outputStrip) { m_outputStrip->setBits(ocByte); }
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 bool Hl2OptionsTab::swapAudioChannelsCheckedForTest() const
 {
     return m_chkSwapAudio && m_chkSwapAudio->isChecked();

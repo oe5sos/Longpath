@@ -45,7 +45,7 @@ using namespace Longpath;
 // ── isLsbFamily reference copy (test seam) ───────────────────────────────────
 // G.4 fixup: isLsbFamily() is a file-scope static in RadioModel.cpp and cannot
 // be linked from the test binary (NereusSDRObjs is not compiled with
-// NEREUS_BUILD_TESTS).  We maintain an independent reference copy here that
+// LONGPATH_BUILD_TESTS).  We maintain an independent reference copy here that
 // mirrors the production logic exactly.  A mismatch between this copy and
 // RadioModel.cpp will be caught by test 18 failing on the observable behaviors
 // of setTune (AM/FM/DIGL/DIGU mode-swap / no-swap tests 16-17 verify the

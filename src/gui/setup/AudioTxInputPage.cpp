@@ -76,7 +76,7 @@ const QVector<int> AudioTxInputPage::kBufferSizes = {
         }
     }
 #elif defined(Q_OS_LINUX)
-    // Linux: prefer PipeWire if NEREUS_HAVE_PIPEWIRE is defined and enumerable,
+    // Linux: prefer PipeWire if LONGPATH_HAVE_PIPEWIRE is defined and enumerable,
     // else fall back to Pulse.
     for (const auto& api : apis) {
         if (api.name.contains(QLatin1String("PipeWire"), Qt::CaseInsensitive)) {

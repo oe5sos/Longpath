@@ -63,8 +63,8 @@
 // 2026-05-15  J.J. Boyd (KG4VCF), with AI tooling assistance
 //   New port. Path B (RADE sync-only) rx_report upload bridge.
 //
-#ifndef NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
-#define NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
+#ifndef LONGPATH_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
+#define LONGPATH_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
 
 #include <QObject>
 #include <QString>
@@ -153,4 +153,4 @@ private:
 
 } // namespace Longpath
 
-#endif // NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
+#endif // LONGPATH_CORE_FREEDV_RADE_REPORTER_BRIDGE_H

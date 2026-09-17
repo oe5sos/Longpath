@@ -249,7 +249,7 @@ public:
     // Test seam: how many barrier members are currently enrolled.
     int producingSliceCount() const;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Deterministic race seam: runs after the readiness barrier admits a
     // drain and before any ring cursor is advanced.
     void setDrainAdmissionHookForTest(std::function<void()> hook)
@@ -463,7 +463,7 @@ private:
     // another.
     std::atomic<std::uint64_t> m_membershipEpoch{0};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     std::function<void()> m_drainAdmissionHookForTest;
 #endif
 };

@@ -4,7 +4,7 @@
 // [v2.10.3.13] (DllImport SetWatchdogTimer) at the concept level only.
 //
 // Wire-format assertions (RUNSTOP byte pkt[3] bit 7) are in
-// tst_p1_watchdog_wire.cpp (3M-1a Task E.5, NEREUS_BUILD_TESTS gated).
+// tst_p1_watchdog_wire.cpp (3M-1a Task E.5, LONGPATH_BUILD_TESTS gated).
 //
 // Default state changed from false to true in 3M-1a Task E.5 — see
 // RadioConnection.h m_watchdogEnabled comment for rationale (HL2 firmware

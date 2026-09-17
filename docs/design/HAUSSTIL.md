@@ -1,11 +1,11 @@
-# NereusSDR — Hausstil
+# Longpath — Hausstil
 
 Verbindlich für jede sichtbare Änderung. Vorbild ist **Zeus Link** —
 nicht dessen Palette, sondern dessen Disziplin.
 
 Stehende Anweisung, OE5SOS, 2026-08-15:
 
-> „Es wird zwar in Zukunft immer technische Neuerungen von Nereus geben,
+> „Es wird zwar in Zukunft immer technische Neuerungen von [Longpath] geben,
 > will diese aber immer auf Design geändert haben."
 
 Ein Feature ist also erst fertig, wenn es in dieser Sprache herauskommt —
@@ -264,8 +264,8 @@ python3 tools/colour_audit.py
   geglobbt.
 - `./tools/syntax_check.sh <datei>…` laufen lassen.
 - Bauen und Starten kann nur der Betreiber:
-  `cd ~/Desktop/neureus/NereusSDR && ./build.sh && ./run.sh`
-  Tests: `cd ~/Desktop/neureus/NereusSDR && ./tools/run_tests.sh`
+  `cd ~/Longpath/NereusSDR && ./build.sh && ./run.sh`
+  Tests: `cd ~/Longpath/NereusSDR && ./tools/run_tests.sh`
 
 ## Die Grenze, die kein Design überschreibt
 

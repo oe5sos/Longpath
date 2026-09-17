@@ -16,7 +16,7 @@
 //   5. setTxInputConfig emits txInputConfigChanged.
 //   6. setVaxConfig emits vaxConfigChanged for each channel.
 //
-// Uses the NEREUS_BUILD_TESTS seam (setSpeakersBusForTest,
+// Uses the LONGPATH_BUILD_TESTS seam (setSpeakersBusForTest,
 // setHeadphonesBusForTest).
 //
 // Design spec:

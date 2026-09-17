@@ -418,14 +418,14 @@ der ANAN-10 mit.
 ### Fixed
 
 - **Longpath liess sich ohne QRhi ueberhaupt nicht uebersetzen.** Neun
-  Felder in `SpectrumWidget.h` lagen im `#ifdef NEREUS_GPU_SPECTRUM`,
+  Felder in `SpectrumWidget.h` lagen im `#ifdef LONGPATH_GPU_SPECTRUM`,
   obwohl der CPU-Pfad sie ungeschuetzt anfasst: Mausbedienung
   (`m_vfoDragStartX`, `m_panDragArmed`, `m_vfoDragStartHz`,
   `m_vfoDragHzPerPx`, `m_panDragLastX`), Abbau (`m_shutdownPrepared`),
   Wasserfall-Fahnen (`m_wfTexFullUpload`, `m_lastSpectrumArrivalMs`) und
   die Einblendungs-Fahne (`m_overlayStaticDirty`). Sie sind dort
   entstanden, nicht dort noetig. Ein Bau mit
-  `-DNEREUS_GPU_SPECTRUM=OFF` meldete darauf 35 Fehler.
+  `-DLONGPATH_GPU_SPECTRUM=OFF` meldete darauf 35 Fehler.
 
   Genau daran ist der ARM-Linux-Job von v0.6.3-rc1 gescheitert: dort
   fehlten die Vulkan-Header, CMake hat QRhi abgeschaltet
@@ -598,7 +598,7 @@ Stand von heute ist dieser:
 
 ### Fixed
 
-- **Solid-magenta waterfall on macOS/Metal (2026-08-11).** The dynamic-overlay texture was partial-uploaded (spectrum band only) after a recreate, alpha-blending undefined Metal memory over a healthy waterfall every frame. One-shot full upload after every texture (re)create; waterfall texture resizes now build fresh texture+SRB objects with checked create(). Found via the `NEREUS_WF_DEBUG=2` green-fill discriminator, which stays in-tree.
+- **Solid-magenta waterfall on macOS/Metal (2026-08-11).** The dynamic-overlay texture was partial-uploaded (spectrum band only) after a recreate, alpha-blending undefined Metal memory over a healthy waterfall every frame. One-shot full upload after every texture (re)create; waterfall texture resizes now build fresh texture+SRB objects with checked create(). Found via the `LONGPATH_WF_DEBUG=2` green-fill discriminator, which stays in-tree.
 - **Spot-menu clicks fell through to the pan overlay menu (2026-08-11).** Spot/notch context menus now show async via `popup()` (no nested `exec()` inside mousePressEvent on the native QRhi surface) plus a 250 ms replay guard.
 - **Voice-Check crash on the first take (2026-08-11).** The offline strip pass ran without `prepare()`; any ENABLED stateful stage dereferenced unallocated delay lines (SIGSEGV in `ClientReverb::process`). `finishPuduTake` now prepares the offline chain; the reverb additionally bypasses when unprepared; regression pinned per-stage in `tst_strip_dsp`.
 - **Sample-rate choices now survive an app restart (2026-08-12).** The rate was the only slice property whose change never reached the per-band settings slot outside a band switch: pick 48 kHz in the VFO menu, quit, and the next launch restored the old 192 kHz — on a remote link that meant every session started at 9.5 Mbit/s until the operator re-picked the rate by hand. Two rounds: a signal-level hook stomped its own persistence (bindSliceToStream ADOPTS the stream default via the same setter at connect, and the hook wrote the default over the operator's persisted choice before the restore could read it); the save now lives at the intent site, `requestSliceSampleRate`. Regression pins both halves (adoption must not write the slot, the menu request must). Verified end-to-end on the remote bench: pick 48 kHz → quit → relaunch → file reads 48000.
@@ -857,7 +857,7 @@ Final pass on PureSignal persistence for ANAN-G2E and HermesC10 boards.
 ### Release-artifact hotfixes
 
 - **`rade.dll` missing from Windows installer + portable ZIP** ([#250](https://github.com/boydsoftprez/NereusSDR/pull/250)). v0.5.0's `NereusSDR-0.5.0-Windows-x64-portable.zip` and NSIS installer staged every other runtime DLL (`libfftw3-3.dll`, `libfftw3f-3.dll`, `deepfilter.dll`, `dxcompiler.dll`, `dxil.dll`, Qt) but not `rade.dll`, so the .exe failed to launch on a clean install with `rade.dll was not found`. `release.yml`'s `build-windows` stage-deploy step gains a `rade.dll` block alongside the existing FFTW / DeepFilter blocks.
-- **macOS x86_64 DMG built without `Qt6::WebSockets`** ([#251](https://github.com/boydsoftprez/NereusSDR/pull/251)). The v0.5.0 `aqtinstall` step on the macOS x86_64 builder was missing `qtwebsockets`, so the build silently dropped FreeDV Reporter, PSK Reporter, and the TCI server at compile time (`HAVE_WEBSOCKETS` undefined). Promotes `Qt6::WebSockets` from a `QUIET` optional `find_package` to the main `REQUIRED` block in `CMakeLists.txt` so configure hard-fails next time, and adds `qtwebsockets` to the five CI/release Qt install manifests that were missing it. Same shape as the v0.1.1 `NEREUS_GPU_SPECTRUM` regression: an implicit optional gate quietly dropping a core feature without failing the build.
+- **macOS x86_64 DMG built without `Qt6::WebSockets`** ([#251](https://github.com/boydsoftprez/NereusSDR/pull/251)). The v0.5.0 `aqtinstall` step on the macOS x86_64 builder was missing `qtwebsockets`, so the build silently dropped FreeDV Reporter, PSK Reporter, and the TCI server at compile time (`HAVE_WEBSOCKETS` undefined). Promotes `Qt6::WebSockets` from a `QUIET` optional `find_package` to the main `REQUIRED` block in `CMakeLists.txt` so configure hard-fails next time, and adds `qtwebsockets` to the five CI/release Qt install manifests that were missing it. Same shape as the v0.1.1 `LONGPATH_GPU_SPECTRUM` regression: an implicit optional gate quietly dropping a core feature without failing the build.
 - **HL2 + Windows 11: waterfall starts saturated or blank, Setup -> Display sliders revert across launches** ([#243](https://github.com/boydsoftprez/NereusSDR/pull/243), closes [#230](https://github.com/boydsoftprez/NereusSDR/issues/230) reported by Chris W4ORS). Root cause: `m_wfLow/HighThreshold` was doing double duty as both the persisted user setting AND the per-frame runtime AGC / Clarity / "Use spectrum min/max" output. `ClarityController` called the user setters on every tick, so `scheduleSettingsSave()` persisted Clarity-derived values over the user's chosen sliders. Source-first re-align with Thetis `display.cs:2522 + 2536 + 6575-6594 [v2.10.3.13]`: introduces `m_wfActiveLow/HighThreshold` (Thetis local equivalents) on `SpectrumWidget`; `dbmToRgb()` reads these; AGC + NF-AGC write to active only; "Use spectrum min/max" is wired via `setWaterfallGainsIfLinkedToSpectrum` at one write per grid change (Thetis `console.cs:9098-9101 [v2.10.3.13]`).
 
 ### Persistence / connection-state correctness
@@ -868,7 +868,7 @@ Final pass on PureSignal persistence for ANAN-G2E and HermesC10 boards.
 
 ### CI / build
 
-- **CodeQL: require Qt 6.8 + add `qt6-websockets-dev`** ([#252](https://github.com/boydsoftprez/NereusSDR/pull/252), [#254](https://github.com/boydsoftprez/NereusSDR/pull/254)). CodeQL was the only workflow still on apt `qt6-*` (Qt 6.4.2 on ubuntu-24.04); `ci.yml` and `release.yml` both build against Qt 6.8.*. Right after #252 promoted `Qt6::WebSockets` to REQUIRED, CodeQL compiled `CatNetworkSetupPages.cpp` and tripped on a `connect(..., &TciServer::clientConnected, this, [this](QWebSocket*){...})` lambda. Qt 6.4.2's `QMetaTypeId<QWebSocket*>` instantiation requires the complete type, but Qt 6.8 pulls `<QWebSocket>` in transitively via newer qtbase headers, so `ci.yml` + `release.yml` never saw it. Replaces the apt `qt6-*` install with `jurplel/install-qt-action@v4` (Qt 6.8.*, matching `ci.yml`); drops the stale `-DNEREUS_GPU_SPECTRUM=OFF` workaround (Qt 6.8 has `QRhiWidget`); adds defensive `#include <QWebSocket>` in `CatNetworkSetupPages.cpp`, `MainWindow.cpp`, `TciApplet.cpp`.
+- **CodeQL: require Qt 6.8 + add `qt6-websockets-dev`** ([#252](https://github.com/boydsoftprez/NereusSDR/pull/252), [#254](https://github.com/boydsoftprez/NereusSDR/pull/254)). CodeQL was the only workflow still on apt `qt6-*` (Qt 6.4.2 on ubuntu-24.04); `ci.yml` and `release.yml` both build against Qt 6.8.*. Right after #252 promoted `Qt6::WebSockets` to REQUIRED, CodeQL compiled `CatNetworkSetupPages.cpp` and tripped on a `connect(..., &TciServer::clientConnected, this, [this](QWebSocket*){...})` lambda. Qt 6.4.2's `QMetaTypeId<QWebSocket*>` instantiation requires the complete type, but Qt 6.8 pulls `<QWebSocket>` in transitively via newer qtbase headers, so `ci.yml` + `release.yml` never saw it. Replaces the apt `qt6-*` install with `jurplel/install-qt-action@v4` (Qt 6.8.*, matching `ci.yml`); drops the stale `-DLONGPATH_GPU_SPECTRUM=OFF` workaround (Qt 6.8 has `QRhiWidget`); adds defensive `#include <QWebSocket>` in `CatNetworkSetupPages.cpp`, `MainWindow.cpp`, `TciApplet.cpp`.
 
 ## [0.5.0] - 2026-05-13
 
@@ -1860,7 +1860,7 @@ J.J. Boyd ~ KG4VCF
 - fix(tx): C.3 fixups (precision parity + attribution gaps)
 - fix(tx): C.1 ownership + comments (code-review fixups)
 - fix(tx): apply B.2 code-review fixups (CMakeLists + Q_DECLARE_METATYPE)
-- fix(spectrum): guard GPU sentinels with NEREUS_GPU_SPECTRUM (CI #1)
+- fix(spectrum): guard GPU sentinels with LONGPATH_GPU_SPECTRUM (CI #1)
 - fix(spectrum): address Codex P1 + P2 on PR #140
 - fix(spectrum): post-live-test fixes for sub-epic E
 - fix(setup): use kMaxWaterfallHistoryRows constant (E task 11 review)
@@ -2767,7 +2767,7 @@ persistence).
 - CI installs ALSA + JACK + PipeWire dev headers on Linux so
   PortAudio's ALSA / JACK backends are compiled in (`PA_USE_ALSA` +
   `PA_USE_JACK` forced on).
-- `NEREUS_HAVE_PIPEWIRE` is now propagated to `LongpathObjs` consumers
+- `LONGPATH_HAVE_PIPEWIRE` is now propagated to `LongpathObjs` consumers
   so unit tests under `build/tests/` see the same compile-time gates as
   the app.
 - Release artifacts grow ~12 MB per platform (DFNet3 model + rnnoise
@@ -2949,10 +2949,10 @@ persistence).
 - `RxApplet` antenna buttons (Ant 1/2/3) now read from `AlexController::txAnt(currentBand)` / `rxAnt(currentBand)` and re-populate on band change. Click-to-select calls the controller setter, respecting Block-TX safety guards. Was: static placeholder buttons. (Phase 3P-F)
 - `RadioModel` now owns `AlexController`, `ApolloController`, `PennyLaneController` instances and pushes MAC + load on connect, mirroring Phase D's OcMatrix and Phase E's IoBoardHl2 + HermesLiteBandwidthMonitor ownership patterns. (Phase 3P-F)
 - `P1RadioConnection` and `P2RadioConnection` now source the OC byte at C&C compose time from `OcMatrix::maskFor(currentBand, mox)` (when the matrix is wired via `setOcMatrix()` — `RadioModel` pushes its `m_ocMatrix` to the connections at connect time) instead of the legacy `m_ocOutput` field. Falls through to legacy when the matrix is unset (test seams). Default state byte-identical: empty matrix → `maskFor()==0` matching legacy `m_ocOutput==0`. Regression-freeze gates (P1 + P2) still PASS byte-for-byte. (Phase 3P-D)
-- `P1RadioConnection`'s C&C compose layer refactored into per-board codec subclasses (`P1CodecStandard`, `P1CodecHl2`, `P1CodecAnvelinaPro3`, `P1CodecRedPitaya`) behind a stable `IP1Codec` interface. Behavior byte-identical for every non-HL2 board (regression-frozen via `tst_p1_regression_freeze` against a pre-refactor JSON baseline). Set `NEREUS_USE_LEGACY_P1_CODEC=1` to revert to the pre-refactor compose path for one release cycle as a rollback hatch.
+- `P1RadioConnection`'s C&C compose layer refactored into per-board codec subclasses (`P1CodecStandard`, `P1CodecHl2`, `P1CodecAnvelinaPro3`, `P1CodecRedPitaya`) behind a stable `IP1Codec` interface. Behavior byte-identical for every non-HL2 board (regression-frozen via `tst_p1_regression_freeze` against a pre-refactor JSON baseline). Set `LONGPATH_USE_LEGACY_P1_CODEC=1` to revert to the pre-refactor compose path for one release cycle as a rollback hatch.
 - `P2RadioConnection` now calls the shared `AlexFilterMap::computeHpf/Lpf` helpers instead of its own inline copies; byte output unchanged.
 - `BoardCapabilities::Attenuator` extended with `mask`, `enableBit`, and `moxBranchesAtt` fields capturing per-board ATT byte encoding parameters.
-- `P2RadioConnection`'s C&C compose layer refactored into per-board codec subclasses (`P2CodecOrionMkII` for the OrionMKII / 7000D / 8000D / AnvelinaPro3 family, `P2CodecSaturn` extending it for ANAN-G2 / G2-1K with the G8NJJ BPF1 override) behind the new `IP2Codec` interface. Behavior byte-identical to pre-refactor for all captured tuples (`tst_p2_regression_freeze` with 36 tuples). `NEREUS_USE_LEGACY_P2_CODEC=1` env var reverts to the pre-refactor compose path for one release cycle as a rollback hatch. (Phase 3P-B)
+- `P2RadioConnection`'s C&C compose layer refactored into per-board codec subclasses (`P2CodecOrionMkII` for the OrionMKII / 7000D / 8000D / AnvelinaPro3 family, `P2CodecSaturn` extending it for ANAN-G2 / G2-1K with the G8NJJ BPF1 override) behind the new `IP2Codec` interface. Behavior byte-identical to pre-refactor for all captured tuples (`tst_p2_regression_freeze` with 36 tuples). `LONGPATH_USE_LEGACY_P2_CODEC=1` env var reverts to the pre-refactor compose path for one release cycle as a rollback hatch. (Phase 3P-B)
 - `BoardCapabilities` extended with `p2SaturnBpf1Edges` (per-band start/end MHz, empty default) and `p2PreampPerAdc` (true for OrionMKII family). `AlexFilterMap` shared between P1 and P2 codecs (was Phase A; Phase B is the first P2 consumer). (Phase 3P-B)
 - `AudioEngine` backend dispatch refactored — the engine holds `IAudioBus` instances rather than a raw `QAudioSink`; platform selection via `Q_OS_*` at startup. Default path (no VAX configuration) falls through to the Qt multimedia output, byte-identical to v0.2.1 audio output. (Phase 3O Sub-Phase 4 + 8.5)
 - **DAX → VAX UI rebrand (app-wide).** All user-facing "DAX" labels, enum values, settings keys, and doc strings renamed to "VAX". `AppSettings` first-launch migration covers persisted pre-rename keys. Internal identifiers (`VaxSlot`, `VaxChannel`, `vaxChannel`) follow the new name. (Phase 3O)

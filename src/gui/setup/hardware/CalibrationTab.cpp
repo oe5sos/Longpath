@@ -145,7 +145,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 #include <QLayout>
 #endif
 
@@ -595,7 +595,7 @@ void CalibrationTab::restoreSettings(const QMap<QString, QVariant>& /*settings*/
 
 // -- groupBoxCountForTest ------------------------------------------------------
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 int CalibrationTab::groupBoxCountForTest() const
 {
     int count = 0;

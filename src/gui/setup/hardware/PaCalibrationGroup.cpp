@@ -316,7 +316,7 @@ void PaCalibrationGroup::syncFromProfile()
     m_updatingFromController = false;
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 
 int PaCalibrationGroup::spinBoxCountForTest() const
 {
@@ -348,6 +348,6 @@ void PaCalibrationGroup::setSpinValueForTest(int idx, double v)
     m_spins[static_cast<std::size_t>(idx)]->setValue(v);
 }
 
-#endif  // NEREUS_BUILD_TESTS
+#endif  // LONGPATH_BUILD_TESTS
 
 }  // namespace Longpath

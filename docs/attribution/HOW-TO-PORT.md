@@ -1,28 +1,28 @@
 # How to Port a File from Thetis / mi0bot-Thetis / any GPL Upstream
 
 When you (or an AI agent) port code from a GPL-licensed upstream into
-NereusSDR, the file's license header is handled this way:
+Longpath, the file's license header is handled this way:
 
 1. Locate the upstream source file that you ported from.
 2. Copy the upstream file's **entire header block** — from the top of the
    file through the end of the copyright / GPL / dual-license region —
    **verbatim, character-for-character**. No substitutions, no
    reformatting, no address modernization, no contributor consolidation.
-3. Prepend a short NereusSDR port-citation block stating the source
+3. Prepend a short Longpath port-citation block stating the source
    file(s) followed by a Modification-History block stating the port
    date, human author, and AI tooling (if any). Format:
 
    ```cpp
    // =================================================================
-   // <repo-relative path>  (NereusSDR)
+   // <repo-relative path>  (Longpath)
    // =================================================================
    //
    // Ported from <upstream> source:
    //   <path>, original licence from <upstream> source is included below
    //
    // =================================================================
-   // Modification history (NereusSDR):
-   //   YYYY-MM-DD — Reimplemented in C++20/Qt6 for NereusSDR by <name>
+   // Modification history (Longpath):
+   //   YYYY-MM-DD — Reimplemented in C++20/Qt6 for Longpath by <name>
    //                 (<callsign>), with AI-assisted transformation via
    //                 <tool> if applicable.
    // =================================================================
@@ -30,20 +30,20 @@ NereusSDR, the file's license header is handled this way:
 
 4. For multi-source files: stack each cited source's verbatim header
    block in citation order, blank comment line between.
-5. For sources with no header (e.g. NetworkIO.cs): NereusSDR block +
+5. For sources with no header (e.g. NetworkIO.cs): Longpath block +
    note `Upstream source has no top-of-file GPL header — project-level
    LICENSE applies`. No fabrication.
 6. For upstream projects with no per-file headers (e.g. AetherSDR):
-   reference the project's URL and primary author at NereusSDR block
+   reference the project's URL and primary author at Longpath block
    level; there is no verbatim block to copy.
 
 Additionally: every ported function / block / inline constant that
 carries an inline attribution marker in the upstream source
 (`//-W2PA`, `//MW0LGE [x.y.z]`, `// added by G8NJJ for X`, etc.) MUST
-preserve that marker at the corresponding position in the NereusSDR
-port. When NereusSDR itself makes post-port modifications inside such a
-marked region, add a NereusSDR marker in the same style using the
-NereusSDR release version tag: `//-KG4VCF [v0.2.0] description`.
+preserve that marker at the corresponding position in the Longpath
+port. When Longpath itself makes post-port modifications inside such a
+marked region, add a Longpath marker in the same style using the
+Longpath release version tag: `//-OE5SOS [v0.6.3] description`.
 
 See `docs/attribution/THETIS-PROVENANCE.md` for the file mapping and
 `docs/attribution/REMEDIATION-LOG.md` for historical cure entries.
@@ -59,12 +59,12 @@ automatically for all files listed in the PROVENANCE derivative tables.
 `scripts/verify-thetis-headers.py` is the merge-gate check — it
 confirms each file carries the required anchor markers (`Ported from`,
 `Thetis`, `Copyright (C)`, `General Public License`, `Modification
-history (NereusSDR)`).
+history (Longpath)`).
 
 ## Inline cite versioning
 
 Every new or modified `// From Thetis <file>:<line>` comment in a
-NereusSDR source file must carry a bracketed version stamp. This gives
+Longpath source file must carry a bracketed version stamp. This gives
 upstream drift a visible anchor at the point of use — if Samphire
 later changes the ported constant, function body, or behaviour, the
 diff between our stamp and the latest Thetis release tells you exactly
@@ -86,7 +86,7 @@ The stamp takes one of three forms:
 
 The verifier enforces stamps on cites whose upstream file ends in
 `.cs`, `.c`, `.h`, or `.cpp` — code sources where upstream drift
-meaningfully affects NereusSDR logic. `.resx` cites (Thetis resource
+meaningfully affects Longpath logic. `.resx` cites (Thetis resource
 strings, e.g. tooltip copy) are deliberately out of scope; they
 reference display text that doesn't drift the same way.
 

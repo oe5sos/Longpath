@@ -328,7 +328,7 @@ warren@wpratt.com
 #include "audio/AudioRingSpsc.h"  // m_tciInputRing — TCI TX audio buffer (3J-1 bench fix)
 #include "dsp/ChannelConfig.h"
 #include "dsp/TxChannelState.h"
-#include "wdsp_api.h"  // NEREUS_STDCALL macro for s_pushVoxCallback (Task 17)
+#include "wdsp_api.h"  // LONGPATH_STDCALL macro for s_pushVoxCallback (Task 17)
 
 namespace Longpath {
 
@@ -2304,7 +2304,7 @@ public:
     /// From Thetis cmaster.cs:143-144 [v2.10.3.13].
     static void setPSTxIdx(int txid, int idx);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // ── Test seam (Phase 3M-1b D.1, updated for 3M-1c E.1 push model) ─────
     //
     // Synchronously drive one fexchange2 cycle by pushing the given mic
@@ -2316,7 +2316,7 @@ public:
     // path (TUNE-tone PostGen output still reaches sendTxIq).  Pass any
     // mismatched frame count to exercise the contract-violation guard.
     //
-    // Only available when NEREUS_BUILD_TESTS is defined.  Production
+    // Only available when LONGPATH_BUILD_TESTS is defined.  Production
     // builds rely on the slot connection wired by RadioModel (Phase L).
     void tickForTest(const float* samples, int frames)
     {
@@ -2451,7 +2451,7 @@ public:
     // "never called" from explicit zero.
     int lastPSIntsForTest()                   const noexcept { return m_lastPSInts; }
     int lastPSSpiForTest()                    const noexcept { return m_lastPSSpi; }
-#endif // NEREUS_BUILD_TESTS
+#endif // LONGPATH_BUILD_TESTS
 
 public slots:
     // ── Per-profile TX filter debounce (Plan 4 D8) ───────────────────────────
@@ -2748,7 +2748,7 @@ private:
     /// Raw-mic tap gate. See setMicTapEnabled() and tapsMic().
     std::atomic<bool> m_micTap{false};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Mutable test caches — populated lazily by inIForTest/inQForTest so
     // those accessors stay drop-in compatible with pre-3M-1c-v3 tests
     // that consumed `vector<float>` views of the (now defunct) Iin/Qin
@@ -2896,7 +2896,7 @@ private:
     // MoxController::onVoxActive for direct MOX engagement.
     //
     // The signature MUST match the WDSP-side typedef byte-for-byte
-    // (NEREUS_STDCALL maps to __stdcall on Windows, nothing elsewhere —
+    // (LONGPATH_STDCALL maps to __stdcall on Windows, nothing elsewhere —
     // see wdsp_api.h SendCBPushDexpVox doc).  Cast to the underlying
     // function-pointer type happens implicitly at the SendCBPushDexpVox
     // callsite in TxChannel::registerVoxCallback().
@@ -2904,7 +2904,7 @@ private:
     // Thread context: WDSP audio worker thread (TxWorkerThread for
     // NereusSDR).  Emitting a Qt signal here is safe because Qt's
     // AutoConnection promotes to QueuedConnection on a thread crossing.
-    static void NEREUS_STDCALL s_pushVoxCallback(int id, int active);
+    static void LONGPATH_STDCALL s_pushVoxCallback(int id, int active);
 
     // Single-instance lookup table.  3M-3a-iii ships exactly one TxChannel
     // (channel id 1) — phase 3F multi-pan TX will turn this into a small

@@ -2346,7 +2346,7 @@ void PgxlConnectionPairingTest::amplifierCreateEmitsExpectedFrame() {
 }
 ```
 
-Add a test signal `testFrameWrittenForTesting(QString)` emitted from `sendCommand` (guarded by `#ifdef NEREUS_TESTING` or always-on test signal).
+Add a test signal `testFrameWrittenForTesting(QString)` emitted from `sendCommand` (guarded by `#ifdef LONGPATH_TESTING` or always-on test signal).
 
 - [ ] **Step 3: Run, expect FAIL then PASS**
 

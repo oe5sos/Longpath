@@ -428,7 +428,7 @@ Two workable seams, both already used in-tree:
   `streamCentreHzForTest` (`RadioModel.h:1947`, `:2483`), the pattern
   `tst_stream_pool_binding.cpp:580-583` already uses for the sibling
   shift push.
-- A real opened channel through the `NEREUS_BUILD_TESTS` friend seam plus
+- A real opened channel through the `LONGPATH_BUILD_TESTS` friend seam plus
   `createRxChannel`'s real `OpenChannel` (`WdspEngine.cpp:377-390`;
   pattern at `tst_ps_feedback_channel.cpp:72,78`).
 
@@ -1049,7 +1049,7 @@ static notch set costs nothing per frame.
 This does not regress the dual-layer overlay split.
 `SpectrumWidget::mouseMoveEvent` already calls `markOverlayDirty()`
 unconditionally at its tail for every hover move in the GPU path
-(`SpectrumWidget.cpp:6491-6495`), and `NEREUS_GPU_SPECTRUM` is default ON
+(`SpectrumWidget.cpp:6491-6495`), and `LONGPATH_GPU_SPECTRUM` is default ON
 (`CMakeLists.txt:420`), so TNF invalidation cannot increase the count.
 The 2026-05-26 dual-layer bench (commit 9723002d) targeted the
 *timer-driven* per-frame rebuild gated at `SpectrumWidget.cpp:2852-2856`,
@@ -1419,7 +1419,7 @@ than no-opping. The in-tree convention exists for exactly this reason:
 
 Consequently the WDSP-facing wrappers are verified either caller-side
 (assert the value the model hands to `RxChannel`) or against a really
-opened channel via the `NEREUS_BUILD_TESTS` friend seam plus
+opened channel via the `LONGPATH_BUILD_TESTS` friend seam plus
 `createRxChannel`'s real `OpenChannel` (`WdspEngine.cpp:377-390`; pattern
 at `tst_ps_feedback_channel.cpp:72,78`). Everything else is bench.
 

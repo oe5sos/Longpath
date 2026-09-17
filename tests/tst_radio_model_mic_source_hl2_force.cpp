@@ -24,7 +24,7 @@
 //   7. isMicSourceLocked() reflects hasMicJack.
 //   8. Reconnect from HL2 → non-HL2 — lock released and Radio allowed.
 //
-// NEREUS_BUILD_TESTS is defined in CMakeLists.txt for this target,
+// LONGPATH_BUILD_TESTS is defined in CMakeLists.txt for this target,
 // enabling RadioModel test seams (setCapsHasMicJackForTest,
 // simulateConnectLoadForTest, simulateDisconnectForTest).
 //

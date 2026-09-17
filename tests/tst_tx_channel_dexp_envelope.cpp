@@ -13,7 +13,7 @@
 //   setup.Designer.cs:45027-45055 [v2.10.3.13] - udDEXPAttack 2..100 ms default 2.
 //   setup.Designer.cs:44967-44995 [v2.10.3.13] - udDEXPRelease 2..1000 ms default 100.
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessors required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessors required):
 //   - First call stores the value (NaN sentinel fires on doubles).
 //   - Round-trip / clamp at the wrapper boundary (Thetis ranges).
 //   - Idempotent guard: second identical call is observable as the stored value.
@@ -26,7 +26,7 @@
 //                 Anthropic Claude Code.
 // =================================================================
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan

@@ -1226,7 +1226,7 @@ QTEST_MAIN(TestTxAppletHl2Slider)
 #include "tst_tx_applet_hl2_slider.moc"
 ```
 
-Note: this test exposes accessors `rfPowerSlider()`, `tunePowerSlider()`, `rfPowerLabel()` — these may need to be added as test-only accessors in TxApplet.h (`#ifdef NEREUSSDR_TESTING` guard or just public accessors per existing pattern). Check existing tests for the project convention.
+Note: this test exposes accessors `rfPowerSlider()`, `tunePowerSlider()`, `rfPowerLabel()` — these may need to be added as test-only accessors in TxApplet.h (`#ifdef LONGPATH_TESTING` guard or just public accessors per existing pattern). Check existing tests for the project convention.
 
 Register in `tests/CMakeLists.txt`.
 

@@ -163,7 +163,7 @@ public:
     // connect). Hides the whole group when boardClass == PaCalBoardClass::None.
     void populate(CalibrationController* controller, PaCalBoardClass boardClass);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seams.
     int     spinBoxCountForTest() const;            // 0 (None) / 10 (any other)
     QString labelTextForTest(int idx) const;        // idx 1..10 -- e.g. "10 W"

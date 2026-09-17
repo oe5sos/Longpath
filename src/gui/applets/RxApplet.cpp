@@ -1774,7 +1774,7 @@ void RxApplet::populateAntennaButtons(Band band)
     }
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 int RxApplet::stepAttMaxForTest() const
 {
     return m_stepAttSpin ? m_stepAttSpin->maximum() : -1;

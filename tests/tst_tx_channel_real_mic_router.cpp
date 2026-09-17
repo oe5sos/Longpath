@@ -30,7 +30,7 @@ warren@wpratt.com
 //
 // No Thetis code is ported in this test file. The test exercises:
 //   - TxChannel::driveOneTxBlock(samples, frames) via the
-//     NEREUS_BUILD_TESTS tickForTest(samples, frames) seam.
+//     LONGPATH_BUILD_TESTS tickForTest(samples, frames) seam.
 //   - The push-driven mic-block contract introduced in Phase 3M-1c E.1.
 //
 // This test verifies two invariants:
@@ -62,7 +62,7 @@ warren@wpratt.com
 //   2026-04-27 — New test for Phase 3M-1b Task D.1: verify real TxMicRouter
 //                 drives fexchange2 with Q=0.  Test seam (tickForTest /
 //                 inIForTest / inQForTest) added to TxChannel.h under
-//                 NEREUS_BUILD_TESTS guard.  J.J. Boyd (KG4VCF), with
+//                 LONGPATH_BUILD_TESTS guard.  J.J. Boyd (KG4VCF), with
 //                 AI-assisted implementation via Anthropic Claude Code.
 //   2026-04-28 — Phase 3M-1c E.1: rewrote tests for the push-driven
 //                 model.  tickForTest now takes (samples, frames); the
@@ -72,7 +72,7 @@ warren@wpratt.com
 // =================================================================
 
 // no-port-check: NereusSDR-original test file. All Thetis source cites are
-// in TxChannel.h/cpp. NEREUS_BUILD_TESTS must be defined (see CMakeLists.txt).
+// in TxChannel.h/cpp. LONGPATH_BUILD_TESTS must be defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>
 

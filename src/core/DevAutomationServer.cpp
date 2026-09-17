@@ -30,7 +30,7 @@
 #include <QStandardPaths>
 #include <QRegularExpression>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #endif
 
@@ -75,7 +75,7 @@ QString automationWidgetValue(const QWidget* w)
 
 QImage grabAutomationWidget(QWidget* w)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // QRhiWidget::grab() (inherited from QWidget) returns an empty pixmap for
     // a GPU surface -- grabFramebuffer() is the real readback, and reads back
     // whatever was last rendered without forcing a synchronous repaint. Qt

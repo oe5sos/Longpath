@@ -318,7 +318,7 @@ void PanadapterStack::moveSliceToPan(int sliceId, const QString& destPanId)
 static void refreshAfterReparent(Longpath::SpectrumWidget* sw)
 {
     if (!sw) { return; }
-#if defined(Q_OS_MAC) && defined(NEREUS_GPU_SPECTRUM)
+#if defined(Q_OS_MAC) && defined(LONGPATH_GPU_SPECTRUM)
     const bool wasVisible = sw->isVisible();
     sw->hide();
     sw->resetGpuResources();

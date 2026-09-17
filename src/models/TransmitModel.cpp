@@ -728,7 +728,7 @@ bool TransmitModel::pureSignalActive() const noexcept
     // calcc has a valid correction set does the safety lift to 31 dB
     // make sense (the gate exists to prevent power surges destabilising
     // the live correction).
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Phase 3C test seam — exercise the ATT-on-TX gate without
     // constructing a full RadioModel + PureSignal coordinator.  Tri-state:
     //   -1 = no override → fall through to live read (or false if not

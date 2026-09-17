@@ -75,10 +75,10 @@ QStringList Theme::searchPaths()
 {
     QStringList out;
 
-    // 1. NEREUS_THEME_DIR schlägt alles. Ein Test braucht einen Ort, den
+    // 1. LONGPATH_THEME_DIR schlägt alles. Ein Test braucht einen Ort, den
     //    er kontrolliert, und wer zwei Themes vergleichen will, braucht
     //    einen Schalter, der keine Datei verschiebt.
-    const QByteArray env = qgetenv("NEREUS_THEME_DIR");
+    const QByteArray env = qgetenv("LONGPATH_THEME_DIR");
     if (!env.isEmpty()) {
         out << QString::fromLocal8Bit(env);
     }

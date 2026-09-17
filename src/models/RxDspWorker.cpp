@@ -197,7 +197,7 @@ void RxDspWorker::setExternalDiversityRoute(
         return;
     }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_externalDiversityRouteHookForTest) {
         m_externalDiversityRouteHookForTest(
             true, route.targetSliceId,
@@ -217,7 +217,7 @@ void RxDspWorker::clearExternalDiversityRoute()
     m_externalDiversityChunkSize = 0;
     m_externalDiversityMaxQueuedSamples = 0;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (oldRoute.active() && m_externalDiversityRouteHookForTest) {
         m_externalDiversityRouteHookForTest(
             false, oldRoute.targetSliceId,
@@ -288,7 +288,7 @@ void RxDspWorker::feedExternalDiversityTarget(int samples)
                 m_externalDiversityOutputInterleaved[2 * sample + 1]);
     }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_externalDiversityOutputHookForTest) {
         m_externalDiversityOutputHookForTest(
             m_externalDiversityRoute.targetSliceId,

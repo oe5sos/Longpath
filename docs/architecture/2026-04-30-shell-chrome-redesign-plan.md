@@ -343,7 +343,7 @@ Append to `tests/CMakeLists.txt`:
 # 8 tests: defaults, setters round-trip, variant style application,
 # left/right-click signal emission. Uses QTEST_MAIN (needs QApplication
 # for QWidget mouse events).
-nereus_add_test(tst_status_badge)
+longpath_add_test(tst_status_badge)
 ```
 
 - [ ] **Step 3: Build and run; expect failures since StatusBadge has no MOC yet**
@@ -621,7 +621,7 @@ Append to `tests/CMakeLists.txt`:
 # ── Shell-Chrome Redesign sub-PR-1: StationBlock widget ───────────────────
 # 5 tests: default/setRadioName/empty-name appearance switching, click +
 # right-click signal emission gated on appearance.
-nereus_add_test(tst_station_block)
+longpath_add_test(tst_station_block)
 ```
 
 - [ ] **Step 3: Build + run**
@@ -839,7 +839,7 @@ Append to `tests/CMakeLists.txt`:
 # ── Shell-Chrome Redesign sub-PR-2: byte-rate counters ────────────────────
 # 4 tests: zero-init, in-window accumulation, out-of-window aging, tx/rx
 # independence. QTEST_APPLESS_MAIN — no QApplication needed.
-nereus_add_test(tst_radio_connection_byte_rates)
+longpath_add_test(tst_radio_connection_byte_rates)
 ```
 
 - [ ] **Step 9: Commit**
@@ -998,7 +998,7 @@ Append to `tests/CMakeLists.txt`:
 ```cmake
 # ── Shell-Chrome Redesign sub-PR-2: ping RTT signal ───────────────────────
 # 3 tests: emit-on-rtt, duplicate-receive-suppression, receive-without-send.
-nereus_add_test(tst_radio_connection_ping_rtt)
+longpath_add_test(tst_radio_connection_ping_rtt)
 ```
 
 - [ ] **Step 9: Commit**
@@ -1200,7 +1200,7 @@ Append to `tests/CMakeLists.txt`:
 ```cmake
 # ── Shell-Chrome Redesign sub-PR-2: voltage signals ───────────────────────
 # 3 tests: PSU Hermes-DC formula, MKII PA formula, identical-raw suppression.
-nereus_add_test(tst_radio_connection_supply_volts)
+longpath_add_test(tst_radio_connection_supply_volts)
 ```
 
 ```bash
@@ -1390,7 +1390,7 @@ Expected: PASS (5/5).
 # ── Shell-Chrome Redesign sub-PR-2: AudioEngine flow state ────────────────
 # 5 tests: initial Dead, Healthy on feed, Underrun on single, Stalled on
 # persistent, identical-state suppression.
-nereus_add_test(tst_audio_engine_flow_state)
+longpath_add_test(tst_audio_engine_flow_state)
 ```
 
 ```bash
@@ -1874,7 +1874,7 @@ QTEST_MAIN(TstNetworkDiagnosticsDialog)
 # ── Shell-Chrome Redesign sub-PR-3: NetworkDiagnosticsDialog ──────────────
 # 3 tests: null-safe construction, reset clears counters, refresh on
 # disconnected model is crash-free.
-nereus_add_test(tst_network_diagnostics_dialog)
+longpath_add_test(tst_network_diagnostics_dialog)
 ```
 
 - [ ] **Step 3: Build + run**
@@ -2171,7 +2171,7 @@ Expected: PASS (5/5).
 # ── Shell-Chrome Redesign sub-PR-4: ConnectionSegment v2 ──────────────────
 # 5 tests: state queries (disconnected/connected), rtt-region click,
 # right-click context menu, audio flow-state setter round-trip.
-nereus_add_test(tst_connection_segment_v2)
+longpath_add_test(tst_connection_segment_v2)
 ```
 
 ```bash
@@ -2602,7 +2602,7 @@ Expected: PASS (4/4).
 # ── Shell-Chrome Redesign sub-PR-5: RxDashboard ───────────────────────────
 # 4 tests: default visibility (only always-on shown), NR enable/disable
 # toggles badge visibility, frequency formatting smoke-test.
-nereus_add_test(tst_rx_dashboard)
+longpath_add_test(tst_rx_dashboard)
 ```
 
 ```bash

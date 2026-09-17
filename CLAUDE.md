@@ -1,36 +1,34 @@
 # Longpath — Project Context for Claude
 
 > **Longpath ist ein Fork von NereusSDR** (© J.J. Boyd, KG4VCF), das
-> seinerseits ein Port von Thetis ist. Umbenannt am 2026-08-20.
+> seinerseits ein Port von Thetis ist. Umbenannt am 2026-08-20; der
+> C++-Namensraum heißt seit dann `Longpath`.
 >
 > Alles, was dieses Dokument über Herkunft, Ports und Zitate sagt,
 > gilt unverändert weiter — die Quellen sind dieselben, nur der Name
-> des Programms hat sich geändert. Historische Einträge unten
-> („shipped in v0.5.0", „Modification history (NereusSDR)") sind
-> absichtlich NICHT umbenannt: sie berichten von damals.
+> des Programms hat sich geändert.
 >
-> Der C++-Namensraum heißt seit dem 2026-08-20 `Longpath`.
+> **Stand 2026-09-17 — Betreiber: „wir haben kein nereus … weg damit":**
+> der Name ist aus allem verschwunden, was das Programm zeigt oder
+> nach außen meldet (Log-Kategorien `longpath.*`, Log-Dateien
+> `longpath-*.log`, TCI-Servername `Longpath-TCI`, Schlüsselbund
+> `Longpath: …`, VAX-Geräte `Longpath VAX n` / `Longpath TX`, Exporte,
+> Menüs, Dialoge), aus den Bau-Namen (`longpath_add_test`,
+> `LONGPATH_BUILD_TESTS`, `LONGPATH_GPU_SPECTRUM`, …) und aus den
+> Kopfzeilen („Modification history (Longpath)").
 >
-> **Wo „Nereus"/„nereus" trotzdem noch steht — und warum das kein
-> Versehen ist:**
+> **Was bewusst bleibt — und warum:**
 >
-> | Stelle | Bleibt „Nereus", weil |
+> | Stelle | Bleibt, weil |
 > | --- | --- |
-> | Repo-Ordnername `NereusSDR` auf der Platte | nie umbenannt, nur der Inhalt — rein kosmetisch, keine Funktion daran geknüpft |
-> | Build-interne Namen (`nereus_add_test`, `NEREUS_TEST_SHARDS`, `NEREUS_BUILD_TESTS`, Log-Kategorien wie `nereus.tci`) | Entwickler-intern, kein Aushängeschild, keine Außenwirkung |
-> | Schlüsselbund-Diensteintrag (`CredentialStore` "NereusSDR: %1") | macOS Keychain sucht Einträge über den exakten Dienstnamen — ein blindes Umbenennen würde jedem Nutzer die gespeicherten Zugangsdaten verlieren |
-> | TCI-Serveridentität (`TciServer` meldet sich als "NereusSDR-TCI") | andere Software (WSJT-X u.a.) identifiziert uns über diesen String |
-> | VAX-Gerätenamen ("NereusSDR VAX N") | vom Betriebssystem als Audiogerät registrierte Namen; andere Apps binden sich daran |
+> | Herkunftsangaben: „Fork von NereusSDR", Copyright J.J. Boyd (KG4VCF), Upstream-Links `boydsoftprez/NereusSDR`, Credits im Über-Dialog | GPL: Copyright- und Herkunftsvermerke dürfen nicht entfernt werden; das ist Geschichte, kein Name des Programms |
+> | Datierte Historien-Zeilen („2026-04-22 — Ported … for NereusSDR by …") | berichten von damals; nur die Überschrift des Blocks heißt jetzt Longpath |
+> | Übergangs-Erkennungen: `NereusSDR.settings` + Ordner `<config>/NereusSDR` (einmaliger Umzug), Schlüsselbund `NereusSDR: …` (Umzug beim ersten Lesen), Gerätename `NereusSDR VAX n` (altes Plug-in), Log-Dateien `nereussdr-*.log` (Aufräumen/Support-Bündel), XML-Wurzel `<NereusSDR>` | vorhandene Daten müssen weiter gefunden werden — Übergang, kein Nebeneinander auf Dauer |
+> | Repo-Ordnername `~/Longpath/NereusSDR` | Bau- und Startbefehl, Worktrees, Launch-Agents und eine zweite Session hängen daran; wird als eigener Schritt mit neuem Befehl umbenannt (ROADMAP B7) |
+> | Dokumente unter `docs/architecture/`, `docs/superpowers/`, `CHANGELOG.md`, `MASTER-PLAN.md` | datierte Entwurfs- und Verlaufsdokumente von damals |
 >
-> **Es gab bereits einen Versuch**, alles per Suchen-und-Ersetzen auf
-> „Longpath" umzustellen — bewusst wieder verworfen, weil er genau
-> diese drei externen Bindungen (Schlüsselbund, TCI-Identität,
-> VAX-Gerätenamen) gebrochen hätte. Eine Umstellung dieser Strings
-> braucht eine echte Übergangslösung (alten Namen weiter erkennen,
-> neuen zusätzlich anbieten), kein Textersatz. Bis das ansteht, ist das
-> Nebeneinander beabsichtigt — nicht nachträglich aufräumen, ohne die
-> Migration mitzudenken.
-
+> Ein neuer Verweis auf „Nereus" gehört in keine dieser Spalten und ist
+> ein Fehler.
 
 ## Project Goal
 
@@ -81,7 +79,7 @@ file's header comment:
 2. The GPLv2-or-later permission block verbatim
 3. The Samphire dual-licensing statement — ONLY if the Thetis source file
    contains Samphire-authored contributions
-4. A trailing "Modification history (NereusSDR)" block with the port date,
+4. A trailing "Modification history (Longpath)" block with the port date,
    human author, and AI tooling disclosure
 
 Templates live in `docs/attribution/HOW-TO-PORT.md`. Failure to
@@ -172,7 +170,7 @@ merge-blocking CI failure (or worse, a missed gap that ships to main).
 
 This applies equally to:
 - New files that port Thetis logic.
-- Edits to NereusSDR-original files that **add** new ported logic
+- Edits to Longpath-original files that **add** new ported logic
   (e.g. wiring in a new Thetis-derived constant or formula).
 - Ports from non-Thetis upstreams (`../mi0bot-Thetis/`, `../AetherSDR/`,
   `../freedv-gui/`, WDSP). Same protocol, different PROVENANCE table /

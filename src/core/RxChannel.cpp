@@ -1570,7 +1570,7 @@ void RxChannel::setAudioPan(double pan)
 {
 #ifdef HAVE_WDSP
     // Convert NereusSDR -1.0..+1.0 to WDSP 0.0..1.0:
-    //   wdsp_pan = (nereus_pan + 1.0) / 2.0
+    //   wdsp_pan = (longpath_pan + 1.0) / 2.0
     //   -1.0 → 0.0 (full left), 0.0 → 0.5 (center), +1.0 → 1.0 (full right)
     // WDSP applies sin-law: gain2I = sin(pan*PI), gain2Q = 1 when pan>0.5
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403

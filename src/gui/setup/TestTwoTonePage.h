@@ -84,7 +84,7 @@ public:
     ~TestTwoTonePage() override = default;
 
     // Test-introspection accessors (always exposed; pages pattern matches
-    // AudioTxInputPage).  No NEREUS_BUILD_TESTS guard needed.
+    // AudioTxInputPage).  No LONGPATH_BUILD_TESTS guard needed.
     QSpinBox*       freq1Spin()       const { return m_freq1Spin; }
     QSpinBox*       freq2Spin()       const { return m_freq2Spin; }
     QDoubleSpinBox* levelSpin()       const { return m_levelSpin; }

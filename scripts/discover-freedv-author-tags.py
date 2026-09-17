@@ -56,7 +56,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 FREEDV_DIR = Path(os.environ.get(
-    "NEREUS_FREEDV_DIR",
+    "LONGPATH_FREEDV_DIR",
     # Standard sibling relative to each worktree depth:
     #   worktree at .claude/worktrees/<branch>/ -> ../../../../freedv-gui
     #   main checkout                            -> ../freedv-gui
@@ -341,7 +341,7 @@ def main() -> int:
         if found is None:
             print(f"FATAL: freedv-gui not found at {freedv_dir}",
                   file=sys.stderr)
-            print("Set NEREUS_FREEDV_DIR or ensure freedv-gui is cloned",
+            print("Set LONGPATH_FREEDV_DIR or ensure freedv-gui is cloned",
                   file=sys.stderr)
             return 2
         freedv_dir = found

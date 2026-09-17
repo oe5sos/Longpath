@@ -20,7 +20,7 @@
 //   rxBlockReady_moxOnToOff_blockResumes
 //                                     — MOX off again → push resumes
 //
-// Test seam: setMoxStateForTest() (NEREUS_BUILD_TESTS) drives the gate
+// Test seam: setMoxStateForTest() (LONGPATH_BUILD_TESTS) drives the gate
 // without a full RadioModel/MoxController fixture.
 //
 // Observation method: FakeAudioBus injected via setSpeakersBusForTest().

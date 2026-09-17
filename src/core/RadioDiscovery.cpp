@@ -206,7 +206,7 @@ qint64 crossProcessHoldoffRemainingMs()
     return remainingNs > 0 ? remainingNs / 1000000 : 0;
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 // Test-only: zero the shared segment so a leftover deadline from one test
 // binary run's earlier test function doesn't leak into a later one via
 // std::max(local, crossProcess) in holdOffRemainingMs(). Mirrors
@@ -334,7 +334,7 @@ qint64 RadioDiscovery::holdOffRemainingMs() const
     return std::max(localRemaining, crossProcessHoldoffRemainingMs());
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void RadioDiscovery::clearHoldOffForTest()
 {
     s_scanHoldOff = QDeadlineTimer();

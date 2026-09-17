@@ -38,7 +38,7 @@ public:
     // arbitrary DetectedCable vector. Used by scanThirdPartyOnly() and
     // exposed as a seam so unit tests can exercise the filter without
     // standing up a PortAudio enumeration. Exposed as a public static
-    // helper (not gated behind NEREUS_BUILD_TESTS like AudioEngine::*ForTest
+    // helper (not gated behind LONGPATH_BUILD_TESTS like AudioEngine::*ForTest
     // seams) because it has no hidden invariants: it's a pure function on
     // its input with no side effects, so external callers can't violate
     // any class state by using it.

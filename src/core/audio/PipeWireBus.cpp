@@ -16,7 +16,7 @@
 // Modification history (NereusSDR):
 //   2026-04-24  J.J. Boyd (KG4VCF) — created for Phase 3O Task 12.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include "core/audio/PipeWireBus.h"
 #include "core/audio/PipeWireThreadLoop.h"
@@ -209,4 +209,4 @@ qint64 PipeWireBus::pull(char* data, qint64 maxBytes)
 
 }  // namespace Longpath
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE

@@ -187,7 +187,7 @@ public:
 
     QString logFilePath() const;
 
-    // Test seams: NEREUS_TESTING-gated wrappers around private wire-
+    // Test seams: LONGPATH_TESTING-gated wrappers around private wire-
     // protocol methods. Production callers go through the QWebSocket
     // signal pipeline (`onWsTextMessage` -> `handleEngineIO` ->
     // `handleSocketIO`); tests bypass the socket and drive the parsers

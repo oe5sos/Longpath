@@ -173,7 +173,7 @@ public:
     /// getbuffsize(48000) at cmsetup.c:106-110 [v2.10.3.13].
     static constexpr int kBlockFrames = 64;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     /// Test seam — drive one pump tick synchronously without standing up
     /// the QThread + semaphore wait infrastructure.  Drains one block
     /// from m_micSource (must have been pre-loaded via inbound + a

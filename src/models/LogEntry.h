@@ -69,7 +69,8 @@ struct LogEntry {
 
     // Has this been accepted by the QRZ logbook?
     //
-    // Written as APP_NEREUS_QRZUP. An APP_ prefix is the ADIF-sanctioned
+    // Written as APP_LONGPATH_QRZUP (APP_NEREUS_QRZUP before 2026-09-17,
+    // still read). An APP_ prefix is the ADIF-sanctioned
     // way to record something the standard has no field for, and other
     // programs are required to leave it alone rather than choke on it.
     //

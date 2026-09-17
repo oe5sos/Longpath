@@ -345,7 +345,7 @@ toggles) is also re-added at that point.
 ### Test seam
 
 `TransmitModel::setPureSignalActiveForTest(bool)` is gated on
-`NEREUS_BUILD_TESTS`. Tests can flip the predicate to true and
+`LONGPATH_BUILD_TESTS`. Tests can flip the predicate to true and
 exercise the gate end-to-end without touching the (non-existent)
 PureSignal stack.
 

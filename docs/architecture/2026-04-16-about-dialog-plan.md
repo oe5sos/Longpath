@@ -469,13 +469,13 @@ Add at the end of `tests/CMakeLists.txt`:
 
 ```cmake
 # ── About dialog ─────────────────────────────────────────────────────────
-nereus_add_test(tst_about_dialog)
+longpath_add_test(tst_about_dialog)
 ```
 
 - [ ] **Step 3: Build with tests and run**
 
 ```bash
-cd build && cmake .. -DNEREUS_BUILD_TESTS=ON && cmake --build . --parallel
+cd build && cmake .. -DLONGPATH_BUILD_TESTS=ON && cmake --build . --parallel
 ctest --test-dir . -R tst_about_dialog -V
 ```
 

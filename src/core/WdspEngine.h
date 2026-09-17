@@ -100,7 +100,7 @@ warren@wpratt.com
 #include <memory>
 #include <vector>
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 // Forward declaration for test-only friend access (see end of class).  The
 // test class lives in the global namespace because it inherits from QObject
 // in tests/tst_wdsp_engine_tx_channel.cpp without a NereusSDR namespace
@@ -281,7 +281,7 @@ public:
     void setExternalDiversityRunning(int id, bool running);
     void destroyExternalDiversity(int id);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Injectable C-API table for lifecycle/order tests. Production builds
     // bind the corresponding members to the real WDSP symbols in the
     // constructor and do not expose a replacement seam.
@@ -499,7 +499,7 @@ public:
     // tests) has run.
     PsFeedbackChannel* psFeedbackChannel() const;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test-only helper that synchronously opens the PS feedback channel
     // without going through the async wisdom path.  Mirrors the
     // m_initialized=true friend-access trick from
@@ -751,7 +751,7 @@ private:
 
     // Phase 3M-4 Task 4: PureSignal feedback RX channel.  Single instance
     // per WdspEngine, opened during finishInitialization() (or via the
-    // openPsFeedbackChannelForTesting() helper in NEREUS_BUILD_TESTS
+    // openPsFeedbackChannelForTesting() helper in LONGPATH_BUILD_TESTS
     // builds).  Held as unique_ptr — destruction order matters: the
     // destructor (~WdspEngine via shutdown()) must run CloseChannel(5)
     // BEFORE the unique_ptr destructor erases the wrapper, mirroring the
@@ -761,18 +761,18 @@ private:
     // Open the WDSP-side PS feedback channel (OpenChannel + state=1) and
     // construct the wrapper.  Idempotent — second call returns silently.
     // Called from finishInitialization() in production, or from
-    // openPsFeedbackChannelForTesting() under NEREUS_BUILD_TESTS.
+    // openPsFeedbackChannelForTesting() under LONGPATH_BUILD_TESTS.
     void openPsFeedbackChannel();
 
     // Close the WDSP-side PS feedback channel and destroy the wrapper.
     // Idempotent — called from shutdown() when the engine is torn down.
     void closePsFeedbackChannel();
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test-only friend: lets unit tests bypass async wisdom load by setting
     // m_initialized = true directly so they can exercise createTxChannel /
     // createRxChannel without a running event loop or a real WDSP wisdom
-    // file.  Production builds (without NEREUS_BUILD_TESTS) never see this.
+    // file.  Production builds (without LONGPATH_BUILD_TESTS) never see this.
     friend class ::TestWdspEngineTxChannel;
     // Phase 3M-3a-iii Task 20: same friendship for the create_dexp test.
     friend class ::TstWdspEngineDexpInit;

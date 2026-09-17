@@ -131,7 +131,7 @@
 #ifdef Q_OS_LINUX
 #include "audio/LinuxPipeBus.h"
 #endif
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
 #include "core/audio/PipeWireBus.h"
 #include "core/audio/PipeWireThreadLoop.h"
 #endif
@@ -224,7 +224,7 @@ AudioEngine::AudioEngine(QObject* parent)
     m_linuxBackend = detectLinuxBackend();
     qCInfo(lcAudio) << "Linux audio backend detected:"
                     << toString(m_linuxBackend);
-#  if defined(NEREUS_HAVE_PIPEWIRE)
+#  if defined(LONGPATH_HAVE_PIPEWIRE)
     if (m_linuxBackend == LinuxAudioBackend::PipeWire) {
         m_pwLoop = std::make_unique<PipeWireThreadLoop>();
         if (!m_pwLoop->connect()) {
@@ -329,7 +329,7 @@ void AudioEngine::rescanLinuxBackend()
                     << toString(previous) << "→"
                     << toString(m_linuxBackend);
 
-#  if defined(NEREUS_HAVE_PIPEWIRE)
+#  if defined(LONGPATH_HAVE_PIPEWIRE)
     // Transitioning TO PipeWire (None/Pactl → PipeWire): create m_pwLoop.
     // On connect failure revert m_linuxBackend rather than emitting a
     // phantom-PipeWire signal with no backing loop.
@@ -407,7 +407,7 @@ void AudioEngine::setSliceStreaming(int sliceId, bool streaming)
     // on every transition (console.cs:27650-27651 [v2.10.3.15]).
     m_antiVoxMix.setSliceStreaming(sliceId, streaming);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (!streaming && m_withdrawalPublishedHookForTest) {
         m_withdrawalPublishedHookForTest();
     }
@@ -651,7 +651,7 @@ std::unique_ptr<IAudioBus> AudioEngine::makeVaxBus(int channel)
     }
     return bus;
 #elif defined(Q_OS_LINUX)
-#  ifdef NEREUS_HAVE_PIPEWIRE
+#  ifdef LONGPATH_HAVE_PIPEWIRE
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         PipeWireBus::Role role = PipeWireBus::Role::Vax1;
         switch (channel) {
@@ -718,7 +718,7 @@ std::unique_ptr<IAudioBus> AudioEngine::makeVaxTxBus()
     }
     return bus;
 #elif defined(Q_OS_LINUX)
-#  ifdef NEREUS_HAVE_PIPEWIRE
+#  ifdef LONGPATH_HAVE_PIPEWIRE
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         auto bus = std::make_unique<PipeWireBus>(
             PipeWireBus::Role::TxInput, m_pwLoop.get());
@@ -763,7 +763,7 @@ std::unique_ptr<IAudioBus> AudioEngine::makeTxInputBus(const QString& sourceNode
     fmt.channels   = 2;
     fmt.sample     = AudioFormat::Sample::Float32;
 
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         // TxInput is a capture (INPUT direction) stream; sourceNode names the
         // PipeWire source node to link from (e.g. the mic or a software
@@ -792,7 +792,7 @@ std::unique_ptr<IAudioBus> AudioEngine::makePrimaryOut(const QString& targetNode
     fmt.channels   = 2;
     fmt.sample     = AudioFormat::Sample::Float32;
 
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         auto bus = std::make_unique<PipeWireBus>(
             PipeWireBus::Role::Primary, m_pwLoop.get(), targetNode);
@@ -818,7 +818,7 @@ std::unique_ptr<IAudioBus> AudioEngine::makeSidetoneOut(const QString& targetNod
     fmt.channels   = 2;
     fmt.sample     = AudioFormat::Sample::Float32;
 
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         auto bus = std::make_unique<PipeWireBus>(
             PipeWireBus::Role::Sidetone, m_pwLoop.get(), targetNode);
@@ -844,7 +844,7 @@ std::unique_ptr<IAudioBus> AudioEngine::makeMonitorOut(const QString& targetNode
     fmt.channels   = 2;
     fmt.sample     = AudioFormat::Sample::Float32;
 
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         auto bus = std::make_unique<PipeWireBus>(
             PipeWireBus::Role::Monitor, m_pwLoop.get(), targetNode);
@@ -1090,7 +1090,7 @@ void AudioEngine::setVaxEnabled(int channel, bool on)
 #endif
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void AudioEngine::setVaxBusForTest(int channel, std::unique_ptr<IAudioBus> bus)
 {
     if (channel < 1 || channel > 4) {

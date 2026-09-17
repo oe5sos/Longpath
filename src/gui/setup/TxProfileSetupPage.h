@@ -37,7 +37,7 @@
 //     • Dirty-tracking via subscription to TransmitModel *Changed signals
 //       (set on load, cleared on save/load/setActiveProfile).
 //
-// Test seams (no NEREUS_BUILD_TESTS guard — same convention as
+// Test seams (no LONGPATH_BUILD_TESTS guard — same convention as
 // TestTwoTonePage / AudioTxInputPage):
 //   • setSavePromptHook(...)         — replace QInputDialog::getText.
 //   • setOverwriteConfirmHook(...)   — replace QMessageBox::question.
@@ -103,7 +103,7 @@ public:
     QPushButton* deleteButton() const { return m_deleteBtn; }
 
     // ── Test seams ──────────────────────────────────────────────────────────
-    // (No NEREUS_BUILD_TESTS guard — same convention as TestTwoTonePage.)
+    // (No LONGPATH_BUILD_TESTS guard — same convention as TestTwoTonePage.)
     //
     // SavePromptHook: replaces QInputDialog::getText for the save dialog.
     // Returns {accepted, name}; name is the user-typed string.  Empty / all-

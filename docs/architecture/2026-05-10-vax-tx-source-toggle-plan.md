@@ -22,7 +22,7 @@
 | Modify | `src/gui/applets/TxApplet.cpp` | Extend mic-source badge to 3-way (Pc/Radio/VAX) at the `micSourceChanged` lambda + `syncFromModel` block |
 | Create | `tests/tst_transmit_model_vax_toggle.cpp` | Unit-test toggle behavior, previous-tracking, HL2 lock interaction, persistence round-trip |
 | Create | `tests/tst_phone_applet_vax_toggle.cpp` | Widget test: click VAX, click again, right-click signal |
-| Modify | `tests/CMakeLists.txt` | Register both new tests via `nereus_add_test(...)` |
+| Modify | `tests/CMakeLists.txt` | Register both new tests via `longpath_add_test(...)` |
 
 No new headers, no new files in `src/`. The `openSetupRequested(category, page)` signal already exists on PhoneCwApplet and is already routed by MainWindow's existing lambda at [MainWindow.cpp:4234](../../src/gui/MainWindow.cpp:4234), so no MainWindow change is needed.
 
@@ -244,7 +244,7 @@ Add the registration in `tests/CMakeLists.txt` immediately after the `tst_transm
 # slot (Vax on -> sets Vax; off -> restores previous), HL2 lock interaction
 # (Radio previous coerces to Pc), and Mic_Source_PreVax persistence (per-MAC
 # + preconnect fallback, mirroring the existing Mic_Source two-key pattern).
-nereus_add_test(tst_transmit_model_vax_toggle)
+longpath_add_test(tst_transmit_model_vax_toggle)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -545,7 +545,7 @@ QTEST_MAIN(TstPhoneAppletVaxToggle)
 #include "tst_phone_applet_vax_toggle.moc"
 ```
 
-Register in `tests/CMakeLists.txt` near the existing `nereus_add_test(tst_phone_applet_proc)` at line 1831:
+Register in `tests/CMakeLists.txt` near the existing `longpath_add_test(tst_phone_applet_proc)` at line 1831:
 
 ```cmake
 # ── Phase 3M-VAX-toggle: PhoneCwApplet VAX button wiring ────────────────────
@@ -554,7 +554,7 @@ Register in `tests/CMakeLists.txt` near the existing `nereus_add_test(tst_phone_
 # restores the previous non-VAX source, external model changes sync the
 # checked state, and right-click emits openSetupRequested("Audio", "TX Input")
 # so MainWindow opens Setup -> Audio -> TX Input.
-nereus_add_test(tst_phone_applet_vax_toggle)
+longpath_add_test(tst_phone_applet_vax_toggle)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -757,14 +757,14 @@ QTEST_MAIN(TstTxAppletMicSourceBadge)
 #include "tst_tx_applet_mic_source_badge.moc"
 ```
 
-Register in `tests/CMakeLists.txt` near the other TxApplet tests (search for `nereus_add_test(tst_tx_applet_lev_eq_cfc)` and add immediately after):
+Register in `tests/CMakeLists.txt` near the other TxApplet tests (search for `longpath_add_test(tst_tx_applet_lev_eq_cfc)` and add immediately after):
 
 ```cmake
 # ── Phase 3M-VAX-toggle: TxApplet mic-source badge 3-way ────────────────────
 # The badge above the gauges previously read "PC mic" or "Radio mic".
 # Phase 3M-VAX-toggle extends it to a 3-way switch so MicSource::Vax
 # renders "VAX" both on micSourceChanged and on syncFromModel.
-nereus_add_test(tst_tx_applet_mic_source_badge)
+longpath_add_test(tst_tx_applet_mic_source_badge)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**

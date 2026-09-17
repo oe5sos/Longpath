@@ -8,7 +8,7 @@
 // AudioEngine::pullTxMic (Phase 3M-1b Task F.1).
 //
 // Strategy: inject a FakeAudioBus into AudioEngine's TX-input slot via
-// the NEREUS_BUILD_TESTS seam setTxInputBusForTest, then verify that
+// the LONGPATH_BUILD_TESTS seam setTxInputBusForTest, then verify that
 // PcMicSource::pullSamples correctly dispatches to AudioEngine::pullTxMic
 // and returns the same sample count and values. This approach exercises
 // the full dispatch chain end-to-end rather than just a mock — matching

@@ -576,7 +576,7 @@ private:
 private slots:
     void onDdcMappingChanged();
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test seams — expose internal TX-path state for white-box unit tests.
     PreampMode savedPreampModeForTest() const noexcept { return m_savedPreampMode; }

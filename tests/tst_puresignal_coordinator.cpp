@@ -243,7 +243,7 @@ private slots:
 
     void pollTimerTick_whenEnabled_runsWithoutCrash()
     {
-        // With NEREUS_BUILD_TESTS the bare TxChannel doesn't have a live
+        // With LONGPATH_BUILD_TESTS the bare TxChannel doesn't have a live
         // calcc engine, so getPSInfo returns silently (rsmpin null-guard
         // in TxChannel::getPSInfo).  pollTimerTick walks the cmd-state
         // machine but all info[] values stay 0.  The test verifies the

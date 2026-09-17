@@ -45,7 +45,7 @@
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. NEREUS_BUILD_TESTS must be
+// no-port-check: NereusSDR-original test file. LONGPATH_BUILD_TESTS must be
 // defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>

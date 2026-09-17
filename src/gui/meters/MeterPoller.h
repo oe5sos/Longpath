@@ -309,8 +309,8 @@ private:
     // (MainWindow.cpp:4696). Der Prüfmodus hat deshalb seinen EIGENEN
     // Zeitgeber und hängt nicht an m_timer.
     //
-    // Aus, sofern nicht ausdrücklich verlangt: NEREUS_METER_DEMO=1.
-    // Dasselbe Muster wie NEREUS_WF_DEBUG in SpectrumWidget — „ein
+    // Aus, sofern nicht ausdrücklich verlangt: LONGPATH_METER_DEMO=1.
+    // Dasselbe Muster wie LONGPATH_WF_DEBUG in SpectrumWidget — „ein
     // Diagnosemittel, das im Normalbetrieb etwas kostet, ist ein
     // Diagnosemittel, das gelöscht wird".
     //

@@ -182,7 +182,7 @@ private:
     // constructed up front.
     int m_paValuesEntry = -1;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Phase 9 of #167: test seams for verifying the cross-page wiring
     // connect() between PaWattMeterPage::resetPaValuesRequested and
@@ -192,7 +192,7 @@ public:
     PaValuesPage*    paValuesPageForTest()    const { return m_paValuesPage;    }
 
     // #272 / #301 lazy-construction seams. Defined inline because
-    // NEREUS_BUILD_TESTS is set on the test targets only, not on
+    // LONGPATH_BUILD_TESTS is set on the test targets only, not on
     // NereusSDRObjs -- an out-of-line body in SetupDialog.cpp would never be
     // compiled and the test link would fail.
 

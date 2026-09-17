@@ -14,7 +14,7 @@
 //   section 8.1  RadioModel::notchModel() accessor
 //   section 11   tst_notch_channel_sync
 //
-// Uses the WdspEngine NEREUS_BUILD_TESTS friend seam exactly as
+// Uses the WdspEngine LONGPATH_BUILD_TESTS friend seam exactly as
 // tests/tst_stream_pool_binding.cpp does: priming m_initialized lets
 // openRxChannelPool run createRxChannel's real OpenChannel, so every
 // RXANBP* wrapper here talks to a genuinely opened WDSP channel. Design
@@ -98,7 +98,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(5, 5, kRateHz);
         const int a = model.addSlice();
@@ -435,7 +435,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         NotchModel* nm = model.notchModel();
         QVERIFY(nm != nullptr);
@@ -494,7 +494,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         NotchModel* nm = model.notchModel();
         QVERIFY(nm != nullptr);
@@ -544,7 +544,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         NotchModel* nm = model.notchModel();
         QVERIFY(nm != nullptr);

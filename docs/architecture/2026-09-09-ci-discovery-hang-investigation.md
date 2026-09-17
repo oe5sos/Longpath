@@ -331,7 +331,7 @@ whenever both are true:
 - `AppSettings::instance().value("Audio/LinuxFirstRunSeen", "False") !=
   "True"` — every test binary runs under
   `QStandardPaths::setTestModeEnabled(true)` (`tests/TestSandboxInit.cpp`,
-  linked into every `nereus_add_test()` target), which sandboxes
+  linked into every `longpath_add_test()` target), which sandboxes
   `AppSettings` to a **fresh** per-run config directory. `Audio/
   LinuxFirstRunSeen` has never been set to `"True"` there, because nothing
   has ever run in that fresh sandbox before. This is true for every test,

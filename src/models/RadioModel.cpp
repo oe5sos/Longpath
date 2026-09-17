@@ -1836,7 +1836,7 @@ RadioModel::RadioModel(QObject* parent)
                 QString()).toString(),
         s.value(QStringLiteral("FreeDvReporter/Message"),
                 QString()).toString(),
-        QStringLiteral("NereusSDR ") + QStringLiteral(NEREUSSDR_VERSION));
+        QStringLiteral("NereusSDR ") + QStringLiteral(LONGPATH_VERSION));
     {
         const QString serverUrl = s.value(
             QStringLiteral("FreeDvReporter/ServerUrl"),
@@ -1864,7 +1864,7 @@ RadioModel::RadioModel(QObject* parent)
                 QString()).toString(),
         s.value(QStringLiteral("PskReporter/GridSquare"),
                 QString()).toString(),
-        QStringLiteral("NereusSDR ") + QStringLiteral(NEREUSSDR_VERSION));
+        QStringLiteral("NereusSDR ") + QStringLiteral(LONGPATH_VERSION));
 
     // Per-source adapter slots. Auto-connection (sender + receiver both on
     // the main thread) gives DirectConnection, so the spot lands in
@@ -2603,7 +2603,7 @@ void RadioModel::restoreSpotClientAutoStartState()
                 s.value(QStringLiteral("FreeDvReporter/Message")).toString();
             const QString versionStr =
                 QStringLiteral("NereusSDR ")
-                    + QStringLiteral(NEREUSSDR_VERSION);
+                    + QStringLiteral(LONGPATH_VERSION);
             qCInfo(lcDsp)
                 << "FreeDVReporter: starting connection with identity"
                 << "callsign=" << freedvCall
@@ -2632,7 +2632,7 @@ void RadioModel::restoreSpotClientAutoStartState()
         if (pskGrid.isEmpty()) pskGrid = userGrid;
         if (!pskCall.isEmpty()) {
             m_pskReporter->setIdentity(pskCall, pskGrid,
-                                       QStringLiteral("NereusSDR ") + QStringLiteral(NEREUSSDR_VERSION));
+                                       QStringLiteral("NereusSDR ") + QStringLiteral(LONGPATH_VERSION));
             if (isTrue(QStringLiteral("PskReporterAutoStart"))) {
                 m_pskReporter->setAutoSendIntervalSec(
                     PskReporterClient::kReportingIntervalSec);
@@ -3111,7 +3111,7 @@ bool RadioModel::isRfKitInOperate() const
 
 const BoardCapabilities& RadioModel::boardCapabilities() const
 {
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_testCapsOverride) {
         static BoardCapabilities overrideCaps{};
         overrideCaps.hasAlex     = m_testCapsHasAlex;
@@ -8555,13 +8555,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                                 : info.macAddress;
         m_flexBroadcaster->setMacAddress(mac);
         m_flexBroadcaster->setSerial(derivedFlexSerial(mac));
-        m_flexBroadcaster->setVersion(QStringLiteral(NEREUSSDR_VERSION));
+        m_flexBroadcaster->setVersion(QStringLiteral(LONGPATH_VERSION));
         m_flexBroadcaster->setCallsign(
             as.value(QStringLiteral("StationCallsign"),
-                     QStringLiteral("NEREUS")).toString());
+                     QStringLiteral("LONGPATH")).toString());
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
-                     QStringLiteral("NereusSDR")).toString());
+                     QStringLiteral("Longpath")).toString());
         m_flexBroadcaster->setModel(
             as.value(QStringLiteral("PGXL_DiscoveryModel"),
                      QStringLiteral("FLEX-6400")).toString());
@@ -15127,7 +15127,7 @@ Longpath::CodecContext RadioModel::currentCodecContext() const
     return ctx;
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 PureSignal* RadioModel::installPureSignalForTest(TxChannel* tx)
 {
     m_pureSignal = std::make_unique<PureSignal>(

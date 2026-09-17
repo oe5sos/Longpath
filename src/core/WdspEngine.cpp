@@ -640,7 +640,7 @@ void WdspEngine::destroyAllExternalDiversity()
     }
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void WdspEngine::setExternalDiversityApiForTest(
     const ExternalDiversityApiForTest& api)
 {
@@ -1350,7 +1350,7 @@ PsFeedbackChannel* WdspEngine::psFeedbackChannel() const
     return m_psFeedbackChannel.get();
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void WdspEngine::openPsFeedbackChannelForTesting()
 {
     // Test path: caller has set m_initialized=true via friend access.

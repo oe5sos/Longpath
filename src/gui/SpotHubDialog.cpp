@@ -556,10 +556,10 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
 
         // Push to live clients if non-null. A connection that is
         // already up picks up the new identity without disconnect.
-        // Version string comes from CMake (NEREUSSDR_VERSION); the
+        // Version string comes from CMake (LONGPATH_VERSION); the
         // FreeDV / PSK Reporter pools want a versioned client tag.
         const QString version =
-            QStringLiteral("Longpath/") + QStringLiteral(NEREUSSDR_VERSION);
+            QStringLiteral("Longpath/") + QStringLiteral(LONGPATH_VERSION);
         if (m_freedvClient) {
             m_freedvClient->setIdentity(call, gridSquare, message, version);
         }

@@ -49,9 +49,9 @@ public:
                       const QVector<DetectedCable>& detected,
                       QWidget* parent = nullptr);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam — returns the scenario this dialog was constructed for.
-    // Gated behind NEREUS_BUILD_TESTS so production builds don't expose
+    // Gated behind LONGPATH_BUILD_TESTS so production builds don't expose
     // the getter. Matches the AudioEngine::setVaxBusForTest pattern.
     FirstRunScenario scenarioForTest() const { return m_scenario; }
 
@@ -82,7 +82,7 @@ private:
     // "Apply suggested" / "Apply to VAX 3 & 4". Pure function of
     // m_scenario + m_detected; used internally by onApplySuggested() and
     // by the Scenario E footer label synthesis in buildFooter(). Exposed
-    // to tests via the NEREUS_BUILD_TESTS-gated suggestedBindingsForTest()
+    // to tests via the LONGPATH_BUILD_TESTS-gated suggestedBindingsForTest()
     // forwarder above.
     QVector<QPair<int, QString>> computeSuggestedBindings() const;
 

@@ -340,10 +340,10 @@ QTEST_MAIN(TestSetupHelpers)
 
 - [ ] **Step 2: Register test in `tests/CMakeLists.txt`**
 
-Find the block of `nereus_add_test(...)` calls near the `tst_hardware_page_capability_gating` entry and add:
+Find the block of `longpath_add_test(...)` calls near the `tst_hardware_page_capability_gating` entry and add:
 
 ```cmake
-nereus_add_test(tst_setup_helpers)
+longpath_add_test(tst_setup_helpers)
 ```
 
 - [ ] **Step 3: Run test to verify it fails**

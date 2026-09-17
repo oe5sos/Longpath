@@ -1,6 +1,6 @@
 // tests/TestSandboxInit.cpp
 //
-// Auto-linked into every test binary by nereus_add_test(). Runs
+// Auto-linked into every test binary by longpath_add_test(). Runs
 // QStandardPaths::setTestModeEnabled(true) as a global static
 // constructor — before main(), before any test code, and crucially
 // before AppSettings::instance() can pin its file path to the real
@@ -29,7 +29,7 @@
 // the real NereusSDR install.
 //
 // This file has no public symbols. It is linked into every test
-// target by nereus_add_test() in tests/CMakeLists.txt.
+// target by longpath_add_test() in tests/CMakeLists.txt.
 
 #include <QStandardPaths>
 

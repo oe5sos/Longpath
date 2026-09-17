@@ -37,7 +37,7 @@ class TestRadeApplet : public QObject {
     Q_OBJECT
 
     // Fixture mirrors tst_slice_model_rade_swap: primes WdspEngine
-    // (NEREUS_BUILD_TESTS friend access — TestRadeApplet is declared
+    // (LONGPATH_BUILD_TESTS friend access — TestRadeApplet is declared
     // a friend of WdspEngine in WdspEngine.h), seeds slice 0 with a
     // RxChannel, switches it to RADE so the RadeChannel exists. Nested
     // inside TestRadeApplet so its constructor inherits the friend
@@ -50,7 +50,7 @@ class TestRadeApplet : public QObject {
         RadioFixture()
         {
             engine = radio.wdspEngine();
-            engine->m_initialized = true;  // NEREUS_BUILD_TESTS friend access
+            engine->m_initialized = true;  // LONGPATH_BUILD_TESTS friend access
             engine->createRxChannel(0);
             const int idx = radio.addSlice();
             Q_ASSERT(idx == 0);

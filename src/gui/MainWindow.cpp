@@ -1578,7 +1578,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // benennt, statt eines Sturzes in fremdem Code.
     //
     // inherits() statt findChild<QRhiWidget*>(): der Kopf steht hinter
-    // NEREUS_GPU_SPECTRUM, und eine Sicherung, die im falschen Aufbau
+    // LONGPATH_GPU_SPECTRUM, und eine Sicherung, die im falschen Aufbau
     // wegfällt, ist keine.
     for (const QWidget* child : applet->findChildren<QWidget*>()) {
         if (child && child->inherits("QRhiWidget")) {
@@ -3660,7 +3660,7 @@ void MainWindow::buildUI()
     // noch „NereusSDR" stand, obwohl das Programm laengst Longpath
     // heisst — alle Urhebervermerke der Vorlagen bleiben davon
     // unberuehrt und stehen weiterhin im Ueber-Dialog.
-    QString title = QStringLiteral("Longpath %1").arg(NEREUSSDR_VERSION);
+    QString title = QStringLiteral("Longpath %1").arg(LONGPATH_VERSION);
 
     const QString buildTag = BuildIdentity::buildTag();
     if (!buildTag.isEmpty()) {
@@ -14468,7 +14468,7 @@ void MainWindow::openSpotHub()
                         psk->setIdentity(
                             call, grid,
                             QStringLiteral("Longpath ") +
-                                QStringLiteral(NEREUSSDR_VERSION));
+                                QStringLiteral(LONGPATH_VERSION));
                         psk->setAutoSendIntervalSec(
                             PskReporterClient::kReportingIntervalSec);
                     });

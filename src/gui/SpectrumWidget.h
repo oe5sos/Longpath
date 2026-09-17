@@ -185,8 +185,8 @@ QT_END_NAMESPACE
 
 // GPU spectrum: QRhiWidget base class for Metal/Vulkan/D3D12 rendering.
 // CPU fallback: QWidget with QPainter.
-// Note: NEREUS_GPU_SPECTRUM is set in CMakeLists.txt via target_compile_definitions.
-#ifdef NEREUS_GPU_SPECTRUM
+// Note: LONGPATH_GPU_SPECTRUM is set in CMakeLists.txt via target_compile_definitions.
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 using SpectrumBaseClass = QRhiWidget;
@@ -906,17 +906,17 @@ public:
     //
     // Die Funktion bleibt in beiden Bauarten stehen, nur ihr Rumpf
     // hängt am Wächter — dasselbe Muster wie markOverlayDirty() weiter
-    // unten. m_showPerfOverlay lebt im NEREUS_GPU_SPECTRUM-Block; stand
+    // unten. m_showPerfOverlay lebt im LONGPATH_GPU_SPECTRUM-Block; stand
     // die Zugriffsfunktion davor ausserhalb, übersetzte der CPU-Bau
     // nicht. Das ist keine ausgedachte Lage: CMakeLists.txt:420 macht
-    // den GPU-Pfad zur Option, Zeile 417 nennt -DNEREUS_GPU_SPECTRUM=OFF
+    // den GPU-Pfad zur Option, Zeile 417 nennt -DLONGPATH_GPU_SPECTRUM=OFF
     // als den Weg dorthin, und ab Zeile 434 schaltet CMake ihn von
     // selbst ab, wenn Qt älter als 6.7 ist oder ShaderTools bzw.
     // GuiPrivate fehlen.
     void setShowPerfOverlay(bool on);
     bool showPerfOverlay() const
     {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         return m_showPerfOverlay;
 #else
         return false;   // ohne GPU-Pfad wird die Überlagerung nie gemalt
@@ -1728,14 +1728,14 @@ public:
     // Overlay-cache seam.  Returns false on a CPU-only build, where there
     // is no cached texture to invalidate.
     bool overlayStaticDirtyForTest() const {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         return m_overlayStaticDirty;
 #else
         return false;
 #endif
     }
     void clearOverlayStaticDirtyForTest() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = false;
 #endif
     }
@@ -1876,7 +1876,7 @@ signals:
     void txFilterOverlayPainted(int xLeft, int xRight);
 
 protected:
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
@@ -3038,7 +3038,7 @@ private:
     // (backgroundImagePath(), backgroundOpacity(), backgroundBrightness(),
     // backgroundFillColor(), waterfallBackgroundFillColor(),
     // visibleBinCountForTest()). Lagen sie im #ifdef, liess sich Longpath
-    // mit -DNEREUS_GPU_SPECTRUM=OFF ueberhaupt nicht uebersetzen: sechs
+    // mit -DLONGPATH_GPU_SPECTRUM=OFF ueberhaupt nicht uebersetzen: sechs
     // Zugriffe auf Member, die es in dieser Uebersetzung nicht gibt.
     //
     // Genau daran ist der ARM-Linux-Bau von v0.6.3-rc1 gescheitert — dort
@@ -3061,12 +3061,12 @@ private:
     // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
     // Umbenennung scheitert.
     //
-    // Unconditional (not inside #ifdef NEREUS_GPU_SPECTRUM): both the
+    // Unconditional (not inside #ifdef LONGPATH_GPU_SPECTRUM): both the
     // GPU and the CPU-only paint path call paintBackgroundLayer(), and
     // its setters/getters above are declared unconditionally too -- these
     // members were stranded inside the GPU-only block below, which broke
     // every CPU-only build (e.g. release.yml's ubuntu-24.04-arm job,
-    // which sets -DNEREUS_GPU_SPECTRUM=OFF because that runner's Qt is
+    // which sets -DLONGPATH_GPU_SPECTRUM=OFF because that runner's Qt is
     // older than the 6.7 QRhiWidget needs).
     QImage  m_bgImage;
     QImage  m_bgScaled;
@@ -3085,7 +3085,7 @@ private:
     // braeuchten. Ein Bau ohne QRhi meldete darauf 35 Fehler. Gefunden per
     // systematischem Abgleich jedes Members in diesem Block gegen seine
     // echten Verwendungsstellen in SpectrumWidget.cpp, nachdem der
-    // ubuntu-24.04-arm-Bau (-DNEREUS_GPU_SPECTRUM=OFF, aeltere Qt-Version
+    // ubuntu-24.04-arm-Bau (-DLONGPATH_GPU_SPECTRUM=OFF, aeltere Qt-Version
     // ohne QRhiWidget) daran einen Fehler nach dem anderen meldete.
 
     /// Wasserfall-Textur beim naechsten Bild vollstaendig hochladen.
@@ -3109,7 +3109,7 @@ private:
     double m_vfoDragStartHz{0.0};
     double m_vfoDragHzPerPx{0.0};
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
     // GPU pipeline init helpers
@@ -3241,7 +3241,7 @@ private:
     // other QPainter-drawn chrome re-render on next frame. Safe no-op
     // when the GPU path is disabled.
     void markOverlayDirty() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = true;
         // Im 3D-Modus liegt die Bandbreite (Saeule, Kanten, Mittellinie)
         // in der DYNAMISCHEN Schicht ueber der Flaeche

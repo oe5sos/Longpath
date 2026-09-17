@@ -109,10 +109,10 @@ int RadioMicSource::pullSamples(float* dst, int n)
 }
 
 // ---------------------------------------------------------------------------
-// Test seams (NEREUS_BUILD_TESTS only)
+// Test seams (LONGPATH_BUILD_TESTS only)
 // ---------------------------------------------------------------------------
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 int RadioMicSource::ringFillForTest() const
 {
     const unsigned int w = m_writeIdx.load(std::memory_order_acquire);

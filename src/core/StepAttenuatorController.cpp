@@ -400,7 +400,7 @@ void StepAttenuatorController::setAttOnTxValue(int dB)
             conn->setTxStepAttenuation(dBcopy); //[2.10.3.6]MW0LGE att_fixes
         });
     }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_attOnTxEnabled) {
         m_lastTxStepAttDb = dB;
     }
@@ -505,7 +505,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
                     conn->setTxStepAttenuation(0); //[2.10.3.6]MW0LGE att_fixes
                 });
             }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
             m_lastTxStepAttDb = 0;
 #endif
             return;
@@ -571,7 +571,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
                     conn->setTxStepAttenuation(txAtt); //[2.10.3.6]MW0LGE att_fixes
                 });
             }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
             m_lastTxStepAttDb = txAtt;
 #endif
         }
@@ -593,7 +593,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
                     conn->setTxStepAttenuation(0); //[2.10.3.6]MW0LGE att_fixes
                 });
             }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
             m_lastTxStepAttDb = 0;
 #endif
 

@@ -29,7 +29,7 @@
 //      with the existing TX channel id.
 //
 // Test strategy mirrors tst_wdsp_engine_dexp_init.cpp: friend access via
-// NEREUS_BUILD_TESTS sets m_initialized = true synchronously to bypass the
+// LONGPATH_BUILD_TESTS sets m_initialized = true synchronously to bypass the
 // async wisdom path, then drives createTxChannel + psFeedbackChannel().
 //
 // Source: NereusSDR-original wrapper.  No Thetis source; Thetis manages
@@ -69,7 +69,7 @@ private slots:
     // TX channel id.
     void hasUniqueChannelId() {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
                                         // bypasses async wisdom path
 
         // PS feedback channel is opened during initialize() — but in the

@@ -36,7 +36,7 @@
 //   byte 51: line_in gain
 //   bytes 57-59: TX step attenuators
 //
-// Test seam: composeCmdTxForTest() in P2RadioConnection.h (NEREUS_BUILD_TESTS)
+// Test seam: composeCmdTxForTest() in P2RadioConnection.h (LONGPATH_BUILD_TESTS)
 // exposes the CmdTx buffer composition without needing a live socket.
 #include <QtTest/QtTest>
 #include "core/P2RadioConnection.h"

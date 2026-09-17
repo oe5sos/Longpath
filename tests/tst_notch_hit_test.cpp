@@ -103,7 +103,7 @@ int expectX(double hz)
 // formula the paint sites use rather than against itself.
 int expectSpecH(int widgetH)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     const int contentH = widgetH - (kFreqScaleHForTest + kDividerHForTest);
     return static_cast<int>(contentH * kSpectrumFracForTest);
 #else
@@ -269,10 +269,10 @@ private slots:
     // Section 8.2: notch chrome lives in the cached GPU static-overlay
     // texture, so every mutator must invalidate it.  A bare update()
     // (which is all the spot push does) leaves a dragged marker frozen on
-    // the shipping path, where NEREUS_GPU_SPECTRUM is ON by default.
+    // the shipping path, where LONGPATH_GPU_SPECTRUM is ON by default.
     void every_notch_mutator_invalidates_the_static_overlay()
     {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         SpectrumWidget sw;
 
         sw.clearOverlayStaticDirtyForTest();
@@ -1033,7 +1033,7 @@ private slots:
     // readout for as long as the pointer stayed over a marker.
     void hover_within_one_notch_keeps_invalidating_the_overlay()
     {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         SpectrumWidget w;
         configureUi(w);
         w.setNotchMarkers({makeNotch(1, kUiCentreHz, 2000.0)});

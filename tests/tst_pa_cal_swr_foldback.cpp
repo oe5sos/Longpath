@@ -27,7 +27,7 @@
 // Strategy:
 //   The wire-byte computation is exposed as a static helper
 //   `RadioModel::computeWireDriveForTest(int powerPct, float swrFactor)`
-//   under NEREUS_BUILD_TESTS — same test-seam pattern Task 3.4 used
+//   under LONGPATH_BUILD_TESTS — same test-seam pattern Task 3.4 used
 //   (handlePaTelemetryForTest).  The helper is a pure function that
 //   reproduces the exact `clamp(int(255.0f * f * swrProtect), 0, 255)`
 //   formula inlined at all three setTxDrive sites in RadioModel.cpp,

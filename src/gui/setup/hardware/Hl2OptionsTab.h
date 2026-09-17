@@ -115,7 +115,7 @@ public:
     void populate(const RadioInfo& info, const BoardCapabilities& caps);
     void restoreSettings(const QMap<QString, QVariant>& settings);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seams — read the underlying state without depending on the
     // QWidget show/hide cycle.
     bool   swapAudioChannelsCheckedForTest() const;

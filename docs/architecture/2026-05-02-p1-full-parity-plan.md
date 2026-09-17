@@ -446,7 +446,7 @@ TEST(P1MicLineInGain, setter_propagates_to_bank_11_c2) {
 
 - [ ] **Step 2.1.4: Implement P2 override** — bridges to existing `m_mic.lineInGain` field.
 
-- [ ] **Step 2.1.5: Add `composeBank11ForTest()` test seam** in `P1RadioConnection.h` (under `#ifdef NEREUS_BUILD_TESTS`).
+- [ ] **Step 2.1.5: Add `composeBank11ForTest()` test seam** in `P1RadioConnection.h` (under `#ifdef LONGPATH_BUILD_TESTS`).
 
 - [ ] **Step 2.1.6: Run — confirm pass**
 

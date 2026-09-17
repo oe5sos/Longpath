@@ -9,7 +9,7 @@
 // Coverage: see private-slot test methods below — each verifies one
 // gain/mute or setter/signal contract scenario.
 //
-// Uses FakeAudioBus injected via the NEREUS_BUILD_TESTS-only
+// Uses FakeAudioBus injected via the LONGPATH_BUILD_TESTS-only
 // AudioEngine::setVaxBusForTest / setSpeakersBusForTest seam, so the
 // test doesn't need a real CoreAudioHalBus / LinuxPipeBus / PortAudio
 // backend. Cross-platform.

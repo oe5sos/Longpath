@@ -609,10 +609,10 @@ QTEST_MAIN(TestClarityDefaults)
 
 - [ ] **Step 2: Register the test**
 
-In `tests/CMakeLists.txt`, add under the existing `nereus_add_test(...)` block:
+In `tests/CMakeLists.txt`, add under the existing `longpath_add_test(...)` block:
 
 ```cmake
-nereus_add_test(tst_clarity_defaults)
+longpath_add_test(tst_clarity_defaults)
 ```
 
 Place it near `tst_setup_helpers` and `tst_smoke` alphabetically.

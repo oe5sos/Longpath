@@ -115,7 +115,7 @@ void MeterPoller::setRxChannel(RxChannel* channel)
 
 void MeterPoller::startDemoFeedIfRequested()
 {
-    if (qEnvironmentVariableIntValue("NEREUS_METER_DEMO") <= 0) { return; }
+    if (qEnvironmentVariableIntValue("LONGPATH_METER_DEMO") <= 0) { return; }
     m_demoWanted = true;
     m_demoTimer.setInterval(100);          // wie der echte Umlauf
     connect(&m_demoTimer, &QTimer::timeout, this, &MeterPoller::tickDemo);
@@ -123,7 +123,7 @@ void MeterPoller::startDemoFeedIfRequested()
     // Laut, und auf INF statt DBG: wer das anschaltet, soll es im
     // Protokoll wiederfinden, wenn er sich später über die Zahlen
     // wundert.
-    qCInfo(lcMeter) << "MeterPoller: PRUEFMODUS AKTIV (NEREUS_METER_DEMO) —"
+    qCInfo(lcMeter) << "MeterPoller: PRUEFMODUS AKTIV (LONGPATH_METER_DEMO) —"
                     << "die Messwerte sind ERFUNDEN und laufen die Skalen ab."
                     << "Er endet, sobald ein RX-Kanal gesetzt wird.";
 }

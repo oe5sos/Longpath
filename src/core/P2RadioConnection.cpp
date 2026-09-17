@@ -2238,9 +2238,9 @@ void P2RadioConnection::onReconnectTimeout()
 void P2RadioConnection::selectCodec()
 {
     m_codec.reset();
-    m_useLegacyP2Codec = (qEnvironmentVariableIntValue("NEREUS_USE_LEGACY_P2_CODEC") == 1);
+    m_useLegacyP2Codec = (qEnvironmentVariableIntValue("LONGPATH_USE_LEGACY_P2_CODEC") == 1);
     if (m_useLegacyP2Codec) {
-        qCInfo(lcConnection) << "P2: NEREUS_USE_LEGACY_P2_CODEC=1 — using pre-refactor compose path";
+        qCInfo(lcConnection) << "P2: LONGPATH_USE_LEGACY_P2_CODEC=1 — using pre-refactor compose path";
         return;
     }
     if (!m_caps) {
@@ -2733,7 +2733,7 @@ CodecContext P2RadioConnection::buildCodecContext() const
 // composeCmd* wrappers — Phase 3P-B Task 7
 //
 // Each wrapper delegates to the per-board codec (m_codec) unless the
-// NEREUS_USE_LEGACY_P2_CODEC=1 env-var is set (rollback hatch).
+// LONGPATH_USE_LEGACY_P2_CODEC=1 env-var is set (rollback hatch).
 // Legacy compose bodies are preserved as composeCmd*Legacy for one release.
 // ---------------------------------------------------------------------------
 
@@ -2786,7 +2786,7 @@ void P2RadioConnection::composeCmdTx(char buf[60]) const
 }
 
 // ---------------------------------------------------------------------------
-// Legacy compose implementations — preserved for NEREUS_USE_LEGACY_P2_CODEC
+// Legacy compose implementations — preserved for LONGPATH_USE_LEGACY_P2_CODEC
 // rollback hatch. These are byte-for-byte the pre-Task-7 bodies.
 // ---------------------------------------------------------------------------
 

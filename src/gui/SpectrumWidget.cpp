@@ -145,7 +145,7 @@
 // new QThread(this) und &QThread::finished brauchen den vollständigen
 // Typ; der Header führt bei m_waterfallTickerThread nur einen Zeiger.
 // Übersetzt hat es bisher allein der vorkompilierte Header — mit
-// -DNEREUS_USE_PCH=OFF, laut CMakeLists.txt:1590 die Einstellung für
+// -DLONGPATH_USE_PCH=OFF, laut CMakeLists.txt:1590 die Einstellung für
 // genau eine Header-Hygiene-Prüfung, fiel diese Datei um.
 #include <QThread>
 #include <QToolTip>
@@ -172,7 +172,7 @@
 #include <QFile>
 #include <QLibraryInfo>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <rhi/qshader.h>
 #endif
 
@@ -531,7 +531,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAutoFillBackground(false);
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Platform-specific QRhi backend selection.
     // Tastenbedienung braucht Fokus. ClickFocus, nicht StrongFocus:
     // wer ins Spektrum klickt, will dort auch mit den Pfeiltasten
@@ -707,11 +707,11 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // overlay is toggled on (setShowPerfOverlay).
     //
     // Unter dem Wächter, weil m_perfPollTimer im
-    // NEREUS_GPU_SPECTRUM-Block des Headers steht und die Überlagerung
+    // LONGPATH_GPU_SPECTRUM-Block des Headers steht und die Überlagerung
     // selbst (paintEvent, im GPU-Zweig) ohne ihn gar nicht gemalt wird.
     // Ohne GPU-Pfad entsteht der Timer also nicht, statt einmal je
     // Sekunde für eine Anzeige zu messen, die es nicht gibt.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_perfPollTimer = new QTimer(this);
     m_perfPollTimer->setInterval(1000);
     connect(m_perfPollTimer, &QTimer::timeout, this, [this]() {
@@ -773,7 +773,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
             setShowPerfOverlay(true);
         }
     }
-#endif  // NEREUS_GPU_SPECTRUM — Perf-Überlagerung
+#endif  // LONGPATH_GPU_SPECTRUM — Perf-Überlagerung
 
     // Phase 3Q-8: child label for the disconnect overlay. Composites in both
     // CPU and GPU paint paths (QRhi early-returns from paintEvent so a QPainter
@@ -1557,7 +1557,7 @@ void SpectrumWidget::setFrequencyRange(double centerHz, double bandwidthHz)
     m_centerHz = centerHz;
     m_bandwidthHz = bandwidthHz;
     updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Band-plan strip depends on m_centerHz/m_bandwidthHz — invalidate the
     // static overlay so the strip repositions correctly on freq/zoom changes.
     markOverlayDirty();
@@ -1620,7 +1620,7 @@ void SpectrumWidget::setFilterOffset(int lowHz, int highHz)
 {
     m_filterLowHz = lowHz;
     m_filterHighHz = highHz;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();
@@ -1983,7 +1983,7 @@ void SpectrumWidget::setActivePeakHoldEnabled(bool on)
     // Force GPU overlay rebuild now — the per-frame nudge in updateSpectrum()
     // only fires once spectrum frames arrive, leaving a stale overlay between
     // the toggle and the next frame.  markOverlayDirty() is guarded for
-    // CPU-only builds (Linux without NEREUS_GPU_SPECTRUM).
+    // CPU-only builds (Linux without LONGPATH_GPU_SPECTRUM).
     markOverlayDirty();
 }
 
@@ -2871,7 +2871,7 @@ void SpectrumWidget::setShowFps(bool on)
 
 void SpectrumWidget::setShowPerfOverlay(bool on)
 {
-#ifndef NEREUS_GPU_SPECTRUM
+#ifndef LONGPATH_GPU_SPECTRUM
     // Ohne GPU-Pfad gibt es nichts einzuschalten: die Überlagerung wird
     // im GPU-Zweig von paintEvent gemalt, und der ist nicht übersetzt.
     // Ein stiller Nichtstuer statt eines Wächters an der Aufrufstelle
@@ -2898,7 +2898,7 @@ void SpectrumWidget::setShowPerfOverlay(bool on)
         QStringLiteral("ShowPerfOverlay"),
         on ? QStringLiteral("True") : QStringLiteral("False"));
     markOverlayDirty();
-#endif  // NEREUS_GPU_SPECTRUM
+#endif  // LONGPATH_GPU_SPECTRUM
 }
 
 void SpectrumWidget::setCursorFreqVisible(bool on)
@@ -3489,7 +3489,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // does the proper fix (static/dynamic layer split: chrome cached
     // on state change, dynamic overlays in a smaller spectrum-area
     // texture rebuilt every frame).
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Mode3D: die Bandbreite liegt dort in dieser Schicht
     // (paintPassbandOverSurface) und muss mit der Flaeche Schritt
     // halten — ohne diesen Zweig wuerde sie ohne Peak-Hold/Blobs/
@@ -3732,7 +3732,7 @@ void SpectrumWidget::applyResizeSettled()
     // Recreate waterfall image at new size
     int w = width();
     int h = height();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // GPU mode: waterfall clips at strip border (strip is in overlay on right edge)
     int wfW = w - effectiveStripW();
 #else
@@ -3744,7 +3744,7 @@ void SpectrumWidget::applyResizeSettled()
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
         m_waterfall.fill(m_wfBgFillColor);
         m_wfWriteRow = 0;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_wfTexFullUpload = true;
 #endif
         // Sub-epic E: schedule history-image rebuild so the ring buffer's
@@ -3768,7 +3768,7 @@ void SpectrumWidget::applyResizeSettled()
 
 void SpectrumWidget::paintEvent(QPaintEvent* event)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // GPU mode: render() handles everything via QRhi.
     // Do NOT use QPainter on QRhiWidget — it doesn't support paintEngine.
     SpectrumBaseClass::paintEvent(event);
@@ -4415,7 +4415,7 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
     // dim overlay matches that visual effect on GPU where the waterfall
     // texture is drawn at full alpha by the m_wfPipeline and the
     // overlay texture is layered on top.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     const int op = qBound(0, m_wfOpacity, 100);
     if (op < 100) {
         const int dimAlpha = 255 - static_cast<int>(255.0 * op / 100.0);
@@ -5512,7 +5512,7 @@ void SpectrumWidget::rebuildWaterfallViewport()
     // `m_wfTexFullUpload = true`); m_wfLastUploadedRow alone leaves the
     // bottom scanline stale because the incremental loop exits before
     // uploading row texH-1.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_wfTexFullUpload = true;
     m_wfLastUploadedRow = -1;
 #endif
@@ -5734,7 +5734,7 @@ void SpectrumWidget::reprojectWaterfall(double oldCenterHz, double oldBandwidthH
     // review): m_wfTexFullUpload routes the GPU upload through the full
     // path, m_wfLastUploadedRow = -1 forces every scanline to be re-sent.
     // Skipping either leaves the bottom row stale on the next frame.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_wfLastUploadedRow = -1;
     m_wfTexFullUpload   = true;
 #endif
@@ -8078,7 +8078,7 @@ bool SpectrumWidget::eventFilter(QObject* obj, QEvent* ev)
 // a non-GPU build can be verified before flipping.
 static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     const int contentH = widgetH - chromeH;
     return static_cast<int>(contentH * spectrumFrac);
 #else
@@ -8100,12 +8100,12 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 // zwei Orte, an denen sie auseinanderlaufen; hier ist es die dritte
 // Wiederholung desselben Musters an einem Tag.
 // From AetherSDR SpectrumWidget.cpp:2264-2306 + 1857-1871 + 7138-7156
-// [@0cd4559] — verbatim wo moeglich; NEREUS_GPU_SPECTRUM statt
+// [@0cd4559] — verbatim wo moeglich; LONGPATH_GPU_SPECTRUM statt
 // AETHER_GPU_SPECTRUM, und der Frequency-Preview-Zweig entfaellt, weil
 // NereusSDR dieses Feature (noch) nicht traegt.
 void SpectrumWidget::prepareForTopLevelChange()
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // QRhiWidget registers a cleanup callback with the current top-level
     // backing-store QRhi. Direct splitter/floating-window reparenting can miss
     // Qt's internal notification, leaving the old QRhi with a stale callback;
@@ -8119,7 +8119,7 @@ void SpectrumWidget::prepareForTopLevelChange()
 
 void SpectrumWidget::resetGpuResources()
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // On macOS/Windows, the GPU surface doesn't survive reparenting — tear
     // down old pipelines so initialize() rebuilds them for the new window.
     // On Linux (OpenGL), a simple update() is sufficient (#1240).
@@ -8144,7 +8144,7 @@ void SpectrumWidget::prepareForShutdown()
     setUpdatesEnabled(false);
     hide();
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     releaseResources();
 #ifdef Q_OS_MAC
     // Drop the native child window while its parent backing store is still
@@ -8158,7 +8158,7 @@ void SpectrumWidget::prepareForShutdown()
 
 void SpectrumWidget::applyNativeWindowIsolationPolicy()
 {
-#if defined(NEREUS_GPU_SPECTRUM) && defined(Q_OS_MAC)
+#if defined(LONGPATH_GPU_SPECTRUM) && defined(Q_OS_MAC)
     // Order matters: block ancestor promotion *before* requesting the native
     // window, so realizing the leaf's NSView can't drag its QWidget tree
     // native (redundant window-sized Core Animation backing stores, #4339).
@@ -9314,7 +9314,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
             emit centerChanged(m_centerHz);
         }
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -9326,7 +9326,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         // Resize spectrum/waterfall split
         float frac = static_cast<float>(my) / h;
         m_spectrumFrac = std::clamp(frac, 0.10f, 0.90f);
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -9374,7 +9374,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         m_centerHz += deltaHz;
         emit centerChanged(m_centerHz);
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -9593,7 +9593,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         }
     }
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();
@@ -9983,7 +9983,7 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
         emit centerChanged(m_centerHz);
         emit bandwidthChangeRequested(newBw);
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #endif
     } else if (event->modifiers() & Qt::ShiftModifier) {
@@ -10008,7 +10008,7 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
 // Ported from AetherSDR SpectrumWidget GPU pipeline
 // ============================================================================
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 
 // Fullscreen quad: position (x,y) + texcoord (u,v)
 // From AetherSDR SpectrumWidget.cpp:1779
@@ -10430,7 +10430,7 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
                         << m_wfGpuTexW << "x" << m_wfGpuTexH
                         << "— the texture will never be written and will"
                         << "show undefined GPU memory.";
-        } else if (qEnvironmentVariableIntValue("NEREUS_WF_DEBUG") > 0) {
+        } else if (qEnvironmentVariableIntValue("LONGPATH_WF_DEBUG") > 0) {
             qDebug() << "SpectrumWidget: waterfall seeded"
                      << seed.width() << "x" << seed.height()
                      << "fmt" << int(seed.format())
@@ -10501,10 +10501,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // the upload and the sampler. One pixel value decides which half to
     // look in, and no amount of further reading will.
     //
-    // Off unless asked for: NEREUS_WF_DEBUG=1. A diagnostic that costs a
+    // Off unless asked for: LONGPATH_WF_DEBUG=1. A diagnostic that costs a
     // qDebug per frame in normal use is a diagnostic that gets deleted.
     static const int kWfDebugLevel =
-        qEnvironmentVariableIntValue("NEREUS_WF_DEBUG");
+        qEnvironmentVariableIntValue("LONGPATH_WF_DEBUG");
     static const bool kWfDebug = kWfDebugLevel > 0;
 
     // Level 2: the one-shot discriminator. Fill the CPU image solid
@@ -10512,7 +10512,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // the entire upload→texture→sampler→quad chain end to end, which
     // pins the fault in the image's CONTENT (and convicts the
     // single-pixel probe below of under-sampling); a screen that stays
-    // magenta convicts the chain. One run with NEREUS_WF_DEBUG=2
+    // magenta convicts the chain. One run with LONGPATH_WF_DEBUG=2
     // answers what four theories could not.
     if (kWfDebugLevel >= 2 && !m_waterfall.isNull()) {
         m_waterfall.fill(QColor(Style::kGreenText));
@@ -10555,7 +10555,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // FRESH OBJECTS, not an in-place recreate (2026-08-11).
             //
             // The sixth and final theory, and the one the evidence
-            // finally allows: with NEREUS_WF_DEBUG=2 the CPU image was
+            // finally allows: with LONGPATH_WF_DEBUG=2 the CPU image was
             // force-filled solid green and full-uploaded EVERY frame —
             // recorded into the same submitted batch whose other
             // resources demonstrably work — and the screen stayed
@@ -10824,7 +10824,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // drawTnfMarkers likewise precedes drawSpotMarkers in the
             // frequency-plane painter.  Missing THIS call site while
             // having the CPU one is a silent GPU-only regression, since
-            // NEREUS_GPU_SPECTRUM is the shipping path.
+            // LONGPATH_GPU_SPECTRUM is the shipping path.
             drawNotchMarkers(p, notchSpecRect());
             // Phase 3J-2 Task E1: spot overlay before VFO marker so labels
             // sit below the slice marker chrome. Mirrors the CPU paintEvent
@@ -11730,7 +11730,7 @@ void SpectrumWidget::releaseResources()
 
 }
 
-#endif // NEREUS_GPU_SPECTRUM
+#endif // LONGPATH_GPU_SPECTRUM
 
 // ============================================================================
 // VFO Flag Widget Hosting (AetherSDR pattern)
@@ -11775,7 +11775,7 @@ void SpectrumWidget::setVfoFrequency(double hz)
     }
 
     updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();
@@ -11788,7 +11788,7 @@ void SpectrumWidget::recenterOnVfo()
     m_vfoOffScreen = VfoOffScreen::None;
     emit centerChanged(m_centerHz);
     updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();

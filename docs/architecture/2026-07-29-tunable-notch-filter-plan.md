@@ -104,7 +104,7 @@ These came out of a reconcile pass over the ten independently authored tasks. **
 
 ### Sequencing
 
-17. Tasks 1, 2, 4 and 9 each add a forward declaration plus a `friend class ::TestX;` line to the same two `NEREUS_BUILD_TESTS` blocks in `src/core/WdspEngine.h:100-124` and `:674-695`. Expect textual conflicts. Land them in task order and rebase rather than merging.
+17. Tasks 1, 2, 4 and 9 each add a forward declaration plus a `friend class ::TestX;` line to the same two `LONGPATH_BUILD_TESTS` blocks in `src/core/WdspEngine.h:100-124` and `:674-695`. Expect textual conflicts. Land them in task order and rebase rather than merging.
 
 ---
 
@@ -1157,7 +1157,7 @@ Called from two places, both gated on `if (m_showSpots)`:
     // other QPainter-drawn chrome re-render on next frame. Safe no-op
     // when the GPU path is disabled.
     void markOverlayDirty() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = true;
 #endif
         update();
@@ -1165,7 +1165,7 @@ Called from two places, both gated on `if (m_showSpots)`:
 ```
 
 It is the LAST member of the class, private, immediately before the closing
-brace. Cache members, all inside `#ifdef NEREUS_GPU_SPECTRUM`
+brace. Cache members, all inside `#ifdef LONGPATH_GPU_SPECTRUM`
 (`SpectrumWidget.h:1984-2018`):
 
 ```cpp
@@ -1414,28 +1414,28 @@ what is verified, and the source authority:
 #   Task 6: ddcIndex    (int,   default -1)  - codec-assigned DDC index; -1=unassigned
 # Source: NereusSDR-original (no Thetis upstream).
 # Design: docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §3.
-nereus_add_test(tst_slice_model_phase3f_properties)
+longpath_add_test(tst_slice_model_phase3f_properties)
 ```
 
-What `nereus_add_test(name)` does (`tests/CMakeLists.txt:114-203`):
+What `longpath_add_test(name)` does (`tests/CMakeLists.txt:114-203`):
 
 ```cmake
-    add_executable(${name} EXCLUDE_FROM_ALL ${name}.cpp $<TARGET_OBJECTS:nereus_test_sandbox> ${ARGN})
+    add_executable(${name} EXCLUDE_FROM_ALL ${name}.cpp $<TARGET_OBJECTS:longpath_test_sandbox> ${ARGN})
     target_link_libraries(${name} PRIVATE NereusSDRObjs Qt6::Test)
-    set_property(GLOBAL APPEND PROPERTY NEREUS_ALL_TESTS ${name})
-    if(NEREUS_USE_PCH)
+    set_property(GLOBAL APPEND PROPERTY LONGPATH_ALL_TESTS ${name})
+    if(LONGPATH_USE_PCH)
         target_precompile_headers(${name} REUSE_FROM NereusSDRObjs)
     endif()
     add_test(NAME ${name} COMMAND ${name})
-    _nereus_derive_test_labels(_test_labels "${name}.cpp")
+    _longpath_derive_test_labels(_test_labels "${name}.cpp")
     set_tests_properties(${name} PROPERTIES
         LABELS "${_test_labels}"
         TIMEOUT 120)
 ```
 
-Extra source files go as `ARGN`: `nereus_add_test(tst_foo Fake.cpp)`.
+Extra source files go as `ARGN`: `longpath_add_test(tst_foo Fake.cpp)`.
 Per-test defines are added after the call, e.g.
-`target_compile_definitions(tst_p1_wire_format PRIVATE NEREUS_BUILD_TESTS)`.
+`target_compile_definitions(tst_p1_wire_format PRIVATE LONGPATH_BUILD_TESTS)`.
 Tests are `EXCLUDE_FROM_ALL`; aggregates are `all_tests` and `tests_<label>`.
 
 ### 7.3 How a test gets a `RadioModel`
@@ -1492,7 +1492,7 @@ private slots:
 Two edits are required, both in `src/core/WdspEngine.h`:
 
 1. Global-scope forward declaration inside the existing
-   `#ifdef NEREUS_BUILD_TESTS` block near the top (`WdspEngine.h:105-124`):
+   `#ifdef LONGPATH_BUILD_TESTS` block near the top (`WdspEngine.h:105-124`):
 
 ```cpp
 // wrapper ,  friend declarations need the fully-qualified name.
@@ -1510,11 +1510,11 @@ class TestWdspChannelIdMap;
 2. The friend line inside the class (`WdspEngine.h:674-694`):
 
 ```cpp
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test-only friend: lets unit tests bypass async wisdom load by setting
     // m_initialized = true directly so they can exercise createTxChannel /
     // createRxChannel without a running event loop or a real WDSP wisdom
-    // file.  Production builds (without NEREUS_BUILD_TESTS) never see this.
+    // file.  Production builds (without LONGPATH_BUILD_TESTS) never see this.
     friend class ::TestWdspEngineTxChannel;
     friend class ::TstWdspEngineDexpInit;
     friend class ::TstPsFeedbackChannel;
@@ -1533,7 +1533,7 @@ Use at `tst_stream_pool_binding.cpp:997-1017`:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(5, 5, 192000);
         const int a = model.addSlice();
@@ -1557,7 +1557,7 @@ The standalone-engine variant (`tst_ps_feedback_channel.cpp:70-78`):
 ```cpp
     void hasUniqueChannelId() {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
                                         // bypasses async wisdom path
         engine.openPsFeedbackChannelForTesting();
         TxChannel* tx = engine.createTxChannel(kTxChannelIdForTest);
@@ -1840,7 +1840,7 @@ Configure (from `CLAUDE.md`; tests are opt-in and OFF by default,
 `CMakeLists.txt:1450`):
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON
 ```
 
 Build the app:
@@ -1947,7 +1947,7 @@ Flagging these rather than inventing answers:
    inserted before `drawSpotMarkers` in BOTH the CPU path
    (`SpectrumWidget.cpp:3043`) and the GPU static-overlay rebuild
    (`SpectrumWidget.cpp:7143`). Missing the second call site is a silent
-   GPU-only regression, since `NEREUS_GPU_SPECTRUM` is the shipping path.
+   GPU-only regression, since `LONGPATH_GPU_SPECTRUM` is the shipping path.
 
 3. **`RXANBPGetMinNotchWidth` has no obvious refresh trigger in-tree.** It
    varies with `nc` and sample rate (spec §9). `RxChannel` already tracks
@@ -1965,7 +1965,7 @@ Flagging these rather than inventing answers:
 
 **Files:**
 - Create: `tests/tst_notch_tune_frequency.cpp`
-- Modify: `tests/CMakeLists.txt:1621` (register the new test after `nereus_add_test(tst_stream_pool_binding)`)
+- Modify: `tests/CMakeLists.txt:1621` (register the new test after `longpath_add_test(tst_stream_pool_binding)`)
 - Modify: `src/core/wdsp_api.h:130-136` (modification-history entry) and `src/core/wdsp_api.h:353-357` (new `extern "C"` declaration)
 - Modify: `src/core/RxChannel.h:615-617` (accessors) and `src/core/RxChannel.h:936-938` (carry members)
 - Modify: `src/core/RxChannel.cpp:1464-1489` (`setShiftFrequency` restructure + new `setNotchTuneFrequency`)
@@ -2030,7 +2030,7 @@ Create `tests/tst_notch_tune_frequency.cpp`:
 // compares (third_party/wdsp/src/nbp.c:477-479), so the usual
 // kTestChannel = 99 never-opened-channel hatch is an out-of-bounds read
 // here, not a no-op. Every slot uses a really opened channel through the
-// NEREUS_BUILD_TESTS friend seam, the pattern at
+// LONGPATH_BUILD_TESTS friend seam, the pattern at
 // tests/tst_ps_feedback_channel.cpp:72,78 and
 // tests/tst_stream_pool_binding.cpp:997-1017.
 // =================================================================
@@ -2077,7 +2077,7 @@ private slots:
     void notch_tune_frequency_defaults_to_zero()
     {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
         RxChannel* ch = engine.createRxChannel(0, bufferSizeForRate(kRateHz),
                                                4096, kRateHz, 48000, 48000);
         QVERIFY(ch != nullptr);
@@ -2127,7 +2127,7 @@ QTEST_MAIN(TestNotchTuneFrequency)
 
 - [ ] **Step 2: Register the test**
 
-In `tests/CMakeLists.txt`, immediately after `nereus_add_test(tst_stream_pool_binding)` (line 1621):
+In `tests/CMakeLists.txt`, immediately after `longpath_add_test(tst_stream_pool_binding)` (line 1621):
 
 ```cmake
 # ── Tunable Notch Filter Task 1: the notch DB's tune frequency ─────────────
@@ -2144,12 +2144,12 @@ In `tests/CMakeLists.txt`, immediately after `nereus_add_test(tst_stream_pool_bi
 # connect-time DDC seed commands the stream centre (§4.5).
 # Source: Thetis console.cs:31940-31941 + radio.cs:1419-1420 [v2.10.3.15].
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §4.
-nereus_add_test(tst_notch_tune_frequency)
+longpath_add_test(tst_notch_tune_frequency)
 ```
 
 - [ ] **Step 3: Open the WdspEngine friend seam for the new test class**
 
-In `src/core/WdspEngine.h`, append to the `#ifdef NEREUS_BUILD_TESTS` forward-declaration block (after `class TestWdspChannelIdMap;`, line 124):
+In `src/core/WdspEngine.h`, append to the `#ifdef LONGPATH_BUILD_TESTS` forward-declaration block (after `class TestWdspChannelIdMap;`, line 124):
 
 ```cpp
 // TNF Task 1: the notch tune-frequency test primes the engine so
@@ -2435,7 +2435,7 @@ Add to `tests/tst_notch_tune_frequency.cpp`, after the §4.3 slot:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(/*userDdcCount*/ 2, /*maxSlices*/ 2, kRateHz);
         // Pool BEFORE the slices. bindSliceToStream is the push site (§4.2)
@@ -2989,7 +2989,7 @@ the four commits above.
 - Modify: `src/core/RxChannel.h:200-201` (add `#include "dsp/Notch.h"`), `:211` (add `#include <QList>`), `:617` region (public notch API, after Task 1's `setNotchTuneFrequency` / `notchTuneFrequencyHz` declarations), `:936-938` region (private carries, next to `m_shiftOffsetHz`)
 - Modify: `src/core/RxChannel.cpp:1488` region (new notch section after Task 1's `RxChannel::setNotchTuneFrequency` definition, before the `// Channel state` banner at :1490)
 - Modify: `src/core/WdspEngine.h:123` (test-only forward declaration) and `:694` (friend declaration)
-- Modify: `tests/CMakeLists.txt:5732` (append `nereus_add_test` after `tst_diversity_dialog_persistence`)
+- Modify: `tests/CMakeLists.txt:5732` (append `longpath_add_test` after `tst_diversity_dialog_persistence`)
 - Test: `tests/tst_rxchannel_notch_wrappers.cpp`
 
 **Interfaces:**
@@ -3085,18 +3085,18 @@ QTEST_MAIN(TestRxChannelNotchWrappers)
 
 - [ ] **Step 2: Register the test in `tests/CMakeLists.txt`**
 
-Insert after line 5732 (`nereus_add_test(tst_diversity_dialog_persistence)`), before the `# ----` aggregate-target banner at line 5734:
+Insert after line 5732 (`longpath_add_test(tst_diversity_dialog_persistence)`), before the `# ----` aggregate-target banner at line 5734:
 
 ```cmake
 # TNF build-order step 2: RxChannel manual-notch wrappers (Notch value type,
 # add / edit / delete / sync / count, notches-run, auto-increase, min width).
-# Opens ONE real WDSP RX channel through the WdspEngine NEREUS_BUILD_TESTS
+# Opens ONE real WDSP RX channel through the WdspEngine LONGPATH_BUILD_TESTS
 # friend seam, because every RXANBP* entry point dereferences rxa[channel].ndb
 # and the usual kTestChannel = 99 convention would read out of bounds
 # (comm.h:110 sizes rxa at MAX_CHANNELS = 32).
 # Source: NereusSDR-original test infrastructure.
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §6.2, §11.1.
-nereus_add_test(tst_rxchannel_notch_wrappers)
+longpath_add_test(tst_rxchannel_notch_wrappers)
 ```
 
 - [ ] **Step 3: Run it and watch it fail**
@@ -3244,13 +3244,13 @@ class TestRxChannelNotchWrappers : public QObject {
     Q_OBJECT
 
 private:
-    // Primes the engine past its async wisdom load (the NEREUS_BUILD_TESTS
+    // Primes the engine past its async wisdom load (the LONGPATH_BUILD_TESTS
     // friend seam on WdspEngine) and opens one real RX channel, so
     // rxa[kNotchTestChannel].ndb exists.  Same pattern as
     // tests/tst_ps_feedback_channel.cpp:72,78.
     RxChannel* openNotchChannel(WdspEngine& engine)
     {
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
         return engine.createRxChannel(kNotchTestChannel,
                                       /*inputBufferSize*/ 238,
                                       /*dspBufferSize*/ kDspBufferSize,
@@ -3368,7 +3368,7 @@ void RXANBPGetMinNotchWidth(int channel, double* minwidth);
 void RXANBPSetAutoIncrease(int channel, int autoincr);
 ```
 
-`src/core/WdspEngine.h` ,  add the global-scope forward declaration after line 123 (`class TestWdspChannelIdMap;`), inside the existing `#ifdef NEREUS_BUILD_TESTS` block:
+`src/core/WdspEngine.h` ,  add the global-scope forward declaration after line 123 (`class TestWdspChannelIdMap;`), inside the existing `#ifdef LONGPATH_BUILD_TESTS` block:
 
 ```cpp
 // Tunable Notch Filter step 2: the notch-wrapper test opens one real RX
@@ -4087,7 +4087,7 @@ git commit -S -m "feat(dsp): wire the notch run flag, auto-increase and min-widt
 - Modify: `CMakeLists.txt:657-673` (add `src/models/NotchModel.cpp` to `MODEL_SOURCES`)
 - Modify: `docs/attribution/THETIS-PROVENANCE.md:315-316` (insert two rows, alphabetical, between `BandDefaults.cpp` and `PanadapterModel.cpp`)
 - Modify: `docs/attribution/aethersdr-reconciliation.md:88-89` (insert two rows in the Models table)
-- Modify: `tests/CMakeLists.txt:5732` (append five `nereus_add_test` registrations)
+- Modify: `tests/CMakeLists.txt:5732` (append five `longpath_add_test` registrations)
 - Test: `tests/tst_notch_model_guards.cpp`
 - Test: `tests/tst_notch_model_index_invariant.cpp`
 - Test: `tests/tst_notch_spatial_helpers.cpp`
@@ -4353,12 +4353,12 @@ Register it in `tests/CMakeLists.txt`, immediately after the `tst_diversity_dial
 # Source: Thetis console.cs:13221; 33299-33321; 40007-40047; 40050-40120;
 #         40222-40280 [v2.10.3.15]; radio.cs:4261-4272 [v2.10.3.15].
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §5.4.
-nereus_add_test(tst_notch_model_guards)
+longpath_add_test(tst_notch_model_guards)
 ```
 
 - [ ] **Step 2: Run it and watch it fail**
 
-Run: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON && cmake --build build --target tst_notch_model_guards`
+Run: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON && cmake --build build --target tst_notch_model_guards`
 
 Expected: FAIL at compile with `fatal error: 'models/NotchModel.h' file not found`.
 
@@ -5279,7 +5279,7 @@ Register it in `tests/CMakeLists.txt`, after the `tst_notch_model_guards` block:
 # retires Thetis's GetFirstNotchThatMatches selection recovery).
 # Source: Thetis console.cs:40198-40219; 40262-40266 [v2.10.3.15].
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §5.2.
-nereus_add_test(tst_notch_model_index_invariant)
+longpath_add_test(tst_notch_model_index_invariant)
 ```
 
 - [ ] **Step 12: Run it and watch it fail**
@@ -5526,7 +5526,7 @@ Register it in `tests/CMakeLists.txt`, after the index-invariant block:
 # (radio.cs:4310), first-found-in-list-order.
 # Source: Thetis radio.cs:4261-4272; 4276-4293; 4297-4325 [v2.10.3.15].
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §5.3.
-nereus_add_test(tst_notch_spatial_helpers)
+longpath_add_test(tst_notch_spatial_helpers)
 ```
 
 - [ ] **Step 17: Run it and watch it fail**
@@ -5707,7 +5707,7 @@ Register it in `tests/CMakeLists.txt`, after the spatial-helpers block:
 # silent on LSB and correct on USB, so it needs its own test.
 # Source: Thetis console.cs:40281-40307 [v2.10.3.15].
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §5.3.
-nereus_add_test(tst_notch_sideband_shift)
+longpath_add_test(tst_notch_sideband_shift)
 ```
 
 - [ ] **Step 22: Run it and watch it fail**
@@ -6060,7 +6060,7 @@ Register it in `tests/CMakeLists.txt`, after the sideband-shift block:
 # mnotchdb string at console.cs:3034-3035, 4763-4764 [v2.10.3.15]; flat keys
 # avoid its locale-sensitive double.Parse).
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §5.3, §5.5.
-nereus_add_test(tst_notch_persistence)
+longpath_add_test(tst_notch_persistence)
 ```
 
 - [ ] **Step 27: Run it and watch it fail**
@@ -6318,7 +6318,7 @@ Create `tests/tst_notch_channel_sync.cpp`:
 //   §8.1  RadioModel::notchModel() accessor
 //   §11   tst_notch_channel_sync
 //
-// Uses the WdspEngine NEREUS_BUILD_TESTS friend seam
+// Uses the WdspEngine LONGPATH_BUILD_TESTS friend seam
 // (src/core/WdspEngine.h:674-695) exactly as
 // tests/tst_stream_pool_binding.cpp:997-1017 does: priming
 // m_initialized lets openRxChannelPool run createRxChannel's real
@@ -6384,7 +6384,7 @@ QTEST_MAIN(TestNotchChannelSync)
 
 - [ ] **Step 2: Register the test and add the `WdspEngine` friend seam**
 
-Append after `tests/CMakeLists.txt:5732` (`nereus_add_test(tst_diversity_dialog_persistence)`), before the `# Aggregate "all_tests" target` block:
+Append after `tests/CMakeLists.txt:5732` (`longpath_add_test(tst_diversity_dialog_persistence)`), before the `# Aggregate "all_tests" target` block:
 
 ```cmake
 # ── TNF Task 4: RadioModel notch fan-out + syncNotchesToAllChannels() ──────
@@ -6400,10 +6400,10 @@ Append after `tests/CMakeLists.txt:5732` (`nereus_add_test(tst_diversity_dialog_
 # Thetis console.cs:40271-40273 [v2.10.3.15] (fixed three-id fan-out) and
 # WDSP RXA.c:85-93 + nbp.c:190,223,499 (inert-by-default notch database).
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §6.3.
-nereus_add_test(tst_notch_channel_sync)
+longpath_add_test(tst_notch_channel_sync)
 ```
 
-Insert after `src/core/WdspEngine.h:123` (`class TestWdspChannelIdMap;`), inside the existing `#ifdef NEREUS_BUILD_TESTS` block:
+Insert after `src/core/WdspEngine.h:123` (`class TestWdspChannelIdMap;`), inside the existing `#ifdef LONGPATH_BUILD_TESTS` block:
 
 ```cpp
 // TNF Task 4: the notch fan-out test primes the engine so openRxChannelPool
@@ -6519,7 +6519,7 @@ Append this slot to `TestNotchChannelSync` in `tests/tst_notch_channel_sync.cpp`
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(5, 5, 192000);
         const int a = model.addSlice();
@@ -7480,7 +7480,7 @@ int main() { return 0; }
 
 - [ ] **Step 2: Register the test, run it, watch it fail**
 
-Insert immediately after `nereus_add_test(tst_diversity_dialog_persistence)` at `tests/CMakeLists.txt:5733`, before the `# Aggregate "all_tests" target` banner (the aggregate reads a GLOBAL property, so registrations must precede it):
+Insert immediately after `longpath_add_test(tst_diversity_dialog_persistence)` at `tests/CMakeLists.txt:5733`, before the `# Aggregate "all_tests" target` banner (the aggregate reads a GLOBAL property, so registrations must precede it):
 
 ```cmake
 # TNF §6.4: rx_nf_enable repoint + both-index broadcast.
@@ -7495,7 +7495,7 @@ Insert immediately after `nereus_add_test(tst_diversity_dialog_persistence)` at 
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §6.4.
 # Gated on Qt6WebSockets_FOUND -- TciServer.h is #ifdef HAVE_WEBSOCKETS.
 if(Qt6WebSockets_FOUND)
-    nereus_add_test(tst_notch_tci_rx_nf_enable)
+    longpath_add_test(tst_notch_tci_rx_nf_enable)
     target_link_libraries(tst_notch_tci_rx_nf_enable PRIVATE Qt6::WebSockets)
 endif()
 ```
@@ -8051,10 +8051,10 @@ private slots:
     // §8.2: notch chrome lives in the cached GPU static-overlay texture,
     // so every mutator must invalidate it.  A bare update() (which is all
     // the spot push does) leaves a dragged marker frozen on the shipping
-    // path, where NEREUS_GPU_SPECTRUM is ON by default (CMakeLists.txt:420).
+    // path, where LONGPATH_GPU_SPECTRUM is ON by default (CMakeLists.txt:420).
     void every_notch_mutator_invalidates_the_static_overlay()
     {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         SpectrumWidget sw;
 
         sw.clearOverlayStaticDirtyForTest();
@@ -8084,7 +8084,7 @@ QTEST_MAIN(TestNotchHitTest)
 - [ ] **Step 2: Register the test in CMake**
 
 Insert into `tests/CMakeLists.txt` at line 5733, immediately after
-`nereus_add_test(tst_diversity_dialog_persistence)` and before the
+`longpath_add_test(tst_diversity_dialog_persistence)` and before the
 `Aggregate "all_tests" target` banner:
 
 ```cmake
@@ -8100,7 +8100,7 @@ Insert into `tests/CMakeLists.txt` at line 5733, immediately after
 # (setTnfMarkers / setTnfGlobalEnabled / drawTnfMarkers) for geometry;
 # Thetis display.cs:386-390, 8691-8722 [v2.10.3.15] for colours.
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §8.
-nereus_add_test(tst_notch_hit_test)
+longpath_add_test(tst_notch_hit_test)
 ```
 
 - [ ] **Step 3: Run it and watch it fail**
@@ -8159,14 +8159,14 @@ the blank line preceding `signals:` at 1122:
     // Overlay-cache seam.  Returns false on a CPU-only build, where there
     // is no cached texture to invalidate.
     bool overlayStaticDirtyForTest() const {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         return m_overlayStaticDirty;
 #else
         return false;
 #endif
     }
     void clearOverlayStaticDirtyForTest() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = false;
 #endif
     }
@@ -8831,7 +8831,7 @@ In `src/gui/SpectrumWidget.cpp`, insert before line 7139
             // drawTnfMarkers likewise precedes drawSpotMarkers in the
             // frequency-plane painter.  Missing THIS call site while
             // having the CPU one is a silent GPU-only regression, since
-            // NEREUS_GPU_SPECTRUM is the shipping path.
+            // LONGPATH_GPU_SPECTRUM is the shipping path.
             drawNotchMarkers(p, specRect);
 ```
 
@@ -9133,7 +9133,7 @@ git commit -m "feat(gui): push notch markers to every panadapter"
 
 **Files:**
 - Create: `tests/tst_notch_hit_test.cpp`
-- Modify: `tests/CMakeLists.txt:4331` (append a `nereus_add_test` block after the `tst_spectrum_overlays` registration)
+- Modify: `tests/CMakeLists.txt:4331` (append a `longpath_add_test` block after the `tst_spectrum_overlays` registration)
 - Modify: `src/gui/SpectrumWidget.h:176` (add `class QMenu;` to the existing `QT_BEGIN_NAMESPACE` forward-decl block)
 - Modify: `src/gui/SpectrumWidget.h:1120-1121` (public test seams, immediately after `spotBgColorForTest()`; after Task 6 this sits at the tail of the notch public block)
 - Modify: `src/gui/SpectrumWidget.h:1199-1200` (five interaction signals, immediately before `protected:`)
@@ -9369,7 +9369,7 @@ QTEST_MAIN(TestNotchHitTest)
 
 - [ ] **Step 2: Register the test in CMake**
 
-Append to `tests/CMakeLists.txt` after the `nereus_add_test(tst_spectrum_overlays)` block (`tests/CMakeLists.txt:4331`):
+Append to `tests/CMakeLists.txt` after the `longpath_add_test(tst_spectrum_overlays)` block (`tests/CMakeLists.txt:4331`):
 
 ```cmake
 # ── TNF design §7 / §11: panadapter notch interaction ────────────────────────
@@ -9386,7 +9386,7 @@ Append to `tests/CMakeLists.txt` after the `nereus_add_test(tst_spectrum_overlay
 # notch context menu (AetherSDR SpectrumWidget.cpp:8517-8572 [@c6481cbf]).
 # Uses QTEST_MAIN (QApplication required for SpectrumWidget); the widget
 # is never shown, so no RHI context is needed.
-nereus_add_test(tst_notch_hit_test)
+longpath_add_test(tst_notch_hit_test)
 ```
 
 - [ ] **Step 3: Run it and watch it fail**
@@ -10646,7 +10646,7 @@ git commit -m "feat(tnf): notch right-click context menu"
 
 **Files:**
 - Create: `tests/tst_tnf_controls.cpp`
-- Modify: `tests/CMakeLists.txt` (append `nereus_add_test(tst_tnf_controls)` before the `get_property(_all_tests ...)` tail block)
+- Modify: `tests/CMakeLists.txt` (append `longpath_add_test(tst_tnf_controls)` before the `get_property(_all_tests ...)` tail block)
 - Modify: `src/gui/SpectrumOverlayPanel.h:118-119` (signal gains `panId`), `src/gui/SpectrumOverlayPanel.h:162` (button-index comment)
 - Modify: `src/gui/SpectrumOverlayPanel.cpp:223-229` (activate `+TNF`), `src/gui/SpectrumOverlayPanel.cpp:272-278` (delete the disabled `MNF` twin)
 - Modify: `src/models/NotchModel.h` (add `tnfAddCenterHz` beside `notchSidebandShift` in the public API block), `src/models/NotchModel.cpp`
@@ -10790,7 +10790,7 @@ QTEST_MAIN(TestTnfControls)
 
 - [ ] **Step 2: Register the test**
 
-Add to `tests/CMakeLists.txt`, immediately before the `get_property(_all_tests GLOBAL PROPERTY NEREUS_ALL_TESTS)` tail block:
+Add to `tests/CMakeLists.txt`, immediately before the `get_property(_all_tests GLOBAL PROPERTY LONGPATH_ALL_TESTS)` tail block:
 
 ```cmake
 # ── TNF build-order step 8: +TNF button, status-bar light, menu action ───────
@@ -10803,7 +10803,7 @@ Add to `tests/CMakeLists.txt`, immediately before the `get_property(_all_tests G
 #     (§10.2 -- fixed chord, no shortcut-assignment subsystem exists).
 # Source: NereusSDR-original test; surfaces fixed by
 # docs/architecture/2026-07-28-tunable-notch-filter-design.md §7.5, §9, §10.2.
-nereus_add_test(tst_tnf_controls)
+longpath_add_test(tst_tnf_controls)
 ```
 
 - [ ] **Step 3: Run it and watch it fail**
@@ -11332,7 +11332,7 @@ git commit -m "feat(tnf): ship the DSP menu TNF toggle with a fixed accelerator"
 - Modify: `src/gui/setup/DspSetupPages.h:245-251` (the `MnfSetupPage` class body) and `:90-93` (includes)
 - Modify: `src/gui/setup/DspSetupPages.cpp:2103-2128` (the placeholder ctor block) and `:15-30` (includes)
 - Modify: `src/core/WdspEngine.h:100-123` (test forward decls) and `:674-694` (friend list)
-- Modify: `tests/CMakeLists.txt:2367` (append registration after `nereus_add_test(tst_cfc_setup_page)`)
+- Modify: `tests/CMakeLists.txt:2367` (append registration after `longpath_add_test(tst_cfc_setup_page)`)
 - Test: `tests/tst_mnf_setup_page.cpp`
 
 **Interfaces:**
@@ -11509,7 +11509,7 @@ QTEST_MAIN(TestMnfSetupPage)
 
 - [ ] **Step 2: Register the test**
 
-Append after `nereus_add_test(tst_cfc_setup_page)` (`tests/CMakeLists.txt:2367`):
+Append after `longpath_add_test(tst_cfc_setup_page)` (`tests/CMakeLists.txt:2367`):
 
 ```cmake
 # ── TNF design §9 / build-order step 9: MnfSetupPage full implementation ─────
@@ -11521,7 +11521,7 @@ Append after `nereus_add_test(tst_cfc_setup_page)` (`tests/CMakeLists.txt:2367`)
 # notch width readout (RXANBPGetMinNotchWidth, nbp.c:594).
 # Layout follows Thetis grpDSPMNF (setup.designer.cs:44145-44412 [v2.10.3.15]).
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md §9, §5.3.
-nereus_add_test(tst_mnf_setup_page)
+longpath_add_test(tst_mnf_setup_page)
 ```
 
 - [ ] **Step 3: Run it and watch it fail**
@@ -12375,7 +12375,7 @@ Append these slots to `tests/tst_mnf_setup_page.cpp`:
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
         QVERIFY(engine);
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
                                                 /*inputBufferSize*/ 238,
@@ -12421,7 +12421,7 @@ Expected: FAIL at compile time first: `error: 'm_initialized' is a private membe
 
 - [ ] **Step 19: Add the friend seam, the readout and the show-time refresh**
 
-`src/core/WdspEngine.h` ,  append inside the `#ifdef NEREUS_BUILD_TESTS` forward-declaration block (after `class TestWdspChannelIdMap;`, `:122`):
+`src/core/WdspEngine.h` ,  append inside the `#ifdef LONGPATH_BUILD_TESTS` forward-declaration block (after `class TestWdspChannelIdMap;`, `:122`):
 
 ```cpp
 // TNF step 9: the MNF Settings page test primes the engine so it can open one
@@ -12429,7 +12429,7 @@ Expected: FAIL at compile time first: `error: 'm_initialized' is a private membe
 class TestMnfSetupPage;
 ```
 
-`src/core/WdspEngine.h` ,  append inside the class's `#ifdef NEREUS_BUILD_TESTS` friend block (after `friend class ::TestWdspChannelIdMap;`, `:694`):
+`src/core/WdspEngine.h` ,  append inside the class's `#ifdef LONGPATH_BUILD_TESTS` friend block (after `friend class ::TestWdspChannelIdMap;`, `:694`):
 
 ```cpp
     // TNF step 9: same friendship for the MnfSetupPage readout test.
@@ -12767,7 +12767,7 @@ QTEST_MAIN(TestNotchVisualDoesNotPerturbNoiseFloorOrMaxbin)
 #include "tst_notch_visual_does_not_perturb_noise_floor_or_maxbin.moc"
 ```
 
-Register it. Insert into `tests/CMakeLists.txt` immediately after the `nereus_add_test(tst_diversity_dialog_persistence)` line (currently `:5732`), before the `Aggregate "all_tests" target` banner:
+Register it. Insert into `tests/CMakeLists.txt` immediately after the `longpath_add_test(tst_diversity_dialog_persistence)` line (currently `:5732`), before the `Aggregate "all_tests" target` banner:
 
 ```cmake
 # TNF Task 10 (visual notch): the section 8.3 measurement-routing gate.
@@ -12781,7 +12781,7 @@ Register it. Insert into `tests/CMakeLists.txt` immediately after the `nereus_ad
 # Source: NereusSDR-original test infrastructure.
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md
 #         section 8.3 + section 11.
-nereus_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
+longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
 ```
 
 - [ ] **Step 2: Run it and watch it fail**
@@ -13780,7 +13780,7 @@ Verified against the tree where a claim was checkable (`third_party/wdsp/src/RXA
 | 1 | Task 6 consumes `NotchModel::kNotchDefaultWidthHz` / `kNotchNarrowWidthHz`. Task 3 produces `kDefaultNotchWidthHz` / `kNarrowNotchWidthHz`. | Task 6 uses `NotchModel::kDefaultNotchWidthHz` and `NotchModel::kNarrowNotchWidthHz`. Task 3's names are already referenced by its own default argument (`widthHz = kDefaultNotchWidthHz`), so Task 3 must not rename. | **6** |
 | 2 | `RxChannel::m_notchAutoIncrease` default: Task 2 `{true}`, Task 4 `{false}`. | Keep `{true}`. Verified `third_party/wdsp/src/RXA.c:105` passes `1, // auto-increase notch width` into `create_nbp`. A `{false}` carry plus Task 4's unconditional reconcile would silently disable auto-increase on every channel (bench row 8). Task 4 deletes its declaration entirely (see 4.1). | **4** |
 | 3 | Task 4 cites `RXA.c:103` for `create_nbp autoincr = 1`. Actual line is `:105` (`:103` is inside the same call but is not that argument). Task 4 also cites `RXA.c:86` for master run; the value line is `:87` (`:86` is the `create_notchdb(` call). Task 2 and Task 3 both cite `:87` / `:105` correctly. | Task 4 uses `RXA.c:87` and `RXA.c:105`. | **4** |
-| 4 | Same executable `tst_notch_hit_test` declared with different labels: Task 6 says `gui` + `models`, Task 7 says `gui` + `core`. | Labels are auto-derived by `_nereus_derive_test_labels()` (`tests/CMakeLists.txt:186`), so both manual claims are advisory. The real defect is double registration; see 4.3. Drop the label claim from Task 7. | **7** |
+| 4 | Same executable `tst_notch_hit_test` declared with different labels: Task 6 says `gui` + `models`, Task 7 says `gui` + `core`. | Labels are auto-derived by `_longpath_derive_test_labels()` (`tests/CMakeLists.txt:186`), so both manual claims are advisory. The real defect is double registration; see 4.3. Drop the label claim from Task 7. | **7** |
 | 5 | Task 8 states `m_menuBtns` is "now 7 entries, indices 0-6" without saying what was removed. Tree currently has 8 appends (`SpectrumOverlayPanel.cpp:220,228,236,244,255,263,270,277`), `+TNF` already at index 1 and the `MNF` disabled stub at index 7. | The arithmetic is correct only if Task 8 deletes the `MNF` stub at `SpectrumOverlayPanel.cpp:273-278` and keeps `+TNF` at index 1. Task 8 must say so explicitly, because Task 10 consumes that deletion. | **8** |
 | 6 | Unit split: `SpectrumWidget::NotchMarker::freqMhz` is MHz (Task 6) while `NotchModel::centerHz`, all five `notch*Requested` signals, `setNotchMinWidthHz`, and Task 10's dent maths are Hz. | Not wrong, but undeclared as a conversion boundary. State in Task 6's contract that `MainWindow::refreshPanNotchMarkers` is the only Hz-to-MHz conversion site and that every signal out of `SpectrumWidget` is Hz. Tasks 7 and 10 both do `freqMhz * 1e6` arithmetic and will silently be off by 1e6 if either assumes otherwise. | **6** (declare), 7 and 10 (consume as declared) |
 
@@ -13790,7 +13790,7 @@ Verified against the tree where a claim was checkable (`third_party/wdsp/src/RXA
 2. **Nobody wires `RxChannel::minNotchWidthHz()` into `SpectrumWidget::setNotchMinWidthHz()`.** Task 6 produces the setter and defers the call site to "step 10"; Task 10 produces no such wiring; Task 9 reads `minNotchWidthHz()` only for the `lblMNFMinWidth` label. The widget therefore keeps its hardcoded `m_notchMinWidthHz{100.0}` forever, which feeds Task 7's edge-drag clamp and Task 10's `max(width, min)` dent span. Assign to Task 10 (it already touches both `SpectrumWidget` and `MainWindow`), or to Task 9 alongside the label refresh.
 3. **Task 10 consumes the removal of `makeDisabledBtn("MNF", this)` from Task 8**, which Task 8 implies by a count but never declares. See 1.5.
 4. **Task 10 consumes "the file-local `QString boolStr(bool v)` helper in `NotchModel.cpp`"**, which Task 3's Produces never mentions. Either Task 3 declares it, or Task 10 stops depending on another TU's file-local static (it is file-local, so Task 10 can only use it from inside `NotchModel.cpp`, which is fine, but the dependency must be declared).
-5. **Task 8 registers no test executable.** Its Produces lists three statics, a `QAction` and object names, and its gaps describe an accelerator-collision test and a menu two-way-sync mirror test, but names no target and no `nereus_add_test` line. Add one (suggest `tst_tnf_ui_wiring`).
+5. **Task 8 registers no test executable.** Its Produces lists three statics, a `QAction` and object names, and its gaps describe an accelerator-collision test and a menu two-way-sync mirror test, but names no target and no `longpath_add_test` line. Add one (suggest `tst_tnf_ui_wiring`).
 6. **Task 8's `+TNF` click handler is unnamed.** `SpectrumOverlayPanel::addTnfClicked(const QString&)` needs a `MainWindow` slot that resolves `sliceForPan(panId)` and calls `NotchModel::tnfAddCenterHz` + `addNotch`. Task 6 produces `MainWindow::onNotchCreateRequested(double, bool)` for the panadapter gesture; Task 8 should either reuse it or name a distinct member.
 7. **Unconsumed producers (inverse problem, likely dead code):** `NotchModel::notchAddRejected(QString)`, `notchNearFreq()`, `notchesInBandwidth()`, `notchSurrounding()` (all Task 3) have no consumer in tasks 4-10. Task 7 hit-tests in pixel space via its own `notchAtPixel`, and the dedupe rejection has no UI surface, so a `+TNF` press that lands inside the 10 Hz dedupe window is silently ignored. Either wire `notchAddRejected` to a status message in Task 8 or drop the signal and the three helpers.
 
@@ -13801,7 +13801,7 @@ No task consumes anything produced by a higher-numbered task. Three **backward f
 - Task 4 edits `RxChannel`'s carries created by Task 2 (resolve by deleting Task 4's copy, see 4.1).
 - Task 8 adds `static double NotchModel::tnfAddCenterHz(...)` to Task 3's file.
 - Task 10 adds `visualEnabled` / `setVisualEnabled` / `visualEnabledChanged` to Task 3's file (resolve by deleting Task 10's copy, see 4.4).
-- Four separate tasks (1, 2, 4, 9) each add a forward decl plus a `friend class ::TestX;` line to the same two `NEREUS_BUILD_TESTS` blocks in `src/core/WdspEngine.h:100-124` and `:674-695`. Expect textual conflicts; sequence them or land them as one combined edit.
+- Four separate tasks (1, 2, 4, 9) each add a forward decl plus a `friend class ::TestX;` line to the same two `LONGPATH_BUILD_TESTS` blocks in `src/core/WdspEngine.h:100-124` and `:674-695`. Expect textual conflicts; sequence them or land them as one combined edit.
 
 ## 4. DUPLICATED WORK
 

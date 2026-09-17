@@ -25,7 +25,7 @@
 // steht, bevor es zurueckkehrt.
 //
 // Dieser Test haelt den simulierten Audio-Faden ueber den
-// NEREUS_BUILD_TESTS-Testhaken setTapWriteDelayHookForTest() gezielt in
+// LONGPATH_BUILD_TESTS-Testhaken setTapWriteDelayHookForTest() gezielt in
 // genau diesem Fenster fest (Zaehler schon erhoeht, Zeiger schon
 // gelesen, write() noch nicht aufgerufen) und misst, wie lange
 // setXxxTap(nullptr, ...) braucht. Vor dem Fix waere das im Bereich

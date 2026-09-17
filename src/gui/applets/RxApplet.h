@@ -215,7 +215,7 @@ public slots:
     // Called by MainWindow on currentRadioChanged after setBoardCapabilities.
     void setHpsdrSku(Longpath::HPSDRModel sku);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only: returns current step-att spinbox maximum (for range assertions).
     // Phase 3P-A Task 15.

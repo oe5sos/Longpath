@@ -240,7 +240,8 @@ QVector<LogEntry> parse(const QByteArray& bytes)
         else if (key == QLatin1String("COMMENT"))       { cur.comment = value; }
         else if (key == QLatin1String("FREQ"))          { cur.freqMHz = value.toDouble(); }
         else if (key == QLatin1String("TX_PWR"))        { cur.txPowerW = value.toDouble(); }
-        else if (key == QLatin1String("APP_NEREUS_QRZUP")) {
+        else if (key == QLatin1String("APP_LONGPATH_QRZUP")
+                 || key == QLatin1String("APP_NEREUS_QRZUP")) {   // geschrieben vor 2026-09-17
             cur.uploadedToQrz = value.trimmed().compare(QLatin1String("Y"),
                                     Qt::CaseInsensitive) == 0;
         }

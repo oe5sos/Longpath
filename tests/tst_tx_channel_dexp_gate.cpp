@@ -32,7 +32,7 @@
 //     udSCFLowCut 100..10000 Hz (defaults 1500 / 500); chkSCFEnable
 //     default CHECKED.
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessors required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessors required):
 //   - First call stores the value (NaN sentinel fires on doubles).
 //   - Round-trip / clamp at the wrapper boundary (Thetis ranges).
 //   - Idempotent guard: second identical call is observable as the
@@ -51,7 +51,7 @@
 //                 via Anthropic Claude Code.
 // =================================================================
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan

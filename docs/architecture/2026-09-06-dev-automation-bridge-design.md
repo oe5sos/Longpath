@@ -57,7 +57,7 @@ confirmed by dogfooding the same day this shipped — by a namespace-stripped
 exact class name (`"SpectrumWidget"`, not `"Longpath::SpectrumWidget"`).
 Capture goes through `QWidget::grab()` for ordinary widgets, or
 `QRhiWidget::grabFramebuffer()` (Qt 6.7+, real API, not custom readback)
-for anything GPU-rendered under `NEREUS_GPU_SPECTRUM` — confirmed live
+for anything GPU-rendered under `LONGPATH_GPU_SPECTRUM` — confirmed live
 against `SpectrumWidget` itself: a full-resolution, pixel-correct PNG of
 the actual rendered panadapter, grid lines and band-edge marker included.
 The PNG is written to a temp file; the reply carries the path plus

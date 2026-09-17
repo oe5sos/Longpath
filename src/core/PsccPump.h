@@ -137,8 +137,8 @@ public:
     int  psFbDdc()            const { return m_psFbDdc; }
     qint64 totalBlocksPumped() const { return m_totalBlocksPumped; }
 
-#ifdef NEREUS_BUILD_TESTS
-    // ── Paired-call test seam (NEREUS_BUILD_TESTS only) ──────────────
+#ifdef LONGPATH_BUILD_TESTS
+    // ── Paired-call test seam (LONGPATH_BUILD_TESTS only) ──────────────
     //
     // Captures the args that the production code WOULD have passed to
     // extern pscc() so tests can verify alignment without dragging in a
@@ -249,7 +249,7 @@ private:
 
     qint64 m_totalBlocksPumped{0};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     bool m_skipPsccForTests{false};
     LastPsccArgs m_lastPsccArgs;
 #endif

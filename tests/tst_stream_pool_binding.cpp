@@ -421,7 +421,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(/*userDdcCount*/ 2, /*maxSlices*/ 3, 192000);
         model.receiverManager()->createReceiver();
@@ -1015,7 +1015,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(5, 5, 192000);
 
@@ -1107,7 +1107,7 @@ private slots:
         DetachConnection detach{&model};
 
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(5, 5, 192000);
 
@@ -1151,7 +1151,7 @@ private slots:
         DetachConnection detach{&model};
 
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         // Seed the connection at 192 kHz. Not running, so restartStreamWithRate
         // records the rate without a stop/start burst.
@@ -1259,7 +1259,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(5, 5, 192000);
         const int a = model.addSlice();

@@ -97,7 +97,7 @@ public:
     // Ring capacity: 4096 float samples (~85 ms at 48 kHz mono).
     static constexpr unsigned int kRingCapacity = 4096u;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     /// Number of samples currently in the ring (consumer-visible fill).
     int ringFillForTest() const;
     /// Cumulative count of samples dropped due to ring overflow.

@@ -209,8 +209,8 @@ jobs:
         # docs/attribution/thetis-author-tags.json does not yet list.
         # Forces corpus refresh before any port can cite a new region.
         env:
-          NEREUS_THETIS_DIR: ${{ github.workspace }}/../Thetis
-          NEREUS_MI0BOT_DIR: ${{ github.workspace }}/../mi0bot-Thetis
+          LONGPATH_THETIS_DIR: ${{ github.workspace }}/../Thetis
+          LONGPATH_MI0BOT_DIR: ${{ github.workspace }}/../mi0bot-Thetis
         run: python3 scripts/discover-thetis-author-tags.py --drift
 
       - name: Verify inline author-tag preservation in ported code
@@ -219,9 +219,9 @@ jobs:
         # appear within ±10 port lines. This is the safety net that
         # would have caught the 2026-04-21 DH1KLM drop at PR time.
         env:
-          NEREUS_THETIS_DIR: ${{ github.workspace }}/../Thetis
-          NEREUS_MI0BOT_DIR: ${{ github.workspace }}/../mi0bot-Thetis
-          NEREUS_FREEDV_DIR: ${{ github.workspace }}/../freedv-gui
+          LONGPATH_THETIS_DIR: ${{ github.workspace }}/../Thetis
+          LONGPATH_MI0BOT_DIR: ${{ github.workspace }}/../mi0bot-Thetis
+          LONGPATH_FREEDV_DIR: ${{ github.workspace }}/../freedv-gui
         run: python3 scripts/verify-inline-tag-preservation.py
 
       - name: Style drift has not grown
@@ -246,8 +246,8 @@ jobs:
         # audit docs stay in lockstep with the mechanical corpus, and
         # by extension with upstream Thetis source.
         env:
-          NEREUS_THETIS_DIR: ${{ github.workspace }}/../Thetis
-          NEREUS_MI0BOT_DIR: ${{ github.workspace }}/../mi0bot-Thetis
+          LONGPATH_THETIS_DIR: ${{ github.workspace }}/../Thetis
+          LONGPATH_MI0BOT_DIR: ${{ github.workspace }}/../mi0bot-Thetis
         run: python3 scripts/generate-contributor-indexes.py --check
 
       - name: WDSP header census drift detector
@@ -313,7 +313,7 @@ jobs:
         # from this one.
         #
         # `shard` / `shards` are unset for Windows, so CMake's
-        # NEREUS_TEST_SHARDS defaults to 0 — no sharding, and moot there
+        # LONGPATH_TEST_SHARDS defaults to 0 — no sharding, and moot there
         # because it builds no tests.
         include:
           - os: ubuntu-24.04
@@ -369,7 +369,7 @@ jobs:
         # so we match the release.yml + Windows CI versions (6.8.*) and
         # get QRhiWidget on Linux too. Apt qt6-* on ubuntu-24.04 was Qt
         # 6.4.2, which is too old for QRhiWidget and forced
-        # -DNEREUS_GPU_SPECTRUM=OFF on Linux.
+        # -DLONGPATH_GPU_SPECTRUM=OFF on Linux.
         #
         # mold (the apt mold package) is the fast linker. With 451 test
         # executables linking against LongpathObjs + Qt6 the default
@@ -529,7 +529,7 @@ jobs:
       # ------------------------------------------------------------------
       - name: Configure (Linux)
         if: runner.os == 'Linux'
-        # 2026-05-12 (PR #238 review P1 #4): NEREUS_BUILD_TESTS=ON
+        # 2026-05-12 (PR #238 review P1 #4): LONGPATH_BUILD_TESTS=ON
         # so the test suite actually compiles + runs in CI.  Prior
         # configure left it off, the ctest step ran with
         # --no-tests=ignore, and any drift in test sources (signal
@@ -539,7 +539,7 @@ jobs:
         # 2026-05-13: Qt now comes from install-qt-action (6.8.*)
         # instead of apt qt6-* (which was 6.4.2 on ubuntu-24.04).
         # That makes QRhiWidget available on Linux CI so we no
-        # longer need -DNEREUS_GPU_SPECTRUM=OFF.  Matches release.yml
+        # longer need -DLONGPATH_GPU_SPECTRUM=OFF.  Matches release.yml
         # x86_64 path and Windows CI.
         #
         # 2026-05-13 (Linux CI speed-alignment): -fuse-ld=mold replaces
@@ -549,8 +549,8 @@ jobs:
         # build wall-clock. _INIT suffix means it composes with any
         # toolchain-provided defaults instead of clobbering them.
         #
-        # 2026-05-13 (sharding): NEREUS_TEST_SHARDS / NEREUS_TEST_SHARD
-        # tell tests/CMakeLists.txt's nereus_add_test() to register
+        # 2026-05-13 (sharding): LONGPATH_TEST_SHARDS / LONGPATH_TEST_SHARD
+        # tell tests/CMakeLists.txt's longpath_add_test() to register
         # only the slice of tests whose name-MD5 modulo SHARDS matches
         # SHARD.  See tests/CMakeLists.txt for the dispatch rules.
         run: |
@@ -561,11 +561,11 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=mold \
             -DCMAKE_SHARED_LINKER_FLAGS_INIT=-fuse-ld=mold \
             -DCMAKE_MODULE_LINKER_FLAGS_INIT=-fuse-ld=mold \
-            -DNEREUS_BUILD_TESTS=ON \
-            -DNEREUS_TEST_SHARDS=${{ matrix.shards }} \
-            -DNEREUS_TEST_SHARD=${{ matrix.shard }}
+            -DLONGPATH_BUILD_TESTS=ON \
+            -DLONGPATH_TEST_SHARDS=${{ matrix.shards }} \
+            -DLONGPATH_TEST_SHARD=${{ matrix.shard }}
 
-      # 2026-08-09: NEREUS_BUILD_TESTS=ON here for the first time. See
+      # 2026-08-09: LONGPATH_BUILD_TESTS=ON here for the first time. See
       # the matrix comment for why the absence mattered; in short, the
       # platform this project is developed and used on was the one
       # platform the suite never touched.
@@ -587,9 +587,9 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
-            -DNEREUS_BUILD_TESTS=ON \
-            -DNEREUS_TEST_SHARDS=${{ matrix.shards }} \
-            -DNEREUS_TEST_SHARD=${{ matrix.shard }} \
+            -DLONGPATH_BUILD_TESTS=ON \
+            -DLONGPATH_TEST_SHARDS=${{ matrix.shards }} \
+            -DLONGPATH_TEST_SHARD=${{ matrix.shard }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
@@ -597,14 +597,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          # -DNEREUS_GPU_SPECTRUM=ON is explicit so CMake's FATAL_ERROR
+          # -DLONGPATH_GPU_SPECTRUM=ON is explicit so CMake's FATAL_ERROR
           # fires at configure time if the Qt install is missing the
           # ShaderTools or Gui private modules. v0.1.1 silently shipped
           # without GPU spectrum because this flag was implicit; never
           # again.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DNEREUS_GPU_SPECTRUM=ON
+            -DLONGPATH_GPU_SPECTRUM=ON
 
       # ------------------------------------------------------------------
       # Build
@@ -627,7 +627,7 @@ jobs:
       # "Not Run" -- which exits 0 and would silently pass.
       #
       # Gated on Linux to match the configure step: only the Linux job
-      # passes -DNEREUS_BUILD_TESTS=ON (ci.yml:458), and `all_tests` is
+      # passes -DLONGPATH_BUILD_TESTS=ON (ci.yml:458), and `all_tests` is
       # created by tests/CMakeLists.txt, which is only add_subdirectory'd
       # when that option is ON.  Asking for the target elsewhere would
       # fail with "No rule to make target".
@@ -647,7 +647,7 @@ jobs:
         shell: bash
         # 2026-05-12 (PR #238 review P1 #4): drop --no-tests=ignore so
         # a configure that produces zero tests fails loud.  Linux is
-        # configured with NEREUS_BUILD_TESTS=ON above; macOS + Windows
+        # configured with LONGPATH_BUILD_TESTS=ON above; macOS + Windows
         # still configure with tests OFF (the test suite uses Linux-
         # specific PortAudio / Qt 6.4 fakes that haven't been ported
         # to the macOS / mingw paths yet — separate scope).  So
@@ -730,7 +730,7 @@ jobs:
   # Die App so bauen, wie sie ausgeliefert wird
   # ====================================================================
   #
-  # OE5SOS, 2026-08-17: „Ein Bau ohne NEREUS_BUILD_TESTS gehört in die
+  # OE5SOS, 2026-08-17: „Ein Bau ohne LONGPATH_BUILD_TESTS gehört in die
   # regelmäßige Prüfung. Sonst kann derselbe Fall jederzeit
   # wiederkommen, und wieder merkt es niemand, bis jemand zufällig von
   # Grund auf baut."
@@ -738,12 +738,12 @@ jobs:
   # ── Der Fall ─────────────────────────────────────────────────────────
   #
   # RadioModel::txWorker() stand innerhalb von
-  # `#ifdef NEREUS_BUILD_TESTS`, und TxVoiceCheckDialog.cpp — reiner
+  # `#ifdef LONGPATH_BUILD_TESTS`, und TxVoiceCheckDialog.cpp — reiner
   # Produktionscode — rief es an fünf Stellen. Die App war damit seit
   # 49d10dc8 nicht mehr von Grund auf baubar.
   #
   # Gemeldet hat es niemand, weil JEDER bestehende Job dieser Datei mit
-  # -DNEREUS_BUILD_TESTS=ON konfiguriert (ci.yml:537, :563, und der
+  # -DLONGPATH_BUILD_TESTS=ON konfiguriert (ci.yml:537, :563, und der
   # Windows-Zweig). CMakeLists.txt:1691 reicht das Makro an
   # LongpathObjs weiter, also übersetzte die CI immer eine
   # Objektbibliothek, in der die Funktion existiert. 678 grüne Tests,
@@ -809,7 +809,7 @@ jobs:
           ccache --set-config=max_size=2G
           ccache --zero-stats
 
-      # NEREUS_BUILD_TESTS wird hier NICHT gesetzt. Die Vorgabe in
+      # LONGPATH_BUILD_TESTS wird hier NICHT gesetzt. Die Vorgabe in
       # CMakeLists.txt:1686 ist OFF, und genau diese Vorgabe soll
       # geprüft werden — sie explizit auf OFF zu setzen würde den Fall
       # verdecken, dass jemand die Vorgabe auf ON dreht.
@@ -834,10 +834,10 @@ jobs:
       # nachsehen, dass das Makro wirklich aus ist, und sonst abbrechen.
       - name: Verify the guard is actually off
         run: |
-          echo "── NEREUS_BUILD_TESTS im Cache ──"
-          grep -E "^NEREUS_BUILD_TESTS" build-ship/CMakeCache.txt || true
-          if ! grep -qE "^NEREUS_BUILD_TESTS:BOOL=OFF$" build-ship/CMakeCache.txt; then
-            echo "::error::NEREUS_BUILD_TESTS ist in diesem Bau nicht OFF."
+          echo "── LONGPATH_BUILD_TESTS im Cache ──"
+          grep -E "^LONGPATH_BUILD_TESTS" build-ship/CMakeCache.txt || true
+          if ! grep -qE "^LONGPATH_BUILD_TESTS:BOOL=OFF$" build-ship/CMakeCache.txt; then
+            echo "::error::LONGPATH_BUILD_TESTS ist in diesem Bau nicht OFF."
             echo "Dieser Job soll die App so bauen, wie sie ausgeliefert wird."
             echo "Steht das Makro auf ON, wiederholt er nur die Test-Jobs und"
             echo "faengt den Fall nicht mehr, fuer den es ihn gibt:"
@@ -848,8 +848,8 @@ jobs:
           # aus. Findet sich im Baum kein einziger davon abhaengiger
           # Block mehr, ist dieser Job gegenstandslos geworden und soll
           # es sagen, statt still weiterzulaufen.
-          if ! grep -rq "ifdef NEREUS_BUILD_TESTS" src/; then
-            echo "::error::Kein einziger #ifdef NEREUS_BUILD_TESTS mehr in src/."
+          if ! grep -rq "ifdef LONGPATH_BUILD_TESTS" src/; then
+            echo "::error::Kein einziger #ifdef LONGPATH_BUILD_TESTS mehr in src/."
             echo "Dann trennt dieser Bau nichts mehr von den Test-Jobs."
             exit 1
           fi

@@ -96,7 +96,7 @@ public:
     explicit HardwarePage(RadioModel* model, QWidget* parent = nullptr);
     ~HardwarePage() override;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     enum class Tab {
         RadioInfo, AntennaAlex, OcOutputs, Xvtr,
         Diversity, Calibration, Hl2Options, Hl2IoBoard, BandwidthMonitor

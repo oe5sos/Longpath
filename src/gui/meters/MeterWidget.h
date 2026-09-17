@@ -59,7 +59,7 @@ mw0lge@grange-lane.co.uk
 #include <QImage>
 #include <QVector>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 using MeterBaseClass = QRhiWidget;
@@ -127,7 +127,7 @@ public:
     void inferStackFromGeometry();
 
 protected:
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
@@ -158,7 +158,7 @@ private:
     // but QHash matches the rest of the file.
     QHash<int, double> m_lastBindingValue;
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
     void initBackgroundPipeline();

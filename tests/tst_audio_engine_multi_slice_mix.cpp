@@ -20,7 +20,7 @@
 // (MasterMixer.h:52-56).
 //
 // Harness pattern mirrors tst_audio_engine_master_mute.cpp: a FakeAudioBus
-// is injected through the NEREUS_BUILD_TESTS-only setSpeakersBusForTest
+// is injected through the LONGPATH_BUILD_TESTS-only setSpeakersBusForTest
 // seam, so the test needs no real CoreAudio / PipeWire / PortAudio
 // backend. start() is deliberately NOT called (it would construct real
 // platform buses); configureStreamPool is the production connect-time

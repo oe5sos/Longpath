@@ -96,7 +96,7 @@ public:
     // can assert the label format without opening a modal QMenu.
     static QString nativeHalLabelForCable(const DetectedCable& cable);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam — override the cable vector used by onAutoDetectClicked()
     // so unit tests can exercise menu population without PortAudio.
     // Passing an empty optional clears the override (back to real scan).
@@ -185,7 +185,7 @@ private:
     QPushButton* m_renameBtn{nullptr};       // Opens QInputDialog
     QPushButton* m_copyNodeBtn{nullptr};     // Copies nereussdr.vax-N
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     bool                    m_useTestCables{false};
     QVector<DetectedCable>  m_testCables;
 #endif

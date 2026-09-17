@@ -27,7 +27,7 @@
 //                 Setup IA reshape Phase 2.  AI-assisted transformation
 //                 via Anthropic Claude Code.
 //   2026-05-02 — Phase 4: PaValuesPage gains MetricLabel members + test
-//                 accessors guarded by NEREUS_BUILD_TESTS.  AI-assisted
+//                 accessors guarded by LONGPATH_BUILD_TESTS.  AI-assisted
 //                 transformation via Anthropic Claude Code.
 //   2026-05-03 — Phase 5 Agent 5A of #167: PaWattMeterPage gains the
 //                 missing Thetis controls — chkPAValues "Show PA Values
@@ -210,7 +210,7 @@ struct BoardCapabilities;
 // land in AppSettings immediately (no separate Save button — matches the
 // existing TX-EQ / CFC dialogs which auto-persist on every spinbox edit).
 //
-// Test seams (always-on, gated by NEREUS_BUILD_TESTS):
+// Test seams (always-on, gated by LONGPATH_BUILD_TESTS):
 //   profileComboForTest()     / gainSpinForTest(Band)
 //   adjustSpinForTest(Band,n) / maxPowerSpinForTest(Band)
 //   useMaxPowerCheckForTest(Band) / autoCalibrateCheckForTest()
@@ -284,7 +284,7 @@ public:
     // [v2.10.3.13].
     void applyCapabilityVisibility(const BoardCapabilities& caps);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     QComboBox*       profileComboForTest()       const { return m_profileCombo; }
     QDoubleSpinBox*  gainSpinForTest(Band b)     const;
     QDoubleSpinBox*  adjustSpinForTest(Band b, int step) const;
@@ -544,7 +544,7 @@ private:
     QPushButton*  m_autoCalCancelButton{nullptr};
     QDoubleSpinBox* m_autoCalTargetSpin{nullptr};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     /// Test injectors (see setNextProfileNameForTest / setDeleteConfirmedForTest /
     /// setResetConfirmedForTest above).
     bool    m_hasPendingProfileNameForTest{false};
@@ -596,7 +596,7 @@ public:
     // [v2.10.3.13].
     void applyCapabilityVisibility(const BoardCapabilities& caps);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     bool showPaValuesCheckedForTest() const;
     void clickResetPaValuesForTest();
 #endif
@@ -665,7 +665,7 @@ public slots:
     /// running peak/min and resets those to current.
     void resetPaValues();
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     QString fwdCalibratedTextForTest() const;
     QString revPowerTextForTest()      const;
     QString swrTextForTest()           const;

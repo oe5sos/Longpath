@@ -2264,9 +2264,9 @@ void P1RadioConnection::setP1AdcCntrl(int bits)
 void P1RadioConnection::selectCodec()
 {
     m_codec.reset();
-    m_useLegacyCodec = (qEnvironmentVariableIntValue("NEREUS_USE_LEGACY_P1_CODEC") == 1);
+    m_useLegacyCodec = (qEnvironmentVariableIntValue("LONGPATH_USE_LEGACY_P1_CODEC") == 1);
     if (m_useLegacyCodec) {
-        qCInfo(lcConnection) << "P1: NEREUS_USE_LEGACY_P1_CODEC=1 — using pre-refactor compose path";
+        qCInfo(lcConnection) << "P1: LONGPATH_USE_LEGACY_P1_CODEC=1 — using pre-refactor compose path";
         return;
     }
     if (!m_caps) {
@@ -3090,7 +3090,7 @@ void P1RadioConnection::sendCommandFrame()
     // Phase 3P-D follow-up: drive the bank ceiling from the active codec's
     // maxBank() so HL2 (18) and AnvelinaPro3 (17) both emit their full bank
     // range. Standard = 16. The legacy compose path (m_codec == nullptr under
-    // NEREUS_USE_LEGACY_P1_CODEC=1) retains the pre-refactor model-keyed
+    // LONGPATH_USE_LEGACY_P1_CODEC=1) retains the pre-refactor model-keyed
     // constant to preserve the regression-freeze byte-identical guarantee.
     const int maxBank = m_codec
         ? m_codec->maxBank()
@@ -3815,12 +3815,12 @@ void P1RadioConnection::composeCcForBankLegacy(int bankIdx, quint8 out[5]) const
 //
 // Phase 3P-A Task 12: delegates to per-board IP1Codec subclass chosen at
 // applyBoardQuirks() time. Falls back to legacy path when:
-//   - NEREUS_USE_LEGACY_P1_CODEC=1 env var is set, or
+//   - LONGPATH_USE_LEGACY_P1_CODEC=1 env var is set, or
 //   - m_codec is null (pre-connect).
 //
 // Regression-freeze gate (Task 16) proved codec and legacy agree byte-for-byte
 // on all non-HL2 boards. Dual-call diagnostic dropped. Legacy path still
-// reachable via NEREUS_USE_LEGACY_P1_CODEC=1 env var until Phase B merges.
+// reachable via LONGPATH_USE_LEGACY_P1_CODEC=1 env var until Phase B merges.
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcForBank(int bankIdx, quint8 out[5]) const
 {
@@ -3941,7 +3941,7 @@ void P1RadioConnection::hl2SendIoBoardInit()
         // Gate the step machine on (retAddr, retSubAddr) matching the
         // expected (deviceAddr, register) for the current step.  Without
         // this gate, unrelated I2C reads (e.g. from the new Hl2OptionsTab
-        // manual R/W tool, or NEREUS_HL2_I2C_SCAN traffic) would advance
+        // manual R/W tool, or LONGPATH_HL2_I2C_SCAN traffic) would advance
         // the probe out of order — false aborts or misleading "init
         // complete" before the intended registers were probed.  Codex P2
         // on PR #157.
@@ -3956,7 +3956,7 @@ void P1RadioConnection::hl2SendIoBoardInit()
     // because no read has fired yet — Idle ignores them.
     hl2ProbeAdvance(/*retAddr=*/0, /*retSubAddr=*/0);
 
-    if (qEnvironmentVariableIntValue("NEREUS_HL2_I2C_SCAN") != 0) {
+    if (qEnvironmentVariableIntValue("LONGPATH_HL2_I2C_SCAN") != 0) {
         requestI2cBusScan();
     }
 }

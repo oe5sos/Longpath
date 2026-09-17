@@ -633,7 +633,7 @@ private:
 
     // Phase 3P-A: per-board codec chosen at applyBoardQuirks() time.
     // Null when m_caps is null (pre-connect) or env var
-    // NEREUS_USE_LEGACY_P1_CODEC=1 forces legacy compose path.
+    // LONGPATH_USE_LEGACY_P1_CODEC=1 forces legacy compose path.
     std::unique_ptr<IP1Codec> m_codec;
     bool m_useLegacyCodec{false};
 
@@ -919,7 +919,7 @@ private:
     int       m_hl2ThrottleCount{0};
     QDateTime m_hl2LastThrottleTick;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only helpers — allow unit tests to inject board caps without a live radio.
     void setBoardForTest(HPSDRHW board) {

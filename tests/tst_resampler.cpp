@@ -97,7 +97,7 @@ private slots:
 // (unsorted)" + SIGABRT inside downsample24kTo8k; the 1:1-rate
 // tests likely also corrupted heap memory but did not happen to
 // trip the sentinel on the macOS / Linux paths that pre-dated CI's
-// NEREUS_BUILD_TESTS=ON gate.
+// LONGPATH_BUILD_TESTS=ON gate.
 //
 // Each Resampler ctor below now explicitly sizes maxBlockSamples to
 // the per-call input size (or larger) so r8brain's allocations fit.

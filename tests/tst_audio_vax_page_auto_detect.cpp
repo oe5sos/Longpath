@@ -20,7 +20,7 @@
 //  10. AudioVaxPage has four VaxChannelCard children with indices 1–4.
 //
 // Notes:
-//   - Tests use the NEREUS_BUILD_TESTS seam setDetectedCablesForTest()
+//   - Tests use the LONGPATH_BUILD_TESTS seam setDetectedCablesForTest()
 //     to inject a predetermined cable vector without invoking PortAudio.
 //   - Menu tests use QTimer::singleShot(50ms, ...) to interact with the
 //     QMenu event loop. The timer fires during exec(), finds the active
@@ -219,7 +219,7 @@ private slots:
     }
 
     // ── 5. configChanged carries correct channel + device name ────────────
-    // Uses the NEREUS_BUILD_TESTS seam bindDeviceNameForTest() to bypass
+    // Uses the LONGPATH_BUILD_TESTS seam bindDeviceNameForTest() to bypass
     // QMenu::exec() and directly verify the signal payload. The menu-open
     // behavior itself is exercised by autoDetectMenu_noCablesOpensAndCloses.
     void configChanged_carriesChannelAndDeviceName()

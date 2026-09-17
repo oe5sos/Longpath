@@ -1751,7 +1751,7 @@ If any tests fail that aren't directly related to this PR's work, diagnose and f
 - [ ] **Step 3: Re-run verifier and pre-commit hooks**
 
 ```bash
-NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis NEREUS_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis python3 scripts/verify-inline-tag-preservation.py
+LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis LONGPATH_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis python3 scripts/verify-inline-tag-preservation.py
 ```
 
 Expected: `[tag-preservation] OK — no missing tags detected`.

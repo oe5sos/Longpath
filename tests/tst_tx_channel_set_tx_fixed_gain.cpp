@@ -14,7 +14,7 @@
 //   to the WDSP/ChannelMaster SetTXFixedGain entry point with channel == m_id
 //   (Igain == Qgain == level).
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessor required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessor required):
 //   1. Initial state: m_lastFixedGain initialises to NaN so the first call
 //      (any value) always passes the idempotent guard.
 //   2. First call dispatches: NaN → value stored after setTxFixedGain(0.5).
@@ -33,7 +33,7 @@
 //
 // Total test cases: 7
 //
-// Requires NEREUS_BUILD_TESTS (set by CMakeLists target
+// Requires LONGPATH_BUILD_TESTS (set by CMakeLists target
 // tst_tx_channel_set_tx_fixed_gain).  Test-seam accessor
 // (lastFixedGainForTest) is compiled into TxChannel only when that define
 // is set.
@@ -50,7 +50,7 @@
 // no-port-check: NereusSDR-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan

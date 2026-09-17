@@ -216,7 +216,7 @@ void PsccPump::onPsPairedIqData(int psFbDdc, const QVector<float>& psFbSamples,
         rx[j] = static_cast<double>(psFbSamples[j]);
     }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_skipPsccForTests) {
         m_lastPsccArgs.channel   = m_txChannelId;
         m_lastPsccArgs.size      = sps;

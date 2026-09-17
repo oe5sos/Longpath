@@ -302,7 +302,7 @@ public:
     // m_lblGetPSpeak was created but never updated.
     double getHwPeak() const;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam (PR #212 follow-up bench fix, J.J. KG4VCF, 2026-05-07):
     // simulate calcc completing a calibration cycle so unit tests can drive
     // the autoAttentionTick gate (curCalCount != m_aaLastSeenCalCount).

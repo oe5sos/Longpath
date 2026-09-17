@@ -459,7 +459,7 @@ private slots:
     void buildDriveFrameHasNoProductionCallSites()
     {
         const QString root =
-            QString::fromLatin1(NEREUS_SOURCE_ROOT) + QStringLiteral("/src");
+            QString::fromLatin1(LONGPATH_SOURCE_ROOT) + QStringLiteral("/src");
         QDirIterator it(root,
                         QStringList{QStringLiteral("*.cpp"), QStringLiteral("*.h"),
                                      QStringLiteral("*.cc"), QStringLiteral("*.hpp"),

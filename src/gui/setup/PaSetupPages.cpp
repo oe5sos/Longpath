@@ -47,7 +47,7 @@
 //                 PaProfileManager (Phase 2B) — auto-persist on every
 //                 spinbox edit; profile lifecycle (New / Copy / Delete /
 //                 Reset Defaults) driven by the manager. Test seams
-//                 exposed via NEREUS_BUILD_TESTS so the dialog flows
+//                 exposed via LONGPATH_BUILD_TESTS so the dialog flows
 //                 (QInputDialog / QMessageBox) can be bypassed in
 //                 ctest. Authored by J.J. Boyd (KG4VCF) with
 //                 AI-assisted implementation via Anthropic Claude Code.
@@ -931,7 +931,7 @@ void PaGainByBandPage::applyCapabilityVisibility(const BoardCapabilities& caps)
     // (Field caps.hasStepAttenuatorCal is still consulted by other components.)
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 // Phase 8 (#167) test seams.
 //
 // isPaEditorEnabledForTest: returns whether the editor surface is enabled.
@@ -1109,7 +1109,7 @@ void PaGainByBandPage::onNewProfile()
     QString name;
     bool accepted = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasPendingProfileNameForTest) {
         name = m_pendingProfileNameForTest;
         accepted = !name.isEmpty();
@@ -1149,7 +1149,7 @@ void PaGainByBandPage::onCopyProfile()
     QString name;
     bool accepted = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasPendingProfileNameForTest) {
         name = m_pendingProfileNameForTest;
         accepted = !name.isEmpty();
@@ -1189,7 +1189,7 @@ void PaGainByBandPage::onDeleteProfile()
     // Mirrors Thetis btnDeletePAProfile_Click (setup.cs:22998-23025 [v2.10.3.13]).
     bool confirmed = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasDeleteConfirmForTest) {
         confirmed = m_deleteConfirmForTest;
         m_hasDeleteConfirmForTest = false;
@@ -1212,7 +1212,7 @@ void PaGainByBandPage::onDeleteProfile()
         // verbatim Thetis precedent string used by MicProfileManager.
         // Test seam: skip the modal so headless tests don't block on
         // a dialog that requires a user click.
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         if (m_suppressLastProfileWarningForTest) { return; }
 #endif
         QMessageBox::information(
@@ -1250,7 +1250,7 @@ void PaGainByBandPage::onResetDefaults()
     // Mirrors Thetis btnResetPAProfile_Click (setup.cs:23161+ [v2.10.3.13]).
     bool confirmed = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasResetConfirmForTest) {
         confirmed = m_resetConfirmForTest;
         m_hasResetConfirmForTest = false;
@@ -1735,7 +1735,7 @@ double PaGainByBandPage::autoCalBandMaxWatts(Band band) const
     return defaultMaxWattsForModelBand(m_connectedModel, band);
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 
 void PaGainByBandPage::simulateBandFwdReadingForTest(Band band, int driveStep,
                                                      double watts)
@@ -1781,7 +1781,7 @@ void PaGainByBandPage::completeAutoCalForTest()
     }
 }
 
-#endif  // NEREUS_BUILD_TESTS
+#endif  // LONGPATH_BUILD_TESTS
 
 // ── Wiring helpers ───────────────────────────────────────────────────────────
 
@@ -1818,7 +1818,7 @@ void PaGainByBandPage::wireUseMaxCheck(QCheckBox* check, Band band)
             });
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 QDoubleSpinBox* PaGainByBandPage::gainSpinForTest(Band b) const
 {
     const int idx = static_cast<int>(b);
@@ -2004,7 +2004,7 @@ void PaWattMeterPage::applyCapabilityVisibility(const BoardCapabilities& caps)
     }
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 bool PaWattMeterPage::showPaValuesCheckedForTest() const
 {
     return m_showPaValuesCheck && m_showPaValuesCheck->isChecked();
@@ -2503,7 +2503,7 @@ QString PaValuesPage::formatPaTempWithPeakMin(double currentC,
     return formatWithPeakMin(convert(currentC), convertedPm, unitSuffix, 1);
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 QString PaValuesPage::fwdCalibratedTextForTest() const
 {
     return m_fwdCalibratedLabel ? m_fwdCalibratedLabel->value() : QString();

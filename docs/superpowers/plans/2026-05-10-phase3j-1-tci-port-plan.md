@@ -78,20 +78,20 @@ Capture once at session start: `sed -n '1,40p' "/Users/j.j.boyd/Thetis/Project F
 
 **AppSettings keys** (17, documented in `TciProtocol.h` comment block during Task 1.1): keys table per design doc Section 10.
 
-### Task 0.1: Add qt6-websockets dependency + NEREUS_THETIS_DIR
+### Task 0.1: Add qt6-websockets dependency + LONGPATH_THETIS_DIR
 
 **Files:** `CMakeLists.txt`, `CLAUDE.md`, `CONTRIBUTING.md`, env-setup file (`.envrc` or shell profile reference)
 
 - [ ] Add `WebSockets` to root `find_package(Qt6 REQUIRED COMPONENTS ...)` and `Qt6::WebSockets` to `target_link_libraries(NereusSDR PRIVATE ...)`.
 - [ ] Add `qt6-websockets` (Arch) / `qt6-websockets-dev` (Debian/Ubuntu) to CLAUDE.md and CONTRIBUTING.md deps lines.
-- [ ] **Set `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis`** so the `verify-inline-tag-preservation.py` pre-commit hook can find Thetis source. Add to `.envrc` if direnv is in use, or document in CONTRIBUTING.md as required setup. Without this, the hook silently SKIPS (caught during the design-doc commit) and dropped author tags will not be flagged locally — only in CI.
+- [ ] **Set `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis`** so the `verify-inline-tag-preservation.py` pre-commit hook can find Thetis source. Add to `.envrc` if direnv is in use, or document in CONTRIBUTING.md as required setup. Without this, the hook silently SKIPS (caught during the design-doc commit) and dropped author tags will not be flagged locally — only in CI.
 - [ ] Verify clean build:
   ```bash
   cmake --build /Users/j.j.boyd/NereusSDR/.worktrees/phase3j-1-tci-server-port/build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
   ```
 - [ ] Commit:
   ```
-  build(tci): add qt6-websockets dep + NEREUS_THETIS_DIR for tag-preservation hook
+  build(tci): add qt6-websockets dep + LONGPATH_THETIS_DIR for tag-preservation hook
   ```
 
 ### Task 0.2: Create lcTci logging category
@@ -151,7 +151,7 @@ command,input,expected_response,expected_notifications,thetis_cite,notes
       struct Row { QString command, input, expectedResponse, expectedNotifs, cite, notes; };
   private:
       QList<Row> loadMatrix() {
-          QFile f(QStringLiteral(NEREUS_TEST_DATA_DIR "/tci/matrix.csv"));
+          QFile f(QStringLiteral(LONGPATH_TEST_DATA_DIR "/tci/matrix.csv"));
           if (!f.open(QIODevice::ReadOnly)) { return {}; }
           QTextStream ts(&f);
           ts.readLine();   // skip header
@@ -639,7 +639,7 @@ This task chunks into 3 logical sub-commits (single task, three commits — impl
 - [x] **Slice nomenclature**: UI Slice A/B/C/D; protocol `trx:N` via `sliceToTrx`/`trxToSlice`.
 - [x] **No CI-unblock language**.
 - [x] **Single end-of-epic gate** (Phase 26); no per-task reviewer ceremony.
-- [x] **Adversarial review fixes applied**: dropped lcTci TDD theater (Task 0.2), single source of truth for matrix (CSV → README via script), per-line burst test → smoke only, dropped redundant pre-commit hook re-verify, added NEREUS_THETIS_DIR setup, deleted noise task, clarified TestMockRadioModel scope, merged Spot+CW stubs into one phase, single docs commit, IQ test placement clarified, self-review checklist scoped to new-file ports only, header templates in setup notes (not standalone task), STANDARD_GUI_VERIFY macro in standing rules, cross-platform GUI commands in macro.
+- [x] **Adversarial review fixes applied**: dropped lcTci TDD theater (Task 0.2), single source of truth for matrix (CSV → README via script), per-line burst test → smoke only, dropped redundant pre-commit hook re-verify, added LONGPATH_THETIS_DIR setup, deleted noise task, clarified TestMockRadioModel scope, merged Spot+CW stubs into one phase, single docs commit, IQ test placement clarified, self-review checklist scoped to new-file ports only, header templates in setup notes (not standalone task), STANDARD_GUI_VERIFY macro in standing rules, cross-platform GUI commands in macro.
 
 **Plan size:** ~850 lines (down from 1,000 in matrix-driven v1, 1,800 in TDD-everywhere v0). Test files: 10. Tasks: ~25. CI runner is the load-bearing artifact.
 

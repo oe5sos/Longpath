@@ -19,7 +19,7 @@ SDR console for OpenHPSDR radios. Community contributions are welcome.
 
 - Open a [GitHub issue](https://github.com/OE5SOS/Longpath/issues/new) directly.
 - Include: OS, Longpath version, radio model, protocol version (P1 or P2), firmware version.
-- Attach logs (`~/.config/Longpath/nereussdr.log`) if available.
+- Attach logs (`~/.config/Longpath/longpath.log` (macOS: `~/Library/Preferences/Longpath/longpath.log`)) if available.
 - Check existing issues first to avoid duplicates.
 
 ## Suggesting Features
@@ -252,17 +252,17 @@ check locally it needs a path to your Thetis clone. Without the path the
 hook silently skips the check, so dropped tags are caught only in CI after
 a 7-minute round-trip.
 
-Set `NEREUS_THETIS_DIR` in your shell rc so it is present for every commit:
+Set `LONGPATH_THETIS_DIR` in your shell rc so it is present for every commit:
 
 ```bash
 # ~/.bashrc or ~/.zshrc
-export NEREUS_THETIS_DIR=/path/to/your/Thetis-clone
+export LONGPATH_THETIS_DIR=/path/to/your/Thetis-clone
 ```
 
 Or supply it inline for individual one-off commits:
 
 ```bash
-NEREUS_THETIS_DIR=/path/to/your/Thetis-clone git commit -m "..."
+LONGPATH_THETIS_DIR=/path/to/your/Thetis-clone git commit -m "..."
 ```
 
 The variable is only read by the local hook; CI sets it independently.
