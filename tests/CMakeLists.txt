@@ -869,6 +869,12 @@ nereus_add_test(tst_slice_persistence_per_band)
 # ── v0.2.0 regression: band-change lambda reentrancy guard ───────────────────
 nereus_add_test(tst_band_change_recursion_guard)
 
+# ── 2026-09-17: gespeicherter LSB/USB-Durchlass ueber den Traeger kommt nicht wieder ──
+nereus_add_test(tst_filter_restore_stays_on_sideband)
+
+# ── 2026-09-17: jede Rauschminderung laeuft wirklich mit Audio durch einen WDSP-Kanal ──
+nereus_add_test(tst_nr_backends_process_audio)
+
 # ── Step attenuator / ADC overload detection ─────────────────────────────
 nereus_add_test(tst_step_attenuator_controller)
 

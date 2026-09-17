@@ -197,6 +197,11 @@ void BandwidthFilterPane::setHasFrequency(bool on)
     update();
 }
 
+QSize BandwidthFilterPane::sizeHint() const
+{
+    return QSize(360, 140);
+}
+
 QRect BandwidthFilterPane::plotRect() const
 {
     return QRect(kPadX, kPadTop,
@@ -329,7 +334,25 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // auch — auf einem seiner Bilder laeuft die rechte Spitze in
         // den Rand.
         const float hi = lo + 40.0f;
-        const int top = r.top() + 30;          // Platz fuer die Marken
+        // ── Die Kurve bekommt das ganze Feld ────────────────────────
+        //
+        // Der Betreiber am 2026-09-17, mit Bildschirmfoto: "der
+        // bandfilter könnte noch genauer und besser sein, schaut eher
+        // flach aus."
+        //
+        // Hier stand `r.top() + 30` — "Platz fuer die Marken". Die
+        // Marken (Kantenwerte, Breitenkaestchen) stehen aber laengst
+        // OBEN in der Kopfzeile, ueber kPadTop; die dreissig Punkte
+        // waren eine Reserve fuer eine Beschriftung, die es an dieser
+        // Stelle seit dem 2026-08-22 nicht mehr gibt. Auf seinem Foto
+        // ist die Flaeche rund 105 Punkte hoch: 30 Kopf, 20 Achse,
+        // 30 Reserve, 2 Rand — fuer 40 dB blieben SIEBENUNDZWANZIG
+        // Punkte, nicht einmal 0,7 je Dezibel. Ein Sprechsignal 20 dB
+        // ueber dem Flur war damit 14 Punkte hoch. Das war das "flach".
+        //
+        // Sechs Punkte Luft bleiben, damit die Spitze eines starken
+        // Traegers nicht in die obere Kante des Durchlasses laeuft.
+        const int top = r.top() + 6;
         const int bot = r.bottom() - 2;
         const double yScale = (bot - top) / static_cast<double>(hi - lo);
 
@@ -372,11 +395,25 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             p.setFont(tiny);
             const QColor gridLine(0x1c, 0x1c, 0x22);
             const QColor gridText(Style::role("text-scale", Style::kTextScale));
+            // Die Zahlen nur, wenn sie Platz haben. Auf dem Foto vom
+            // 2026-09-17 standen "-83", "-93" und "-103" mit acht
+            // Punkten Abstand uebereinander — drei Zahlen zu einem
+            // unlesbaren Klumpen. Eine Linie ohne Zahl ist immer noch
+            // ein Raster; drei Zahlen ineinander sind keines. Die
+            // Ziffern der kleinen Schrift sind rund acht Punkte hoch:
+            // ab vierzehn Punkten Linienabstand stehen alle drei, ab
+            // zehn nur die mittlere (eine Zahl gibt den Massstab, drei
+            // gedraengte nehmen ihn) — live am 2026-09-17 nachgesehen,
+            // bei elf Punkten Abstand beruehrten sich alle drei.
+            const int spacing = (bot - top) / 4;
+            const bool roomForAll = spacing >= 14;
+            const bool roomForOne = spacing >= 10;
             for (int k = 1; k <= 3; ++k) {
                 const double frac = k / 4.0;
                 const int y = static_cast<int>(bot - (bot - top) * frac);
                 p.setPen(gridLine);
                 p.drawLine(r.left() + 1, y, r.right() - 1, y);
+                if (!roomForAll && !(roomForOne && k == 2)) { continue; }
                 const int dbm = static_cast<int>(std::lround(lo + (hi - lo) * frac));
                 p.setPen(gridText);
                 p.drawText(QRect(r.right() - 46, y - 7, 42, 12),
@@ -419,6 +456,15 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // EIN breiter Strich waere falsch — der gibt einen Balken.
         // Drei Durchgaenge von breit und blass nach schmal und
         // kraeftig geben den Verlauf.
+        //
+        // Kantenglaettung NUR fuer den Kurvenzug (Hof, Verlauf, Linie,
+        // Bezugslinie). Seit dem 2026-09-17 liegen die Stuetzstellen
+        // doppelt so dicht (BandwidthFilterApplet), und ohne Glaettung
+        // zerfaellt ein flacher Anstieg ueber sechs Punkte in Treppen
+        // — bei zwoelf Punkten je Stuetzstelle fiel das nicht auf.
+        // Raster, Durchlass und Griffe bleiben ungeglaettet: die sind
+        // waagrecht und senkrecht, Glaettung machte sie nur unscharf.
+        p.setRenderHint(QPainter::Antialiasing, true);
         {
             struct GlowPass { double width; int alpha; };
             // Zwei Durchgaenge, nicht drei: mit den grob gesetzten
@@ -463,6 +509,35 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             p.drawPath(tracePath);
         }
 
+        // ── Im Durchlass eine FLAECHE, nicht nur ein Strich ─────────
+        //
+        // Der Betreiber am 2026-09-17: "der bereich meines hörbaren
+        // bandbreite sollte einen bereich von oben bis unten haben" —
+        // "leider ist da nur ein kleiner strich."
+        //
+        // Der Verlauf oben blendet nach unten aus und haengt am
+        // Massstab des ganzen Feldes: ein Signal auf halber Hoehe
+        // bekommt an seiner Spitze noch Alpha 70, am Boden 10 — im
+        // Durchlass bleibt davon ein Strich mit einem Hauch darunter.
+        // Was HOERBAR ist, soll als Flaeche dastehen: dieselbe Kurve,
+        // auf den Durchlass beschnitten, mit einer Fuellung, die bis
+        // zum Boden traegt. Ausserhalb bleibt der zarte Verlauf — man
+        // sieht auf einen Blick, was durchkommt und was die Kante
+        // abschneidet.
+        {
+            p.save();
+            p.setClipRect(QRect(xlF, top, std::max(1, xhF - xlF), bot - top + 1));
+            QLinearGradient inner(0, top, 0, bot);
+            QColor i0(traceLine); i0.setAlpha(200);
+            QColor i1(traceLine); i1.setAlpha(90);
+            inner.setColorAt(0.0, i0);
+            inner.setColorAt(1.0, i1);
+            p.setPen(Qt::NoPen);
+            p.setBrush(inner);
+            p.drawPath(tracePath);
+            p.restore();
+        }
+
         // Zarte Linie, wie in der Vorlage. 1,2 war fuer eine Flaeche
         // dieser Groesse zu fett.
         p.setPen(QPen(traceLine, 1.0));
@@ -502,6 +577,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             p.setBrush(Qt::NoBrush);
             p.drawPolyline(ap);
         }
+        p.setRenderHint(QPainter::Antialiasing, false);
 
         // ── Feinskala oben im Durchlass ─────────────────────────────
         //
@@ -532,7 +608,16 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // mindestens 6 dB ueber dem leisesten Punkt darin liegen (sonst
         // benennt man Rauschen), und mit Mindestabstand, damit nicht
         // viermal derselbe Buckel gezaehlt wird.
-        if (xhF - xlF > 60 && bot - top > 40) {
+        //
+        // Erst ab 84 Punkten Kurvenhoehe. Die Zellen sind 28 Punkte
+        // hoch und liegen UEBER dem unteren Teil der Kurve im
+        // Durchlass — genau dem Teil, den man in diesem Fenster sehen
+        // will. Bei 40 Punkten (die alte Schwelle) deckten sie mehr
+        // als die Haelfte davon ab; ab 84 hoechstens ein Drittel.
+        // Beim Betreiber (105 Punkte Flaechenhoehe, 2026-09-17) sind
+        // sie damit weiterhin aus, wie schon vorher — sie erscheinen,
+        // sobald er das Fenster hoeher zieht.
+        if (xhF - xlF > 60 && bot - top >= 84) {
             const int n = m_trace.size();
             auto hzAt = [&](int i) {
                 return -m_spanHz / 2.0 + m_spanHz * double(i) / (n - 1);
@@ -639,16 +724,22 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     // 0,10 war auf dem Vergleichsblatt kaum zu sehen; die Vorlage
     // legt eine deutlich erkennbare Tuenche ueber den Durchlass.
     fill.setAlphaF(0.14f);
-    p.fillRect(QRect(xl, r.top(), std::max(1, xh - xl), r.height()), fill);
-
-    QColor topEdge = m_accent;
-    topEdge.setAlphaF(0.55f);
-    p.setPen(topEdge);
-    p.drawLine(xl, r.top(), xh, r.top());
+    // ── Von oben bis unten ──────────────────────────────────────────
+    //
+    // Der Betreiber am 2026-09-17: "der bereich meines hörbaren
+    // bandbreite sollte einen bereich von oben bis unten haben."
+    //
+    // Die Saeule reichte vom Kopf des Zeichenfelds bis ueber die
+    // Achse — ein Kaestchen in der Mitte. Jetzt steht sie ueber die
+    // GANZE Hoehe, hinter den Kantenwerten oben und der Achse unten:
+    // die Zahlen gehoeren zu dieser Saeule, und so sieht man es auch.
+    // Die obere Querlinie entfaellt damit — die Saeule endet am Rand
+    // der Flaeche, nicht an einer Linie in der Kopfzeile.
+    p.fillRect(QRect(xl, 0, std::max(1, xh - xl), height()), fill);
 
     p.setPen(QPen(m_accent, 2));
-    p.drawLine(xl, r.top(), xl, r.bottom());
-    p.drawLine(xh, r.top(), xh, r.bottom());
+    p.drawLine(xl, 0, xl, height());
+    p.drawLine(xh, 0, xh, height());
 
     // Griffe als Pillen in halber Hoehe. Die ganze Kante als Griff
     // waere zwar groesser, sagt aber nicht, WO man fassen soll.
@@ -708,12 +799,26 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         mark.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
         p.setFont(mark);
         p.setPen(faint);
+        // ── Die Wortmarken folgen dem Seitenband ─────────────────────
+        //
+        // Ohne Vorzeichen ("minus darf nie", 2026-09-03) muss das Wort
+        // sagen, was die Zahl ist. Bei LSB liegt die Kante NAHE am
+        // Traeger rechts (|m_high|, z.B. 100 Hz) und die ferne links
+        // (|m_low|, z.B. 3.00 kHz) — links steht also der Audio-
+        // HOCHschnitt. Zeus schreibt links "LOW CUT -3.00 kHz" und
+        // verlaesst sich auf das Minus; wir haben keines, darum tauschen
+        // die Woerter die Seite. Die Zahlen bleiben, wo ihre Kante ist,
+        // und stimmen so mit den Feldern LOW/HIGH darunter ueberein
+        // (BandwidthFilterApplet, sidebandOf: LOW = nahe Kante).
+        const bool lowerSideband = (m_low < 0 && m_high <= 0);
         p.drawText(QRect(xl + 4, 1, 74, 10),
                    Qt::AlignLeft | Qt::AlignVCenter,
-                   QStringLiteral("LOW CUT"));
+                   lowerSideband ? QStringLiteral("HIGH CUT")
+                                 : QStringLiteral("LOW CUT"));
         p.drawText(QRect(xh - 78, 1, 74, 10),
                    Qt::AlignRight | Qt::AlignVCenter,
-                   QStringLiteral("HIGH CUT"));
+                   lowerSideband ? QStringLiteral("LOW CUT")
+                                 : QStringLiteral("HIGH CUT"));
     }
 
     // Frueherer Vermerk (2026-08-22), zur Geschichte:

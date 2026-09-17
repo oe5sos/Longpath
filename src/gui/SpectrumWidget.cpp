@@ -185,6 +185,24 @@
 
 namespace Longpath {
 
+namespace {
+
+// ── Die Bandbreite ueber Wasserfall und 3D-Flaeche ───────────────────
+//
+// Hell, nicht tuerkis. Die Benutzerfarbe der Saeule (m_rxFilterColor,
+// Vorgabe Tuerkis mit Alpha 80) ist fuer das schwarze 2D-Spektrum
+// gemacht; auf dem bunten Wasserfall und auf der blauen 3D-Flaeche geht
+// sie unter — der Betreiber am 2026-09-17: "ich sehe meine bandbreite im
+// unteren bild nicht von oben bis unten." Zeus (live angesehen am
+// selben Tag) legt dort eine weissliche, durchscheinende Saeule mit
+// duennen Kanten quer durch Spektrum und Wasserfall; hell steht auf
+// jeder Farbe. Leicht blaeulich, damit es zur Sprache des Hauses passt
+// (Blau ist anfassbar — die Kanten zieht man).
+const QColor kPassbandWash(0xdc, 0xe6, 0xf0, 60);
+const QColor kPassbandEdgeLight(0xdc, 0xe6, 0xf0, 165);
+
+} // namespace
+
 // ── Flächen, Gitter und Rahmen kommen aus dem Theme ──────────────────
 //
 // 2026-08-15, OE5SOS: „der Spektrumbereich im Hauptfenster ist noch
@@ -3472,8 +3490,13 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // on state change, dynamic overlays in a smaller spectrum-area
     // texture rebuilt every frame).
 #ifdef NEREUS_GPU_SPECTRUM
+    // Mode3D: die Bandbreite liegt dort in dieser Schicht
+    // (paintPassbandOverSurface) und muss mit der Flaeche Schritt
+    // halten — ohne diesen Zweig wuerde sie ohne Peak-Hold/Blobs/
+    // Rauschflur nie neu gemalt.
     if (m_activePeakHold.enabled() || m_peakBlobs.enabled()
-        || m_showNoiseFloor) {
+        || m_showNoiseFloor
+        || m_renderMode == SpectrumRenderMode::Mode3D) {
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
         // 2026-05-26 KG4VCF dual-layer overlay split: peak-hold trace
         // + peak blobs + noise-floor line/text live in their own GPU
@@ -6304,6 +6327,33 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     const int specBottomClipped = specRect.bottom() - bandPlanH;
     const int specHeightClipped = std::max(0, specBottomClipped - specRect.top());
 
+    // ── Im 3D-Modus gehoert der Spektrum-Teil NICHT hierher ──────────
+    //
+    // Der Betreiber am 2026-09-17, mit Bildschirmfoto im 3D-Modus:
+    // "ich sehe meine bandbreite im unteren bild nicht von oben bis
+    // unten." Zwei Ursachen, beide hier:
+    //
+    //   1. Diese Funktion malt in die STATISCHE Chrome-Schicht, und die
+    //      liegt seit dem 2026-08-22 absichtlich UNTER der Kurve („die
+    //      Rasterzellen muessen HINTER den Signalspitzen liegen"). Im
+    //      2D-Modus ist die Kurve durchsichtig genug, die Saeule scheint
+    //      durch. Die 3D-Flaeche (DssRenderer) ist aber DECKEND — sie
+    //      verdeckt Saeule, Kanten und Mittellinie vollstaendig, im
+    //      Spektrum blieb nur das Dreieck oben uebrig.
+    //   2. Die Farbe: Tuerkis mit Alpha 80 auf schwarzem Grund ist eine
+    //      Saeule; Tuerkis auf der blauen 3D-Flaeche und auf dem bunten
+    //      Wasserfall ist nichts.
+    //
+    // Deshalb: im 3D-Modus malt paintPassbandOverSurface() den
+    // Spektrum-Teil in die DYNAMISCHE Schicht, die als letzte ueber die
+    // Flaeche kommt — hier bleibt dann nur der Wasserfall-Teil. Und der
+    // Wasserfall bekommt eine HELLE Tuenche statt der Benutzerfarbe: so
+    // macht es Zeus (Vorlage vom 2026-09-17, live angesehen), und hell
+    // steht auf jeder Wasserfallfarbe, tuerkis nur auf schwarz. Die
+    // Benutzerfarbe (Setup > Display) gilt weiter fuer die Saeule im
+    // 2D-Spektrum, wo sie sichtbar ist.
+    const bool overSurface = (m_renderMode == SpectrumRenderMode::Mode3D);
+
     // Plan 4 follow-up (option A): MOX-gate the RX passband fill so it
     // disappears during TX/TUNE.  The TX filter overlay (drawTxFilterOverlay)
     // takes over in that state — gives the user a clear visual swap between
@@ -6311,32 +6361,36 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     if (!m_moxOverlay) {
         // Spectrum passband fill — Plan 4 D9b: user-pickable m_rxFilterColor.
         // Previously hardcoded AetherSDR cyan alpha=35/25; now single user colour.
-        if (specHeightClipped > 0) {
+        if (specHeightClipped > 0 && !overSurface) {
             p.fillRect(xLo, specRect.top(), fW, specHeightClipped, m_rxFilterColor);
         }
 
-        // Waterfall passband fill — Plan 4 D9b: same user-pickable colour.
+        // Waterfall passband fill — hell, siehe oben.
         // Ab 2026-08-19 abschaltbar (m_extendedPassband, Vorgabe ein):
         // AetherSDRs setExtendedPassband, dort mit Vorgabe AUS. Wir haben
         // die Verlaengerung seit je unbedingt gemalt, also bleibt sie die
         // Vorgabe — der Schalter fuegt nur die Moeglichkeit hinzu.
         if (m_extendedPassband) {
-            p.fillRect(xLo, wfRect.top(), fW, wfRect.height(), m_rxFilterColor);
+            p.fillRect(xLo, wfRect.top(), fW, wfRect.height(), kPassbandWash);
         }
     }
 
     // Filter edge lines — from AetherSDR line 3237: slice color, alpha=130
     // Clip the spectrum-side edge to specBottomClipped so the line stops at
     // the bandplan strip's top edge.
-    p.setPen(QPen(QColor(kSliceR, kSliceG, kSliceB, 130), 1));
-    p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
-    p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
+    if (!overSurface) {
+        p.setPen(QPen(QColor(kSliceR, kSliceG, kSliceB, 130), 1));
+        p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
+        p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
+    }
     // Die Wasserfall-Haelfte der Kanten haengt am selben Schalter wie die
     // Mittellinie: bei AetherSDR enden die Kanten immer am Spektrum, und
     // nur die Frequenzlinie hat den Schalter. Ein dritter Schalter fuer
     // die Kanten allein waere eine Einstellung, die niemand sucht — Kante
-    // und Linie gehoeren zum selben Bild.
+    // und Linie gehoeren zum selben Bild. Hell wie die Tuenche, aus
+    // demselben Grund.
     if (m_extendedFrequencyLine) {
+        p.setPen(QPen(kPassbandEdgeLight, 1));
         p.drawLine(xLo, wfRect.top(), xLo, wfRect.bottom());
         p.drawLine(xHi, wfRect.top(), xHi, wfRect.bottom());
     }
@@ -6348,8 +6402,14 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     // Port aus AetherSDR: drawFrequencyLine malt immer im Spektrum und nur
     // bei m_extendedFrequencyLine auch im Wasserfall
     // (SpectrumWidget.cpp:16843-16848 [@0cd4559]).
-    p.drawLine(vfoX, specRect.top(), vfoX,
-               m_extendedFrequencyLine ? wfRect.bottom() : specBottomClipped);
+    // Im 3D-Modus nur der Wasserfall-Teil; das Spektrum uebernimmt
+    // paintPassbandOverSurface().
+    if (!overSurface) {
+        p.drawLine(vfoX, specRect.top(), vfoX,
+                   m_extendedFrequencyLine ? wfRect.bottom() : specBottomClipped);
+    } else if (m_extendedFrequencyLine) {
+        p.drawLine(vfoX, wfRect.top(), vfoX, wfRect.bottom());
+    }
 
     // VFO triangle marker — from AetherSDR line 3285-3293
     // Drawn below any VFO flag widget that may be positioned at the top.
@@ -6380,6 +6440,66 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
             << QPoint(vfoX + kTriHalf, triTop)
             << QPoint(vfoX, triTop + kTriH);
         p.drawPolygon(tri);
+    }
+}
+
+// ---- Die Bandbreite UEBER der 3D-Flaeche ----
+//
+// Gegenstueck zu drawSliceMarker fuer den 3D-Modus: derselbe Spektrum-
+// Teil (Saeule, Kanten, Mittellinie, Dreieck), aber in die dynamische
+// Schicht gemalt, die als letzte ueber die deckende DSS-Flaeche kommt —
+// siehe die Begruendung in drawSliceMarker. Hell statt tuerkis, weil
+// die Flaeche blau ist. Der Wasserfall-Teil bleibt in drawSliceMarker.
+void SpectrumWidget::paintPassbandOverSurface(QPainter& p, const QRect& specRect)
+{
+    if (m_renderMode != SpectrumRenderMode::Mode3D) { return; }
+
+    const int bandPlanH = (m_bandPlanMgr && m_bandPlanFontSize > 0)
+                          ? (m_bandPlanFontSize + 4) : 0;
+    const int specBottomClipped = specRect.bottom() - bandPlanH;
+    const int specHeightClipped = std::max(0, specBottomClipped - specRect.top());
+    if (specHeightClipped <= 0) { return; }
+
+    for (const SliceMarkerGeometry& g : sliceMarkerGeometry()) {
+        const int vfoX = hzToX(g.centreHz, specRect);
+        int xLo = hzToX(g.centreHz + g.filterLowHz, specRect);
+        int xHi = hzToX(g.centreHz + g.filterHighHz, specRect);
+        if (xLo > xHi) { std::swap(xLo, xHi); }
+        const int fW = xHi - xLo;
+
+        // MOX-Sperre wie im 2D-Zweig: waehrend TX/TUNE zeigt
+        // drawTxFilterOverlay das Sendeband, nicht wir den Empfang.
+        if (!m_moxOverlay) {
+            p.fillRect(xLo, specRect.top(), fW, specHeightClipped, kPassbandWash);
+        }
+        p.setPen(QPen(kPassbandEdgeLight, 1));
+        p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
+        p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
+
+        // Mittellinie: dieselbe Breitenregel wie im 2D-Zweig (schmal,
+        // wenn eine Kante naeher als 4 px liegt — CW), hell statt tuerkis.
+        const qreal vfoLineW =
+            (std::abs(vfoX - xLo) <= 4 || std::abs(vfoX - xHi) <= 4) ? 1.0 : 2.0;
+        QColor vfoLine(kPassbandEdgeLight);
+        vfoLine.setAlpha(230);
+        p.setPen(QPen(vfoLine, vfoLineW));
+        p.drawLine(vfoX, specRect.top(), vfoX, specBottomClipped);
+
+        // Das Dreieck oben, wie im 2D-Zweig (ohne Flaggen-Zweig: im
+        // 3D-Modus gibt es keine Flagge, an die es sich haengen koennte).
+        if (vfoX >= specRect.left() && vfoX <= specRect.right()) {
+            static constexpr int kTriHalf = 6;
+            static constexpr int kTriH = 10;
+            static constexpr int kSliceR = 0x00, kSliceG = 0xd4, kSliceB = 0xff;
+            const int triTop = specRect.top();
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(kSliceR, kSliceG, kSliceB));
+            QPolygon tri;
+            tri << QPoint(vfoX - kTriHalf, triTop)
+                << QPoint(vfoX + kTriHalf, triTop)
+                << QPoint(vfoX, triTop + kTriH);
+            p.drawPolygon(tri);
+        }
     }
 }
 
@@ -8625,6 +8745,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                     this, [this](int v) { m_wfColorGain = v; update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::wfBlackLevelChanged,
                     this, [this](int v) { m_wfBlackLevel = v; update(); scheduleSettingsSave(); });
+            connect(m_overlayMenu, &SpectrumOverlayMenu::wfUpdatePeriodChanged,
+                    this, [this](int ms) { setWfUpdatePeriodMs(ms); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::wfColorSchemeChanged,
                     this, [this](int v) { m_wfColorScheme = static_cast<WfColorScheme>(v); update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::fillAlphaChanged,
@@ -8650,6 +8772,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                                   static_cast<int>(m_wfColorScheme),
                                   m_fillAlpha, m_panFill, false,
                                   m_refLevel, m_dynamicRange, m_ctunEnabled);
+        m_overlayMenu->setWfUpdatePeriodMs(m_wfUpdatePeriodMs);
         // The frequency under the cursor, captured at popup time: the
         // popup outlives the press, and by the time the button is clicked
         // the pointer has moved onto the popup itself.
@@ -11024,6 +11147,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 }
             }
             paintNoiseFloorOverlay(pd, specRect);
+            // Im 3D-Modus die Bandbreite UEBER die Flaeche — siehe
+            // drawSliceMarker fuer den Grund.
+            paintPassbandOverSurface(pd, specRect);
 
             // Reuse PerfMonitor's ovly metric for the *dynamic* rebuild
             // cost since that's now the per-frame variable; chrome

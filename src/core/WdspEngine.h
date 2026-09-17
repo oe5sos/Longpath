@@ -117,6 +117,9 @@ class TestSliceModelRadeSwap;
 // Phase 3R Task L2: same friendship for the RadeApplet UI test which
 // constructs a real RadioModel + RadeChannel fixture.
 class TestRadeApplet;
+// 2026-09-17: same pattern for the NR-backend audio pruefstand, which
+// pushes real audio through every noise-reduction slot on a real channel.
+class TstNrBackendsProcessAudio;
 // Phase 3F Sub-Epic I closeout, defect H1: the per-stream drain-geometry
 // test primes the engine so createRxChannel can seed real RX channels.
 class TestStreamPoolBinding;
@@ -804,6 +807,10 @@ private:
     // opens one real RX channel so RXANBPGetMinNotchWidth has an rxa[].nbp0
     // to read.
     friend class ::TestMnfSetupPage;
+    // 2026-09-17: same friendship for the NR-backend audio pruefstand
+    // (tests/tst_nr_backends_process_audio.cpp), which needs really
+    // opened RX channels to run NR1..NR4/NNR/MNR on audio.
+    friend class ::TstNrBackendsProcessAudio;
 #endif
 };
 

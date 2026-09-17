@@ -27,6 +27,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 namespace Longpath {
 
@@ -42,6 +43,75 @@ QColor accentFor(int index)
     case 1:  return QColor(Style::kGreenText);   // gruen
     case 2:  return QColor(Style::kAmberText);   // bernstein
     default: return QColor(Style::kTextSecondary);
+    }
+}
+
+// ── LOW und HIGH sind AUDIO-Begriffe ────────────────────────────────
+//
+// Der Betreiber am 2026-09-17, auf 40 m LSB: "100 - 3000 ergibt
+// 2900?!?!?" — und davor: "hört sich auf 40 meter katastrophal an".
+//
+// Was passiert war: die Felder zeigten seit dem 2026-09-03 die
+// BETRAEGE der inneren Kanten (filterLow, filterHigh), und die sind
+// bei LSB beide negativ: filterLow = -2950 ist die FERNE Kante
+// (Audio-Hochschnitt), filterHigh = -150 die NAHE (Audio-Tiefschnitt).
+// Im Feld "LOW" stand darum 2950 und in "HIGH" 150 — genau verkehrt
+// zu dem, was jeder Funker unter Low Cut und High Cut versteht. Wer
+// dann "LOW 100" tippte, setzte in Wahrheit die FERNE Kante auf -100,
+// und WIDTH 3000 zaehlte von dort nach OBEN: -100 … +2900, quer ueber
+// den Traeger auf das falsche Seitenband. Bei USB fiel das nicht auf,
+// weil dort innere Zaehlrichtung und Audiorichtung zusammenfallen —
+// "20 meter passt".
+//
+// Deshalb hier die eine Uebersetzung, an der alles andere haengt:
+//
+//   LOW  = die Kante NAHE am Traeger   (Audio-Tiefschnitt)
+//   HIGH = die Kante FERN vom Traeger  (Audio-Hochschnitt)
+//
+// fuer beide Seitenbaender. Bei USB ist das filterLow/filterHigh, bei
+// LSB umgekehrt |filterHigh|/|filterLow|. Zweiseitige Betriebsarten
+// (AM/SAM/FM/DSB/SPEC/DRM) behalten LOW = negative, HIGH = positive
+// Kante — dort gibt es kein "nah" und "fern".
+//
+// Das Vorzeichen bleibt weiterhin unsichtbar ("minus darf nie",
+// 2026-09-03) — es steckt jetzt in der Betriebsart, nicht im Feld.
+enum class Sideband { Lower, Upper, Both };
+
+Sideband sidebandOf(DSPMode mode)
+{
+    switch (mode) {
+    case DSPMode::LSB:
+    case DSPMode::CWL:
+    case DSPMode::DIGL:
+    case DSPMode::RADE_L:
+        return Sideband::Lower;
+    case DSPMode::USB:
+    case DSPMode::CWU:
+    case DSPMode::DIGU:
+    case DSPMode::RADE_U:
+        return Sideband::Upper;
+    default:
+        return Sideband::Both;
+    }
+}
+
+/// Die nahe Kante (Audio-Tiefschnitt) als Betrag.
+int nearEdgeHz(const SliceModel* s)
+{
+    switch (sidebandOf(s->dspMode())) {
+    case Sideband::Lower: return qAbs(s->filterHigh());
+    case Sideband::Upper: return qAbs(s->filterLow());
+    default:              return qAbs(s->filterLow());
+    }
+}
+
+/// Die ferne Kante (Audio-Hochschnitt) als Betrag.
+int farEdgeHz(const SliceModel* s)
+{
+    switch (sidebandOf(s->dspMode())) {
+    case Sideband::Lower: return qAbs(s->filterLow());
+    case Sideband::Upper: return qAbs(s->filterHigh());
+    default:              return qAbs(s->filterHigh());
     }
 }
 
@@ -158,9 +228,9 @@ void BandwidthFilterApplet::buildUI()
         m_widthBox = box(50, 2 * SliceModel::kMaxFilterWidthHz);
         m_widthBox->setObjectName(QStringLiteral("bwFilterWidth"));
         m_widthBox->setToolTip(QStringLiteral(
-            "Type a width and the edges land where this mode wants them: "
-            "CW centred on the sidetone, SSB anchored at the default low "
-            "cut, AM symmetric around zero."));
+            "Type a width: SSB keeps the edge you set last and moves the "
+            "other (LOW 100 + 3000 = HIGH 3100, on either sideband), CW "
+            "stays centred on the sidetone, AM symmetric around zero."));
         row->addWidget(m_widthBox);
 
         addShrinkableLabel(QStringLiteral("HIGH"));
@@ -245,66 +315,75 @@ void BandwidthFilterApplet::buildUI()
             SliceModel* s = activeSlice();
             if (!s) { return; }
             m_lastEditedEdge = LastEditedEdge::Low;
-            const int prev = s->filterLow();
-            const bool negative = prev != 0 ? (prev < 0) : (s->filterHigh() <= 0);
-            s->setFilterLow(negative ? -v : v);
+            switch (sidebandOf(s->dspMode())) {
+            case Sideband::Lower: s->setFilterHigh(-v); break;   // nahe Kante
+            case Sideband::Upper: s->setFilterLow(v);   break;   // nahe Kante
+            default: {
+                // Zweiseitig: LOW ist die negative Kante. Nur wenn sie
+                // zufaellig exakt auf 0 stand, entscheidet die andere
+                // Kante ueber die Seite.
+                const int prev = s->filterLow();
+                const bool negative = prev != 0 ? (prev < 0) : (s->filterHigh() <= 0);
+                s->setFilterLow(negative ? -v : v);
+                break;
+            }
+            }
         });
         connect(m_highBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
             SliceModel* s = activeSlice();
             if (!s) { return; }
             m_lastEditedEdge = LastEditedEdge::High;
-            const int prev = s->filterHigh();
-            const bool negative = prev != 0 ? (prev < 0) : (s->filterLow() < 0);
-            s->setFilterHigh(negative ? -v : v);
+            switch (sidebandOf(s->dspMode())) {
+            case Sideband::Lower: s->setFilterLow(-v);  break;   // ferne Kante
+            case Sideband::Upper: s->setFilterHigh(v);  break;   // ferne Kante
+            default: {
+                const int prev = s->filterHigh();
+                const bool negative = prev != 0 ? (prev < 0) : (s->filterLow() < 0);
+                s->setFilterHigh(negative ? -v : v);
+                break;
+            }
+            }
         });
         connect(m_widthBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
             SliceModel* s = activeSlice();
             if (!s) { return; }
-            // Betreiber 2026-09-03, mit Nachdruck, nach einem konkreten
-            // Nachvollzug: LOW auf 50 gesetzt, WIDTH auf 5000 gesetzt,
-            // "dann erscheint bei LOW automatisch 5150" -- die Regel je
-            // Betriebsart steckte bislang in SliceModel::setFilterWidth()
-            // (widthToEdges()), das LSB/USB immer am VORGABEWERT der
-            // Betriebsart verankert (z.B. -150 Hz fuer LSB), unabhaengig
-            // davon, was gerade von Hand in LOW/HIGH stand -- die Kante,
-            // die der Bedienende zuletzt selbst gesetzt hatte, ging dabei
-            // stillschweigend verloren. Hier stattdessen: GENAU DIE Kante
-            // (m_lastEditedEdge) bleibt stehen, nur die andere folgt der
-            // neuen Breite.
+            // Betreiber 2026-09-03: "ich muss beide Werte frei eingeben
+            // koennen" — die Kante, die zuletzt von Hand gesetzt wurde,
+            // bleibt stehen, die andere folgt der Breite. Seit dem
+            // 2026-09-17 in AUDIO-Begriffen (siehe sidebandOf): LOW ist
+            // die nahe Kante, HIGH die ferne, bei beiden Seitenbaendern.
             //
-            // NUR fuer LSB/USB/RADE_L/RADE_U -- widthToEdges() selbst
-            // behandelt CWL/CWU/DIGL/DIGU anders (Mitte bleibt stehen,
-            // beide Kanten wandern gemeinsam, SliceModel.cpp:633-640),
-            // weil dort der Mithoerton in der Mitte sitzt, keine Kante
-            // ein fester Ankerpunkt ist. Codereview 2026-09-03 (gefunden,
-            // nicht gemeldet): eine fruehere Fassung dieses switch zaehlte
-            // CWL/CWU/DIGL/DIGU faelschlich zu LSB/USB und verankerte dort
-            // eine Kante -- tst_bandwidth_filter_applet.cpp faengt genau
-            // das ab ("bei CW muss die Mitte auf dem Mithoerton
-            // stehenbleiben"). Symmetrische Betriebsarten (AM/SAM/FM/DSB)
-            // und alles Kuenftige behalten ebenfalls die bisherige,
-            // Mitten-erhaltende Regel -- dort ist "welche Kante zuletzt"
-            // keine sinnvolle Frage, beide Kanten gehoeren untrennbar zur
-            // Mitte.
+            //   LOW zuletzt:  HIGH = LOW + WIDTH      (100 + 3000 = 3100)
+            //   HIGH zuletzt: LOW  = HIGH - WIDTH; reicht das unter den
+            //                 Traeger, bleibt LOW bei 0 und HIGH wird
+            //                 die Breite — nie ueber den Traeger hinweg.
+            //
+            // NUR fuer LSB/USB/RADE_L/RADE_U. CWL/CWU/DIGL/DIGU halten
+            // die Mitte (Mithoerton bzw. Click-Tune-Versatz,
+            // SliceModel::widthToEdges), die zweiseitigen Betriebsarten
+            // ebenso — dort ist "welche Kante zuletzt" keine Frage.
             switch (s->dspMode()) {
             case DSPMode::LSB:
             case DSPMode::RADE_L:
-                if (m_lastEditedEdge == LastEditedEdge::Low) {
-                    s->setFilter(s->filterLow(), s->filterLow() + v);
-                } else {
-                    s->setFilter(s->filterHigh() - v, s->filterHigh());
-                }
-                break;
             case DSPMode::USB:
-            case DSPMode::RADE_U:
-                if (m_lastEditedEdge == LastEditedEdge::High) {
-                    s->setFilter(s->filterHigh() - v, s->filterHigh());
+            case DSPMode::RADE_U: {
+                int nearHz = nearEdgeHz(s);
+                int farHz  = farEdgeHz(s);
+                if (m_lastEditedEdge == LastEditedEdge::Low) {
+                    farHz = nearHz + v;
                 } else {
-                    s->setFilter(s->filterLow(), s->filterLow() + v);
+                    nearHz = farHz - v;
+                    if (nearHz < 0) { nearHz = 0; farHz = v; }
+                }
+                if (sidebandOf(s->dspMode()) == Sideband::Lower) {
+                    s->setFilter(-farHz, -nearHz);
+                } else {
+                    s->setFilter(nearHz, farHz);
                 }
                 break;
+            }
             default:
                 s->setFilterWidth(v);
                 break;
@@ -447,10 +526,13 @@ void BandwidthFilterApplet::wirePane(BandwidthFilterPane* pane, int sliceIndex)
             const int prevHigh = s->filterHigh();
             const int lowDelta = qAbs(low - prevLow);
             const int highDelta = qAbs(high - prevHigh);
+            // In FELD-Begriffen (LOW = nahe Kante): bei LSB ist die
+            // innere Low-Kante die ferne, also das HIGH-Feld.
+            const bool lower = sidebandOf(s->dspMode()) == Sideband::Lower;
             if (lowDelta > highDelta) {
-                m_lastEditedEdge = LastEditedEdge::Low;
+                m_lastEditedEdge = lower ? LastEditedEdge::High : LastEditedEdge::Low;
             } else if (highDelta > lowDelta) {
-                m_lastEditedEdge = LastEditedEdge::High;
+                m_lastEditedEdge = lower ? LastEditedEdge::Low : LastEditedEdge::High;
             }
             s->setFilterByHand(low, high);
         }
@@ -570,30 +652,16 @@ void BandwidthFilterApplet::refreshVarButtons()
     }
 }
 
-// Welche Kante SliceModel::widthToEdges() fuer diese Betriebsart als
-// Anker behandelt (High fuer die LSB-Familie: high=-defaultLowCut(),
-// low folgt; Low fuer die USB-Familie: low=defaultLowCut(), high
-// folgt -- SliceModel.cpp widthToEdges()). Nur fuer die beiden
-// Betriebsartfamilien sinnvoll, die der WIDTH-Anschluss unten selbst
-// unterscheidet; fuer alles andere (AM/FM/SAM/DSB/SPEC/DRM) ist der
-// Rueckgabewert bedeutungslos, weil jener Zweig m_lastEditedEdge gar
-// nicht befragt.
+// Welche FELD-Kante als Anker gilt, solange der Bedienende noch keine
+// selbst gesetzt hat: die nahe (LOW). So rechnet auch
+// SliceModel::widthToEdges — LSB verankert high=-defaultLowCut(), USB
+// low=defaultLowCut(), beides die nahe Kante. Fuer alles andere
+// (CW/DIG/AM/FM/...) fragt der WIDTH-Anschluss den Wert nicht ab.
 BandwidthFilterApplet::LastEditedEdge
 BandwidthFilterApplet::naturalAnchorEdge(DSPMode mode)
 {
-    // Muss mit dem switch im m_widthBox-Anschluss uebereinstimmen: nur
-    // LSB/RADE_L und USB/RADE_U fragen m_lastEditedEdge dort ueberhaupt
-    // ab (CWL/CWU/DIGL/DIGU/AM/FM/... nehmen den Mitten-erhaltenden
-    // Standardpfad und ignorieren diesen Wert) -- der Rueckgabewert fuer
-    // alles andere ist ohne Wirkung, bleibt hier aber auf High (die
-    // LSB-Seite) als harmlose Vorgabe.
-    switch (mode) {
-    case DSPMode::USB:
-    case DSPMode::RADE_U:
-        return LastEditedEdge::Low;
-    default:
-        return LastEditedEdge::High;
-    }
+    Q_UNUSED(mode);
+    return LastEditedEdge::Low;
 }
 
 void BandwidthFilterApplet::refreshNumbers()
@@ -621,12 +689,12 @@ void BandwidthFilterApplet::refreshNumbers()
     const QSignalBlocker b2(m_highBox);
     const QSignalBlocker b3(m_widthBox);
 
-    // qAbs(): siehe die Anschluesse oben und cutLabel() in
-    // BandwidthFilterPane.cpp -- "minus darf nie!!!!!" gilt fuer jede
-    // Anzeige dieser Kanten, nicht nur die schwebende Beschriftung im
-    // Bild.
-    m_lowBox->setValue(qAbs(s->filterLow()));
-    m_highBox->setValue(qAbs(s->filterHigh()));
+    // Audio-Begriffe, siehe sidebandOf(): LOW = nahe Kante, HIGH = ferne
+    // Kante — bei LSB also |filterHigh| und |filterLow|. Betraege, weil
+    // "minus darf nie!!!!!" (2026-09-03) fuer jede Anzeige dieser Kanten
+    // gilt, nicht nur die schwebende Beschriftung im Bild.
+    m_lowBox->setValue(nearEdgeHz(s));
+    m_highBox->setValue(farEdgeHz(s));
     // qAbs() hier ebenso: SliceModel::filterWidth() ist ein einfaches
     // filterHigh()-filterLow(), das negativ wird, sobald LOW zahlenmaessig
     // kleiner als HIGH steht (z.B. LOW=50, HIGH=150 bei LSB -- ungewoehnlich,
@@ -699,7 +767,33 @@ void BandwidthFilterApplet::setSpectrumSource(SpectrumSource src)
                 // nimmt je Eimer das MAXIMUM, ein Traeger bleibt also
                 // in voller Hoehe stehen, nur eben als eine Zacke
                 // statt als sechs.
-                const int pts = qBound(48, pane->width() / 12, 200);
+                //
+                // ── Zwoelf BILDSCHIRMpunkte, nicht zwoelf Qt-Punkte ──
+                //
+                // Der Betreiber am 2026-09-17: "der bandfilter könnte
+                // noch genauer und besser sein."
+                //
+                // Die zwoelf waren von seinen OpenHPSDR-Bildern
+                // abgezaehlt — Bildschirmpunkte. `pane->width()` zaehlt
+                // aber Qt-Punkte, und auf seinem Retina-Schirm ist
+                // jeder davon zwei Bildschirmpunkte. Unsere
+                // Stuetzstellen lagen also doppelt so weit auseinander
+                // wie die der Vorlage: 51 Stueck auf 620 Qt-Punkten,
+                // eine je 196 Hz bei 10 kHz Spanne — ein Sprechsignal
+                // von 2,8 kHz bestand aus vierzehn Punkten. Jetzt in
+                // Bildschirmpunkten gerechnet: derselbe Abstand wie in
+                // der Vorlage, auf Retina doppelt so viele Stellen,
+                // auf einem 1:1-Schirm unveraendert. Dieselbe
+                // Korrektur, die der Panadapter am 2026-08-26 fuer
+                // seine Abtastbreite bekommen hat (displayWidth in
+                // Geraetepunkten, SpectrumWidget::pushSpectrum).
+                //
+                // Untergrenze 64 statt 48, Obergrenze 400 statt 200 —
+                // die alten Deckel waren fuer die halbe Dichte gesetzt.
+                const qreal dpr = pane->devicePixelRatioF();
+                const int pts = qBound(
+                    64, static_cast<int>(std::lround(pane->width() * dpr / 12.0)),
+                    400);
                 pane->setTrace(
                     m_spectrumSource(i, f - half, f + half, pts));
             }

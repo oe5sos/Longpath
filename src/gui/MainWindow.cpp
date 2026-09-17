@@ -9044,7 +9044,16 @@ void MainWindow::buildMenuBar()
             { "NR&2",   Slot::NR2,  false },
             { "NR&3",   Slot::NR3,  false },
             { "NR&4",   Slot::NR4,  false },
-            { "&DFNR",  Slot::DFNR, false },
+            // DFNR nur, wenn die DeepFilterNet-Bibliothek im Bau ist —
+            // dieselbe Regel wie fuer MNR/BNR darunter; bisher stand es
+            // immer da und tat ohne HAVE_DFNR nichts (2026-09-17).
+            { "&DFNR",  Slot::DFNR,
+#ifdef HAVE_DFNR
+                false
+#else
+                true
+#endif
+            },
             { "&MNR",   Slot::MNR,
 #ifdef HAVE_MNR
                 false
@@ -9059,6 +9068,11 @@ void MainWindow::buildMenuBar()
                 true
 #endif
             },
+            // NNR (WDSP 2.10) kam am 2026-09-14 in die Befehlsleiste, aber
+            // nicht hierher — mit aktivem NNR zeigte dieses Menue keinen
+            // Haken. Am Ende, weil der Abgleich unten ueber die Reihenfolge
+            // geht.
+            { "N&NR",   Slot::NNR,  false },
         };
         for (const auto& nr : nrSlots) {
             Slot slot = nr.slot;
@@ -9235,6 +9249,7 @@ void MainWindow::buildMenuBar()
             Longpath::NrSlot::NR2,  Longpath::NrSlot::NR3,
             Longpath::NrSlot::NR4,  Longpath::NrSlot::DFNR,
             Longpath::NrSlot::MNR,  Longpath::NrSlot::BNR,
+            Longpath::NrSlot::NNR,
         };
         auto syncNr = [this, nrOrder](Longpath::NrSlot slot) {
             QList<QAction*> acts = m_nrGroup->actions();
@@ -11588,6 +11603,21 @@ void MainWindow::setVoltsAmpsVisible(bool visible)
 void MainWindow::wireSetupDialog(SetupDialog* dialog)
 {
     if (!dialog) { return; }
+
+    // ── Vor die schwebenden Fenster, nicht dahinter ──────────────────
+    //
+    // Der Betreiber am 2026-09-17: "ich wollte auf settings gehen,
+    // fenster öffnet sich jedoch im hintergrund." Dieselbe Ursache wie
+    // beim Antennenfenster am 2026-09-01 (siehe dort): die schwebenden
+    // Werkzeugfenster (Panadapter, Rotor/Log, Bandfilter, Applets) sind
+    // Qt::Tool — auf macOS NSPanels auf einer HOEHEREN Ebene als ein
+    // gewoehnlicher QDialog; raise() hebt nur innerhalb der eigenen
+    // Ebene. Also dieselbe Ebene und dasselbe Space-Verhalten wie sie.
+    // Alle dreizehn Stellen, die einen SetupDialog anlegen, laufen
+    // durch diese Funktion — darum hier, nicht dreizehnmal.
+    dialog->setWindowFlag(Qt::Tool, true);
+    enableFullScreenAuxiliaryBehavior(dialog);
+
     if (m_txApplet) {
         connect(dialog, &SetupDialog::cfcDialogRequested,
                 m_txApplet, &TxApplet::requestOpenCfcDialog);

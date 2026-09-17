@@ -388,6 +388,19 @@ void SliceModel::setDspMode(DSPMode mode)
             s.contains(newPrefix + QStringLiteral("FilterHigh"))) {
             low  = s.value(newPrefix + QStringLiteral("FilterLow")).toInt();
             high = s.value(newPrefix + QStringLiteral("FilterHigh")).toInt();
+            // Dieselbe Wache wie in restoreBandState(): ein gespeicherter
+            // Durchlass, der bei LSB/USB ueber den Traeger reicht, ist
+            // kein Wunsch des Bedienenden, sondern ein Rest des
+            // Bandfilter-Fehlers vom 2026-09-17 -- Vorgabe statt Muell.
+            if (filterCrossesCarrier(low, high, mode)) {
+                qCWarning(lcDsp) << "Persisted filter" << low << high
+                                 << "crosses the carrier for"
+                                 << SliceModel::modeName(mode)
+                                 << "-- using the mode default instead";
+                auto pair = defaultFilterForMode(mode);
+                low  = pair.first;
+                high = pair.second;
+            }
         } else {
             // From Thetis console.cs:5180-5575 — InitFilterPresets, F5 per mode
             auto pair = defaultFilterForMode(mode);
@@ -555,6 +568,24 @@ bool SliceModel::constrainFilter(int& low, int& high, DSPMode mode,
     }
 
     return (low != originalLow) || (high != originalHigh);
+}
+
+bool SliceModel::filterCrossesCarrier(int low, int high, DSPMode mode)
+{
+    switch (mode) {
+    case DSPMode::LSB:
+    case DSPMode::CWL:
+    case DSPMode::DIGL:
+    case DSPMode::RADE_L:
+        return high > 0;
+    case DSPMode::USB:
+    case DSPMode::CWU:
+    case DSPMode::DIGU:
+    case DSPMode::RADE_U:
+        return low < 0;
+    default:
+        return false;
+    }
 }
 
 // ── Breite und Lage rechnen mit ──────────────────────────────────────
@@ -2486,15 +2517,39 @@ void SliceModel::restoreFromSettings(Band band)
     // before reaching this restore block, so it reflects the destination
     // mode for the band restore.
     {
+        // ── Wache gegen einen Durchlass auf dem falschen Seitenband ──
+        //
+        // Der Betreiber am 2026-09-17: "hört sich auf 40 meter
+        // katastrophal an" -- in den Einstellungen stand fuer 40 m LSB
+        // ein Durchlass von -100 … +2900 Hz, entstanden aus dem LOW/
+        // WIDTH-Fehler des Bandfilters (BandwidthFilterApplet, sidebandOf).
+        // Der Fehler ist behoben, aber der gespeicherte Wert kaeme bei
+        // jedem Bandwechsel und jedem Start wieder: "wieder das gleiche".
+        // Ein Durchlass, der bei einer einseitigen Betriebsart ueber den
+        // Traeger reicht, ist kein Wunsch, den jemand gespeichert haben
+        // wollte -- dieselbe Art Wache wie fuer DspMode/AgcMode hier
+        // daneben: Vorgabe der Betriebsart statt des kaputten Werts.
+        auto restoreFilter = [this](int low, int high) {
+            if (filterCrossesCarrier(low, high, m_dspMode)) {
+                qCWarning(lcDsp) << "Persisted filter" << low << high
+                                 << "crosses the carrier for"
+                                 << SliceModel::modeName(m_dspMode)
+                                 << "-- using the mode default instead";
+                const auto pair = defaultFilterForMode(m_dspMode);
+                low  = pair.first;
+                high = pair.second;
+            }
+            setFilter(low, high);
+        };
         const QString bmp = bandModePrefix(m_sliceIndex, band, m_dspMode);
         if (s.contains(bmp + QStringLiteral("FilterLow")) &&
             s.contains(bmp + QStringLiteral("FilterHigh"))) {
-            setFilter(s.value(bmp + QStringLiteral("FilterLow")).toInt(),
-                      s.value(bmp + QStringLiteral("FilterHigh")).toInt());
+            restoreFilter(s.value(bmp + QStringLiteral("FilterLow")).toInt(),
+                          s.value(bmp + QStringLiteral("FilterHigh")).toInt());
         } else if (s.contains(bp + QStringLiteral("FilterLow")) &&
                    s.contains(bp + QStringLiteral("FilterHigh"))) {
-            setFilter(s.value(bp + QStringLiteral("FilterLow")).toInt(),
-                      s.value(bp + QStringLiteral("FilterHigh")).toInt());
+            restoreFilter(s.value(bp + QStringLiteral("FilterLow")).toInt(),
+                          s.value(bp + QStringLiteral("FilterHigh")).toInt());
         }
     }
     if (s.contains(bp + QStringLiteral("AgcMode"))) {

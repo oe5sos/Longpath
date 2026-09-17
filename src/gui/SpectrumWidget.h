@@ -2002,6 +2002,10 @@ private:
     void drawVfoMarker(QPainter& p, const QRect& specRect, const QRect& wfRect);
     void drawSliceMarker(QPainter& p, const QRect& specRect, const QRect& wfRect,
                          const SliceMarkerGeometry& g);
+    /// Der Spektrum-Teil der Bandbreiten-Marke fuer den 3D-Modus, in die
+    /// dynamische Schicht gemalt (ueber der deckenden DSS-Flaeche). Tut
+    /// ausserhalb von Mode3D nichts. Begruendung in drawSliceMarker.
+    void paintPassbandOverSurface(QPainter& p, const QRect& specRect);
     void drawCursorInfo(QPainter& p, const QRect& specRect);
 
     // ---- Spot overlay (Phase 3J-2 Task E1) ----
@@ -3239,6 +3243,14 @@ private:
     void markOverlayDirty() {
 #ifdef NEREUS_GPU_SPECTRUM
         m_overlayStaticDirty = true;
+        // Im 3D-Modus liegt die Bandbreite (Saeule, Kanten, Mittellinie)
+        // in der DYNAMISCHEN Schicht ueber der Flaeche
+        // (paintPassbandOverSurface) — was das Chrome veraltet, veraltet
+        // dort auch sie. Ohne diese Zeile wanderte die Saeule beim
+        // Filterziehen erst mit dem naechsten Spektrumbild nach.
+        if (m_renderMode == SpectrumRenderMode::Mode3D) {
+            m_overlayDynamicDirty = true;
+        }
 #endif
         update();
     }

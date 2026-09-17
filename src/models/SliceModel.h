@@ -486,6 +486,17 @@ public:
                                 bool filterShift = false,
                                 bool limitToSidebands = false);
 
+    /// Reicht ein Durchlass bei einer EINSEITIGEN Betriebsart (LSB/USB,
+    /// CW, DIG, RADE) ueber den Traeger auf die andere Seite? Bei LSB
+    /// gehoeren beide Kanten unter Null, bei USB ueber Null; ein Filter
+    /// von -100 … +2900 in LSB demoduliert das falsche Seitenband.
+    /// Zweiseitige Betriebsarten (AM/SAM/FM/DSB/SPEC/DRM) kreuzen den
+    /// Traeger absichtlich -- dort immer false. Live darf ein Filter
+    /// weiterhin dorthin gezogen werden (Thetis: limitFiltersToSidebands
+    /// ist Vorgabe AUS); die Frage stellt nur die Wiederherstellung
+    /// gespeicherter Werte, siehe restoreBandState()/setDspMode().
+    static bool filterCrossesCarrier(int low, int high, DSPMode mode);
+
     // From Thetis console.cs:13151 [@852bf0e] —
     // _max_filter_width = 10000.
     static constexpr int kMaxFilterWidthHz = 10000;

@@ -117,6 +117,26 @@ void SpectrumOverlayMenu::buildUI()
         emit wfBlackLevelChanged(v);
     });
 
+    // Speed — Zeit je Zeile. Links langsam, rechts schnell, wie man einen
+    // Geschwindigkeitsregler liest; der Wert ist trotzdem die Periode,
+    // weil SpectrumWidget so rechnet.
+    auto* speedRow = new QHBoxLayout;
+    speedRow->addWidget(new QLabel(QStringLiteral("Speed"), this));
+    m_wfSpeedSlider = new QSlider(Qt::Horizontal, this);
+    m_wfSpeedSlider->setRange(10, 500);
+    m_wfSpeedSlider->setInvertedAppearance(true);
+    m_wfSpeedSlider->setToolTip(QStringLiteral(
+        "Waterfall scroll speed — left is slower (more milliseconds per line)"));
+    m_wfSpeedLabel = new QLabel(this);
+    speedRow->addWidget(m_wfSpeedSlider);
+    speedRow->addWidget(m_wfSpeedLabel);
+    layout->addLayout(speedRow);
+
+    connect(m_wfSpeedSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_wfSpeedLabel->setText(QStringLiteral("%1 ms").arg(v));
+        emit wfUpdatePeriodChanged(v);
+    });
+
     // --- Spectrum section ---
     auto* specLabel = new QLabel(QStringLiteral("Spectrum"), this);
     specLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
@@ -251,6 +271,15 @@ void SpectrumOverlayMenu::updateNotchAddLabel()
     }
     m_notchFreqLabel->setText(
         QStringLiteral("%1 MHz").arg(m_notchAddFreqHz / 1.0e6, 0, 'f', 6));
+}
+
+void SpectrumOverlayMenu::setWfUpdatePeriodMs(int ms)
+{
+    if (!m_wfSpeedSlider) { return; }
+    m_wfSpeedSlider->blockSignals(true);
+    m_wfSpeedSlider->setValue(qBound(10, ms, 500));
+    m_wfSpeedLabel->setText(QStringLiteral("%1 ms").arg(qBound(10, ms, 500)));
+    m_wfSpeedSlider->blockSignals(false);
 }
 
 void SpectrumOverlayMenu::setValues(int wfColorGain, int wfBlackLevel, bool autoBlack,

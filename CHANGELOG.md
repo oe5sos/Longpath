@@ -4,6 +4,18 @@
 
 ### Added
 
+- **⤢ in jeder schwebenden Titelleiste: volle Groesse und zurueck.**
+  Betreiber 2026-09-17: "man sollte auch immer das fenster auf die
+  volle größe anpassen können, geht aber so nicht." Ein Klick fuellt
+  den nutzbaren Bildschirm, der zweite stellt Lage und Groesse wieder
+  her; festgestellt (Schloss) bleibt der Knopf aus. Doppelklick auf die
+  Leiste dockt weiterhin an.
+
+- **Wasserfall-Geschwindigkeit direkt im Panadapter-Menue** (Rechtsklick
+  > Waterfall > Speed). Betreiber 2026-09-17: "unten soll die
+  geschwindigkeit langsamer sein" -- der Regler sass bisher nur in
+  Setup > Display > Waterfall; Zeus hat ihn am Panadapter.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
@@ -77,6 +89,57 @@
   Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
 
 ### Fixed
+
+- **Bandfilter: die Kurve war flach, weil das Zeichenfeld sie auf
+  27 Punkte drueckte.** Betreiber 2026-09-17 mit Bildschirmfoto: "der
+  bandfilter könnte noch genauer und besser sein, schaut eher flach
+  aus." Im Zeichenfeld steckte seit dem 2026-08-22 eine 30-Punkte-
+  Reserve fuer Beschriftungen, die laengst in der Kopfzeile stehen --
+  bei seiner Fensterhoehe (105 Punkte) blieben fuer 40 dB nur 27
+  Punkte. Reserve weg (jetzt 46 Punkte, in der Vorgabegroesse 81),
+  dazu doppelt so viele Stuetzstellen (die "zwoelf Bildpunkte" der
+  OpenHPSDR-Vorlage waren Bildschirm-, nicht Qt-Punkte -- auf Retina
+  lag unsere Kurve doppelt so grob), Kantenglaettung fuer den
+  Kurvenzug, dBm-Zahlen weichen bei knappem Platz statt sich zu
+  ueberlagern. Auf Wunsch ("meine bandbreite sollte von oben bis unten
+  markiert sein") steht die Durchlass-Saeule jetzt ueber die ganze
+  Hoehe, und das Hoerbare ist als Flaeche gefuellt, nicht nur als
+  Strich (Vorlage: Zeus Link, live angesehen).
+
+- **Panadapter: die Bandbreite war im 3D-Modus unsichtbar.** Die Saeule
+  wurde in die statische Chrome-Schicht gemalt, die absichtlich UNTER
+  der Kurve liegt -- die deckende 3D-Flaeche verdeckte sie ganz; auf dem
+  bunten Wasserfall ging die tuerkise Tuenche ohnehin unter. Jetzt: im
+  3D-Modus Saeule, Kanten und Mittellinie in der dynamischen Schicht
+  ueber der Flaeche (`paintPassbandOverSurface`), im Wasserfall eine
+  helle Tuenche mit hellen Kanten statt Tuerkis (wie Zeus). Die
+  Benutzerfarbe gilt weiter fuer die Saeule im 2D-Spektrum.
+
+- **LSB klang "katastrophal": LOW/HIGH im Bandfilter zaehlten bei LSB
+  verkehrt herum.** Betreiber: "100 - 3000 ergibt 2900?!?!?" Die Felder
+  zeigten die Betraege der INNEREN Kanten, bei LSB also LOW = ferne
+  Kante (2950) und HIGH = nahe (150); "LOW 100" + "WIDTH 3000" ergab
+  -100 … +2900 Hz, quer ueber den Traeger aufs falsche Seitenband. LOW
+  und HIGH sind jetzt bei beiden Seitenbaendern Audio-Begriffe (nahe/
+  ferne Kante), 100 + 3000 = 3100 auch bei LSB, WIDTH schiebt nie mehr
+  ueber den Traeger; die Wortmarken in der Flaeche tauschen bei LSB die
+  Seite. Dazu eine Wache beim Wiederherstellen: ein gespeicherter
+  LSB/USB-Durchlass ueber den Traeger (so stand er fuer 40 m in den
+  Einstellungen und kam bei jedem Start zurueck -- "wieder das gleiche")
+  wird durch die Vorgabe der Betriebsart ersetzt.
+
+- **Rauschminderung: DFNR und BNR standen im Menue, obwohl dieser Bau
+  sie nicht enthaelt** (DFNR nur mit DeepFilterNet-Bibliothek, BNR nur
+  Windows/NVIDIA) -- ein Klick leuchtete den Knopf an, schaltete die
+  laufende Minderung ab und tat sonst nichts. Jetzt nur noch, was der
+  Bau kann; NNR fehlte umgekehrt im Menue DSP > NR. Neuer Pruefstand
+  `tst_nr_backends_process_audio` laesst NR1-NR4, NNR und MNR mit
+  echtem Audio durch einen WDSP-Kanal laufen.
+
+- **Einstellungen oeffneten sich hinter den schwebenden Fenstern.**
+  Dieselbe Ursache wie beim Antennenfenster am 2026-09-01 (Qt::Tool-
+  Panels liegen auf macOS ueber einem gewoehnlichen QDialog); der
+  SetupDialog bekommt jetzt dieselbe Ebene.
 
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
   Qt-Accessibility-Explosion ausloesen wie das Logbuch und die

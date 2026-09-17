@@ -126,13 +126,17 @@ private:
     // eines Edits zeigen beide Felder schon den neuen Wert, das Modell
     // aber noch den alten -- ohne eigene Kennung liesse sich "zuletzt"
     // nicht mehr feststellen, sobald WIDTH selbst dran ist.
+    /// In FELD-Begriffen seit dem 2026-09-17: Low = das LOW-Feld = die
+    /// Kante NAHE am Traeger (Audio-Tiefschnitt), High = das HIGH-Feld
+    /// = die ferne Kante — bei beiden Seitenbaendern. Nicht die inneren
+    /// Vorzeichenkanten; die Uebersetzung steht in sidebandOf() in der
+    /// .cpp.
     enum class LastEditedEdge { Low, High };
-    /// Welche Kante SliceModel::widthToEdges() fuer diese Betriebsart als
-    /// Anker behandelt -- High fuer die LSB-Familie, Low fuer die
-    /// USB-Familie. Nur fuer die beiden Betriebsartfamilien
-    /// aussagekraeftig, die der WIDTH-Anschluss selbst unterscheidet.
+    /// Welche Feld-Kante als Anker gilt, solange keine von Hand gesetzt
+    /// wurde: die nahe (Low), so wie SliceModel::widthToEdges() sie
+    /// verankert. Der Betriebsart-Parameter bleibt fuer die Aufrufer.
     static LastEditedEdge naturalAnchorEdge(DSPMode mode);
-    LastEditedEdge m_lastEditedEdge{LastEditedEdge::High};
+    LastEditedEdge m_lastEditedEdge{LastEditedEdge::Low};
     /// Fuer welche (Scheibe, Betriebsart) m_lastEditedEdge zuletzt einen
     /// echten Bedienereingriff gesehen hat. Wechselt eines der beiden,
     /// ist die gemerkte Kante nicht mehr die Auskunft des Bedienenden,

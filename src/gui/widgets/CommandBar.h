@@ -109,6 +109,10 @@ public:
 
     /// Die Beschriftungen einer Gruppe, in Reihenfolge, ohne das „…".
     QStringList pillsIn(const QString& group) const;
+    /// Alle Rauschminderungen, die diese Leiste anbietet — die drei
+    /// vorne UND die im „…". Damit ein Test sagen kann, was NICHT
+    /// angeboten wird (DFNR/BNR ohne HAVE_DFNR/HAVE_BNR, 2026-09-17).
+    QStringList allNrLabels() const;
     /// Die eingeschaltete Pille einer Gruppe, oder leer.
     QString activePill(const QString& group) const;
     /// Eine Pille auslösen, als hätte jemand geklickt.

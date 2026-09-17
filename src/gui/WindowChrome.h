@@ -82,6 +82,21 @@ signals:
     void closeRequested();
     void dockRequested();
 
+public:
+    // ── Volle Groesse ────────────────────────────────────────────────
+    //
+    // Der Betreiber am 2026-09-17: "man sollte auch immer das fenster
+    // auf die volle größe anpassen können, geht aber so nicht." Ein
+    // schwebendes Fenster hat keinen macOS-Zoomknopf (rahmenlos), der
+    // Doppelklick auf die Leiste dockt an (siehe oben), und Kante
+    // oder Anfasser bis an den Bildschirmrand zu ziehen ist Arbeit,
+    // keine Geste. Darum ein eigener Knopf ⤢: einmal klicken fuellt
+    // den nutzbaren Bildschirm (ohne Menueleiste und Dock), noch einmal
+    // stellt die vorige Lage und Groesse wieder her. Festgestellt
+    // (Schloss) heisst auch hier: keine Groessenaenderung.
+    bool isZoomed() const { return m_zoomed; }
+    void toggleZoom();
+
 protected:
     void mousePressEvent(QMouseEvent* ev) override;
     void mouseMoveEvent(QMouseEvent* ev) override;
@@ -93,8 +108,11 @@ private:
 
     QLabel*      m_label{nullptr};
     QPushButton* m_lockBtn{nullptr};
+    QPushButton* m_zoomBtn{nullptr};
     QString      m_lockKey;
     bool         m_locked{false};
+    bool         m_zoomed{false};
+    QRect        m_geometryBeforeZoom;
 };
 
 // ── Der Anfasser unten rechts ───────────────────────────────────────

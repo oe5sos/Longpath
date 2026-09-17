@@ -103,6 +103,15 @@ public:
     /// Nachgesehen, bevor gebaut wurde.
     void setTrace(const QVector<float>& dbm);
 
+    /// Die Wunschhoehe. Ohne sie richtete sich ein frisch abgeloestes
+    /// Fenster nur nach der Mindesthoehe (84) und der 160-Punkte-
+    /// Untergrenze des Fensters — davon gingen Kopfzeile und Achse ab,
+    /// und fuer 40 dB Kurve blieben rund 25 Punkte: das "flach", das
+    /// der Betreiber am 2026-09-17 fotografiert hat. 140 Punkte geben
+    /// der Kurve etwa 80, ein Sprechsignal 20 dB ueber dem Flur steht
+    /// dann 40 Punkte hoch. Kleiner ziehen darf man weiterhin.
+    QSize sizeHint() const override;
+
 signals:
     // Beim Ziehen einer Kante. Die Breite darf sich aendern.
     void filterChanged(int low, int high);
