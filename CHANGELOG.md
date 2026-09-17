@@ -78,6 +78,31 @@
 
 ### Fixed
 
+- **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
+  laesst ihn nicht mehr getastet zurueck.** Bisher gab
+  `TciServer::onClientDisconnected()` nur den TX-Audio-Mutex frei; MOX
+  blieb gesetzt, wenn der Client, der `trx:0,true;` geschickt hatte
+  (WSJT-X, ein Fernclient), abstuerzte oder die Verbindung verlor -- bis
+  der Bediener oder eine andere PTT-Quelle ihn loeste. Thetis hat dieselbe
+  Luecke; das Zeus Station Engine schliesst sie mit Sende-Lease und
+  Herzschlag. Kleinste Form derselben Regel: der Server merkt sich den
+  Socket hinter jedem `trx:N,true` (mit oder ohne `,tci`), vergisst ihn bei
+  `trx:N,false` desselben Clients und sobald MOX aus irgendeiner Quelle
+  abzufallen beginnt (`MoxController::moxChanging`, synchron -- nicht das
+  Ende des TX->RX-Laufs, das ein schneller Neu-Tastvorgang abbricht), und
+  loest MOX, wenn genau dieser Socket geht, waehrend MOX noch an ist. Nur
+  Loesen, nie Tasten; ein Bediener, der nach dem Loslassen des Clients
+  selbst tastet, wird nicht abgeschaltet. Dazu ein **Wachhund fuer
+  haengende Clients**: solange ein Client MOX haelt, wird er jede Sekunde
+  angepingt; nach drei unbeantworteten Pings wird MOX geloest (ein
+  eingefrorenes Programm haelt seinen Socket, ein Disconnect kaeme nie),
+  der Socket bleibt offen. Warnung im Log (`nereus.tci`), Signal
+  `moxReleasedOnClientLoss(peer)`. Fund aus dem Zeus-Protokoll-Inventar
+  (`docs/design/2026-09-17-zeus-stationsprotokoll-inventar.md` par. 3.1);
+  sieben Regressionstests in `tst_tci_mox_release_on_disconnect`, zwei
+  mit echtem RadioModel, einer mit einem rohen TCP-Client, der die
+  WebSocket-Hand schuettelt, tastet und dann nichts mehr beantwortet.
+
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
   Qt-Accessibility-Explosion ausloesen wie das Logbuch und die
   KiwiSDR-Empfaengerliste (b5e9b915, e913abe6) -- jetzt ebenfalls
