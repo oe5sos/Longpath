@@ -1,201 +1,127 @@
-# Roadmap — Design als eigene Schicht
+# Roadmap — Longpath
 
-> „Es werden immer Änderungen von Nereus kommen, die ich dann downloade
-> und die sich dann automatisch meiner Farben und meinem Design anpassen
-> sollen. **Technik Nereus, Design ich.**"
-> — OE5SOS, 2026-08-15
+**Stand:** 17. September 2026, Abend. Diese Datei ist die eine Liste,
+in der steht, was gebaut ist, was als Nächstes kommt und was dafür vom
+Betreiber gebraucht wird. Sie wird bei jedem Schritt nachgezogen; der
+Chat ist kein Ersatz dafür.
 
-Dieser Satz entscheidet die Architektur, nicht die Farbwahl.
-
----
-
-## Warum der bisherige Weg nicht reicht
-
-Heute steht das Design **im Quelltext**: `StyleConstants.h` ist eine
-C++-Datei, und die 1737 Hex-Literale in 134 Widgets erst recht. Jede
-Änderung daran ist eine Änderung an Nereus.
-
-Das hat zwei Folgen, und die zweite ist die schlimmere:
-
-1. **Jeder Download kollidiert.** `StyleConstants.h` ist genau die
-   Datei, die ein Upstream-Commit auch anfasst. Merge-Konflikt bei jedem
-   Update, für immer.
-2. **Neue Widgets sind nicht angepasst.** Ein Panel, das mit dem
-   nächsten Download kommt, bringt Nereus-Farben mit und weiß nichts
-   von deiner Palette. Du müsstest es jedes Mal nachziehen — genau das,
-   was du nicht willst.
-
-Beides ist lösbar, aber nicht durch weiteres Umfärben. Es braucht eine
-**Schicht**.
+Die Richtung für alles Sichtbare heißt seit dem 17.09. **„Glas & Tiefe"**
+(Stilblatt 3 von vier, vom Betreiber gewählt): Flächen versenkt,
+Knöpfe erhaben, Zahlen in Glaschips, Kurven mit Hof, Auswahl als
+gedeckter Blauverlauf. Die Grundregeln aus [`HAUSSTIL.md`](HAUSSTIL.md)
+bleiben; die Richtung ist ihre Ausformung. Die Farbschicht darunter
+(Theme-Datei, `Style::themed()`, Polish-Filter) ist seit August fertig
+und trägt das alles — sie steht hier nicht mehr als eigene Baustelle.
 
 ---
 
-## Die Schicht
+## Erledigt (17.09.)
 
-```
-   ┌─────────────────────────────────────────────────┐
-   │  ~/Library/…/NereusSDR/themes/oe5sos.json       │   ← DU
-   │  Rollen → Werte. Kein C++. Nicht im Repo.       │
-   └──────────────────────┬──────────────────────────┘
-                          │  beim Start geladen
-   ┌──────────────────────▼──────────────────────────┐
-   │  Theme  ·  Style::themed()  ·  Polish-Filter    │   ← Brücke
-   │  Ein Einhängepunkt in main()                    │
-   └──────────────────────┬──────────────────────────┘
-                          │
-   ┌──────────────────────▼──────────────────────────┐
-   │  src/  —  1737 Literale, 134 Widgets            │   ← NEREUS
-   │  darf bleiben wie es ist, auch nach Downloads   │
-   └─────────────────────────────────────────────────┘
-```
+| Schritt | Was | Commit |
+| --- | --- | --- |
+| Durchsicht | Befundliste Bandfilter / Technik / Gestaltung, [`2026-09-17-design-durchsicht.md`](2026-09-17-design-durchsicht.md) | e17e8612 |
+| 1 | Bandfilter neu gezeichnet, Achse auf runden Frequenzen, Bedienzeile mit Versalzeilen und Glasfeldern, Panelkopf versal | 3ad720dc |
+| 2 | TX-Feld (Rinnen versenkt, Bernstein-Verlauf), Regler, Wertchips, Messingtaste, Kopfleisten-Pillen erhaben mit gedeckter Auswahl | 2d5020a4 |
+| 3 | Platten für schwebende Fenster und gedockte Zellen (Verlauf, Rahmen, Luft dazwischen), Fenstertitel versal | ab7104bc |
+| 4 | Fußleiste: „ON AIR" passt; zentraler Glas-Tabellenstil (Logbuch im Rotor-Fenster); Bandfilter ohne Gerät `——`; DVK-Schriftwarnung | dee85dc3 |
+| 5 | Fußleiste: CH 1 kommt nicht mehr allein zurück (Prüfstand am echten Fenster) | 3290b2ee |
+| 6 | Frequenz-Applet/Instrumente: Strich statt Null, Einheit nur wo sie passt, PK/LIM | 56f0a915 |
+| 7 | Kopfleiste: Wunsch-Knopf grau, Lautstärke wie jeder Regler, Lautsprecher als Zeichnung | 0f01ff0e |
+| 8 | Sechs weitere Tabellen auf den Glas-Tabellenstil, Zebra-Farbe | 89e9d5d8 |
+| 9 | Drift-Ratsche wieder grün (61 namenlose Farben, 0 Schriften daneben) | 9bb73c13 |
+| 10 | Applets, erste Runde: Auswahlblau gedeckt, Knöpfe nie schmaler als ihr Text, VAX-Pegel in Bernstein, RTTY-Doppelkopf, Bandfilter-Enge | a46ec862 |
 
-Der Kern: **der Quelltext muss nichts wissen.** Er schreibt weiter
-`#00b4d8` hin; die Theme-Datei sagt „wo Nereus `#00b4d8` malt, male
-`#c2924f`". Ein Download bringt neue Widgets mit alten Nereus-Farben —
-und die Schicht bildet sie ab, ohne dass jemand sie anfasst.
-
-### Der eine Einhängepunkt
-
-Qt hat dafür einen Haken, den man nur einmal setzen muss:
-
-```cpp
-// main.cpp — eine Zeile
-app.installEventFilter(new Style::ThemeFilter(&app));
-```
-
-Der Filter horcht auf `QEvent::Polish`. Qt schickt das an **jedes**
-Widget, kurz bevor es zum ersten Mal gezeichnet wird — auch an eines,
-das erst mit dem nächsten Download in den Baum kommt. Der Filter liest
-dessen Stylesheet, schickt es durch `themed()` und setzt es zurück.
-
-Das ist die Antwort auf „soll sich automatisch anpassen": nicht 400
-Aufrufstellen einwickeln, sondern einmal einhängen.
-
-### Was der Haken nicht erreicht
-
-Ehrlich, weil es die Grenze der Idee ist:
-
-- **QPainter-Code.** S-Meter, Spektrum, Wasserfall, Charts malen mit
-  `QColor(…)` direkt. Dafür gibt es keinen Haken; diese Stellen müssen
-  `Style::…` benutzen. Rund 600 Vorkommen, und darunter sind die
-  größten Farbflächen der App.
-- **Widgets, die ihr Stylesheet später wechseln** (Zustandswechsel nach
-  dem Polish). Die brauchen ein explizites `Style::themed(...)`.
-- **Struktur.** Pillenform, Gruppenüberschriften, Panelköpfe, Laufweite
-  — das ist Layout, keine Farbe, und keine Theme-Datei der Welt kann es
-  nachrüsten.
+Werkzeuge, die dabei entstanden sind und bleiben: `tst_filter_pane_sheet`
+(Bandfilter-Fläche in Betriebsgröße), `tst_tx_entwurf_sheet` mit
+`gebaut` / `kopfleiste` / `platte` / `logbuch` / `applets` (echte
+Widgets als Blatt), `tst_real_status_bar_chain_indicators` (Fußleiste
+am echten Fenster). Live-Prüfung ohne Funkgerät: Sandbox-Instanz mit
+eigenem HOME und `LONGPATH_AUTOMATION=1` (`dumpTree`, `grab`).
 
 ---
 
-## Phasen
+## Als Nächstes, in dieser Reihenfolge
 
-### ✅ Phase 0 — Zählen statt schätzen · erledigt
+### A · Sichern, ohne auf das Beenden zu warten  *(gebaut, noch nicht übernommen)*
 
-`tools/colour_audit.py`. Ergab 1737 Literale, 276 Farben, 241 davon
-namenlos. Die Schätzung vorher war „dreißig Dateien" und lag um das
-Vierfache daneben.
+Betreiber, 17.09.: „wichtig ist, dass sich das programm immer
+automatisch sichert. sollte ein stromausfall oder sonstiges sein,
+sollte man immer auf die daten zurück greifen können!"
 
-### ✅ Phase 1 — Die ununterscheidbaren einsammeln · erledigt
+- `AppSettings::isDirty()` + Autosave-Timer im Hauptfenster: jede
+  Minute, wenn sich etwas geändert hat, wird der ganze Stand samt
+  Fenstergeometrie geschrieben (bisher nur beim Beenden — ein
+  Stromausfall kennt kein closeEvent).
+- Tageskopie `Longpath.settings.<JJJJ-MM-TT>` beim ersten Schreiben
+  eines Tages, 14 Tage bleiben, Handkopien bleiben unberührt — die
+  `.bak` hielt nur den Stand vor dem letzten Schreiben.
+- Logbuch (ADIF) und Profile schreiben schon heute sofort bzw. nach
+  500 ms und atomar (QSaveFile); daran ändert sich nichts.
+- Prüfstand `tst_app_settings_autosave` grün; ein zweiter am echten
+  Fenster ist vorbereitet, aber noch nicht eingebaut.
 
-221 Vorkommen in 52 Dateien auf Palettenwerte angeglichen (ΔE < 8).
-**276 → 202 Farben.** Wert durch Wert, geprüft Zeile für Zeile mit
-maskierten Hex-Werten.
+### B · „Nereus" verschwindet  *(Betreiber, 17.09.: „wir haben kein nereus … weg damit")*
 
-### ✅ Phase 2 — Grautöne entblauen · erledigt
+Sichtbar zuerst, dann der Rest:
 
-17 Werte in `StyleConstants.h`. Der wichtigste: `kBorder`
-`#205070` → `#2c2c31`. Der umrandete jeden Knopf im Programm.
+1. **Audiogeräte** „NereusSDR VAX 1–4" / „NereusSDR TX" → „Longpath VAX
+   1–4" / „Longpath TX". Die Namen vergibt das HAL-Plug-in
+   (`hal-plugin/LongpathVAX.cpp`, `Info.plist`); die App erkennt sie
+   per Muster (`VirtualCableDetector`, PipeWire/Linux-Bus, VAX-Seiten).
+   Beides ändern, das alte Muster als Übergang weiter erkennen. Das
+   Plug-in muss danach neu installiert werden (`/Library/Audio/Plug-Ins/HAL`,
+   braucht das Betreiber-Passwort), und WSJT-X/fldigi brauchen einmal
+   das neue Gerät in ihren Audioeinstellungen.
+2. **TCI-Kennung** „NereusSDR-TCI" → „Longpath-TCI" (`TciServer.cpp`).
+3. **Schlüsselbund** „NereusSDR: …" → „Longpath: …" mit Lesen des alten
+   Eintrags als Rückweg (`CredentialStore.cpp`), sonst sind gespeicherte
+   Zugangsdaten weg.
+4. **Log-Kategorien** `nereus.*` → `longpath.*` (`LogCategories.cpp`,
+   30 Stellen) — das sind die Präfixe im Terminal-Log.
+5. **Texte in Dialogen** (VAX-Ersteinrichtung, Audio-Setup, Über,
+   Support-Bundle, Diagnose).
+6. **Dokumente und Kommentare**: `HAUSSTIL.md` („NereusSDR — Hausstil"),
+   `CLAUDE.md`, die Kopfzeilen „Modification history (NereusSDR)" in
+   ~200 Dateien. Nicht sichtbar im Programm, aber sichtbar beim Lesen.
+7. **Ordnername** `~/Longpath/NereusSDR` → zuletzt, weil Bau- und
+   Startbefehl daran hängen; mit neuem Befehl im selben Schritt.
 
-### ✅ Phase 3 — Bedeutungsfarben dämpfen · erledigt
+### C · Übrige Applets, zweite Runde
+Qt-Standard-Comboboxen (USB, Preset, Profile, Rate, Buffer, Baud) und
+-Checkboxen auf Glas, vertikale EQ-Regler, CAT-Kapseln, Slider-Rinnen in
+Tuner/Diversity. Braucht einen App-weiten Formularstil (QComboBox,
+QCheckBox, QLineEdit) — derselbe Hebel wie für den Setup-Dialog.
 
-24 Werte. Auswahl gedämpftes Blau, Messwert warm, Bestätigt Salbei,
-Gefahr entsättigt. Türkis `#00b4d8` ist raus.
+### D · Verbindungsdialog
+Der erste Bildschirm, den jeder sieht: Versalzeilen statt
+Qt-Gruppenrahmen, Glas-Tabelle, gedeckte Auswahl, eine Sprache in der
+Fehlerzeile. **Wartet darauf, dass die offenen Änderungen in
+`ConnectionPanel.cpp/.h` festgeschrieben sind** (sonst kollidieren wir).
 
-### ✅ Phase 4 — Theme als Datei · erledigt
+### E · Sprache
+Eine Entscheidung des Betreibers: Englisch durchgehend (Empfehlung —
+MOX, VOX, BW, S-Meter sind ohnehin englisch) oder Deutsch durchgehend.
+Danach eine Durchsicht aller sichtbaren Texte („Bandwidth Filter" neben
+„Frequenz", „Leistung" neben „Tune", „Mitschrift", „Leeren").
 
-`gui/styles/Theme.{h,cpp}`. Die Palette kommt aus einer JSON-Datei
-außerhalb des Quellbaums:
+### F · Setup-Dialog
+Seite für Seite auf Glas, mit dem Formularstil aus C.
 
-```
-~/Library/Application Support/NereusSDR/themes/*.json
-```
+### G · Panadapter-Kopf, Overlay, Wasserfall-Palette
+Die Pillen CH 0/TX, die dBm-Pfeile, das Rechtsklick-Menü; eine
+Hausstil-Palette für den Wasserfall als wählbare Vorgabe (kein Zwang).
 
-Vorlage mit allen 46 Rollen: [`oe5sos.example.json`](oe5sos.example.json).
-Kopieren, umbenennen, eine Zeile ändern, App neu starten.
-
-```json
-{ "name": "OE5SOS", "colors": { "border": "#2c2c31", "measured": "#c2924f" } }
-```
-
-Was nicht drinsteht, malt NereusSDR wie immer. Ein Schlüssel der Form
-`#rrggbb` ersetzt eine Farbe, die noch keine Rolle hat — der Notausgang
-für die 162, die es davon gibt.
-
-Der wichtigste Test ist nicht, dass Laden geht, sondern
-`abrokenFileChangesNothingAtAll`: eine Datei mit einem Tippfehler wird
-komplett abgelehnt, mit einer Meldung, die den Fehler nennt, und das
-laufende Theme bleibt unverändert. Halb übernommen wäre schlimmer als
-gar nicht — dann sucht man den Fehler im Programm statt in der Datei.
-
-### ✅ Phase 5 — Der Einhängepunkt · erledigt
-
-`Style::ThemeFilter` auf `QEvent::Polish` und `QEvent::StyleChange`,
-eine Zeile in `main.cpp`. Qt schickt Polish an jedes Widget, kurz bevor
-es zum ersten Mal gezeichnet wird — auch an eines, das erst mit dem
-nächsten Download in den Baum kommt.
-
-Dass das terminiert, hängt an einer Eigenschaft, die vorher aus einem
-anderen Grund gebaut wurde: `themed()` ist idempotent. Der Filter setzt
-das Stylesheet, das löst StyleChange aus, der Filter läuft wieder — und
-bricht ab, weil der zweite Durchlauf nichts mehr ändert.
-
-`tst_theme_filter::aWidgetThatNeverHeardOfTheThemeGetsItAnyway` ist
-wörtlich der Download-Fall.
-
-Für Malcode ohne Stylesheet gibt es `Style::role()`:
-
-```cpp
-p.setPen(QColor(Style::role("measured", Style::kAmberText)));
-```
-
-### Phase 6 — Der Malcode
-
-Die rund 600 `QColor`-Stellen in den zeichnenden Widgets auf
-`Style::…` ziehen. Nach Sichtbarkeit: **Wasserfall** und **S-Meter**
-zuerst — das sind die größten Farbflächen. Dann Spektrum, Charts,
-Meter.
-
-*Prüfbar:* `python3 tools/colour_audit.py` erfasst auch die
-`QColor(0x.., 0x.., 0x..)`-Schreibweise, die es heute noch übersieht.
-
-### Phase 7 — Die namenlosen 162
-
-88 Farben mit ΔE 8–18 entscheiden, 74 mit ΔE > 18 benennen oder
-streichen. Die auffälligsten zuerst: `#ffff00` reines Gelb (10×),
-`#adff2f` Grüngelb (11×). In einer Oberfläche mit deinem Anspruch an
-Dezenz haben die nichts verloren.
-
-### Phase 8 — Struktur
-
-Erst wenn Farbe steht, denn sonst kämpfen zwei Baustellen um dieselbe
-Beurteilung. Gruppenüberschriften, Pillen mit Radius 6, Panelköpfe mit
-Akzentbalken, Monospace für alle veränderlichen Ziffern, ein `…` pro
-Gruppe statt dreizehn Knöpfen nebeneinander. Siehe
-[`HAUSSTIL.md`](HAUSSTIL.md).
-
-### Phase 9 — Downloadfest machen
-
-Ein Skript, das nach einem Update sagt, was das Theme nicht erreicht:
-neue Literale, neue `QColor`-Stellen, neue Widgets ohne Rollen. Damit
-ist „Technik Nereus, Design ich" keine Absicht mehr, sondern eine
-Prüfung, die durchläuft oder nicht.
+### H · Live am Gerät, dann Release
+Bandfilter mit Kurve, TX-Feld beim Senden, Fußleiste mit zwei Ketten —
+das Foto, das kein Prüfstand ersetzt. Danach die 0.6.3 (Website
+nachziehen, siehe Notiz vom 05.09.).
 
 ---
 
-## Die Reihenfolge, kurz
+## Was vom Betreiber gebraucht wird
 
-Phasen 4 und 5 sind der Kern — davor ist alles nur Umfärben, danach ist
-es eine Schicht. Phase 6 bringt die größte sichtbare Wirkung, weil
-Wasserfall und S-Meter mehr Fläche haben als alle Knöpfe zusammen.
-Phase 8 kommt zuletzt, weil Struktur und Farbe sich sonst gegenseitig
-die Beurteilung verderben.
+- **Sprache** (E): Englisch oder Deutsch.
+- **ConnectionPanel committen** (D).
+- **Passwort für das HAL-Plug-in** (B1), wenn es so weit ist — den
+  Befehl gebe ich dann.
+- **Ein Foto mit Funkgerät** (H), sobald das ANVELINA wieder da ist.
