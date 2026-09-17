@@ -137,6 +137,14 @@ public:
     // interval takes effect immediately.
     void setPingIntervalMs(int ms);
 
+    // Keyed-client watchdog (2026-09-17): while a client owns MOX it is
+    // pinged every intervalMs and MOX is released after maxUnanswered pings
+    // in a row went without a pong — a HUNG client (frozen event loop)
+    // keeps its socket, so onClientDisconnected() alone would never fire.
+    // Defaults: 1000 ms, 3 pings (≈ 3 s keyed with nobody home). Exposed
+    // for tests; the app keeps the defaults.
+    void setKeyedWatchdog(int intervalMs, int maxUnanswered);
+
     // Test-only: bypass the RxChannel signal chain and inject audio directly
     // into the per-slice ring buffer.  Used by tst_tci_audio_roundtrip;
     // production code paths go through the Qt::DirectConnection signal at
@@ -226,6 +234,12 @@ private slots:
 
     // From AetherSDR src/core/TciServer.cpp:275+ [@0cd4559] — cleanup on disconnect
     void onClientDisconnected();
+
+    // Keyed-client watchdog (2026-09-17): a pong from the MOX owner resets
+    // its unanswered-ping count; the watchdog tick pings the owner and
+    // releases MOX once too many pings went unanswered.
+    void onPong(quint64 elapsedTime, const QByteArray& payload);
+    void onKeyedWatchdogTick();
 
     // Text-frame handler — Phase 3 Task 3.2 wires TciProtocol dispatch here.
     void onTextMessageReceived(const QString& msg);
@@ -504,6 +518,23 @@ private:
     //
     // QPointer, main-thread only, same rules as m_txAudioActiveClient.
     QPointer<QWebSocket> m_moxOwner;
+
+    // The one place MOX is released on the owner's behalf — from
+    // onClientDisconnected() (socket gone) and from the watchdog (socket
+    // alive, nobody answering). Clears the owner, unkeys if MOX is still
+    // on, logs, emits moxReleasedOnClientLoss.
+    void releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QString& why);
+    void startKeyedWatchdog();
+    void stopKeyedWatchdog();
+
+    // Keyed-client watchdog state. The timer runs only while m_moxOwner is
+    // set (started in the trx path, stopped in releaseMoxHeldBy / when the
+    // owner is cleared). Pings carry the payload "Longpath-keyed" so the
+    // ping test can tell them from the 20 s "Thetis" keepalive.
+    QTimer* m_keyedWatchdog{nullptr};
+    int     m_keyedWatchdogIntervalMs{1000};
+    int     m_keyedWatchdogMaxUnanswered{3};
+    int     m_ownerPingsUnanswered{0};
 
     // ── Phase 19: sensor broadcast timers ────────────────────────────────────
     //

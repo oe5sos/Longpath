@@ -16,9 +16,11 @@
 //   2026-09-17 — MOX release on client loss: m_moxOwner is set on
 //                trx:N,true, cleared on trx:N,false / moxStateChanged(false),
 //                and onClientDisconnected() unkeys the radio if the owner
-//                vanished while MOX was on. NereusSDR-original; see
-//                TciServer.h and docs/design/2026-09-17-zeus-
-//                stationsprotokoll-inventar.md §3.1.
+//                vanished while MOX was on; a keyed-client watchdog pings
+//                the owner every second and releases MOX after three
+//                unanswered pings (hung client, socket still open).
+//                NereusSDR-original; see TciServer.h and docs/design/
+//                2026-09-17-zeus-stationsprotokoll-inventar.md §3.1.
 
 #ifdef HAVE_WEBSOCKETS
 
@@ -1102,7 +1104,10 @@ void TciServer::hookGlobalBroadcasts()
         // signal here.
         connect(mox, &MoxController::moxChanging, this,
                 [this](int, bool, bool newMox) {
-                    if (!newMox) { m_moxOwner = nullptr; }
+                    if (!newMox) {
+                        m_moxOwner = nullptr;
+                        stopKeyedWatchdog();
+                    }
                 });
         connect(mox, &MoxController::moxStateChanged, this,
                 [this](bool on) {
@@ -1434,6 +1439,8 @@ void TciServer::stop()
     m_audioTapSources.clear();  // P2.3: reset so hookAudioAndIqTaps() re-arms
 
     m_pingTimer->stop();
+    stopKeyedWatchdog();
+    m_moxOwner = nullptr;
     m_drainTimer->stop();        // Phase 14: stop drain before disconnecting clients
     m_rxSensorTimer->stop();     // Phase 19: stop sensor broadcast timers
     m_txSensorTimer->stop();
@@ -1585,6 +1592,9 @@ void TciServer::onNewConnection()
                 this, &TciServer::onBinaryMessageReceived);
         connect(ws, &QWebSocket::disconnected,
                 this, &TciServer::onClientDisconnected);
+        // Keyed-client watchdog (2026-09-17): every client answers pings
+        // at the WebSocket layer; only the MOX owner's answers are counted.
+        connect(ws, &QWebSocket::pong, this, &TciServer::onPong);
 
         qCInfo(lcTci) << "TciServer: client connected from" << session->peer;
         emit clientConnected(ws);
@@ -1631,19 +1641,7 @@ void TciServer::onClientDisconnected()
     // socket that last sent trx:N,true is the one going away and MOX is
     // still on, unkey. Only ever unkeys — it can never key.
     if (!m_moxOwner.isNull() && m_moxOwner.data() == ws) {
-        m_moxOwner = nullptr;
-        const QString peer = it.value()->peer;
-        // Without a model (test path) there is nothing to unkey; the
-        // signal still reports that the bookkeeping fired.
-        const bool stillKeyed = m_model.isNull() ? true : m_model->mox();
-        if (stillKeyed) {
-            qCWarning(lcTci) << "TciServer: client" << peer
-                             << "keyed the radio and disconnected — releasing MOX";
-            if (!m_model.isNull()) {
-                m_model->setMox(false);
-            }
-            emit moxReleasedOnClientLoss(peer);
-        }
+        releaseMoxHeldBy(ws, it.value()->peer, QStringLiteral("disconnected"));
     }
 
     // Phase 17: release TX audio mutex if this client held it.
@@ -1665,6 +1663,90 @@ void TciServer::onClientDisconnected()
 
     m_clients.erase(it);
     ws->deleteLater();
+}
+
+// ── Keyed-client watchdog + shared MOX release (2026-09-17) ──────────────────
+//
+// Two ways a keying client can go missing: its socket closes (a crash —
+// onClientDisconnected handles that) or its event loop freezes while the
+// socket stays open (a hang — nothing would ever fire). The watchdog covers
+// the second: while a client owns MOX it is pinged every
+// m_keyedWatchdogIntervalMs, and after m_keyedWatchdogMaxUnanswered pings
+// in a row without a pong, MOX is released exactly as on a disconnect. The
+// socket itself is left alone — a client that wakes up again may carry on;
+// it just is not allowed to hold the transmitter while nobody is home.
+
+void TciServer::releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QString& why)
+{
+    if (m_moxOwner.data() != ws) { return; }
+    m_moxOwner = nullptr;
+    m_ownerPingsUnanswered = 0;
+    stopKeyedWatchdog();
+    // Without a model (test path) there is nothing to unkey; the signal
+    // still reports that the bookkeeping fired.
+    const bool stillKeyed = m_model.isNull() ? true : m_model->mox();
+    if (!stillKeyed) { return; }
+    qCWarning(lcTci) << "TciServer: client" << peer << "keyed the radio and"
+                     << why << "— releasing MOX";
+    if (!m_model.isNull()) {
+        m_model->setMox(false);
+    }
+    emit moxReleasedOnClientLoss(peer);
+}
+
+void TciServer::setKeyedWatchdog(int intervalMs, int maxUnanswered)
+{
+    m_keyedWatchdogIntervalMs   = qMax(50, intervalMs);
+    m_keyedWatchdogMaxUnanswered = qMax(1, maxUnanswered);
+    if (m_keyedWatchdog && m_keyedWatchdog->isActive()) {
+        m_keyedWatchdog->start(m_keyedWatchdogIntervalMs);
+    }
+}
+
+void TciServer::startKeyedWatchdog()
+{
+    if (!m_keyedWatchdog) {
+        m_keyedWatchdog = new QTimer(this);   // parented — destroyed with server
+        connect(m_keyedWatchdog, &QTimer::timeout,
+                this, &TciServer::onKeyedWatchdogTick);
+    }
+    if (!m_keyedWatchdog->isActive()) {
+        m_ownerPingsUnanswered = 0;
+        m_keyedWatchdog->start(m_keyedWatchdogIntervalMs);
+    }
+}
+
+void TciServer::stopKeyedWatchdog()
+{
+    if (m_keyedWatchdog) { m_keyedWatchdog->stop(); }
+    m_ownerPingsUnanswered = 0;
+}
+
+void TciServer::onKeyedWatchdogTick()
+{
+    if (m_moxOwner.isNull()) {
+        stopKeyedWatchdog();
+        return;
+    }
+    if (m_ownerPingsUnanswered >= m_keyedWatchdogMaxUnanswered) {
+        auto it = m_clients.find(m_moxOwner.data());
+        const QString peer = (it != m_clients.end()) ? it.value()->peer
+                                                     : QStringLiteral("(unknown)");
+        releaseMoxHeldBy(m_moxOwner.data(), peer,
+                         QStringLiteral("stopped answering pings"));
+        return;
+    }
+    ++m_ownerPingsUnanswered;
+    m_moxOwner->ping(QByteArrayLiteral("Longpath-keyed"));
+}
+
+void TciServer::onPong(quint64 elapsedTime, const QByteArray& payload)
+{
+    Q_UNUSED(elapsedTime);
+    Q_UNUSED(payload);
+    auto* ws = qobject_cast<QWebSocket*>(sender());
+    if (ws == nullptr || m_moxOwner.isNull() || m_moxOwner.data() != ws) { return; }
+    m_ownerPingsUnanswered = 0;
 }
 
 // ── totalResamplerInstances() ─────────────────────────────────────────────────
@@ -2196,9 +2278,12 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     // keying client has vanished. See the member note in
                     // TciServer.h.
                     if (wantsMox) {
+                        if (m_moxOwner.data() != ws) { m_ownerPingsUnanswered = 0; }
                         m_moxOwner = ws;
+                        startKeyedWatchdog();
                     } else if (!m_moxOwner.isNull() && m_moxOwner.data() == ws) {
                         m_moxOwner = nullptr;
+                        stopKeyedWatchdog();
                     }
 
                     if (hasTciArg && wantsMox) {

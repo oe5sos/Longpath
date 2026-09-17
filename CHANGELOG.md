@@ -92,11 +92,16 @@
   Ende des TX->RX-Laufs, das ein schneller Neu-Tastvorgang abbricht), und
   loest MOX, wenn genau dieser Socket geht, waehrend MOX noch an ist. Nur
   Loesen, nie Tasten; ein Bediener, der nach dem Loslassen des Clients
-  selbst tastet, wird nicht abgeschaltet. Warnung im Log
-  (`nereus.tci`), Signal `moxReleasedOnClientLoss(peer)`. Fund aus dem
-  Zeus-Protokoll-Inventar (`docs/design/2026-09-17-zeus-
-  stationsprotokoll-inventar.md` par. 3.1); fuenf Regressionstests in
-  `tst_tci_mox_release_on_disconnect`, zwei davon mit echtem RadioModel.
+  selbst tastet, wird nicht abgeschaltet. Dazu ein **Wachhund fuer
+  haengende Clients**: solange ein Client MOX haelt, wird er jede Sekunde
+  angepingt; nach drei unbeantworteten Pings wird MOX geloest (ein
+  eingefrorenes Programm haelt seinen Socket, ein Disconnect kaeme nie),
+  der Socket bleibt offen. Warnung im Log (`nereus.tci`), Signal
+  `moxReleasedOnClientLoss(peer)`. Fund aus dem Zeus-Protokoll-Inventar
+  (`docs/design/2026-09-17-zeus-stationsprotokoll-inventar.md` par. 3.1);
+  sieben Regressionstests in `tst_tci_mox_release_on_disconnect`, zwei
+  mit echtem RadioModel, einer mit einem rohen TCP-Client, der die
+  WebSocket-Hand schuettelt, tastet und dann nichts mehr beantwortet.
 
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
   Qt-Accessibility-Explosion ausloesen wie das Logbuch und die
