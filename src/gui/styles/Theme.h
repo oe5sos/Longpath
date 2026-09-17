@@ -6,33 +6,34 @@
 //
 // Longpath-original.
 //
-// ── Technik Nereus, Design du ────────────────────────────────────────
+// ── Technik vom Programm, Design vom Betreiber ────────────────────────────────────────
 //
 // OE5SOS, 2026-08-15:
 //
-//   „Es werden immer Änderungen von Nereus kommen, die ich dann
-//    downloade und die sich dann automatisch meiner Farben und meinem
-//    Design anpassen sollen. Technik Nereus, Design ich."
+//   Es werden immer technische Änderungen kommen, die er dann
+//   herunterlädt und die sich automatisch seinen Farben und seinem
+//   Design anpassen sollen — die Technik kommt aus dem Quelltext, das
+//   Design von ihm.
 //
 // Das geht nicht, solange das Design IM Quelltext steht. StyleConstants.h
 // ist genau die Datei, die ein Upstream-Commit auch anfasst — Konflikt
 // bei jedem Update, für immer. Und ein Panel, das mit dem nächsten
-// Download kommt, bringt Nereus-Farben mit und weiß nichts von einer
+// Download kommt, bringt die Farben des Quelltexts mit und weiß nichts von einer
 // fremden Palette.
 //
 // Also eine Schicht:
 //
-//   Theme-Datei    ~/Library/Application Support/NereusSDR/themes/*.json
+//   Theme-Datei    <Konfigurationsordner>/themes/*.json
 //                  Rollen → Werte. Kein C++, nicht im Repo, überlebt
 //                  jeden Download.
 //
-//   Theme + themed()  bildet ab, was Nereus malt, auf das, was die
+//   Theme + themed()  bildet ab, was der Quelltext malt, auf das, was die
 //                  Datei will.
 //
 //   src/           1737 Literale in 134 Widgets. Dürfen bleiben.
 //
 // Der Quelltext muss nichts wissen. Er schreibt weiter #00b4d8 hin; die
-// Datei sagt „wo Nereus #00b4d8 malt, male #c2924f".
+// Datei sagt „wo der Quelltext #00b4d8 malt, male #c2924f".
 //
 // ── Rollen, nicht Hex ────────────────────────────────────────────────
 //
@@ -40,7 +41,7 @@
 //
 //   { "name": "OE5SOS", "colors": { "accent": "#c2924f" } }
 //
-// Ein Hex-Wert als Schlüssel geht auch — dann ist er der Nereus-Wert,
+// Ein Hex-Wert als Schlüssel geht auch — dann ist er der Quelltext-Wert,
 // der ersetzt werden soll. Das ist der Notausgang für eine Farbe, die
 // noch keine Rolle hat, und es sind derzeit 162 davon.
 //
@@ -78,7 +79,7 @@ public:
     static QStringList searchPaths();
 
     /// Load the first theme found in searchPaths(). No file is the
-    /// normal case and not an error — dann gilt die Nereus-Palette.
+    /// normal case and not an error — dann gilt die Quelltext-Palette.
     bool loadUserTheme();
 
     // ── Auswaehlbare Paletten ────────────────────────────────────────
@@ -164,7 +165,7 @@ public:
     //   mulde    versenkt: Tiefe                 0..40   (10)
     int forForm(const QString& name, int fallback) const;
 
-    /// What this theme wants in place of a Nereus colour, or empty.
+    /// What this theme wants in place of a source-code colour, or empty.
     QString forHex(const QString& legacyHex) const;
 
     /// Alle Hex-Ersetzungen der Datei. Für die 162 Farben im Programm,

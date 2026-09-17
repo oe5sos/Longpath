@@ -83,7 +83,7 @@ mw0lge@grange-lane.co.uk
 //
 // Das Anschalten des Abgriffs (WavRecorderController) und die
 // Dateibenennung/UI (bewusst offen gelassen — siehe design doc §8 und
-// CLAUDE.local.md "Technik Nereus, Design ich"). Diese Klasse bekommt
+// CLAUDE.local.md: Technik vom Programm, Design vom Betreiber). Diese Klasse bekommt
 // Abtastwerte gereicht und weiss nicht, woher.
 //
 // =================================================================

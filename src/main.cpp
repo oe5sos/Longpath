@@ -18,7 +18,7 @@
 // This is the only translation unit that includes it, and that is on
 // purpose: it is compiled into the application target alone, so a new commit
 // rebuilds this file and relinks this binary, and leaves the test suite (which
-// links the NereusSDRObjs object library) untouched. See CMakeLists.txt
+// links the LongpathObjs object library) untouched. See CMakeLists.txt
 // section "Build tag" and src/core/BuildIdentity.h.
 #include "LongpathBuildTag.h"
 
@@ -329,12 +329,12 @@ int main(int argc, char* argv[])
     Longpath::applyDarkPalette(app);
     Longpath::applyAppBaselineQss(app);
 
-    // ── Technik Nereus, Design der Betreiber ─────────────────────────
+    // ── Technik aus dem Quelltext, Design vom Betreiber ─────────────────────────
     //
     // Die persönliche Palette liegt als JSON neben den Einstellungen,
     // nicht im Quellbaum — sie überlebt damit jeden Download. Keine
     // Datei ist der Normalfall und kein Fehler; dann gilt die
-    // Nereus-Palette aus StyleConstants.h.
+    // Palette aus StyleConstants.h.
     //
     // Der Filter ist der eine Einhängepunkt statt vierhundert
     // eingewickelter setStyleSheet-Aufrufe: Qt schickt QEvent::Polish

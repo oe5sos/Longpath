@@ -45,6 +45,12 @@
 #include "gui/applets/TciApplet.h"
 #include "gui/applets/AsrApplet.h"
 #include "gui/setup/AsrPage.h"
+#include "gui/styles/AppTheme.h"
+#include <QCheckBox>
+#include <QGroupBox>
+#include <QLineEdit>
+#include <QRadioButton>
+#include <QFormLayout>
 #include "asr/WhisperServerLauncher.h"
 #include "gui/applets/DvkApplet.h"
 #include "gui/applets/QsoRecorderApplet.h"
@@ -805,6 +811,25 @@ private slots:
             QVERIFY2(img.save(aus), qPrintable(aus));
             qInfo().noquote() << "Blatt:" << aus;
         }
+        {
+            // Die Mitschrift gedockt: im Sandbox-Bild vom 18.09. stand
+            // hinter dem Zustandstext ein Balken in #0f0f1a — schwebend
+            // (mitschrift-Blatt) nicht. Hier die Zelle, um es zu sehen.
+            applyAppBaselineQss(*qApp);
+            AppletGrid grid;
+            grid.resize(300, 260);
+            const QString a = grid.addCell(QString());
+            grid.cell(a)->addWidget(new AsrApplet(&modell));
+            grid.setAttribute(Qt::WA_DontShowOnScreen);
+            grid.show();
+            QCoreApplication::processEvents();
+            QImage img(grid.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            grid.render(&img);
+            QVERIFY(img.save(QStringLiteral("/tmp/platte_mitschrift.png")));
+            qInfo().noquote() << "Blatt: /tmp/platte_mitschrift.png";
+        }
     }
 
     // Das Logbuchfenster mit dem Logbuch des Betreibers-Sandkastens (oder
@@ -842,6 +867,7 @@ private slots:
     // "Glas & Tiefe" noch fehlt (2026-09-17, Punkt 5 der Runde).
     void applets()
     {
+        applyAppBaselineQss(*qApp);   // wie im Programm (main.cpp)
         RadioModel modell;
         TciServer tci(&modell);
         SliceModel* slice = modell.sliceById(0);
@@ -900,6 +926,7 @@ private slots:
     // sind Zustaende, die das Blatt zeigen soll.
     void mitschrift()
     {
+        applyAppBaselineQss(*qApp);
         RadioModel modell;
         auto& launcher = WhisperServerLauncher::instance();
         launcher.start(WhisperServerLauncher::configFromSettings());
@@ -939,6 +966,72 @@ private slots:
             qInfo().noquote() << "Blatt: /tmp/mitschrift_setup.png" << page.size();
         }
         launcher.stop();
+    }
+
+    // Der Formularstil (Roadmap C/F, 2026-09-18): die App-Basislinie
+    // allein — kein Widget hier hat ein eigenes Stylesheet. So sieht
+    // jede Setup-Seite aus, die nichts weiter tut, und jedes Applet-
+    // Auswahlfeld, das applyComboStyle() ruft.
+    void formular()
+    {
+        applyAppBaselineQss(*qApp);
+
+        QWidget page;
+        page.setAttribute(Qt::WA_DontShowOnScreen);
+        page.setStyleSheet(QStringLiteral("QWidget { background: %1; color: %2; }")
+                               .arg(QLatin1String(Style::kAppBg),
+                                    QLatin1String(Style::kTextPrimary)));
+        auto* col = new QVBoxLayout(&page);
+        col->setContentsMargins(16, 14, 16, 14);
+        col->setSpacing(10);
+
+        auto* group = new QGroupBox(QStringLiteral("Erkennung"), &page);
+        auto* form = new QFormLayout(group);
+        form->setHorizontalSpacing(12);
+        form->setVerticalSpacing(8);
+        auto* combo = new QComboBox(group);
+        combo->addItems({QStringLiteral("USB"), QStringLiteral("LSB"), QStringLiteral("CW")});
+        form->addRow(QStringLiteral("Betriebsart:"), combo);
+        auto* edit = new QLineEdit(QStringLiteral("http://127.0.0.1:8080/inference"), group);
+        form->addRow(QStringLiteral("Adresse:"), edit);
+        auto* spin = new QSpinBox(group);
+        spin->setRange(0, 5000); spin->setValue(2850); spin->setSuffix(QStringLiteral(" Hz"));
+        form->addRow(QStringLiteral("Bandbreite:"), spin);
+        auto* slider = new QSlider(Qt::Horizontal, group);
+        slider->setRange(0, 100); slider->setValue(62);
+        form->addRow(QStringLiteral("Pegel:"), slider);
+        col->addWidget(group);
+
+        auto* checks = new QGroupBox(QStringLiteral("Schalter"), &page);
+        auto* row = new QHBoxLayout(checks);
+        auto* c1 = new QCheckBox(QStringLiteral("selbst starten"), checks); c1->setChecked(true);
+        auto* c2 = new QCheckBox(QStringLiteral("Automatik"), checks);
+        auto* c3 = new QCheckBox(QStringLiteral("gesperrt"), checks); c3->setChecked(true); c3->setEnabled(false);
+        auto* r1 = new QRadioButton(QStringLiteral("Deutsch"), checks); r1->setChecked(true);
+        auto* r2 = new QRadioButton(QStringLiteral("Englisch"), checks);
+        for (QWidget* w : std::initializer_list<QWidget*>{c1, c2, c3, r1, r2}) { row->addWidget(w); }
+        row->addStretch(1);
+        col->addWidget(checks);
+
+        auto* buttons = new QHBoxLayout;
+        auto* b1 = new QPushButton(QStringLiteral("Starten"), &page);
+        auto* b2 = new QPushButton(QStringLiteral("Stoppen"), &page); b2->setEnabled(false);
+        auto* b3 = new QPushButton(QStringLiteral("Erreichbarkeit pruefen"), &page);
+        auto* v = new QSlider(Qt::Vertical, &page); v->setRange(-12, 12); v->setValue(3); v->setFixedHeight(70);
+        buttons->addWidget(b1); buttons->addWidget(b2); buttons->addWidget(b3);
+        buttons->addStretch(1); buttons->addWidget(v);
+        col->addLayout(buttons);
+        col->addStretch(1);
+
+        page.resize(560, 330);
+        page.show();
+        QCoreApplication::processEvents();
+        QImage img(page.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        page.render(&img);
+        QVERIFY(img.save(QStringLiteral("/tmp/formular.png")));
+        qInfo().noquote() << "Blatt: /tmp/formular.png" << page.size();
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.

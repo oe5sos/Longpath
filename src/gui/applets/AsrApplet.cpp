@@ -152,7 +152,9 @@ void AsrApplet::setStatus(const QString& s, const QString& colour)
     if (!m_status) { return; }
     m_status->setText(s);
     m_status->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(colour));
+        // background: transparent — gedockt bekam das Label sonst einen
+        // Grund in der alten Fensterfarbe (Sandbox-Bild 2026-09-18).
+        QStringLiteral("QLabel { color: %1; font-size: 11px; background: transparent; }").arg(colour));
 }
 
 } // namespace Longpath

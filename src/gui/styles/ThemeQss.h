@@ -74,8 +74,8 @@ namespace Longpath::Style {
 /// Schlüssel ist eine stille Farbänderung beim nächsten Start.
 struct ThemeEntry {
     const char* role;     ///< z. B. "border", "accent", "measured"
-    const char* legacy;   ///< was der Nereus-Quelltext hinschreibt
-    const char* current;  ///< was Nereus heute daraus malt
+    const char* legacy;   ///< was der Quelltext hinschreibt
+    const char* current;  ///< was das Programm heute daraus malt
 };
 
 /// The whole map, in the order it is applied. Public so a test can walk
@@ -101,7 +101,7 @@ QString themed(QString qss);
 // stehen (2026-08-20: zwei schwarze Balken im TX-Applet, der
 // Panadapter als schwarzes Loch).
 //
-// hexRole() nimmt einen Nereus-Farbwert, sucht die Rolle, die er in
+// hexRole() nimmt einen Farbwert aus dem Quelltext, sucht die Rolle, die er in
 // der Tabelle hat, und liefert, was das laufende Thema dafuer will.
 // Ohne Thema, ohne Rolle oder bei unbekanntem Wert kommt der Wert
 // unveraendert zurueck — ein Malcode-Aufruf ist damit immer sicher.
@@ -113,7 +113,7 @@ QString hexRole(const QString& nereusHex);
 bool hasLegacyColour(const QString& qss);
 
 /// Was an dieser Stelle gemalt werden soll: die Theme-Datei, wenn sie
-/// eine Meinung hat, sonst der Nereus-Wert. Für Malcode, der kein
+/// eine Meinung hat, sonst der Quelltext-Wert. Für Malcode, der kein
 /// Stylesheet hat — QPainter, Charts, Instrumente.
 ///
 ///     p.setPen(QColor(Style::role("measured", Style::kAmberText)));

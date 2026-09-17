@@ -110,7 +110,7 @@ private slots:
             VirtualCableDetector::filterThirdParty(QVector<DetectedCable>{});
         QVERIFY(filtered.isEmpty());
     }
-    void filterThirdPartyAllNereusIsEmpty() {
+    void filterThirdPartyAllOwnIsEmpty() {
         QVector<DetectedCable> all;
         all.push_back(makeCable(VirtualCableProduct::LongpathVax, "NereusSDR VAX 1"));
         all.push_back(makeCable(VirtualCableProduct::LongpathVax, "NereusSDR VAX 2"));

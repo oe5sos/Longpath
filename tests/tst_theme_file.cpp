@@ -4,7 +4,7 @@
 //
 // ── Die Datei, die den Download überlebt ─────────────────────────────
 //
-// OE5SOS, 2026-08-15: „Technik Nereus, Design ich."
+// OE5SOS, 2026-08-15: Technik vom Programm, Design vom Betreiber.
 //
 // Damit das mehr ist als eine Absicht, muss die Palette aus einer Datei
 // kommen, die kein Upstream-Commit anfasst. Diese Tests prüfen die
@@ -47,12 +47,12 @@ private slots:
     void init()    { Style::Theme::instance().clear(); }
     void cleanup() { Style::Theme::instance().clear(); }
 
-    void withoutAFileNereusDrawsItsOwnPalette()
+    void withoutAFileTheSourcePaletteApplies()
     {
         QVERIFY(!Style::Theme::instance().isActive());
         const QString qss = QStringLiteral("QLabel { color: %1; }")
                                 .arg(QString::fromLatin1(Style::kTextPrimary));
-        // Der Nereus-Wert steht schon da; es gibt nichts zu bewegen.
+        // Der Quelltext-Wert steht schon da; es gibt nichts zu bewegen.
         QCOMPARE(Style::themed(qss), qss);
     }
 
@@ -67,7 +67,7 @@ private slots:
         QVERIFY2(Style::Theme::instance().loadFile(p, &err), qPrintable(err));
         QCOMPARE(Style::Theme::instance().name(), QStringLiteral("Test"));
 
-        // Der Quelltext schreibt weiter den alten Nereus-Rahmen hin.
+        // Der Quelltext schreibt weiter den alten Rahmen aus dem Quelltext hin.
         const QString out =
             Style::themed(QStringLiteral("QFrame { border: 1px solid #205070; }"));
         QVERIFY2(out.contains(QStringLiteral("#123456")), qPrintable(out));
@@ -83,7 +83,7 @@ private slots:
         QVERIFY(Style::Theme::instance().loadFile(p));
         QCOMPARE(Style::role("measured", Style::kAmberText),
                  QStringLiteral("#abcdef"));
-        // Eine Rolle, zu der die Datei schweigt, bleibt bei Nereus.
+        // Eine Rolle, zu der die Datei schweigt, bleibt beim Quelltext.
         QCOMPARE(Style::role("accent", Style::kAccent),
                  QString::fromLatin1(Style::kAccent));
     }
@@ -103,7 +103,7 @@ private slots:
 
     void aRoleBeatsAHexKeyForTheSameColour()
     {
-        // Beide zeigen auf denselben Nereus-Wert. Die Rolle gewinnt,
+        // Beide zeigen auf denselben Quelltext-Wert. Die Rolle gewinnt,
         // weil sie das ausdrückt, was gemeint war.
         const QString p = write(QStringLiteral("b.json"), QStringLiteral(R"({
             "colors": { "border": "#111111", "#205070": "#222222" }
@@ -182,7 +182,7 @@ private slots:
         QVERIFY(!err.isEmpty());
     }
 
-    void clearGoesBackToNereus()
+    void clearGoesBackToTheSourcePalette()
     {
         const QString p = write(QStringLiteral("c.json"), QStringLiteral(R"({
             "colors": { "border": "#123456" }

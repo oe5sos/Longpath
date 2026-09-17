@@ -26,8 +26,8 @@ namespace {
 
 // ── Die Tabelle ──────────────────────────────────────────────────────
 //
-// Links die Rolle, in der Mitte was der Nereus-Quelltext hinschreibt,
-// rechts was Nereus heute daraus malt. Eine Theme-Datei kann jede Rolle
+// Links die Rolle, in der Mitte was der Quelltext hinschreibt,
+// rechts was das Programm heute daraus malt. Eine Theme-Datei kann jede Rolle
 // überschreiben; wo sie schweigt, gilt die rechte Spalte.
 //
 // Eine Konstante ohne Zeile ist eine Farbe, die kein Theme je erreicht.
@@ -124,7 +124,7 @@ const QVector<ThemeEntry>& table()
 
         // Abzeichen — eigene Abstufung, siehe StyleConstants.h.
         // Der mittlere Wert ist hier derselbe wie der Zielwert: diese
-        // Rollen sind neu (2026-08-17) und haben keine Nereus-Vorgeschichte,
+        // Rollen sind neu (2026-08-17) und haben keine Vorgeschichte im Quelltext,
         // aus der etwas zu ersetzen waere.
         { "badge-info-bg",     "#161e27", Style::kBadgeInfoBg },
         { "badge-ok-bg",       "#212b27", Style::kBadgeOkBg },

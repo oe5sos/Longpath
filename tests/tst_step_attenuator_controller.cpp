@@ -394,7 +394,7 @@ private slots:
     // Issue #259 regression: enable + value persistence round-trip.
     //
     // Bug surface: user opens Setup → General → Options, sets RX1 Enable
-    // and RX2 Enable to 5 dB, closes Nereus, reopens — both controls
+    // and RX2 Enable to 5 dB, closes Longpath, reopens — both controls
     // revert to unchecked / 0 dB.
     //
     // The fix has two halves; this test covers half-A (controller

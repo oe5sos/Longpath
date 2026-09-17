@@ -800,10 +800,9 @@ void RxApplet::buildUi()
         m_agcTSlider->setRange(-160, 0);
         m_agcTSlider->setValue(-20);
         m_agcTSlider->setFixedHeight(18);
-        m_agcTSlider->setStyleSheet(
-            QStringLiteral("QSlider::groove:horizontal { background: %1; height: 6px; border-radius: 3px; }"
-                            "QSlider::handle:horizontal { background: %2; width: 12px; margin: -3px 0; border-radius: 6px; }")
-                .arg(Style::kButtonBg, Style::kAccent));
+        // Dieselbe Rinne wie jeder Regler im Haus (2026-09-18) — bis
+        // dahin der letzte mit Qt-Kugel und flacher Rinne im RX-Feld.
+        m_agcTSlider->setStyleSheet(Style::sliderHStyle());
         // From Thetis console.resx:8397 — ptbRF.ToolTip (ptbRF is the AGC-T slider)
         m_agcTSlider->setToolTip(QStringLiteral("AGC Max Gain - Operates similarly to traditional RF Gain. Right click AUTO based on noise floor."));
         containerLayout->addWidget(m_agcTSlider);

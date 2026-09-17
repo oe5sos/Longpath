@@ -5048,7 +5048,7 @@ longpath_add_test(tst_swr_analysis_superseded)
 #    Funktion. Siehe docs/design/HAUSSTIL.md --
 longpath_add_test(tst_theme_qss)
 
-# -- Die Palette als Datei ausserhalb des Repos. „Technik Nereus, Design
+# -- Die Palette als Datei ausserhalb des Repos. „Technik vom Programm, Design
 #    ich" scheitert, solange das Design in StyleConstants.h steht: genau
 #    die Datei fasst ein Upstream-Commit auch an --
 longpath_add_test(tst_theme_file)

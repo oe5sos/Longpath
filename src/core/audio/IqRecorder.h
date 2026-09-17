@@ -84,7 +84,7 @@ mw0lge@grange-lane.co.uk
 //
 // Das Anschalten des Abgriffs (IqRecorderController) und die
 // Dateibenennung/UI (bewusst offen gelassen — design doc §8 und
-// CLAUDE.local.md "Technik Nereus, Design ich").
+// CLAUDE.local.md: Technik vom Programm, Design vom Betreiber).
 //
 // =================================================================
 // Modification history (Longpath):
