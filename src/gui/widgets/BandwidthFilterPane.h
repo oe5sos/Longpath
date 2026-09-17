@@ -48,6 +48,8 @@
 // Modification history (NereusSDR):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-17 — Neu gezeichnet in der Richtung "Glas & Tiefe"
+//                 (Stilblatt 3), Achse auf runden Frequenzen.
 // =================================================================
 
 #include <QColor>
@@ -62,6 +64,7 @@ class BandwidthFilterPane : public QWidget
 
 public:
     explicit BandwidthFilterPane(QWidget* parent = nullptr);
+
 
     // Beschriftung links oben, „RX1" / „RX2".
     void setLabel(const QString& text);

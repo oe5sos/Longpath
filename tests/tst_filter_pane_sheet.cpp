@@ -137,10 +137,13 @@ private:
         BandwidthFilterPane pane;
         pane.setLabel(QStringLiteral("RX1"));
         pane.setAccent(QColor(Style::kAccent));
-        pane.setVfoFrequency(7'166'000.0);
+        // Wie auf dem Foto des Betreibers vom 2026-09-17: 7.192.500,
+        // LSB 100–3000. Die halbe Kilohertz-Stelle ist kein Zufall —
+        // an ihr sieht man, was die Achsenrundung anrichtet.
+        pane.setVfoFrequency(7'192'500.0);
         pane.setHasFrequency(true);
         pane.setSpan(spanHz);
-        pane.setFilter(-2950, -150);
+        pane.setFilter(-3000, -100);
         pane.resize(w, h);
 
         // Stuetzstellen wie im Betrieb: BandwidthFilterApplet rechnet
@@ -170,13 +173,13 @@ private:
 private slots:
     void drawTheSheets()
     {
-        // Wie beim Betreiber am 2026-09-17: 620×105 Punkte, 10-kHz-
-        // Spanne (AUTO bei 2,8 kHz Filter).
+        // Wie auf dem Foto des Betreibers vom 2026-09-17, 15:11: der
+        // Bandfilter ueber die volle Fensterbreite gedockt, Flaeche
+        // rund 1130×158 Punkte (Retina).
+        drawSheet(QStringLiteral("bandfilter_1130x158.png"), 1130, 158, 12, 10000);
+        // Die knappe Form von frueher (620×105) — dort muessen die
+        // dBm-Zahlen weichen und die Wortmarken bleiben.
         drawSheet(QStringLiteral("bandfilter_620x105.png"), 620, 105, 12, 10000);
-        // Die Vorgabegroesse eines frisch abgeloesten Fensters.
-        drawSheet(QStringLiteral("bandfilter_620x140.png"), 620, 140, 12, 10000);
-        // Das breite Feld von frueher, zum Vergleich mit den alten Blaettern.
-        drawSheet(QStringLiteral("bandfilter_760x230.png"), 760, 230, 12, 10000);
     }
 };
 

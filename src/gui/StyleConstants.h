@@ -411,6 +411,33 @@ constexpr auto kGaugeWarning    = "#a8853f";
 constexpr auto kGaugeDanger     = "#a86b6d";
 constexpr auto kGaugePeak       = "#c4c4c9";
 
+// ── Glas & Tiefe ─────────────────────────────────────────────────────
+//
+// Die Richtung, die der Betreiber am 2026-09-17 aus vier Stilblaettern
+// gewaehlt hat (docs/design/2026-09-17-design-durchsicht.md, Blatt 3):
+// Panels mit Verlauf und Schatten, Zeichenflaechen VERSENKT (Schwarz,
+// Innenschatten oben, Lichtkante), Knoepfe ERHABEN (Verlauf, Lichtkante,
+// dunkle Unterkante), Zahlen in schwarzen Glaschips, Kurven mit Hof.
+// Die Grundregeln des Hausstils bleiben (zwei Prozent Farbe, Blau ist
+// anfassbar, Warm ist gemessen); das hier ist ihre Ausformung.
+//
+// Licht und Schatten sind ALPHA-Werte auf Weiss bzw. Schwarz, keine
+// Farben: dieselbe Kante liegt auf jedem Grund richtig.
+constexpr auto kGlassPanelTop   = "#17171b";   // Panelverlauf oben
+constexpr auto kGlassPanelBot   = "#0e0e10";   // Panelverlauf unten
+constexpr auto kGlassBtnTop     = "#222227";   // erhabener Knopf, oben
+constexpr auto kGlassBtnBot     = "#141417";   // erhabener Knopf, unten
+constexpr auto kGlassSelTop     = "#2f5f92";   // Auswahl, oben
+constexpr auto kGlassSelBot     = "#1e3d5f";   // Auswahl, unten
+constexpr auto kGlassSelBorder  = "#3d78b0";
+constexpr auto kGlassSelText    = "#dbe9f8";
+constexpr int  kGlassLightAlpha  = 18;   // Lichtkante: Weiss mit diesem Alpha
+constexpr int  kGlassShadeAlpha  = 110;  // Innenschatten: Schwarz, erste Zeile
+constexpr auto kGlassLight       = "rgba(255, 255, 255, 18)";   // dieselbe Kante fuer Stylesheets
+constexpr auto kGlassShade       = "rgba(0, 0, 0, 160)";
+constexpr int  kGlassChipRadius  = 7;
+constexpr int  kGlassPanelRadius = 10;
+
 // Disabled
 constexpr auto kDisabledBg      = "#141417";
 constexpr auto kDisabledText    = "#4e4e53";
@@ -569,6 +596,10 @@ inline QString buttonBaseStyle()
         // Knopfreihen bei Zeus wirken nicht ruhiger, weil dort weniger
         // steht, sondern weil um jedes Ding mehr Luft ist.
         "  background: %1; border: 1px solid %2; border-radius: %6px;"
+        // Glas & Tiefe (2026-09-17): ein erhabener Knopf hat oben eine
+        // Lichtkante und unten eine dunkle Kante — der Rahmen ist
+        // nicht rundum gleich, sondern das Licht kommt von oben.
+        "  border-top-color: %9; border-bottom-color: %10;"
         "  color: %3; font-size: 11px; font-weight: bold;"
         "  padding: %7px %8px;"
         "}"
@@ -576,7 +607,7 @@ inline QString buttonBaseStyle()
         // Gedrueckt: der Verlauf kippt. Ein Knopf, der sich beim
         // Druecken nicht bewegt, fuehlt sich tot an — und das kostet
         // hier kein einziges Pixel Verschiebung.
-        "QPushButton:pressed { background: %5; }"
+        "QPushButton:pressed { background: %5; border-top-color: %10; border-bottom-color: %9; }"
     ).arg(raisedFill(kButtonBg),
           QLatin1String(kBorder),
           QLatin1String(kTextPrimary),
@@ -584,7 +615,9 @@ inline QString buttonBaseStyle()
           sunkenFill(kButtonBg))
      .arg(formInt("radius", 7))
      .arg(formInt("luft-v", 4))
-     .arg(formInt("luft-h", 10));
+     .arg(formInt("luft-h", 10))
+     .arg(shiftL(QColor(hexRole(kBorder)), 12),
+          shiftL(QColor(hexRole(kBorder)), -14));
 }
 
 inline QString greenCheckedStyle()
@@ -700,6 +733,37 @@ inline QString sliderVStyle()
     ).arg(kGroove, kAccent);
 }
 
+/// Ein Zahlenfeld hinter Glas (Glas & Tiefe, 2026-09-17): schwarz,
+/// feiner Rahmen, oben die dunkle Kante des Innenschattens, unten eine
+/// Lichtkante — und KEINE Pfeile. Mausrad, Pfeiltasten und Tippen
+/// bleiben; die Pfeilknoepfe waren Qt-Optik und nahmen dem Feld die
+/// Ruhe. Die Schrift setzt der Aufrufer per setFont (Monospace, Regel
+/// 4) — Groesse gehoert nicht ins Stylesheet (HAUSSTIL.md, die Falle).
+inline QString glassFieldStyle()
+{
+    return QStringLiteral(
+        "QSpinBox, QDoubleSpinBox, QLineEdit {"
+        "  background: %1; border: 1px solid %2;"
+        "  border-top-color: %3; border-bottom-color: %4;"
+        "  border-radius: %5px; color: %6; padding: 3px 8px;"
+        "  selection-background-color: %7; selection-color: %8;"
+        "}"
+        "QSpinBox::up-button, QSpinBox::down-button,"
+        "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {"
+        "  width: 0px; border: none; }"
+        "QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {"
+        "  border: 1px solid %9; }"
+    ).arg(sunkenFill(kInsetBg, 8, 4),
+          hexRole(kBorder),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight),
+          QString::number(kGlassChipRadius),
+          hexRole(kTextPrimary),
+          hexRole(kGlassSelBot),
+          hexRole(kGlassSelText),
+          hexRole(kAccent));
+}
+
 inline QString insetValueStyle()
 {
     // VERSENKT: oben dunkel, unten heller — siehe die Notiz bei
@@ -721,11 +785,14 @@ inline QString titleBarStyle()
     // kraeftiger als die Platte darunter, und eine dunkle Unterkante,
     // die sie von ihr abhebt. Die Toene stehen weiter in der Palette
     // (kTitleGrad*) — hier ist nur der Schluss dunkler geworden.
+    // Glas & Tiefe (2026-09-17): dazu eine Lichtkante am oberen Rand,
+    // damit der Kopf eine Oberflaeche hat und nicht nur einen Verlauf.
     return QStringLiteral(
         "background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
         " stop:0 %1, stop:0.5 %2, stop:1 %3);"
-        " border-bottom: 1px solid %4;"
-    ).arg(kTitleGradTop, kTitleGradMid, kTitleGradBot, kTitleBorder);
+        " border-bottom: 1px solid %4; border-top: 1px solid %5;"
+    ).arg(kTitleGradTop, kTitleGradMid, kTitleGradBot, kTitleBorder,
+          QLatin1String(kGlassLight));
 }
 
 // ── Setup Dialog Page Stylesheets ─────────────────────────────────────────────

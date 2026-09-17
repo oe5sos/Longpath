@@ -159,14 +159,13 @@ private:
     SpectrumSource m_spectrumSource;
     class QTimer*  m_traceTimer{nullptr};
     QList<QMetaObject::Connection> m_paneConns;
-    QList<QLabel*> m_shrinkableLabels;
     /// Die Bedienzeile. Eng bricht sie in zwei Reihen um — siehe
-    /// resizeEvent().
+    /// resizeEvent(): die beiden Knopfgruppen wandern nach unten.
     class QHBoxLayout* m_ctrlRow{nullptr};
     class QHBoxLayout* m_ctrlRow2{nullptr};
-    QList<QWidget*>    m_tier2;
+    QWidget*           m_memoryGroup{nullptr};
+    QWidget*           m_spanGroup{nullptr};
     bool               m_ctrlWrapped{false};
-    QLabel*      m_modeLbl{nullptr};
 
     bool m_updatingFromModel{false};
     int  m_spanHz{10000};

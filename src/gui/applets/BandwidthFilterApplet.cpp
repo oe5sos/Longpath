@@ -153,18 +153,36 @@ void BandwidthFilterApplet::buildUI()
     // ── Die Zahlen ───────────────────────────────────────────────────
     //
     // Sie gelten fuer die AKTIVE Scheibe. Eine Zeile je Empfaenger
-    // waere ehrlicher, aber bei vier Scheiben unlesbar; die
-    // Beschriftung sagt, welche gemeint ist.
+    // waere ehrlicher, aber bei vier Scheiben unlesbar; die Kapsel
+    // in der Flaeche ("RX1 · LSB") sagt, welche gemeint ist.
+    //
+    // Glas & Tiefe (2026-09-17, Stilblatt 3): jede Bedienung steht in
+    // einer benannten Gruppe — eine Versalzeile UEBER dem Feld, nicht
+    // ein fettes Wort daneben (Hausstil Regel 1). Die Zahlen sitzen in
+    // Glasfeldern ohne Pfeile, Monospace (Regel 4). Die Betriebsart
+    // stand hier links als Label; sie steht jetzt in der Kapsel der
+    // Flaeche, wo sie zur Kurve gehoert.
     {
         auto* row = new QHBoxLayout;
-        row->setSpacing(6);
+        row->setSpacing(22);
 
-        auto label = [&](const QString& t) {
+        auto caps = [&](const QString& t) {
             auto* l = new QLabel(t, body);
-            l->setStyleSheet(QStringLiteral(
-                "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
+            l->setFont(Style::capsFont(body->font(), Style::kFontCaption));
+            l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                 .arg(QLatin1String(Style::kTextScale)));
             return l;
+        };
+
+        // Eine Gruppe: Versalzeile, darunter das Ding selbst.
+        auto group = [&](const QString& title, QWidget* content) {
+            auto* w = new QWidget(body);
+            auto* v = new QVBoxLayout(w);
+            v->setContentsMargins(0, 0, 0, 0);
+            v->setSpacing(3);
+            v->addWidget(caps(title));
+            v->addWidget(content);
+            return w;
         };
 
         auto box = [&](int lo, int hi) {
@@ -172,29 +190,17 @@ void BandwidthFilterApplet::buildUI()
             sb->setRange(lo, hi);
             sb->setSingleStep(50);
             sb->setSuffix(QStringLiteral(" Hz"));
+            sb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            sb->setButtonSymbols(QAbstractSpinBox::NoButtons);
             // Nachgiebig statt fest: 92 Punkte sind die Wunschbreite,
-            // 62 die Schmerzgrenze. Vorher war es setFixedWidth(92) —
-            // damit hatte die Bedienzeile einen harten Boden von rund
-            // 700 Punkten, und wer das Fenster kleiner zog, bekam
-            // einen Rollbalken statt eines kleineren Inhalts.
+            // 62 die Schmerzgrenze (siehe Umbruch in resizeEvent).
             sb->setMinimumWidth(62);
             sb->setMaximumWidth(92);
             sb->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-            sb->setStyleSheet(Style::spinBoxStyle());
+            sb->setFont(Style::monoFont(body->font(), Style::kFontBody));
+            sb->setStyleSheet(Style::glassFieldStyle());
             sb->setKeyboardTracking(false);   // erst bei Enter/Verlassen
             return sb;
-        };
-
-        m_modeLbl = new QLabel(QStringLiteral("—"), body);
-        m_modeLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
-            .arg(QLatin1String(Style::kTextPrimary)));
-        row->addWidget(m_modeLbl);
-
-        auto addShrinkableLabel = [&](const QString& t) {
-            QLabel* l = label(t);
-            m_shrinkableLabels.append(l);
-            row->addWidget(l);
         };
 
         // Betreiber 2026-09-03, mit Nachdruck: "minus darf nie!!!!!" —
@@ -206,10 +212,9 @@ void BandwidthFilterApplet::buildUI()
         // intern erhalten (siehe die beiden valueChanged-Anschluesse
         // unten) und wird beim Zurueckschreiben ins Modell wieder
         // angelegt.
-        addShrinkableLabel(QStringLiteral("LOW"));
         m_lowBox = box(0, SliceModel::kMaxFilterWidthHz);
         m_lowBox->setObjectName(QStringLiteral("bwFilterLow"));
-        row->addWidget(m_lowBox);
+        row->addWidget(group(QStringLiteral("Low"), m_lowBox));
 
         // Betreiber 2026-09-03: "bandbreite solle von 50-3000 sein" /
         // "Ende zwischen 2700 bis 3000 standard, maximum 8000 (10000)
@@ -224,19 +229,17 @@ void BandwidthFilterApplet::buildUI()
         // den breitesten ueberhaupt erreichbaren Fall (beide Kanten am
         // Anschlag) und liegt fuer SSB/CW in der Praxis laengst
         // innerhalb der 10000, die der Betreiber nannte.
-        addShrinkableLabel(QStringLiteral("WIDTH"));
         m_widthBox = box(50, 2 * SliceModel::kMaxFilterWidthHz);
         m_widthBox->setObjectName(QStringLiteral("bwFilterWidth"));
         m_widthBox->setToolTip(QStringLiteral(
             "Type a width: SSB keeps the edge you set last and moves the "
             "other (LOW 100 + 3000 = HIGH 3100, on either sideband), CW "
             "stays centred on the sidetone, AM symmetric around zero."));
-        row->addWidget(m_widthBox);
+        row->addWidget(group(QStringLiteral("Width"), m_widthBox));
 
-        addShrinkableLabel(QStringLiteral("HIGH"));
         m_highBox = box(0, SliceModel::kMaxFilterWidthHz);
         m_highBox->setObjectName(QStringLiteral("bwFilterHigh"));
-        row->addWidget(m_highBox);
+        row->addWidget(group(QStringLiteral("High"), m_highBox));
 
         // ── VAR1 und VAR2 ────────────────────────────────────────
         //
@@ -247,12 +250,16 @@ void BandwidthFilterApplet::buildUI()
         //
         // Ein Klick holt zurueck, ein Rechtsklick legt ab. Ein leerer
         // Platz sagt das auch, statt still nichts zu tun.
+        auto* memRow = new QWidget(body);
+        auto* memLay = new QHBoxLayout(memRow);
+        memLay->setContentsMargins(0, 0, 0, 0);
+        memLay->setSpacing(5);
         for (int i = 0; i < SliceModel::kVarSlots; ++i) {
             QPushButton* b = styledButton(
-                QStringLiteral("VAR %1").arg(i + 1), 56);
+                QStringLiteral("VAR %1").arg(i + 1), 56, 26);
             b->setContextMenuPolicy(Qt::CustomContextMenu);
             m_varBtns.append(b);
-            row->addWidget(b);
+            memLay->addWidget(b);
 
             connect(b, &QPushButton::clicked, this, [this, i]() {
                 if (SliceModel* s = activeSlice()) { s->recallVarFilter(i); }
@@ -265,18 +272,23 @@ void BandwidthFilterApplet::buildUI()
             });
         }
 
-        m_resetBtn = styledButton(QStringLiteral("↺ Centre"), 78);
+        m_resetBtn = styledButton(QStringLiteral("↺ Centre"), 78, 26);
         m_resetBtn->setToolTip(QStringLiteral(
             "Put the passband back where this mode wants it — on the "
             "sidetone for CW, at the default low cut for SSB."));
-        row->addWidget(m_resetBtn);
+        memLay->addWidget(m_resetBtn);
+        m_memoryGroup = group(QStringLiteral("Memory"), memRow);
+        m_memoryGroup->setObjectName(QStringLiteral("bwFilterMemoryGroup"));
+        row->addWidget(m_memoryGroup);
 
         row->addStretch(1);
 
-        m_spanBtn = styledButton(QStringLiteral("AUTO"), 62);
+        m_spanBtn = styledButton(QStringLiteral("AUTO"), 62, 26);
         m_spanBtn->setToolTip(QStringLiteral(
             "How much band the panes show. Click to cycle."));
-        row->addWidget(m_spanBtn);
+        m_spanGroup = group(QStringLiteral("Span"), m_spanBtn);
+        m_spanGroup->setObjectName(QStringLiteral("bwFilterSpanGroup"));
+        row->addWidget(m_spanGroup);
 
         m_ctrlRow = row;
         col->addLayout(row);
@@ -284,7 +296,7 @@ void BandwidthFilterApplet::buildUI()
         // Zweite Reihe, zunaechst leer. Sie fuellt sich erst, wenn es
         // eng wird (resizeEvent) — breit bleibt alles wie bisher.
         m_ctrlRow2 = new QHBoxLayout;
-        m_ctrlRow2->setSpacing(6);
+        m_ctrlRow2->setSpacing(22);
         col->addLayout(m_ctrlRow2);
     }
 
@@ -566,14 +578,18 @@ void BandwidthFilterApplet::refreshPane(int i)
 {
     if (i < 0 || i >= m_panes.size()) { return; }
     BandwidthFilterPane* pane = m_panes.at(i);
-    pane->setLabel(QStringLiteral("RX%1").arg(i + 1));
 
     SliceModel* s = sliceAt(i);
     if (!s) {
         // Kein Empfaenger dahinter: die Flaeche steht da und sagt es.
+        pane->setLabel(QStringLiteral("RX%1").arg(i + 1));
         pane->setHasFrequency(false);
         return;
     }
+    // Die Kapsel traegt die Betriebsart mit: sie gehoert zur Kurve,
+    // nicht in die Bedienzeile (Glas & Tiefe, 2026-09-17).
+    pane->setLabel(QStringLiteral("RX%1 · %2").arg(i + 1)
+                       .arg(SliceModel::modeName(s->dspMode())));
 
     pane->setFilter(s->filterLow(), s->filterHigh());
 
@@ -703,7 +719,6 @@ void BandwidthFilterApplet::refreshNumbers()
     // qAbs() kappt QSpinBox::setValue() den negativen Wert stillschweigend
     // auf das Feldminimum (50) -- eine Zahl, die nichts Echtes mehr zeigt.
     m_widthBox->setValue(qAbs(s->filterWidth()));
-    m_modeLbl->setText(SliceModel::modeName(s->dspMode()));
 
     m_updatingFromModel = false;
     refreshVarButtons();
@@ -814,30 +829,21 @@ void BandwidthFilterApplet::resizeEvent(QResizeEvent* event)
     AppletWidget::resizeEvent(event);
     if (!m_ctrlRow || !m_ctrlRow2) { return; }
 
-    // Erste Stufe: die Wortmarken. Sie sind Beschriftung, keine
-    // Information — die Einheit steht im Feld selbst ("2900 Hz"), und
-    // die Reihenfolge tief/breit/hoch ist dieselbe wie im Bild
-    // darueber.
-    const bool roomy = width() >= 470;
-    for (QLabel* l : m_shrinkableLabels) {
-        if (l) { l->setVisible(roomy); }
-    }
-
-    // Zweite Stufe: die Knopfgruppe rutscht in eine eigene Reihe.
-    //
-    // Ohne sie blieb ein harter Boden von rund 600 Punkten, und
+    // Eng: die Knopfgruppen (Memory, Span) rutschen in eine eigene
+    // Reihe. Ohne das blieb ein harter Boden von rund 600 Punkten, und
     // darunter schnitt ein Rollbalken den Inhalt ab, statt ihn zu
     // verkleinern — genau der Befund des Betreibers ("vor allem
     // verkleinert!"). Breit bleibt alles, wie es war: umgebrochen
-    // wird erst unterhalb der Schwelle.
+    // wird erst unterhalb der Schwelle. Die Versalzeilen ueber den
+    // Feldern bleiben immer — sie sind neun Punkte hoch und kosten
+    // keine Breite.
     const bool wrap = width() < 470;
     if (wrap == m_ctrlWrapped) { return; }
     m_ctrlWrapped = wrap;
 
     QList<QWidget*> movers;
-    for (QPushButton* b : m_varBtns) { if (b) { movers.append(b); } }
-    if (m_resetBtn) { movers.append(m_resetBtn); }
-    if (m_spanBtn)  { movers.append(m_spanBtn); }
+    if (m_memoryGroup) { movers.append(m_memoryGroup); }
+    if (m_spanGroup)   { movers.append(m_spanGroup); }
 
     for (QWidget* wgt : movers) {
         if (wrap) {

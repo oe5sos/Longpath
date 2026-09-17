@@ -57,10 +57,14 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     m_titleLayout->addWidget(grip);
 
     m_titleLabel = new QLabel(m_titleBar);
+    // Versal mit weiter Laufweite (Hausstil Regel 3, umgesetzt mit der
+    // Richtung "Glas & Tiefe" am 2026-09-17). Die Groesse kommt aus
+    // capsFont, nicht aus dem Stylesheet — dort gewinnt sie sonst
+    // gegen jedes setFont darunter (HAUSSTIL.md, die Falle).
+    m_titleLabel->setFont(Style::capsFont(m_titleBar->font(), Style::kFontCaption));
     m_titleLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 11px; font-weight: bold;"
-        " background: transparent; }"
-    ).arg(Style::kTitleText));
+        "QLabel { color: %1; background: transparent; }"
+    ).arg(Style::kLabelMid));
     m_titleLayout->addWidget(m_titleLabel);
 
     // ── Die Knoepfe DICHT beim Titel, nicht am Rand ──────────────────
