@@ -3124,6 +3124,12 @@ const BoardCapabilities& RadioModel::boardCapabilities() const
         const BoardCapabilities& canonical = BoardCapsTable::forBoard(m_testCapsHw);
         overrideCaps.micGainMinDb = canonical.micGainMinDb;
         overrideCaps.micGainMaxDb = canonical.micGainMaxDb;
+        // 2026-09-17: die Zahl der Filterketten ebenfalls aus der Tabelle,
+        // damit ein Pruefstand die CH-0/CH-1-Anzeige der Fussleiste fuer
+        // ein Zwei-Ketten-Geraet (OrionMkII) ohne Funkgeraet nachstellen
+        // kann (tst_real_status_bar_chain_indicators).
+        overrideCaps.rxFilterChainCount = canonical.rxFilterChainCount;
+        overrideCaps.adcCount           = canonical.adcCount;
         return overrideCaps;
     }
 #endif

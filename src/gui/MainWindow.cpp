@@ -496,6 +496,12 @@ warren@wpratt.com
 namespace Longpath {
 
 namespace {
+
+// Die Kettenanzeige (CH 0 / CH 1) in der Fussleiste ist seit dem Wunsch
+// des Betreibers ("bitte weg") abgeschafft — die Pille im Panadapter-
+// Kopf zeigt den Kettenzustand. Beide Haelften haengen an dieser einen
+// Zahl, damit nie wieder nur eine davon zurueckkommt.
+constexpr bool kChainIndicatorsInBottomBar = false;
 // First-run/rescan wants the "relevant" virtual cables for the current
 // platform — 3rd-party cables on Windows (BYO), our own NereusSdrVax
 // entries on Mac/Linux (native HAL plugin / pipe-source). Centralising
@@ -4203,12 +4209,28 @@ void MainWindow::buildUI()
     // Registered with m_chromeBar at rung 4 (design §6); the >=2 fact is
     // reported via setItemAvailable, not a direct setVisible call, per
     // ChromeBarController::setItemAvailable's own doc comment.
+    //
+    // ── CH 1 bleibt aus, seit CH 0 aus ist (2026-09-17) ─────────────
+    //
+    // Der Betreiber hat die Kettenanzeige aus der Fussleiste genommen
+    // ("40m kannst du auch loeschen. daneben sind ganz links noch
+    // zeichen, bitte weg" — siehe die Ausblende-Liste nach
+    // registerChromeBarItems: bar.chain0 ist nicht verfuegbar, an seine
+    // Stelle trat die Pille im Panadapter-Kopf). CH 1 hing aber weiter
+    // an DIESEM Gatter und kam zurueck, sobald ein Zwei-Ketten-Geraet
+    // verbunden war: auf seinem Foto vom 2026-09-17 stand links unten
+    // "CH 1 / 20m (idle)" — die zweite Kette eines ANVELINA PRO 3, ohne
+    // die erste, mit dem zuletzt geschalteten Band eines anderen Tages.
+    // Nachgestellt in tst_real_status_bar_chain_indicators. Eine
+    // Anzeige, die als Ganzes abgeschafft ist, darf nicht zur Haelfte
+    // wiederkommen: CH 1 folgt CH 0.
     auto updateChain1Visibility = [this]() {
         if (!m_chain1IndicatorWidget) { return; }
         const auto caps = m_radioModel->boardCapabilities();
         if (m_chromeBar && m_chromeBarWidget) {
             m_chromeBar->setItemAvailable(m_chain1IndicatorWidget,
-                                          caps.rxFilterChainCount >= 2);
+                                          kChainIndicatorsInBottomBar
+                                              && caps.rxFilterChainCount >= 2);
             m_chromeBar->relayout(m_chromeBarWidget->width());
         }
     };
@@ -11134,6 +11156,7 @@ void MainWindow::buildStatusBar()
     for (QWidget* w : {static_cast<QWidget*>(bar.bandStackLabel),
                        static_cast<QWidget*>(bar.panButton),
                        static_cast<QWidget*>(bar.chain0),
+                       static_cast<QWidget*>(bar.chain1),   // folgt CH 0, siehe updateChain1Visibility
                        static_cast<QWidget*>(bar.rxDashRow)}) {
         if (w) { m_chromeBar->setItemAvailable(w, false); }
     }
