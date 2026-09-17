@@ -27,3 +27,4 @@ is compatible with Thetis's GPLv2-or-later terms.
 - [WDSP-PROVENANCE.md](WDSP-PROVENANCE.md) — WDSP v1.29 vendored at `third_party/wdsp/`
 - [FFTW3-PROVENANCE.md](FFTW3-PROVENANCE.md) — FFTW3 3.3.5 binaries vendored at `third_party/fftw3/` (Windows only)
 - [THETIS-PROVENANCE.md](THETIS-PROVENANCE.md) — NereusSDR files derived from Thetis
+- [ZEUS-PROVENANCE.md](ZEUS-PROVENANCE.md) — NereusSDR files derived from the Zeus station engine (GPL; the Zeus client is proprietary and never a source)

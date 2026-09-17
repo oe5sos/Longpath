@@ -20,6 +20,7 @@ WDSP (Warren Pratt NR0V's DSP library) is vendored in `third_party/wdsp/`.
 | `third_party/wdsp/src/calcc.h` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/calcc.h` | 2026-05-06 |
 | `third_party/wdsp/src/iqc.c` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/iqc.c` | 2026-05-06 |
 | `third_party/wdsp/src/iqc.h` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/iqc.h` | 2026-05-06 |
+| `third_party/wdsp/src/delay.c` | TAPR v1.29 + `set_delay_value_unlocked()` ported from the Zeus station engine v2.0.19 (commit `324e865`), GPL-2.0-or-later — see `ZEUS-PROVENANCE.md` | `../zeus-station-engine/native/wdsp/delay.c` | 2026-09-17 |
 
 **Reason:** Phase 3M-3a-ii needs per-band Qg (gain skirt Q) and Qe (ceiling
 skirt Q) on the SetTXACFCOMPprofile setter so the CFC dialog can ship with
