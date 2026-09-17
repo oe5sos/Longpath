@@ -906,6 +906,12 @@ nereus_add_test(tst_rtty_decoder)
 nereus_add_test(tst_rtty_decoder_sensitivity)
 nereus_add_test(tst_rtty_decoder_applet)
 
+# -- The native CW decoder (ported from the Zeus station engine,
+#    2026-09-17): synthetic Morse at three speeds, off-pitch tracking,
+#    noise alone, a weak signal, reset, and the stereo->mono wrapper --
+nereus_add_test(tst_cw_decoder)
+nereus_add_test(tst_cw_decoder_applet)
+
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 nereus_add_test(tst_vax_first_run_dialog)
 

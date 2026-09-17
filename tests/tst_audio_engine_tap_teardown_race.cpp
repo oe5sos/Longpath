@@ -155,6 +155,14 @@ private slots:
             [](AudioEngine* e, AudioTapRing* r, int s) { e->setRttyTap(r, s); },
             [](AudioEngine* e) { e->setRttyTap(nullptr, -1); });
     }
+
+    // Fuenfter Abgriff (CW-Decoder, 2026-09-17): dieselbe Zusage.
+    void cwTapWaitsForInFlightWrite()
+    {
+        checkTapWaitsForInFlightWrite(
+            [](AudioEngine* e, AudioTapRing* r, int s) { e->setCwTap(r, s); },
+            [](AudioEngine* e) { e->setCwTap(nullptr, -1); });
+    }
 };
 
 QTEST_MAIN(TstAudioEngineTapTeardownRace)

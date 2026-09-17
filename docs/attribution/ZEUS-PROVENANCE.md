@@ -72,9 +72,19 @@ Derivation type:
 
 | NereusSDR file | Zeus source | Lines | Type | Notes |
 | --- | --- | --- | --- | --- |
+| `src/core/CwDecoderCore.h` | `Station.Engine.Hosting/CwDecoder/GoertzelDetector.cs`, `AdaptiveThreshold.cs`, `MorseTimingEstimator.cs`, `MorseFsm.cs`, `CwDecoderCore.cs` | full | port | Receive-side CW decoder: eleven-bin Goertzel bank with confirmed retune, adaptive key-on/key-off threshold with noise-floor reacquire, lower-cluster dit estimator, Morse FSM with per-character confidence. Ported 2026-09-17 @8970f2d (v2.0.26). Two documented deviations in `CwMorseTimingEstimator` (letter/word gap thresholds 2.0/5.0 dits instead of 3.0/5.5; displayed WPM from the mean of tone and element-gap clusters) — marked "Longpath deviation"/"Longpath addition" at the site, found and pinned by `tests/tst_cw_decoder.cpp`. |
+| `src/core/CwDecoderCore.cpp` | same five files | full | port | Implementation; every function cites its upstream file and lines. |
+| `src/core/CwDecoder.{h,cpp}` | — | — | reference | Longpath-original Qt wrapper (stereo tap → mono → core, signals at the Zeus 10 Hz status cadence). No ported code. |
+| `src/gui/applets/CwDecoderApplet.{h,cpp}` | — | — | reference | Longpath-original applet modelled on Longpath's own `RttyDecoderApplet`; shows what Zeus's CW Console shows (tone lock, WPM, SNR) but shares no code with it. |
 | `third_party/wdsp/src/delay.c` | `native/wdsp/delay.c` | 29-38, 55, 122-128 | port | `set_delay_value_unlocked()`: clamps the requested delay to `(WSDEL-1)*L + (L-1)` phases so `snum` can never exceed the ring (`rsize = cpp + WSDEL - 1`) — upstream WDSP computed it unbounded and `xdelay()` wraps its read index once, so a delay past `(WSDEL-1)/rate` (5.3 ms at 192 kHz; the PureSignal amp-delay field allows 25 ms) read beyond the ring's allocation. `tdelay` now holds the realised value and `SetDelayValue()` returns it. Ported 2026-09-17 @324e865; regression test `tests/tst_wdsp_delay_clamp.cpp`. Brace style adapted to the vendored file (Allman, tabs); arithmetic unchanged. |
 
 ## Design references (no code taken)
+
+- The Zeus CW Console (2.0.26 changelog #2181/#2183: keyer + decoder +
+  macro banks with decoded speed and SNR) is the feature the CW decoder
+  applet answers; only the engine-side decoder was open and is ported
+  above, the keyer we already had (`CwxApplet`), the macro banks are not
+  built.
 
 - `docs/design/2026-09-17-zeus-plugin-system-inventar.md` — the plugin
   system, read for architecture only; the non-finite guard in

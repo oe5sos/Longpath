@@ -4,6 +4,19 @@
 
 ### Added
 
+- **Nativer CW-Decoder** (View > Containers > Applets, sichtbar nur in
+  CWL/CWU): decodiert Morse direkt aus dem Empfangston, mit Ton-
+  Einrastung (±125 Hz um den Mithoerton, `TON: ◀ 600 Hz ▶`),
+  Gebegeschwindigkeit in WPM, SNR-Balken und Tonkapsel. Der Kern ist ein
+  Port des GPL-lizenzierten Zeus Station Engine (Goertzel-Bank, adaptive
+  Schwelle, Punktlaengen-Schaetzer, Morse-Zustandsmaschine; KB2UKA/N9WAR,
+  @8970f2d) -- zwei dokumentierte Abweichungen im Timing, die der
+  Pruefstand mit synthetischem Morse fand (Pausenschwellen 2,0/5,0 statt
+  3,0/5,5 Punktlaengen, WPM aus Ton- und Pausencluster). Gleicher Bau
+  wie der RTTY-Decoder: eigener Audio-Abgriff, eigenes Applet, dieselbe
+  Sichtbarkeitsachse. `docs/architecture/2026-09-17-cw-decoder.md`.
+  Live am Funkgeraet noch nicht geprueft.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.

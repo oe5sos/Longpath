@@ -363,6 +363,7 @@ warren@wpratt.com
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
 #include "applets/RttyDecoderApplet.h"
+#include "applets/CwDecoderApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
@@ -6478,6 +6479,13 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_rttyDecoderApplet);
     m_rttyDecoderApplet->setVisible(false);
 
+    // CwDecoderApplet (2026-09-17) — visible only when the active slice's
+    // mode is CWL or CWU. Same wiring as the RTTY decoder: constructed
+    // hidden, availability set from rebindRttyRadeAvailability().
+    m_cwDecoderApplet = new CwDecoderApplet(m_radioModel, nullptr);
+    panel->addApplet(m_cwDecoderApplet);
+    m_cwDecoderApplet->setVisible(false);
+
     // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // These applets are entirely placeholder-only today (no wired controls).
     // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
@@ -6984,6 +6992,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
+    m_appletsById[QStringLiteral("CwDecoder")]  = m_cwDecoderApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7048,6 +7057,9 @@ void MainWindow::populateDefaultMeter()
     // setAvailable(true) only when mode is DSPMode::DIGL.
     m_appletVis->registerApplet(QStringLiteral("RttyDecoder"),
                                 QStringLiteral("RTTY Decoder"), true);
+    // CW decoder (2026-09-17): same pattern, gated on CWL/CWU.
+    m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
+                                QStringLiteral("CW Decoder"),   true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -7181,6 +7193,11 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("rtty"), QStringLiteral("digital"),
          QStringLiteral("decoder"), QStringLiteral("baudot"),
          QStringLiteral("fernschreiber"), QStringLiteral("digl")});
+    m_appletVis->describeApplet(QStringLiteral("CwDecoder"),
+        QStringLiteral("CW"),
+        {QStringLiteral("cw"), QStringLiteral("morse"),
+         QStringLiteral("decoder"), QStringLiteral("telegrafie"),
+         QStringLiteral("wpm"), QStringLiteral("cwl"), QStringLiteral("cwu")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -11704,12 +11721,18 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     if (m_rttyDecoderApplet) {
         m_rttyDecoderApplet->setSlice(slice);
     }
+    // The CW decoder (2026-09-17) rides the same rebind: same slice, same
+    // availability axis, gated on CWL/CWU instead of DIGL.
+    if (m_cwDecoderApplet) {
+        m_cwDecoderApplet->setSlice(slice);
+    }
 
     if (!m_appletVis) { return; }
 
     if (!slice) {
         m_appletVis->setAvailable(QStringLiteral("Rade"), false);
         m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
+        m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
         return;
     }
 
@@ -11726,6 +11749,8 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         // flag's mark/shift container; this applet follows the same gate.
         m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
                                   mode == DSPMode::DIGL);
+        m_appletVis->setAvailable(QStringLiteral("CwDecoder"),
+                                  mode == DSPMode::CWL || mode == DSPMode::CWU);
     };
     applyForMode(slice->dspMode());
 

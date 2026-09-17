@@ -522,6 +522,8 @@ set(CORE_SOURCES
     src/core/LogCategories.cpp
     src/core/DevAutomationServer.cpp
     src/core/RttyDecoder.cpp
+    src/core/CwDecoderCore.cpp
+    src/core/CwDecoder.cpp
     src/core/SupportBundle.cpp
     src/core/RadioDiscovery.cpp
     src/core/RadioConnection.cpp
@@ -1131,6 +1133,7 @@ set(GUI_SOURCES
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/RttyDecoderApplet.cpp
+    src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
