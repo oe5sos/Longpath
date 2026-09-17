@@ -96,12 +96,21 @@ auf der ROADMAP mit Blick auf Thetis' nächstes Release.
    Zeus-Zitat (GPL-2.0-or-later, KB2UKA/N9WAR) im Kopf, Regressionstest:
    `SetPSTXDelay(25e-3)` bei 192 kHz darf den Ring nicht verlassen und muss
    den realisierten Wert zurückgeben.
-2. **`FFTW_ESTIMATE` für Entwurfs-FFTs** (#2) — vorher messen: Filterwechsel
-   bei 16 384 Taps ohne passende Wisdom, Zeit von `SetRXABandpassNC` bis
-   Rückkehr. Wenn > 100 ms, portieren; sonst lassen.
-3. **FIRCORE-Planteilung** (#3) — nur mit Prüfstand, der die Faltungsausgabe
-   bit-gleich gegen den alten Kern hält; lohnt, wenn Punkt 2 zeigt, dass
-   Filterwechsel bei uns stocken.
+2. **`FFTW_ESTIMATE` für Entwurfs-FFTs** (#2) — **nicht nötig, ohne Messung
+   entschieden (Nachtrag 17.09. abends):** `wisdom.c` plant beim ersten
+   Start alle Zweierpotenzen 64 … 262 144 **und** jeweils `psize + 1`
+   (`comm.h`: `MAX_WISDOM_SIZE_FILTER 262144`), Longpath bietet nur
+   1024 … 16384 Taps an (`DspOptionsPage.cpp:125`), und `fir_fsamp` plant
+   genau `N = nc` — jeder `FFTW_PATIENT`-Aufruf trifft die Wisdom und ist
+   ein Nachschlagen. Zeus braucht `ESTIMATE`, weil es keine Wisdom
+   erzeugt; wir nicht. Nur relevant, falls je krumme Tap-Zahlen kommen.
+3. **FIRCORE-Planteilung** (#3) — der Rechenweg bleibt: `nfor = nc/size`
+   Partitionen, je 3 Pläne à `2·size`; bei 16 384 Taps und P1-Puffer 64 sind
+   das 768 Planaufrufe je Bandpass-Neubau — mit Wisdom je ein Nachschlagen
+   plus Allokation, geschätzt einige zehn ms je Neubau, zwei Bandpässe je
+   Kanal. Spürbar nur als Ruckler beim Filtergrößen-Wechsel; wer das
+   bemerkt, misst `SetRXABandpassNC` mit `QElapsedTimer` und entscheidet
+   dann. Kein Alleingang: Kernstück der Faltung, Prüfstand Pflicht.
 4. **Nicht übernehmen:** Ultra-Auflösung (#6 Taps bis 262 144), Cache-Härtung
    (#4) ohne #6, `psccF` (#10), Portabilitätsschicht (#11).
 5. **Martin fragen:** TX-Filter minimalphasig als Vorgabe (#6, eine Zeile in
