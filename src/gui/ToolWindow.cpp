@@ -38,7 +38,11 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     lay->setSpacing(0);
 
     m_titleBar = new WindowTitleBar(title, this);
-    connect(m_titleBar, &WindowTitleBar::closeRequested, this, &QWidget::close);
+    // × und Pfeil docken beide DIREKT an -- nicht ueber close(), denn
+    // ein QCloseEvent dockt seit dem 2026-09-17 nie mehr (closeEvent()).
+    connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
+        emit dockRequested(m_id);
+    });
     connect(m_titleBar, &WindowTitleBar::dockRequested, this, [this]() {
         emit dockRequested(m_id);
     });
@@ -156,8 +160,18 @@ void ToolWindow::closeEvent(QCloseEvent* ev)
         return;
     }
 
+    // Und OHNE gesetzte Sperre ebenso: annehmen, nie andocken. Der
+    // ×-Knopf und der Andock-Pfeil laufen ueber WindowTitleBar direkt
+    // nach dockRequested, nicht ueber close(); ein QCloseEvent kommt
+    // hier nur vom System (Beenden ueber Dock/Apfelmenue, dessen
+    // Reihenfolge Qt nicht garantiert, oder ein Space-/Vollbild-
+    // Nebeneffekt von macOS). Volle Begruendung in
+    // AppletFloatingWindow::closeEvent() (2026-09-17, "profile bleiben
+    // wieder nicht automatisch gespeichert").
+    qWarning() << "[ToolWindowClose]" << m_id
+               << "spontaneous=" << ev->spontaneous()
+               << "-- nicht angedockt, siehe closeEvent()";
     ev->accept();
-    emit dockRequested(m_id);
 }
 
 // Betreiber 2026-08-31: "die ausrichtung des rotors passt nie" -- ohne

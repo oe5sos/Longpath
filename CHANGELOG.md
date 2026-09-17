@@ -136,6 +136,22 @@
   `tst_nr_backends_process_audio` laesst NR1-NR4, NNR und MNR mit
   echtem Audio durch einen WDSP-Kanal laufen.
 
+- **"profile bleiben wieder nicht automatisch gespeichert!!!!!" --
+  schwebende Fenster dockten sich beim Beenden selbst an.** Die Logs
+  des 2026-09-17: gestartet mit 6 schwebenden Applets, beim Beenden 4
+  gesichert; dann 4 -> 1, Rotor/Log angedockt -- ohne Profilwechsel,
+  ohne Andock-Klick. Ursache: die closeEvents von AppletFloatingWindow,
+  ToolWindow (Rotor/Log) und PanFloatingWindow hiessen "Schliessen
+  heisst andocken", und Qt garantiert nicht, dass
+  MainWindow::closeEvent (setzt die Sperre, nimmt das Profil auf) vor
+  ihnen laeuft -- beim Beenden ueber Dock oder Apfelmenue kamen sie
+  zuerst, dockten an, riefen captureIntoCurrent()+save(), und die
+  Aufnahme danach sah ein Fenster weniger. Je nach Reihenfolge ein
+  anderes. Jetzt dockt ein QCloseEvent NIE mehr (die rahmenlosen
+  Fenster bekommen es nur noch vom System); × und Pfeil der
+  Titelleiste gehen direkt auf den Andock-Weg. Jede solche Schliessung
+  steht im Log ([AppletFloatClose]/[ToolWindowClose]/[PanFloatClose]).
+
 - **Einstellungen oeffneten sich hinter den schwebenden Fenstern.**
   Dieselbe Ursache wie beim Antennenfenster am 2026-09-01 (Qt::Tool-
   Panels liegen auf macOS ueber einem gewoehnlichen QDialog); der

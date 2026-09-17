@@ -77,8 +77,10 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     m_titleBar = new WindowTitleBar(
         QStringLiteral("Panadapter %1").arg(applet ? applet->panId()
                                                    : QString()), this);
+    // × und Pfeil docken beide DIREKT an -- nicht ueber close(), denn
+    // ein QCloseEvent dockt seit dem 2026-09-17 nie mehr (closeEvent()).
     connect(m_titleBar, &WindowTitleBar::closeRequested,
-            this, &QWidget::close);
+            this, &PanFloatingWindow::requestDock);
     connect(m_titleBar, &WindowTitleBar::dockRequested,
             this, &PanFloatingWindow::requestDock);
     // Je Panadapter ein eigener Schluessel: zwei festgestellte Fenster
@@ -195,11 +197,17 @@ void PanFloatingWindow::closeEvent(QCloseEvent* event)
         return;
     }
 
-    // Sonst: NICHT schliessen, sondern zurueckdocken. Das Ignorieren
-    // ist Absicht (Aether ebenso) — wer das Fenster schliesst UND
-    // gleichzeitig zurueckhaengt, laesst zwei Abbauten um dasselbe
-    // Widget rennen.
-    requestDock();
+    // Sonst: weder schliessen noch andocken. Bis zum 2026-09-17 stand
+    // hier requestDock() (AetherSDR-Erbe: Schliessen heisst andocken).
+    // Der ×-Knopf laeuft aber ueber die Titelleiste direkt nach
+    // requestDock(), nicht ueber close(); ein QCloseEvent kommt an
+    // dieses rahmenlose Fenster nur vom System -- beim Beenden ueber
+    // Dock/Apfelmenue, dessen Reihenfolge Qt nicht garantiert (die
+    // Sperre oben ist dann noch nicht gesetzt), oder als macOS-
+    // Nebeneffekt eines Space-/Vollbild-Wechsels (die Diagnose oben
+    // wurde genau dafuer eingebaut). Beides darf das Profil nicht
+    // umschreiben. Volle Begruendung in
+    // AppletFloatingWindow::closeEvent().
     event->ignore();
 }
 

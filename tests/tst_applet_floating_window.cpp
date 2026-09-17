@@ -39,6 +39,8 @@
 
 #include <QtTest>
 #include <QScreen>
+#include <QSignalSpy>
+#include <QCloseEvent>
 #include <QPushButton>
 
 #include "gui/applets/AppletFloatingWindow.h"
@@ -279,6 +281,38 @@ private slots:
         QVERIFY(!zoom->isEnabled());
         bar->toggleZoom();
         QVERIFY2(!bar->isZoomed(), "festgestellt heisst festgestellt");
+    }
+
+    // Der Betreiber am 2026-09-17: "profile bleiben wieder nicht
+    // automatisch gespeichert!!!!!" Ein Schliess-EREIGNIS (vom System:
+    // Beenden ueber Dock/Apfelmenue, Space-Wechsel) darf das Fenster
+    // nicht andocken -- sonst schrumpft das Profil bei jedem Beenden um
+    // die Fenster, deren closeEvent vor dem des Hauptfensters kam. Nur
+    // der Andock-Pfeil und das × der Titelleiste docken.
+    void aSystemCloseEventDoesNotDock()
+    {
+        RadioModel model;
+        model.addSlice();
+        auto* rx = new RxApplet(model.slices().value(0), &model);
+        AppletFloatingWindow win(rx, QStringLiteral("Rx"), 0, nullptr);
+        win.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&win));
+
+        QSignalSpy docks(&win, &AppletFloatingWindow::dockRequested);
+        QCloseEvent ev;
+        QApplication::sendEvent(&win, &ev);
+        QCOMPARE(docks.count(), 0);
+        QVERIFY2(ev.isAccepted(), "beim Beenden muss das Fenster gehen duerfen");
+
+        // × und Pfeil in der Leiste docken weiterhin -- der Pfeil erst
+        // nach der Schutzfrist gegen den Doppel-Klick (kDockGuardMs).
+        auto* bar = win.findChild<WindowTitleBar*>();
+        QVERIFY(bar);
+        emit bar->closeRequested();
+        QCOMPARE(docks.count(), 1);
+        QTest::qWait(700);
+        emit bar->dockRequested();
+        QCOMPARE(docks.count(), 2);
     }
 };
 
