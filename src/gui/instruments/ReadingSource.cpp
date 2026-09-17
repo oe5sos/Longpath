@@ -347,6 +347,12 @@ QString ReadingDescriptor::text(double value) const
     return QString::number(value, 'f', decimals);
 }
 
+QString ReadingDescriptor::textWithUnit(double value) const
+{
+    if (format || unit.isEmpty()) { return text(value); }
+    return QStringLiteral("%1 %2").arg(text(value), unit);
+}
+
 QString ReadingDescriptor::thetisName() const
 {
     return readingName(bindingId);

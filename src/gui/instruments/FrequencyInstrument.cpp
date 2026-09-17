@@ -401,6 +401,12 @@ void FrequencyInstrument::resizeEvent(QResizeEvent* ev)
 void FrequencyInstrument::refreshDigits()
 {
     const qint64 hz = static_cast<qint64>(std::llround(m_hz));
+    // Ohne Frequenz ein Strich je Stelle, keine Nullen (Hausstil Regel
+    // 7): "0.000.000 MHz" ohne Funkgeraet liest sich als eingestellte
+    // Frequenz — auf dem Foto vom 2026-09-17 stand es so da. Ein
+    // Strich je Stelle haelt die Zeile in ihrer Breite und sagt
+    // "nichts", nicht "null".
+    const bool none = (hz <= 0);
     for (int i = 0; i < m_digits.size(); ++i) {
         const qint64 dec = static_cast<qint64>(m_decades.at(i));
         const int digit = static_cast<int>((hz / dec) % 10);
@@ -408,9 +414,10 @@ void FrequencyInstrument::refreshDigits()
         // Zeile darunter macht es genauso (0 wird dort nicht gepolstert),
         // und eine fuehrende Null liest sich als Teil der Zahl.
         const bool blank = (i == 0 && hz < 10000000);
-        m_digits[i]->setText(blank ? QString()
-                                   : QString::number(digit));
-        const bool dim = (i >= kDimFromIndex);
+        m_digits[i]->setText(none ? QStringLiteral("\u2013")
+                             : blank ? QString()
+                                     : QString::number(digit));
+        const bool dim = none || (i >= kDimFromIndex);
         m_digits[i]->setStyleSheet(Style::themed(
             QStringLiteral("QLabel { color: %1; padding: 2px 1px;"
                            " border-radius: 6px; }"

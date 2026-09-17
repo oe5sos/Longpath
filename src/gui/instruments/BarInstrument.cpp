@@ -136,10 +136,7 @@ void BarInstrument::refreshFooter()
         return;
     }
 
-    m_footer->setValueText(d->unit.isEmpty()
-                               ? d->text(m_value)
-                               : QStringLiteral("%1 %2")
-                                     .arg(d->text(m_value), d->unit));
+    m_footer->setValueText(d->textWithUnit(m_value));
     m_footer->setValueColour(Instrument::valueColour(*d, m_value));
     m_footer->setPeakAndLimit(
         m_peak.enabled() ? d->text(m_peak.value()) : QStringLiteral("—"),
@@ -203,16 +200,19 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
         p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
         p.drawText(QPointF(area.left(), textY), d.thetisName());
 
-        if (hasValue) {
-            const QString text = d.unit.isEmpty()
-                                      ? d.text(value)
-                                      : QStringLiteral("%1 %2")
-                                            .arg(d.text(value), d.unit);
+        {
+            // Ohne Messung ein Strich, keine leere Stelle (Hausstil
+            // Regel 7): auf dem Foto vom 2026-09-17 standen POWER und
+            // SWR im Frequenz-Applet ohne jede Zahl da — eine leere
+            // Zeile liest sich als "kaputt", ein Strich als "nichts
+            // gemessen".
+            const QString text = hasValue ? d.textWithUnit(value)
+                                          : QStringLiteral("\u2014\u2014");
             const QFont valueFont = Style::monoFont(
                 p.font(), Style::kFontCaption, QFont::DemiBold);
             p.setFont(valueFont);
             const QFontMetricsF fm(valueFont);
-            p.setPen(col);
+            p.setPen(hasValue ? col : Instrument::measuredDim());
             p.drawText(QPointF(area.right() - fm.horizontalAdvance(text),
                                textY), text);
         }

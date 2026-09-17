@@ -105,6 +105,13 @@ struct ReadingDescriptor {
     /// Anzeigetext für einen Wert.
     QString text(double value) const;
 
+    /// Anzeigetext MIT Einheit — aber nur, wo die Einheit zum Text
+    /// passt: ein eigenes `format` (die S-Skala: "S8", "S9+20") traegt
+    /// seine Einheit schon im Wort, und "S8 dBm" war auf dem Foto vom
+    /// 2026-09-17 eine S-Stufe mit einer Einheit, die nicht ihre ist.
+    /// Ohne eigenes Format haengt die Einheit an ("-97 dBm", "3.4 W").
+    QString textWithUnit(double value) const;
+
     /// Der Thetis-wörtliche Name aus readingName(). Eigene Funktion,
     /// damit hier keine zweite Namensliste entsteht.
     QString thetisName() const;
