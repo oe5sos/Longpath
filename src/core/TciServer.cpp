@@ -13,6 +13,12 @@
 // Modification history (NereusSDR):
 //   2026-05-10 — Phase 3J-1 Task 2.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
+//   2026-09-17 — MOX release on client loss: m_moxOwner is set on
+//                trx:N,true, cleared on trx:N,false / moxStateChanged(false),
+//                and onClientDisconnected() unkeys the radio if the owner
+//                vanished while MOX was on. NereusSDR-original; see
+//                TciServer.h and docs/design/2026-09-17-zeus-
+//                stationsprotokoll-inventar.md §3.1.
 
 #ifdef HAVE_WEBSOCKETS
 
@@ -1085,6 +1091,19 @@ void TciServer::hookGlobalBroadcasts()
     // the TX/RX walk (Codex P1: TXEnable boundary).  Format from
     // sendMOX at TCIServer.cs:2207-2211 [v2.10.3.13].
     if (auto* mox = m_model->moxController()) {
+        // Who keyed the radio (2026-09-17): the moment MOX starts going off
+        // — from any source, the client included — nobody owns it, so a
+        // later local key-up is never attributed to a client that keyed
+        // earlier (its disconnect would otherwise unkey the operator).
+        // moxChanging fires synchronously at the START of the TX→RX walk;
+        // moxStateChanged only at its END, behind the key-up/PTT-out
+        // timers — and an operator who re-keys quickly cancels that chain
+        // (stopAllTimers), so the end signal never comes. Hence the start
+        // signal here.
+        connect(mox, &MoxController::moxChanging, this,
+                [this](int, bool, bool newMox) {
+                    if (!newMox) { m_moxOwner = nullptr; }
+                });
         connect(mox, &MoxController::moxStateChanged, this,
                 [this](bool on) {
                     const QString boolStr =
@@ -1602,6 +1621,30 @@ void TciServer::onClientDisconnected()
 
     qCInfo(lcTci) << "TciServer: client disconnected from" << it.value()->peer;
     emit clientDisconnected(ws);
+
+    // Who keyed the radio (2026-09-17): a client that keyed the radio and
+    // then vanished — WSJT-X crashed mid-over, a remote client lost its
+    // link — must not leave the transmitter keyed until the operator
+    // notices. Thetis has this gap (ClientDisconnectedHandler only refreshes
+    // stream state); Zeus's station engine closes it with a transmit lease
+    // and a heartbeat. This is the smallest version of that rule: if the
+    // socket that last sent trx:N,true is the one going away and MOX is
+    // still on, unkey. Only ever unkeys — it can never key.
+    if (!m_moxOwner.isNull() && m_moxOwner.data() == ws) {
+        m_moxOwner = nullptr;
+        const QString peer = it.value()->peer;
+        // Without a model (test path) there is nothing to unkey; the
+        // signal still reports that the bookkeeping fired.
+        const bool stillKeyed = m_model.isNull() ? true : m_model->mox();
+        if (stillKeyed) {
+            qCWarning(lcTci) << "TciServer: client" << peer
+                             << "keyed the radio and disconnected — releasing MOX";
+            if (!m_model.isNull()) {
+                m_model->setMox(false);
+            }
+            emit moxReleasedOnClientLoss(peer);
+        }
+    }
 
     // Phase 17: release TX audio mutex if this client held it.
     // QPointer auto-nulls when the socket is deleted (ws->deleteLater below),
@@ -2145,6 +2188,18 @@ void TciServer::onTextMessageReceived(const QString& msg)
 
                     const bool wantsMox = (parts.at(1).trimmed().compare(
                         QLatin1String("true"), Qt::CaseInsensitive) == 0);
+
+                    // Who keyed the radio (2026-09-17): remember the socket
+                    // behind every trx:N,true — with or without ",tci" —
+                    // and forget it on trx:N,false from the same socket.
+                    // onClientDisconnected() uses this to unkey a radio whose
+                    // keying client has vanished. See the member note in
+                    // TciServer.h.
+                    if (wantsMox) {
+                        m_moxOwner = ws;
+                    } else if (!m_moxOwner.isNull() && m_moxOwner.data() == ws) {
+                        m_moxOwner = nullptr;
+                    }
 
                     if (hasTciArg && wantsMox) {
                         // Client wants TX audio ownership.

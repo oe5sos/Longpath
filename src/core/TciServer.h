@@ -25,6 +25,16 @@
 // Modification history (NereusSDR):
 //   2026-05-10 — Phase 3J-1 Task 2.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
+//   2026-09-17 — MOX release on client loss (NereusSDR-original, no Thetis
+//                equivalent — Thetis's ClientDisconnectedHandler only
+//                refreshes stream state). The server remembers which client
+//                keyed the radio through `trx:N,true` and unkeys it when
+//                that client's socket goes away. Prompted by the Zeus
+//                station-engine inventory (docs/design/2026-09-17-zeus-
+//                stationsprotokoll-inventar.md §3.1), where transmit is a
+//                lease with a heartbeat; this is the smallest version of
+//                the same rule. Martin Fischer, AI-assisted via Anthropic
+//                Claude.
 
 #pragma once
 #ifdef HAVE_WEBSOCKETS
@@ -181,6 +191,13 @@ signals:
     // Phase 23: used by MainWindow::updateTciIndicator() for the
     // "On · N ▸TX" indicator state.
     void txAudioActiveClientChanged(QWebSocket* newOwner);
+
+    // Emitted when the client that keyed the radio (trx:N,true) has gone
+    // away while the radio was still keyed, and the server has unkeyed it
+    // (2026-09-17). Carries the peer string for the log / a status line.
+    // Also emitted when no RadioModel is installed (test path), so the
+    // ownership bookkeeping can be checked without a radio.
+    void moxReleasedOnClientLoss(const QString& peer);
 
     // Emitted when the server fails to bind.
     void errorOccurred(const QString& errStr);
@@ -471,6 +488,22 @@ private:
     // Access is main-thread only (onTextMessageReceived + onBinaryMessageReceived
     // both run on the Qt event loop that owns TciServer).  No additional locking.
     QPointer<QWebSocket> m_txAudioActiveClient;
+
+    // ── Who keyed the radio (2026-09-17) ─────────────────────────────────────
+    //
+    // The client whose `trx:N,true` last keyed the radio, or null. Set in
+    // onTextMessageReceived on `trx:N,true` (with or without the `tci`
+    // suffix — WSJT-X keys without it), cleared on `trx:N,false` from that
+    // client and whenever MOX starts going off from ANY source (moxChanging
+    // with newMox=false in hookGlobalBroadcasts), so a later local key-up is never attributed
+    // to a client. onClientDisconnected() unkeys the radio if the owner is
+    // the socket that just vanished and MOX is still on — a client that
+    // keyed and then crashed must not leave the transmitter keyed. The TX
+    // audio mutex above is a different question (who may push audio) and
+    // is tracked separately, as before.
+    //
+    // QPointer, main-thread only, same rules as m_txAudioActiveClient.
+    QPointer<QWebSocket> m_moxOwner;
 
     // ── Phase 19: sensor broadcast timers ────────────────────────────────────
     //
