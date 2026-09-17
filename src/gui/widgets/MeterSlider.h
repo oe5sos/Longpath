@@ -24,6 +24,7 @@
 #pragma once
 
 #include <QWidget>
+#include "gui/StyleConstants.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <algorithm>
@@ -84,17 +85,23 @@ protected:
         const int barH = h - 2 * margin;
         const int barW = w - 2 * margin;
 
-        // Background
-        p.fillRect(rect(), QColor(0x0a, 0x0a, 0x18));
-        p.setPen(QColor(0x1e, 0x2e, 0x3e));
+        // Hausstil (2026-09-17, Applet-Blaetter): "Blau ist anfassbar,
+        // Warm ist gemessen." Hier stand alles im abgeschafften Tuerkis
+        // #00b4d8 auf blaustichigem Grund — der Pegel (gemessen) und der
+        // Griff (anfassbar) in derselben Farbe. Jetzt: versenkte Rinne,
+        // Pegel in Bernstein (ab 90 % die Warnfarbe), Verstaerkung und
+        // Griff in Akzentblau.
+        p.fillRect(rect(), QColor(Style::kInsetBg));
+        p.setPen(QColor(Style::kBorder));
         p.drawRect(rect().adjusted(0, 0, -1, -1));
 
-        // Level meter fill (behind the slider)
+        // Level meter fill (behind the slider) — gemessen: Bernstein
         if (m_level > 0.0f) {
             int fillW = static_cast<int>(m_level * barW);
-            QColor fillColor = m_level < 0.7f ? QColor(0x00, 0x80, 0xa0, 120)
-                             : m_level < 0.9f ? QColor(0xa0, 0xa0, 0x20, 120)
-                                              : QColor(0xc0, 0x30, 0x30, 120);
+            QColor fillColor = m_level < 0.7f ? QColor(Style::kAmberDim)
+                             : m_level < 0.9f ? QColor(Style::kAmberText)
+                                              : QColor(Style::kGaugeDanger);
+            fillColor.setAlpha(150);
             p.fillRect(margin, margin, fillW, barH, fillColor);
         }
 
@@ -102,14 +109,16 @@ protected:
         int thumbX = margin + static_cast<int>(m_gain * barW);
         thumbX = std::clamp(thumbX, margin, margin + barW);
 
-        // Gain fill (solid, up to thumb)
+        // Gain fill (solid, up to thumb) — anfassbar: Akzent
         if (m_gain > 0.0f) {
             int gainW = static_cast<int>(m_gain * barW);
-            p.fillRect(margin, margin, gainW, barH, QColor(0x00, 0xb4, 0xd8, 60));
+            QColor gainFill(Style::kAccent);
+            gainFill.setAlpha(50);
+            p.fillRect(margin, margin, gainW, barH, gainFill);
         }
 
         // Thumb line
-        p.setPen(QPen(QColor(0x00, 0xb4, 0xd8), 2));
+        p.setPen(QPen(QColor(Style::kAccent), 2));
         p.drawLine(thumbX, margin, thumbX, margin + barH);
 
         // Thumb triangle (top)
@@ -117,7 +126,7 @@ protected:
         tri << QPoint(thumbX - 3, margin)
             << QPoint(thumbX + 3, margin)
             << QPoint(thumbX, margin + 4);
-        p.setBrush(QColor(0x00, 0xb4, 0xd8));
+        p.setBrush(QColor(Style::kAccent));
         p.setPen(Qt::NoPen);
         p.drawPolygon(tri);
     }

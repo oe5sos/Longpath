@@ -452,6 +452,9 @@ void FrequencyInstrument::refreshVfoRow()
     // ein zweites Feld zu sehen.
     auto fmt = [](double hz) {
         const qint64 v = static_cast<qint64>(std::llround(hz));
+        // Ohne Frequenz ein Strich, keine Nullen (Regel 7) — wie die
+        // grossen Ziffern darueber.
+        if (v <= 0) { return QStringLiteral("\u2013.\u2013\u2013\u2013.\u2013\u2013\u2013"); }
         return QStringLiteral("%1.%2.%3")
             .arg(v / 1000000)
             .arg((v / 1000) % 1000, 3, 10, QLatin1Char('0'))

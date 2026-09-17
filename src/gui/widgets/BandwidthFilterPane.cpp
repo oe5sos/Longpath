@@ -651,7 +651,26 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
 
     // Zahlen mittig unter ihrer Marke, am Rand hineingeschoben statt
     // angeschnitten (".111" statt "7.111" ist schlimmer als keine).
-    for (int hz : marks) {
+    //
+    // Eng — die Flaeche im RxApplet ist 180 Punkte breit — stuenden
+    // fuenf Zahlen ineinander ("14.22014.222…" auf dem Blatt vom
+    // 2026-09-17). Dann bekommt nur jede zweite (dritte, …) Marke eine
+    // Zahl; die Gitterlinien bleiben alle. Gemessen an der breitesten
+    // Zahl gegen den Markenabstand, nicht geraten.
+    int every = 1;
+    if (marks.size() >= 2) {
+        int widest = 0;
+        for (int hz : marks) {
+            widest = qMax(widest, p.fontMetrics().horizontalAdvance(axisLabel(m_vfoHz + hz)));
+        }
+        const int gap = qAbs(hzToX(marks[1]) - hzToX(marks[0]));
+        if (gap > 0) {
+            while (every * gap < widest + 10) { ++every; }
+        }
+    }
+    for (int i = 0; i < marks.size(); ++i) {
+        if (i % every != 0) { continue; }
+        const int hz = marks[i];
         const int x = hzToX(hz);
         const QString t = axisLabel(m_vfoHz + hz);
         const int tw = p.fontMetrics().horizontalAdvance(t) + 8;

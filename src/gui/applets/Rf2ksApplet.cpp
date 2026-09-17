@@ -214,11 +214,15 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
 void Rf2ksApplet::setConnectedState(bool connected)
 {
     m_connected = connected;
+    // Nicht verbunden ist kein Alarm: ein stiller Punkt (kTextInactive),
+    // kein kraeftiges Rot — das bleibt "Sendet / Gefahr" (Hausstil;
+    // auf dem Applet-Blatt vom 2026-09-17 war der Punkt das einzige
+    // kraeftige Rot im Feld, ohne dass etwas nicht stimmte).
     const QString color = connected
-        ? QStringLiteral("#6fa384")
-        : QStringLiteral("#c25a5c");
+        ? QString::fromLatin1(Style::kGreenText)
+        : QString::fromLatin1(Style::kTextInactive);
     m_statusDot->setStyleSheet(
-        QStringLiteral("background:%1; border-radius:6px;").arg(color));
+        QStringLiteral("background:%1; border-radius:5px;").arg(color));
 }
 
 // ---------- Section B slots ----------

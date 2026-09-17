@@ -60,9 +60,10 @@ public:
                                      : (active ? accent.name()
                                                : Style::role("border", Style::kBorder));
         setStyleSheet(QStringLiteral(
-            "QWidget { background: %1; border: 1px solid %2; border-radius: 3px; }")
+            "QWidget { background: %1; border: 1px solid %2; border-radius: %3px; }")
             .arg(active ? Style::role("button-bg", Style::kButtonBg)
-                        : Style::role("panel", Style::kPanelBg), border));
+                        : Style::role("panel", Style::kPanelBg), border)
+            .arg(Style::kGlassChipRadius));   // nie Radius 3 (Hausstil)
         m_top->setStyleSheet(QStringLiteral(
             "QLabel { border: none; color: %1; font-size: 9px; font-weight: bold; }")
             .arg(alert ? QString::fromLatin1(Style::kTxRed) : accent.name()));

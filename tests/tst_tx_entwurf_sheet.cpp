@@ -29,6 +29,33 @@
 #include "gui/widgets/CommandBar.h"
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/LogbookWindow.h"
+#include "gui/applets/RxApplet.h"
+#include "gui/applets/PhoneCwApplet.h"
+#include "gui/applets/VaxApplet.h"
+#include "gui/applets/EqApplet.h"
+#include "gui/applets/KiwiSdrApplet.h"
+#include "gui/applets/PureSignalApplet.h"
+#include "gui/applets/FrequencyApplet.h"
+#include "gui/applets/DigitalApplet.h"
+#include "gui/applets/FmApplet.h"
+#include "gui/applets/CwxApplet.h"
+#include "gui/applets/DiversityApplet.h"
+#include "gui/applets/AmpApplet.h"
+#include "gui/applets/CatApplet.h"
+#include "gui/applets/TciApplet.h"
+#include "gui/applets/AsrApplet.h"
+#include "gui/applets/DvkApplet.h"
+#include "gui/applets/QsoRecorderApplet.h"
+#include "gui/applets/ClientChainApplet.h"
+#include "gui/applets/RttyDecoderApplet.h"
+#include "gui/applets/TunerApplet.h"
+#include "gui/applets/Rf2ksApplet.h"
+#include "gui/applets/RadeApplet.h"
+#include "gui/applets/BandwidthFilterApplet.h"
+#include "core/TciServer.h"
+#include "core/AudioEngine.h"
+#include "models/SliceModel.h"
+
 #include "gui/applets/AppletGrid.h"
 #include "gui/applets/GridCellWidget.h"
 #include "models/RadioModel.h"
@@ -805,6 +832,62 @@ private slots:
         const QString aus = QStringLiteral("/tmp/logbuch_gebaut.png");
         QVERIFY2(img.save(aus), qPrintable(aus));
         qInfo().noquote() << "Blatt:" << aus;
+    }
+
+    // ALLE Applets, je eines in seinem echten schwebenden Fenster, in
+    // der Groesse, die es sich selbst wuenscht (mindestens 420x160): ein
+    // Blatt je Applet, damit man Panel fuer Panel sieht, was vom Look
+    // "Glas & Tiefe" noch fehlt (2026-09-17, Punkt 5 der Runde).
+    void applets()
+    {
+        RadioModel modell;
+        TciServer tci(&modell);
+        SliceModel* slice = modell.sliceById(0);
+        if (!slice) { slice = modell.sliceById(modell.addSlice()); }
+
+        struct A { const char* name; std::function<AppletWidget*()> bauen; };
+        const A liste[] = {
+            {"Rx",          [&]{ return new RxApplet(slice, &modell); }},
+            {"PhoneCw",     [&]{ return new PhoneCwApplet(&modell); }},
+            {"Vax",         [&]{ return new VaxApplet(&modell, modell.audioEngine()); }},
+            {"Eq",          [&]{ return new EqApplet(&modell); }},
+            {"KiwiSdr",     [&]{ return new KiwiSdrApplet(&modell); }},
+            {"PureSignal",  [&]{ return new PureSignalApplet(&modell); }},
+            {"Frequency",   [&]{ return new FrequencyApplet(&modell); }},
+            {"Digital",     [&]{ return new DigitalApplet(&modell); }},
+            {"Fm",          [&]{ return new FmApplet(&modell); }},
+            {"Cwx",         [&]{ return new CwxApplet(&modell); }},
+            {"Diversity",   [&]{ return new DiversityApplet(&modell); }},
+            {"Amp",         [&]{ return new AmpApplet(&modell); }},
+            {"Cat",         [&]{ return new CatApplet(&modell); }},
+            {"Tci",         [&]{ return new TciApplet(&tci); }},
+            {"Asr",         [&]{ return new AsrApplet(&modell); }},
+            {"Dvk",         [&]{ return new DvkApplet(&modell); }},
+            {"QsoRecorder", [&]{ return new QsoRecorderApplet(&modell); }},
+            {"ClientChain", [&]{ return new ClientChainApplet(&tci); }},
+            {"RttyDecoder", [&]{ return new RttyDecoderApplet(&modell); }},
+            {"Tuner",       [&]{ return new TunerApplet(&modell, modell.tunerModel()); }},
+            {"Rf2ks",       [&]{ return new Rf2ksApplet(&modell); }},
+            {"Rade",        [&]{ return new RadeApplet(&modell); }},
+            {"BwFilter",    [&]{ return new BandwidthFilterApplet(&modell); }},
+        };
+        for (const A& a : liste) {
+            AppletWidget* applet = a.bauen();
+            AppletFloatingWindow win(applet, QString::fromLatin1(a.name), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            const QSize wish = win.sizeHint().expandedTo(QSize(420, 160));
+            win.resize(qMin(wish.width(), 1130), qMin(wish.height(), 700));
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            const QString aus = QStringLiteral("/tmp/applet_%1.png").arg(QLatin1String(a.name));
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus << win.size();
+        }
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.

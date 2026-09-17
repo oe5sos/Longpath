@@ -633,12 +633,18 @@ inline QString blueCheckedStyle()
     // dieselbe aufgesetzte Flaeche wie jeder andere, nur in der
     // Akzentfarbe. Zwei verschiedene Bauarten fuer denselben Knopf
     // waeren genau die Art Unstimmigkeit, die man als „unfertig" liest.
+    // Glas & Tiefe (2026-09-17): der gedeckte Auswahlverlauf der
+    // Kopfleisten-Pillen (kGlassSel*) statt des flachen kBlueBg — auf
+    // den Applet-Blaettern leuchteten "Stereo", "Phone", "5.0k", "ON/RX/
+    // TX" und die Scheibenmarke "A" in einem Blau, das die Kopfleiste
+    // laengst nicht mehr trug. Eine Auswahl, eine Farbe.
     return QStringLiteral(
-        "QPushButton:checked { background: %1; color: %2;"
-        " border: 1px solid %3; }"
-    ).arg(raisedFill(kBlueBg, 18, 14),
-          QLatin1String(kBlueText),
-          QLatin1String(kBlueBorder));
+        "QPushButton:checked {"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2);"
+        "  color: %3; border: 1px solid %4; border-top-color: %5; }"
+    ).arg(hexRole(kGlassSelTop), hexRole(kGlassSelBot),
+          hexRole(kGlassSelText), hexRole(kGlassSelBorder),
+          shiftL(QColor(hexRole(kGlassSelBorder)), 16));
 }
 
 // Eingerastet, aber leise: dunkler Grund, Akzentrand, heller Text.

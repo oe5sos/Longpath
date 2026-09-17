@@ -193,11 +193,14 @@ void BandwidthFilterApplet::buildUI()
             sb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
             sb->setButtonSymbols(QAbstractSpinBox::NoButtons);
             // Nachgiebig statt fest: 92 Punkte sind die Wunschbreite,
-            // 62 die Schmerzgrenze (siehe Umbruch in resizeEvent).
-            sb->setMinimumWidth(62);
+            // 74 die Schmerzgrenze (siehe Umbruch in resizeEvent) — bei 62
+            // stand auf dem 540-Punkte-Blatt "2900 H" ohne z. Monospace
+            // 11 (kFontSmall), nicht 13: "2900 Hz" braucht so 46 Punkte
+            // plus Polsterung und passt in die Schmerzgrenze.
+            sb->setMinimumWidth(74);
             sb->setMaximumWidth(92);
             sb->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-            sb->setFont(Style::monoFont(body->font(), Style::kFontBody));
+            sb->setFont(Style::monoFont(body->font(), Style::kFontSmall));
             sb->setStyleSheet(Style::glassFieldStyle());
             sb->setKeyboardTracking(false);   // erst bei Enter/Verlassen
             return sb;
@@ -860,7 +863,10 @@ void BandwidthFilterApplet::resizeEvent(QResizeEvent* event)
     // wird erst unterhalb der Schwelle. Die Versalzeilen ueber den
     // Feldern bleiben immer — sie sind neun Punkte hoch und kosten
     // keine Breite.
-    const bool wrap = width() < 470;
+    // 600, nicht 470: mit den Glasfeldern (74 Punkte Schmerzgrenze) und
+    // den Versalzeilen ist die eine Reihe breiter geworden; auf dem
+    // 540-Punkte-Blatt vom 2026-09-17 stand "↺ Cen" ohne Ende.
+    const bool wrap = width() < 600;
     if (wrap == m_ctrlWrapped) { return; }
     m_ctrlWrapped = wrap;
 

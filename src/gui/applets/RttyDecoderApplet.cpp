@@ -127,7 +127,8 @@ RttyDecoderApplet::~RttyDecoderApplet()
 void RttyDecoderApplet::buildUI()
 {
     auto* root = new QVBoxLayout(this);
-    root->addWidget(appletTitleBar(QStringLiteral("RTTY DECODER")));
+    // Kein eigener Kopf: Zelle bzw. Fenster tragen ihn (auf dem Blatt
+    // vom 2026-09-17 stand "RTTY DECODER" zweimal uebereinander).
 
     // -- Row 1: status ---------------------------------------------------
     auto* statusRow = new QHBoxLayout();

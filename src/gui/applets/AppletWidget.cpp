@@ -119,7 +119,10 @@ QHBoxLayout* AppletWidget::sliderRow(const QString& labelText,
     row->addWidget(slider, 1);
 
     if (valueLabel) {
-        valueLabel->setFixedWidth(36);
+        // Mindestbreite, nicht feste Breite: der Wertchip ist seit dem
+        // 2026-09-17 Monospace und breiter — "50 dB" stand als "50 d"
+        // auf dem Phone/CW-Blatt. Waechst mit seinem Text.
+        valueLabel->setMinimumWidth(36);
         valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         valueLabel->setStyleSheet(Style::insetValueStyle());
         row->addWidget(valueLabel);
@@ -133,7 +136,14 @@ QPushButton* AppletWidget::styledButton(const QString& text, int w, int h)
     auto* btn = new QPushButton(text, this);
     btn->setCheckable(true);
     btn->setFixedHeight(h);
-    if (w > 0) { btn->setFixedWidth(w); }
+    // Nie schmaler als sein Text: die gewuenschte Breite ist ein
+    // Mindestmass. Auf den Applet-Blaettern vom 2026-09-17 standen
+    // "MUTI", "ROC", "DEXP" ohne Anfang und "/AC 1" — feste Breiten aus
+    // der Zeit vor der breiteren Knopfpolsterung des Hausstils.
+    if (w > 0) {
+        btn->ensurePolished();
+        btn->setFixedWidth(qMax(w, btn->sizeHint().width()));
+    }
     return btn;
 }
 
