@@ -603,16 +603,23 @@ void RotorLogbookPanel::buildUi()
     m_recent->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_recent->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_recent->setMaximumHeight(130);
-    m_recent->setStyleSheet(QStringLiteral(
-        "QTableWidget { background: %1; color: %2; border: 1px solid %3;"
-        "  border-radius: 6px; gridline-color: %3; font-size: 11px; }"
-        "QHeaderView::section { background: %4; color: %5; border: none;"
-        "  border-bottom: 1px solid %3; padding: 2px 5px; font-size: 9px; }"
-    ).arg(QString::fromLatin1(Style::kInsetBg),
-          QString::fromLatin1(Style::kTextPrimary),
-          QString::fromLatin1(Style::kBorderSubtle),
-          QString::fromLatin1(Style::kButtonBg),
-          QString::fromLatin1(Style::kTextSecondary)));
+    // Glas & Tiefe (2026-09-17): die Tabelle versenkt, der Kopf eine
+    // Versalzeile ohne Kaesten (Style::tableStyle). Schriften per
+    // setFont, nicht im Stylesheet — die Zahlen (UTC, Freq) in
+    // Monospace, Regel 4.
+    m_recent->setStyleSheet(Style::tableStyle());
+    // Tabelle in der Textschrift (11 px); Monospace bekommen nur die
+    // Zeit- und Frequenzspalte, je Zelle beim Fuellen — die ganze
+    // Tabelle in Monospace war auf 286 Punkten zu breit, das
+    // Rufzeichen (Stretch-Spalte) schrumpfte auf "O…".
+    m_recent->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+    // Kopf 8 px mit Laufweite: bei 9 px plus .18em Laufweite wurden
+    // die vier festen Spalten so breit, dass dem Rufzeichen (Stretch)
+    // auf 286 Punkten nur "O…" blieb — am Blatt gesehen.
+    m_recent->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_recent->horizontalHeader()->setHighlightSections(false);
+    m_recent->horizontalHeader()->setMinimumSectionSize(24);
+    m_recent->setShowGrid(false);
     col->addWidget(m_recent);
 
     // ── Shrinking down to the compass (2026-08-10) ───────────────────
@@ -2235,14 +2242,19 @@ void RotorLogbookPanel::refreshRecentList()
     for (int i = 0; i < shown; ++i) {
         const LogEntry& e = all.at(i);   // already newest first
         const QDateTime u = e.timeOn.toUTC();
-        m_recent->setItem(i, 0, new QTableWidgetItem(
-            u.isValid() ? u.toString(QStringLiteral("hh:mm")) : QString{}));
+        const QFont mono = Style::monoFont(m_recent->font(), Style::kFontSmall);
+        auto* utc = new QTableWidgetItem(
+            u.isValid() ? u.toString(QStringLiteral("hh:mm")) : QString{});
+        utc->setFont(mono);   // Zahlen sind Monospace (Regel 4)
+        m_recent->setItem(i, 0, utc);
         // HAUSSTIL.md Regel 7: "Unbekannt ist ein Strich, keine Null" --
         // 0.000 sieht wie eine echte Frequenz aus, ist aber nur der
         // Sentinel fuer "kein Funkgeraet beim Loggen verbunden".
-        m_recent->setItem(i, 1, new QTableWidgetItem(
+        auto* freq = new QTableWidgetItem(
             e.freqMHz > 0.0 ? QString::number(e.freqMHz, 'f', 3)
-                            : QStringLiteral("—")));
+                            : QStringLiteral("—"));
+        freq->setFont(mono);
+        m_recent->setItem(i, 1, freq);
         m_recent->setItem(i, 2, new QTableWidgetItem(e.call));
         m_recent->setItem(i, 3, new QTableWidgetItem(e.band));
         m_recent->setItem(i, 4, new QTableWidgetItem(

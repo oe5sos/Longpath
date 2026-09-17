@@ -761,6 +761,44 @@ inline QString glassPanelFill()
         .arg(hexRole(kGlassPanelTop), hexRole(kGlassPanelBot));
 }
 
+/// Eine Tabelle hinter Glas (Glas & Tiefe, 2026-09-17): versenkt wie
+/// ein Zahlenfeld, Kopfzeile ohne Kaesten — nur eine Haarlinie unter
+/// den Titeln —, Auswahl im gedeckten Blauverlauf, Gitter leise. Keine
+/// Schriftangaben: Groesse und Versalien setzt der Aufrufer per
+/// setFont (Tabelle 11 px, Kopf capsFont 9 px), sonst kaskadiert eine
+/// font-size aus dem Stylesheet in den Kopf und schlaegt sie tot.
+inline QString tableStyle()
+{
+    return QStringLiteral(
+        "QTableView, QTableWidget, QTreeView, QTreeWidget, QListView, QListWidget {"
+        "  background: %1; color: %2; border: 1px solid %3;"
+        "  border-top-color: %4; border-bottom-color: %5;"
+        "  border-radius: %6px; gridline-color: %7; outline: none;"
+        "  selection-background-color: %8; selection-color: %9;"
+        "}"
+        "QTableView::item, QTableWidget::item, QTreeView::item, QListView::item {"
+        "  padding: 2px 3px; border: none; }"
+        "QTableView::item:selected, QTableWidget::item:selected,"
+        "QTreeView::item:selected, QListView::item:selected {"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %10, stop:1 %8);"
+        "  color: %9; }"
+        "QHeaderView { background: transparent; border: none; }"
+        "QHeaderView::section { background: transparent; color: %11;"
+        "  border: none; border-bottom: 1px solid %3; padding: 3px 3px; }"
+        "QTableCornerButton::section { background: transparent; border: none; }"
+    ).arg(sunkenFill(kInsetBg, 8, 4),
+          hexRole(kTextPrimary),
+          hexRole(kBorder),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight),
+          QString::number(kGlassChipRadius),
+          hexRole(kBorderSubtle),
+          hexRole(kGlassSelBot),
+          hexRole(kGlassSelText))
+     .arg(hexRole(kGlassSelTop),
+          hexRole(kTextScale));
+}
+
 /// Ein Zahlenfeld hinter Glas (Glas & Tiefe, 2026-09-17): schwarz,
 /// feiner Rahmen, oben die dunkle Kante des Innenschattens, unten eine
 /// Lichtkante — und KEINE Pfeile. Mausrad, Pfeiltasten und Tippen

@@ -10985,7 +10985,7 @@ void MainWindow::buildStatusBar()
     // The alarm gets a slot sized to its own content, not to its
     // neighbours. PA and TX stay narrow and learnable by position.
     addSlot(m_adcOvlBadge, kOverloadSlotWidthPx);
-    addSlot(m_txStatusBadge);
+    addSlot(m_txStatusBadge, kTxSlotWidthPx);
     hbox->addWidget(m_safetyGroup);
 
     // Wire TX badge to MoxController. MoxController lives on m_radioModel;

@@ -29,6 +29,12 @@ class ChromeBarController;
 inline constexpr int kSafetySlotWidthPx = 60;
 /// Sized to the overload badge's widest real state: a three-ADC alarm.
 inline constexpr int kOverloadSlotWidthPx = 88;
+/// Der Sende-Platz. Seit dem 2026-08-20 steht dort "ON AIR" statt "TX"
+/// (MainWindow, Begruendung beim Badge) — mit Punkt-Symbol rund 74 px,
+/// und der 60-px-Platz schnitt das R ab: auf dem Foto des Betreibers
+/// vom 2026-09-17 stand rechts unten "ON AI". Der Pruefstand hatte es
+/// nicht gefangen, weil er noch "TX" mass.
+inline constexpr int kTxSlotWidthPx = 78;
 
 /// Every widget the banner registers. Any member may be null; registration
 /// skips nulls. In production every SKU currently constructs chain1

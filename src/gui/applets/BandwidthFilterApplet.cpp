@@ -683,7 +683,30 @@ BandwidthFilterApplet::naturalAnchorEdge(DSPMode mode)
 void BandwidthFilterApplet::refreshNumbers()
 {
     SliceModel* s = activeSlice();
-    if (!s || !m_lowBox) { return; }
+    if (!m_lowBox) { return; }
+
+    // ── Ohne Scheibe: ein Strich, keine Null ────────────────────────
+    //
+    // Hausstil Regel 7: "Unbekannt ist ein Strich, keine Null — eine
+    // Null sieht aus wie eine Messung." Ohne Funkgeraet standen hier
+    // "0 Hz / 50 Hz / 0 Hz" (die Feldminima), als waere das ein
+    // eingestellter Durchlass. QSpinBox zeigt am Minimum den
+    // specialValueText; der wird hier gesetzt und mit der ersten
+    // Scheibe wieder geloescht, damit ein echtes "0 Hz" (AM, LOW) nicht
+    // als Strich erscheint.
+    for (QSpinBox* sb : {m_lowBox, m_widthBox, m_highBox}) {
+        sb->setSpecialValueText(s ? QString() : QStringLiteral("\u2014\u2014"));
+        sb->setEnabled(s != nullptr);
+    }
+    if (!s) {
+        const QSignalBlocker b1(m_lowBox);
+        const QSignalBlocker b2(m_highBox);
+        const QSignalBlocker b3(m_widthBox);
+        m_lowBox->setValue(m_lowBox->minimum());
+        m_widthBox->setValue(m_widthBox->minimum());
+        m_highBox->setValue(m_highBox->minimum());
+        return;
+    }
 
     // Scheibe oder Betriebsart seit dem letzten Mal gewechselt? Dann ist
     // m_lastEditedEdge die Auskunft einer ANDEREN Scheibe/Betriebsart und
