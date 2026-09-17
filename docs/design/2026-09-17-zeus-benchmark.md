@@ -39,7 +39,7 @@ Bild: [`2026-09-17-zeus-benchmark/longpath-erststart-1440.png`](2026-09-17-zeus-
 
 | | Zeus | Longpath |
 | --- | --- | --- |
-| Version / Datum | 2.0.26 / 16.09.2026 | 0.6.2 auf der Website, Ast bei 0.6.3-rc |
+| Version / Datum | 2.0.26 / 16.09.2026 | 0.6.1 auf der Website (Stand 05.09.), Ast bei 0.6.3-rc |
 | Kadenz | **13 Releases in 20 Tagen** (2.0.14 am 27.08. → 2.0.26 am 16.09.), jede mit Änderungsnotizen | zurückgestellt seit 05.09. (Gerätetest) |
 | Team | zwei Maintainer (KB2UKA, N9WAR), Issue-Nummern bis #2196 | einer + KI |
 | Geräte | HL2 (RX+TX), ANAN G2/G2 MkII (RX+TX), ANAN-100D/Angelia (RX, P1 auch TX), Anvelina (Profil-Steuerung, „physisch unbestätigt"), **IC-7760 experimentell** (USB, RX-Audio, Scope), KiwiSDR | ANAN 10E, ANVELINA PRO 3, HL2 (Code vorhanden), SunSDR2 QRP nativ **und** via TCI, FLEX-8400 via AetherSDR/TCI, KiwiSDR |
@@ -111,7 +111,7 @@ Legende: ✅ gleichwertig oder besser · ⚠️ teilweise / anders · ❌ fehlt 
 | Logbuch-Arbeitsplatz: Tabelle + **Worked-the-World-Globus** (NASA Blue Marble, Tag/Nacht, 1844 Standorte) + Kennzahlen-Kacheln (Log/Bänder/Modi/Aktivität 26 Wochen/Top-Länder/**Awards DXCC·WAS·Grids**) + Detailkarte je Rufzeichen mit QRZ-Kopf, History, Notizen, Tags, QSL/LoTW | `LogbookWindow`, ADIF, `WorkedBefore`, `QsoConfirmation`, `QsoMapWindow` (Weltkugel-Zoom), Spot-Hub | ⚠️ **Awards-Zentrum und Kennzahlen fehlen**; unser Logbuch ist Tabelle + Karte |
 | QRZ-Awards-Center mit Schätzung der fehlenden Credits (2.0.24) | nichts | ❌ mittel |
 | Logbuch-Backend als Plugin, „Zehntausende QSOs ohne Ruckeln" | Qt-Tabelle (Accessibility-Explosion 07.09. behoben) | ✅ |
-| Spots: DX-Cluster, RBN, PSK-Reporter, POTA, SOTA, Watchlist (`SpotHubDialog`) | ✅ **voraus** (Zeus: DxCluster-DTOs, kein POTA/SOTA gefunden) | ✅ |
+| Spots: DX-Cluster, POTA/SOTA-Spots-Feature (`Dtos.cs:1701`) | DX-Cluster, RBN, PSK-Reporter, POTA, SOTA, Watchlist, Farben je Quelle (`SpotHubDialog`) | ✅ gleichwertig, RBN/PSK-Reporter bei uns dazu |
 | **Zeus HUD**: Globus mit APRS-Stationen, NOAA-Blitzen, Flugzeugen (ADS-B), Schiffen (AIS), Kameras, **Satelliten-Vorhersage** (SGP4) — „GodsEye" | Weltkarte mit Kartenhintergrund, QSO-Karte, Rotor-Richtung | ⚠️ Sat-Vorhersage wäre für VHF/UHF (Contest!) interessant, Rest ist Schau |
 | Stations-Favoriten / Speicher (`/api/station/favorites/{slot}`, „SAVE MEM") | `TuneMemoryStore` (Tuner), Bandstapel ✅, **keine Frequenzspeicher** | ⚠️ klein |
 | Kontest-Log (`/api/contest-log`) | eigenes Contestprogramm (getrennt) | ✅ anders |
@@ -124,7 +124,7 @@ Legende: ✅ gleichwertig oder besser · ⚠️ teilweise / anders · ❌ fehlt 
 | RF2K-S, PGXL, TGXL, Antenna Genius, KPA500, Mercury LUX, VK3AMP, **SPE Taurus** (mit Auto-Tune-Koordinator), HF-AUTO (UDP) | RF2K-S, PGXL, TGXL ✅, Antennenumschalter-Toast | ✅ für unsere Geräte |
 | **Zeus Tuner Companion**: manuelle Tuner-Einstellungen je Tuner/Antenne/Frequenz merken, mit Notizen, Backup (2.0.25) | `TuneMemoryStore` (TGXL_TuneMemory_Ant) ✅ | ✅ |
 | HL2 IO-Board + HL2+-Codec-Regler, HL2-GPIO, **G2-Wartung** (FPGA/p2app-Update, Backup, SD-Karte) | HL2 IoBoard ✅ (49 Treffer), keine G2-Wartung | ⚠️ (kein G2 hier) |
-| Rotor | im Engine **nicht gefunden** | ✅ voraus (ARCO live 16.09.) |
+| Antennenrotor | im Engine **nicht vorhanden** (`Rotator*` dort ist der TX-Phasenrotator) | ✅ voraus (ARCO live 16.09.) |
 | Radio **reclaim** (belegtes HPSDR-Radio per Stop übernehmen, mit Bestätigung) | ? | ⚠️ prüfen — nützlich, wenn eine abgestürzte Session das Radio hält |
 | Geräte-Stopp-Erholung, P1-Startfehler-Erholung, P2-Auto-Connect, Preferred Radio | Reconnect-Timer, Connect-Watchdog (28.08.) ✅ | ✅ |
 | VNA: NanoVNA, HL2-VNA-Sweep, Sweep über das verbundene Radio, `VnaMath` (11 Routen) | SWR-Sweep über Radio + `.s1p`-Import ✅ | ✅ (NanoVNA-Direktanbindung fehlt, niedrig) |
@@ -163,8 +163,8 @@ Legende: ✅ gleichwertig oder besser · ⚠️ teilweise / anders · ❌ fehlt 
 
 RTTY-Decoder · ASR/Whisper-Transkription (Zeus' Voyeur-Plugin macht das, aber
 als Zusatz) · Voice-Check/Strip-Tuner („Broadcast Optimizer" ist bei Zeus
-proprietär) · Rotor (ARCO) · SunSDR-Nativtreiber und TCI-**Client** ·
-POTA/SOTA-Spots · KiwiSDR-Wasserfall-OOM-Fixes · SVG-/PNG-Kartenhintergründe ·
+proprietär) · Antennenrotor (ARCO) · SunSDR-Nativtreiber und TCI-**Client** ·
+RBN- und PSK-Reporter-Spots · SVG-/PNG-Kartenhintergründe ·
 Automatisierungsbrücke.
 
 ---
@@ -269,10 +269,11 @@ Bild: [longpath-erststart-1440.png](2026-09-17-zeus-benchmark/longpath-erststart
    CWX/DVK/FDX grau, „Click to connect" als Text, PA ✓, OVERLOAD, ON AIR) —
    Zeus trennt: links Schalter, rechts Status. Bei uns ist „Click to connect"
    der einzige Weg zum Radio und sieht wie ein Etikett aus.
-7. **Knopfhöhe und Radius** sind bei uns größer (≈ 36 px, Radius 8) als bei
-   Zeus (≈ 26 px, Radius 4); dadurch trägt die Kopfleiste weniger Gruppen in
-   derselben Breite (5 statt 10). Das ist Geschmack — aber es erklärt, warum
-   AGC/SQL/AF bei uns nicht in der Kopfleiste sind.
+7. **Knöpfe sind bei uns höher und runder** als bei Zeus; dadurch trägt die
+   Kopfleiste in derselben Breite fünf Gruppen (BAND · MODE · FILTER · STEP ·
+   NR), Zeus zehn (dazu FAVORITES · FRONT-END · AGC · SQL · AF · ROGER). Das
+   ist Geschmack — aber es erklärt, warum AGC/SQL/AF bei uns nicht in der
+   Kopfleiste stehen.
 
 Nicht vergleichbar aus diesem Bild: der verbundene Zustand (Meter, Kurven,
 Wasserfall) — dafür hätte ich Martins Radio belegen müssen.
