@@ -1025,6 +1025,39 @@ void TxWorkerThread::dispatchOneBlock()
             // accident.
             m_in[static_cast<size_t>(2 * i + 1)] = 0.0;
         }
+
+        // The strip caught a value that is not a number (2026-09-17).
+        // It has already dealt with it — the block that reaches WDSP
+        // below is finite either way — but an operator whose EQ is
+        // being bypassed every block should be told which stage, not
+        // left to wonder why the panel says one thing and the air
+        // another. Same 5 s cadence as the other pump diagnostics.
+        const quint32 caught = m_stripChain->nonFiniteBlocksTotal();
+        if (caught != m_stripNonFiniteReported) {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (now - m_stripNonFiniteReportMs >= 5000) {
+                QString where;
+                if (m_stripChain->nonFiniteInputBlocks() > 0) {
+                    where += QStringLiteral(" input=%1")
+                                 .arg(m_stripChain->nonFiniteInputBlocks());
+                }
+                for (int i = 0; i < StripChain::kStageCount; ++i) {
+                    const auto st = static_cast<StripChain::Stage>(i);
+                    if (m_stripChain->nonFiniteBlocks(st) > 0) {
+                        where += QStringLiteral(" %1=%2")
+                                     .arg(QLatin1String(StripChain::stageName(st)))
+                                     .arg(m_stripChain->nonFiniteBlocks(st));
+                    }
+                }
+                qCWarning(lcTxWorker)
+                    << "strip caught non-finite audio in"
+                    << (caught - m_stripNonFiniteReported)
+                    << "blocks since last report (total" << caught
+                    << "); blocks per source:" << qPrintable(where);
+                m_stripNonFiniteReported = caught;
+                m_stripNonFiniteReportMs = now;
+            }
+        }
     }
 
     // ── Voice-check tap, POST-strip (2026-08-11) ────────────────────

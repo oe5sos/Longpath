@@ -41,6 +41,13 @@
 // Modification history (NereusSDR):
 //   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-17 — Non-finite guard: a NaN or an infinity, from the
+//                 microphone or from a stage, is caught per stage, the
+//                 stage is bypassed for that block and reset, and the
+//                 event is counted. Prompted by the Zeus station-engine
+//                 inventory (docs/design/2026-09-17-zeus-plugin-system-
+//                 inventar.md, Mitnahme 3): Zeus repairs after every
+//                 chain slot; we can do better because we own the stages.
 // =================================================================
 
 #include "core/strip/ClientComp.h"
@@ -115,6 +122,32 @@ public:
     float inputPeakDb() const noexcept;
     float outputPeakDb() const noexcept;
 
+    // ── Values that are not numbers ──────────────────────────────────
+    //
+    // A NaN or an infinity in the transmit path is not a loud sample,
+    // it is a poison: every filter with memory that touches it keeps
+    // it forever (the limiter's envelope goes to infinity and stays
+    // there, a biquad's delay line never clears), WDSP's TXA chain and
+    // PureSignal's calibration would inherit it, and the conversion to
+    // wire integers turns it into full-scale garbage on the air.
+    //
+    // So processMono() checks the block once at the input and once
+    // after every enabled stage. A non-finite input sample becomes
+    // silence. A stage whose output is not finite is treated as if it
+    // had been bypassed for that block — the block it was handed is
+    // restored, which is the chain's own bypass guarantee applied
+    // after the fact — and the stage is reset(), so state it may have
+    // poisoned does not carry into the next block. Whatever arrives at
+    // WDSP is finite. Always.
+    //
+    // Each event is counted per source, so the pump can report which
+    // stage did it and how often. Written on the audio thread, read by
+    // anyone; relaxed, like the meters — a count that is one block
+    // stale is still a count.
+    uint32_t nonFiniteBlocks(Stage s) const noexcept;
+    uint32_t nonFiniteInputBlocks() const noexcept;
+    uint32_t nonFiniteBlocksTotal() const noexcept;
+
     // ── The microphone, for drawing over ─────────────────────────────
     //
     // Fed by whoever owns the mic tap, read by the EQ curve. It lives
@@ -170,6 +203,28 @@ private:
     // slightly fresher is the wrong trade.
     std::atomic<float> m_inPeakDb{-120.0f};
     std::atomic<float> m_outPeakDb{-120.0f};
+
+    // The non-finite guard. One stage at a time: snapshot the block,
+    // run the stage, and if what came out is not finite put the
+    // snapshot back and reset the stage. Defined in the .cpp; every
+    // instantiation lives there.
+    template <typename S>
+    void runStage(Stage which, S& stage, float* samples, int frames) noexcept;
+
+    // The block as it was before the stage that is running now. Fixed
+    // size and part of the object, so the audio thread never allocates
+    // for it; the pump's blocks are 64 frames and the offline preview's
+    // are too. A block larger than this still comes out finite — the
+    // offending samples are zeroed instead of the stage being bypassed.
+    static constexpr int kSnapshotFrames = 2048;
+    std::array<float, kSnapshotFrames> m_snapshot{};
+
+    // Blocks in which a non-finite value was caught: one counter per
+    // stage, one for the input, and the sum, so "did anything happen"
+    // is one load.
+    std::array<std::atomic<uint32_t>, kStageCount> m_nonFiniteBlocks;
+    std::atomic<uint32_t> m_nonFiniteInputBlocks{0};
+    std::atomic<uint32_t> m_nonFiniteTotal{0};
 
     ClientGate         m_gate;
     ClientEq           m_eq;
