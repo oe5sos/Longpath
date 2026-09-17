@@ -62,6 +62,7 @@
 
 #include "AppSettings.h"
 
+#include <QDate>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -709,6 +710,8 @@ void AppSettings::save()
     // that's the exact failure mode reported in issue #241 (NTFS journal
     // rollback over a non-atomic write left the user with no recovery
     // path at all).
+    rotateDailyBackup();
+
     if (QFileInfo::exists(m_filePath)) {
         const QString bakPath    = m_filePath + QStringLiteral(".bak");
         const QString bakTmpPath = m_filePath + QStringLiteral(".bak.tmp");
@@ -781,6 +784,44 @@ void AppSettings::save()
 
     QFile::setPermissions(m_filePath,
                           QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    m_dirty = false;
+}
+
+// ── Tageskopie ──────────────────────────────────────────────────────
+//
+// Vor dem ersten Schreiben eines Tages wird die noch unveraenderte Datei
+// als "<Datei>.<JJJJ-MM-TT>" abgelegt; existiert die Kopie fuer heute
+// schon, passiert nichts. Aeltere als kDailyBackupsToKeep fallen weg.
+// Handkopien des Betreibers ("…settings.vor-…") haben kein Datumsmuster
+// und bleiben unberuehrt.
+QStringList AppSettings::dailyBackups() const
+{
+    const QFileInfo fi(m_filePath);
+    QDir dir(fi.absolutePath());
+    const QString pattern = fi.fileName() + QStringLiteral(".????-??-??");
+    QStringList names = dir.entryList({pattern}, QDir::Files, QDir::Name);
+    static const QRegularExpression rx(QStringLiteral("\\.\\d{4}-\\d{2}-\\d{2}$"));
+    QStringList out;
+    for (const QString& n : names) {
+        if (rx.match(n).hasMatch()) { out << dir.absoluteFilePath(n); }
+    }
+    return out;   // QDir::Name sortiert die ISO-Daten chronologisch
+}
+
+void AppSettings::rotateDailyBackup()
+{
+    if (!QFileInfo::exists(m_filePath)) { return; }
+    const QString today = QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString todayPath = m_filePath + QLatin1Char('.') + today;
+    if (!QFileInfo::exists(todayPath)) {
+        if (!QFile::copy(m_filePath, todayPath)) {
+            qWarning() << "AppSettings: Tageskopie nicht angelegt:" << todayPath;
+        }
+    }
+    QStringList backups = dailyBackups();
+    while (backups.size() > kDailyBackupsToKeep) {
+        QFile::remove(backups.takeFirst());
+    }
 }
 
 QVariant AppSettings::value(const QString& key, const QVariant& defaultValue) const
@@ -794,12 +835,16 @@ QVariant AppSettings::value(const QString& key, const QVariant& defaultValue) co
 
 void AppSettings::setValue(const QString& key, const QVariant& val)
 {
-    m_settings.insert(key, val.toString());
+    const QString str = val.toString();
+    auto it = m_settings.find(key);
+    if (it != m_settings.end() && it.value() == str) { return; }   // nichts Neues
+    m_settings.insert(key, str);
+    m_dirty = true;
 }
 
 void AppSettings::remove(const QString& key)
 {
-    m_settings.remove(key);
+    if (m_settings.remove(key) > 0) { m_dirty = true; }
 }
 
 bool AppSettings::contains(const QString& key) const

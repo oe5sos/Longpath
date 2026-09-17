@@ -118,6 +118,26 @@ public:
     // Save settings to disk.
     void save();
 
+    // ── Sicherung, die nicht auf das Beenden wartet (2026-09-17) ─────
+    //
+    // Betreiber: "wichtig ist, dass sich das programm immer automatisch
+    // sichert. sollte ein stromausfall oder sonstiges sein, sollte man
+    // immer auf die daten zurueck greifen koennen!"
+    //
+    // Zwei Dinge dazu: isDirty() sagt, ob seit dem letzten save() etwas
+    // gesetzt wurde -- MainWindow sichert damit alle 60 s, statt nur beim
+    // Beenden (ein Stromausfall kennt kein closeEvent). Und save() legt
+    // beim ersten Schreiben eines Tages eine Tageskopie
+    // "<Datei>.<JJJJ-MM-TT>" an und behaelt kDailyBackupsToKeep davon:
+    // die .bak haelt nur den Stand VOR dem letzten Schreiben, eine
+    // Fehleinstellung von gestern ist damit nicht mehr zu holen -- der
+    // Betreiber hat sich bisher von Hand "Longpath.settings.vor-…"-Kopien
+    // angelegt.
+    bool isDirty() const { return m_dirty; }
+    static constexpr int kDailyBackupsToKeep = 14;
+    /// Die Tageskopien, aelteste zuerst (fuer Pruefstaende und Aufraeumen).
+    QStringList dailyBackups() const;
+
     // Get/set top-level settings.
     QVariant value(const QString& key, const QVariant& defaultValue = {}) const;
     void setValue(const QString& key, const QVariant& val);
@@ -468,6 +488,8 @@ private:
     QString m_filePath;
     QMap<QString, QString> m_settings;
     QMap<QString, QString> m_stationSettings;
+    bool    m_dirty{false};
+    void    rotateDailyBackup();
     QString m_stationName{"Longpath"};
 
     // Issue #241 — corruption-recovery diagnostics (cleared at the top of

@@ -502,6 +502,10 @@ namespace {
 // Kopf zeigt den Kettenzustand. Beide Haelften haengen an dieser einen
 // Zahl, damit nie wieder nur eine davon zurueckkommt.
 constexpr bool kChainIndicatorsInBottomBar = false;
+
+// Wie oft der Stand gesichert wird, wenn sich etwas geaendert hat.
+// Eine Minute: hoechstens so viel geht bei Stromausfall verloren.
+constexpr int kSettingsAutosaveMs = 60 * 1000;
 // First-run/rescan wants the "relevant" virtual cables for the current
 // platform — 3rd-party cables on Windows (BYO), our own NereusSdrVax
 // entries on Mac/Linux (native HAL plugin / pipe-source). Centralising
@@ -1059,6 +1063,33 @@ MainWindow::MainWindow(QWidget* parent)
         AppSettings::instance().save();
         qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
     });
+
+    // ── Sichern, ohne auf das Beenden zu warten (2026-09-17) ─────────
+    //
+    // Betreiber: "wichtig ist, dass sich das programm immer automatisch
+    // sichert. sollte ein stromausfall oder sonstiges sein, sollte man
+    // immer auf die daten zurueck greifen koennen!"
+    //
+    // Bisher schrieben nur closeEvent/aboutToQuit den ganzen Stand auf
+    // die Platte, dazu einzelne Schreiber mit eigenem 500-ms-Aufschub
+    // (LayoutProfiles, RadioModel::scheduleSettingsSave). Alles andere
+    // -- ein setValue() ohne eigenen Aufschub -- lebte bis zum Beenden
+    // im Speicher, und ein Stromausfall kennt kein closeEvent. Jetzt:
+    // jede Minute nachsehen, ob seit dem letzten Schreiben etwas gesetzt
+    // wurde (AppSettings::isDirty), und dann alles sichern, samt
+    // Fenstergeometrie. Im Ruhezustand kostet das nichts (dirty bleibt
+    // falsch); eine volle Sicherung sind wenige Millisekunden XML plus
+    // ein fsync. AppSettings legt dabei die Tageskopie an.
+    auto* autosave = new QTimer(this);
+    autosave->setObjectName(QStringLiteral("settingsAutosave"));
+    autosave->setInterval(kSettingsAutosaveMs);
+    connect(autosave, &QTimer::timeout, this, [this]() {
+        if (!AppSettings::instance().isDirty()) { return; }
+        saveMainWindowGeometry();
+        AppSettings::instance().save();
+        qInfo() << "[Autosave] Einstellungen gesichert";
+    });
+    autosave->start();
 }
 
 MainWindow::~MainWindow()
