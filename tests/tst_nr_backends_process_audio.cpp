@@ -22,11 +22,11 @@
 // abgestuerzt, Ausgabe endlich (kein NaN/Inf), Ausgabe nicht ueberall
 // null.
 //
-// DFNR und BNR stehen NICHT hier: DFNR ist in diesem Bau nicht
-// enthalten (Bibliothek fehlt, ./setup-deepfilter.sh nie gelaufen),
-// BNR gibt es nur unter Windows mit NVIDIA. Beide sind im Menue trotzdem
-// anklickbar und tun dann nichts — das ist ein eigener Befund, kein
-// Fall fuer diesen Pruefstand.
+// DFNR laeuft nur mit, wenn der Bau es enthaelt (HAVE_DFNR nach
+// ./setup-deepfilter.sh; auf Martins Mac seit dem 2026-09-17 nachmittags,
+// Rust ueber Homebrew, libdeepfilter aus dem Quelltext gebaut). BNR gibt
+// es nur unter Windows mit NVIDIA und steht darum nicht hier. Beide sind
+// seit demselben Tag nur noch im Menue, wenn der Bau sie hat.
 //
 // =================================================================
 // Modification history (NereusSDR):
@@ -200,6 +200,23 @@ private slots:
         QSKIP("MNR nur unter macOS");
 #else
         runSlot(NrSlot::MNR, "MNR (Apple Accelerate)");
+#endif
+    }
+
+    void dfnr_deepfilternet()
+    {
+#ifndef HAVE_DFNR
+        QSKIP("DFNR nicht in diesem Bau (./setup-deepfilter.sh)");
+#else
+        // Das Modell sucht DeepFilterFilter selbst (ModelPaths::
+        // dfnrModelTarball); fehlt es, setzt RxChannel m_dfnr zurueck
+        // und der Durchlauf waere ein stiller Durchreicher -- darum
+        // vorher pruefen, dass es gefunden wird.
+        const QString tarball = modelPath(ModelPaths::dfnrModelTarball(),
+                                          "../third_party/deepfilter/models/DeepFilterNet3_onnx.tar.gz");
+        if (tarball.isEmpty()) { QSKIP("DeepFilterNet3_onnx.tar.gz nicht gefunden"); }
+        qInfo().noquote() << "DFNR-Modell:" << tarball;
+        runSlot(NrSlot::DFNR, "DFNR (DeepFilterNet3)");
 #endif
     }
 };
